@@ -256,12 +256,12 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "bids:" not in message
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
     assert "bid: 350 \u20bd" in plan_ranked_block
-    assert "expected_daily_impressions: 95 818" in plan_ranked_block
-    assert "expected_daily_clicks: 1 397" in plan_ranked_block
-    assert "expected_daily_orders: 69.83" in plan_ranked_block
+    assert "прогноз заказов/сутки: 69.83" in plan_ranked_block
     assert "CPO: 568.06 \u20bd" in plan_ranked_block
-    assert "CPC: 12.34 \u20bd" in plan_ranked_block
-    assert "ctr: 1.10%" in message
+    assert "CTR: 1.10%" in plan_ranked_block
+    assert "expected_daily_impressions:" not in plan_ranked_block
+    assert "expected_daily_clicks:" not in plan_ranked_block
+    assert "CPC:" not in plan_ranked_block
     assert "35000" not in message
     assert "568.0587841906347" not in message
     assert "Top-3 plan_ranked:" in message
@@ -274,6 +274,11 @@ def test_render_main_message_omits_missing_rec_fields_but_keeps_ctr() -> None:
             "plan_ranked": [
                 {
                     "bid": 14_100,
+                    "impressions": 1234,
+                    "clicks": 56,
+                    "carts": 7,
+                    "orders": 3,
+                    "spend": 255.4,
                     "cpc": 4.56,
                     "ctr": 0.0321,
                 },
@@ -287,13 +292,11 @@ def test_render_main_message_omits_missing_rec_fields_but_keeps_ctr() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
-    assert "bid: 141 \u20bd | CPC: 4.56 \u20bd | ctr: 3.21%" in plan_ranked_block
-    assert "expected_daily_impressions: \u2014" not in plan_ranked_block
-    assert "expected_daily_clicks: \u2014" not in plan_ranked_block
+    assert "bid: 141 \u20bd | показы 1 234 | CTR: 3.21%" in plan_ranked_block
+    assert "прогноз заказов/сутки:" not in plan_ranked_block
     assert "expected_daily_orders: \u2014" not in plan_ranked_block
     assert "CPO: \u2014" not in plan_ranked_block
-    assert "sales_gap: \u2014" not in plan_ranked_block
-    assert "plan_distance_score: \u2014" not in plan_ranked_block
+    assert "CPC:" not in plan_ranked_block
 
 
 def test_render_main_message_formats_infinite_cpc_as_infinity_symbol() -> None:
@@ -313,8 +316,7 @@ def test_render_main_message_formats_infinite_cpc_as_infinity_symbol() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
-    assert "CPC: \u221e \u20bd" in plan_ranked_block
-    assert "CPC: inf \u20bd" not in plan_ranked_block
+    assert "CPC:" not in plan_ranked_block
 
 
 def test_render_main_message_rejects_bool_best_plan_bid() -> None:
@@ -342,7 +344,7 @@ def test_render_main_message_rejects_bool_best_plan_bid() -> None:
     assert "best_plan_bid:" not in message
     assert "Лучшая плановая ставка:" not in message
     assert "bid: —" in message
-    assert "ctr: 1.10%" in message
+    assert "CTR: 1.10%" in message
     assert "best_plan_bid: 1 ₽" not in message
     assert "bid: 0 ₽" not in message
     assert "0.01 ₽" not in message

@@ -142,6 +142,8 @@ def _format_rec_bid_field_label(field: str) -> str:
         return "CPO"
     if field == "cpc":
         return "CPC"
+    if field == "spend":
+        return "spend"
     return field
 
 
@@ -153,12 +155,19 @@ def _format_rec_bid_value(field: str, value: object) -> str:
         return _format_rec_bid_percent(value)
     if field in {"expected_order_cost_rub", "resolved_order_cost_rub", "cpo_rub", "cpc"}:
         return _format_rec_bid_rub(value)
-    if field == "expected_daily_impressions":
-        return _format_rec_bid_int(value)
-    if field == "expected_daily_clicks":
+    if field in {
+        "expected_daily_impressions",
+        "expected_daily_clicks",
+        "impressions",
+        "clicks",
+        "carts",
+        "orders",
+    }:
         return _format_rec_bid_int(value)
     if field == "expected_daily_orders":
         return _format_rec_bid_number(value, precision=2)
+    if field == "spend":
+        return _format_rec_bid_rub(value)
     if field == "sales_gap":
         return _format_rec_bid_number(value, precision=2)
     if field == "plan_distance_score":
@@ -181,6 +190,32 @@ def _format_rec_bid_row(row: dict[str, object], fields: tuple[str, ...]) -> str:
     return " | ".join(parts) if parts else "-"
 
 
+def _format_plan_ranked_row(row: dict[str, object]) -> str:
+    """Format Top-3 plan-ranked rows like coverage diagnostics."""
+    parts: list[str] = []
+    bid_value = row.get("bid")
+    if bid_value is not None:
+        parts.append(f"bid: {_format_rec_bid_minor(bid_value)}")
+    impressions = row.get("impressions")
+    if impressions is not None:
+        parts.append(f"показы {_format_rec_bid_int(impressions)}")
+    expected_daily_orders = row.get("expected_daily_orders")
+    if expected_daily_orders is not None:
+        parts.append(
+            "прогноз заказов/сутки: "
+            f"{_format_rec_bid_number(expected_daily_orders, precision=2)}"
+        )
+    cpo_value = row.get("cpo_rub")
+    if cpo_value is None:
+        cpo_value = row.get("expected_order_cost_rub")
+    if cpo_value is not None:
+        parts.append(f"CPO: {_format_rec_bid_rub(cpo_value)}")
+    ctr_value = row.get("ctr")
+    if ctr_value is not None:
+        parts.append(f"CTR: {_format_ctr(float(ctr_value))}")
+    return " | ".join(parts) if parts else "-"
+
+
 def _format_rec_bid_rows(
     rows: object,
     fields: tuple[str, ...],
@@ -197,6 +232,16 @@ def _format_rec_bid_rows(
     return "\n".join(formatted_rows) if formatted_rows else "-"
 
 
+def _format_plan_ranked_rows(rows: object, *, limit: int = 3) -> str:
+    """Format top-N plan-ranked rows with the same semantics as coverage rows."""
+    if not isinstance(rows, list) or not rows:
+        return "-"
+    formatted_rows: list[str] = []
+    for item in rows[:limit]:
+        formatted_rows.append(f"- {_format_plan_ranked_row(_as_dict(item))}")
+    return "\n".join(formatted_rows) if formatted_rows else "-"
+
+
 def _format_rec_bid_best_bid(value: object) -> str:
     return _format_rec_bid_minor(value)
 
@@ -209,20 +254,7 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
     recommendation_dict = _as_dict(recommendation)
     plan_ranked = recommendation_dict.get("plan_ranked")
     expected_ranked = recommendation_dict.get("expected_ranked")
-    plan_ranked_text = _format_rec_bid_rows(
-        plan_ranked,
-        (
-            "bid",
-            "expected_daily_impressions",
-            "expected_daily_clicks",
-            "expected_daily_orders",
-            "cpo_rub",
-            "cpc",
-            "ctr",
-            "sales_gap",
-            "plan_distance_score",
-        ),
-    )
+    plan_ranked_text = _format_plan_ranked_rows(plan_ranked)
 
     return (
         "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a\n"
