@@ -71,6 +71,12 @@ class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     reset_filter: bool = False
 
 
+class UiModeToggle(CallbackData, prefix="ui_mode_toggle"):
+    """Toggle the admin-selected UI mode between free and paid."""
+
+    wb_user_cabinet_original_id: int
+
+
 class Action:
     new = "new"
     select = "select"

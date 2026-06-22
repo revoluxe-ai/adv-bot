@@ -40,12 +40,36 @@ def _build_shop_menu(token_status: TokenStatusReport) -> ShopMenu:
     shop_menu._shop_balance_snapshot = None
     shop_menu._wb_user_cabinet = MagicMock()
     shop_menu._wb_user_cabinet.name = "Test Shop"
+    shop_menu._wb_user_cabinet.user = MagicMock()
+    shop_menu._wb_user_cabinet.user.user_telegram_id = 373435337
     shop_menu._wb_cabinet = MagicMock()
     shop_menu._wb_cabinet.shop_id = "shop_123"
     shop_menu._wb_cabinet.active = True
     shop_menu._token_status_loaded = True
     shop_menu._token_status = token_status
     return shop_menu
+
+
+def test_shop_menu_shows_ui_mode_toggle_for_admin() -> None:
+    """Admin shop menu includes a UI mode toggle button."""
+    read_only_token = _build_token(is_read_only=True)
+    token_status = TokenStatusReport(
+        shop_id="shop_123",
+        shop_name="Test Shop",
+        status="Insufficient",
+        all_tokens=[read_only_token],
+        valid_tokens=[],
+        expired_tokens=[],
+        available_permissions=set(),
+        missing_permissions={"РџСЂРѕРґРІРёР¶РµРЅРёРµ"},
+        has_all_required_permissions=False,
+        expiring_tokens=[],
+    )
+
+    keyboard = _build_shop_menu(token_status).keyboard
+    texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
+
+    assert "Режим интерфейса: FREE" in texts
 
 
 def _build_token(*, is_read_only: bool) -> TokenInfo:
