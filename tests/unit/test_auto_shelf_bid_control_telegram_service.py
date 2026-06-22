@@ -708,3 +708,37 @@ async def test_set_strategy_in_main_mode_recomputes_main_bid() -> None:
         await service.set_strategy(1, AutoShelfBidControlStrategy.CPC)
 
     manager_instance.apply_main_bid_refresh_if_needed.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_apply_main_bid_refresh_normalizes_legacy_cycle_metric_strategy() -> None:
+    service, manager_instance, _snapshot = _telegram_main_open_setup(
+        expected_bid_minor=57_000,
+    )
+    repository = service._repository
+    adv = _enabled_main_adv()
+    adv.auto_shelf_bid_control_strategy = AutoShelfBidControlStrategy.CYCLE_METRIC
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+
+    async def _apply_refresh(complex_adv: object, **_: object) -> MainBidRefreshResult:
+        assert (
+            getattr(complex_adv, "auto_shelf_bid_control_strategy")
+            == AutoShelfBidControlStrategy.CPC
+        )
+        return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+
+    manager_instance.apply_main_bid_refresh_if_needed = AsyncMock(side_effect=_apply_refresh)
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_telegram_service.AutoShelfBidControlManager",
+            return_value=manager_instance,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_telegram_service.PlanFactReader"
+        ) as plan_fact_reader_cls,
+    ):
+        plan_fact_reader_cls.return_value.get_latest_plan_fact = AsyncMock(return_value=None)
+        await service.apply_main_bid_refresh_if_needed(1)
+
+    manager_instance.apply_main_bid_refresh_if_needed.assert_awaited_once()
