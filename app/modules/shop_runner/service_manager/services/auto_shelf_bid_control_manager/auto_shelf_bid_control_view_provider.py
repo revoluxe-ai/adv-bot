@@ -260,6 +260,9 @@ class AutoShelfBidControlViewProvider:
                 "expected_daily_clicks": expected_daily_clicks,
                 "expected_daily_orders": expected_daily_orders,
                 "expected_order_cost_rub": expected_order_cost_rub,
+                "ctr": AutoShelfBidControlViewProvider._coerce_optional_float(
+                    item.get("ctr")
+                ),
                 "plan_distance_score": plan_distance_score,
                 "status_text": item.get("status_text"),
             }
@@ -440,6 +443,9 @@ class AutoShelfBidControlViewProvider:
                 ),
                 expected_order_cost_rub=AutoShelfBidControlViewProvider._coerce_optional_float(
                     forecast.get("expected_order_cost_rub")
+                ),
+                ctr=AutoShelfBidControlViewProvider._coerce_optional_float(
+                    forecast.get("ctr")
                 ),
                 plan_distance_score=AutoShelfBidControlViewProvider._coerce_optional_float(
                     forecast.get("plan_distance_score")

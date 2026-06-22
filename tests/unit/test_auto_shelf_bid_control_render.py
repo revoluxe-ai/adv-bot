@@ -8,6 +8,10 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     build_auto_shelf_bid_settings_keyboard,
     render_auto_shelf_bid_control_message,
 )
+from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render import (
+    build_auto_shelf_bid_strategy_keyboard,
+    render_auto_shelf_bid_strategy_message,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     OptimizationMetric,
@@ -16,6 +20,40 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
     AutoShelfBidControlStrategy,
 )
+
+
+def test_settings_keyboard_contains_all_actions_outdated() -> None:
+    markup = build_auto_shelf_bid_settings_keyboard(
+        _view(enabled=True, has_settings=True),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert texts == [
+        "Режим main bid: Best plan",
+        "Изменить max ставку",
+        "Изменить долю теста",
+        "Изменить показов на тест",
+        "Изменить минут теста",
+        "Изменить шаг между ставками",
+        "Назад к управлению ставкой",
+    ]
+
+
+def test_strategy_keyboard_contains_only_strategy_actions() -> None:
+    markup = build_auto_shelf_bid_strategy_keyboard(
+        _view(enabled=True, has_settings=True),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert texts == ["✅ Best plan", "CTR", "CPC", "Назад к настройкам"]
+
+
+def test_render_strategy_message_shows_current_mode() -> None:
+    message = render_auto_shelf_bid_strategy_message(
+        _view(enabled=True, has_settings=True)
+    )
+    assert "Режим main bid" in message
+    assert "Текущий режим: Best plan" in message
 
 
 def _view(*, enabled: bool, has_settings: bool) -> AutoShelfBidControlViewDTO:
@@ -110,7 +148,7 @@ def test_main_keyboard_shows_cycle_coverage_button_when_state_exists() -> None:
     assert "Покрытия цикла" in texts
 
 
-def test_settings_keyboard_contains_all_actions() -> None:
+def legacy_settings_keyboard_contains_all_actions_legacy() -> None:
     markup = build_auto_shelf_bid_settings_keyboard(
         _view(enabled=True, has_settings=True),
         adv_setting_original_id=1,
@@ -225,6 +263,34 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "35000" not in message
     assert "568.0587841906347" not in message
     assert "Top-3 plan_ranked:" in message
+
+
+def test_render_main_message_omits_missing_rec_fields_but_keeps_ctr() -> None:
+    view = replace(
+        _view(enabled=True, has_settings=True),
+        rec_bid_recommendation={
+            "plan_ranked": [
+                {
+                    "bid": 14_100,
+                    "ctr": 0.0321,
+                },
+                {
+                    "bid": 22_200,
+                },
+            ],
+        },
+    )
+
+    message = render_auto_shelf_bid_control_message(view)
+
+    plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
+    assert "bid: 141 \u20bd | ctr: 3.21%" in plan_ranked_block
+    assert "expected_daily_impressions: \u2014" not in plan_ranked_block
+    assert "expected_daily_clicks: \u2014" not in plan_ranked_block
+    assert "expected_daily_orders: \u2014" not in plan_ranked_block
+    assert "CPO: \u2014" not in plan_ranked_block
+    assert "sales_gap: \u2014" not in plan_ranked_block
+    assert "plan_distance_score: \u2014" not in plan_ranked_block
 
 
 def test_render_main_message_rejects_bool_best_plan_bid() -> None:
