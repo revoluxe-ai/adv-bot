@@ -133,7 +133,14 @@ def build_plan_ranked_rows_from_bid_stats(
     """Нормализовать ranked stats в ``plan_ranked`` rows для snapshot/UI."""
     rows: list[dict[str, object]] = []
     for item in ranked_stats[:limit]:
-        row: dict[str, object] = {"bid": int(item.bid_minor)}
+        row: dict[str, object] = {
+            "bid": int(item.bid_minor),
+            "impressions": int(item.impressions),
+            "clicks": int(item.clicks),
+            "carts": int(item.carts),
+            "orders": int(item.orders),
+            "spend": float(item.spend),
+        }
         if item.ctr is not None:
             row["ctr"] = float(item.ctr)
         if item.cart_cpa is not None:
