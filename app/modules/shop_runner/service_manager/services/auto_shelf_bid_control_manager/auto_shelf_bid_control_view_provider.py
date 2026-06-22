@@ -584,6 +584,9 @@ class AutoShelfBidControlViewProvider:
             warnings.append("single_nmid_guard_skip")
         nmid = nmids[0] if nmids else 0
         auto_adv_id = int(adv.adv_id)
+        normalized_strategy = resolve_auto_shelf_bid_control_strategy(
+            getattr(adv, "auto_shelf_bid_control_strategy", None)
+        )
 
         # Получаем plan-fact данные для определения метрики оптимизации
         fact_cpo: float | None = None
@@ -601,7 +604,7 @@ class AutoShelfBidControlViewProvider:
             fact_predict_orders,
         )
         optimization_metric = self._resolve_display_optimization_metric(
-            strategy=getattr(adv, "auto_shelf_bid_control_strategy", None),
+            strategy=normalized_strategy,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
         )
@@ -1065,7 +1068,7 @@ class AutoShelfBidControlViewProvider:
                                 getattr(adv, "auto_adv_active_status", True)
                             ),
                             "auto_shelf_bid_control_enabled": control_enabled,
-                            "auto_shelf_bid_control_strategy": adv.auto_shelf_bid_control_strategy,
+                            "auto_shelf_bid_control_strategy": normalized_strategy,
                             "adv_setting": adv,
                             "fact_pay_for_order": fact_cpo,
                             "resolve_cpo": resolve_cpo,
@@ -1184,9 +1187,7 @@ class AutoShelfBidControlViewProvider:
             optimization_metric=optimization_metric,
             fact_cpo=fact_cpo,
             resolve_cpo=resolve_cpo,
-            auto_shelf_bid_control_strategy=resolve_auto_shelf_bid_control_strategy(
-                getattr(adv, "auto_shelf_bid_control_strategy", None)
-            ),
+            auto_shelf_bid_control_strategy=normalized_strategy,
             best_plan_bid_minor=best_plan_bid_minor,
             fresh_best_main_bid_minor=fresh_best_main_bid_minor,
             fresh_next_test_bid_minor=fresh_next_test_bid_minor,
