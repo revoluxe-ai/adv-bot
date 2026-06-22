@@ -30,6 +30,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+from app.modules.token_monitoring.services.token_info_service import TokenInfoService
 from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
@@ -47,6 +48,21 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 pricer = Pricer()
+
+READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE = (
+    "У этого токена только права чтения. Автоуправление недоступно. "
+    "Вы можете пользоваться аналитикой или заменить токен на ключ с правами управления продвижением."
+)
+
+
+async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
+    """Return True when the shop has only active read-only tokens for analytics."""
+    token_status = await TokenInfoService().get_shop_token_status(shop_id)
+    has_active_read_only_token = any(
+        token.is_read_only and token.is_valid and not token.is_expired
+        for token in token_status.all_tokens
+    )
+    return has_active_read_only_token and not token_status.valid_tokens
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter))
@@ -305,6 +321,14 @@ async def turn_adv_on(
             return
         if not sum_balance >= price_for_adv_for_day:
             await bot.send_message(callback.message.chat.id, "Недостаточно средств")
+            await ShopMenu(
+                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
+            )()
+            return
+        if await _shop_has_read_only_only_tokens(wb_cabinet.shop_id):
+            await bot.send_message(
+                callback.message.chat.id, READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE
+            )
             await ShopMenu(
                 bot, callback.message.chat.id, state, wb_user_cabinet_original_id
             )()
