@@ -207,13 +207,8 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
     if recommendation is None:
         return ""
     recommendation_dict = _as_dict(recommendation)
-    diagnostics = _as_dict(recommendation_dict.get("diagnostics"))
     plan_ranked = recommendation_dict.get("plan_ranked")
     expected_ranked = recommendation_dict.get("expected_ranked")
-    hour_observation_count = _format_rec_bid_value(
-        "hour_observation_count", diagnostics.get("hour_observation_count")
-    )
-    bid_count = _format_rec_bid_value("bid_count", diagnostics.get("bid_count"))
     plan_ranked_text = _format_rec_bid_rows(
         plan_ranked,
         (
@@ -231,8 +226,7 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
 
     return (
         "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a\n"
-        f"hours: {hour_observation_count}\n"
-        f"bids: {bid_count}\n\n"
+        "\n"
         "Top-3 plan_ranked:\n"
         f"{plan_ranked_text}\n\n"
     )

@@ -252,8 +252,8 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "\U0001f9ea \u0420\u0435\u043a\u043e\u043c\u0435\u043d\u0434\u0430\u0446\u0438\u0438 \u043f\u043e \u0441\u0442\u0430\u0432\u043a\u0435 \u043f\u043e\u043b\u043e\u043a" in message
     assert "best_expected_bid:" not in message
     assert "best_plan_bid:" not in message
-    assert "hours: 7" in message
-    assert "bids: 3" in message
+    assert "hours:" not in message
+    assert "bids:" not in message
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
     assert "bid: 350 \u20bd" in plan_ranked_block
     assert "expected_daily_impressions: 95 818" in plan_ranked_block
