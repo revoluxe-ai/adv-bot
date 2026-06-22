@@ -199,7 +199,20 @@ async def auto_shelf_bid_control_menu_router(
     action = callbacks.normalize_auto_shelf_bid_control_action(callback_data.action)
     adv_setting_original_id = callback_data.adv_setting_original_id
     service = AutoShelfBidControlTelegramService(redis_client=redis_client)
+    guarded_write_actions = {
+        "enable",
+        "disable",
+        "reset_cycle",
+        "force_main",
+        "set_max_bid",
+        "set_test_share",
+        "set_target_test_impressions",
+        "set_target_test_observation_minutes",
+        "set_min_bid_distance",
+    }
     try:
+        if action in guarded_write_actions:
+            await service.ensure_write_allowed(adv_setting_original_id)
         if action in {"open", "refresh"}:
             await _send_main_screen(
                 callback,

@@ -21,6 +21,12 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 
 pytestmark = pytest.mark.unit
 
+BOT_ACTIVE_PAYWALL_MESSAGE = (
+    "Управление ставкой в полках доступно только после включения автоуправления кампанией.\n\n"
+    "Бесплатно можно смотреть аналитику и рекламные данные.\n"
+    "Чтобы бот сам тестировал и выставлял ставки в полках — подключите автоуправление."
+)
+
 
 @dataclass
 class FakeMessage:
@@ -129,6 +135,39 @@ async def test_send_main_screen_applies_refresh_before_build_view(
     assert calls[0] == "apply"
     assert calls[1] == "build"
     assert calls[2] == "answer:rendered"
+
+
+@pytest.mark.asyncio
+async def test_menu_write_action_shows_paywall_when_bot_inactive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    callback_message = FakeMessage(text="main")
+    callback = SimpleNamespace(
+        message=callback_message,
+        from_user=SimpleNamespace(id=1),
+    )
+    state = AsyncMock()
+
+    class FakeService:
+        async def ensure_write_allowed(self, *_: object) -> None:
+            raise AutoShelfBidControlTelegramError(BOT_ACTIVE_PAYWALL_MESSAGE)
+
+    monkeypatch.setattr(handler, "AutoShelfBidControlTelegramService", lambda **_: FakeService())
+
+    await handler.auto_shelf_bid_control_menu_router(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        callback_data=callbacks.AutoShelfBidControlMenu(
+            adv_setting_original_id=1,
+            action=callbacks.compact_auto_shelf_bid_control_action("set_max_bid"),
+        ),
+        state=state,  # pyright: ignore[reportArgumentType]
+        bot=AsyncMock(),  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    assert callback_message.answers == [BOT_ACTIVE_PAYWALL_MESSAGE]
+    state.update_data.assert_not_awaited()
+    state.set_state.assert_not_awaited()
 
 
 @pytest.mark.asyncio
