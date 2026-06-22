@@ -20,6 +20,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     CoverageLayerBidDTO,
     OptimizationMetric,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -32,6 +35,8 @@ def format_bid(value: int | None, currency: str = "RUB") -> str:
 def _format_money(value: float | None) -> str:
     if value is None:
         return "—"
+    if value == float("inf"):
+        return "∞"
     return f"{value:.2f}"
 
 
@@ -468,6 +473,14 @@ def _format_last_event(view: AutoShelfBidControlViewDTO) -> str:
     return _format_main_waiting_reason(view)
 
 
+def _format_strategy_label(strategy: AutoShelfBidControlStrategy) -> str:
+    if strategy == AutoShelfBidControlStrategy.CTR:
+        return "CTR"
+    if strategy == AutoShelfBidControlStrategy.CPC:
+        return "CPC"
+    return "Best plan"
+
+
 def _render_main_bid_line(view: AutoShelfBidControlViewDTO) -> str:
     """Лучшая свежая main-ставка (только из snapshot recommendation)."""
     main_bid = view.recommended_main_bid_minor
@@ -624,6 +637,7 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
     return (
         "⚙️ Настройки управления ставкой в полках\n\n"
         f"Артикул: {view.nmid}\n\n"
+        f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}\n"
         f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
         f"Доля теста: {((view.test_share or 0) * 100):.2f}%\n"
         f"Показов на тест: {view.target_test_impressions or '—'}\n"
@@ -634,9 +648,27 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
     )
 
 
-def build_auto_shelf_bid_settings_keyboard(adv_setting_original_id: int) -> InlineKeyboardMarkup:
+def build_auto_shelf_bid_settings_keyboard(
+    view: AutoShelfBidControlViewDTO,
+    adv_setting_original_id: int,
+) -> InlineKeyboardMarkup:
     """Собрать inline-клавиатуру экрана настроек."""
     builder = InlineKeyboardBuilder()
+    for strategy, action in (
+        (AutoShelfBidControlStrategy.PLAN_DISTANCE, "set_strategy_plan_distance"),
+        (AutoShelfBidControlStrategy.CTR, "set_strategy_ctr"),
+        (AutoShelfBidControlStrategy.CPC, "set_strategy_cpc"),
+    ):
+        label = _format_strategy_label(strategy)
+        if view.auto_shelf_bid_control_strategy == strategy:
+            label = f"✅ {label}"
+        builder.button(
+            text=label,
+            callback_data=AutoShelfBidControlMenu(
+                action=compact_auto_shelf_bid_control_action(action),
+                adv_setting_original_id=adv_setting_original_id,
+            ).pack(),
+        )
     builder.button(
         text="Изменить max ставку",
         callback_data=AutoShelfBidControlMenu(

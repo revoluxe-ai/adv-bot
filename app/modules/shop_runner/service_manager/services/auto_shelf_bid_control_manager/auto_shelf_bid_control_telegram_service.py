@@ -335,6 +335,77 @@ class AutoShelfBidControlTelegramService:
         await self._repository.update_settings(nmid=nmid, min_bid_distance_minor=parsed)
         return await self.build_view(adv_setting_original_id)
 
+    async def set_strategy(
+        self,
+        adv_setting_original_id: int,
+        strategy: AutoShelfBidControlStrategy,
+    ) -> AutoShelfBidControlViewDTO:
+        """Persist selected strategy and refresh current main bid only in main mode."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        normalized_strategy = (
+            AutoShelfBidControlStrategy.CPC
+            if strategy == AutoShelfBidControlStrategy.CYCLE_METRIC
+            else strategy
+        )
+        adv = await self._repository.update_adv_strategy(
+            adv_setting_original_id,
+            normalized_strategy,
+        )
+        nmid = self._get_single_nmid_or_raise(adv)
+        state = await self._repository.get_state(nmid)
+        if state is None or state.current_mode != "main":
+            return await self.build_view(adv_setting_original_id)
+        settings_obj = await self._repository.get_or_create_default_settings(nmid=nmid)
+        min_bid_minor = await self._view_provider._fetch_wb_min_bid_minor(  # type: ignore[attr-defined]
+            int(adv_setting_original_id),
+            nmid,
+        )
+        if min_bid_minor is None:
+            return await self.build_view(adv_setting_original_id)
+        actual_bid_minor = None
+        cached_bid = await self._bid_cache.get_bid(auto_adv_id=int(adv.adv_id), nmid=nmid)
+        if cached_bid is not None:
+            actual_bid_minor = int(cached_bid.bid_minor)
+        plan_fact_summary = await PlanFactReader().get_latest_plan_fact(int(adv.adv_id))
+        complex_adv_like = SimpleNamespace(
+            main_nmid=nmid,
+            auto_adv_id=int(adv.adv_id),
+            nmids=[nmid],
+            bot_active=bool(getattr(adv, "bot_active", True)),
+            auto_adv_active_status=bool(getattr(adv, "auto_adv_active_status", True)),
+            auto_shelf_bid_control_enabled=bool(adv.auto_shelf_bid_control_enabled),
+            auto_shelf_bid_control_strategy=normalized_strategy,
+            adv_setting=adv,
+            original_max_cpo=float(adv.max_price_for_order or 0.0),
+            fact_pay_for_order=(
+                plan_fact_summary.fact_pay_for_order if plan_fact_summary else None
+            ),
+            resolve_cpo=resolve_target_cost_from_summary(
+                plan_fact_summary,
+                plan_orders=int(adv.plan_for_sales_for_day or 0),
+                plan_target_pay_for_order=adv.target_price_for_order,
+                plan_max_pay_for_order=adv.max_price_for_order,
+            ),
+        )
+        manager = AutoShelfBidControlManager(
+            bid_cache_manager=self._bid_cache,
+            wb_bid_setter=cast(
+                AutoShelfBidSetter,
+                _TelegramBidSetterAdapter(self, adv, nmid),
+            ),
+            repository=self._repository,
+            analytics_repository=self._view_provider._analytics,  # type: ignore[attr-defined]
+        )
+        _ = await manager.apply_main_bid_refresh_if_needed(
+            complex_adv_like,  # type: ignore[arg-type]
+            state=state,
+            min_bid_minor=int(min_bid_minor),
+            max_bid_minor=int(settings_obj.max_bid_minor),
+            actual_bid_minor=actual_bid_minor,
+            now=datetime.now(UTC),
+        )
+        return await self.build_view(adv_setting_original_id)
+
     async def reset_cycle(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Сбросить цикл в mode=test и выставить middle bid через setter."""
         adv = await self._get_adv_or_raise(adv_setting_original_id)

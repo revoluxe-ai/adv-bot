@@ -39,12 +39,21 @@ def resolve_auto_shelf_bid_control_strategy(
     """
     if raw_value is None or raw_value == "":
         return AutoShelfBidControlStrategy.PLAN_DISTANCE
+    if raw_value == AutoShelfBidControlStrategy.CYCLE_METRIC:
+        return AutoShelfBidControlStrategy.CPC
     if isinstance(raw_value, AutoShelfBidControlStrategy):
-        return raw_value
+        return (
+            AutoShelfBidControlStrategy.CPC
+            if raw_value == AutoShelfBidControlStrategy.CYCLE_METRIC
+            else raw_value
+        )
     try:
-        return AutoShelfBidControlStrategy(str(raw_value))
+        resolved = AutoShelfBidControlStrategy(str(raw_value))
     except ValueError:
         return AutoShelfBidControlStrategy.PLAN_DISTANCE
+    if resolved == AutoShelfBidControlStrategy.CYCLE_METRIC:
+        return AutoShelfBidControlStrategy.CPC
+    return resolved
 
 
 class GetKeywordsProvider(Protocol):

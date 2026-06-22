@@ -15,6 +15,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     AutoShelfBidControlViewDTO,
     OptimizationMetric,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -82,6 +85,7 @@ def _view() -> AutoShelfBidControlViewDTO:
         optimization_metric=OptimizationMetric.CPC,
         fact_cpo=None,
         resolve_cpo=None,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
     )
 
 
@@ -213,7 +217,7 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
 
 
 def test_auto_shelf_bid_settings_keyboard_callback_data_fits_telegram_limit() -> None:
-    keyboard = handler.build_auto_shelf_bid_settings_keyboard(1151721977)
+    keyboard = handler.build_auto_shelf_bid_settings_keyboard(_view(), 1151721977)
     callback_data_values = [
         button.callback_data
         for row in keyboard.inline_keyboard
@@ -235,3 +239,4 @@ def test_auto_shelf_bid_control_action_normalization_accepts_compact_and_legacy_
         )
         == "set_target_test_observation_minutes"
     )
+    assert callbacks.normalize_auto_shelf_bid_control_action("sp") == "set_strategy_plan_distance"

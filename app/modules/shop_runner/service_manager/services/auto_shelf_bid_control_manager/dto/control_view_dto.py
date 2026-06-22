@@ -7,6 +7,9 @@ from datetime import datetime
 from typing import cast
 
 from .optimization_metric import OptimizationMetric
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,3 +125,6 @@ class AutoShelfBidControlViewDTO:
     main_target_explanation: str | None = None
     rec_bid_recommendation: dict[str, object] | None = None
     legacy_cycle_next_test_bid_minor: int | None = None
+    auto_shelf_bid_control_strategy: AutoShelfBidControlStrategy = (
+        AutoShelfBidControlStrategy.PLAN_DISTANCE
+    )

@@ -24,7 +24,11 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
         (None, AutoShelfBidControlStrategy.PLAN_DISTANCE),
         ("", AutoShelfBidControlStrategy.PLAN_DISTANCE),
         ("unknown", AutoShelfBidControlStrategy.PLAN_DISTANCE),
+        ("cycle_metric", AutoShelfBidControlStrategy.CPC),
+        (AutoShelfBidControlStrategy.CYCLE_METRIC, AutoShelfBidControlStrategy.CPC),
         (AutoShelfBidControlStrategy.PLAN_DISTANCE, AutoShelfBidControlStrategy.PLAN_DISTANCE),
+        ("ctr", AutoShelfBidControlStrategy.CTR),
+        ("cpc", AutoShelfBidControlStrategy.CPC),
     ],
 )
 def test_resolve_auto_shelf_bid_control_strategy(
@@ -42,7 +46,10 @@ def test_resolve_auto_shelf_bid_control_strategy(
         (None, AutoShelfBidControlStrategy.PLAN_DISTANCE),
         ("", AutoShelfBidControlStrategy.PLAN_DISTANCE),
         ("unknown", AutoShelfBidControlStrategy.PLAN_DISTANCE),
+        ("cycle_metric", AutoShelfBidControlStrategy.CPC),
         (AutoShelfBidControlStrategy.PLAN_DISTANCE, AutoShelfBidControlStrategy.PLAN_DISTANCE),
+        (AutoShelfBidControlStrategy.CTR, AutoShelfBidControlStrategy.CTR),
+        (AutoShelfBidControlStrategy.CPC, AutoShelfBidControlStrategy.CPC),
     ],
 )
 def test_complex_adv_exposes_auto_shelf_bid_control_strategy(

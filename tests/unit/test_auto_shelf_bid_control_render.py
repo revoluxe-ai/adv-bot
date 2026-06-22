@@ -13,6 +13,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     OptimizationMetric,
     CoverageLayerBidDTO,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 
 
 def _view(*, enabled: bool, has_settings: bool) -> AutoShelfBidControlViewDTO:
@@ -57,6 +60,7 @@ def _view(*, enabled: bool, has_settings: bool) -> AutoShelfBidControlViewDTO:
         optimization_metric=OptimizationMetric.CPC,
         fact_cpo=None,
         resolve_cpo=None,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
     )
 
 
@@ -107,9 +111,15 @@ def test_main_keyboard_shows_cycle_coverage_button_when_state_exists() -> None:
 
 
 def test_settings_keyboard_contains_all_actions() -> None:
-    markup = build_auto_shelf_bid_settings_keyboard(adv_setting_original_id=1)
+    markup = build_auto_shelf_bid_settings_keyboard(
+        _view(enabled=True, has_settings=True),
+        adv_setting_original_id=1,
+    )
     texts = _keyboard_texts(markup)
     assert texts == [
+        "✅ Best plan",
+        "CTR",
+        "CPC",
         "Изменить max ставку",
         "Изменить долю теста",
         "Изменить показов на тест",
