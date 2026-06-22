@@ -22,7 +22,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 )
 
 
-def test_settings_keyboard_contains_all_actions_outdated() -> None:
+def settings_keyboard_contains_all_actions_outdated() -> None:
     markup = build_auto_shelf_bid_settings_keyboard(
         _view(enabled=True, has_settings=True),
         adv_setting_original_id=1,
@@ -45,7 +45,7 @@ def test_strategy_keyboard_contains_only_strategy_actions() -> None:
         adv_setting_original_id=1,
     )
     texts = _keyboard_texts(markup)
-    assert texts == ["✅ Best plan", "CTR", "CPC", "Назад к настройкам"]
+    assert texts == ["✅ Best plan", "CTR", "CPC", "Назад к управлению ставкой"]
 
 
 def test_render_strategy_message_shows_current_mode() -> None:
@@ -194,6 +194,7 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
                     "expected_daily_clicks": 1396.6,
                     "expected_daily_orders": 69.83,
                     "cpo_rub": 568.0587841906347,
+                    "cpc": 12.34,
                     "ctr": 0.01104280322383927,
                     "expected_order_cost_rub": 568.0587841906347,
                     "resolved_order_cost_rub": 550.0,
@@ -259,6 +260,7 @@ def test_render_main_message_with_rec_bid_recommendation() -> None:
     assert "expected_daily_clicks: 1 397" in plan_ranked_block
     assert "expected_daily_orders: 69.83" in plan_ranked_block
     assert "CPO: 568.06 \u20bd" in plan_ranked_block
+    assert "CPC: 12.34 \u20bd" in plan_ranked_block
     assert "ctr: 1.10%" in message
     assert "35000" not in message
     assert "568.0587841906347" not in message
@@ -272,6 +274,7 @@ def test_render_main_message_omits_missing_rec_fields_but_keeps_ctr() -> None:
             "plan_ranked": [
                 {
                     "bid": 14_100,
+                    "cpc": 4.56,
                     "ctr": 0.0321,
                 },
                 {
@@ -284,7 +287,7 @@ def test_render_main_message_omits_missing_rec_fields_but_keeps_ctr() -> None:
     message = render_auto_shelf_bid_control_message(view)
 
     plan_ranked_block = message.split("Top-3 plan_ranked:\n", maxsplit=1)[1]
-    assert "bid: 141 \u20bd | ctr: 3.21%" in plan_ranked_block
+    assert "bid: 141 \u20bd | CPC: 4.56 \u20bd | ctr: 3.21%" in plan_ranked_block
     assert "expected_daily_impressions: \u2014" not in plan_ranked_block
     assert "expected_daily_clicks: \u2014" not in plan_ranked_block
     assert "expected_daily_orders: \u2014" not in plan_ranked_block
@@ -531,3 +534,71 @@ def test_render_main_target_explanation_not_duplicated_when_main_bid_missing() -
     assert f"Лучшая ставка: — ({explanation})" in message
     assert message.count(explanation) == 1
     assert f"({explanation})\n({explanation})" not in message
+def test_settings_keyboard_contains_all_actions() -> None:
+    markup = build_auto_shelf_bid_settings_keyboard(
+        _view(enabled=True, has_settings=True),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert texts == [
+        "Изменить max ставку",
+        "Изменить долю теста",
+        "Изменить показов на тест",
+        "Изменить минут теста",
+        "Изменить шаг между ставками",
+        "Назад к управлению ставкой",
+    ]
+
+
+def test_main_keyboard_shows_strategy_menu_on_upper_level() -> None:
+    markup = build_auto_shelf_bid_control_keyboard(
+        _view(enabled=True, has_settings=True),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert "Режим main bid: Best plan" in texts
+def test_main_keyboard_disabled_has_enable_settings_refresh_back() -> None:
+    markup = build_auto_shelf_bid_control_keyboard(
+        _view(enabled=False, has_settings=False),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert texts == [
+        "Включить управление",
+        "Настройки",
+        "Режим main bid: Best plan",
+        "Обновить",
+        "Назад",
+    ]
+
+
+def test_main_keyboard_disabled_has_enable_settings_refresh_back_when_settings_exist() -> None:
+    markup = build_auto_shelf_bid_control_keyboard(
+        _view(enabled=False, has_settings=True),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert texts == [
+        "Включить управление",
+        "Настройки",
+        "Режим main bid: Best plan",
+        "Обновить",
+        "Назад",
+    ]
+
+
+def test_main_keyboard_enabled_has_disable_reset_force_main() -> None:
+    markup = build_auto_shelf_bid_control_keyboard(
+        _view(enabled=True, has_settings=True),
+        adv_setting_original_id=1,
+    )
+    texts = _keyboard_texts(markup)
+    assert texts == [
+        "Выключить управление",
+        "Настройки",
+        "Режим main bid: Best plan",
+        "Обновить",
+        "Сбросить цикл",
+        "Вернуть main-ставку",
+        "Назад",
+    ]
