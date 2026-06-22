@@ -11,6 +11,9 @@ import pytest
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
     AutoShelfBidControlViewProvider,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
+    AutoShelfBidControlManager,
+)
 from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
     AutoShelfBidControlStrategy,
 )
@@ -138,6 +141,10 @@ async def test_build_view_builds_coverage_layer_payload_without_actual_bid_price
     repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
     repository.get_state = AsyncMock(return_value=state)
     repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+    repository.update_settings = AsyncMock(return_value=settings_obj)
+    repository.save_state = AsyncMock(return_value=state)
+    repository.update_settings = AsyncMock(return_value=settings_obj)
+    repository.save_state = AsyncMock(return_value=state)
     repository.save_state = AsyncMock(side_effect=lambda saved_state: saved_state)
 
     analytics = MagicMock()
@@ -978,6 +985,105 @@ async def test_build_view_cycle_metric_maps_to_cpc_for_backward_compatibility(
     analytics.get_best_bid_by_ctr.assert_not_awaited()
     analytics.get_best_bid_by_cart_cpa.assert_awaited_once()
     assert view.optimization_metric == OptimizationMetric.CPC
+
+
+@pytest.mark.asyncio
+async def test_build_view_normalizes_legacy_cycle_metric_before_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.auto_shelf_bid_control_strategy = AutoShelfBidControlStrategy.CYCLE_METRIC
+    adv.bot_active = True
+    adv.auto_adv_active_status = True
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 100
+    adv.max_price_for_order = 200
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.target_test_observation_minutes = 60
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+
+    state = MagicMock()
+    state.current_mode = "main"
+    state.currency = "RUB"
+    state.current_cycle_started_at = datetime(2026, 5, 25, tzinfo=UTC)
+    state.previous_cycle_started_at = None
+    state.current_main_bid_minor = 20_000
+    state.current_test_bid_minor = 10_000
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=state)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+    repository.update_settings = AsyncMock(return_value=settings_obj)
+    repository.save_state = AsyncMock(return_value=state)
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=0.05)
+    analytics.get_impressions = AsyncMock(return_value=0)
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=10_000)  # type: ignore[method-assign]
+    provider._rec_bid_recommendation_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={"view": {"plan_ranked": []}}
+    )  # type: ignore[attr-defined]
+
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.decision_snapshot_dto import (
+        AutoShelfBidControlDecisionSnapshot,
+        BidSyncStatus,
+    )
+
+    async def _build_snapshot(self: object, complex_adv: object, **_: object) -> AutoShelfBidControlDecisionSnapshot:
+        assert (
+            getattr(complex_adv, "auto_shelf_bid_control_strategy")
+            == AutoShelfBidControlStrategy.CPC
+        )
+        return AutoShelfBidControlDecisionSnapshot(
+            nmid=111,
+            auto_adv_id=12345,
+            current_mode="main",
+            actual_bid_minor=None,
+            min_bid_minor=10_000,
+            max_bid_minor=50_000,
+            fresh_best_main_bid_minor=None,
+            fresh_next_test_bid_minor=None,
+            expected_bid_minor=None,
+            bid_sync_status=BidSyncStatus.SYNCED,
+            can_count_progress=False,
+        )
+
+    monkeypatch.setattr(
+        AutoShelfBidControlManager,
+        "build_decision_snapshot",
+        _build_snapshot,
+    )
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.auto_shelf_bid_control_strategy == AutoShelfBidControlStrategy.CPC
 
 
 @pytest.mark.asyncio
