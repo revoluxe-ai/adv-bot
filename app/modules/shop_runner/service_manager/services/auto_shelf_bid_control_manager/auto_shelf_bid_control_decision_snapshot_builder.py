@@ -67,8 +67,7 @@ def _resolve_cycle_metric_for_snapshot(
         AutoShelfBidControlStrategy.CPC,
         AutoShelfBidControlStrategy.CYCLE_METRIC,
     }:
-        if strategy == AutoShelfBidControlStrategy.CPC:
-            return OptimizationMetric.CPC
+        return OptimizationMetric.CPC
     return resolve_optimization_metric(
         complex_adv.fact_pay_for_order,
         complex_adv.resolve_cpo,

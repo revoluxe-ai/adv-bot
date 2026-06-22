@@ -513,6 +513,49 @@ async def test_decision_snapshot_two_qualified_tested_bids_selects_ranked_best()
 
 
 @pytest.mark.asyncio
+async def test_decision_snapshot_legacy_cycle_metric_fallback_uses_cpc_ranking() -> None:
+    manager = _cycle_metric_manager(
+        [
+            _cycle_bid_stat(57_000, cart_cpa=7.0, ctr=0.06),
+            _cycle_bid_stat(48_000, cart_cpa=4.0, ctr=0.03),
+        ]
+    )
+    manager._choose_main_bid_by_strategy = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    state = MagicMock()
+    state.current_mode = "main"
+    state.currency = "RUB"
+    state.current_cycle_started_at = MagicMock()
+    state.previous_cycle_started_at = None
+    state.current_main_bid_minor = 57_000
+    settings_obj = MagicMock(
+        max_bid_minor=80_000,
+        target_test_impressions=100,
+        target_test_observation_minutes=60,
+        min_bid_distance_minor=100,
+    )
+    complex_adv = MagicMock(
+        main_nmid=1,
+        auto_adv_id=2,
+        fact_pay_for_order=1.0,
+        resolve_cpo=10.0,
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
+    )
+
+    snapshot = await manager.build_decision_snapshot(
+        complex_adv,
+        settings_obj=settings_obj,
+        state=state,
+        min_bid_minor=10_000,
+        actual_bid_minor=57_000,
+        control_enabled=True,
+    )
+
+    assert snapshot.fresh_best_main_bid_minor == 48_000
+    assert snapshot.rec_bid_recommendation is not None
+    assert snapshot.rec_bid_recommendation["plan_ranked"][0]["bid"] == 48_000
+
+
+@pytest.mark.asyncio
 async def test_decision_snapshot_ctr_strategy_uses_strategy_resolver_for_main_bid() -> None:
     manager = _cycle_metric_manager(
         [
