@@ -116,21 +116,21 @@ class ShopDataUpdater:
         adv_ids: list[int] = []
         async with sm(read_only=True) as session:
            adv_settings = await self.get_adv_setting_by_wb_cabinet_active_filter(session,
-                                                                                 self.wb_cabinet.id
+                                                                                 wb_cabinet_id=self.wb_cabinet.id,
                                                                                  )
         for adv_setting in adv_settings:
-            if adv_setting.adv_id is not None:
-                adv_ids.append(adv_setting.adv_id)
-            search_id = adv_setting.search_adv_id
+            if adv_setting.adv_id is not None: # pyright: ignore
+                adv_ids.append(adv_setting.adv_id) # pyright: ignore
+            search_id = adv_setting.search_adv_id # pyright: ignore
             if search_id is not None:
-                adv_ids.append(search_id)
+                adv_ids.append(search_id) # pyright: ignore
         adv_ids = list(dict.fromkeys(adv_ids))  # порядок сохраняем, дубли убираем
 
         if not adv_ids:
             return []
         logger.debug(f"Получены adv_ids: {len(adv_ids)} штук")
-        advs: list[Adv] = await advert_api.get_advs(adv_ids)
-        await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
+        advs: list[Adv] = await advert_api.get_advs(adv_ids) # pyright: ignore
+        await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id) # pyright: ignore
         await self._cache_auto_recommendations_bids(advs)
         logger.debug("Обновление в базе advs завершено")
         return advs
@@ -150,7 +150,7 @@ class ShopDataUpdater:
         if not isinstance(raw_map, dict):
             return {}
         result: dict[int, int] = {}
-        for nmid_raw, bid_raw in raw_map.items():
+        for nmid_raw, bid_raw in raw_map.items(): # pyright: ignore
             if not isinstance(nmid_raw, int):
                 continue
             if not isinstance(bid_raw, int):
@@ -189,7 +189,7 @@ class ShopDataUpdater:
     async def update_cards_data(self) -> None:
         wb_api = self.wb_api
         cards = await wb_api.get_all_cards()
-        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
+        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet) # pyright: ignore
         logger.debug("Обновление карточек в базе завершено")
 
 
@@ -208,7 +208,7 @@ class ShopDataUpdater:
                 )
             ).where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                models.AdvSetting._search_adv_id.is_not(None)
+                models.AdvSetting._search_adv_id.is_not(None) # pyright: ignore
             )
         )
 
