@@ -163,7 +163,7 @@ async def test_refresh_stats_freshness_cache_writes_redis(fake_redis) -> None:
         "app.modules.shop_runner.service_manager.manager.StatsFreshnessManager"
     ) as mgr_cls:
         mgr_cls.return_value.evaluate = AsyncMock(side_effect=_evaluate)
-        await manager.refresh_stats_freshness_cache.__wrapped__(manager)
+        await manager.refresh_stats_freshness_cache.__wrapped__(manager, only_bot_active=False)
 
     cache = RedisStatsFreshnessStateCacheManager(RedisClient(redis_client=fake_redis))
     loaded = await cache.mget_entries(manager.shop_id, [10, 20])
