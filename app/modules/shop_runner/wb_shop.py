@@ -54,32 +54,32 @@ class WBShop:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self._alive_worker_run())
                 tg.create_task(coroutines_manager.update_advs_data_from_wb_to_pg()) # Адаптировал под free
-                tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg()) #  Тут вроде все и так работает под free
-                tg.create_task(coroutines_manager.update_common_sale_stat()) # запись в БД
-                tg.create_task(coroutines_manager.update_full_adv_stat()) # запись в БД
-                tg.create_task(coroutines_manager.update_clusters_adv_stats_today()) # запись в БД
+                tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg(only_bot_active=False)) #  Тут вроде все и так работает под free
+                tg.create_task(coroutines_manager.update_common_sale_stat(only_bot_active=False)) # Здесь поставил загрузку всех
+                tg.create_task(coroutines_manager.update_full_adv_stat(only_bot_active=False)) # Здесь поставил загрузку всех
+                tg.create_task(coroutines_manager.update_clusters_adv_stats_today(only_bot_active=False)) # Здесь поставил загрузку всех
                 tg.create_task(
-                    coroutines_manager.update_clusters_adv_stats_history() # запись в БД
+                    coroutines_manager.update_clusters_adv_stats_history(only_bot_active=False) # Здесь поставил загрузку всех
                 )
-                tg.create_task(coroutines_manager.refresh_stats_freshness_cache()) # обновление fresh, нужен в free
-                tg.create_task(coroutines_manager.adv_settings_auto_update()) # платка
-                tg.create_task(coroutines_manager.update_minus_phrases_in_advs()) # платка
-                tg.create_task(coroutines_manager.update_cluster_bids()) # платка
-                tg.create_task(coroutines_manager.cache_current_cluster_bids()) # в бесплатку
-                tg.create_task(coroutines_manager.preload_min_bids_cache_miss()) # в бесплатку
-                tg.create_task(coroutines_manager.preload_min_bids_cache_old()) # в бесплатку
-                tg.create_task(coroutines_manager.handle_stats_stale_emergency()) # в бесплатку
-                tg.create_task(coroutines_manager.update_plan_fact_stats()) # в бесплатку
-                tg.create_task(coroutines_manager.auto_budget_watchdog()) # платка
-                tg.create_task(coroutines_manager.update_top_key_in_advs()) # платка
-                tg.create_task(coroutines_manager.update_common_bid_in_search_adv())  # платка
-                tg.create_task(coroutines_manager.increment_fact_data_stats()) # бесплатно
-                tg.create_task(coroutines_manager.auto_shelf_bid_increment_stats()) # бесплатка
-                tg.create_task(coroutines_manager.auto_shelf_bid_control()) # платка
-                tg.create_task(coroutines_manager.white_list_tail_trimmer()) # платка
-                tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv()) # платка
-                tg.create_task(coroutines_manager.update_individual_keyword_target_places()) # платка
-                tg.create_task(coroutines_manager.change_adv_strategy()) # платка
+                tg.create_task(coroutines_manager.refresh_stats_freshness_cache(only_bot_active=False)) # Здесь поставил загрузку всех
+                tg.create_task(coroutines_manager.adv_settings_auto_update(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.update_minus_phrases_in_advs(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.update_cluster_bids(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.cache_current_cluster_bids(only_bot_active=False)) # в бесплатку
+                tg.create_task(coroutines_manager.preload_min_bids_cache_miss(only_bot_active=False)) # в бесплатку
+                tg.create_task(coroutines_manager.preload_min_bids_cache_old(only_bot_active=False)) # в бесплатку
+                tg.create_task(coroutines_manager.handle_stats_stale_emergency(only_bot_active=False)) # в бесплатку
+                tg.create_task(coroutines_manager.update_plan_fact_stats(only_bot_active=False)) # в бесплатку
+                tg.create_task(coroutines_manager.auto_budget_watchdog(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.update_top_key_in_advs(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.update_common_bid_in_search_adv(only_bot_active=True))  # платка
+                tg.create_task(coroutines_manager.increment_fact_data_stats(only_bot_active=False)) # бесплатно
+                tg.create_task(coroutines_manager.auto_shelf_bid_increment_stats(only_bot_active=False)) # бесплатка
+                tg.create_task(coroutines_manager.auto_shelf_bid_control(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.white_list_tail_trimmer(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.auto_reset_bid_for_auto_adv(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.update_individual_keyword_target_places(only_bot_active=True)) # платка
+                tg.create_task(coroutines_manager.change_adv_strategy(only_bot_active=True)) # платка
         except* StopShopUpdateException as stop_exc:
             # Проглатываем StopShopUpdateException
             # (все StopShopUpdateException из группы соберутся сюда)
