@@ -156,6 +156,7 @@ async def build_decision_snapshot(
     best_plan_bid_minor: int | None = None
     fresh_best_main_bid_minor: int | None = None
     main_target_explanation: str | None = None
+    current_main_bid_minor = getattr(state, "current_main_bid_minor", None)
 
     if not sufficient_qualified_tested:
         fresh_best_main_bid_minor = None
@@ -216,14 +217,35 @@ async def build_decision_snapshot(
             metric=optimization_metric,
         )
         rec_bid_recommendation = build_cycle_metric_rec_recommendation(ranked_stats)
-        fresh_best_main_bid_minor, _ranked_top, clamp_explanation = (
-            resolve_main_bid_from_qualified_ranking(
-                rec_bid_recommendation,
-                min_bid_minor=min_bid_minor,
-                max_bid_minor=max_bid_minor,
-            )
+        fresh_best_main_bid_minor = await manager._choose_main_bid_by_strategy(
+            complex_adv=complex_adv,
+            currency=state.currency,
+            current_cycle_started_at=state.current_cycle_started_at,
+            previous_cycle_started_at=getattr(state, "previous_cycle_started_at", None),
+            current_main_bid_minor=current_main_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
         )
+        if fresh_best_main_bid_minor is None:
+            _fallback_main_bid_minor, _ranked_top, clamp_explanation = (
+                resolve_main_bid_from_qualified_ranking(
+                    rec_bid_recommendation,
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
+            )
+        else:
+            _ranked_top = fresh_best_main_bid_minor
+            clamp_explanation = None
         main_target_explanation = clamp_explanation
+        if fresh_best_main_bid_minor is None:
+            fresh_best_main_bid_minor = _fallback_main_bid_minor
+            if fresh_best_main_bid_minor is None:
+                main_target_explanation = (
+                    main_target_explanation
+                    or INSUFFICIENT_QUALIFIED_TESTED_BIDS_EXPLANATION
+                )
 
     _coverages, _current_layer, _covered_anchor_count, coverage_next_test = (
         await manager._build_coverage_snapshot(
