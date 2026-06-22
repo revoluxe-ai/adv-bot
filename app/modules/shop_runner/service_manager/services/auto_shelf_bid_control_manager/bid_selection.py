@@ -78,6 +78,7 @@ async def resolve_cycle_best_bids(
     previous_cycle_started_at: datetime | None,
     fact_cpo: float | None = None,
     resolve_cpo: float | None = None,
+    metric: OptimizationMetric | None = None,
 ) -> tuple[BidStatsDTO | None, BidStatsDTO | None, BidStatsDTO | None]:
     """Лучшие ставки текущего цикла, предыдущего и глобальная.
 
@@ -97,13 +98,15 @@ async def resolve_cycle_best_bids(
         previous_cycle_started_at: Начало предыдущего цикла (None если первый)
         fact_cpo: Фактическое CPO кампании
         resolve_cpo: Resolve/target CPO кампании
+        metric: Явная метрика для legacy/UI override. Если ``None``, метрика
+            определяется из ``fact_cpo/resolve_cpo`` как раньше.
 
     Returns:
         ``(cycle_best, previous_cycle_best, global_best)``.
     """
     from .dto import resolve_optimization_metric as _resolve_metric
 
-    metric = _resolve_metric(fact_cpo, resolve_cpo)
+    metric = metric or _resolve_metric(fact_cpo, resolve_cpo)
 
     if metric == OptimizationMetric.CTR:
         cycle_best = await analytics.get_best_bid_by_ctr(
