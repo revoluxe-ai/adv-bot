@@ -90,7 +90,10 @@ def _format_rec_bid_rub(value: object) -> str:
     if value is None:
         return "\u2014"
     try:
-        return f"{float(value):.2f} \u20bd"
+        amount = float(value)
+        if amount == float("inf"):
+            return "\u221e \u20bd"
+        return f"{amount:.2f} \u20bd"
     except (TypeError, ValueError):
         return "\u2014"
 
