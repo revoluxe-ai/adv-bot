@@ -1,4 +1,4 @@
-from app import settings
+from app.settings.settings_master import settings
 
 PRICE_PER_MONTH = 4500
 EMAIL_FOR_PAYMENT_RECEIPT = "revoluxe@gmail.com"
@@ -31,11 +31,13 @@ AUTO_BIDDER_PRICE = 25
 
 MIN_CPM = 100
 
-ADMINS = [
+_BASE_ADMINS = [
     373435337,  # я
     707068503,  # Лена
-    5401359037, # Рома
-    ]
+    5401359037,  # Рома
+]
+
+ADMINS = _BASE_ADMINS + list(settings.extra_admin_telegram_ids)
 
 DEFAULT_BIDDER_STEP = 2
 

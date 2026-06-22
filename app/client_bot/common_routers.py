@@ -93,6 +93,7 @@ from .user_interface.handlers import (
     campaign_activity,
     auto_shelf_bid_control_menu,
     time_settings,
+    ui_mode_toggle,
     white_list_mode_toggle,
 )
 from .user_interface.handlers.common_budget_mode_toggle import (
@@ -171,6 +172,7 @@ common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
 common_router.include_routers(auto_shelf_bid_control_menu.router)
 common_router.include_routers(time_settings.router)
+common_router.include_routers(ui_mode_toggle.router)
 # common_router.include_routers(adv_creator_router)
 common_router.include_routers(add_black_phrases.router)
 common_router.include_routers(add_relevant_phrase_templates.router)
