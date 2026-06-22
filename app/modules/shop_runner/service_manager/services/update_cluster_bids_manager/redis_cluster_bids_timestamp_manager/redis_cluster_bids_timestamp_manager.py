@@ -14,7 +14,7 @@ class RedisClusterBidsTimestampManager(BaseRedisManager):
         search_adv_id = adv.search_adv_id
         if search_adv_id is None:
             return None
-        key = self._get_key(search_adv_id)
+        key = self._get_key(search_adv_id) # pyright: ignore
         value = await self._client.get(key)
         if value is None:
             return None
@@ -25,7 +25,7 @@ class RedisClusterBidsTimestampManager(BaseRedisManager):
         search_adv_id = adv.search_adv_id
         if search_adv_id is None:
             raise ValueError("adv.search_adv_id is None")
-        key: str = self._get_key(search_adv_id)
+        key: str = self._get_key(search_adv_id) # pyright: ignore
         value_str = datetime.datetime.now().isoformat()
         _ = await self._client.set(key, value_str)
         return None

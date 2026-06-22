@@ -24,7 +24,7 @@ _SENSITIVE_FIELD_RE = re.compile(
 def reset_trace_config_for_tests() -> None:
     """Сброс кеша env (только для unit-тестов)."""
     global _TRACE_CONFIG
-    _TRACE_CONFIG = None
+    _TRACE_CONFIG = None # pyright: ignore
 
 
 def _is_enabled() -> bool:
@@ -45,7 +45,7 @@ def _load_config() -> dict[str, Any]:
     global _TRACE_CONFIG
     if _TRACE_CONFIG is not None:
         return _TRACE_CONFIG
-    _TRACE_CONFIG = {
+    _TRACE_CONFIG = { # pyright: ignore
         "enabled": _is_enabled(),
         "shop_id": _opt_str("DEBUG_CLUSTER_BID_TRACE_SHOP_ID"),
         "adv_id": _opt_int("DEBUG_CLUSTER_BID_TRACE_ADV_ID"),
