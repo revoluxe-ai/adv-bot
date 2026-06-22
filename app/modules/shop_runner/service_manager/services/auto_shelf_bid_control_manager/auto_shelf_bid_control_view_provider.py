@@ -195,6 +195,28 @@ class AutoShelfBidControlViewProvider:
         return scores
 
     @staticmethod
+    def _resolve_display_optimization_metric(
+        *,
+        strategy: AutoShelfBidControlStrategy | None,
+        fact_cpo: float | None,
+        resolve_cpo: float | None,
+    ) -> OptimizationMetric:
+        """Resolve the UI metric so display matches the selected strategy.
+
+        Explicit CTR/CPC modes must keep their own metric for all Telegram
+        highlights and "best bid" labels. Legacy `cycle_metric` is normalized
+        to CPC for backward compatibility, so only a missing strategy value may
+        fall back to the historic dynamic metric derived from
+        `fact_cpo/resolve_cpo`.
+        """
+        normalized_strategy = resolve_auto_shelf_bid_control_strategy(strategy)
+        if normalized_strategy == AutoShelfBidControlStrategy.CTR:
+            return OptimizationMetric.CTR
+        if normalized_strategy == AutoShelfBidControlStrategy.CPC:
+            return OptimizationMetric.CPC
+        return resolve_optimization_metric(fact_cpo, resolve_cpo)
+
+    @staticmethod
     def _coerce_optional_float(value: object) -> float | None:
         """Convert loosely typed recommendation values into float-compatible data."""
         if value is None or isinstance(value, bool):
@@ -578,7 +600,11 @@ class AutoShelfBidControlViewProvider:
             adv.max_price_for_order,
             fact_predict_orders,
         )
-        optimization_metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
+        optimization_metric = self._resolve_display_optimization_metric(
+            strategy=getattr(adv, "auto_shelf_bid_control_strategy", None),
+            fact_cpo=fact_cpo,
+            resolve_cpo=resolve_cpo,
+        )
 
         state = await self._repository.get_state(nmid) if nmid else None
         settings_obj = None
@@ -673,6 +699,7 @@ class AutoShelfBidControlViewProvider:
                     previous_cycle_started_at=state.previous_cycle_started_at,
                     fact_cpo=fact_cpo,
                     resolve_cpo=resolve_cpo,
+                    metric=optimization_metric,
                 )
 
         covered_points_count = 0
