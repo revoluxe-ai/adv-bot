@@ -102,7 +102,7 @@ class TestTokenPermissionsValidator:
         assert not result.is_expired
 
         # Token should NOT be usable because API probes returned False (403)
-        assert result.can_be_used_for_free
+        assert not result.can_be_used_for_free
         assert not result.can_be_used_for_pay
         assert result.error_message is not None
         assert len(result.missing_required) > 0
@@ -275,7 +275,7 @@ class TestTokenPermissionsValidator:
             result = await validator.validate("test_token", mode="claims_only")
 
         assert result.is_valid_jwt
-        assert result.can_be_used_for_free
+        assert not result.can_be_used_for_free
         assert not result.can_be_used_for_pay
         assert "Продвижение" in result.missing_required
         assert "Продвижение" in result.error_message
@@ -517,7 +517,7 @@ class TestTokenPermissionsValidator:
             permissions=permissions,
         )
 
-        assert result.can_be_used_for_free
+        assert not result.can_be_used_for_free
         assert not result.can_be_used_for_pay
         assert "Аналитика" in result.missing_required
         assert "Продвижение" in result.missing_required
