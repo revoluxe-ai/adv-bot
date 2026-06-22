@@ -46,7 +46,8 @@
     "app/modules/wb_adv_updater/calculated_keywords_manager/calculated_keywords_manager.py",
     "app/snapshot_data_updater/services/calculated_keywords_warmup.py",
     "app/modules/shop_runner/service_manager/services/auto_updater_v3",
-    "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager"
+    "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager",
+    "app/modules/common_slaves/wildberries/shops_data_updater.py"
   ],
 
   "exclude": [
