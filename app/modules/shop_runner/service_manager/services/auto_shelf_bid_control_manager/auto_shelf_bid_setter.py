@@ -17,6 +17,10 @@ from app.settings import settings
 logger = logging.getLogger(__name__)
 
 
+class AutoShelfBidControlWriteBlockedError(PermissionError):
+    """Raised when shelf bid write is attempted for read-only campaigns."""
+
+
 class _AutoShelfBidPatchPort(Protocol):
     """Порт PATCH ставки полок (копейки)."""
 
@@ -71,6 +75,18 @@ class AutoShelfBidSetter:
         nmids = complex_adv.nmids
         if len(nmids) != 1:
             raise ValueError("AutoShelfBidSetter supports only single-nmid campaigns")
+        if not complex_adv.bot_active:
+            raise AutoShelfBidControlWriteBlockedError(
+                "Auto shelf bid write requires bot_active=True"
+            )
+        if not bool(getattr(complex_adv, "auto_shelf_bid_control_enabled", True)):
+            logger.info(
+                "auto_shelf_bid_control_set_bid_skipped_disabled auto_adv_id=%s nmid=%s bid_minor=%s",
+                getattr(complex_adv, "auto_adv_id", None),
+                nmids[0],
+                bid_minor,
+            )
+            return None
         auto_adv_id = complex_adv.auto_adv_id
         nmid = nmids[0]
         api_bid = self.to_api_bid(bid_minor)
