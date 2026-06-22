@@ -14,6 +14,7 @@ def test_sales_plan_button_text_depends_only_on_plan_fields() -> None:
         plan_for_sales_for_day=None,
         target_price_for_order=None,
         max_price_for_order=None,
+        substitute_fact_cpo_for_max=None,
     )
 
     button = sales_plan_button.get(adv)
