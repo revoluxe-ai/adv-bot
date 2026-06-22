@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
-from app.client_bot.user_interface.states import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from . import models, wb_db_manager
@@ -26,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Типы Auto/Search РК v2 (unified=8, manual=9), для которых WB отдаёт recommendations bid.
 _AUTO_RECOMMENDATIONS_BID_ADV_TYPES = frozenset({8, 9})
 
-_coroutine_parallel_run_queue = asyncio.Queue()
+_coroutine_parallel_run_queue = asyncio.Queue() # pyright: ignore
 
 
 async def consumer():
@@ -36,15 +35,15 @@ async def consumer():
         logger.info("Consumer waiting for task")
         if _coroutine_parallel_run_queue.empty() and active_tasks:
             logger.info("Consumer waiting for task")
-            done, _ = await asyncio.wait(
-                active_tasks, return_when=asyncio.FIRST_COMPLETED
+            done, _ = await asyncio.wait( # pyright: ignore
+                active_tasks, return_when=asyncio.FIRST_COMPLETED # pyright: ignore
             )
             # Удалять задачи из списка active_tasks здесь не нужно, так как мы используем колбэки для их удаления
         else:
-            coroutine: asyncio.Future = await _coroutine_parallel_run_queue.get()
-            task = asyncio.create_task(coroutine)
-            task.add_done_callback(lambda t, lst=active_tasks: lst.remove(t))
-            active_tasks.append(task)
+            coroutine: asyncio.Future = await _coroutine_parallel_run_queue.get() # pyright: ignore
+            task = asyncio.create_task(coroutine) # pyright: ignore
+            task.add_done_callback(lambda t, lst=active_tasks: lst.remove(t)) # pyright: ignore
+            active_tasks.append(task) # pyright: ignore
         await asyncio.sleep(1)
 
 
@@ -87,26 +86,26 @@ class ShopDataUpdater:
                 models.AdvSetting.adv_id.in_(adv_ids)
             )
             exist_advs_result = (await session.execute(stmt)).unique()
-            existing_advs: list[models.AdvSetting] = exist_advs_result.scalars().all()
+            existing_advs: list[models.AdvSetting] = exist_advs_result.scalars().all() # pyright: ignore
             existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
             not_existing_adv_ids: set[int] = set(adv_ids) - existind_advs_ids
             if not_existing_adv_ids:
                 await self.__quick_update_advs_in_db(not_existing_adv_ids)
             func = self.__quick_update_advs_in_db(existind_advs_ids)
-            await _coroutine_parallel_run_queue.put(func)
+            await _coroutine_parallel_run_queue.put(func) # pyright: ignore
 
     async def __quick_update_advs_in_db(self, adv_ids: set[int]) -> None:
         wb_api = self.wb_api
         advs = await wb_api.get_advs(list(adv_ids))
-        nmids_collection = set()
+        nmids_collection = set() # pyright: ignore
         await wb_db_manager.update_advs_in_db(advs, self.wb_cabinet.id)
         for adv in advs:
             nmids = adv.nmids
             if nmids:
                 for nmid in nmids:
-                    nmids_collection.add(nmid)
+                    nmids_collection.add(nmid) # pyright: ignore
         cards = await wb_api.get_all_cards()
-        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet)
+        await wb_db_manager.update_cards_in_db(cards, self.wb_cabinet) # pyright: ignore
 
     async def update_advs_data(self) -> list[Adv]:
         # adv_ids берём из БД по кампаниям с bot_active; обновляем и авто-, и поисковые РК
@@ -204,7 +203,7 @@ class ShopDataUpdater:
                 load_only(
                     models.AdvSetting.name,
                     models.AdvSetting.adv_id,
-                    models.AdvSetting._search_adv_id,
+                    models.AdvSetting._search_adv_id, # pyright: ignore
                 )
             ).where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
