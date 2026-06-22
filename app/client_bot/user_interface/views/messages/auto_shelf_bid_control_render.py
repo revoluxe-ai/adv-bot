@@ -569,7 +569,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     )
 
 
-def build_auto_shelf_bid_control_keyboard(
+def _deprecated_build_auto_shelf_bid_control_keyboard(
     view: AutoShelfBidControlViewDTO,
     adv_setting_original_id: int,
 ) -> InlineKeyboardMarkup:
@@ -652,7 +652,9 @@ def build_auto_shelf_bid_control_keyboard(
     return builder.as_markup()
 
 
-def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> str:
+def _deprecated_render_auto_shelf_bid_settings_message(
+    view: AutoShelfBidControlViewDTO,
+) -> str:
     """Собрать экран редактирования настроек управления."""
     enabled_text = "да" if view.enabled else "нет"
     dry_run_text = "включён" if view.dry_run else "выключен"
@@ -670,7 +672,7 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
     )
 
 
-def build_auto_shelf_bid_settings_keyboard(
+def _deprecated_build_auto_shelf_bid_settings_keyboard(
     view: AutoShelfBidControlViewDTO,
     adv_setting_original_id: int,
 ) -> InlineKeyboardMarkup:
@@ -754,7 +756,7 @@ def render_auto_shelf_bid_strategy_message(view: AutoShelfBidControlViewDTO) -> 
     )
 
 
-def build_auto_shelf_bid_settings_keyboard(
+def _deprecated_v2_build_auto_shelf_bid_settings_keyboard(
     view: AutoShelfBidControlViewDTO,
     adv_setting_original_id: int,
 ) -> InlineKeyboardMarkup:
