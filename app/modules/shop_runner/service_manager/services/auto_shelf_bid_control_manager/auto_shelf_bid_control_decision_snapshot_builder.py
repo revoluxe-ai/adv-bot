@@ -240,7 +240,7 @@ async def build_decision_snapshot(
             clamp_explanation = None
         main_target_explanation = clamp_explanation
         if fresh_best_main_bid_minor is None:
-            fresh_best_main_bid_minor = _fallback_main_bid_minor
+            fresh_best_main_bid_minor = _fallback_main_bid_minor # pyright: ignore
             if fresh_best_main_bid_minor is None:
                 main_target_explanation = (
                     main_target_explanation
