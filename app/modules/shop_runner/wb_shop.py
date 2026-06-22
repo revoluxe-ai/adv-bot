@@ -58,7 +58,7 @@ class WBShop:
             async with asyncio.TaskGroup() as tg:
                 tg.create_task(self._alive_worker_run())
                 tg.create_task(coroutines_manager.update_advs_data_from_wb_to_pg()) # Адаптировал под free
-                tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg(only_bot_active=False)) #  Тут вроде все и так работает под free
+                tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg()) #  Тут вроде все и так работает под free
                 tg.create_task(coroutines_manager.update_common_sale_stat(only_bot_active=False)) # Здесь поставил загрузку всех
                 tg.create_task(coroutines_manager.update_full_adv_stat(only_bot_active=False)) # Здесь поставил загрузку всех
                 tg.create_task(coroutines_manager.update_clusters_adv_stats_today(only_bot_active=False)) # Здесь поставил загрузку всех
