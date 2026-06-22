@@ -25,6 +25,29 @@ class SettingsRepairResult:
     changed: bool
 
 
+def _snap_bid_minor_to_unit(
+    bid_minor: int,
+    *,
+    bid_unit_minor: int = 100,
+) -> int:
+    """Snap a bid to the 1-ruble grid, preferring the lower bid on exact ties."""
+    if bid_unit_minor <= 0:
+        raise ValueError("bid_unit_minor must be positive")
+    value = int(bid_minor)
+    unit = int(bid_unit_minor)
+    remainder = value % unit
+    if remainder == 0:
+        return value
+    lower = value - remainder
+    upper = lower + unit
+    return lower if remainder * 2 <= unit else upper
+
+
+def _middle_bid(min_bid_minor: int, max_bid_minor: int) -> int:
+    midpoint = int(round((int(min_bid_minor) + int(max_bid_minor)) / 2))
+    return _snap_bid_minor_to_unit(midpoint)
+
+
 def repair_max_bid_minor(
     max_bid_minor: int,
     *,
@@ -105,6 +128,6 @@ def repair_state_test_bid_minor(
     ):
         state.current_test_bid_minor = int(actual_bid_minor)
     else:
-        state.current_test_bid_minor = int(round((min_bid_minor + max_bid_minor) / 2))
+        state.current_test_bid_minor = _middle_bid(int(min_bid_minor), int(max_bid_minor))
     state.last_reason = "settings_units_repaired"
     return True
