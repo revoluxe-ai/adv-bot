@@ -18,6 +18,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
     ComplexAdv,
+    resolve_auto_shelf_bid_control_strategy,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost_from_summary
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
@@ -121,6 +122,12 @@ class AutoShelfBidControlTelegramService:
         adv_setting_original_id: int,
     ) -> MainBidRefreshResult:
         """Применить main bid refresh до чтения view и вернуть результат."""
+        # Keep Telegram/manual refresh aligned with worker ticks.
+        # Transitional case: even after the migration, legacy `cycle_metric`
+        # can still appear in tests, local dumps, or partially updated
+        # environments. Worker paths normalize it through ComplexAdv
+        # (`cycle_metric -> cpc`), so Telegram must normalize the same way
+        # before building the lightweight complex_adv_like object.
         adv = await self._get_adv_or_raise(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         state = await self._repository.get_state(nmid)
@@ -145,6 +152,9 @@ class AutoShelfBidControlTelegramService:
         if cached_bid is not None:
             actual_bid_minor = int(cached_bid.bid_minor)
         plan_fact_summary = await PlanFactReader().get_latest_plan_fact(int(adv.adv_id))
+        normalized_strategy = resolve_auto_shelf_bid_control_strategy(
+            getattr(adv, "auto_shelf_bid_control_strategy", None)
+        )
         complex_adv_like = SimpleNamespace(
             main_nmid=nmid,
             auto_adv_id=int(adv.adv_id),
@@ -152,10 +162,7 @@ class AutoShelfBidControlTelegramService:
             bot_active=bool(getattr(adv, "bot_active", True)),
             auto_adv_active_status=bool(getattr(adv, "auto_adv_active_status", True)),
             auto_shelf_bid_control_enabled=bool(adv.auto_shelf_bid_control_enabled),
-            auto_shelf_bid_control_strategy=(
-                adv.auto_shelf_bid_control_strategy
-                or AutoShelfBidControlStrategy.PLAN_DISTANCE
-            ),
+            auto_shelf_bid_control_strategy=normalized_strategy,
             adv_setting=adv,
             original_max_cpo=float(adv.max_price_for_order or 0.0),
             fact_pay_for_order=(
