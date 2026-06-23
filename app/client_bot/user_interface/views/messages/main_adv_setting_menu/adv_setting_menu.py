@@ -157,7 +157,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._v3_last_action_str: str | None = None
         self._ui_access: UiAccessMode = UiAccessMode.FREE
         self._ui_access_resolver: UiAccessResolver | None = None
-        if isinstance(redis_client, RedisClient):
+        if isinstance(redis_client, RedisClient): # pyright: ignore
             self._ui_access_resolver = UiAccessResolver(
                 UiModeService(redis_client=redis_client)
             )
