@@ -100,3 +100,32 @@ async def test_backfill_repairs_fixed_phrase_to_max_for_max_conv_adv() -> None:
 
     assert count == 1
     assert kw.strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.asyncio
+async def test_backfill_repairs_fixed_phrase_to_optimum_for_optimum_adv() -> None:
+    kw = MagicMock()
+    kw.hard_status = 4
+    kw.strategy_mode = KeywordStrategyMode.MIN_CPA
+
+    session = MagicMock()
+    execute_result = MagicMock()
+    execute_result.all.return_value = [(kw, 3, Strategy.OPTIMUM)]
+    session.execute = AsyncMock(return_value=execute_result)
+    session.commit = AsyncMock()
+
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=session)
+    cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.v3_status_mode_backfill.sm",
+        return_value=cm,
+    ):
+        count = await backfill_v3_status_mode_consistency(
+            dry_run=False,
+            adv_setting_id=99,
+        )
+
+    assert count == 1
+    assert kw.strategy_mode == KeywordStrategyMode.OPTIMUM

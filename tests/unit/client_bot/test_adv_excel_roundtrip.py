@@ -125,6 +125,7 @@ def test_parse_edit_enum_accepts_enum_name() -> None:
 def test_enum_names_for_field_strategy() -> None:
     values = enum_names_for_field("strategy")
     assert "MIN_CPO" in values
+    assert "OPTIMUM" in values
     assert "MAX_CONV" in values
 
 

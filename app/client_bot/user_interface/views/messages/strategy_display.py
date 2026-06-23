@@ -6,6 +6,7 @@ def format_adv_strategy(strategy: Strategy | None) -> str:
     value = strategy or Strategy.MIN_CPO
     labels = {
         Strategy.MIN_CPO: "Мин себес",
+        Strategy.OPTIMUM: "Оптимум",
         Strategy.MAX_CONV: "Макс конв",
     }
     return labels.get(value, "Мин себес")
