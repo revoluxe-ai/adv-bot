@@ -55,6 +55,7 @@ class User(BaseTable):
         BIGINT, nullable=True, unique=True
     )
     username: Mapped[str] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
     # Web registration (phase 1: nullable; phase 2 may tighten to NOT NULL/UNIQUE)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
