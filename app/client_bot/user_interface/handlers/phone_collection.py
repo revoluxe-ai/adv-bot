@@ -1,7 +1,11 @@
 """Handlers for mandatory Telegram phone collection."""
 
-from aiogram import Bot, F, Router
-from aiogram.types import Message, ReplyKeyboardRemove
+import asyncio
+import json
+
+from aiogram import Bot, Dispatcher, F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, Update
 from sqlalchemy import select
 
 from app.client_bot.user_interface.views.phone_request import (
@@ -15,7 +19,12 @@ _sm = get_async_session_maker
 
 
 @router.message(F.contact)
-async def save_user_phone(message: Message, bot: Bot) -> None:
+async def save_user_phone(
+    message: Message,
+    bot: Bot,
+    state: FSMContext,
+    dispatcher: Dispatcher,
+) -> None:
     """Save the user's own Telegram contact and remove the reply keyboard."""
     if message.from_user is None or message.contact is None:
         return
@@ -43,8 +52,17 @@ async def save_user_phone(message: Message, bot: Bot) -> None:
         user.phone = phone_number
         await session.commit()
 
+    pending_callback = (await state.get_data()).get("pending_phone_callback")
+    await state.update_data(pending_phone_callback=None)
     await bot.send_message(
         message.chat.id,
-        "Номер телефона сохранён. Теперь можно продолжить работу.",
+        "Номер телефона сохранён.",
         reply_markup=ReplyKeyboardRemove(),
     )
+    if not pending_callback:
+        return
+
+    await asyncio.sleep(0.3)
+    callback_query = CallbackQuery.model_validate(json.loads(pending_callback))
+    replay_update = Update(update_id=message.message_id, callback_query=callback_query)
+    await dispatcher.feed_update(bot, replay_update)
