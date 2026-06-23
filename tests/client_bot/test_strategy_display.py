@@ -12,5 +12,9 @@ def test_format_adv_strategy_max_conv() -> None:
     assert format_adv_strategy(Strategy.MAX_CONV) == "Макс конв"
 
 
+def test_format_adv_strategy_optimum() -> None:
+    assert format_adv_strategy(Strategy.OPTIMUM) == "Оптимум"
+
+
 def test_format_adv_strategy_none_uses_min_cpo_fallback() -> None:
     assert format_adv_strategy(None) == "Мин себес"
