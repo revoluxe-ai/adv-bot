@@ -1093,6 +1093,24 @@ class CPMSetting(TextWithKeyboard):
         builder.row(bottom)
 
         bottom = InlineKeyboardButton(
+            text="Скачать шаблон целевых позиций",
+            callback_data=callbacks.CPMSettingMenu(
+                action="download_target_places_template",
+                adv_original_id=self.adv_setting.id,
+            ).pack(),
+        )
+        builder.row(bottom)
+
+        bottom = InlineKeyboardButton(
+            text="Загрузить целевые позиции из файла",
+            callback_data=callbacks.CPMSettingMenu(
+                action="upload_target_places_template",
+                adv_original_id=self.adv_setting.id,
+            ).pack(),
+        )
+        builder.row(bottom)
+
+        bottom = InlineKeyboardButton(
             text="К настройкам АРК",
             callback_data=callbacks.Adv(adv_original_id=self.adv_setting.id).pack(),
         )

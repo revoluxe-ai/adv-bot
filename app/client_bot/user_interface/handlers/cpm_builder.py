@@ -1,12 +1,20 @@
 """Telegram handlers for CPM bidder settings flow."""
 
+import io
+
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.types import BufferedInputFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from app.client_bot.user_interface.services.cpm_target_place_workbook import (
+    TargetPlaceImportSummary,
+    apply_target_place_workbook,
+    build_target_place_workbook,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -28,6 +36,23 @@ async def _set_all_keywords_target_place(
     )
     for keyword_setting in result.scalars():
         keyword_setting.target_place = target_place
+
+
+def _format_target_place_import_summary(summary: TargetPlaceImportSummary) -> str:
+    """Build compact user-facing import summary with first errors only."""
+    lines = [
+        "Готово. Импорт целевых позиций завершён.",
+        f"Строк обработано: {summary.processed_rows}",
+        f"Обновлено target_place: {summary.updated_rows}",
+        f"Пропущено пустых target_place: {summary.skipped_empty_rows}",
+        f"Не найдено: {summary.not_found_rows}",
+        f"Ошибок валидации: {summary.validation_error_rows}",
+    ]
+    if summary.errors:
+        lines.append("")
+        lines.append("Первые ошибки:")
+        lines.extend(summary.errors[:5])
+    return "\n".join(lines)
 
 
 @router.callback_query(
@@ -210,4 +235,83 @@ async def set_max_position_message(
         await _set_all_keywords_target_place(session, adv_original_id, max_position)
         await session.commit()
         await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
+    await state.set_state(state=None)
+
+
+@router.callback_query(
+    callbacks.CPMSettingMenu.filter(F.action == "download_target_places_template")
+)
+async def download_target_places_template(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.ChoiceAdvPaginator,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Export xlsx template with editable target places for campaign keywords."""
+    adv_original_id = callback_data.adv_original_id
+    payload = await build_target_place_workbook(adv_original_id)
+    await state.update_data(last_adv_original_id=adv_original_id)
+    await bot.send_document(
+        chat_id=callback.message.chat.id,
+        document=BufferedInputFile(
+            payload, filename=f"campaign_{adv_original_id}_target_places.xlsx"
+        ),
+        caption="Шаблон целевых позиций по текущей РК.",
+    )
+
+
+@router.callback_query(
+    callbacks.CPMSettingMenu.filter(F.action == "upload_target_places_template")
+)
+async def upload_target_places_template_start(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.ChoiceAdvPaginator,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Switch FSM to workbook upload mode for campaign target places."""
+    adv_original_id = callback_data.adv_original_id
+    await state.update_data(last_adv_original_id=adv_original_id)
+    await state.set_state(states.CPMSetting.waiting_for_target_place_workbook)
+    await bot.send_message(
+        callback.message.chat.id,
+        "Пришлите файл .xlsx с целевыми позициями. Меняйте только колонку target_place.",
+    )
+
+
+@router.message(
+    StateFilter(states.CPMSetting.waiting_for_target_place_workbook),
+    F.document,
+)
+async def upload_target_places_template_file(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Apply uploaded workbook to keyword target places of the current campaign."""
+    if message.document is None:
+        return
+    file_name = message.document.file_name or ""
+    if file_name and not file_name.lower().endswith(".xlsx"):
+        await message.answer("Нужен файл в формате .xlsx")
+        return
+
+    state_data = await state.get_data()
+    adv_original_id = state_data.get("last_adv_original_id")
+    if adv_original_id is None:
+        await state.clear()
+        await message.answer(
+            "Сессия истекла. Откройте управление ставкой и снова нажмите загрузку файла."
+        )
+        return
+
+    await message.answer("Файл получен, начинаю обработку целевых позиций…")
+    payload = io.BytesIO()
+    await bot.download(message.document, payload)
+    try:
+        summary = await apply_target_place_workbook(adv_original_id, payload.getvalue())
+    except ValueError as exc:
+        await message.answer(f"Не удалось обработать файл: {exc}")
+        return
+
+    await message.answer(_format_target_place_import_summary(summary))
+    await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)

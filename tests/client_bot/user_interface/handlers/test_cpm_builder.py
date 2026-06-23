@@ -368,3 +368,5 @@ def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> No
 
     assert "Изменить Максимальную ставку" in button_texts
     assert "Изменить целевую позицию" in button_texts
+    assert "Скачать шаблон целевых позиций" in button_texts
+    assert "Загрузить целевые позиции из файла" in button_texts
