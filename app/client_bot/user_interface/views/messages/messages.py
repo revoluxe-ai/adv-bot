@@ -1072,14 +1072,13 @@ class CPMSetting(TextWithKeyboard):
 
         builder.row(bottom)
 
-        if self.adv_setting.bidder_active:
-            bottom = InlineKeyboardButton(
-                text="Изменить целевую позицию",
-                callback_data=callbacks.CPMSettingMenu(
-                    action="set_max_position", adv_original_id=self.adv_setting.id
-                ).pack(),
-            )
-            builder.row(bottom)
+        bottom = InlineKeyboardButton(
+            text="Изменить целевую позицию",
+            callback_data=callbacks.CPMSettingMenu(
+                action="set_max_position", adv_original_id=self.adv_setting.id
+            ).pack(),
+        )
+        builder.row(bottom)
 
         bottom = InlineKeyboardButton(
             text="К настройкам АРК",
