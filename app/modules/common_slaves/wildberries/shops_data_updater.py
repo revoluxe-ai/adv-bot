@@ -114,9 +114,9 @@ class ShopDataUpdater:
 
         adv_ids: list[int] = []
         async with sm(read_only=True) as session:
-           adv_settings = await self.get_adv_setting_by_wb_cabinet_active_filter(session,
-                                                                                 wb_cabinet_id=self.wb_cabinet.id,
-                                                                                 )
+           adv_settings = await self.get_adv_setting_by_wb_cabinet_with_search_adv_id(session,
+                                                                                      wb_cabinet_id=self.wb_cabinet.id,
+                                                                                      )
         for adv_setting in adv_settings:
             if adv_setting.adv_id is not None: # pyright: ignore
                 adv_ids.append(adv_setting.adv_id) # pyright: ignore
@@ -193,9 +193,9 @@ class ShopDataUpdater:
 
 
     @staticmethod
-    async def get_adv_setting_by_wb_cabinet_active_filter(session: AsyncSession,
-                                                          *,
-                                                          wb_cabinet_id: int) -> typing.Sequence[models.AdvSetting]:
+    async def get_adv_setting_by_wb_cabinet_with_search_adv_id(session: AsyncSession,
+                                                               *,
+                                                               wb_cabinet_id: int,) -> typing.Sequence[models.AdvSetting]:
         stmt = (
             select(models.AdvSetting)
 
@@ -207,11 +207,9 @@ class ShopDataUpdater:
                 )
             ).where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                models.AdvSetting._search_adv_id.is_not(None) # pyright: ignore
+                ~models.AdvSetting._search_adv_id.is_(None),
             )
         )
-
         result = await session.execute(stmt)
         adv_settings = result.unique().scalars().all()
         return adv_settings
-
