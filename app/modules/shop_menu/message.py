@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 from app.client_bot import const
 from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
+from app.client_bot.ui_access import UiAccessMode, UiAccessResolver
 from app.client_bot.ui_mode import UiModeService
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import (
@@ -77,7 +78,7 @@ def _has_read_only_only_tokens(token_status: TokenStatusReport) -> bool:
 def build_shop_main_keyboard(
     wb_user_cabinet: WBUserCabinet,
     wb_cabinet: WBCabinet,
-    ui_mode: str = "free",
+    ui_access: UiAccessMode = UiAccessMode.FREE,
 ) -> InlineKeyboardMarkup:
     wb_cabinet_original_id = wb_cabinet.id
     builder = InlineKeyboardBuilder()
@@ -129,7 +130,7 @@ def build_shop_main_keyboard(
         )
     )
 
-    if ui_mode == "paid":
+    if ui_access == UiAccessMode.PAID:
         _ = builder.row(
             InlineKeyboardButton(
                 text="Массовые операции с РК",
@@ -151,14 +152,14 @@ def build_shop_main_keyboard(
     if _is_admin_user(getattr(wb_user_cabinet.user, "user_telegram_id", None)):
         _ = builder.row(
             InlineKeyboardButton(
-                text=f"Режим интерфейса: {ui_mode.upper()}",
+                text=f"Режим интерфейса: {ui_access.name}",
                 callback_data=UiModeToggle(
                     wb_user_cabinet_original_id=wb_user_cabinet.id
                 ).pack(),
             )
         )
 
-    if ui_mode == "paid":
+    if ui_access == UiAccessMode.PAID:
         _ = builder.row(
             InlineKeyboardButton(
                 text="Загрузить настройки из Excel",
@@ -253,11 +254,13 @@ class ShopMenu(TextWithKeyboard):
         self._balance_snapshot_manager: RedisShopBalanceSnapshotManager | None = None
         self._shop_balance_snapshot: dict[str, int | str | None] | None = None
         self._ui_mode_service: UiModeService | None = None
-        self._ui_mode: str = "free"
+        self._ui_access_resolver: UiAccessResolver | None = None
+        self._ui_access: UiAccessMode = UiAccessMode.FREE
         if isinstance(redis_client, RedisClient):
             self._billing_redis_manager = BillingRedisManager(redis_client=redis_client)
             self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
             self._ui_mode_service = UiModeService(redis_client=redis_client)
+            self._ui_access_resolver = UiAccessResolver(self._ui_mode_service)
 
         # Initialize token status attributes
         self._token_status: TokenStatusReport | None = None
@@ -337,9 +340,9 @@ class ShopMenu(TextWithKeyboard):
                 self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
                     self._wb_cabinet.shop_id
                 )
-            if self._ui_mode_service is not None:
-                self._ui_mode = await self._ui_mode_service.get_user_ui_mode(
-                    self._user_telegram_id
+            if self._ui_access_resolver is not None:
+                self._ui_access = await self._ui_access_resolver.resolve_shop_ui_access(
+                    self._user_telegram_id, session, self._wb_cabinet.shop_id
                 )
             # 6. Load token status
             await self.get_shop_token_status()
@@ -629,7 +632,7 @@ class ShopMenu(TextWithKeyboard):
     @property
     def keyboard(self):
         return build_shop_main_keyboard(
-            self._wb_user_cabinet, self._wb_cabinet, ui_mode=self._ui_mode
+            self._wb_user_cabinet, self._wb_cabinet, ui_access=self._ui_access
         )
 
     @staticmethod
