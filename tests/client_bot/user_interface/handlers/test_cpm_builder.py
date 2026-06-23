@@ -66,6 +66,7 @@ async def _create_adv_with_keywords(
     max_cpm: int | None,
     bidder_active: bool = False,
     bot_active: bool = False,
+    auto_update_target_place: bool = False,
     keyword_places: list[int | None] | None = None,
 ) -> tuple[int, list[KeywordSetting]]:
     wb_cabinet = WBCabinet(
@@ -85,6 +86,7 @@ async def _create_adv_with_keywords(
         bidder_active=bidder_active,
         max_place=max_place,
         max_cpm=max_cpm,
+        auto_update_target_place=auto_update_target_place,
     )
     session.add_all([wb_cabinet, adv])
     await session.flush()
@@ -350,6 +352,38 @@ async def test_change_manual_max_cpm_does_not_touch_bot_active(
     cpm_page.assert_awaited_once_with(adv_id)
 
 
+@pytest.mark.asyncio
+async def test_change_target_position_is_blocked_when_auto_target_place_enabled(
+    async_session: AsyncSession,
+) -> None:
+    adv_id, _ = await _create_adv_with_keywords(
+        async_session,
+        max_place=5,
+        max_cpm=100,
+        auto_update_target_place=True,
+        keyword_places=[2, 3],
+    )
+    state = _FakeState({"last_adv_original_id": adv_id})
+    bot = AsyncMock()
+    cpm_page = AsyncMock()
+    mock_sm = _MockSessionMaker(async_session)
+
+    with patch(
+        "app.client_bot.user_interface.handlers.cpm_builder.sm",
+        mock_sm,
+    ), patch(
+        "app.client_bot.user_interface.handlers.cpm_builder.messages.CPMSetting",
+        MagicMock(return_value=cpm_page),
+    ):
+        await cpm_builder.set_max_position_message(_message("13"), bot, state)
+
+    updated = await _get_adv(async_session, adv_id)
+    assert updated.max_place == 5
+    assert await _get_keyword_places(async_session, adv_id) == [2, 3]
+    cpm_page.assert_not_awaited()
+    assert state.state_calls[-1] is None
+
+
 def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> None:
     view = CPMSetting.__new__(CPMSetting)
     view.adv_setting = SimpleNamespace(
@@ -357,6 +391,7 @@ def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> No
         bidder_active=False,
         bidder_for_auto=False,
         bidder_step=None,
+        auto_update_target_place=False,
     )
 
     button_texts = _button_texts(view.keyboard)
@@ -365,3 +400,21 @@ def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> No
     assert "Изменить целевую позицию" in button_texts
     assert "Скачать шаблон целевых позиций" in button_texts
     assert "Загрузить целевые позиции из файла" in button_texts
+
+
+def test_cpm_setting_keyboard_hides_target_place_tools_when_auto_update_enabled() -> None:
+    view = CPMSetting.__new__(CPMSetting)
+    view.adv_setting = SimpleNamespace(
+        id=77,
+        bidder_active=False,
+        bidder_for_auto=False,
+        bidder_step=None,
+        auto_update_target_place=True,
+    )
+
+    button_texts = _button_texts(view.keyboard)
+
+    assert "Изменить Максимальную ставку" in button_texts
+    assert "Изменить целевую позицию" not in button_texts
+    assert "Скачать шаблон целевых позиций" not in button_texts
+    assert "Загрузить целевые позиции из файла" not in button_texts
