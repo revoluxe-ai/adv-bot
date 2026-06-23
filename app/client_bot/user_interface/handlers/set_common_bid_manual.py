@@ -1,7 +1,8 @@
-"""Ручная установка общей ставки в поисковой (аукционной) кампании."""
+"""Manual one-shot tool for common bid update in search campaign and its keywords."""
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from aiogram import Bot, Router, types
@@ -20,7 +21,13 @@ from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
     SetCommonBidsCommandItem,
 )
+from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
+    SetNormqueryBidsCommandItem,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.redis_cluster_bids_timestamp_manager import (
+    RedisClusterBidsTimestampManager,
+)
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
     RedisCommonBidTimestampManager,
 )
@@ -30,6 +37,10 @@ from app.modules.shop_runner.service_manager.services.update_commot_bid_in_searc
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
+from app.shared.domains.wb.utils.wb_campaign_meta import (
+    wb_campaign_meta_known,
+    wb_supports_normquery_minus_phrases,
+)
 from app.shared.domains.wb.enums import AdvType
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -38,6 +49,15 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 MAX_BID_RUB = 3000
+
+
+@dataclass(frozen=True, slots=True)
+class SearchBidApplyResult:
+    """Summary of manual one-shot search bid updates."""
+
+    updated_keywords: int
+    total_keywords: int
+    errors: tuple[str, ...]
 
 
 async def _reload_adv_setting_menu(
@@ -69,6 +89,68 @@ def _build_complex_adv(main_adv: AdvSetting, search_adv: AdvSetting, shop_id: st
         adv_setting=main_adv,
         search_adv=search_adv,
         shop_id=shop_id,
+    )
+
+
+def _is_manual_search_campaign(search_adv_setting: AdvSetting) -> bool:
+    """Allow manual search bid tool unless synced WB meta explicitly says otherwise."""
+    if not wb_campaign_meta_known(search_adv_setting):
+        return True
+    return wb_supports_normquery_minus_phrases(search_adv_setting)
+
+
+def _build_normquery_bid_items(
+    current_bids: list[Any] | None,
+    bid_value: int,
+    search_adv_id: int,
+) -> list[SetNormqueryBidsCommandItem]:
+    """Build unique per-cluster write items from current WB search bids snapshot."""
+    if not current_bids:
+        return []
+    seen: set[tuple[int, int, str]] = set()
+    items: list[SetNormqueryBidsCommandItem] = []
+    for bid in current_bids:
+        advert_id = int(getattr(bid, "advert_id"))
+        nm_id = int(getattr(bid, "nm_id"))
+        norm_query = str(getattr(bid, "norm_query", "")).strip()
+        key = (advert_id, nm_id, norm_query)
+        if advert_id != search_adv_id or not norm_query or key in seen:
+            continue
+        seen.add(key)
+        items.append(
+            SetNormqueryBidsCommandItem(
+                advert_id=advert_id,
+                nm_id=nm_id,
+                norm_query=norm_query,
+                bid=bid_value,
+            )
+        )
+    return items
+
+
+async def _apply_normquery_bids(
+    wb_modifier: Any,
+    bid_items: list[SetNormqueryBidsCommandItem],
+) -> SearchBidApplyResult:
+    """Apply normquery bids one by one to preserve partial success reporting."""
+    updated_keywords = 0
+    errors: list[str] = []
+    for item in bid_items:
+        try:
+            await wb_modifier.set_normquery_bids([item])
+            updated_keywords += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "set_normquery_bids failed advert_id=%s nm_id=%s norm_query=%s",
+                item.advert_id,
+                item.nm_id,
+                item.norm_query,
+            )
+            errors.append(f"{item.norm_query} (nm {item.nm_id}): {exc}")
+    return SearchBidApplyResult(
+        updated_keywords=updated_keywords,
+        total_keywords=len(bid_items),
+        errors=tuple(errors),
     )
 
 
@@ -117,6 +199,9 @@ async def set_common_bid_manual_start(
             chat_id,
             "Поисковая РК не найдена в настройках.",
         )
+        return
+    if not _is_manual_search_campaign(search_adv_setting):
+        await bot.send_message(chat_id, "Эта кнопка доступна только для Поисковых РК.")
         return
 
     shop_id = adv_setting.wb_cabinet.shop_id if adv_setting.wb_cabinet else None
@@ -170,7 +255,7 @@ async def set_common_bid_manual_start(
     await bot.send_message(
         chat_id,
         f"Минимальная ставка для аукциона: {min_common} р.\n"
-        f"Введите новую общую ставку (руб., целое число, не менее {min_common}):",
+        f"Введите ставку для Поисковой РК (руб., целое число, не менее {min_common}):",
     )
 
 
@@ -244,6 +329,10 @@ async def set_common_bid_manual_apply(
         await state.set_state(None)
         await message.answer("Поисковая РК не найдена.")
         return
+    if not _is_manual_search_campaign(search_adv_setting):
+        await state.set_state(None)
+        await message.answer("Эта кнопка доступна только для Поисковых РК.")
+        return
 
     shop_id = adv_setting.wb_cabinet.shop_id if adv_setting.wb_cabinet else None
     if not shop_id:
@@ -269,6 +358,10 @@ async def set_common_bid_manual_apply(
     ]
     command = SetCommonBidsCommand(items=command_items)
 
+    await message.answer(
+        "Отправляю новую ставку в WB для Поисковой РК и её ключей..."
+    )
+
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
             factory = (
@@ -276,8 +369,20 @@ async def set_common_bid_manual_apply(
             )
             hub = factory.get_wb_manager_hub(shop_id)
             redis_client = hub.redis_client_wrapper
+            current_bids = await hub.wb_data_manager.get_current_bids_for_advs(
+                [complex_adv]
+            )
+            normquery_items = _build_normquery_bid_items(
+                current_bids=current_bids,
+                bid_value=bid_value,
+                search_adv_id=int(search_adv_setting.adv_id),
+            )
 
             await hub.wb_modifier.update_search_adv_common_cpm(command)
+            normquery_result = await _apply_normquery_bids(
+                hub.wb_modifier,
+                normquery_items,
+            )
 
             redis_bid_value = RedisCommonBidValueManager(redis_client)
             redis_bid_ts = RedisCommonBidTimestampManager(redis_client)
@@ -286,6 +391,9 @@ async def set_common_bid_manual_apply(
             if search_adv_id is not None:
                 await redis_bid_value.set_bids(search_adv_id, bid_values)
                 await redis_bid_ts.set(search_adv_id)
+                if normquery_result.total_keywords > 0:
+                    cluster_bid_ts = RedisClusterBidsTimestampManager(redis_client)
+                    await cluster_bid_ts.set(adv_setting)
     except Exception as e:
         logger.exception(
             "update_search_adv_common_cpm failed for adv_setting_id=%s",
@@ -297,6 +405,24 @@ async def set_common_bid_manual_apply(
         return
 
     await state.set_state(None)
-    await message.answer(f"Общая ставка изменена на {bid_value} р.")
+    if normquery_result.total_keywords == 0:
+        await message.answer(
+            f"Готово. Общая ставка поисковой РК установлена: {bid_value} ₽. "
+            "Ключи поисковой кампании для обновления ставок не найдены."
+        )
+    elif normquery_result.updated_keywords == normquery_result.total_keywords:
+        await message.answer(
+            f"Готово. Общая ставка поисковой РК установлена: {bid_value} ₽. "
+            "Такая же ставка поставлена всем ключам кампании."
+        )
+    else:
+        errors_text = "; ".join(normquery_result.errors[:3])
+        if len(normquery_result.errors) > 3:
+            errors_text += f"; и ещё {len(normquery_result.errors) - 3}"
+        await message.answer(
+            f"Общая ставка установлена: {bid_value} ₽. "
+            f"По ключам обновлено: {normquery_result.updated_keywords} "
+            f"из {normquery_result.total_keywords}. Ошибки: {errors_text}"
+        )
 
     await _reload_adv_setting_menu(bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id)
