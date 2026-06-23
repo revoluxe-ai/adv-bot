@@ -1,10 +1,12 @@
 """Unit tests for mandatory phone collection middleware and handlers."""
 
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Chat, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -136,8 +138,28 @@ async def test_phone_required_middleware_blocks_callback_without_phone() -> None
     event.from_user = MagicMock(id=444, username="u")
     event.message = MagicMock(spec=Message)
     event.message.chat = MagicMock(spec=Chat, id=444)
+    event.model_dump.return_value = {
+        "id": "callback-id",
+        "from_user": {
+            "id": 444,
+            "is_bot": False,
+            "first_name": "User",
+        },
+        "chat_instance": "chat-instance",
+        "data": "adv:test",
+        "message": {
+            "message_id": 55,
+            "date": 0,
+            "chat": {
+                "id": 444,
+                "type": "private",
+            },
+        },
+    }
     bot = AsyncMock()
     handler = AsyncMock()
+    state = MagicMock(spec=FSMContext)
+    state.update_data = AsyncMock()
 
     with patch(
         "app.client_bot.middlewars.phone_required._sm",
@@ -145,10 +167,11 @@ async def test_phone_required_middleware_blocks_callback_without_phone() -> None
     ), patch("app.client_bot.middlewars.phone_required.settings") as mock_settings:
         mock_settings.invite_gate = True
         middleware = PhoneRequiredMiddleware()
-        await middleware(handler, event, {"bot": bot})
+        await middleware(handler, event, {"bot": bot, "state": state})
 
     handler.assert_not_awaited()
     bot.send_message.assert_awaited_once()
+    state.update_data.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -162,19 +185,25 @@ async def test_save_user_phone_saves_own_contact() -> None:
     message.chat = MagicMock(spec=Chat, id=555)
     message.from_user = MagicMock(id=555)
     message.contact = MagicMock(user_id=555, phone_number="+79990001122")
+    message.message_id = 99
     bot = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+    state.update_data = AsyncMock()
+    dispatcher = AsyncMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.phone_collection._sm",
         session_cm,
     ):
-        await save_user_phone(message, bot)
+        await save_user_phone(message, bot, state, dispatcher)
 
     assert user.phone == "+79990001122"
     session.commit.assert_awaited_once()
     bot.send_message.assert_awaited_once()
     _, kwargs = bot.send_message.call_args
     assert kwargs["reply_markup"].remove_keyboard is True
+    dispatcher.feed_update.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -188,12 +217,70 @@ async def test_save_user_phone_rejects_foreign_contact() -> None:
     message.from_user = MagicMock(id=666)
     message.contact = MagicMock(user_id=777, phone_number="+79990001122")
     bot = AsyncMock()
+    state = MagicMock(spec=FSMContext)
+    dispatcher = AsyncMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.phone_collection._sm",
         session_cm,
     ):
-        await save_user_phone(message, bot)
+        await save_user_phone(message, bot, state, dispatcher)
 
     session.commit.assert_not_awaited()
     bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_save_user_phone_replays_pending_callback() -> None:
+    """Saved contact replays the callback that had been blocked by phone gating."""
+    user = MagicMock(spec=User)
+    user.phone = None
+    session, session_cm = make_session_context(user=user)
+
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat, id=777)
+    message.from_user = MagicMock(id=777)
+    message.contact = MagicMock(user_id=777, phone_number="+79990001122")
+    message.message_id = 1234
+    bot = AsyncMock()
+    state = MagicMock()
+    pending_callback = {
+        "id": "callback-id",
+        "from_user": {
+            "id": 777,
+            "is_bot": False,
+            "first_name": "Test",
+        },
+        "chat_instance": "chat-instance",
+        "data": "adv:test",
+        "message": {
+            "message_id": 55,
+            "date": 0,
+            "chat": {
+                "id": 777,
+                "type": "private",
+            },
+        },
+    }
+    state.get_data = AsyncMock(
+        return_value={"pending_phone_callback": json.dumps(pending_callback)}
+    )
+    state.update_data = AsyncMock()
+    dispatcher = AsyncMock()
+
+    with patch(
+        "app.client_bot.user_interface.handlers.phone_collection._sm",
+        session_cm,
+    ), patch(
+        "app.client_bot.user_interface.handlers.phone_collection.asyncio.sleep",
+        new_callable=AsyncMock,
+    ) as mock_sleep:
+        await save_user_phone(message, bot, state, dispatcher)
+
+    mock_sleep.assert_awaited_once_with(0.7)
+    dispatcher.feed_update.assert_awaited_once()
+    _, replay_kwargs = dispatcher.feed_update.call_args
+    replay_update = replay_kwargs["update"] if "update" in replay_kwargs else dispatcher.feed_update.call_args.args[1]
+    assert replay_update.callback_query is not None
+    assert replay_update.callback_query.data == "adv:test"
+    state.update_data.assert_awaited_once_with(pending_phone_callback=None)

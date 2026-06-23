@@ -1,9 +1,11 @@
 """Middleware that blocks bot usage until the Telegram phone is stored."""
 
+import json
 from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from aiogram import BaseMiddleware
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
@@ -49,6 +51,15 @@ class PhoneRequiredMiddleware(BaseMiddleware):
 
         if isinstance(event, Message) and getattr(event, "contact", None) is not None:
             return await handler(event, data)
+
+        if isinstance(event, CallbackQuery):
+            state = data.get("state")
+            if isinstance(state, FSMContext):
+                await state.update_data(
+                    pending_phone_callback=json.dumps(
+                        event.model_dump(mode="json", exclude_none=True)
+                    )
+                )
 
         bot = data.get("bot")
         if bot is None:
