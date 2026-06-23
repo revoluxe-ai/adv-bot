@@ -67,7 +67,7 @@ async def _create_adv_with_keywords(
     bidder_active: bool = False,
     bot_active: bool = False,
     keyword_places: list[int | None] | None = None,
-) -> tuple[AdvSetting, list[KeywordSetting]]:
+) -> tuple[int, list[KeywordSetting]]:
     wb_cabinet = WBCabinet(
         shop_id=f"shop_{datetime.now().timestamp()}",
         active=True,
@@ -88,17 +88,18 @@ async def _create_adv_with_keywords(
     )
     session.add_all([wb_cabinet, adv])
     await session.flush()
+    adv_id = adv.id
     keywords = [
         KeywordSetting(
             text=f"kw_{index}",
-            adv_setting_id=adv.id,
+            adv_setting_id=adv_id,
             target_place=place,
         )
         for index, place in enumerate(keyword_places or [None, None], start=1)
     ]
     session.add_all(keywords)
     await session.commit()
-    return adv, keywords
+    return adv_id, keywords
 
 
 async def _get_adv(session: AsyncSession, adv_id: int) -> AdvSetting:
@@ -124,10 +125,9 @@ def _button_texts(markup: object) -> list[str]:
 async def test_set_auto_cpm_enables_immediately_when_settings_exist(
     async_session: AsyncSession,
 ) -> None:
-    adv, _ = await _create_adv_with_keywords(
+    adv_id, _ = await _create_adv_with_keywords(
         async_session, max_place=5, max_cpm=120, bidder_active=False
     )
-    adv_id = adv.id
     state = _FakeState()
     bot = AsyncMock()
     callback_data = SimpleNamespace(adv_original_id=adv_id)
@@ -153,10 +153,9 @@ async def test_set_auto_cpm_enables_immediately_when_settings_exist(
 async def test_set_auto_cpm_requests_target_place_only_when_max_place_missing(
     async_session: AsyncSession,
 ) -> None:
-    adv, _ = await _create_adv_with_keywords(
+    adv_id, _ = await _create_adv_with_keywords(
         async_session, max_place=0, max_cpm=250, bidder_active=False
     )
-    adv_id = adv.id
     state = _FakeState()
     bot = AsyncMock()
     callback_data = SimpleNamespace(adv_original_id=adv_id)
@@ -203,10 +202,9 @@ async def test_set_auto_cpm_requests_target_place_only_when_max_place_missing(
 async def test_set_auto_cpm_requests_max_cpm_only_when_it_is_missing(
     async_session: AsyncSession,
 ) -> None:
-    adv, _ = await _create_adv_with_keywords(
+    adv_id, _ = await _create_adv_with_keywords(
         async_session, max_place=8, max_cpm=None, bidder_active=False
     )
-    adv_id = adv.id
     state = _FakeState()
     bot = AsyncMock()
     callback_data = SimpleNamespace(adv_original_id=adv_id)
@@ -247,10 +245,9 @@ async def test_set_auto_cpm_requests_max_cpm_only_when_it_is_missing(
 async def test_set_auto_cpm_requests_both_values_when_both_missing(
     async_session: AsyncSession,
 ) -> None:
-    adv, _ = await _create_adv_with_keywords(
+    adv_id, _ = await _create_adv_with_keywords(
         async_session, max_place=0, max_cpm=None, bidder_active=False
     )
-    adv_id = adv.id
     state = _FakeState()
     bot = AsyncMock()
     callback_data = SimpleNamespace(adv_original_id=adv_id)
@@ -302,10 +299,9 @@ async def test_set_auto_cpm_requests_both_values_when_both_missing(
 async def test_change_target_position_updates_campaign_and_keywords_only(
     async_session: AsyncSession,
 ) -> None:
-    adv, _ = await _create_adv_with_keywords(
+    adv_id, _ = await _create_adv_with_keywords(
         async_session, max_place=5, max_cpm=100, bidder_active=False, bot_active=False
     )
-    adv_id = adv.id
     state = _FakeState({"last_adv_original_id": adv_id})
     bot = AsyncMock()
     cpm_page = AsyncMock()
@@ -331,10 +327,9 @@ async def test_change_target_position_updates_campaign_and_keywords_only(
 async def test_change_manual_max_cpm_does_not_touch_bot_active(
     async_session: AsyncSession,
 ) -> None:
-    adv, _ = await _create_adv_with_keywords(
+    adv_id, _ = await _create_adv_with_keywords(
         async_session, max_place=6, max_cpm=200, bidder_active=False, bot_active=False
     )
-    adv_id = adv.id
     state = _FakeState({"last_adv_original_id": adv_id})
     bot = AsyncMock()
     cpm_page = AsyncMock()
