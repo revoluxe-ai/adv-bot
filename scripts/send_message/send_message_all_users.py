@@ -14,14 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from app.admin_bot.sender import redis_manager
 from app.client_bot.bot import aclose_telegram_http_session, get_bots_for_tokens
-from app.modules.common_slaves.wildberries.models.models import (
-    WBUserCabinet,
-)
-from app.utils.db.models import User
-from app.utils.db.session_maker import get_async_session_maker as sm
-from scripts.get_users.filters.filters import get_users_by_telegram_id, get_test_users
-from scripts.send_message.utils.get_users_with_low_balance_and_near_last_payment import \
-    get_users_with_low_balance_and_near_last_payment
+
 from scripts.send_message.utils.messages import message_11
 from scripts.users_communicate_module.main_user_generator import get_users_iterator, get_test_users_iterator
 from scripts.users_csv_exporter.dto import UserDTO
