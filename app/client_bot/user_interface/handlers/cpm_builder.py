@@ -1,10 +1,13 @@
+"""Telegram handlers for CPM bidder settings flow."""
+
 import aiogram
 from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker
 
 from .. import states
@@ -16,21 +19,35 @@ sm = get_async_session_maker
 router = Router()
 
 
+async def _set_all_keywords_target_place(
+    session: AsyncSession, adv_original_id: int, target_place: int
+) -> None:
+    """Synchronize campaign target place to all keywords of the campaign."""
+    result = await session.execute(
+        select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_original_id)
+    )
+    for keyword_setting in result.scalars():
+        keyword_setting.target_place = target_place
+
+
 @router.callback_query(
-    callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page") # noqa
+    callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page")  # noqa
 )
 async def to_page_for_cpm_setting(
     callback: types.CallbackQuery,
     callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
-):
+) -> None:
+    """Open CPM settings page for the selected campaign."""
     adv_original_id = callback_data.adv_original_id
     await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
-    return
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_min_position))
-async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def get_max_cpm(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Persist target place and request max CPM only when it is still missing."""
     text = message.text
     if "/start" in text:
         await state.set_state(state=None)
@@ -43,14 +60,36 @@ async def get_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
     if min_position < 1:
         await message.answer("Введите целое положительное число от 1 и выше")
         return
+
+    state_data = await state.get_data()
+    adv_original_id = state_data["last_adv_original_id"]
+    async with sm(read_only=False) as session:
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        )
+        adv = result.scalar_one()
+        adv.max_place = min_position
+        has_max_cpm = adv.max_cpm is not None and adv.max_cpm > 0
+        if has_max_cpm:
+            adv.bidder_active = True
+        await _set_all_keywords_target_place(session, adv_original_id, min_position)
+        await session.commit()
+
+    if has_max_cpm:
+        await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
+        await state.set_state(state=None)
+        return
+
     await state.update_data(min_position=min_position)
     await state.set_state(states.CPMSetting.waiting_for_max_cpm)
     await messages.AutoCPMSettingGetMaxCPM(bot, message.chat.id)()
-    return
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_max_cpm))
-async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def set_max_cpm(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Persist max CPM and enable bidder, keeping any prior target place value."""
     data = await state.get_data()
     text = message.text
     if "/start" in text:
@@ -65,38 +104,41 @@ async def set_max_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContex
         await message.answer("Введите целое положительное число от 1 и выше")
         return
 
-    state_data = await state.get_data()
-    adv_original_id = state_data["last_adv_original_id"]
+    adv_original_id = data["last_adv_original_id"]
     async with sm(read_only=False) as session:
         result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv = result.scalar_one()
-        adv.max_place = data["min_position"]
+        min_position = data.get("min_position")
+        if min_position is not None:
+            adv.max_place = min_position
         adv.max_cpm = max_cpm
         adv.bidder_active = True
         await session.commit()
         await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)
-    return
 
 
-@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm")) # noqa
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm"))  # noqa
 async def set_manual_cpm(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
+    """Request manual max CPM value for the selected campaign."""
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_manual_cpm)
     await messages.ManualCPMSetting(bot, callback.message.chat.id)()
-    return
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_manual_cpm))
-async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def set_manual_cpm_message(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Save manual max CPM without touching bidder or bot activity flags."""
     text = message.text
     if "/start" in text:
         await state.set_state(state=None)
@@ -122,27 +164,29 @@ async def set_manual_cpm(message: types.Message, bot: aiogram.Bot, state: FSMCon
     _ = await bot.send_message(message.chat.id, f"CPM успешно установлен ({manual_cpm}) р.")
     await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)
-    return
 
 
-@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position")) # noqa
+@router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position"))  # noqa
 async def set_max_position(
     callback: types.CallbackQuery,
     callback_data: callbacks.ChoiceAdvPaginator,
     bot: aiogram.Bot,
     state: FSMContext,
-):
+) -> None:
+    """Request a new shared target place for the selected campaign."""
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_max_position)
     await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(
         adv_original_id
     )
-    return
 
 
 @router.message(StateFilter(states.CPMSetting.waiting_for_max_position))
-async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMContext):
+async def set_max_position_message(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Save shared target place and propagate it to all campaign keywords."""
     text = message.text
     if "/start" in text:
         await state.set_state(state=None)
@@ -163,7 +207,7 @@ async def set_max_position(message: types.Message, bot: aiogram.Bot, state: FSMC
         )
         adv = result.scalar_one()
         adv.max_place = max_position
+        await _set_all_keywords_target_place(session, adv_original_id, max_position)
         await session.commit()
         await messages.CPMSetting(bot, message.chat.id)(adv_original_id)
     await state.set_state(state=None)
-    return
