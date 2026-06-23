@@ -19,6 +19,8 @@ from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
+from app.client_bot.ui_access import UiAccessMode, UiAccessResolver
+from app.client_bot.ui_mode import UiModeService
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
@@ -153,6 +155,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._stats_stale_reason: str | None = None
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._v3_last_action_str: str | None = None
+        self._ui_access: UiAccessMode = UiAccessMode.FREE
+        self._ui_access_resolver: UiAccessResolver | None = None
+        if isinstance(redis_client, RedisClient):
+            self._ui_access_resolver = UiAccessResolver(
+                UiModeService(redis_client=redis_client)
+            )
 
 
     @staticmethod
@@ -195,6 +203,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             return status
 
     async def __call__(self) -> Message:
+        self._ui_access = await self._resolve_ui_access()
         auction_adv_id: int | None = self.adv.search_adv_id
         if auction_adv_id:
              status_auction = await self._get_status_auction(auction_adv_id)
@@ -366,6 +375,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 self._spend_search_today = 0.0
 
         return await super().__call__()
+
+    async def _resolve_ui_access(self) -> UiAccessMode:
+        """Resolve effective freemium access for campaign menu rendering."""
+        if self._ui_access_resolver is None:
+            return UiAccessMode.PAID if self.adv.bot_active else UiAccessMode.FREE
+        return await self._ui_access_resolver.resolve_adv_ui_access(
+            int(self.chat_id), self.adv
+        )
 
     @property
     def text(self) -> str:
@@ -676,7 +693,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboard.get_adv_setting_keyboard(
-            self.wb_user_cabinet, self.adv, self.in_favorites_user
+            self.wb_user_cabinet,
+            self.adv,
+            self.in_favorites_user,
+            ui_access=self._ui_access,
         )
 
     @staticmethod
