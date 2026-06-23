@@ -63,6 +63,7 @@ class CPMSetting(StatesGroup):
     waiting_for_max_cpm = State()
     waiting_for_manual_cpm = State()
     waiting_for_max_position = State()
+    waiting_for_target_place_workbook = State()
 
 
 class AddBlackPhrasesTemplates(StatesGroup):
