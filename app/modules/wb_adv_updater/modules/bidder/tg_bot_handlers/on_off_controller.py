@@ -23,7 +23,7 @@ async def get_min_position(
     state: FSMContext,
 ) -> None:
     """Enable bidder immediately or request only the missing CPM settings."""
-    adv_original_id = callback_data.adv_original_id  # type: ignore[attr-defined]
+    adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     async with sm(read_only=False) as session:
         result = await session.execute(
@@ -34,22 +34,24 @@ async def get_min_position(
         has_max_cpm = adv.max_cpm is not None and adv.max_cpm > 0
 
         import app.client_bot.user_interface.views.messages as ui_messages
-
+        chat_id = callback.message.chat.id
         if has_max_place and has_max_cpm:
             adv.bidder_active = True
             await session.commit()
-            await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)  # pyright: ignore[arg-type]
+            await ui_messages.CPMSetting(bot, chat_id)(adv_original_id)
             return
 
         if not has_max_place:
             await state.set_state(states.CPMSetting.waiting_for_min_position)
-            await ui_messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(  # pyright: ignore[arg-type]
+            await ui_messages.AutoCPMSettingGetMinPosition(bot, chat_id)(
                 adv_original_id
             )
             return
+        if not callback.message:
+            raise RuntimeError("callback.message is None")
 
         await state.set_state(states.CPMSetting.waiting_for_max_cpm)
-        await ui_messages.AutoCPMSettingGetMaxCPM(bot, callback.message.chat.id)()
+        await ui_messages.AutoCPMSettingGetMaxCPM(bot, chat_id)()
 
 
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "off_auto_cpm"))
