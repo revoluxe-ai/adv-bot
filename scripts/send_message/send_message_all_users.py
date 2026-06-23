@@ -60,8 +60,8 @@ async def async_chain(
 
 redis_semaphore = asyncio.Semaphore(1)
 
-TEST_MODE = False
-DRY_RUN_MODE = False
+TEST_MODE = True
+DRY_RUN_MODE = True
 
 
 

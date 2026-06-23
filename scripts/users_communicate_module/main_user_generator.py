@@ -85,5 +85,6 @@ async def get_users_iterator(
         telegram_ids_filter=None,
         only_with_auto_campaign=False,
         balance_more_than_0=False,
+        without_active_advs=True
     )
     return get_users_generator
