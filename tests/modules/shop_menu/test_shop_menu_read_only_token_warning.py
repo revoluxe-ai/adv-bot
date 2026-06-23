@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.client_bot.ui_access import UiAccessMode
 from app.modules.shop_menu.message import ShopMenu, build_shop_main_keyboard
 from app.modules.token_monitoring.services.token_info_service import (
     TokenInfo,
@@ -116,7 +117,7 @@ def test_shop_menu_hides_paid_controls_in_free_mode() -> None:
     keyboard = build_shop_main_keyboard(
         shop._wb_user_cabinet,
         shop._wb_cabinet,
-        ui_mode="free",
+        ui_access=UiAccessMode.FREE,
     )
     texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
 
@@ -150,7 +151,7 @@ def test_shop_menu_shows_paid_controls_in_paid_mode() -> None:
     keyboard = build_shop_main_keyboard(
         shop._wb_user_cabinet,
         shop._wb_cabinet,
-        ui_mode="paid",
+        ui_access=UiAccessMode.PAID,
     )
     texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
 
