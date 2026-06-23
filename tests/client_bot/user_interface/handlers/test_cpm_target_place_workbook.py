@@ -62,6 +62,8 @@ class _FakeState:
 
 async def _create_adv_with_keywords(
     session: AsyncSession,
+    *,
+    auto_update_target_place: bool = False,
 ) -> tuple[AdvSetting, list[KeywordSetting], AdvSetting]:
     cabinet = WBCabinet(
         shop_id=f"shop_{datetime.now().timestamp()}",
@@ -80,6 +82,7 @@ async def _create_adv_with_keywords(
         bidder_active=False,
         max_place=9,
         max_cpm=333,
+        auto_update_target_place=auto_update_target_place,
     )
     other_adv = AdvSetting(
         adv_id=(int(datetime.now().timestamp() * 1000000) % 2_000_000_000) + 1,
@@ -238,9 +241,13 @@ async def test_upload_target_places_start_sets_fsm_and_prompts_user() -> None:
     callback = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=77)))
     callback_data = SimpleNamespace(adv_original_id=123)
 
-    await cpm_builder.upload_target_places_template_start(
-        callback, callback_data, bot, state
-    )
+    with patch(
+        "app.client_bot.user_interface.handlers.cpm_builder._load_adv_setting",
+        AsyncMock(return_value=SimpleNamespace(auto_update_target_place=False)),
+    ):
+        await cpm_builder.upload_target_places_template_start(
+            callback, callback_data, bot, state
+        )
 
     assert state.data["last_adv_original_id"] == 123
     assert state.state_calls[-1] == states.CPMSetting.waiting_for_target_place_workbook
@@ -270,6 +277,9 @@ async def test_upload_target_places_file_processes_document_and_sends_summary() 
     cpm_page = AsyncMock()
 
     with patch(
+        "app.client_bot.user_interface.handlers.cpm_builder._load_adv_setting",
+        AsyncMock(return_value=SimpleNamespace(auto_update_target_place=False)),
+    ), patch(
         "app.client_bot.user_interface.handlers.cpm_builder.apply_target_place_workbook",
         AsyncMock(return_value=summary),
     ), patch(
@@ -283,3 +293,60 @@ async def test_upload_target_places_file_processes_document_and_sends_summary() 
     assert "Обновлено target_place: 2" in message.answer.await_args_list[1].args[0]
     cpm_page.assert_awaited_once_with(123)
     assert state.state_calls[-1] is None
+
+
+@pytest.mark.asyncio
+async def test_download_target_place_template_is_blocked_when_auto_update_enabled(
+    async_session: AsyncSession,
+) -> None:
+    adv, _, _ = await _create_adv_with_keywords(
+        async_session, auto_update_target_place=True
+    )
+    state = _FakeState()
+    bot = AsyncMock()
+    callback = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=77)))
+    callback_data = SimpleNamespace(adv_original_id=adv.id)
+    mock_sm = _MockSessionMaker(async_session)
+
+    with patch(
+        "app.client_bot.user_interface.handlers.cpm_builder.sm",
+        mock_sm,
+    ):
+        await cpm_builder.download_target_places_template(
+            callback, callback_data, bot, state
+        )
+
+    bot.send_document.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_upload_target_places_file_is_blocked_when_auto_update_enabled(
+    async_session: AsyncSession,
+) -> None:
+    adv, _, _ = await _create_adv_with_keywords(
+        async_session, auto_update_target_place=True
+    )
+    state = _FakeState({"last_adv_original_id": adv.id})
+    bot = AsyncMock()
+    message = SimpleNamespace(
+        document=SimpleNamespace(file_name="target_places.xlsx"),
+        chat=SimpleNamespace(id=88),
+        answer=AsyncMock(),
+    )
+    mock_sm = _MockSessionMaker(async_session)
+
+    with patch(
+        "app.client_bot.user_interface.handlers.cpm_builder.sm",
+        mock_sm,
+    ), patch(
+        "app.client_bot.user_interface.handlers.cpm_builder.apply_target_place_workbook",
+        AsyncMock(),
+    ) as apply_mock:
+        await cpm_builder.upload_target_places_template_file(message, bot, state)
+
+    apply_mock.assert_not_awaited()
+    assert state.state_calls[-1] is None
+    assert message.answer.await_args.args[0].startswith(
+        "Автоматическое обновление целевых позиций включено"
+    )

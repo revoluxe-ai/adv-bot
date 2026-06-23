@@ -1084,31 +1084,32 @@ class CPMSetting(TextWithKeyboard):
 
         builder.row(bottom)
 
-        bottom = InlineKeyboardButton(
-            text="Изменить целевую позицию",
-            callback_data=callbacks.CPMSettingMenu(
-                action="set_max_position", adv_original_id=self.adv_setting.id
-            ).pack(),
-        )
-        builder.row(bottom)
+        if not self.adv_setting.auto_update_target_place:
+            bottom = InlineKeyboardButton(
+                text="Изменить целевую позицию",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="set_max_position", adv_original_id=self.adv_setting.id
+                ).pack(),
+            )
+            builder.row(bottom)
 
-        bottom = InlineKeyboardButton(
-            text="Скачать шаблон целевых позиций",
-            callback_data=callbacks.CPMSettingMenu(
-                action="download_target_places_template",
-                adv_original_id=self.adv_setting.id,
-            ).pack(),
-        )
-        builder.row(bottom)
+            bottom = InlineKeyboardButton(
+                text="Скачать шаблон целевых позиций",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="download_target_places_template",
+                    adv_original_id=self.adv_setting.id,
+                ).pack(),
+            )
+            builder.row(bottom)
 
-        bottom = InlineKeyboardButton(
-            text="Загрузить целевые позиции из файла",
-            callback_data=callbacks.CPMSettingMenu(
-                action="upload_target_places_template",
-                adv_original_id=self.adv_setting.id,
-            ).pack(),
-        )
-        builder.row(bottom)
+            bottom = InlineKeyboardButton(
+                text="Загрузить целевые позиции из файла",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="upload_target_places_template",
+                    adv_original_id=self.adv_setting.id,
+                ).pack(),
+            )
+            builder.row(bottom)
 
         bottom = InlineKeyboardButton(
             text="К настройкам АРК",
