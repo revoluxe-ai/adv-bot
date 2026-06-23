@@ -61,7 +61,7 @@ async def async_chain(
 redis_semaphore = asyncio.Semaphore(1)
 
 TEST_MODE = True
-DRY_RUN_MODE = True
+DRY_RUN_MODE = False
 
 
 
@@ -99,7 +99,8 @@ async def send_message_to_users():
     not_send_count = 0
     if not TEST_MODE:
         users: AsyncIterator[UserDTO] = await get_users_iterator(
-            only_with_auto_campaign=False
+            only_with_auto_campaign=False,
+            balance_more_than_0=False
         )
         bots = get_bots()
     #

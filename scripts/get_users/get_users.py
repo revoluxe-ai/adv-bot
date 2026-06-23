@@ -51,7 +51,7 @@ async def _fetch_user_batch(
     telegram_ids_filter: list[int] | None,
     only_with_auto_campaign: bool = False,
     balance_more_than_0: bool = None,
-   without_active_advs: bool =False,
+     without_active_advs: bool =False,
 ) -> list[User]:
     stmt = (
         select(User)

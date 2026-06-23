@@ -70,8 +70,9 @@ async def get_test_users_iterator() -> AsyncGenerator[UserDTO, None]:
 
 
 async def get_users_iterator(
-    only_with_auto_campaign: bool = True,
     *,
+    only_with_auto_campaign: bool,
+    balance_more_than_0: bool,
     batch_size: int | None = None,
 ) -> AsyncIterator[UserDTO]:
     """Iterate users from DB in batches (``batch_size`` rows per query; default 30)."""
@@ -83,8 +84,7 @@ async def get_users_iterator(
     get_users_generator = get_users(
         batch_size=effective_batch,
         telegram_ids_filter=None,
-        only_with_auto_campaign=False,
-        balance_more_than_0=False,
-        without_active_advs=True
+        only_with_auto_campaign=only_with_auto_campaign,
+        balance_more_than_0= balance_more_than_0,
     )
     return get_users_generator
