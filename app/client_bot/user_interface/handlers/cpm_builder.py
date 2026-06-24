@@ -62,10 +62,7 @@ async def _load_adv_setting(
     session: AsyncSession, adv_original_id: int
 ) -> AdvSetting | None:
     """Load campaign settings by id using the current session maker."""
-    result = await session.execute(
-        select(AdvSetting).where(AdvSetting.id == adv_original_id)
-    )
-    return result.scalar_one_or_none()
+    return await session.get(AdvSetting, adv_original_id)
 
 
 @router.callback_query(
@@ -102,10 +99,10 @@ async def get_max_cpm(
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv = result.scalar_one()
+        adv = await _load_adv_setting(session, adv_original_id)
+        if adv is None:
+            await state.set_state(state=None)
+            raise RuntimeError('Не удалось найти РК')
         if adv.auto_update_target_place:
             await state.set_state(state=None)
             await message.answer(get_auto_target_place_manual_change_locked_text())
@@ -148,10 +145,10 @@ async def set_max_cpm(
 
     adv_original_id = data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv = result.scalar_one()
+        adv = await _load_adv_setting(session, adv_original_id)
+        if adv is None:
+            await state.set_state(state=None)
+            raise RuntimeError('Не удалось найти РК')
         min_position = data.get("min_position")
         if min_position is not None:
             adv.max_place = min_position
@@ -197,10 +194,11 @@ async def set_manual_cpm_message(
     adv_original_id = state_data["last_adv_original_id"]
 
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv = result.scalar_one()
+        adv = await _load_adv_setting(session, adv_original_id)
+        if adv is None:
+            await state.set_state(state=None)
+            raise RuntimeError("Не удалось найти кампанию для настройки.")
+
         adv.max_cpm = manual_cpm
         await session.commit()
     _ = await bot.send_message(message.chat.id, f"CPM успешно установлен ({manual_cpm}) р.")
@@ -221,7 +219,11 @@ async def set_max_position(
         adv = await _load_adv_setting(session, adv_original_id)
 
     if adv is None:
-        raise RuntimeError('Не найдена кампания для настройки')
+        await state.set_state(state=None)
+        raise RuntimeError(
+            "Не удалось найти кампанию для настройки.",
+        )
+
 
     if adv.auto_update_target_place:
         await state.set_state(state=None)
@@ -257,10 +259,11 @@ async def set_max_position_message(
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv = result.scalar_one()
+        adv = await _load_adv_setting(session, adv_original_id)
+        if adv is None:
+            await state.set_state(state=None)
+            raise RuntimeError("Не удалось найти кампанию для настройки.")
+
         if adv.auto_update_target_place:
             await state.set_state(state=None)
             await message.answer(get_auto_target_place_manual_change_locked_text())
@@ -286,8 +289,10 @@ async def download_target_places_template(
     async with sm(read_only=True) as session:
         adv = await _load_adv_setting(session, adv_original_id)
     if adv is None:
-        raise RuntimeError('Не найдена кампания для настройки')
-
+        await state.set_state(state=None)
+        raise RuntimeError(
+            "Не удалось найти кампанию для настройки.",
+        )
     if adv.auto_update_target_place:
         await state.set_state(state=None)
         await bot.send_message(
@@ -320,7 +325,8 @@ async def upload_target_places_template_start(
     async with sm(read_only=True) as session:
         adv = await _load_adv_setting(session, adv_original_id)
     if adv is None:
-        raise RuntimeError('Не найдена кампания для настройки')
+        await state.set_state(state=None)
+        raise RuntimeError('Не удалось найти РК')
 
     if adv.auto_update_target_place:
         await state.set_state(state=None)
@@ -364,7 +370,8 @@ async def upload_target_places_template_file(
         adv = await _load_adv_setting(session, int(adv_original_id))
     if adv is None:
         await state.set_state(state=None)
-        raise RuntimeError('Не найдена кампания для настройки')
+        raise RuntimeError("Не удалось найти кампанию для настройки.")
+
 
     if adv.auto_update_target_place:
         await state.set_state(state=None)
