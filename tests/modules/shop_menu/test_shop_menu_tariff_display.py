@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any, cast
+from unittest.mock import Mock
 
 import pytest
 
@@ -74,7 +75,10 @@ class TestShopMenuTariffDisplay:
     def test_shop_menu_keyboard_uses_active_fallback_when_attribute_absent(self):
         menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
         m = cast(Any, menu)
-        m._wb_user_cabinet = type("WBUC", (), {"name": "Shop Fallback", "id": 11})()
+
+        user = Mock()
+
+        m._wb_user_cabinet = type("WBUC", (), {"name": "Shop Fallback", "id": 11, "user": user})()
         # intentionally no `active` attribute
         m._wb_cabinet = type(
             "WBC",
