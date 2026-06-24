@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, Mock
 
 import pytest
 
@@ -47,7 +47,11 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
         wb_user_cabinet_original_id=wb_user_cabinet_id
     )
     wb_cabinet = SimpleNamespace(id=7, active=True)
-    wb_user_cabinet = SimpleNamespace(id=wb_user_cabinet_id, wb_cabinet=wb_cabinet)
+    user = Mock()
+
+    wb_user_cabinet = SimpleNamespace(id=wb_user_cabinet_id,
+                                      wb_cabinet=wb_cabinet,
+                                      user=user)
 
     with patch(
         "app.client_bot.user_interface.handlers.start.start._get_wb_user_cabinet_for_shop_menu",
