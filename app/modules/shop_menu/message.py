@@ -642,8 +642,8 @@ class ShopMenu(TextWithKeyboard):
         # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
         stmt = (
             select(WBUserCabinet)
-            .join(WBUserCabinet.wb_cabinet,
-                  WBUserCabinet.user)
+            .join(WBUserCabinet.wb_cabinet)
+            .join(WBUserCabinet.user)
             .options(
                 selectinload(WBUserCabinet.user),
                 # Загружаем WBCabinet со всеми необходимыми связями
