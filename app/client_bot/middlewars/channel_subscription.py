@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
+from functools import lru_cache
 from typing import Any, cast
 
 from aiogram import BaseMiddleware, Bot
@@ -20,10 +21,13 @@ from app.client_bot.const import SUPPORT_CHANNEL_ID
 from app.client_bot.start_command import is_start_command_message
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.messages.messages import NeedSubscribe
+from app.core.redis_manager_v2.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 
 ALLOWED_SUBSCRIPTION_STATUSES = {"member", "administrator", "creator"}
+SUBSCRIPTION_CACHE_TTL_SECONDS = 60 * 60 * 24
+SUBSCRIPTION_CACHE_PREFIX = "client_bot:support_channel_subscription"
 
 
 def _resolve_chat_id(event: Message | CallbackQuery) -> int | None:
@@ -42,11 +46,64 @@ def _is_whitelisted_event(event: Message | CallbackQuery) -> bool:
     return bool(event.data and event.data == callbacks.CheckSubscribe().pack())
 
 
+def _build_subscription_cache_key(telegram_id: int) -> str:
+    """Build the Redis key for positive channel-subscription cache."""
+    return f"{SUBSCRIPTION_CACHE_PREFIX}:{telegram_id}"
+
+
+@lru_cache(maxsize=1)
+def _get_subscription_cache_client() -> RedisClient | None:
+    """Return the shared Redis wrapper used for subscription cache.
+
+    The helper is lazy and intentionally fail-open: if Redis wiring is not ready,
+    the subscription check still works via Telegram API without local cache.
+    """
+    try:
+        from app.core.di.app_container import AppContainer
+
+        return AppContainer().redis_client_wrapper()
+    except Exception:
+        logger.warning(
+            "Failed to initialize Redis client for support channel subscription cache",
+            exc_info=True,
+        )
+        return None
+
+
+async def _get_cached_subscription_status(telegram_id: int) -> bool | None:
+    """Return cached positive subscription status if it exists."""
+    redis_client = _get_subscription_cache_client()
+    if redis_client is None:
+        return None
+
+    cached_value = await redis_client.get(_build_subscription_cache_key(telegram_id))
+    if cached_value == "1":
+        return True
+    return None
+
+
+async def _cache_positive_subscription_status(telegram_id: int) -> None:
+    """Persist a positive subscription result for 24 hours."""
+    redis_client = _get_subscription_cache_client()
+    if redis_client is None:
+        return
+
+    await redis_client.set(
+        _build_subscription_cache_key(telegram_id),
+        "1",
+        ex=SUBSCRIPTION_CACHE_TTL_SECONDS,
+    )
+
+
 async def is_user_subscribed_to_support_channel(
     bot: Bot,
     telegram_id: int,
 ) -> bool | None:
-    """Return channel membership status with fail-open API error handling."""
+    """Return channel membership status with Redis cache and fail-open API handling."""
+    cached_status = await _get_cached_subscription_status(telegram_id)
+    if cached_status is True:
+        return True
+
     try:
         member = await bot.get_chat_member(SUPPORT_CHANNEL_ID, telegram_id)
     except TelegramAPIError:
@@ -57,7 +114,10 @@ async def is_user_subscribed_to_support_channel(
         )
         return None
 
-    return getattr(member, "status", None) in ALLOWED_SUBSCRIPTION_STATUSES
+    is_subscribed = getattr(member, "status", None) in ALLOWED_SUBSCRIPTION_STATUSES
+    if is_subscribed:
+        await _cache_positive_subscription_status(telegram_id)
+    return is_subscribed
 
 
 async def send_need_subscribe_message(bot: Bot, event: Message | CallbackQuery) -> None:
