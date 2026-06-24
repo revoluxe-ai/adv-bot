@@ -7,6 +7,7 @@ from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -58,11 +59,11 @@ def get_main_menu_keyboard(
                 callback_data=AdminPanel(action="menu").pack(),
             )
             keyboard_buttons.append([admin_button])
-        presentation_button = InlineKeyboardButton(
-            text="Запросить презентацию",
-            callback_data=callbacks.RequestPresentation(action="request").pack(),
+        invite_button = InlineKeyboardButton(
+            text="Ввести инвайт",
+            callback_data=Gate(action="invite_enter").pack(),
         )
-        keyboard_buttons.append([presentation_button])
+        keyboard_buttons.append([invite_button])
         return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
     if is_bot_admin(user_telegram_id):

@@ -91,9 +91,7 @@ async def callback_start_registration(
 
         stmt = (
             select(User)
-            .options(
-                joinedload(User.wb_user_cabinets).joinedload(WBUserCabinet.wb_cabinet)
-            )
+            .options(load_only(User.id, User.passed_gate))
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)

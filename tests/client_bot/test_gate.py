@@ -321,6 +321,70 @@ async def test_gate_middleware_presentation_only_blocks_unknown_message() -> Non
 
     handler.assert_not_awaited()
     bot.send_message.assert_awaited_once()
+    call_args, call_kw = bot.send_message.call_args
+    text = call_args[1] if len(call_args) > 1 else call_kw.get("text", "")
+    assert "инвайт" in text.lower()
+    assert call_kw.get("reply_markup") is not None
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_presentation_only_allows_gate_invite_callback() -> None:
+    """В режиме presentation_only callback gate:* должен открывать ввод инвайт-кода."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+
+    _, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=CallbackQuery)
+    event.from_user = MagicMock(id=999101, is_bot=False, username="u")
+    event.data = Gate(action="invite_enter").pack()
+    event.message = MagicMock(spec=Message)
+    event.message.chat = MagicMock(spec=Chat, id=999101)
+    data = {"bot": AsyncMock(), "state": None}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ), patch("app.client_bot.middlewars.gate.settings") as mock_settings:
+        mock_settings.presentation_only = True
+        mock_settings.invite_gate = True
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_presentation_only_allows_gate_invite_state_message() -> None:
+    """В режиме presentation_only сообщение в FSM GateInvite:* не должно блокироваться."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+
+    _, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=999102, is_bot=False, username="u")
+    event.chat = MagicMock(spec=Chat, id=999102)
+    event.text = "INVITE-CODE"
+    event.successful_payment = None
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_state = AsyncMock(return_value="GateInvite:waiting_code")
+    data = {"bot": bot, "state": state}
+    handler = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.gate._sm",
+        session_cm,
+    ), patch("app.client_bot.middlewars.gate.settings") as mock_settings:
+        mock_settings.presentation_only = True
+        mock_settings.invite_gate = True
+        mw = GateMiddleware()
+        await mw(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+    bot.send_message.assert_not_called()
 
 
 @pytest.mark.asyncio
