@@ -11,6 +11,7 @@ from ..modules.cabinet_bonus_manager.bonus_scene import (
     register_bonus_scene,
 )
 from .common_routers import common_router
+from .middlewars.channel_subscription import ChannelSubscriptionMiddleware
 from .middlewars.gate import GateMiddleware
 from .middlewars.phone_required import PhoneRequiredMiddleware
 from .middlewars.return_to_start_from_state import ReturnToStart
@@ -22,8 +23,10 @@ global_router = Router()
 
 _ = global_router.message.middleware(ReturnToStart())
 _ = global_router.message.middleware(GateMiddleware())
+_ = global_router.message.middleware(ChannelSubscriptionMiddleware())
 _ = global_router.message.middleware(PhoneRequiredMiddleware())
 _ = global_router.callback_query.middleware(GateMiddleware())
+_ = global_router.callback_query.middleware(ChannelSubscriptionMiddleware())
 _ = global_router.callback_query.middleware(PhoneRequiredMiddleware())
 # Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
 # иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.
