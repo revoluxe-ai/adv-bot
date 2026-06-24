@@ -47,6 +47,7 @@ def _make_callback_event(telegram_id: int, data: str) -> MagicMock:
     event.data = data
     event.message = MagicMock(spec=Message)
     event.message.chat = MagicMock(spec=Chat, id=telegram_id)
+    event.message.message_id = 55
     event.answer = AsyncMock()
     return event
 
@@ -106,6 +107,26 @@ async def test_channel_subscription_middleware_blocks_unsubscribed_statuses(
 
 
 @pytest.mark.asyncio
+async def test_channel_subscription_middleware_stores_pending_callback_when_blocked() -> None:
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_callback_event(223, "adv:test")
+    handler = AsyncMock()
+    bot = MagicMock()
+    bot.get_chat_member = AsyncMock(return_value=MagicMock(status="left"))
+    bot.send_message = AsyncMock()
+    state = AsyncMock(spec=FSMContext)
+    state.update_data = AsyncMock()
+
+    await middleware(handler, event, {"bot": bot, "state": state})
+
+    handler.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+    state.update_data.assert_awaited_once()
+    saved_payload = state.update_data.await_args.kwargs["pending_subscription_callback"]
+    assert '"data": "adv:test"' in saved_payload
+
+
+@pytest.mark.asyncio
 async def test_channel_subscription_middleware_allows_start_command() -> None:
     middleware = ChannelSubscriptionMiddleware()
     event = _make_message_event(333, "/start")
@@ -115,7 +136,7 @@ async def test_channel_subscription_middleware_allows_start_command() -> None:
     await middleware(handler, event, {"bot": bot})
 
     handler.assert_awaited_once_with(event, {"bot": bot})
-    assert bot.get_chat_member.called is False if hasattr(bot, "get_chat_member") else True
+    assert not hasattr(bot, "get_chat_member") or bot.get_chat_member.called is False
 
 
 @pytest.mark.asyncio
@@ -159,7 +180,7 @@ async def test_channel_subscription_middleware_allows_gate_invite_state_message(
 @pytest.mark.asyncio
 async def test_channel_subscription_middleware_admin_bypass() -> None:
     if not ADMINS:
-        pytest.skip("ADMINS пустой")
+        pytest.skip("ADMINS empty")
 
     middleware = ChannelSubscriptionMiddleware()
     event = _make_message_event(ADMINS[0])
@@ -217,6 +238,9 @@ async def test_check_subscribe_handler_returns_to_start_flow_when_subscribed() -
     callback = _make_callback_event(666, callbacks.CheckSubscribe().pack())
     bot = MagicMock()
     state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+    state.update_data = AsyncMock()
+    dispatcher = MagicMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
@@ -225,10 +249,46 @@ async def test_check_subscribe_handler_returns_to_start_flow_when_subscribed() -
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
         new=AsyncMock(),
     ) as start_mock:
-        await check_subscribe(callback, bot, state)
+        await check_subscribe(callback, bot, state, dispatcher)
 
     callback.answer.assert_awaited_once_with("Подписка подтверждена")
     start_mock.assert_awaited_once_with(callback, bot, state)
+    state.update_data.assert_awaited_once_with(pending_subscription_callback=None)
+
+
+@pytest.mark.asyncio
+async def test_check_subscribe_handler_replays_pending_callback_when_subscribed() -> None:
+    callback = _make_callback_event(667, callbacks.CheckSubscribe().pack())
+    callback.message.message_id = 99
+    bot = MagicMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={"pending_subscription_callback": '{"id":"cb","data":"adv:test"}'}
+    )
+    state.update_data = AsyncMock()
+    dispatcher = MagicMock()
+
+    with patch(
+        "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
+        new=AsyncMock(return_value=True),
+    ), patch(
+        "app.client_bot.user_interface.handlers.user_subscribe_on_channel.replay_serialized_callback",
+        new=AsyncMock(),
+    ) as replay_mock, patch(
+        "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
+        new=AsyncMock(),
+    ) as start_mock:
+        await check_subscribe(callback, bot, state, dispatcher)
+
+    callback.answer.assert_awaited_once_with("Подписка подтверждена")
+    replay_mock.assert_awaited_once_with(
+        dispatcher,
+        bot,
+        '{"id":"cb","data":"adv:test"}',
+        update_id=99,
+    )
+    start_mock.assert_not_awaited()
+    state.update_data.assert_awaited_once_with(pending_subscription_callback=None)
 
 
 @pytest.mark.asyncio
@@ -242,7 +302,7 @@ async def test_check_subscribe_handler_repeats_need_subscribe_when_not_subscribe
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
         new=AsyncMock(return_value=False),
     ):
-        await check_subscribe(callback, bot, state)
+        await check_subscribe(callback, bot, state, MagicMock())
 
     callback.answer.assert_awaited_once()
     bot.send_message.assert_awaited_once()
@@ -253,6 +313,9 @@ async def test_check_subscribe_handler_fail_open_on_telegram_error() -> None:
     callback = _make_callback_event(778, callbacks.CheckSubscribe().pack())
     bot = MagicMock()
     state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+    state.update_data = AsyncMock()
+    dispatcher = MagicMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
@@ -261,10 +324,11 @@ async def test_check_subscribe_handler_fail_open_on_telegram_error() -> None:
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
         new=AsyncMock(),
     ) as start_mock:
-        await check_subscribe(callback, bot, state)
+        await check_subscribe(callback, bot, state, dispatcher)
 
     callback.answer.assert_awaited_once()
     start_mock.assert_awaited_once_with(callback, bot, state)
+    state.update_data.assert_awaited_once_with(pending_subscription_callback=None)
 
 
 def test_subscribe_keyboard_has_url_and_recheck_buttons() -> None:

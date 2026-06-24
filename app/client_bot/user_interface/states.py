@@ -125,6 +125,12 @@ class AdminGrantGate(StatesGroup):
     waiting_telegram_id = State()
 
 
+class AdminResetUserAccess(StatesGroup):
+    """Админ: сбросить доступ пользователя по Telegram ID."""
+
+    waiting_telegram_id = State()
+
+
 class AdvExcelRoundtrip(StatesGroup):
     """Ожидание .xlsx для импорта настроек РК."""
 

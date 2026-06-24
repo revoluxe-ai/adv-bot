@@ -1,6 +1,5 @@
 """Middleware that blocks bot usage until the Telegram phone is stored."""
 
-import json
 from collections.abc import Awaitable, Callable
 import logging
 from typing import Any, cast
@@ -11,6 +10,7 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
+from app.client_bot.callback_replay import serialize_callback_query
 from app.client_bot.user_interface.views.phone_request import (
     get_phone_request_keyboard,
     get_phone_request_text,
@@ -21,49 +21,6 @@ from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
 logger = logging.getLogger(__name__)
-
-
-def _json_scalar(value: Any, default: Any) -> Any:
-    """Return a JSON-safe scalar value or the provided default."""
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    return default
-
-
-def _serialize_pending_callback(event: CallbackQuery) -> str:
-    """Serialize only the callback fields required for replay after phone save."""
-    payload: dict[str, Any] = {
-        "id": _json_scalar(getattr(event, "id", ""), ""),
-        "chat_instance": _json_scalar(getattr(event, "chat_instance", ""), ""),
-        "data": _json_scalar(getattr(event, "data", None), None),
-    }
-    if event.from_user is not None:
-        payload["from_user"] = {
-            "id": event.from_user.id,
-            "is_bot": _json_scalar(getattr(event.from_user, "is_bot", False), False),
-            "first_name": _json_scalar(
-                getattr(event.from_user, "first_name", "User"),
-                "User",
-            ),
-            "username": _json_scalar(getattr(event.from_user, "username", None), None),
-        }
-    if event.message is not None:
-        payload["message"] = {
-            "message_id": _json_scalar(getattr(event.message, "message_id", 0), 0),
-            "date": (
-                int(event.message.date.timestamp())
-                if getattr(event.message, "date", None) is not None
-                else 0
-            ),
-            "chat": {
-                "id": event.message.chat.id,
-                "type": _json_scalar(
-                    getattr(event.message.chat, "type", "private"),
-                    "private",
-                ),
-            },
-        }
-    return json.dumps(payload)
 
 
 class PhoneRequiredMiddleware(BaseMiddleware):
@@ -119,7 +76,7 @@ class PhoneRequiredMiddleware(BaseMiddleware):
             state = data.get("state")
             if isinstance(state, FSMContext):
                 await state.update_data(
-                    pending_phone_callback=_serialize_pending_callback(event)
+                    pending_phone_callback=serialize_callback_query(event)
                 )
                 logger.debug(
                     "PhoneRequiredMiddleware: saved pending callback user=%s data=%r",

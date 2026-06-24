@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from aiogram import Bot, Router
+from aiogram import Bot, Dispatcher, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
+from app.client_bot.callback_replay import replay_serialized_callback
 from app.client_bot.middlewars.channel_subscription import (
     is_user_subscribed_to_support_channel,
 )
@@ -21,8 +22,9 @@ async def check_subscribe(
     callback: CallbackQuery,
     bot: Bot,
     state: FSMContext,
+    dispatcher: Dispatcher,
 ) -> None:
-    """Re-check channel membership and continue the normal start flow."""
+    """Re-check channel membership and continue the interrupted callback flow."""
     if callback.from_user is None:
         return
 
@@ -32,6 +34,17 @@ async def check_subscribe(
     )
     if subscription_status is not False:
         await callback.answer("Подписка подтверждена")
+        state_data = await state.get_data()
+        pending_callback = state_data.get("pending_subscription_callback")
+        await state.update_data(pending_subscription_callback=None)
+        if pending_callback:
+            await replay_serialized_callback(
+                dispatcher,
+                bot,
+                pending_callback,
+                update_id=callback.message.message_id if callback.message is not None else 0,
+            )
+            return
         await callback_start_registration(callback, bot, state)
         return
 
