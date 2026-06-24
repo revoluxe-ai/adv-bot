@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
@@ -22,7 +22,6 @@ async def check_subscribe(
     callback: CallbackQuery,
     bot: Bot,
     state: FSMContext,
-    dispatcher: Dispatcher,
 ) -> None:
     """Re-check channel membership and continue the interrupted callback flow."""
     if callback.from_user is None:
@@ -39,7 +38,6 @@ async def check_subscribe(
         await state.update_data(pending_subscription_callback=None)
         if pending_callback:
             await replay_serialized_callback(
-                dispatcher,
                 bot,
                 pending_callback,
                 update_id=callback.message.message_id if callback.message is not None else 0,

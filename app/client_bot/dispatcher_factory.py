@@ -6,6 +6,7 @@ from aiohttp import ClientSession
 from aiogram import Dispatcher
 
 from app.client_bot.global_router import global_router
+from app.client_bot.callback_replay import register_dispatcher
 from app.client_bot.middlewars.immediate_callback_answer import (
     ImmediateCallbackAnswerUpdateMiddleware,
 )
@@ -28,5 +29,6 @@ def create_client_bot_dispatcher(
         billing_event_manager=billing_event_manager,
     )
     install_client_bot_dispatcher_middleware(dp)
+    register_dispatcher(dp)
     dp.include_router(global_router)
     return dp

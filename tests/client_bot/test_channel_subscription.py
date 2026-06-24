@@ -240,7 +240,6 @@ async def test_check_subscribe_handler_returns_to_start_flow_when_subscribed() -
     state = MagicMock()
     state.get_data = AsyncMock(return_value={})
     state.update_data = AsyncMock()
-    dispatcher = MagicMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
@@ -249,7 +248,7 @@ async def test_check_subscribe_handler_returns_to_start_flow_when_subscribed() -
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
         new=AsyncMock(),
     ) as start_mock:
-        await check_subscribe(callback, bot, state, dispatcher)
+        await check_subscribe(callback, bot, state)
 
     callback.answer.assert_awaited_once_with("Подписка подтверждена")
     start_mock.assert_awaited_once_with(callback, bot, state)
@@ -266,7 +265,6 @@ async def test_check_subscribe_handler_replays_pending_callback_when_subscribed(
         return_value={"pending_subscription_callback": '{"id":"cb","data":"adv:test"}'}
     )
     state.update_data = AsyncMock()
-    dispatcher = MagicMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
@@ -278,11 +276,10 @@ async def test_check_subscribe_handler_replays_pending_callback_when_subscribed(
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
         new=AsyncMock(),
     ) as start_mock:
-        await check_subscribe(callback, bot, state, dispatcher)
+        await check_subscribe(callback, bot, state)
 
     callback.answer.assert_awaited_once_with("Подписка подтверждена")
     replay_mock.assert_awaited_once_with(
-        dispatcher,
         bot,
         '{"id":"cb","data":"adv:test"}',
         update_id=99,
@@ -302,7 +299,7 @@ async def test_check_subscribe_handler_repeats_need_subscribe_when_not_subscribe
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
         new=AsyncMock(return_value=False),
     ):
-        await check_subscribe(callback, bot, state, MagicMock())
+        await check_subscribe(callback, bot, state)
 
     callback.answer.assert_awaited_once()
     bot.send_message.assert_awaited_once()
@@ -315,7 +312,6 @@ async def test_check_subscribe_handler_fail_open_on_telegram_error() -> None:
     state = MagicMock()
     state.get_data = AsyncMock(return_value={})
     state.update_data = AsyncMock()
-    dispatcher = MagicMock()
 
     with patch(
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
@@ -324,7 +320,7 @@ async def test_check_subscribe_handler_fail_open_on_telegram_error() -> None:
         "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
         new=AsyncMock(),
     ) as start_mock:
-        await check_subscribe(callback, bot, state, dispatcher)
+        await check_subscribe(callback, bot, state)
 
     callback.answer.assert_awaited_once()
     start_mock.assert_awaited_once_with(callback, bot, state)

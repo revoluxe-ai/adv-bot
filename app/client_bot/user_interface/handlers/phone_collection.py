@@ -83,8 +83,8 @@ async def save_user_phone(
         pending_callback,
     )
     await replay_serialized_callback(
-        dispatcher,
         bot,
         pending_callback,
         update_id=message.message_id,
+        dispatcher=dispatcher,
     )
