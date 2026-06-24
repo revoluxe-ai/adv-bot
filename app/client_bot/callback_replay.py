@@ -9,6 +9,8 @@ from typing import Any
 from aiogram import Bot, Dispatcher
 from aiogram.types import CallbackQuery, Update
 
+_dispatcher: Dispatcher | None = None
+
 
 def _json_scalar(value: Any, default: Any) -> Any:
     """Return a JSON-safe scalar value or the provided default."""
@@ -53,13 +55,22 @@ def serialize_callback_query(event: CallbackQuery) -> str:
 
 
 async def replay_serialized_callback(
-    dispatcher: Dispatcher,
     bot: Bot,
     serialized_callback: str,
     *,
     update_id: int,
+    dispatcher: Dispatcher | None = None,
 ) -> None:
     """Replay a previously serialized callback query through the dispatcher."""
+    target_dispatcher = dispatcher or _dispatcher
+    if target_dispatcher is None:
+        raise RuntimeError("Dispatcher is not registered for callback replay.")
     callback_query = CallbackQuery.model_validate(json.loads(serialized_callback))
     replay_update = Update(update_id=update_id, callback_query=callback_query)
-    await dispatcher.feed_update(bot, replay_update)
+    await target_dispatcher.feed_update(bot, replay_update)
+
+
+def register_dispatcher(dispatcher: Dispatcher) -> None:
+    """Register the active dispatcher for later callback replay."""
+    global _dispatcher
+    _dispatcher = dispatcher
