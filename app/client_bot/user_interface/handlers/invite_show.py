@@ -12,6 +12,7 @@ from aiogram import Bot, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
 from app.client_bot.user_interface.views.callbacks import InviteShow
@@ -85,7 +86,7 @@ def _build_partner_page_text(
 
 async def _resolve_active_invite(
     *,
-    session: object,
+    session: AsyncSession,
     user: User,
     now_utc: datetime.datetime,
 ) -> Invite | None:
