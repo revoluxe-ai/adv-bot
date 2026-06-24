@@ -18,6 +18,11 @@ sm = get_async_session_maker
 router = Router()
 
 
+async def _load_adv_setting(session, adv_original_id: int) -> AdvSetting | None:
+    """Load CPM campaign settings for bidder toggle flow."""
+    return await session.get(AdvSetting, adv_original_id)
+
+
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_auto_cpm"))
 async def get_min_position(
     callback: types.CallbackQuery,
@@ -29,10 +34,11 @@ async def get_min_position(
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv = result.scalar_one()
+        adv = await _load_adv_setting(session, adv_original_id)
+        if adv is None:
+            await state.set_state(state=None)
+            raise RuntimeError("Не удалось найти кампанию для настройки.")
+
         has_max_place = adv.max_place is not None and adv.max_place > 0
         has_max_cpm = adv.max_cpm is not None and adv.max_cpm > 0
 
