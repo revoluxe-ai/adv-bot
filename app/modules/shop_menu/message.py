@@ -16,6 +16,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
@@ -31,7 +32,6 @@ from app.client_bot.user_interface.views.callbacks import (
     ResetShopNonRelevantPhrases,
     ShopMassAdvOpsBack,
     ShopMassAdvOpsMenu,
-    ToggleCabinetActive,
     ExportShopAdvExcel,
     ImportShopAdvExcel,
     UiModeToggle,
@@ -62,6 +62,7 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
+from tests.integration.billing.test_pricer_tariff_integration import wb_cabinet
 
 logger = logging.getLogger(__name__)
 
@@ -323,33 +324,16 @@ class ShopMenu(TextWithKeyboard):
         await self._state.update_data(
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id
         )
+        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
         async with sm(read_only=True) as session:
-            # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
-            stmt = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.wb_cabinet)
-                .options(
-                    # Загружаем WBCabinet со всеми необходимыми связями
-                    selectinload(WBUserCabinet.wb_cabinet),
-                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                        WBCabinet.bonus_payments
-                    ),
-                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                        WBCabinet.balance_payments
-                    ),
-                    # Загружаем пользователя
-                    selectinload(WBUserCabinet.user),
-                    # Предзагружаем активные рекламные кампании
-                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                        WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
-                    ),
-                )
-                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)
+            wb_user_cabinet: WBUserCabinet = await self._get_wb_user_cabinet_with_user_and_wb_cabinet(
+                session,
+                wb_user_cabinet_original_id,
             )
 
-            result = await session.execute(stmt)
-            self._wb_user_cabinet = result.scalar_one()
-            self._wb_cabinet = self._wb_user_cabinet.wb_cabinet
+            wb_cabinet = wb_user_cabinet.wb_cabinet
+            self._wb_user_cabinet: WBUserCabinet = wb_user_cabinet
+            self._wb_cabinet = wb_cabinet
 
             # 3. Расчет метрик кабинета
             self._now = datetime.now()
@@ -674,3 +658,35 @@ class ShopMenu(TextWithKeyboard):
             f"🧾 <b>Cashback</b>: {parsed.total} руб"
             f"{parsed.percent_part}{exp_part}"
         )
+    @staticmethod
+    async def _get_wb_user_cabinet_with_user_and_wb_cabinet(session: AsyncSession,
+                                                            wb_user_cabinet_original_id: int,
+                                                            ) -> WBUserCabinet:
+        # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
+        stmt = (
+            select(WBUserCabinet)
+            .join(WBUserCabinet.wb_cabinet,
+                  WBUserCabinet.user)
+            .options(
+                selectinload(WBUserCabinet.user),
+                # Загружаем WBCabinet со всеми необходимыми связями
+                selectinload(WBUserCabinet.wb_cabinet),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.bonus_payments
+                ),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.balance_payments
+                ),
+                # Загружаем пользователя
+                selectinload(WBUserCabinet.user),
+                # Предзагружаем активные рекламные кампании
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
+                ),
+            )
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+
+        result = await session.execute(stmt)
+        wb_cabinet = result.scalar_one()
+        return wb_cabinet
