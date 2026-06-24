@@ -11,9 +11,11 @@ def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str
         )
 
     text = f"""
-Ваш Телеграм ID: {user_telegram_id}\n
+Ваш Телеграм ID: 6395831646
 
-📈 Экономическое управление рекламой на Wildberries \n
+
+📈 Экономическое управление рекламой на Wildberries
+
 Я управляю рекламой на Wildberries через экономику, а не через бесконечные ручные правки.
 
 🤖 Бот автоматически создаёт и ведёт поисковую рекламу и авторекламу:
@@ -34,7 +36,7 @@ def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str
 ⛔️ Если реклама “не крутится”
 Чаще это связано с настройками, бюджетом или лимитами, а не с “поломкой” ✅
 
-Поддержка и помощь -> {const.SUPPORT_LINK}
+Поддержка и помощь -> https://t.me/sky_manager_1
 
 """
 
