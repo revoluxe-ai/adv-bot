@@ -1,14 +1,14 @@
 """Handlers for mandatory Telegram phone collection."""
 
 import asyncio
-import json
 import logging
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, Update
+from aiogram.types import Message, ReplyKeyboardRemove
 from sqlalchemy import select
 
+from app.client_bot.callback_replay import replay_serialized_callback
 from app.client_bot.user_interface.views.phone_request import (
     get_phone_request_keyboard,
 )
@@ -77,11 +77,14 @@ async def save_user_phone(
         return
 
     await asyncio.sleep(0.3)
-    callback_query = CallbackQuery.model_validate(json.loads(pending_callback))
-    replay_update = Update(update_id=message.message_id, callback_query=callback_query)
     logger.debug(
         "save_user_phone: replay callback user=%s data=%r",
         message.from_user.id,
-        callback_query.data,
+        pending_callback,
     )
-    await dispatcher.feed_update(bot, replay_update)
+    await replay_serialized_callback(
+        dispatcher,
+        bot,
+        pending_callback,
+        update_id=message.message_id,
+    )
