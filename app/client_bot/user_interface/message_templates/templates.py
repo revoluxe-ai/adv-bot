@@ -74,12 +74,26 @@ class TextWithKeyboard(Base):
         parse_mode = getattr(self, "parse_mode", None)
         if parse_mode == "Markdown":
             text = text.replace("_", r"\_")
+        logger.debug(
+            "TextWithKeyboard: sending class=%s chat_id=%s parse_mode=%s text_len=%s keyboard_rows=%s text_preview=%r",
+            self.__class__.__name__,
+            self.chat_id,
+            parse_mode,
+            len(text),
+            len(self.keyboard.inline_keyboard),
+            text[:80],
+        )
         _ = await self.bot.send_message(
             chat_id=self.chat_id,
             text=text,
             reply_markup=self.keyboard,
             parse_mode=parse_mode,
             disable_web_page_preview=True,
+        )
+        logger.debug(
+            "TextWithKeyboard: sent class=%s chat_id=%s",
+            self.__class__.__name__,
+            self.chat_id,
         )
         return None
 

@@ -139,19 +139,40 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
     ) -> Any:
         event = cast(Message | CallbackQuery, event)
         telegram_id = event.from_user.id if event.from_user else None
+        logger.debug(
+            "ChannelSubscriptionMiddleware: enter type=%s user=%s callback=%r text=%r",
+            type(event).__name__,
+            telegram_id,
+            getattr(event, "data", None),
+            getattr(event, "text", None),
+        )
         if telegram_id is None:
+            logger.debug("ChannelSubscriptionMiddleware: no telegram_id, pass through")
             return await handler(event, data)
 
         if is_bot_admin(telegram_id) or _is_whitelisted_event(event):
+            logger.debug(
+                "ChannelSubscriptionMiddleware: bypass user=%s admin=%s whitelisted=%s",
+                telegram_id,
+                is_bot_admin(telegram_id),
+                _is_whitelisted_event(event),
+            )
             return await handler(event, data)
 
         bot = data.get("bot")
         if not hasattr(bot, "get_chat_member") or not hasattr(bot, "send_message"):
+            logger.debug("ChannelSubscriptionMiddleware: bot missing methods, pass through user=%s", telegram_id)
             return await handler(event, data)
 
         is_subscribed = await is_user_subscribed_to_support_channel(bot, telegram_id)
+        logger.debug(
+            "ChannelSubscriptionMiddleware: subscription result user=%s subscribed=%s",
+            telegram_id,
+            is_subscribed,
+        )
         if is_subscribed is None or is_subscribed is True:
             return await handler(event, data)
 
+        logger.debug("ChannelSubscriptionMiddleware: blocking user=%s", telegram_id)
         await send_need_subscribe_message(bot, event)
         return None
