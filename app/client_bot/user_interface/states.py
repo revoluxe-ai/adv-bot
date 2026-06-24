@@ -131,6 +131,12 @@ class AdminResetUserAccess(StatesGroup):
     waiting_telegram_id = State()
 
 
+class AdminPartnerPayout(StatesGroup):
+    """РђРґРјРёРЅ: РІРІРѕРґ СЃСѓРјРјС‹ РІС‹РїР»Р°С‚С‹ РїР°СЂС‚РЅС‘СЂСѓ."""
+
+    waiting_amount = State()
+
+
 class AdvExcelRoundtrip(StatesGroup):
     """Ожидание .xlsx для импорта настроек РК."""
 
