@@ -887,9 +887,16 @@ def get_keyword_setting_keyboard(
 
 
 def get_subscribe_keyboard() -> InlineKeyboardMarkup:
+    """Build the support-channel subscription keyboard."""
     builder = InlineKeyboardBuilder()
     _ = builder.row(
-        InlineKeyboardButton(text="Подписаться", url="https://t.me/auto_wb_master")
+        InlineKeyboardButton(text="Подписаться", url=const.SUPPORT_CHANNEL_URL)
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Проверить подписку",
+            callback_data=callbacks.CheckSubscribe().pack(),
+        )
     )
     return builder.as_markup()
 

@@ -10,6 +10,7 @@ MAX_MESSAGE_LENGTH = 4096
 MAX_TOKENS = 2
 
 SUPPORT_CHANNEL_ID = -1002006645663
+SUPPORT_CHANNEL_URL = "t.me/skyline_project"
 
 #
 # Статус коды ключевых слов

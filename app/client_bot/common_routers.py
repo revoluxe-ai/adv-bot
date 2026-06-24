@@ -94,6 +94,7 @@ from .user_interface.handlers import (
     auto_shelf_bid_control_menu,
     time_settings,
     ui_mode_toggle,
+    user_subscribe_on_channel,
     white_list_mode_toggle,
 )
 from .user_interface.handlers.common_budget_mode_toggle import (
@@ -133,6 +134,7 @@ common_router.include_routers(v3_tick_report_ui_router)
 common_router.include_routers(keyword_v3_decision_trace_ui_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
+common_router.include_routers(user_subscribe_on_channel.router)
 common_router.include_routers(orders_source_toggle.router)
 common_router.include_routers(predict_ctr_mode_toggle.router)
 common_router.include_routers(target_position_mode_toggle.router)
