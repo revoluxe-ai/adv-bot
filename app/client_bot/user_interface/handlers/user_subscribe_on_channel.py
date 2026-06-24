@@ -26,11 +26,11 @@ async def check_subscribe(
     if callback.from_user is None:
         return
 
-    is_subscribed = await is_user_subscribed_to_support_channel(
+    subscription_status = await is_user_subscribed_to_support_channel(
         bot,
         callback.from_user.id,
     )
-    if is_subscribed is True:
+    if subscription_status is not False:
         await callback.answer("Подписка подтверждена")
         await callback_start_registration(callback, bot, state)
         return
