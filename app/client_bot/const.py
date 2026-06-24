@@ -60,3 +60,4 @@ SUPPORT_USER_NAME = "sky_manager_1"  # username для лички (без @)
 # Получатель уведомлений о заявке на презентацию (главный менеджер @sky_manager_1).
 # Переопределение: PRESENTATION_NOTIFY_TELEGRAM_ID в окружении.
 MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID = 373435337
+PARTNER_PAYOUT_REQUEST_URL = SUPPORT_LINK
