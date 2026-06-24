@@ -30,6 +30,7 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.ui_access import UiAccessMode
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import (
     models as wb_models,
@@ -927,14 +928,29 @@ async def shop_menu_process(
 async def _get_wb_user_cabinet_for_shop_menu(
     wb_user_cabinet_original_id: int,
 ) -> WBUserCabinet | None:
+    """Load the shop cabinet with relations needed to rebuild the main keyboard."""
     async with sm(read_only=True) as session:
         stmt = (
             select(WBUserCabinet)
-            .options(joinedload(WBUserCabinet.wb_cabinet))
+            .options(
+                joinedload(WBUserCabinet.user),
+                joinedload(WBUserCabinet.wb_cabinet).joinedload(WBCabinet.adv_settings),
+            )
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+
+def _resolve_shop_keyboard_access(wb_user_cabinet: WBUserCabinet) -> UiAccessMode:
+    """Infer free/paid access for restoring the shop keyboard after nested menus."""
+    user = getattr(wb_user_cabinet, "user", None)
+    if is_bot_admin(getattr(user, "user_telegram_id", None)):
+        return UiAccessMode.PAID
+
+    adv_settings = getattr(wb_user_cabinet.wb_cabinet, "adv_settings", [])
+    has_paid_adv = any(getattr(adv, "bot_active", False) for adv in adv_settings)
+    return UiAccessMode.PAID if has_paid_adv else UiAccessMode.FREE
 
 
 @router.callback_query(callbacks.ShopMassAdvOpsMenu.filter())
@@ -979,6 +995,7 @@ async def close_shop_mass_adv_ops_menu(
         reply_markup=build_shop_main_keyboard(
             wb_user_cabinet,
             wb_user_cabinet.wb_cabinet,
+            ui_access=_resolve_shop_keyboard_access(wb_user_cabinet),
         )
     )
 

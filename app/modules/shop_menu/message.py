@@ -80,6 +80,7 @@ def build_shop_main_keyboard(
     wb_cabinet: WBCabinet,
     ui_access: UiAccessMode = UiAccessMode.FREE,
 ) -> InlineKeyboardMarkup:
+    """Build the shop menu keyboard for the effective free/paid access mode."""
     wb_cabinet_original_id = wb_cabinet.id
     builder = InlineKeyboardBuilder()
 
@@ -149,7 +150,8 @@ def build_shop_main_keyboard(
             )
         )
 
-    if _is_admin_user(getattr(wb_user_cabinet.user, "user_telegram_id", None)):
+    wb_user = wb_user_cabinet.user
+    if _is_admin_user(getattr(wb_user, "user_telegram_id", None)):
         _ = builder.row(
             InlineKeyboardButton(
                 text=f"Режим интерфейса: {ui_access.name}",
