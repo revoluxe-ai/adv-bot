@@ -207,7 +207,7 @@ class ShopDataUpdater:
                 )
             ).where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                ~models.AdvSetting._search_adv_id.is_(None), # pyright_strict
+                ~models.AdvSetting._search_adv_id.is_(None), # pyright: ignore
             )
         )
         result = await session.execute(stmt)
