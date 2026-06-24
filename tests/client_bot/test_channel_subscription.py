@@ -11,11 +11,25 @@ from app.client_bot.const import ADMINS, SUPPORT_CHANNEL_URL
 from app.client_bot.global_router import global_router
 from app.client_bot.middlewars.channel_subscription import (
     ChannelSubscriptionMiddleware,
+    SUBSCRIPTION_CACHE_TTL_SECONDS,
 )
 from app.client_bot.user_interface.handlers.user_subscribe_on_channel import (
     check_subscribe,
 )
 from app.client_bot.user_interface.views import callbacks, keyboards
+
+
+@pytest.fixture(autouse=True)
+def reset_subscription_cache_client():
+    from app.client_bot.middlewars import channel_subscription
+
+    channel_subscription._get_subscription_cache_client.cache_clear()
+    with patch(
+        "app.client_bot.middlewars.channel_subscription._get_subscription_cache_client",
+        return_value=None,
+    ):
+        yield
+    channel_subscription._get_subscription_cache_client.cache_clear()
 
 
 def _make_message_event(telegram_id: int, text: str = "ping") -> MagicMock:
@@ -50,6 +64,26 @@ async def test_channel_subscription_middleware_allows_subscribed_statuses(
     await middleware(handler, event, {"bot": bot})
 
     handler.assert_awaited_once_with(event, {"bot": bot})
+
+
+@pytest.mark.asyncio
+async def test_channel_subscription_middleware_uses_positive_redis_cache() -> None:
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_message_event(110)
+    handler = AsyncMock()
+    bot = MagicMock()
+    redis_client = MagicMock()
+    redis_client.get = AsyncMock(return_value="1")
+
+    with patch(
+        "app.client_bot.middlewars.channel_subscription._get_subscription_cache_client",
+        return_value=redis_client,
+    ):
+        await middleware(handler, event, {"bot": bot})
+
+    handler.assert_awaited_once_with(event, {"bot": bot})
+    redis_client.get.assert_awaited_once()
+    assert not hasattr(bot, "get_chat_member") or bot.get_chat_member.called is False
 
 
 @pytest.mark.parametrize("status", ["left", "kicked", "restricted", "unknown"])
@@ -127,6 +161,31 @@ async def test_channel_subscription_middleware_fail_open_on_telegram_error() -> 
 
 
 @pytest.mark.asyncio
+async def test_channel_subscription_middleware_caches_positive_status_for_day() -> None:
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_message_event(556)
+    handler = AsyncMock()
+    bot = MagicMock()
+    bot.get_chat_member = AsyncMock(return_value=MagicMock(status="member"))
+    redis_client = MagicMock()
+    redis_client.get = AsyncMock(return_value=None)
+    redis_client.set = AsyncMock(return_value=True)
+
+    with patch(
+        "app.client_bot.middlewars.channel_subscription._get_subscription_cache_client",
+        return_value=redis_client,
+    ):
+        await middleware(handler, event, {"bot": bot})
+
+    handler.assert_awaited_once_with(event, {"bot": bot})
+    redis_client.set.assert_awaited_once_with(
+        "client_bot:support_channel_subscription:556",
+        "1",
+        ex=SUBSCRIPTION_CACHE_TTL_SECONDS,
+    )
+
+
+@pytest.mark.asyncio
 async def test_check_subscribe_handler_returns_to_start_flow_when_subscribed() -> None:
     callback = _make_callback_event(666, callbacks.CheckSubscribe().pack())
     bot = MagicMock()
@@ -160,6 +219,25 @@ async def test_check_subscribe_handler_repeats_need_subscribe_when_not_subscribe
 
     callback.answer.assert_awaited_once()
     bot.send_message.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_check_subscribe_handler_fail_open_on_telegram_error() -> None:
+    callback = _make_callback_event(778, callbacks.CheckSubscribe().pack())
+    bot = MagicMock()
+    state = MagicMock()
+
+    with patch(
+        "app.client_bot.user_interface.handlers.user_subscribe_on_channel.is_user_subscribed_to_support_channel",
+        new=AsyncMock(return_value=None),
+    ), patch(
+        "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
+        new=AsyncMock(),
+    ) as start_mock:
+        await check_subscribe(callback, bot, state)
+
+    callback.answer.assert_awaited_once()
+    start_mock.assert_awaited_once_with(callback, bot, state)
 
 
 def test_subscribe_keyboard_has_url_and_recheck_buttons() -> None:
