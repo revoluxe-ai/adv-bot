@@ -3,6 +3,7 @@ from factory.alchemy import SQLAlchemyModelFactory
 from faker import Faker
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.utils.db.models import User
 
 fake = Faker("ru_RU")
 
@@ -22,15 +23,23 @@ class WBCabinetFactory(SQLAlchemyModelFactory):
     expiration_alarm_days_pass = None
 
 
+class UserFactory(SQLAlchemyModelFactory):
+    class Meta:
+        model = User
+        sqlalchemy_session = None
+
+    id = factory.Sequence(lambda n: n + 1_000)
+
+
 class WBUserCabinetFactory(SQLAlchemyModelFactory):
     class Meta:
         model = WBUserCabinet
         sqlalchemy_session = None
 
-    id = factory.Sequence(lambda n: n + 1)
+    id = factory.Sequence(lambda n: n + 1_000)
     name = factory.LazyFunction(lambda: fake.company())
     wb_cabinet = factory.SubFactory(WBCabinetFactory)
-
+    user = factory.SubFactory(UserFactory)
 
 class AdvSettingFactory(SQLAlchemyModelFactory):
     class Meta:
