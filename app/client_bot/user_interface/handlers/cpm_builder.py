@@ -45,6 +45,8 @@ def _format_target_place_import_summary(summary: TargetPlaceImportSummary) -> st
     """Build compact user-facing import summary with first errors only."""
     lines = [
         "Готово. Импорт целевых позиций завершён.",
+        "меняется только target_place.",
+        "пустые ячейки бот пропустит.",
         f"Строк обработано: {summary.processed_rows}",
         f"Обновлено target_place: {summary.updated_rows}",
         f"Пропущено пустых target_place: {summary.skipped_empty_rows}",
@@ -315,7 +317,13 @@ async def download_target_places_template(
         document=BufferedInputFile(
             payload, filename=f"campaign_{adv_original_id}_target_places.xlsx"
         ),
-        caption="Шаблон целевых позиций по текущей РК.",
+        caption=(
+            "Excel для целевых позиций по текущей РК.\n"
+            "Скачайте Excel, заполните только целевые позиции, которые хотите изменить, "
+            "и загрузите файл обратно.\n"
+            "пустые ячейки бот пропустит.\n"
+            "меняется только target_place."
+        ),
     )
 
 
@@ -349,7 +357,11 @@ async def upload_target_places_template_start(
     await state.set_state(states.CPMSetting.waiting_for_target_place_workbook)
     await bot.send_message(
         callback.message.chat.id,
-        "Пришлите файл .xlsx с целевыми позициями. Меняйте только колонку target_place.",
+        "Пришлите файл .xlsx с целевыми позициями.\n"
+        "Скачайте Excel, заполните только целевые позиции, которые хотите изменить, "
+        "и загрузите файл обратно.\n"
+        "пустые ячейки бот пропустит.\n"
+        "меняется только target_place.",
     )
 
 

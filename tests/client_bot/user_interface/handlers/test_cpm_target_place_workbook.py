@@ -24,6 +24,13 @@ from app.client_bot.user_interface.services.cpm_target_place_workbook import (
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from tests.helpers.telegram_message_asserts import (
+    assert_caption_within_telegram_limit,
+    assert_html_is_telegram_safe,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 pytestmark = [
     pytest.mark.integration,
@@ -257,6 +264,18 @@ async def test_upload_target_places_start_sets_fsm_and_prompts_user() -> None:
     assert state.data["last_adv_original_id"] == 123
     assert state.state_calls[-1] == states.CPMSetting.waiting_for_target_place_workbook
     bot.send_message.assert_awaited_once()
+    prompt_text = bot.send_message.await_args.args[1]
+    assert_message_within_telegram_limit(prompt_text)
+    assert_html_is_telegram_safe(prompt_text)
+    assert_message_contains_required_phrases(
+        prompt_text,
+        [
+            "Excel",
+            "пустые ячейки",
+            "меняется только target_place",
+        ],
+    )
+    assert_no_raw_technical_text(prompt_text)
 
 
 @pytest.mark.asyncio
@@ -295,12 +314,56 @@ async def test_upload_target_places_file_processes_document_and_sends_summary() 
 
     assert message.answer.await_count == 2
     assert "начинаю обработку" in message.answer.await_args_list[0].args[0].lower()
-    assert "Обновлено target_place: 2" in message.answer.await_args_list[1].args[0]
+    summary_text = message.answer.await_args_list[1].args[0]
+    assert "Обновлено target_place: 2" in summary_text
+    assert_message_within_telegram_limit(summary_text)
+    assert_html_is_telegram_safe(summary_text)
+    assert_message_contains_required_phrases(
+        summary_text,
+        [
+            "меняется только target_place",
+            "пустые ячейки",
+        ],
+    )
+    assert_no_raw_technical_text(summary_text)
     cpm_page.assert_awaited_once_with(123)
     assert state.state_calls[-1] is None
 
 
 @pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_download_target_place_template_caption_explains_excel_roundtrip() -> None:
+    state = _FakeState()
+    bot = AsyncMock()
+    callback = SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=77)))
+    callback_data = SimpleNamespace(adv_original_id=123)
+
+    with patch(
+        "app.client_bot.user_interface.handlers.cpm_builder._load_adv_setting",
+        AsyncMock(return_value=SimpleNamespace(auto_update_target_place=False)),
+    ), patch(
+        "app.client_bot.user_interface.handlers.cpm_builder.build_target_place_workbook",
+        AsyncMock(return_value=b"xlsx"),
+    ):
+        await cpm_builder.download_target_places_template(
+            callback, callback_data, bot, state
+        )
+
+    bot.send_document.assert_awaited_once()
+    caption = bot.send_document.await_args.kwargs["caption"]
+    assert_caption_within_telegram_limit(caption)
+    assert_html_is_telegram_safe(caption)
+    assert_message_contains_required_phrases(
+        caption,
+        [
+            "Excel",
+            "пустые ячейки",
+            "меняется только target_place",
+        ],
+    )
+    assert_no_raw_technical_text(caption)
+
+
 @pytest.mark.asyncio
 async def test_download_target_place_template_is_blocked_when_auto_update_enabled(
     async_session: AsyncSession,
@@ -354,6 +417,14 @@ async def test_upload_target_places_file_is_blocked_when_auto_update_enabled(
 
     apply_mock.assert_not_awaited()
     assert state.state_calls[-1] is None
-    assert message.answer.await_args.args[0].startswith(
-        "Автоматическое обновление целевых позиций включено"
+    locked_text = message.answer.await_args.args[0]
+    assert_message_within_telegram_limit(locked_text)
+    assert_html_is_telegram_safe(locked_text)
+    assert_message_contains_required_phrases(
+        locked_text,
+        [
+            "автообновление target_place",
+            "Max CPM остаётся доступным",
+        ],
     )
+    assert_no_raw_technical_text(locked_text)

@@ -13,6 +13,13 @@ from app.client_bot.user_interface.handlers import cpm_builder
 from app.client_bot.user_interface.views.messages.messages import CPMSetting
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from tests.helpers.telegram_message_asserts import (
+    assert_html_is_telegram_safe,
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 from app.modules.wb_adv_updater.modules.bidder.tg_bot_handlers import on_off_controller
 
 pytestmark = [
@@ -433,12 +440,31 @@ def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> No
         auto_update_target_place=False,
     )
 
-    button_texts = _button_texts(view.keyboard)
+    text = view.text
+    keyboard = view.keyboard
 
-    assert "Изменить Максимальную ставку" in button_texts
-    assert "Изменить целевую позицию" in button_texts
-    assert "Скачать шаблон целевых позиций" in button_texts
-    assert "Загрузить целевые позиции из файла" in button_texts
+    assert_message_within_telegram_limit(text)
+    assert_html_is_telegram_safe(text)
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "Целевая позиция",
+            "Max CPM",
+            "верхний предел ставки",
+            "бесплатный инструмент",
+            "Автоуправление рекламой подключается отдельно",
+        ],
+    )
+    assert_no_raw_technical_text(text)
+    assert_keyboard_has_buttons(
+        keyboard,
+        [
+            "Изменить Максимальную ставку",
+            "Изменить целевую позицию",
+            "Скачать шаблон целевых позиций",
+            "Загрузить целевые позиции из файла",
+        ],
+    )
 
 
 def test_cpm_setting_keyboard_hides_target_place_tools_when_auto_update_enabled() -> None:
@@ -451,8 +477,12 @@ def test_cpm_setting_keyboard_hides_target_place_tools_when_auto_update_enabled(
         auto_update_target_place=True,
     )
 
+    text = view.text
     button_texts = _button_texts(view.keyboard)
 
+    assert_message_within_telegram_limit(text)
+    assert_html_is_telegram_safe(text)
+    assert_no_raw_technical_text(text)
     assert "Изменить Максимальную ставку" in button_texts
     assert "Изменить целевую позицию" not in button_texts
     assert "Скачать шаблон целевых позиций" not in button_texts

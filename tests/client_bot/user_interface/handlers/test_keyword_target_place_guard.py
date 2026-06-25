@@ -14,6 +14,12 @@ from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers import keyword_settings
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from tests.helpers.telegram_message_asserts import (
+    assert_html_is_telegram_safe,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -116,6 +122,17 @@ async def test_change_keyword_target_place_callback_is_blocked_when_auto_update_
         )
 
     bot.send_message.assert_awaited_once()
+    locked_text = bot.send_message.await_args.args[1]
+    assert_message_within_telegram_limit(locked_text)
+    assert_html_is_telegram_safe(locked_text)
+    assert_message_contains_required_phrases(
+        locked_text,
+        [
+            "автообновление target_place",
+            "Max CPM остаётся доступным",
+        ],
+    )
+    assert_no_raw_technical_text(locked_text)
     prompt.assert_not_awaited()
     assert state.state_calls[-1] is None
 
@@ -142,6 +159,17 @@ async def test_keyword_target_place_submit_is_blocked_when_auto_update_enabled(
     updated = await _get_keyword(async_session, keyword_id)
     assert updated.target_place == 4
     bot.send_message.assert_awaited_once()
+    locked_text = bot.send_message.await_args.args[1]
+    assert_message_within_telegram_limit(locked_text)
+    assert_html_is_telegram_safe(locked_text)
+    assert_message_contains_required_phrases(
+        locked_text,
+        [
+            "автообновление target_place",
+            "Max CPM остаётся доступным",
+        ],
+    )
+    assert_no_raw_technical_text(locked_text)
     assert state.data["keyword_setting_for_target_place"] is None
     assert state.state_calls[-1] is None
 

@@ -714,6 +714,8 @@ class KeywordSettingMessage(TextWithKeyboard):
 
 
 class KeywordTargetPlacePrompt(Text):
+    """Prompt for changing a keyword target place manually."""
+
     def __init__(self, bot: Bot, chat_id: int, current_value: str, adv_default: str):
         super().__init__(bot, chat_id)
         self._current_value = current_value
@@ -722,12 +724,15 @@ class KeywordTargetPlacePrompt(Text):
     @property
     def text(self) -> str:
         return (
-            f"Текущая целевая позиция: {self._current_value}. "
+            f"Текущая целевая позиция: {self._current_value}.\n"
+            "Целевая позиция — место, которое вы хотите удерживать по ключу.\n"
             f"Введите новое целое число (0 — использовать позицию кампании {self._adv_default})."
         )
 
 
 class KeywordTargetPlaceUpdated(Text):
+    """Confirmation after a manual keyword target place change."""
+
     def __init__(self, bot: Bot, chat_id: int, new_value: str):
         super().__init__(bot, chat_id)
         self._new_value = new_value
@@ -969,6 +974,8 @@ class FixedPhrasesAdded(TextWithKeyboard):
 
 
 class CPMSetting(TextWithKeyboard):
+    """Bidder settings screen for manual CPM and target place tools."""
+
     @inject
     def __init__(
         self,
@@ -1000,7 +1007,12 @@ class CPMSetting(TextWithKeyboard):
     @property
     def text(self) -> str:
         mode = "Ручной" if not self.adv_setting.bidder_active else "Автоматический"
-        text = f"Режим управления ставкой: {mode}\n\n"
+        text = (
+            f"Режим управления ставкой: {mode}\n\n"
+            "Целевая позиция — место, которое вы хотите удерживать по ключу.\n"
+            "Max CPM — верхний предел ставки. Бот не должен ставить выше этого значения.\n"
+            "Это free-инструмент.\n\n"
+        )
         if self.adv_setting.bidder_active:
             max_place = (
                 str(self.adv_setting.max_place)
@@ -1127,6 +1139,8 @@ class CPMSetting(TextWithKeyboard):
 
 
 class AutoCPMSettingGetMinPosition(Text):
+    """Prompt asking for the desired target place for the bidder."""
+
     async def __call__(self, adv_setting_id: int):
         async with sm() as session:
             stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
@@ -1137,22 +1151,35 @@ class AutoCPMSettingGetMinPosition(Text):
 
     @property
     def text(self):
-        text = """
-Введите позицию, которую вы хотите занимать в топе:
-        """
-        return text
+        return (
+            "Введите целевую позицию, которую вы хотите занимать\n"
+            "целевая позиция — место, которое вы хотите удерживать по ключу.\n"
+            "Это free-инструмент."
+        )
 
 
 class AutoCPMSettingGetMaxCPM(Text):
+    """Prompt asking for the manual upper CPM limit."""
+
     @property
     def text(self) -> str:
-        return """Укажите максимальную ставку:"""
+        return (
+            "Укажите Max CPM.\n"
+            "Max CPM — верхний предел ставки. Бот не должен ставить выше этого значения.\n"
+            "Это бесплатный инструмент."
+        )
 
 
 class ManualCPMSetting(Text):
+    """Prompt asking for a manual Max CPM value."""
+
     @property
     def text(self) -> str:
-        return  """Укажите ставку (целое число от 100):"""
+        return (
+            "Укажите Max CPM (целое число от 100).\n"
+            "Max CPM — верхний предел ставки. Бот не должен ставить выше этого значения.\n"
+            "Это бесплатный инструмент. "
+        )
 
 
 class WaitingForBlackPhrases(TextWithKeyboard):
