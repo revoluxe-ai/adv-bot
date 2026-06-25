@@ -26,7 +26,7 @@ def _assert_safe_message(text: str, phrases: list[str]) -> None:
     assert_no_raw_technical_text(text)
 
 
-def test_cpm_and_target_place_prompts_explain_manual_free_mode() -> None:
+def test_cpm_and_target_place_prompts_explain_manual_mode() -> None:
     min_position_prompt = AutoCPMSettingGetMinPosition.__new__(AutoCPMSettingGetMinPosition)
     max_cpm_prompt = AutoCPMSettingGetMaxCPM.__new__(AutoCPMSettingGetMaxCPM)
     manual_cpm_prompt = ManualCPMSetting.__new__(ManualCPMSetting)
@@ -38,7 +38,7 @@ def test_cpm_and_target_place_prompts_explain_manual_free_mode() -> None:
         min_position_prompt.text,
         [
             "целевая позиция",
-            "ручной free-инструмент",
+            "Бесплатный инструмент",
         ],
     )
     _assert_safe_message(
@@ -46,7 +46,7 @@ def test_cpm_and_target_place_prompts_explain_manual_free_mode() -> None:
         [
             "Max CPM",
             "верхний предел ставки",
-            "ручной free-инструмент",
+            "Бесплатный инструмент",
         ],
     )
     _assert_safe_message(
@@ -54,7 +54,7 @@ def test_cpm_and_target_place_prompts_explain_manual_free_mode() -> None:
         [
             "Max CPM",
             "верхний предел ставки",
-            "ручной free-инструмент",
+            "Бесплатный инструмент",
         ],
     )
     _assert_safe_message(
