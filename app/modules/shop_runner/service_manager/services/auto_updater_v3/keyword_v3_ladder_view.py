@@ -1,7 +1,7 @@
 """SSOT лестницы M/O/C для UI и updater (без импорта ``orchestrator``).
 
 ``LadderInputs`` строится один раз на тик / карточку; ``cost_for_mode`` только читает
-предрасчёт (без повторного ``build_worst_per_state_costs``).
+предрасчёт каталога M/O/C.
 """
 
 from __future__ import annotations
@@ -25,7 +25,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     CampaignV3DecisionCache,
     effective_conv_for_v3,
-    resolve_no_ch_operational_pay_for_order_cost,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    keyword_pfo_value,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     KeywordV3Eligibility,
@@ -35,10 +37,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
     KeywordV3Context,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-    PreparedList,
-    build_prepared_from_contexts,
-    build_worst_per_state_costs,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
+    KeywordsPreparedList,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,8 +83,7 @@ class LadderInputs:
     """Предрасчёт на список contexts; переиспользуется всеми ``cost_for_mode`` на тике."""
 
     all_contexts: list[KeywordV3Context]
-    prepared: PreparedList
-    worst_costs: dict[AggressionTargetMode, float]
+    prepared: KeywordsPreparedList
     campaign_cache: CampaignV3DecisionCache
     campaign_orders_per_cart_7d: float | None = None
     rec_orders_per_view: float | None = None
@@ -115,43 +114,34 @@ class LadderInputs:
         rec_orders_per_view: float | None = None,
         rk_orders_per_cart: float | None = None,
     ) -> LadderInputs:
-        """Один проход: prepared + worst_costs + campaign_cache."""
+        """Один проход: prepared + campaign_cache."""
         campaign_opc = (
             campaign_orders_per_cart_7d
             if campaign_orders_per_cart_7d is not None
             else rk_orders_per_cart
         )
-        prepared = build_prepared_from_contexts(contexts)
-        worst = build_worst_per_state_costs(
-            prepared,
-            campaign_orders_per_cart_7d=campaign_opc,
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder import (
+            bootstrap_ladder_inputs,
+            build_keywords_prepared_list,
         )
+
+        bootstrap = bootstrap_ladder_inputs(contexts)
+        bootstrap = LadderInputs(
+            all_contexts=bootstrap.all_contexts,
+            prepared=KeywordsPreparedList(keywords=[]),
+            campaign_cache=bootstrap.campaign_cache,
+            campaign_orders_per_cart_7d=campaign_opc,
+            rec_orders_per_view=rec_orders_per_view,
+        )
+        prepared = build_keywords_prepared_list(contexts, ladder_inputs=bootstrap)
         return cls(
             all_contexts=list(contexts),
             prepared=prepared,
-            worst_costs=worst,
-            campaign_cache=CampaignV3DecisionCache.from_contexts(contexts),
+            campaign_cache=bootstrap.campaign_cache,
             campaign_orders_per_cart_7d=campaign_opc,
             rec_orders_per_view=rec_orders_per_view,
         )
 
-
-async def cache_worst_costs_for_adv(
-    adv_id: int,
-    worst_costs: dict[AggressionTargetMode, float],
-) -> None:
-    """Записать worst CPO M/O/C в Redis (TTL 10 мин) после расчёта ``LadderInputs``."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_worst_costs_cache import (
-        V3WorstCostsRedisCache,
-    )
-
-    try:
-        await V3WorstCostsRedisCache().set_worst_costs(adv_id, worst_costs)
-    except Exception:
-        logger.exception(
-            "v3 worst_costs cache write failed adv_id=%s",
-            adv_id,
-        )
 
 
 def state_candidates_by_mode_for_ctx(
@@ -185,20 +175,12 @@ def _catalog_for_ctx(
     return state_candidates_by_mode_for_ctx(ctx, ladder_inputs)
 
 
+catalog_for_ctx = _catalog_for_ctx
+
+
 def _strategy_mode_for_agg(mode: AggressionTargetMode) -> KeywordStrategyMode:
     return KeywordStrategyMode[mode.name] # type: ignore
 
-
-def has_campaign_worst_costs(worst_costs: dict[AggressionTargetMode, float]) -> bool:
-    """Есть хотя бы один per-mode worst (max state_cost) по донорам РК."""
-    return any(
-        worst_costs.get(mode) is not None
-        for mode in (
-            AggressionTargetMode.MIN_CPA,
-            AggressionTargetMode.OPTIMUM,
-            AggressionTargetMode.MAX_CONVERSION,
-        )
-    )
 
 
 def _keyword_has_ch_profile(ctx: KeywordV3Context) -> bool:
@@ -264,27 +246,6 @@ def _min_pay_for_order_oc_reason(
     return _NO_CH_LADDER_REASON
 
 
-def _stage_from_campaign_worst(
-    target: AggressionTargetMode,
-    ladder_inputs: LadderInputs,
-    *,
-    candidate: ModeCandidate | None,
-    conv_imputed: bool = False,
-) -> LadderStageResult | None:
-    """Ступень только из ``worst_costs`` (нет CH-профиля на ключе)."""
-    worst = ladder_inputs.worst_costs.get(target)
-    if worst is None:
-        return None
-    return LadderStageResult(
-        mode=target,
-        is_valid=True,
-        cost=float(worst),
-        source=LadderCostSource.WORST,
-        conv_imputed=conv_imputed,
-        cost_imputed=True,
-        candidate=candidate,
-    )
-
 
 def cost_for_mode(
     ctx: KeywordV3Context,
@@ -293,17 +254,7 @@ def cost_for_mode(
     ladder_inputs: LadderInputs,
     eligibility: KeywordV3Eligibility | None = None,
 ) -> tuple[float, bool]:
-    """Себестоимость target mode: NO CH → ``pay_for_order``; CH → profile → per-mode worst.
-
-    Args:
-        ctx: Контекст ключа.
-        to_mode: Целевой режим (M/O/C).
-        ladder_inputs: Предрасчёт на тик (обязателен).
-        eligibility: Tier/allowed_modes; если ``None`` — без NO_CH-ветки.
-
-    Returns:
-        ``(state_cost, cost_imputed)``; ``inf`` если ступень недоступна.
-    """
+    """Себестоимость target mode: PFO → ``pay_for_order``; FULL → profile CPO; иначе ``inf``."""
     target = AggressionTargetMode[to_mode.name]
     catalog = _catalog_for_ctx(ctx, ladder_inputs)
 
@@ -311,7 +262,7 @@ def cost_for_mode(
         ctx, eligibility, catalog
     ):
         if to_mode == KeywordStrategyMode.MIN_CPA:
-            pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+            pfo_cost = keyword_pfo_value(ctx.keyword)
             if pfo_cost is not None:
                 return float(pfo_cost), False
         return float("inf"), False
@@ -322,22 +273,13 @@ def cost_for_mode(
             return float("inf"), False
 
     if not _keyword_has_ch_profile(ctx):
-        worst_stage = _stage_from_campaign_worst(
-            target, ladder_inputs, candidate=None # type: ignore
-        )
-        if worst_stage is not None:
-            return float(worst_stage.cost), True
+        return float("inf"), False
 
-    mc = catalog.get(target) # type: ignore
+    mc = catalog.get(target)  # type: ignore
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
         profile_cost = float(mc.predicted_cpa)
-    allow_worst = not min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog)
-    return resolve_effective_state_cost(
-        profile_cost=profile_cost,
-        worst_cost=ladder_inputs.worst_costs.get(target), # type: ignore
-        allow_worst_imputation=allow_worst,
-    )
+    return resolve_effective_state_cost(profile_cost=profile_cost)
 
 
 def _resolve_stage(
@@ -353,13 +295,13 @@ def _resolve_stage(
     mc = catalog.get(target)
     eff_conv = effective_conv_for_v3(ctx, ladder_inputs.all_contexts)
     own_conv = ctx.keyword.conv_views_to_orders
-    conv_imputed = eff_conv is not None and (own_conv is None or own_conv <= 0)
+    conv_imputed = eff_conv is not None and own_conv <= 0
 
     if eligibility is not None and min_cpa_operational_via_pay_for_order(
         ctx, eligibility, catalog
     ):
         if target == AggressionTargetMode.MIN_CPA:
-            pfo_cost = resolve_no_ch_operational_pay_for_order_cost(ctx.keyword)
+            pfo_cost = keyword_pfo_value(ctx.keyword)
             if pfo_cost is not None:
                 return LadderStageResult(
                     mode=target,
@@ -394,35 +336,28 @@ def _resolve_stage(
             )
 
     if not _keyword_has_ch_profile(ctx):
-        worst_only = _stage_from_campaign_worst(
-            target, ladder_inputs, candidate=mc, conv_imputed=conv_imputed
+        return LadderStageResult(
+            mode=target,
+            is_valid=False,
+            cost=None,
+            source=LadderCostSource.NONE,
+            conv_imputed=conv_imputed,
+            reason=_NO_CH_LADDER_REASON,
+            candidate=mc,
         )
-        if worst_only is not None:
-            return worst_only
 
     profile_cost: float | None = None
     if mc is not None and mc.is_valid and mc.predicted_cpa is not None:
         profile_cost = float(mc.predicted_cpa)
-    allow_worst = not min_cpa_operational_via_pay_for_order(ctx, eligibility, catalog)
-    cost_val, cost_imputed = resolve_effective_state_cost(
-        profile_cost=profile_cost,
-        worst_cost=ladder_inputs.worst_costs.get(target),
-        allow_worst_imputation=allow_worst,
-    )
+    _, cost_imputed = resolve_effective_state_cost(profile_cost=profile_cost)
     if profile_cost is not None:
         source = LadderCostSource.PROFILE
         is_valid = True
         display_cost: float | None = profile_cost
-    elif cost_imputed and not math.isinf(cost_val):
-        source = LadderCostSource.WORST
-        is_valid = True
-        display_cost = float(cost_val)
     else:
         source = LadderCostSource.NONE
-        is_valid = mc.is_valid if mc is not None else False
-        display_cost = None if math.isinf(cost_val) else float(cost_val)
-        if mc is not None and not mc.is_valid:
-            is_valid = False
+        is_valid = False
+        display_cost = None
 
     return LadderStageResult(
         mode=target,

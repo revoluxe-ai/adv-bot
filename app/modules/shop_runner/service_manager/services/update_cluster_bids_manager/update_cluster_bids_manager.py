@@ -39,7 +39,7 @@ from app.modules.cluster_bids_redis import (
 )
 from app.modules.cluster_bids_redis.redis_cluster_bids_manager import ClusterBidEntry
 from .wb_manager import WBManager
-from app.modules.plan_fact.provider import PlanFactProvider
+
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -52,6 +52,14 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 )
 from .new_bids_calculator.calculation_input import CalculationInput
 from .dto.calculate_data import BidderCalculateData
+from .cluster_bid_trace import (
+    format_error_detail,
+    is_trace_bid_cell,
+    is_trace_cell,
+    is_trace_enabled,
+    log_cluster_bid_trace,
+    trace_target_defaults,
+)
 
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, run_tasks
 
@@ -65,6 +73,40 @@ logger = logging.getLogger(__name__)
 
 def _max_workers_for(handler_count: int, cap: int) -> int:
     return max(1, min(handler_count, cap))
+
+
+def _normalize_cluster_bids_to_search_adv_id(
+    fresh: list[NormqueryBidDTO],
+    sub_advs: list[ComplexAdv],
+    needed_search_adv_ids: set[int],
+) -> dict[ClusterBidKey, NormqueryBidDTO]:
+    """Приводит WB normquery bids к ключам search auction РК.
+
+    Legacy-ответы с auto ``advert_id`` маппятся через ``auto_adv_id → auction_adv_id``.
+    """
+    auto_to_search = {
+        adv.auto_adv_id: adv.auction_adv_id
+        for adv in sub_advs
+        if adv.auction_adv_id is not None
+    }
+    by_key: dict[ClusterBidKey, NormqueryBidDTO] = {}
+    for bid in fresh:
+        search_id = bid.advert_id
+        if search_id not in needed_search_adv_ids:
+            mapped = auto_to_search.get(bid.advert_id)
+            if mapped is None:
+                continue
+            search_id = mapped
+        key = ClusterBidKey(
+            search_adv_id=search_id, nmid=bid.nm_id, cluster=bid.norm_query
+        )
+        by_key[key] = NormqueryBidDTO(
+            advert_id=search_id,
+            nm_id=bid.nm_id,
+            norm_query=bid.norm_query,
+            bid=bid.bid,
+        )
+    return by_key
 
 
 _PREDICT_BIDS_MAX_CONCURRENT = 16
@@ -105,9 +147,9 @@ class UpdateClusterBidsManager:
             redis_cluster_bids_timestamp_manager
         )
         self._tasks_manager = tasks_manager
-
+    @staticmethod
     async def _get_keywords_for_cluster_bids(
-        self, adv: ComplexAdv
+         adv: ComplexAdv
     ) -> list[CalculatedKeyword]:
         """Keywords для расчёта карт: snapshot adapter (shadow/read) или strict Redis."""
         from app.snapshot_data_updater.config import get_snapshot_config
@@ -137,19 +179,14 @@ class UpdateClusterBidsManager:
         return await self._get_bidder_update_data(advs, map_datas)
 
     async def _get_calculate_data(self, advs: list[ComplexAdv]) -> BidderCalculateData:
-        trace = ShopBatchPhaseTrace.from_complex_advs(
-            coroutine=_COROUTINE_CLUSTER_BIDS, advs=advs
+        local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
+        remote_data: BidderUpdateData = await self._get_data_from_wb_api(
+            advs, local_data
         )
-        with trace.phase("manager_get_local_data"):
-            local_data: set[AdvIdItemCalculateData] = await self._get_local_data(advs)
-        with trace.phase("manager_get_remote_data"):
-            remote_data: BidderUpdateData = await self._get_data_from_wb_api(
-                advs, local_data
-            )
-        with trace.phase("manager_get_predict_bids_data"):
-            predict_bids_data: dict[
-                int, (dict[int, dict[str, dict[int, int]]] | None)
-            ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
+
+        predict_bids_data: dict[
+            int, (dict[int, dict[str, dict[int, int]]] | None)
+        ] = await self._get_predict_bids_data(advs, remote_data.min_bids.search)
 
         return BidderCalculateData(
             data_from_local=local_data,
@@ -158,30 +195,109 @@ class UpdateClusterBidsManager:
         )
 
     async def update_cluster_bids(self, advs: list[ComplexAdv]) -> None:
-        trace = ShopBatchPhaseTrace.from_complex_advs(
-            coroutine=_COROUTINE_CLUSTER_BIDS, advs=advs
+        calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
+        calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(
+                calculate_data)
+
+        new_bids_command: UpdateBidsCommand = self._get_bids_command(
+            calculation_inputs
         )
-        with trace.phase("manager_get_calculate_data"):
-            calculate_data: BidderCalculateData = await self._get_calculate_data(advs)
-        with trace.phase("manager_get_calculation_inputs"):
-            calculation_inputs: list[CalculationInput] = await self._get_calculation_inputs(
-                calculate_data, batch_trace=trace
+        trace_defaults = trace_target_defaults()
+        if trace_defaults:
+            shop_id = self._wb_manager._shop_id # pyright: ignore # type: ignore
+            map_match = any(
+                is_trace_cell(
+                    shop_id=shop_id,
+                    adv_id=cell.adv_id,
+                    search_adv_id=cell.search_adv_id,
+                    nmid=cell.nmid,
+                    ks_id=cell.keyword_setting_original_id,
+                    key=cell.cluster,
+                )
+                for cell in calculate_data.data_from_local
             )
-        with trace.phase("manager_get_bids_command"):
-            new_bids_command: UpdateBidsCommand = self._get_bids_command(
-                calculation_inputs
+            calc_match = sum(
+                1
+                for ci in calculation_inputs
+                if is_trace_bid_cell(
+                    shop_id=shop_id,
+                    search_adv_id=ci.search_adv_id,
+                    nmid=ci.nmid,
+                    key=ci.cluster,
+                )
             )
-        trace.marker(
-            "bids_command_built",
-            extra={
-                "calculation_inputs": len(calculation_inputs),
-                "new_bids": len(new_bids_command.new_bids),
-            },
-        )
-        await self._apply_command(new_bids_command, batch_trace=trace)
+            cmd_match = sum(
+                1
+                for nb in new_bids_command.new_bids
+                if is_trace_bid_cell(
+                    shop_id=shop_id,
+                    search_adv_id=nb.search_adv_id,
+                    nmid=nb.nmid,
+                    key=nb.cluster,
+                )
+            )
+            log_cluster_bid_trace(
+                step="tick_batch",
+                shop_id=shop_id,
+                adv_id=trace_defaults.get("adv_id"),
+                search_adv_id=trace_defaults.get("search_adv_id"),
+                nmid=trace_defaults.get("nmid"),
+                ks_id=trace_defaults.get("ks_id"),
+                key=trace_defaults.get("key"),
+                map_cells_count=len(calculate_data.data_from_local),
+                calc_inputs_count=len(calculation_inputs),
+                command_bids_count=len(new_bids_command.new_bids),
+                trace_in_map=map_match,
+                trace_calc_inputs=calc_match,
+                trace_in_command=cmd_match,
+            )
+        v3_cells = {
+            cell for cell in calculate_data.data_from_local if cell.v3_managed
+        }
+        if v3_cells:
+            from .v3_cluster_bid_safety_cap import (
+                apply_v3_cluster_bid_safety_cap,
+                build_keywords_by_cell,
+                build_v3_matrix_cap_index,
+            )
+
+            bid_keys = [
+                ClusterBidKey(
+                    search_adv_id=cell.search_adv_id,
+                    nmid=cell.nmid,
+                    cluster=cell.cluster,
+                )
+                for cell in v3_cells
+            ]
+            stored_bids = await self._redis_cluster_bids_manager.get_bids(
+                bid_keys
+            )
+            wb_data = calculate_data.data_from_wb_api
+            cap_index = await build_v3_matrix_cap_index(
+                advs=wb_data.advs,
+                map_datas=v3_cells,
+                min_bids=wb_data.min_bids,
+                keywords_getter=self._get_keywords_for_cluster_bids,
+            )
+            keywords_by_cell = await build_keywords_by_cell(
+                wb_data.advs,
+                v3_cells,
+                self._get_keywords_for_cluster_bids,
+            )
+            new_bids_command = apply_v3_cluster_bid_safety_cap(
+                command=new_bids_command,
+                map_datas=v3_cells,
+                calculation_inputs=calculation_inputs,
+                fact_datas=wb_data.fact_datas,
+                plan_datas=wb_data.plan_datas,
+                cap_index=cap_index,
+                stored_bids=stored_bids,
+                keywords_by_cell=keywords_by_cell,
+            )
+
+        await self._apply_command(new_bids_command)
         if advs:
-            with trace.phase("manager_set_cluster_bids_timestamp"):
-                await self._redis_cluster_bids_timestamp_manager.set_many(advs)
+            await self._redis_cluster_bids_timestamp_manager.set_many(advs)
 
 
     async def _get_bidder_update_data(
@@ -255,7 +371,7 @@ class UpdateClusterBidsManager:
             return []
         keys: list[ClusterBidKey] = [
             ClusterBidKey(
-                adv_id=data.adv_id,
+                search_adv_id=data.search_adv_id,
                 nmid=data.nmid,
                 cluster=data.cluster,
             )
@@ -280,7 +396,7 @@ class UpdateClusterBidsManager:
         )
         bids_map: dict[ClusterBidKey, NormqueryBidDTO] = {
             key: NormqueryBidDTO(
-                advert_id=key.adv_id,
+                advert_id=key.search_adv_id,
                 nm_id=key.nmid,
                 norm_query=key.cluster,
                 bid=value,
@@ -288,7 +404,7 @@ class UpdateClusterBidsManager:
             for key, value in cached.items()
         }
         if missing_keys:
-            needed_adv_ids = {k.adv_id for k in missing_keys}
+            needed_adv_ids = {k.search_adv_id for k in missing_keys}
             sub_advs = [
                 a
                 for a in advs
@@ -313,18 +429,18 @@ class UpdateClusterBidsManager:
                     )
                 else:
                     with trace.phase("cluster_bids_wb_fallback_redis_write"):
+                        by_key = _normalize_cluster_bids_to_search_adv_id(
+                            fresh, sub_advs, needed_adv_ids
+                        )
+                        normalized_fresh = list(by_key.values())
                         try:
                             _ = await self._redis_api_cluster_bids_manager.replace_from_api(
-                                fresh
+                                normalized_fresh
                             )
                         except Exception:
                             logger.exception(
                                 "Cluster bid: failed to write WB fallback to Redis API cache"
                             )
-                    by_key = {
-                        ClusterBidKey(b.advert_id, b.nm_id, b.norm_query): b
-                        for b in fresh
-                    }
                     for mk in missing_keys:
                         dto = by_key.get(mk)
                         if dto is not None:
@@ -359,7 +475,7 @@ class UpdateClusterBidsManager:
         mapper = Mapper(bidder_update_data)
         bid_keys = [
             ClusterBidKey(
-                adv_id=map_data.adv_id,
+                search_adv_id=map_data.search_adv_id, # TODO: ТУт поменять на явное search_adv_id
                 nmid=map_data.nmid,
                 cluster=map_data.cluster,
             )
@@ -369,72 +485,113 @@ class UpdateClusterBidsManager:
             cached_states = await self._redis_cluster_bids_manager.get_bid_states(bid_keys)
         inputs: list[CalculationInput] = []
         skipped_no_bid = 0
-        with trace.phase("calc_inputs_build_loop"):
-            for map_data in maps_data:
-                current_bid = mapper.get_current_bid(map_data)
-                if current_bid is None:
-                    fallback_bid = map_data.current_cpm
-                    if fallback_bid is None:
-                        skipped_no_bid += 1
-                        logger.debug(
-                            "Нет текущей ставки для adv_id: %s, nmid: %s, cluster: %s",
-                            map_data.adv_id,
-                            map_data.nmid,
-                            map_data.cluster,
+        # Batch per-shop: WBManager/ClusterBidsManagerContainer создаются с одним shop_id;
+        # advs здесь — только ComplexAdv этого магазина (см. DOTO/WORKLOG.md DEBUG_CLUSTER_BID_TRACE).
+        trace_shop_id = self._wb_manager._shop_id # pyright: ignore # type: ignore
+        trace_on = is_trace_enabled()
+        for map_data in maps_data:
+            current_bid = mapper.get_current_bid(map_data)
+            if current_bid is None:
+                fallback_bid = map_data.current_cpm
+                if fallback_bid is None:
+                    skipped_no_bid += 1
+                    if trace_on and is_trace_cell(
+                        shop_id=trace_shop_id,
+                        adv_id=map_data.adv_id,
+                        search_adv_id=map_data.search_adv_id,
+                        nmid=map_data.nmid,
+                        ks_id=map_data.keyword_setting_original_id,
+                        key=map_data.cluster,
+                    ):
+                        log_cluster_bid_trace(
+                            step="calc_input",
+                            shop_id=trace_shop_id,
+                            adv_id=map_data.adv_id,
+                            search_adv_id=map_data.search_adv_id,
+                            nmid=map_data.nmid,
+                            ks_id=map_data.keyword_setting_original_id,
+                            key=map_data.cluster,
+                            created=False,
+                            skip_reason="no_current_bid",
                         )
-                        continue
-                    current_bid = fallback_bid
-                current_position = mapper.get_current_position(map_data)
-                target_position: int | None = mapper.get_target_position(map_data)
-                adv_id = map_data.adv_id
-                nmid = map_data.nmid
-                state_key = ClusterBidKey(
-                    adv_id=adv_id,
-                    nmid=nmid,
-                    cluster=map_data.cluster,
-                )
-                prev_state = cached_states.get(state_key)
-                prev_step: int | None = prev_state.step if prev_state else None
-                prev_direct: DirectEnum | None = None
-                if prev_state and prev_state.direct is not None:
-                    try:
-                        prev_direct = DirectEnum(prev_state.direct)
-                    except ValueError:
-                        prev_direct = None
-                predict_bids_data_for_adv = (
-                    calculate_data.predict_bids_data.get(adv_id)
-                    if calculate_data.predict_bids_data is not None
-                    else None
-                )
-                predict_target_bids = (
-                    predict_bids_data_for_adv.get(nmid)
-                    if isinstance(predict_bids_data_for_adv, dict)
-                    else None
-                )
-                calculate_input = CalculationInput(
-                    adv_id=adv_id,
-                    nmid=nmid,
+                    logger.debug(
+                        "Нет текущей ставки для search_adv_id: %s, nmid: %s, cluster: %s",
+                        map_data.search_adv_id,
+                        map_data.nmid,
+                        map_data.cluster,
+                    )
+                    continue
+                current_bid = fallback_bid
+            current_position = mapper.get_current_position(map_data)
+            target_position: int | None = mapper.get_target_position(map_data)
+            search_adv_id = map_data.search_adv_id
+            nmid = map_data.nmid
+            state_key = ClusterBidKey(
+                search_adv_id=search_adv_id,
+                nmid=nmid,
+                cluster=map_data.cluster,
+            )
+            prev_state = cached_states.get(state_key)
+            prev_step: int | None = prev_state.step if prev_state else None
+            prev_direct: DirectEnum | None = None
+            if prev_state and prev_state.direct is not None:
+                try:
+                    prev_direct = DirectEnum(prev_state.direct)
+                except ValueError:
+                    prev_direct = None
+            predict_bids_data_for_adv = (
+                calculate_data.predict_bids_data.get(search_adv_id)
+                if calculate_data.predict_bids_data is not None
+                else None
+            )
+            predict_target_bids = (
+                predict_bids_data_for_adv.get(nmid)
+                if isinstance(predict_bids_data_for_adv, dict)
+                else None
+            )
+            calculate_input = CalculationInput(
+                search_adv_id=search_adv_id,
+                nmid=nmid,
+                current_bid=current_bid,
+                current_position=current_position,
+                target_position=target_position,
+                cluster=map_data.cluster,
+                step=map_data.step,
+                min_bid=mapper.get_min_bid(map_data),
+                max_bid=map_data.max_cpm,
+                predict_target_bids=predict_target_bids,
+                prev_direct=prev_direct,
+                prev_step=prev_step,
+                snap_to_min_bid_no_keyword_target=map_data.snap_to_min_bid_no_keyword_target,
+            )
+            if trace_on and is_trace_cell(
+                shop_id=trace_shop_id,
+                adv_id=map_data.adv_id,
+                search_adv_id=map_data.search_adv_id,
+                nmid=map_data.nmid,
+                ks_id=map_data.keyword_setting_original_id,
+                key=map_data.cluster,
+            ):
+                log_cluster_bid_trace(
+                    step="calc_input",
+                    shop_id=trace_shop_id,
+                    adv_id=map_data.adv_id,
+                    search_adv_id=map_data.search_adv_id,
+                    nmid=map_data.nmid,
+                    ks_id=map_data.keyword_setting_original_id,
+                    key=map_data.cluster,
+                    created=True,
                     current_bid=current_bid,
                     current_position=current_position,
                     target_position=target_position,
-                    cluster=map_data.cluster,
-                    step=map_data.step,
-                    min_bid=mapper.get_min_bid(map_data),
-                    max_bid=map_data.max_cpm,
-                    predict_target_bids=predict_target_bids,
+                    min_bid=calculate_input.min_bid,
+                    max_bid=calculate_input.max_bid,
+                    bidder_step=calculate_input.step,
                     prev_direct=prev_direct,
                     prev_step=prev_step,
-                    snap_to_min_bid_no_keyword_target=map_data.snap_to_min_bid_no_keyword_target,
                 )
-                inputs.append(calculate_input)
-        trace.marker(
-            "calc_inputs_built",
-            extra={
-                "map_datas": len(maps_data),
-                "inputs": len(inputs),
-                "skipped_no_bid": skipped_no_bid,
-            },
-        )
+            inputs.append(calculate_input)
+
         return inputs
 
     async def __get_calculate_data(
@@ -498,60 +655,85 @@ class UpdateClusterBidsManager:
                 )
             ]
         # clusters_adv_stats / WB API use norm_query; keyword_setting.text (kw.text) may differ.
-        with trace.phase("per_adv_match_cluster_texts"):
-            matched_in_ch = [
-                kw
-                for kw in keywords_good
-                if kw.cluster_stat.text in texts_in_this_adv
-                or kw.text in texts_in_this_adv
-            ]
+        matched_in_ch = [
+            kw
+            for kw in keywords_good
+            if kw.cluster_stat.text in texts_in_this_adv
+            or kw.text in texts_in_this_adv
+        ]
         # Если единственные GOOD не попали в snapshots clusters_adv_stats (срез может отличаться
         # от mv_clusters_*), всё равно участвуют в торгах по norm_query из cluster_stat.
         keywords = matched_in_ch if matched_in_ch else keywords_good
         map_datas: set[AdvIdItemCalculateData] = set()
-        with trace.phase("per_adv_build_map_datas"):
-            for nmid in adv.nmids:
-                for kw in keywords:
-                    cluster_for_wb = kw.cluster_stat.text or kw.text
-                    kw_cpm = getattr(kw, "cpm", None)
-                    current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
-                    # snap_to_min: target_place is None или 0 — торг на минимум WB.
-                    # target_place > 0 — индивидуальная позиция из CH/V3.
-                    if adv.individual_keywords_target_place_mode:
-                        keyword_target_place = kw.target_place
-                        if (
-                            keyword_target_place is not None
-                            and keyword_target_place > 0
-                        ):
-                            target_position = keyword_target_place
-                            snap_to_min = False
-                        else:
-                            target_position = None
-                            snap_to_min = True
-                    else:
-                        target_position = adv.target_place
+        for nmid in adv.nmids:
+            for kw in keywords:
+                cluster_for_wb = kw.cluster_stat.text or kw.text
+                kw_cpm = getattr(kw, "cpm", None)
+                current_cpm = int(kw_cpm + 0.5) if kw_cpm is not None else None
+                # snap_to_min: target_place is None или 0 — торг на минимум WB.
+                # target_place > 0 — индивидуальная позиция из CH/V3.
+                if adv.individual_keywords_target_place_mode:
+                    keyword_target_place = kw.target_place
+                    if (
+                        keyword_target_place is not None
+                        and keyword_target_place > 0
+                    ):
+                        target_position = keyword_target_place
                         snap_to_min = False
-                    map_data = AdvIdItemCalculateData(
-                        adv_id=search_adv_id,
-                        nmid=nmid,
-                        cluster=cluster_for_wb,
-                        current_position=kw.position,
-                        max_cpm=adv.max_user_cpm,
-                        target_position=target_position,
-                        step=adv.bid_cpm_step,
-                        current_cpm=current_cpm,
-                        snap_to_min_bid_no_keyword_target=snap_to_min,
+                    else:
+                        target_position = None
+                        snap_to_min = True
+                else:
+                    target_position = adv.target_place
+                    snap_to_min = False
+                v3_managed = adv.auto_updater_version == 3
+                map_data = AdvIdItemCalculateData(
+                    search_adv_id=search_adv_id,
+                    adv_id=adv.adv_id,
+                    nmid=nmid,
+                    cluster=cluster_for_wb,
+                    current_position=kw.position,
+                    max_cpm=adv.max_user_cpm,
+                    target_position=target_position,
+                    step=adv.bid_cpm_step,
+                    current_cpm=current_cpm,
+                    keyword_setting_original_id=kw.keyword_setting_original_id,
+                    strategy_mode=(
+                        kw.strategy_mode if adv.auto_updater_version == 3 else None
+                    ),
+                    v3_managed=v3_managed,
+                    snap_to_min_bid_no_keyword_target=snap_to_min,
+                )
+                map_datas.add(map_data)
+        trace_defaults = trace_target_defaults()
+        if trace_defaults:
+            target_nmid = trace_defaults.get("nmid")
+            target_key = trace_defaults.get("key")
+            target_ks_id = trace_defaults.get("ks_id")
+            in_map = any(
+                (
+                    (target_nmid is None or cell.nmid == target_nmid)
+                    and (target_key is None or cell.cluster == target_key)
+                    and (
+                        target_ks_id is None
+                        or cell.keyword_setting_original_id == target_ks_id
                     )
-                    map_datas.add(map_data)
-        trace.marker(
-            "per_adv_map_datas_built",
-            extra={
-                "keywords_total": len(keywords),
-                "keywords_good": len(keywords_good),
-                "keywords_matched_ch": len(matched_in_ch),
-                "map_datas": len(map_datas),
-            },
-        )
+                )
+                for cell in map_datas
+            )
+            log_cluster_bid_trace(
+                step="map_cell",
+                shop_id=adv.shop_id,
+                adv_id=adv.adv_id,
+                search_adv_id=search_adv_id,
+                nmid=target_nmid,
+                ks_id=target_ks_id,
+                key=target_key,
+                in_map=in_map,
+                map_cells_count=len(map_datas),
+                cluster_texts_ch=len(texts_in_this_adv),
+                keywords_good_count=len(keywords_good),
+            )
         return map_datas
 
     async def _get_maps(self, advs: list[ComplexAdv]) -> set[AdvIdItemCalculateData]:
@@ -631,14 +813,83 @@ class UpdateClusterBidsManager:
         Это fail-closed: без сохранённого состояния шага следующий расчёт может быть
         некорректным, поэтому цикл считается неуспешным, даже если WB уже принял ставки.
         """
-        adv_ids = list({b.adv_id for b in update_bids_command.new_bids})
+        adv_ids = list({b.search_adv_id for b in update_bids_command.new_bids})
+        trace_defaults = trace_target_defaults()
+        if trace_defaults:
+            shop_id = self._wb_manager._shop_id # pyright: ignore # type: ignore
+            matching_bids = [
+                b
+                for b in update_bids_command.new_bids
+                if is_trace_bid_cell(
+                    shop_id=shop_id,
+                    search_adv_id=b.search_adv_id,
+                    nmid=b.nmid,
+                    key=b.cluster,
+                )
+            ]
+            for bid in matching_bids:
+                log_cluster_bid_trace(
+                    step="apply_before",
+                    shop_id=shop_id,
+                    adv_id=trace_defaults.get("adv_id"),
+                    search_adv_id=bid.search_adv_id,
+                    nmid=bid.nmid,
+                    key=bid.cluster,
+                    in_command=True,
+                    outgoing_bid=bid.new_bid,
+                    direct=bid.direct,
+                    step_value=bid.step,
+                    command_size=len(update_bids_command.new_bids),
+                    wb_payload_advert_id=bid.search_adv_id,
+                    wb_payload_nm_id=bid.nmid,
+                    wb_payload_norm_query=bid.cluster,
+                    wb_payload_bid=bid.new_bid,
+                )
+            if not matching_bids:
+                log_cluster_bid_trace(
+                    step="apply_before",
+                    shop_id=shop_id,
+                    adv_id=trace_defaults.get("adv_id"),
+                    search_adv_id=trace_defaults.get("search_adv_id"),
+                    nmid=trace_defaults.get("nmid"),
+                    ks_id=trace_defaults.get("ks_id"),
+                    key=trace_defaults.get("key"),
+                    in_command=False,
+                    command_size=len(update_bids_command.new_bids),
+                )
         trace = batch_trace or ShopBatchPhaseTrace(
             coroutine=_COROUTINE_CLUSTER_BIDS,
             shop_id="unknown",
             adv_ids=adv_ids,
         )
-        with trace.phase("apply_set_new_cluster_bids"):
-            await self._wb_manager.set_new_cluster_bids(update_bids_command)
+        try:
+            with trace.phase("apply_set_new_cluster_bids"):
+                await self._wb_manager.set_new_cluster_bids(update_bids_command)
+        except Exception as exc:
+            if trace_defaults:
+                log_cluster_bid_trace(
+                    step="apply_after",
+                    shop_id=self._wb_manager._shop_id, # pyright: ignore # type: ignore
+                    adv_id=trace_defaults.get("adv_id"),
+                    search_adv_id=trace_defaults.get("search_adv_id"),
+                    nmid=trace_defaults.get("nmid"),
+                    ks_id=trace_defaults.get("ks_id"),
+                    key=trace_defaults.get("key"),
+                    wb_ok=False,
+                    error_detail=format_error_detail(exc),
+                )
+            raise
+        if trace_defaults:
+            log_cluster_bid_trace(
+                step="apply_after",
+                shop_id=self._wb_manager._shop_id, # pyright: ignore # type: ignore
+                adv_id=trace_defaults.get("adv_id"),
+                search_adv_id=trace_defaults.get("search_adv_id"),
+                nmid=trace_defaults.get("nmid"),
+                ks_id=trace_defaults.get("ks_id"),
+                key=trace_defaults.get("key"),
+                wb_ok=True,
+            )
         try:
             with trace.phase("apply_update_keyword_statuses"):
                 await self._redis_keyword_bidder_status_manager.update_statuses(
@@ -648,12 +899,12 @@ class UpdateClusterBidsManager:
             logger.exception("Не удалось обновить статусы ключей в Redis")
         entries = [
             ClusterBidEntry(
-                adv_id=b.adv_id,
+                search_adv_id=b.search_adv_id,
                 nmid=b.nmid,
                 cluster=b.cluster,
                 new_bid=b.new_bid,
                 step=b.step,
-                direct=b.direct.value,
+                direct=str(b.direct.value),
             )
             for b in update_bids_command.new_bids
         ]
@@ -666,8 +917,36 @@ class UpdateClusterBidsManager:
         from .new_bids_calculator import new_bid_calculate
 
         new_bids: list[NewBid] = []
+        trace_on = is_trace_enabled()
+        trace_shop_id = trace_target_defaults().get("shop_id")
         for input_dto in calculation_inputs:
             new_bid: NewBid | None = new_bid_calculate(input_dto)
+            if trace_on and is_trace_bid_cell(
+                shop_id=trace_shop_id,
+                search_adv_id=input_dto.search_adv_id,
+                nmid=input_dto.nmid,
+                key=input_dto.cluster,
+            ):
+                if new_bid is None:
+                    log_cluster_bid_trace(
+                        step="new_bid_calculate",
+                        search_adv_id=input_dto.search_adv_id,
+                        nmid=input_dto.nmid,
+                        key=input_dto.cluster,
+                        result="none",
+                    )
+                else:
+                    log_cluster_bid_trace(
+                        step="new_bid_calculate",
+                        search_adv_id=input_dto.search_adv_id,
+                        nmid=input_dto.nmid,
+                        key=input_dto.cluster,
+                        result="created",
+                        new_bid=new_bid.new_bid,
+                        direct=new_bid.direct,
+                        step_value=new_bid.step,
+                        status=new_bid.bidder_keyword_status,
+                    )
             if new_bid:
                 new_bids.append(new_bid)
         return UpdateBidsCommand(new_bids)
@@ -694,6 +973,7 @@ class UpdateClusterBidsManager:
             logger.error("Ошибка batch-получения факта из CH: %s", error)
             return {}
         adv_to_fact_map: dict[int, FactData] = {}
+        from app.modules.plan_fact.provider import PlanFactProvider
         for adv in advs:
             fact = PlanFactProvider.fact_data_from_plan_fact_summary(
                 summaries_by_adv_id.get(adv.adv_id),
@@ -706,6 +986,7 @@ class UpdateClusterBidsManager:
     @staticmethod
     def _get_plan_data(advs: list[ComplexAdv]) -> dict[int, PlanData]:
         plan_datas_map: dict[int, PlanData] = {}
+        from app.modules.plan_fact.provider import PlanFactProvider
         for adv in advs:
             plan = PlanFactProvider.get_plan_data(adv.adv_setting)
             if plan is not None:

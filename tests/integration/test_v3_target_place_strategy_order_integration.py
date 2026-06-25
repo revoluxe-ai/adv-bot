@@ -160,15 +160,18 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
         _patched_sm(session_cm),
     )
 
+    # RK ratio без CH wb_common_stat (sync вызывает load_campaign_orders_per_cart_7d).
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_campaign_orders_per_cart_7d",
+        AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
+    )
+
     adv = MagicMock()
     adv.adv_setting_original_id = 1
     adv.adv_id = 123
-
-    # Минимальный adv без nmids: RK ratio мокаем (как unit conftest), без CH wb_common_stat.
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rk_orders_per_cart_7d",
-        AsyncMock(return_value=RK_ORDERS_PER_CART_TEST),
-    )
+    adv.complex_adv = MagicMock()
+    adv.complex_adv.adv_setting = MagicMock()
+    adv.complex_adv.adv_setting.nmids = [TEST_NMID]
 
     expected = target_places_for_v3_modes(
         base_profile,

@@ -17,12 +17,12 @@ _API_TIMEOUT = 1.0
 class _AdvForTimestamp:
     """Minimal adapter for get_set_bid_map timestamp lookup (AdvProtocol)."""
 
-    def __init__(self, adv_id: int) -> None:
-        self._adv_id = adv_id
+    def __init__(self, search_adv_id: int) -> None:
+        self._search_adv_id = search_adv_id
 
     @property
-    def adv_id(self) -> int:
-        return self._adv_id
+    def search_adv_id(self) -> int:
+        return self._search_adv_id
 
 
 async def _fetch_api_bids(complex_adv: ComplexAdv) -> dict[str, int]:
@@ -37,8 +37,11 @@ async def _fetch_api_bids(complex_adv: ComplexAdv) -> dict[str, int]:
             timeout=_API_TIMEOUT,
         )
         api_bids: dict[str, int] = {}
+        search_adv_id = complex_adv.search_adv_id
         if bids:
             for dto in bids:
+                if search_adv_id is not None and dto.advert_id != search_adv_id:
+                    continue
                 q = dto.norm_query
                 b = dto.bid
                 if q not in api_bids:

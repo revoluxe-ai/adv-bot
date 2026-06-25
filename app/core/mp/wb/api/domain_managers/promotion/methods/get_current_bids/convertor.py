@@ -10,7 +10,11 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 
 
 def dto_to_request(complex_advs: list[ComplexAdv]) -> V0GetNormQueryBidsRequest:
-    """Собирает тело запроса normquery/get-bids для переданных рекламных кампаний."""
+    """Собирает тело запроса normquery/get-bids для переданных рекламных кампаний.
+
+    Normquery cluster bids живут только в search (auction) РК — запрашиваем
+    ``search_adv_id``, не auto ``adv_id``.
+    """
 
     items: list[V0GetNormQueryBidsRequestItem] = []
     for adv in complex_advs:
@@ -18,9 +22,12 @@ def dto_to_request(complex_advs: list[ComplexAdv]) -> V0GetNormQueryBidsRequest:
         if not nmids:
             continue
 
-        items.extend(_build_items(adv.auto_adv_id, nmids))
-        if search_adv := adv.search_adv:
-            items.extend(_build_items(search_adv.adv_id, nmids))
+        search_adv_id = adv.search_adv_id
+        if search_adv_id is None and (search_adv := adv.search_adv) is not None:
+            search_adv_id = search_adv.adv_id
+        if search_adv_id is None:
+            continue
+        items.extend(_build_items(search_adv_id, nmids))
 
     return V0GetNormQueryBidsRequest(items=items)
 

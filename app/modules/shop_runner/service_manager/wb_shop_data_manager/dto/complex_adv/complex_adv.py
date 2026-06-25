@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import \
+    AutoShelfBidControlStrategy
+
+"""DTO wrapper over AdvSetting for shop-runner control flows."""
+
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -21,6 +26,34 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 from app.shared.domains.wb.enums import AdvType
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+
+
+
+
+def resolve_auto_shelf_bid_control_strategy(
+    raw_value: AutoShelfBidControlStrategy | str | None,
+) -> AutoShelfBidControlStrategy:
+    """Нормализует стратегию control-логики полок.
+
+    None, пустые и неизвестные значения безопасно сводятся к legacy-режиму.
+    """
+    if raw_value is None or raw_value == "":
+        return AutoShelfBidControlStrategy.PLAN_DISTANCE
+    if raw_value == AutoShelfBidControlStrategy.CYCLE_METRIC:
+        return AutoShelfBidControlStrategy.CPC
+    if isinstance(raw_value, AutoShelfBidControlStrategy):
+        return (
+            AutoShelfBidControlStrategy.CPC
+            if raw_value == AutoShelfBidControlStrategy.CYCLE_METRIC
+            else raw_value
+        )
+    try:
+        resolved = AutoShelfBidControlStrategy(str(raw_value))
+    except ValueError:
+        return AutoShelfBidControlStrategy.PLAN_DISTANCE
+    if resolved == AutoShelfBidControlStrategy.CYCLE_METRIC:
+        return AutoShelfBidControlStrategy.CPC
+    return resolved
 
 
 class GetKeywordsProvider(Protocol):
@@ -75,6 +108,9 @@ class ComplexAdv:
         shop_id: str | None = None,
         get_keywords_func: GetKeywordsProvider | None = None,
         min_nmids_bids: AdvMinNmidsBids | None = None,
+        fact_pay_for_order: float | None = None,
+        resolve_cpo: float | None = None,
+        original_max_cpo: float | None = None,
     ):
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
@@ -93,6 +129,9 @@ class ComplexAdv:
         self._keyword_getting_mode: KeywordGettingMode = KeywordGettingMode.ALL_KEYWORDS
         self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
+        self._fact_pay_for_order: float | None = fact_pay_for_order
+        self._resolve_cpo: float | None = resolve_cpo
+        self._original_max_cpo = original_max_cpo
 
     def __repr__(self):
         return str(self._adv_setting.id)
@@ -192,12 +231,11 @@ class ComplexAdv:
             auction_adv_id = self.auction_adv_id
             if auction_adv_id is None:
                 raise ValueError(
-                    "Аукционная кампания не зарегистрирована для adv_id=%s"
-                    % self.auto_adv_id
+                    f"Аукционная кампания не зарегистрирована для adv_id={self.auto_adv_id}"
                 )
             return auction_adv_id
         raise ValueError(
-            "Неизвестный тип кампании %s" % adv_type
+            f"Неизвестный тип кампании {adv_type}"
         )
 
     @property
@@ -273,6 +311,13 @@ class ComplexAdv:
         return bool(self._adv_setting.auto_shelf_bid_control_enabled)
 
     @property
+    def auto_shelf_bid_control_strategy(self) -> AutoShelfBidControlStrategy:
+        """Стратегия выбора main bid для auto_shelf_bid_control."""
+        return resolve_auto_shelf_bid_control_strategy(
+            getattr(self._adv_setting, "auto_shelf_bid_control_strategy", None)
+        )
+
+    @property
     def traffic_clicks_dto(self) -> TrafficClicksDTO | None:
         """Клики орг/пол за сегодня; None если полки выкл или enrich не вызывали / упал."""
         if not self.rec_system_promotion_mode_active:
@@ -325,6 +370,10 @@ class ComplexAdv:
     @property
     def v3_rollout_aggressiveness(self) -> int:
         return int(self._adv_setting.aggressiveness)
+
+    @property
+    def keyword_calibration_max_step(self) -> int:
+        return int(self._adv_setting.keyword_calibration_max_step)
 
     @property
     def shop_id(self) -> str:
@@ -423,7 +472,7 @@ class ComplexAdv:
         if self._calculated_keywords is not None:
             return self._filter_keywords(self._calculated_keywords)
 
-        cached = await self._get_keywords(self, cache_only=True)
+        cached = await self._get_keywords(self)
         # Пустой [] (__empty__ в Redis) не кэшируем на инстансе: snapshot warmup
         # может записать keywords после первого чтения.
         if cached:
@@ -494,3 +543,18 @@ class ComplexAdv:
     @property
     def max_user_cpm(self) -> int:
         return self._adv_setting.max_cpm
+
+    @property
+    def fact_pay_for_order(self) -> float | None:
+        """Фактическое CPO кампании (cost per order) из plan-fact статистики."""
+        return self._fact_pay_for_order
+
+    @property
+    def resolve_cpo(self) -> float | None:
+        """Resolve CPO кампании (целевое/разрешенное значение CPO)."""
+        return self._resolve_cpo
+
+    @property
+    def original_max_cpo(self) -> float | None:
+        """Исходный max CPO из настроек РК до синтетических пересчётов бюджета."""
+        return self._original_max_cpo

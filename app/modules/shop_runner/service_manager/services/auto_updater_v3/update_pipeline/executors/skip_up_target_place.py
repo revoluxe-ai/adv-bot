@@ -1,0 +1,53 @@
+"""Фаза: схлопнуть alias UP на текущем ``target_place`` (до max M/O/C на place)."""
+
+from __future__ import annotations
+
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    state_candidates_by_mode_for_ctx,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+    UpdateContext,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.next_state.manager import (
+    NextStateManager,
+)
+
+
+class SkipUpTargetPlaceExecutor:
+    """Схлопнуть alias-UP на том же ``target_place`` для FULL ключей.
+
+    PFO/GAP сюда не попадают: для них трафик регулируется NF migrate/plan-fact
+    и отдельными bootstrap-enable фазами, а не ladder alias logic.
+    """
+
+    phase_name = "skip_up_same_target_place"
+    _skip_reason: str | None = None
+
+    def __init__(self) -> None:
+        self._next_state_manager = NextStateManager(SkipUpTargetPlaceExecutor)
+
+    def execute(self, context: UpdateContext) -> None:
+        self._skip_reason = None
+        ladder_inputs = context.adv_state.ladder_inputs
+        resolve = (
+            float(context.adv_state.resolve)
+            if context.adv_state.resolve_valid
+            else None
+        )
+        for dto in context.keywords:
+            if dto.data_tier != KeywordV3DataTier.FULL:
+                continue
+            catalog = state_candidates_by_mode_for_ctx(dto.context, ladder_inputs)
+            self._next_state_manager.skip_up_same_target_place(
+                dto,
+                catalog,
+                max_target_mode=context.adv_state.policy.max_target_mode,
+                resolve=resolve,
+            )
+
+    @property
+    def skip_reason(self) -> str | None:
+        return self._skip_reason

@@ -12,6 +12,7 @@ from app.client_bot.user_interface.utils import (
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import (
     Action,
+    AutoCommonBudgetToggle,
     CommonBudgetModeToggle,
 )
 from app.modules.admin_user_balance.callbacks import AdminUserBalance
@@ -37,15 +38,6 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.mo
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
     format_keyword_list_target_place_suffix,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-    KeywordV3Eligibility,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
-    LadderInputs,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
-    KeywordV3Context,
-)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 from app.utils.db.session_maker import get_async_session_maker
@@ -69,6 +61,22 @@ def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboa
                     adv_setting_original_id=adv_setting.id,
                     campaign_type=None,
                 ).pack(),
+            )
+        )
+        auto_common_flag = bool(getattr(adv_setting, "auto_common_budget", False))
+        auto_common_text = (
+            "Включить авторасчёт общего бюджета"
+            if not auto_common_flag
+            else "Выключить авторасчёт общего бюджета"
+        )
+        auto_common_callback = AutoCommonBudgetToggle(
+            adv_setting_original_id=adv_setting.id,
+            new_status=not auto_common_flag,
+        ).pack()
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=auto_common_text,
+                callback_data=auto_common_callback,
             )
         )
     else:
@@ -329,33 +337,13 @@ def get_advs_keyboard_with_paginator(
 
 def sorting_keywords_for_v3(
     keywords: list[CalculatedKeyword],
-    *,
-    contexts: list[KeywordV3Context] | None = None,
-    ladder_inputs: LadderInputs | None = None,
-    eligibility_by_ks_id: dict[int, KeywordV3Eligibility] | None = None,
 ) -> list[CalculatedKeyword]:
-    """V3: state_cost текущего режима (OFF → MIN); без ladder-контекста — ``pay_for_order`` asc.
-
-    Список в prod сортируется в ``AdvKeywordsSetting`` через ``sort_keywords_for_v3_ui``.
-    Опциональные ``contexts`` / ``ladder_inputs`` / ``eligibility_by_ks_id`` — для unit-тестов SSOT.
-    """
+    """V3: сортировка по возрастанию ``pay_for_order`` (``None`` — в конец списка)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.sort_utils import (
-        pay_for_order_sort_key,
-        sort_keywords_by_current_state_cost,
+        sort_keywords_by_pay_for_order,
     )
 
-    if (
-        contexts is not None
-        and ladder_inputs is not None
-        and eligibility_by_ks_id is not None
-    ):
-        return sort_keywords_by_current_state_cost(
-            keywords,
-            contexts,
-            ladder_inputs,
-            eligibility_by_ks_id,
-        )
-    return sorted(keywords, key=pay_for_order_sort_key)
+    return sort_keywords_by_pay_for_order(keywords)
 
 
 def get_keywords_setting_keyboard(
@@ -369,6 +357,7 @@ def get_keywords_setting_keyboard(
     sort_mode: str = "default",
     image_mode: str = "graphic",
 ):
+    """Клавиатура списка ключей на странице кампании."""
     from . import keyword_statuses_util as k_util
 
     def sorting_keywords(
@@ -596,6 +585,20 @@ def get_keywords_setting_keyboard(
     bottoms.append(
         [
             InlineKeyboardButton(
+                text="Статистика по дням",
+                callback_data=callbacks.KeywordsDailyStats(
+                    adv_original_id=adv_setting.id,
+                    page=1,
+                    keywords_page=page,
+                    sort_mode=sort_mode,
+                ).pack(),
+            )
+        ]
+    )
+
+    bottoms.append(
+        [
+            InlineKeyboardButton(
                 text="К настройкам АРК",
                 callback_data=callbacks.Adv(adv_original_id=adv_setting.id).pack(),
             )
@@ -603,6 +606,102 @@ def get_keywords_setting_keyboard(
     )
     keyboard = InlineKeyboardMarkup(inline_keyboard=bottoms)
     return keyboard
+
+
+def get_keywords_daily_stats_keyboard(
+    adv_original_id: int,
+    page: int,
+    total_pages: int,
+    keywords_page: int,
+    sort_mode: str,
+) -> InlineKeyboardMarkup:
+    """Клавиатура экрана дневной статистики ключей."""
+    builder = InlineKeyboardBuilder()
+    current_page = min(max(page, 1), max(total_pages, 1))
+    nav_buttons: list[InlineKeyboardButton] = []
+
+    if total_pages > 1 and current_page > 1:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=callbacks.KeywordsDailyStats(
+                    adv_original_id=adv_original_id,
+                    page=current_page - 1,
+                    keywords_page=keywords_page,
+                    sort_mode=sort_mode,
+                ).pack(),
+            )
+        )
+    if total_pages > 1 and current_page < total_pages:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=callbacks.KeywordsDailyStats(
+                    adv_original_id=adv_original_id,
+                    page=current_page + 1,
+                    keywords_page=keywords_page,
+                    sort_mode=sort_mode,
+                ).pack(),
+            )
+        )
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    builder.row(
+        InlineKeyboardButton(
+            text="К списку ключевых слов",
+            callback_data=callbacks.SettingKeywords(
+                adv_original_id=adv_original_id,
+                type=sort_mode,
+                page=keywords_page,
+            ).pack(),
+        )
+    )
+    return builder.as_markup()
+
+
+def get_keyword_daily_history_keyboard(
+    keyword_setting_original_id: int,
+    page: int,
+    total_pages: int,
+) -> InlineKeyboardMarkup:
+    """Клавиатура для постраничной истории одного ключа."""
+    builder = InlineKeyboardBuilder()
+    current_page = min(max(page, 1), max(total_pages, 1))
+    nav_buttons: list[InlineKeyboardButton] = []
+
+    if total_pages > 1 and current_page > 1:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="⬅️",
+                callback_data=callbacks.KeywordDailyHistory(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                    page=current_page - 1,
+                ).pack(),
+            )
+        )
+    if total_pages > 1 and current_page < total_pages:
+        nav_buttons.append(
+            InlineKeyboardButton(
+                text="➡️",
+                callback_data=callbacks.KeywordDailyHistory(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                    page=current_page + 1,
+                ).pack(),
+            )
+        )
+    if nav_buttons:
+        builder.row(*nav_buttons)
+
+    builder.row(
+        InlineKeyboardButton(
+            text="К настройкам ключа",
+            callback_data=callbacks.SettingKeyword(
+                keyword_setting_original_id=keyword_setting_original_id,
+            ).pack(),
+        )
+    )
+    return builder.as_markup()
 
 
 def get_keyword_setting_keyboard(
@@ -725,6 +824,18 @@ def get_keyword_setting_keyboard(
                 text=f"Целевая позиция: {target_place_value} ({source_text}) — Изменить",
                 callback_data=callbacks.ChangeKeywordTargetPlace(
                     keyword_setting_original_id=keyword_setting_original_id,
+                ).pack(),
+            )
+        ]
+    )
+
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                text="📅 История по дням",
+                callback_data=callbacks.KeywordDailyHistory(
+                    keyword_setting_original_id=keyword_setting_original_id,
+                    page=1,
                 ).pack(),
             )
         ]

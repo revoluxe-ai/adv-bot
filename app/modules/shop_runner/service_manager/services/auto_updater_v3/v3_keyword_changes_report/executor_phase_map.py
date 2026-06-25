@@ -1,0 +1,78 @@
+"""Маппинг имён executor → phase_id отчёта V3."""
+
+from __future__ import annotations
+
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report import (
+    PHASE_TITLES,
+)
+
+EXECUTOR_TO_PHASE_ID: dict[str, str] = {
+    "HardStatusValidateExecutor": "validate_state_by_hard_status",
+    "ClampStateToAggressionExecutor": "clamp_state_to_aggression",
+    "ClampStatesToResolveWhenNoEffectiveStepsExecutor": (
+        "clamp_states_to_resolve_when_no_effective_steps"
+    ),
+    "NotFullTargetPlaceMigrateExecutor": "not_full_target_place_migrate",
+    "NotFullValidateExecutor": "validate_not_full_state",
+    "NotFullTargetPlacePlanFactExecutor": "not_full_target_place_plan_fact",
+    "SkipUpTargetPlaceExecutor": "skip_up_same_target_place",
+    "RaiseStateToTargetCpoExecutor": "raise_state_to_target_cpo",
+    "ResetOverMaxCpoOnOverspendExecutor": "reset_over_max_cpo_on_overspend",
+    "ShelfCleanupExecutor": "shelf_cleanup",
+    "PayForOrderNoChEnableExecutor": "pay_for_order_no_ch_enable",
+    "RebalanceExecutor": "cost_reallocation",
+    "PayForOrderGapEnableExecutor": "pay_for_order_gap_enable",
+    "PayForOrderOverMaxOffOnDeepOverspendExecutor": (
+        "pay_for_order_over_max_off_on_deep_overspend"
+    ),
+    "ResolveCalibrationExecutor": "resolve_calibration",
+}
+
+# Служебные executor — не попадают в отчёт фаз.
+IGNORED_EXECUTOR_NAMES: frozenset[str] = frozenset(
+    {
+        "PrepareExecutor",
+        "from_prepared_row",
+    }
+)
+
+# Короткие метки для цепочки ключa (audit Redis).
+EXECUTOR_SHORT_LABEL: dict[str, str] = {
+    "HardStatusValidateExecutor": "V",
+    "ClampStateToAggressionExecutor": "cap",
+    "ClampStatesToResolveWhenNoEffectiveStepsExecutor": "R0",
+    "NotFullTargetPlaceMigrateExecutor": "NFm",
+    "NotFullValidateExecutor": "NF",
+    "NotFullTargetPlacePlanFactExecutor": "NFp",
+    "SkipUpTargetPlaceExecutor": "skip",
+    "RaiseStateToTargetCpoExecutor": "R↑",
+    "ResetOverMaxCpoOnOverspendExecutor": "R↓",
+    "ShelfCleanupExecutor": "S",
+    "PayForOrderNoChEnableExecutor": "enP",
+    "RebalanceExecutor": "R",
+    "PayForOrderGapEnableExecutor": "en",
+    "PayForOrderOverMaxOffOnDeepOverspendExecutor": "pfo↓",
+    "ResolveCalibrationExecutor": "cal",
+    "DATA_BOOTSTRAP": "boot",
+}
+
+
+def phase_id_for_executor(executor_name: str) -> str:
+    """phase_id для executor; неизвестный → slug от имени класса."""
+    mapped = EXECUTOR_TO_PHASE_ID.get(executor_name)
+    if mapped is not None:
+        return mapped
+    return executor_name
+
+
+def title_ru_for_phase(phase_id: str) -> str:
+    """Заголовок фазы из ``PHASE_TITLES`` или fallback."""
+    meta = PHASE_TITLES.get(phase_id)
+    if meta is None:
+        return phase_id
+    return meta[0]
+
+
+def short_label_for_executor(executor_name: str) -> str:
+    """Короткая метка executor для audit-цепочки."""
+    return EXECUTOR_SHORT_LABEL.get(executor_name, executor_name[:8])

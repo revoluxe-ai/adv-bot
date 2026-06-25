@@ -12,7 +12,7 @@ from app.modules.shop_runner.service_manager.services.update_cluster_bids_manage
 def update_bids_command_to_redis_command(update_bids_command: "UpdateBidsCommand") -> list[RedisCommand]:
     redis_commands: list[RedisCommand] = []
     for bid in update_bids_command.new_bids:
-        redis_command = RedisCommand(adv_id=bid.adv_id,
+        redis_command = RedisCommand(adv_id=bid.search_adv_id,
                                      text=bid.cluster,
                                      bidder_keyword_status=bid.bidder_keyword_status)
         redis_commands.append(redis_command)
@@ -21,10 +21,14 @@ def update_bids_command_to_redis_command(update_bids_command: "UpdateBidsCommand
 
 
 def dto_to_redis_commands(adv: "ComplexAdv", texts: list[str]) -> list[RedisCommand]:
+    """Ключи bidder-keyword-status совпадают с write-path: search_adv_id × cluster."""
+    search_adv_id = adv.search_adv_id
+    if search_adv_id is None:
+        return []
     redis_commands: list[RedisCommand] = []
     for text in texts:
         redis_command = RedisCommand(
-            adv_id=adv.adv_id,
+            adv_id=search_adv_id,
             text=text,
             bidder_keyword_status=None,
         )

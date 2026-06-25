@@ -1,4 +1,4 @@
-"""Контракт единиц ставок Auto Shelf Bid Control.
+﻿"""Контракт единиц ставок Auto Shelf Bid Control.
 
 Внутренний канон (PG, CH, Redis recommendations, setter, DTO ``*_minor``):
     **копейки** — как в WB API ``adv/v0/bids`` (200 ₽ → ``20000``).
@@ -31,13 +31,16 @@ DEFAULT_MIN_BID_DISTANCE_MINOR = 100
 
 
 def cpc_from_totals(spend: float, clicks: int) -> float:
-    """CPC для отображения в UI: ``spend / max(clicks, 1)``.
+    """CPC для отображения в UI: ``spend / clicks`` или ``+inf`` при ``clicks == 0``.
 
-    Нулевые клики дают ``spend/1`` только в строках просмотрщика.
+    Нулевые клики дают ``+inf`` только для display/sorting в UI.
     Выбор ``best``/``global_best`` в SQL требует только ``clicks > 0``
     (см. get_best_bid_by_cart_cpa.sql); порог покрытия — только для ✅ в UI.
     """
-    return spend / max(int(clicks), 1)
+    normalized_clicks = int(clicks)
+    if normalized_clicks <= 0:
+        return float("inf")
+    return spend / normalized_clicks
 
 
 def report_day_start_utc(tz_name: str = "Europe/Moscow") -> datetime:
@@ -119,14 +122,14 @@ def format_timestamp_for_telegram(
     if value is None:
         return "—"
     if isinstance(value, datetime):
-        dt = truncate_datetime_to_seconds(value)
+        base = value if value.microsecond == 0 else value.replace(microsecond=0)
     else:
         text = str(value).strip()
         if not text:
-            return "—"
-        dt = _parse_timestamp_for_display(text)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    local = dt.astimezone(ZoneInfo(tz_name))
+            return "—”"
+        base = _parse_timestamp_for_display(text)
+    if base.tzinfo is None:
+        base = base.replace(tzinfo=timezone.utc)
+    local = base.astimezone(ZoneInfo(tz_name))
     suffix = " МСК" if tz_name == TELEGRAM_DISPLAY_TZ else ""
     return local.strftime("%Y-%m-%d %H:%M:%S") + suffix

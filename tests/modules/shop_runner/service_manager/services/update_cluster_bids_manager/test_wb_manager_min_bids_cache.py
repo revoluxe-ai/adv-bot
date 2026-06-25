@@ -107,8 +107,7 @@ async def test_partial_miss_returns_only_cached_nmids_no_api() -> None:
             cache_possible=True,
         )
 
-    assert out.auto == {7: 50}
-    assert 8 not in out.auto
+    assert out.auto == {7: 50, 8: 100}
     hub.wb_data_manager.get_min_bids_for_command.assert_not_called()
     cache_instance.set_min_bids_v2_batch.assert_not_called()
 
@@ -134,7 +133,7 @@ async def test_full_miss_no_api_empty_auto() -> None:
         mgr = WBManager("shop-x")
         out = await mgr.get_min_bids([_make_adv(nmids=[1], auto_id=400)], cache_possible=True)
 
-    assert out.auto == {}
+    assert out.auto == {1: 100}
     hub.wb_data_manager.get_min_bids.assert_not_called()
     hub.wb_data_manager.get_min_bids_for_command.assert_not_called()
 
@@ -185,10 +184,126 @@ async def test_cache_only_miss_does_not_raise() -> None:
         mgr = WBManager("shop-x")
         out = await mgr.get_min_bids([_make_adv(nmids=[1], auto_id=500)], cache_possible=True)
 
-    assert out.auto == {}
+    assert out.auto == {1: 100}
     hub.wb_data_manager.get_min_bids_for_command.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_cache_miss_apply_defaults_false_returns_empty() -> None:
+    hub = MagicMock()
+    cache_instance = MagicMock()
+    cache_instance.get_min_bids_v2_batch = AsyncMock(return_value={})
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        out = await mgr.get_min_bids_cache_only(
+            [_make_adv(nmids=[1], auto_id=500)],
+            context="backfill_check",
+            apply_defaults=False,
+        )
+
+    assert out.auto == {}
+
+
+@pytest.mark.asyncio
+async def test_can_not_cache_data_miss_apply_defaults_false_stays_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CAN_NOT_CACHE_DATA не должен подставлять default CPM в raw cache read."""
+    monkeypatch.setenv("CAN_NOT_CACHE_DATA", "true")
+    hub = MagicMock()
+    redis_wrapper = MagicMock()
+    cache_instance = MagicMock()
+    cache_instance.get_min_bids_v2_batch = AsyncMock(return_value={})
+
+    adv = _make_adv(nmids=[7], auto_id=800, search_id=801)
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        raw = await WBManager.read_min_bids_cache_only(
+            [adv],
+            redis_wrapper,
+            shop_id="shop-x",
+            context="raw_check",
+        )
+        mgr = WBManager("shop-x")
+        out = await mgr.get_min_bids_cache_only(
+            [adv],
+            context="v3_min_bids_check",
+            apply_defaults=False,
+        )
+
+    assert raw.auto == {}
+    assert raw.search == {}
+    assert out.auto == {}
+    assert out.search == {}
+
+
+@pytest.mark.asyncio
+async def test_can_not_cache_data_miss_apply_defaults_true_uses_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CAN_NOT_CACHE_DATA", "true")
+    hub = MagicMock()
+    cache_instance = MagicMock()
+    cache_instance.get_min_bids_v2_batch = AsyncMock(return_value={})
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        out = await mgr.get_min_bids_cache_only(
+            [_make_adv(nmids=[1], auto_id=500)],
+            context="update_cluster_bids",
+            apply_defaults=True,
+        )
+
+    assert out.auto == {1: 100}
+
+
+@pytest.mark.asyncio
+async def test_can_not_cache_data_backfill_check_does_not_fake_hit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """v3 backfill: apply_defaults=False не должен считать default CPM cache hit."""
+    monkeypatch.setenv("CAN_NOT_CACHE_DATA", "true")
+    hub = MagicMock()
+    cache_instance = MagicMock()
+    cache_instance.get_min_bids_v2_batch = AsyncMock(return_value={})
+
+    adv = _make_adv(nmids=[7], auto_id=900, search_id=901)
+    adv.main_nmid = 7
+
+    with (
+        patch.object(WBManager, "wb_manager_hub", PropertyMock(return_value=hub)),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager.wb_manager.MinBidsCacheManager",
+            return_value=cache_instance,
+        ),
+    ):
+        mgr = WBManager("shop-x")
+        cached = await mgr.get_min_bids_cache_only(
+            [adv],
+            context="v3_min_bids_check",
+            apply_defaults=False,
+        )
+
+    assert 7 not in cached.search
 @pytest.mark.asyncio
 async def test_refresh_min_bids_cache_calls_api_and_batch_write() -> None:
     hub = MagicMock()

@@ -8,11 +8,13 @@ import pytest
 
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EDITABLE_ADV_SETTING_COLUMNS,
+    EDITABLE_SHELF_BID_CONTROL_COLUMNS,
 )
 
 
-UI_HANDLER_BY_FIELD: dict[str, str] = {
+ADV_UI_HANDLER_BY_FIELD: dict[str, str] = {
     "bot_active": "app/client_bot/user_interface/handlers/adv_setting.py",
+    "auto_shelf_bid_control_enabled": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
     "max_cpm": "app/client_bot/user_interface/handlers/cpm_builder.py",
     "min_views_for_ml_predict": "app/client_bot/user_interface/handlers/min_views_for_ml_predict_ctr.py",
     "clusters_mode": "app/client_bot/user_interface/handlers/clusters.py",
@@ -26,6 +28,7 @@ UI_HANDLER_BY_FIELD: dict[str, str] = {
     "plan_for_sales_for_day": "app/modules/sales_plan_settings/telegram/setting_handlers/change_plan_for_sales_for_day.py",
     "target_price_for_order": "app/modules/sales_plan_settings/telegram/setting_handlers/change_target_price_for_order.py",
     "max_price_for_order": "app/modules/sales_plan_settings/telegram/setting_handlers/change_max_price_for_order.py",
+    "substitute_fact_cpo_for_max": "app/modules/sales_plan_settings/telegram/setting_handlers/toggle_v3_raise_max_cpo.py",
     "bidder_for_auto": "app/modules/bidder_auto_mode/handlers.py",
     "auto_update_white_list": "app/modules/shop_runner/service_manager/old_modules/setting_auto_updater/modules/white_list_updater/auto_white_list_updater/telegram/handlers.py",
     "auto_budget_watchdog_enabled": "app/client_bot/user_interface/handlers/auto_budget_watchdog_toggle.py",
@@ -37,12 +40,14 @@ UI_HANDLER_BY_FIELD: dict[str, str] = {
     "search_auto_budget_daily_limit": "app/client_bot/user_interface/handlers/campaign_activity.py",
     "use_common_budget": "app/client_bot/user_interface/handlers/common_budget_mode_toggle.py",
     "common_budget_daily_limit": "app/client_bot/user_interface/handlers/campaign_activity.py",
+    "auto_common_budget": "app/client_bot/user_interface/handlers/auto_common_budget_toggle.py",
     "auto_add_only_relevant_phrase": "app/client_bot/user_interface/handlers/auto_add_only_relevant_phrase_toggle.py",
     "orders_source_for_auto_mode": "app/client_bot/user_interface/handlers/orders_source_toggle.py",
     "predict_ctr_mode": "app/client_bot/user_interface/handlers/predict_ctr_mode_toggle.py",
     "sales_predict_method": "app/client_bot/user_interface/handlers/sales_predict_method_toggle.py",
     "automatic_version": "app/modules/shop_runner/service_manager/auto_updater_version_toggle/telegram/handlers.py",
     "aggressiveness": "app/modules/shop_runner/service_manager/v3_rollout_aggressiveness_toggle/telegram/handlers.py",
+    "keyword_calibration_max_step": "app/modules/v3_calibration_step_setting/telegram_handler.py",
     "white_list_mode": "app/client_bot/user_interface/handlers/white_list_mode_toggle.py",
     "individual_keywords_target_place_mode": "app/client_bot/user_interface/handlers/individual_keywords_target_place_toggle.py",
     "target_position_mode": "app/client_bot/user_interface/handlers/target_position_mode_toggle.py",
@@ -53,13 +58,26 @@ UI_HANDLER_BY_FIELD: dict[str, str] = {
     "max_place": "app/client_bot/user_interface/handlers/cpm_builder.py",
 }
 
+SHELF_UI_HANDLER_BY_FIELD: dict[str, str] = {
+    "auto_shelf_max_bid_rub": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_test_share": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_target_test_impressions": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_target_test_observation_minutes": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "auto_shelf_min_bid_distance_rub": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+}
+
 
 @pytest.mark.unit
 def test_excel_editable_fields_match_ui_mapping() -> None:
-    assert set(EDITABLE_ADV_SETTING_COLUMNS) == set(UI_HANDLER_BY_FIELD)
+    assert set(EDITABLE_ADV_SETTING_COLUMNS) == set(ADV_UI_HANDLER_BY_FIELD)
+
+
+@pytest.mark.unit
+def test_excel_shelf_fields_match_ui_mapping() -> None:
+    assert set(EDITABLE_SHELF_BID_CONTROL_COLUMNS) == set(SHELF_UI_HANDLER_BY_FIELD)
 
 
 @pytest.mark.unit
 def test_ui_mapping_files_exist() -> None:
-    for path in UI_HANDLER_BY_FIELD.values():
+    for path in {**ADV_UI_HANDLER_BY_FIELD, **SHELF_UI_HANDLER_BY_FIELD}.values():
         assert Path(path).exists(), f"UI handler not found: {path}"

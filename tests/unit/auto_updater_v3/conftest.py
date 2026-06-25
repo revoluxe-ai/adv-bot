@@ -40,7 +40,7 @@ RK_ORDERS_PER_CART_TEST = 2.0
 
 @pytest.fixture(autouse=True)
 def _stub_v3_orchestrator_baseline_loaders(request: pytest.FixtureRequest):
-    """Orchestrator unit-тесты: без реального ClickHouse для RK/rec baseline."""
+    """RK/rec baseline не ходят в CH в orchestrator unit-тестах."""
     if "test_orchestrator" not in request.node.nodeid:
         yield
         return
@@ -60,10 +60,6 @@ def _stub_v3_orchestrator_baseline_loaders(request: pytest.FixtureRequest):
         patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
             new=AsyncMock(return_value=0.01),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.cache_worst_costs_for_adv",
-            new=AsyncMock(),
         ),
     ):
         yield

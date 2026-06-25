@@ -14,7 +14,6 @@ from app.client_bot.user_interface.views import callbacks
 async def test_open_shop_mass_adv_ops_menu_edits_reply_markup() -> None:
     wb_user_cabinet_id = 42
     callback = SimpleNamespace(
-        answer=AsyncMock(),
         message=SimpleNamespace(edit_reply_markup=AsyncMock()),
     )
     callback_data = callbacks.ShopMassAdvOpsMenu(
@@ -29,7 +28,6 @@ async def test_open_shop_mass_adv_ops_menu_edits_reply_markup() -> None:
     ):
         await open_shop_mass_adv_ops_menu(callback, callback_data)
 
-    callback.answer.assert_awaited_once()
     callback.message.edit_reply_markup.assert_awaited_once()
     reply_markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]
@@ -43,7 +41,6 @@ async def test_open_shop_mass_adv_ops_menu_edits_reply_markup() -> None:
 async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
     wb_user_cabinet_id = 42
     callback = SimpleNamespace(
-        answer=AsyncMock(),
         message=SimpleNamespace(edit_reply_markup=AsyncMock()),
     )
     callback_data = callbacks.ShopMassAdvOpsBack(
@@ -58,7 +55,6 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
     ):
         await close_shop_mass_adv_ops_menu(callback, callback_data)
 
-    callback.answer.assert_awaited_once()
     callback.message.edit_reply_markup.assert_awaited_once()
     reply_markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]

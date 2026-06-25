@@ -1,4 +1,4 @@
-"""Интеграция V3: cost-first UP с синтетическим профилем (jump OFF→режим с min state_cost)."""
+"""Интеграция V3: cost-first UP через ``plan_one_up_by_policy`` (pooled planner)."""
 
 from __future__ import annotations
 
@@ -7,9 +7,6 @@ from datetime import UTC, datetime
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
-    SalesStates,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.activation_strategy import (
     ShelfClickMode,
 )
@@ -19,12 +16,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
     V3RolloutAggressiveness,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
-    KeywordV3Context,
-    select_v3_actions,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
     SelectionPolicy,
+    build_prepared_from_contexts,
     plan_one_up_by_policy,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
@@ -63,18 +57,16 @@ def _ladder_profile() -> list[PositionProfilePoint]:
 
 
 @pytest.mark.integration
-def test_v3_underperform_cost_first_jump_via_selector() -> None:
-    """E2E на уровне selector: один UP, target — режим с минимальным state_cost."""
+def test_v3_underperform_cost_first_jump_via_pooled_planner() -> None:
+    """E2E pooled UP: один UP, target — режим с минимальным state_cost."""
     prof = _ladder_profile()
-    prepared = [
-        (ctx(ks_id=42, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
-    ]
-    actions = select_v3_actions(
-        state=SalesStates.UNDERPERFORM,
-        contexts=[p[0] for p in prepared],
-        shelf_promotion_active=False,
-        rollout_aggressiveness=3,
+    contexts = [ctx(ks_id=42, mode=KeywordStrategyMode.OFF, profile=prof)]
+    prepared = build_prepared_from_contexts(contexts)
+    policy = SelectionPolicy.from_aggressiveness(
+        click_mode=ShelfClickMode.ORGANIC_DOMINANT,
+        aggressiveness=V3RolloutAggressiveness.MAX,
     )
+    actions = plan_one_up_by_policy(prepared, policy=policy)
     assert len(actions) == 1
     act = actions[0]
     assert act.action == V3ActionType.UP
@@ -82,20 +74,3 @@ def test_v3_underperform_cost_first_jump_via_selector() -> None:
     assert act.target_strategy_mode is not None
     assert act.selection_log is not None
     assert act.selection_log.state_cost is not None
-
-
-@pytest.mark.integration
-def test_v3_plan_cost_first_organic_dominant() -> None:
-    prof = _ladder_profile()
-    prepared = [
-        (ctx(ks_id=7, mode=KeywordStrategyMode.OFF, profile=prof), KeywordStrategyMode.OFF)
-    ]
-    actions = plan_one_up_by_policy(
-        prepared,
-        policy=SelectionPolicy.from_aggressiveness(
-            click_mode=ShelfClickMode.ORGANIC_DOMINANT,
-            aggressiveness=V3RolloutAggressiveness.MAX,
-        ),
-    )
-    assert actions[0].action == V3ActionType.UP
-    assert actions[0].target_strategy_mode == KeywordStrategyMode.MIN_CPA

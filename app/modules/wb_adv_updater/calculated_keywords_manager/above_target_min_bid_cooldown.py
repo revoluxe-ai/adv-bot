@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.core.mp.wb.min_bid_defaults import default_min_bid_rub, resolve_search_min_bid_rub
+from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.modules.wb_adv_updater.calculated_keywords_manager.above_target_cooldown_entry import (
     AboveTargetCooldownEntry,
 )
@@ -41,13 +43,18 @@ COOLDOWN_RETEST_DISPLAY_TAG = "Т"
 def max_search_min_bid_for_complex_nmids(
     nmids: list[int], min_bids: AdvMinNmidsBids | None
 ) -> int | None:
-    """Максимум мин. CPM поиска по артикулам комплекса; None если нечего сравнивать."""
-    if not nmids or min_bids is None or not min_bids.search:
+    """Максимум мин. CPM поиска по артикулам комплекса.
+
+    При пустом/невалидном кеше — ``settings.MIN_BID_SEARCH_DEFAULT`` (руб.).
+    """
+    if not nmids:
         return None
-    values = [min_bids.search.get(nmid, 0) for nmid in nmids]
+    if min_bids is None or not min_bids.search:
+        return default_min_bid_rub(AdvPlacementType.SEARCH_ADV)
+    values = [resolve_search_min_bid_rub(nmid, min_bids) for nmid in nmids]
     m = max(values)
     if m <= 0:
-        return None
+        return default_min_bid_rub(AdvPlacementType.SEARCH_ADV)
     return m
 
 
@@ -281,6 +288,29 @@ def apply_above_target_min_bid_cooldown(
     text = pre_kw.keyword_setting.text
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)
+
+    # Если базовая логика уже дала GOOD и себестоимость не превышает target,
+    # правило МС не должно удерживать ключ в BAD даже в окне freeze.
+    if (
+        base_state.status == KeywordStatus.GOOD
+        and keyword_pay_for_order is not None
+        and resolved_target_cost is not None
+        and keyword_pay_for_order <= resolved_target_cost
+    ):
+        entry = _normalize_entry(cooldown_map.get(text))
+        if entry is not None:
+            cooldown_updates[text] = None
+        returned = base_state.model_copy(update={"cooldown_display_tag": None})
+        diag = _build_ms_diagnostic(
+            returned_state=returned,
+            diagnostic_state=AboveTargetMinBidDiagnosticState.PASS_BY_COST,
+            gates=gates,
+            keyword_pay_for_order=keyword_pay_for_order,
+            resolved_target_cost=resolved_target_cost,
+            cost_gate_evaluated=True,
+            cost_condition_pass=True,
+        )
+        return _attach_ms_diagnostic(returned, diag)
 
     # Только ключи, которые по базовой логике сейчас GOOD (активны); остальные не трогаем и не проверяем МС.
     if base_state.status != KeywordStatus.GOOD:

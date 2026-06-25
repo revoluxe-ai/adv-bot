@@ -144,6 +144,63 @@ async def test_get_fact_datas_uses_batch_plan_fact_reader_once(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_get_cluster_bids_for_maps_maps_auto_advert_id_to_search() -> None:
+    """WB fallback: ответ с auto advert_id нормализуется к search_adv_id."""
+    api_cache = MagicMock()
+    api_cache.get_bids = AsyncMock(return_value={})
+    api_cache.replace_from_api = AsyncMock(return_value=1)
+
+    wb_manager = MagicMock()
+    wb_manager.get_current_bids = AsyncMock(
+        return_value=[
+            NormqueryBidDTO(
+                advert_id=32824944,
+                nm_id=1,
+                norm_query="q1",
+                bid=42,
+            )
+        ]
+    )
+
+    manager = UpdateClusterBidsManager(
+        wb_manager=wb_manager,
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=api_cache,
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
+    )
+
+    map_data = AdvIdItemCalculateData(
+        search_adv_id=29734515,
+        adv_id=32824944,
+        nmid=1,
+        cluster="q1",
+        current_position=1.0,
+        target_position=5,
+        max_cpm=500,
+        step=10,
+        current_cpm=None,
+        keyword_setting_original_id=1,
+        strategy_mode=KeywordStrategyMode.MIN_CPA,
+        snap_to_min_bid_no_keyword_target=False,
+    )
+    adv = MagicMock()
+    adv.auction_adv_id = 29734515
+    adv.auto_adv_id = 32824944
+
+    result = await manager._get_cluster_bids_for_maps({map_data}, [adv])
+
+    assert len(result) == 1
+    assert result[0].bid == 42
+    assert result[0].advert_id == 29734515
+    api_cache.replace_from_api.assert_awaited_once()
+    written = api_cache.replace_from_api.await_args.args[0]
+    assert written[0].advert_id == 29734515
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
     """Cold Redis API cache: WB fills bids and warms Redis (same as cache_current_cluster_bids)."""
     api_cache = MagicMock()
@@ -172,7 +229,8 @@ async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
     )
 
     map_data = AdvIdItemCalculateData(
-        adv_id=100,
+        search_adv_id=100,
+        adv_id=1,
         nmid=1,
         cluster="q1",
         current_position=1.0,
@@ -180,6 +238,9 @@ async def test_get_cluster_bids_for_maps_fetches_wb_on_redis_miss() -> None:
         max_cpm=500,
         step=10,
         current_cpm=None,
+        keyword_setting_original_id=1,
+        strategy_mode=KeywordStrategyMode.MIN_CPA,
+        snap_to_min_bid_no_keyword_target=False,
     )
     adv = MagicMock()
     adv.auction_adv_id = 100

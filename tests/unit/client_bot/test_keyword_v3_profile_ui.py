@@ -6,9 +6,16 @@ import pytest
 
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     KeywordV3ProfileData,
+    format_keyword_v3_last_tick_executor_line,
     format_keyword_v3_profile_block,
 )
+from datetime import datetime, timezone
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report.models import (
+    V3KeywordChangeEntry,
+    V3KeywordChangesSnapshot,
+    V3KeywordStepRecord,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
@@ -411,8 +418,8 @@ def test_profile_full_tier_hides_max_rk_when_own_profile() -> None:
 
 
 @pytest.mark.unit
-def test_profile_worst_source_shows_max_rk_suffix() -> None:
-    """NO_CONV / worst: CPO из РК + суффикс |maxРК."""
+def test_profile_worst_source_no_longer_shows_max_rk_suffix() -> None:
+    """Worst-imputation удалён — ``|maxРК`` не показывается."""
     data = _profile_data(
         diagnostic=KeywordV3DataDiagnostic(
             has_v2_cpo=False,
@@ -424,17 +431,16 @@ def test_profile_worst_source_shows_max_rk_suffix() -> None:
                 AggressionTargetMode.MIN_CPA, 1, 100.0, 814.0
             ),
         },
-        campaign_worst_costs={AggressionTargetMode.MIN_CPA: 814.0},
         stage_sources={AggressionTargetMode.MIN_CPA: "worst"},
     )
     text = format_keyword_v3_profile_block(data)
-    assert "|maxРК814" in text
-    assert "maxРК — max CPO" in text
+    assert "|maxРК" not in text
+    assert "maxРК — max CPO" not in text
 
 
 @pytest.mark.unit
-def test_profile_worst_source_simplified_line_shows_max_rk_suffix() -> None:
-    """CH + worst, без поз/ставки: упрощённая строка с ``|maxРК``, как полный формат."""
+def test_profile_worst_simplified_line_without_max_rk() -> None:
+    """Упрощённая строка без суффикса maxРК после удаления worst."""
     data = _profile_data(
         diagnostic=KeywordV3DataDiagnostic(
             has_v2_cpo=False,
@@ -454,13 +460,12 @@ def test_profile_worst_source_simplified_line_shows_max_rk_suffix() -> None:
         stage_sources={AggressionTargetMode.MIN_CPA: "worst"},
     )
     text = format_keyword_v3_profile_block(data)
-    assert "M CPO=814.00|maxРК814" in text
-    assert " (max РК)" not in text
+    assert "|maxРК" not in text
 
 
 @pytest.mark.unit
-def test_profile_no_conv_tier_shows_max_rk_header() -> None:
-    """NO_CONV + CH: заголовок про max CPO по РК, не про имп. conv."""
+def test_profile_no_conv_tier_no_max_rk_header() -> None:
+    """NO_CONV + CH: без заголовка max CPO по РК (worst удалён)."""
     diag = KeywordV3DataDiagnostic(
         has_v2_cpo=False,
         has_ch_position_profile=True,
@@ -476,5 +481,111 @@ def test_profile_no_conv_tier_shows_max_rk_header() -> None:
         },
     )
     text = format_keyword_v3_profile_block(data)
-    assert "max CPO по РК (нет conv)" in text
-    assert "имп. conv" not in text.split("\n")[0]
+    assert "max CPO по РК" not in text
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_resolve_calibration_up() -> None:
+    """Решающий UP на последнем тике → компактная строка без заголовка-блока."""
+    tick_at = datetime(2026, 6, 2, 17, 59, tzinfo=timezone.utc)
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=tick_at,
+        adv_id=1,
+        keyword_entries=[
+            V3KeywordChangeEntry(
+                keyword_setting_id=42,
+                keyword_text="test kw",
+                stored_mode="MIN_CPA",
+                current_mode="OPTIMUM",
+                steps=[
+                    V3KeywordStepRecord(
+                        executor_name="ResolveCalibrationExecutor",
+                        from_mode="MIN_CPA",
+                        to_mode="OPTIMUM",
+                        action="UP",
+                    ),
+                ],
+            ),
+        ],
+    )
+    text = format_keyword_v3_last_tick_executor_line(
+        keyword_setting_id=42,
+        keyword_changes=snapshot,
+    )
+    assert text.startswith("V3 · cal · 10 · calibration:")
+    assert "↑ MIN_CPA→OPTIMUM" in text
+    assert "20:59:00 02-06-2026" in text
+    assert "Почему ключ не крутится" not in text
+    assert "⚠️" not in text
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_empty_when_no_entry() -> None:
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=datetime.now(timezone.utc),
+        adv_id=1,
+        keyword_entries=[],
+    )
+    assert (
+        format_keyword_v3_last_tick_executor_line(
+            keyword_setting_id=99,
+            keyword_changes=snapshot,
+        )
+        == ""
+    )
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_target_place_only() -> None:
+    tick_at = datetime(2026, 6, 2, 12, 0, tzinfo=timezone.utc)
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=tick_at,
+        adv_id=1,
+        keyword_entries=[
+            V3KeywordChangeEntry(
+                keyword_setting_id=7,
+                keyword_text="tp kw",
+                stored_mode="MIN_CPA",
+                current_mode="MIN_CPA",
+                target_place_steps=["15 (R↑)"],
+            ),
+        ],
+    )
+    text = format_keyword_v3_last_tick_executor_line(
+        keyword_setting_id=7,
+        keyword_changes=snapshot,
+    )
+    assert "V3 · R↑ ·" in text
+    assert "tp → 15" in text
+    assert "15:00:00 02-06-2026" in text
+
+
+@pytest.mark.unit
+def test_last_tick_executor_line_empty_when_all_noop() -> None:
+    snapshot = V3KeywordChangesSnapshot(
+        tick_at=datetime.now(timezone.utc),
+        adv_id=1,
+        keyword_entries=[
+            V3KeywordChangeEntry(
+                keyword_setting_id=1,
+                keyword_text="noop",
+                stored_mode="MIN_CPA",
+                current_mode="MIN_CPA",
+                steps=[
+                    V3KeywordStepRecord(
+                        executor_name="ShelfCleanupExecutor",
+                        from_mode="MIN_CPA",
+                        to_mode="MIN_CPA",
+                        action="NOOP",
+                    ),
+                ],
+            ),
+        ],
+    )
+    assert (
+        format_keyword_v3_last_tick_executor_line(
+            keyword_setting_id=1,
+            keyword_changes=snapshot,
+        )
+        == ""
+    )

@@ -1,15 +1,38 @@
-"""Effective STEP_UP / STEP_DOWN: пропуск логических режимов с тем же target_place.
+"""Effective STEP_UP / STEP_DOWN: SSOT схлопывания alias по ``target_place``.
 
-Логические режимы MIN_CPA / OPTIMUM / MAX_CONVERSION сохраняются в модели;
-переход создаётся только если ``target_place`` (позиция CH-кандидата) реально меняется.
+Контракт исполнения **любого** шага V3 (pooled UP, passing, calibration, realloc,
+trim, shelf cleanup):
+- одно действие = один вызов ``resolve_next_effective_step_up`` / ``resolve_next_effective_step_down``;
+- режимы M/O/C с тем же ``target_place``, что у якоря шага, схлопываются (UP → max
+  ``mode_level`` в группе, DOWN → пройти alias-цепочку до следующего place или OFF);
+- это **не** увеличивает cap шагов (×2 calibration, released_steps realloc и т.д.).
 
-OFF не сравнивается по target_place — это выключение ключа.
+``iter_effective_upper_modes`` / ``iter_effective_lower_modes`` / ``iter_effective_upper_mode_groups``
+— перечисление смен ``target_place`` для анализа и «до упора» в **одном** UP
+(``_highest_passing_mode_in_upper_groups``), не для N отдельных действий по alias.
+
+OFF не сравнивается по ``target_place`` — отдельный уровень лестницы.
+
+OFF → первый effective UP (важно для eligibility)
+-------------------------------------------------
+При ``current == OFF`` первый шаг не фиксирован как ``MIN_CPA``: после ``step_up(OFF)``
+берётся ``target_place`` первой ступени и **схлопываются** все M/O/C на этом place
+в max ``mode_level`` (например OFF→``MAX_CONVERSION``, если M=O=C на pos40).
+
+Collectors с ослабленным gate (calibration UP ``off_no_data_bootstrap``) проверяют
+``to_mode == MIN_CPA`` буквально. Если collapsed target — ``OPTIMUM``/``MAX_CONVERSION``,
+а ``can_target_mode`` запрещает (MIN-only tier, пустой ``allowed_modes`` у NO DATA
+без bootstrap-ветки), ключ **выпадает из пула без fallback** на ``MIN_CPA``.
+Enable (``plan_pay_for_order_gap_enable``) всегда целится в ``MIN_CPA`` и не затронут.
+См. ``collect_calibration_up_next_step_candidates`` и ``V3_UPDATER_VALIDATION.md``.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
@@ -29,7 +52,112 @@ _LADDER_MODES: tuple[KeywordStrategyMode, ...] = (
     KeywordStrategyMode.MAX_CONVERSION,
 )
 
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
+        KeywordV3LadderState,
+    )
+
 logger = logging.getLogger(__name__)
+
+
+class LadderStepKind(str, Enum):
+    """Направление одного ladder-шага (смена place или переход OFF)."""
+
+    UP = "UP"
+    DOWN = "DOWN"
+    OFF = "OFF"
+
+
+@dataclass(frozen=True, slots=True)
+class LadderStepSnapshot:
+    """Снимок режима и ``target_place`` для классификации шага."""
+
+    mode: KeywordStrategyMode
+    target_place: int | None
+
+
+def ladder_step_snapshot_from_dto(dto: KeywordDTO) -> LadderStepSnapshot:
+    """Текущий ``mode`` + ``target_place`` ключа (OFF → ``place=None``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+
+    assert isinstance(dto, KeywordDTO)
+    if dto.current_mode == KeywordStrategyMode.OFF:
+        return LadderStepSnapshot(KeywordStrategyMode.OFF, None)
+    place = dto.current_target_place
+    return LadderStepSnapshot(dto.current_mode, int(place))
+
+
+def ladder_step_snapshot_for_mode(
+    dto: KeywordDTO,
+    mode: KeywordStrategyMode,
+) -> LadderStepSnapshot:
+    """Снимок для ``mode`` по матрице ladder (не зависит от ``dto.current_mode``)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+        KeywordDTO,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+        ladder_state_for_mode,
+    )
+
+    assert isinstance(dto, KeywordDTO)
+    if mode == KeywordStrategyMode.OFF:
+        return LadderStepSnapshot(KeywordStrategyMode.OFF, None)
+    state = ladder_state_for_mode(dto, mode)
+    if state is None:
+        return LadderStepSnapshot(mode, None)
+    return LadderStepSnapshot(mode, int(state.target_position))
+
+
+def _ladder_step_rank(snapshot: LadderStepSnapshot) -> tuple[int, int]:
+    if snapshot.mode == KeywordStrategyMode.OFF:
+        return (-1, -1)
+    place = snapshot.target_place if snapshot.target_place is not None else 0
+    return (mode_level(snapshot.mode), -place)
+
+
+def classify_ladder_step(
+    before: LadderStepSnapshot,
+    after: LadderStepSnapshot,
+) -> LadderStepKind | None:
+    """Классифицировать переход: ``None`` если alias на том же ``target_place``."""
+    if before.mode == after.mode and before.target_place == after.target_place:
+        return None
+    if after.mode == KeywordStrategyMode.OFF and before.mode != KeywordStrategyMode.OFF:
+        return LadderStepKind.OFF
+    if before.mode == KeywordStrategyMode.OFF and after.mode != KeywordStrategyMode.OFF:
+        return LadderStepKind.UP
+    if (
+        before.target_place is not None
+        and after.target_place is not None
+        and before.target_place == after.target_place
+        and before.mode != after.mode
+    ):
+        return None
+    before_rank = _ladder_step_rank(before)
+    after_rank = _ladder_step_rank(after)
+    if after_rank > before_rank:
+        return LadderStepKind.UP
+    if after_rank < before_rank:
+        return LadderStepKind.DOWN
+    return None
+
+
+def is_ladder_step(before: LadderStepSnapshot, after: LadderStepSnapshot) -> bool:
+    """``True``, если переход считается одним ladder-шагом."""
+    return classify_ladder_step(before, after) is not None
+
+
+def count_ladder_step_if_applied(
+    before: LadderStepSnapshot,
+    after: LadderStepSnapshot,
+) -> int:
+    """``1`` если переход — ladder-шаг, иначе ``0``."""
+    return 1 if is_ladder_step(before, after) else 0
 
 
 def candidate_for_strategy_mode(
@@ -105,6 +233,130 @@ def logical_modes_at_target_place_above(
     return tuple(out)
 
 
+def resolve_alias_collapse_up_at_same_target_place(
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    *,
+    max_target_mode: KeywordStrategyMode | None = None,
+    resolve: float | None = None,
+) -> KeywordStrategyMode | None:
+    """Схлопнуть alias UP на текущем ``target_place`` до max ``mode_level`` в группе.
+
+    Срабатывает только если ``step_up(current)`` ведёт на тот же ``target_place``,
+    что и текущий режим. Не поднимает ключ на новый place (в отличие от
+    ``resolve_next_effective_step_up``).
+
+    Если задан ``max_target_mode``, группа дополнительно отсекается по
+    aggression cap, чтобы alias-collapse не мог перескочить выше policy.
+    Если задан ``resolve``, группа также отсекается по текущему economic ceiling.
+    """
+    if current in (
+        KeywordStrategyMode.OFF,
+        KeywordStrategyMode.MAX_CONVERSION,
+    ):
+        return None
+    cur_c = candidate_for_strategy_mode(current, catalog)
+    if cur_c is None or not cur_c.is_valid:
+        return None
+    place = target_place_from_mode_candidate(cur_c)
+    if place is None:
+        return None
+    nxt = step_up(current)
+    if nxt is None:
+        return None
+    nxt_c = candidate_for_strategy_mode(nxt, catalog)
+    if nxt_c is None or not nxt_c.is_valid:
+        return None
+    if not mode_candidates_same_effective_target(cur_c, nxt_c):
+        return None
+    group = logical_modes_at_target_place_above(current, place, catalog)
+    if max_target_mode is not None:
+        group = tuple(
+            mode for mode in group if mode_level(mode) <= mode_level(max_target_mode)
+        )
+    if resolve is not None:
+        resolved_group: list[KeywordStrategyMode] = []
+        for mode in group:
+            candidate = _candidate_for_strategy_mode(catalog, mode)
+            if candidate is None or candidate.predicted_cpa is None:
+                continue
+            if float(candidate.predicted_cpa) > float(resolve):
+                continue
+            resolved_group.append(mode)
+        group = tuple(resolved_group)
+    if not group:
+        return None
+    target = max(group, key=mode_level)
+    if mode_level(target) <= mode_level(current):
+        return None
+    return target
+
+
+def resolve_alias_collapse_up_state_at_same_target_place(
+    dto: KeywordDTO,
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    *,
+    max_target_mode: KeywordStrategyMode | None = None,
+    resolve: float | None = None,
+) -> KeywordV3LadderState | None:
+    """Конкретная ladder-ступень alias-up на том же ``target_place``.
+
+    В отличие от ``resolve_alias_collapse_up_at_same_target_place`` не ищет state
+    глобально по mode: возвращает именно row из alias-группы текущего place.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.ladder_state_pick import (
+        resolve_current_ladder_state,
+    )
+
+    current_state = resolve_current_ladder_state(dto)
+    if (
+        current_state is None
+        or current_state.strategy_mode != current
+        or current_state.strategy_mode in (
+            KeywordStrategyMode.OFF,
+            KeywordStrategyMode.MAX_CONVERSION,
+        )
+        or not current_state.is_valid
+    ):
+        return None
+    current_place = int(current_state.target_position)
+    nxt = step_up(current)
+    if nxt is None:
+        return None
+    nxt_c = candidate_for_strategy_mode(nxt, catalog)
+    if nxt_c is None or not nxt_c.is_valid:
+        return None
+    nxt_place = target_place_from_mode_candidate(nxt_c)
+    if nxt_place is None or int(nxt_place) != current_place:
+        return None
+    cap_level = (
+        mode_level(max_target_mode) if max_target_mode is not None else None
+    )
+    candidates = [
+        state
+        for state in dto.ladder_states
+        if state.strategy_mode in _LADDER_MODES
+        and state.is_valid
+        and state.cpo is not None
+        and int(state.target_position) == current_place
+        and mode_level(state.strategy_mode) > mode_level(current)
+        and (cap_level is None or mode_level(state.strategy_mode) <= cap_level)
+        and (resolve is None or float(state.cpo) <= float(resolve))
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda state: mode_level(state.strategy_mode))
+
+
+def _candidate_for_strategy_mode(
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+    mode: KeywordStrategyMode,
+) -> ModeCandidate | None:
+    """Helper for alias-collapse filters to avoid repeated catalog lookups."""
+    return candidate_for_strategy_mode(mode, catalog)
+
+
 def resolve_next_effective_step_up(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
@@ -113,15 +365,45 @@ def resolve_next_effective_step_up(
 
     DOWN по-прежнему пропускает alias; UP внутри группы с одним place выбирает
     самый высокий логический режим (например MIN→MAX при O=C на pos1).
+
+    Ветка ``current == OFF``: см. module docstring — collapse на первом place может
+    вернуть режим выше ``MIN_CPA``; callers с MIN-only bootstrap должны учитывать
+    рассинхрон с ``can_target_mode`` / ``off_no_data_bootstrap``.
     """
     if current == KeywordStrategyMode.OFF:
         nxt = step_up(KeywordStrategyMode.OFF)
-        return EffectiveStepResult(nxt, ())
+        if nxt is None:
+            return EffectiveStepResult(None, ())
+        nxt_c = candidate_for_strategy_mode(nxt, catalog)
+        if nxt_c is None or not nxt_c.is_valid:
+            return EffectiveStepResult(nxt, ())
+        place = target_place_from_mode_candidate(nxt_c)
+        if place is None:
+            return EffectiveStepResult(nxt, ())
+        group = logical_modes_at_target_place_above(
+            KeywordStrategyMode.OFF, place, catalog
+        )
+        if not group:
+            return EffectiveStepResult(nxt, ())
+        highest = max(group, key=mode_level)
+        skipped_off: list[str] = []
+        for mode in group:
+            if mode != highest:
+                skipped_off.append(
+                    skipped_mode_alias_reason(
+                        mode,
+                        highest,
+                        target_place=place,
+                    )
+                )
+        return EffectiveStepResult(highest, tuple(skipped_off))
     skipped: list[str] = []
     cursor = current
     while True:
         nxt = step_up(cursor)
         if nxt is None:
+            if mode_level(cursor) > mode_level(current):
+                return EffectiveStepResult(cursor, tuple(skipped))
             return EffectiveStepResult(None, tuple(skipped))
         nxt_c = candidate_for_strategy_mode(nxt, catalog)
         if nxt_c is None or not nxt_c.is_valid:
@@ -160,7 +442,7 @@ def resolve_next_effective_step_down(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> EffectiveStepResult:
-    """Первый режим ниже ``current`` с другим ``target_place``."""
+    """Один effective DOWN: alias ниже ``current`` с тем же place пропускаются (до OFF)."""
     if current == KeywordStrategyMode.OFF:
         return EffectiveStepResult(None, ())
     skipped: list[str] = []
@@ -204,7 +486,7 @@ def iter_effective_upper_mode_groups(
         nxt_c = candidate_for_strategy_mode(res.next_mode, catalog)
         place = target_place_from_mode_candidate(nxt_c)
         if place is None:
-            if cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+            if cursor == KeywordStrategyMode.OFF:
                 groups.append((res.next_mode,))
                 cursor = res.next_mode
                 continue
@@ -212,7 +494,7 @@ def iter_effective_upper_mode_groups(
         group = logical_modes_at_target_place_above(cursor, place, catalog)
         if group:
             groups.append(group)
-        elif cursor == KeywordStrategyMode.OFF and res.next_mode is not None:
+        elif cursor == KeywordStrategyMode.OFF:
             groups.append((res.next_mode,))
         cursor = res.next_mode
 
@@ -221,7 +503,7 @@ def iter_effective_upper_modes(
     current: KeywordStrategyMode,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> list[KeywordStrategyMode]:
-    """По одному режиму на каждый новый ``target_place`` (max logical в alias-группе)."""
+    """Цепочка collapsed UP-целей (по place); не для N действий за тик — см. module docstring."""
     out: list[KeywordStrategyMode] = []
     cursor = current
     while True:
@@ -235,18 +517,46 @@ def iter_effective_upper_modes(
     return out
 
 
+def iter_effective_lower_modes(
+    current: KeywordStrategyMode,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> list[KeywordStrategyMode]:
+    """Цепочка collapsed DOWN-целей; не для N действий за тик — см. module docstring."""
+    out: list[KeywordStrategyMode] = []
+    if current == KeywordStrategyMode.OFF:
+        return out
+    cursor = current
+    while True:
+        res = resolve_next_effective_step_down(cursor, catalog)
+        for msg in res.skipped_aliases:
+            logger.debug("%s", msg)
+        if res.next_mode is None:
+            return out
+        out.append(res.next_mode)
+        if res.next_mode == KeywordStrategyMode.OFF:
+            return out
+        cursor = res.next_mode
+    return out
+
+
 def count_effective_released_aggression_steps(
     from_mode: KeywordStrategyMode,
     to_mode: KeywordStrategyMode | None,
     catalog: dict[AggressionTargetMode, ModeCandidate],
 ) -> int:
-    """Сколько «снято агрессии» одним DOWN: 1 только если place изменился или OFF.
+    """Сколько «снято агрессии» одним DOWN: 1 только если place изменился или OFF."""
+    return count_effective_aggression_steps_between(from_mode, to_mode, catalog)
 
-    Логический MAX→OPT при том же ``target_place`` = 0 (alias, не шаг ребаланса).
-    """
+
+def count_effective_aggression_steps_between(
+    from_mode: KeywordStrategyMode,
+    to_mode: KeywordStrategyMode | None,
+    catalog: dict[AggressionTargetMode, ModeCandidate],
+) -> int:
+    """1 если ``target_place`` изменился между режимами (или OFF); 0 для alias-only."""
     if to_mode is None or to_mode == from_mode:
         return 0
-    if to_mode == KeywordStrategyMode.OFF:
+    if to_mode == KeywordStrategyMode.OFF or from_mode == KeywordStrategyMode.OFF:
         return 1
     from_c = candidate_for_strategy_mode(from_mode, catalog)
     to_c = candidate_for_strategy_mode(to_mode, catalog)

@@ -5,6 +5,11 @@
 на ставке → ``calc_pay_for_order``. SSOT: ``v3_point_order_cpo``.
 
 OPTIMUM: ``select_optimum_row_production`` — balance conv/economy на всём usable-профиле.
+
+Usable-точки: ``settings.include_synthetic_position_profile`` (env
+``INCLUDE_SYNTHETIC_POSITION_PROFILE``, default True). При True в M/O/C входят
+синтетика ``_fill_positions``; при False — только ``ch_observed=True``.
+Поле ``ch_observed`` в DTO сохраняется для UI/диагностики.
 """
 
 from __future__ import annotations
@@ -12,6 +17,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from app.settings import settings
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
@@ -51,22 +57,13 @@ def _pay_for_cart_at_point(row: PositionProfilePoint) -> float | None:
 def resolve_effective_state_cost(
     *,
     profile_cost: float | None,
-    worst_cost: float | None,
+    worst_cost: float | None = None,
     allow_worst_imputation: bool = True,
 ) -> tuple[float, bool]:
-    """Единая логика state_cost CH-tier: профиль → per-mode worst → ``inf``.
-
-    ``profile_cost`` — CPO из CH-матрицы для конкретного режима M/O/C. Если его нет,
-    подставляется ``worst_cost`` по этому же режиму (пессимистичный CPA РК), без gate
-    «вся матрица invalid». Fallback на ``keyword.pay_for_order`` не используется.
-
-    Args:
-        allow_worst_imputation: если ``False``, worst не подставляется (legacy call sites).
-    """
+    """Единая логика state_cost: profile CPO → ``inf`` (worst imputation удалён)."""
+    _ = worst_cost, allow_worst_imputation
     if profile_cost is not None:
         return float(profile_cost), False
-    if allow_worst_imputation and worst_cost is not None:
-        return float(worst_cost), True
     return float("inf"), False
 
 
@@ -93,6 +90,29 @@ def predicted_pay_for_order_from_point(
     return calc_pay_for_order(orders)
 
 
+def _resolve_include_synthetic_profile(*, include_synthetic: bool | None) -> bool:
+    """Флаг usable-точек: аргумент тестов перекрывает ``settings``."""
+    if include_synthetic is not None:
+        return include_synthetic
+    return settings.include_synthetic_position_profile
+
+
+def _usable_profile_points(
+    profile: list[PositionProfilePoint],
+    *,
+    include_synthetic: bool,
+) -> list[PositionProfilePoint]:
+    """Точки профиля для MIN/OPTIMUM/MAX с conv и bid."""
+    usable: list[PositionProfilePoint] = []
+    for p in profile:
+        if p.predicted_conversion is None or p.bid < 0:
+            continue
+        if not include_synthetic and not p.ch_observed:
+            continue
+        usable.append(p)
+    return usable
+
+
 def build_mode_candidates(
     *,
     profile: list[PositionProfilePoint] | None,
@@ -100,14 +120,18 @@ def build_mode_candidates(
     conv_views_to_orders: float | None = None,
     orders_per_cart: float | None = None,
     rk_orders_per_cart: float | None = None,
+    include_synthetic: bool | None = None,
 ) -> dict[AggressionTargetMode, ModeCandidate]:
     """Return three mode candidates; invalid if profile missing or unusable.
 
-    Usable — только ``ch_observed=True`` (реальные buckets CH). Синтетика
-    ``_fill_positions`` не участвует в M/O/C (см. ``BidPositionRow.ch_observed``).
+    Usable-точки — см. ``_usable_profile_points`` и
+    ``settings.include_synthetic_position_profile``.
 
     ``orders_per_cart`` — effective заказов/корзину (сглаженный по ключу или campaign).
     ``conv_views_to_orders`` — legacy/fallback, если ``orders_per_cart`` не задан.
+
+    Args:
+        include_synthetic: Перекрывает settings (unit-тесты); в проде не передаётся.
     """
     empty = {
         m: ModeCandidate(
@@ -120,13 +144,10 @@ def build_mode_candidates(
     if not profile:
         return empty
 
-    usable = [
-        p
-        for p in profile
-        if p.predicted_conversion is not None
-        and p.bid >= 0
-        and p.ch_observed
-    ]
+    use_synthetic = _resolve_include_synthetic_profile(
+        include_synthetic=include_synthetic
+    )
+    usable = _usable_profile_points(profile, include_synthetic=use_synthetic)
     if not usable:
         return {
             m: ModeCandidate(

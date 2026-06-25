@@ -1,6 +1,7 @@
 """Unit tests for V3 hard_status <-> strategy_mode synchronization."""
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -140,10 +141,14 @@ def test_repaired_strategy_mode_for_v3_fixes_fixed_to_max_conv() -> None:
         (1, KeywordStrategyMode.OFF, None, False),
         (1, KeywordStrategyMode.MIN_CPA, None, False),
         (2, KeywordStrategyMode.MIN_CPA, None, True),
+        (2, KeywordStrategyMode.OPTIMUM, None, True),
         (2, KeywordStrategyMode.OFF, None, False),
         (4, KeywordStrategyMode.MIN_CPA, Strategy.MIN_CPO, True),
         (4, KeywordStrategyMode.MAX_CONVERSION, Strategy.MAX_CONV, True),
-        (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, False),
+        # ФФ с любым активным mode — eligible; adv.strategy не участвует в cluster bids.
+        (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, True),
+        (4, KeywordStrategyMode.OPTIMUM, Strategy.MAX_CONV, True),
+        (4, KeywordStrategyMode.OFF, Strategy.MIN_CPO, False),
     ],
 )
 def test_is_v3_keyword_eligible_for_cluster_bidding(
@@ -194,12 +199,29 @@ def test_sync_white_list_uses_adv_strategy_max_conv() -> None:
     keyword_setting = SimpleNamespace(
         hard_status=2,
         strategy_mode=KeywordStrategyMode.OFF,
-        adv_setting=SimpleNamespace(strategy=Strategy.MAX_CONV),
     )
     changed = sync_keyword_setting_mode_for_v3(
         keyword_setting,
         automatic_version=3,
         hard_status_override=2,
+        adv_strategy=Strategy.MAX_CONV,
     )
     assert changed is True
     assert keyword_setting.strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.unit
+def test_sync_black_list_does_not_access_adv_setting_relationship() -> None:
+    """ЧС (hard_status=0): sync не обращается к relationship adv_setting."""
+    keyword_setting = MagicMock(spec=["hard_status", "strategy_mode"])
+    keyword_setting.hard_status = 1
+    keyword_setting.strategy_mode = KeywordStrategyMode.MIN_CPA
+
+    changed = sync_keyword_setting_mode_for_v3(
+        keyword_setting,
+        automatic_version=3,
+        hard_status_override=0,
+    )
+
+    assert changed is True
+    assert keyword_setting.strategy_mode == KeywordStrategyMode.OFF

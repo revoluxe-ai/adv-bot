@@ -7,10 +7,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.modules.shop_runner.required_data_miss import ShopRunnerKeywordsCacheMissError
+from app.client_bot.user_interface.views.keyword_strategy_ui import keyword_strategy_letter
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
     build_keyword_v3_contexts,
     load_campaign_v3_contexts,
     load_campaign_v3_contexts_from_database,
+    merge_position_profiles_from_contexts,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+    KeywordV3Context,
 )
 from tests.unit.auto_updater_v3.test_no_data_activation import (
     _kw as _calculated_kw_fixture,
@@ -39,6 +45,26 @@ def test_build_keyword_v3_contexts_merges_profile() -> None:
     assert len(contexts) == 1
     assert contexts[0].position_profile is not None
     assert len(contexts[0].position_profile) == len(_sample_profile())
+
+
+@pytest.mark.unit
+def test_merge_position_profiles_from_contexts_for_list_letter() -> None:
+    """После merge список видит CH-профиль → буква режима, не tier ``N``."""
+    kw = _calculated_kw_fixture(
+        ks_id=7,
+        text="крем",
+        mode=KeywordStrategyMode.OFF,
+        conv=0.05,
+    )
+    assert kw.position_profile is None
+    profile = _sample_profile()
+    ctx = KeywordV3Context(
+        keyword=kw.model_copy(update={"position_profile": profile}),
+        position_profile=profile,
+    )
+    merged = merge_position_profiles_from_contexts([kw], [ctx])
+    assert merged[0].position_profile is not None
+    assert keyword_strategy_letter(merged[0]) == "o"
 
 
 @pytest.mark.unit

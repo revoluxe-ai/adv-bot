@@ -23,6 +23,9 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     edit_header,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
+    AutoShelfBidControlSettings,
+)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 from tests.factories.adv_factory import AdvSettingFactory
@@ -100,6 +103,19 @@ async def excel_shop_bundle(async_session: AsyncSession) -> dict[str, object]:
     async_session.add(adv)
     await async_session.flush()
 
+    async_session.add(
+        AutoShelfBidControlSettings(
+            nmid=int(adv.nmids[0]),
+            max_bid_minor=50_000,
+            currency="RUB",
+            min_bid_distance_minor=100,
+            target_test_impressions=500,
+            target_test_observation_minutes=60,
+            test_share=0.1,
+        )
+    )
+    await async_session.flush()
+
     return {"user": user, "wb_user_cabinet": wuc, "adv": adv}
 
 
@@ -127,9 +143,18 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
     key_mv = edit_header("min_views_for_ml_predict")
     assert key_mv in row
     row[key_mv] = 47
+    key_v3_step = edit_header("keyword_calibration_max_step")
+    assert key_v3_step in row
+    row[key_v3_step] = 7
+    row[edit_header("auto_shelf_bid_control_enabled")] = "TRUE"
+    row[edit_header("auto_shelf_max_bid_rub")] = 600
+    row[edit_header("auto_shelf_min_bid_distance_rub")] = 2
+    row[edit_header("auto_shelf_target_test_impressions")] = 700
+    row[edit_header("auto_shelf_target_test_observation_minutes")] = 120
+    row[edit_header("auto_shelf_test_share")] = 10
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
-        updated = await apply_adv_excel_rows(
+        updated, _effects = await apply_adv_excel_rows(
             telegram_user_id=int(user.user_telegram_id),
             expected_wb_user_cabinet_id=wuc.id,
             rows=rows,
@@ -141,6 +166,179 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
         await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
     ).scalar_one()
     assert fresh.min_views_for_ml_predict == 47
+    assert fresh.keyword_calibration_max_step == 7
+    assert fresh.auto_shelf_bid_control_enabled is True
+
+    shelf = (
+        await async_session.execute(
+            select(AutoShelfBidControlSettings).where(
+                AutoShelfBidControlSettings.nmid == int(adv.nmids[0])
+            )
+        )
+    ).scalar_one()
+    assert shelf.max_bid_minor == 60_000
+    assert shelf.min_bid_distance_minor == 200
+    assert shelf.target_test_impressions == 700
+    assert shelf.target_test_observation_minutes == 120
+    assert shelf.test_share == pytest.approx(0.1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("nmid_count", [0, 2])
+async def test_adv_excel_import_adv_fields_ignore_multi_or_empty_nmid(
+    async_session: AsyncSession,
+    excel_shop_bundle: dict[str, object],
+    nmid_count: int,
+) -> None:
+    """Импорт обычных AdvSetting-полей не должен зависеть от shelf-control NMID guard."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+
+    adv = cast(
+        AdvSetting,
+        AdvSettingFactory.build(
+            wb_cabinet=wuc.wb_cabinet,
+            name=f"Excel guard adv {nmid_count}",
+            bot_active=True,
+            active_status="started",
+            adv_id=610_000 + nmid_count,
+            min_views_for_ml_predict=11,
+        ),
+    )
+    adv.nmids = []
+    if nmid_count == 2:
+        adv.nmids = [
+            210_000 + (uuid.uuid4().int % 10_000),
+            220_000 + (uuid.uuid4().int % 10_000),
+        ]
+    adv.search_adv_id = 710_000 + nmid_count
+    async_session.add(adv)
+    await async_session.flush()
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+
+    row = next(
+        item for item in rows if item[column_header("RO", "adv_setting_id")] == adv.id
+    )
+    if nmid_count != 1:
+        assert row[edit_header("auto_shelf_max_bid_rub")] == ""
+        assert row[edit_header("auto_shelf_test_share")] == ""
+        assert row[edit_header("auto_shelf_target_test_impressions")] == ""
+        assert row[edit_header("auto_shelf_target_test_observation_minutes")] == ""
+        assert row[edit_header("auto_shelf_min_bid_distance_rub")] == ""
+    row[edit_header("min_views_for_ml_predict")] = 19
+
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        updated, _effects = await apply_adv_excel_rows(
+            telegram_user_id=int(user.user_telegram_id),
+            expected_wb_user_cabinet_id=wuc.id,
+            rows=[row],
+        )
+
+    assert updated == 1
+    await async_session.commit()
+    fresh = (
+        await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
+    ).scalar_one()
+    assert fresh.min_views_for_ml_predict == 19
+
+
+@pytest.mark.asyncio
+async def test_adv_excel_import_shelf_fields_without_enabled_flag(
+    async_session: AsyncSession, excel_shop_bundle: dict[str, object]
+) -> None:
+    """Shelf-поля должны применяться даже без явного enabled-флага."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+    adv = excel_shop_bundle["adv"]
+    assert isinstance(adv, AdvSetting)
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+
+    row = rows[0]
+    row[edit_header("auto_shelf_max_bid_rub")] = 600
+    row[edit_header("auto_shelf_test_share")] = 10
+    row[edit_header("auto_shelf_target_test_impressions")] = 800
+    row[edit_header("auto_shelf_target_test_observation_minutes")] = 120
+    row[edit_header("auto_shelf_min_bid_distance_rub")] = 3
+
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        updated, _effects = await apply_adv_excel_rows(
+            telegram_user_id=int(user.user_telegram_id),
+            expected_wb_user_cabinet_id=wuc.id,
+            rows=rows,
+        )
+
+    assert updated == 1
+    await async_session.commit()
+    shelf = (
+        await async_session.execute(
+            select(AutoShelfBidControlSettings).where(
+                AutoShelfBidControlSettings.nmid == int(adv.nmids[0])
+            )
+        )
+    ).scalar_one()
+    assert shelf.max_bid_minor == 60_000
+    assert shelf.test_share == pytest.approx(0.1)
+    assert shelf.target_test_impressions == 800
+    assert shelf.target_test_observation_minutes == 120
+    assert shelf.min_bid_distance_minor == 300
+
+
+@pytest.mark.asyncio
+async def test_adv_excel_export_import_auto_common_budget_flag(
+    async_session: AsyncSession, excel_shop_bundle: dict[str, object]
+) -> None:
+    """Экспорт → TRUE в auto_common_budget → импорт → значение сохраняется."""
+    user = excel_shop_bundle["user"]
+    assert isinstance(user, User)
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+    adv = excel_shop_bundle["adv"]
+    assert isinstance(adv, AdvSetting)
+
+    mock_sm = MockSessionMaker(async_session)
+    with (
+        patch(_PATCH_IMPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_SM, mock_sm),
+        patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub),
+    ):
+        _headers, rows = await build_adv_excel_export(wb_user_cabinet_id=wuc.id)
+    assert len(rows) == 1
+    row = rows[0]
+    key_auto = edit_header("auto_common_budget")
+    row[key_auto] = "TRUE"
+
+    mock_sm = MockSessionMaker(async_session)
+    with patch(_PATCH_IMPORT_SM, mock_sm):
+        updated, _effects = await apply_adv_excel_rows(
+            telegram_user_id=int(user.user_telegram_id),
+            expected_wb_user_cabinet_id=wuc.id,
+            rows=rows,
+        )
+    assert updated == 1
+
+    await async_session.commit()
+    fresh = (
+        await async_session.execute(select(AdvSetting).where(AdvSetting.id == adv.id))
+    ).scalar_one()
+    assert fresh.auto_common_budget is True
 
 
 @pytest.mark.asyncio
@@ -168,7 +366,7 @@ async def test_adv_excel_import_template_v1_rejected(
 
     with patch(_PATCH_IMPORT_SM, mock_sm):
         with pytest.raises(AdvExcelImportError) as excinfo:
-            _ = await apply_adv_excel_rows(
+            _updated, _effects = await apply_adv_excel_rows(
                 telegram_user_id=int(user.user_telegram_id),
                 expected_wb_user_cabinet_id=wuc.id,
                 rows=rows,
@@ -200,7 +398,7 @@ async def test_adv_excel_import_invalid_enum_rejected(
     mock_sm = MockSessionMaker(async_session)
     with patch(_PATCH_IMPORT_SM, mock_sm):
         with pytest.raises(AdvExcelImportError) as excinfo:
-            _ = await apply_adv_excel_rows(
+            _updated, _effects = await apply_adv_excel_rows(
                 telegram_user_id=int(user.user_telegram_id),
                 expected_wb_user_cabinet_id=wuc.id,
                 rows=rows,
@@ -234,7 +432,7 @@ async def test_adv_excel_import_old_template_version_rejected(
     mock_sm = MockSessionMaker(async_session)
     with patch(_PATCH_IMPORT_SM, mock_sm):
         with pytest.raises(AdvExcelImportError) as excinfo:
-            _ = await apply_adv_excel_rows(
+            _updated, _effects = await apply_adv_excel_rows(
                 telegram_user_id=int(user.user_telegram_id),
                 expected_wb_user_cabinet_id=wuc.id,
                 rows=rows,

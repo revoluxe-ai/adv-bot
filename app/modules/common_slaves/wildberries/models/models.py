@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 import datetime
 import json
 import logging
@@ -35,6 +35,7 @@ from app.modules.common_slaves.wildberries.models.enums import (
     TargetPositionMode,
 )
 from .bidder_mode import BidderMode
+from .enums.auto_shelf_bid_control_strategy import AutoShelfBidControlStrategy
 from .enums.strategy import Strategy
 from .fact_methods_enum import FactMethods
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
@@ -573,7 +574,16 @@ class AdvSetting(BaseTable):
     plan_for_sales_for_day = mapped_column(Integer, nullable=True, default=None)
     target_price_for_order = mapped_column(Float, nullable=True, default=None)
 
-    max_price_for_order = mapped_column(Float, nullable=True, default=None)
+    max_price_for_order: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    substitute_fact_cpo_for_max: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment=(
+            "V3 Raise MAX: in-memory max=fact CPO when fact>db max (per tick, no persist)"
+        ),
+    )
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
         Boolean, nullable=True, default=True, server_default="true"
@@ -608,7 +618,31 @@ class AdvSetting(BaseTable):
         server_default="false",
         comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
     )
-    # TODO: Завернуть server_default в text
+
+    # Intentional default:
+    # auto_shelf_bid_control_strategy defaults to plan_distance intentionally.
+    # At the moment auto_shelf_bid_control is enabled only for controlled shelf-test campaigns.
+    # Legacy bidder paths do not read this field.
+    auto_shelf_bid_control_strategy: Mapped[AutoShelfBidControlStrategy | None] = mapped_column(
+        SAEnum(
+            AutoShelfBidControlStrategy,
+            name="auto_shelf_bid_control_strategy",
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            validate_strings=True,
+        ),
+        nullable=True,
+        default=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        server_default="plan_distance",
+        comment=(
+            "Стратегия выбора main bid для auto_shelf_bid_control: "
+            "cycle_metric | plan_distance | ctr | cpc. "
+            "auto_shelf_bid_control_strategy defaults to plan_distance intentionally. "
+            "At the moment auto_shelf_bid_control is enabled only for controlled shelf-test campaigns. "
+            "Legacy bidder paths do not read this field."
+        ),
+    )
+
+    # TODO: Р—Р°РІРµСЂРЅСѓС‚СЊ server_default РІ text
     hide_zero_views_keywords: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
@@ -691,6 +725,14 @@ class AdvSetting(BaseTable):
         server_default=text("3"),
         comment="AutoUpdater v3: 1=min_cpm_first / 2=optimal_first / 3=max_conv_first (only outside shelf phase)",
     )
+    keyword_calibration_max_step: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
+        comment="V3 RESOLVE_CALIBRATION_TRIM: cap effective ladder DOWN steps per keyword per tick",
+    )
+
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
         nullable=True,
@@ -731,6 +773,13 @@ class AdvSetting(BaseTable):
                                                server_default=Strategy.MIN_CPO.name)
     auto_update_strategy: Mapped[bool | None] = mapped_column(
         Boolean, nullable=True, default=True, server_default=text("true")
+    )
+
+    auto_common_budget: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=False,
+        server_default=text("false")
     )
 
     __table_args__ = (
@@ -783,17 +832,6 @@ class AdvSetting(BaseTable):
     @search_adv_id.setter
     def search_adv_id(self, value: int) -> None:
         self._search_adv_id = value
-
-    #
-    @property
-    def max_pay_for_order(self) -> int | None:
-        pattern = re.compile(
-            r"<MAX_PAY>(\d+)!?</MAX_PAY>"
-        )  # Добавили !? для необязательного символа "!"
-        match = re.search(pattern, self.name)
-        if match:
-            return int(match.group(1))
-        return None
 
     @property
     def worst_promo_position(self) -> bool | None:

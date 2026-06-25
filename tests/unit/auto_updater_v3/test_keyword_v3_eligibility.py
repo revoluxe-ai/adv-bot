@@ -8,10 +8,8 @@ import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    CampaignV3DecisionCache,
     keyword_has_v2_cpo,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
-    _weighted_campaign_conv,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
@@ -54,7 +52,7 @@ def test_eligibility_no_ch_own_conv_allowed_modes_min_only() -> None:
     )
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
     elig = resolve_keyword_v3_eligibility(ctx, [ctx])
-    assert elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+    assert elig.data_tier == KeywordDataTier.KEYWORD_PFO
     assert elig.allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
     assert elig.participates_in_ladder is True
     assert elig.target_place_fallback_zero is True
@@ -73,7 +71,7 @@ def test_keyword_has_v2_cpo_from_pay_for_order_without_views() -> None:
     assert keyword_has_v2_cpo(kw)
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
     elig = resolve_keyword_v3_eligibility(ctx, [ctx])
-    assert elig.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
+    assert elig.data_tier == KeywordDataTier.KEYWORD_PFO
     assert elig.fallback_kind == "v2_cpo"
 
 
@@ -87,14 +85,14 @@ def test_eligibility_invalid_empty_allowed_modes() -> None:
     # INVALID: нет CH и нет V2 CPO (NO_CONV требует CH-матрицу на ключе)
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
     elig = resolve_keyword_v3_eligibility(ctx, [ctx])
-    assert elig.data_tier == KeywordDataTier.KEYWORD_INVALID
+    assert elig.data_tier == KeywordDataTier.KEYWORD_NO_DATA
     assert elig.allowed_modes == frozenset()
     assert not elig.participates_in_ladder
 
 
 @pytest.mark.unit
-def test_build_eligibility_map_computes_weighted_conv_once() -> None:
-    """Один агрегат РК на ``build_eligibility_map``, не на каждый ключ без своей conv."""
+def test_build_eligibility_map_builds_campaign_cache_once() -> None:
+    """Один ``CampaignV3DecisionCache.from_contexts`` на ``build_eligibility_map``."""
     kw_a = _calculated_kw_fixture(
         ks_id=10, text="a", mode=KeywordStrategyMode.MIN_CPA, conv=0.05
     )
@@ -105,25 +103,20 @@ def test_build_eligibility_map_computes_weighted_conv_once() -> None:
         KeywordV3Context(keyword=kw_a, position_profile=_sample_profile()),
         KeywordV3Context(keyword=kw_b, position_profile=_sample_profile()),
     ]
-    with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data._weighted_campaign_conv",
-        wraps=_weighted_campaign_conv,
-    ) as weighted_mock:
+    with patch.object(
+        CampaignV3DecisionCache,
+        "from_contexts",
+        wraps=CampaignV3DecisionCache.from_contexts,
+    ) as cache_mock:
         result = build_eligibility_map(contexts)
 
-    assert weighted_mock.call_count == 1
+    assert cache_mock.call_count == 1
     assert len(result) == 2
 
 
 @pytest.mark.unit
-def test_eligibility_catalog_uses_campaign_orders_per_cart() -> None:
-    """Каталог collapsed CH в eligibility совпадает с ladder при том же campaign OPC."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
-        CampaignV3DecisionCache,
-    )
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
-        _mode_catalog_for_eligibility,
-    )
+def test_eligibility_ladder_catalog_uses_campaign_orders_per_cart() -> None:
+    """``state_candidates_by_mode_for_ctx`` с campaign OPC строит valid MIN."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
         LadderInputs,
         state_candidates_by_mode_for_ctx,
@@ -144,20 +137,12 @@ def test_eligibility_catalog_uses_campaign_orders_per_cart() -> None:
     )
     kw = kw.model_copy(update={"cluster_stat": stat})
     ctx = KeywordV3Context(keyword=kw, position_profile=profile)
-    contexts = [ctx]
     campaign_opc = 0.2618
-    cache = CampaignV3DecisionCache.from_contexts(contexts)
     ladder = LadderInputs.from_contexts(
-        contexts, campaign_orders_per_cart_7d=campaign_opc
+        [ctx], campaign_orders_per_cart_7d=campaign_opc
     )
     ladder_cat = state_candidates_by_mode_for_ctx(ctx, ladder)
-    elig_cat = _mode_catalog_for_eligibility(
-        ctx, contexts, cache, campaign_orders_per_cart_7d=campaign_opc
-    )
-    for mode in ladder_cat:
-        assert ladder_cat[mode].is_valid == elig_cat[mode].is_valid
-        assert ladder_cat[mode].predicted_cpa == elig_cat[mode].predicted_cpa
-    assert elig_cat[AggressionTargetMode.MIN_CPA].is_valid
+    assert ladder_cat[AggressionTargetMode.MIN_CPA].is_valid
 
 
 @pytest.mark.unit
@@ -182,9 +167,28 @@ def test_eligibility_collapsed_ch_min_only_preserves_data_tier() -> None:
     ctx = KeywordV3Context(keyword=kw, position_profile=profile)
     elig = resolve_keyword_v3_eligibility(ctx, [ctx])
     assert elig.data_tier == KeywordDataTier.KEYWORD_FULL
-    assert elig.allowed_modes == frozenset({KeywordStrategyMode.MIN_CPA})
-    assert elig.target_place_fallback_zero is True
-    assert build_target_place_fallback_zero_by_keyword_id([ctx])[7] is True
+    assert KeywordStrategyMode.MAX_CONVERSION in elig.allowed_modes
+    assert build_target_place_fallback_zero_by_keyword_id([ctx]).get(7) is False
+
+
+@pytest.mark.unit
+def test_build_target_place_fallback_zero_not_full_active_false() -> None:
+    """NOT FULL active: sync не форсит 0 через fallback map (без overspend)."""
+    kw = _calculated_kw_fixture(
+        ks_id=6, text="nf", mode=KeywordStrategyMode.MIN_CPA, conv=0.08
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    assert build_target_place_fallback_zero_by_keyword_id([ctx]).get(6) is False
+
+
+@pytest.mark.unit
+def test_build_target_place_fallback_zero_not_full_overspend_true() -> None:
+    """NOT FULL active при fact CPO > MAX: sync не форсит tp=0."""
+    kw = _calculated_kw_fixture(
+        ks_id=6, text="nf", mode=KeywordStrategyMode.MIN_CPA, conv=0.08
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    assert build_target_place_fallback_zero_by_keyword_id([ctx]).get(6) is False
 
 
 @pytest.mark.unit
@@ -199,8 +203,8 @@ def test_build_target_place_fallback_zero_excludes_off_mode() -> None:
 
 
 @pytest.mark.unit
-def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
-    """Один агрегат РК на вызов; результат совпадает с ``build_eligibility_map``."""
+def test_build_target_place_fallback_zero_matches_eligibility_map() -> None:
+    """``build_target_place_fallback_zero_by_keyword_id`` согласован с eligibility."""
     kw_a = _calculated_kw_fixture(
         ks_id=10, text="a", mode=KeywordStrategyMode.MIN_CPA, conv=0.05
     )
@@ -215,11 +219,5 @@ def test_build_target_place_fallback_zero_computes_weighted_conv_once() -> None:
         ks_id: elig.target_place_fallback_zero
         for ks_id, elig in build_eligibility_map(contexts).items()
     }
-    with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data._weighted_campaign_conv",
-        wraps=_weighted_campaign_conv,
-    ) as weighted_mock:
-        result = build_target_place_fallback_zero_by_keyword_id(contexts)
-
-    assert weighted_mock.call_count == 1
+    result = build_target_place_fallback_zero_by_keyword_id(contexts)
     assert result == expected

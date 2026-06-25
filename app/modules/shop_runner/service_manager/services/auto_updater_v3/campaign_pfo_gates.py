@@ -1,0 +1,114 @@
+"""SSOT гейты кампании по fact/max pay_for_order и keyword.pay_for_order.
+
+Пороги «1 от MAX плана» — доля ``plan.max_pay_for_order`` из ``settings_master`` (``.env``):
+
+- ``V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO`` (default ``1``) — skip enable;
+- ``V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO`` (default ``1``) — фаза pfo_off.
+
+- ``pay_for_order_gap_enable`` — skip enable, если fact уже в этой зоне;
+- ``pay_for_order_over_max_off_on_deep_overspend`` — OFF ключей с ``PFO > max`` в этой зоне;
+- ``raise_state_to_target_cpo`` — per-keyword skip только если ``kw.pay_for_order > resolve``
+  и ``fact >= MAX_PAY_STABILIZATION_RATIO × resolve``; при ``kw.pay_for_order <= resolve`` — never skip.
+"""
+
+from __future__ import annotations
+
+from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
+    MAX_PAY_STABILIZATION_RATIO,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.cpo_max_boundary import (
+    cmp_over_threshold,
+    keyword_pfo_over_max,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
+    AdvState,
+    KeywordDTO,
+)
+from app.settings import settings
+
+
+def gap_enable_plan_headroom_ratio() -> float:
+    """Доля plan.max для skip ``PayForOrderGapEnableExecutor`` (env, default 1)."""
+    return float(settings.V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO)
+
+
+def pfo_off_plan_headroom_ratio() -> float:
+    """Доля plan.max для gate ``PayForOrderOverMaxOffOnDeepOverspend`` (env, default 1)."""
+    return float(settings.V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO)
+
+
+def gap_enable_plan_headroom_floor(max_pay: float) -> float:
+    """Нижняя граница зоны skip enable: ``ratio × plan.max_pay_for_order``."""
+    return gap_enable_plan_headroom_ratio() * float(max_pay)
+
+
+def pfo_off_plan_headroom_floor(max_pay: float) -> float:
+    """Нижняя граница зоны pfo_off: ``ratio × plan.max_pay_for_order``."""
+    return pfo_off_plan_headroom_ratio() * float(max_pay)
+
+
+def plan_max_stabilization_floor(max_pay: float) -> float:
+    """Алиас ``pfo_off_plan_headroom_floor`` (tick-report, тесты)."""
+    return pfo_off_plan_headroom_floor(max_pay)
+
+
+def is_campaign_at_plan_headroom_plus_one(adv_state: AdvState) -> bool:
+    """``True``, если fact в зоне pfo_off (``> ratio × plan.max``)."""
+    if adv_state.fact_pay_for_order is None:
+        return False
+    max_pay = float(adv_state.max_pay_for_order)
+    if max_pay <= 0:
+        return False
+    return cmp_over_threshold(
+        float(adv_state.fact_pay_for_order),
+        pfo_off_plan_headroom_floor(max_pay),
+    )
+
+
+def is_deep_overspend(adv_state: AdvState) -> bool:
+    """Алиас ``is_campaign_at_plan_headroom_plus_one`` (имя фазы legacy)."""
+    return is_campaign_at_plan_headroom_plus_one(adv_state)
+
+
+def raise_state_resolve_stabilization_floor(resolve: float) -> float:
+    """Порог зоны стабилизации R↑: ``MAX_PAY_STABILIZATION_RATIO × resolve`` (90 %)."""
+    return MAX_PAY_STABILIZATION_RATIO * float(resolve)
+
+
+def is_campaign_in_raise_stabilization_zone(adv_state: AdvState) -> bool:
+    """``True``, если fact CPO РК в зоне стабилизации (``>= 90 % resolve``)."""
+    if adv_state.fact_pay_for_order is None:
+        return False
+    if not adv_state.resolve_valid:
+        return False
+    resolve = float(adv_state.resolve)
+    if resolve <= 0:
+        return False
+    return float(adv_state.fact_pay_for_order) >= raise_state_resolve_stabilization_floor(
+        resolve
+    )
+
+
+def should_skip_keyword_raise_to_target_cpo(
+    dto: KeywordDTO,
+    adv_state: AdvState,
+) -> bool:
+    """Skip подъёма ключа в R↑ только для дорогих ключей в зоне стабилизации кампании.
+
+    Абсолютное правило: ``kw.pay_for_order <= resolve`` → never skip.
+    Условный skip: ``kw.pay_for_order > resolve`` и ``fact >= 0.9×resolve``.
+    """
+    resolve = float(adv_state.resolve)
+    kw_pfo = dto.calculated_keyword.pay_for_order
+    if kw_pfo is None or float(kw_pfo) <= resolve:
+        return False
+    return is_campaign_in_raise_stabilization_zone(adv_state)
+
+
+def keyword_pay_for_order_over_plan_max(
+    dto: KeywordDTO,
+    *,
+    max_pay: float,
+) -> bool:
+    """``keyword.pay_for_order`` строго выше потолка плана (как в NO CH bootstrap)."""
+    return keyword_pfo_over_max(dto.calculated_keyword.pay_for_order, float(max_pay))

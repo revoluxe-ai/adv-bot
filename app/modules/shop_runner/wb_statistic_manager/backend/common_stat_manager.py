@@ -1,3 +1,5 @@
+"""ClickHouse helpers for daily common-card statistics."""
+
 import logging
 import time
 from datetime import datetime, timedelta
@@ -5,6 +7,7 @@ from datetime import datetime, timedelta
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.core.wb_api.mixins.statistic_mixin.wb_statistic_obj import CommonStat
 from app.modules.shop_runner.modules.wb_api import WBApi
+from app.settings import settings
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from app.utils.click_house.client import get_clickhouse_client
 from .types.common_card_stat import CommonCardStat
@@ -81,20 +84,68 @@ async def get_stats_by_days(nmid: int, last_days: int) -> list[CommonCardStat]:
     query = """
     SELECT
         toDate(date) AS stat_date,
-        SUM(open_card) AS open_card,
-        SUM(add_to_cart) AS add_to_cart,
-        SUM(orders) AS orders,
-        SUM(orders_sum) AS orders_sum,
-        SUM(buy_outs) AS buy_outs
+        argMax(open_card, version) AS open_card,
+        argMax(add_to_cart, version) AS add_to_cart,
+        argMax(orders, version) AS orders,
+        argMax(orders_sum, version) AS orders_sum,
+        argMax(buy_outs, version) AS buy_outs
     FROM wb_common_stat
     WHERE nmid = %(nmid)s
-      AND date BETWEEN %(start_date)s AND %(end_date)s
-      AND version = (
-        SELECT MAX(version)
-        FROM wb_common_stat AS inner_stat
-        WHERE inner_stat.nmid = %(nmid)s
-          AND inner_stat.date = wb_common_stat.date
-      )
+      AND toDate(date) BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
+    GROUP BY stat_date
+    ORDER BY stat_date DESC
+    """
+
+    params = {
+        "nmid": nmid,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "end_date": end_date.strftime("%Y-%m-%d"),
+    }
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            result = await client.query(query, parameters=params)
+
+    stats: list[CommonCardStat] = []
+    for row in result.result_rows:
+        stat = CommonCardStat(
+            nmid=nmid,
+            open_card=row[1],
+            add_to_cart=row[2],
+            orders=row[3],
+            orders_sum=row[4],
+            buy_outs=row[5],
+        )
+        stat.date = row[0]
+        stats.append(stat)
+
+    return stats
+
+
+async def get_stats_by_date_range(
+    nmid: int, start_date: datetime, end_date: datetime
+) -> list[CommonCardStat]:
+    """
+    Возвращает статистику по дням за заданный диапазон дат.
+
+    Args:
+        nmid: Артикул товара.
+        start_date: Начало диапазона включительно.
+        end_date: Конец диапазона включительно.
+
+    Returns:
+        list[CommonCardStat]: Статистика по дням в обратном хронологическом порядке.
+    """
+    query = """
+    SELECT
+        toDate(date) AS stat_date,
+        argMax(open_card, version) AS open_card,
+        argMax(add_to_cart, version) AS add_to_cart,
+        argMax(orders, version) AS orders,
+        argMax(orders_sum, version) AS orders_sum,
+        argMax(buy_outs, version) AS buy_outs
+    FROM wb_common_stat
+    WHERE nmid = %(nmid)s
+      AND toDate(date) BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
     GROUP BY stat_date
     ORDER BY stat_date DESC
     """
@@ -162,9 +213,10 @@ class WBCommonStatManager:
         self.wb_access = wb_api.access
 
     async def update_common_statistic(self, nmids: list[int]):
+        """Обновляет воронку карточки в CH за ``FULL_STAT_THRESHOLD_DATES`` дней."""
         try:
             statistics: list[CommonStat] = await self.wb_api.get_cards_stats_by_days(
-                nmids, 6
+                nmids, settings.FULL_STAT_THRESHOLD_DATES
             )
         except ApiForbiddenError as exc:
             logger.error("Нет доступов к статистике")

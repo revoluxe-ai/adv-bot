@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 
 import pytest
 
@@ -14,12 +14,15 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
     AutoShelfBidControlViewDTO,
     BidPointStatsDTO,
+    OptimizationMetric,
 )
 
 pytestmark = pytest.mark.unit
 
 
-def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
+def _view_with_bid_point(
+    optimization_metric: OptimizationMetric = OptimizationMetric.CPC,
+) -> AutoShelfBidControlViewDTO:
     return AutoShelfBidControlViewDTO(
         nmid=10749810,
         auto_adv_id=32824944,
@@ -38,15 +41,19 @@ def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
         next_test_bid_minor=31_000,
         currency="RUB",
         current_mode="test",
-        current_cycle_started_at=datetime.now(timezone.utc),
-        test_started_at=datetime.now(timezone.utc),
+        current_cycle_started_at=datetime.now(UTC),
+        test_started_at=datetime.now(UTC),
         main_started_at=None,
         test_share=0.1,
         target_test_impressions=500,
+        target_test_observation_minutes=60,
         target_main_impressions=4500,
+        target_main_observation_minutes=540,
         min_bid_distance_minor=100,
         test_impressions=10,
         main_impressions=0,
+        test_elapsed_minutes=60,
+        main_elapsed_minutes=0,
         covered_points_count=0,
         bid_points_total=1,
         cycle_covered_points_count=0,
@@ -55,7 +62,7 @@ def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
             BidPointStatsDTO(
                 bid_minor=20_000,
                 currency="RUB",
-                last_interval_at=datetime(2026, 5, 25, 12, 0, 0, tzinfo=timezone.utc),
+                last_interval_at=datetime(2026, 5, 25, 12, 0, 0, tzinfo=UTC),
                 impressions=100,
                 clicks=5,
                 carts=2,
@@ -72,11 +79,15 @@ def _view_with_bid_point() -> AutoShelfBidControlViewDTO:
         ],
         last_reason="initialized",
         warnings=[],
+        optimization_metric=optimization_metric,
+        fact_cpo=150.0,
+        resolve_cpo=100.0,
+        best_plan_bid_minor=None,
     )
 
 
 def test_format_cycle_timestamp_without_microseconds() -> None:
-    ts = datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=timezone.utc)
+    ts = datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=UTC)
     assert _format_cycle_timestamp(ts) == "2026-05-25 13:21:36 МСК"
     assert ".799753" not in _format_cycle_timestamp(ts)
 
@@ -91,11 +102,11 @@ def test_render_cycle_timestamps_without_fractional_seconds() -> None:
     view = replace(
         _view_with_bid_point(),
         current_cycle_started_at=datetime(
-            2026, 5, 25, 10, 21, 36, 799753, tzinfo=timezone.utc
+            2026, 5, 25, 10, 21, 36, 799753, tzinfo=UTC
         ),
-        test_started_at=datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=timezone.utc),
+        test_started_at=datetime(2026, 5, 25, 10, 21, 36, 799753, tzinfo=UTC),
         main_started_at=datetime(
-            2026, 5, 25, 12, 11, 12, 448857, tzinfo=timezone.utc
+            2026, 5, 25, 12, 11, 12, 448857, tzinfo=UTC
         ),
     )
     text = render_auto_shelf_bid_control_message(view)
@@ -110,6 +121,31 @@ def test_render_shows_bid_points_in_rubles_not_raw_kopecks() -> None:
     text = render_auto_shelf_bid_control_message(_view_with_bid_point())
     assert "Покрытые ставки:" not in text
     assert "20000:" not in text
+    assert "Лучшая плановая ставка" not in text
     assert "Минимальная ставка WB: 120 ₽" in text
     assert "Максимальная ставка: 500 ₽" in text
     assert "Шаг между тестовыми ставками: 1 ₽" in text
+
+
+def test_render_does_not_show_best_plan_bid_when_none() -> None:
+    view = _view_with_bid_point()
+    text = render_auto_shelf_bid_control_message(view)
+    assert "best_plan_bid" not in text
+    assert "Лучшая плановая ставка" not in text
+
+
+def test_render_shows_main_waiting_observation_progress() -> None:
+    view = replace(
+        _view_with_bid_point(),
+        last_reason="main_waiting_observation_time",
+        main_elapsed_minutes=12,
+        target_main_observation_minutes=60,
+        main_impressions=31_572,
+        target_main_impressions=18_000,
+    )
+    text = render_auto_shelf_bid_control_message(view)
+    assert "main_waiting_observation_time" in text
+    assert "Main observation: 12 / 60 мин" in text
+    assert "Main: 31572 / 18000 показов" in text
+
+

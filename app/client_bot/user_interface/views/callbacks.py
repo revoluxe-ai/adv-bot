@@ -1,3 +1,10 @@
+"""Telegram callback-схемы для client bot UI.
+
+Модуль хранит aiogram ``CallbackData`` для экранов Telegram-интерфейса и
+компактные коды для action-полей, чтобы не упираться в лимит 64 байта у
+callback_data.
+"""
+
 from aiogram.filters.callback_data import CallbackData
 
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
@@ -6,6 +13,56 @@ from app.modules.common_slaves.wildberries.models.models import PredictCTRMode
 from app.shared.domains.wb.enums import (
     AdvType,
 )
+
+
+_AUTO_SHELF_BID_CONTROL_ACTION_CODES: dict[str, str] = {
+    "open": "o",
+    "refresh": "r",
+    "enable": "e",
+    "disable": "d",
+    "settings": "s",
+    "set_max_bid": "mb",
+    "set_test_share": "ts",
+    "set_target_test_impressions": "tti",
+    "set_target_test_observation_minutes": "tto",
+    "set_min_bid_distance": "md",
+    "strategy_menu": "sm",
+    "set_strategy_plan_distance": "sp",
+    "set_strategy_ctr": "sc",
+    "set_strategy_cpc": "sk",
+    "reset_cycle": "rc",
+    "force_main": "fm",
+    "back": "b",
+}
+_AUTO_SHELF_BID_CONTROL_ACTION_NAMES: dict[str, str] = {
+    code: name for name, code in _AUTO_SHELF_BID_CONTROL_ACTION_CODES.items()
+}
+
+
+def compact_auto_shelf_bid_control_action(action: str) -> str:
+    """Сжать action для Telegram callback_data.
+
+    Args:
+        action: Полное имя действия, используемое в коде обработчиков.
+
+    Returns:
+        Короткий код, если для action есть компактное представление, иначе
+        исходное значение.
+    """
+    return _AUTO_SHELF_BID_CONTROL_ACTION_CODES.get(action, action)
+
+
+def normalize_auto_shelf_bid_control_action(action: str) -> str:
+    """Восстановить полное имя action из compact callback_data.
+
+    Args:
+        action: Значение, пришедшее из callback_data.
+
+    Returns:
+        Полное имя действия для маршрутизации. Старые длинные значения
+        возвращаются без изменений.
+    """
+    return _AUTO_SHELF_BID_CONTROL_ACTION_NAMES.get(action, action)
 
 
 class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
@@ -78,8 +135,24 @@ class SettingKeywords(CallbackData, prefix="setting_keywords"):
     reset_filter: bool = False
 
 
+class KeywordsDailyStats(CallbackData, prefix="kw_daily_stats"):
+    """Пагинация дневной статистики на странице ключей."""
+
+    adv_original_id: int
+    page: int = 1
+    keywords_page: int = 1
+    sort_mode: str = "by_adv"
+
+
 class SettingKeyword(CallbackData, prefix="setting_keyword"):
     keyword_setting_original_id: int
+
+
+class KeywordDailyHistory(CallbackData, prefix="kw_day_hist"):
+    """Пагинация дневной истории по одному ключу."""
+
+    keyword_setting_original_id: int
+    page: int = 1
 
 
 class ChangeKeywordHardStatus(CallbackData, prefix="change_keyword_hard_status"):
@@ -291,6 +364,10 @@ class AutoShelfBidControlMenu(CallbackData, prefix="auto_shelf_bid_ctrl"):
         set_max_bid, set_test_share, set_target_test_impressions, set_min_bid_distance,
         reset_cycle, force_main,
         back.
+
+    Для новых кнопок action кодируется в compact-формате, чтобы callback_data
+    не превышал лимит Telegram; старые длинные значения остаются совместимы в
+    обработчиках.
     """
 
     action: str
@@ -480,6 +557,22 @@ class V3RolloutAggSet(CallbackData, prefix="v3_rollout_agg_set"):
     level: int
 
 
+class V3CalibrationStepChange(CallbackData, prefix="v3_cal_step_change"):
+    adv_setting_original_id: int
+
+
+class V3TickReportOpen(CallbackData, prefix="v3_tick_report_open"):
+    adv_setting_original_id: int
+
+
+class V3TickReportRefresh(CallbackData, prefix="v3_tick_report_refresh"):
+    adv_setting_original_id: int
+
+
+class V3TickReportBack(CallbackData, prefix="v3_tick_report_back"):
+    adv_setting_original_id: int
+
+
 class ChangeAutoUpdateExponentStatus(
     CallbackData, prefix="change_auto_update_exponent"
 ):
@@ -508,6 +601,11 @@ class AutoBudgetWatchdogToggle(CallbackData, prefix="auto_budget_watchdog_toggle
 
 
 class CommonBudgetModeToggle(CallbackData, prefix="common_budget_mode_toggle"):
+    adv_setting_original_id: int
+    new_status: bool
+
+
+class AutoCommonBudgetToggle(CallbackData, prefix="auto_common_budget_toggle"):
     adv_setting_original_id: int
     new_status: bool
 

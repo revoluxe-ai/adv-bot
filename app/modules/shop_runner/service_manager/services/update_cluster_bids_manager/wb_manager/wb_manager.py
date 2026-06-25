@@ -19,6 +19,7 @@ from app.core.mp.wb.api.domain_managers.promotion.methods.get_min_bids.convertor
 )
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
+from app.core.mp.wb.min_bid_defaults import apply_min_bid_defaults_for_advs
 from app.core.mp.wb.wb_base_manager import WBBaseManager
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.excs import (
     ClusterBidsUpdateError,
@@ -34,7 +35,6 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,9 @@ class WBManager(WBBaseManager):
         context: str = "",
     ) -> AdvMinNmidsBids:
         """Чтение min_bids v2 из Redis без ``WBBaseManager.wb_manager_hub`` (snapshot/DI-free path).
+
+        Возвращает только закэшированные ячейки; miss не подставляет ``MIN_BID_*_DEFAULT``
+        (дефолты — ``apply_min_bid_defaults_for_advs`` при ``apply_defaults=True``).
 
         При miss ячейки — ``logger.warning`` (ожидаемо до ``preload_min_bids_cache_miss`` /
         snapshot). ERROR оставлен для ``refresh_min_bids_cache*`` (сбой WB). Ops: перенести
@@ -407,35 +410,53 @@ class WBManager(WBBaseManager):
         advs: list[ComplexAdv],
         *,
         context: str = "",
+        apply_defaults: bool = True,
     ) -> AdvMinNmidsBids:
-        """Только Redis v2; при miss — warning в лог, ячейка не попадает в результат.
+        """Только Redis v2; при miss — warning в лог.
+
+        ``apply_defaults=True`` (по умолчанию): пропущенные ячейки заполняются
+        ``MIN_BID_*_DEFAULT`` для расчётов/UI. ``False`` — raw cache (backfill-проверки).
 
         См. ``read_min_bids_cache_only``: miss штатны до фоновой догрузки; алерты по
         ``min_bids cache miss`` — уровень WARNING, не ERROR.
         """
-        return await self._get_min_bids_cache_only_impl(advs, context=context)
+        return await self._get_min_bids_cache_only_impl(
+            advs,
+            context=context,
+            apply_defaults=apply_defaults,
+        )
 
     async def _get_min_bids_cache_only_impl(
         self,
         advs: list[ComplexAdv],
         *,
         context: str,
+        apply_defaults: bool = True,
     ) -> AdvMinNmidsBids:
-        return await WBManager.read_min_bids_cache_only(
+        raw = await WBManager.read_min_bids_cache_only(
             advs,
             self.wb_manager_hub.redis_client_wrapper,
             shop_id=self._shop_id,
             context=context,
         )
+        if not apply_defaults:
+            return raw
+        return apply_min_bid_defaults_for_advs(raw, advs, context=context)
 
     async def get_min_bids(
-        self, advs: list[ComplexAdv], cache_possible: bool
+        self,
+        advs: list[ComplexAdv],
+        cache_possible: bool,
+        *,
+        apply_defaults: bool = True,
     ) -> AdvMinNmidsBids:
         """cache_possible=True: только кеш. cache_possible=False: прямой запрос к WB API."""
 
         if cache_possible:
             return await self.get_min_bids_cache_only(
-                advs, context="get_min_bids_cache_possible"
+                advs,
+                context="get_min_bids_cache_possible",
+                apply_defaults=apply_defaults,
             )
 
         min_bids = await self.wb_manager_hub.wb_data_manager.get_min_bids(advs)
@@ -443,4 +464,10 @@ class WBManager(WBBaseManager):
             raise ClusterBidsUpdateError(
                 "Ошибка получения минимальных ставок для кампании"
             )
-        return min_bids
+        if not apply_defaults:
+            return min_bids
+        return apply_min_bid_defaults_for_advs(
+            min_bids,
+            advs,
+            context="get_min_bids_wb_api",
+        )

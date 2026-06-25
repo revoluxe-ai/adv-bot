@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import load_only
 
 from app.client_bot.admin_access import is_bot_admin
+from app.client_bot.start_command import is_start_command_message
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
 from app.settings import settings
@@ -20,17 +21,6 @@ _sm = get_async_session_maker
 PRESENTATION_ONLY_BLOCKED_TEXT = (
     "Доступ к функциям бота закрыт. Откройте меню через /start — запись на презентацию."
 )
-
-
-def _is_start_command(message: Message) -> bool:
-    raw = getattr(message, "text", None)
-    if not isinstance(raw, str):
-        return False
-    stripped = raw.strip()
-    if not stripped:
-        return False
-    first = stripped.split(maxsplit=1)[0]
-    return first == "/start" or first.startswith("/start@")
 
 
 class GateMiddleware(BaseMiddleware):
@@ -79,7 +69,7 @@ class GateMiddleware(BaseMiddleware):
                 return await handler(event, data)
 
             if isinstance(event, Message):
-                if _is_start_command(event):
+                if is_start_command_message(event):
                     return await handler(event, data)
                 state = data.get("state")
                 if state is not None:

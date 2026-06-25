@@ -167,7 +167,6 @@ async def confirm_create_complex_adv(
     callback_data: ConfirmCreateComplexAdv,
     bot: Bot,
 ) -> None:
-    await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)  # убрать клавиатуру
 
     wb_cabinet_original_id = callback_data.wb_cabinet_original_id

@@ -1,12 +1,36 @@
+"""Legacy bidder with an optional V3 safety cap preloaded per campaign."""
+
 import logging
+from dataclasses import dataclass
 
 from dependency_injector.wiring import inject, Provide
 import typing
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries import wb_db_manager
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.old_modules.adv_common_parameters_manager.adv_parameter_manager import (
     AdvParameterManager,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+    aggression_target_for_stored_mode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.loaders import (
+    load_v3_wb_context,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_contexts import (
+    build_keyword_v3_contexts,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_ladder_view import (
+    LadderInputs,
+    state_candidates_by_mode_for_ctx,
+)
+from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
+    load_campaign_orders_per_cart_7d,
+)
+from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
+    ComplexAdv,
+    WBShopDataManager,
 )
 
 from app.settings import settings
@@ -31,6 +55,25 @@ from ..modules.wb_api import WBApi
 logger = logging.getLogger(__name__)
 
 # TODO: включить проверку РК: обновлять только если РК активна и не приостановлена
+
+
+@dataclass(frozen=True, slots=True)
+class BidderV3SafetyCapContext:
+    """Preloaded V3 row for bidder safety-cap checks.
+
+    The map is keyed by ``keyword_setting_original_id`` and built once per
+    campaign before the bidder loop. The bidder consumes it without any extra
+    V3/profile queries.
+    """
+
+    keyword_setting_original_id: int
+    current_mode: KeywordStrategyMode | None
+    current_target_place: int | None
+    matrix_state_bid: int | None
+    fact_pay_for_order: float | None
+    max_pay_for_order: float | None
+    overspend: bool
+    skip_reason: str | None = None
 
 
 async def get_cpms_from_wb(advs: list[AuctionAdv]) -> set[int] | None:
@@ -64,6 +107,7 @@ async def __get_new_cpm_by_position(
     wb_api: WBApi,
     best_keyword: CalculatedKeyword,
     cpm_now: int,
+    technical_min_cpm: int,
 ) -> int | None:
     adv_id = adv_setting.adv_id
     shop_id = wb_api.shop_id
@@ -80,9 +124,7 @@ async def __get_new_cpm_by_position(
         new_cpm: int = cpm_now - step
     else:
         new_cpm = cpm_now + step
-    adv_param_manager = AdvParameterManager()
-    min_cpm = await adv_param_manager.get_min_cpm(adv_setting)
-    new_cpm = max(min(new_cpm, max_cpm), min_cpm)
+    new_cpm = max(min(new_cpm, max_cpm), technical_min_cpm)
 
     if new_cpm == max_cpm and adv_setting.reset_place:
         async with sm(read_only=False) as session:
@@ -100,11 +142,123 @@ async def __get_new_cpm_by_position(
     return new_cpm
 
 
+def _rounded_matrix_state_bid(candidate: object | None) -> int | None:
+    """Вернуть bid из V3 matrix в формате bidder/UI (целое CPM)."""
+    if candidate is None:
+        return None
+    bid = getattr(candidate, "bid", None)
+    if bid is None or not getattr(candidate, "is_valid", False):
+        return None
+    rounded = int(float(bid) + 0.5)
+    return rounded if rounded > 0 else None
+
+
+async def build_v3_safety_cap_by_keyword_setting_original_id(
+    complex_adv: ComplexAdv,
+    keywords: list[CalculatedKeyword],
+    *,
+    wb_shop_data_manager: WBShopDataManager,
+) -> dict[int, BidderV3SafetyCapContext]:
+    """Preload V3 safety-cap rows for all bidder-managed keywords in one pass.
+
+    The helper mirrors the production UI/profile source of truth:
+    ``BidPosition -> PositionProfilePoint -> build_mode_candidates ->
+    ModeCandidate.bid``.
+    """
+    try:
+        dto, raw_profiles = await load_v3_wb_context(
+            complex_adv,
+            wb_shop_data_manager=wb_shop_data_manager,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "[adv_id=%s] V3 safety cap preload failed; fallback to legacy bidder",
+            complex_adv.adv_id,
+            exc_info=True,
+        )
+        return {}
+    if dto is None or not raw_profiles:
+        return {}
+
+    try:
+        campaign_orders_per_cart_7d = await load_campaign_orders_per_cart_7d(
+            complex_adv.adv_setting
+        )
+        all_contexts = build_keyword_v3_contexts(keywords, raw_profiles)
+        ladder_inputs = LadderInputs.from_contexts(
+            all_contexts,
+            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning(
+            "[adv_id=%s] V3 safety cap context build failed; fallback to legacy bidder",
+            complex_adv.adv_id,
+            exc_info=True,
+        )
+        return {}
+
+    fact_pay_for_order = dto.fact_pay_for_order
+    max_pay_for_order = dto.plan.max_pay_for_order
+    overspend = (
+        fact_pay_for_order is not None and fact_pay_for_order > max_pay_for_order
+    )
+    if not overspend:
+        return {}
+
+    result: dict[int, BidderV3SafetyCapContext] = {}
+    for ctx in all_contexts:
+        keyword_setting_original_id = int(ctx.keyword.keyword_setting_original_id or 0)
+        if keyword_setting_original_id <= 0:
+            continue
+        current_mode = ctx.keyword.strategy_mode
+        if current_mode == KeywordStrategyMode.OFF:
+            continue
+        agg_mode = aggression_target_for_stored_mode(current_mode)
+        if agg_mode is None:
+            continue
+        candidates = state_candidates_by_mode_for_ctx(ctx, ladder_inputs)
+        matrix_state_bid = _rounded_matrix_state_bid(candidates.get(agg_mode))
+        if matrix_state_bid is None:
+            continue
+        result[keyword_setting_original_id] = BidderV3SafetyCapContext(
+            keyword_setting_original_id=keyword_setting_original_id,
+            current_mode=current_mode,
+            current_target_place=ctx.keyword.target_place,
+            matrix_state_bid=matrix_state_bid,
+            fact_pay_for_order=fact_pay_for_order,
+            max_pay_for_order=max_pay_for_order,
+            overspend=overspend,
+        )
+    return result
+
+
+def _apply_v3_safety_cap(
+    *,
+    new_cpm: int,
+    technical_min_cpm: int,
+    cap_context: BidderV3SafetyCapContext | None,
+) -> tuple[int | None, str | None]:
+    """Clamp bidder CPM to V3 cap or skip when cap is technically impossible."""
+    if cap_context is None or not cap_context.overspend:
+        return new_cpm, None
+    cap = cap_context.matrix_state_bid
+    if cap is None or cap <= 0:
+        return new_cpm, None
+    if cap < technical_min_cpm:
+        return None, "v3_safety_cap_below_technical_min"
+    if new_cpm > cap:
+        return cap, None
+    return new_cpm, None
+
+
 @inject
 async def run_bidder_process_for_adv(
     adv_setting: AdvSetting,
     wb_api: WBApi,
     keywords: list[CalculatedKeyword],
+    v3_safety_cap_by_keyword_setting_original_id: dict[
+        int, BidderV3SafetyCapContext
+    ] | None = None,
     redis_last_total_views: "RedisLastTotalViews" = Provide[
         "module_resources.bidder_container.redis_last_total_views"
     ],
@@ -130,6 +284,7 @@ async def run_bidder_process_for_adv(
     user_max_cpm = adv_setting.max_cpm
     if not user_max_cpm:
         return None
+    technical_min_cpm = await AdvParameterManager().get_min_cpm(adv_setting)
     white_list = [kw for kw in keywords if kw.hard_status in (2, 4)]
     best_keyword = data_manager.get_best_keyword(white_list)
     if not best_keyword:
@@ -148,10 +303,31 @@ async def run_bidder_process_for_adv(
         wb_api,
         best_keyword,
         cpm_now,
+        technical_min_cpm,
     )
     if not new_cpm:
         return None
 
+    cap_context = None
+    if v3_safety_cap_by_keyword_setting_original_id:
+        cap_context = v3_safety_cap_by_keyword_setting_original_id.get(
+            int(best_keyword.keyword_setting_original_id)
+        )
+    new_cpm, skip_reason = _apply_v3_safety_cap(
+        new_cpm=new_cpm,
+        technical_min_cpm=technical_min_cpm,
+        cap_context=cap_context,
+    )
+    if skip_reason is not None:
+        logger.warning(
+            "[%s] [%s] Skip CPM update: %s",
+            wb_api.shop_id,
+            adv_setting.adv_id,
+            skip_reason,
+        )
+        return None
+    if new_cpm is None:
+        return None
 
     if not adv_setting.nmids:
         raise RuntimeError("Пустой список nmids - это недопустимое состояние")

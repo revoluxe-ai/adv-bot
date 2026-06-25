@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Float, Integer, String, func
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Float, Integer, String, func, text
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.utils.db.base import Base
@@ -23,6 +23,10 @@ class AutoShelfBidControlSettings(Base):
         CheckConstraint(
             "target_test_impressions > 0",
             name="ck_asbcs_target_test_impressions_positive",
+        ),
+        CheckConstraint(
+            "target_test_observation_minutes >= 60",
+            name="ck_asbcs_target_test_observation_minutes_min_60",
         ),
         CheckConstraint(
             "test_share > 0 AND test_share <= 0.49",
@@ -48,6 +52,12 @@ class AutoShelfBidControlSettings(Base):
         default=500,
         nullable=False,
     )
+    target_test_observation_minutes: Mapped[int] = mapped_column(
+        Integer,
+        default=60,
+        nullable=True,
+        server_default=text('60')
+    )
     test_share: Mapped[float] = mapped_column(Float, default=0.1, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -72,6 +82,14 @@ class AutoShelfBidControlSettings(Base):
         if int(value) <= 0:
             raise ValueError(f"{key} must be positive")
         return int(value)
+
+    @validates("target_test_observation_minutes")
+    def _validate_target_test_observation_minutes(self, _: str, value: int) -> int:
+        """Минимальная длительность теста — один час."""
+        casted = int(value)
+        if casted < 60:
+            raise ValueError("target_test_observation_minutes must be >= 60")
+        return casted
 
     @validates("test_share")
     def _validate_test_share(self, _: str, value: float) -> float:
@@ -134,4 +152,3 @@ class AutoShelfBidControlState(Base):
         if value not in {"main", "test"}:
             raise ValueError("current_mode must be 'main' or 'test'")
         return value
-

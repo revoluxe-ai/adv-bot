@@ -1,3 +1,5 @@
+"""Главное меню настроек РК с кнопками для UI и управлением активностью."""
+
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
@@ -152,6 +154,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._v3_last_action_str: str | None = None
 
+
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
         """Числовой код WB (4,9,11,7,8) или текст статуса → строка для отображения."""
@@ -280,9 +283,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self.adv_stat: FullAdvStat | None = adv_stat
         self._traffic_clicks_dto = await self._get_today_traffic_clicks_dto()
 
-        adv_id = self.adv.adv_id
+        search_adv_id = self.adv.search_adv_id
         last_common_bid_update = (
-            await self._redis_common_bid_timestamp_manager.get(adv_id)
+            await self._redis_common_bid_timestamp_manager.get(search_adv_id)
+            if search_adv_id is not None
+            else None
         )
         if last_common_bid_update:
             self.last_common_bid_update_str = last_common_bid_update.strftime(
@@ -671,7 +676,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboard.get_adv_setting_keyboard(
-           self.wb_user_cabinet, self.adv, self.in_favorites_user
+            self.wb_user_cabinet, self.adv, self.in_favorites_user
         )
 
     @staticmethod

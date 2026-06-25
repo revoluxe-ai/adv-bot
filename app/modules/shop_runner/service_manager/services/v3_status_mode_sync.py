@@ -74,24 +74,20 @@ def is_v3_keyword_eligible_for_cluster_bidding(
     strategy_mode: KeywordStrategyMode,
     adv_strategy: Strategy | str | None = None,
 ) -> bool:
-    """Может ли ключ участвовать в кластерных торгах V3 (страховка по cache).
+    """Может ли V3-ключ участвовать в ``update_cluster_bids``.
 
-    Требует согласованную пару ``hard_status`` / ``strategy_mode`` и активный режим
-    только у белого списка или фикс.фраз. Ключи в авто (1) с дефолтным MIN_CPA
-    не проходят.
+    Только белый список (2) или фикс.фразы (4) с ``strategy_mode != OFF``.
+    Авто (1), ЧС, отключённые и OFF-mode не торгуются.
+
+    ``adv_strategy`` не используется: cluster bids живёт отдельно от V2
+    ``AdvSetting.strategy`` и V3 updater-тика; для cap/матрицы важен
+    ``strategy_mode`` ключа из Redis, а не стратегия РК.
     """
-    if not is_v3_status_mode_consistent(
-        hard_status=hard_status,
-        strategy_mode=strategy_mode,
-        adv_strategy=adv_strategy,
-    ):
-        return False
+    _ = adv_strategy
     hs = int(hard_status)
-    if hs == _HARD_STATUS_WHITE_LIST:
-        return strategy_mode != KeywordStrategyMode.OFF
-    if hs == _HARD_STATUS_ALWAYS_ON:
-        return strategy_mode == keyword_strategy_mode_for_adv_strategy(adv_strategy)
-    return False
+    if hs not in (_HARD_STATUS_WHITE_LIST, _HARD_STATUS_ALWAYS_ON):
+        return False
+    return strategy_mode != KeywordStrategyMode.OFF
 
 
 def is_v3_status_mode_consistent(
@@ -149,6 +145,10 @@ def sync_keyword_setting_mode_for_v3(
 ) -> bool:
     """Синхронизировать mode у ``KeywordSetting`` после изменения ``hard_status``.
 
+    ``adv_strategy`` передаётся явно из загруженного ``AdvSetting`` (без lazy-load
+    relationship в async-контуре). Для V3 при ``hard_status`` 2 (БС) и 4 (фикс.фразы)
+    вызывающий код должен передать стратегию РК; для 0/1/3 можно ``None`` (режим OFF).
+
     Returns:
         ``True``, если ``strategy_mode`` был изменен.
     """
@@ -159,10 +159,6 @@ def sync_keyword_setting_mode_for_v3(
         if hard_status_override is not None
         else int(keyword_setting.hard_status)
     )
-    if adv_strategy is None:
-        adv_setting = getattr(keyword_setting, "adv_setting", None)
-        if adv_setting is not None:
-            adv_strategy = getattr(adv_setting, "strategy", None)
     expected = strategy_mode_for_hard_status_write_v3(
         hard_status, adv_strategy=adv_strategy
     )

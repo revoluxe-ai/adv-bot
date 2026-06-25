@@ -11,6 +11,9 @@ from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import 
     AutoShelfBidControlSettings,
     AutoShelfBidControlState,
 )
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as get_session_maker
 
@@ -19,6 +22,7 @@ from .settings_normalizer import compute_settings_repair
 
 DEFAULT_CURRENCY = "RUB"
 DEFAULT_TARGET_TEST_IMPRESSIONS = 500
+DEFAULT_TARGET_TEST_OBSERVATION_MINUTES = 60
 DEFAULT_TEST_SHARE = 0.1
 
 # Product-дефолты при автосоздании settings (get_or_create_default_settings).
@@ -64,6 +68,7 @@ class AutoShelfBidControlRepository:
                 currency=currency,
                 min_bid_distance_minor=DEFAULT_MIN_BID_DISTANCE_MINOR,
                 target_test_impressions=DEFAULT_TARGET_TEST_IMPRESSIONS,
+                target_test_observation_minutes=DEFAULT_TARGET_TEST_OBSERVATION_MINUTES,
                 test_share=DEFAULT_TEST_SHARE,
             )
             session.add(created)
@@ -134,6 +139,7 @@ class AutoShelfBidControlRepository:
         max_bid_minor: int | None = None,
         test_share: float | None = None,
         target_test_impressions: int | None = None,
+        target_test_observation_minutes: int | None = None,
         min_bid_distance_minor: int | None = None,
     ) -> AutoShelfBidControlSettings:
         """Обновить отдельные поля settings по nmid."""
@@ -150,6 +156,10 @@ class AutoShelfBidControlRepository:
                 settings_obj.test_share = float(test_share)
             if target_test_impressions is not None:
                 settings_obj.target_test_impressions = int(target_test_impressions)
+            if target_test_observation_minutes is not None:
+                settings_obj.target_test_observation_minutes = int(
+                    target_test_observation_minutes
+                )
             if min_bid_distance_minor is not None:
                 settings_obj.min_bid_distance_minor = int(min_bid_distance_minor)
             await session.flush()
@@ -174,6 +184,27 @@ class AutoShelfBidControlRepository:
             await session.flush()
             await session.commit()
             return None
+
+    async def update_adv_strategy(
+        self,
+        adv_setting_original_id: int,
+        strategy: AutoShelfBidControlStrategy,
+    ) -> AdvSetting:
+        """Update the main-bid strategy on AdvSetting and return fresh model."""
+        async with get_session_maker() as session:
+            stmt: Select[tuple[AdvSetting]] = (
+                select(AdvSetting)
+                .options(joinedload(AdvSetting.wb_cabinet))
+                .where(AdvSetting.id == adv_setting_original_id)
+            )
+            adv = (await session.execute(stmt)).scalar_one_or_none()
+            if adv is None:
+                raise ValueError("adv_setting_not_found")
+            adv.auto_shelf_bid_control_strategy = strategy
+            await session.flush()
+            await session.refresh(adv)
+            await session.commit()
+            return adv
 
     async def save_state(self, state: AutoShelfBidControlState) -> AutoShelfBidControlState:
         """Создать или обновить state в БД."""
@@ -289,4 +320,3 @@ class AutoShelfBidControlRepository:
             await session.flush()
             await session.commit()
             return None
-

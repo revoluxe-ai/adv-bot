@@ -1,13 +1,4 @@
-"""Keyword-level data tier и eligibility для V3 (отдельно от ``CampaignMode``).
-
-``allowed_modes`` — рабочие UP/realloc target modes **без OFF**. ``OFF`` допустим только
-как результат DOWN/FORCE_OFF, не как UP-кандидат (см. ``can_target_mode``).
-
-Tier ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``: нет CH-матрицы, но есть свой V2 CPO на ключе.
-Границы UP/trim — ``keyword.pay_for_order`` (UI), не imputed conv и не
-``resolve_keyword_v2_pay_for_order_cost``. Tier ``KEYWORD_PESSIMISTIC_FALLBACK``: CH есть,
-conv импутирована с РК — лестница через ``effective_conv_for_v3``.
-"""
+"""Keyword-level data tier и eligibility для V3: FULL / PFO / NO DATA."""
 
 from __future__ import annotations
 
@@ -22,11 +13,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
     KeywordV3DecisionTier,
-    _keyword_has_own_conv,
-    effective_conv_for_v3,
-    keyword_has_v2_cpo,
+    keyword_has_own_conv,
     resolve_keyword_v3_decision,
     resolve_no_ch_operational_pay_for_order_cost,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    is_keyword_no_data,
+    keyword_pfo_value,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.ladder import (
     mode_level,
@@ -39,8 +32,11 @@ if TYPE_CHECKING:
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
         KeywordV3Context,
     )
+    from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+        PositionProfilePoint,
+    )
 
-FallbackKind = Literal["none", "pessimistic", "v2_cpo"]
+FallbackKind = Literal["none", "v2_cpo"]
 
 _FULL_LADDER_TARGET_MODES: frozenset[KeywordStrategyMode] = frozenset(
     {
@@ -56,21 +52,21 @@ _EMPTY_TARGET_MODES: frozenset[KeywordStrategyMode] = frozenset()
 
 
 class KeywordDataTier(str, Enum):
-    """Keyword-level tier данных (не campaign state).
-
-    ``KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV`` — нет CH bid profile, свой V2 CPO на ключе;
-    MIN-only; границы UP/trim — ``keyword.pay_for_order`` (как в UI).
-    """
+    """Keyword-level tier: FULL / PFO / NO DATA."""
 
     KEYWORD_FULL = "keyword_full"
-    KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV = "keyword_no_ch_profile_with_own_conv"
-    KEYWORD_PESSIMISTIC_FALLBACK = "keyword_pessimistic_fallback"
-    KEYWORD_INVALID = "keyword_invalid"
+    KEYWORD_PFO = "keyword_pfo"
+    KEYWORD_NO_DATA = "keyword_no_data"
+
+    # Legacy aliases (logs/tests migration)
+    KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV = "keyword_pfo"
+    KEYWORD_INVALID = "keyword_no_data"
+    KEYWORD_PESSIMISTIC_FALLBACK = "keyword_pfo"
 
 
 @dataclass(frozen=True, slots=True)
 class KeywordV3Eligibility:
-    """Eligibility ключа для ladder-фаз и bootstrap."""
+    """Eligibility ключа для ladder-фаз и preamble."""
 
     data_tier: KeywordDataTier
     allowed_modes: frozenset[KeywordStrategyMode]
@@ -92,21 +88,34 @@ def can_target_mode(
     return mode in eligibility.allowed_modes
 
 
+def _profile_has_ch_observed_usable_points(
+    profile: list["PositionProfilePoint"],
+) -> bool:
+    """Есть ли в профиле CH-наблюдаемая точка с conv и bid (не синтетика ``_fill_positions``)."""
+    for point in profile:
+        if (
+            point.ch_observed
+            and point.predicted_conversion is not None
+            and point.bid >= 0
+        ):
+            return True
+    return False
+
+
 def collapsed_ch_ladder_with_pay_for_order(
     ctx: "KeywordV3Context",
-    catalog: dict[AggressionTargetMode, ModeCandidate],
+    catalog: dict[AggressionTargetMode, ModeCandidate] | None = None,
 ) -> bool:
-    """CH raw есть, usable M/O/C нет, operational cost — ``keyword.pay_for_order``.
+    """CH-профиль есть, нет CH-observed M/O/C matrix, operational cost — ``pay_for_order``.
 
-    Stored mode остаётся ``MIN_CPA``; отличие — ``target_place=0`` и ``PAY_FOR_ORDER`` в ladder.
+    Не смотрим на prod-каталог с ``include_synthetic_position_profile`` (синтетика
+    может дать valid OPT/MAX при ``ch_observed=False``). Stored MIN → PFO в ladder/UI.
     """
-    if not ctx.position_profile:
+    _ = catalog
+    profile = ctx.position_profile
+    if not profile:
         return False
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
-        missing_target_matrix_from_catalog,
-    )
-
-    if not missing_target_matrix_from_catalog(catalog):
+    if _profile_has_ch_observed_usable_points(profile):
         return False
     return resolve_no_ch_operational_pay_for_order_cost(ctx.keyword) is not None
 
@@ -116,12 +125,9 @@ def min_cpa_operational_via_pay_for_order(
     eligibility: KeywordV3Eligibility | None,
     catalog: dict[AggressionTargetMode, ModeCandidate] | None = None,
 ) -> bool:
-    """MIN через ``pay_for_order``: NO CH tier или collapsed CH ladder + own PFO."""
-    if (
-        eligibility is not None
-        and eligibility.data_tier == KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV
-    ):
-        return True
+    """MIN через ``keyword.pay_for_order``: tier PFO или collapsed CH ladder + own PFO."""
+    if eligibility is not None and eligibility.data_tier == KeywordDataTier.KEYWORD_PFO:
+        return keyword_pfo_value(ctx.keyword) is not None
     if catalog is None:
         return False
     return collapsed_ch_ladder_with_pay_for_order(ctx, catalog)
@@ -141,75 +147,6 @@ def clamp_target_mode(
     return mode
 
 
-def _mode_catalog_for_eligibility(
-    ctx: "KeywordV3Context",
-    contexts: list["KeywordV3Context"],
-    campaign_cache: "CampaignV3DecisionCache",
-    *,
-    campaign_orders_per_cart_7d: float | None = None,
-) -> dict[AggressionTargetMode, ModeCandidate]:
-    """Каталог M/O/C для предиката collapsed CH (паритет с ``LadderInputs`` на тике).
-
-    Args:
-        campaign_orders_per_cart_7d: baseline РК 7d (``wb_common_stat``), как в
-            ``LadderInputs.orders_per_cart_for_ctx``; без него — только key prior.
-    """
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
-        build_mode_candidates,
-    )
-    from app.modules.shop_runner.service_manager.services.v3_point_order_cpo import (
-        resolve_orders_per_cart_for_cpo,
-    )
-
-    opc = resolve_orders_per_cart_for_cpo(
-        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-        key_orders=ctx.keyword.orders,
-        key_carts=ctx.keyword.add_to_cart,
-    )
-    conv: float | None = None
-    if opc is None or opc <= 0:
-        conv = effective_conv_for_v3(
-            ctx, contexts, campaign_cache=campaign_cache
-        )
-        if conv is None:
-            conv = ctx.keyword.conv_views_to_orders
-    return build_mode_candidates(
-        profile=ctx.position_profile,
-        keyword_text=ctx.keyword.text,
-        conv_views_to_orders=conv,
-        orders_per_cart=opc,
-    )
-
-
-def _apply_min_only_pay_for_order_override(
-    base: KeywordV3Eligibility,
-    ctx: "KeywordV3Context",
-    contexts: list["KeywordV3Context"],
-    campaign_cache: "CampaignV3DecisionCache",
-    *,
-    campaign_orders_per_cart_7d: float | None = None,
-) -> KeywordV3Eligibility:
-    """Collapsed CH + pay_for_order: MIN-only и ``target_place=0``, ``data_tier`` без смены."""
-    catalog = _mode_catalog_for_eligibility(
-        ctx,
-        contexts,
-        campaign_cache,
-        campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-    )
-    if not collapsed_ch_ladder_with_pay_for_order(ctx, catalog):
-        return base
-    return KeywordV3Eligibility(
-        data_tier=base.data_tier,
-        allowed_modes=_MIN_ONLY_TARGET_MODES,
-        max_allowed_mode=KeywordStrategyMode.MIN_CPA,
-        participates_in_ladder=True,
-        target_place_fallback_zero=True,
-        imputed=base.imputed,
-        fallback_kind=base.fallback_kind,
-        decision_tier=base.decision_tier,
-    )
-
-
 def resolve_keyword_v3_eligibility(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
@@ -217,113 +154,50 @@ def resolve_keyword_v3_eligibility(
     campaign_cache: "CampaignV3DecisionCache | None" = None,
     campaign_orders_per_cart_7d: float | None = None,
 ) -> KeywordV3Eligibility:
-    """Свести conv/CH decision к продуктовому ``KeywordDataTier``.
-
-    NO CH + ``keyword_has_v2_cpo`` → MIN-only, ``target_place_fallback_zero=True``.
-    CH + imputed conv → полная лестница с ``fallback_kind="pessimistic"`` (не V2 CPO path).
-
-    Args:
-        campaign_cache: предрасчёт агрегата РК (см. ``CampaignV3DecisionCache``).
-        campaign_orders_per_cart_7d: baseline корз→заказ РК 7d для каталога collapsed CH.
-    """
+    """Свести данные ключа к ``KeywordDataTier`` FULL / PFO / NO DATA."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache as _CampaignV3DecisionCache,
     )
 
+    _ = campaign_orders_per_cart_7d
     cache = campaign_cache or _CampaignV3DecisionCache.from_contexts(contexts)
     decision = resolve_keyword_v3_decision(ctx, contexts, campaign_cache=cache)
-    has_ch = decision.has_ch_position_profile
-    eff = decision.effective_conv_views_to_orders
-    keyword = ctx.keyword
 
-    def _with_collapsed_override(base: KeywordV3Eligibility) -> KeywordV3Eligibility:
-        return _apply_min_only_pay_for_order_override(
-            base,
-            ctx,
-            contexts,
-            cache,
-            campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
-        )
-
-    if not has_ch:
-        if keyword_has_v2_cpo(keyword):
-            return KeywordV3Eligibility(
-                data_tier=KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV,
-                allowed_modes=_MIN_ONLY_TARGET_MODES,
-                max_allowed_mode=KeywordStrategyMode.MIN_CPA,
-                participates_in_ladder=True,
-                target_place_fallback_zero=True,
-                imputed=False,
-                fallback_kind="none" if _keyword_has_own_conv(keyword) else "v2_cpo",
-                decision_tier=decision.tier,
-            )
-        return _invalid_eligibility(decision)
-
-    if decision.tier == KeywordV3DecisionTier.FULL:
-        return _with_collapsed_override(
-            KeywordV3Eligibility(
-                data_tier=KeywordDataTier.KEYWORD_FULL,
-                allowed_modes=_FULL_LADDER_TARGET_MODES,
-                max_allowed_mode=KeywordStrategyMode.MAX_CONVERSION,
-                participates_in_ladder=True,
-                target_place_fallback_zero=False,
-                imputed=False,
-                fallback_kind="none",
-                decision_tier=decision.tier,
-            )
-        )
-
-    if decision.tier in (
-        KeywordV3DecisionTier.RK_AGGREGATE,
-        KeywordV3DecisionTier.PEER_MAX,
+    if (
+        decision.tier == KeywordV3DecisionTier.FULL
+        and decision.effective_conv_views_to_orders is not None
     ):
-        if eff is None or eff <= 0:
-            return _invalid_eligibility(decision)
-        return _with_collapsed_override(
-            KeywordV3Eligibility(
-                data_tier=KeywordDataTier.KEYWORD_PESSIMISTIC_FALLBACK,
-                allowed_modes=_FULL_LADDER_TARGET_MODES,
-                max_allowed_mode=KeywordStrategyMode.MAX_CONVERSION,
-                participates_in_ladder=True,
-                target_place_fallback_zero=False,
-                imputed=True,
-                fallback_kind="pessimistic",
-                decision_tier=decision.tier,
-            )
+        return KeywordV3Eligibility(
+            data_tier=KeywordDataTier.KEYWORD_FULL,
+            allowed_modes=_FULL_LADDER_TARGET_MODES,
+            max_allowed_mode=KeywordStrategyMode.MAX_CONVERSION,
+            participates_in_ladder=True,
+            target_place_fallback_zero=False,
+            imputed=False,
+            fallback_kind="none",
+            decision_tier=decision.tier,
         )
 
-    if decision.tier == KeywordV3DecisionTier.NO_CONV:
-        # CH есть, conv импутировать нельзя — worst только без own pay_for_order.
-        return _with_collapsed_override(
-            KeywordV3Eligibility(
-                data_tier=KeywordDataTier.KEYWORD_PESSIMISTIC_FALLBACK,
-                allowed_modes=_FULL_LADDER_TARGET_MODES,
-                max_allowed_mode=KeywordStrategyMode.MAX_CONVERSION,
-                participates_in_ladder=True,
-                target_place_fallback_zero=False,
-                imputed=False,
-                fallback_kind="pessimistic",
-                decision_tier=decision.tier,
-            )
+    if is_keyword_no_data(ctx.keyword):
+        return KeywordV3Eligibility(
+            data_tier=KeywordDataTier.KEYWORD_NO_DATA,
+            allowed_modes=_EMPTY_TARGET_MODES,
+            max_allowed_mode=KeywordStrategyMode.OFF,
+            participates_in_ladder=False,
+            target_place_fallback_zero=True,
+            imputed=False,
+            fallback_kind=None,
+            decision_tier=decision.tier,
         )
 
-    return _invalid_eligibility(decision)
-
-
-def _invalid_eligibility(decision: object) -> KeywordV3Eligibility:
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
-        KeywordV3Decision,
-    )
-
-    assert isinstance(decision, KeywordV3Decision)
     return KeywordV3Eligibility(
-        data_tier=KeywordDataTier.KEYWORD_INVALID,
-        allowed_modes=_EMPTY_TARGET_MODES,
-        max_allowed_mode=KeywordStrategyMode.OFF,
-        participates_in_ladder=False,
-        target_place_fallback_zero=False,
-        imputed=decision.imputed,
-        fallback_kind=None,
+        data_tier=KeywordDataTier.KEYWORD_PFO,
+        allowed_modes=_MIN_ONLY_TARGET_MODES,
+        max_allowed_mode=KeywordStrategyMode.MIN_CPA,
+        participates_in_ladder=True,
+        target_place_fallback_zero=True,
+        imputed=False,
+        fallback_kind="none" if keyword_has_own_conv(ctx.keyword) else "v2_cpo",
         decision_tier=decision.tier,
     )
 
@@ -333,7 +207,7 @@ def build_eligibility_map(
     *,
     campaign_orders_per_cart_7d: float | None = None,
 ) -> dict[int, KeywordV3Eligibility]:
-    """Индекс eligibility по ``keyword_setting_original_id`` (один агрегат РК на тик)."""
+    """Индекс eligibility по ``keyword_setting_original_id``."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache,
     )
@@ -342,9 +216,9 @@ def build_eligibility_map(
     result: dict[int, KeywordV3Eligibility] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
-        result[int(ks_id)] = resolve_keyword_v3_eligibility(
+        result[ks_id] = resolve_keyword_v3_eligibility(
             ctx,
             contexts,
             campaign_cache=campaign_cache,
@@ -358,10 +232,72 @@ def build_target_place_fallback_zero_by_keyword_id(
     *,
     campaign_orders_per_cart_7d: float | None = None,
 ) -> dict[int, bool]:
-    """Map ``ks_id → target_place_fallback_zero`` для sync при ``CAMPAIGN_NORMAL``.
+    """Построить карту принудительного сброса ``target_place`` в 0 по ключам V3.
 
-    Один ``CampaignV3DecisionCache`` на вызов (как в ``build_eligibility_map``).
-    ``OFF`` не включается: после MAX_CPA_GUARD / FORCE_OFF sync ставит ``None``, не 0.
+    Используется на этапе подготовки тика V3 (``orchestrator``, ``DataUpdateManager``,
+    ``ApplyManager``) и передаётся в ``sync_keyword_target_places_v3`` как
+    ``target_place_fallback_zero_by_keyword_id`` при режиме кампании
+    ``CampaignMode.NORMAL`` (в отличие от ``force_all_target_place_zero`` для
+    ``CampaignMode.NO_DATA``).
+
+    Для каждого ключа с ``keyword_setting_original_id > 0`` вычисляет, нужно ли при
+    синхронизации в PostgreSQL записать ``KeywordSetting.target_place = 0``
+    (``NO_DATA_TARGET_PLACE_FALLBACK``) вместо расчёта по ladder-профилю позиций.
+    Значение ``True`` означает «force 0» только для **управляемых** ключей
+    (``hard_status`` managed) — фильтр применяется уже в ``sync_keyword_target_places_v3``.
+
+    После рефакторинга NF bootstrap эта карта больше не является местом, где
+    no-CH ключи получают стартовый ``target_place``. Для PFO/GAP ключей карта
+    всегда возвращает ``False``: bootstrap и дальнейшая коррекция происходят в
+    preamble-фазах ``NotFullValidateExecutor`` → ``NotFullTargetPlaceMigrateExecutor``
+    → ``NotFullTargetPlacePlanFactExecutor``.
+
+    То есть sync-слой здесь выполняет только сохранение уже подготовленного
+    состояния. Он не должен заново инициализировать no-CH ключ, не должен
+    подменять bootstrap-логику NF и не должен делать overspend-reset в 0 для
+    PFO/GAP.
+
+    Алгоритм (по приоритету для одного ``KeywordV3Context``):
+
+    1. **Пропуск** — ``ks_id <= 0`` не попадает в результат.
+    2. **PFO/GAP active** — нет ``position_profile`` (нет CH-профиля / collapsed
+       ladder), но ``strategy_mode != OFF``:
+       всегда ``False`` — sync **не** форсит 0; ``target_place`` для PFO/GAP
+       управляется отдельно в preamble (validate → migrate → plan-fact), а sync
+       только уважает уже подготовленное значение из ledger/Redis. Это ключевой
+       контракт: bootstrap no-CH ключа больше не происходит на стадии sync.
+    3. **Остальные случаи** — ``elig.target_place_fallback_zero`` из
+       ``resolve_keyword_v3_eligibility``, но только если ``strategy_mode != OFF``:
+
+       - ``KeywordV3DecisionTier.FULL`` → ``target_place_fallback_zero=False`` →
+         ``False`` в карте: позиция считается по полному CH-профилю;
+       - ``KEYWORD_PFO`` / ``KEYWORD_NO_DATA`` → ``target_place_fallback_zero=True`` →
+         ``True`` в карте: нет достаточных данных для ladder, min-bid fallback;
+       - ``OFF`` → всегда ``False``, даже если tier NO_DATA/PFO в eligibility
+         (ключ выключен — sync не перезаписывает ``target_place`` через fallback).
+
+    Карта согласована с ``build_eligibility_map`` для контекстов **с** профилем
+    (FULL/PFO/NO_DATA без ветки PFO/GAP active). Для PFO/GAP поведение
+    намеренно расходится: eligibility может давать ``target_place_fallback_zero=True``,
+    но sync не должен сбрасывать такой ключ в ``0`` — этот контур обслуживается
+    отдельно NF pipeline-ом. Это сделано специально, чтобы один и тот же
+    bootstrap-контракт не реализовывался в двух местах с разной семантикой.
+
+    Args:
+        contexts: Все ``KeywordV3Context`` тика (managed + operable); общий
+            ``CampaignV3DecisionCache`` строится один раз на список.
+        campaign_orders_per_cart_7d: Пробрасывается в ``resolve_keyword_v3_eligibility``
+            (зарезервировано для campaign-level CPO; сейчас не меняет tier внутри
+            eligibility, но сохраняет единый контракт вызова с preamble/sync).
+    Returns:
+        Словарь ``keyword_setting_original_id → force_zero``. Отсутствующий ``ks_id``
+        в sync трактуется как ``False`` (``.get(ks_id, False)``). Побочных эффектов
+        нет (только чтение контекстов и eligibility).
+
+    См. также:
+        ``sync_keyword_target_places_v3`` — потребитель карты при ``CAMPAIGN_NORMAL``;
+        ``KeywordV3Eligibility.target_place_fallback_zero`` — источник флага для
+        ключей с профилем.
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
         CampaignV3DecisionCache,
@@ -371,7 +307,7 @@ def build_target_place_fallback_zero_by_keyword_id(
     out: dict[int, bool] = {}
     for ctx in contexts:
         ks_id = ctx.keyword.keyword_setting_original_id
-        if ks_id is None:
+        if ks_id <= 0:
             continue
         elig = resolve_keyword_v3_eligibility(
             ctx,
@@ -380,8 +316,10 @@ def build_target_place_fallback_zero_by_keyword_id(
             campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         )
         mode = ctx.keyword.keyword_setting.strategy_mode
+        if not bool(ctx.position_profile) and mode != KeywordStrategyMode.OFF:
+            out[int(ks_id)] = False
+            continue
         out[int(ks_id)] = (
-            elig.target_place_fallback_zero
-            and mode != KeywordStrategyMode.OFF
+            elig.target_place_fallback_zero and mode != KeywordStrategyMode.OFF
         )
     return out

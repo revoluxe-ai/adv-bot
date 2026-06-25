@@ -65,6 +65,58 @@ def _build_settings(**overrides):
     return SimpleNamespace(**base)
 
 
+def _build_adv_setting() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=1,
+        adv_id=42,
+        auto_budget_daily_limit=1000,
+        auto_budget_balance_type="balance",
+        search_adv_id=None,
+        search_auto_budget_daily_limit=0,
+        search_auto_budget_balance_type=None,
+    )
+
+
+def _wrap_complex_adv(adv_setting: SimpleNamespace) -> SimpleNamespace:
+    """Обёртка AdvSetting в контракт ComplexAdv для unit-тестов."""
+    return SimpleNamespace(
+        adv_setting=adv_setting,
+        original_adv_setting_id=adv_setting.id,
+        use_common_budget=getattr(adv_setting, "use_common_budget", False),
+        common_budget_daily_limit=getattr(
+            adv_setting, "common_budget_daily_limit", None
+        ),
+        auto_adv_id=adv_setting.adv_id,
+        search_adv_id=getattr(adv_setting, "search_adv_id", None),
+        adv_id=adv_setting.adv_id,
+    )
+
+
+def _build_fake_complex_adv(**adv_setting_overrides: object) -> SimpleNamespace:
+    adv_setting = _build_adv_setting()
+    for key, value in adv_setting_overrides.items():
+        setattr(adv_setting, key, value)
+    return _wrap_complex_adv(adv_setting)
+
+
+@pytest.fixture
+def complex_adv() -> SimpleNamespace:
+    return _build_fake_complex_adv(
+        use_common_budget=True,
+        search_adv_id=43,
+        common_budget_daily_limit=500,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _patch_wb_shop_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_get_wb_shop_id",
+        AsyncMock(return_value="test-shop"),
+    )
+
+
 @pytest.mark.asyncio
 async def test_ensure_budget_skips_when_lock_busy(monkeypatch) -> None:
     fake_redis = _FakeRedis()
@@ -79,6 +131,7 @@ async def test_ensure_budget_skips_when_lock_busy(monkeypatch) -> None:
     monkeypatch.setattr(service, "_ensure_budget_locked", inner)
 
     result = await service.ensure_budget(
+        _build_fake_complex_adv(id=1),
         adv_setting_id=1,
         campaign_type=AdvType.AUTO,
         wb_manager_hub=MagicMock(),
@@ -106,6 +159,7 @@ async def test_ensure_budget_releases_lock(monkeypatch) -> None:
     monkeypatch.setattr(service, "_ensure_budget_locked", inner)
 
     result = await service.ensure_budget(
+        _build_fake_complex_adv(id=42),
         adv_setting_id=42,
         campaign_type=AdvType.AUTO,
         wb_manager_hub=MagicMock(),
@@ -152,6 +206,7 @@ def test_compute_planned_amount_uses_default_topup_amount(monkeypatch) -> None:
 
 def test_get_campaign_config_selects_search_when_active() -> None:
     adv_setting = SimpleNamespace(
+        id=1,
         adv_id=1,
         search_adv_id=200,
         auto_budget_daily_limit=0,
@@ -160,8 +215,9 @@ def test_get_campaign_config_selects_search_when_active() -> None:
         search_auto_budget_balance_type="bonus",
     )
 
+    complex_adv = _wrap_complex_adv(adv_setting)
     config = AutoBudgetService.get_campaign_config(
-        adv_setting,
+        complex_adv,
         AdvType.SEARCH,
     )
 
@@ -335,18 +391,6 @@ def _patch_adv_setting(monkeypatch, adv_setting, execute_values: list[float] | N
     monkeypatch.setattr("app.modules.auto_budget_manager.service.sm", _fake_sm)
 
 
-def _build_adv_setting() -> SimpleNamespace:
-    return SimpleNamespace(
-        id=1,
-        adv_id=42,
-        auto_budget_daily_limit=1000,
-        auto_budget_balance_type="balance",
-        search_adv_id=None,
-        search_auto_budget_daily_limit=0,
-        search_auto_budget_balance_type=None,
-    )
-
-
 def _build_wb_manager_hub():
     wb_modifier = MagicMock()
     wb_modifier.get_campaign_budget = AsyncMock(return_value=MagicMock(total=0))
@@ -395,7 +439,9 @@ async def test_ensure_budget_limits_by_successful_topups(monkeypatch) -> None:
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
     wb_manager_hub = _build_wb_manager_hub()
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         campaign_type=AdvType.AUTO,
         wb_manager_hub=wb_manager_hub,
@@ -446,7 +492,9 @@ async def test_ensure_budget_limits_by_doubled_all_attempts(monkeypatch) -> None
     )
     service = AutoBudgetService(redis_client=_FakeRedis())
     wb_manager_hub = _build_wb_manager_hub()
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         campaign_type=AdvType.AUTO,
         wb_manager_hub=wb_manager_hub,
@@ -458,7 +506,7 @@ async def test_ensure_budget_limits_by_doubled_all_attempts(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch) -> None:
+async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch, complex_adv) -> None:
     fake_redis = _FakeRedis()
     fake_redis.is_locked = True
     monkeypatch.setattr(
@@ -469,6 +517,7 @@ async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch) -> None:
     monkeypatch.setattr(service, "_ensure_common_budget_locked", inner)
 
     result = await service.ensure_common_budget(
+        complex_adv,
         adv_setting_id=1,
         wb_manager_hub=MagicMock(),
     )
@@ -479,7 +528,7 @@ async def test_ensure_common_budget_skips_when_lock_busy(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_ensure_common_budget_releases_lock(monkeypatch) -> None:
+async def test_ensure_common_budget_releases_lock(monkeypatch, complex_adv) -> None:
     fake_redis = _FakeRedis()
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings", _build_settings()
@@ -493,9 +542,9 @@ async def test_ensure_common_budget_releases_lock(monkeypatch) -> None:
     )
     inner = AsyncMock(return_value=expected)
     monkeypatch.setattr(service, "_ensure_common_budget_locked", inner)
-
     result = await service.ensure_common_budget(
-        adv_setting_id=1,
+        complex_adv,
+        adv_setting_id=complex_adv.original_adv_setting_id,
         wb_manager_hub=MagicMock(),
     )
 
@@ -541,7 +590,9 @@ async def test_ensure_common_budget_locked_limit_reached_when_topups_exceed(
     )
 
     service = AutoBudgetService(redis_client=_FakeRedis())
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_common_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         wb_manager_hub=MagicMock(),
     )
@@ -603,7 +654,9 @@ async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
     )
     wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_common_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         wb_manager_hub=wb_manager_hub,
     )
@@ -658,7 +711,9 @@ async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats
     )
     wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_common_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         wb_manager_hub=wb_manager_hub,
     )
@@ -707,7 +762,9 @@ async def test_ensure_common_budget_rejects_when_one_campaign_missing_stats(
     )
 
     service = AutoBudgetService(redis_client=_FakeRedis())
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_common_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         wb_manager_hub=MagicMock(),
     )
@@ -765,7 +822,9 @@ async def test_ensure_budget_rejects_when_stats_not_refreshed(monkeypatch) -> No
         "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
         AsyncMock(return_value=0.0),
     )
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         campaign_type=AdvType.AUTO,
         wb_manager_hub=wb_manager_hub,
@@ -858,7 +917,9 @@ async def test_ensure_budget_rejects_stale_when_min_balance_zero_but_wb_high(
         "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
         AsyncMock(return_value=0.0),
     )
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         campaign_type=AdvType.AUTO,
         wb_manager_hub=wb_manager_hub,
@@ -914,7 +975,9 @@ async def test_ensure_common_budget_rejects_stale_when_min_zero_both_wb_high(
     )
     wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
+    complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_common_budget_locked(
+        complex_adv,
         adv_setting_id=adv_setting.id,
         wb_manager_hub=wb_manager_hub,
     )

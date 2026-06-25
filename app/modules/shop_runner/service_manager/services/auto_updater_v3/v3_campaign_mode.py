@@ -39,6 +39,11 @@ def allows_ladder_phases(mode: CampaignMode) -> bool:
     return mode == CampaignMode.NORMAL
 
 
+def needs_apply_manager(mode: CampaignMode) -> bool:
+    """``ApplyManager.apply``: flush ledger, Redis caches, target_place (NORMAL + NO_DATA)."""
+    return mode in (CampaignMode.NORMAL, CampaignMode.NO_DATA)
+
+
 def is_campaign_full_stop(mode: CampaignMode) -> bool:
     """``NOT_READY``: без keyword bootstrap, ladder, flush, target_place sync."""
     return mode == CampaignMode.NOT_READY

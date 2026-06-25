@@ -19,6 +19,9 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import Complex
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+    PositionProfilePoint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,54 @@ def build_keyword_v3_contexts(
         merged = kw.model_copy(update={"position_profile": profile})
         contexts.append(KeywordV3Context(keyword=merged, position_profile=profile))
     return contexts
+
+
+def merge_position_profiles_from_contexts(
+    keywords: list[CalculatedKeyword],
+    contexts: list[KeywordV3Context],
+) -> list[CalculatedKeyword]:
+    """Перенести CH ``position_profile`` из контекстов в ключи списка UI.
+
+    ``fetch_keywords_from_database`` не заполняет профиль; после загрузки CH для
+    сортировки/карточки буква режима в списке (`keyword_strategy_letter`) должна
+    совпадать с наличием матрицы.
+
+    Args:
+        keywords: Отображаемые ключи (порядок сохраняется).
+        contexts: Контексты с профилями (та же РК / тот же ``raw_profiles``).
+
+    Returns:
+        Копии ключей с подставленным ``position_profile`` где он есть в контексте.
+    """
+    profile_by_ks_id: dict[int, list[PositionProfilePoint]] = {}
+    profile_by_text: dict[str, list[PositionProfilePoint]] = {}
+    for ctx in contexts:
+        profile = ctx.position_profile
+        if not profile:
+            continue
+        ks_id = ctx.keyword.keyword_setting_original_id
+        if ks_id > 0:
+            profile_by_ks_id[ks_id] = profile
+        text_key = (ctx.keyword.text or "").casefold()
+        if text_key:
+            profile_by_text[text_key] = profile
+
+    merged: list[CalculatedKeyword] = []
+    for kw in keywords:
+        if bool(kw.position_profile):
+            merged.append(kw)
+            continue
+        profile: list[PositionProfilePoint] | None = None
+        ks_id = kw.keyword_setting_original_id
+        if ks_id > 0:
+            profile = profile_by_ks_id.get(ks_id)
+        if profile is None:
+            profile = profile_by_text.get((kw.text or "").casefold())
+        if profile:
+            merged.append(kw.model_copy(update={"position_profile": profile}))
+        else:
+            merged.append(kw)
+    return merged
 
 
 async def load_campaign_v3_contexts(

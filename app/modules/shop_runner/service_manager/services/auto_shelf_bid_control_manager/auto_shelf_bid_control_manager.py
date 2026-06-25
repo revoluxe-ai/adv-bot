@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, UTC
+from enum import StrEnum
 
 from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
     AutoShelfBidControlSettings,
@@ -12,24 +14,49 @@ from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
 )
+
 from app.core.mp.wb.dto import AdvMinNmidsBids
+from app.core.mp.wb.min_bid_defaults import default_min_bid_rub, resolve_auto_min_bid_rub
+from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
+)
 from .auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
+)
+from .bid_coverage_selector import (
+    BidCoverage,
+    build_coverage_selector_seed,
+    build_bid_universe,
+    closed_layers_for_bid,
+    choose_next_test_bid_by_coverage_layers,
 )
 from .bid_selection import resolve_cycle_best_bids
 from .bid_units import (
     report_day_start_utc,
-    resolve_test_segment_start_utc,
     wb_min_cpm_rub_to_bid_minor,
 )
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .settings_normalizer import repair_state_test_bid_minor
 from .auto_shelf_bid_setter import AutoShelfBidSetter
-from .dto import BidStatsDTO
+from .dto.decision_snapshot_dto import (
+    AutoShelfBidControlDecisionSnapshot,
+    can_set_observation_waiting_reason,
+    cast_rec_dict,
+    resolve_observation_sync_block_reason,
+    resolve_recommended_main_bid_minor,
+    snapshot_from_state_fallback,
+)
+from .auto_shelf_bid_control_decision_snapshot_builder import (
+    apply_bid_sync_from_snapshot as _apply_bid_sync_from_snapshot,
+    build_decision_snapshot as _build_decision_snapshot,
+    fetch_plan_distance_rec_result as _fetch_plan_distance_rec_result,
+)
+
+from app.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -47,17 +74,34 @@ class ControlReason:
     INVALID_BID_RANGE = "invalid_bid_range"
     INVALID_TEST_SHARE = "invalid_test_share"
     TEST_WAITING_IMPRESSIONS = "test_waiting_impressions"
+    TEST_WAITING_OBSERVATION_TIME = "test_waiting_observation_time"
     TEST_COMPLETED_SWITCH_TO_MAIN = "test_completed_switch_to_main"
+    TEST_COMPLETED_SWITCH_TO_TEST = "test_completed_switch_to_test"
     MAIN_WAITING_IMPRESSIONS = "main_waiting_impressions"
+    MAIN_WAITING_OBSERVATION_TIME = "main_waiting_observation_time"
     MAIN_COMPLETED_SWITCH_TO_TEST = "main_completed_switch_to_test"
     CYCLE_COMPLETED = "cycle_completed"
     BEST_BID_SELECTED = "best_bid_selected"
     BEST_BID_NOT_FOUND = "best_bid_not_found"
+    INSUFFICIENT_QUALIFIED_TESTED_BIDS = "insufficient_qualified_tested_bids"
     SET_BID_OK = "set_bid_ok"
     SET_BID_FAILED = "set_bid_failed"
     EXTERNAL_BID_CHANGED_REAPPLY = "external_bid_changed_reapply"
+    BID_SYNC_MISMATCH_NOT_APPLIED = "bid_sync_mismatch_not_applied"
+    PROGRESS_BLOCKED = "progress_blocked"
     MANUAL_CYCLE_RESET = "manual_cycle_reset"
     SETTINGS_UPDATED = "settings_updated"
+    MAIN_BID_REFRESHED = "main_bid_refreshed"
+
+
+class MainBidRefreshResult(StrEnum):
+    """Результат попытки refresh/apply main bid."""
+
+    APPLIED = "applied"
+    NO_CHANGE = "no_change"
+    SKIPPED_NOT_MAIN = "skipped_not_main"
+    SKIPPED_DISABLED = "skipped_disabled"
+    SKIPPED_NO_DESIRED_BID = "skipped_no_desired_bid"
 
 
 class AutoShelfBidControlManager:
@@ -78,11 +122,30 @@ class AutoShelfBidControlManager:
 
     @staticmethod
     def _now() -> datetime:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
+
+    @staticmethod
+    def _snap_bid_minor_to_unit(
+        bid_minor: int,
+        *,
+        bid_unit_minor: int = 100,
+    ) -> int:
+        """Snap a bid to the bid grid, preferring the lower bid on exact ties."""
+        if bid_unit_minor <= 0:
+            raise ValueError("bid_unit_minor must be positive")
+        value = int(bid_minor)
+        unit = int(bid_unit_minor)
+        remainder = value % unit
+        if remainder == 0:
+            return value
+        lower = value - remainder
+        upper = lower + unit
+        return lower if remainder * 2 <= unit else upper
 
     @staticmethod
     def _middle_bid(min_bid: int, max_bid: int) -> int:
-        return int(round((min_bid + max_bid) / 2))
+        midpoint = int(round((int(min_bid) + int(max_bid)) / 2))
+        return AutoShelfBidControlManager._snap_bid_minor_to_unit(midpoint)
 
     @staticmethod
     def _clamp_bid_minor(
@@ -116,6 +179,186 @@ class AutoShelfBidControlManager:
             return None
         return int(target_test_impressions * (1 - test_share) / test_share)
 
+    @staticmethod
+    def _calc_target_main_observation_minutes(
+        target_test_observation_minutes: int,
+        test_share: float,
+    ) -> int | None:
+        if test_share <= 0 or test_share > 0.49:
+            return None
+        return int(target_test_observation_minutes * (1 - test_share) / test_share)
+
+    @staticmethod
+    def _target_observation_minutes_or_default(
+        value: int | None,
+    ) -> int:
+        """Вернуть безопасный fallback для nullable observation minutes.
+
+        SQL NULL и значения ниже минимального порога не должны обходить time gate.
+        Бизнесовый минимум observation window — 60 минут.
+        """
+        if value is None:
+            return 60
+        normalized = int(value)
+        return max(60, normalized)
+
+    @staticmethod
+    def _target_observation_hours_from_minutes(minutes: int) -> int:
+        """Округлить required observation window вверх до полных часов."""
+        normalized_minutes = int(minutes)
+        return max(1, (normalized_minutes + 59) // 60)
+
+    @staticmethod
+    def _elapsed_minutes(started_at: datetime | None, now: datetime) -> int | None:
+        if started_at is None:
+            return None
+        elapsed = int((now - started_at).total_seconds() // 60)
+        return max(0, elapsed)
+
+    async def _closed_layers_for_bid_at(
+        self,
+        *,
+        nmid: int,
+        currency: str,
+        bid_minor: int,
+        date_to: datetime,
+        target_test_impressions: int,
+        target_test_observation_hours: int,
+    ) -> int:
+        """Compute closed layers for one bid at a given point in time."""
+        price_minor: int | None = None
+        mode: str | None = None
+        first_bucket_start = await self._analytics.get_first_available_bid_bucket_start(
+            nmid=nmid,
+            currency=currency,
+            price_minor=price_minor,
+            mode=mode,
+        )
+        if first_bucket_start is None:
+            return 0
+        coverages = await self._analytics.get_bid_coverages(
+            nmid=nmid,
+            date_from=first_bucket_start,
+            date_to=date_to,
+            currency=currency,
+            price_minor=price_minor,
+            mode=mode,
+        )
+        coverage_by_bid = {int(item.bid_minor): item for item in coverages}
+        coverage = coverage_by_bid.get(
+            int(bid_minor),
+            BidCoverage(bid_minor=int(bid_minor), impressions=0, valid_hours=0),
+        )
+        return closed_layers_for_bid(
+            impressions=coverage.impressions,
+            valid_hours=coverage.valid_hours,
+            target_test_impressions=int(target_test_impressions),
+            target_test_observation_hours=int(target_test_observation_hours),
+        )
+
+    async def _build_coverage_snapshot(
+        self,
+        *,
+        nmid: int,
+        currency: str,
+        min_bid_minor: int,
+        max_bid_minor: int,
+        target_test_impressions: int,
+        target_test_observation_hours: int,
+        min_bid_distance_minor: int,
+        date_to: datetime,
+    ) -> tuple[list[BidCoverage], int, int, int | None]:
+        """Load accumulated coverage and derive current layer diagnostics."""
+        price_minor: int | None = None
+        mode: str | None = None
+        first_bucket_start = await self._analytics.get_first_available_bid_bucket_start(
+            nmid=nmid,
+            currency=currency,
+            price_minor=price_minor,
+            mode=mode,
+        )
+        coverages: list[BidCoverage]
+        if first_bucket_start is None:
+            coverages = []
+        else:
+            coverages = await self._analytics.get_bid_coverages(
+                nmid=nmid,
+                date_from=first_bucket_start,
+                date_to=date_to,
+                currency=currency,
+                price_minor=price_minor,
+                mode=mode,
+            )
+        next_test_bid = choose_next_test_bid_by_coverage_layers(
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+            bid_unit_minor=100,
+            coverages=coverages,
+            target_test_impressions=target_test_impressions,
+            target_test_observation_hours=target_test_observation_hours,
+            min_bid_distance_minor=min_bid_distance_minor,
+            random_seed=build_coverage_selector_seed(
+                nmid=nmid,
+                currency=currency,
+                price_minor=price_minor,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid_minor,
+                min_bid_distance_minor=min_bid_distance_minor,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            ),
+        )
+        coverage_by_bid = {int(item.bid_minor): item for item in coverages}
+        current_layer: int | None = None
+        covered_anchor_count = 0
+        for bid in range(int(min_bid_minor), int(max_bid_minor) + 1, 100):
+            coverage = coverage_by_bid.get(
+                bid,
+                BidCoverage(bid_minor=bid, impressions=0, valid_hours=0),
+            )
+            closed_layers = closed_layers_for_bid(
+                impressions=coverage.impressions,
+                valid_hours=coverage.valid_hours,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            )
+            if current_layer is None or closed_layers < current_layer:
+                current_layer = closed_layers
+        assert current_layer is not None
+        for bid in range(int(min_bid_minor), int(max_bid_minor) + 1, 100):
+            coverage = coverage_by_bid.get(
+                bid,
+                BidCoverage(bid_minor=bid, impressions=0, valid_hours=0),
+            )
+            closed_layers = closed_layers_for_bid(
+                impressions=coverage.impressions,
+                valid_hours=coverage.valid_hours,
+                target_test_impressions=target_test_impressions,
+                target_test_observation_hours=target_test_observation_hours,
+            )
+            if closed_layers > current_layer:
+                covered_anchor_count += 1
+        return coverages, current_layer, covered_anchor_count, next_test_bid
+
+    @staticmethod
+    def repair_cycle_started_at(state: AutoShelfBidControlState) -> bool:
+        """Откатить corrupted cycle start назад, не трогая историю test/main."""
+        test_started_at = getattr(state, "test_started_at", None)
+        current_cycle_started_at = getattr(state, "current_cycle_started_at", None)
+        previous_cycle_started_at = getattr(state, "previous_cycle_started_at", None)
+        if not isinstance(test_started_at, datetime):
+            return False
+        if not isinstance(current_cycle_started_at, datetime):
+            return False
+        if test_started_at >= current_cycle_started_at:
+            return False
+        if isinstance(previous_cycle_started_at, datetime) and previous_cycle_started_at <= test_started_at:
+            state.current_cycle_started_at = previous_cycle_started_at
+        else:
+            state.current_cycle_started_at = test_started_at
+        state.last_reason = "repair_cycle_started_after_test_started"
+        return True
+
     async def _get_actual_bid(self, auto_adv_id: int, nmid: int) -> int | None:
         cached = await self._bid_cache_manager.get_bid(auto_adv_id, nmid)
         if cached is None:
@@ -130,13 +373,12 @@ class AutoShelfBidControlManager:
         """Минимальная ставка WB (auto/полки) в ``bid_minor`` (копейки).
 
         ``AdvMinNmidsBids.auto`` — legacy CPM в рублях; конвертируем ×100.
+        При miss — ``settings.MIN_BID_AUTO_DEFAULT``.
         """
-        if min_bids is None:
-            return None
-        value = min_bids.auto.get(nmid)
-        if value is None or int(value) <= 0:
-            return None
-        return wb_min_cpm_rub_to_bid_minor(int(value))
+        rub = resolve_auto_min_bid_rub(nmid, min_bids)
+        if rub <= 0:
+            rub = default_min_bid_rub(AdvPlacementType.AUTO_ADV)
+        return wb_min_cpm_rub_to_bid_minor(int(rub))
 
     @staticmethod
     def _resolve_min_bid_minor(complex_adv: ComplexAdv, nmid: int) -> int | None:
@@ -170,7 +412,7 @@ class AutoShelfBidControlManager:
         if max_bid not in covered_set:
             candidates.append((abs(max_bid - covered[-1]), max_bid))
         for left, right in zip(covered, covered[1:]):
-            mid = int(round((left + right) / 2))
+            mid = cls._snap_bid_minor_to_unit(int(round((left + right) / 2)))
             if mid in covered_set:
                 continue
             distance = min(abs(mid - left), abs(right - mid))
@@ -187,14 +429,6 @@ class AutoShelfBidControlManager:
         """Кампании для тика ``auto_shelf_bid_control`` (без лишних skip-логов)."""
         if not complex_adv.auto_shelf_bid_control_enabled:
             return False
-        if len(complex_adv.nmids) != 1:
-            return False
-        if not complex_adv.bot_active:
-            return False
-        if not complex_adv.auto_adv_active_status:
-            return False
-        if complex_adv.auto_adv_id is None:
-            return False
         return True
 
     def _is_eligible(self, complex_adv: ComplexAdv) -> tuple[bool, str]:
@@ -204,8 +438,6 @@ class AutoShelfBidControlManager:
             return False, ControlReason.DISABLED
         if not complex_adv.auto_shelf_bid_control_enabled:
             return False, ControlReason.DISABLED
-        if complex_adv.auto_adv_id is None:
-            return False, ControlReason.NO_AUTO_ADV
         if len(complex_adv.nmids) != 1:
             return False, ControlReason.SINGLE_NMID_GUARD_SKIP
         return True, ControlReason.SETTINGS_UPDATED
@@ -227,19 +459,286 @@ class AutoShelfBidControlManager:
         complex_adv: ComplexAdv,
         *,
         state: AutoShelfBidControlState,
-        bid_minor: int,
+        bid_minor: int | None,
     ) -> None:
         """Сохранить фазу цикла в PG, затем PATCH WB.
 
         Единый порядок для test↔main: при сбое PATCH increment/control на
         следующем тике видят верный ``current_mode`` и дожимают ставку.
         """
-        await self._repository.save_state(state)
+        _ = await self._repository.save_state(state)
+        if bid_minor is None:
+            raise ValueError("bid_minor is required for setter path")
         await self._set_target_bid(
             complex_adv,
             bid_minor=bid_minor,
             currency=state.currency,
         )
+
+    async def _block_observation_progress(
+        self,
+        *,
+        state: AutoShelfBidControlState,
+        control_enabled: bool,
+        snapshot: AutoShelfBidControlDecisionSnapshot,
+    ) -> None:
+        """Сохранить sync/block reason и остановить observation/progress-path."""
+        state.last_reason = resolve_observation_sync_block_reason(
+            control_enabled=control_enabled,
+            snapshot=snapshot,
+        )
+        _ = await self._repository.save_state(state)
+
+    async def _reconcile_expected_bid_for_current_mode(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        state: AutoShelfBidControlState,
+        actual_bid_minor: int | None,
+        min_bid_minor: int,
+        max_bid_minor: int,
+        now: datetime,
+        expected_bid_minor: int | None,
+    ) -> bool:
+        """Reapply fresh expected bid for the active mode before progress checks.
+
+        Returns ``True`` when the method had to reapply or refresh the mode
+        observation window and the caller must stop processing the tick.
+        """
+        if expected_bid_minor is None:
+            return False
+        mode = state.current_mode
+        clamped_expected_bid = self._clamp_bid_minor(
+            int(expected_bid_minor),
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+        )
+        if mode == "test":
+            if actual_bid_minor == clamped_expected_bid:
+                return False
+            state.current_test_bid_minor = clamped_expected_bid
+            state.test_started_at = now
+            state.last_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
+            await self._persist_state_then_set_bid(
+                complex_adv,
+                state=state,
+                bid_minor=clamped_expected_bid,
+            )
+            logger.info(
+                "auto_shelf_bid_control_reconcile_expected_bid "
+                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s clamped_expected_bid=%s actual_bid=%s reason=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.main_nmid,
+                mode,
+                expected_bid_minor,
+                clamped_expected_bid,
+                actual_bid_minor,
+                state.last_reason,
+            )
+            return True
+        if mode == "main":
+            if actual_bid_minor == clamped_expected_bid:
+                return False
+            state.current_main_bid_minor = clamped_expected_bid
+            state.main_started_at = now
+            state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            await self._persist_state_then_set_bid(
+                complex_adv,
+                state=state,
+                bid_minor=clamped_expected_bid,
+            )
+            logger.info(
+                "auto_shelf_bid_control_reconcile_expected_bid "
+                "auto_adv_id=%s nmid=%s mode=%s expected_bid=%s clamped_expected_bid=%s actual_bid=%s reason=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.main_nmid,
+                mode,
+                expected_bid_minor,
+                clamped_expected_bid,
+                actual_bid_minor,
+                state.last_reason,
+            )
+            return True
+        return False
+
+    async def apply_bid_sync_from_snapshot(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        state: AutoShelfBidControlState,
+        snapshot: AutoShelfBidControlDecisionSnapshot,
+        control_enabled: bool,
+        bid_units_confirmed: bool,
+        min_bid_minor: int,
+        max_bid_minor: int,
+        now: datetime,
+    ) -> bool:
+        """Синхронизировать WB-ставку с fresh expected bid из snapshot."""
+        return await _apply_bid_sync_from_snapshot(
+            self,
+            complex_adv,
+            state=state,
+            snapshot=snapshot,
+            control_enabled=control_enabled,
+            bid_units_confirmed=bid_units_confirmed,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+            now=now,
+        )
+
+    async def build_decision_snapshot(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        settings_obj: AutoShelfBidControlSettings,
+        state: AutoShelfBidControlState,
+        min_bid_minor: int,
+        actual_bid_minor: int | None,
+        control_enabled: bool,
+        bid_units_confirmed: bool | None = None,
+    ) -> AutoShelfBidControlDecisionSnapshot:
+        """Пересчитать fresh decision snapshot из текущих входов (без state bids)."""
+        return await _build_decision_snapshot(
+            self,
+            complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=min_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            control_enabled=control_enabled,
+            bid_units_confirmed=bid_units_confirmed,
+        )
+
+    async def _fetch_plan_distance_rec_result(
+        self,
+        complex_adv: ComplexAdv,
+    ) -> dict[str, object] | None:
+        """Загрузить rec-bid recommendation для PLAN_DISTANCE без state fallback."""
+        return await _fetch_plan_distance_rec_result(self, complex_adv)
+
+    async def _maybe_continue_main_exploration(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        settings_obj: AutoShelfBidControlSettings,
+        state: AutoShelfBidControlState,
+        min_bid_minor: int,
+        now: datetime,
+        coverage_snapshot: tuple[list[BidCoverage], int, int, int | None] | None = None,
+    ) -> tuple[bool, tuple[list[BidCoverage], int, int, int | None] | None]:
+        """Переключить main обратно в test, если PLAN_DISTANCE ещё должен исследовать."""
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            != AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            return False, coverage_snapshot
+        get_first = getattr(self._analytics, "get_first_available_bid_bucket_start", None)
+        get_coverages = getattr(self._analytics, "get_bid_coverages", None)
+        if not inspect.iscoroutinefunction(get_first) or not inspect.iscoroutinefunction(
+            get_coverages
+        ):
+            return False, coverage_snapshot
+        target_test_observation_minutes = self._target_observation_minutes_or_default(
+            settings_obj.target_test_observation_minutes
+        )
+        target_test_observation_hours = self._target_observation_hours_from_minutes(
+            target_test_observation_minutes
+        )
+        bid_universe = build_bid_universe(
+            min_bid_minor,
+            int(settings_obj.max_bid_minor),
+            bid_unit_minor=100,
+        )
+        if coverage_snapshot is None:
+            coverage_snapshot = await self._build_coverage_snapshot(
+                nmid=complex_adv.main_nmid,
+                currency=state.currency,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=int(settings_obj.max_bid_minor),
+                target_test_impressions=int(settings_obj.target_test_impressions),
+                target_test_observation_hours=target_test_observation_hours,
+                min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                date_to=now,
+            )
+        _coverages, _current_layer, covered_anchor_count, next_test_bid = coverage_snapshot
+        should_continue_test = (
+            len(bid_universe) > 1
+            and covered_anchor_count < 2
+            and next_test_bid is not None
+            and next_test_bid != state.current_test_bid_minor
+        )
+        if not should_continue_test:
+            return False, coverage_snapshot
+        state.current_mode = "test"
+        state.current_test_bid_minor = next_test_bid
+        state.test_started_at = now
+        state.main_started_at = None
+        state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
+        _ = await self._repository.save_state(state)
+        logger.info(
+            "auto_shelf_bid_control_continue_test_coverage_bootstrap auto_adv_id=%s nmid=%s covered_anchor_count=%s next_test_bid=%s reason=%s",
+            complex_adv.auto_adv_id,
+            complex_adv.main_nmid,
+            covered_anchor_count,
+            next_test_bid,
+            state.last_reason,
+        )
+        return True, coverage_snapshot
+
+    async def apply_main_bid_refresh_if_needed(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        state: AutoShelfBidControlState,
+        min_bid_minor: int,
+        max_bid_minor: int,
+        actual_bid_minor: int | None,
+        now: datetime,
+    ) -> MainBidRefreshResult:
+        """Refresh main bid target and apply it through the safe setter path.
+
+        Returns:
+            Explicit refresh outcome for tick/UI orchestration.
+        """
+        if state.current_mode != "main":
+            return MainBidRefreshResult.SKIPPED_NOT_MAIN
+        if (
+            not getattr(complex_adv, "bot_active", True)
+            or not getattr(complex_adv, "auto_adv_active_status", True)
+            or not getattr(complex_adv, "auto_shelf_bid_control_enabled", False)
+        ):
+            return MainBidRefreshResult.SKIPPED_DISABLED
+        desired_bid_minor = await self._choose_main_bid_by_strategy(
+            complex_adv=complex_adv,
+            currency=state.currency,
+            current_cycle_started_at=state.current_cycle_started_at,
+            previous_cycle_started_at=state.previous_cycle_started_at,
+            current_main_bid_minor=state.current_main_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+        )
+        if desired_bid_minor is None:
+            return MainBidRefreshResult.SKIPPED_NO_DESIRED_BID
+        clamped_bid_minor = self._clamp_bid_minor(
+            int(desired_bid_minor),
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+        )
+        if (
+            state.current_main_bid_minor == clamped_bid_minor
+            and actual_bid_minor == clamped_bid_minor
+        ):
+            return MainBidRefreshResult.NO_CHANGE
+        state.current_main_bid_minor = clamped_bid_minor
+        state.main_started_at = now
+        state.last_reason = ControlReason.MAIN_BID_REFRESHED
+        await self._persist_state_then_set_bid(
+            complex_adv,
+            state=state,
+            bid_minor=clamped_bid_minor,
+        )
+        return MainBidRefreshResult.APPLIED
 
     async def _choose_best_bid_with_fallback(
         self,
@@ -252,6 +751,8 @@ class AutoShelfBidControlManager:
         actual_bid_minor: int | None,
         min_bid_minor: int,
         max_bid_minor: int,
+        fact_cpo: float | None = None,
+        resolve_cpo: float | None = None,
     ) -> int:
         def _in_window(bid: int) -> int:
             return self._clamp_bid_minor(
@@ -267,21 +768,105 @@ class AutoShelfBidControlManager:
             currency=currency,
             current_cycle_started_at=cycle_started_at,
             previous_cycle_started_at=previous_cycle_started_at,
+            fact_cpo=fact_cpo,
+            resolve_cpo=resolve_cpo,
         )
         if global_best is not None:
             return _in_window(global_best.bid_minor)
-        best = await self._analytics.get_best_bid_by_cart_cpa(
-            nmid=nmid,
-            from_ts=report_from,
-            currency=currency,
-        )
+
+        # Fallback к статистике за день с учётом метрики оптимизации
+        from .dto import OptimizationMetric, resolve_optimization_metric
+        metric = resolve_optimization_metric(fact_cpo, resolve_cpo)
+
+        if metric == OptimizationMetric.CTR:
+            best = await self._analytics.get_best_bid_by_ctr(
+                nmid=nmid,
+                from_ts=report_from,
+                currency=currency,
+            )
+        else:
+            best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=nmid,
+                from_ts=report_from,
+                currency=currency,
+            )
         if best is not None:
             return _in_window(best.bid_minor)
-        if current_main_bid_minor is not None:
-            return _in_window(current_main_bid_minor)
         if actual_bid_minor is not None:
             return _in_window(actual_bid_minor)
         return self._middle_bid(min_bid_minor, max_bid_minor)
+
+    async def _choose_main_bid_by_strategy(
+        self,
+        *,
+        complex_adv: ComplexAdv,
+        currency: str,
+        current_cycle_started_at: datetime,
+        previous_cycle_started_at: datetime | None,
+        current_main_bid_minor: int | None,
+        actual_bid_minor: int | None,
+        min_bid_minor: int,
+        max_bid_minor: int,
+    ) -> int | None:
+        """Выбрать main bid по стратегии кампании.
+
+        PLAN_DISTANCE использует rec-bid plan-ranked recommendation.
+        Если рекомендация недоступна, возвращает ``None`` без cycle fallback.
+        """
+        strategy = complex_adv.auto_shelf_bid_control_strategy
+        if strategy == AutoShelfBidControlStrategy.CYCLE_METRIC:
+            return await self._choose_best_bid_with_fallback(
+                nmid=complex_adv.main_nmid,
+                currency=currency,
+                cycle_started_at=current_cycle_started_at,
+                previous_cycle_started_at=previous_cycle_started_at,
+                current_main_bid_minor=current_main_bid_minor,
+                actual_bid_minor=actual_bid_minor,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid_minor,
+                fact_cpo=complex_adv.fact_pay_for_order,
+                resolve_cpo=complex_adv.resolve_cpo,
+            )
+        if strategy == AutoShelfBidControlStrategy.CTR:
+            best = await self._analytics.get_best_bid_by_ctr(
+                nmid=complex_adv.main_nmid,
+                from_ts=report_day_start_utc(),
+                currency=currency,
+            )
+            return (
+                None
+                if best is None
+                else self._clamp_bid_minor(
+                    int(best.bid_minor),
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
+            )
+        if strategy == AutoShelfBidControlStrategy.CPC:
+            best = await self._analytics.get_best_bid_by_cart_cpa(
+                nmid=complex_adv.main_nmid,
+                from_ts=report_day_start_utc(),
+                currency=currency,
+            )
+            return (
+                None
+                if best is None
+                else self._clamp_bid_minor(
+                    int(best.bid_minor),
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=max_bid_minor,
+                )
+            )
+
+        rec_result = await self._fetch_plan_distance_rec_result(complex_adv)
+        if rec_result is None:
+            return None
+        rec_view = cast_rec_dict(rec_result.get("view", rec_result))
+        return resolve_recommended_main_bid_minor(
+            rec_view,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=max_bid_minor,
+        )
 
     async def _initialize_state(
         self,
@@ -291,6 +876,7 @@ class AutoShelfBidControlManager:
         min_bid_minor: int,
         actual_bid_minor: int | None,
     ) -> AutoShelfBidControlState:
+        """Создать и сохранить начальный state; ставку применяет следующий update через sync-path."""
         max_bid_minor = int(settings_obj.max_bid_minor)
         middle_bid = self._middle_bid(min_bid_minor, max_bid_minor)
         test_bid = middle_bid
@@ -313,14 +899,7 @@ class AutoShelfBidControlManager:
             test_started_at=now,
             last_reason=ControlReason.INITIALIZED,
         )
-        saved = await self._repository.save_state(state)
-        if actual_bid_minor != test_bid:
-            await self._set_target_bid(
-                complex_adv,
-                bid_minor=test_bid,
-                currency=settings_obj.currency,
-            )
-        return saved
+        return await self._repository.save_state(state)
 
     async def update(self, complex_adv: ComplexAdv) -> None:
         """Сделать один тик управления ставкой для одной кампании."""
@@ -409,21 +988,61 @@ class AutoShelfBidControlManager:
             return None
 
         if state.current_mode == "test":
+            snapshot = await self.build_decision_snapshot(
+                complex_adv,
+                settings_obj=settings_obj,
+                state=state,
+                min_bid_minor=min_bid_minor,
+                actual_bid_minor=actual_bid_minor,
+                control_enabled=True,
+            )
+            if await self.apply_bid_sync_from_snapshot(
+                complex_adv,
+                state=state,
+                snapshot=snapshot,
+                control_enabled=True,
+                bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=int(settings_obj.max_bid_minor),
+                now=self._now(),
+            ):
+                return None
             await self._handle_test_mode(
                 complex_adv=complex_adv,
                 settings_obj=settings_obj,
                 state=state,
                 min_bid_minor=min_bid_minor,
                 actual_bid_minor=actual_bid_minor,
+                snapshot=snapshot,
             )
             return None
 
+        snapshot = await self.build_decision_snapshot(
+            complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=min_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            control_enabled=True,
+        )
+        if await self.apply_bid_sync_from_snapshot(
+            complex_adv,
+            state=state,
+            snapshot=snapshot,
+            control_enabled=True,
+            bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
+            min_bid_minor=min_bid_minor,
+            max_bid_minor=int(settings_obj.max_bid_minor),
+            now=self._now(),
+        ):
+            return None
         await self._handle_main_mode(
             complex_adv=complex_adv,
             settings_obj=settings_obj,
             state=state,
             min_bid_minor=min_bid_minor,
             actual_bid_minor=actual_bid_minor,
+            snapshot=snapshot,
         )
         return None
 
@@ -435,67 +1054,149 @@ class AutoShelfBidControlManager:
         state: AutoShelfBidControlState,
         min_bid_minor: int,
         actual_bid_minor: int,
+        snapshot: AutoShelfBidControlDecisionSnapshot | None = None,
     ) -> None:
+        snapshot_provided = snapshot is not None
+        if snapshot is None:
+            snapshot = snapshot_from_state_fallback(
+                complex_adv=complex_adv,
+                state=state,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=int(settings_obj.max_bid_minor),
+                actual_bid_minor=actual_bid_minor,
+            )
         nmid = complex_adv.main_nmid
         auto_adv_id = complex_adv.auto_adv_id
         now = self._now()
-        test_bid = state.current_test_bid_minor
+        if snapshot_provided:
+            test_bid = snapshot.fresh_next_test_bid_minor
+            if test_bid is None:
+                test_bid = snapshot.expected_bid_minor
+        else:
+            test_bid = snapshot.fresh_next_test_bid_minor
+            if test_bid is None:
+                test_bid = state.current_test_bid_minor
         if test_bid is None:
             test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
-            state.current_test_bid_minor = test_bid
-            state.test_started_at = state.test_started_at or now
-        test_started_at = resolve_test_segment_start_utc(
-            test_started_at=state.test_started_at,
-            current_cycle_started_at=state.current_cycle_started_at,
-            fallback_now=now,
+        if not isinstance(state.test_started_at, datetime):
+            state.test_started_at = now
+        test_started_at = state.test_started_at
+        target_test_observation_minutes = self._target_observation_minutes_or_default(
+            settings_obj.target_test_observation_minutes
         )
-        test_impressions = await self._analytics.get_impressions(
+        target_test_observation_hours = self._target_observation_hours_from_minutes(
+            target_test_observation_minutes
+        )
+        closed_layers_at_test_start = await self._closed_layers_for_bid_at(
             nmid=nmid,
-            from_ts=test_started_at,
             currency=state.currency,
             bid_minor=test_bid,
+            date_to=test_started_at,
+            target_test_impressions=int(settings_obj.target_test_impressions),
+            target_test_observation_hours=target_test_observation_hours,
         )
-        if test_impressions < int(settings_obj.target_test_impressions):
-            if actual_bid_minor != test_bid:
-                await self._set_target_bid(
-                    complex_adv,
-                    bid_minor=test_bid,
-                    currency=state.currency,
+        closed_layers_now = await self._closed_layers_for_bid_at(
+            nmid=nmid,
+            currency=state.currency,
+            bid_minor=test_bid,
+            date_to=now,
+            target_test_impressions=int(settings_obj.target_test_impressions),
+            target_test_observation_hours=target_test_observation_hours,
+        )
+        if closed_layers_now <= closed_layers_at_test_start:
+            if not can_set_observation_waiting_reason(
+                control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                snapshot=snapshot,
+            ):
+                await self._block_observation_progress(
+                    state=state,
+                    control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                    snapshot=snapshot,
                 )
-                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
-            else:
-                state.last_reason = ControlReason.TEST_WAITING_IMPRESSIONS
-            await self._repository.save_state(state)
+                return None
+            wait_reason = ControlReason.TEST_WAITING_OBSERVATION_TIME
+            state.last_reason = wait_reason
+            _ = await self._repository.save_state(state)
             logger.info(
-                "auto_shelf_bid_control_test_wait auto_adv_id=%s nmid=%s mode=%s test_impressions=%s target=%s reason=%s",
+                "auto_shelf_bid_control_test_wait_coverage auto_adv_id=%s nmid=%s mode=%s test_bid=%s closed_layers_start=%s closed_layers_now=%s reason=%s",
                 auto_adv_id,
                 nmid,
                 state.current_mode,
-                test_impressions,
-                settings_obj.target_test_impressions,
+                test_bid,
+                closed_layers_at_test_start,
+                closed_layers_now,
                 state.last_reason,
             )
             return None
 
-        best_bid = await self._choose_best_bid_with_fallback(
-            nmid=nmid,
-            currency=state.currency,
-            cycle_started_at=state.current_cycle_started_at,
-            previous_cycle_started_at=state.previous_cycle_started_at,
-            current_main_bid_minor=state.current_main_bid_minor,
-            actual_bid_minor=actual_bid_minor,
-            min_bid_minor=min_bid_minor,
-            max_bid_minor=int(settings_obj.max_bid_minor),
-        )
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            == AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            bid_universe = build_bid_universe(
+                min_bid_minor,
+                int(settings_obj.max_bid_minor),
+                bid_unit_minor=100,
+            )
+            _coverages, _current_layer, covered_anchor_count, next_test_bid = (
+                await self._build_coverage_snapshot(
+                    nmid=nmid,
+                    currency=state.currency,
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=int(settings_obj.max_bid_minor),
+                    target_test_impressions=int(settings_obj.target_test_impressions),
+                    target_test_observation_hours=target_test_observation_hours,
+                    min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                    date_to=now,
+                )
+            )
+            should_continue_test = (
+                len(bid_universe) > 1
+                and covered_anchor_count < 2
+                and next_test_bid is not None
+                and next_test_bid != test_bid
+            )
+            if should_continue_test:
+                state.current_mode = "test"
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
+                state.main_started_at = None
+                state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
+                _ = await self._repository.save_state(state)
+                logger.info(
+                    "auto_shelf_bid_control_continue_test_coverage_bootstrap auto_adv_id=%s nmid=%s covered_anchor_count=%s next_test_bid=%s reason=%s",
+                    auto_adv_id,
+                    nmid,
+                    covered_anchor_count,
+                    next_test_bid,
+                    state.last_reason,
+                )
+                return None
+
+        best_bid = snapshot.fresh_best_main_bid_minor
+        if best_bid is None:
+            next_test_bid = snapshot.fresh_next_test_bid_minor
+            if next_test_bid is not None and next_test_bid != test_bid:
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
+            state.current_mode = "test"
+            state.main_started_at = None
+            state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+            _ = await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_continue_test_insufficient_qualified auto_adv_id=%s nmid=%s qualified_count=%s next_test_bid=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                snapshot.qualified_tested_bids_count,
+                state.current_test_bid_minor,
+                state.last_reason,
+            )
+            return None
         state.current_main_bid_minor = best_bid
         state.current_mode = "main"
         state.main_started_at = now
         state.last_reason = ControlReason.TEST_COMPLETED_SWITCH_TO_MAIN
-        await self._persist_state_then_set_bid(
-            complex_adv,
-            state=state,
-            bid_minor=best_bid,
-        )
+        _ = await self._repository.save_state(state)
         logger.info(
             "auto_shelf_bid_control_switch_to_main auto_adv_id=%s nmid=%s main_bid=%s reason=%s",
             auto_adv_id,
@@ -513,7 +1214,16 @@ class AutoShelfBidControlManager:
         state: AutoShelfBidControlState,
         min_bid_minor: int,
         actual_bid_minor: int,
+        snapshot: AutoShelfBidControlDecisionSnapshot | None = None,
     ) -> None:
+        if snapshot is None:
+            snapshot = snapshot_from_state_fallback(
+                complex_adv=complex_adv,
+                state=state,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=int(settings_obj.max_bid_minor),
+                actual_bid_minor=actual_bid_minor,
+            )
         nmid = complex_adv.main_nmid
         auto_adv_id = complex_adv.auto_adv_id
         now = self._now()
@@ -523,7 +1233,7 @@ class AutoShelfBidControlManager:
         )
         if target_main_impressions is None:
             state.last_reason = ControlReason.INVALID_TEST_SHARE
-            await self._repository.save_state(state)
+            _ = await self._repository.save_state(state)
             logger.warning(
                 "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s test_share=%s",
                 auto_adv_id,
@@ -533,36 +1243,147 @@ class AutoShelfBidControlManager:
             )
             return None
 
+        if self.repair_cycle_started_at(state):
+            _ = await self._repository.save_state(state)
+
         max_bid = int(settings_obj.max_bid_minor)
-        main_bid = state.current_main_bid_minor
-        if main_bid is None:
-            main_bid = self._middle_bid(min_bid_minor, max_bid)
-            state.current_main_bid_minor = main_bid
-            state.main_started_at = state.main_started_at or now
-        else:
-            clamped_main = self._clamp_bid_minor(
-                main_bid,
-                min_bid_minor=min_bid_minor,
-                max_bid_minor=max_bid,
+        if snapshot.fresh_best_main_bid_minor is None:
+            next_test_bid = snapshot.fresh_next_test_bid_minor
+            if next_test_bid is None:
+                next_test_bid = state.current_test_bid_minor
+            if next_test_bid is None:
+                state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+                _ = await self._repository.save_state(state)
+                logger.info(
+                    "auto_shelf_bid_control_revert_main_blocked_no_test_bid auto_adv_id=%s nmid=%s qualified_count=%s reason=%s",
+                    auto_adv_id,
+                    nmid,
+                    snapshot.qualified_tested_bids_count,
+                    state.last_reason,
+                )
+                return None
+            state.current_test_bid_minor = next_test_bid
+            state.test_started_at = now
+            state.current_mode = "test"
+            state.main_started_at = None
+            state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+            _ = await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_revert_main_to_test_insufficient_qualified auto_adv_id=%s nmid=%s qualified_count=%s next_test_bid=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                snapshot.qualified_tested_bids_count,
+                state.current_test_bid_minor,
+                state.last_reason,
             )
-            if clamped_main != int(main_bid):
-                main_bid = clamped_main
-                state.current_main_bid_minor = main_bid
-        target_main_bid = await self._choose_best_bid_with_fallback(
-            nmid=nmid,
-            currency=state.currency,
-            cycle_started_at=state.current_cycle_started_at,
-            previous_cycle_started_at=state.previous_cycle_started_at,
-            current_main_bid_minor=state.current_main_bid_minor,
-            actual_bid_minor=actual_bid_minor,
+            return None
+
+        main_bid_value = self._clamp_bid_minor(
+            int(snapshot.fresh_best_main_bid_minor),
             min_bid_minor=min_bid_minor,
             max_bid_minor=max_bid,
         )
-        if int(main_bid) != target_main_bid:
-            main_bid = target_main_bid
-            state.current_main_bid_minor = main_bid
+        state.current_main_bid_minor = main_bid_value
+        if state.main_started_at is None:
             state.main_started_at = now
-        main_started_at = state.main_started_at or state.current_cycle_started_at
+
+        fresh_worker_snapshot = snapshot.computed_at is not None
+
+        main_coverage_snapshot: tuple[list[BidCoverage], int, int, int | None] | None = None
+        bootstrap_continue, main_coverage_snapshot = await self._maybe_continue_main_exploration(
+            complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=min_bid_minor,
+            now=now,
+            coverage_snapshot=main_coverage_snapshot,
+        )
+        if bootstrap_continue:
+            return None
+        if fresh_worker_snapshot:
+            if not can_set_observation_waiting_reason(
+                control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                snapshot=snapshot,
+            ):
+                await self._block_observation_progress(
+                    state=state,
+                    control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                    snapshot=snapshot,
+                )
+                return None
+        else:
+            refresh_result = await self.apply_main_bid_refresh_if_needed(
+                complex_adv,
+                state=state,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid,
+                actual_bid_minor=actual_bid_minor,
+                now=now,
+            )
+            if refresh_result == MainBidRefreshResult.APPLIED:
+                return None
+            if refresh_result in {
+                MainBidRefreshResult.SKIPPED_DISABLED,
+                MainBidRefreshResult.SKIPPED_NOT_MAIN,
+            }:
+                return None
+            if await self._reconcile_expected_bid_for_current_mode(
+                complex_adv,
+                state=state,
+                actual_bid_minor=actual_bid_minor,
+                min_bid_minor=min_bid_minor,
+                max_bid_minor=max_bid,
+                now=now,
+                expected_bid_minor=snapshot.expected_bid_minor,
+            ):
+                return None
+        main_bid: int = main_bid_value
+        main_started_at = state.main_started_at
+        main_elapsed_minutes = self._elapsed_minutes(main_started_at, now)
+        target_main_observation_minutes = self._calc_target_main_observation_minutes(
+            self._target_observation_minutes_or_default(
+                settings_obj.target_test_observation_minutes
+            ),
+            float(settings_obj.test_share),
+        )
+        if target_main_observation_minutes is None:
+            state.last_reason = ControlReason.INVALID_TEST_SHARE
+            _ = await self._repository.save_state(state)
+            logger.warning(
+                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s test_share=%s",
+                auto_adv_id,
+                nmid,
+                state.last_reason,
+                settings_obj.test_share,
+            )
+            return None
+        if (
+            main_elapsed_minutes is None
+            or main_elapsed_minutes < target_main_observation_minutes
+        ):
+            if not can_set_observation_waiting_reason(
+                control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                snapshot=snapshot,
+            ):
+                await self._block_observation_progress(
+                    state=state,
+                    control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                    snapshot=snapshot,
+                )
+                return None
+            wait_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+            state.last_reason = wait_reason
+            _ = await self._repository.save_state(state)
+            logger.info(
+                "auto_shelf_bid_control_main_wait_time auto_adv_id=%s nmid=%s mode=%s main_elapsed_minutes=%s target=%s reason=%s",
+                auto_adv_id,
+                nmid,
+                state.current_mode,
+                main_elapsed_minutes,
+                target_main_observation_minutes,
+                state.last_reason,
+            )
+            return None
         main_impressions = await self._analytics.get_impressions(
             nmid=nmid,
             from_ts=main_started_at,
@@ -571,16 +1392,19 @@ class AutoShelfBidControlManager:
             mode="main",
         )
         if main_impressions < target_main_impressions:
-            if actual_bid_minor != main_bid:
-                await self._set_target_bid(
-                    complex_adv,
-                    bid_minor=main_bid,
-                    currency=state.currency,
+            if not can_set_observation_waiting_reason(
+                control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                snapshot=snapshot,
+            ):
+                await self._block_observation_progress(
+                    state=state,
+                    control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                    snapshot=snapshot,
                 )
-                state.last_reason = ControlReason.EXTERNAL_BID_CHANGED_REAPPLY
-            else:
-                state.last_reason = ControlReason.MAIN_WAITING_IMPRESSIONS
-            await self._repository.save_state(state)
+                return None
+            wait_reason = ControlReason.MAIN_WAITING_IMPRESSIONS
+            state.last_reason = wait_reason
+            _ = await self._repository.save_state(state)
             logger.info(
                 "auto_shelf_bid_control_main_wait auto_adv_id=%s nmid=%s mode=%s main_impressions=%s target=%s reason=%s",
                 auto_adv_id,
@@ -591,76 +1415,133 @@ class AutoShelfBidControlManager:
                 state.last_reason,
             )
             return None
-
-        cycle_from_ts = state.current_cycle_started_at
-        if cycle_from_ts is None:
-            cycle_from_ts = now
-        covered_stats = await self._analytics.get_bid_stats(
-            nmid=nmid,
-            from_ts=cycle_from_ts,
-            currency=state.currency,
+        target_test_observation_minutes = self._target_observation_minutes_or_default(
+            settings_obj.target_test_observation_minutes
         )
-        covered_bids = [
-            row.bid_minor
-            for row in covered_stats
-            if row.impressions >= int(settings_obj.target_test_impressions)
-        ]
-        next_test_bid = self.choose_next_test_bid(
-            min_bid=min_bid_minor,
-            max_bid=int(settings_obj.max_bid_minor),
-            covered_bids=covered_bids,
-            min_distance=int(settings_obj.min_bid_distance_minor),
+        target_test_observation_hours = self._target_observation_hours_from_minutes(
+            target_test_observation_minutes
         )
-        if next_test_bid is None:
-            best_bid = await self._choose_best_bid_with_fallback(
-                nmid=nmid,
-                currency=state.currency,
-                cycle_started_at=state.current_cycle_started_at,
-                previous_cycle_started_at=state.previous_cycle_started_at,
-                current_main_bid_minor=state.current_main_bid_minor,
-                actual_bid_minor=actual_bid_minor,
-                min_bid_minor=min_bid_minor,
-                max_bid_minor=int(settings_obj.max_bid_minor),
+        if main_coverage_snapshot is None:
+            coverage_price_minor: int | None = None
+            first_bucket_start = (
+                await self._analytics.get_first_available_bid_bucket_start(
+                    nmid=nmid,
+                    currency=state.currency,
+                    price_minor=coverage_price_minor,
+                    mode=None,
+                )
             )
-            new_test_bid = self._middle_bid(min_bid_minor, int(settings_obj.max_bid_minor))
-            state.previous_cycle_started_at = state.current_cycle_started_at
-            state.current_cycle_started_at = now
+            coverages: list[BidCoverage]
+            if first_bucket_start is None:
+                coverages = []
+            else:
+                coverages = await self._analytics.get_bid_coverages(
+                    nmid=nmid,
+                    date_from=first_bucket_start,
+                    date_to=now,
+                    currency=state.currency,
+                    price_minor=coverage_price_minor,
+                    mode=None,
+                )
+            main_coverage_snapshot = (
+                coverages,
+                0,
+                0,
+                choose_next_test_bid_by_coverage_layers(
+                    min_bid_minor=min_bid_minor,
+                    max_bid_minor=int(settings_obj.max_bid_minor),
+                    bid_unit_minor=100,
+                    coverages=coverages,
+                    target_test_impressions=int(settings_obj.target_test_impressions),
+                    target_test_observation_hours=target_test_observation_hours,
+                    min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                    random_seed=build_coverage_selector_seed(
+                        nmid=nmid,
+                        currency=state.currency,
+                        price_minor=coverage_price_minor,
+                        min_bid_minor=min_bid_minor,
+                        max_bid_minor=int(settings_obj.max_bid_minor),
+                        min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
+                        target_test_impressions=int(settings_obj.target_test_impressions),
+                        target_test_observation_hours=target_test_observation_hours,
+                    ),
+                ),
+            )
+        coverages, _current_layer, _covered_anchor_count, next_test_bid = (
+            main_coverage_snapshot
+        )
+        if next_test_bid is not None:
             state.current_mode = "test"
-            state.current_test_bid_minor = new_test_bid
-            state.current_main_bid_minor = best_bid
+            state.current_test_bid_minor = next_test_bid
+            state.current_main_bid_minor = main_bid
             state.test_started_at = now
             state.main_started_at = None
-            state.last_reason = ControlReason.CYCLE_COMPLETED
-            await self._persist_state_then_set_bid(
-                complex_adv,
-                state=state,
-                bid_minor=new_test_bid,
-            )
+            state.last_reason = ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
+            _ = await self._repository.save_state(state)
             logger.info(
-                "auto_shelf_bid_control_cycle_completed auto_adv_id=%s nmid=%s new_test_bid=%s best_main_bid=%s reason=%s",
+                "auto_shelf_bid_control_switch_to_test auto_adv_id=%s nmid=%s next_test_bid=%s reason=%s",
                 auto_adv_id,
                 nmid,
-                new_test_bid,
-                best_bid,
+                next_test_bid,
                 state.last_reason,
             )
             return None
-
-        state.current_test_bid_minor = next_test_bid
-        state.current_mode = "test"
-        state.test_started_at = now
-        state.last_reason = ControlReason.MAIN_COMPLETED_SWITCH_TO_TEST
-        await self._persist_state_then_set_bid(
-            complex_adv,
-            state=state,
-            bid_minor=next_test_bid,
-        )
+        if (
+            complex_adv.auto_shelf_bid_control_strategy
+            != AutoShelfBidControlStrategy.PLAN_DISTANCE
+        ):
+            if snapshot.qualified_tested_bids_count < 2:
+                next_test_bid = snapshot.fresh_next_test_bid_minor
+                if next_test_bid is None:
+                    next_test_bid = state.current_test_bid_minor
+                if next_test_bid is None:
+                    state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+                    _ = await self._repository.save_state(state)
+                    logger.warning(
+                        "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s qualified_count=%s blocked=no_test_bid",
+                        auto_adv_id,
+                        nmid,
+                        state.last_reason,
+                        complex_adv.auto_shelf_bid_control_strategy,
+                        snapshot.qualified_tested_bids_count,
+                    )
+                    return None
+                state.current_test_bid_minor = next_test_bid
+                state.test_started_at = now
+                state.current_mode = "test"
+                state.main_started_at = None
+                state.last_reason = ControlReason.INSUFFICIENT_QUALIFIED_TESTED_BIDS
+            else:
+                state.last_reason = ControlReason.BEST_BID_NOT_FOUND
+            _ = await self._repository.save_state(state)
+            logger.warning(
+                "auto_shelf_bid_control_skip auto_adv_id=%s nmid=%s reason=%s strategy=%s qualified_count=%s",
+                auto_adv_id,
+                nmid,
+                state.last_reason,
+                complex_adv.auto_shelf_bid_control_strategy,
+                snapshot.qualified_tested_bids_count,
+            )
+            return None
+        state.current_mode = "main"
+        state.main_started_at = now
+        if not can_set_observation_waiting_reason(
+            control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+            snapshot=snapshot,
+        ):
+            await self._block_observation_progress(
+                state=state,
+                control_enabled=bool(complex_adv.auto_shelf_bid_control_enabled),
+                snapshot=snapshot,
+            )
+            return None
+        state.last_reason = ControlReason.MAIN_WAITING_OBSERVATION_TIME
+        _ = await self._repository.save_state(state)
         logger.info(
-            "auto_shelf_bid_control_switch_to_test auto_adv_id=%s nmid=%s next_test_bid=%s reason=%s",
+            "auto_shelf_bid_control_main_bid_kept auto_adv_id=%s nmid=%s main_bid=%s reason=%s",
             auto_adv_id,
             nmid,
-            next_test_bid,
+            main_bid,
             state.last_reason,
         )
         return None
-

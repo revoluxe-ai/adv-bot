@@ -33,33 +33,58 @@ async def test_process_adv_v3_finally_sync_failure_preserves_try_exception() -> 
 
     with (
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator._load_v3_wb_context",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context",
             new=AsyncMock(return_value=(dto, {})),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater.get_plan_data",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data",
             return_value=MagicMock(max_pay_for_order=100.0, orders=10, target_pay_for_order=80.0),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.AdvSettingAutoUpdater"
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater"
         ) as updater_cls,
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.detect_campaign_state",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.detect_campaign_state",
             return_value=SalesStates.OPTIMAL,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.build_keyword_v3_contexts",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.build_keyword_v3_contexts",
             return_value=[],
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_data_bootstrap_v3",
-            side_effect=_ROOT_ERROR,
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact",
+        ) as pfc_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFactViews",
+        ) as views_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.V3CalibrationStepState",
+        ) as step_cls,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.resolve_complex_adv_total_views",
+            new=AsyncMock(return_value=100),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.sync_keyword_target_places_v3",
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager.manager.sync_keyword_target_places_v3",
             new=AsyncMock(side_effect=OSError("db down")),
         ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_tick_report",
+            new=AsyncMock(),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.manager.UpdatePipelineManager.run_preamble",
+            side_effect=_ROOT_ERROR,
+        ),
     ):
+        plan_fact = MagicMock()
+        plan_fact.check_equal_in_cache = AsyncMock(return_value=True)
+        plan_fact.set_new_plan_fact = AsyncMock()
+        pfc_cls.return_value = plan_fact
+        views_cls.return_value.get_cached_views = AsyncMock(return_value=100)
+        views_cls.return_value.set_views = AsyncMock()
+        step_cls.return_value.get_state = AsyncMock(return_value=None)
+        step_cls.return_value.set_state = AsyncMock()
         updater_cls.return_value.get_fact_data = AsyncMock(
             return_value=MagicMock(pay_for_order=50.0, predict_orders=10)
         )

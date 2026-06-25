@@ -1,4 +1,10 @@
-"""Unified cost-based activity decision for auto campaigns."""
+"""Единое решение об активности автокампании по среднему CPO vs resolve.
+
+При ``avg_cost > resolve`` кампания считается неактивной — watchdog ставит
+автокампанию на паузу, UI показывает предупреждение.
+
+При ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
+"""
 
 from __future__ import annotations
 
@@ -23,6 +29,14 @@ if TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import AdvSetting
 
 
+def _cost_rule_controls_auto_campaign(adv_setting: AdvSetting) -> bool:
+    """True, если cost-rule (пауза автокампании по среднему CPO) применяется.
+
+    Не применяется при ``auto_shelf_bid_control_enabled``.
+    """
+    return not adv_setting.auto_shelf_bid_control_enabled
+
+
 @dataclass(frozen=True)
 class AutoCampaignCostActivityMetrics:
     target_cost: float | None
@@ -32,6 +46,7 @@ class AutoCampaignCostActivityMetrics:
     plan_fact_ch_ts_msk: str | None
     cost_threshold_kind: Literal["target", "max"] | None
     campaign_sales_state: SalesStates | None = None
+    fact_pay_for_order: float | None = None
 
 
 async def get_auto_campaign_cost_activity_metrics(
@@ -68,18 +83,18 @@ async def get_auto_campaign_cost_activity_metrics(
         adv_setting.adv_id,
         days=days_for_avg,
     )
-
-    is_active: bool | None
-    if target_cost is None or avg_cost is None:
-        is_active = None
-    else:
-        is_active = avg_cost <= target_cost
-
     ch_ts = (
         plan_fact_summary.plan_fact_ch_ts_msk
         if plan_fact_summary is not None
         else None
     )
+    is_active: bool | None
+    if not _cost_rule_controls_auto_campaign(adv_setting):
+        is_active = True
+    elif target_cost is None or avg_cost is None:
+        is_active = None
+    else:
+        is_active = avg_cost <= target_cost
 
     campaign_sales_state: SalesStates | None = None
     if plan is not None:
@@ -95,6 +110,11 @@ async def get_auto_campaign_cost_activity_metrics(
         plan_fact_ch_ts_msk=ch_ts,
         cost_threshold_kind=cost_threshold_kind,
         campaign_sales_state=campaign_sales_state,
+        fact_pay_for_order=(
+            plan_fact_summary.fact_pay_for_order
+            if plan_fact_summary is not None
+            else None
+        ),
     )
 
 

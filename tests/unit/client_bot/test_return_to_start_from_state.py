@@ -79,6 +79,29 @@ async def test_return_to_start_does_not_intercept_similar_command(
     "app.client_bot.middlewars.return_to_start_from_state.start_registration",
     new_callable=AsyncMock,
 )
+async def test_return_to_start_case_insensitive(
+    mock_start_registration: AsyncMock,
+) -> None:
+    msg = MagicMock(spec=Message)
+    msg.text = "/Start"
+    msg.caption = None
+    next_handler = AsyncMock()
+    data: dict = {"bot": MagicMock(), "state": MagicMock()}
+    state = data["state"]
+    state.clear = AsyncMock()
+
+    await ReturnToStart()(next_handler, msg, data)
+
+    state.clear.assert_awaited_once()
+    mock_start_registration.assert_awaited_once_with(msg, data["bot"], state)
+    next_handler.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.client_bot.middlewars.return_to_start_from_state.start_registration",
+    new_callable=AsyncMock,
+)
 async def test_return_to_start_in_caption_triggers_registration(
     mock_start_registration: AsyncMock,
 ) -> None:

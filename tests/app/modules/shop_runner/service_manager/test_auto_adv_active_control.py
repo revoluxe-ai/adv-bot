@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
     AutoAdvActiveControlService,
 )
@@ -45,6 +46,10 @@ class _FakeAdvSetting:
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
+        auto_shelf_bid_control_enabled: bool = False,
+        bidder_coroutine_type: BidderCoroutineType = (
+            BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        ),
     ):
         self.active_status = active_status
         self.adv_id = adv_id
@@ -55,6 +60,8 @@ class _FakeAdvSetting:
         self.max_price_for_order = max_price_for_order
         self.rec_system_mode = rec_system_mode
         self.sales_predict_method = FactMethods.DIRECT_SALES
+        self.auto_shelf_bid_control_enabled = auto_shelf_bid_control_enabled
+        self.bidder_coroutine_type = bidder_coroutine_type
 
 
 class _FakeSearchAdv:
@@ -81,6 +88,11 @@ class _FakeComplexAdv:
         target_price_for_order: int | float | None = None,
         max_price_for_order: int | float | None = None,
         rec_system_mode: bool = True,
+        auto_adv_bid_control_enable: bool = False,
+        auto_shelf_bid_control_enabled: bool = False,
+        bidder_coroutine_type: BidderCoroutineType = (
+            BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
+        ),
     ):
         self.bot_active = bot_active
         self.auto_budget_watchdog_enabled = watchdog_enabled
@@ -93,6 +105,8 @@ class _FakeComplexAdv:
             target_price_for_order=target_price_for_order,
             max_price_for_order=max_price_for_order,
             rec_system_mode=rec_system_mode,
+            auto_shelf_bid_control_enabled=auto_shelf_bid_control_enabled,
+            bidder_coroutine_type=bidder_coroutine_type,
         )
         self.search_adv = _FakeSearchAdv(active_status=search_status, adv_id=search_adv_id)
         self.shop_id = "shop-1"
@@ -102,6 +116,7 @@ class _FakeComplexAdv:
         self.search_adv_active_status_str = WBAdvActiveStatus(search_status)
         self._use_common_budget = use_common_budget
         self._common_budget_daily_limit = common_budget_daily_limit
+        self.auto_adv_bid_control_enable = auto_adv_bid_control_enable
 
     @property
     def adv_setting(self):
@@ -140,6 +155,8 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
         plan_for_sales_for_day=1,
         target_price_for_order=100,
         max_price_for_order=200,
+        auto_adv_bid_control_enable=False,
+        auto_shelf_bid_control_enabled=True
     )
     adv_to_pause = _FakeComplexAdv(
         auto_limit=0,
@@ -241,6 +258,7 @@ async def test_auto_adv_active_control_pauses_auto_campaign_when_rec_system_mode
         auto_adv_id=10,
         search_adv_id=11,
         rec_system_mode=False,
+        auto_shelf_bid_control_enabled=True
     )
     wb_modifier = MagicMock()
     wb_modifier.start_auto_campaign = AsyncMock()
@@ -285,6 +303,7 @@ async def test_auto_adv_active_control_wb_wallet_fallback_when_bot_balance_zero(
         search_status="started",
         auto_adv_id=20,
         search_adv_id=21,
+        auto_shelf_bid_control_enabled=True
     )
     monkeypatch.setattr(
         f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
@@ -708,6 +727,66 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_does_not_pause_when_avg_cost_above_target():
+    """auto_shelf_bid_control_enabled: cost-rule отключён — автокампания не на паузе."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=10,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+        auto_shelf_bid_control_enabled=True,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        results = []
+        for handler in handlers:
+            results.append(await handler())
+        return results
+
+    tasks_manager = MagicMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=10,
+            fact_predict_orders=12.0,
+            fact_pay_for_order=120.0,
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=tasks_manager,
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=150.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
     wb_modifier.start_auto_campaign.assert_not_called()
 
 

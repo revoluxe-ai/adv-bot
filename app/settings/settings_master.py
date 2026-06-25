@@ -747,6 +747,49 @@ class Settings:
         raise Exception("STATS_FRESHNESS_GUARD_ENABLED env var is not bool")
 
     @property
+    def V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO(self) -> float:
+        """Доля ``plan.max_pay_for_order`` для skip ``PayForOrderGapEnableExecutor``.
+
+        Зона «1 от MAX плана»: при ``fact >= ratio × plan.max`` enable не выполняется.
+        По умолчанию ``1`` (порог = plan.max).
+        """
+        value = os.getenv("V3_PAY_FOR_ORDER_GAP_ENABLE_PLAN_HEADROOM_RATIO")
+        if not value:
+            return 1
+        return float(value)
+
+    @property
+    def V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO(self) -> float:
+        """Доля ``plan.max_pay_for_order`` для gate ``PayForOrderOverMaxOffOnDeepOverspend``.
+
+        При ``fact >= ratio × plan.max`` — OFF ключей с ``keyword.pay_for_order > max``.
+        По умолчанию ``1``.
+        """
+        value = os.getenv("V3_PAY_FOR_ORDER_OFF_PLAN_HEADROOM_RATIO")
+        if not value:
+            return 1
+        return float(value)
+
+    @property
+    def include_synthetic_position_profile(self) -> bool:
+        """M/O/C V3: учитывать синтетические позиции ``_fill_positions`` (``ch_observed=False``).
+
+        По умолчанию True. Выключить (только buckets ``bid_decision_log``):
+        ``INCLUDE_SYNTHETIC_POSITION_PROFILE=false``
+        """
+        value = os.environ.get("INCLUDE_SYNTHETIC_POSITION_PROFILE")
+        if value is None or not str(value).strip():
+            return True
+        value = str(value).strip().lower()
+        if value == "false":
+            return False
+        if value == "true":
+            return True
+        raise ValueError(
+            "Не верное значение в INCLUDE_SYNTHETIC_POSITION_PROFILE"
+        )
+
+    @property
     def AUTO_SHELF_BID_CONTROL_DRY_RUN(self) -> bool:
         """Dry-run для control-модуля полок.
 
@@ -818,6 +861,56 @@ class Settings:
         if value is None or not str(value).strip():
             return None
         return str(value).strip()
+
+    @property
+    def MIN_BID_AUTO_DEFAULT(self) -> int:
+        """Мин. CPM (руб.) для авто/полок при cache miss и в расчётах fallback.
+
+        Env: ``MIN_BID_AUTO_DEFAULT``. Пустое или отсутствующее значение → **100** (руб.).
+        Не используется при refresh/backfill min_bids в Redis (там raw miss).
+        """
+        value = os.environ.get("MIN_BID_AUTO_DEFAULT")
+        if value is None or not str(value).strip():
+            return 100  # значение в рублях
+        return int(str(value).strip())
+
+    @property
+    def MIN_BID_SEARCH_DEFAULT(self) -> int:
+        """Мин. CPM (руб.) для поиска/аукциона при cache miss и в расчётах fallback.
+
+        Env: ``MIN_BID_SEARCH_DEFAULT``. Пустое или отсутствующее значение → **300** (руб.).
+        Пути: cluster bids, stats_stale emergency, UI/cooldown. Не подставляется при
+        ``read_min_bids_cache_only`` / backfill (``apply_defaults=False``).
+        """
+        value = os.environ.get("MIN_BID_SEARCH_DEFAULT")
+        if value is None or not str(value).strip():
+            return 300  # значение в рублях
+        return int(str(value).strip())
+    @property
+    def AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED(self) -> bool:
+        value = os.environ.get("AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        else:
+            raise ValueError(': AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED must be true or false')
+
+    @property
+    def CAN_NOT_CACHE_DATA(self) -> bool:
+        value = os.environ.get("CAN_NOT_CACHE_DATA")
+        if value is None:
+            return False
+        value = value.strip().lower()
+        if value == "true":
+            return True
+        if value == "false":
+            return False
+        else:
+            raise ValueError(': CAN_MIN_BID_DEFAULT must be true or false')
 
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли

@@ -28,6 +28,12 @@ from app.modules.shop_runner.service_manager.auto_updater_version_toggle import 
 from app.modules.shop_runner.service_manager.v3_rollout_aggressiveness_toggle import (
     v3_rollout_aggressiveness_toggle_router,
 )
+from app.modules.shop_runner.service_manager.v3_tick_report_ui import (
+    v3_tick_report_ui_router,
+)
+from app.modules.v3_calibration_step_setting import (
+    v3_calibration_step_setting_router,
+)
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater import (
     AutoWhiteListUpdaterRouter,
 )
@@ -85,6 +91,9 @@ from .user_interface.handlers import (
 from .user_interface.handlers.common_budget_mode_toggle import (
     router as common_budget_mode_toggle_router,
 )
+from .user_interface.handlers.auto_common_budget_toggle import (
+    router as auto_common_budget_toggle_router,
+)
 from .user_interface.handlers.incremental_stats_toggle import (
     router as incremental_stats_toggle_router,
 )
@@ -109,6 +118,8 @@ common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_routers(auto_updater_target_place_setting_router)
 common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(v3_rollout_aggressiveness_toggle_router)
+common_router.include_routers(v3_calibration_step_setting_router)
+common_router.include_routers(v3_tick_report_ui_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)
@@ -119,6 +130,7 @@ common_router.include_routers(auto_update_exponent_toggle.router)
 common_router.include_routers(auto_add_only_relevant_phrase_toggle.router)
 common_router.include_routers(auto_budget_watchdog_toggle.router)
 common_router.include_routers(common_budget_mode_toggle_router)
+common_router.include_routers(auto_common_budget_toggle_router)
 common_router.include_routers(common_bid_toggle.router)
 common_router.include_routers(set_common_bid_manual.router)
 common_router.include_routers(rebind_adv_campaign_ids.router)

@@ -1,28 +1,9 @@
-"""Хелперы для toast/alert при ответе на CallbackQuery.
+"""Политика ACK на CallbackQuery в клиентском боте.
 
-При ``CallbackAnswerMiddleware(pre=True)`` в ``global_router`` повторный
-``callback.answer()`` из хендлера невозможен — Telegram принимает один ответ.
-Для кастомного текста после обработки используйте ``pre=False`` на роутере
-(``flags={"callback_answer": {"pre": False}}``) и ``set_callback_toast``.
+Pre-answer: ``ImmediateCallbackAnswerUpdateMiddleware`` на Dispatcher (см.
+``dispatcher_factory.install_client_bot_dispatcher_middleware``). Из хендлеров
+``callback.answer()`` не вызываем.
+
+Для пояснений после действия — ``callback.message.answer`` или
+``bot.send_message``, не второй ``callback.answer``.
 """
-
-from __future__ import annotations
-
-from aiogram.utils.callback_answer import CallbackAnswer
-
-
-def set_callback_toast(
-    callback_answer: CallbackAnswer,
-    text: str,
-    *,
-    show_alert: bool = False,
-) -> None:
-    """Задать текст единственного ответа middleware (режим ``pre=False``).
-
-    Args:
-        callback_answer: объект из data, инжектируется aiogram в хендлер.
-        text: текст toast или alert.
-        show_alert: True — модальное окно вместо краткого toast.
-    """
-    callback_answer.text = text
-    callback_answer.show_alert = show_alert

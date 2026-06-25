@@ -40,7 +40,7 @@ class RedisApiClusterBidsManager(BaseRedisManager):
             return {}
         async with self._client.read_pipeline() as pipeline:  # pyright: ignore
             for key in keys:
-                redis_key = self._get_key(key.adv_id, key.nmid, key.cluster)
+                redis_key = self._get_key(key.search_adv_id, key.nmid, key.cluster)
                 pipeline.get(redis_key)
             raw_results: list[str | None] = await pipeline.execute()  # pyright: ignore
         result: dict[ClusterBidKey, int] = {}

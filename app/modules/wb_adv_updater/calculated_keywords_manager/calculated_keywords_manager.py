@@ -43,6 +43,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
     calc_pay_for_order,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.pre_calculated_keyword import PreCalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import KeywordCpmSources
 from app.modules.wb_adv_updater.calculated_keywords_manager.redis_above_target_min_bid_cooldown_manager import (
@@ -104,6 +107,28 @@ def _coerce_optional_float_for_resolve(value: object) -> float | None:
     if isinstance(value, Real):
         return float(value)
     return None
+
+
+def _can_override_target_cost_from_ch(
+    *,
+    plan_orders: int | None,
+    target_pay_for_order: float | None,
+    max_pay_for_order: float | None,
+    fact_predict_orders: float | None,
+) -> bool:
+    """Whether CH fact has enough signal to override the safe fallback target cost.
+
+    ``complex_adv.target_pay_for_order`` is the safe fallback. ClickHouse-derived
+    resolve may overwrite it only when all inputs required by ``resolve_target_cost``
+    are present. In particular, ``fact_predict_orders=None`` must not be treated as
+    ``0`` here, otherwise an incomplete CH row would incorrectly force ``max``.
+    """
+    return (
+        plan_orders is not None
+        and target_pay_for_order is not None
+        and max_pay_for_order is not None
+        and fact_predict_orders is not None
+    )
 
 
 class CalculatedKeywordsManager(BaseClickHouseManager):
@@ -411,9 +436,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         # Target cost already resolved at WBShopDataManager.get_complex_advs():
         # PreComplexAdv.resolved_target_pay_for_order uses batch get_latest_plan_facts.
         # Do not query ClickHouse again per campaign.
+        resolved_target_cost: float | None
         _raw_target = complex_adv.target_pay_for_order
         if _raw_target is None or isinstance(_raw_target, bool):
-            resolved_target_cost: float | None = None
+            resolved_target_cost = None
         elif isinstance(_raw_target, Real):
             resolved_target_cost = float(_raw_target)
         else:
@@ -422,6 +448,30 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             resolved_target_cost = resolve_target_cost(
                 _plan_o, _plan_t, _plan_m, None
             )
+        _resolved_ch: float | None = None
+        try:
+            _summary = await PlanFactReader().get_latest_plan_fact(
+                complex_adv.adv_id
+            )
+            if _summary is not None and _can_override_target_cost_from_ch(
+                plan_orders=_plan_o,
+                target_pay_for_order=_plan_t,
+                max_pay_for_order=_plan_m,
+                fact_predict_orders=_summary.fact_predict_orders,
+            ):
+                _resolved_ch = resolve_target_cost(
+                    _plan_o, _plan_t, _plan_m, _summary.fact_predict_orders
+                )
+        except Exception:
+            logger.exception(
+                "PlanFactReader.get_latest_plan_fact failed for adv_id=%r; "
+                "falling back to target_pay_for_order / plan without CH fact",
+                getattr(complex_adv, "adv_id", None),
+            )
+            _resolved_ch = None
+
+        if _resolved_ch is not None:
+            resolved_target_cost = _resolved_ch
 
         auto_campaign_active: bool | None = None
         rec_conversion: float | None = None

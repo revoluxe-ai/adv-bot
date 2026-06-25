@@ -19,7 +19,10 @@ from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
 from app.client_bot.user_interface.services.keyword_v3_ui_sort import (
-    sort_keywords_for_v3_ui,
+    enrich_keywords_v3_list_profiles,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.sort_utils import (
+    sort_keywords_by_pay_for_order,
 )
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.backend.common_stat_data_manager import (
     CommonStatDataManager,
@@ -95,11 +98,11 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._adv_setting.search_adv_id
         )
         redis_manager = RedisCommonBidValueManager(redis_client)
-        adv_id = self._adv_setting.adv_id
+        search_adv_id = self._adv_setting.search_adv_id
         nmids = self._adv_setting.nmids or []
         self._last_saved_bids = {}
-        if adv_id is not None and nmids:
-            self._last_saved_bids = await redis_manager.get_bids(adv_id, nmids)
+        if search_adv_id is not None and nmids:
+            self._last_saved_bids = await redis_manager.get_bids(search_adv_id, nmids)
 
         keywords_filter: list[str] = data.get("keywords_filter")
         clear_keywords = []
@@ -152,7 +155,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             self._keywords = clear_keywords
 
         if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
-            self._keywords = await sort_keywords_for_v3_ui(
+            self._keywords = sort_keywords_by_pay_for_order(self._keywords)
+            self._keywords = await enrich_keywords_v3_list_profiles(
                 self._adv_setting, self._keywords
             )
 

@@ -75,7 +75,7 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
         direct = DirectEnum.DOWN if new_bid < current_bid else DirectEnum.UP
         effective_step = max(1, calculation_input.step)
         return NewBid(
-            adv_id=calculation_input.adv_id,
+            search_adv_id=calculation_input.search_adv_id,
             nmid=calculation_input.nmid,
             new_bid=new_bid,
             bidder_keyword_status=BidderKeywordStatus.GOOD,
@@ -89,7 +89,7 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
         logger.error(
             "Нет target_position при snap_to_min_bid_no_keyword_target=False: "
             "adv_id=%s nmid=%s cluster=%s",
-            calculation_input.adv_id,
+            calculation_input.search_adv_id,
             calculation_input.nmid,
             calculation_input.cluster,
         )
@@ -143,7 +143,7 @@ def new_bid_calculate(calculation_input: CalculationInput) -> NewBid | None:
     if new_bid == current_bid:
         return None
     return  NewBid(
-        adv_id=calculation_input.adv_id,
+        search_adv_id=calculation_input.search_adv_id,
         nmid=calculation_input.nmid,
         new_bid=new_bid,
         bidder_keyword_status=bidder_keyword_status,

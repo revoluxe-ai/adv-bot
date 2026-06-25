@@ -948,7 +948,6 @@ async def open_shop_mass_adv_ops_menu(
     callback: types.CallbackQuery,
     callback_data: callbacks.ShopMassAdvOpsMenu,
 ) -> None:
-    _ = await callback.answer()
     if callback.message is None:
         return
     message = cast(types.Message, callback.message)
@@ -972,7 +971,6 @@ async def close_shop_mass_adv_ops_menu(
     callback: types.CallbackQuery,
     callback_data: callbacks.ShopMassAdvOpsBack,
 ) -> None:
-    _ = await callback.answer()
     if callback.message is None:
         return
     message = cast(types.Message, callback.message)

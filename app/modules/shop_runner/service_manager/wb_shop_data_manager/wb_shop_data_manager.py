@@ -33,13 +33,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_complex_adv import (
     PreComplexAdv,
 )
-from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
-    AdvPhaseTrace,
-    ShopBatchPhaseTrace,
-)
-
-_COROUTINE_GET_WB_ADVS_DTO = "get_wb_advs_dto"
-_COROUTINE_V3_LOAD = "process_adv_v3"
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
@@ -49,6 +42,7 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
     run_tasks,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
+from app.settings import settings
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -82,44 +76,24 @@ class WBShopDataManager:
     @single_run()
     async def __get_calculated_keywords(
         self,
-        complex_adv: ComplexAdv,
-        *,
-        cache_only: bool = True,
+        complex_adv: ComplexAdv
     ) -> list[CalculatedKeyword]:
         """Только Redis ``calculated_keywords:{adv_id}`` (прогрев — snapshot updater).
 
         Raises:
             ShopRunnerKeywordsCacheMissError: hash отсутствует.
         """
-        if not cache_only:
-            raise RuntimeError(
-                "__get_calculated_keywords(cache_only=False) отключён: "
-                "полный пересчёт — snapshot updater warmup или fetch_keywords_from_database."
-            )
-        trace = AdvPhaseTrace.for_complex_adv(
-            coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
-        )
-        trace.marker(
-            "kw_provider_enter",
-            extra={"cache_only": True},
-        )
         from app.modules.shop_runner.required_data_miss import (
             fetch_calculated_keywords_from_redis,
         )
-
-        with trace.phase("kw_redis_cache_get_all"):
-            cached = await fetch_calculated_keywords_from_redis(
-                complex_adv.adv_id,
-                shop_id=complex_adv.shop_id or self.shop_id,
-            )
-        trace.marker(
-            "kw_redis_cache_result",
-            extra={
-                "keywords_count": len(cached) if cached else 0,
-                "hit": cached is not None,
-            },
+        if settings.CAN_NOT_CACHE_DATA:
+            from app.modules.wb_adv_updater.calculated_keywords_manager import CalculatedKeywordsManager
+            calc_kw_manager = CalculatedKeywordsManager()
+            return await calc_kw_manager.get_calculated_keywords(complex_adv)
+        return await fetch_calculated_keywords_from_redis(
+            complex_adv.adv_id,
+            shop_id=complex_adv.shop_id or self.shop_id,
         )
-        return cached
 
     @single_run()
     async def _get_active_advs(self) -> list[AdvSetting]:
@@ -155,8 +129,6 @@ class WBShopDataManager:
         self,
         complex_advs: list[ComplexAdv],
         search_adv_bids_override: dict[int, dict[int, int]] | None = None,
-        *,
-        adv_trace: AdvPhaseTrace | None = None,
     ) -> list[WBAdvDTO]:
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs_with_search_adv: list[ComplexAdv] = []
@@ -171,59 +143,28 @@ class WBShopDataManager:
 
         if not complex_advs:
             return []
-        trace = (
-            ShopBatchPhaseTrace.from_complex_advs(
-                coroutine=adv_trace.coroutine if adv_trace else _COROUTINE_GET_WB_ADVS_DTO,
-                advs=complex_advs,
-            )
-            if adv_trace is None
-            else ShopBatchPhaseTrace(
-                coroutine=adv_trace.coroutine,
-                shop_id=adv_trace.shop_id,
-                adv_ids=[a.adv_id for a in complex_advs],
-            )
-        )
-        if adv_trace is not None:
-            adv_trace.marker("dto_get_wb_advs_dto_enter", extra={"adv_count": len(complex_advs)})
         reuse_min_bids = self._reuse_shared_min_bids_from_complex_advs(complex_advs)
-        trace.marker(
-            "dto_min_bids_source",
-            extra={"reuse_min_bids": reuse_min_bids is not None},
-        )
 
         if search_adv_bids_override is not None:
             if reuse_min_bids is not None:
                 min_bids = reuse_min_bids
             else:
-                with trace.phase("dto_get_min_bids"):
-                    min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
+                min_bids = await self._get_min_bids(complex_advs, cache_possible=True)
             search_adv_bids = search_adv_bids_override
         else:
             if reuse_min_bids is not None:
                 min_bids = reuse_min_bids
-                with trace.phase("dto_get_search_adv_common_bids"):
-                    search_adv_bids = await self._get_search_adv_common_bids(
-                        complex_advs
-                    )
+                search_adv_bids = await self._get_search_adv_common_bids(
+                    complex_advs
+                )
             else:
-                async def _timed_min_bids() -> AdvMinNmidsBids | None:
-                    with trace.phase("dto_parallel_get_min_bids"):
-                        return await self._get_min_bids(
-                            complex_advs, cache_possible=True
-                        )
-
-                async def _timed_search_bids() -> dict[int, dict[int, int]]:
-                    with trace.phase("dto_parallel_get_search_bids"):
-                        return await self._get_search_adv_common_bids(complex_advs)
-
                 # TODO: Вынести получение данных по API отсюда
-                with trace.phase("dto_gather_min_and_search_bids"):
-                    result = await asyncio.gather(
-                        _timed_min_bids(),
-                        _timed_search_bids(),
-                    )
-                min_bids = result[0]
-                search_adv_bids = result[1]
+                gathered = await asyncio.gather(
+                    self._get_min_bids(complex_advs, cache_possible=True),
+                    self._get_search_adv_common_bids(complex_advs),
+                )
+                min_bids = gathered[0]
+                search_adv_bids = gathered[1]
 
         if min_bids is None:
             raise RuntimeError("Missing min_bids for advs")
@@ -245,13 +186,7 @@ class WBShopDataManager:
                 _adv: ComplexAdv = complex_adv,
                 _bids: dict[int, int] | None = search_bids_snapshot,
             ) -> WBAdvDataParts:
-                part_trace = adv_trace or AdvPhaseTrace.for_complex_adv(
-                    coroutine=trace.coroutine, adv=_adv
-                )
-                with part_trace.phase("dto_collect_adv_data_parts_total"):
-                    return await self._collect_adv_data_parts(
-                        _adv, _bids, adv_trace=part_trace
-                    )
+                return await self._collect_adv_data_parts(_adv, _bids)
 
             handlers.append(_collect_handler)
 
@@ -259,13 +194,12 @@ class WBShopDataManager:
         # Важно: здесь может быть вложенный вызов из handler-а shared TasksManager
         # (adv_settings_auto_update -> process_adv_v3 -> get_wb_advs_dto).
         # Если передать тот же tasks_manager при max_workers=1, получится self-queue deadlock.
-        with trace.phase("dto_parallel_collect_adv_data_parts"):
-            results = await run_tasks(
-                handlers,
-                max_workers=max_workers,
-                tasks_manager=None,
-                return_exceptions=True,
-            )
+        results = await run_tasks(
+            handlers,
+            max_workers=max_workers,
+            tasks_manager=None,
+            return_exceptions=True,
+        )
 
         successful_parts: list[WBAdvDataParts] = []
         for adv, result in zip(complex_advs_with_bids, results):
@@ -332,23 +266,12 @@ class WBShopDataManager:
         self,
         complex_adv: ComplexAdv,
         current_search_bids: dict[int, int] | None,
-        *,
-        adv_trace: AdvPhaseTrace | None = None,
     ) -> WBAdvDataParts:
-        trace = adv_trace or AdvPhaseTrace.for_complex_adv(
-            coroutine=_COROUTINE_GET_WB_ADVS_DTO, adv=complex_adv
-        )
-        with trace.phase("dto_collect_plan_data"):
-            plan = await self._collect_plan_data(complex_adv)
-        trace.marker("dto_collect_keywords_start")
-        with trace.phase("dto_collect_keywords"):
-            keywords = await self._collect_keywords(complex_adv)
-        trace.marker("dto_keywords_loaded", extra={"keywords_count": len(keywords)})
+        plan = await self._collect_plan_data(complex_adv)
+        keywords = await self._collect_keywords(complex_adv)
         manager = PlanFactProvider(complex_adv.adv_setting)
-        with trace.phase("dto_ch_get_stat_data"):
-            stat = await manager.get_stat_data(keywords)
-        with trace.phase("dto_ch_get_fact_data"):
-            fact = await manager.get_fact_data(stat)
+        stat = await manager.get_stat_data(keywords)
+        fact = await manager.get_fact_data(stat)
 
         return WBAdvDataParts(
             complex_adv=complex_adv,
@@ -359,40 +282,56 @@ class WBShopDataManager:
         )
 
     @single_run()
-    async def get_pre_complex_advs(self, *, skip_plan_fact: bool = False) -> list[PreComplexAdv]:
+    async def get_pre_complex_advs(
+        self,
+        *,
+        skip_plan_fact: bool = False,
+    ) -> list[PreComplexAdv]:
         """Собрать PreComplexAdv из PG.
 
         Args:
-            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats (для корутин,
-                где факт подгружается отдельно, напр. ``update_cluster_bids``).
+            skip_plan_fact: не ходить в ClickHouse за plan_fact_stats. Используется
+                для корутин, где факт подгружается отдельно, например
+                ``update_cluster_bids``.
+
+        Важно:
+            Это точка, где должен быть синхронизирован auto common budget.
+            Если здесь не пересчитать ``common_budget_daily_limit`` по актуальным
+            plan-fact данным при включённом ``auto_common_budget``, downstream
+            продолжит работать с устаревшим in-memory лимитом и общий бюджет
+            не применится.
         """
         adv_settings: list[AdvSetting] = cast(
             list[AdvSetting], await self._get_active_advs()
         )
+        self._set_auto_commom_budget(adv_settings)
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
-        summaries_by_adv_id: dict[int, PlanFactSummary] = {}
+
+        adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
+        summaries_by_adv_id = {}
         if skip_plan_fact:
-            if search_adv_ids:
-                search_adv_idv = await self.__get_adv_id_to_search_adv_map(
-                    search_adv_ids
-                )
-            else:
-                search_adv_idv = {}
+            plan_fact_reader = None
         else:
             plan_fact_reader = PlanFactReader()
-            adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
-            if search_adv_ids:
+
+        if search_adv_ids:
+            search_adv_task = self.__get_adv_id_to_search_adv_map(search_adv_ids)
+            if plan_fact_reader is not None:
                 search_adv_idv, summaries_by_adv_id = await asyncio.gather(
-                    self.__get_adv_id_to_search_adv_map(search_adv_ids),
+                    search_adv_task,
                     plan_fact_reader.get_latest_plan_facts(adv_ids_for_plan_fact),
                 )
             else:
-                search_adv_idv = {}
+                search_adv_idv = await search_adv_task
+        else:
+            search_adv_idv = {}
+            if plan_fact_reader is not None:
                 summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
                     adv_ids_for_plan_fact
                 )
+
         return [
             PreComplexAdv(
                 auto_adv=adv,
@@ -452,7 +391,7 @@ class WBShopDataManager:
         # - или убрать `@single_run()` с одного из методов и оставить single-flight на одном
         #   уровне (например, только на `get_complex_advs()`), чтобы исключить циклы;
         # - или сделать общий "seed" метод без декоратора и вызывать его из обоих путей.
-        pre_complex_advs = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
+        pre_complex_advs: list[PreComplexAdv] = await self.get_pre_complex_advs(skip_plan_fact=skip_plan_fact)
         complex_advs: list[ComplexAdv] = []
         for pre_adv in pre_complex_advs:
             complex_adv = ComplexAdv(
@@ -461,6 +400,8 @@ class WBShopDataManager:
                 get_keywords_func=self.__get_calculated_keywords,
                 search_adv=pre_adv.search_adv,
                 target_pay_for_order=pre_adv.resolved_target_pay_for_order,
+                fact_pay_for_order=pre_adv.plan_fact_summary.fact_pay_for_order if pre_adv.plan_fact_summary else None,
+                resolve_cpo=pre_adv.resolved_target_pay_for_order,
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [
@@ -492,8 +433,6 @@ class WBShopDataManager:
     async def backfill_min_bids_for_adv(
         self,
         complex_adv: ComplexAdv,
-        *,
-        adv_trace: AdvPhaseTrace | None = None,
     ) -> bool:
         """Догрузить min_bids в Redis для РК (как ``preload_min_bids_cache_miss``).
 
@@ -504,9 +443,6 @@ class WBShopDataManager:
         Returns:
             True, если после догрузки ``main_nmid`` есть в ``min_bids.search``.
         """
-        trace = adv_trace or AdvPhaseTrace.for_complex_adv(
-            coroutine=_COROUTINE_V3_LOAD, adv=complex_adv
-        )
         if self._wb_manager is None:
             logger.error(
                 "backfill_min_bids_for_adv: WBManager недоступен shop_id=%s adv_id=%s",
@@ -519,30 +455,26 @@ class WBShopDataManager:
         wb_manager = self._wb_manager
 
         async def _main_nmid_cached() -> bool:
-            with trace.phase("min_bids_backfill_cache_check"):
-                cached = await wb_manager.get_min_bids_cache_only(
-                    [complex_adv],
-                    context="v3_min_bids_check",
-                )
+            cached = await wb_manager.get_min_bids_cache_only(
+                [complex_adv],
+                context="v3_min_bids_check",
+                apply_defaults=False,
+            )
             return nmid in cached.search
 
         if await _main_nmid_cached():
-            trace.marker("min_bids_backfill_already_cached", extra={"nmid": nmid})
             return True
 
-        with trace.phase("min_bids_backfill_find_miss_cells"):
-            miss_cells = await wb_manager.find_min_bids_cache_miss_cells(
-                [complex_adv],
-                emit_app_log=True,
-                log_label="v3_min_bids_backfill",
-            )
-        trace.marker("min_bids_backfill_miss_cells", extra={"cells": len(miss_cells)})
+        miss_cells = await wb_manager.find_min_bids_cache_miss_cells(
+            [complex_adv],
+            emit_app_log=True,
+            log_label="v3_min_bids_backfill",
+        )
         if miss_cells:
             try:
-                with trace.phase("min_bids_backfill_refresh_miss_cells"):
-                    written = await wb_manager.refresh_min_bids_cache_miss_cells(
-                        miss_cells
-                    )
+                written = await wb_manager.refresh_min_bids_cache_miss_cells(
+                    miss_cells
+                )
                 logger.info(
                     "v3_min_bids_backfill: refresh miss shop_id=%s adv_id=%s "
                     "cells=%s written=%s",
@@ -571,8 +503,7 @@ class WBShopDataManager:
             nmid,
         )
         try:
-            with trace.phase("min_bids_backfill_refresh_wb_api"):
-                await wb_manager.refresh_min_bids_cache([complex_adv])
+            await wb_manager.refresh_min_bids_cache([complex_adv])
         except Exception:
             logger.error(
                 "v3_min_bids_backfill: refresh_min_bids_cache failed shop_id=%s adv_id=%s",
@@ -665,5 +596,26 @@ class WBShopDataManager:
                 )
             return await self._wb_manager.get_min_bids(complex_advs, cache_possible=False)
         return await self._wb_api_data_manager.get_min_bids(complex_advs)
+
+    @staticmethod
+    def _set_auto_commom_budget(adv_settings: list[AdvSetting]) -> None:
+        """Пересчитать ``common_budget_daily_limit`` в памяти для auto common budget.
+
+        Вызывается из ``get_pre_complex_advs`` на каждом тике shop-runner. Меняет только
+        in-memory ``AdvSetting``; в PostgreSQL лимит не сохраняется.
+
+        При ``auto_common_budget=True`` и наличии ``max_price_for_order`` и
+        ``plan_for_sales_for_day`` лимит = произведение. При выключенном авторасчёте или
+        неполной конфигурации существующее значение не перезаписывается.
+        """
+        for adv in adv_settings:
+            if not adv.auto_common_budget:
+                continue
+            max_pay = adv.max_price_for_order
+            plan_sales = adv.plan_for_sales_for_day
+            if max_pay is None or plan_sales is None:
+                continue
+            adv.common_budget_daily_limit = int(max_pay) * int(plan_sales)
+
 
 # TODO: Реализовать гибкую модель управления через плавающую мощность и расчет потенциала от текущего статуса

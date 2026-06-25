@@ -34,8 +34,8 @@ def test_full_tier_when_own_conv_and_ch() -> None:
 
 
 @pytest.mark.unit
-def test_rk_aggregate_when_no_own_views_but_campaign_has() -> None:
-    """Сначала агрегат РК (средневзвешенная conv), не peer_max."""
+def test_no_ch_matrix_when_no_own_conv() -> None:
+    """Нет своей conv на ключе с CH — ``NO_CH_MATRIX`` без импутации."""
     dead = _calculated_kw_fixture(
         ks_id=1, text="dead", mode=KeywordStrategyMode.OFF, conv=0.0
     )
@@ -49,15 +49,14 @@ def test_rk_aggregate_when_no_own_views_but_campaign_has() -> None:
     alive_ctx = KeywordV3Context(keyword=alive, position_profile=profile)
     contexts = [dead_ctx, alive_ctx]
     decision = resolve_keyword_v3_decision(dead_ctx, contexts)
-    assert decision.tier == KeywordV3DecisionTier.RK_AGGREGATE
-    assert decision.effective_conv_views_to_orders == pytest.approx(0.12)
-    assert decision.imputed
-    assert not keyword_lacks_v3_decision_data(dead_ctx, contexts)
+    assert decision.tier == KeywordV3DecisionTier.NO_CONV
+    assert decision.effective_conv_views_to_orders is None
+    assert not decision.imputed
 
 
 @pytest.mark.unit
-def test_peer_max_when_no_views_anywhere_but_conv_in_stat() -> None:
-    """Нет показов в окне — max conv среди других ключей (если агрегат пуст)."""
+def test_no_ch_matrix_solo_without_views() -> None:
+    """Нет показов — tier ``NO_CH_MATRIX``, без peer/RK imputation."""
     a = _calculated_kw_fixture(ks_id=1, text="a", mode=KeywordStrategyMode.OFF, conv=0.15)
     a_stat = a.cluster_stat.model_copy(update={"views": 0, "conv_views_to_orders": 0.15})
     a = a.model_copy(update={"cluster_stat": a_stat})
@@ -68,8 +67,8 @@ def test_peer_max_when_no_views_anywhere_but_conv_in_stat() -> None:
     a_ctx = KeywordV3Context(keyword=a, position_profile=profile)
     b_ctx = KeywordV3Context(keyword=b, position_profile=profile)
     decision = resolve_keyword_v3_decision(a_ctx, [a_ctx, b_ctx])
-    assert decision.tier == KeywordV3DecisionTier.PEER_MAX
-    assert decision.effective_conv_views_to_orders == pytest.approx(0.09)
+    assert decision.tier == KeywordV3DecisionTier.NO_CONV
+    assert decision.effective_conv_views_to_orders is None
 
 
 @pytest.mark.unit
@@ -85,8 +84,7 @@ def test_no_conv_tier_when_ch_but_no_imputation() -> None:
     decision = resolve_keyword_v3_decision(ctx, [ctx])
     assert decision.tier == KeywordV3DecisionTier.NO_CONV
     assert decision.has_ch_position_profile
-    # NO_CONV: pessimistic ladder (worst CPO), не INVALID / N-state bootstrap
-    assert not keyword_lacks_v3_decision_data(ctx, [ctx])
+    assert keyword_lacks_v3_decision_data(ctx, [ctx])
 
 
 @pytest.mark.unit

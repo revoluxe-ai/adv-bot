@@ -37,7 +37,6 @@ async def request_presentation_start(
         callback.message.chat.id,
         "Для записи на презентацию отправьте инвайт-код одним сообщением.",
     )
-    await callback.answer()
 
 
 @router.message(StateFilter(PresentationRequest.waiting_invite), F.text)

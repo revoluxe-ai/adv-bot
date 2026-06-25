@@ -48,7 +48,12 @@ from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
     profile_load_failure,
 )
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
+    format_keyword_v3_last_tick_executor_line,
     format_keyword_v3_profile_block,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword_changes_report import (
+    V3KeywordChangesRedisCache,
+    V3KeywordChangesSnapshot,
 )
 from app.client_bot.user_interface.views.above_target_min_bid_ui import (
     format_ms_rule_line,
@@ -504,6 +509,7 @@ class KeywordSettingMessage(TextWithKeyboard):
         self._page = last_page
         self._chat_id = chat_id
         self._v3_profile_block: str | None = None
+        self._v3_keyword_changes: V3KeywordChangesSnapshot | None = None
 
     @staticmethod
     async def _get_calculated_keyword(
@@ -567,6 +573,7 @@ class KeywordSettingMessage(TextWithKeyboard):
                     reason="ошибка загрузки профиля",
                 )
             self._v3_profile_block = format_keyword_v3_profile_block(profile_data)
+            self._v3_keyword_changes = await V3KeywordChangesRedisCache(adv_setting).get()
 
         return await super().__call__()
 
@@ -647,6 +654,12 @@ class KeywordSettingMessage(TextWithKeyboard):
             text += f"Выше конв. рек.: {rec_str}\n"
 
         if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
+            executor_line = format_keyword_v3_last_tick_executor_line(
+                keyword_setting_id=self._keyword_original_id,
+                keyword_changes=self._v3_keyword_changes,
+            )
+            if executor_line:
+                text += executor_line
             if self._v3_profile_block:
                 text += self._v3_profile_block
 
@@ -955,12 +968,13 @@ class CPMSetting(TextWithKeyboard):
         if adv_setting is None:
             raise RuntimeError(f"AdvSetting с id {adv_setting_id} не найден")
         self.adv_setting = adv_setting
-        adv_id = adv_setting.adv_id
+        search_adv_id = adv_setting.search_adv_id
         nmids = adv_setting.nmids or []
         self._last_saved_bids = {}
-        self._last_saved_bids = await self._redis_common_bid_value_manager.get_bids(
-            adv_id, nmids
-        )
+        if search_adv_id is not None and nmids:
+            self._last_saved_bids = await self._redis_common_bid_value_manager.get_bids(
+                search_adv_id, nmids
+            )
         await super().__call__()
 
     @property

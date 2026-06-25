@@ -8,6 +8,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, update
 
+from app.client_bot.start_command import is_start_command_text
 from app.client_bot.user_interface.handlers.presentation_invite import (
     normalize_invite_code,
 )
@@ -47,8 +48,7 @@ async def gate_invite_process_code(
         return
     text = message.text.strip()
     first_token = text.split(maxsplit=1)[0].lower() if text else ""
-    is_start_command = first_token == "/start" or first_token.startswith("/start@")
-    if is_start_command:
+    if is_start_command_text(text):
         # /start централизованно перехватывается ReturnToStart middleware на global_router.
         return
     if first_token.startswith("/"):

@@ -1,0 +1,303 @@
+"""DTO одного ключa V3: CalculatedKeyword + матрица CH + цепочка NextState на тике."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.candidates import (
+    stored_strategy_mode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_mode import (
+    KeywordMode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_prepared_row import (
+    KeywordPreparedRow,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_v3_ladder_state import (
+    KeywordV3LadderState,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.next_state import (
+    NextState,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.next_target_place import (
+    NextTargetPlace,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.target_place_matrix import (
+    TargetPlaceMatrix,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_tier import (
+    KeywordV3DataTier,
+    resolve_keyword_v3_data_tier,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+    PositionProfilePoint,
+)
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+        KeywordV3Context,
+    )
+
+@dataclass(slots=True)
+class KeywordDTO:
+    """Аккумулятор данных ключa на тик V3.
+
+    DTO хранит и состояние ladder, и текущий operational tier ключа.
+
+    ``current_mode`` остаётся SSOT для режима: именно он показывает, OFF ли ключ,
+    находится ли он в MIN_CPA или уже поднят по ladder. ``data_tier`` — это
+    отдельная продуктовая классификация готовности ключа к разным веткам
+    updater-а. Благодаря ей NF-фазы больше не используют размытое
+    ``is_not_full()`` и могут явно различать:
+
+    - ``FULL``: есть CH-профиль, значит действуют ladder-правила;
+    - ``PFO``: CH-профиля нет, но есть operational PFO, значит можно
+      выполнять NF bootstrap и plan-fact;
+    - ``GAP``: нет ни профиля, ни operational PFO, значит ключ ещё в
+      bootstrap/enable контуре.
+    """
+
+    calculated_keyword: CalculatedKeyword
+    position_profile: list[PositionProfilePoint] | None
+    stored_mode: KeywordStrategyMode
+    target_place_matrix: TargetPlaceMatrix
+    next_state: list[NextState] = field(default_factory=lambda: list[NextState]())
+    history_target_place: list[NextTargetPlace] = field(
+        default_factory=lambda: list[NextTargetPlace]()
+    )
+
+    @property
+    def keyword_setting_id(self) -> int:
+        """``keyword_setting_original_id`` (0 если нет id)."""
+        return int(self.calculated_keyword.keyword_setting_original_id or 0)
+
+    @property
+    def current_mode(self) -> KeywordStrategyMode:
+        """Текущий рабочий режим: хвост ``next_state`` или ``stored_mode``."""
+        if self.next_state:
+            return self.next_state[-1].new_mode.to_strategy_mode()
+        return self.stored_mode
+
+    @current_mode.setter
+    def current_mode(self, step: NextState) -> None:
+        """Append перехода или validate-команда ``NOT_FULL_ACTIVATE``."""
+        if step.new_mode is KeywordMode.NOT_FULL_ACTIVATE:
+            self._validate_not_full_state(
+                step.executor_name,
+                phase_id=step.phase_id,
+            )
+            return
+        strategy = step.new_mode.to_strategy_mode()
+        if strategy == self.current_mode:
+            return
+        self.next_state.append(step)
+
+    @property
+    def current_target_place(self) -> int:
+        """Текущий target_place: хвост history или значение из keyword setting."""
+        if self.history_target_place:
+            return self.history_target_place[-1].new_target_place
+        place = self.calculated_keyword.target_place
+        return 0 if place is None else int(place)
+
+    @current_target_place.setter
+    def current_target_place(self, step: NextTargetPlace) -> None:
+        """Append target_place; skip если значение не изменилось."""
+        if step.new_target_place == self.current_target_place:
+            return
+        self.history_target_place.append(step)
+        self.calculated_keyword.keyword_setting.target_place = step.new_target_place
+
+    @property
+    def target_place(self) -> int | None:
+        """Текущий ``target_place`` ключа."""
+        return self.calculated_keyword.target_place
+
+    @property
+    def hard_status(self) -> int:
+        return self.calculated_keyword.hard_status
+
+    @property
+    def ladder_states(self) -> tuple[KeywordV3LadderState, ...]:
+        """Плоская проекция матрицы для planner/collector."""
+        return self.target_place_matrix.states
+
+    @property
+    def data_tier(self) -> KeywordV3DataTier:
+        """FULL/PFO/GAP по профилю позиций и operational ``pay_for_order``.
+
+        Это центральный классификатор V3-контракта. Он не пытается понять
+        «хороший» ключ или «плохой» ключ, не смотрит на overspend и не
+        интерпретирует текущий режим как источник истины. Его задача проще:
+        ответить, к какому operational сценарию относится ключ прямо сейчас.
+
+        Классификация устроена как трёхточечный контракт:
+
+        ``FULL``
+            У ключа есть CH-профиль. Это значит, что он уже живёт в
+            ladder-контуре, а NF-фазы не имеют права использовать его как
+            bootstrap-кандидата.
+
+        ``PFO``
+            CH-профиля нет, но есть operational ``pay_for_order``. Это
+            активный no-CH сценарий: ключ можно перевести в ``MIN_CPA`` через
+            validate, затем инициализировать стартовый ``target_place`` через
+            migrate, а дальше корректировать plan-fact шагом ``±1``.
+
+        ``GAP``
+            Ни CH-профиля, ни operational PFO нет. Это ещё не NF-ключ и не
+            ladder-ключ, а отдельная bootstrap/enable/reset-зона. Такой ключ не
+            должен получать NF bootstrap только потому, что у него пустой
+            профиль.
+
+        Это свойство не кэширует бизнес-решение и не проверяет overspend. Оно
+        лишь определяет, в какой из трёх operational веток ключ находится
+        сейчас. Весь дальнейший контракт строится уже поверх этого ответа.
+
+        Возвращаемое значение используется как SSOT для:
+
+        - NF validate / migrate / plan-fact;
+        - пропуска FULL-ключей через ladder-only ветки;
+        - исключения GAP из NF bootstrap;
+        - sync/fallback логики, где no-CH ключи не должны получать target_place
+          через старые overspend-reset эвристики.
+        """
+        return resolve_keyword_v3_data_tier(
+            position_profile=self.position_profile,
+            keyword=self.calculated_keyword,
+        )
+
+    def is_no_data_singleton(self) -> bool:
+        """NO DATA singleton: единственный synthetic MIN_CPA-state с fact pay_for_order."""
+        states = self.ladder_states
+        return (
+            len(states) == 1
+            and states[0].synthetic_no_data
+        )
+
+    def _validate_not_full_state(
+        self,
+        executor_name: str,
+        *,
+        phase_id: str | None = None,
+    ) -> None:
+        """PFO + active: принудительно свести режим к ``MIN_CPA``.
+
+        Эта валидация — только входной gate для NF bootstrap. Она отвечает за
+        один очень узкий переход: если no-CH ключ уже операционно активен
+        (tier ``PFO``) и не находится в ``OFF``, то его режим должен быть
+        приведён к ``MIN_CPA`` до migrate/plan-fact.
+
+        Что здесь важно не перепутать:
+
+        - ``FULL`` не трогаем, потому что у него свой ladder-контур;
+        - ``GAP`` не трогаем, потому что он ещё не имеет operational PFO и
+          должен идти через отдельный enable/reset путь;
+        - ``OFF`` не трогаем, чтобы не оживлять ключи без явного enable;
+        - ``target_place`` здесь не меняем вообще, потому что bootstrap позиции
+          относится к отдельной migrate-фазе.
+
+        После этого NF pipeline может безопасно считать, что активный PFO ключ
+        готов к bootstrap ``target_place`` и последующему plan-fact ``±1``.
+
+        Идея этой проверки в том, чтобы не тащить в NF bootstrap скрытые
+        предпосылки: validate только выравнивает режим, а смысловое решение о
+        том, можно ли ключ инициализировать вообще, уже было принято раньше
+        через tier-классификацию и upstream-готовность данных.
+        """
+        if self.data_tier != KeywordV3DataTier.PFO:
+            return
+        if self.current_mode == KeywordStrategyMode.OFF:
+            return
+        if self.current_mode != KeywordStrategyMode.MIN_CPA:
+            self.current_mode = NextState(
+                new_mode=KeywordMode.MIN_CPA,
+                executor_name=executor_name,
+                phase_id=phase_id,
+            )
+
+    def apply_ladder_state(
+        self,
+        state: KeywordV3LadderState,
+        *,
+        executor_name: str,
+        phase_id: str | None = None,
+    ) -> None:
+        """Сменить режим и ``target_place`` атомарно из ladder-state."""
+        self.current_mode = NextState(
+            new_mode=KeywordMode.from_strategy_mode(state.strategy_mode),
+            executor_name=executor_name,
+            phase_id=phase_id,
+        )
+        target_place = (
+            None
+            if state.strategy_mode == KeywordStrategyMode.OFF
+            else state.target_position
+        )
+        setting = self.calculated_keyword.keyword_setting
+        setting.strategy_mode = state.strategy_mode
+        setting.target_place = target_place
+        if target_place is not None:
+            self.current_target_place = NextTargetPlace(
+                new_target_place=int(target_place),
+                executor_name=executor_name,
+            )
+
+    @property
+    def context(self) -> KeywordV3Context:
+        """Legacy ``KeywordV3Context`` для rollout planner."""
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector import (
+            KeywordV3Context,
+        )
+
+        return KeywordV3Context(
+            keyword=self.calculated_keyword,
+            position_profile=self.position_profile,
+        )
+
+    def to_prepared_row(self) -> KeywordPreparedRow:
+        """Legacy строка ``KeywordsPreparedList.rows``."""
+        return KeywordPreparedRow(
+            keyword=self.calculated_keyword,
+            position_profile=self.position_profile,
+            stored_mode=self.stored_mode,
+            active_mode=self.current_mode,
+            states=self.ladder_states,
+        )
+
+    @classmethod
+    def from_prepared_row(cls, row: KeywordPreparedRow) -> KeywordDTO:
+        """Обратная совместимость со старыми ``KeywordPreparedRow``."""
+        dto = cls(
+            calculated_keyword=row.keyword,
+            position_profile=row.position_profile,
+            stored_mode=row.stored_mode,
+            target_place_matrix=TargetPlaceMatrix(row.states),
+        )
+        if row.active_mode != row.stored_mode:
+            dto.current_mode = NextState(
+                new_mode=KeywordMode.from_strategy_mode(row.active_mode),
+                executor_name="from_prepared_row",
+            )
+        return dto
+
+    @classmethod
+    def from_context(
+        cls,
+        ctx: KeywordV3Context,
+        *,
+        ladder_states: tuple[KeywordV3LadderState, ...],
+    ) -> KeywordDTO:
+        """Сборка из ``KeywordV3Context`` + ladder states."""
+        stored_mode = stored_strategy_mode(ctx.keyword)
+        return cls(
+            calculated_keyword=ctx.keyword,
+            position_profile=ctx.position_profile,
+            stored_mode=stored_mode,
+            target_place_matrix=TargetPlaceMatrix(ladder_states),
+        )

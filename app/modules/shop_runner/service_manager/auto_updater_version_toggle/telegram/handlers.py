@@ -88,7 +88,10 @@ async def open_auto_updater_version_menu(
         )
 
     if adv is None or markup is None:
-        await callback_query.answer("Кампания не найдена.", show_alert=True)
+        if callback_query.message is not None:
+            await bot.send_message(
+                callback_query.message.chat.id, "Кампания не найдена."
+            )
         return
 
     assert callback_query.message
@@ -101,7 +104,6 @@ async def open_auto_updater_version_menu(
         }
     )
     await bot.send_message(chat_id, _SUBMENU_TEXT, reply_markup=markup)
-    await callback_query.answer()
 
 
 @router.callback_query(AutoUpdaterVersionMenuBack.filter())
@@ -111,15 +113,12 @@ async def close_auto_updater_version_menu(
     state: FSMContext,
 ) -> None:
     if callback_query.message is None:
-        await callback_query.answer("Нет сообщения.", show_alert=True)
         await _clear_version_menu_fsm(state)
         return
 
     chat_id = callback_query.message.chat.id
     fsm_data = await state.get_data()
     adv_setting_original_id = fsm_data.get(FSM_ADV_AUTO_VER_MENU_ADV_SETTING_ID)
-
-    await callback_query.answer()
 
     await _clear_version_menu_fsm(state)
 
@@ -157,10 +156,10 @@ async def toggle_auto_updater_version(
     adv_setting_original_id: int = callback_data.adv_setting_original_id
 
     if new_version not in _ALLOWED_AUTOMATIC_VERSIONS:
-        await callback_query.answer(
-            "Недопустимая версия.",
-            show_alert=True,
-        )
+        if callback_query.message is not None:
+            await bot.send_message(
+                callback_query.message.chat.id, "Недопустимая версия."
+            )
         return
 
     async with sm() as session:
@@ -170,12 +169,14 @@ async def toggle_auto_updater_version(
         adv_before = adv_result.scalar_one_or_none()
 
         if adv_before is None:
-            await callback_query.answer("Кампания не найдена.", show_alert=True)
+            if callback_query.message is not None:
+                await bot.send_message(
+                    callback_query.message.chat.id, "Кампания не найдена."
+                )
             return
 
         current_norm = normalize_automatic_version_ui(adv_before.automatic_version)
         if new_version == current_norm:
-            await callback_query.answer("Уже выбрано", show_alert=False)
             return
 
         stmt = (
@@ -227,7 +228,6 @@ async def toggle_auto_updater_version(
 
     submenu_msg = callback_query.message
     if submenu_msg is None:
-        await callback_query.answer(f"Версия {label}", show_alert=False)
         return
     chat_id = submenu_msg.chat.id
 
@@ -257,10 +257,8 @@ async def toggle_auto_updater_version(
             )
 
     if parent_failed:
-        await callback_query.answer(
+        await bot.send_message(
+            chat_id,
             f"Версия {label} сохранена. Если кнопка в главном меню не обновилась — "
             "нажмите «Назад» и откройте настройки РК снова.",
-            show_alert=True,
         )
-    else:
-        await callback_query.answer(f"Версия {label}", show_alert=False)

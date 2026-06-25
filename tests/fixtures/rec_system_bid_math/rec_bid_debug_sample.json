@@ -1,0 +1,50 @@
+[
+  {
+    "bid": 100,
+    "bucket_start": "2026-06-07T03:00:00",
+    "impressions": 10.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 100,
+    "bucket_start": "2026-06-07T03:15:00",
+    "impressions": 20.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 100,
+    "bucket_start": "2026-06-07T03:30:00",
+    "impressions": 30.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 100,
+    "bucket_start": "2026-06-07T03:45:00",
+    "impressions": 40.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 120,
+    "bucket_start": "2026-06-07T04:00:00",
+    "impressions": 12.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 120,
+    "bucket_start": "2026-06-07T04:15:00",
+    "impressions": 22.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 120,
+    "bucket_start": "2026-06-07T04:30:00",
+    "impressions": 32.0,
+    "price_minor": 700
+  },
+  {
+    "bid": 120,
+    "bucket_start": "2026-06-07T04:45:00",
+    "impressions": 42.0,
+    "price_minor": 700
+  }
+]

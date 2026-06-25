@@ -3,6 +3,7 @@
 import asyncio
 import functools
 import logging
+import os
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterable, Sequence
@@ -70,7 +71,10 @@ from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
 from .wb_shop_data_manager.dto.pre_complex_adv import PreComplexAdv
 from .while_coroutines_decorator import while_coroutine_decorator
-from ..bidder.bidder_func import run_bidder_process_for_adv
+from ..bidder.bidder_func import (
+    build_v3_safety_cap_by_keyword_setting_original_id,
+    run_bidder_process_for_adv,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.shop_runner.tasks_manager.tasks_manager import (
     TasksManager,
@@ -95,10 +99,15 @@ from .services.adv_strategy_selector import AdvStrategySelector, StrategySelecti
 from .services.stats_freshness_cache_manager import RedisStatsFreshnessStateCacheManager
 from .services.stats_freshness_guard import StatsFreshnessState
 from .services.stats_freshness_manager import StatsFreshnessManager
-from .coroutine_phase_trace import ShopBatchPhaseTrace
 from .services.v3_status_mode_sync import (
     is_v3_campaign,
     keyword_strategy_mode_for_adv_strategy,
+)
+from .services.update_cluster_bids_manager.cluster_bid_trace import (
+    is_trace_cell,
+    is_trace_enabled,
+    log_cluster_bid_trace,
+    trace_target_defaults,
 )
 from .services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
@@ -112,8 +121,10 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
-# Если после кеша и WB API минимальная ставка по поиску неизвестна — emergency normquery.
-STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB = 150
+def _cluster_stats_diagnostic_enabled() -> bool:
+    """Включает подробные DEBUG-логи для cluster freshness path."""
+    value = os.environ.get("CLUSTER_STATS_DIAGNOSTIC_ENABLED", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 T = TypeVar("T")
 
@@ -257,9 +268,48 @@ class CoroutinesManager:
             assert state is not None
             if state.is_stale_over_6h:
                 stale_over_6h.append(adv)
+                if (
+                    operation_name == "update_cluster_bids"
+                    and is_trace_enabled()
+                    and is_trace_cell(shop_id=self.shop_id, adv_id=adv.adv_id)
+                ):
+                    log_cluster_bid_trace(
+                        step="tick_filtered",
+                        shop_id=self.shop_id,
+                        adv_id=adv.adv_id,
+                        in_advs_filtred=False,
+                        stale_reason="stale_over_6h",
+                        stats_freshness_kind=kind,
+                    )
             elif state.is_fresh:
                 fresh.append(adv)
+                if (
+                    operation_name == "update_cluster_bids"
+                    and is_trace_enabled()
+                    and is_trace_cell(shop_id=self.shop_id, adv_id=adv.adv_id)
+                ):
+                    log_cluster_bid_trace(
+                        step="tick_filtered",
+                        shop_id=self.shop_id,
+                        adv_id=adv.adv_id,
+                        in_advs_filtred=True,
+                        stale_reason="",
+                        stats_freshness_kind=kind,
+                    )
             else:
+                if (
+                    operation_name == "update_cluster_bids"
+                    and is_trace_enabled()
+                    and is_trace_cell(shop_id=self.shop_id, adv_id=adv.adv_id)
+                ):
+                    log_cluster_bid_trace(
+                        step="tick_filtered",
+                        shop_id=self.shop_id,
+                        adv_id=adv.adv_id,
+                        in_advs_filtred=False,
+                        stale_reason=state.reason,
+                        stats_freshness_kind=kind,
+                    )
                 logger.debug(
                     "Automation skipped by stale stats: shop_id=%s adv_id=%s op=%s reason=%s",
                     self.shop_id,
@@ -354,11 +404,24 @@ class CoroutinesManager:
         logger.debug("Все ставки обновлены для магазина %s", self.shop_id)
         return None
 
-    @staticmethod
-    async def __run_bidder_process_for_adv(complex_adv:  ComplexAdv, wb_api: WBApi) -> None:
+    async def __run_bidder_process_for_adv(
+        self, complex_adv: ComplexAdv, wb_api: WBApi
+    ) -> None:
         adv_setting: AdvSetting = complex_adv.adv_setting
         keywords = await complex_adv.get_keywords()
-        await run_bidder_process_for_adv(adv_setting, wb_api, keywords)
+        v3_safety_cap_by_keyword_setting_original_id = (
+            await build_v3_safety_cap_by_keyword_setting_original_id(
+                complex_adv,
+                keywords,
+                wb_shop_data_manager=self._wb_shop_data_manager,
+            )
+        )
+        await run_bidder_process_for_adv(
+            adv_setting,
+            wb_api,
+            keywords,
+            v3_safety_cap_by_keyword_setting_original_id=v3_safety_cap_by_keyword_setting_original_id,
+        )
 
     @while_coroutine_decorator(60 * 5, 5)
     async def update_common_sale_stat(self) -> None:
@@ -457,13 +520,22 @@ class CoroutinesManager:
         advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs, _ = await self._split_advs_by_stats_freshness(
+        advs_filtred, _ = await self._split_advs_by_stats_freshness(
             advs, operation_name="adv_settings_auto_update"
         )
         control_system_v2 = AdvControlSystem(max_last_period=2)
         from .services.auto_updater_v3 import process_adv_v3
-
+        # TODO: Убрал фильтрацию в качестве быстрого фикса, т.к. новая модель v3 отключала все ключи, и потом не включала, потому что стата кластеров не свежая, а она не свежая, потому что ключи все OFF
         handlers: list[Callable[[], Awaitable[Any]]] = []
+        for adv in advs_filtred:
+            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
+            if ver == 2:
+                handlers.append(
+                    functools.partial(control_system_v2.process_adv, adv)
+                )
+                continue
+
+
         for adv in advs:
             ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
             if ver == 3:
@@ -474,13 +546,11 @@ class CoroutinesManager:
                         wb_shop_data_manager=self._wb_shop_data_manager,
                     )
                 )
-            elif ver == 2:
-                handlers.append(
-                    functools.partial(control_system_v2.process_adv, adv)
-                )
-            else:
-                logger.error('Установлена не поддерживаемая версия автоапдейтера')
-                continue
+        for adv in advs:
+            if adv.auto_updater_version not in [2, 3]:
+                logger.error('Установлена не поддерживаемая версия автоапдейтера '
+                             'shop_id %s', self.shop_id)
+
 
         if not handlers:
             return None
@@ -764,9 +834,11 @@ class CoroutinesManager:
                 adv_setting_id = adv_setting.id
                 if adv.use_common_budget:
                     handlers.append(
-                        lambda adv_setting_id_=adv_setting_id,
+                        lambda adv_=adv,
+                               adv_setting_id_=adv_setting_id,
                                wb_manager_hub_=wb_manager_hub: (
                             self._auto_budget_service.ensure_common_budget(
+                                adv_,
                                 adv_setting_id_,
                                 wb_manager_hub_,
                             )
@@ -783,10 +855,12 @@ class CoroutinesManager:
                         )
                     for campaign_type, adv_id in campaign_checks:
                         handlers.append(
-                            lambda adv_setting_id_=adv_setting_id,
+                            lambda  adv_=adv,
+                            adv_setting_id_=adv_setting_id,
                                    campaign_type_=campaign_type,
                                    wb_manager_hub_=wb_manager_hub: (
                                 self._auto_budget_service.ensure_budget(
+                                    adv_,
                                     adv_setting_id_,
                                     campaign_type_,
                                     wb_manager_hub_,
@@ -864,6 +938,7 @@ class CoroutinesManager:
                 AdvType.SEARCH if kind == "search" else AdvType.AUTO
             )
             _ = await self._auto_budget_service.ensure_common_budget(
+                adv,
                 setting_id,
                 hub,
                 force_after_start_rejection=force,
@@ -872,6 +947,7 @@ class CoroutinesManager:
             return
         if kind == "search" and (adv.search_auto_budget_daily_limit or 0) > 0 and adv.search_adv_id:
             _ = await self._auto_budget_service.ensure_budget(
+                adv,
                 setting_id,
                 AdvType.SEARCH,
                 hub,
@@ -880,6 +956,7 @@ class CoroutinesManager:
             return
         if kind == "auto" and (adv.auto_budget_daily_limit or 0) > 0 and adv.adv_id:
             _ = await self._auto_budget_service.ensure_budget(
+                adv,
                 setting_id,
                 AdvType.AUTO,
                 hub,
@@ -890,6 +967,8 @@ class CoroutinesManager:
     async def update_clusters_adv_stats_today(self) -> None:
         """Обновление статистики кластеров за сегодня."""
 
+        diag_enabled = _cluster_stats_diagnostic_enabled()
+        started_at = time.perf_counter()
         wb_manager_hub = self._wb_manager_hub
         container = ClustersAdvStatUpdaterContainer(
             _wb_manager_hub=wb_manager_hub
@@ -900,16 +979,76 @@ class CoroutinesManager:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
-        updated_original_adv_ids = await updater.update_today_stats(
-            complex_advs
-        )
+        if diag_enabled:
+            logger.debug(
+                "cluster_stats_diagnostic step=start shop_id=%s complex_advs_count=%s",
+                self.shop_id,
+                len(complex_advs),
+            )
+        if not complex_advs:
+            elapsed_sec = time.perf_counter() - started_at
+            logger.warning(
+                "cluster_stats_diagnostic step=empty shop_id=%s complex_advs_count=0 "
+                "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "timestamp_not_updated=true",
+                self.shop_id,
+                elapsed_sec,
+            )
+            return None
+        try:
+            updated_original_adv_ids = await updater.update_today_stats(
+                complex_advs
+            )
+        except Exception as exc:
+            elapsed_sec = time.perf_counter() - started_at
+            logger.exception(
+                "cluster_stats_diagnostic step=error shop_id=%s complex_advs_count=%s "
+                "updated_original_adv_ids_count=0 duration_sec=%.3f "
+                "exception_type=%s exception_message=%s timestamp_not_updated=true",
+                self.shop_id,
+                len(complex_advs),
+                elapsed_sec,
+                type(exc).__name__,
+                exc,
+            )
+            raise
+        if not updated_original_adv_ids:
+            elapsed_sec = time.perf_counter() - started_at
+            logger.warning(
+                "cluster_stats_diagnostic step=skipped shop_id=%s "
+                "complex_advs_count=%s updated_original_adv_ids_count=0 "
+                "duration_sec=%.3f timestamp_not_updated=true",
+                self.shop_id,
+                len(complex_advs),
+                elapsed_sec,
+            )
+            return None
+        if diag_enabled:
+            logger.debug(
+                "cluster_stats_diagnostic step=end shop_id=%s complex_advs_count=%s "
+                "updated_original_adv_ids_count=%s",
+                self.shop_id,
+                len(complex_advs),
+                len(updated_original_adv_ids),
+            )
         for adv_orig_id in updated_original_adv_ids:
-            await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
-        logger.info(
-            "heartbeat update_clusters_adv_stats_today shop_id=%s updated=%s",
-            self.shop_id,
-            len(updated_original_adv_ids),
-        )
+            try:
+                await self._redis_cluster_stat_timestamp_manager.set(adv_orig_id)
+            except Exception as exc:
+                elapsed_sec = time.perf_counter() - started_at
+                logger.exception(
+                    "cluster_stats_diagnostic step=error shop_id=%s "
+                    "original_adv_id=%s updated_original_adv_ids_count=%s "
+                    "duration_sec=%.3f exception_type=%s exception_message=%s "
+                    "timestamp_not_updated=true",
+                    self.shop_id,
+                    adv_orig_id,
+                    len(updated_original_adv_ids),
+                    elapsed_sec,
+                    type(exc).__name__,
+                    exc,
+                )
+                raise
 
         return None
 
@@ -936,33 +1075,53 @@ class CoroutinesManager:
             tasks_manager=self._tasks_manager,
         )
         update_clusters_bid_manager = container.update_cluster_bids_manager()
-        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
+        all_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
-        advs = [adv for adv in advs if adv.bot_active]
+        trace_defaults = trace_target_defaults()
+        trace_adv_id = trace_defaults.get("adv_id")
+        trace_adv = next(
+            (adv for adv in all_advs if adv.adv_id == trace_adv_id),
+            None,
+        ) if trace_adv_id is not None else None
+        if trace_adv_id is not None and is_trace_cell(
+            shop_id=self.shop_id, adv_id=trace_adv_id
+        ):
+            log_cluster_bid_trace(
+                step="tick_enter",
+                shop_id=self.shop_id,
+                adv_id=trace_adv_id,
+                in_complex_advs=trace_adv is not None,
+                bot_active=trace_adv.bot_active if trace_adv is not None else None,
+                bidder_active=trace_adv.bidder_active if trace_adv is not None else None,
+            )
+        advs = [adv for adv in all_advs if adv.bot_active]
         advs = [
             adv
             for adv in advs
             if adv.bidder_active
         ]
-        trace = ShopBatchPhaseTrace(
-            coroutine="update_cluster_bids",
-            shop_id=self.shop_id,
-            adv_ids=[adv.adv_id for adv in advs],
-        )
-        with trace.phase("split_by_stats_freshness"):
-            advs_filtred, _ = await self._split_advs_by_stats_freshness(
-                advs, operation_name="update_cluster_bids"
+        if trace_adv_id is not None and is_trace_cell(
+            shop_id=self.shop_id, adv_id=trace_adv_id
+        ):
+            log_cluster_bid_trace(
+                step="tick_pre_stale",
+                shop_id=self.shop_id,
+                adv_id=trace_adv_id,
+                passed_bot_active=trace_adv.bot_active if trace_adv is not None else None,
+                passed_bidder_active=trace_adv.bidder_active if trace_adv is not None else None,
+                in_bot_bidder_filtered=trace_adv is not None
+                and trace_adv.adv_id in {adv.adv_id for adv in advs},
             )
+
+        advs_filtred, _ = await self._split_advs_by_stats_freshness(
+            advs, operation_name="update_cluster_bids"
+        )
         if not advs_filtred:
             return None
-        trace = ShopBatchPhaseTrace(
-            coroutine="update_cluster_bids",
-            shop_id=self.shop_id,
-            adv_ids=[adv.adv_id for adv in advs_filtred],
-        )
-        with trace.phase("manager_update_cluster_bids"):
-            await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
+
+
+        await update_clusters_bid_manager.update_cluster_bids(advs_filtred)
         logger.info(
             "heartbeat update_cluster_bids shop_id=%s advs=%s",
             self.shop_id,
@@ -1262,15 +1421,15 @@ class CoroutinesManager:
                     self.shop_id,
                     complex_adv.adv_id,
                     nmid,
-                    STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB,
+                    settings.MIN_BID_SEARCH_DEFAULT,
                 )
-                min_bid = STATS_STALE_EMERGENCY_DEFAULT_SEARCH_BID_RUB
+                min_bid = int(settings.MIN_BID_SEARCH_DEFAULT)
             else:
                 min_bid = int(raw_min)
             new_bids.append(
                 NewBid(
                     new_bid=min_bid,
-                    adv_id=search_adv_id,
+                    search_adv_id=search_adv_id,
                     nmid=nmid,
                     cluster=keyword_text,
                     bidder_keyword_status=BidderKeywordStatus.GOOD,

@@ -1,9 +1,19 @@
+"""Доменный модификатор WB Promotion API для shop-runner и бота.
+
+Auto PATCH ставок (``update_auto_adv_cpm``, ``patch_auto_adv_bids_kopecks``):
+см. блок «Auto bid placement» ниже и ``_patch_auto_adv_with_placement_strategy``.
+Аукционная общая ставка — ``update_search_adv_common_cpm`` / ``set_common_bids`` (``search``).
+"""
+
 from __future__ import annotations
 
+import json
 import logging
 import typing
 from collections.abc import Awaitable
 from typing import Callable
+
+from app.core.mp.wb.api.excs import BadRequestError
 
 
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
@@ -22,6 +32,61 @@ from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.m
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Auto bid placement (PATCH /api/advert/v1/bids, только auto-РК)
+# ---------------------------------------------------------------------------
+# Допустимые placement для auto: ``combined`` (unified) и ``recommendations`` (manual
+# полка). ``search`` — только аукцион (``set_common_bids``, AdvType.SEARCH).
+#
+# 1) v2/adverts вернул ``bid_type=unified`` → один PATCH ``combined``.
+#    v2 вернул ``bid_type=manual`` → один PATCH ``recommendations``.
+#    Если WB отклонил placement (400) — **ошибка наружу, без второй попытки**.
+#    Это намеренно: v2 считается источником правды; silent fallback маскирует
+#    рассинхрон данных и неверную конфигурацию РК.
+#
+# 2) v2 miss (пустой ответ) или неизвестный ``bid_type`` → retry по порядку:
+#    ``combined`` → ``recommendations``; только на placement-400 из
+#    ``_AUTO_BID_PLACEMENT_ERROR_MARKERS``. Иная 400 — сразу raise. Обе попытки
+#    failed → raise последней BadRequestError.
+# ---------------------------------------------------------------------------
+
+_AUTO_BID_PLACEMENT_RETRY_ORDER: tuple[
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement, ...
+] = (
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED,
+    PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS,
+)
+
+_AUTO_BID_PLACEMENT_ERROR_MARKERS: tuple[str, ...] = (
+    "invalid target type recom",
+    "combined placement is disabled",
+)
+
+
+def _bad_request_message(detail: str | None) -> str:
+    """Извлечь текст ошибки WB из ``BadRequestError.detail`` (JSON или plain)."""
+    if not isinstance(detail, str):
+        return ""
+    message = detail
+    try:
+        loaded = json.loads(detail)
+        if isinstance(loaded, dict):
+            parsed_detail = loaded.get("detail") # pyright: ignore
+            if isinstance(parsed_detail, str):
+                message = parsed_detail
+    except json.JSONDecodeError:
+        pass
+    return message.lower()
+
+
+def _is_auto_bid_placement_error(exc: BadRequestError) -> bool:
+    """True, если WB отклонил PATCH из-за неверного auto-placement (combined/recom).
+
+    ``search`` не используется для auto — не распознаём ``invalid target type search``.
+    """
+    message = _bad_request_message(exc.detail)
+    return any(marker in message for marker in _AUTO_BID_PLACEMENT_ERROR_MARKERS)
 
 
 if typing.TYPE_CHECKING:
@@ -104,7 +169,7 @@ class WBModifier:
         # Конвертируем NewBid в SetNormqueryBidsCommandItem
         converted_bids = [
             SetNormqueryBidsCommandItem(
-                advert_id=bid.adv_id,
+                advert_id=bid.search_adv_id,
                 nm_id=bid.nmid,
                 norm_query=bid.cluster,
                 bid=bid.new_bid,
@@ -118,52 +183,59 @@ class WBModifier:
     async def update_auto_adv_cpm(
         self, adv_id: int, nm_bid_pairs: dict[int, int]
     ) -> None:
-        """Обновляет CPM авто-кампании через PATCH /api/advert/v1/bids (ставки в копейках)."""
-        placement = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
-        nm_bids = [
-            PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
-                nm_id=nm_id,
-                bid_kopecks=int(bid_rub * 100),
-                placement=placement,
-            )
-            for nm_id, bid_rub in nm_bid_pairs.items()
-        ]
-        body = PatchApiAdvertV1BidsBody(
-            bids=[
-                PatchApiAdvertV1BidsBodyBidsItem(
-                    advert_id=adv_id,
-                    nm_bids=nm_bids,
-                )
-            ]
-        )
-        await self._promotion_manager.patch_adv_v1_bids(body)
+        """Обновляет CPM auto-РК через PATCH /api/advert/v1/bids (вход в рублях).
 
-    async def _resolve_shelf_bid_placement(
+        Placement — ``_patch_auto_adv_with_placement_strategy`` (см. module docstring).
+        При известном ``bid_type`` из v2 ошибка WB не перехватывается: caller должен
+        увидеть сбой, если placement не подошёл.
+        """
+        if not nm_bid_pairs:
+            return None
+        nm_bid_kopecks = {
+            int(nm_id): int(bid_rub * 100) for nm_id, bid_rub in nm_bid_pairs.items()
+        }
+        await self._patch_auto_adv_with_placement_strategy(adv_id, nm_bid_kopecks)
+        return None
+
+    async def _resolve_auto_adv_bid_placement(
         self, adv_id: int
-    ) -> PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement:
-        """Placement для ставки полок: по включённым зонам РК, иначе recommendations."""
-        default = PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+    ) -> PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement | None:
+        """Placement для auto PATCH по v2/adverts.
+
+        Returns:
+            ``combined`` для ``unified``, ``recommendations`` для ``manual`` —
+            вызывающий код делает **один** PATCH без fallback.
+            ``None`` если v2 miss или ``bid_type`` неизвестен — retry в
+            ``_patch_auto_adv_with_placement_strategy``.
+
+        Для auto допустимы только ``combined`` и ``recommendations``; ``search`` —
+        аукционный путь (``set_common_bids`` / ``AdvType.SEARCH``).
+        """
         campaigns = await self._promotion_manager.get_adverts_v2_by_ids([int(adv_id)])
         if not campaigns:
-            return default
-        placements = campaigns[0].settings.placements
-        if placements.recommendations:
-            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
-        if placements.search:
-            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.SEARCH
-        return default
-
-    async def patch_auto_adv_bids_kopecks(
-        self, adv_id: int, nm_bid_kopecks: dict[int, int]
-    ) -> None:
-        """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (control ``bid_minor``).
-
-        Placement не COMBINED: для многих Auto-РК WB отдаёт 400 «combined placement is disabled»;
-        для полок используем recommendations (или search, если рекомендации выключены).
-        """
-        if not nm_bid_kopecks:
+            logger.warning("auto_adv_bid_placement_v2_miss adv_id=%s", adv_id)
             return None
-        placement = await self._resolve_shelf_bid_placement(adv_id)
+
+        bid_type = (getattr(campaigns[0], "bid_type", None) or "").lower()
+        if bid_type == "unified":
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.COMBINED
+        if bid_type == "manual":
+            return PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement.RECOMMENDATIONS
+
+        logger.warning(
+            "auto_adv_bid_placement_unknown_bid_type adv_id=%s bid_type=%s",
+            adv_id,
+            bid_type or "?",
+        )
+        return None
+
+    async def _patch_auto_adv_v1_bids(
+        self,
+        adv_id: int,
+        nm_bid_kopecks: dict[int, int],
+        placement: PatchApiAdvertV1BidsBodyBidsItemNmBidsItemPlacement,
+    ) -> None:
+        """PATCH /api/advert/v1/bids для auto-РК с явным placement."""
         nm_bids = [
             PatchApiAdvertV1BidsBodyBidsItemNmBidsItem(
                 nm_id=int(nm_id),
@@ -181,6 +253,75 @@ class WBModifier:
             ]
         )
         await self._promotion_manager.patch_adv_v1_bids(body)
+
+    async def _patch_auto_adv_with_placement_strategy(
+        self,
+        adv_id: int,
+        nm_bid_kopecks: dict[int, int],
+    ) -> None:
+        """PATCH auto-ставки с выбором placement.
+
+        Ветка A — v2 известен (``unified`` / ``manual``):
+            Один PATCH с placement из ``_resolve_auto_adv_bid_placement``.
+            ``BadRequestError`` пробрасывается без retry — нужна явная ошибка,
+            если v2 и WB расходятся (не подменяем другим placement молча).
+
+        Ветка B — v2 miss или неизвестный ``bid_type`` (resolver вернул ``None``):
+            Перебор ``_AUTO_BID_PLACEMENT_RETRY_ORDER`` (combined → recommendations).
+            Retry только при placement-400 (``_is_auto_bid_placement_error``).
+            После двух неудач — raise последней ошибки.
+
+        Side effects: WB API ``PATCH /api/advert/v1/bids``.
+        """
+        placement = await self._resolve_auto_adv_bid_placement(adv_id)
+        if placement is not None:
+            # Намеренно без try/retry: известный bid_type → fail loud.
+            await self._patch_auto_adv_v1_bids(adv_id, nm_bid_kopecks, placement)
+            return None
+
+        last_exc: BadRequestError | None = None
+        for attempt, candidate in enumerate(_AUTO_BID_PLACEMENT_RETRY_ORDER, start=1):
+            try:
+                await self._patch_auto_adv_v1_bids(adv_id, nm_bid_kopecks, candidate)
+            except BadRequestError as exc:
+                is_last = attempt >= len(_AUTO_BID_PLACEMENT_RETRY_ORDER)
+                if not _is_auto_bid_placement_error(exc) or is_last:
+                    raise
+                last_exc = exc
+                logger.warning(
+                    "auto_adv_bid_placement_retry adv_id=%s placement=%s attempt=%s err=%s",
+                    adv_id,
+                    candidate.value,
+                    attempt,
+                    exc.detail,
+                )
+                continue
+            logger.info(
+                "auto_adv_bid_placement_retry_ok adv_id=%s placement=%s attempt=%s",
+                adv_id,
+                candidate.value,
+                attempt,
+            )
+            return None
+
+        if last_exc is not None:
+            raise last_exc
+        return None
+
+    async def patch_auto_adv_bids_kopecks(
+        self, adv_id: int, nm_bid_kopecks: dict[int, int]
+    ) -> None:
+        """PATCH /api/advert/v1/bids: ``nm_bid_kopecks`` уже в копейках (shelf control).
+
+        Placement — ``_patch_auto_adv_with_placement_strategy``; при известном v2
+        типе ошибка placement не глотается (см. module docstring).
+        """
+        if not nm_bid_kopecks:
+            return None
+        normalized = {
+            int(nm_id): int(kopecks) for nm_id, kopecks in nm_bid_kopecks.items()
+        }
+        await self._patch_auto_adv_with_placement_strategy(adv_id, normalized)
         return None
 
     async def get_campaign_budget(self, adv_id: int) -> "CampaignBudgetInfo":

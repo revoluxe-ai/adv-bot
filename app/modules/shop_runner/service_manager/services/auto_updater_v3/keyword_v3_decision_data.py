@@ -1,22 +1,6 @@
-"""Уровни данных V3 по ключу: свои CH+conv → агрегат РК → max среди ключей → N-state.
+"""Уровни данных V3 по ключу: FULL (CH+своя conv), иначе tier через ``keyword_v3_eligibility``.
 
-``NO_CH_MATRIX`` — нет CH bid profile. ``NO_CONV`` — матрица есть, conv нельзя импутировать.
-Недостаток своей conv/CPO не отправляет ключ в ``plan_no_data_keyword_actions``: подставляется
-``effective_conv`` для ``build_mode_candidates`` / M1/M2/M3 с отдельным ``KeywordV3DecisionTier``.
-
-Два независимых контура себестоимости (намеренно не смешиваются):
-
-1. **NO CH + свой V2 CPO** (``KeywordDataTier.KEYWORD_NO_CH_PROFILE_WITH_OWN_CONV``):
-   MIN-only, ``target_place=0``. Лестница/UI/expansion MIN — ``resolve_no_ch_operational_pay_for_order_cost``
-   (``keyword.pay_for_order``). Границы UP/trim/OVERSPEND — та же метрика. Импутация conv по РК **не** применяется.
-
-2. **CH + импутированная conv** (``RK_AGGREGATE`` / ``PEER_MAX``):
-   Лестница M/O/C через ``effective_conv_for_v3`` → ``build_mode_candidates`` /
-   ``predicted_cpa`` по CH-матрице. ``resolve_keyword_v2_pay_for_order_cost`` здесь **не**
-   пересчитывает CPO с imputed conv: это метрика **своего** V2 (conv + rating CPM), без bid_log.
-
-``resolve_keyword_v2_pay_for_order_cost`` также **не** подставляет ``keyword.pay_for_order`` —
-иначе смешиваются rating CPM и каскад bid_log (см. ``candidates.resolve_effective_state_cost``).
+``NO_CH_MATRIX`` / ``NO_CONV`` — decision tier для диагностики; продуктовый tier — FULL/PFO/NO DATA.
 """
 
 from __future__ import annotations
@@ -27,12 +11,6 @@ from typing import TYPE_CHECKING
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
-)
-from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
-    PositionProfilePoint,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
-    AggressionTargetMode,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub import (
     calc_orders_per_1000_rub,
@@ -46,22 +24,11 @@ if TYPE_CHECKING:
 
 
 class KeywordV3DecisionTier(str, Enum):
-    """Источник conv/CPO для лестницы V3 (не путать с ``SalesStates.NO_DATA`` кампании)."""
+    """Источник conv для диагностики (не путать с ``KeywordDataTier``)."""
 
     FULL = "full"
-    """Свои показы и conv_views_to_orders + CH-матрица."""
-
-    RK_AGGREGATE = "rk_aggregate"
-    """Средневзвешенная conv по ключам РК с показами (как общая статистика V2/CH)."""
-
-    PEER_MAX = "peer_max"
-    """Max conv среди других ключей РК с показами (нет своих показов)."""
-
     NO_CH_MATRIX = "no_ch_matrix"
-    """Нет CH bid profile — только N-state activation (MIN_CPA / target_place=0)."""
-
     NO_CONV = "no_conv"
-    """CH bid profile есть, conv нельзя импутировать ни из одного источника."""
 
 
 _N_STATE_TIERS: frozenset[KeywordV3DecisionTier] = frozenset(
@@ -74,14 +41,11 @@ _N_STATE_TIERS: frozenset[KeywordV3DecisionTier] = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class CampaignV3DecisionCache:
-    """Предрасчёт на список contexts: один проход по РК вместо O(n) повторов."""
-
-    weighted_conv: float | None
+    """Заглушка для совместимости call sites (агрегат РК удалён)."""
 
     @classmethod
     def from_contexts(cls, contexts: list["KeywordV3Context"]) -> CampaignV3DecisionCache:
-        """Средневзвешенная conv по ключам с показами (для ``RK_AGGREGATE``)."""
-        return cls(weighted_conv=_weighted_campaign_conv(contexts))
+        return cls()
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,15 +54,19 @@ class KeywordV3Decision:
 
     tier: KeywordV3DecisionTier
     effective_conv_views_to_orders: float | None
-    imputed: bool
     has_ch_position_profile: bool
 
     @property
+    def imputed(self) -> bool:
+        """Imputed conv удалён — всегда ``False``."""
+        return False
+
+    @property
     def in_ladder_pool(self) -> bool:
-        """Участвует в M1/M2/M3 / gap-rebalance с CH (не N-state preamble)."""
+        """Участвует в ladder-фазах только FULL с своей conv."""
         return (
             self.has_ch_position_profile
-            and self.tier not in _N_STATE_TIERS
+            and self.tier == KeywordV3DecisionTier.FULL
             and self.effective_conv_views_to_orders is not None
             and self.effective_conv_views_to_orders > 0
         )
@@ -109,11 +77,11 @@ def _keyword_has_own_conv(keyword: CalculatedKeyword) -> bool:
     return stat.views > 0 and keyword.conv_views_to_orders > 0
 
 
-def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
-    """CPM как в рейтинге/карточке: set_bid → stats → cluster_stat, без bid_log/api.
+keyword_has_own_conv = _keyword_has_own_conv
 
-    Нулевые значения пропускаются (не блокируют fall-through), как для ``cluster_stat.cpm``.
-    """
+
+def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
+    """CPM как в рейтинге/карточке: set_bid → stats → cluster_stat, без bid_log/api."""
     sources = keyword.cpm_sources
     if sources is not None:
         if sources.cpm_set_bid is not None and int(sources.cpm_set_bid) > 0:
@@ -126,25 +94,33 @@ def rating_aligned_cpm(keyword: CalculatedKeyword) -> float | None:
     return None
 
 
-def pessimistic_min_cpa_cost(
-    worst_costs: dict[AggressionTargetMode, float] | None,
-) -> float | None:
-    """Worst (max) predicted CPA по MIN_CPA среди ключей РК с CH-матрицей."""
-    if worst_costs is None:
+def keyword_has_v2_cpo(keyword: CalculatedKeyword) -> bool:
+    """Есть **свой** V2 CPO: conv ключа + rating CPM."""
+    return resolve_keyword_v2_pay_for_order_cost(keyword) is not None
+
+
+def resolve_keyword_v2_pay_for_order_cost(keyword: CalculatedKeyword) -> float | None:
+    """Себестоимость V2: только conv ключа + rating CPM (без worst/imputed)."""
+    conv = keyword.conv_views_to_orders
+    if conv <= 0:
         return None
-    cost = worst_costs.get(AggressionTargetMode.MIN_CPA)
-    if cost is None or cost <= 0:
+    cpm = rating_aligned_cpm(keyword)
+    if cpm is None or cpm <= 0:
         return None
-    return float(cost)
+    orders = calc_orders_per_1000_rub(float(conv), cpm)
+    if orders is None:
+        return None
+    result = calc_pay_for_order(orders)
+    return None if result is None else float(result)
 
 
 def resolve_no_ch_operational_pay_for_order_cost(
     keyword: CalculatedKeyword,
 ) -> float | None:
-    """Операционная себестоимость NO CH tier: ``keyword.pay_for_order`` (как в карточке Telegram).
+    """Операционная себестоимость NO CH: ``keyword.pay_for_order`` (как в карточке UI).
 
-    Используется в ``cost_for_mode`` / UI вместо ``resolve_keyword_v2_pay_for_order_cost``
-    (rating CPM без bid_log). Trim/guard/expansion для NO CH — та же метрика.
+    Используется в сортировке UI и границах NO CH tier вместо
+    ``resolve_keyword_v2_pay_for_order_cost`` (rating CPM без bid_log).
     """
     pfo = keyword.pay_for_order
     if pfo is None:
@@ -155,119 +131,22 @@ def resolve_no_ch_operational_pay_for_order_cost(
     return value
 
 
-def keyword_has_v2_cpo(
-    keyword: CalculatedKeyword,
-    *,
-    worst_costs: dict[AggressionTargetMode, float] | None = None,
-) -> bool:
-    """Есть **свой** V2 CPO: ``keyword.conv_views_to_orders`` + rating CPM или pessimistic MIN.
-
-    Не означает «можно считать лестницу с imputed conv» — для CH+импутации см.
-    ``resolve_keyword_v3_decision`` / ``effective_conv_for_v3``.
-    """
-    return (
-        resolve_keyword_v2_pay_for_order_cost(keyword, worst_costs=worst_costs)
-        is not None
-    )
-
-
-def resolve_keyword_v2_pay_for_order_cost(
-    keyword: CalculatedKeyword,
-    *,
-    worst_costs: dict[AggressionTargetMode, float] | None = None,
-) -> float | None:
-    """Себестоимость для NO-CH MIN и флага «свой V2 CPO»: **только** conv ключа + rating CPM.
-
-    Намеренно **не** использует:
-
-    - ``keyword.pay_for_order`` — там полный CPM-каскад (set_bid → bid_log → stats);
-    - imputed ``effective_conv`` — для CH+RK_AGGREGATE/PEER_MAX экономика идёт через
-      ``build_mode_candidates(profile, conv=effective_conv_for_v3(...))``, не через эту функцию.
-
-    При отсутствии rating CPM возвращает ``worst_costs[MIN_CPA]`` — worst predicted CPA
-    по ключам РК с CH-матрицей (pessimistic fallback для NO CH без CPM).
-
-    Операционные границы (bootstrap UP, OVERSPEND trim) для tier NO CH — ``keyword.pay_for_order``
-    в ``no_data_activation._no_ch_bootstrap_allowed_by_pay_for_order`` и
-    ``rollout_planner.keyword_pay_for_order_exceeds_max``.
-    """
-    conv = keyword.conv_views_to_orders
-    if conv is None or conv <= 0:
-        return None
-    cpm = rating_aligned_cpm(keyword)
-    if cpm is not None and cpm > 0:
-        orders = calc_orders_per_1000_rub(float(conv), cpm)
-        if orders is None:
-            return None
-        result = calc_pay_for_order(orders)
-        return None if result is None else float(result)
-    return pessimistic_min_cpa_cost(worst_costs)
-
-
-def _weighted_campaign_conv(contexts: list["KeywordV3Context"]) -> float | None:
-    """Средневзвешенная conv показ→заказ по ключам РК с показами в окне."""
-    num = 0.0
-    den = 0.0
-    for ctx in contexts:
-        stat = ctx.keyword.cluster_stat
-        views = int(stat.views)
-        if views <= 0:
-            continue
-        conv = float(ctx.keyword.conv_views_to_orders)
-        if conv <= 0:
-            continue
-        num += conv * views
-        den += float(views)
-    if den <= 0:
-        return None
-    return num / den
-
-
-def _peer_max_conv(
-    ctx: "KeywordV3Context",
-    contexts: list["KeywordV3Context"],
-) -> float | None:
-    """Максимум conv среди других ключей РК с показами."""
-    own_text = ctx.keyword.text.lower()
-    best: float | None = None
-    for other in contexts:
-        if other.keyword.text.lower() == own_text:
-            continue
-        conv = float(other.keyword.conv_views_to_orders)
-        if conv <= 0:
-            continue
-        if best is None or conv > best:
-            best = conv
-    return best
-
-
 def resolve_keyword_v3_decision(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
     *,
     campaign_cache: CampaignV3DecisionCache | None = None,
 ) -> KeywordV3Decision:
-    """Цепочка: свои данные → агрегат РК → max по соседям → N-state (нет CH или conv).
-
-    Args:
-        campaign_cache: если задан, ``weighted_conv`` не пересчитывается на каждый ключ.
-    """
+    """Цепочка: CH+своя conv → FULL; иначе NO_CH / NO_CONV без импутации."""
+    _ = contexts, campaign_cache
     profile = ctx.position_profile
     has_ch = bool(profile)
     if not has_ch:
-        if keyword_has_v2_cpo(ctx.keyword):
-            conv = ctx.keyword.conv_views_to_orders
-            eff_conv = float(conv) if conv is not None and conv > 0 else None
-            return KeywordV3Decision(
-                tier=KeywordV3DecisionTier.NO_CH_MATRIX,
-                effective_conv_views_to_orders=eff_conv,
-                imputed=False,
-                has_ch_position_profile=False,
-            )
+        conv = ctx.keyword.conv_views_to_orders
+        eff_conv = float(conv) if conv > 0 else None
         return KeywordV3Decision(
             tier=KeywordV3DecisionTier.NO_CH_MATRIX,
-            effective_conv_views_to_orders=None,
-            imputed=False,
+            effective_conv_views_to_orders=eff_conv,
             has_ch_position_profile=False,
         )
 
@@ -275,36 +154,12 @@ def resolve_keyword_v3_decision(
         return KeywordV3Decision(
             tier=KeywordV3DecisionTier.FULL,
             effective_conv_views_to_orders=float(ctx.keyword.conv_views_to_orders),
-            imputed=False,
-            has_ch_position_profile=True,
-        )
-
-    agg = (
-        campaign_cache.weighted_conv
-        if campaign_cache is not None
-        else _weighted_campaign_conv(contexts)
-    )
-    if agg is not None and agg > 0:
-        return KeywordV3Decision(
-            tier=KeywordV3DecisionTier.RK_AGGREGATE,
-            effective_conv_views_to_orders=agg,
-            imputed=True,
-            has_ch_position_profile=True,
-        )
-
-    peer = _peer_max_conv(ctx, contexts)
-    if peer is not None and peer > 0:
-        return KeywordV3Decision(
-            tier=KeywordV3DecisionTier.PEER_MAX,
-            effective_conv_views_to_orders=peer,
-            imputed=True,
             has_ch_position_profile=True,
         )
 
     return KeywordV3Decision(
         tier=KeywordV3DecisionTier.NO_CONV,
         effective_conv_views_to_orders=None,
-        imputed=False,
         has_ch_position_profile=True,
     )
 
@@ -315,17 +170,20 @@ def effective_conv_for_v3(
     *,
     campaign_cache: CampaignV3DecisionCache | None = None,
 ) -> float | None:
-    """Conv для ``build_mode_candidates`` с учётом импутации."""
-    return resolve_keyword_v3_decision(
+    """Conv для ``build_mode_candidates`` — только FULL (своя conv)."""
+    decision = resolve_keyword_v3_decision(
         ctx, contexts, campaign_cache=campaign_cache
-    ).effective_conv_views_to_orders
+    )
+    if decision.tier != KeywordV3DecisionTier.FULL:
+        return None
+    return decision.effective_conv_views_to_orders
 
 
 def keyword_lacks_v3_decision_data(
     ctx: "KeywordV3Context",
     contexts: list["KeywordV3Context"],
 ) -> bool:
-    """Keyword-level bootstrap (INVALID tier): нет данных даже для MIN-only ladder."""
+    """Keyword-level NO DATA tier."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
         KeywordDataTier,
         resolve_keyword_v3_eligibility,
@@ -333,7 +191,7 @@ def keyword_lacks_v3_decision_data(
 
     return (
         resolve_keyword_v3_eligibility(ctx, contexts).data_tier
-        == KeywordDataTier.KEYWORD_INVALID
+        == KeywordDataTier.KEYWORD_NO_DATA
     )
 
 
@@ -341,37 +199,17 @@ def keyword_v2_pay_for_order_unavailable_with_conv(
     keyword: CalculatedKeyword,
     *,
     conv_views_to_orders: float | None,
-    worst_costs: dict[AggressionTargetMode, float] | None = None,
 ) -> bool:
-    """«Нет **своего** V2 CPO» для диагностики; imputed conv в расчёт **не** подставляется.
-
-    ``conv_views_to_orders`` — только guard «есть ли effective conv у decision tier»
-    (``None``/``<=0`` → unavailable). Дальше проверяется **собственная** conv ключа через
-    ``resolve_keyword_v2_pay_for_order_cost(keyword)`` — это ожидаемо:
-
-    - tier ``RK_AGGREGATE``/``PEER_MAX``: updater живёт на CH+imputed conv, не на V2 CPO;
-      ``has_v2_cpo=False`` здесь = «нет своего V2», не «ключ INVALID».
-    - tier ``NO_CH_MATRIX``: imputed conv не бывает; границы — ``keyword.pay_for_order``.
-
-    Не расширять до ``calc_orders_per_1000_rub(imputed_conv, cpm)`` без смены контракта
-    метрик (см. module docstring).
-    """
+    """«Нет своего V2 CPO» для диагностики."""
     if conv_views_to_orders is None or conv_views_to_orders <= 0:
         return True
-    return (
-        resolve_keyword_v2_pay_for_order_cost(
-            keyword, worst_costs=worst_costs
-        )
-        is None
-    )
+    return resolve_keyword_v2_pay_for_order_cost(keyword) is None
 
 
 def tier_label_ru(tier: KeywordV3DecisionTier) -> str:
     """Короткая подпись уровня данных для UI."""
     return {
         KeywordV3DecisionTier.FULL: "свои CH+conv",
-        KeywordV3DecisionTier.RK_AGGREGATE: "агрегат РК",
-        KeywordV3DecisionTier.PEER_MAX: "max conv по РК",
         KeywordV3DecisionTier.NO_CH_MATRIX: "нет матрицы CH",
-        KeywordV3DecisionTier.NO_CONV: "нет conv (импутация невозможна)",
+        KeywordV3DecisionTier.NO_CONV: "нет своей conv",
     }[tier]

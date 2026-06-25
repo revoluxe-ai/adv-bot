@@ -1,6 +1,5 @@
 from aiogram import Router
 from aiogram.fsm.scene import SceneRegistry
-from aiogram.utils import callback_answer
 
 from ..modules.admin_user_balance.scene import (
     UserBalanceScene,
@@ -18,12 +17,10 @@ from .user_interface.handlers import gate, request_presentation, start
 
 global_router = Router()
 
-# Pre-answer must run before GateMiddleware/DB work to avoid stale callbacks.
+# Pre-answer: ImmediateCallbackAnswerUpdateMiddleware на Dispatcher (dispatcher_factory).
+
 _ = global_router.message.middleware(ReturnToStart())
 _ = global_router.message.middleware(GateMiddleware())
-_ = global_router.callback_query.middleware(
-    callback_answer.CallbackAnswerMiddleware(pre=True, text="Запрос в обработке"),
-)
 _ = global_router.callback_query.middleware(GateMiddleware())
 # Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
 # иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.

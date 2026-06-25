@@ -365,6 +365,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
                     keyword,
                     automatic_version=adv_setting.automatic_version,
                     hard_status_override=int(keyword.hard_status),
+                    adv_strategy=adv_setting.strategy,
                 )
                 session.add(keyword)
             await session.commit()

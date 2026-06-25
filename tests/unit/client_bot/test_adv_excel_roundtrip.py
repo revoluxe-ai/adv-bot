@@ -14,8 +14,10 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     column_header,
     edit_header,
     enum_names_for_field,
+    header_type_suffix,
     parse_edit_value,
     parse_header,
+    serialize_shelf_bid_control_cell,
 )
 from app.client_bot.user_interface.handlers.adv_excel_roundtrip import _ProgressReporter
 from app.client_bot.user_interface.services.adv_excel_roundtrip.export_build import (
@@ -60,6 +62,15 @@ def test_edit_header_aggressiveness_uses_orm_field_name() -> None:
 
 
 @pytest.mark.unit
+def test_edit_header_keyword_calibration_step_uses_orm_field_name() -> None:
+    h = edit_header("keyword_calibration_max_step")
+    k, f, s = parse_header(h)
+    assert k == "EDIT"
+    assert f == "keyword_calibration_max_step"
+    assert s == "INT"
+
+
+@pytest.mark.unit
 def test_parse_header_edit_bool() -> None:
     k, f, s = parse_header("EDIT__bot_active__BOOL")
     assert k == "EDIT"
@@ -81,6 +92,13 @@ def test_column_header_contains_tech_key() -> None:
     h = column_header("RO", "adv_id")
     assert "ID единой ставки" in h
     assert "(RO__adv_id)" in h
+
+
+@pytest.mark.unit
+def test_column_header_auto_common_budget_label() -> None:
+    h = column_header("EDIT", "auto_common_budget", "BOOL")
+    assert "Авторасчёт общего бюджета" in h
+    assert "(EDIT__auto_common_budget__BOOL)" in h
 
 
 @pytest.mark.unit
@@ -111,8 +129,42 @@ def test_enum_names_for_field_strategy() -> None:
 
 
 @pytest.mark.unit
+def test_parse_edit_bool_v3_raise_max_cpo() -> None:
+    assert parse_edit_value("substitute_fact_cpo_for_max", "TRUE") is True
+    assert parse_edit_value("substitute_fact_cpo_for_max", "FALSE") is False
+    assert header_type_suffix("substitute_fact_cpo_for_max") == "BOOL"
+
+
+@pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION == 2
+    assert EXCEL_TEMPLATE_VERSION == 5
+
+
+@pytest.mark.unit
+def test_edit_header_auto_shelf_max_bid_uses_technical_field_name() -> None:
+    h = edit_header("auto_shelf_max_bid_rub")
+    k, f, s = parse_header(h)
+    assert k == "EDIT"
+    assert f == "auto_shelf_max_bid_rub"
+    assert s == "INT"
+
+
+@pytest.mark.unit
+def test_parse_edit_shelf_max_bid_to_minor_units() -> None:
+    assert parse_edit_value("auto_shelf_max_bid_rub", 600) == 60_000
+    assert parse_edit_value("auto_shelf_min_bid_distance_rub", "1") == 100
+
+
+@pytest.mark.unit
+def test_parse_edit_shelf_test_share_accepts_percent_input() -> None:
+    assert parse_edit_value("auto_shelf_test_share", "10") == pytest.approx(0.1)
+    assert parse_edit_value("auto_shelf_test_share", 0.1) == pytest.approx(0.1)
+
+
+@pytest.mark.unit
+def test_serialize_edit_shelf_values_converts_minor_units_to_rubles() -> None:
+    assert serialize_shelf_bid_control_cell("auto_shelf_max_bid_rub", 60_000) == 600.0
+    assert serialize_shelf_bid_control_cell("auto_shelf_min_bid_distance_rub", 100) == 1.0
 
 
 @pytest.mark.unit

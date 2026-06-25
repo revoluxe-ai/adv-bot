@@ -24,13 +24,14 @@ from app.client_bot.user_interface.views.messages.auto_shelf_bid_control_render 
     BID_POINT_VIEWER_HEADER,
     build_auto_shelf_bid_control_keyboard,
     build_auto_shelf_bid_settings_keyboard,
+    build_auto_shelf_bid_strategy_keyboard,
     bid_point_viewer_page_count,
     build_bid_point_viewer_keyboard,
     clamp_bid_point_page,
     render_auto_shelf_bid_control_message,
     render_auto_shelf_bid_settings_message,
+    render_auto_shelf_bid_strategy_message,
     render_bid_point_viewer_message,
-    select_cycle_bid_points_for_viewer,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -38,6 +39,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager import (
     AutoShelfBidControlTelegramError,
     AutoShelfBidControlTelegramService,
+)
+from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_strategy import (
+    AutoShelfBidControlStrategy,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -56,12 +60,17 @@ async def _show_bid_point_viewer(
         True, если экран показан; False, если покрытий нет.
     """
     view = await service.build_view(adv_setting_original_id)
-    points = select_cycle_bid_points_for_viewer(view.cycle_bid_points)
+    points = view.coverage_bid_rows
     if not points:
         return False
     total_pages = bid_point_viewer_page_count(len(points))
     safe_page = clamp_bid_point_page(index, total_pages)
-    text = render_bid_point_viewer_message(safe_page, points)
+    text = render_bid_point_viewer_message(
+        safe_page,
+        points,
+        currency=view.currency,
+        optimization_metric=view.optimization_metric,
+    )
     keyboard = build_bid_point_viewer_keyboard(
         adv_setting_original_id,
         safe_page,
@@ -90,6 +99,7 @@ async def _send_main_screen(
     service: AutoShelfBidControlTelegramService,
     adv_setting_original_id: int,
 ) -> None:
+    await service.apply_main_bid_refresh_if_needed(adv_setting_original_id)
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_control_message(view)
     keyboard = build_auto_shelf_bid_control_keyboard(view, adv_setting_original_id)
@@ -105,7 +115,20 @@ async def _send_settings_screen(
 ) -> None:
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_settings_message(view)
-    keyboard = build_auto_shelf_bid_settings_keyboard(adv_setting_original_id)
+    keyboard = build_auto_shelf_bid_settings_keyboard(view, adv_setting_original_id)
+    if callback.message:
+        await callback.message.answer(text, reply_markup=keyboard)
+
+
+async def _send_strategy_screen(
+    callback: CallbackQuery,
+    *,
+    service: AutoShelfBidControlTelegramService,
+    adv_setting_original_id: int,
+) -> None:
+    view = await service.build_view(adv_setting_original_id)
+    text = render_auto_shelf_bid_strategy_message(view)
+    keyboard = build_auto_shelf_bid_strategy_keyboard(view, adv_setting_original_id)
     if callback.message:
         await callback.message.answer(text, reply_markup=keyboard)
 
@@ -156,7 +179,7 @@ async def auto_shelf_bid_control_bid_points_router(
         )
         if not shown and callback.message:
             await callback.message.answer(
-                "В текущем цикле пока нет ставок с показами."
+                "В покрытии ставок теста пока нет доступных строк."
             )
     except AutoShelfBidControlTelegramError as exc:
         if callback.message:
@@ -173,7 +196,7 @@ async def auto_shelf_bid_control_menu_router(
     redis_client: RedisClient = Provide["redis_client_wrapper"],
 ) -> None:
     """Маршрутизация callback actions для Telegram-управления ставкой в полках."""
-    action = callback_data.action
+    action = callbacks.normalize_auto_shelf_bid_control_action(callback_data.action)
     adv_setting_original_id = callback_data.adv_setting_original_id
     service = AutoShelfBidControlTelegramService(redis_client=redis_client)
     try:
@@ -185,6 +208,12 @@ async def auto_shelf_bid_control_menu_router(
             )
         elif action == "settings":
             await _send_settings_screen(
+                callback,
+                service=service,
+                adv_setting_original_id=adv_setting_original_id,
+            )
+        elif action == "strategy_menu":
+            await _send_strategy_screen(
                 callback,
                 service=service,
                 adv_setting_original_id=adv_setting_original_id,
@@ -249,6 +278,15 @@ async def auto_shelf_bid_control_menu_router(
                 await callback.message.answer(
                     "Введите количество показов на одну тестовую ставку.\nНапример: 500"
                 )
+        elif action == "set_target_test_observation_minutes":
+            await state.update_data(adv_setting_original_id=adv_setting_original_id)
+            await state.set_state(
+                states.AutoShelfBidControlFSM.waiting_for_target_test_observation_minutes
+            )
+            if callback.message:
+                await callback.message.answer(
+                    "Введите минимальное время теста в минутах.\nПример: 60\nМинимум: 60 минут."
+                )
         elif action == "set_min_bid_distance":
             await state.update_data(adv_setting_original_id=adv_setting_original_id)
             await state.set_state(
@@ -259,6 +297,28 @@ async def auto_shelf_bid_control_menu_router(
                     "Введите минимальный шаг между тестовыми ставками, в рублях.\n"
                     "Например: 1"
                 )
+        elif action in {
+            "set_strategy_plan_distance",
+            "set_strategy_ctr",
+            "set_strategy_cpc",
+        }:
+            strategy = {
+                "set_strategy_plan_distance": AutoShelfBidControlStrategy.PLAN_DISTANCE,
+                "set_strategy_ctr": AutoShelfBidControlStrategy.CTR,
+                "set_strategy_cpc": AutoShelfBidControlStrategy.CPC,
+            }[action]
+            _ = await service.set_strategy(adv_setting_original_id, strategy)
+            view = await service.build_view(adv_setting_original_id)
+            text = render_auto_shelf_bid_strategy_message(view)
+            keyboard = build_auto_shelf_bid_strategy_keyboard(
+                view, adv_setting_original_id
+            )
+            if callback.message:
+                try:
+                    await callback.message.edit_text(text, reply_markup=keyboard)
+                except TelegramBadRequest as exc:
+                    if "message is not modified" not in str(exc).lower():
+                        raise
         elif action == "back":
             if callback.message and callback.from_user:
                 await _reload_adv_setting_menu(
@@ -299,7 +359,7 @@ async def _handle_fsm_update(
     await message.answer("Настройка сохранена.")
     view = await service.build_view(int(adv_setting_original_id))
     text = render_auto_shelf_bid_settings_message(view)
-    keyboard = build_auto_shelf_bid_settings_keyboard(int(adv_setting_original_id))
+    keyboard = build_auto_shelf_bid_settings_keyboard(view, int(adv_setting_original_id))
     await message.answer(text, reply_markup=keyboard)
     await state.clear()
 
@@ -351,6 +411,23 @@ async def auto_shelf_waiting_for_target_test_impressions(
     )
 
 
+@router.message(
+    StateFilter(states.AutoShelfBidControlFSM.waiting_for_target_test_observation_minutes)
+)
+@inject
+async def auto_shelf_waiting_for_target_test_observation_minutes(
+    message: Message,
+    state: FSMContext,
+    redis_client: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    await _handle_fsm_update(
+        message=message,
+        state=state,
+        redis_client=redis_client,
+        update_method="update_target_test_observation_minutes",
+    )
+
+
 @router.message(StateFilter(states.AutoShelfBidControlFSM.waiting_for_min_bid_distance))
 @inject
 async def auto_shelf_waiting_for_min_bid_distance(
@@ -364,4 +441,3 @@ async def auto_shelf_waiting_for_min_bid_distance(
         redis_client=redis_client,
         update_method="update_min_bid_distance",
     )
-

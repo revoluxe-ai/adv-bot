@@ -11,8 +11,8 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     FactData,
     PlanData,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator import (
-    _resolve_v3_fact_data,
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.loaders import (
+    resolve_v3_fact_data,
 )
 from app.shared.domains.wb.dto.wb_adv_dto import WBAdvDTO
 
@@ -37,7 +37,7 @@ async def test_resolve_v3_fact_data_reuses_wb_adv_dto_fact() -> None:
     updater = MagicMock()
     updater.get_fact_data = AsyncMock()
 
-    resolved, source = await _resolve_v3_fact_data(
+    resolved, source = await resolve_v3_fact_data(
         dto=dto,
         updater=updater,
         keywords=[],
@@ -56,7 +56,7 @@ async def test_resolve_v3_fact_data_falls_back_when_no_dto() -> None:
     updater = MagicMock()
     updater.get_fact_data = AsyncMock(return_value=fact)
 
-    resolved, source = await _resolve_v3_fact_data(
+    resolved, source = await resolve_v3_fact_data(
         dto=None,
         updater=updater,
         keywords=[],

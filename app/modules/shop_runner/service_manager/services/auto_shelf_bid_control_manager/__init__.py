@@ -7,6 +7,7 @@ from .auto_shelf_bid_control_telegram_service import (
     AutoShelfBidControlTelegramService,
 )
 from .auto_shelf_bid_setter import AutoShelfBidSetter
+from .dto import OptimizationMetric, resolve_optimization_metric
 
 __all__ = [
     "AutoShelfBidControlManager",
@@ -15,5 +16,7 @@ __all__ = [
     "AutoShelfBidControlTelegramService",
     "AutoShelfBidSetter",
     "ControlReason",
+    "OptimizationMetric",
+    "resolve_optimization_metric",
 ]
 
