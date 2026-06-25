@@ -316,11 +316,11 @@ async def process_cabinet_api(
     chat_id = message.chat.id
 
     # Предварительная простая валидация формата токена: отсекаем явно мусорные строки
-    token_text = text.strip()
+    token_text = text.strip() # есть очистка токен от лишних пробелов
     if len(token_text) < 24:  # эвристика: валидные токены заметно длиннее
         _= await bot.send_message(
             chat_id,
-            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
+            _build_token_invalid_format_message(),
         )
         return None
 
@@ -330,7 +330,7 @@ async def process_cabinet_api(
 
     if not validation_result.is_valid_jwt:
         logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
-        _= await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        _= await bot.send_message(chat_id, _build_token_invalid_format_message())
         return None
 
     if not validation_result.is_personal:
@@ -503,8 +503,8 @@ async def process_cabinet_api(
         if validation_result.is_read_only:
 
             await bot.send_message(
-                chat_id, ("""ВНИМАНИЕ! Добавлен токен с правами "Только для чтения".\n\n"""
-                          """Данные права позволяют использовать бот только для аналитических функций.\n\n""")
+                chat_id,
+                _build_token_read_only_added_message(),
             )
             await asyncio.sleep(3)
 
@@ -581,7 +581,7 @@ async def process_add_new_token(
     if len(token_text) < 24:
         await bot.send_message(
             chat_id,
-            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
+            _build_token_invalid_format_message(),
         )
         return None
 
@@ -602,7 +602,7 @@ async def process_add_new_token(
 
     if not validation_result.is_valid_jwt:
         logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
-        await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        await bot.send_message(chat_id, _build_token_invalid_format_message())
         return None
 
     if not validation_result.is_personal:
@@ -618,7 +618,7 @@ async def process_add_new_token(
         logger.info("Token is read-only for user %s", user_telegram_id)
         await bot.send_message(
             chat_id,
-            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
+            _build_token_read_only_rejected_message(),
         )
         await state.set_state(states.AddNewToken.token)
         return None
@@ -825,7 +825,7 @@ async def process_add_new_token(
     await bot.send_message(chat_id, "Токен проверяется...")
 
     await bot.send_message(
-        chat_id, f"Токен успешно добавлен для магазина {wb_user_cabinet.name}!"
+        chat_id, _build_token_success_added_message(wb_user_cabinet.name)
     )
 
     # Очистка состояния
