@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.client_bot.const import TELEGRAM_CAPTION_LIMIT
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
@@ -10,14 +11,16 @@ from app.client_bot.user_interface.message_templates.templates import (
 @pytest.mark.unit
 def test_split_caption_short_unchanged() -> None:
     caption = "short"
-    head, tail = TextWithKeyboardAndImage._split_caption(caption, limit=1024)
+    head, tail = TextWithKeyboardAndImage._split_caption(
+        caption, limit=TELEGRAM_CAPTION_LIMIT
+    )
     assert head == caption
     assert tail == ""
 
 
 @pytest.mark.unit
 def test_split_caption_no_gap_between_head_and_tail() -> None:
-    limit = 1024
+    limit = TELEGRAM_CAPTION_LIMIT
     suffix = "\n..."
     split_at = limit - len(suffix)
     caption = "a" * (limit + 100)

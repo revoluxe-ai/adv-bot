@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.client_bot.const import TELEGRAM_TEXT_MESSAGE_LIMIT
 from app.client_bot.user_interface.views.messages.last_v3_action_informer import (
     format_snapshot_time_msk,
 )
@@ -9,8 +10,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_re
     V3PhaseStats,
     V3TickReportSnapshot,
 )
-
-_TELEGRAM_MAX_LEN = 4096
 
 _CALIBRATION_BRANCH_RU: dict[str, str] = {
     "loosen": "UP",
@@ -198,6 +197,6 @@ def format_v3_tick_report_text(snapshot: V3TickReportSnapshot | None) -> str:
         for label, count in sorted(snapshot.hard_status_counts.items()):
             lines.append(f"  · {label}: {count}")
     text = "\n".join(lines)
-    if len(text) > _TELEGRAM_MAX_LEN:
-        return text[: _TELEGRAM_MAX_LEN - 20] + "\n\n… (обрезано)"
+    if len(text) > TELEGRAM_TEXT_MESSAGE_LIMIT:
+        return text[: TELEGRAM_TEXT_MESSAGE_LIMIT - 20] + "\n\n… (обрезано)"
     return text
