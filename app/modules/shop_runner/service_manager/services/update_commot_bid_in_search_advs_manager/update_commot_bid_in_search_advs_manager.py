@@ -27,7 +27,7 @@ class UpdateCommotBidInSearchAdvsManager:
         self._redis_common_bid_value_manager = redis_common_bid_value_manager
 
     async def update_common_bid_in_search_adv(self, adv: WBAdvDTO) -> None:
-        count_auto_keywords: int = await self._count_auto_keywords(adv)
+        count_auto_keywords: int = await self._count_candidate_to_keywords(adv)
         direct: Literal['reset', 'up']
         if count_auto_keywords > 0:
             direct = 'reset'
@@ -116,7 +116,7 @@ class UpdateCommotBidInSearchAdvsManager:
             if new_bid is not None
         ]
     @staticmethod
-    async def _count_auto_keywords(adv: WBAdvDTO) -> int:
+    async def _count_candidate_to_keywords(adv: WBAdvDTO) -> int:
         from app.modules.keywords_manager.keywords_manager import KeywordsManager
         keywords_manager = KeywordsManager()
         candidates: list[CalculatedKeyword] = await keywords_manager.get_candidates_to_white_list(adv.complex_adv)
