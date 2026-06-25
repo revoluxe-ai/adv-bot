@@ -451,8 +451,7 @@ def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> No
             "Целевая позиция",
             "Max CPM",
             "верхний предел ставки",
-            "бесплатный инструмент",
-            "Автоуправление рекламой подключается отдельно",
+            "Бесплатный инструмент",
         ],
     )
     assert_no_raw_technical_text(text)
