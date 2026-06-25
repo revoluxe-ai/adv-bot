@@ -6,13 +6,27 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.client_bot.ui_access import UiAccessMode
 from app.client_bot.user_interface.views.messages.last_auto_update_informer import (
     LastAutoUpdateSettingInformer,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.adv_setting_menu import (
     AdvSettingMenu,
 )
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.keyboard import (
+    get_adv_setting_keyboard,
+)
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from tests.helpers.telegram_message_asserts import (
+    assert_caption_within_telegram_limit,
+    assert_html_is_telegram_safe,
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_no_raw_technical_text,
+)
 
 
 def _minimal_menu_for_text(
@@ -80,6 +94,31 @@ def _extract_obnovl_block(menu: AdvSettingMenu) -> str:
     return text[start : text.index("\n", end) + 1]
 
 
+def _build_keyboard_adv() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=1,
+        adv_id=101,
+        bot_active=False,
+        individual_keywords_target_place_mode=False,
+        use_incremental_stats=False,
+        updater_common_bid_in_search_adv_active_status=False,
+        auto_budget_watchdog_enabled=False,
+        bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+        auto_update_target_place=False,
+        auto_add_only_relevant_phrase=False,
+        orders_source_for_auto_mode=OrdersSourceForAutoMode.ADV_SUM,
+        sales_predict_method=FactMethods.DIRECT_SALES,
+        automatic_version=3,
+        search_adv_id=202,
+        rec_system_mode=False,
+        keyword_calibration_max_step=4,
+        aggressiveness=2,
+        plan_for_sales_for_day=None,
+        target_price_for_order=None,
+        max_price_for_order=None,
+    )
+
+
 @pytest.mark.unit
 def test_obnovl_v3_shows_last_v3_not_bs() -> None:
     menu = _minimal_menu_for_text(
@@ -101,3 +140,38 @@ def test_obnovl_v2_shows_bs_not_v3() -> None:
     assert "добавл в БС" in block
     assert "удал из БС" in block
     assert "посл. V3" not in block
+
+
+@pytest.mark.unit
+def test_campaign_menu_free_copy_is_clear_and_safe() -> None:
+    menu = _minimal_menu_for_text(automatic_version=3, v3_last_action_str="Нет данных")
+    text = menu.text
+    keyboard = get_adv_setting_keyboard(
+        wb_user_cabinet=SimpleNamespace(id=55),
+        adv_setting=_build_keyboard_adv(),
+        in_favorites=False,
+        ui_access=UiAccessMode.FREE,
+    )
+
+    assert_caption_within_telegram_limit(text)
+    assert_html_is_telegram_safe(text)
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "меню рекламной кампании",
+            "free-режиме",
+            "ручные действия",
+            "Excel",
+            "автоуправление",
+            "подключаются отдельно",
+        ],
+    )
+    assert_no_raw_technical_text(text)
+    assert_keyboard_has_buttons(
+        keyboard,
+        [
+            "Управление ставкой",
+            "Изменить ставку в Авто",
+            "Выгрузить ключи в csv-файл",
+        ],
+    )

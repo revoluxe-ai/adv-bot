@@ -401,6 +401,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._stats_stale_reason:
                 text += f"{self._stats_stale_reason}\n"
         text += "\n"
+        text += (
+            "Это меню рекламной кампании.\n"
+            "Во free-режиме можно смотреть данные и выполнять ручные действия: "
+            "ставки, целевые позиции, Excel.\n"
+            "автоуправление рекламой и автоматическая оптимизация "
+            "подключаются отдельно.\n\n"
+        )
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
