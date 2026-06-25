@@ -26,8 +26,8 @@ from scripts.users_csv_exporter.dto import UserDTO
 
 logger = logging.getLogger(__name__)
 
-SEND_BATCH_SIZE = 50
-QUEUE_MAX_SIZE = SEND_BATCH_SIZE * 4
+SEND_BATCH_SIZE = 1
+QUEUE_MAX_SIZE = 1000
 QUEUE_SENTINEL = object()
 
 TEST_MODE = False
