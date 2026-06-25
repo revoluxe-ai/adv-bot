@@ -471,13 +471,6 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-    button = InlineKeyboardButton(
-        text="Загрузить статистику из WB",
-        callback_data=callbacks.WBUpdate(
-            action="update_keyword_stat", adv_setting_original_id=adv_setting.id
-        ).pack(),
-    )
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Изменить ставку в Авто",
