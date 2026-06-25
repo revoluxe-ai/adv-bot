@@ -11,6 +11,13 @@ MAX_MESSAGE_LENGTH = TELEGRAM_TEXT_MESSAGE_LIMIT
 
 MAX_TOKENS = 2
 
+FULL_ACCESS_WB_TOKEN_REQUIRED_SCOPES = (
+    "Контент",
+    "Статистика",
+    "Аналитика",
+    "Продвижение",
+)
+
 SUPPORT_CHANNEL_ID = -1002006645663
 SUPPORT_CHANNEL_URL = "t.me/skyline_project"
 

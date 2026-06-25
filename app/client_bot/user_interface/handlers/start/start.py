@@ -30,6 +30,7 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.user_interface.utils import format_required_wb_token_scopes
 from app.client_bot.ui_access import UiAccessMode
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import (
@@ -68,6 +69,46 @@ from app.modules.token_monitoring.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_token_invalid_format_message() -> str:
+    """Return guidance when the supplied WB token is malformed."""
+    return (
+        "Токен не принят. Проверьте, что токен скопирован полностью и не содержит "
+        "лишних пробелов.\n\n"
+        "Если нужен безопасный первый вход, создайте токен только для чтения в кабинете WB."
+    )
+
+
+def _build_token_read_only_rejected_message() -> str:
+    """Return guidance when a read-only token is sent to the add-token flow."""
+    return (
+        "Обнаружен токен только для чтения. Такой токен подходит для просмотра аналитики, "
+        "магазинов и кампаний.\n"
+        "Бот не будет менять рекламу с таким токеном.\n"
+        "Для управления ставками нужен токен с возможностью изменений в кабинете.\n"
+        f"{format_required_wb_token_scopes()}"
+    )
+
+
+def _build_token_read_only_added_message() -> str:
+    """Return a success notice after saving a read-only token."""
+    return (
+        'ВНИМАНИЕ! Добавлен токен с правами "Только для чтения".\n\n'
+        "Этот токен только для чтения подходит для просмотра аналитики, магазинов и кампаний.\n"
+        "Бот не будет менять рекламу с таким токеном.\n"
+        "Для управления ставками нужен токен с возможностью изменений в кабинете.\n"
+        f"{format_required_wb_token_scopes()}"
+    )
+
+
+def _build_token_success_added_message(shop_name: str) -> str:
+    """Return the success message after a WB token is added."""
+    return (
+        f"Токен успешно добавлен для магазина {shop_name}.\n\n"
+        "Теперь откройте «Мои магазины», выберите магазин и рекламную кампанию."
+    )
+
 
 sm = get_async_session_maker
 
