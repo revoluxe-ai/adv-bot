@@ -94,9 +94,6 @@
 Добавить показы в статистику карточки
 Добавить тексты в линтеры
 Поменять тесты ставки в Авто Время из PG на CH
-что-то сделать с ботом https://t.me/wb_adv_master_bot  А то вылазит в поиске
-
-
 TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Зачем: prod-логов недостаточно, чтобы понять где пропадает NewBid(560) в update_cluster_bids для exact кейса.
 - Exact case: shop_id=db28efff-f7a9-52f8-8342-f1a58f7d8ed3, adv_id=32824944, search_adv_id=29734515, nmid=10749810, ks_id=17783715, key="антивозрастной матирующий крем".
