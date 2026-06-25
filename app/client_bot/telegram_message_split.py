@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from app.client_bot.const import TELEGRAM_TEXT_MESSAGE_LIMIT
 
-def split_telegram_plain_text(text: str, max_chars: int = 4096) -> list[str]:
+
+def split_telegram_plain_text(
+    text: str,
+    max_chars: int = TELEGRAM_TEXT_MESSAGE_LIMIT,
+) -> list[str]:
     """Return segments each no longer than ``max_chars`` in Python ``len`` (code points).
 
     Telegram Bot API documents a 4096-character cap on message text. Packing prefers
