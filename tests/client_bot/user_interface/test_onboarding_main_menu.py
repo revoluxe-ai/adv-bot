@@ -28,7 +28,17 @@ def test_main_menu_text_contains_key_phrases() -> None:
     text = menu.text
     assert_message_within_telegram_limit(text)
     assert_html_is_telegram_safe(text)
-    assert_message_contains_required_phrases(text, ["Telegram ID", "Wildberries"])
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "Telegram ID",
+            "Wildberries",
+            "Начните с раздела",
+            "Мои магазины",
+            "подключите токен",
+            "выберите рекламную кампанию",
+        ],
+    )
     assert "Экономическое управление" in text
     assert_no_raw_technical_text(text)
 
@@ -99,7 +109,10 @@ async def test_main_menu_calls_bot_send_message() -> None:
     text = kwargs["text"]
     assert_message_within_telegram_limit(text)
     assert_html_is_telegram_safe(text)
-    assert_message_contains_required_phrases(text, ["Telegram ID", "Wildberries"])
+    assert_message_contains_required_phrases(
+        text,
+        ["Telegram ID", "Wildberries", "Начните с раздела", "Мои магазины"],
+    )
     assert kwargs["reply_markup"] is not None
     assert kwargs["parse_mode"] == "HTML"
 
