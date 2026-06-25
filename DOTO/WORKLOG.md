@@ -100,6 +100,8 @@ TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Включение: DEBUG_CLUSTER_BID_TRACE=1 + env DEBUG_CLUSTER_BID_TRACE_* (см. env.sample). No-op при !=1.
 - Batch per-shop: CoroutinesManager → ClusterBidsManagerContainer(shop_id) → WBManager(shop_id); trace shop_id = wb_manager._shop_id, не advs[0].
 - После root cause: выключить env на prod, удалить cluster_bid_trace.py + trace calls + test_cluster_bid_trace.py (или оставить guard под флагом, если решим оставить навсегда).
+- сделать модуль заметок для РК и магазина с кнопкой выполения, потом развить в таск менеджер
+
 
  UI message test infra:
  - централизовать HTML escaping для всех HTML-экранов
