@@ -115,7 +115,17 @@ async def test_channel_subscription_middleware_blocks_unsubscribed_statuses(
     kwargs = bot.send_message.call_args.kwargs
     text = kwargs["text"]
     assert_message_within_telegram_limit(text)
-    assert_message_contains_required_phrases(text, ["функций", "подписаны", "канал"])
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "функций",
+            "подписаны",
+            "канал",
+            "Подпишитесь",
+            "Проверить подписку",
+            "доступ к функциям",
+        ],
+    )
     assert_no_raw_technical_text(text)
     assert_keyboard_has_buttons(kwargs["reply_markup"], ["Подписаться", "Проверить подписку"])
 
@@ -351,7 +361,17 @@ def test_subscribe_keyboard_has_url_and_recheck_buttons() -> None:
 def test_need_subscribe_message_text_is_user_facing() -> None:
     text = NeedSubscribe(bot=MagicMock(), chat_id=1).text
     assert_message_within_telegram_limit(text)
-    assert_message_contains_required_phrases(text, ["функций", "подписаны", "канал"])
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "функций",
+            "подписаны",
+            "канал",
+            "Подпишитесь",
+            "Проверить подписку",
+            "доступ к функциям",
+        ],
+    )
     assert_no_raw_technical_text(text)
 
 

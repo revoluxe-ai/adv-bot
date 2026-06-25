@@ -777,7 +777,11 @@ class LongTimeOperation(Text):
 class NeedSubscribe(TextWithKeyboard):
     @property
     def text(self) -> str:
-        return "Для использования функций вы должны быть подписаны на канал службы поддержки"
+        return (
+            "Для использования функций вы должны быть подписаны на канал службы поддержки.\n\n"
+            "Подпишитесь на канал, затем нажмите «Проверить подписку». "
+            "После проверки бот откроет доступ к функциям."
+        )
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:

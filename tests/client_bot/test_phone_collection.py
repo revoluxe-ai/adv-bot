@@ -59,6 +59,23 @@ def _extract_sent_text(send_message_mock: AsyncMock) -> str:
     return kwargs.get("text", args[1] if len(args) > 1 else "")
 
 
+def test_phone_request_text_explains_why_contact_is_needed() -> None:
+    """Phone request text should explain the reason and next step."""
+    text = get_phone_request_text()
+    assert_message_within_telegram_limit(text)
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "контакт",
+            "кнопкой ниже",
+            "Номер нужен для доступа",
+            "обратной связи",
+            "восстановления связи по заявкам",
+        ],
+    )
+    assert_no_raw_technical_text(text)
+
+
 @pytest.mark.asyncio
 async def test_phone_required_middleware_blocks_message_without_phone() -> None:
     """A passed-gate user without phone gets a reply keyboard instead of handler access."""
@@ -86,7 +103,10 @@ async def test_phone_required_middleware_blocks_message_without_phone() -> None:
     text = _extract_sent_text(bot.send_message)
     assert text == get_phone_request_text()
     assert_message_within_telegram_limit(text)
-    assert_message_contains_required_phrases(text, ["телефон", "кнопкой ниже"])
+    assert_message_contains_required_phrases(
+        text,
+        ["контакт", "кнопкой ниже", "Номер нужен для доступа"],
+    )
     assert_no_raw_technical_text(text)
     assert_keyboard_has_buttons(kwargs["reply_markup"], ["Отправить номер телефона"])
     assert kwargs["reply_markup"].keyboard[0][0].request_contact is True
