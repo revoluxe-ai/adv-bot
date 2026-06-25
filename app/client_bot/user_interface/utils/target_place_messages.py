@@ -4,6 +4,7 @@
 def get_auto_target_place_manual_change_locked_text() -> str:
     """Return guard text for manual target place changes while auto-update is enabled."""
     return (
-        "Автоматическое обновление целевых позиций включено. "
-        "Отключите его, чтобы менять целевые позиции вручную."
+        "Ручное изменение целевых позиций сейчас заблокировано, потому что "
+        "включено автообновление target_place. "
+        "Max CPM остаётся доступным для ручного изменения."
     )
