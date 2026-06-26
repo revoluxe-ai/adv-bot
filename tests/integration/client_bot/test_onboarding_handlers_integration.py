@@ -95,6 +95,7 @@ async def test_callback_start_registration_passed_gate_shows_main_menu(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(user.user_telegram_id, callbacks.Start().pack(), 99992)
 
@@ -115,6 +116,7 @@ async def test_callback_start_registration_not_passed_gate_shows_gate(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(user.user_telegram_id, callbacks.Start().pack(), 99993)
 
@@ -142,6 +144,7 @@ async def test_show_shops_list_passed_gate_with_shops_shows_shops_list_page(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(
         user.user_telegram_id, callbacks.ShowShopsList().pack(), 99994
@@ -167,6 +170,7 @@ async def test_show_shops_list_not_passed_gate_shows_gate(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(
         user.user_telegram_id, callbacks.ShowShopsList().pack(), 99995
@@ -193,6 +197,7 @@ async def test_shops_list_paginator_page2_shows_page2(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(
         user.user_telegram_id,
@@ -231,6 +236,7 @@ async def test_shops_list_paginator_page0_normalized_to_page1(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(
         user.user_telegram_id,
@@ -256,6 +262,7 @@ async def test_shops_list_paginator_not_passed_gate_shows_gate(
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
 
     callback = _make_callback(
         user.user_telegram_id,
