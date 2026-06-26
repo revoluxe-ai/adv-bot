@@ -151,7 +151,8 @@ async def test_gate_invite_wrong_code_user_stays_blocked(
     second_text = second_call.kwargs.get(
         "text", second_call.args[1] if len(second_call.args) > 1 else ""
     )
-    assert "Введите инвайт" in second_text
+    assert "Ввести инвайт" in second_text
+    assert "инвайт-код" in second_text
 
 
 async def test_gate_invite_expired_becomes_expired_user_stays_blocked(
