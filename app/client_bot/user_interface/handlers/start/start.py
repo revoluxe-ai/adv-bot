@@ -166,7 +166,7 @@ async def callback_start_registration(
         callback.message.chat.id if callback.message is not None else None,
     )
     await state.clear()
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         user_id = callback.from_user.id
 
         stmt = (
@@ -214,6 +214,7 @@ async def callback_start_registration(
             and not is_bot_admin(user_id)
         ):
             logger.debug("callback_start_registration: sending gate screen user=%s", user_id)
+            await state.set_state(states.GateInvite.waiting_code)
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
