@@ -16,7 +16,6 @@ from .v3_calibration_step_ui import v3_calibration_step_main_button
 from .v3_tick_report_button import v3_tick_report_main_button
 from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
-    TurnBot,
     OrdersSourceToggle,
     SalesPredictMethodToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
