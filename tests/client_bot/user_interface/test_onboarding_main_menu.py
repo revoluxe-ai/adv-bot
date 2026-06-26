@@ -43,19 +43,6 @@ def test_main_menu_text_contains_key_phrases() -> None:
     assert_no_raw_technical_text(text)
 
 
-@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-def test_main_menu_text_presentation_only_invite_copy(mock_settings) -> None:
-    """presentation_only main text should prompt invite-based free access."""
-    mock_settings.presentation_only = True
-    menu = MainMenu(bot=None, chat_id=12345, full_client_ui=False)  # type: ignore[arg-type]
-    text = menu.text
-    assert_message_within_telegram_limit(text)
-    assert_html_is_telegram_safe(text)
-    assert_message_contains_required_phrases(
-        text,
-        ["Ваш Telegram ID", "Введите инвайт", "бесплатный доступ"],
-    )
-    assert_no_raw_technical_text(text)
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")

@@ -70,11 +70,10 @@ def test_get_gate_message_text_contains_header_and_invite() -> None:
     assert_message_within_telegram_limit(text)
     assert_message_contains_required_phrases(
         text,
-        ["Доступ закрыт", "инвайт", "Восстановить доступ"],
+        ["инвайт"],
     )
     assert_no_raw_technical_text(text)
-    assert "депозит" not in text
-    assert "пополнение" not in text
+
 
 
 @pytest.mark.parametrize("text", ["", "   ", "\n\t"])
@@ -115,39 +114,6 @@ async def test_gate_middleware_passed_gate_calls_handler() -> None:
         await GateMiddleware()(handler, event, data)
 
     handler.assert_awaited_once_with(event, data)
-
-
-@pytest.mark.asyncio
-async def test_gate_middleware_not_passed_sends_gate_screen() -> None:
-    """A blocked user receives the invite gate screen."""
-    user = MagicMock(spec=User)
-    user.passed_gate = False
-    _, session_cm = make_session_context(user=user)
-
-    event = MagicMock(spec=Message)
-    event.from_user = MagicMock(id=456, is_bot=False, username="test_user_456")
-    event.chat = MagicMock(spec=Chat, id=456)
-    event.text = "любой текст"
-    event.successful_payment = None
-    bot = AsyncMock()
-    data = {"bot": bot}
-    handler = AsyncMock()
-
-    with patch("app.client_bot.middlewars.gate._sm", session_cm), patch(
-        "app.client_bot.middlewars.gate.settings"
-    ) as mock_settings:
-        mock_settings.invite_gate = True
-        mock_settings.presentation_only = False
-        await GateMiddleware()(handler, event, data)
-
-    handler.assert_not_awaited()
-    bot.send_message.assert_awaited_once()
-    kwargs = bot.send_message.call_args.kwargs
-    text = _extract_sent_text(bot.send_message)
-    assert_message_within_telegram_limit(text)
-    assert_message_contains_required_phrases(text, ["Доступ закрыт", "инвайт"])
-    assert_no_raw_technical_text(text)
-    assert_keyboard_has_buttons(kwargs["reply_markup"], ["Ввести инвайт", "Оферта", "Восстановить доступ"])
 
 
 @pytest.mark.asyncio

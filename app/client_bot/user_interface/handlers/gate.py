@@ -9,6 +9,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import select, update
 
 from app.client_bot.start_command import is_start_command_text
+from app.client_bot.user_interface.handlers.invate_gate_message import InviteGateMessage
 from app.client_bot.user_interface.handlers.presentation_invite import (
     normalize_invite_code,
 )
@@ -91,11 +92,10 @@ async def gate_invite_process_code(
         invite = invite_result.scalar_one_or_none()
 
         if invite is None:
-            _ = await bot.send_message(
-                chat_id,
-                "Неверный инвайт-код.",
-                reply_markup=get_gate_keyboard(),
-            )
+            await bot.send_message(chat_id,
+                'Неверный инвайт-код, попробуйте еще раз')
+
+            await InviteGateMessage(bot, chat_id)()
             return
 
         if invite.status != InviteStatus.ACTIVE:
