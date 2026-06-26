@@ -439,6 +439,7 @@ async def callback_start_registration(
             and not is_bot_admin(user_id)
         ):
             logger.debug("callback_start_registration: sending gate screen user=%s", user_id)
+            await state.set_state(states.GateInvite.waiting_code)
             _ = await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
