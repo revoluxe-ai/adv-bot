@@ -5,7 +5,9 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import load_only
 from app.client_bot.admin_access import is_bot_admin, use_minimal_presentation_ui
+from app.client_bot.user_interface.handlers.invate_gate_message import InviteGateMessage
 from app.client_bot.user_interface.handlers.shop_choice_message import MainMenu
+from app.client_bot.user_interface.states import GateInvite
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.utils import create_user
 from app.settings import settings
@@ -31,7 +33,9 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
         user_id = from_user.id
         stmt = (
             select(User)
-            .options(load_only(User.id, User.passed_gate))
+            .options(load_only(User.id,
+                               User.passed_gate,
+                               ))
             .where(User.user_telegram_id == user_id)
         )
         result = await session.execute(stmt)
@@ -62,6 +66,10 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
         )
         if minimal:
             logger.debug("start_registration: sending minimal MainMenu user=%s", user_id)
+            if settings.presentation_only and user.passed_gate is False:
+                await state.set_state(GateInvite.waiting_code)
+                await InviteGateMessage(bot, chat_id)()
+                return
             await MainMenu(bot, chat_id, full_client_ui=False)()
             return
 

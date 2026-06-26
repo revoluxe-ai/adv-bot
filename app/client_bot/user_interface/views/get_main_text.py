@@ -5,14 +5,8 @@ from app.client_bot import const
 
 from app.settings import settings
 
-def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str:
+def get_main_text(user_telegram_id: int,) -> str:
     """Return the appropriate main-menu text for the current onboarding mode."""
-    if settings.presentation_only and not full_client_ui:
-        return (
-            f"Ваш Telegram ID: <code>{user_telegram_id}</code>\n\n"
-            "Введите инвайт и получите бесплатный доступ к нашей системе "
-            "управления рекламой и продажами на WB.\n\n"
-        )
 
     return f"""
 Ваш Telegram ID: <code>{user_telegram_id}</code>

@@ -36,7 +36,7 @@ class MainMenu(TextWithKeyboard):
 
     @property
     def text(self) -> str:
-        return get_main_text(self.user_telegram_id, full_client_ui=self._full_client_ui)
+        return get_main_text(self.user_telegram_id)
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
