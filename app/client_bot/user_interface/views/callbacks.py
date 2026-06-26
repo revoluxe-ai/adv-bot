@@ -116,6 +116,14 @@ class TurnBot(CallbackData, prefix="turn_bot"):
     wb_user_cabinet_original_id: int
 
 
+class AutoManagementLanding(CallbackData, prefix="auto_mgmt_landing"):
+    """Коллбеки paid-landing автоуправления рекламой в меню кампании."""
+
+    action: str
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
 class BotActive:
     action: bool
 
