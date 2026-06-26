@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.client_bot import const
@@ -17,13 +18,13 @@ class AutoManagementLanding(TextWithKeyboard):
 
     def __init__(
         self,
-        bot,
+        bot: Bot,
         chat_id: int,
         wb_user_cabinet: WBUserCabinet,
         adv_setting: AdvSetting,
     ) -> None:
         self._wb_user_cabinet = wb_user_cabinet
-        self._adv_setting = adv_setting
+        self._adv_setting: AdvSetting = adv_setting
         super().__init__(bot, chat_id)
 
     @property
@@ -109,7 +110,7 @@ class AutoManagementHowItWorks(TextWithKeyboard):
 
     def __init__(
         self,
-        bot,
+        bot: Bot,
         chat_id: int,
         wb_user_cabinet: WBUserCabinet,
         adv_setting: AdvSetting,
