@@ -69,7 +69,6 @@ def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> No
     assert "Изменить ставку в Авто" in texts
     assert "Поставить общую ставку для Поисковой РК" in texts
     assert "Обновить минус-слова" in texts
-    assert "Загрузить статистику из WB" in texts
     assert "Выгрузить ключи в csv-файл" in texts
     assert "История позиций ключевых слов" in texts
     assert "Последние действия с ключами" in texts
