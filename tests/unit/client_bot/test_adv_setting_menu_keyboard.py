@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.client_bot.ui_access import UiAccessMode
+from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.adv_setting_menu import (
     AdvSettingMenu,
 )
@@ -49,10 +50,15 @@ def _button_texts(markup: object) -> list[str]:
     return [button.text for row in rows for button in row]
 
 
+def _first_button_callback(markup: object) -> str:
+    rows = getattr(markup, "inline_keyboard")
+    return rows[0][0].callback_data
+
+
 @pytest.mark.unit
 def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> None:
     markup = get_adv_setting_keyboard(
-        wb_user_cabinet=SimpleNamespace(id=55),
+        wb_user_cabinet=SimpleNamespace(id=55, wb_cabinet_id=155),
         adv_setting=_build_adv(bot_active=False),
         in_favorites=False,
         ui_access=UiAccessMode.FREE,
@@ -61,6 +67,11 @@ def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> No
     texts = _button_texts(markup)
 
     assert texts[0] == "🔴 Автоуправление выключено / подключить"
+    assert _first_button_callback(markup) == callbacks.AutoManagementLanding(
+        action="open",
+        adv_setting_original_id=1,
+        wb_user_cabinet_original_id=55,
+    ).pack()
     assert "➡ Контроль ключевых слов по кампании" in texts
     assert "Анализ Динамики Ранжирования" in texts
     assert "Управление активностью РК" in texts
@@ -88,7 +99,7 @@ def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> No
 @pytest.mark.unit
 def test_paid_keyboard_shows_autopilot_controls_and_top_auto_button() -> None:
     markup = get_adv_setting_keyboard(
-        wb_user_cabinet=SimpleNamespace(id=55),
+        wb_user_cabinet=SimpleNamespace(id=55, wb_cabinet_id=155),
         adv_setting=_build_adv(bot_active=True),
         in_favorites=False,
         ui_access=UiAccessMode.PAID,
@@ -97,6 +108,11 @@ def test_paid_keyboard_shows_autopilot_controls_and_top_auto_button() -> None:
     texts = _button_texts(markup)
 
     assert texts[0] == "🟢 Автоуправление включено"
+    assert _first_button_callback(markup) == callbacks.AutoManagementLanding(
+        action="open",
+        adv_setting_original_id=1,
+        wb_user_cabinet_original_id=55,
+    ).pack()
     assert "Стратегия РК" in texts
     assert "Управление ставкой в полках" in texts
     assert "Применить дефолтные настройки" in texts
@@ -116,7 +132,7 @@ def test_search_common_bid_button_hidden_without_search_campaign() -> None:
     adv.search_adv_id = None
 
     markup = get_adv_setting_keyboard(
-        wb_user_cabinet=SimpleNamespace(id=55),
+        wb_user_cabinet=SimpleNamespace(id=55, wb_cabinet_id=155),
         adv_setting=adv,
         in_favorites=False,
         ui_access=UiAccessMode.FREE,

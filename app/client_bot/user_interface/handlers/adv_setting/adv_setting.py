@@ -355,6 +355,84 @@ async def adv_handler(
     return
 
 
+@router.callback_query(callbacks.AutoManagementLanding.filter(F.action == "open"))
+async def open_auto_management_landing(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.AutoManagementLanding,
+    bot: aiogram.Bot,
+) -> None:
+    """Open the paid-landing screen instead of toggling bot_active from menu."""
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+
+    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+        callback_data.wb_user_cabinet_original_id
+    )
+    if wb_user_cabinet is None:
+        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
+        return
+
+    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
+    if adv_setting is None:
+        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
+        return
+
+    await AutoManagementLanding(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+
+@router.callback_query(callbacks.AutoManagementLanding.filter(F.action == "how"))
+async def open_auto_management_how_it_works(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.AutoManagementLanding,
+    bot: aiogram.Bot,
+) -> None:
+    """Show the detailed explanation screen for paid auto-management."""
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+
+    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+        callback_data.wb_user_cabinet_original_id
+    )
+    if wb_user_cabinet is None:
+        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
+        return
+
+    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
+    if adv_setting is None:
+        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
+        return
+
+    await AutoManagementHowItWorks(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+
+@router.callback_query(callbacks.AutoManagementLanding.filter(F.action == "back"))
+async def back_from_auto_management_landing(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.AutoManagementLanding,
+    bot: aiogram.Bot,
+) -> None:
+    """Return from the paid-landing screen back to the campaign menu."""
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+
+    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+        callback_data.wb_user_cabinet_original_id
+    )
+    if wb_user_cabinet is None:
+        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
+        return
+
+    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
+    if adv_setting is None:
+        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
+        return
+
+    await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+
 @router.callback_query(callbacks.TurnBot.filter(F.action == "on"))
 async def turn_adv_on(
     callback: types.CallbackQuery,

@@ -133,13 +133,12 @@ def get_adv_setting_keyboard(
         if adv_setting.bot_active
         else "🔴 Автоуправление выключено / подключить"
     )
-    auto_button_action = "off" if adv_setting.bot_active else "on"
     _ = builder.row(
         InlineKeyboardButton(
             text=auto_button_text,
-            callback_data=TurnBot(
-                action=auto_button_action,
-                adv_original_id=adv_setting.id,
+            callback_data=callbacks.AutoManagementLanding(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
                 wb_user_cabinet_original_id=wb_user_cabinet.id,
             ).pack(),
         )
