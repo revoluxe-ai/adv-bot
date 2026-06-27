@@ -141,7 +141,11 @@ import atexit
 
 import pytest
 
+from alembic import command
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 from typing import AsyncGenerator
@@ -185,6 +189,62 @@ def _create_test_async_engine(**kwargs: object):
         connect_args=connect_args,
         **kwargs,  # type: ignore[arg-type]
     )
+
+
+def _build_test_alembic_config() -> Config:
+    """Возвращает Alembic Config, принудительно направленный в test PostgreSQL."""
+    config = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", TEST_DB_POSTGRES_URL)
+    return config
+
+
+def _run_test_db_migrations_to_head() -> tuple[list[str], list[str]]:
+    """Ставит test DB на актуальные Alembic heads и проверяет ревизии и колонку."""
+    config = _build_test_alembic_config()
+    script = ScriptDirectory.from_config(config)
+    expected_heads = sorted(script.get_heads())
+
+    engine = create_engine(TEST_DB_POSTGRES_URL, poolclass=NullPool)
+    try:
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.stamp(config, "heads")
+
+        with engine.connect() as connection:
+            current_rows = connection.execute(
+                text("SELECT version_num FROM alembic_version ORDER BY version_num")
+            ).scalars()
+            current_heads = sorted(current_rows)
+
+            has_minus_phrases_column = connection.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'advsetting'
+                          AND column_name = 'auto_update_minus_phrases'
+                    )
+                    """
+                )
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    if current_heads != expected_heads:
+        raise RuntimeError(
+            "Test DB Alembic migration mismatch: "
+            f"current={current_heads}, head={expected_heads}, url={TEST_DB_POSTGRES_URL}"
+        )
+
+    if not has_minus_phrases_column:
+        raise RuntimeError(
+            "Test DB migration verification failed: "
+            "column public.advsetting.auto_update_minus_phrases is missing after Alembic upgrade."
+        )
+
+    return current_heads, expected_heads
 
 
 def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
@@ -391,10 +451,13 @@ def _validate_ch_preflight() -> None:
 
 
 def _run_pg_schema_bootstrap() -> None:
-    """Session-once PG DROP/CREATE + create_all + baseline seed.
+    """Session-once PG DROP/CREATE + create_all + baseline seed + Alembic verify.
 
     Вызывается из sync ``ensure_resources``; может идти из-под async fixture —
     поэтому не ``asyncio.run`` напрямую (см. ``run_awaitable_from_sync``).
+
+    После ORM bootstrap вызывает ``_run_test_db_migrations_to_head`` для проверки
+    Alembic heads и критичных колонок (intent replay 72221e27b).
     """
     from tests.support.destructive_lifecycle import run_awaitable_from_sync
     from tests.support.destructive_pg_reset import init_postgres_schema_and_seed
@@ -407,6 +470,11 @@ def _run_pg_schema_bootstrap() -> None:
             await engine.dispose()
 
     run_awaitable_from_sync(_run())
+    current_heads, expected_heads = _run_test_db_migrations_to_head()
+    print(
+        "[OK] Test DB Alembic heads verified. "
+        f"current={current_heads} head={expected_heads}"
+    )
 
 
 def _run_ch_schema_bootstrap() -> None:
