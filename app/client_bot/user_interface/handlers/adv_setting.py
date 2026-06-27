@@ -87,6 +87,7 @@ async def _get_wb_user_cabinet(
         )
     return wb_user_cabinet
 
+# TODO: переделать в тестируемую функцию
 
 async def _get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
     """Load AdvSetting by id for campaign menu and paid-landing handlers."""
@@ -257,20 +258,9 @@ async def adv_handler(
         raise RuntimeError(
             f"AdvSetting not found for original_id={adv_original_id}"
         )
-        async with sm() as session:
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = list(result.scalars().all())
 
-        await messages.AdvCompanyChoicing(
-            bot,
-            chat_id,
-            wb_user_cabinet_original_id,
-            adv_settings,
-            state,
-        )()
-        return
-
-    async with sm() as session:
+    # TODO: Перенести в отдельную функцию
+    async with sm(read_only=True) as session:
         stmt = (
             select(WBUserCabinet)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)

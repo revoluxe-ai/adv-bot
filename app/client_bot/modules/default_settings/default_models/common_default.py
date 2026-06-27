@@ -1,3 +1,5 @@
+"""Default campaign settings applied to newly created or connected campaigns."""
+
 from dataclasses import dataclass
 
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
