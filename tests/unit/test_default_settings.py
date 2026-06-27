@@ -72,3 +72,10 @@ def test_apply_defaults_to_adv_setting_keeps_max_place():
     adv_setting.wb_cabinet = wb_cabinet
     apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
     assert adv_setting.max_place == 10
+
+
+def test_campaign_defaults_v1_disables_bidder_for_auto_for_safe_start() -> None:
+    defaults_v1 = CampaignDefaultsV1()
+
+    assert defaults_v1.bidder_for_auto is False
+    assert defaults_v1.auto_update_minus_phrases is False
