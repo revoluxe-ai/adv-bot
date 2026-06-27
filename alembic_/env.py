@@ -24,9 +24,9 @@ dotenv.load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
-row = get_alchemy_row_for_migration()
-
-config.set_main_option("sqlalchemy.url", row)
+if config.attributes.get("connection") is None:
+    row = get_alchemy_row_for_migration()
+    config.set_main_option("sqlalchemy.url", row)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -79,6 +79,15 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    existing_connection = config.attributes.get("connection")
+    if existing_connection is not None:
+        connection = existing_connection
+        context.configure(connection=connection, target_metadata=target_metadata)
+
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

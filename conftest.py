@@ -2,8 +2,6 @@
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
-from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-
 # Устанавливаем переменные окружения для тестовой БД ДО любых импортов.
 # 127.0.0.1: на Windows Docker Desktop localhost (::1) часто даёт WinError 64.
 _TEST_PG_HOST = "127.0.0.1"
@@ -80,12 +78,13 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from alembic import command
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
-
-from app.utils.db.base import BaseTable as Base
 
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
@@ -108,6 +107,62 @@ def _create_test_async_engine(**kwargs: object):
         connect_args=connect_args,
         **kwargs,  # type: ignore[arg-type]
     )
+
+
+def _build_test_alembic_config() -> Config:
+    """Возвращает Alembic Config, принудительно направленный в test PostgreSQL."""
+    config = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    config.set_main_option("sqlalchemy.url", TEST_DB_POSTGRES_URL)
+    return config
+
+
+def _run_test_db_migrations_to_head() -> tuple[list[str], list[str]]:
+    """Ставит test DB на актуальные Alembic heads и проверяет ревизии и колонку."""
+    config = _build_test_alembic_config()
+    script = ScriptDirectory.from_config(config)
+    expected_heads = sorted(script.get_heads())
+
+    engine = create_engine(TEST_DB_POSTGRES_URL, poolclass=NullPool)
+    try:
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.stamp(config, "heads")
+
+        with engine.connect() as connection:
+            current_rows = connection.execute(
+                text("SELECT version_num FROM alembic_version ORDER BY version_num")
+            ).scalars()
+            current_heads = sorted(current_rows)
+
+            has_minus_phrases_column = connection.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'advsetting'
+                          AND column_name = 'auto_update_minus_phrases'
+                    )
+                    """
+                )
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    if current_heads != expected_heads:
+        raise RuntimeError(
+            "Test DB Alembic migration mismatch: "
+            f"current={current_heads}, head={expected_heads}, url={TEST_DB_POSTGRES_URL}"
+        )
+
+    if not has_minus_phrases_column:
+        raise RuntimeError(
+            "Test DB migration verification failed: "
+            "column public.advsetting.auto_update_minus_phrases is missing after Alembic upgrade."
+        )
+
+    return current_heads, expected_heads
 
 
 def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
@@ -287,55 +342,24 @@ def setup_test_database(docker_compose_cmd):
     time.sleep(10)
 
     async def init_schema_and_seed() -> None:
-        """Пересоздаёт public-схему и сидирует wbcabinet id=1 для integration-тестов."""
+        """Пересоздаёт public-схему, собирает ORM-схему и сидирует wbcabinet."""
         engine = _create_test_async_engine()
         try:
+            import app.admin_bot.sender.utils.db.models  # noqa: F401
+            import app.modules.billing.event_manager.models  # noqa: F401
+            import app.modules.common_slaves.wildberries.models  # noqa: F401
+            import app.modules.rentgen_access.models  # noqa: F401
+            import app.modules.token_monitoring.models  # noqa: F401
+            import app.modules.wb_adv_updater.modules.balance_exp_informer.models  # noqa: F401
+            import app.payments.db.models  # noqa: F401
+            import app.utils.db.models  # noqa: F401
+            from app.utils.db.base import BaseTable as Base
+
             async with engine.begin() as conn:
                 await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
                 await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-                from app.modules.common_slaves.wildberries.models.models import (
-                    AdvSetting,
-                    KeywordSetting,
-                    WBUserCabinet,
-                    WBCard,
-                    WBCategory,
-                    WBToken,
-                    WBBalancePayment,
-                    WBBonusPayment,
-                    WBAutoBudgetTopUp,
-                    AdvKeyword,
-                )
-                from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (
-                    BalanceReminder,
-                )
-                from app.modules.billing.event_manager.models import BillingEvent
-                from app.utils.db.models import User, Invite
-
                 await conn.run_sync(Base.metadata.create_all)
-
-                initial_wb_cabinet_data = {
-                    "id": 1,
-                    "shop_id": "test_shop_id",
-                    "active": True,
-                    "expiration_time": datetime.now() + timedelta(days=7),
-                    "balance": 0.0,
-                    "bonus": 0.0,
-                    "demo": True,
-                    "expiration_alarm_days_pass": None,
-                }
-                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                    index_elements=["id"],
-                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
-                )
-                await conn.execute(on_conflict_stmt)
-                await conn.execute(
-                    text(
-                        "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
-                        "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
-                    )
-                )
         finally:
             await engine.dispose()
 
@@ -345,6 +369,47 @@ def setup_test_database(docker_compose_cmd):
     for attempt in range(1, max_init_retries + 1):
         try:
             asyncio.run(init_schema_and_seed())
+            current_heads, expected_heads = _run_test_db_migrations_to_head()
+            print(
+                "[OK] Test DB schema stamped to Alembic heads. "
+                f"current={current_heads} head={expected_heads}"
+            )
+
+            async def seed_wb_cabinet() -> None:
+                """Добавляет базовую тестовую запись кабинета после миграций."""
+                engine = _create_test_async_engine()
+                try:
+                    from app.modules.common_slaves.wildberries.models.wb_cabinet import (
+                        WBCabinet,
+                    )
+
+                    async with engine.begin() as conn:
+                        initial_wb_cabinet_data = {
+                            "id": 1,
+                            "shop_id": "test_shop_id",
+                            "active": True,
+                            "expiration_time": datetime.now() + timedelta(days=7),
+                            "balance": 0.0,
+                            "bonus": 0.0,
+                            "demo": True,
+                            "expiration_alarm_days_pass": None,
+                        }
+                        insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                        on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                            index_elements=["id"],
+                            set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                        )
+                        await conn.execute(on_conflict_stmt)
+                        await conn.execute(
+                            text(
+                                "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
+                                "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+                            )
+                        )
+                finally:
+                    await engine.dispose()
+
+            asyncio.run(seed_wb_cabinet())
             break
         except Exception as exc:  # noqa: BLE001
             if attempt >= max_init_retries:
