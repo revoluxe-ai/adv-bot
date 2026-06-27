@@ -71,6 +71,48 @@ async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
     )
     return has_active_read_only_token and not token_status.valid_tokens
 
+ # TODO: Переделать в WBCabinet.get()
+async def _get_wb_user_cabinet(
+    wb_user_cabinet_original_id: int,
+) -> WBUserCabinet:
+    """Load WBUserCabinet by id for campaign and landing navigation."""
+    async with sm(read_only=True) as session:
+        result = await session.execute(
+            select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+        wb_user_cabinet = result.scalar_one_or_none()
+    if wb_user_cabinet is None:
+        raise RuntimeError(
+            f"WBUserCabinet not found for original_id={wb_user_cabinet_original_id}"
+        )
+    return wb_user_cabinet
+
+# TODO: переделать в тестируемую функцию
+
+async def _get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
+    """Load AdvSetting by id for campaign menu and paid-landing handlers."""
+    async with sm(read_only=True) as session:
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+        )
+        adv_setting = result.scalar_one_or_none()
+    if adv_setting is None:
+        raise RuntimeError(
+            f"AdvSetting not found for original_id={adv_setting_original_id}"
+        )
+    return adv_setting
+
+
+async def _get_adv_setting_or_none(adv_setting_original_id: int) -> AdvSetting:
+    """Backward-compatible alias for tests patching the legacy helper name."""
+    return await _get_adv_setting(adv_setting_original_id)
+
+
+async def _get_wb_user_cabinet_or_none(
+    wb_user_cabinet_original_id: int,
+) -> WBUserCabinet:
+    """Backward-compatible alias for tests patching the legacy helper name."""
+    return await _get_wb_user_cabinet(wb_user_cabinet_original_id)
 
 
 
@@ -275,7 +317,7 @@ async def open_auto_management_landing(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -296,7 +338,7 @@ async def open_auto_management_how_it_works(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -317,7 +359,7 @@ async def back_from_auto_management_landing(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -338,7 +380,7 @@ async def open_minus_phrases_setting_screen(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
