@@ -71,8 +71,6 @@ async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
     )
     return has_active_read_only_token and not token_status.valid_tokens
 
-
-async def _get_wb_user_cabinet_or_none(
  # TODO: Переделать в WBCabinet.get()
     wb_user_cabinet_original_id: int,
 ) -> WBUserCabinet | None:
