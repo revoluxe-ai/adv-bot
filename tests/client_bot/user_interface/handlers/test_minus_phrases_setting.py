@@ -16,7 +16,7 @@ from app.client_bot.user_interface.handlers.adv_setting import (
 )
 from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import AdvSetting
-from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from tests.factories import AdvSettingFactory, WBCabinetFactory
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
@@ -39,9 +39,9 @@ def _callback(chat_id: int = 404) -> SimpleNamespace:
     return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
 
 
-async def _create_adv(session: AsyncSession) -> AdvSetting:
-    wb_cabinet = WBCabinet(shop_id="shop-minus-setting", active=True, demo=False)
-    adv = AdvSetting(
+async def _create_adv() -> AdvSetting:
+    wb_cabinet = WBCabinetFactory.build(shop_id="shop-minus-setting", active=True, demo=False)
+    adv = AdvSettingFactory.build(
         adv_id=987654321,
         name="minus-setting-adv",
         wb_cabinet=wb_cabinet,
@@ -53,8 +53,7 @@ async def _create_adv(session: AsyncSession) -> AdvSetting:
         auto_update_target_place=True,
         auto_update_minus_phrases=False,
     )
-    session.add_all([wb_cabinet, adv])
-    await session.commit()
+
     return adv
 
 
@@ -62,7 +61,7 @@ async def _create_adv(session: AsyncSession) -> AdvSetting:
 async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
     async_session: AsyncSession,
 ) -> None:
-    adv = await _create_adv(async_session)
+    adv = await _create_adv()
     bot = AsyncMock()
     screen_call = AsyncMock()
 
@@ -98,7 +97,7 @@ async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
 async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
     async_session: AsyncSession,
 ) -> None:
-    adv = await _create_adv(async_session)
+    adv = await _create_adv()
     adv_id = adv.id
     bot = AsyncMock()
     screen_call = AsyncMock()
@@ -140,12 +139,12 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
     assert updated.auto_update_target_place is True
     screen_call.assert_awaited_once()
 
-
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_back_from_minus_phrases_setting_returns_to_campaign_menu(
     async_session: AsyncSession,
 ) -> None:
-    adv = await _create_adv(async_session)
+    adv = await _create_adv()
     bot = AsyncMock()
     menu_call = AsyncMock()
     wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
