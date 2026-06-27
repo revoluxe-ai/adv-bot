@@ -53,7 +53,7 @@ class AdvSettingFactory(SQLAlchemyModelFactory):
     name = factory.LazyFunction(lambda: fake.sentence(nb_words=3))
     max_cpm = factory.LazyFunction(lambda: fake.random_int(50, 3000))
     plan_for_sales_for_day = factory.LazyFunction(lambda: fake.random_int(10, 50))
-
+    wb_cabinet = factory.SubFactory(WBCabinetFactory)
     target_price_for_order = factory.LazyFunction(
         lambda: round(fake.pyfloat(min_value=50, max_value=500), 2)
     )
