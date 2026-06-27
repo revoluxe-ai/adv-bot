@@ -138,6 +138,14 @@ DEFAULT SETTINGS REFACTOR follow-up
   bot_active, automatic_version, white_list_mode, bidder_active, bidder_for_auto, auto_update_target_place, auto_update_white_list, auto_update_minus_phrases.
 - Не делать перед первым запуском free bot, если не блокирует запуск.
 
+DEFAULT ACTION MODE OVERLAY follow-up
+- Сделать отдельную ревизию кнопок "Применить дефолтные настройки" и "Применить дефолты всем кампаниям".
+- Целевое поведение:
+  - если РК в PAID: сначала common defaults, потом paid overlay;
+  - если РК в FREE: сначала common defaults, потом free overlay.
+- Покрыть тестами, что default action не переводит РК в неправильный режим.
+- В текущем slice helper-слои уже подготовлены; отдельную ревизию кнопок не смешивать с запуском free bot без необходимости.
+
 проверить
 
 
