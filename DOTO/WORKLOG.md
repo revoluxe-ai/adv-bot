@@ -121,6 +121,22 @@ AUTO-MANAGEMENT SAFE START follow-up
 - Перед любой записью нужен preview: пагинация, список ключей, крестик удаления возле каждого ключа, просмотр подробностей ключа, кнопки "Продолжить" и "Отменить".
 - Не делать это перед первым запуском free bot, если не блокирует safe start.
 
+DEFAULT SETTINGS REFACTOR follow-up
+- Давно пора навести порядок в default settings: дефолты давно не обслуживались, из-за этого сложно понимать и настраивать поведение РК.
+- Сейчас в дефолтах смешаны разные смыслы:
+  - создание/подключение новой РК;
+  - FREE mode;
+  - PAID activation;
+  - paid auto-management defaults;
+  - legacy-настройки bidder/БС/target_place.
+- Нужно разделить три явных слоя:
+  1. creation defaults — что получает новая/подключённая РК;
+  2. free transition — что применяется при выключении paid/автоуправления;
+  3. paid transition — что применяется при включении paid/автоуправления.
+- Запретить broad defaults там, где нужен узкий режимный переход.
+- Покрыть тестами ключевые поля:
+  bot_active, automatic_version, white_list_mode, bidder_active, bidder_for_auto, auto_update_target_place, auto_update_white_list, auto_update_minus_phrases.
+- Не делать перед первым запуском free bot, если не блокирует запуск.
 
 проверить
 
