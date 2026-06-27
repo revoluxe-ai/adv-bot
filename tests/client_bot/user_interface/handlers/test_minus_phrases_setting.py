@@ -42,6 +42,7 @@ def _callback(chat_id: int = 404) -> SimpleNamespace:
 async def _create_adv() -> AdvSetting:
     wb_cabinet = WBCabinetFactory.build(shop_id="shop-minus-setting", active=True, demo=False)
     adv = AdvSettingFactory.build(
+        id=4040,
         adv_id=987654321,
         name="minus-setting-adv",
         wb_cabinet=wb_cabinet,
@@ -98,6 +99,9 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
     async_session: AsyncSession,
 ) -> None:
     adv = await _create_adv()
+    async_session.add(adv.wb_cabinet)
+    async_session.add(adv)
+    await async_session.flush()
     adv_id = adv.id
     bot = AsyncMock()
     screen_call = AsyncMock()
@@ -159,7 +163,7 @@ async def test_back_from_minus_phrases_setting_returns_to_campaign_menu(
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting",
             AsyncMock(return_value=adv),
         ),
         patch(
