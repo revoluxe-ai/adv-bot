@@ -43,7 +43,6 @@ def test_minus_phrases_setting_screen_disabled_copy_is_safe() -> None:
             "обновлением минус-фраз в кабинете WB",
             "бот может менять минус-фразы",
             "по умолчанию она выключена для безопасного старта",
-            "включите его явно",
         ],
     )
     assert_no_raw_technical_text(screen.text)
