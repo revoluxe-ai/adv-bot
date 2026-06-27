@@ -20,11 +20,16 @@ from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactM
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 
 
-def _build_adv(*, bot_active: bool) -> SimpleNamespace:
+def _build_adv(
+    *,
+    bot_active: bool,
+    auto_update_minus_phrases: bool = False,
+) -> SimpleNamespace:
     return SimpleNamespace(
         id=1,
         adv_id=101,
         bot_active=bot_active,
+        auto_update_minus_phrases=auto_update_minus_phrases,
         individual_keywords_target_place_mode=False,
         use_incremental_stats=False,
         updater_common_bid_in_search_adv_active_status=False,
@@ -79,11 +84,12 @@ def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> No
     assert "Управление ставкой" in texts
     assert "Изменить ставку в Авто" in texts
     assert "Поставить общую ставку для Поисковой РК" in texts
-    assert "Обновить минус-слова" in texts
+    assert "🔴 Обновление минус-фраз: выключено" in texts
     assert "Выгрузить ключи в csv-файл" in texts
     assert "История позиций ключевых слов" in texts
     assert "Последние действия с ключами" in texts
 
+    assert "Обновить минус-слова" not in texts
     assert "Режимы Управления Белым Списком" not in texts
     assert "Стратегия РК" not in texts
     assert "Управление ставкой в полках" not in texts
@@ -114,6 +120,7 @@ def test_paid_keyboard_shows_autopilot_controls_and_top_auto_button() -> None:
         wb_user_cabinet_original_id=55,
     ).pack()
     assert "Стратегия РК" in texts
+    assert "🔴 Обновление минус-фраз: выключено" in texts
     assert "Управление ставкой в полках" in texts
     assert "Применить дефолтные настройки" in texts
     assert "Переключить на кластерный биддер" in texts
@@ -141,6 +148,23 @@ def test_search_common_bid_button_hidden_without_search_campaign() -> None:
     texts = _button_texts(markup)
 
     assert "Поставить общую ставку для Поисковой РК" not in texts
+
+
+@pytest.mark.unit
+def test_minus_phrases_status_button_shows_enabled_state() -> None:
+    markup = get_adv_setting_keyboard(
+        wb_user_cabinet=SimpleNamespace(id=55, wb_cabinet_id=155),
+        adv_setting=_build_adv(
+            bot_active=False,
+            auto_update_minus_phrases=True,
+        ),
+        in_favorites=False,
+        ui_access=UiAccessMode.FREE,
+    )
+
+    texts = _button_texts(markup)
+
+    assert "🟢 Обновление минус-фраз: включено" in texts
 
 
 @pytest.mark.asyncio

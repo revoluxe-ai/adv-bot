@@ -40,6 +40,17 @@ from ... import states
 from ...views import callbacks, messages
 from ...views.messages.main_adv_setting_menu import AdvSettingMenu
 from .... import const
+from .. import states
+from ..views import callbacks, messages
+from ..views.messages.main_adv_setting_menu import AdvSettingMenu
+from ..views.messages.main_adv_setting_menu.auto_management_landing import (
+    AutoManagementHowItWorks,
+    AutoManagementLanding,
+)
+from ..views.messages.main_adv_setting_menu.minus_phrases_setting import (
+    MinusPhrasesSettingScreen,
+)
+from ... import const
 
 sm = get_async_session_maker
 
@@ -336,6 +347,38 @@ async def back_from_auto_management_landing(
     if callback.message is None:
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
+@router.callback_query(callbacks.MinusPhrasesSetting.filter(F.action == "open"))
+async def open_minus_phrases_setting_screen(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.MinusPhrasesSetting,
+    bot: aiogram.Bot,
+) -> None:
+    """Open the dedicated minus-phrase background sync settings screen."""
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+
+    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+        callback_data.wb_user_cabinet_original_id
+    )
+    adv_setting = await _get_adv_setting_or_none(
+        callback_data.adv_setting_original_id
+    )
+
+    await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+
+@router.callback_query(callbacks.MinusPhrasesSetting.filter(F.action.in_(("on", "off"))))
+async def toggle_minus_phrases_setting(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.MinusPhrasesSetting,
+    bot: aiogram.Bot,
+) -> None:
+    """Toggle only AdvSetting.auto_update_minus_phrases and reopen the settings screen."""
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+    new_status = callback_data.action == "on"
 
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
@@ -343,11 +386,43 @@ async def back_from_auto_management_landing(
     if wb_user_cabinet is None:
         await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
         return
+    async with sm(read_only=False) as session:
+            update(AdvSetting)
+            .where(AdvSetting.id == callback_data.adv_setting_original_id)
+            .values({"auto_update_minus_phrases": new_status})
+        )
+        result: CursorResult[AdvSetting] = await session.execute(stmt)
+        await session.commit()
+    if int(result.rowcount or 0) == 0:
+        raise RuntimeError(
+            "AdvSetting not found for original_id="
+            f"{callback_data.adv_setting_original_id}"
+        )
 
-    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
-    if adv_setting is None:
-        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
-        return
+    adv_setting = await _get_adv_setting_or_none(
+        callback_data.adv_setting_original_id
+    )
+
+    await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
+
+
+@router.callback_query(callbacks.MinusPhrasesSetting.filter(F.action == "back"))
+async def back_from_minus_phrases_setting(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.MinusPhrasesSetting,
+    bot: aiogram.Bot,
+) -> None:
+    """Return from the minus-phrase settings screen back to the campaign menu."""
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+
+    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+        callback_data.wb_user_cabinet_original_id
+    )
+    adv_setting = await _get_adv_setting_or_none(
+        callback_data.adv_setting_original_id
+    )
 
     await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
