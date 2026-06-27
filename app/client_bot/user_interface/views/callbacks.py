@@ -119,6 +119,8 @@ class TurnBot(CallbackData, prefix="turn_bot"):
 class AutoManagementLanding(CallbackData, prefix="auto_mgmt_landing"):
     """Коллбеки paid-landing автоуправления рекламой в меню кампании."""
 
+class MinusPhrasesSetting(CallbackData, prefix="minus_phrases_setting"):
+    """Коллбеки экрана настройки фонового обновления минус-фраз."""
     action: str
     adv_setting_original_id: int
     wb_user_cabinet_original_id: int

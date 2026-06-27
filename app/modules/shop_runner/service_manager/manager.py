@@ -769,6 +769,9 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
+        complex_advs = [
+            adv for adv in complex_advs if adv.auto_update_minus_phrases
+        ]
         handlers: list[Callable[[], Awaitable[Any]]] = [
             lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
                 complex_adv_

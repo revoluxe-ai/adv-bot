@@ -23,6 +23,7 @@ def test_apply_defaults_to_adv_setting():
         orders_source_for_auto_mode=OrdersSourceForAutoMode.ADV_SUM,
         sales_predict_method=FactMethods.DIRECT_SALES,
         auto_update_white_list=False,
+        auto_update_minus_phrases=True,
         auto_update_target_place=False,
         target_ctr_mode=True,
         new_auto_min_ctr_mode=True,
@@ -46,6 +47,10 @@ def test_apply_defaults_to_adv_setting():
     assert adv_setting.orders_source_for_auto_mode == defaults_v1.orders_source_for_auto_mode
     assert adv_setting.sales_predict_method == defaults_v1.sales_predict_method
     assert adv_setting.auto_update_white_list == defaults_v1.auto_update_white_list
+    assert (
+        adv_setting.auto_update_minus_phrases
+        == defaults_v1.auto_update_minus_phrases
+    )
     assert adv_setting.auto_update_target_place == defaults_v1.auto_update_target_place
     assert (
         adv_setting.auto_budget_watchdog_enabled
