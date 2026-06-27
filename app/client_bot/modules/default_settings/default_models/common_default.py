@@ -24,7 +24,7 @@ class CampaignDefaultsV1:
 
     # --- БАЗОВАЯ РАБОТА БИДДЕРА ---
     bidder_active: bool = True
-    bidder_for_auto: bool = True
+    bidder_for_auto: bool = False
     bidder_mode: BidderMode = BidderMode.BY_POSITIONS
 
     # --- АКТУАЛЬНАЯ АВТОМАТИКА ---
