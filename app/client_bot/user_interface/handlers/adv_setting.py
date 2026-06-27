@@ -104,6 +104,11 @@ async def _get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
     return adv_setting
 
 
+async def _get_adv_setting_or_none(adv_setting_original_id: int) -> AdvSetting:
+    """Backward-compatible alias for tests patching the legacy helper name."""
+    return await _get_adv_setting(adv_setting_original_id)
+
+
 async def _get_wb_user_cabinet_or_none(
     wb_user_cabinet_original_id: int,
 ) -> WBUserCabinet:
@@ -313,7 +318,7 @@ async def open_auto_management_landing(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -334,7 +339,7 @@ async def open_auto_management_how_it_works(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -355,7 +360,7 @@ async def back_from_auto_management_landing(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -376,7 +381,7 @@ async def open_minus_phrases_setting_screen(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await _get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
