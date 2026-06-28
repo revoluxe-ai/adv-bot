@@ -119,6 +119,18 @@ AUTO-MANAGEMENT SAFE START follow-up
 - Перед любой записью нужен preview: пагинация, список ключей, крестик удаления возле каждого ключа, просмотр подробностей ключа, кнопки "Продолжить" и "Отменить".
 - Не делать это перед первым запуском free bot, если не блокирует safe start.
 
+WHITE LIST MODE follow-up
+- white_list_mode сейчас смешивает два смысла: free/manual режим активации ключей и paid replacement strategy.
+- active key не всегда равен ключу в БС.
+- FREE должен поддерживать безопасные режимы:
+  1. свободная активация по порогу БС;
+  2. только ключи из БС.
+- REPLACE_ON_TRIM нельзя показывать и применять во FREE.
+- Позже нужно разнести:
+  1. режим manual/free activation;
+  2. paid replacement strategy;
+  3. флаг запуска white-list automation.
+
 DEFAULT SETTINGS REFACTOR follow-up
 - Давно пора навести порядок в default settings: дефолты давно не обслуживались, из-за этого сложно понимать и настраивать поведение РК.
 - Сейчас в дефолтах смешаны разные смыслы:
@@ -143,3 +155,6 @@ DEFAULT ACTION MODE OVERLAY follow-up
   - если РК в FREE: сначала common defaults, потом free overlay.
 - Покрыть тестами, что default action не переводит РК в неправильный режим.
 - В текущем slice helper-слои уже подготовлены; отдельную ревизию кнопок не смешивать с запуском free bot без необходимости.
+
+
+внедрить graphlens-mcp , чтобы меньше жечь токены
