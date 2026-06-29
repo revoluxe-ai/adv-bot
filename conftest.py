@@ -193,7 +193,10 @@ def _create_test_async_engine(**kwargs: object):
 
 def _build_test_alembic_config() -> Config:
     """Возвращает Alembic Config, принудительно направленный в test PostgreSQL."""
-    config = Config(os.path.join(os.path.dirname(__file__), "alembic.ini"))
+    project_root = os.path.dirname(__file__)
+    config = Config(os.path.join(project_root, "alembic.ini"))
+    config.set_main_option("script_location", os.path.join(project_root, "alembic_"))
+    config.set_main_option("prepend_sys_path", project_root)
     config.set_main_option("sqlalchemy.url", TEST_DB_POSTGRES_URL)
     return config
 
