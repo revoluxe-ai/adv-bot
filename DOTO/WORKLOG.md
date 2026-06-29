@@ -199,3 +199,4 @@ DEFAULT ACTION MODE OVERLAY follow-up
 
 
 внедрить graphlens-mcp , чтобы меньше жечь токены
+разобрать все ветки-все стеши!
