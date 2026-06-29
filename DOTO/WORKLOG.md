@@ -482,3 +482,4 @@ Raw notes from `/opsx-bound-scope:GO`. Not current change DoD. Return via `/opsx
 внедрить нагрузочные тесты
 
 внедрить graphlens-mcp , чтобы меньше жечь токены
+разобрать все ветки-все стеши!
