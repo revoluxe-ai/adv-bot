@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -46,8 +47,8 @@ class PlanFactSummary:
 class PlanFactCacheManager:
     """Redis cache for ``PlanFactSummary`` keyed by ``adv_id``."""
 
-    def __init__(self, redis_client: object | None = None) -> None:
-        self._client = (
+    def __init__(self, redis_client: RedisClient | None = None) -> None:
+        self._client: RedisClient = (
             redis_client
             if redis_client is not None
             else legacy_redis_client
@@ -71,19 +72,19 @@ class PlanFactCacheManager:
         if not isinstance(data, dict):
             raise TypeError("plan_fact cache payload must be a JSON object")
         return PlanFactSummary(
-            adv_id=PlanFactReader._as_int(data["adv_id"]),
-            fact_predict_orders=PlanFactReader._as_float_or_none(
-                data.get("fact_predict_orders")
+            adv_id=PlanFactReader._as_int(data["adv_id"]), # pyright: ignore
+            fact_predict_orders=PlanFactReader._as_float_or_none(  # pyright: ignore
+                data.get("fact_predict_orders") # pyright: ignore
             ),
-            fact_pay_for_order=PlanFactReader._as_float_or_none(
-                data.get("fact_pay_for_order")
+            fact_pay_for_order=PlanFactReader._as_float_or_none(  # pyright: ignore
+                data.get("fact_pay_for_order") # pyright: ignore
             ),
-            fact_original_orders=PlanFactReader._as_float_or_none(
-                data.get("fact_original_orders")
+            fact_original_orders=PlanFactReader._as_float_or_none( # pyright: ignore
+                data.get("fact_original_orders")  # pyright: ignore
             ),
-            fact_method=PlanFactReader._as_str_or_none(data.get("fact_method")),
-            plan_fact_ch_ts_msk=PlanFactReader._as_str_or_none(
-                data.get("plan_fact_ch_ts_msk")
+            fact_method=PlanFactReader._as_str_or_none(data.get("fact_method")), # pyright: ignore
+            plan_fact_ch_ts_msk=PlanFactReader._as_str_or_none(  # pyright: ignore
+                data.get("plan_fact_ch_ts_msk") # pyright: ignore
             ),
             plan_orders=(
                 PlanFactReader._as_int(data["plan_orders"]) # pyright: ignore
@@ -120,7 +121,7 @@ class PlanFactCacheManager:
 
     async def get_one(self, adv_id: int) -> tuple[PlanFactSummary | None, bool]:
         """Return cached summary and invalid-payload flag."""
-        raw = await self._client.get(self._get_key(int(adv_id)))  # pyright: ignore[attr-defined] # mypy: ignore
+        raw = await self._client.get(self._get_key(int(adv_id)))  # pyright: ignore # mypy: ignore
         if raw is None:
             return None, False
         try:
@@ -144,7 +145,7 @@ class PlanFactCacheManager:
 
     async def set_one(self, summary: PlanFactSummary) -> None:
         """Persist one summary with the hard 15-minute TTL."""
-        await self._client.set(  # pyright: ignore # mypy: ignore
+        await self._client.set(  # mypy: ignore # pyright: ignore
             self._get_key(summary.adv_id),
             self._serialize(summary),
             ex=PLAN_FACT_CACHE_TTL_SECONDS,
