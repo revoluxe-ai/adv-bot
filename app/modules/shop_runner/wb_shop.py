@@ -37,6 +37,10 @@ class WBShop:
         self._plan_fact_reader = plan_fact_reader
         self._wb_manager_hub = wb_manager_hub
 
+    @property
+    def shop_id(self) -> str:
+        return self._wb_api.shop_id
+
     async def run(self) -> None:
         from .service_manager.exc import StopShopUpdateException
         wb_api = self._wb_api
