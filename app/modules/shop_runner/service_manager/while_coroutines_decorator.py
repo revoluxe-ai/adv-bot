@@ -22,6 +22,7 @@ from app.modules.shop_runner.required_data_miss import (
     required_data_miss_max_attempts,
     required_data_miss_retry_sec,
 )
+from app.modules.shop_runner.wb_shop import WBShop
 
 logger = logging.getLogger(__name__)
 
@@ -124,13 +125,21 @@ def while_coroutine_decorator(
         func: Callable[F_Spec, Awaitable[T_Result]],
     ) -> Callable[F_Spec, Coroutine[Any, Any, T_Result]]:
         coroutine_name = func.__name__
-
         @wraps(func)
         async def wrapper(*args: F_Spec.args, **kwargs: F_Spec.kwargs) -> T_Result:
-            instance = _get_instance_from_args(args)
+            instance: WBShop = _get_instance_from_args(args)
             while True:
                 try:
-                    await func(*args, **kwargs)
+                    try:
+                        await asyncio.wait_for(*args, **kwargs, timeout=10*60)
+                    except asyncio.TimeoutError:
+                        logger.error(
+                            "while_coroutine_decorator: timeout for %s, shop_id=%s",
+                            func.__name__,
+                            instance.shop_id,
+                            exc_info=True,
+                        )
+                        raise
                     _set_required_data_miss_streak(instance, coroutine_name, 0)
                     await asyncio.sleep(pause_on_success)
                     continue
