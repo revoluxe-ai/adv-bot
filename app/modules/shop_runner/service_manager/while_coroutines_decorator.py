@@ -7,7 +7,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
-from typing import Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
 from sqlalchemy.exc import InterfaceError
 
@@ -22,7 +22,9 @@ from app.modules.shop_runner.required_data_miss import (
     required_data_miss_max_attempts,
     required_data_miss_retry_sec,
 )
-from app.modules.shop_runner.wb_shop import WBShop
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.wb_shop import WBShop
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +129,7 @@ def while_coroutine_decorator(
         coroutine_name = func.__name__
         @wraps(func)
         async def wrapper(*args: F_Spec.args, **kwargs: F_Spec.kwargs) -> T_Result:
-            instance: WBShop = _get_instance_from_args(args)
+            instance: WBShop | None = _get_instance_from_args(args)
             while True:
                 try:
                     try:
