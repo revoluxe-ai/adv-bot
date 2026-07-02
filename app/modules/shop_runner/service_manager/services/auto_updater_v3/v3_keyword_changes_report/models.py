@@ -7,6 +7,22 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+def _empty_keyword_steps() -> list["V3KeywordStepRecord"]:
+    return []
+
+
+def _empty_target_place_steps() -> list[str]:
+    return []
+
+
+def _empty_phase_breakdowns() -> list["V3ExecutorPhaseBreakdown"]:
+    return []
+
+
+def _empty_keyword_entries() -> list["V3KeywordChangeEntry"]:
+    return []
+
+
 class V3KeywordStepRecord(BaseModel):
     """Один шаг смены режима ключа с атрибуцией executor."""
 
@@ -25,8 +41,8 @@ class V3KeywordChangeEntry(BaseModel):
     current_mode: str
     mode_chain: str = ""
     executor_short_labels: str = ""
-    steps: list[V3KeywordStepRecord] = Field(default_factory=list)
-    target_place_steps: list[str] = Field(default_factory=list)
+    steps: list[V3KeywordStepRecord] = Field(default_factory=_empty_keyword_steps)
+    target_place_steps: list[str] = Field(default_factory=_empty_target_place_steps)
 
     model_config = {"extra": "forbid"}
 
@@ -61,7 +77,11 @@ class V3KeywordChangesSnapshot(BaseModel):
     net_force_off: int = 0
     net_on: int = 0
     aggression_score_after: int = 0
-    by_phase: list[V3ExecutorPhaseBreakdown] = Field(default_factory=list)
-    keyword_entries: list[V3KeywordChangeEntry] = Field(default_factory=list)
+    by_phase: list[V3ExecutorPhaseBreakdown] = Field(
+        default_factory=_empty_phase_breakdowns
+    )
+    keyword_entries: list[V3KeywordChangeEntry] = Field(
+        default_factory=_empty_keyword_entries
+    )
 
     model_config = {"extra": "forbid"}
