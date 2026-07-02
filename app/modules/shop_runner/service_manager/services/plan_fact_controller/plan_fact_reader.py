@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
+from typing import TypeVar
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -26,7 +28,9 @@ logger = logging.getLogger(__name__)
 PLAN_FACT_CH_TS_FORMAT_MSK = "%d.%m.%Y %H:%i"
 PLAN_FACT_CACHE_TTL_SECONDS = 15 * 60
 PLAN_FACT_CH_FALLBACK_TIMEOUT_SECONDS = 15
+PLAN_FACT_REDIS_TIMEOUT_SECONDS = 2
 _PLAN_FACT_CACHE_PREFIX = "adv_snapshot:v1:plan_fact:adv"
+_T = TypeVar("_T")
 
 
 @dataclass
@@ -48,6 +52,46 @@ class PlanFactCacheManager:
 
     def __init__(self, redis_client: RedisClient) -> None:
         self._client = redis_client
+
+    async def _with_redis_timeout(
+        self,
+        operation: Awaitable[_T],
+        *,
+        action: str,
+        adv_id: int | None = None,
+        adv_count: int | None = None,
+    ) -> _T | None:
+        started = time.perf_counter()
+        try:
+            return await asyncio.wait_for(
+                operation,
+                timeout=PLAN_FACT_REDIS_TIMEOUT_SECONDS,
+            )
+        except (asyncio.TimeoutError, TimeoutError):
+            duration_ms = (time.perf_counter() - started) * 1000
+            logger.warning(
+                "plan_fact_cache_%s_timeout adv_id=%s adv_count=%s duration_ms=%.2f timeout_sec=%s",
+                action,
+                adv_id,
+                adv_count,
+                duration_ms,
+                PLAN_FACT_REDIS_TIMEOUT_SECONDS,
+                exc_info=True,
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001
+            duration_ms = (time.perf_counter() - started) * 1000
+            logger.error(
+                "plan_fact_cache_%s_error adv_id=%s adv_count=%s duration_ms=%.2f timeout_sec=%s exc_type=%s",
+                action,
+                adv_id,
+                adv_count,
+                duration_ms,
+                PLAN_FACT_REDIS_TIMEOUT_SECONDS,
+                type(exc).__name__,
+                exc_info=True,
+            )
+            return None
 
     @staticmethod
     def _get_key(adv_id: int) -> str:
@@ -95,9 +139,15 @@ class PlanFactCacheManager:
         normalized_adv_ids = [int(adv_id) for adv_id in adv_ids]
         if not normalized_adv_ids:
             return {}, set()
-        raw_list = await self._client.mget(
-            [self._get_key(adv_id) for adv_id in normalized_adv_ids]
+        raw_list = await self._with_redis_timeout(
+            self._client.mget(
+                [self._get_key(adv_id) for adv_id in normalized_adv_ids]
+            ),
+            action="read",
+            adv_count=len(normalized_adv_ids),
         )
+        if raw_list is None:
+            return {}, set()
         hits: dict[int, PlanFactSummary] = {}
         invalid_adv_ids: set[int] = set()
         for adv_id, raw in zip(normalized_adv_ids, raw_list, strict=True):
@@ -116,7 +166,13 @@ class PlanFactCacheManager:
 
     async def get_one(self, adv_id: int) -> tuple[PlanFactSummary | None, bool]:
         """Return cached summary and invalid-payload flag."""
-        raw = await self._client.get(self._get_key(int(adv_id)))
+        normalized_adv_id = int(adv_id)
+        raw = await self._with_redis_timeout(
+            self._client.get(self._get_key(normalized_adv_id)),
+            action="read",
+            adv_id=normalized_adv_id,
+            adv_count=1,
+        )
         if raw is None:
             return None, False
         try:
@@ -128,22 +184,35 @@ class PlanFactCacheManager:
         """Persist summaries with the hard 15-minute TTL."""
         if not summaries:
             return 0
-        async with self._client.write_pipeline() as pipe:
-            for summary in summaries:
-                pipe.set(
-                    self._get_key(summary.adv_id),
-                    self._serialize(summary),
-                    ex=PLAN_FACT_CACHE_TTL_SECONDS,
-                )
-            await pipe.execute()
-        return len(summaries)
+        async def _write() -> int:
+            async with self._client.write_pipeline() as pipe:
+                for summary in summaries:
+                    pipe.set(
+                        self._get_key(summary.adv_id),
+                        self._serialize(summary),
+                        ex=PLAN_FACT_CACHE_TTL_SECONDS,
+                    )
+                await pipe.execute()
+            return len(summaries)
+
+        written = await self._with_redis_timeout(
+            _write(),
+            action="write",
+            adv_count=len(summaries),
+        )
+        return written or 0
 
     async def set_one(self, summary: PlanFactSummary) -> None:
         """Persist one summary with the hard 15-minute TTL."""
-        await self._client.set(
-            self._get_key(summary.adv_id),
-            self._serialize(summary),
-            ex=PLAN_FACT_CACHE_TTL_SECONDS,
+        await self._with_redis_timeout(
+            self._client.set(
+                self._get_key(summary.adv_id),
+                self._serialize(summary),
+                ex=PLAN_FACT_CACHE_TTL_SECONDS,
+            ),
+            action="write",
+            adv_id=summary.adv_id,
+            adv_count=1,
         )
 
 class PlanFactReader:
@@ -312,6 +381,8 @@ class PlanFactReader:
                 type(exc).__name__,
                 exc_info=True,
             )
+            return
+        if written <= 0:
             return
         logger.debug(
             "plan_fact_cache_write_success adv_count=%s ttl_sec=%s",
