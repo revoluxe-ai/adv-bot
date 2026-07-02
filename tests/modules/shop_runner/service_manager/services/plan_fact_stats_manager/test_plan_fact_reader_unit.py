@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from unittest.mock import AsyncMock, patch
 
@@ -25,6 +26,12 @@ def _reader(fake_redis: FakeRedis) -> PlanFactReader:
     return PlanFactReader(cache_manager=PlanFactCacheManager(redis_client=redis_client))
 
 
+def _reader_with_redis_client(redis_client: object) -> PlanFactReader:
+    return PlanFactReader(
+        cache_manager=PlanFactCacheManager(redis_client=redis_client)  # type: ignore[arg-type]
+    )
+
+
 def _summary(
     adv_id: int,
     *,
@@ -42,6 +49,81 @@ def _summary(
         fact_method=fact_method,
         plan_fact_ch_ts_msk=plan_fact_ch_ts_msk,
     )
+
+
+class _FailingRedisClient:
+    def __init__(self, *, read_exc: Exception | None = None) -> None:
+        self._read_exc = read_exc or RuntimeError("redis read failed")
+
+    async def get(self, key: str) -> str | None:
+        raise self._read_exc
+
+    async def mget(self, keys: list[str]) -> list[str | None]:
+        raise self._read_exc
+
+    async def set(
+        self,
+        key: str,
+        value: str,
+        ex: int | None = None,
+    ) -> bool:
+        return True
+
+    def write_pipeline(self) -> "_SuccessfulPipeline":
+        return _SuccessfulPipeline()
+
+
+class _WriteFailingRedisClient:
+    def __init__(self, *, write_exc: Exception | None = None) -> None:
+        self._write_exc = write_exc or RuntimeError("redis write failed")
+
+    async def get(self, key: str) -> str | None:
+        return None
+
+    async def mget(self, keys: list[str]) -> list[str | None]:
+        return [None for _ in keys]
+
+    async def set(
+        self,
+        key: str,
+        value: str,
+        ex: int | None = None,
+    ) -> bool:
+        raise self._write_exc
+
+    def write_pipeline(self) -> "_FailingPipeline":
+        return _FailingPipeline(self._write_exc)
+
+
+class _SuccessfulPipeline:
+    async def __aenter__(self) -> "_SuccessfulPipeline":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    def set(self, key: str, value: str, ex: int | None = None) -> None:
+        return None
+
+    async def execute(self) -> list[object]:
+        return []
+
+
+class _FailingPipeline:
+    def __init__(self, exc: Exception) -> None:
+        self._exc = exc
+
+    async def __aenter__(self) -> "_FailingPipeline":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    def set(self, key: str, value: str, ex: int | None = None) -> None:
+        return None
+
+    async def execute(self) -> list[object]:
+        raise self._exc
 
 
 @pytest.mark.asyncio
@@ -147,6 +229,66 @@ async def test_get_latest_plan_fact_fallback_success_writes_cache_and_ttl(
 
 
 @pytest.mark.asyncio
+async def test_get_latest_plan_fact_redis_read_error_uses_clickhouse(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(_FailingRedisClient())
+    fallback = _summary(111)
+    caplog.set_level(logging.ERROR)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_fact_from_clickhouse",
+        new=AsyncMock(return_value=fallback),
+    ) as query_mock:
+        result = await reader.get_latest_plan_fact(111)
+
+    assert result == fallback
+    query_mock.assert_awaited_once_with(111)
+    assert "plan_fact_cache_read_error" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_latest_plan_fact_redis_read_error_and_ch_timeout_returns_none(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(_FailingRedisClient())
+    caplog.set_level(logging.WARNING)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_fact_from_clickhouse",
+        new=AsyncMock(side_effect=TimeoutError()),
+    ):
+        result = await reader.get_latest_plan_fact(111)
+
+    assert result is None
+    assert "plan_fact_cache_read_error" in caplog.text
+    assert "plan_fact_clickhouse_fallback_timeout" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_latest_plan_fact_redis_read_timeout_uses_clickhouse(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(
+        _FailingRedisClient(read_exc=asyncio.TimeoutError())
+    )
+    fallback = _summary(111)
+    caplog.set_level(logging.WARNING)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_fact_from_clickhouse",
+        new=AsyncMock(return_value=fallback),
+    ):
+        result = await reader.get_latest_plan_fact(111)
+
+    assert result == fallback
+    assert "plan_fact_cache_read_timeout" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_get_latest_plan_fact_timeout_returns_none_and_logs(
     fake_redis: FakeRedis,
     caplog: pytest.LogCaptureFixture,
@@ -162,6 +304,45 @@ async def test_get_latest_plan_fact_timeout_returns_none_and_logs(
         result = await reader.get_latest_plan_fact(333)
 
     assert result is None
+    assert "plan_fact_clickhouse_fallback_timeout" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_latest_plan_facts_redis_mget_error_uses_clickhouse(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(_FailingRedisClient())
+    fallback = {111: _summary(111), 222: _summary(222)}
+    caplog.set_level(logging.ERROR)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(return_value=fallback),
+    ) as query_mock:
+        result = await reader.get_latest_plan_facts([111, 222])
+
+    assert result == fallback
+    query_mock.assert_awaited_once_with([111, 222])
+    assert "plan_fact_cache_read_error" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_latest_plan_facts_redis_mget_error_and_ch_timeout_returns_empty(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(_FailingRedisClient())
+    caplog.set_level(logging.WARNING)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(side_effect=TimeoutError()),
+    ):
+        result = await reader.get_latest_plan_facts([111, 222])
+
+    assert result == {}
+    assert "plan_fact_cache_read_error" in caplog.text
     assert "plan_fact_clickhouse_fallback_timeout" in caplog.text
 
 
@@ -208,6 +389,46 @@ async def test_get_latest_plan_facts_error_returns_empty_without_cache_write(
 
 
 @pytest.mark.asyncio
+async def test_get_latest_plan_fact_ch_success_redis_write_error_returns_ch_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(_WriteFailingRedisClient())
+    fallback = _summary(111)
+    caplog.set_level(logging.ERROR)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_fact_from_clickhouse",
+        new=AsyncMock(return_value=fallback),
+    ):
+        result = await reader.get_latest_plan_fact(111)
+
+    assert result == fallback
+    assert "plan_fact_cache_write_error" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_get_latest_plan_facts_pipeline_execute_timeout_returns_ch_data(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(
+        _WriteFailingRedisClient(write_exc=asyncio.TimeoutError())
+    )
+    fallback = {111: _summary(111), 222: _summary(222)}
+    caplog.set_level(logging.WARNING)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(return_value=fallback),
+    ):
+        result = await reader.get_latest_plan_facts([111, 222])
+
+    assert result == fallback
+    assert "plan_fact_cache_write_timeout" in caplog.text
+
+
+@pytest.mark.asyncio
 async def test_refresh_cache_from_clickhouse_writes_shape_reader_reads(
     fake_redis: FakeRedis,
     caplog: pytest.LogCaptureFixture,
@@ -234,6 +455,25 @@ async def test_refresh_cache_from_clickhouse_writes_shape_reader_reads(
     for adv_id in fresh:
         ttl = await fake_redis.ttl(reader._cache_manager._get_key(adv_id))
         assert 0 < ttl <= PLAN_FACT_CACHE_TTL_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_refresh_cache_from_clickhouse_write_error_does_not_escape(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader_with_redis_client(_WriteFailingRedisClient())
+    fresh = {111: _summary(111)}
+    caplog.set_level(logging.ERROR)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(return_value=fresh),
+    ):
+        refreshed = await reader.refresh_cache_from_clickhouse([111])
+
+    assert refreshed == fresh
+    assert "plan_fact_cache_write_error" in caplog.text
 
 
 @pytest.mark.asyncio
