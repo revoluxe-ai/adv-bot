@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fakeredis.aioredis import FakeRedis
 
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PLAN_FACT_CACHE_TTL_SECONDS,
     PlanFactCacheManager,
@@ -20,7 +21,8 @@ pytestmark = pytest.mark.unit
 
 
 def _reader(fake_redis: FakeRedis) -> PlanFactReader:
-    return PlanFactReader(cache_manager=PlanFactCacheManager(redis_client=fake_redis))
+    redis_client = RedisClient(redis_client=fake_redis)
+    return PlanFactReader(cache_manager=PlanFactCacheManager(redis_client=redis_client))
 
 
 def _summary(
@@ -208,12 +210,14 @@ async def test_get_latest_plan_facts_error_returns_empty_without_cache_write(
 @pytest.mark.asyncio
 async def test_refresh_cache_from_clickhouse_writes_shape_reader_reads(
     fake_redis: FakeRedis,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     reader = _reader(fake_redis)
     fresh = {
         111: _summary(111),
         222: _summary(222, fact_predict_orders=180.0, fact_pay_for_order=610.0),
     }
+    caplog.set_level(logging.DEBUG)
 
     with patch.object(
         reader,
@@ -226,6 +230,68 @@ async def test_refresh_cache_from_clickhouse_writes_shape_reader_reads(
     query_mock.assert_awaited_once_with([111, 222])
     from_cache = await reader.get_latest_plan_facts([111, 222])
     assert from_cache == fresh
+    assert "plan_fact_warmup_success" in caplog.text
     for adv_id in fresh:
         ttl = await fake_redis.ttl(reader._cache_manager._get_key(adv_id))
         assert 0 < ttl <= PLAN_FACT_CACHE_TTL_SECONDS
+
+
+@pytest.mark.asyncio
+async def test_refresh_cache_from_clickhouse_handles_empty_result(
+    fake_redis: FakeRedis,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader(fake_redis)
+    caplog.set_level(logging.DEBUG)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(return_value={}),
+    ) as query_mock:
+        refreshed = await reader.refresh_cache_from_clickhouse([333])
+
+    assert refreshed == {}
+    query_mock.assert_awaited_once_with([333])
+    assert await fake_redis.get(reader._cache_manager._get_key(333)) is None
+    assert "plan_fact_warmup_success" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_refresh_cache_from_clickhouse_timeout_returns_empty(
+    fake_redis: FakeRedis,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader(fake_redis)
+    caplog.set_level(logging.WARNING)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(side_effect=TimeoutError()),
+    ):
+        refreshed = await reader.refresh_cache_from_clickhouse([444])
+
+    assert refreshed == {}
+    assert await fake_redis.get(reader._cache_manager._get_key(444)) is None
+    assert "plan_fact_warmup_timeout" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_refresh_cache_from_clickhouse_error_returns_empty(
+    fake_redis: FakeRedis,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    reader = _reader(fake_redis)
+    caplog.set_level(logging.ERROR)
+
+    with patch.object(
+        reader,
+        "_query_latest_plan_facts_from_clickhouse",
+        new=AsyncMock(side_effect=RuntimeError("ch broken")),
+    ):
+        refreshed = await reader.refresh_cache_from_clickhouse([555])
+
+    assert refreshed == {}
+    assert await fake_redis.get(reader._cache_manager._get_key(555)) is None
+    assert "plan_fact_warmup_error" in caplog.text
