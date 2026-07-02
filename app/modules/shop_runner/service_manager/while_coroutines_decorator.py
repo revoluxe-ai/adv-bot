@@ -142,7 +142,8 @@ def while_coroutine_decorator(
                             instance.shop_id,
                             exc_info=True,
                         )
-                        raise
+                        await asyncio.sleep(pause_on_error)
+                        continue
                     _set_required_data_miss_streak(instance, coroutine_name, 0)
                     await asyncio.sleep(pause_on_success)
                     continue
