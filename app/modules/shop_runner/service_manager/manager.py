@@ -1467,6 +1467,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60, 60)
     async def update_plan_fact_stats(self, only_bot_active: bool = False) -> None:
         """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
+        # TODO: Перенести запись данных в CH в единый пайплайн под updater.py для единнобразия
         from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
 
         pre_advs: list[PreComplexAdv] = (
