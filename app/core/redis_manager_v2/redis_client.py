@@ -1,12 +1,12 @@
 __all__ = ("RedisClient",)
 
 import asyncio
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Protocol, Self, cast
 from collections.abc import Mapping
 from typing import TypeVar
 from collections.abc import Awaitable
 from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 
 T = TypeVar("T")
 
@@ -27,6 +27,32 @@ def ensure_awaitable(obj: Awaitable[T] | T) -> Awaitable[T]:
     if hasattr(obj, "__await__"):
         return obj
     return asyncio.sleep(0, result=obj)
+
+
+class _RedisPipeline(Protocol):
+    """Minimal async Redis pipeline API exposed by ``RedisClient``."""
+
+    async def __aenter__(self) -> Self: ...
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None: ...
+
+    def set(
+        self,
+        name: str,
+        value: Any,
+        ex: int | None = None,
+        px: int | None = None,
+        nx: bool | None = None,
+    ) -> Any: ...
+
+    def get(self, name: str) -> Any: ...
+
+    async def execute(self, raise_on_error: bool = True) -> list[Any]: ...
 
 
 # TODO: Чтобы быстрее закинуть в прод убрал ABC из класса RedisClient
@@ -233,13 +259,13 @@ class RedisClient:
     async def flushdb(self) -> bool:
         return cast(bool, await ensure_awaitable(self._replica_write_client.flushdb()))
 
-    def read_pipeline(self) -> Pipeline:
+    def read_pipeline(self) -> _RedisPipeline:
         """Создает pipeline для операций чтения"""
-        return self._replica_read_client.pipeline()
+        return cast(_RedisPipeline, self._replica_read_client.pipeline())
 
-    def write_pipeline(self) -> Pipeline:  # добавлена аннотация возвращаемого типа
+    def write_pipeline(self) -> _RedisPipeline:
         """Создает pipeline для операций записи"""
-        return self._replica_write_client.pipeline()
+        return cast(_RedisPipeline, self._replica_write_client.pipeline())
 
     async def execute_read_pipeline(self, commands: list[list[Any]]) -> list[Any]:
         """Выполняет список команд чтения через pipeline"""

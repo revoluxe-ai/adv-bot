@@ -185,12 +185,15 @@ async def _update_tasks(
 
 
 
-async def run() -> None:
+@inject
+async def run(
+    redis_client_wrapper: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
     from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import PlanFactReader
     tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
     stop_event = asyncio.Event()
     queue_task = asyncio.create_task(tasks_manager.run_queue(stop_event))
-    plan_fact_reader = PlanFactReader()
+    plan_fact_reader = PlanFactReader(redis_client=redis_client_wrapper)
     async with ClientSession() as session:
         shop_loop_task = asyncio.create_task(
             _run_shops_loop(

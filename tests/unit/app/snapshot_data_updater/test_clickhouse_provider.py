@@ -19,7 +19,7 @@ from app.snapshot_data_updater.providers.clickhouse_provider import (
 async def test_fetch_plan_facts_uses_original_orders_for_fact_orders() -> None:
     """``fact_orders`` — фактические заказы; ``fact_predict_orders`` — прогноз."""
     reader = MagicMock()
-    reader.get_latest_plan_facts = AsyncMock(
+    reader.refresh_cache_from_clickhouse = AsyncMock(
         return_value={
             10: PlanFactSummary(
                 adv_id=10,
@@ -44,7 +44,7 @@ async def test_fetch_plan_facts_uses_original_orders_for_fact_orders() -> None:
 async def test_fetch_plan_facts_fact_orders_falls_back_to_predict() -> None:
     """Если ``fact_original_orders`` нет — как в ``fact_data_from_plan_fact_summary``."""
     reader = MagicMock()
-    reader.get_latest_plan_facts = AsyncMock(
+    reader.refresh_cache_from_clickhouse = AsyncMock(
         return_value={
             11: PlanFactSummary(
                 adv_id=11,

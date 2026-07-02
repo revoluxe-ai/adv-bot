@@ -1,11 +1,13 @@
 """Воркер для обновления магазинов."""
 
 import asyncio
+from typing import Any, cast
 
 import dotenv
 from aiohttp import ClientSession
 
 from app.core.di.di_manager import DIManager
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -28,12 +30,16 @@ async def run_shop_update_worker() -> None:
     from app.core.di.app_container import AppContainer
 
     tasks_manager = TasksManager(max_workers=settings.MAX_TASKS)
-    plan_fact_reader = PlanFactReader()
     redis_manager = RedisShopManager()
     stop_event = asyncio.Event()
     queue_task = asyncio.create_task(tasks_manager.run_queue(stop_event))
     try:
-        async with await DIManager.create(AppContainer):  # type: ignore[attr-defined]
+        async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            redis_client_wrapper = cast(
+                RedisClient,
+                cast(Any, container).redis_client_wrapper(),
+            )
+            plan_fact_reader = PlanFactReader(redis_client=redis_client_wrapper)
             async with ClientSession() as session:
                 worker = ShopWorker(
                     session,
