@@ -133,7 +133,8 @@ def while_coroutine_decorator(
             while True:
                 try:
                     try:
-                        await asyncio.wait_for(*args, **kwargs, timeout=10*60)
+                        # TODO: Осознанный hard-блок, в будущем - убрать. Суть в том, что корутина дольше 30 минут - ясно сломанная корутина, ее не должно быть и нужно видеть ошибку
+                        await asyncio.wait_for(func(*args, **kwargs), timeout=30*60)
                     except asyncio.TimeoutError:
                         logger.error(
                             "while_coroutine_decorator: timeout for %s, shop_id=%s",
