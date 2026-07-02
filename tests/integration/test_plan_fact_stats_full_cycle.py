@@ -19,6 +19,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PLAN_FACT_CH_TS_FORMAT_MSK,
+    PlanFactCacheManager,
     PlanFactReader,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
@@ -225,7 +226,11 @@ async def test_full_cycle_plan_fact_stats(
     assert row[10] == "DIRECT_SALES"  # fact_method
     assert isinstance(row[11], float)  # version
 
-    reader = PlanFactReader()
+    reader = PlanFactReader(
+        cache_manager=PlanFactCacheManager(
+            redis_client=RedisClient(redis_client=fake_redis)
+        )
+    )
     summary = await reader.get_latest_plan_fact(complex_adv.adv_id)
     assert summary is not None
     assert summary.plan_fact_ch_ts_msk is not None
@@ -508,4 +513,3 @@ async def test_full_cycle_data_correctness_in_clickhouse(
     timestamp_from_db = row[3].replace(tzinfo=None) if row[3].tzinfo else row[3]
     time_diff = abs((datetime.now() - timestamp_from_db).total_seconds())
     assert time_diff < 60  # Разница должна быть меньше минуты
-
