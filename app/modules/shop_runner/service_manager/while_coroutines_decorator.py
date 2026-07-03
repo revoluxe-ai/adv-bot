@@ -22,6 +22,7 @@ from app.modules.shop_runner.required_data_miss import (
     required_data_miss_max_attempts,
     required_data_miss_retry_sec,
 )
+from typing import cast
 
 if TYPE_CHECKING:
     from app.modules.shop_runner.wb_shop import WBShop
@@ -44,9 +45,9 @@ F_Spec = ParamSpec("F_Spec")
 _REQUIRED_DATA_MISS_STREAKS_ATTR = "_required_data_miss_streaks"
 
 
-def _get_instance_from_args(args: tuple[Any, ...]) -> Any | None:
+def _get_instance_from_args(args: tuple[Any, ...]) -> str:
     """Первый аргумент обёрнутой корутины — обычно CoroutinesManager (self)."""
-    return args[0] if args else None
+    return cast(str, args[0] if args else None)
 
 
 def _get_required_data_miss_streaks_dict(instance: Any) -> dict[str, int]:
@@ -129,7 +130,7 @@ def while_coroutine_decorator(
         coroutine_name = func.__name__
         @wraps(func)
         async def wrapper(*args: F_Spec.args, **kwargs: F_Spec.kwargs) -> T_Result:
-            instance: WBShop | None = _get_instance_from_args(args)
+            instance: WBShop = _get_instance_from_args(args)
             while True:
                 try:
                     try:
