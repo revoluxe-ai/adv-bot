@@ -885,7 +885,7 @@ class AutoBudgetService:
                 status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
                 campaign_type=AdvType.AUTO,
                 adv_id=adv_id_auto,
-                spend_today=0.0,
+                spend_today=spend_today,
                 budget_total_before=int(combined_budget),
                 reason="Missing full adv stats for one or both campaigns",
             )
