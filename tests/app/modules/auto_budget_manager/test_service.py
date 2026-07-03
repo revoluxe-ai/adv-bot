@@ -16,6 +16,7 @@ from app.modules.auto_budget_manager import (
 from app.shared.domains.wb.enums import (
     AdvType,
 )
+from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.balance_source import (
     BalanceSnapshot,
     cashback_summary_from_response,
@@ -88,6 +89,9 @@ def _wrap_complex_adv(adv_setting: SimpleNamespace) -> SimpleNamespace:
         ),
         auto_adv_id=adv_setting.adv_id,
         search_adv_id=getattr(adv_setting, "search_adv_id", None),
+        search_adv_active_status_str=getattr(
+            adv_setting, "search_adv_active_status_str", None
+        ),
         adv_id=adv_setting.adv_id,
     )
 
@@ -723,15 +727,16 @@ async def test_ensure_common_budget_rejects_when_both_campaigns_have_stale_stats
 
 
 @pytest.mark.asyncio
-async def test_ensure_common_budget_rejects_when_one_campaign_missing_stats(
+async def test_ensure_common_budget_allows_search_topup_when_campaign_missing_stats_and_search_needs_cold_start(
     monkeypatch,
 ) -> None:
-    """When either timestamp is None, reject with NOT_NEW_ADV_STATS."""
+    """Missing stats must not block cold-start SEARCH top-up when live WB budgets are low."""
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings",
-        _build_settings(),
+        _build_settings(AUTO_BUDGET_MIN_BALANCE=500),
     )
     adv_setting = _build_common_adv_setting()
+    adv_setting.search_adv_active_status_str = WBAdvActiveStatus.PAUSE
     _patch_adv_setting(monkeypatch, adv_setting)
 
     now = datetime.datetime(
@@ -761,12 +766,106 @@ async def test_ensure_common_budget_rejects_when_one_campaign_missing_stats(
         AsyncMock(return_value=(0.0, 0.0)),
     )
 
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.select_topup_balance_decision",
+        lambda response, *, topup_amount: SimpleNamespace(
+            balance_name="balance",
+            cashback=None,
+        ),
+    )
+
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            side_effect=[
+                SimpleNamespace(total=0, raw={"total": 0}),
+                SimpleNamespace(total=0, raw={"total": 0}),
+            ]
+        ),
+        get_campaign_balance=AsyncMock(
+            return_value=_FakeBalanceResponse(balance=0, net=5000, bonus=0, cashbacks=None)
+        ),
+        top_up_budget=AsyncMock(return_value=SimpleNamespace(raw={"ok": True})),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
+
+    mark_topup_entry = AsyncMock()
+    create_topup_entry = AsyncMock(return_value=SimpleNamespace(id=777))
+    monkeypatch.setattr(service := AutoBudgetService(redis_client=_FakeRedis()), "_create_topup_entry", create_topup_entry)
+    monkeypatch.setattr(service, "_mark_topup_entry", mark_topup_entry)
+
+    complex_adv = _wrap_complex_adv(adv_setting)
+    result = await service._ensure_common_budget_locked(
+        complex_adv,
+        adv_setting_id=adv_setting.id,
+        wb_manager_hub=wb_manager_hub,
+    )
+
+    assert result.status == AutoBudgetEnsureStatus.TOPUP_UNVERIFIED
+    assert result.campaign_type == AdvType.SEARCH
+    assert result.adv_id == adv_setting.search_adv_id
+    assert result.reason is None
+    wb_modifier.top_up_budget.assert_awaited_once()
+    assert wb_modifier.top_up_budget.await_args.kwargs["adv_id"] == adv_setting.search_adv_id
+    create_topup_entry.assert_awaited_once()
+    assert create_topup_entry.await_args.kwargs["adv_id"] == adv_setting.search_adv_id
+    assert create_topup_entry.await_args.kwargs["campaign_type"] == AdvType.SEARCH
+
+
+@pytest.mark.asyncio
+async def test_ensure_common_budget_rejects_when_one_campaign_missing_stats_and_budgets_already_sufficient(
+    monkeypatch,
+) -> None:
+    """Missing stats should still block when live WB budgets are already above the threshold."""
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.settings",
+        _build_settings(AUTO_BUDGET_MIN_BALANCE=500),
+    )
+    adv_setting = _build_common_adv_setting()
+    adv_setting.search_adv_active_status_str = WBAdvActiveStatus.PAUSE
+    _patch_adv_setting(monkeypatch, adv_setting)
+
+    now = datetime.datetime(
+        2026, 1, 19, 12, 0, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=3))
+    )
+
+    async def mock_get_last_full(adv_id: int):
+        if adv_id == adv_setting.adv_id:
+            return now
+        return None
+
+    monkeypatch.setattr(
+        AutoBudgetService,
+        "_now_msk",
+        staticmethod(lambda: now),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._calculate_spend_today",
+        AsyncMock(return_value=0.0),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_last_full_stat_update",
+        AsyncMock(side_effect=mock_get_last_full),
+    )
+    monkeypatch.setattr(
+        "app.modules.auto_budget_manager.service.AutoBudgetService._get_daily_topup_sums_common",
+        AsyncMock(return_value=(0.0, 0.0)),
+    )
+
+    wb_modifier = SimpleNamespace(
+        get_campaign_budget=AsyncMock(
+            side_effect=[
+                SimpleNamespace(total=600, raw={"total": 600}),
+                SimpleNamespace(total=600, raw={"total": 600}),
+            ]
+        ),
+    )
+    wb_manager_hub = SimpleNamespace(wb_modifier=wb_modifier)
     service = AutoBudgetService(redis_client=_FakeRedis())
     complex_adv = _wrap_complex_adv(adv_setting)
     result = await service._ensure_common_budget_locked(
         complex_adv,
         adv_setting_id=adv_setting.id,
-        wb_manager_hub=MagicMock(),
+        wb_manager_hub=wb_manager_hub,
     )
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
@@ -984,4 +1083,3 @@ async def test_ensure_common_budget_rejects_stale_when_min_zero_both_wb_high(
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
     assert result.reason == "Last full adv stats too old"
-
