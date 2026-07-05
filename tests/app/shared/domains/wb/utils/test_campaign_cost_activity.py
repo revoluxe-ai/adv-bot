@@ -13,10 +13,10 @@ from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
 
 def _plan_fact_summary(
     *,
-    fact_predict_orders: float,
+    fact_predict_orders: object,
     plan_fact_ch_ts_msk: str = "01.01.2025 00:00",
     fact_original_orders: float | None = None,
-    fact_pay_for_order: float | None = None,
+    fact_pay_for_order: object = None,
     fact_method: str | None = None,
 ) -> SimpleNamespace:
     """Минимальный снимок plan/fact для unit-тестов cost activity."""
@@ -35,8 +35,8 @@ class _FakeAdvSetting:
         adv_id: int,
         *,
         plan_for_sales_for_day: int | None,
-        target_price_for_order: int | float | None,
-        max_price_for_order: int | float | None,
+        target_price_for_order: float | None,
+        max_price_for_order: float | None,
         auto_shelf_bid_control_enabled: bool = False,
         bidder_coroutine_type: BidderCoroutineType = (
             BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
@@ -89,6 +89,7 @@ async def test_is_auto_campaign_active_returns_false_when_avg_cost_above_target(
         get_latest_plan_fact=AsyncMock(
             return_value=_plan_fact_summary(
                 fact_predict_orders=15.0,
+                fact_pay_for_order=150.0,
                 plan_fact_ch_ts_msk="01.01.2025 00:00",
             )
         )
@@ -118,6 +119,7 @@ async def test_is_auto_campaign_active_returns_false_for_cluster_bidder_without_
         get_latest_plan_fact=AsyncMock(
             return_value=_plan_fact_summary(
                 fact_predict_orders=5.0,
+                fact_pay_for_order=680.0,
                 plan_fact_ch_ts_msk="01.01.2025 00:00",
             )
         )
@@ -133,8 +135,7 @@ async def test_is_auto_campaign_active_returns_false_for_cluster_bidder_without_
 
 
 @pytest.mark.asyncio
-async def test_is_auto_campaign_active_returns_true_for_shelf_bid_control_when_avg_cost_above_target() -> None:
-    """auto_shelf_bid_control: cost-rule отключён, is_active=True даже при avg_cost > resolve."""
+async def test_is_auto_campaign_active_returns_false_for_shelf_bid_control_when_both_cpo_bad() -> None:
     adv = _FakeAdvSetting(
         105,
         plan_for_sales_for_day=10,
@@ -146,6 +147,7 @@ async def test_is_auto_campaign_active_returns_true_for_shelf_bid_control_when_a
         get_latest_plan_fact=AsyncMock(
             return_value=_plan_fact_summary(
                 fact_predict_orders=15.0,
+                fact_pay_for_order=120.0,
                 plan_fact_ch_ts_msk="01.01.2025 00:00",
             )
         )
@@ -157,12 +159,11 @@ async def test_is_auto_campaign_active_returns_true_for_shelf_bid_control_when_a
     ):
         result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
 
-    assert result is True
+    assert result is False
 
 
 @pytest.mark.asyncio
-async def test_get_auto_campaign_cost_activity_metrics_shelf_bid_control_keeps_metrics_when_cost_high() -> None:
-    """auto_shelf_bid_control: метрики target/avg считаются, is_active=True при превышении resolve."""
+async def test_get_auto_campaign_cost_activity_metrics_shelf_bid_control_is_uncertain_when_total_cpo_ok() -> None:
     adv = _FakeAdvSetting(
         106,
         plan_for_sales_for_day=10,
@@ -174,6 +175,7 @@ async def test_get_auto_campaign_cost_activity_metrics_shelf_bid_control_keeps_m
         get_latest_plan_fact=AsyncMock(
             return_value=_plan_fact_summary(
                 fact_predict_orders=15.0,
+                fact_pay_for_order=100.0,
                 plan_fact_ch_ts_msk="01.01.2025 00:00",
             )
         )
@@ -190,12 +192,13 @@ async def test_get_auto_campaign_cost_activity_metrics_shelf_bid_control_keeps_m
 
     assert metrics.target_cost == 100.0
     assert metrics.avg_cost == 150.0
-    assert metrics.is_active is True
+    assert metrics.fact_pay_for_order == 100.0
+    assert metrics.is_active is None
     assert metrics.cost_threshold_kind == "target"
 
 
 @pytest.mark.asyncio
-async def test_is_auto_campaign_active_returns_true_with_auto_shelf_bid_control_enabled() -> None:
+async def test_is_auto_campaign_active_returns_none_for_shelf_bid_control_without_plan_fact() -> None:
     adv = _FakeAdvSetting(
         103,
         plan_for_sales_for_day=10,
@@ -213,11 +216,94 @@ async def test_is_auto_campaign_active_returns_true_with_auto_shelf_bid_control_
     ):
         result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
 
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_is_auto_campaign_active_returns_true_for_shelf_bid_control_when_avg_cost_below_target_without_total_cpo() -> None:
+    adv = _FakeAdvSetting(
+        108,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+        auto_shelf_bid_control_enabled=True,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=_plan_fact_summary(
+                fact_predict_orders=15.0,
+                fact_pay_for_order=None,
+            )
+        )
+    )
+
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=90.0),
+    ):
+        result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
+
     assert result is True
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fact_pay_for_order", [None, "bad", float("nan")])
+async def test_is_auto_campaign_active_returns_none_for_shelf_bid_control_when_total_cpo_missing_or_bad(
+    fact_pay_for_order: object,
+) -> None:
+    adv = _FakeAdvSetting(
+        109,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+        auto_shelf_bid_control_enabled=True,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=_plan_fact_summary(
+                fact_predict_orders=15.0,
+                fact_pay_for_order=fact_pay_for_order,
+            )
+        )
+    )
+
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=150.0),
+    ):
+        result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
+
+    assert result is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fact_predict_orders", [None, "bad", float("nan")])
+async def test_is_auto_campaign_active_returns_none_when_fact_predict_orders_missing_or_bad(
+    fact_predict_orders: object,
+) -> None:
+    adv = _FakeAdvSetting(
+        110,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+        auto_shelf_bid_control_enabled=True,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=_plan_fact_summary(
+                fact_predict_orders=fact_predict_orders,
+                fact_pay_for_order=120.0,
+            )
+        )
+    )
+
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=150.0),
+    ):
+        result = await is_auto_campaign_active(adv, plan_fact_reader=reader)
+
+    assert result is None
 
 @pytest.mark.asyncio
 async def test_is_auto_campaign_active_returns_none_without_plan_fact_row() -> None:
