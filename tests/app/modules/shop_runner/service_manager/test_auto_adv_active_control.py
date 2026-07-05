@@ -844,6 +844,26 @@ async def test_auto_adv_shelf_bid_control_does_not_pause_when_total_cpo_is_ok():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "fact_pay_for_order",
+    [None, "bad", float("nan"), float("inf")],
+)
+async def test_auto_adv_shelf_bid_control_does_not_pause_when_total_cpo_missing_or_bad(
+    fact_pay_for_order: object,
+):
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=fact_pay_for_order,
+        fact_predict_orders=12.0,
+        auto_shelf_bid_control_enabled=True,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.reason_manager.set.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_auto_adv_shelf_bid_control_starts_when_avg_cost_is_ok():
     wb_modifier = await _run_auto_cost_rule_case(
         auto_status="pause",
