@@ -876,6 +876,41 @@ async def test_auto_adv_cost_rule_does_not_pause_when_avg_cost_is_ok():
 
 
 @pytest.mark.asyncio
+async def test_auto_adv_cost_rule_starts_when_avg_cost_ok_without_total_cpo():
+    wb_modifier = await _run_auto_cost_rule_case(
+        auto_status="pause",
+        avg_cost=100.0,
+        fact_pay_for_order=None,
+    )
+
+    wb_modifier.start_auto_campaign.assert_awaited_once()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_cost_rule_does_not_pause_when_avg_cost_ok_without_total_cpo():
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=100.0,
+        fact_pay_for_order=None,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.start_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_cost_rule_starts_when_avg_cost_ok_and_total_cpo_high():
+    wb_modifier = await _run_auto_cost_rule_case(
+        auto_status="pause",
+        avg_cost=100.0,
+        fact_pay_for_order=150.0,
+    )
+
+    wb_modifier.start_auto_campaign.assert_awaited_once()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_auto_adv_cost_rule_pauses_when_avg_cost_and_total_cpo_are_high():
     wb_modifier = await _run_auto_cost_rule_case(
         avg_cost=150.0,
@@ -968,15 +1003,38 @@ async def test_auto_adv_cost_rule_does_not_pause_on_bad_fact_predict_orders(
 
 
 @pytest.mark.asyncio
-async def test_auto_adv_cost_rule_starts_when_avg_cost_high_but_total_cpo_ok():
+async def test_auto_adv_cost_rule_does_not_start_when_avg_cost_high_but_total_cpo_ok():
     wb_modifier = await _run_auto_cost_rule_case(
         auto_status="pause",
         avg_cost=150.0,
         fact_pay_for_order=100.0,
     )
 
-    wb_modifier.start_auto_campaign.assert_awaited_once()
+    wb_modifier.start_auto_campaign.assert_not_called()
     wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_cost_rule_does_not_start_when_avg_cost_high_without_total_cpo():
+    wb_modifier = await _run_auto_cost_rule_case(
+        auto_status="pause",
+        avg_cost=150.0,
+        fact_pay_for_order=None,
+    )
+
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_cost_rule_does_not_pause_when_avg_cost_high_without_total_cpo():
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=None,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.start_auto_campaign.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -1161,8 +1219,8 @@ async def test_auto_adv_does_not_start_when_no_plan_fact():
 
 
 @pytest.mark.asyncio
-async def test_auto_adv_common_budget_starts_when_avg_cost_high_but_total_cpo_ok():
-    """Common budget: PAUSE, budget OK, avg_cost high but total CPO OK -> auto starts."""
+async def test_auto_adv_common_budget_does_not_start_auto_when_avg_cost_high_but_total_cpo_ok():
+    """Common budget: PAUSE, budget OK, avg_cost high but total CPO OK -> auto blocked."""
     adv = _FakeComplexAdv(
         auto_limit=0,
         auto_status="pause",
@@ -1220,7 +1278,7 @@ async def test_auto_adv_common_budget_starts_when_avg_cost_high_but_total_cpo_ok
     ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
-    wb_modifier.start_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_called()
     wb_modifier.start_auction_campaign.assert_awaited_once_with(adv)
     wb_modifier.pause_auto_campaign.assert_not_called()
     wb_modifier.pause_auction_campaign.assert_not_called()
