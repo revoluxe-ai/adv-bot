@@ -148,6 +148,7 @@ async def _run_auto_cost_rule_case(
     auto_status: str = "started",
     avg_cost: object,
     fact_pay_for_order: object,
+    fact_predict_orders: object = 12.0,
     resolved_target_cost: object = 100,
 ) -> MagicMock:
     adv = _FakeComplexAdv(
@@ -176,7 +177,7 @@ async def _run_auto_cost_rule_case(
     plan_fact_reader.get_latest_plan_fact = AsyncMock(
         return_value=PlanFactSummary(
             adv_id=1001,
-            fact_predict_orders=12.0,
+            fact_predict_orders=fact_predict_orders,  # type: ignore[arg-type]
             fact_pay_for_order=fact_pay_for_order,  # type: ignore[arg-type]
         )
     )
@@ -920,6 +921,46 @@ async def test_auto_adv_cost_rule_does_not_pause_on_missing_or_bad_values(
         resolved_target_cost=resolved_target_cost,
         avg_cost=avg_cost,
         fact_pay_for_order=fact_pay_for_order,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.start_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_cost_rule_does_not_pause_without_fact_predict_orders():
+    wb_modifier = await _run_auto_cost_rule_case(
+        fact_predict_orders=None,
+        avg_cost=150.0,
+        fact_pay_for_order=120.0,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.start_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_cost_rule_does_not_start_without_fact_predict_orders():
+    wb_modifier = await _run_auto_cost_rule_case(
+        auto_status="pause",
+        fact_predict_orders=None,
+        avg_cost=150.0,
+        fact_pay_for_order=120.0,
+    )
+
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fact_predict_orders", ["bad", float("nan")])
+async def test_auto_adv_cost_rule_does_not_pause_on_bad_fact_predict_orders(
+    fact_predict_orders: object,
+):
+    wb_modifier = await _run_auto_cost_rule_case(
+        fact_predict_orders=fact_predict_orders,
+        avg_cost=150.0,
+        fact_pay_for_order=120.0,
     )
 
     wb_modifier.pause_auto_campaign.assert_not_called()
