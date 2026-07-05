@@ -561,11 +561,23 @@ class AutoAdvActiveControlService:
             plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(
                 auto_adv_id
             )
+            fact_predict_orders = (
+                plan_fact_summary.fact_predict_orders if plan_fact_summary else None
+            )
+            fact_predict_orders_value = _as_finite_cost_number(fact_predict_orders)
+            if fact_predict_orders_value is None:
+                logger.info(
+                    "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
+                    cost_log_suffix,
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                return None
             target_cost = resolve_target_cost(
                 plan.orders if plan else None,
                 plan.target_pay_for_order if plan else None,
                 plan.max_pay_for_order if plan else None,
-                plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
+                fact_predict_orders_value,
             )
             avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
                 auto_adv_id,
