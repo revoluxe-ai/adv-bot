@@ -15,6 +15,10 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactReader,
     PlanFactSummary,
 )
+from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
+    AutoReasonCode,
+    CampaignActivityCommand,
+)
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 
 _SERVICE_MODULE = (
@@ -150,6 +154,7 @@ async def _run_auto_cost_rule_case(
     fact_pay_for_order: object,
     fact_predict_orders: object = 12.0,
     resolved_target_cost: object = 100,
+    auto_shelf_bid_control_enabled: bool = False,
 ) -> MagicMock:
     adv = _FakeComplexAdv(
         auto_limit=100,
@@ -160,6 +165,7 @@ async def _run_auto_cost_rule_case(
         plan_for_sales_for_day=10,
         target_price_for_order=100,
         max_price_for_order=200,
+        auto_shelf_bid_control_enabled=auto_shelf_bid_control_enabled,
     )
     wb_modifier = MagicMock()
     wb_modifier.start_auto_campaign = AsyncMock()
@@ -181,10 +187,13 @@ async def _run_auto_cost_rule_case(
             fact_pay_for_order=fact_pay_for_order,  # type: ignore[arg-type]
         )
     )
+    reason_manager = MagicMock()
+    reason_manager.set = AsyncMock()
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
         tasks_manager=MagicMock(),
         plan_fact_reader=plan_fact_reader,
+        redis_campaign_activity_reason_manager=reason_manager,
     )
     mock_ts_repo = MagicMock()
     mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
@@ -203,6 +212,7 @@ async def _run_auto_cost_rule_case(
     ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
 
+    wb_modifier.reason_manager = reason_manager
     return wb_modifier
 
 
@@ -366,7 +376,10 @@ async def test_auto_adv_active_control_wb_wallet_fallback_when_bot_balance_zero(
         search_status="started",
         auto_adv_id=20,
         search_adv_id=21,
-        auto_shelf_bid_control_enabled=True
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+        auto_shelf_bid_control_enabled=True,
     )
     monkeypatch.setattr(
         f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
@@ -393,7 +406,13 @@ async def test_auto_adv_active_control_wb_wallet_fallback_when_bot_balance_zero(
         return []
 
     plan_fact_reader = MagicMock(spec=PlanFactReader)
-    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=20,
+            fact_predict_orders=12.0,
+            fact_pay_for_order=80.0,
+        )
+    )
 
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
@@ -794,63 +813,47 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
 
 
 @pytest.mark.asyncio
-async def test_auto_adv_shelf_bid_control_does_not_pause_when_avg_cost_above_target():
-    """auto_shelf_bid_control_enabled: cost-rule отключён — автокампания не на паузе."""
-    adv = _FakeComplexAdv(
-        auto_limit=100,
-        auto_status="started",
-        search_limit=0,
-        search_status="pause",
-        auto_adv_id=10,
-        plan_for_sales_for_day=10,
-        target_price_for_order=100,
-        max_price_for_order=200,
+async def test_auto_adv_shelf_bid_control_pauses_when_avg_cost_and_total_cpo_are_high():
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=120.0,
         auto_shelf_bid_control_enabled=True,
     )
 
-    wb_modifier = MagicMock()
-    wb_modifier.start_auto_campaign = AsyncMock()
-    wb_modifier.pause_auto_campaign = AsyncMock()
-    wb_modifier.start_auction_campaign = AsyncMock()
-    wb_modifier.pause_auction_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.reason_manager.set.assert_awaited_once()
+    adv_id, campaign_type, reason = wb_modifier.reason_manager.set.await_args.args
+    assert adv_id == 1001
+    assert campaign_type == "auto"
+    assert reason.command == CampaignActivityCommand.PAUSE
+    assert reason.reason_code == AutoReasonCode.COST_RULE_FAILED
 
-    async def mock_run_tasks(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
-        results = []
-        for handler in handlers:
-            results.append(await handler())
-        return results
 
-    tasks_manager = MagicMock()
-    plan_fact_reader = MagicMock(spec=PlanFactReader)
-    plan_fact_reader.get_latest_plan_fact = AsyncMock(
-        return_value=PlanFactSummary(
-            adv_id=10,
-            fact_predict_orders=12.0,
-            fact_pay_for_order=120.0,
-        )
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_does_not_pause_when_total_cpo_is_ok():
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=100.0,
+        auto_shelf_bid_control_enabled=True,
     )
-    service = AutoAdvActiveControlService(
-        wb_modifier=wb_modifier,
-        tasks_manager=tasks_manager,
-        plan_fact_reader=plan_fact_reader,
-    )
-
-    mock_ts_repo = MagicMock()
-    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
-    with patch(
-        f"{_SERVICE_MODULE}.run_tasks",
-        new=mock_run_tasks,
-    ), patch(
-        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
-        new=AsyncMock(return_value=0.0),
-    ), patch(
-        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
-        new=AsyncMock(return_value=150.0),
-    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
-        await service.ensure_campaigns_active([adv])
 
     wb_modifier.pause_auto_campaign.assert_not_called()
     wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.reason_manager.set.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_starts_when_avg_cost_is_ok():
+    wb_modifier = await _run_auto_cost_rule_case(
+        auto_status="pause",
+        avg_cost=100.0,
+        fact_pay_for_order=None,
+        auto_shelf_bid_control_enabled=True,
+    )
+
+    wb_modifier.start_auto_campaign.assert_awaited_once()
+    wb_modifier.pause_auto_campaign.assert_not_called()
 
 
 @pytest.mark.asyncio
