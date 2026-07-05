@@ -87,14 +87,12 @@ def _as_finite_cost_number(value: object) -> float | None:
 def _get_comparable_cost_rule_values(
     target_cost: object,
     avg_cost: object,
-    fact_pay_for_order: object,
-) -> tuple[float, float, float] | None:
+) -> tuple[float, float] | None:
     target = _as_finite_cost_number(target_cost)
     avg = _as_finite_cost_number(avg_cost)
-    fact = _as_finite_cost_number(fact_pay_for_order)
-    if target is None or avg is None or fact is None:
+    if target is None or avg is None:
         return None
-    return target, avg, fact
+    return target, avg
 
 
 def _is_wb_low_budget_start_error(detail: str) -> bool:
@@ -588,7 +586,6 @@ class AutoAdvActiveControlService:
             cost_rule_values = _get_comparable_cost_rule_values(
                 target_cost,
                 avg_cost,
-                fact_pay_for_order,
             )
 
             # When values are missing or not comparable, do not pause by cost-rule.
@@ -602,11 +599,11 @@ class AutoAdvActiveControlService:
                 )
                 return None
 
-            target_cost_value, avg_cost_value, fact_pay_for_order_value = (
-                cost_rule_values
-            )
+            target_cost_value, avg_cost_value = cost_rule_values
+            fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
             cost_rule_failed = (
                 avg_cost_value > target_cost_value
+                and fact_pay_for_order_value is not None
                 and fact_pay_for_order_value > target_cost_value
             )
             if cost_rule_failed and auto_status == WBAdvActiveStatus.STARTED:
@@ -635,7 +632,7 @@ class AutoAdvActiveControlService:
                 )
                 return None
 
-            cost_rule_ok = True
+            cost_rule_ok = avg_cost_value <= target_cost_value
         if (
             budget_ok
             and cost_rule_ok
