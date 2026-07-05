@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Literal, cast
 from dataclasses import dataclass, field
@@ -41,6 +42,7 @@ from app.client_bot.user_interface.handlers.time_settings.repository import (
 )
 from app.core.mp.wb.api.excs import BadRequestError, StandardError
 from app.core.mp.wb.api.managers import WBModifier
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -56,10 +58,10 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager, run_tasks
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
-from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
-    is_auto_campaign_active,
+from app.shared.domains.wb.utils.cost_resolver import (
+    resolve_target_cost,
 )
+from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.balance_source import (
     balance_snapshot_from_response,
     cashback_summary_from_response,
@@ -71,6 +73,28 @@ logger = logging.getLogger(__name__)
 MSK_TZ = timezone(timedelta(hours=3))
 
 _time_settings_repo = TimeSettingsRepository()
+
+
+def _as_finite_cost_number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    result = float(value)
+    if not math.isfinite(result):
+        return None
+    return result
+
+
+def _get_comparable_cost_rule_values(
+    target_cost: object,
+    avg_cost: object,
+    fact_pay_for_order: object,
+) -> tuple[float, float, float] | None:
+    target = _as_finite_cost_number(target_cost)
+    avg = _as_finite_cost_number(avg_cost)
+    fact = _as_finite_cost_number(fact_pay_for_order)
+    if target is None or avg is None or fact is None:
+        return None
+    return target, avg, fact
 
 
 def _is_wb_low_budget_start_error(detail: str) -> bool:
@@ -530,45 +554,76 @@ class AutoAdvActiveControlService:
                 return None
             budget_ok = auto_limit > 0 and spend_today < auto_limit
 
-        cost_activity = await is_auto_campaign_active(
-            adv.adv_setting,
-            plan_fact_reader=self._plan_fact_reader,
-        )
-        # When cost_activity is None we do not change campaign state (do nothing).
-        # Do not record PAUSE here — the campaign may still be running; recording PAUSE
-        # would make the UI show "на паузе" and contradict the real WB status.
-        if cost_activity is None:
-            logger.info(
-                "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
-                cost_log_suffix,
-                auto_adv_id,
-                adv.shop_id,
+        if adv.adv_setting.auto_shelf_bid_control_enabled:
+            cost_rule_ok = True
+        else:
+            plan = PlanFactProvider.get_plan_data(adv.adv_setting)
+            plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(
+                auto_adv_id
             )
-            return None
+            target_cost = resolve_target_cost(
+                plan.orders if plan else None,
+                plan.target_pay_for_order if plan else None,
+                plan.max_pay_for_order if plan else None,
+                plan_fact_summary.fact_predict_orders if plan_fact_summary else None,
+            )
+            avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+                auto_adv_id,
+            )
+            fact_pay_for_order = (
+                plan_fact_summary.fact_pay_for_order if plan_fact_summary else None
+            )
+            cost_rule_values = _get_comparable_cost_rule_values(
+                target_cost,
+                avg_cost,
+                fact_pay_for_order,
+            )
 
-        if cost_activity is False and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto watchdog: pausing auto campaign%s due to failed cost rule adv_id=%s shop_id=%s",
-                cost_log_suffix,
-                auto_adv_id,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-            await self._set_auto_reason(
-                auto_adv_id,
-                CampaignActivityCommand.PAUSE,
-                AutoReasonCode.COST_RULE_FAILED,
-            )
-            return None
-        if cost_activity is False and auto_status != WBAdvActiveStatus.STARTED:
-            await self._set_auto_reason(
-                auto_adv_id,
-                CampaignActivityCommand.PAUSE,
-                AutoReasonCode.COST_RULE_FAILED,
-            )
-            return None
+            # When values are missing or not comparable, do not pause by cost-rule.
+            # Also do not record PAUSE here, because WB state may still be running.
+            if cost_rule_values is None:
+                logger.info(
+                    "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
+                    cost_log_suffix,
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                return None
 
-        cost_rule_ok = cost_activity is True
+            target_cost_value, avg_cost_value, fact_pay_for_order_value = (
+                cost_rule_values
+            )
+            cost_rule_failed = (
+                avg_cost_value > target_cost_value
+                and fact_pay_for_order_value > target_cost_value
+            )
+            if cost_rule_failed and auto_status == WBAdvActiveStatus.STARTED:
+                logger.info(
+                    "Auto watchdog: pausing auto campaign%s due to high avg cost "
+                    "%.2f and total CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
+                    cost_log_suffix,
+                    avg_cost_value,
+                    fact_pay_for_order_value,
+                    target_cost_value,
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode.COST_RULE_FAILED,
+                )
+                return None
+            if cost_rule_failed and auto_status != WBAdvActiveStatus.STARTED:
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode.COST_RULE_FAILED,
+                )
+                return None
+
+            cost_rule_ok = True
         if (
             budget_ok
             and cost_rule_ok
