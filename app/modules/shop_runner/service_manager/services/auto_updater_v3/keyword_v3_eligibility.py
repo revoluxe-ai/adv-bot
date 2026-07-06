@@ -163,6 +163,18 @@ def resolve_keyword_v3_eligibility(
     cache = campaign_cache or _CampaignV3DecisionCache.from_contexts(contexts)
     decision = resolve_keyword_v3_decision(ctx, contexts, campaign_cache=cache)
 
+    if is_keyword_no_data(ctx.keyword):
+        return KeywordV3Eligibility(
+            data_tier=KeywordDataTier.KEYWORD_NO_DATA,
+            allowed_modes=_EMPTY_TARGET_MODES,
+            max_allowed_mode=KeywordStrategyMode.OFF,
+            participates_in_ladder=False,
+            target_place_fallback_zero=True,
+            imputed=False,
+            fallback_kind=None,
+            decision_tier=decision.tier,
+        )
+
     if (
         decision.tier == KeywordV3DecisionTier.FULL
         and decision.effective_conv_views_to_orders is not None
@@ -175,18 +187,6 @@ def resolve_keyword_v3_eligibility(
             target_place_fallback_zero=False,
             imputed=False,
             fallback_kind="none",
-            decision_tier=decision.tier,
-        )
-
-    if is_keyword_no_data(ctx.keyword):
-        return KeywordV3Eligibility(
-            data_tier=KeywordDataTier.KEYWORD_NO_DATA,
-            allowed_modes=_EMPTY_TARGET_MODES,
-            max_allowed_mode=KeywordStrategyMode.OFF,
-            participates_in_ladder=False,
-            target_place_fallback_zero=True,
-            imputed=False,
-            fallback_kind=None,
             decision_tier=decision.tier,
         )
 
@@ -260,8 +260,9 @@ def build_target_place_fallback_zero_by_keyword_id(
     Алгоритм (по приоритету для одного ``KeywordV3Context``):
 
     1. **Пропуск** — ``ks_id <= 0`` не попадает в результат.
-    2. **PFO/GAP active** — нет ``position_profile`` (нет CH-профиля / collapsed
-       ladder), но ``strategy_mode != OFF``:
+    2. **PFO/GAP active** — есть operational ``pay_for_order`` без
+       ``position_profile`` либо нет operational ``pay_for_order`` вообще, но
+       ``strategy_mode != OFF``:
        всегда ``False`` — sync **не** форсит 0; ``target_place`` для PFO/GAP
        управляется отдельно в preamble (validate → migrate → plan-fact), а sync
        только уважает уже подготовленное значение из ledger/Redis. Это ключевой
@@ -316,7 +317,13 @@ def build_target_place_fallback_zero_by_keyword_id(
             campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         )
         mode = ctx.keyword.keyword_setting.strategy_mode
-        if not bool(ctx.position_profile) and mode != KeywordStrategyMode.OFF:
+        if (
+            mode != KeywordStrategyMode.OFF
+            and (
+                not bool(ctx.position_profile)
+                or is_keyword_no_data(ctx.keyword)
+            )
+        ):
             out[int(ks_id)] = False
             continue
         out[int(ks_id)] = (

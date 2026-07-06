@@ -17,12 +17,14 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     KeywordV3DecisionTier,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    build_eligibility_map,
     KeywordDataTier,
     KeywordV3Eligibility,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto import (
     KeywordDTO,
     UpdateContextManager,
+    build_update_context,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto import (
     AdvState,
@@ -53,6 +55,9 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keywo
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import (
     KeywordState,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+    PositionProfilePoint,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
@@ -118,7 +123,11 @@ def _full_ladder_states(ks_id: int) -> tuple[KeywordV3LadderState, ...]:
     )
 
 
-def _gap_dto(*, ks_id: int = 1) -> KeywordDTO:
+def _gap_dto(
+    *,
+    ks_id: int = 1,
+    position_profile: list[PositionProfilePoint] | None = None,
+) -> KeywordDTO:
     stat = make_zero_keyword_stat(f"gap{ks_id}")
     kw = CalculatedKeyword(
         adv_id=1,
@@ -138,7 +147,7 @@ def _gap_dto(*, ks_id: int = 1) -> KeywordDTO:
         rating=1.0,
         target_pay_for_order=None,
     )
-    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+    ctx = KeywordV3Context(keyword=kw, position_profile=position_profile)
     return KeywordDTO.from_context(ctx, ladder_states=_gap_ladder_states(ks_id))
 
 
@@ -232,6 +241,71 @@ def test_enable_one_gap_keyword_to_min_cpa() -> None:
     assert dto.target_place == 0
     assert len(dto.next_state) == 1
     assert dto.next_state[0].executor_name == "PayForOrderGapEnableExecutor"
+
+
+@pytest.mark.unit
+def test_enable_gap_with_ch_profile_without_pay_for_order() -> None:
+    """CH-профиль без operational PFO остаётся GAP и включается отдельной phase."""
+    dto = _gap_dto(
+        position_profile=[PositionProfilePoint(position=1, bid=100)],
+    )
+    ctx = _context([dto], _adv_state(fact=50.0))
+    PayForOrderGapEnableExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+    assert dto.target_place == 0
+
+
+@pytest.mark.unit
+def test_enable_gap_with_ch_profile_from_real_context_builder() -> None:
+    """Regression: CH matrix + no PFO не должен превращаться в not_allowed FULL."""
+    kw = _gap_dto(
+        position_profile=[PositionProfilePoint(position=1, bid=100)],
+    ).calculated_keyword
+    adv_state = _adv_state(fact=50.0, eligibility={1: _no_data_elig()})
+    ctx = build_update_context(
+        [
+            KeywordV3Context(
+                keyword=kw,
+                position_profile=[PositionProfilePoint(position=1, bid=100)],
+            )
+        ],
+        eligibility_by_ks_id=adv_state.eligibility_by_ks_id,
+        adv_state=adv_state,
+    )
+    dto = ctx.keywords[0]
+    assert any(state.stage == V3LadderStageKind.GAP for state in dto.ladder_states)
+    PayForOrderGapEnableExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_enable_gap_with_full_decision_but_missing_pay_for_order() -> None:
+    """Regression: own conv + CH profile не блокируют GAP, если operational PFO нет."""
+    kw = _calc_kw(
+        ks_id=1,
+        text="full_decision_gap",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        conv=0.05,
+        cpm_set_bid=0,
+        hard_status=2,
+    )
+    context = KeywordV3Context(
+        keyword=kw,
+        position_profile=[PositionProfilePoint(position=1, bid=100)],
+    )
+    eligibility = build_eligibility_map([context])
+    assert eligibility[1].data_tier == KeywordDataTier.KEYWORD_NO_DATA
+    adv_state = _adv_state(fact=50.0, eligibility=eligibility)
+    ctx = build_update_context(
+        [context],
+        eligibility_by_ks_id=eligibility,
+        adv_state=adv_state,
+    )
+    dto = ctx.keywords[0]
+    assert any(state.stage == V3LadderStageKind.GAP for state in dto.ladder_states)
+    PayForOrderGapEnableExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
 
 
 @pytest.mark.unit

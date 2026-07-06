@@ -6,7 +6,7 @@ from enum import Enum
 
 
 class V3LadderStageKind(str, Enum):
-    """Ступени ladder-state: OFF, GAP (NO DATA без CH), MIN/OPT/MAX."""
+    """Ступени ladder-state: OFF, GAP (NO DATA без operational PFO), MIN/OPT/MAX."""
 
     OFF = "OFF"
     GAP = "GAP"
