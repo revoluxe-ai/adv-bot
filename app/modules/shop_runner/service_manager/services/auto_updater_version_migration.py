@@ -43,6 +43,7 @@ async def migrate_v1_auto_updaters_to_v2(advs: Sequence[ComplexAdv]) -> int:
 
     for adv in advs:
         if adv.auto_updater_version == V1_AUTO_UPDATER_VERSION:
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv.adv_setting.automatic_version = V2_AUTO_UPDATER_VERSION
 
     logger.debug(
