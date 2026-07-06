@@ -1,5 +1,5 @@
 ﻿import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, Awaitable, Callable
 
 import pytest
@@ -10,6 +10,9 @@ from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactM
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
     AutoAdvActiveControlService,
+)
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
+    AutoShelfBidSelectedCpoContract,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -155,6 +158,7 @@ async def _run_auto_cost_rule_case(
     fact_predict_orders: object = 12.0,
     resolved_target_cost: object = 100,
     auto_shelf_bid_control_enabled: bool = False,
+    selected_cpo_contract: AutoShelfBidSelectedCpoContract | None = None,
 ) -> MagicMock:
     adv = _FakeComplexAdv(
         auto_limit=100,
@@ -189,10 +193,18 @@ async def _run_auto_cost_rule_case(
     )
     reason_manager = MagicMock()
     reason_manager.set = AsyncMock()
+    selected_cpo_provider = None
+    if selected_cpo_contract is not None:
+        selected_cpo_provider = MagicMock()
+        selected_cpo_provider.build_selected_cpo_contract = AsyncMock(
+            return_value=selected_cpo_contract
+        )
+    legacy_avg_cost_mock = AsyncMock(return_value=avg_cost)
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
         tasks_manager=MagicMock(),
         plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=selected_cpo_provider,
         redis_campaign_activity_reason_manager=reason_manager,
     )
     mock_ts_repo = MagicMock()
@@ -205,7 +217,7 @@ async def _run_auto_cost_rule_case(
         new=AsyncMock(return_value=0.0),
     ), patch(
         f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
-        new=AsyncMock(return_value=avg_cost),
+        new=legacy_avg_cost_mock,
     ), patch(
         f"{_SERVICE_MODULE}.resolve_target_cost",
         return_value=resolved_target_cost,
@@ -213,6 +225,8 @@ async def _run_auto_cost_rule_case(
         await service.ensure_campaigns_active([adv])
 
     wb_modifier.reason_manager = reason_manager
+    wb_modifier.selected_cpo_provider = selected_cpo_provider
+    wb_modifier.legacy_avg_cost_mock = legacy_avg_cost_mock
     return wb_modifier
 
 
@@ -874,6 +888,74 @@ async def test_auto_adv_shelf_bid_control_starts_when_avg_cost_is_ok():
 
     wb_modifier.start_auto_campaign.assert_awaited_once()
     wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_prefers_selected_cpo_over_legacy():
+    selected_contract = AutoShelfBidSelectedCpoContract(
+        selected_bid_minor=12300,
+        selected_cpo_rub=90.0,
+        updated_at=datetime.now(UTC),
+        source="rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
+    )
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=120.0,
+        auto_shelf_bid_control_enabled=True,
+        selected_cpo_contract=selected_contract,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_awaited_once_with(
+        1001
+    )
+    wb_modifier.legacy_avg_cost_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_falls_back_to_legacy_when_selected_cpo_missing():
+    unavailable_contract = AutoShelfBidSelectedCpoContract(
+        selected_bid_minor=12300,
+        selected_cpo_rub=None,
+        updated_at=datetime.now(UTC),
+        source="rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
+        unavailable_reason="selected_bid_not_synced",
+    )
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=120.0,
+        auto_shelf_bid_control_enabled=True,
+        selected_cpo_contract=unavailable_contract,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_awaited_once_with(
+        1001
+    )
+    wb_modifier.legacy_avg_cost_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_pauses_when_selected_cpo_and_total_are_high():
+    selected_contract = AutoShelfBidSelectedCpoContract(
+        selected_bid_minor=12300,
+        selected_cpo_rub=150.0,
+        updated_at=datetime.now(UTC),
+        source="rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
+    )
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=90.0,
+        fact_pay_for_order=120.0,
+        auto_shelf_bid_control_enabled=True,
+        selected_cpo_contract=selected_contract,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_awaited_once_with(
+        1001
+    )
+    wb_modifier.legacy_avg_cost_mock.assert_not_awaited()
 
 
 @pytest.mark.asyncio
