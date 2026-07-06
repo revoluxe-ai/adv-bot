@@ -10,7 +10,9 @@ from sqlalchemy.orm import load_only, selectinload
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.wb_api.data_classes.advs.other_classes import Balances
-from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_new_campaign_free_defaults,
+)
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 
 from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -83,7 +85,8 @@ class MainAdvManager:
                 .with_for_update()
             )
             adv_setting: AdvSetting = (await session.execute(stmt)).scalar_one()
-            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+            apply_new_campaign_free_defaults(adv_setting, adv_setting.wb_cabinet)
             await session.commit()
 
     @staticmethod
@@ -211,6 +214,7 @@ class MainAdvManager:
             )
 
             # Подготавливаем данные для upsert
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv_data = {
                 "adv_id": auto_adv_id,
                 "_search_adv_id": search_adv_id,  # Исправлено на _search_adv_id
@@ -221,7 +225,7 @@ class MainAdvManager:
                 "bidder_active": False,
                 "wb_cabinet_id": wb_cabinet.id,
                 "parsing_active": False,
-                "bot_active": True,
+                "bot_active": False,
                 "auto_adv_target_status": False,
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,
@@ -319,6 +323,7 @@ class MainAdvManager:
             wb_cabinet_from_db = await self._get_wb_cabinet_from_session(
                 session, wb_cabinet_id
             )
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv_data = {
                 "adv_id": existing_auto_adv_id,
                 "_search_adv_id": search_adv_id,
@@ -329,7 +334,7 @@ class MainAdvManager:
                 "bidder_active": False,
                 "wb_cabinet_id": wb_cabinet_from_db.id,
                 "parsing_active": False,
-                "bot_active": True,
+                "bot_active": False,
                 "auto_adv_target_status": False,
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,
@@ -404,6 +409,7 @@ class MainAdvManager:
             wb_cabinet_from_db = await self._get_wb_cabinet_from_session(
                 session, wb_cabinet_id
             )
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv_data = {
                 "adv_id": auto_adv_id,
                 "_search_adv_id": existing_search_adv_id,
@@ -414,7 +420,7 @@ class MainAdvManager:
                 "bidder_active": False,
                 "wb_cabinet_id": wb_cabinet_from_db.id,
                 "parsing_active": False,
-                "bot_active": True,
+                "bot_active": False,
                 "auto_adv_target_status": False,
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,

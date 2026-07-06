@@ -29,7 +29,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     is_switch_to_version_blocked_by_ab_hold,
 )
 from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
-    backfill_v3_status_mode_consistency,
+    backfill_v3_hard_statuses_and_states_consistency,
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import User
@@ -194,6 +194,7 @@ async def toggle_auto_updater_version(
         if new_version == current_norm:
             return
 
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         stmt = (
             update(AdvSetting)
             .where(AdvSetting.id == adv_setting_original_id)
@@ -203,7 +204,8 @@ async def toggle_auto_updater_version(
         await session.commit()
 
     if new_version == 3:
-        repaired = await backfill_v3_status_mode_consistency(
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+        repaired = await backfill_v3_hard_statuses_and_states_consistency(
             dry_run=False,
             adv_setting_id=adv_setting_original_id,
         )
