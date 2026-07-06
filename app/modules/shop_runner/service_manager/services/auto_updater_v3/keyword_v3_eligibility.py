@@ -260,8 +260,9 @@ def build_target_place_fallback_zero_by_keyword_id(
     Алгоритм (по приоритету для одного ``KeywordV3Context``):
 
     1. **Пропуск** — ``ks_id <= 0`` не попадает в результат.
-    2. **PFO/GAP active** — нет ``position_profile`` (нет CH-профиля / collapsed
-       ladder), но ``strategy_mode != OFF``:
+    2. **PFO/GAP active** — есть operational ``pay_for_order`` без
+       ``position_profile`` либо нет operational ``pay_for_order`` вообще, но
+       ``strategy_mode != OFF``:
        всегда ``False`` — sync **не** форсит 0; ``target_place`` для PFO/GAP
        управляется отдельно в preamble (validate → migrate → plan-fact), а sync
        только уважает уже подготовленное значение из ledger/Redis. Это ключевой
@@ -316,7 +317,13 @@ def build_target_place_fallback_zero_by_keyword_id(
             campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
         )
         mode = ctx.keyword.keyword_setting.strategy_mode
-        if not bool(ctx.position_profile) and mode != KeywordStrategyMode.OFF:
+        if (
+            mode != KeywordStrategyMode.OFF
+            and (
+                not bool(ctx.position_profile)
+                or is_keyword_no_data(ctx.keyword)
+            )
+        ):
             out[int(ks_id)] = False
             continue
         out[int(ks_id)] = (

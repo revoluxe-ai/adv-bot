@@ -55,11 +55,11 @@ class KeywordDTO:
     updater-а. Благодаря ей NF-фазы больше не используют размытое
     ``is_not_full()`` и могут явно различать:
 
-    - ``FULL``: есть CH-профиль, значит действуют ladder-правила;
+    - ``FULL``: есть CH-профиль и operational PFO, значит действуют ladder-правила;
     - ``PFO``: CH-профиля нет, но есть operational PFO, значит можно
       выполнять NF bootstrap и plan-fact;
-    - ``GAP``: нет ни профиля, ни operational PFO, значит ключ ещё в
-      bootstrap/enable контуре.
+    - ``GAP``: нет operational PFO, значит ключ ещё в bootstrap/enable контуре
+      независимо от наличия CH-профиля.
     """
 
     calculated_keyword: CalculatedKeyword
@@ -129,7 +129,7 @@ class KeywordDTO:
 
     @property
     def data_tier(self) -> KeywordV3DataTier:
-        """FULL/PFO/GAP по профилю позиций и operational ``pay_for_order``.
+        """FULL/PFO/GAP по operational ``pay_for_order`` и профилю позиций.
 
         Это центральный классификатор V3-контракта. Он не пытается понять
         «хороший» ключ или «плохой» ключ, не смотрит на overspend и не
@@ -139,9 +139,9 @@ class KeywordDTO:
         Классификация устроена как трёхточечный контракт:
 
         ``FULL``
-            У ключа есть CH-профиль. Это значит, что он уже живёт в
-            ladder-контуре, а NF-фазы не имеют права использовать его как
-            bootstrap-кандидата.
+            У ключа есть CH-профиль и operational ``pay_for_order``. Это значит,
+            что он уже живёт в ladder-контуре, а NF-фазы не имеют права
+            использовать его как bootstrap-кандидата.
 
         ``PFO``
             CH-профиля нет, но есть operational ``pay_for_order``. Это
@@ -150,10 +150,9 @@ class KeywordDTO:
             migrate, а дальше корректировать plan-fact шагом ``±1``.
 
         ``GAP``
-            Ни CH-профиля, ни operational PFO нет. Это ещё не NF-ключ и не
-            ladder-ключ, а отдельная bootstrap/enable/reset-зона. Такой ключ не
-            должен получать NF bootstrap только потому, что у него пустой
-            профиль.
+            Operational PFO нет. CH-профиль без PFO больше не делает ключ FULL:
+            это отдельная bootstrap/enable/reset-зона, пока на ключе не
+            появится свой ``pay_for_order``.
 
         Это свойство не кэширует бизнес-решение и не проверяет overspend. Оно
         лишь определяет, в какой из трёх operational веток ключ находится
