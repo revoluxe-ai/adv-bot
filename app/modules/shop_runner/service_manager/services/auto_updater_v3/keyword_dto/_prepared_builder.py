@@ -22,9 +22,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dt
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.keyword_dto import (
     KeywordDTO,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.target_place_matrix import (
-    TargetPlaceMatrix,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto.dto.next_target_place import (
     NextTargetPlace,
 )
@@ -52,8 +49,8 @@ def _stage_for_agg(mode: AggressionTargetMode) -> V3LadderStageKind:
 
 
 def _is_gap_context(ctx: KeywordV3Context) -> bool:
-    """GAP: нет операционного PFO и нет CH-профиля."""
-    return is_keyword_no_data(ctx.keyword) and not bool(ctx.position_profile)
+    """GAP: на ключе нет операционного PFO, даже если CH-профиль уже есть."""
+    return is_keyword_no_data(ctx.keyword)
 
 
 def _target_position_for_stage(
@@ -292,38 +289,7 @@ def assemble_update_context(
             eligibility_by_ks_id=eligibility_by_ks_id,
             ladder_inputs=ladder_inputs,
         )
-    _apply_no_data_singletons(prepared, state)
     return UpdateContext(prepared=prepared, adv_state=state)
-
-
-def _apply_no_data_singletons(prepared: KeywordsPreparedList, state: AdvState) -> None:
-    """Заменить GAP-матрицу на singleton NO DATA, когда доступен fact pay_for_order."""
-    fact_pfo = state.fact_pay_for_order
-    if fact_pfo is None:
-        return
-    for dto in prepared.keywords:
-        if dto.keyword_setting_id <= 0:
-            continue
-        if not is_keyword_no_data(dto.calculated_keyword):
-            continue
-        profile = dto.position_profile
-        if bool(profile):
-            continue
-        states = dto.ladder_states
-        if len(states) != 2:
-            continue
-        if not any(s.stage == V3LadderStageKind.GAP for s in states):
-            continue
-        singleton = KeywordV3LadderState(
-            keyword_setting_id=dto.keyword_setting_id,
-            stage=V3LadderStageKind.MIN_CPA,
-            strategy_mode=KeywordStrategyMode.MIN_CPA,
-            target_position=0,
-            cpo=float(fact_pfo),
-            is_valid=True,
-            synthetic_no_data=True,
-        )
-        dto.target_place_matrix = TargetPlaceMatrix((singleton,))
 
 
 def update_context_from_prepared(
@@ -343,7 +309,6 @@ def update_context_from_prepared(
             )
         else:
             raise TypeError(f"unsupported prepared type: {type(prepared)!r}")
-    _apply_no_data_singletons(prepared, state)
     return UpdateContext(
         prepared=prepared,
         adv_state=state,

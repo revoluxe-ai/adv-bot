@@ -42,6 +42,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pip
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.update_pipeline.executors.states_list_generator import (
     StatesListGenerator,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.position_profile_point import (
+    PositionProfilePoint,
+)
 from tests.unit.test_auto_updater_v3 import _calc_kw
 
 
@@ -122,6 +125,15 @@ def test_gap_state_when_no_pfo_and_no_profile() -> None:
 
 
 @pytest.mark.unit
+def test_gap_state_when_no_pfo_even_with_ch_profile() -> None:
+    """NO DATA с CH-профилем остаётся GAP: без PFO ключ нельзя вести как FULL."""
+    ctx = _ctx(22, no_data=True, profile=[PositionProfilePoint(position=1, bid=100)])
+    states = build_ladder_states_for_context(ctx)
+    stages = {s.stage for s in states}
+    assert stages == {V3LadderStageKind.OFF, V3LadderStageKind.GAP}
+
+
+@pytest.mark.unit
 def test_iter_all_ladder_states_flattens() -> None:
     prepared = build_keywords_prepared_list([_ctx(1), _ctx(2)])
     flat = list(prepared.iter_all_ladder_states())
@@ -147,7 +159,8 @@ def test_update_context_from_prepared_preserves_next_state() -> None:
 
 
 @pytest.mark.unit
-def test_no_data_singleton_post_process_is_parity_for_both_entrypoints() -> None:
+def test_no_data_gap_is_preserved_with_campaign_fact_for_both_entrypoints() -> None:
+    """Campaign fact не подменяет GAP на synthetic MIN_CPA до GAP enable phase."""
     ctx = _ctx(3, mode=KeywordStrategyMode.OFF, no_data=True, profile=None)
     adv_state = replace(AdvState.empty(), fact_pay_for_order=222.0)
 
@@ -156,18 +169,13 @@ def test_no_data_singleton_post_process_is_parity_for_both_entrypoints() -> None
 
     for update_ctx in (assembled, prepared_ctx):
         dto = update_ctx.keywords[0]
-        state = dto.ladder_states[0]
 
-        assert len(dto.ladder_states) == 1
-        assert state.synthetic_no_data is True
-        assert state.stage == V3LadderStageKind.MIN_CPA
-        assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
-        assert state.target_position == 0
-        assert state.cpo == 222.0
-        assert not state.is_gap
+        assert len(dto.ladder_states) == 2
+        assert any(state.is_gap for state in dto.ladder_states)
+        assert not any(state.synthetic_no_data for state in dto.ladder_states)
         assert dto.stored_mode == KeywordStrategyMode.OFF
         assert dto.current_mode == KeywordStrategyMode.OFF
-        assert dto.is_no_data_singleton()
+        assert not dto.is_no_data_singleton()
 
         current, potential = StatesListGenerator(update_ctx.adv_state).get_current_states(
             update_ctx.keywords
@@ -176,10 +184,7 @@ def test_no_data_singleton_post_process_is_parity_for_both_entrypoints() -> None
         assert potential == []
 
         down = pick_effective_down_ladder_state(dto)
-        assert down is not None
-        assert down.stage == V3LadderStageKind.OFF
-        assert down.strategy_mode == KeywordStrategyMode.OFF
-        assert down.synthetic_no_data is True
+        assert down is None
 
     ledger = V3TickKeywordLedger.from_keywords([assembled.keywords[0].calculated_keyword])
     assert ledger.baseline_mode_for(assembled.keywords[0].keyword_setting_id) == KeywordStrategyMode.OFF

@@ -92,6 +92,14 @@ def test_data_tier_gap_without_ch_profile_and_pay_for_order() -> None:
 
 
 @pytest.mark.unit
+def test_data_tier_gap_with_ch_profile_without_pay_for_order() -> None:
+    """CH-профиль без operational PFO не переводит ключ в FULL."""
+    profile = [PositionProfilePoint(position=1, bid=100)]
+    dto = _dto(position_profile=profile, pay_for_order=None)
+    assert dto.data_tier == KeywordV3DataTier.GAP
+
+
+@pytest.mark.unit
 def test_data_tier_full_with_ch_profile() -> None:
     profile = [PositionProfilePoint(position=1, bid=100)]
     dto = _dto(position_profile=profile)
