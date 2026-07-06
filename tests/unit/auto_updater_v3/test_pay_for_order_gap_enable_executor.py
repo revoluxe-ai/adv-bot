@@ -17,6 +17,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     KeywordV3DecisionTier,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
+    build_eligibility_map,
     KeywordDataTier,
     KeywordV3Eligibility,
 )
@@ -269,6 +270,36 @@ def test_enable_gap_with_ch_profile_from_real_context_builder() -> None:
             )
         ],
         eligibility_by_ks_id=adv_state.eligibility_by_ks_id,
+        adv_state=adv_state,
+    )
+    dto = ctx.keywords[0]
+    assert any(state.stage == V3LadderStageKind.GAP for state in dto.ladder_states)
+    PayForOrderGapEnableExecutor().execute(ctx)
+    assert dto.current_mode == KeywordStrategyMode.MIN_CPA
+
+
+@pytest.mark.unit
+def test_enable_gap_with_full_decision_but_missing_pay_for_order() -> None:
+    """Regression: own conv + CH profile не блокируют GAP, если operational PFO нет."""
+    kw = _calc_kw(
+        ks_id=1,
+        text="full_decision_gap",
+        mode=KeywordStrategyMode.OFF,
+        rating=1.0,
+        conv=0.05,
+        cpm_set_bid=0,
+        hard_status=2,
+    )
+    context = KeywordV3Context(
+        keyword=kw,
+        position_profile=[PositionProfilePoint(position=1, bid=100)],
+    )
+    eligibility = build_eligibility_map([context])
+    assert eligibility[1].data_tier == KeywordDataTier.KEYWORD_NO_DATA
+    adv_state = _adv_state(fact=50.0, eligibility=eligibility)
+    ctx = build_update_context(
+        [context],
+        eligibility_by_ks_id=eligibility,
         adv_state=adv_state,
     )
     dto = ctx.keywords[0]
