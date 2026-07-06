@@ -1,3 +1,7 @@
+"""Helpers for sending informational messages to inactive or zero-balance users."""
+
+import asyncio
+import logging
 import time
 
 import dotenv
@@ -6,19 +10,11 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 dotenv.load_dotenv()
 from app.client_bot.bot import aclose_telegram_http_session, get_bot
+from app.modules.user_message_sender import messages
 from app.utils import redis_manager
-from python_modules.logger import setup_logging
-
-setup_logging()
-import asyncio
 
 from sqlalchemy import or_, select
 from sqlalchemy.sql.functions import func
-
-from app.modules.user_message_sender import messages
-
-setup_logging()
-import logging
 
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
 from app.utils.db.models import User
