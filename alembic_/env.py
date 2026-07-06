@@ -1,4 +1,9 @@
-# alembic_/env.py
+"""Alembic environment configuration for project migrations.
+
+Keeps the application logger tree intact during migration runs so test and
+runtime log capture continue to work after Alembic initializes its own logging.
+"""
+
 import os
 from logging.config import fileConfig
 
@@ -32,7 +37,7 @@ if config.attributes.get("connection") is None:
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
