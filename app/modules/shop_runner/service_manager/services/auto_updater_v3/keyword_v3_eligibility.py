@@ -163,6 +163,18 @@ def resolve_keyword_v3_eligibility(
     cache = campaign_cache or _CampaignV3DecisionCache.from_contexts(contexts)
     decision = resolve_keyword_v3_decision(ctx, contexts, campaign_cache=cache)
 
+    if is_keyword_no_data(ctx.keyword):
+        return KeywordV3Eligibility(
+            data_tier=KeywordDataTier.KEYWORD_NO_DATA,
+            allowed_modes=_EMPTY_TARGET_MODES,
+            max_allowed_mode=KeywordStrategyMode.OFF,
+            participates_in_ladder=False,
+            target_place_fallback_zero=True,
+            imputed=False,
+            fallback_kind=None,
+            decision_tier=decision.tier,
+        )
+
     if (
         decision.tier == KeywordV3DecisionTier.FULL
         and decision.effective_conv_views_to_orders is not None
@@ -175,18 +187,6 @@ def resolve_keyword_v3_eligibility(
             target_place_fallback_zero=False,
             imputed=False,
             fallback_kind="none",
-            decision_tier=decision.tier,
-        )
-
-    if is_keyword_no_data(ctx.keyword):
-        return KeywordV3Eligibility(
-            data_tier=KeywordDataTier.KEYWORD_NO_DATA,
-            allowed_modes=_EMPTY_TARGET_MODES,
-            max_allowed_mode=KeywordStrategyMode.OFF,
-            participates_in_ladder=False,
-            target_place_fallback_zero=True,
-            imputed=False,
-            fallback_kind=None,
             decision_tier=decision.tier,
         )
 
