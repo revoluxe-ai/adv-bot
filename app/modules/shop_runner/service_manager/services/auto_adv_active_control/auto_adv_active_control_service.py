@@ -46,6 +46,9 @@ from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
+    AutoShelfBidControlViewProvider,
+)
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
     AutoReasonCode,
     AuctionReasonCode,
@@ -179,6 +182,7 @@ class AutoAdvActiveControlService:
         wb_modifier: WBModifier,
         tasks_manager: TasksManager,
         plan_fact_reader: PlanFactReader | None = None,
+        auto_shelf_bid_control_view_provider: AutoShelfBidControlViewProvider | None = None,
         redis_campaign_activity_reason_manager: RedisCampaignActivityReasonManager | None = None,
         budget_ensure_before_start_retry: Callable[
             [ComplexAdv, Literal["auto", "search"]], Awaitable[None]
@@ -188,6 +192,7 @@ class AutoAdvActiveControlService:
         self._wb_modifier = wb_modifier
         self._tasks_manager = tasks_manager
         self._plan_fact_reader = plan_fact_reader or PlanFactReader()  # просят тесты, потом все это исправить, техдолг
+        self._auto_shelf_bid_control_view_provider = auto_shelf_bid_control_view_provider
         self._reason_manager = redis_campaign_activity_reason_manager
         self._budget_ensure_before_start_retry = budget_ensure_before_start_retry
 
@@ -304,6 +309,45 @@ class AutoAdvActiveControlService:
                 "search",
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
+
+    async def _resolve_auto_avg_cost(
+        self,
+        adv: ComplexAdv,
+        *,
+        auto_adv_id: int,
+    ) -> tuple[object | None, str]:
+        """Resolve selected Auto Shelf CPO first, then fall back to legacy."""
+        if bool(adv.adv_setting.auto_shelf_bid_control_enabled) and (
+            self._auto_shelf_bid_control_view_provider is not None
+        ):
+            try:
+                selected_contract = await self._auto_shelf_bid_control_view_provider.build_selected_cpo_contract(
+                    int(adv.adv_setting.id)
+                )
+            except Exception:
+                logger.warning(
+                    "Auto watchdog: selected CPO contract failed adv_id=%s shop_id=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                    exc_info=True,
+                )
+            else:
+                if selected_contract.is_available:
+                    return selected_contract.selected_cpo_rub, selected_contract.source
+                logger.info(
+                    "Auto watchdog: selected CPO unavailable adv_id=%s shop_id=%s reason=%s",
+                    auto_adv_id,
+                    adv.shop_id,
+                    selected_contract.unavailable_reason,
+                )
+
+        legacy_avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
+            auto_adv_id,
+        )
+        return (
+            legacy_avg_cost,
+            "legacy_full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        )
 
     async def _start_auto_campaign_maybe_retry(self, adv: ComplexAdv) -> None:
         try:
@@ -574,8 +618,9 @@ class AutoAdvActiveControlService:
             plan.max_pay_for_order if plan else None,
             fact_predict_orders_value,
         )
-        avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
-            auto_adv_id,
+        avg_cost, _avg_cost_source = await self._resolve_auto_avg_cost(
+            adv,
+            auto_adv_id=auto_adv_id,
         )
         fact_pay_for_order = (
             plan_fact_summary.fact_pay_for_order if plan_fact_summary else None

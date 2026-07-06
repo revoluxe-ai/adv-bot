@@ -66,6 +66,9 @@ from .services.auto_shelf_bid_control_manager import (
     AutoShelfBidControlManager,
     AutoShelfBidSetter,
 )
+from .services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
+    AutoShelfBidControlViewProvider,
+)
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -190,6 +193,10 @@ class CoroutinesManager:
             redis_client=redis_client_wrapper,
             wb_manager_hub=self._wb_manager_hub,
             auto_recommendations_bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
+        )
+        self._auto_shelf_bid_control_view_provider = AutoShelfBidControlViewProvider(
+            redis_client=redis_client_wrapper,
+            plan_fact_reader=self._plan_fact_reader,
         )
         self._auto_shelf_bid_control_manager = AutoShelfBidControlManager(
             bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
@@ -930,6 +937,7 @@ class CoroutinesManager:
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            auto_shelf_bid_control_view_provider=self._auto_shelf_bid_control_view_provider,
             redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
             budget_ensure_before_start_retry=self._ensure_budget_for_campaign_start_retry,
         )

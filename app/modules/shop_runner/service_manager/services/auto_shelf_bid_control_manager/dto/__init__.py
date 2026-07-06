@@ -8,6 +8,10 @@ from .control_view_dto import (
 )
 from .next_test_bid import NextTestBid
 from .optimization_metric import OptimizationMetric, resolve_optimization_metric
+from .selected_cpo_contract import (
+    AutoShelfBidSelectedCpoContract,
+    resolve_selected_cpo_contract_from_view,
+)
 
 __all__ = [
     "AutoShelfBidControlViewDTO",
@@ -16,5 +20,7 @@ __all__ = [
     "BidStatsDTO",
     "NextTestBid",
     "OptimizationMetric",
+    "AutoShelfBidSelectedCpoContract",
+    "resolve_selected_cpo_contract_from_view",
     "resolve_optimization_metric",
 ]
