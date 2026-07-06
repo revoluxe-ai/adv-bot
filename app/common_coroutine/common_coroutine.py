@@ -1,3 +1,5 @@
+"""Entry point for the common coroutine runtime."""
+
 import asyncio
 import logging
 
@@ -8,9 +10,6 @@ from app.common_coroutine.di import CommonCoroutineContainer
 from python_modules.logger import setup_logging
 
 dotenv.load_dotenv()
-
-setup_logging()
-
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +43,8 @@ async def run_runtime() -> None:
 
 
 def run() -> None:
+    setup_logging()
     asyncio.run(run_runtime())
-
 
 
 

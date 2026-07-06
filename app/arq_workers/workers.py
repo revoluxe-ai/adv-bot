@@ -1,3 +1,5 @@
+"""ARQ worker settings and lifecycle hooks for background tasks."""
+
 from typing import Any
 
 import dotenv
@@ -15,13 +17,12 @@ from app.modules.adv_creator.backend.tasks import (
 )
 from python_modules.logger import setup_logging
 
-# Настраиваем логирование
-setup_logging()
 logger = logging.getLogger(__name__)
 
 
 async def startup(ctx: dict[str, Any]) -> None:
     """Инициализация бота при запуске воркера."""
+    setup_logging()
     logger.debug("Инициализация воркера. ctx перед запуском: %s", ctx)
     ctx["bot"] = get_bot()
     client_session = ClientSession()
