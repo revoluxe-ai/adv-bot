@@ -126,6 +126,7 @@ class AutoShelfBidControlViewDTO:
     main_target_explanation: str | None = None
     rec_bid_recommendation: dict[str, object] | None = None
     legacy_cycle_next_test_bid_minor: int | None = None
+    state_updated_at: datetime | None = None
     auto_shelf_bid_control_strategy: AutoShelfBidControlStrategy = (
         AutoShelfBidControlStrategy.PLAN_DISTANCE
     )
