@@ -16,13 +16,20 @@ from app.modules.common_slaves.wildberries.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
+from app.client_bot.modules.default_settings import apply_common_defaults_settings_for_adv
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_free_mode_transition,
+    apply_paid_auto_management_transition,
+)
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
+)
+from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
+    backfill_v3_hard_statuses_and_states_consistency,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -455,6 +462,7 @@ async def back_from_minus_phrases_setting(
     await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
+# TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
 @router.callback_query(callbacks.TurnBot.filter(F.action == "on"))
 async def turn_adv_on(
     callback: types.CallbackQuery,
@@ -468,6 +476,7 @@ async def turn_adv_on(
 
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     adv_original_id = callback_data.adv_original_id
+    # TODO: Упростить эту функцию, разбить, покрыть тестами, в том числе интгериационными
     async with sm(read_only=False) as session:
         session.begin()
         stmt = (
@@ -518,8 +527,16 @@ async def turn_adv_on(
             )()
             return
         await bot.send_message(callback.message.chat.id, "Включаю бота")
-        adv.bot_active = True
+        switched_to_v3 = adv.automatic_version != 3
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+        apply_paid_auto_management_transition(adv, wb_cabinet)
         await session.commit()
+        if switched_to_v3:
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+            await backfill_v3_hard_statuses_and_states_consistency(
+                dry_run=False,
+                adv_setting_id=adv.id,
+            )
         wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
         await state.update_data(adv_original_id=adv.id)
@@ -533,6 +550,7 @@ async def turn_adv_on(
     return
 
 
+# TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
 @router.callback_query(callbacks.TurnBot.filter(F.action == "off_all"))
 async def turn_adv_off_all(
     callback: types.CallbackQuery,
@@ -540,6 +558,7 @@ async def turn_adv_off_all(
     callback_data: callbacks.TurnBot,
     bot: aiogram.Bot,
 ):
+    # TODO: Функции on off надо вынестить в отдельные общие
     if callback.message is None:
         raise ValueError('Нет сообщения')
 
@@ -552,16 +571,19 @@ async def turn_adv_off_all(
             select(AdvSetting)
             .join(AdvSetting.wb_cabinet)
             .join(WBCabinet.wb_user_cabinets)
+            .options(selectinload(AdvSetting.wb_cabinet))
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         advs = advs.scalars().all()
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         for adv_ in advs:
-            adv_.bot_active = False
+            apply_free_mode_transition(adv_, adv_.wb_cabinet)
         await session.commit()
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
     return
 
 
+# TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
 @router.callback_query(callbacks.TurnBot.filter(F.action == "off"))
 async def turn_adv_off(
     call: types.CallbackQuery, callback_data: callbacks.TurnBot, bot: aiogram.Bot
@@ -577,22 +599,19 @@ async def turn_adv_off(
         stmt = (
             select(WBUserCabinet)
             .join(WBUserCabinet.wb_cabinet)
+            .options(selectinload(WBUserCabinet.wb_cabinet))
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar()
-
-    if not wb_user_cabinet:
-        raise RuntimeError(
-            f"WBUserCabinet not found for original_id={wb_user_cabinet_original_id}"
-        )
+        wb_user_cabinet = wb_user_cabinet.scalar_one()
 
     async with sm(read_only=False) as session:
         result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         )
         adv_setting: AdvSetting = result.scalar_one()
-        adv_setting.bot_active = False
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+        apply_free_mode_transition(adv_setting, wb_user_cabinet.wb_cabinet)
         await session.commit()
 
     await AdvSettingMenu(
@@ -622,7 +641,7 @@ async def apply_campaign_defaults(
         adv_setting: AdvSetting = result.scalar_one()
 
         # Применяем дефолты через ORM
-        apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+        apply_common_defaults_settings_for_adv(adv_setting, adv_setting.wb_cabinet)
         await session.commit()
 
         await bot.send_message(
@@ -776,8 +795,7 @@ async def apply_defaults_for_shop(
         # Применяем дефолты через ORM для каждой активной кампании
         updated_count = 0
         for adv_setting in adv_settings:
-            apply_defaults_to_adv_setting(adv_setting,
-                                         adv_setting.wb_cabinet)
+            apply_common_defaults_settings_for_adv(adv_setting, adv_setting.wb_cabinet)
             updated_count += 1
 
         await session.commit()

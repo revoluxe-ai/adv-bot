@@ -95,6 +95,7 @@ async def set_manual_strategy(
             await bot.send_message(callback.message.chat.id, "Передана неизвестная стратегия.")
             return
 
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         adv_setting.strategy = strategy
         await session.commit()
 

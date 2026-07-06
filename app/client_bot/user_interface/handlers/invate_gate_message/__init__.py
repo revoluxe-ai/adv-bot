@@ -1,8 +1,8 @@
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from app.client_bot.const import OFFERTA_URL, CHAT_FOR_INVITES
-from app.client_bot.user_interface.message_templates import Text, TextWithKeyboard
+from app.client_bot.const import  CHAT_FOR_INVITES
+from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import Gate
 
 
