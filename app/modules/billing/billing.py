@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.client_bot.notification_sender import get_notification_sender
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_free_mode_transition,
+)
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 
 from app.modules.billing.di import BillingContainer
@@ -393,11 +396,10 @@ async def __process_single_cabinet(
             if balance_after_charge < -max_allowed_negative:
                 # Превышен лимит минуса — деактивируем кампании, не списываем, не сбрасываем neg_at
                 grace_exceeded_cabinet_id = cabinet_id
+                # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
                 for campaign in wb_cabinet.adv_settings:
                     if campaign.bot_active:
-                        campaign.bot_active = False
-                        campaign.auto_update_white_list = False
-                        campaign.auto_update_target_place = False
+                        apply_free_mode_transition(campaign, wb_cabinet)
             else:
                 # В пределах лимита: списание в минус
                 if getattr(wb_cabinet, "balance_went_negative_at", None) is None:

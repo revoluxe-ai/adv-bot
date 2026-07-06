@@ -90,7 +90,7 @@ def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> No
     assert "Последние действия с ключами" in texts
 
     assert "Обновить минус-слова" not in texts
-    assert "Режимы Управления Белым Списком" not in texts
+    assert "Режимы Управления Белым Списком" in texts
     assert "Стратегия РК" not in texts
     assert "Управление ставкой в полках" not in texts
     assert "Применить дефолтные настройки" not in texts

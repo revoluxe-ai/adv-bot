@@ -5,8 +5,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
-from app.client_bot.modules.default_settings import (
-    apply_defaults_to_adv_setting,
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_new_campaign_free_defaults,
 )
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
@@ -84,7 +84,8 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
                     cpm=adv.cpm,
                 )
                 # Применяем дефолты через ORM
-                apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
+                # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+                apply_new_campaign_free_defaults(adv_setting, wb_cabinet)
                 apply_wb_campaign_meta_from_legacy_adv_data(
                     adv_setting, adv.data
                 )

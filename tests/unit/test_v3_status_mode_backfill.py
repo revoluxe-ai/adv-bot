@@ -9,7 +9,7 @@ import pytest
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
-    backfill_v3_status_mode_consistency,
+    backfill_v3_hard_statuses_and_states_consistency,
 )
 
 
@@ -33,7 +33,7 @@ async def test_backfill_repairs_auto_keyword_with_min_cpa_for_single_adv() -> No
         "app.modules.shop_runner.service_manager.services.v3_status_mode_backfill.sm",
         return_value=cm,
     ):
-        count = await backfill_v3_status_mode_consistency(
+        count = await backfill_v3_hard_statuses_and_states_consistency(
             dry_run=False,
             adv_setting_id=99,
         )
@@ -63,7 +63,7 @@ async def test_backfill_dry_run_does_not_mutate() -> None:
         "app.modules.shop_runner.service_manager.services.v3_status_mode_backfill.sm",
         return_value=cm,
     ):
-        count = await backfill_v3_status_mode_consistency(
+        count = await backfill_v3_hard_statuses_and_states_consistency(
             dry_run=True,
             adv_setting_id=99,
         )
@@ -93,7 +93,7 @@ async def test_backfill_repairs_fixed_phrase_to_max_for_max_conv_adv() -> None:
         "app.modules.shop_runner.service_manager.services.v3_status_mode_backfill.sm",
         return_value=cm,
     ):
-        count = await backfill_v3_status_mode_consistency(
+        count = await backfill_v3_hard_statuses_and_states_consistency(
             dry_run=False,
             adv_setting_id=99,
         )
@@ -122,7 +122,7 @@ async def test_backfill_repairs_fixed_phrase_to_optimum_for_optimum_adv() -> Non
         "app.modules.shop_runner.service_manager.services.v3_status_mode_backfill.sm",
         return_value=cm,
     ):
-        count = await backfill_v3_status_mode_consistency(
+        count = await backfill_v3_hard_statuses_and_states_consistency(
             dry_run=False,
             adv_setting_id=99,
         )

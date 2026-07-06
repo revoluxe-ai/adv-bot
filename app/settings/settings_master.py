@@ -725,7 +725,7 @@ class Settings:
     def DEFAULT_MAX_CPM(self) -> int:
         value = os.getenv("DEFAULT_MAX_CPM")
         if not value:
-            return 5000
+            return 10000
         else:
             return int(value)
 

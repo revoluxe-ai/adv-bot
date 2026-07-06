@@ -222,11 +222,11 @@ def get_adv_setting_keyboard(
                 callback_data=indiv_place_callback,
             )
         )
-        white_list_button = InlineKeyboardButton(
-            text="Режимы Управления Белым Списком",
-            callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
-        )
-        _ = builder.row(white_list_button)
+    white_list_button = InlineKeyboardButton(
+        text="Режимы Управления Белым Списком",
+        callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
+    )
+    _ = builder.row(white_list_button)
     incremental_stats_text = (
         "Включить инкрементальную статистику ПП"
         if not adv_setting.use_incremental_stats
