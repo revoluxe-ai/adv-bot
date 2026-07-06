@@ -452,6 +452,7 @@ async def _save_connect_existing_finish(
             if c.get("id") == chosen_auto and "status" in c:
                 auto_status_text = _wb_status_code_to_text(int(c["status"]))
                 break
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         adv_data = {
             "adv_id": chosen_auto,
             "_search_adv_id": chosen_auction,
@@ -462,7 +463,7 @@ async def _save_connect_existing_finish(
             "bidder_active": False,
             "wb_cabinet_id": wb_cabinet.id,
             "parsing_active": False,
-            "bot_active": True,
+            "bot_active": False,
             "auto_adv_target_status": False,
             "auto_update_white_list": False,
             "auto_update_target_place": False,
@@ -485,6 +486,7 @@ async def _save_connect_existing_finish(
             chosen_auction,
         )
 
+    # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
     await MainAdvManager._apply_default_settings_to_adv(chosen_auto)
     wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
     await state.clear()
