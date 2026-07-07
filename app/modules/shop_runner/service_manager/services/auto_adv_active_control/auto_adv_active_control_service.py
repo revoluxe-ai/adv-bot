@@ -349,6 +349,46 @@ class AutoAdvActiveControlService:
             "legacy_full_wb_adv_stat.get_additional_cost_per_order_for_adv",
         )
 
+    async def _resolve_plan_ranked_best_cpo(
+        self, adv: ComplexAdv, *, auto_adv_id: int
+    ) -> tuple[float | None, str]:
+        """Resolve authoritative shelf BEST CPO from the view provider (plan_ranked top row).
+
+        Returns (value, source_tag) where value is float or None when missing/invalid.
+        """
+        if self._auto_shelf_bid_control_view_provider is None:
+            return None, "no_view_provider"
+        try:
+            # build_view may not be an awaitable on some test providers (MagicMock).
+            build_view = getattr(self._auto_shelf_bid_control_view_provider, "build_view", None)
+            if not callable(build_view):
+                return None, "no_build_view"
+            import inspect
+
+            if inspect.iscoroutinefunction(build_view):
+                view = await build_view(int(adv.adv_setting.id))
+            else:
+                # not async: attempt to call synchronously (tests may provide MagicMock)
+                view = build_view(int(adv.adv_setting.id))
+        except Exception:
+            logger.warning(
+                "Auto watchdog: build_view failed adv_id=%s shop_id=%s",
+                auto_adv_id,
+                adv.shop_id,
+                exc_info=True,
+            )
+            return None, "build_view_error"
+        best = getattr(view, "best_cpo_bid_rub", None)
+        if best is None:
+            return None, "plan_ranked_missing"
+        try:
+            val = float(best)
+        except (TypeError, ValueError):
+            return None, "plan_ranked_invalid"
+        if not math.isfinite(val) or val < 0:
+            return None, "plan_ranked_invalid"
+        return val, "plan_ranked_top"
+
     async def _start_auto_campaign_maybe_retry(self, adv: ComplexAdv) -> None:
         try:
             await self._wb_modifier.start_auto_campaign(adv)
@@ -643,10 +683,54 @@ class AutoAdvActiveControlService:
 
         target_cost_value, avg_cost_value = cost_rule_values
         fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
-        cost_rule_failed = (
-            avg_cost_value > target_cost_value
-            and fact_pay_for_order_value is not None
-            and fact_pay_for_order_value > target_cost_value
+
+        # New behavior: for auto_shelf-enabled campaigns, prefer authoritative
+        # BEST CPO from the view provider (plan_ranked top) for pause decision.
+        # Do not use legacy avg as a substitute. If best CPO missing/invalid,
+        # apply degraded rule based only on fact_pay_for_order.
+        cost_rule_failed: bool
+        cpo_source: str = "avg_cost_legacy"
+        best_cpo_value: float | None = None
+        if bool(adv.adv_setting.auto_shelf_bid_control_enabled) and (
+            self._auto_shelf_bid_control_view_provider is not None
+        ):
+            best_cpo_value, cpo_source = await self._resolve_plan_ranked_best_cpo(
+                adv, auto_adv_id=auto_adv_id
+            )
+            if best_cpo_value is not None:
+                cost_rule_failed = (
+                    best_cpo_value > target_cost_value
+                    and fact_pay_for_order_value is not None
+                    and fact_pay_for_order_value > target_cost_value
+                )
+            elif cpo_source == "no_build_view":
+                # provider present but no build_view callable - preserve legacy behavior
+                cost_rule_failed = (
+                    avg_cost_value > target_cost_value
+                    and fact_pay_for_order_value is not None
+                    and fact_pay_for_order_value > target_cost_value
+                )
+            else:
+                # degraded: only fact_pay_for_order drives pause
+                cost_rule_failed = (
+                    fact_pay_for_order_value is not None
+                    and fact_pay_for_order_value > target_cost_value
+                )
+        else:
+            # legacy behavior: avg_cost_value (selected or legacy) drives pause
+            cost_rule_failed = (
+                avg_cost_value > target_cost_value
+                and fact_pay_for_order_value is not None
+                and fact_pay_for_order_value > target_cost_value
+            )
+        logger.debug(
+            "auto_watchdog_cost_decision adv_id=%s cpo_source=%s best_cpo=%s avg_cpo=%s fact_cpo=%s target=%s",
+            auto_adv_id,
+            cpo_source,
+            best_cpo_value,
+            avg_cost_value,
+            fact_pay_for_order_value,
+            target_cost_value,
         )
         if cost_rule_failed and auto_status == WBAdvActiveStatus.STARTED:
             logger.info(
