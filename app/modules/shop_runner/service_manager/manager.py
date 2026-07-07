@@ -132,6 +132,14 @@ def _cluster_stats_diagnostic_enabled() -> bool:
 T = TypeVar("T")
 
 
+def _collect_plan_fact_refresh_adv_ids(pre_advs: list[PreComplexAdv]) -> list[int]:
+    """Собирает уникальные adv_id для немедленного refresh plan-fact кеша.
+
+    Сортировка нужна для стабильных тестов и предсказуемого порядка чтения из CH.
+    """
+    return sorted({int(pre_adv.adv_id) for pre_adv in pre_advs})
+
+
 class CoroutinesManager:
     def __init__(
         self,
@@ -1488,6 +1496,8 @@ class CoroutinesManager:
 
         manager = PlanFactManager()
         await manager.process_and_save_pre_complex_advs(pre_advs)
+        adv_ids = _collect_plan_fact_refresh_adv_ids(pre_advs)
+        await self._plan_fact_reader.refresh_cache_from_clickhouse(adv_ids)
         return None
     def _log_auto_budget_result(
         self,
