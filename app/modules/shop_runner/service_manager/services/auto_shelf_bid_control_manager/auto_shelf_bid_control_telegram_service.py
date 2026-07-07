@@ -363,7 +363,7 @@ class AutoShelfBidControlTelegramService:
             raise AutoShelfBidControlTelegramError(
                 "Нельзя сбросить цикл: max ставка ниже минимальной ставки WB."
             )
-        middle_bid = AutoShelfBidControlManager._middle_bid(int(min_bid), max_bid)
+        middle_bid = AutoShelfBidControlManager._middle_bid(int(min_bid), max_bid) # pyright: ignore
         self._require_bid_units_confirmed_for_manual_set()
         now = datetime.now(UTC)
         state = await self._repository.get_state(nmid)

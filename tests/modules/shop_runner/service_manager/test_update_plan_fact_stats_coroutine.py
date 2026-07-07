@@ -7,6 +7,7 @@ import pytest
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
+from app.modules.shop_runner.service_manager import manager as coroutines_manager_module
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -19,6 +20,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_comple
 def _create_manager(wb_api, redis_client_wrapper):
     plan_fact_reader = MagicMock(spec=PlanFactReader)
     plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    plan_fact_reader.refresh_cache_from_clickhouse = AsyncMock(return_value={})
 
     wb_manager_hub = MagicMock()
     wb_manager_hub.wb_data_manager = MagicMock()
@@ -69,10 +71,13 @@ async def test_update_plan_fact_stats_success_with_full_data(
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
     call_args = mock_plan_fact_manager.process_and_save_pre_complex_advs.call_args
     advs_arg = call_args[0][0]
+    refresh_call = manager._plan_fact_reader.refresh_cache_from_clickhouse.call_args
 
     assert len(advs_arg) == 2
     assert advs_arg[0].adv_id == 11111
     assert advs_arg[1].adv_id == 22222
+    assert refresh_call is not None
+    assert refresh_call.args == ([11111, 22222],)
 
 
 @pytest.mark.unit
@@ -100,6 +105,7 @@ async def test_update_plan_fact_stats_empty_advs_list(access_mock, fake_redis):
 
     # Проверяем, что process_and_save не был вызван (early return в корутине)
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_not_called()
+    manager._plan_fact_reader.refresh_cache_from_clickhouse.assert_not_called()
 
 
 @pytest.mark.unit
@@ -133,9 +139,12 @@ async def test_update_plan_fact_stats_calls_process_and_save(access_mock, fake_r
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
     call_args = mock_plan_fact_manager.process_and_save_pre_complex_advs.call_args
     advs_arg = call_args[0][0]
+    refresh_call = manager._plan_fact_reader.refresh_cache_from_clickhouse.call_args
 
     assert len(advs_arg) == 1
     assert advs_arg[0].adv_id == 12345
+    assert refresh_call is not None
+    assert refresh_call.args == ([12345],)
 
 
 @pytest.mark.unit
@@ -172,10 +181,13 @@ async def test_update_plan_fact_stats_multiple_advs(access_mock, fake_redis):
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
     call_args = mock_plan_fact_manager.process_and_save_pre_complex_advs.call_args
     advs_arg = call_args[0][0]
+    refresh_call = manager._plan_fact_reader.refresh_cache_from_clickhouse.call_args
 
     assert len(advs_arg) == 5
     for i, adv in enumerate(advs_arg):
         assert adv.adv_id == 10000 + i
+    assert refresh_call is not None
+    assert refresh_call.args == ([10000, 10001, 10002, 10003, 10004],)
 
 
 @pytest.mark.unit
@@ -208,3 +220,21 @@ async def test_update_plan_fact_stats_uses_wrapped(access_mock, fake_redis):
 
     # Проверяем, что метод был вызван
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
+    manager._plan_fact_reader.refresh_cache_from_clickhouse.assert_called_once()
+
+
+@pytest.mark.unit
+def test_collect_plan_fact_refresh_adv_ids_dedup_and_sort():
+    """Проверяет стабильную дедупликацию и сортировку adv_id для refresh."""
+    pre_adv_1 = MagicMock(spec=PreComplexAdv)
+    pre_adv_1.adv_id = 22
+    pre_adv_2 = MagicMock(spec=PreComplexAdv)
+    pre_adv_2.adv_id = 11
+    pre_adv_3 = MagicMock(spec=PreComplexAdv)
+    pre_adv_3.adv_id = 22
+
+    result = coroutines_manager_module._collect_plan_fact_refresh_adv_ids(
+        [pre_adv_1, pre_adv_2, pre_adv_3]
+    )
+
+    assert result == [11, 22]

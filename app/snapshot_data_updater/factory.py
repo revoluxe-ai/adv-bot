@@ -22,15 +22,15 @@ from app.snapshot_data_updater.collector import AdvDataSnapshotCollector
 from app.snapshot_data_updater.config import SnapshotUpdaterConfig, get_snapshot_config
 from app.snapshot_data_updater.providers.clickhouse_provider import (
     ClickHouseSnapshotProviderLive,
-    StubClickHouseSnapshotProvider,
+)
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
 )
 from app.snapshot_data_updater.providers.postgres_provider import (
     PostgresSnapshotProviderLive,
-    StubPostgresSnapshotProvider,
 )
 from app.snapshot_data_updater.providers.redis_provider import (
     RedisSnapshotProviderLive,
-    StubRedisSnapshotProvider,
 )
 from app.snapshot_data_updater.resource_queue import build_resource_queue_manager
 from app.snapshot_data_updater.services.calculated_keywords_warmup import (
@@ -65,10 +65,15 @@ def build_snapshot_updater_live(
     """
     cfg = config or get_snapshot_config()
     queues = build_resource_queue_manager(cfg)
+    from app.modules.cluster_bids_redis.redis_client_provider import get_redis_client
+
+    redis_client_wrapper = get_redis_client()
     warmup = CalculatedKeywordsWarmupService(config=cfg, resource_queues=queues)
     collector = AdvDataSnapshotCollector(
         postgres=PostgresSnapshotProviderLive(),
-        clickhouse=ClickHouseSnapshotProviderLive(),
+        clickhouse=ClickHouseSnapshotProviderLive(
+            plan_fact_reader=PlanFactReader(redis_client=redis_client_wrapper)
+        ),
         redis=RedisSnapshotProviderLive(),
         assembler=AdvDataSnapshotAssembler(),
         resource_queues=queues,

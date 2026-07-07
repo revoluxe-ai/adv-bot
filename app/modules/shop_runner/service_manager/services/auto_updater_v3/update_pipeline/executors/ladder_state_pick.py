@@ -38,7 +38,7 @@ _OPERABLE_LADDER_STAGES = OPERABLE_LADDER_STAGES
 
 
 def is_gap_ladder(dto: KeywordDTO) -> bool:
-    """``True``, если в матрице есть ступень GAP (NO DATA без CH)."""
+    """``True``, если в матрице есть ступень GAP (NO DATA без operational PFO)."""
     return any(state.stage == V3LadderStageKind.GAP for state in dto.ladder_states)
 
 

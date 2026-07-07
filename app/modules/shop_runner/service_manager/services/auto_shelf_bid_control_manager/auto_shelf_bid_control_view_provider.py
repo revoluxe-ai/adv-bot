@@ -50,7 +50,13 @@ from .bid_units import (
     truncate_datetime_to_seconds,
     wb_min_cpm_rub_to_bid_minor,
 )
-from .dto import AutoShelfBidControlViewDTO, BidPointStatsDTO, BidStatsDTO
+from .dto import (
+    AutoShelfBidControlViewDTO,
+    AutoShelfBidSelectedCpoContract,
+    BidPointStatsDTO,
+    BidStatsDTO,
+)
+from .dto import resolve_selected_cpo_contract_from_view
 from .dto.decision_snapshot_dto import (
     resolve_bid_sync_detail,
     resolve_expected_bid_minor,
@@ -77,6 +83,7 @@ class AutoShelfBidControlViewProvider:
         redis_client: RedisClient,
         repository: AutoShelfBidControlRepository | None = None,
         analytics_repository: AutoShelfBidControlAnalyticsRepository | None = None,
+        plan_fact_reader: PlanFactReader | None = None,
     ) -> None:
         self._repository = repository or AutoShelfBidControlRepository()
         self._analytics = analytics_repository or AutoShelfBidControlAnalyticsRepository()
@@ -85,6 +92,13 @@ class AutoShelfBidControlViewProvider:
         self._rec_bid_recommendation_service = AutoShelfBidRecommendationReadService(
             self._analytics
         )
+        self._plan_fact_reader = plan_fact_reader
+
+    def _get_plan_fact_reader(self) -> PlanFactReader:
+        """Вернуть injected reader или лениво создать дефолтный для тестов/CLI."""
+        if self._plan_fact_reader is None:
+            self._plan_fact_reader = PlanFactReader()
+        return self._plan_fact_reader
 
     async def _fetch_wb_min_bid_minor(self, auto_adv_id: int, nmid: int) -> int | None:
         """Минимальная ставка WB для Auto-РК из Redis min_bids (рубли → bid_minor)."""
@@ -575,6 +589,7 @@ class AutoShelfBidControlViewProvider:
                 fact_cpo=None,
                 resolve_cpo=None,
                 best_plan_bid_minor=None,
+                state_updated_at=None,
             )
 
         nmids = list(adv.nmids or [])
@@ -592,8 +607,9 @@ class AutoShelfBidControlViewProvider:
         fact_cpo: float | None = None
         fact_predict_orders: float | None = None
         resolve_cpo: float | None = None
-        plan_fact_reader = PlanFactReader()
-        plan_fact_summary = await plan_fact_reader.get_latest_plan_fact(auto_adv_id)
+        plan_fact_summary = await self._get_plan_fact_reader().get_latest_plan_fact(
+            auto_adv_id
+        )
         if plan_fact_summary is not None:
             fact_predict_orders = plan_fact_summary.fact_predict_orders
             fact_cpo = plan_fact_summary.fact_pay_for_order
@@ -1199,5 +1215,16 @@ class AutoShelfBidControlViewProvider:
             can_count_progress=can_count_progress,
             main_target_explanation=main_target_explanation,
             legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
+            state_updated_at=truncate_datetime_to_seconds(
+                state.updated_at if state else None
+            ),
             qualified_tested_bids_count=qualified_tested_bids_count,
         )
+
+    async def build_selected_cpo_contract(
+        self,
+        adv_setting_original_id: int,
+    ) -> AutoShelfBidSelectedCpoContract:
+        """Собрать read-only контракт для selected/current/applied CPO."""
+        view = await self.build_view(adv_setting_original_id)
+        return resolve_selected_cpo_contract_from_view(view)

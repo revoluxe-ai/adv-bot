@@ -138,6 +138,7 @@ class UpdateClusterBidsManager:
         redis_api_cluster_bids_manager: RedisApiClusterBidsManager,
         redis_cluster_bids_timestamp_manager: RedisClusterBidsTimestampManager,
         tasks_manager: TasksManager,
+        plan_fact_reader: PlanFactReader | None = None,
     ):
         self._wb_manager = wb_manager
         self._redis_keyword_bidder_status_manager = redis_keyword_bidder_status_manager
@@ -147,6 +148,7 @@ class UpdateClusterBidsManager:
             redis_cluster_bids_timestamp_manager
         )
         self._tasks_manager = tasks_manager
+        self._plan_fact_reader = plan_fact_reader or PlanFactReader()
     @staticmethod
     async def _get_keywords_for_cluster_bids(
          adv: ComplexAdv
@@ -962,11 +964,10 @@ class UpdateClusterBidsManager:
         trace = batch_trace or ShopBatchPhaseTrace.from_complex_advs(
             coroutine=_COROUTINE_CLUSTER_BIDS, advs=advs
         )
-        plan_fact_reader = PlanFactReader()
         adv_ids = [adv.adv_id for adv in advs]
         try:
             with trace.phase("fact_data_ch_get_latest_plan_facts"):
-                summaries_by_adv_id = await plan_fact_reader.get_latest_plan_facts(
+                summaries_by_adv_id = await self._plan_fact_reader.get_latest_plan_facts(
                     adv_ids
                 )
         except Exception as error:

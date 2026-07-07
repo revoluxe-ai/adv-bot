@@ -46,9 +46,9 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 
 | Ситуация | Кто обрабатывает |
 |----------|------------------|
-| Есть CH-профиль | **FULL** — ladder-контур: M/O/C, raise/skip_up/rebalance/calibration работают по профилю; NF-фазы не вмешиваются |
+| Есть CH-профиль и operational ``pay_for_order`` | **FULL** — ladder-контур: M/O/C, raise/skip_up/rebalance/calibration работают по профилю; NF-фазы не вмешиваются |
 | Нет CH-профиля, но есть operational ``pay_for_order`` | **PFO** — NF-контур: validate → migrate (bootstrap target_place из текущей WB-позиции) → plan-fact (±1); дальше ключ может жить как активный MIN_CPA без CH-профиля |
-| Нет CH-профиля и нет operational ``pay_for_order`` | **GAP** — отдельный bootstrap/enable/reset-контур: OFF → GAP enable / NO DATA bootstrap; если campaign overspend, GAP-состояние уходит в reset; NF migrate/plan-fact его не трогают, пока не появится operational PFO |
+| Нет operational ``pay_for_order`` | **GAP** — отдельный bootstrap/enable/reset-контур, даже если CH-профиль уже есть: OFF → GAP enable / NO DATA bootstrap; если campaign overspend, GAP-состояние уходит в reset; NF migrate/plan-fact его не трогают, пока не появится operational PFO |
 | UP/realloc/calibration | ``can_target_mode(eligibility, mode)`` — tier без профиля не даёт OPT/MAX |
 
 **Не восстанавливать** ``CapDownExecutor`` без изменения продуктового контракта «есть профиль →
@@ -78,15 +78,15 @@ NORMAL    → filter operable → V → NF → NF_migrate → NF_plan_fact → s
 
 Раньше NF-логика опиралась на размытое «нет CH-профиля» и helper `is_not_full()`. После рефакторинга это разбито на три явных operational tier:
 
-- **FULL** — есть `position_profile`; ключ живёт по ladder и обслуживается фазами `skip_up`, `raise`, `reset`, `shelf_cleanup`, `rebalance`, `calibration`. NF validate/migrate/plan-fact сюда не лезут.
+- **FULL** — есть `position_profile` и operational `pay_for_order`; ключ живёт по ladder и обслуживается фазами `skip_up`, `raise`, `reset`, `shelf_cleanup`, `rebalance`, `calibration`. NF validate/migrate/plan-fact сюда не лезут.
 - **PFO** — `position_profile` отсутствует, но есть operational `pay_for_order`; это активный no-CH ключ, который должен пройти NF validate, затем bootstrap target_place в migrate, затем plan-fact ±1.
-- **GAP** — нет `position_profile` и нет operational `pay_for_order`; это bootstrap/enable/reset зона. GAP-контур обрабатывается отдельными executor-ами: `pay_for_order_gap_enable` даёт один OFF→MIN ключ за тик, а `reset_over_max_cpo_on_overspend` при campaign overspend уводит GAP обратно в OFF. NF bootstrap-позицию такие ключи не получают, пока не появится operational PFO.
+- **GAP** — нет operational `pay_for_order`, независимо от наличия `position_profile`; это bootstrap/enable/reset зона. GAP-контур обрабатывается отдельными executor-ами: `pay_for_order_gap_enable` даёт один OFF→MIN ключ за тик, а `reset_over_max_cpo_on_overspend` при campaign overspend уводит GAP обратно в OFF. NF bootstrap-позицию такие ключи не получают, пока не появится operational PFO.
 
 Ключевое следствие: NF-ветка больше не делает “reset в 0”, не подменяет bootstrap и не пытается смешивать ladder-контур FULL с no-CH контуром PFO/GAP. Весь NF bootstrap для активных no-CH ключей идёт только через PFO: NF validate → NF migrate → NF plan-fact. GAP живёт отдельно и управляется enable/reset фазами, а всё ladder-управление остаётся у FULL.
 
 Если перевести это в практическое правило, то оно звучит так:
 
-1. `FULL` никогда не получает NF bootstrap, потому что у него уже есть профиль.
+1. `FULL` никогда не получает NF bootstrap, потому что у него уже есть профиль и operational PFO.
 2. `PFO` получает NF bootstrap один раз: сначала режим `MIN_CPA`, потом стартовый `target_place`, потом plan-fact `±1`.
 3. `GAP` не получает NF bootstrap вообще, пока у него нет operational PFO. Для него есть только отдельный поочередный enable и отдельный reset на overspend.
 4. `target_place=0` в NF-контуре больше не означает «давай обнулим ключ»; это только «позиция ещё не инициализирована».
@@ -281,8 +281,8 @@ overspend-reset.
 
 #### 3. GAP key
 
-Если нет ни `position_profile`, ни operational `pay_for_order`, то это
-**GAP**. Он ещё не готов к NF bootstrap:
+Если нет operational `pay_for_order`, то это **GAP**. Наличие CH-профиля не
+переводит такой ключ в FULL: без PFO он ещё не готов к NF bootstrap:
 
 1. `pay_for_order_gap_enable` по одному за тик переводит OFF-GAP в MIN_CPA,
    если campaign не находится в overspend-зоне.
