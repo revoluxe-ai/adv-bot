@@ -1,9 +1,7 @@
 """Read-only contract for the selected/current/applied Auto Shelf CPO.
 
-The contract is intentionally narrow: it only exposes the bid that is actually
-considered selected/current/applied by the control flow, the corresponding CPO,
-and enough metadata to decide whether the value can be safely consumed by a
-caller such as the Auto watchdog.
+The module keeps a neutral resolver input so lifecycle code can reuse the
+selected-CPO contract logic without depending on the full view DTO.
 """
 
 from __future__ import annotations
@@ -14,6 +12,18 @@ from datetime import datetime
 from collections.abc import Mapping, Sequence
 
 from .control_view_dto import AutoShelfBidControlViewDTO
+
+
+@dataclass(frozen=True, slots=True)
+class AutoShelfBidSelectedCpoResolverInput:
+    """Neutral input for selected CPO resolution."""
+
+    enabled: bool
+    selected_bid_minor: int | None
+    actual_bid_minor: int | None
+    bid_sync_detail: str | None
+    updated_at: datetime | None
+    recommendation_rows: Sequence[object] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,22 +85,22 @@ def _unavailable_contract(
     )
 
 
-def resolve_selected_cpo_contract_from_view(
-    view: AutoShelfBidControlViewDTO,
+def resolve_selected_cpo_contract(
+    input: AutoShelfBidSelectedCpoResolverInput,
 ) -> AutoShelfBidSelectedCpoContract:
-    """Resolve the selected CPO from a fresh read-only view DTO.
+    """Resolve the selected CPO from neutral lifecycle/read-only inputs.
 
     The resolver is strict by design:
-    - it only accepts the enforced bid for the active mode;
+    - it only accepts the selected bid for the active mode;
     - it requires the current bid to be synced;
     - it searches the recommendation rows for the exact selected bid;
     - it refuses to fall back to ``plan_ranked[0]`` when the selected bid row is
       missing or stale.
     """
-    selected_bid_minor = view.expected_enforced_bid_minor
-    updated_at = getattr(view, "state_updated_at", None)
+    selected_bid_minor = input.selected_bid_minor
+    updated_at = input.updated_at
 
-    if not bool(view.enabled):
+    if not bool(input.enabled):
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
             updated_at=updated_at,
@@ -108,26 +118,26 @@ def resolve_selected_cpo_contract_from_view(
             updated_at=updated_at,
             reason="selected_bid_missing",
         )
-    if view.actual_bid_minor is None:
+    if input.actual_bid_minor is None:
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
             updated_at=updated_at,
             reason="actual_bid_missing",
         )
-    if int(view.actual_bid_minor) != int(selected_bid_minor):
+    if int(input.actual_bid_minor) != int(selected_bid_minor):
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
             updated_at=updated_at,
             reason="selected_bid_not_applied",
         )
-    if view.bid_sync_detail != "synced":
+    if input.bid_sync_detail != "synced":
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
             updated_at=updated_at,
             reason="selected_bid_not_synced",
         )
 
-    recommendation = _as_object_dict(view.rec_bid_recommendation)
+    recommendation = _as_object_dict({"plan_ranked": input.recommendation_rows})
     if recommendation is None:
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
@@ -176,3 +186,22 @@ def resolve_selected_cpo_contract_from_view(
         updated_at=updated_at,
         reason="selected_bid_not_found_in_plan_ranked",
     )
+
+
+def resolve_selected_cpo_contract_from_view(
+    view: AutoShelfBidControlViewDTO,
+) -> AutoShelfBidSelectedCpoContract:
+    """Resolve the selected CPO from a fresh read-only view DTO."""
+    recommendation = view.rec_bid_recommendation
+    plan_ranked_rows: Sequence[object] | None = None
+    if isinstance(recommendation, Mapping):
+        plan_ranked_rows = _as_object_sequence(recommendation.get("plan_ranked"))
+    resolver_input = AutoShelfBidSelectedCpoResolverInput(
+        enabled=bool(view.enabled),
+        selected_bid_minor=view.expected_enforced_bid_minor,
+        actual_bid_minor=view.actual_bid_minor,
+        bid_sync_detail=view.bid_sync_detail,
+        updated_at=getattr(view, "state_updated_at", None),
+        recommendation_rows=plan_ranked_rows,
+    )
+    return resolve_selected_cpo_contract(resolver_input)
