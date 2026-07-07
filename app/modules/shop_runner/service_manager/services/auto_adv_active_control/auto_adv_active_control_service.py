@@ -758,7 +758,25 @@ class AutoAdvActiveControlService:
             )
             return None
 
-        cost_rule_ok = avg_cost_value <= target_cost_value
+        # Determine cost_rule_ok (used for resume/start) using same authoritative
+        # source as pause decision to avoid resume mismatches.
+        if bool(adv.adv_setting.auto_shelf_bid_control_enabled) and (
+            self._auto_shelf_bid_control_view_provider is not None
+        ):
+            # If we have authoritative best_cpo_value, use it for resume decision.
+            if best_cpo_value is not None:
+                cost_rule_ok = best_cpo_value <= target_cost_value
+            elif cpo_source == "no_build_view":
+                # provider not usable - preserve legacy behaviour
+                cost_rule_ok = avg_cost_value <= target_cost_value
+            else:
+                # degraded: rely on fact_pay_for_order (total CPO) for resume
+                cost_rule_ok = (
+                    fact_pay_for_order_value is not None
+                    and fact_pay_for_order_value <= target_cost_value
+                )
+        else:
+            cost_rule_ok = avg_cost_value <= target_cost_value
         if (
             budget_ok
             and cost_rule_ok
