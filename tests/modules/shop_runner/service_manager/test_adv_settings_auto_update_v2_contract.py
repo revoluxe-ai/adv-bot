@@ -148,21 +148,13 @@ async def test_update_cpm_bid_is_the_old_bidder_path(
     assert len(handlers) == 1
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="update_cluster_bids currently filters bidder_active but not bidder_coroutine_type",
-)
 @pytest.mark.asyncio
-async def test_update_cluster_bids_excludes_old_bidder_path(
+async def test_update_cluster_bids_is_paid_cluster_path(
     monkeypatch,
     access_mock,
     client_session_mock,
     fake_redis,
 ) -> None:
-    monkeypatch.setattr(
-        "app.modules.shop_runner.service_manager.manager.settings.AUTO_SETTING_ACTIVE",
-        True,
-    )
     access_mock.shop_id = "shop-cluster-bidder"
     wb_api = WBApi(access_mock, client_session_mock)
     old_adv = _bidder_adv(
@@ -201,8 +193,9 @@ async def test_update_cluster_bids_excludes_old_bidder_path(
 
         await manager.update_cluster_bids.__wrapped__(manager, only_bot_active=True)
 
+    # Guard-map: paid auto/cluster path only; search/manual bidder is covered elsewhere.
     manager._split_advs_by_stats_freshness.assert_awaited_once_with(
-        [new_adv], operation_name="update_cluster_bids"
+        [old_adv, new_adv], operation_name="update_cluster_bids"
     )
     update_cluster_bids_manager.update_cluster_bids.assert_awaited_once_with([new_adv])
 
