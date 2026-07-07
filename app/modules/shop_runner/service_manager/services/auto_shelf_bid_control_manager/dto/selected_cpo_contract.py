@@ -70,6 +70,17 @@ def _coerce_finite_float(value: object) -> float | None:
     return result
 
 
+def _resolve_row_cpo_raw(row: Mapping[str, object]) -> object | None:
+    """Вернуть CPO из строки плана, не теряя легитимный ноль.
+
+    ``0.0`` должен считаться валидным значением CPO и не заменяться fallback-ом.
+    """
+    cpo_raw = row.get("cpo_rub")
+    if cpo_raw is None:
+        cpo_raw = row.get("expected_order_cost_rub")
+    return cpo_raw
+
+
 def _unavailable_contract(
     *,
     selected_bid_minor: int | None,
@@ -161,10 +172,7 @@ def resolve_selected_cpo_contract(
             continue
         if int(bid_raw) != int(selected_bid_minor):
             continue
-        cpo_raw = row.get("cpo_rub")
-        if cpo_raw is None:
-            cpo_raw = row.get("expected_order_cost_rub")
-        cpo_rub = _coerce_finite_float(cpo_raw)
+        cpo_rub = _coerce_finite_float(_resolve_row_cpo_raw(row))
         if cpo_rub is None or cpo_rub < 0:
             return _unavailable_contract(
                 selected_bid_minor=selected_bid_minor,

@@ -264,12 +264,25 @@ def test_diagnostics_view_model_formats_cached_values() -> None:
         auto_shelf_enabled=True,
         strategy_label="PLAN_DISTANCE",
         cache_value=SimpleNamespace(
-            bid_rub=123.0,
-            cpo_rub=45.67,
+            best_cpo_bid_rub=123.0,
+            current_bid_rub=120.0,
+            expected_bid_rub=123.0,
+            selected_cpo_rub=45.67,
+            unavailable_reason="selected_bid_not_applied",
             updated_at=datetime(2026, 7, 7, 13, 0, tzinfo=UTC),
         ),
     )
 
     assert diagnostics.bid == "123"
+    assert diagnostics.best_cpo_bid_rub == "123"
+    assert diagnostics.current_bid_rub == "120"
+    assert diagnostics.expected_bid_rub == "123"
     assert diagnostics.cpo == "45.67"
+    assert diagnostics.selected_cpo_rub == "45.67"
+    assert diagnostics.unavailable_reason == "selected_bid_not_applied"
     assert diagnostics.last_update_ts == "07.07 16:00"
+    text = format_adv_keywords_diagnostics_block(diagnostics)
+    assert "Лучшая ставка по CPO: 123" in text
+    assert "Текущая ставка WB: 120" in text
+    assert "Целевая ставка бота: 123" in text
+    assert "Примечание: selected_bid_not_applied" in text

@@ -227,6 +227,32 @@ async def test_view_wrapper_caches_best_bid_when_contract_is_unavailable() -> No
     }
 
 
+@pytest.mark.asyncio
+async def test_view_wrapper_preserves_zero_cpo_value() -> None:
+    redis_client = _FakeRedisClient()
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=redis_client,  # type: ignore[arg-type]
+        repository=MagicMock(),
+        analytics_repository=MagicMock(),
+    )
+    view = _build_view(
+        selected_bid_minor=12300,
+        actual_bid_minor=12300,
+        bid_sync_detail="synced",
+        plan_ranked=[{"bid": 12300, "cpo_rub": 0.0, "expected_order_cost_rub": 123.45}],
+    )
+    provider.build_view = AsyncMock(return_value=view)  # type: ignore[method-assign]
+
+    contract = await provider.build_selected_cpo_contract(1)
+
+    assert contract.selected_bid_minor == 12300
+    assert contract.selected_cpo_rub == 0.0
+    assert contract.unavailable_reason is None
+    assert len(redis_client.set_calls) == 1
+    _, payload, _, _, _ = redis_client.set_calls[0]
+    assert json.loads(payload)["selected_cpo_rub"] == 0.0
+
+
 def test_view_wrapper_matches_neutral_resolver_for_same_payload() -> None:
     view = _build_view(
         selected_bid_minor=12300,

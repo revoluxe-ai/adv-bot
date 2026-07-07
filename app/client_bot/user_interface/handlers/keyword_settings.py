@@ -94,20 +94,41 @@ def _build_adv_keywords_diagnostics_view_model(
     cache_value: AutoShelfBidDiagnosticsDTO | None,
 ) -> AdvKeywordsDiagnosticsView:
     """Собрать DTO экрана из уже подготовленных данных и кеш-снимка."""
+    best_cpo_bid_rub = (
+        _format_diagnostics_value(cache_value.best_cpo_bid_rub)
+        if cache_value is not None and cache_value.best_cpo_bid_rub is not None
+        else None
+    )
+    current_bid_rub = (
+        _format_diagnostics_value(cache_value.current_bid_rub)
+        if cache_value is not None and cache_value.current_bid_rub is not None
+        else None
+    )
+    expected_bid_rub = (
+        _format_diagnostics_value(cache_value.expected_bid_rub)
+        if cache_value is not None and cache_value.expected_bid_rub is not None
+        else None
+    )
+    selected_cpo_rub = (
+        _format_diagnostics_value(cache_value.selected_cpo_rub)
+        if cache_value is not None and cache_value.selected_cpo_rub is not None
+        else None
+    )
     return AdvKeywordsDiagnosticsView(
         bidder_label=bidder_label,
         auto_shelf_enabled=auto_shelf_enabled,
         strategy_label=strategy_label,
-        bid=(
-            _format_diagnostics_value(cache_value.bid_rub)
-            if cache_value is not None and cache_value.bid_rub is not None
-            else None
+        best_cpo_bid_rub=best_cpo_bid_rub,
+        current_bid_rub=current_bid_rub,
+        expected_bid_rub=expected_bid_rub,
+        selected_cpo_rub=selected_cpo_rub,
+        unavailable_reason=(
+            cache_value.unavailable_reason if cache_value is not None else None
         ),
-        cpo=(
-            _format_diagnostics_value(cache_value.cpo_rub)
-            if cache_value is not None and cache_value.cpo_rub is not None
-            else None
-        ),
+        # Legacy compact fields stay populated for callers that still render the
+        # old one-line summary when detailed diagnostics are absent.
+        bid=best_cpo_bid_rub,
+        cpo=selected_cpo_rub,
         last_update_ts=(
             _format_diagnostics_time(cache_value.updated_at)
             if cache_value is not None and cache_value.updated_at is not None
