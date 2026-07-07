@@ -42,6 +42,9 @@ from .bid_units import (
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
 from .settings_normalizer import repair_state_test_bid_minor
 from .auto_shelf_bid_setter import AutoShelfBidSetter
+from .auto_shelf_bid_control_diagnostics_cache import (
+    AutoShelfBidDiagnosticsCacheManager,
+)
 from .dto.decision_snapshot_dto import (
     AutoShelfBidControlDecisionSnapshot,
     can_set_observation_waiting_reason,
@@ -119,6 +122,9 @@ class AutoShelfBidControlManager:
         self._setter = wb_bid_setter
         self._repository = repository or AutoShelfBidControlRepository()
         self._analytics = analytics_repository or AutoShelfBidControlAnalyticsRepository()
+        self._diagnostics_cache = AutoShelfBidDiagnosticsCacheManager(
+            bid_cache_manager._client
+        )
 
     @staticmethod
     def _now() -> datetime:
@@ -616,6 +622,25 @@ class AutoShelfBidControlManager:
         """Загрузить rec-bid recommendation для PLAN_DISTANCE без state fallback."""
         return await _fetch_plan_distance_rec_result(self, complex_adv)
 
+    async def _cache_snapshot_diagnostics(
+        self,
+        complex_adv: ComplexAdv,
+        snapshot: AutoShelfBidControlDecisionSnapshot,
+    ) -> None:
+        """Сохранить fresh snapshot diagnostics для Telegram UI."""
+        try:
+            await self._diagnostics_cache.set_decision_snapshot(
+                complex_adv.adv_setting_original_id,
+                snapshot,
+            )
+        except Exception:
+            logger.warning(
+                "auto_shelf_bid_control_diagnostics_cache_failed auto_adv_id=%s nmid=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.main_nmid,
+                exc_info=True,
+            )
+
     async def _maybe_continue_main_exploration(
         self,
         complex_adv: ComplexAdv,
@@ -996,6 +1021,7 @@ class AutoShelfBidControlManager:
                 actual_bid_minor=actual_bid_minor,
                 control_enabled=True,
             )
+            await self._cache_snapshot_diagnostics(complex_adv, snapshot)
             if await self.apply_bid_sync_from_snapshot(
                 complex_adv,
                 state=state,
@@ -1025,6 +1051,7 @@ class AutoShelfBidControlManager:
             actual_bid_minor=actual_bid_minor,
             control_enabled=True,
         )
+        await self._cache_snapshot_diagnostics(complex_adv, snapshot)
         if await self.apply_bid_sync_from_snapshot(
             complex_adv,
             state=state,

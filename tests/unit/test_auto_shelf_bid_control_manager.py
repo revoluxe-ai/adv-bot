@@ -3938,6 +3938,39 @@ async def test_fresh_winner_mismatch_calls_setter_once() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_refreshes_diagnostics_from_fresh_main_snapshot() -> None:
+    manager, repository, wb_bid_setter, state, settings_obj, complex_adv = (
+        _build_reconcile_fixture(
+            current_mode="main",
+            current_test_bid_minor=41_000,
+            current_main_bid_minor=48_000,
+            actual_bid_minor=48_000,
+        )
+    )
+    snapshot = _fresh_main_snapshot(actual=48_000, fresh_main=57_000)
+    snapshot.computed_at = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
+    snapshot.rec_bid_recommendation = {
+        "plan_ranked": [{"bid": 57_000, "cpo_rub": 123.45}]
+    }
+    manager.build_decision_snapshot = AsyncMock(return_value=snapshot)  # type: ignore[method-assign]
+    manager.apply_bid_sync_from_snapshot = AsyncMock(return_value=False)  # type: ignore[method-assign]
+    manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._diagnostics_cache = MagicMock(
+        set_decision_snapshot=AsyncMock(return_value=None)
+    )
+    complex_adv.adv_setting_original_id = 35018182
+
+    await manager.update(complex_adv)
+
+    manager._diagnostics_cache.set_decision_snapshot.assert_awaited_once_with(
+        complex_adv.adv_setting_original_id,
+        snapshot,
+    )
+    wb_bid_setter.set_bid.assert_not_awaited()
+    manager._handle_main_mode.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_disabled_control_does_not_enforce_fresh_main() -> None:
     manager = AutoShelfBidControlManager(
         bid_cache_manager=MagicMock(),

@@ -178,6 +178,8 @@ async def test_view_wrapper_builds_selected_cpo_contract_from_view() -> None:
         "best_cpo_bid_rub": 123.0,
         "current_bid_rub": 123.0,
         "expected_bid_rub": 123.0,
+        "bid_sync_status": "synced",
+        "computed_at": "2026-07-06T00:00:00Z",
         "selected_cpo_rub": 123.45,
         "updated_at": "2026-07-06T00:00:00Z",
         "source": "rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
@@ -196,7 +198,7 @@ async def test_view_wrapper_caches_best_bid_when_contract_is_unavailable() -> No
     view = _build_view(
         selected_bid_minor=12300,
         actual_bid_minor=12000,
-        bid_sync_detail="synced",
+        bid_sync_detail="pending",
         plan_ranked=[{"bid": 12300, "cpo_rub": 123.45}],
     )
     provider.build_view = AsyncMock(return_value=view)  # type: ignore[method-assign]
@@ -216,6 +218,8 @@ async def test_view_wrapper_caches_best_bid_when_contract_is_unavailable() -> No
         "best_cpo_bid_rub": 123.0,
         "current_bid_rub": 120.0,
         "expected_bid_rub": 123.0,
+        "bid_sync_status": "pending",
+        "computed_at": "2026-07-06T00:00:00Z",
         "selected_cpo_rub": None,
         "updated_at": "2026-07-06T00:00:00Z",
         "source": "auto_shelf_bid_control_view_provider.selected_cpo_contract",
@@ -252,6 +256,8 @@ async def test_diagnostics_cache_manager_round_trip() -> None:
         best_cpo_bid_rub=123.0,
         current_bid_rub=120.0,
         expected_bid_rub=123.0,
+        bid_sync_status="synced",
+        computed_at=datetime(2026, 7, 6, tzinfo=UTC),
         selected_cpo_rub=45.67,
         updated_at=datetime(2026, 7, 6, tzinfo=UTC),
         source="source",
