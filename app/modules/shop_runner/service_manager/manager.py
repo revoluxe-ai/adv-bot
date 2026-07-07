@@ -132,6 +132,14 @@ def _cluster_stats_diagnostic_enabled() -> bool:
 T = TypeVar("T")
 
 
+def _collect_plan_fact_refresh_adv_ids(pre_advs: list[PreComplexAdv]) -> list[int]:
+    """Собирает уникальные adv_id для немедленного refresh plan-fact кеша.
+
+    Сортировка нужна для стабильных тестов и предсказуемого порядка чтения из CH.
+    """
+    return sorted({int(pre_adv.adv_id) for pre_adv in pre_advs})
+
+
 class CoroutinesManager:
     def __init__(
         self,
@@ -1463,7 +1471,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_plan_fact_stats(self) -> None:
-        """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""\
+        """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут."""
         # TODO: Перенести запись данных в CH в единый пайплайн под updater.py для единнобразия
         from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
 
@@ -1475,6 +1483,8 @@ class CoroutinesManager:
 
         manager = PlanFactManager()
         await manager.process_and_save_pre_complex_advs(pre_advs)
+        adv_ids = _collect_plan_fact_refresh_adv_ids(pre_advs)
+        await self._plan_fact_reader.refresh_cache_from_clickhouse(adv_ids)
         return None
     def _log_auto_budget_result(
         self,
