@@ -23,6 +23,7 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
     ComplexAdv,
 )
 from app.settings import settings
+from .dto import BidStatsDTO
 
 from .dto.decision_snapshot_dto import (
     AutoShelfBidControlDecisionSnapshot,
@@ -159,7 +160,7 @@ async def build_decision_snapshot(
     )
     optimization_metric = _resolve_cycle_metric_for_snapshot(complex_adv)
 
-    cycle_bid_stats = await manager._analytics.get_bid_stats(
+    cycle_bid_stats:  list[BidStatsDTO] = await manager._analytics.get_bid_stats(
         nmid=complex_adv.main_nmid,
         from_ts=state.current_cycle_started_at,
         currency=state.currency,
