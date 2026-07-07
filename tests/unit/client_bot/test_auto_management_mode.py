@@ -10,6 +10,7 @@ from app.client_bot.user_interface.services.auto_management_mode import (
     apply_paid_defaults_settings_for_adv,
 )
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 
@@ -51,6 +52,26 @@ def test_apply_paid_auto_management_mode_sets_only_paid_mode_fields(
     assert adv_setting.auto_update_minus_phrases is True
 
 
+def test_paid_auto_management_transition_keeps_current_bidder_path(
+    wb_cabinet: WBCabinet,
+) -> None:
+    adv_setting = AdvSetting(
+        bot_active=False,
+        bidder_active=False,
+        bidder_for_auto=True,
+        automatic_version=2,
+        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+    )
+
+    apply_paid_auto_management_transition(adv_setting, wb_cabinet)
+
+    assert adv_setting.bot_active is True
+    assert adv_setting.bidder_active is True
+    assert adv_setting.automatic_version == 3
+    assert adv_setting.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    assert adv_setting.bidder_for_auto is False
+
+
 def test_apply_free_auto_management_mode_sets_only_free_mode_fields(
     wb_cabinet: WBCabinet,
 ) -> None:
@@ -79,6 +100,26 @@ def test_apply_free_auto_management_mode_sets_only_free_mode_fields(
     assert adv_setting.max_place == 11
     assert adv_setting.max_cpm == 3300
     assert adv_setting.auto_update_minus_phrases is True
+
+
+def test_free_transition_does_not_use_bot_active_as_bidder_path_selector(
+    wb_cabinet: WBCabinet,
+) -> None:
+    adv_setting = AdvSetting(
+        bot_active=False,
+        bidder_active=True,
+        bidder_for_auto=True,
+        automatic_version=3,
+        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+    )
+
+    apply_free_mode_transition(adv_setting, wb_cabinet)
+
+    assert adv_setting.bot_active is False
+    assert adv_setting.bidder_active is False
+    assert adv_setting.automatic_version == 2
+    assert adv_setting.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    assert adv_setting.bidder_for_auto is False
 
 
 def test_apply_new_campaign_free_defaults_apply_common_then_free(
