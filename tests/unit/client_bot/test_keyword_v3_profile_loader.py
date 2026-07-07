@@ -23,6 +23,9 @@ from tests.unit.test_auto_updater_v3 import _sample_profile
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_cpm_sources import (
+    KeywordCpmSources,
+)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keyword_state import (
     KeywordState,
 )
@@ -59,6 +62,7 @@ def _calculated_keyword() -> CalculatedKeyword:
         ),
         target_pay_for_order=None,
         rating=1.0,
+        cpm_sources=KeywordCpmSources(cpm_set_bid=200),
     )
 
 
@@ -152,6 +156,11 @@ async def test_load_keyword_v3_profile_data_success() -> None:
             return_value=2.0,
         ),
         patch(
+            "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_campaign_orders_per_cart_7d",
+            new_callable=AsyncMock,
+            return_value=2.0,
+        ),
+        patch(
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
             new_callable=AsyncMock,
             return_value=None,
@@ -164,6 +173,8 @@ async def test_load_keyword_v3_profile_data_success() -> None:
         kw = _calculated_keyword()
         stat = kw.cluster_stat.model_copy(update={"views": 100})
         kw = kw.model_copy(update={"cluster_stat": stat})
+        assert kw.pay_for_order is not None
+        assert kw.pay_for_order > 0
         prof = _sample_profile()
         load_contexts.return_value = [
             KeywordV3Context(keyword=kw, position_profile=prof)
