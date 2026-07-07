@@ -1,4 +1,4 @@
-"""Regression tests for AutoResetBidService (partial get_min_bids results)."""
+"""Regression tests for auto campaign CPM reset behavior and partial get_min_bids results."""
 
 from __future__ import annotations
 
