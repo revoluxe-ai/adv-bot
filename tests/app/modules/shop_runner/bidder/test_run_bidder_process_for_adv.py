@@ -184,7 +184,7 @@ async def test_run_bidder_process_for_adv_injects_redis_caches(monkeypatch):
 async def test_run_bidder_process_for_adv_bidder_for_auto_false_keeps_search_path(
     monkeypatch,
 ):
-    """bidder_for_auto controls only Auto CPM writes, not the search bidder path."""
+    """bidder_for_auto gates only auto campaign CPM application to WB; search/manual stays on."""
 
     class DummyAdvParameterManager:
         async def get_min_cpm(self, _):
@@ -420,6 +420,5 @@ async def test_run_bidder_process_for_adv_skips_when_cap_below_min(monkeypatch):
             app_container.redis_client_wrapper.reset_override()
             app_container.redis_client.reset_override()
             app_container.settings.reset_override()
-
 
 
