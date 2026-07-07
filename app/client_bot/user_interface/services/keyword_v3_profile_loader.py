@@ -353,10 +353,14 @@ async def load_keyword_v3_profile_data(
         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
     )
     ks_id = calculated_keyword.keyword_setting_original_id
-    elig = (
-        eligibility_map.get(int(ks_id)) if ks_id is not None else None
-    )
-    ladder = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
+    elig = eligibility_map.get(int(ks_id)) if ks_id is not None else None
+    # Some eligibility entries indicate the key does not participate in ladder
+    # (e.g. NO_DATA/GAP). For UI ladder display we prefer to still build the
+    # ladder from CH when possible — pass `None` to `resolve_ladder_stage_display`
+    # so the stage resolution does not preemptively block modes based on
+    # non-participation flags; eligibility is still preserved in diagnostics.
+    elig_for_ladder = elig if (elig is None or elig.participates_in_ladder) else None
+    ladder = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig_for_ladder)
     candidates = ladder_view_to_candidates(ladder)
     stage_sources = {
         mode: ladder.stages[mode].source.value for mode in ladder.stages
