@@ -45,7 +45,9 @@ async def update_keywords(session: AsyncSession,
         )
     )
     update_non_v3_result = cast(CursorResult[Any], await session.execute(stmt_non_v3))
-    update_v3_result:  CursorResult[Any] = cast(CursorResult[Any], await session.execute(stmt_v3))
-    updated_count = update_non_v3_result.rowcount +  update_v3_result.rowcount
+    update_v3_result = cast(CursorResult[Any], await session.execute(stmt_v3))
+    update_non_v3_result_count = update_non_v3_result.rowcount
+    update_v3_result_count = update_v3_result.rowcount
+    updated_count = update_v3_result_count + update_non_v3_result_count
     await session.commit()
     return updated_count
