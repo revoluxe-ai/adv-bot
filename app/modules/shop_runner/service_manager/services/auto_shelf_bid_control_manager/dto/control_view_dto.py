@@ -1,4 +1,4 @@
-"""DTO СЌРєСЂР°РЅР° Telegram РґР»СЏ Auto Shelf Bid Control."""
+"""DTO экрана Telegram для Auto Shelf Bid Control."""
 
 from __future__ import annotations
 
@@ -14,14 +14,14 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 
 @dataclass(frozen=True, slots=True)
 class BidPointStatsDTO:
-    """РЎС‚Р°С‚РёСЃС‚РёРєР° РїРѕ РѕРґРЅРѕР№ С‚РѕС‡РєРµ СЃС‚Р°РІРєРё РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РІ Telegram.
+    """Статистика по одной точке ставки для отображения в Telegram.
 
-    ``cart_cpa`` вЂ” CPC score (РЅРµ CPA РєРѕСЂР·РёРЅС‹), СЃРј. ``BidStatsDTO.cart_cpa``.
+    ``cart_cpa`` - CPC score, а не CPA корзины; см. ``BidStatsDTO.cart_cpa``.
     """
 
-    bid_minor: int  # РєРѕРїРµР№РєРё (РєР°Рє РІ CH auto_shelf_bid_intervals)
+    bid_minor: int  # Копейки (как в CH auto_shelf_bid_intervals)
     currency: str
-    last_interval_at: datetime | None  # РїРѕСЃР»РµРґРЅРёР№ РёРЅС‚РµСЂРІР°Р» РїРѕ СЃС‚Р°РІРєРµ (РґР»СЏ СЃРѕСЂС‚РёСЂРѕРІРєРё UI)
+    last_interval_at: datetime | None  # Последний интервал по ставке (для сортировки UI)
     impressions: int
     clicks: int
     carts: int
@@ -64,23 +64,23 @@ class CoverageLayerBidDTO:
 class AutoShelfBidControlViewDTO:
 
     # TODO: Найти и исправить битую кодировку
-    """РЎСЂРµР· СЃРѕСЃС‚РѕСЏРЅРёСЏ control-РјРѕРґСѓР»СЏ РґР»СЏ Telegram-СЌРєСЂР°РЅР°."""
+    """Срез состояния control-модуля для Telegram-экрана."""
 
     nmid: int
     auto_adv_id: int | None
     enabled: bool
     has_settings: bool
     has_state: bool
-    dry_run: bool  # РіР»РѕР±Р°Р»СЊРЅРѕ: settings.AUTO_SHELF_BID_CONTROL_DRY_RUN
+    dry_run: bool  # Глобально: settings.AUTO_SHELF_BID_CONTROL_DRY_RUN
     bid_units_confirmed: bool
-    actual_bid_minor: int | None  # РєРѕРїРµР№РєРё, Redis recommendations
-    min_bid_minor: int | None  # РєРѕРїРµР№РєРё, РјРёРЅ. СЃС‚Р°РІРєР° WB (РёР· min_bids cache)
-    max_bid_minor: int | None  # РєРѕРїРµР№РєРё, РЅР°СЃС‚СЂРѕР№РєР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
-    current_main_bid_minor: int | None  # РєРѕРїРµР№РєРё
-    current_test_bid_minor: int | None  # РєРѕРїРµР№РєРё
-    cycle_best_bid_minor: int | None  # РєРѕРїРµР№РєРё, Р»СѓС‡С€РёР№ CPC РІ С‚РµРєСѓС‰РµРј С†РёРєР»Рµ
-    global_best_bid_minor: int | None  # РєРѕРїРµР№РєРё, min CPC С‚РµРєСѓС‰РёР№ в€Є РїСЂРµРґС‹РґСѓС‰РёР№ С†РёРєР»
-    next_test_bid_minor: int | None  # РєРѕРїРµР№РєРё
+    actual_bid_minor: int | None  # Копейки, Redis recommendations
+    min_bid_minor: int | None  # Копейки, мин. ставка WB (из min_bids cache)
+    max_bid_minor: int | None  # Копейки, настройка пользователя
+    current_main_bid_minor: int | None  # Копейки
+    current_test_bid_minor: int | None  # Копейки
+    cycle_best_bid_minor: int | None  # Копейки, лучший CPC в текущем цикле
+    global_best_bid_minor: int | None  # Копейки, min CPC текущий ∪ предыдущий цикл
+    next_test_bid_minor: int | None  # Копейки
     currency: str
     current_mode: str | None
     current_cycle_started_at: datetime | None
@@ -96,15 +96,15 @@ class AutoShelfBidControlViewDTO:
     main_impressions: int | None
     test_elapsed_minutes: int | None
     main_elapsed_minutes: int | None
-    covered_points_count: int   # покрытые точки текущего цикла (порог test)
-    bid_points_total: int  # всего точек за отчётный день (диагностика)
-    bid_points: list[BidPointStatsDTO]  # агрегаты за отчётный день (диагностика)
-    cycle_covered_points_count: int  # дубль covered_points_count для совместимости
-    cycle_bid_points: list[BidPointStatsDTO]   # агрегаты от current_cycle_started_at
+    covered_points_count: int   # Покрытые точки текущего цикла (порог test)
+    bid_points_total: int  # Всего точек за отчётный день (диагностика)
+    bid_points: list[BidPointStatsDTO]  # Агрегаты за отчётный день (диагностика)
+    cycle_covered_points_count: int  # Дубль covered_points_count для совместимости
+    cycle_bid_points: list[BidPointStatsDTO]   # Агрегаты от current_cycle_started_at
     last_reason: str | None
     warnings: list[str]
-    optimization_metric: OptimizationMetric  # CPC или CTR — текущая метрика оптимизации
-    fact_cpo: float | None  # фактическое CPO кампании
+    optimization_metric: OptimizationMetric  # CPC или CTR - текущая метрика оптимизации
+    fact_cpo: float | None  # Фактическое CPO кампании
     resolve_cpo: float | None  # resolve/target CPO кампании
     coverage_first_available_bucket_start: datetime | None = None
     coverage_current_layer: int | None = None
