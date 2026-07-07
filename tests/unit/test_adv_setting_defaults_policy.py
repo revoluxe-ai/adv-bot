@@ -21,7 +21,10 @@ from app.client_bot.modules.default_settings.adv_setting_policy import (
     apply_paid_auto_management_transition,
     apply_paid_defaults_settings_for_adv,
 )
-from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.models import (
+    AdvSetting,
+    BidderCoroutineType,
+)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from tests.factories import AdvSettingFactory, WBCabinetFactory
@@ -248,11 +251,13 @@ def test_common_plus_paid_defaults_apply_current_paid_start_behavior(
     assert adv_setting.bidder_active is True
     assert adv_setting.bot_active is True
     assert adv_setting.automatic_version == 3
+    assert adv_setting.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
     assert adv_setting.white_list_mode == WhiteListMode.REPLACE_ON_TRIM
     assert adv_setting.auto_update_white_list is False
     assert adv_setting.auto_update_target_place is True
     assert adv_setting.bidder_for_auto is False
     assert adv_setting.auto_update_minus_phrases is False
+
 
 def test_free_overlay_sets_only_free_mode_fields(
     adv_setting: AdvSetting,
