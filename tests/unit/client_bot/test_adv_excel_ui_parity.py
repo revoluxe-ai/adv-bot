@@ -80,4 +80,11 @@ def test_excel_shelf_fields_match_ui_mapping() -> None:
 @pytest.mark.unit
 def test_ui_mapping_files_exist() -> None:
     for path in {**ADV_UI_HANDLER_BY_FIELD, **SHELF_UI_HANDLER_BY_FIELD}.values():
-        assert Path(path).exists(), f"UI handler not found: {path}"
+        p = Path(path)
+        if p.exists():
+            continue
+        # Support modules moved to a package directory (adv_setting -> adv_setting/).
+        alt = p.with_suffix("")  # remove .py
+        if alt.is_dir() and (alt / "__init__.py").exists():
+            continue
+        pytest.fail(f"UI handler not found: {path}")
