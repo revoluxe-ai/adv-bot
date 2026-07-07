@@ -27,6 +27,9 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.keywords_
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.keyword_daily_history_message import (
     KeywordDailyHistoryScreen,
 )
+from app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages import (
+    AdvKeywordsDiagnosticsView,
+)
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -57,6 +60,29 @@ router = Router()
 
 
 _sm = get_async_session_maker
+
+
+def _build_adv_keywords_diagnostics_view(
+    adv_setting: AdvSetting,
+) -> AdvKeywordsDiagnosticsView:
+    bidder_kind = getattr(adv_setting, "bidder_coroutine_type", None)
+    bidder_for_auto = bool(getattr(adv_setting, "bidder_for_auto", False))
+    if not bidder_for_auto:
+        bidder_label = "ручной"
+    else:
+        bidder_name = getattr(bidder_kind, "name", None) or str(bidder_kind) or "—"
+        bidder_label = "старый" if bidder_name == "OLD_UPDATE_CPM_BIDDER" else "новый"
+    if bidder_kind is None and bidder_for_auto:
+        bidder_label = "—"
+    strategy = getattr(adv_setting, "auto_shelf_bid_control_strategy", None)
+    strategy_label = getattr(strategy, "value", None) or str(strategy) or "—"
+    return AdvKeywordsDiagnosticsView(
+        bidder_label=bidder_label,
+        auto_shelf_enabled=bool(
+            getattr(adv_setting, "auto_shelf_bid_control_enabled", False)
+        ),
+        strategy_label=strategy_label,
+    )
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == "filter_by_query"))
@@ -118,6 +144,7 @@ async def setting_keywords_active_keywords(
         adv_choice_last_page,
         main_photos[0],
         page=1,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -171,6 +198,7 @@ async def setting_keywords_sort_by_ctr_desc(
         adv_choice_last_page,
         main_photos[0],
         page=1,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state, "sort_by_ctr_desc")
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -228,6 +256,7 @@ async def setting_keywords_show_keywords_is_hard(
         adv_choice_last_page,
         main_photos[0],
         page=1,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -297,6 +326,7 @@ async def setting_keywords_white_list(
         main_photos[0],
         page=page,
         image_mode="main_photo",
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -357,6 +387,7 @@ async def setting_keywords_white_list(
         adv_choice_last_page,
         main_photos[0],
         page=page,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state, "white_list")
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -443,6 +474,7 @@ async def setting_keywords_by_adv(
         adv_choice_last_page,
         main_photos[0],
         page=1,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
     logger.debug("Отправили сообщение")
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -524,6 +556,7 @@ async def setting_keywords_hide_keywords_is_hard(
         adv_choice_last_page,
         main_photos[0],
         page=1,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -565,6 +598,7 @@ async def setting_keywords_hide_keywords_is_hard(
         adv_choice_last_page,
         main_photos[0],
         page=1,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -647,6 +681,7 @@ async def setting_keywords_by_adv(
         adv_choice_last_page,
         main_photos[0],
         page,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
     logger.debug("Отправили сообщение")
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -857,6 +892,7 @@ async def setting_keywords_filter_by_query(
         adv_choice_last_page,
         main_photos[0],
         page,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state)
     logger.debug("Отправили сообщение")
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -1041,6 +1077,7 @@ async def show_only_on_out_index(
         adv_choice_last_page,
         main_photos[0],
         page=page,
+        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
     )(state, "only_out_index")
 
     await redis_manager.set_check_last_24_hours(adv_original_id)

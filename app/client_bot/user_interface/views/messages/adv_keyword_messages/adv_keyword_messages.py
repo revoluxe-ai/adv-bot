@@ -1,6 +1,7 @@
 import logging
 import typing
 from datetime import datetime
+from dataclasses import dataclass
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
@@ -53,6 +54,15 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class AdvKeywordsDiagnosticsView:
+    """Короткая read-only диагностика для keywords/stat экрана."""
+
+    bidder_label: str
+    auto_shelf_enabled: bool
+    strategy_label: str | None = None
+
+
 # TODO: Во все списки ключей нужно передавать полные списки ключей, в уже внутри фильтровать т.к. они нужны для расчета АвтоМаксимальной ставки
 
 
@@ -69,6 +79,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         page: int,
         image_mode: str = "graphic",
         cpm_date_map: dict[str, tuple[float | None, datetime | None]] | None = None,
+        diagnostics: AdvKeywordsDiagnosticsView | None = None,
     ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
@@ -82,6 +93,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.image_mode = image_mode
         self._last_saved_bids: dict[int, int] = {}
         self._cpm_date_map = cpm_date_map
+        self._diagnostics = diagnostics
         self.min_orders_per_1000_rub: float | None = None
 
     @inject
@@ -242,12 +254,6 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += t
         page_block = f"Стр.:{self._page}/{total_page + 1}\n"
         text += page_block
-        text += (
-            f"Общий расход: {self.total_spend:.2f}\n"
-            f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
-            f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
-            f"Расход на рек.(авто): {self.addition_spend_in_adv:.2f} р.\n"
-        )
         if self.cost_per_order_from_additional_last_week is not None:
             text += (
                 f"Себес. зак. из доп. пок. (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
@@ -320,6 +326,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Цел. поз.: {self._adv_setting.max_place}\n"
         text += self._format_last_saved_bids()
+        if self._diagnostics is not None:
+            text += self._render_diagnostics_block()
         return text
 
     @property
@@ -369,6 +377,19 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         for nmid in sorted(self._last_saved_bids):
             lines.append(f"{nmid}: {self._last_saved_bids[nmid]}")
         return "\n".join(lines) + "\n"
+
+    def _render_diagnostics_block(self) -> str:
+        if self._diagnostics is None:
+            return ""
+        bidder = self._diagnostics.bidder_label or "—"
+        shelf_status = "вкл" if self._diagnostics.auto_shelf_enabled else "выкл"
+        strategy = self._diagnostics.strategy_label or "—"
+        return (
+            "\n"
+            f"🤖 Биддер: {bidder} · Auto Shelf: {shelf_status}\n"
+            f"Режим: {strategy}\n"
+            "CPO/ставка: недоступно в этом экране\n"
+        )
 
     @staticmethod
     async def _get_status_auction(search_adv_id: int) -> str:
