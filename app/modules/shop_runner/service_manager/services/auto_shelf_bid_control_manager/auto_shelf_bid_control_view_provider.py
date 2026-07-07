@@ -108,11 +108,13 @@ class AutoShelfBidControlViewProvider:
     async def _cache_selected_cpo_contract(
         self,
         adv_setting_original_id: int,
+        view: AutoShelfBidControlViewDTO,
         contract: AutoShelfBidSelectedCpoContract,
     ) -> None:
         """Сохранить selected CPO contract в Redis для Telegram diagnostics."""
         await self._diagnostics_cache.set_selected_cpo_contract(
             adv_setting_original_id,
+            view,
             contract,
         )
 
@@ -1247,6 +1249,7 @@ class AutoShelfBidControlViewProvider:
         try:
             await self._cache_selected_cpo_contract(
                 adv_setting_original_id,
+                view,
                 contract,
             )
         except Exception:

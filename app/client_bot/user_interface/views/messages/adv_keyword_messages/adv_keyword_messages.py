@@ -65,6 +65,12 @@ class AdvKeywordsDiagnosticsView:
     bidder_label: str
     auto_shelf_enabled: bool
     strategy_label: str | None = None
+    best_cpo_bid_rub: str | None = None
+    current_bid_rub: str | None = None
+    expected_bid_rub: str | None = None
+    selected_cpo_rub: str | None = None
+    unavailable_reason: str | None = None
+    # Backward-compatible fields used by existing callers/tests.
     bid: str | None = None
     cpo: str | None = None
     last_update_ts: str | None = None
@@ -84,11 +90,39 @@ def format_adv_keywords_diagnostics_block(
     bidder = diagnostics.bidder_label or "—"
     shelf_status = "вкл" if diagnostics.auto_shelf_enabled else "выкл"
     strategy = diagnostics.strategy_label or "—"
+    best_cpo_bid_rub = diagnostics.best_cpo_bid_rub
+    current_bid_rub = diagnostics.current_bid_rub
+    expected_bid_rub = diagnostics.expected_bid_rub
+    selected_cpo_rub = diagnostics.selected_cpo_rub
+    unavailable_reason = diagnostics.unavailable_reason
     bid = diagnostics.bid
     cpo = diagnostics.cpo
     last_update_ts = diagnostics.last_update_ts
-    if bid is None and cpo is None and last_update_ts is None:
+    if (
+        best_cpo_bid_rub is None
+        and current_bid_rub is None
+        and expected_bid_rub is None
+        and selected_cpo_rub is None
+        and unavailable_reason is None
+        and bid is None
+        and cpo is None
+        and last_update_ts is None
+    ):
         metrics_line = "Ставка/CPO/время: н/д"
+    elif (
+        best_cpo_bid_rub is not None
+        or current_bid_rub is not None
+        or expected_bid_rub is not None
+        or unavailable_reason is not None
+    ):
+        metrics_lines = [
+            f"Лучшая ставка по CPO: {best_cpo_bid_rub or 'н/д'}",
+            f"Текущая ставка WB: {current_bid_rub or 'н/д'}",
+            f"Целевая ставка бота: {expected_bid_rub or 'н/д'}",
+        ]
+        if unavailable_reason:
+            metrics_lines.append(f"Примечание: {unavailable_reason}")
+        metrics_line = "\n".join(metrics_lines)
     else:
         metrics_line = (
             f"Ставка: {bid or 'н/д'} · CPO: {cpo or 'н/д'} · "
@@ -96,7 +130,7 @@ def format_adv_keywords_diagnostics_block(
         )
     return (
         "\n"
-        f"🤖 Биддер-Авто: {shelf_status}\n"
+        f"🤖 Биддер: {bidder} · Auto Shelf: {shelf_status}\n"
         f"Режим: {strategy}\n"
         f"{metrics_line}\n"
     )

@@ -175,10 +175,51 @@ async def test_view_wrapper_builds_selected_cpo_contract_from_view() -> None:
     assert px is None
     assert nx is None
     assert json.loads(payload) == {
-        "bid_rub": 123.0,
-        "cpo_rub": 123.45,
+        "best_cpo_bid_rub": 123.0,
+        "current_bid_rub": 123.0,
+        "expected_bid_rub": 123.0,
+        "selected_cpo_rub": 123.45,
         "updated_at": "2026-07-06T00:00:00Z",
         "source": "rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
+        "unavailable_reason": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_view_wrapper_caches_best_bid_when_contract_is_unavailable() -> None:
+    redis_client = _FakeRedisClient()
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=redis_client,  # type: ignore[arg-type]
+        repository=MagicMock(),
+        analytics_repository=MagicMock(),
+    )
+    view = _build_view(
+        selected_bid_minor=12300,
+        actual_bid_minor=12000,
+        bid_sync_detail="synced",
+        plan_ranked=[{"bid": 12300, "cpo_rub": 123.45}],
+    )
+    provider.build_view = AsyncMock(return_value=view)  # type: ignore[method-assign]
+
+    contract = await provider.build_selected_cpo_contract(1)
+
+    assert contract.selected_bid_minor == 12300
+    assert contract.selected_cpo_rub is None
+    assert contract.unavailable_reason == "selected_bid_not_applied"
+    assert len(redis_client.set_calls) == 1
+    key, payload, ttl, px, nx = redis_client.set_calls[0]
+    assert key == "auto_shelf:diagnostics:1"
+    assert ttl == 300
+    assert px is None
+    assert nx is None
+    assert json.loads(payload) == {
+        "best_cpo_bid_rub": 123.0,
+        "current_bid_rub": 120.0,
+        "expected_bid_rub": 123.0,
+        "selected_cpo_rub": None,
+        "updated_at": "2026-07-06T00:00:00Z",
+        "source": "auto_shelf_bid_control_view_provider.selected_cpo_contract",
+        "unavailable_reason": "selected_bid_not_applied",
     }
 
 
@@ -208,10 +249,13 @@ async def test_diagnostics_cache_manager_round_trip() -> None:
     redis_client = _FakeRedisClient()
     cache = AutoShelfBidDiagnosticsCacheManager(redis_client)  # type: ignore[arg-type]
     dto = AutoShelfBidDiagnosticsDTO(
-        bid_rub=123.0,
-        cpo_rub=45.67,
+        best_cpo_bid_rub=123.0,
+        current_bid_rub=120.0,
+        expected_bid_rub=123.0,
+        selected_cpo_rub=45.67,
         updated_at=datetime(2026, 7, 6, tzinfo=UTC),
         source="source",
+        unavailable_reason="selected_bid_not_applied",
     )
 
     await cache.set(1, dto)

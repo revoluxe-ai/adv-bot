@@ -125,8 +125,10 @@ async def test_diagnostics_view_reads_cached_auto_shelf_values() -> None:
         auto_shelf_bid_control_strategy="PLAN_DISTANCE",
     )
     payload = AutoShelfBidDiagnosticsDTO(
-        bid_rub=123.0,
-        cpo_rub=45.67,
+        best_cpo_bid_rub=123.0,
+        current_bid_rub=123.0,
+        expected_bid_rub=123.0,
+        selected_cpo_rub=45.67,
         updated_at=datetime(2026, 7, 7, 13, 0, tzinfo=UTC),
         source="source",
     ).model_dump_json()
@@ -147,8 +149,10 @@ async def test_diagnostics_cache_round_trip_returns_text() -> None:
     await cache.set(
         123,
         AutoShelfBidDiagnosticsDTO(
-            bid_rub=None,
-            cpo_rub=None,
+            best_cpo_bid_rub=None,
+            current_bid_rub=None,
+            expected_bid_rub=None,
+            selected_cpo_rub=None,
             updated_at=None,
             source="source",
         ),
@@ -179,7 +183,7 @@ def test_adv_keywords_setting_text_includes_compact_partial_diagnostics() -> Non
 
     assert "🤖 Биддер: старый · Auto Shelf: вкл" in text
     assert "Режим: PLAN_DISTANCE" in text
-    assert "Ставка: 123 · CPO: 45.67 · время 07.07 13:00" in text
+    assert "Ставка: 123 · CPO: 45.67 · (07.07 13:00)" in text
     assert "fallback_possible" not in text
     assert "⚙️ Управление рекламой" not in text
     assert "CPM Авто: 25 р." in text
@@ -210,6 +214,48 @@ def test_adv_keywords_setting_text_shows_overall_nd_when_diagnostics_missing() -
 
     assert "🤖 Биддер: старый · Auto Shelf: вкл" in text
     assert "Ставка/CPO/время: н/д" in text
+
+
+def test_adv_keywords_setting_text_renders_explicit_cpo_semantics() -> None:
+    diagnostics = AdvKeywordsDiagnosticsView(
+        bidder_label="старый",
+        auto_shelf_enabled=True,
+        strategy_label="PLAN_DISTANCE",
+        best_cpo_bid_rub="123",
+        current_bid_rub="120",
+        expected_bid_rub="125",
+        selected_cpo_rub=None,
+        unavailable_reason="selected_bid_not_applied",
+    )
+
+    text = format_adv_keywords_diagnostics_block(diagnostics)
+
+    assert "Лучшая ставка по CPO: 123" in text
+    assert "Текущая ставка WB: 120" in text
+    assert "Целевая ставка бота: 125" in text
+    assert "Примечание: selected_bid_not_applied" in text
+    assert "синхрониз" not in text
+    assert "safe" not in text
+    assert "Ставка: 123" not in text
+
+
+def test_adv_keywords_setting_text_renders_available_contract_without_note() -> None:
+    diagnostics = AdvKeywordsDiagnosticsView(
+        bidder_label="старый",
+        auto_shelf_enabled=True,
+        strategy_label="PLAN_DISTANCE",
+        best_cpo_bid_rub="123",
+        current_bid_rub="123",
+        expected_bid_rub="123",
+        selected_cpo_rub="45.67",
+    )
+
+    text = format_adv_keywords_diagnostics_block(diagnostics)
+
+    assert "Лучшая ставка по CPO: 123" in text
+    assert "Текущая ставка WB: 123" in text
+    assert "Целевая ставка бота: 123" in text
+    assert "Примечание:" not in text
 
 
 def test_diagnostics_view_model_formats_cached_values() -> None:
