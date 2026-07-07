@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -11,6 +12,10 @@ from unittest.mock import AsyncMock, MagicMock
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
     AutoShelfBidControlViewProvider,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_diagnostics_cache import (
+    AutoShelfBidDiagnosticsCacheManager,
+    AutoShelfBidDiagnosticsDTO,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.selected_cpo_contract import (
     AutoShelfBidSelectedCpoResolverInput,
     resolve_selected_cpo_contract,
@@ -18,6 +23,27 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 )
 
 pytestmark = pytest.mark.unit
+
+
+class _FakeRedisClient:
+    def __init__(self) -> None:
+        self.store: dict[str, str] = {}
+        self.set_calls: list[tuple[str, str, int | None, int | None, bool | None]] = []
+
+    async def set(
+        self,
+        key: str,
+        value: str,
+        ex: int | None = None,
+        px: int | None = None,
+        nx: bool | None = None,
+    ) -> bool:
+        self.set_calls.append((key, value, ex, px, nx))
+        self.store[key] = value
+        return True
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
 
 
 def _build_input(
@@ -123,8 +149,9 @@ def test_selected_cpo_contract_is_unavailable_when_control_is_disabled() -> None
 
 @pytest.mark.asyncio
 async def test_view_wrapper_builds_selected_cpo_contract_from_view() -> None:
+    redis_client = _FakeRedisClient()
     provider = AutoShelfBidControlViewProvider(
-        redis_client=MagicMock(),
+        redis_client=redis_client,  # type: ignore[arg-type]
         repository=MagicMock(),
         analytics_repository=MagicMock(),
     )
@@ -141,6 +168,18 @@ async def test_view_wrapper_builds_selected_cpo_contract_from_view() -> None:
     assert contract.selected_bid_minor == 12300
     assert contract.selected_cpo_rub == 123.45
     assert contract.unavailable_reason is None
+    assert len(redis_client.set_calls) == 1
+    key, payload, ttl, px, nx = redis_client.set_calls[0]
+    assert key == "auto_shelf:diagnostics:1"
+    assert ttl == 300
+    assert px is None
+    assert nx is None
+    assert json.loads(payload) == {
+        "bid_rub": 123.0,
+        "cpo_rub": 123.45,
+        "updated_at": "2026-07-06T00:00:00Z",
+        "source": "rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
+    }
 
 
 def test_view_wrapper_matches_neutral_resolver_for_same_payload() -> None:
@@ -162,3 +201,20 @@ def test_view_wrapper_matches_neutral_resolver_for_same_payload() -> None:
     )
 
     assert contract_from_view == contract_from_input
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_cache_manager_round_trip() -> None:
+    redis_client = _FakeRedisClient()
+    cache = AutoShelfBidDiagnosticsCacheManager(redis_client)  # type: ignore[arg-type]
+    dto = AutoShelfBidDiagnosticsDTO(
+        bid_rub=123.0,
+        cpo_rub=45.67,
+        updated_at=datetime(2026, 7, 6, tzinfo=UTC),
+        source="source",
+    )
+
+    await cache.set(1, dto)
+    loaded = await cache.get(1)
+
+    assert loaded == dto

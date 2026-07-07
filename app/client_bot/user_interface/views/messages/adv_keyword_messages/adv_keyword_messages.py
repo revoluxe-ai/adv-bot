@@ -56,11 +56,50 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class AdvKeywordsDiagnosticsView:
-    """Короткая read-only диагностика для keywords/stat экрана."""
+    """Короткая read-only диагностика для keywords/stat экрана.
+
+    Поля уже готовы к рендеру и используются как компактная строка с
+    отображением ставки, CPO и времени обновления кеша.
+    """
 
     bidder_label: str
     auto_shelf_enabled: bool
     strategy_label: str | None = None
+    bid: str | None = None
+    cpo: str | None = None
+    last_update_ts: str | None = None
+
+
+def format_adv_keywords_diagnostics_block(
+    diagnostics: AdvKeywordsDiagnosticsView | None,
+) -> str:
+    """Собрать компактный текстовый блок диагностики.
+
+    Функция чистая: на вход получает только DTO, на выходе возвращает готовую
+    строку для Telegram UI. Это делает блок легко тестируемым отдельно от
+    загрузки данных из Redis.
+    """
+    if diagnostics is None:
+        return ""
+    bidder = diagnostics.bidder_label or "—"
+    shelf_status = "вкл" if diagnostics.auto_shelf_enabled else "выкл"
+    strategy = diagnostics.strategy_label or "—"
+    bid = diagnostics.bid
+    cpo = diagnostics.cpo
+    last_update_ts = diagnostics.last_update_ts
+    if bid is None and cpo is None and last_update_ts is None:
+        metrics_line = "Ставка/CPO/время: н/д"
+    else:
+        metrics_line = (
+            f"Ставка: {bid or 'н/д'} · CPO: {cpo or 'н/д'} · "
+            f"({last_update_ts or 'н/д'})"
+        )
+    return (
+        "\n"
+        f"🤖 Биддер-Авто: {shelf_status}\n"
+        f"Режим: {strategy}\n"
+        f"{metrics_line}\n"
+    )
 
 
 # TODO: Во все списки ключей нужно передавать полные списки ключей, в уже внутри фильтровать т.к. они нужны для расчета АвтоМаксимальной ставки
@@ -379,17 +418,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         return "\n".join(lines) + "\n"
 
     def _render_diagnostics_block(self) -> str:
-        if self._diagnostics is None:
-            return ""
-        bidder = self._diagnostics.bidder_label or "—"
-        shelf_status = "вкл" if self._diagnostics.auto_shelf_enabled else "выкл"
-        strategy = self._diagnostics.strategy_label or "—"
-        return (
-            "\n"
-            f"🤖 Биддер: {bidder} · Auto Shelf: {shelf_status}\n"
-            f"Режим: {strategy}\n"
-            "CPO/ставка: недоступно в этом экране\n"
-        )
+        return format_adv_keywords_diagnostics_block(self._diagnostics)
 
     @staticmethod
     async def _get_status_auction(search_adv_id: int) -> str:

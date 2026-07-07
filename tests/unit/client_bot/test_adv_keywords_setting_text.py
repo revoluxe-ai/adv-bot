@@ -2,14 +2,50 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
+
+from app.client_bot.user_interface.handlers.keyword_settings import (
+    _build_adv_keywords_diagnostics_view_model,
+    load_adv_keywords_diagnostics_view,
+)
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages import (
     AdvKeywordsDiagnosticsView,
     AdvKeywordsSetting,
+    format_adv_keywords_diagnostics_block,
 )
 from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_diagnostics_cache import (
+    AutoShelfBidDiagnosticsCacheManager,
+    AutoShelfBidDiagnosticsDTO,
+)
+
+
+class _FakeRedisClient:
+    def __init__(self, payload: str | None = None) -> None:
+        self._payload = payload
+        self.store: dict[str, str] = {}
+
+    async def get(self, key: str) -> str | None:
+        if key in self.store:
+            return self.store[key]
+        if key != "auto_shelf:diagnostics:123":
+            return None
+        return self._payload
+
+    async def set(
+        self,
+        key: str,
+        value: str,
+        ex: int | None = None,
+        px: int | None = None,
+        nx: bool | None = None,
+    ) -> bool:
+        self.store[key] = value
+        return True
 
 
 def _build_setting() -> AdvKeywordsSetting:
@@ -43,6 +79,9 @@ def _build_setting() -> AdvKeywordsSetting:
             bidder_label="старый",
             auto_shelf_enabled=True,
             strategy_label="PLAN_DISTANCE",
+            bid="123",
+            cpo="45.67",
+            last_update_ts="07.07 13:00",
         ),
     )
     setting._status_auction = "active"
@@ -76,6 +115,63 @@ def _build_setting() -> AdvKeywordsSetting:
     return setting
 
 
+@pytest.mark.asyncio
+async def test_diagnostics_view_reads_cached_auto_shelf_values() -> None:
+    adv_setting = SimpleNamespace(
+        id=123,
+        bidder_for_auto=True,
+        bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy="PLAN_DISTANCE",
+    )
+    payload = AutoShelfBidDiagnosticsDTO(
+        bid_rub=123.0,
+        cpo_rub=45.67,
+        updated_at=datetime(2026, 7, 7, 13, 0, tzinfo=UTC),
+        source="source",
+    ).model_dump_json()
+
+    diagnostics = await load_adv_keywords_diagnostics_view(
+        adv_setting, redis_client=_FakeRedisClient(payload)
+    )
+
+    assert diagnostics.bid == "123"
+    assert diagnostics.cpo == "45.67"
+    assert diagnostics.last_update_ts == "07.07 16:00"
+
+
+@pytest.mark.asyncio
+async def test_diagnostics_cache_round_trip_returns_text() -> None:
+    redis_client = _FakeRedisClient()
+    cache = AutoShelfBidDiagnosticsCacheManager(redis_client)  # type: ignore[arg-type]
+    await cache.set(
+        123,
+        AutoShelfBidDiagnosticsDTO(
+            bid_rub=None,
+            cpo_rub=None,
+            updated_at=None,
+            source="source",
+        ),
+    )
+
+    adv_setting = SimpleNamespace(
+        id=123,
+        bidder_for_auto=True,
+        bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+        auto_shelf_bid_control_enabled=True,
+        auto_shelf_bid_control_strategy="PLAN_DISTANCE",
+    )
+    diagnostics = await load_adv_keywords_diagnostics_view(
+        adv_setting,
+        redis_client=redis_client,  # type: ignore[arg-type]
+    )
+    text = format_adv_keywords_diagnostics_block(diagnostics)
+
+    assert "🤖 Биддер: старый · Auto Shelf: вкл" in text
+    assert "Ставка/CPO/время: н/д" in text
+    assert text.endswith("\n")
+
+
 def test_adv_keywords_setting_text_includes_compact_partial_diagnostics() -> None:
     setting = _build_setting()
 
@@ -83,10 +179,9 @@ def test_adv_keywords_setting_text_includes_compact_partial_diagnostics() -> Non
 
     assert "🤖 Биддер: старый · Auto Shelf: вкл" in text
     assert "Режим: PLAN_DISTANCE" in text
-    assert "CPO/ставка: недоступно в этом экране" in text
+    assert "Ставка: 123 · CPO: 45.67 · время 07.07 13:00" in text
     assert "fallback_possible" not in text
     assert "⚙️ Управление рекламой" not in text
-    assert "Общий расход: 123.45" in text
     assert "CPM Авто: 25 р." in text
     assert "Последняя ставка (по артикулам): Нет данных" in text
     assert len(text) < 4000
@@ -99,6 +194,36 @@ def test_adv_keywords_setting_text_keeps_legacy_stats_without_diagnostics() -> N
     text = setting.text
 
     assert "🤖 Биддер:" not in text
-    assert "CPO/ставка: недоступно в этом экране" not in text
-    assert "Общий расход: 123.45" in text
+    assert "Ставка/CPO/время: н/д" not in text
     assert "Последняя ставка (по артикулам): Нет данных" in text
+
+
+def test_adv_keywords_setting_text_shows_overall_nd_when_diagnostics_missing() -> None:
+    setting = _build_setting()
+    setting._diagnostics = AdvKeywordsDiagnosticsView(
+        bidder_label="старый",
+        auto_shelf_enabled=True,
+        strategy_label="PLAN_DISTANCE",
+    )
+
+    text = setting.text
+
+    assert "🤖 Биддер: старый · Auto Shelf: вкл" in text
+    assert "Ставка/CPO/время: н/д" in text
+
+
+def test_diagnostics_view_model_formats_cached_values() -> None:
+    diagnostics = _build_adv_keywords_diagnostics_view_model(
+        bidder_label="старый",
+        auto_shelf_enabled=True,
+        strategy_label="PLAN_DISTANCE",
+        cache_value=SimpleNamespace(
+            bid_rub=123.0,
+            cpo_rub=45.67,
+            updated_at=datetime(2026, 7, 7, 13, 0, tzinfo=UTC),
+        ),
+    )
+
+    assert diagnostics.bid == "123"
+    assert diagnostics.cpo == "45.67"
+    assert diagnostics.last_update_ts == "07.07 16:00"

@@ -3,6 +3,7 @@
 
 # type: ignore
 import logging
+from datetime import datetime
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
@@ -12,6 +13,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
+from dependency_injector.wiring import Provide, inject
 from sqlalchemy import and_
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -30,6 +32,7 @@ from app.client_bot.user_interface.views.messages.adv_keyword_messages.keyword_d
 from app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages import (
     AdvKeywordsDiagnosticsView,
 )
+from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -38,6 +41,10 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     sync_keyword_setting_mode_for_v3,
+)
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_diagnostics_cache import (
+    AutoShelfBidDiagnosticsCacheManager,
+    AutoShelfBidDiagnosticsDTO,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater import data_manager
@@ -62,8 +69,57 @@ router = Router()
 _sm = get_async_session_maker
 
 
-def _build_adv_keywords_diagnostics_view(
+def _format_diagnostics_value(value: float | None) -> str:
+    """Свернуть числовое значение в компактную строку для Telegram."""
+    if value is None:
+        return "н/д"
+    rounded = round(float(value), 2)
+    if float(rounded).is_integer():
+        return str(int(rounded))
+    return f"{rounded:.2f}".rstrip("0").rstrip(".")
+
+
+def _format_diagnostics_time(value: datetime | None) -> str:
+    """Отформатировать время обновления кеша для компактного блока."""
+    if value is None:
+        return "н/д"
+    return value.astimezone().strftime("%d.%m %H:%M")
+
+
+def _build_adv_keywords_diagnostics_view_model(
+    *,
+    bidder_label: str,
+    auto_shelf_enabled: bool,
+    strategy_label: str,
+    cache_value: AutoShelfBidDiagnosticsDTO | None,
+) -> AdvKeywordsDiagnosticsView:
+    """Собрать DTO экрана из уже подготовленных данных и кеш-снимка."""
+    return AdvKeywordsDiagnosticsView(
+        bidder_label=bidder_label,
+        auto_shelf_enabled=auto_shelf_enabled,
+        strategy_label=strategy_label,
+        bid=(
+            _format_diagnostics_value(cache_value.bid_rub)
+            if cache_value is not None and cache_value.bid_rub is not None
+            else None
+        ),
+        cpo=(
+            _format_diagnostics_value(cache_value.cpo_rub)
+            if cache_value is not None and cache_value.cpo_rub is not None
+            else None
+        ),
+        last_update_ts=(
+            _format_diagnostics_time(cache_value.updated_at)
+            if cache_value is not None and cache_value.updated_at is not None
+            else None
+        ),
+    )
+
+
+@inject
+async def load_adv_keywords_diagnostics_view(
     adv_setting: AdvSetting,
+    redis_client: RedisClient = Provide["redis_client_wrapper"],
 ) -> AdvKeywordsDiagnosticsView:
     bidder_kind = getattr(adv_setting, "bidder_coroutine_type", None)
     bidder_for_auto = bool(getattr(adv_setting, "bidder_for_auto", False))
@@ -76,12 +132,15 @@ def _build_adv_keywords_diagnostics_view(
         bidder_label = "—"
     strategy = getattr(adv_setting, "auto_shelf_bid_control_strategy", None)
     strategy_label = getattr(strategy, "value", None) or str(strategy) or "—"
-    return AdvKeywordsDiagnosticsView(
+    cache = AutoShelfBidDiagnosticsCacheManager(redis_client)
+    cache_value = await cache.get(int(adv_setting.id))
+    return _build_adv_keywords_diagnostics_view_model(
         bidder_label=bidder_label,
         auto_shelf_enabled=bool(
             getattr(adv_setting, "auto_shelf_bid_control_enabled", False)
         ),
         strategy_label=strategy_label,
+        cache_value=cache_value,
     )
 
 
@@ -144,7 +203,7 @@ async def setting_keywords_active_keywords(
         adv_choice_last_page,
         main_photos[0],
         page=1,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -198,7 +257,7 @@ async def setting_keywords_sort_by_ctr_desc(
         adv_choice_last_page,
         main_photos[0],
         page=1,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state, "sort_by_ctr_desc")
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -256,7 +315,7 @@ async def setting_keywords_show_keywords_is_hard(
         adv_choice_last_page,
         main_photos[0],
         page=1,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -326,7 +385,7 @@ async def setting_keywords_white_list(
         main_photos[0],
         page=page,
         image_mode="main_photo",
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -387,7 +446,7 @@ async def setting_keywords_white_list(
         adv_choice_last_page,
         main_photos[0],
         page=page,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state, "white_list")
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -474,7 +533,7 @@ async def setting_keywords_by_adv(
         adv_choice_last_page,
         main_photos[0],
         page=1,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
     logger.debug("Отправили сообщение")
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -556,7 +615,7 @@ async def setting_keywords_hide_keywords_is_hard(
         adv_choice_last_page,
         main_photos[0],
         page=1,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -598,7 +657,7 @@ async def setting_keywords_hide_keywords_is_hard(
         adv_choice_last_page,
         main_photos[0],
         page=1,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -681,7 +740,7 @@ async def setting_keywords_by_adv(
         adv_choice_last_page,
         main_photos[0],
         page,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
     logger.debug("Отправили сообщение")
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -892,7 +951,7 @@ async def setting_keywords_filter_by_query(
         adv_choice_last_page,
         main_photos[0],
         page,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state)
     logger.debug("Отправили сообщение")
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -1077,7 +1136,7 @@ async def show_only_on_out_index(
         adv_choice_last_page,
         main_photos[0],
         page=page,
-        diagnostics=_build_adv_keywords_diagnostics_view(adv_setting),
+        diagnostics=await load_adv_keywords_diagnostics_view(adv_setting),
     )(state, "only_out_index")
 
     await redis_manager.set_check_last_24_hours(adv_original_id)
