@@ -233,6 +233,7 @@ def test_adv_keywords_setting_text_renders_explicit_cpo_semantics() -> None:
     assert "Лучшая ставка по CPO: 123" in text
     assert "Текущая ставка WB: 120" in text
     assert "Целевая ставка бота: 125" in text
+    assert "Выбранный CPO: 45.67" not in text
     assert "Примечание: selected_bid_not_applied" in text
     assert "синхрониз" not in text
     assert "safe" not in text
@@ -255,6 +256,7 @@ def test_adv_keywords_setting_text_renders_available_contract_without_note() -> 
     assert "Лучшая ставка по CPO: 123" in text
     assert "Текущая ставка WB: 123" in text
     assert "Целевая ставка бота: 123" in text
+    assert "Выбранный CPO: 45.67" in text
     assert "Примечание:" not in text
 
 
@@ -285,4 +287,5 @@ def test_diagnostics_view_model_formats_cached_values() -> None:
     assert "Лучшая ставка по CPO: 123" in text
     assert "Текущая ставка WB: 120" in text
     assert "Целевая ставка бота: 123" in text
+    assert "Выбранный CPO: 45.67" in text
     assert "Примечание: selected_bid_not_applied" in text

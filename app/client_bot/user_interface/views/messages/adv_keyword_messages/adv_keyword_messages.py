@@ -113,6 +113,7 @@ def format_adv_keywords_diagnostics_block(
         best_cpo_bid_rub is not None
         or current_bid_rub is not None
         or expected_bid_rub is not None
+        or selected_cpo_rub is not None
         or unavailable_reason is not None
     ):
         metrics_lines = [
@@ -120,6 +121,8 @@ def format_adv_keywords_diagnostics_block(
             f"Текущая ставка WB: {current_bid_rub or 'н/д'}",
             f"Целевая ставка бота: {expected_bid_rub or 'н/д'}",
         ]
+        if selected_cpo_rub is not None:
+            metrics_lines.append(f"Выбранный CPO: {selected_cpo_rub}")
         if unavailable_reason:
             metrics_lines.append(f"Примечание: {unavailable_reason}")
         metrics_line = "\n".join(metrics_lines)
