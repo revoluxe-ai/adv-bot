@@ -176,3 +176,42 @@ def resolve_selected_cpo_contract_from_view(
         updated_at=updated_at,
         reason="selected_bid_not_found_in_plan_ranked",
     )
+
+
+def extract_selected_cpo_details_from_view(
+    view: AutoShelfBidControlViewDTO,
+) -> tuple[float | None, str | None]:
+    """Extract selected bid CPO value and an optional unavailable reason.
+
+    Unlike the strict contract resolver, this helper only searches the
+    recommendation rows for the selected/expected bid and returns the CPO
+    value when present. It does NOT enforce sync/applied invariants —
+    those remain the responsibility of resolve_selected_cpo_contract_from_view.
+    The returned reason explains why a CPO value could not be extracted.
+    """
+    selected_bid_minor = view.expected_enforced_bid_minor
+    if selected_bid_minor is None:
+        return None, "selected_bid_missing"
+    recommendation = _as_object_dict(view.rec_bid_recommendation)
+    if recommendation is None:
+        return None, "recommendation_missing"
+    plan_ranked_rows = _as_object_sequence(recommendation.get("plan_ranked"))
+    if plan_ranked_rows is None:
+        return None, "plan_ranked_missing"
+    for raw_row in plan_ranked_rows:
+        row = _as_object_dict(raw_row)
+        if row is None:
+            continue
+        bid_raw = row.get("bid")
+        if isinstance(bid_raw, bool) or not isinstance(bid_raw, int):
+            continue
+        if int(bid_raw) != int(selected_bid_minor):
+            continue
+        cpo_raw = row.get("cpo_rub")
+        if cpo_raw is None:
+            cpo_raw = row.get("expected_order_cost_rub")
+        cpo_rub = _coerce_finite_float(cpo_raw)
+        if cpo_rub is None or cpo_rub < 0:
+            return None, "selected_cpo_missing"
+        return cpo_rub, None
+    return None, "selected_bid_not_found_in_plan_ranked"

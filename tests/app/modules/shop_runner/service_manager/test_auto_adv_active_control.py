@@ -1,5 +1,6 @@
 ﻿import asyncio
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 from typing import Any, Awaitable, Callable
 
 import pytest
@@ -27,6 +28,15 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 _SERVICE_MODULE = (
     "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service"
 )
+
+
+async def _run_tasks_for_tests(
+    handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs
+) -> list[object]:
+    results = []
+    for handler in handlers:
+        results.append(await handler())
+    return results
 
 
 @pytest.fixture(autouse=True)
@@ -196,6 +206,24 @@ async def _run_auto_cost_rule_case(
     selected_cpo_provider = None
     if selected_cpo_contract is not None:
         selected_cpo_provider = MagicMock()
+        selected_cpo_provider.build_view = AsyncMock(
+            return_value=SimpleNamespace(
+                enabled=True,
+                expected_enforced_bid_minor=selected_cpo_contract.selected_bid_minor,
+                actual_bid_minor=selected_cpo_contract.selected_bid_minor,
+                bid_sync_detail="synced",
+                state_updated_at=selected_cpo_contract.updated_at,
+                rec_bid_recommendation={
+                    "plan_ranked": [
+                        {
+                            "bid": selected_cpo_contract.selected_bid_minor,
+                            "cpo_rub": selected_cpo_contract.selected_cpo_rub,
+                        }
+                    ]
+                },
+                best_cpo_bid_rub=selected_cpo_contract.selected_cpo_rub,
+            )
+        )
         selected_cpo_provider.build_selected_cpo_contract = AsyncMock(
             return_value=selected_cpo_contract
         )
@@ -452,6 +480,513 @@ async def test_auto_adv_active_control_wb_wallet_fallback_when_bot_balance_zero(
     wb_modifier.pause_auto_campaign.assert_not_awaited()
     wb_modifier.pause_auction_campaign.assert_not_awaited()
     assert wb_modifier.get_campaign_balance.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_no_pause_when_plan_ranked_best_below_resolve_and_fact_above_resolve():
+    """If plan_ranked best CPO <= resolve and fact CPO > resolve -> no pause."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=200,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    # plan_fact: fact_predict_orders valid, fact_pay_for_order > resolve
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=200, fact_predict_orders=12.0, fact_pay_for_order=383.87
+        )
+    )
+
+    # view provider that returns best_cpo_bid_rub = 259.23 (below resolve 300)
+    class ViewDTO:
+        def __init__(self, best):
+            self.best_cpo_bid_rub = best
+
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=ViewDTO(259.23))
+    # ensure build_selected_cpo_contract is awaitable and returns unavailable contract
+    view_provider.build_selected_cpo_contract = AsyncMock(
+        return_value=AutoShelfBidSelectedCpoContract(
+            selected_bid_minor=None,
+            selected_cpo_rub=None,
+            updated_at=datetime.now(UTC),
+            source="test",
+            unavailable_reason="test_unavailable",
+        )
+    )
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    async def _run_tasks_for_tests(handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs):
+        results = []
+        for handler in handlers:
+            results.append(await handler())
+        return results
+
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pause_when_plan_ranked_best_above_resolve_and_fact_above_resolve():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=201,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=201, fact_predict_orders=12.0, fact_pay_for_order=383.87
+        )
+    )
+    class ViewDTO:
+        def __init__(self, best):
+            self.best_cpo_bid_rub = best
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=ViewDTO(350.0))
+    view_provider.build_selected_cpo_contract = AsyncMock(
+        return_value=AutoShelfBidSelectedCpoContract(
+            selected_bid_minor=None,
+            selected_cpo_rub=None,
+            updated_at=datetime.now(UTC),
+            source="test",
+            unavailable_reason="test_unavailable",
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_pause_degraded_when_plan_ranked_missing_and_fact_above_resolve():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=202,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=202, fact_predict_orders=12.0, fact_pay_for_order=383.87
+        )
+    )
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=type("V", (), {"best_cpo_bid_rub": None})())
+    view_provider.build_selected_cpo_contract = AsyncMock(
+        return_value=AutoShelfBidSelectedCpoContract(
+            selected_bid_minor=None,
+            selected_cpo_rub=None,
+            updated_at=datetime.now(UTC),
+            source="test",
+            unavailable_reason="test_unavailable",
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_no_pause_degraded_when_plan_ranked_missing_and_fact_below_resolve():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=203,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=203, fact_predict_orders=12.0, fact_pay_for_order=250.0
+        )
+    )
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=type("V", (), {"best_cpo_bid_rub": None})())
+    view_provider.build_selected_cpo_contract = AsyncMock(
+        return_value=AutoShelfBidSelectedCpoContract(
+            selected_bid_minor=None,
+            selected_cpo_rub=None,
+            updated_at=datetime.now(UTC),
+            source="test",
+            unavailable_reason="test_unavailable",
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_no_build_view_pauses_by_fact_only_ignoring_low_legacy_avg():
+    """no_build_view degraded rule: fact > resolve pauses even if legacy avg <= resolve.
+
+    Regression guard for the case where the view provider exists but exposes no
+    callable ``build_view`` (cpo_source == "no_build_view"): the decision must
+    never fall back to the legacy avg CPO, only fact_pay_for_order matters.
+    """
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=207,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=207, fact_predict_orders=12.0, fact_pay_for_order=383.87
+        )
+    )
+    # Provider present but exposes no callable build_view/build_selected_cpo_contract.
+    view_provider = MagicMock(spec=[])
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        # Legacy avg is LOW (<= resolve=300) -> old avg-based rule would NOT pause.
+        new=AsyncMock(return_value=200.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_no_build_view_no_pause_when_fact_below_resolve_despite_high_legacy_avg():
+    """no_build_view degraded rule: fact <= resolve must not pause even if legacy avg > resolve."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=208,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=208, fact_predict_orders=12.0, fact_pay_for_order=250.0
+        )
+    )
+    view_provider = MagicMock(spec=[])
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        # Legacy avg is HIGH (> resolve=300) -> old avg-based rule would have paused.
+        new=AsyncMock(return_value=350.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_no_build_view_starts_by_fact_only_ignoring_high_legacy_avg():
+    """no_build_view degraded resume rule: fact <= resolve allows start despite high legacy avg."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="pause",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=209,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=209, fact_predict_orders=12.0, fact_pay_for_order=250.0
+        )
+    )
+    view_provider = MagicMock(spec=[])
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        # Legacy avg is HIGH (> resolve=300) -> old avg-based rule would have blocked start.
+        new=AsyncMock(return_value=350.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.start_auto_campaign.assert_awaited_once()
+    wb_modifier.pause_auto_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_regression_legacy_avg_high_but_plan_ranked_low_no_pause():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=204,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=204, fact_predict_orders=12.0, fact_pay_for_order=383.87
+        )
+    )
+    # view best low
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=type("V", (), {"best_cpo_bid_rub": 259.23})())
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    # legacy avg high (but should be ignored for decision)
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=383.87),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_auto_shelf_disabled_preserves_legacy_behavior():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=205,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=False,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=205, fact_predict_orders=12.0, fact_pay_for_order=383.87
+        )
+    )
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock()
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=383.87),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    view_provider.build_view.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_missing_bad_fact_pay_for_order_no_pause():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=206,
+        plan_for_sales_for_day=10,
+        target_price_for_order=300,
+        max_price_for_order=400,
+        auto_shelf_bid_control_enabled=True,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=206, fact_predict_orders=12.0, fact_pay_for_order=None
+        )
+    )
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=type("V", (), {"best_cpo_bid_rub": 350.0})())
+    view_provider.build_selected_cpo_contract = AsyncMock(
+        return_value=AutoShelfBidSelectedCpoContract(
+            selected_bid_minor=None,
+            selected_cpo_rub=None,
+            updated_at=datetime.now(UTC),
+            source="test",
+            unavailable_reason="test_unavailable",
+        )
+    )
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+
 
 
 @pytest.mark.asyncio
@@ -906,9 +1441,10 @@ async def test_auto_adv_shelf_bid_control_prefers_selected_cpo_over_legacy():
     )
 
     wb_modifier.pause_auto_campaign.assert_not_called()
-    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_awaited_once_with(
+    wb_modifier.selected_cpo_provider.build_view.assert_awaited_once_with(
         1001
     )
+    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_not_awaited()
     wb_modifier.legacy_avg_cost_mock.assert_not_awaited()
 
 
@@ -921,18 +1457,112 @@ async def test_auto_adv_shelf_bid_control_falls_back_to_legacy_when_selected_cpo
         source="rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
         unavailable_reason="selected_bid_not_synced",
     )
-    wb_modifier = await _run_auto_cost_rule_case(
-        avg_cost=150.0,
-        fact_pay_for_order=120.0,
+    # Build service manually to control view provider behavior.
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=301,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
         auto_shelf_bid_control_enabled=True,
-        selected_cpo_contract=unavailable_contract,
+    )
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(adv_id=301, fact_predict_orders=12.0, fact_pay_for_order=120.0)
+    )
+    # view provider returns missing best -> degraded rule (fact > resolve -> pause)
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(return_value=type("V", (), {"best_cpo_bid_rub": None})())
+    view_provider.build_selected_cpo_contract = AsyncMock(return_value=unavailable_contract)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=150.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+    wb_modifier.pause_auto_campaign.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_auto_shelf_watchdog_builds_view_once_per_pass():
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=401,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+        auto_shelf_bid_control_enabled=True,
     )
 
-    wb_modifier.pause_auto_campaign.assert_awaited_once()
-    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_awaited_once_with(
-        1001
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(
+            adv_id=401,
+            fact_predict_orders=12.0,
+            fact_pay_for_order=90.0,
+        )
     )
-    wb_modifier.legacy_avg_cost_mock.assert_awaited_once()
+
+    view_provider = MagicMock()
+    view_provider.build_view = AsyncMock(
+        return_value=SimpleNamespace(
+            enabled=True,
+            expected_enforced_bid_minor=12300,
+            actual_bid_minor=12300,
+            bid_sync_detail="synced",
+            state_updated_at=datetime.now(UTC),
+            rec_bid_recommendation={
+                "plan_ranked": [{"bid": 12300, "cpo_rub": 90.0}]
+            },
+            best_cpo_bid_rub=90.0,
+        )
+    )
+    view_provider.build_selected_cpo_contract = AsyncMock()
+
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=80.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    view_provider.build_view.assert_awaited_once_with(401)
+    view_provider.build_selected_cpo_contract.assert_not_awaited()
+    wb_modifier.pause_auto_campaign.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -943,19 +1573,46 @@ async def test_auto_adv_shelf_bid_control_pauses_when_selected_cpo_and_total_are
         updated_at=datetime.now(UTC),
         source="rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
     )
-    wb_modifier = await _run_auto_cost_rule_case(
-        avg_cost=90.0,
-        fact_pay_for_order=120.0,
+    # Build service manually with view_provider returning best equal to selected
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="started",
+        search_limit=0,
+        search_status="pause",
+        auto_adv_id=302,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
         auto_shelf_bid_control_enabled=True,
-        selected_cpo_contract=selected_contract,
     )
-
+    wb_modifier = MagicMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(
+        return_value=PlanFactSummary(adv_id=302, fact_predict_orders=12.0, fact_pay_for_order=120.0)
+    )
+    view_provider = MagicMock()
+    # ensure build_view returns best equal to selected_contract.selected_cpo_rub
+    view_provider.build_view = AsyncMock(return_value=type("V", (), {"best_cpo_bid_rub": 150.0})())
+    view_provider.build_selected_cpo_contract = AsyncMock(return_value=selected_contract)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+        auto_shelf_bid_control_view_provider=view_provider,
+    )
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(side_effect=_mock_load_time_settings_for_adv_ids)
+    with patch(f"{_SERVICE_MODULE}.run_tasks", new=_run_tasks_for_tests), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=90.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
     wb_modifier.pause_auto_campaign.assert_awaited_once()
     wb_modifier.start_auto_campaign.assert_not_called()
-    wb_modifier.selected_cpo_provider.build_selected_cpo_contract.assert_awaited_once_with(
-        1001
-    )
-    wb_modifier.legacy_avg_cost_mock.assert_not_awaited()
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,7 @@ import inspect
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
+from types import SimpleNamespace
 
 from app.core.mp.wb.dto.adv_placement_type import AdvPlacementType
 from app.core.mp.wb.min_bid_defaults import default_min_bid_rub
@@ -61,6 +62,10 @@ from .dto.decision_snapshot_dto import (
     resolve_bid_sync_detail,
     resolve_expected_bid_minor,
     resolve_primary_status,
+)
+from .dto.selected_cpo_contract import (
+    extract_selected_cpo_details_from_view,
+    _as_object_dict,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -1142,6 +1147,47 @@ class AutoShelfBidControlViewProvider:
             last_reason=(state.last_reason if state else None),
         )
 
+        # derive some extra diagnostics fields required by UI semantics
+        best_cpo_bid_rub_value: float | None = None
+        if rec_bid_recommendation is not None:
+            # prefer top plan_ranked row CPO when available (best recommendation)
+            plan_ranked_list = cast(list[object], rec_bid_recommendation.get("plan_ranked", []))
+            if plan_ranked_list:
+                top_row = _as_object_dict(plan_ranked_list[0])
+                if top_row is not None:
+                    cpo_val = (
+                        top_row.get("cpo_rub")
+                        if top_row.get("cpo_rub") is not None
+                        else top_row.get("expected_order_cost_rub")
+                    )
+                    try:
+                        best_cpo_bid_rub_value = float(cpo_val) if cpo_val is not None else None
+                    except (TypeError, ValueError):
+                        best_cpo_bid_rub_value = None
+
+        # current WB bid in rubles (from actual_bid_minor)
+        current_bid_rub_value: float | None = None
+        if actual_bid_minor is not None:
+            current_bid_rub_value = float(int(actual_bid_minor)) / 100.0
+
+        # expected/control bid in rubles
+        expected_bid_rub_value: float | None = None
+        if expected_enforced_bid_minor is not None:
+            expected_bid_rub_value = float(int(expected_enforced_bid_minor)) / 100.0
+
+        # selected CPO details (search recommendation rows regardless of sync/applied)
+        selected_cpo_value: float | None = None
+        unavailable_reason_value: str | None = None
+        try:
+            selected_cpo_value, unavailable_reason_value = extract_selected_cpo_details_from_view(
+                cast(AutoShelfBidControlViewDTO, SimpleNamespace(  # type: ignore[name-defined]
+                    expected_enforced_bid_minor=expected_enforced_bid_minor,
+                    rec_bid_recommendation=rec_bid_recommendation,
+                ))
+            )
+        except Exception:
+            selected_cpo_value, unavailable_reason_value = None, "selected_cpo_extraction_failed"
+
         return AutoShelfBidControlViewDTO(
             nmid=nmid,
             auto_adv_id=auto_adv_id,
@@ -1212,6 +1258,13 @@ class AutoShelfBidControlViewProvider:
             expected_enforced_bid_minor=expected_enforced_bid_minor,
             primary_status=primary_status,
             bid_sync_detail=bid_sync_detail,
+            # new diagnostics fields
+            best_cpo_bid_rub=best_cpo_bid_rub_value,
+            current_bid_rub=current_bid_rub_value,
+            expected_bid_rub=expected_bid_rub_value,
+            selected_cpo_rub=selected_cpo_value,
+            bid_sync_status=bid_sync_detail,
+            unavailable_reason=unavailable_reason_value,
             can_count_progress=can_count_progress,
             main_target_explanation=main_target_explanation,
             legacy_cycle_next_test_bid_minor=legacy_cycle_next_test_bid_minor,
