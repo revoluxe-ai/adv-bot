@@ -18,7 +18,7 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     automatic_version_main_menu_button,
     build_automatic_version_submenu_markup,
     normalize_automatic_version_ui,
-    show_relevant_phrase_toggle,
+    show_if,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
     V3RolloutAggMenuOpen,
