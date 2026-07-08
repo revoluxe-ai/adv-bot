@@ -330,12 +330,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += t
         page_block = f"Стр.:{self._page}/{total_page + 1}\n"
         text += page_block
-        text += (
-            f"Общий расход: {self.total_spend:.2f}\n"
-            f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
-            f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
-            f"Расход на рек.(авто): {self.addition_spend_in_adv:.2f} р.\n"
-        )
+        # специально удалил, чтоб освободить место!
         if self.cost_per_order_from_additional_last_week is not None:
             text += (
                 f"Себес. зак. из доп. пок. (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
