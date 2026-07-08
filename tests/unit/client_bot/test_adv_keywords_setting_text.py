@@ -262,6 +262,7 @@ def test_adv_keywords_setting_text_renders_explicit_cpo_semantics() -> None:
         expected_bid_rub="125",
         selected_cpo_rub=None,
         unavailable_reason="selected_bid_not_applied",
+        last_update_ts="07.07 16:00",
     )
 
     text = format_adv_keywords_diagnostics_block(diagnostics)
@@ -271,6 +272,7 @@ def test_adv_keywords_setting_text_renders_explicit_cpo_semantics() -> None:
     assert "Целевая ставка бота: 125" in text
     assert "Выбранный CPO: 45.67" not in text
     assert "Примечание: selected_bid_not_applied" in text
+    assert "Обновлено: 07.07 16:00" in text
     assert "синхрониз" not in text
     assert "safe" not in text
     assert "Ставка: 123" not in text
@@ -285,6 +287,7 @@ def test_adv_keywords_setting_text_renders_available_contract_without_note() -> 
         current_bid_rub="123",
         expected_bid_rub="123",
         selected_cpo_rub="45.67",
+        last_update_ts="07.07 16:00",
     )
 
     text = format_adv_keywords_diagnostics_block(diagnostics)
@@ -294,6 +297,23 @@ def test_adv_keywords_setting_text_renders_available_contract_without_note() -> 
     assert "Целевая ставка бота: 123" in text
     assert "Выбранный CPO: 45.67" in text
     assert "Примечание:" not in text
+    assert "Обновлено: 07.07 16:00" in text
+
+
+def test_adv_keywords_setting_text_does_not_show_update_time_without_timestamp() -> None:
+    diagnostics = AdvKeywordsDiagnosticsView(
+        bidder_label="старый",
+        auto_shelf_enabled=True,
+        strategy_label="PLAN_DISTANCE",
+        best_cpo_bid_rub="123",
+        current_bid_rub="123",
+        expected_bid_rub="123",
+        selected_cpo_rub="45.67",
+    )
+
+    text = format_adv_keywords_diagnostics_block(diagnostics)
+
+    assert "Обновлено:" not in text
 
 
 def test_diagnostics_view_model_formats_cached_values() -> None:

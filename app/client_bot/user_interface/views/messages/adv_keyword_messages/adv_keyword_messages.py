@@ -125,6 +125,8 @@ def format_adv_keywords_diagnostics_block(
             metrics_lines.append(f"Выбранный CPO: {selected_cpo_rub}")
         if unavailable_reason:
             metrics_lines.append(f"Примечание: {unavailable_reason}")
+        if last_update_ts is not None:
+            metrics_lines.append(f"Обновлено: {last_update_ts}")
         metrics_line = "\n".join(metrics_lines)
     else:
         metrics_line = (
