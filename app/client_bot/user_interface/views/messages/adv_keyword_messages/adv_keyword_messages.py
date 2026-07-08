@@ -204,6 +204,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._common_stat_by_days = await common_days_stat_manager.get_days_static_text(
             self._adv_setting, 2
         )
+
+        self._only_relevant_phrase_status: str = self._get_add_only_relevant_phrase_status()
+
         from app.modules.wb_adv_updater.min_ctr_manager.min_ctr_manager import (
             MinCtrManager,
         )
@@ -223,6 +226,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         #  сообщений сделать тесты, проверяющие длину текста и его корректность
         text = (
             str(self._adv_setting.name) + "\n"
+            f"{self._only_relevant_phrase_status}"
             f"Авто: {self._adv_setting.active_status}\n"
             f"Аук.: {self._status_auction}\n"
             f"Стратегия: {format_adv_strategy(self._adv_setting.strategy)}\n"
@@ -383,3 +387,10 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             if not status:
                 status = "Не найдена"
             return status
+
+    def _get_add_only_relevant_phrase_status(self) -> str:
+        adv: AdvSetting = self._adv_setting
+        only_relevant_phrase_status  = adv.auto_add_only_relevant_phrase
+        if only_relevant_phrase_status:
+            return "⚠️ Вкл. добавление только релевантных фраз\n"
+        return ""
