@@ -49,6 +49,9 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
     AutoShelfBidControlViewProvider,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto import (
+    resolve_selected_cpo_contract_from_view,
+)
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
     AutoReasonCode,
     AuctionReasonCode,
@@ -321,9 +324,10 @@ class AutoAdvActiveControlService:
             self._auto_shelf_bid_control_view_provider is not None
         ):
             try:
-                selected_contract = await self._auto_shelf_bid_control_view_provider.build_selected_cpo_contract(
+                view = await self._auto_shelf_bid_control_view_provider.build_view(
                     int(adv.adv_setting.id)
                 )
+                selected_contract = resolve_selected_cpo_contract_from_view(view)
             except Exception:
                 logger.warning(
                     "Auto watchdog: selected CPO contract failed adv_id=%s shop_id=%s",

@@ -1,6 +1,7 @@
 import logging
 import typing
 from datetime import datetime
+from dataclasses import dataclass
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
@@ -53,6 +54,93 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class AdvKeywordsDiagnosticsView:
+    """Короткая read-only диагностика для keywords/stat экрана.
+
+    Поля уже готовы к рендеру и используются как компактная строка с
+    отображением ставки, CPO и времени обновления кеша.
+    """
+
+    bidder_label: str
+    auto_shelf_enabled: bool
+    strategy_label: str | None = None
+    best_cpo_bid_rub: str | None = None
+    current_bid_rub: str | None = None
+    expected_bid_rub: str | None = None
+    selected_cpo_rub: str | None = None
+    unavailable_reason: str | None = None
+    # Backward-compatible fields used by existing callers/tests.
+    bid: str | None = None
+    cpo: str | None = None
+    last_update_ts: str | None = None
+
+
+def format_adv_keywords_diagnostics_block(
+    diagnostics: AdvKeywordsDiagnosticsView | None,
+) -> str:
+    """Собрать компактный текстовый блок диагностики.
+
+    Функция чистая: на вход получает только DTO, на выходе возвращает готовую
+    строку для Telegram UI. Это делает блок легко тестируемым отдельно от
+    загрузки данных из Redis.
+    """
+    if diagnostics is None:
+        return ""
+    bidder = diagnostics.bidder_label or "—"
+    shelf_status = "вкл" if diagnostics.auto_shelf_enabled else "выкл"
+    strategy = diagnostics.strategy_label or "—"
+    best_cpo_bid_rub = diagnostics.best_cpo_bid_rub
+    current_bid_rub = diagnostics.current_bid_rub
+    expected_bid_rub = diagnostics.expected_bid_rub
+    selected_cpo_rub = diagnostics.selected_cpo_rub
+    unavailable_reason = diagnostics.unavailable_reason
+    bid = diagnostics.bid
+    cpo = diagnostics.cpo
+    last_update_ts = diagnostics.last_update_ts
+    if (
+        best_cpo_bid_rub is None
+        and current_bid_rub is None
+        and expected_bid_rub is None
+        and selected_cpo_rub is None
+        and unavailable_reason is None
+        and bid is None
+        and cpo is None
+        and last_update_ts is None
+    ):
+        metrics_line = "Ставка/CPO/время: н/д"
+    elif (
+        best_cpo_bid_rub is not None
+        or current_bid_rub is not None
+        or expected_bid_rub is not None
+        or selected_cpo_rub is not None
+        or unavailable_reason is not None
+    ):
+        metrics_lines = [
+            f"Лучшая ставка по CPO: {best_cpo_bid_rub or 'н/д'}",
+            f"Текущая ставка WB: {current_bid_rub or 'н/д'}",
+            f"Целевая ставка бота: {expected_bid_rub or 'н/д'}",
+        ]
+        if selected_cpo_rub is not None:
+            metrics_lines.append(f"Выбранный CPO: {selected_cpo_rub}")
+        if unavailable_reason:
+            metrics_lines.append(f"Примечание: {unavailable_reason}")
+        if last_update_ts is not None:
+            metrics_lines.append(f"Обновлено: {last_update_ts}")
+        metrics_line = "\n".join(metrics_lines)
+    else:
+        metrics_line = (
+            f"Ставка: {bid or 'н/д'} · CPO: {cpo or 'н/д'} · "
+            f"({last_update_ts or 'н/д'})"
+        )
+    return (
+        "\n"
+        f"🤖 Биддер: {bidder} · Auto Shelf: {shelf_status}\n"
+        f"Режим: {strategy}\n"
+        f"{metrics_line}\n"
+    )
+
+
 # TODO: Во все списки ключей нужно передавать полные списки ключей, в уже внутри фильтровать т.к. они нужны для расчета АвтоМаксимальной ставки
 
 
@@ -69,6 +157,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         page: int,
         image_mode: str = "graphic",
         cpm_date_map: dict[str, tuple[float | None, datetime | None]] | None = None,
+        diagnostics: AdvKeywordsDiagnosticsView | None = None,
     ) -> None:
         super().__init__(bot, chat_id)
         self._keywords = keywords
@@ -82,6 +171,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.image_mode = image_mode
         self._last_saved_bids: dict[int, int] = {}
         self._cpm_date_map = cpm_date_map
+        self._diagnostics = diagnostics
         self.min_orders_per_1000_rub: float | None = None
 
     @inject
@@ -242,12 +332,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += t
         page_block = f"Стр.:{self._page}/{total_page + 1}\n"
         text += page_block
-        text += (
-            f"Общий расход: {self.total_spend:.2f}\n"
-            f"Расход аукцион: {self.full_adv_stat_for_last_days_for_auction.spend:.2f}\n"
-            f"Общий расход в Авто: {self.full_adv_stat_for_last_days_for_auto_adv.spend:.2f}\n"
-            f"Расход на рек.(авто): {self.addition_spend_in_adv:.2f} р.\n"
-        )
+        # специально удалил, чтоб освободить место!
         if self.cost_per_order_from_additional_last_week is not None:
             text += (
                 f"Себес. зак. из доп. пок. (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
@@ -320,6 +405,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             text += f"Ставка из Аукциона: {self.auction_cpm}\n"
         text += f"Цел. поз.: {self._adv_setting.max_place}\n"
         text += self._format_last_saved_bids()
+        if self._diagnostics is not None:
+            text += self._render_diagnostics_block()
         return text
 
     @property
@@ -369,6 +456,9 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         for nmid in sorted(self._last_saved_bids):
             lines.append(f"{nmid}: {self._last_saved_bids[nmid]}")
         return "\n".join(lines) + "\n"
+
+    def _render_diagnostics_block(self) -> str:
+        return format_adv_keywords_diagnostics_block(self._diagnostics)
 
     @staticmethod
     async def _get_status_auction(search_adv_id: int) -> str:

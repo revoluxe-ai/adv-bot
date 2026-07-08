@@ -54,3 +54,17 @@
   Miss in shop-runner → `ShopRunnerKeywordsCacheMissError`; retry — `SHOP_RUNNER_REQUIRED_DATA_MISS_*` in `env.sample`.
 - **min_bids cache miss** on read-only path: log level **WARNING** (`min_bids cache miss`), not ERROR;
   WB refresh failures use ERROR (`refresh_min_bids_cache_miss`). See `README_min_bids.md`, `wb_manager.py`.
+
+## Agent / Test runner — use Poetry (updated)
+
+Guidance for agents and local test runs:
+
+- Always run tests through Poetry so the project's virtualenv and dependency resolution are used:
+  - Run tests: `poetry run pytest [path::test_name]`
+- CI and local task runners should invoke tests with `poetry run pytest` (not a bare `pytest`) to ensure optional native deps and tool versions match.
+- Editor/IDE integration:
+  - Configure the test task / launch configuration to use `poetry run` (for example, VSCode "Run Task" or a launch.json entry that runs `poetry run pytest`).
+  - If using the built-in Python debugger, prefer a "Poetry" flavored launch which runs the module under Poetry's environment.
+- When authoring agent automations that run tests, ensure the automation first runs `poetry install --no-interaction` and then `poetry run pytest` so tests reproduce the same environment as developers.
+
+Rationale: Some optional dependencies (native libs) are only available when Poetry installs the exact wheel/build; running plain `pytest` may use a different interpreter or miss deps and produce false negatives.

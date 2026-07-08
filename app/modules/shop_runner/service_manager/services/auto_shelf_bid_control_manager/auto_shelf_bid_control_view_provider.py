@@ -71,6 +71,10 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_ad
     resolve_auto_shelf_bid_control_strategy,
 )
 
+from .auto_shelf_bid_control_diagnostics_cache import (
+    AutoShelfBidDiagnosticsCacheManager,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -88,6 +92,7 @@ class AutoShelfBidControlViewProvider:
         self._repository = repository or AutoShelfBidControlRepository()
         self._analytics = analytics_repository or AutoShelfBidControlAnalyticsRepository()
         self._bid_cache = RedisAutoRecommendationsBidValueManager(redis_client=redis_client)
+        self._diagnostics_cache = AutoShelfBidDiagnosticsCacheManager(redis_client)
         self._min_bids_cache = MinBidsCacheManager(redis_client)
         self._rec_bid_recommendation_service = AutoShelfBidRecommendationReadService(
             self._analytics
@@ -99,6 +104,19 @@ class AutoShelfBidControlViewProvider:
         if self._plan_fact_reader is None:
             self._plan_fact_reader = PlanFactReader()
         return self._plan_fact_reader
+
+    async def _cache_selected_cpo_contract(
+        self,
+        adv_setting_original_id: int,
+        view: AutoShelfBidControlViewDTO,
+        contract: AutoShelfBidSelectedCpoContract,
+    ) -> None:
+        """Сохранить selected CPO contract в Redis для Telegram diagnostics."""
+        await self._diagnostics_cache.set_selected_cpo_contract(
+            adv_setting_original_id,
+            view,
+            contract,
+        )
 
     async def _fetch_wb_min_bid_minor(self, auto_adv_id: int, nmid: int) -> int | None:
         """Минимальная ставка WB для Auto-РК из Redis min_bids (рубли → bid_minor)."""
@@ -1227,4 +1245,17 @@ class AutoShelfBidControlViewProvider:
     ) -> AutoShelfBidSelectedCpoContract:
         """Собрать read-only контракт для selected/current/applied CPO."""
         view = await self.build_view(adv_setting_original_id)
-        return resolve_selected_cpo_contract_from_view(view)
+        contract = resolve_selected_cpo_contract_from_view(view)
+        try:
+            await self._cache_selected_cpo_contract(
+                adv_setting_original_id,
+                view,
+                contract,
+            )
+        except Exception:
+            logger.warning(
+                "auto_shelf_bid_control_selected_cpo_cache_failed adv_setting_original_id=%s",
+                adv_setting_original_id,
+                exc_info=True,
+            )
+        return contract

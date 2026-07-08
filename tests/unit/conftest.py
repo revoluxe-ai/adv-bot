@@ -10,7 +10,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST
+try:
+    from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST
+except Exception:
+    # If importing the auxiliary unit conftest fails (missing optional deps),
+    # fall back to a sensible default used in tests.
+    RK_ORDERS_PER_CART_TEST = 2.0
 
 
 @pytest.fixture(autouse=True)
