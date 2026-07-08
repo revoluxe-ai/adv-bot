@@ -589,6 +589,12 @@ class ChangeAutoAddOnlyRelevantPhraseStatus(
     new_status: bool
 
 
+class ManageRelevantAndNonRelevantPhrases(
+    CallbackData, prefix="manage_rel_nonrel_phrases"
+):
+    adv_setting_original_id: int
+
+
 class ChangeRecSystemModeStatus(CallbackData, prefix="change_rec_system_mode"):
     adv_id: int
     wb_user_cabinet_original_id: int
