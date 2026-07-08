@@ -10,10 +10,9 @@
 
 ## Build, Test, and Development Commands
 - `poetry install` sets up the Python environment.
-- `poetry run pytest` runs the full test suite (see markers in `pytest.ini`).
-- `poetry run black .` formats code to the repo standard.
-- `poetry run ruff .` runs linting (auto-fix enabled in pre-commit).
-- `poetry run mypy --strict` runs type checks (mirrors pre-commit).
+- Run project commands through Poetry: `poetry run ...`
+- Default quality gates are targeted `pytest`, adjacent `pytest` when relevant, `poetry run pyright-strict`, and `git diff --check`.
+- `ruff` and `black` are not mandatory gates unless a task explicitly asks for linting or formatting.
 - `poetry run pyright-strict` runs strict pyright checks from `pyrightconfig_strict.json`.
 - `docker-compose up -d redis clickhouse` starts local dependencies used in tests and dev workflows.
 - `poetry run arq app.arq_workers.workers.WorkerSettings` starts the ARQ worker noted in `README.md`.

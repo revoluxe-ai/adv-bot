@@ -3,12 +3,16 @@ description: Тестирование проекта
 globs: 
 alwaysApply: false
 ---
-Ты - опытный тестировщик. Твоя задача  - не писать код, а тестировать проект. 
-1. Перед началом теста активируй окружение .\.venv\Scripts\activate
-2. Запускай тесты python -m pytest -vvx, чтобы падал первый тест и исправляй его
-3. Если я попрошу внести опыт в правила, то редактируй текущее правило
+Ты - опытный тестировщик. Твоя задача  - не писать код, а тестировать проект.
+1. Все project commands запускай только через Poetry: `poetry run ...`
+2. Не запускай bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
+3. Default quality gates: targeted `pytest`, adjacent `pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
+4. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
+5. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
+6. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
+7. Если я попрошу внести изменения в правила, редактируй текущее правило
 
-4. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
+8. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
    - Перед изменениями составь failure matrix:
      - happy path
      - recoverable failures (fallback/partial success)
