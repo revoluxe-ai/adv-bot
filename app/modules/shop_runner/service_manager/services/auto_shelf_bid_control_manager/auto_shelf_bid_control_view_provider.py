@@ -1155,7 +1155,11 @@ class AutoShelfBidControlViewProvider:
             if plan_ranked_list:
                 top_row = _as_object_dict(plan_ranked_list[0])
                 if top_row is not None:
-                    cpo_val = top_row.get("cpo_rub") or top_row.get("expected_order_cost_rub")
+                    cpo_val = (
+                        top_row.get("cpo_rub")
+                        if top_row.get("cpo_rub") is not None
+                        else top_row.get("expected_order_cost_rub")
+                    )
                     try:
                         best_cpo_bid_rub_value = float(cpo_val) if cpo_val is not None else None
                     except (TypeError, ValueError):
