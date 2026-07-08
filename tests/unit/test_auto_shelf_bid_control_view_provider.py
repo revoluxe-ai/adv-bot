@@ -1850,3 +1850,19 @@ async def test_view_provider_expected_none_can_count_progress_false(
     assert view.fresh_best_main_bid_minor is None
     assert view.qualified_tested_bids_count == 1
     assert view.can_count_progress is False
+
+
+@pytest.mark.asyncio
+async def test_parse_plan_ranked_preserves_zero_cpo() -> None:
+    """Zero `cpo_rub` in plan_ranked must be preserved (not treated as falsy)."""
+    rec_view = {
+        "plan_ranked": [
+            {"bid": 12300, "cpo_rub": 0.0, "expected_order_cost_rub": 259.23}
+        ]
+    }
+
+    forecasts = AutoShelfBidControlViewProvider._parse_plan_ranked_forecasts(
+        rec_view
+    )
+    assert 12300 in forecasts
+    assert forecasts[12300]["expected_order_cost_rub"] == 0.0
