@@ -105,6 +105,8 @@ TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Batch per-shop: CoroutinesManager → ClusterBidsManagerContainer(shop_id) → WBManager(shop_id); trace shop_id = wb_manager._shop_id, не advs[0].
 - После root cause: выключить env на prod, удалить cluster_bid_trace.py + trace calls + test_cluster_bid_trace.py (или оставить guard под флагом, если решим оставить навсегда).
 
+- централизовать в v3 экзекуторах получение фраз
+- сделать в v3 экзекуторах нормальную только релеватные фразы фильтрацию
 
 
 NEXT
