@@ -16,6 +16,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     AutoShelfBidDiagnosticsCacheManager,
     AutoShelfBidDiagnosticsDTO,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.decision_snapshot_dto import (
+    BidSyncStatus,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.selected_cpo_contract import (
     AutoShelfBidSelectedCpoResolverInput,
     resolve_selected_cpo_contract,
@@ -175,7 +178,7 @@ async def test_view_wrapper_builds_selected_cpo_contract_from_view() -> None:
     assert px is None
     assert nx is None
     assert json.loads(payload) == {
-        "best_cpo_bid_rub": 123.0,
+        "best_cpo_bid_rub": None,
         "current_bid_rub": 123.0,
         "expected_bid_rub": 123.0,
         "bid_sync_status": "synced",
@@ -215,7 +218,7 @@ async def test_view_wrapper_caches_best_bid_when_contract_is_unavailable() -> No
     assert px is None
     assert nx is None
     assert json.loads(payload) == {
-        "best_cpo_bid_rub": 123.0,
+        "best_cpo_bid_rub": None,
         "current_bid_rub": 120.0,
         "expected_bid_rub": 123.0,
         "bid_sync_status": "pending",
@@ -294,3 +297,46 @@ async def test_diagnostics_cache_manager_round_trip() -> None:
     loaded = await cache.get(1)
 
     assert loaded == dto
+
+
+def test_diagnostics_snapshot_keeps_best_cpo_separate_from_expected_bid() -> None:
+    snapshot = SimpleNamespace(
+        fresh_best_main_bid_minor=11100,
+        actual_bid_minor=12300,
+        expected_bid_minor=12300,
+        bid_sync_status=BidSyncStatus.SYNCED,
+        computed_at=datetime(2026, 7, 6, tzinfo=UTC),
+        rec_bid_recommendation={
+            "plan_ranked": [{"bid": 12300, "cpo_rub": 45.67}],
+        },
+    )
+
+    dto = AutoShelfBidDiagnosticsDTO.from_decision_snapshot(snapshot)
+
+    assert dto.best_cpo_bid_rub == 111.0
+    assert dto.expected_bid_rub == 123.0
+    assert dto.best_cpo_bid_rub != dto.expected_bid_rub
+    assert dto.current_bid_rub == 123.0
+    assert dto.selected_cpo_rub == 45.67
+
+
+@pytest.mark.asyncio
+async def test_selected_cpo_contract_does_not_backfill_best_cpo_from_selected_bid() -> None:
+    redis_client = _FakeRedisClient()
+    cache = AutoShelfBidDiagnosticsCacheManager(redis_client)  # type: ignore[arg-type]
+    view = _build_view(
+        selected_bid_minor=12300,
+        actual_bid_minor=12300,
+        bid_sync_detail="synced",
+        plan_ranked=[{"bid": 12300, "cpo_rub": 45.67}],
+    )
+    contract = resolve_selected_cpo_contract_from_view(view)
+
+    await cache.set_selected_cpo_contract(1, view, contract)
+    loaded = await cache.get(1)
+
+    assert loaded is not None
+    assert loaded.best_cpo_bid_rub is None
+    assert loaded.expected_bid_rub == 123.0
+    assert loaded.current_bid_rub == 123.0
+    assert loaded.selected_cpo_rub == 45.67

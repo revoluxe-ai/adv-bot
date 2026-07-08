@@ -84,7 +84,9 @@ class AutoShelfBidDiagnosticsDTO(BaseModel):
             return float(value) / 100.0
 
         return cls(
-            best_cpo_bid_rub=_bid_minor_to_rub(contract.selected_bid_minor),
+            best_cpo_bid_rub=_bid_minor_to_rub(
+                getattr(view, "best_cpo_bid_rub", None)
+            ),
             current_bid_rub=_bid_minor_to_rub(view.actual_bid_minor),
             expected_bid_rub=_bid_minor_to_rub(view.expected_enforced_bid_minor),
             selected_cpo_rub=contract.selected_cpo_rub,
