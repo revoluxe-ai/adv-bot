@@ -159,6 +159,7 @@ async def _run_auto_cost_rule_case(
     resolved_target_cost: object = 100,
     auto_shelf_bid_control_enabled: bool = False,
     selected_cpo_contract: AutoShelfBidSelectedCpoContract | None = None,
+    cache_write_raises: bool = False,
 ) -> MagicMock:
     adv = _FakeComplexAdv(
         auto_limit=100,
@@ -197,6 +198,9 @@ async def _run_auto_cost_rule_case(
     if selected_cpo_contract is not None:
         selected_cpo_provider = MagicMock()
         selected_cpo_provider.build_view = AsyncMock(return_value=MagicMock())
+        selected_cpo_provider._cache_selected_cpo_contract = AsyncMock(
+            side_effect=RuntimeError("cache boom") if cache_write_raises else None
+        )
     legacy_avg_cost_mock = AsyncMock(return_value=avg_cost)
     service = AutoAdvActiveControlService(
         wb_modifier=wb_modifier,
@@ -912,6 +916,7 @@ async def test_auto_adv_shelf_bid_control_prefers_selected_cpo_over_legacy():
 
     wb_modifier.pause_auto_campaign.assert_not_called()
     wb_modifier.selected_cpo_provider.build_view.assert_awaited_once_with(1001)
+    wb_modifier.selected_cpo_provider._cache_selected_cpo_contract.assert_awaited_once()
     wb_modifier.legacy_avg_cost_mock.assert_not_awaited()
 
 
@@ -933,6 +938,7 @@ async def test_auto_adv_shelf_bid_control_falls_back_to_legacy_when_selected_cpo
 
     wb_modifier.pause_auto_campaign.assert_awaited_once()
     wb_modifier.selected_cpo_provider.build_view.assert_awaited_once_with(1001)
+    wb_modifier.selected_cpo_provider._cache_selected_cpo_contract.assert_awaited_once()
     wb_modifier.legacy_avg_cost_mock.assert_awaited_once()
 
 
@@ -954,6 +960,7 @@ async def test_auto_adv_shelf_bid_control_pauses_when_selected_cpo_and_total_are
     wb_modifier.pause_auto_campaign.assert_awaited_once()
     wb_modifier.start_auto_campaign.assert_not_called()
     wb_modifier.selected_cpo_provider.build_view.assert_awaited_once_with(1001)
+    wb_modifier.selected_cpo_provider._cache_selected_cpo_contract.assert_awaited_once()
     wb_modifier.legacy_avg_cost_mock.assert_not_awaited()
 
 
@@ -972,6 +979,28 @@ async def test_auto_adv_shelf_bid_control_does_not_load_view_when_disabled():
     )
 
     wb_modifier.selected_cpo_provider.build_view.assert_not_called()
+    wb_modifier.selected_cpo_provider._cache_selected_cpo_contract.assert_not_called()
+    wb_modifier.legacy_avg_cost_mock.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_auto_adv_shelf_bid_control_ignores_diagnostics_cache_write_failure():
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=90.0,
+        fact_pay_for_order=120.0,
+        auto_shelf_bid_control_enabled=True,
+        selected_cpo_contract=AutoShelfBidSelectedCpoContract(
+            selected_bid_minor=12300,
+            selected_cpo_rub=90.0,
+            updated_at=datetime.now(UTC),
+            source="rec_bid_recommendation.plan_ranked[selected_bid_minor=12300]",
+        ),
+        cache_write_raises=True,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.selected_cpo_provider.build_view.assert_awaited_once_with(1001)
+    wb_modifier.selected_cpo_provider._cache_selected_cpo_contract.assert_awaited_once()
     wb_modifier.legacy_avg_cost_mock.assert_awaited_once()
 
 

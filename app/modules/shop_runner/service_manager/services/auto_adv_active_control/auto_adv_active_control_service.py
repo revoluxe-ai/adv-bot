@@ -328,6 +328,11 @@ class AutoAdvActiveControlService:
                     int(adv.adv_setting.id)
                 )
                 selected_contract = resolve_selected_cpo_contract_from_view(view)
+                await self._auto_shelf_bid_control_view_provider._cache_selected_cpo_contract(
+                    int(adv.adv_setting.id),
+                    view,
+                    selected_contract,
+                )
             except Exception:
                 logger.warning(
                     "Auto watchdog: selected CPO contract failed adv_id=%s shop_id=%s",
