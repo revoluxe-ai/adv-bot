@@ -3987,6 +3987,48 @@ async def test_update_refreshes_diagnostics_from_fresh_main_snapshot() -> None:
 
 
 @pytest.mark.asyncio
+async def test_update_keeps_running_when_diagnostics_refresh_fails() -> None:
+    manager, repository, wb_bid_setter, state, settings_obj, complex_adv = (
+        _build_reconcile_fixture(
+            current_mode="main",
+            current_test_bid_minor=41_000,
+            current_main_bid_minor=48_000,
+            actual_bid_minor=48_000,
+        )
+    )
+
+    async def _build_snapshot(
+        *_args: object,
+        actual_bid_minor: int | None,
+        **_kwargs: object,
+    ) -> AutoShelfBidControlDecisionSnapshot:
+        snapshot = _fresh_main_snapshot(
+            actual=int(actual_bid_minor or 0),
+            fresh_main=57_000,
+        )
+        snapshot.computed_at = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
+        snapshot.rec_bid_recommendation = {
+            "plan_ranked": [{"bid": 57_000, "cpo_rub": 123.45}]
+        }
+        return snapshot
+
+    manager.build_decision_snapshot = AsyncMock(side_effect=_build_snapshot)  # type: ignore[method-assign]
+    manager._get_actual_bid = AsyncMock(side_effect=[48_000, 57_000])  # type: ignore[method-assign]
+    manager.apply_bid_sync_from_snapshot = AsyncMock(return_value=False)  # type: ignore[method-assign]
+    manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
+    manager._diagnostics_cache = MagicMock(
+        set_decision_snapshot=AsyncMock(side_effect=RuntimeError("boom"))
+    )
+    complex_adv.adv_setting_original_id = 35018182
+
+    await manager.update(complex_adv)
+
+    manager._diagnostics_cache.set_decision_snapshot.assert_awaited_once()
+    manager._handle_main_mode.assert_awaited_once()
+    wb_bid_setter.set_bid.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_disabled_control_does_not_enforce_fresh_main() -> None:
     manager = AutoShelfBidControlManager(
         bid_cache_manager=MagicMock(),
@@ -4980,9 +5022,19 @@ async def test_mode_transition_defers_bid_apply_to_centralized_sync_path(
         can_count_progress=False,
         computed_at=now,
     )
-    manager.build_decision_snapshot = AsyncMock(  # type: ignore[method-assign]
-        side_effect=[transition_snapshot, sync_snapshot],
-    )
+    build_snapshot_calls = 0
+
+    async def _build_snapshot(
+        *_args: object,
+        **_kwargs: object,
+    ) -> AutoShelfBidControlDecisionSnapshot:
+        nonlocal build_snapshot_calls
+        build_snapshot_calls += 1
+        if build_snapshot_calls == 1:
+            return transition_snapshot
+        return sync_snapshot
+
+    manager.build_decision_snapshot = AsyncMock(side_effect=_build_snapshot)  # type: ignore[method-assign]
     real_apply = manager.apply_bid_sync_from_snapshot
     apply_sync_spy = AsyncMock(wraps=real_apply)
     manager.apply_bid_sync_from_snapshot = apply_sync_spy  # type: ignore[method-assign]

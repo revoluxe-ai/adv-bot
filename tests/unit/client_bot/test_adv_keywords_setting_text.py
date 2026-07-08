@@ -143,6 +143,42 @@ async def test_diagnostics_view_reads_cached_auto_shelf_values() -> None:
 
 
 @pytest.mark.asyncio
+async def test_diagnostics_view_hides_cached_values_when_auto_shelf_is_off() -> None:
+    adv_setting = SimpleNamespace(
+        id=123,
+        bidder_for_auto=True,
+        bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+        auto_shelf_bid_control_enabled=False,
+        auto_shelf_bid_control_strategy="PLAN_DISTANCE",
+    )
+    payload = AutoShelfBidDiagnosticsDTO(
+        best_cpo_bid_rub=123.0,
+        current_bid_rub=120.0,
+        expected_bid_rub=125.0,
+        selected_cpo_rub=45.67,
+        updated_at=datetime(2026, 7, 7, 13, 0, tzinfo=UTC),
+        source="source",
+    ).model_dump_json()
+
+    diagnostics = await load_adv_keywords_diagnostics_view(
+        adv_setting, redis_client=_FakeRedisClient(payload)
+    )
+    text = format_adv_keywords_diagnostics_block(diagnostics)
+
+    assert diagnostics.auto_shelf_enabled is False
+    assert diagnostics.best_cpo_bid_rub is None
+    assert diagnostics.current_bid_rub is None
+    assert diagnostics.expected_bid_rub is None
+    assert diagnostics.selected_cpo_rub is None
+    assert diagnostics.last_update_ts is None
+    assert "Auto Shelf: выкл" in text
+    assert "Лучшая ставка по CPO: 123" not in text
+    assert "Текущая ставка WB: 120" not in text
+    assert "Целевая ставка бота: 125" not in text
+    assert "Выбранный CPO: 45.67" not in text
+
+
+@pytest.mark.asyncio
 async def test_diagnostics_cache_round_trip_returns_text() -> None:
     redis_client = _FakeRedisClient()
     cache = AutoShelfBidDiagnosticsCacheManager(redis_client)  # type: ignore[arg-type]

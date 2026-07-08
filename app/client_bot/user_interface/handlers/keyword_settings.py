@@ -142,6 +142,7 @@ async def load_adv_keywords_diagnostics_view(
     adv_setting: AdvSetting,
     redis_client: RedisClient = Provide["redis_client_wrapper"],
 ) -> AdvKeywordsDiagnosticsView:
+    """Загрузить диагностику keywords и скрыть кеш Auto Shelf при выключенном режиме."""
     bidder_kind = getattr(adv_setting, "bidder_coroutine_type", None)
     bidder_for_auto = bool(getattr(adv_setting, "bidder_for_auto", False))
     if not bidder_for_auto:
@@ -153,13 +154,16 @@ async def load_adv_keywords_diagnostics_view(
         bidder_label = "—"
     strategy = getattr(adv_setting, "auto_shelf_bid_control_strategy", None)
     strategy_label = getattr(strategy, "value", None) or str(strategy) or "—"
-    cache = AutoShelfBidDiagnosticsCacheManager(redis_client)
-    cache_value = await cache.get(int(adv_setting.id))
+    auto_shelf_enabled = bool(
+        getattr(adv_setting, "auto_shelf_bid_control_enabled", False)
+    )
+    cache_value = None
+    if auto_shelf_enabled:
+        cache = AutoShelfBidDiagnosticsCacheManager(redis_client)
+        cache_value = await cache.get(int(adv_setting.id))
     return _build_adv_keywords_diagnostics_view_model(
         bidder_label=bidder_label,
-        auto_shelf_enabled=bool(
-            getattr(adv_setting, "auto_shelf_bid_control_enabled", False)
-        ),
+        auto_shelf_enabled=auto_shelf_enabled,
         strategy_label=strategy_label,
         cache_value=cache_value,
     )

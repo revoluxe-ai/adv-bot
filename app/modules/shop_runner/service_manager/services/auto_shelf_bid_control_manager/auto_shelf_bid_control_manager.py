@@ -657,20 +657,28 @@ class AutoShelfBidControlManager:
         показывал предсинхронный sync status или selected CPO, кеш нужно
         обновлять уже после этих мутаций, опираясь на свежий actual bid из Redis.
         """
-        actual_bid_minor = await self._get_actual_bid(
-            int(complex_adv.auto_adv_id),
-            int(complex_adv.main_nmid),
-        )
-        refreshed_snapshot = await self.build_decision_snapshot(
-            complex_adv,
-            settings_obj=settings_obj,
-            state=state,
-            min_bid_minor=min_bid_minor,
-            actual_bid_minor=actual_bid_minor,
-            control_enabled=control_enabled,
-            bid_units_confirmed=bid_units_confirmed,
-        )
-        await self._cache_snapshot_diagnostics(complex_adv, refreshed_snapshot)
+        try:
+            actual_bid_minor = await self._get_actual_bid(
+                int(complex_adv.auto_adv_id),
+                int(complex_adv.main_nmid),
+            )
+            refreshed_snapshot = await self.build_decision_snapshot(
+                complex_adv,
+                settings_obj=settings_obj,
+                state=state,
+                min_bid_minor=min_bid_minor,
+                actual_bid_minor=actual_bid_minor,
+                control_enabled=control_enabled,
+                bid_units_confirmed=bid_units_confirmed,
+            )
+            await self._cache_snapshot_diagnostics(complex_adv, refreshed_snapshot)
+        except Exception:
+            logger.warning(
+                "auto_shelf_bid_control_diagnostics_refresh_failed auto_adv_id=%s nmid=%s",
+                complex_adv.auto_adv_id,
+                complex_adv.main_nmid,
+                exc_info=True,
+            )
 
     async def _maybe_continue_main_exploration(
         self,
