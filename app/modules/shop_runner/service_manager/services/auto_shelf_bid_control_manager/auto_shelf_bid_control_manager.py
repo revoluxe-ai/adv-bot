@@ -641,6 +641,37 @@ class AutoShelfBidControlManager:
                 exc_info=True,
             )
 
+    async def _cache_fresh_snapshot_diagnostics(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        state: AutoShelfBidControlState,
+        settings_obj: AutoShelfBidControlSettings,
+        min_bid_minor: int,
+        control_enabled: bool,
+        bid_units_confirmed: bool | None = None,
+    ) -> None:
+        """Пересобрать diagnostics после sync/mode mutations и сохранить их.
+
+        Control loop меняет WB bid и state в нескольких ветках. Чтобы UI не
+        показывал предсинхронный sync status или selected CPO, кеш нужно
+        обновлять уже после этих мутаций, опираясь на свежий actual bid из Redis.
+        """
+        actual_bid_minor = await self._get_actual_bid(
+            int(complex_adv.auto_adv_id),
+            int(complex_adv.main_nmid),
+        )
+        refreshed_snapshot = await self.build_decision_snapshot(
+            complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            min_bid_minor=min_bid_minor,
+            actual_bid_minor=actual_bid_minor,
+            control_enabled=control_enabled,
+            bid_units_confirmed=bid_units_confirmed,
+        )
+        await self._cache_snapshot_diagnostics(complex_adv, refreshed_snapshot)
+
     async def _maybe_continue_main_exploration(
         self,
         complex_adv: ComplexAdv,
@@ -1021,7 +1052,6 @@ class AutoShelfBidControlManager:
                 actual_bid_minor=actual_bid_minor,
                 control_enabled=True,
             )
-            await self._cache_snapshot_diagnostics(complex_adv, snapshot)
             if await self.apply_bid_sync_from_snapshot(
                 complex_adv,
                 state=state,
@@ -1032,6 +1062,14 @@ class AutoShelfBidControlManager:
                 max_bid_minor=int(settings_obj.max_bid_minor),
                 now=self._now(),
             ):
+                await self._cache_fresh_snapshot_diagnostics(
+                    complex_adv,
+                    state=state,
+                    settings_obj=settings_obj,
+                    min_bid_minor=min_bid_minor,
+                    control_enabled=True,
+                    bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
+                )
                 return None
             await self._handle_test_mode(
                 complex_adv=complex_adv,
@@ -1040,6 +1078,14 @@ class AutoShelfBidControlManager:
                 min_bid_minor=min_bid_minor,
                 actual_bid_minor=actual_bid_minor,
                 snapshot=snapshot,
+            )
+            await self._cache_fresh_snapshot_diagnostics(
+                complex_adv,
+                state=state,
+                settings_obj=settings_obj,
+                min_bid_minor=min_bid_minor,
+                control_enabled=True,
+                bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
             )
             return None
 
@@ -1051,7 +1097,6 @@ class AutoShelfBidControlManager:
             actual_bid_minor=actual_bid_minor,
             control_enabled=True,
         )
-        await self._cache_snapshot_diagnostics(complex_adv, snapshot)
         if await self.apply_bid_sync_from_snapshot(
             complex_adv,
             state=state,
@@ -1062,6 +1107,14 @@ class AutoShelfBidControlManager:
             max_bid_minor=int(settings_obj.max_bid_minor),
             now=self._now(),
         ):
+            await self._cache_fresh_snapshot_diagnostics(
+                complex_adv,
+                state=state,
+                settings_obj=settings_obj,
+                min_bid_minor=min_bid_minor,
+                control_enabled=True,
+                bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
+            )
             return None
         await self._handle_main_mode(
             complex_adv=complex_adv,
@@ -1070,6 +1123,14 @@ class AutoShelfBidControlManager:
             min_bid_minor=min_bid_minor,
             actual_bid_minor=actual_bid_minor,
             snapshot=snapshot,
+        )
+        await self._cache_fresh_snapshot_diagnostics(
+            complex_adv,
+            state=state,
+            settings_obj=settings_obj,
+            min_bid_minor=min_bid_minor,
+            control_enabled=True,
+            bid_units_confirmed=settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED,
         )
         return None
 

@@ -3947,12 +3947,26 @@ async def test_update_refreshes_diagnostics_from_fresh_main_snapshot() -> None:
             actual_bid_minor=48_000,
         )
     )
-    snapshot = _fresh_main_snapshot(actual=48_000, fresh_main=57_000)
-    snapshot.computed_at = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
-    snapshot.rec_bid_recommendation = {
-        "plan_ranked": [{"bid": 57_000, "cpo_rub": 123.45}]
-    }
-    manager.build_decision_snapshot = AsyncMock(return_value=snapshot)  # type: ignore[method-assign]
+    snapshot_calls: list[AutoShelfBidControlDecisionSnapshot] = []
+
+    async def _build_snapshot(
+        *_args: object,
+        actual_bid_minor: int | None,
+        **_kwargs: object,
+    ) -> AutoShelfBidControlDecisionSnapshot:
+        snapshot = _fresh_main_snapshot(
+            actual=int(actual_bid_minor or 0),
+            fresh_main=57_000,
+        )
+        snapshot.computed_at = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
+        snapshot.rec_bid_recommendation = {
+            "plan_ranked": [{"bid": 57_000, "cpo_rub": 123.45}]
+        }
+        snapshot_calls.append(snapshot)
+        return snapshot
+
+    manager.build_decision_snapshot = AsyncMock(side_effect=_build_snapshot)  # type: ignore[method-assign]
+    manager._get_actual_bid = AsyncMock(side_effect=[48_000, 57_000])  # type: ignore[method-assign]
     manager.apply_bid_sync_from_snapshot = AsyncMock(return_value=False)  # type: ignore[method-assign]
     manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
     manager._diagnostics_cache = MagicMock(
@@ -3964,8 +3978,10 @@ async def test_update_refreshes_diagnostics_from_fresh_main_snapshot() -> None:
 
     manager._diagnostics_cache.set_decision_snapshot.assert_awaited_once_with(
         complex_adv.adv_setting_original_id,
-        snapshot,
+        snapshot_calls[-1],
     )
+    assert snapshot_calls[0].actual_bid_minor == 48_000
+    assert snapshot_calls[-1].actual_bid_minor == 57_000
     wb_bid_setter.set_bid.assert_not_awaited()
     manager._handle_main_mode.assert_awaited_once()
 
