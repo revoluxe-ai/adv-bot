@@ -92,9 +92,17 @@ class RebalanceExecutor:
         if self._skip_reason is not None:
             return
         generator = StatesListGenerator(context.adv_state)
-        current_states, potential_states = generator.get_current_states(
-            context.keywords
-        )
+        result = generator.get_current_states(context.keywords)
+        resolve = context.adv_state.resolve # это должен быть целевой CPO РК в зависимости от продаж
+        current_states: list[tuple[KeywordDTO, KeywordV3LadderState, float]] = result[0]
+
+        def filter_func(row: tuple[KeywordDTO, KeywordV3LadderState, float]) -> bool:
+            return row[2] > resolve if row[2] > resolve else False
+
+        current_states = list(filter(filter_func, current_states))
+        potential_states: list[tuple[KeywordDTO, KeywordV3LadderState, float]] = result[1]
+        potential_states = list(filter(filter_func, potential_states))
+
         if not current_states:
             self._skip_reason = SKIP_NO_CURRENT_ACTIVE
             return
