@@ -9,6 +9,8 @@ CPO на точке CH = ``к→к`` × сглаженный ``orders_per_cart``
 
 На V3-карточке — компактная строка последнего решающего executor на тике
 (``V3KeywordChanges`` Redis, SSOT ``last_decisive_step``).
+
+Admin debug: экран «Почему бот так решил?» — ``format_keyword_v3_decision_trace_screen``.
 """
 
 from __future__ import annotations
@@ -20,6 +22,9 @@ from typing import TYPE_CHECKING
 
 from app.client_bot.user_interface.views.keyword_strategy_ui import strategy_mode_letter
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     AggressionTargetMode,
     ModeCandidate,
@@ -323,6 +328,137 @@ def format_keyword_v3_last_tick_executor_line(
     short, title, body = parts
     time_str = _format_tick_at_msk(keyword_changes.tick_at)
     return f"V3 · {short} · {title}: {body} · {time_str}\n"
+
+
+NON_V3_DECISION_TRACE_MESSAGE = (
+    "Разбор решений доступен только для V3-управления."
+)
+
+_NO_CHANGING_EXECUTOR_NOTE = (
+    "В последнем сохранённом V3-тике по этому ключу нет изменяющего "
+    "executor'а. Полный каскад SKIP/APPLY будет добавлен отдельным "
+    "trace-модулем."
+)
+
+_REASON_NOT_IN_JOURNAL = (
+    "Причина не зафиксирована в текущем журнале решений."
+)
+
+_DECISION_ACTION_LABEL: dict[str, str] = {
+    "UP": "UP",
+    "DOWN": "DOWN",
+    "FORCE_OFF": "FORCE_OFF",
+    "NOOP": "DO_NOTHING",
+    "TARGET_PLACE": "TARGET_PLACE",
+}
+
+
+def keyword_v3_decision_trace_button_label(display_status: KeywordStatus) -> str:
+    """Текст admin-кнопки разбора решения V3 в карточке ключа."""
+    if display_status == KeywordStatus.GOOD:
+        return "🔎 Почему бот включил?"
+    return "🔎 Почему бот не включил?"
+
+
+def _display_status_label(display_status: KeywordStatus) -> str:
+    if display_status == KeywordStatus.GOOD:
+        return "good"
+    if display_status == KeywordStatus.BAD:
+        return "bad"
+    if display_status == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
+        return "pause"
+    return display_status.value
+
+
+def _decision_fields_from_decisive(
+    decisive: V3KeywordStepRecord | str,
+) -> tuple[str, str, str | None]:
+    """Executor (RU title), решение и причина из решающего шага audit."""
+    parts = _format_decisive_step_body(decisive)
+    if parts is None:
+        return "нет записанного решения", "нет изменений", None
+    _short, title, body = parts
+    if isinstance(decisive, V3KeywordStepRecord):
+        decision = _DECISION_ACTION_LABEL.get(decisive.action, decisive.action)
+        tech = decisive.executor_name
+        executor_line = f"{title} ({tech})"
+        return executor_line, decision, body
+    return title, _DECISION_ACTION_LABEL["TARGET_PLACE"], body
+
+
+def format_keyword_v3_decision_trace_screen(
+    *,
+    nmid: str,
+    keyword_text: str,
+    display_status: KeywordStatus,
+    keyword_setting_id: int,
+    keyword_changes: V3KeywordChangesSnapshot | None,
+) -> str:
+    """Текст экрана «Почему бот так решил?» без ladder/CPM/CH-матрицы.
+
+    Args:
+        nmid: Артикул(ы) кампании для заголовка.
+        keyword_text: Текст ключевого запроса.
+        display_status: Статус ключа для UI (good/bad/pause).
+        keyword_setting_id: ID ``KeywordSetting``.
+        keyword_changes: Audit последнего V3-тика из Redis.
+
+    Returns:
+        Markdown-текст для ``ParseMode.MARKDOWN`` (legacy V1).
+    """
+    safe_nmid = _escape_markdown_v1(nmid)
+    safe_keyword = _escape_markdown_v1(keyword_text.replace("\n", " ").strip())
+    status_label = _display_status_label(display_status)
+
+    lines = [
+        "🔎 *Почему бот так решил?*",
+        "",
+        f"📦 {safe_nmid}",
+        f"🔑 {safe_keyword}",
+        f"🔄 Текущий статус: {status_label}",
+        "",
+        "Последнее записанное решение V3:",
+    ]
+
+    executor_line = "нет записанного решения"
+    decision_line = "нет изменений"
+    reason_line: str | None = None
+    show_no_changing_note = False
+
+    if keyword_changes is not None:
+        entry = find_keyword_change_entry(keyword_changes, keyword_setting_id)
+        if entry is not None:
+            decisive = last_decisive_step(entry)
+            if decisive is not None:
+                executor_line, decision_line, reason_line = (
+                    _decision_fields_from_decisive(decisive)
+                )
+            else:
+                show_no_changing_note = True
+        else:
+            show_no_changing_note = True
+    else:
+        show_no_changing_note = True
+
+    lines.append(executor_line)
+    lines.extend(
+        [
+            "",
+            "Решение:",
+            decision_line,
+            "",
+            "Причина:",
+        ]
+    )
+    if reason_line:
+        lines.append(reason_line)
+    else:
+        lines.append(_REASON_NOT_IN_JOURNAL)
+
+    if show_no_changing_note:
+        lines.extend(["", _NO_CHANGING_EXECUTOR_NOTE])
+
+    return "\n".join(lines)
 
 
 def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
