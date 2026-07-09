@@ -758,7 +758,10 @@ async def test_connect_existing_confirm_type2_creates_adv_setting() -> None:
     mock_wb_cabinet.id = 1
     mock_session = MagicMock()
     mock_session.get = AsyncMock(return_value=mock_wb_cabinet)
-    mock_session.execute = AsyncMock()
+    main_adv = MagicMock()
+    mock_main_adv_result = MagicMock()
+    mock_main_adv_result.scalar_one.return_value = main_adv
+    mock_session.execute = AsyncMock(side_effect=[None, mock_main_adv_result])
     mock_session.commit = AsyncMock()
     mock_sm = MagicMock()
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -767,13 +770,16 @@ async def test_connect_existing_confirm_type2_creates_adv_setting() -> None:
     with patch(f"{MODULE}.sm", mock_sm), patch(
         "app.modules.adv_creator.backend.main_manager.MainAdvManager._apply_default_settings_to_adv",
         new_callable=AsyncMock,
+    ), patch(
+        f"{MODULE}.ensure_search_adv_setting_for_main_adv",
+        new_callable=AsyncMock,
     ):
         await connect_existing_advs.connect_existing_confirm_type2(
             callback, callback_data, bot, state
         )
 
     state.clear.assert_called_once()
-    mock_session.execute.assert_called_once()
+    assert mock_session.execute.await_count == 2
     mock_session.commit.assert_called_once()
     bot.send_message.assert_called_once()
     assert "Кампании подключены" in bot.send_message.call_args[0][1]
@@ -850,7 +856,10 @@ async def test_connect_existing_confirm_type2_rename_exception_still_upserts() -
     mock_wb_cabinet.id = 1
     mock_session = MagicMock()
     mock_session.get = AsyncMock(return_value=mock_wb_cabinet)
-    mock_session.execute = AsyncMock()
+    main_adv = MagicMock()
+    mock_main_adv_result = MagicMock()
+    mock_main_adv_result.scalar_one.return_value = main_adv
+    mock_session.execute = AsyncMock(side_effect=[None, mock_main_adv_result])
     mock_session.commit = AsyncMock()
     mock_sm = MagicMock()
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=mock_session)
@@ -873,6 +882,9 @@ async def test_connect_existing_confirm_type2_rename_exception_still_upserts() -
     ), patch(
         "app.modules.adv_creator.backend.main_manager.MainAdvManager._apply_default_settings_to_adv",
         new_callable=AsyncMock,
+    ), patch(
+        f"{MODULE}.ensure_search_adv_setting_for_main_adv",
+        new_callable=AsyncMock,
     ):
         await connect_existing_advs.connect_existing_confirm_type2(
             callback, callback_data, bot, state
@@ -884,7 +896,7 @@ async def test_connect_existing_confirm_type2_rename_exception_still_upserts() -
     )
     assert rename_msg is not None
     assert "переименование на WB не удалось" in rename_msg
-    mock_session.execute.assert_called_once()
+    assert mock_session.execute.await_count == 2
     mock_session.commit.assert_called_once()
     state.clear.assert_called_once()
 

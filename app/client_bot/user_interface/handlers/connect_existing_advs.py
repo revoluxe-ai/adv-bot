@@ -28,6 +28,9 @@ from app.core.mp.wb.api.excs import ApiForbiddenError, BadRequestError
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.modules.common_slaves.wildberries.search_adv_settings import (
+    ensure_search_adv_setting_for_main_adv,
+)
 from app.modules.connect_existing_advs import (
     get_connect_existing_candidates,
     validate_campaign_id_for_connect,
@@ -405,12 +408,20 @@ async def _save_connect_existing_finish(
 
     auction_candidates: list[dict] = data.get("auction_candidates") or []
     current_auction_name = next(
-        (c["name"] for c in auction_candidates if c["id"] == chosen_auction),
-        "",
+        (
+            c.get("name") or f"РК {chosen_auction}"
+            for c in auction_candidates
+            if c["id"] == chosen_auction
+        ),
+        f"РК {chosen_auction}",
     )
     current_auto_name = next(
-        (c["name"] for c in auto_candidates if c["id"] == chosen_auto),
-        "",
+        (
+            c.get("name") or f"РК {chosen_auto}"
+            for c in auto_candidates
+            if c["id"] == chosen_auto
+        ),
+        f"РК {chosen_auto}",
     )
     need_rename_auction = current_auction_name.strip() != auction_name_trunc.strip()
     need_rename_auto = current_auto_name.strip() != auto_name_trunc.strip()
@@ -452,6 +463,11 @@ async def _save_connect_existing_finish(
             if c.get("id") == chosen_auto and "status" in c:
                 auto_status_text = _wb_status_code_to_text(int(c["status"]))
                 break
+        auction_status_text: str | None = None
+        for c in auction_candidates:
+            if c.get("id") == chosen_auction and "status" in c:
+                auction_status_text = _wb_status_code_to_text(int(c["status"]))
+                break
         adv_data = {
             "adv_id": chosen_auto,
             "_search_adv_id": chosen_auction,
@@ -477,6 +493,17 @@ async def _save_connect_existing_finish(
             set_={k: v for k, v in adv_data.items() if k != "adv_id"},
         )
         await session.execute(on_conflict_stmt)
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.adv_id == chosen_auto)
+        )
+        main_adv = result.scalar_one()
+        await ensure_search_adv_setting_for_main_adv(
+            session,
+            main_adv,
+            chosen_auction,
+            active_status=auction_status_text,
+            nmids=[nmid],
+        )
         await session.commit()
         logger.info(
             "connect_existing upserted AdvSetting adv_id=%s nmid=%s auction=%s",

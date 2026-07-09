@@ -40,10 +40,12 @@ class TestPricerTariffs:
 
     def test_auto_tariff_table_caps_at_max_limit(self):
         pricer = Pricer()
+        max_limit = max(tariffs_for_auto_setting)
+        count_advs = max_limit + 1
         total = pricer.get_price_for_count_advs_in_cabinet_for_month(
-            120, tariff_table=tariffs_for_auto_setting
+            count_advs, tariff_table=tariffs_for_auto_setting
         )
-        assert total == 120 * tariffs_for_auto_setting[100]
+        assert total == count_advs * tariffs_for_auto_setting[max_limit]
 
     @pytest.mark.asyncio
     async def test_context_no_bot_active_advs_means_zero_and_old(
@@ -251,4 +253,3 @@ class TestPricerTariffs:
 
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.OLD
-
