@@ -507,13 +507,23 @@ class CabinetNameTooLong(Text):
 class KeywordSettingMessage(TextWithKeyboard):
     parse_mode = ParseMode.MARKDOWN
 
-    def __init__(self, bot: Bot, chat_id: int, keyword_setting_id: int, last_page: int):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        keyword_setting_id: int,
+        last_page: int = 1,
+        *,
+        telegram_user_id: int | None = None,
+    ):
         super().__init__(bot, chat_id)
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
         self._chat_id = chat_id
+        self._telegram_user_id = telegram_user_id
         self._v3_profile_block: str | None = None
         self._v3_keyword_changes: V3KeywordChangesSnapshot | None = None
+
 
     @staticmethod
     async def _get_calculated_keyword(
@@ -698,6 +708,8 @@ class KeywordSettingMessage(TextWithKeyboard):
             self._keyword_setting,
             self._adv_setting,
             self._page,
+            telegram_user_id=self._telegram_user_id,
+            keyword_display_status=self._display_status_from_db_and_cache(),
         )
 
 
@@ -1385,13 +1397,9 @@ class WaitingForRelevantPhrases(Text):
 
 
 class RelevantPhraseManagementMenuMessage(TextWithKeyboard):
-    def __init__(self, bot: Bot, chat_id: int):
+    def __init__(self, bot: Bot, chat_id: int, adv: AdvSetting):
         super().__init__(bot, chat_id)
-
-    async def __call__(self, adv: AdvSetting):
-        self._adv:  AdvSetting = adv
-        await super().__call__()
-
+        self._adv = adv
 
     @property
     def text(self) -> str:
