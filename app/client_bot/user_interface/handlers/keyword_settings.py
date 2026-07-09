@@ -681,7 +681,8 @@ async def setting_keyword(
 
     chat_id = callback.message.chat.id
     await messages.KeywordSettingMessage(
-        bot, chat_id, keyword_setting_original_id, page
+        bot, chat_id, keyword_setting_original_id, page,
+        telegram_user_id=callback.from_user.id,
     )()
     return
 
@@ -784,7 +785,8 @@ async def change_keyword_hard_status(
 
         chat_id = callback.message.chat.id
         await messages.KeywordSettingMessage(
-            bot, chat_id, keyword_setting_original_id, page
+            bot, chat_id, keyword_setting_original_id, page,
+            telegram_user_id=callback.from_user.id,
         )()
 
         return
@@ -993,6 +995,7 @@ async def keyword_target_place_value(
         message.chat.id,
         keyword_setting_original_id,
         page,
+        telegram_user_id=message.from_user.id,
     )()
 
     await state.update_data(keyword_setting_for_target_place=None)

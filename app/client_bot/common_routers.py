@@ -31,6 +31,9 @@ from app.modules.shop_runner.service_manager.v3_rollout_aggressiveness_toggle im
 from app.modules.shop_runner.service_manager.v3_tick_report_ui import (
     v3_tick_report_ui_router,
 )
+from app.modules.shop_runner.service_manager.keyword_v3_decision_trace_ui import (
+    keyword_v3_decision_trace_ui_router,
+)
 from app.modules.v3_calibration_step_setting import (
     v3_calibration_step_setting_router,
 )
@@ -120,6 +123,7 @@ common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(v3_rollout_aggressiveness_toggle_router)
 common_router.include_routers(v3_calibration_step_setting_router)
 common_router.include_routers(v3_tick_report_ui_router)
+common_router.include_routers(keyword_v3_decision_trace_ui_router)
 common_router.include_routers(AutoWhiteListUpdaterRouter)
 common_router.include_routers(keyword_relevant_setting.router)
 common_router.include_routers(orders_source_toggle.router)

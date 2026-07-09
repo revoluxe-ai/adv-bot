@@ -186,7 +186,7 @@ async def test_open_menu_does_not_toggle_setting(monkeypatch: pytest.MonkeyPatch
     data = ManageRelevantAndNonRelevantPhrases(adv_setting_original_id=1)
     await open_relevant_phrase_management_menu(callback, data, bot=AsyncMock())
     assert rendered["called"] is True
-    assert rendered["chat_id"] == 88
+    assert rendered["chat_id"] == 77
     assert rendered["adv_obj"] is adv
     assert fake_factory.session.committed is False
 
@@ -235,5 +235,5 @@ async def test_toggle_rerenders_menu_after_write(monkeypatch: pytest.MonkeyPatch
     await toggle_auto_add_only_relevant_phrase(callback, data, bot=bot)
     assert sent_messages == ["Включено добавление только релевантных фраз"]
     assert rendered["called"] is True
-    assert rendered["chat_id"] == 88
+    assert rendered["chat_id"] == 77
     assert rendered["adv_obj"] is adv

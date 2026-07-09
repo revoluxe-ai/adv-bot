@@ -32,11 +32,12 @@ async def open_relevant_phrase_management_menu(
             raise RuntimeError("РR не найдена")
         return
 
-    assert callback_query.from_user
+    assert callback_query.message is not None
     await RelevantPhraseManagementMenuMessage(
         bot,
-        callback_query.from_user.id,
-    )( adv)
+        callback_query.message.chat.id,
+        adv,
+    )()
 
 
 @router.callback_query(ChangeAutoAddOnlyRelevantPhraseStatus.filter())
@@ -78,4 +79,6 @@ async def toggle_auto_add_only_relevant_phrase(
     assert callback_query.from_user
     await RelevantPhraseManagementMenuMessage(
         bot,
-        callback_query.from_user.id)(adv)
+        chat_id,
+        adv,
+    )()
