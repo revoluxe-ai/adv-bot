@@ -38,6 +38,7 @@ class TestPricerTariffs:
         total = pricer.get_price_for_count_advs_in_cabinet_for_month(5)
         assert total == 5 * tariffs[5]
     @pytest.mark.xfail
+    #TODO: СРОЧНО ВЕРНУТЬ ЭТОТ ТЕСТ
     def test_auto_tariff_table_caps_at_max_limit(self):
         pricer = Pricer()
         total = pricer.get_price_for_count_advs_in_cabinet_for_month(

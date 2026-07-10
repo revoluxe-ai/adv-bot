@@ -17,6 +17,7 @@ def _monthly_total(count: int, tariff: dict[int, int]) -> int:
 
 
 @pytest.mark.xfail
+# TODO: СРОЧНО ИСПРАВИТЬ ТЕСТ, ПОПРАВИТЬ ТАРИФЫ
 @pytest.mark.unit
 def test_auto_setting_tariff_monthly_total_does_not_drop() -> None:
     previous_count = 1

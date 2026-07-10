@@ -64,6 +64,8 @@ from .dto.decision_snapshot_dto import (
     resolve_primary_status,
 )
 from .dto.selected_cpo_contract import (
+    as_object_dict,
+    coerce_finite_float,
     extract_selected_cpo_details_from_view,
     as_object_dict,
 )
