@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
@@ -34,6 +35,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_operabl
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_tick_report_phase_notes import (
     summarize_phase_zero_actions,
 )
+
+if TYPE_CHECKING:
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_decision_trace.collector import (
+        KeywordDecisionTraceCollector,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +184,12 @@ def _phase_outcome_note(
 class UpdatePipelineManager:
     """Прогон NORMAL preamble: executors in-place → ``NextState`` на ``KeywordDTO``."""
 
-    def run_preamble(self, update_context: UpdateContext) -> PreamblePipelineRunResult:
+    def run_preamble(
+        self,
+        update_context: UpdateContext,
+        *,
+        trace_collector: KeywordDecisionTraceCollector | None = None,
+    ) -> PreamblePipelineRunResult:
         """V → clamp → B → U → S → G → R → enable → calibration."""
         rt = update_context.runtime
         if rt is None:
@@ -195,7 +206,12 @@ class UpdatePipelineManager:
             ladder_inputs=state.ladder_inputs,
         )
 
+        if trace_collector is not None:
+            trace_collector.register_operable_keywords(current_ctx.keywords)
+
+        phase_order = 0
         for executor in UpdatePipeline(build_normal_preamble_executors()).executors:
+            phase_order += 1
             prepared_before = current_ctx.keyword_batch.to_legacy_prepared()
             steps_before = _steps_before(current_ctx)
             tp_steps_before = _target_place_steps_before(current_ctx)
@@ -204,6 +220,15 @@ class UpdatePipelineManager:
             extra = _executor_extra(current_ctx, executor)
 
             skip_reason = getattr(executor, "skip_reason", None)
+            if trace_collector is not None:
+                trace_collector.record_executor_phase(
+                    context=current_ctx,
+                    executor=executor,
+                    order=phase_order,
+                    steps_before=steps_before,
+                    tp_steps_before=tp_steps_before,
+                    skip_reason=skip_reason,
+                )
             if skip_reason is not None:
                 if executor.phase_name == "resolve_calibration":
                     stats.calibration_reset_required = True
