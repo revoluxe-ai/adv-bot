@@ -16,7 +16,7 @@ class KeywordCpmSources(BaseModel):
     cpm_from_stats: float | None = None
     cpm_from_stats_date: datetime | None = None
 
-    def resolved_cpm(self) -> float | None:
+    def resolved_cpm(self) -> float |int | None:
         """First non-None by priority: set_bid → api → from_bid_log → from_stats."""
         if self.cpm_set_bid is not None:
             return float(self.cpm_set_bid)

@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 from .control_view_dto import AutoShelfBidControlViewDTO
 
@@ -37,21 +38,22 @@ class AutoShelfBidSelectedCpoContract:
         )
 
 
-def _as_object_sequence(value: object) -> Sequence[object] | None:
+def as_object_sequence(value: object) -> Sequence[object] | None:
     if isinstance(value, (str, bytes, bytearray)):
         return None
     if isinstance(value, Sequence):
-        return value
+        return cast(Sequence[object], value)
     return None
 
 
-def _as_object_dict(value: object) -> dict[str, object] | None:
+def as_object_dict(value: object) -> dict[str, object] | None:
     if not isinstance(value, Mapping):
         return None
-    return {str(key): item for key, item in value.items()}
+    mapping = cast(Mapping[object, object], value)
+    return {str(key): item for key, item in mapping.items()}
 
 
-def _coerce_finite_float(value: object) -> float | None:
+def coerce_finite_float(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     result = float(value)
@@ -127,14 +129,14 @@ def resolve_selected_cpo_contract_from_view(
             reason="selected_bid_not_synced",
         )
 
-    recommendation = _as_object_dict(view.rec_bid_recommendation)
+    recommendation = as_object_dict(view.rec_bid_recommendation)
     if recommendation is None:
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
             updated_at=updated_at,
             reason="recommendation_missing",
         )
-    plan_ranked_rows = _as_object_sequence(recommendation.get("plan_ranked"))
+    plan_ranked_rows = as_object_sequence(recommendation.get("plan_ranked"))
     if plan_ranked_rows is None:
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
@@ -143,7 +145,7 @@ def resolve_selected_cpo_contract_from_view(
         )
 
     for raw_row in plan_ranked_rows:
-        row = _as_object_dict(raw_row)
+        row = as_object_dict(raw_row)
         if row is None:
             continue
         bid_raw = row.get("bid")
@@ -154,7 +156,7 @@ def resolve_selected_cpo_contract_from_view(
         cpo_raw = row.get("cpo_rub")
         if cpo_raw is None:
             cpo_raw = row.get("expected_order_cost_rub")
-        cpo_rub = _coerce_finite_float(cpo_raw)
+        cpo_rub = coerce_finite_float(cpo_raw)
         if cpo_rub is None or cpo_rub < 0:
             return _unavailable_contract(
                 selected_bid_minor=selected_bid_minor,
@@ -192,14 +194,14 @@ def extract_selected_cpo_details_from_view(
     selected_bid_minor = view.expected_enforced_bid_minor
     if selected_bid_minor is None:
         return None, "selected_bid_missing"
-    recommendation = _as_object_dict(view.rec_bid_recommendation)
+    recommendation = as_object_dict(view.rec_bid_recommendation)
     if recommendation is None:
         return None, "recommendation_missing"
-    plan_ranked_rows = _as_object_sequence(recommendation.get("plan_ranked"))
+    plan_ranked_rows = as_object_sequence(recommendation.get("plan_ranked"))
     if plan_ranked_rows is None:
         return None, "plan_ranked_missing"
     for raw_row in plan_ranked_rows:
-        row = _as_object_dict(raw_row)
+        row = as_object_dict(raw_row)
         if row is None:
             continue
         bid_raw = row.get("bid")
@@ -210,7 +212,7 @@ def extract_selected_cpo_details_from_view(
         cpo_raw = row.get("cpo_rub")
         if cpo_raw is None:
             cpo_raw = row.get("expected_order_cost_rub")
-        cpo_rub = _coerce_finite_float(cpo_raw)
+        cpo_rub = coerce_finite_float(cpo_raw)
         if cpo_rub is None or cpo_rub < 0:
             return None, "selected_cpo_missing"
         return cpo_rub, None

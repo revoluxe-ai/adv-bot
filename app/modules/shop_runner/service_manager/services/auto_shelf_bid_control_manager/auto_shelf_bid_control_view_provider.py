@@ -64,8 +64,9 @@ from .dto.decision_snapshot_dto import (
     resolve_primary_status,
 )
 from .dto.selected_cpo_contract import (
+    as_object_dict,
+    coerce_finite_float,
     extract_selected_cpo_details_from_view,
-    _as_object_dict,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -1153,17 +1154,12 @@ class AutoShelfBidControlViewProvider:
             # prefer top plan_ranked row CPO when available (best recommendation)
             plan_ranked_list = cast(list[object], rec_bid_recommendation.get("plan_ranked", []))
             if plan_ranked_list:
-                top_row = _as_object_dict(plan_ranked_list[0])
+                top_row = as_object_dict(plan_ranked_list[0])
                 if top_row is not None:
-                    cpo_val = (
-                        top_row.get("cpo_rub")
-                        if top_row.get("cpo_rub") is not None
-                        else top_row.get("expected_order_cost_rub")
-                    )
-                    try:
-                        best_cpo_bid_rub_value = float(cpo_val) if cpo_val is not None else None
-                    except (TypeError, ValueError):
-                        best_cpo_bid_rub_value = None
+                    cpo_raw = top_row.get("cpo_rub")
+                    if cpo_raw is None:
+                        cpo_raw = top_row.get("expected_order_cost_rub")
+                    best_cpo_bid_rub_value = coerce_finite_float(cpo_raw)
 
         # current WB bid in rubles (from actual_bid_minor)
         current_bid_rub_value: float | None = None
