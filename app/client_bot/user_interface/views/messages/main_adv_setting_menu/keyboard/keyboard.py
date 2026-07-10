@@ -1,6 +1,5 @@
 
 """Клавиатура главного меню настроек кампании."""
-from typing import cast
 
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -9,7 +8,6 @@ from app.client_bot.user_interface.views import callbacks
 from .automatic_version_ui import (
     automatic_version_main_menu_button,
     normalize_automatic_version_ui,
-    show_if,
 )
 from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from .v3_calibration_step_ui import v3_calibration_step_main_button
