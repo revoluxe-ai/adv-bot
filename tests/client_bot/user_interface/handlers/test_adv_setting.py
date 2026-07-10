@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
+import app.client_bot.user_interface.handlers.adv_setting.adv_setting as adv_setting_handlers
 from app.client_bot.user_interface.handlers.adv_setting import (
     reset_shop_non_relevant_phrases,
 )
@@ -211,11 +212,13 @@ async def test_reset_shop_non_relevant_phrases_updates_only_target_shop(async_se
     mock_sm = _MockSessionMaker(async_session)
 
     shop_menu_instance = AsyncMock()
-    with patch(
-        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu",
+    with patch.object(
+        adv_setting_handlers,
+        "ShopMenu",
         MagicMock(return_value=shop_menu_instance),
-    ) as shop_menu_cls, patch(
-        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+    ) as shop_menu_cls, patch.object(
+        adv_setting_handlers,
+        "sm",
         mock_sm,
     ):
         await reset_shop_non_relevant_phrases(
@@ -264,11 +267,13 @@ async def test_reset_shop_non_relevant_phrases_handles_empty_case(async_session:
     mock_sm = _MockSessionMaker(async_session)
 
     shop_menu_instance = AsyncMock()
-    with patch(
-        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu",
+    with patch.object(
+        adv_setting_handlers,
+        "ShopMenu",
         MagicMock(return_value=shop_menu_instance),
-    ), patch(
-        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+    ), patch.object(
+        adv_setting_handlers,
+        "sm",
         mock_sm,
     ):
         await reset_shop_non_relevant_phrases(
