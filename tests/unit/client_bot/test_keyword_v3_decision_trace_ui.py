@@ -1,4 +1,4 @@
-"""Тесты экрана «Почему бот так решил?» (MVP, read-only audit)."""
+"""Тесты экрана «Почему бот так решил?» (legacy adapter + новый formatter)."""
 
 from __future__ import annotations
 
@@ -69,11 +69,9 @@ def test_screen_shows_executor_and_reason() -> None:
     assert "туалетный столик с зеркалом" in text
     assert "bad" in text
     assert "RaiseStateToTargetCpoExecutor" in text
-    assert "Решение:" in text
-    assert "UP" in text
-    assert "Причина:" in text
+    assert "legacy journal" in text
+    assert "Решение: UP" in text
     assert "OFF" in text and "MIN_CPA" in text
-    assert "нет изменяющего executor" not in text
 
 
 @pytest.mark.unit
@@ -90,11 +88,8 @@ def test_screen_fallback_without_entry() -> None:
         keyword_setting_id=99,
         keyword_changes=snapshot,
     )
-    assert "нет записанного решения" in text
-    assert "нет изменений" in text
-    assert "Причина не зафиксирована" in text
-    assert "нет изменяющего executor" in text
-    assert "Полный каскад SKIP/APPLY" in text
+    assert "Нет trace" in text
+    assert "неизвестно" in text
 
 
 @pytest.mark.unit
@@ -106,9 +101,8 @@ def test_screen_fallback_without_snapshot() -> None:
         keyword_setting_id=1,
         keyword_changes=None,
     )
-    assert "нет записанного решения" in text
-    assert "Причина не зафиксирована" in text
-    assert "нет изменяющего executor" in text
+    assert "Нет trace" in text
+    assert "неизвестно" in text
 
 
 @pytest.mark.unit
@@ -140,8 +134,7 @@ def test_screen_fallback_all_noop_steps() -> None:
         keyword_setting_id=1,
         keyword_changes=snapshot,
     )
-    assert "нет записанного решения" in text
-    assert "нет изменяющего executor" in text
+    assert "Нет trace" in text
 
 
 @pytest.mark.unit

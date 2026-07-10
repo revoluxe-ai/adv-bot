@@ -394,71 +394,55 @@ def format_keyword_v3_decision_trace_screen(
     keyword_setting_id: int,
     keyword_changes: V3KeywordChangesSnapshot | None,
 ) -> str:
-    """Текст экрана «Почему бот так решил?» без ladder/CPM/CH-матрицы.
+    """Текст экрана «Почему бот так решил?» (legacy adapter → ViewData formatter).
 
     Args:
         nmid: Артикул(ы) кампании для заголовка.
         keyword_text: Текст ключевого запроса.
         display_status: Статус ключа для UI (good/bad/pause).
         keyword_setting_id: ID ``KeywordSetting``.
-        keyword_changes: Audit последнего V3-тика из Redis.
+        keyword_changes: Audit последнего V3-тика из Redis (legacy).
 
     Returns:
         Markdown-текст для ``ParseMode.MARKDOWN`` (legacy V1).
     """
-    safe_nmid = _escape_markdown_v1(nmid)
-    safe_keyword = _escape_markdown_v1(keyword_text.replace("\n", " ").strip())
-    status_label = _display_status_label(display_status)
+    from app.client_bot.user_interface.services.keyword_decision_trace_loader import (
+        KeywordDecisionTraceViewData,
+        ProcessingOutcome,
+        TracePresence,
+    )
+    from app.client_bot.user_interface.views.keyword_decision_trace_ui import (
+        format_keyword_decision_trace_screen as _format_from_view,
+    )
 
-    lines = [
-        "🔎 *Почему бот так решил?*",
-        "",
-        f"📦 {safe_nmid}",
-        f"🔑 {safe_keyword}",
-        f"🔄 Текущий статус: {status_label}",
-        "",
-        "Последнее записанное решение V3:",
-    ]
-
-    executor_line = "нет записанного решения"
-    decision_line = "нет изменений"
-    reason_line: str | None = None
-    show_no_changing_note = False
-
+    legacy_decisive = None
+    legacy_tick_at = None
+    source: str = "empty"
     if keyword_changes is not None:
         entry = find_keyword_change_entry(keyword_changes, keyword_setting_id)
         if entry is not None:
-            decisive = last_decisive_step(entry)
-            if decisive is not None:
-                executor_line, decision_line, reason_line = (
-                    _decision_fields_from_decisive(decisive)
-                )
-            else:
-                show_no_changing_note = True
-        else:
-            show_no_changing_note = True
-    else:
-        show_no_changing_note = True
+            legacy_decisive = last_decisive_step(entry)
+            if legacy_decisive is not None:
+                source = "legacy_changes"
+                legacy_tick_at = keyword_changes.tick_at
 
-    lines.append(executor_line)
-    lines.extend(
-        [
-            "",
-            "Решение:",
-            decision_line,
-            "",
-            "Причина:",
-        ]
+    view = KeywordDecisionTraceViewData(
+        nmid_display=nmid,
+        keyword_text=keyword_text,
+        display_status=display_status,
+        automatic_version=3,
+        keyword_setting_id=keyword_setting_id,
+        trace_presence=TracePresence.NO_SNAPSHOT,
+        processing_outcome=ProcessingOutcome.UNKNOWN,
+        tick_started_at=None,
+        processing_started_at=None,
+        tick_finished_at=None,
+        entry=None,
+        source=source,  # type: ignore[arg-type]
+        legacy_decisive=legacy_decisive,
+        legacy_tick_at=legacy_tick_at,
     )
-    if reason_line:
-        lines.append(reason_line)
-    else:
-        lines.append(_REASON_NOT_IN_JOURNAL)
-
-    if show_no_changing_note:
-        lines.extend(["", _NO_CHANGING_EXECUTOR_NOTE])
-
-    return "\n".join(lines)
+    return _format_from_view(view)
 
 
 def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
