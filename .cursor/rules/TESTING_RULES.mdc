@@ -3,7 +3,7 @@
 ## КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА
 - **ВСЕ команды проекта** запускать через Poetry: `poetry run ...`
 - **НИКОГДА** не запускать bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
-- **DEFAULT quality gates**: targeted `pytest`, adjacent `pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
+- **DEFAULT quality gates**: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
 - **НЕ считать** `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
 - Если добавлен новый Python module/file, **сначала** обновить список/набор файлов для `pyright-strict`, **потом** запускать `poetry run pyright-strict`
 - На Windows PowerShell **не использовать** bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
@@ -12,4 +12,4 @@
 - **НИКОГДА** не запускать тесты через `cd tests && pytest` или подобные команды
 - **ВСЕГДА** выполнять тесты в контексте корневой директории проекта
 - **ВАЖНО**: При использовании фикстуры `test_async_db` не используйте конструкцию `async with test_async_db as session:`, вместо этого напрямую используйте `session = test_async_db`
-- **КРИТИЧНО**: В тестах ВСЕГДА использовать моки моделей (TestUser, TestWBToken и т.д.) из tests/test_models.py вместо реальных моделей из приложения. Это помогает избежать проблем с циклическими зависимостями и делает тесты более изолированными. 
+- **КРИТИЧНО**: В тестах ВСЕГДА использовать моки моделей (TestUser, TestWBToken и т.д.) из tests/test_models.py вместо реальных моделей из приложения. Это помогает избежать проблем с циклическими зависимостями и делает тесты более изолированными.
