@@ -1397,6 +1397,8 @@ class WaitingForRelevantPhrases(Text):
 
 
 class RelevantPhraseManagementMenuMessage(TextWithKeyboard):
+    parse_mode = ParseMode.HTML
+
     def __init__(self, bot: Bot, chat_id: int, adv: AdvSetting):
         super().__init__(bot, chat_id)
         self._adv = adv
