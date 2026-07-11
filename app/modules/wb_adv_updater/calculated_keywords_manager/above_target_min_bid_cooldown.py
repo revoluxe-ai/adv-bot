@@ -67,8 +67,6 @@ def is_above_target_at_min_bid(pre_kw: PreCalculatedKeyword, min_bid_for_adv: in
     if target is None:
         return False
     cpm_raw = pre_kw.cpm
-    if cpm_raw is None:
-        return False
     cpm = int(cpm_raw)
     if cpm <= 0:
         return False
