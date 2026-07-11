@@ -739,12 +739,9 @@ class AutoAdvActiveControlService:
                 )
             else:
                 # degraded (missing/invalid best CPO, build_view error, no
-                # provider, or no callable build_view): never fall back to
-                # legacy avg CPO here - only fact_pay_for_order drives pause.
-                cost_rule_failed = (
-                    fact_pay_for_order_value is not None
-                    and fact_pay_for_order_value > target_cost_value
-                )
+                # provider, or no callable build_view): do not block start/stop
+                # by cost rule, because there is no authoritative bidder input.
+                cost_rule_failed = False
         else:
             # legacy behavior: avg_cost_value (selected or legacy) drives pause
             if avg_cost_value is None:
@@ -812,12 +809,9 @@ class AutoAdvActiveControlService:
                 cost_rule_ok = best_cpo_value <= target_cost_value
             else:
                 # degraded (missing/invalid best CPO, build_view error, no
-                # provider, or no callable build_view): never fall back to
-                # legacy avg CPO here - rely on fact_pay_for_order for resume.
-                cost_rule_ok = (
-                    fact_pay_for_order_value is not None
-                    and fact_pay_for_order_value <= target_cost_value
-                )
+                # provider, or no callable build_view): allow start/resume,
+                # because there is no authoritative bidder input to block it.
+                cost_rule_ok = True
         else:
             # avg_cost_value is guaranteed non-None here: the legacy pause-decision
             # branch above returns early when it is None.
