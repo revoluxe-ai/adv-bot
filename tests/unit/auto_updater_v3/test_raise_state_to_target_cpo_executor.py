@@ -412,6 +412,87 @@ def test_raise_state_executor_skips_down_when_already_above_resolve_cap() -> Non
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("adv_state", "expected_mode"),
+    [
+        (_adv_state(resolve=400.0), KeywordStrategyMode.MIN_CPA),
+        (
+            _adv_state(
+                resolve=900.0,
+                max_pay_for_order=400.0,
+                fact_pay_for_order=400.0,
+                guard_condition=True,
+            ),
+            KeywordStrategyMode.MIN_CPA,
+        ),
+    ],
+)
+def test_raise_state_execute_excludes_candidate_equal_to_active_ceiling(
+    adv_state: AdvState,
+    expected_mode: KeywordStrategyMode,
+) -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.OFF,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+
+    assert dto.current_mode == expected_mode
+    assert dto.current_target_place == 10
+    assert len(dto.next_state) == 1
+
+
+@pytest.mark.unit
+def test_raise_state_guard_condition_with_no_raise_ceiling_uses_resolve() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+    )
+    adv_state = _adv_state(resolve=500.0, guard_condition=True)
+    assert adv_state.raise_cpo_ceiling is None
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert len(dto.next_state) == 1
+
+
+@pytest.mark.unit
+def test_raise_state_guard_condition_ceiling_above_resolve_keeps_resolve_ceiling() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.MIN_CPA,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=700.0),
+    )
+    adv_state = _adv_state(
+        resolve=500.0,
+        max_pay_for_order=450.0,
+        fact_pay_for_order=800.0,
+        guard_condition=True,
+        v3_substitute_fact_cpo_for_max=True,
+    )
+    assert adv_state.raise_cpo_ceiling == 800.0
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_target_place == 20
+    assert len(dto.next_state) == 1
+
+
+@pytest.mark.unit
 def test_is_campaign_in_raise_stabilization_zone_uses_resolve() -> None:
     resolve = 400.0
     floor = raise_state_resolve_stabilization_floor(resolve)
@@ -419,6 +500,21 @@ def test_is_campaign_in_raise_stabilization_zone_uses_resolve() -> None:
     assert is_campaign_in_raise_stabilization_zone(adv_at) is True
     adv_below = _adv_state(resolve=resolve, fact_pay_for_order=floor - 1.0)
     assert is_campaign_in_raise_stabilization_zone(adv_below) is False
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "adv",
+    [
+        _adv_state(resolve=400.0, fact_pay_for_order=None),
+        _adv_state(resolve=400.0, fact_pay_for_order=400.0, resolve_valid=False),
+        _adv_state(resolve=0.0, fact_pay_for_order=400.0),
+    ],
+)
+def test_is_campaign_in_raise_stabilization_zone_false_for_invalid_inputs(
+    adv: AdvState,
+) -> None:
+    assert is_campaign_in_raise_stabilization_zone(adv) is False
 
 
 @pytest.mark.unit
@@ -440,6 +536,34 @@ def test_should_skip_keyword_true_when_expensive_and_stabilization() -> None:
 
 
 @pytest.mark.unit
+def test_should_skip_keyword_false_when_pfo_equals_resolve() -> None:
+    resolve = 400.0
+    fact = raise_state_resolve_stabilization_floor(resolve)
+    adv = _adv_state(resolve=resolve, fact_pay_for_order=fact)
+    dto = _dto(target_pfo=resolve)
+    assert dto.calculated_keyword.pay_for_order == pytest.approx(resolve)
+    assert should_skip_keyword_raise_to_target_cpo(dto, adv) is False
+
+
+@pytest.mark.unit
+def test_should_skip_keyword_false_when_pfo_is_none() -> None:
+    kw = _calc_kw(
+        ks_id=2,
+        text="kw-without-pfo",
+        mode=KeywordStrategyMode.MIN_CPA,
+        rating=1.0,
+        conv=0.0,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
+    dto = KeywordDTO.from_context(ctx, ladder_states=_ladder_states(2))
+    resolve = 400.0
+    fact = raise_state_resolve_stabilization_floor(resolve)
+    adv = _adv_state(resolve=resolve, fact_pay_for_order=fact)
+    assert dto.calculated_keyword.pay_for_order is None
+    assert should_skip_keyword_raise_to_target_cpo(dto, adv) is False
+
+
+@pytest.mark.unit
 def test_cheap_kw_never_skipped_regardless_of_campaign_fact() -> None:
     """Регрессия: fact выше 0.9×max и 0.9×resolve, но дешёвый ключ поднимается."""
     dto = _dto(ks_id=1, mode=KeywordStrategyMode.MIN_CPA, target_pfo=10.73)
@@ -457,6 +581,46 @@ def test_cheap_kw_never_skipped_regardless_of_campaign_fact() -> None:
     assert executor.skip_reason is None
     assert dto.current_mode == KeywordStrategyMode.OPTIMUM
     assert len(dto.next_state) == 1
+
+
+@pytest.mark.unit
+def test_raise_state_same_mode_more_aggressive_target_position_is_applied() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.OPTIMUM,
+        ladder=_ladder_states_duplicate_optimum_cap(1),
+        target_place=11,
+    )
+    adv_state = _adv_state(resolve=500.0)
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_target_place == 3
+    assert dto.next_state == []
+
+
+@pytest.mark.unit
+def test_raise_state_same_rank_candidate_is_noop() -> None:
+    dto = _dto(
+        mode=KeywordStrategyMode.OPTIMUM,
+        ladder=_ladder_states(1, min_cpo=300.0, opt_cpo=400.0, max_cpo=600.0),
+        target_place=20,
+    )
+    adv_state = _adv_state(resolve=500.0)
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[dto]),
+        adv_state=adv_state,
+    )
+
+    RaiseStateToTargetCpoExecutor().execute(ctx)
+
+    assert dto.current_mode == KeywordStrategyMode.OPTIMUM
+    assert dto.current_target_place == 20
+    assert dto.next_state == []
 
 
 @pytest.mark.unit
