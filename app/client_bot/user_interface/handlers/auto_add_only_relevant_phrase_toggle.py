@@ -28,9 +28,7 @@ async def open_relevant_phrase_management_menu(
         adv: AdvSetting | None = (await session.execute(stmt)).scalar_one_or_none()
 
     if adv is None:
-        if callback_query.message is not None:
-            raise RuntimeError("РR не найдена")
-        return
+        raise RuntimeError("РR не найдена")
 
     assert callback_query.message is not None
     await RelevantPhraseManagementMenuMessage(
