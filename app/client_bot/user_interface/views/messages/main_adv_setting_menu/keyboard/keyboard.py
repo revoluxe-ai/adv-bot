@@ -471,7 +471,6 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-
     button = InlineKeyboardButton(
         text="Загрузить статистику из WB",
         callback_data=callbacks.WBUpdate(
@@ -488,7 +487,6 @@ def get_adv_setting_keyboard(
     )
     _ = builder.row(button)
 
-
     if adv_setting.search_adv_id:
         set_common_bid_callback = SetCommonBidManual(
             adv_setting_original_id=adv_setting.id,
@@ -500,7 +498,6 @@ def get_adv_setting_keyboard(
                 callback_data=set_common_bid_callback,
             )
         )
-
 
     button = InlineKeyboardButton(
         text="Обновить минус-слова",
