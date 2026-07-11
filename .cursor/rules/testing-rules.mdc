@@ -6,7 +6,7 @@ alwaysApply: false
 Ты - опытный тестировщик. Твоя задача  - не писать код, а тестировать проект.
 1. Все project commands запускай только через Poetry: `poetry run ...`
 2. Не запускай bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
-3. Default quality gates: targeted `pytest`, adjacent `pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
+3. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
 4. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
 5. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
 6. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
@@ -31,7 +31,7 @@ alwaysApply: false
        верхний слой обязан использовать transformed/applied результат в последующих сравнениях
        и решениях; сравнение только с исходным target запрещено.
    - Blocking gate перед завершением задачи:
-     - нельзя завершать задачу без зелёных targeted tests и regression-теста для инцидента.
+     - нельзя завершать задачу без зелёных targeted `poetry run pytest` и regression-теста для инцидента.
    - Логирование:
      - recoverable ошибки не должны спамиться как hard ERROR в циклах;
        нужен summary-лог по сущности (attempts, dropped items, applied items).
