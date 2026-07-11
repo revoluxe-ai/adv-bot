@@ -31,6 +31,7 @@ class PreCalculatedKeyword(BaseModel):
             resolved = self.cpm_sources.resolved_cpm()
             if resolved is not None:
                 return resolved
+        # TODO: надо выпилить 0 отсюда, None вместо него надо
         return getattr(self.cluster_stat, "cpm", 0.0) or 0.0
 
     @property
