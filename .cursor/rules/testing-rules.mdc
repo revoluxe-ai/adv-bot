@@ -7,12 +7,13 @@ alwaysApply: false
 1. Все project commands запускай только через Poetry: `poetry run ...`
 2. Не запускай bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
 3. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
-4. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
-5. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
-6. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
-7. Если я попрошу внести изменения в правила, редактируй текущее правило
+4. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза; если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
+5. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
+6. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
+7. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
+8. Если я попрошу внести изменения в правила, редактируй текущее правило
 
-8. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
+9. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
    - Перед изменениями составь failure matrix:
      - happy path
      - recoverable failures (fallback/partial success)

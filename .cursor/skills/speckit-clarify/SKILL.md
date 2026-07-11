@@ -207,7 +207,7 @@ Execution steps:
      1. Read the checklist file.
      2. Identify all GitHub task-list checkbox lines — lines matching `- [ ]`, `- [x]`, or `- [X]` (case-insensitive, tolerant of leading whitespace for nested items) outside of code fences. Ignore all other content (headings, notes, non-checkbox bullets, metadata).
      3. For each checkbox line, record its current marker state (checked or unchecked) and item text into a before-snapshot list.
-     4. Re-evaluate each checkbox item against the **updated** spec (the version just saved in step 7).
+     4. Re-evaluate each checkbox item against the **updated** spec (the version just saved in step 8).
      5. For each checkbox item, update only if the checked/unchecked state actually changes:
         - If the item now passes and was unchecked: change `[ ]` to `[x]`.
         - If the item now fails and was checked: change `[x]`/`[X]` to `[ ]`.
