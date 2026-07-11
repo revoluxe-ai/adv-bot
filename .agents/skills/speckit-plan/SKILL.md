@@ -101,10 +101,6 @@ Check if `.specify/extensions.yml` exists in the project root.
     To execute: `/{command}`
     ```
 
-## Completion Report
-
-Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated artifacts.
-
 ## Phases
 
 ### Phase 0: Outline & Research
@@ -158,6 +154,15 @@ Command ends after Phase 1 design. Report branch, IMPL_PLAN path, and generated 
 
 - Use absolute paths for filesystem operations; use project-relative paths for references in documentation
 - ERROR on gate failures or unresolved clarifications
+
+## Completion Report
+
+Command ends after Phase 1 design. Report the branch, `IMPL_PLAN` path, and the generated artifacts:
+
+- `research.md`
+- `data-model.md`
+- `/contracts/*` when applicable
+- `quickstart.md`
 
 ## Done When
 
