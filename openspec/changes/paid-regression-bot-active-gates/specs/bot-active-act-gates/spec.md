@@ -36,7 +36,15 @@ When bot active is disabled, the system MUST NOT add, remove, or trim whitelist 
 - **WHEN** shop-runner runs top-key whitelist update
 - **AND** campaign has bot active disabled
 - **AND** auto whitelist update is enabled
+- **AND** the campaign is in the v2 / non-v3 updater path where `update_top_key_in_advs` is applicable
 - **THEN** no whitelist mutation is sent to Wildberries
+
+#### Scenario: Top key whitelist updater is paid v2 only
+
+- **WHEN** top-key whitelist behavior is tested for a campaign with bot active enabled
+- **AND** the campaign uses updater v2 / non-v3 automation
+- **THEN** `update_top_key_in_advs` is the applicable ACT path
+- **AND** v3 whitelist behavior is covered through `adv_settings_auto_update` / `process_adv_v3`
 
 #### Scenario: Whitelist tail trimmer skips when inactive
 
