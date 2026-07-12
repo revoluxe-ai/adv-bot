@@ -19,43 +19,62 @@ context: |
 
   Важные доменные зоны:
     Высокорисковыми считаются изменения, которые затрагивают:
-      - превышение расхода сверх нормы
-      - необоснованное (не понятное пользователю) отсутствие трафика, что вызывает гнев у пользователей
-      - ошибки в списании платы за бот, в том числе отсутствие, в том числе излишние
-      - проект должен быть рассчитан на работу с большим количеством РК: тысячи, десятки тысяч
+      - ставки: CPO/CPA, V3, ApplyManager, lifecycle кампаний, автозапуск / автоостановку,
+        WB API write actions, БД и миграции, превышение расхода сверх нормы,
+        необоснованное или непонятное пользователю отсутствие трафика,
+        ошибки в списании платы за бот, работу с большим количеством РК: тысячи и десятки тысяч.
 
   Free/Paid граница:
-    во free сейчас не должно быть только: обновление ставок в shelf-кампаниях, обновление общей ставки поисковых рк,
-  обновление целевых позиций ключей, автообновление shelf-ставки (автокампания, полочная РК), но ручное изменение доступно,
-  обновление целевой позиции ключей, обновление белого списка (весь функционал авто-адпейтеров не доступне и не применяется)
+    Free bot должен максимально использовать read-only value:
+      - аналитика;
+      - диагностика;
+      - объяснения;
+      - preview;
+      - export-import excel;
+      - onboarding;
+      - navigation;
+      - lead capture;
+      - paid offer routing. и т.д.
 
-    Read-only аналитика, диагностика, объяснения, preview, export, onboarding,
-    navigation, lead capture и paid offer routing должны быть во Free bot - используем возможности по-максимуму
+    Paid automation core не должен бесплатно отдаваться во Free:
+      - автоматическое обновление ставок в shelf-кампаниях;
+      - автоматическое обновление общей ставки поисковых РК;
+      - автоматическое обновление целевых позиций ключей;
+      - автоматическая остановка Авто кампании по повышенной ставке (сейчас не так, надо изменить);
+      - автоматическое обновление белого списка и целевых позиций..
 
-    Все действия, которые меняют состояние рекламы на Wildberries должны быть на free по умолчанию (при создании РК выключены)
+    Manual self-service во Free:
+      Ручное изменение может быть допустимо только если отдельный spec явно описывает
+      preview, объяснение, affected records и explicit confirmation пользователя.
 
-    В Free режиме WB write-действия должны быть выключены по умолчанию,
-    если отдельный spec явно не разрешает ручное действие с preview,
-    объяснением и явным подтверждением пользователя.
+    Default:
+      В Free режиме все WB write-действия выключены по умолчанию.
 
   Обратная совместимость:
     Paid bot и существующий paid-интерфейс нельзя ломать без отдельного proposal.
     Backend может быть общим, но Free/Paid поведение должно разделяться через access guards.
 
-rules:
-  language:
-    - Все OpenSpec artifacts для WB Sky писать на русском языке.
-    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
-    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
+  Видение на будущее:
+    В перспективе adv-bot должен развиваться не просто как платный инструмент
+    автоуправления рекламой, а как self-service продукт с бесплатной версией,
+    партнёрской программой, встроенным обучением пользователя и AI-first
+    поддержкой. Цель — снизить ручную нагрузку владельца и сделать так,
+    чтобы пользователь мог разобраться, получить пользу, дойти до платного
+    сценария и решить типовые проблемы без личного участия владельца.
 
+rules:
   proposal:
     - Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea.
     - Один change должен иметь один intent.
     - Proposal должен объяснять зачем и в каких границах делается изменение.
     - Не писать в proposal список файлов, классов, функций или SQL-запросов.
     - Явно указывать out of scope.
+    - Писать на русском языке.
+    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
+    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
 
   specs:
+    - Любое изменение считать high-risk, если оно затрагивает ставки, CPO/CPA, V3/V2 апдейтеры, ApplyManager, lifecycle кампаний, автозапуск / автоостановку, WB API write actions, БД и миграции, paid/free boundary, списание платы за бот, управление активностью ключей - перерасход-недорасход, управление ставкой ключей - слишком большая ставка, поломка биддера (перестал менять ставки).
     - Описывать observable behavior, а не implementation.
     - Использовать GIVEN/WHEN/THEN scenarios.
     - Не включать classes, functions, SQLAlchemy, Redis, file paths или implementation details.
@@ -65,25 +84,31 @@ rules:
     - Specs должны описывать stable product behavior или access boundary.
     - Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation.
     - Manual self-service actions нельзя описывать как automatic optimization.
+    - Писать на русском языке.
+    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
+    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
 
   design:
     - Перед техническими изменениями изучать существующую реализацию.
+    - Использовать стек: Python 3.11, SqlAlchemy + Postgres, dependency injection, clickhouse, Redis (смотри внимательно практику использования)
     - Переиспользовать существующие project patterns, если нет явно описанной причины отклониться.
     - Описывать affected components, side effects, access guards, validation plan, rollback idea и performance considerations.
     - Технические детали, data flow, queries, modules и file changes писать в design, а не в spec.
     - Для любого write-path описывать preview, explicit confirmation, affected records, recovery/rollback idea и tests.
     - Перед изменениями Free/Paid поведения найти и классифицировать все WB-impacting write paths.
-    - используй dependency injection библиотеку в проекта
+    - Писать на русском языке.
+    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
+    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
 
   tasks:
+    - Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов.
+    - Сначала добавлять или обновлять regression/characterization tests, затем менять production code.
+    - Тест не должен мокать функцию, фильтрацию или decision logic, поведение которой он проверяет.
     - Tasks должны быть маленькими, последовательными, проверяемыми.
     - Включать characterization tests перед изменением рискованного или неясного поведения.
     - Включать regression tests для bug fixes.
     - Включать targeted tests для каждой новой или изменённой decision function.
     - Включать tests для business invariants и forbidden side effects.
     - Не добавлять поверхностные tests, которые проверяют только существование результата.
-
-  validation:
-    - openspec validate проверяет структуру artifacts, но не доказывает правильность business logic.
-    - Реализацию нужно отдельно проверять на соответствие proposal/spec/design/tasks.
-    - Passing tests не означает, что spec хороший.
+    - Писать на русском языке.
+    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
