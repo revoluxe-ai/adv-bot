@@ -22,6 +22,7 @@ async def test_common_bid_skipped_when_bot_inactive(
     update_mock = AsyncMock(return_value=None)
     manager_mock = MagicMock()
     manager_mock.update_common_bid_in_search_adv = update_mock
+    wb_adv_dto = MagicMock()
 
     with (
         patch(
@@ -36,8 +37,12 @@ async def test_common_bid_skipped_when_bot_inactive(
         ) as resolver_cls,
     ):
         mock_settings.AUTO_SETTING_ACTIVE = True
-        resolver_cls.return_value.get_merged_bids = AsyncMock(return_value={})
-        manager._wb_shop_data_manager.get_wb_advs_dto = AsyncMock(return_value=[])
+        resolver_cls.return_value.get_merged_bids = AsyncMock(
+            return_value={90001: {123456: 100}}
+        )
+        manager._wb_shop_data_manager.get_wb_advs_dto = AsyncMock(
+            return_value=[wb_adv_dto]
+        )
 
         await unwrap_coroutine(manager.update_common_bid_in_search_adv)(manager)
 

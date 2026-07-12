@@ -13,6 +13,7 @@ from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
     turn_adv_off_all,
 )
 from app.client_bot.user_interface.views import callbacks
+from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory
 
 pytestmark = [pytest.mark.unit, pytest.mark.paid_regression, pytest.mark.asyncio]
 
@@ -34,8 +35,9 @@ async def test_turn_adv_off_sets_bot_inactive() -> None:
         adv_original_id=2,
     )
     bot = AsyncMock()
-    adv = SimpleNamespace(id=2, bot_active=True)
-    wb_user_cabinet = SimpleNamespace(id=1)
+    wb_cabinet = WBCabinetFactory.build(id=10, shop_id="shop-1")
+    adv = AdvSettingFactory.build(id=2, bot_active=True, wb_cabinet=wb_cabinet)
+    wb_user_cabinet = SimpleNamespace(id=1, wb_cabinet=wb_cabinet)
 
     session_read = MagicMock()
     session_read.execute = AsyncMock(
@@ -77,8 +79,9 @@ async def test_turn_adv_off_all_sets_all_inactive() -> None:
     callback_data = callbacks.TurnBot(action="off_all", wb_user_cabinet_original_id=1)
     bot = AsyncMock()
     state = AsyncMock()
-    adv1 = SimpleNamespace(bot_active=True)
-    adv2 = SimpleNamespace(bot_active=True)
+    wb_cabinet = WBCabinetFactory.build(id=10, shop_id="shop-1")
+    adv1 = AdvSettingFactory.build(id=1, bot_active=True, wb_cabinet=wb_cabinet)
+    adv2 = AdvSettingFactory.build(id=2, bot_active=True, wb_cabinet=wb_cabinet)
 
     session = MagicMock()
     scalars = MagicMock()

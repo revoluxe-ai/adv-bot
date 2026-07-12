@@ -10,6 +10,7 @@ import pytest
 
 from app.client_bot.user_interface.handlers.adv_setting.adv_setting import turn_adv_on
 from app.client_bot.user_interface.views import callbacks
+from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory
 
 pytestmark = [pytest.mark.unit, pytest.mark.paid_regression, pytest.mark.asyncio]
 
@@ -35,12 +36,17 @@ async def test_turn_bot_on_sets_bot_active_when_balance_ok() -> None:
     bot = AsyncMock()
     state = AsyncMock()
 
-    adv = SimpleNamespace(id=2, bot_active=False)
-    wb_cabinet = SimpleNamespace(id=10, shop_id="shop-1")
+    wb_cabinet = WBCabinetFactory.build(id=10, shop_id="shop-1")
+    adv = AdvSettingFactory.build(
+        id=2,
+        bot_active=False,
+        automatic_version=3,
+        wb_cabinet=wb_cabinet,
+    )
     wb_user_cabinet = SimpleNamespace(wb_cabinet=wb_cabinet, id=1)
 
     session = MagicMock()
-    session.begin = MagicMock()
+    session.begin = AsyncMock()
     wb_uc_result = MagicMock()
     wb_uc_result.scalar_one.return_value = wb_user_cabinet
     adv_result = MagicMock()
@@ -70,6 +76,10 @@ async def test_turn_bot_on_sets_bot_active_when_balance_ok() -> None:
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
             new=AsyncMock(return_value=(500.0, 0.0)),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._shop_has_read_only_only_tokens",
+            new=AsyncMock(return_value=False),
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
