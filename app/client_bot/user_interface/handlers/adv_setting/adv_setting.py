@@ -1,24 +1,25 @@
+"""Handlers for campaign settings and paid auto-management screens."""
+
 import logging
 import aiogram
 from typing import Any, Sequence, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result, update
-from sqlalchemy.engine import CursorResult
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import Result
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
+from app.client_bot import const
 from app.core.di.wb_manager_hub import WBManagerHub, WBManagerHubFactory
 from app.modules import balance_manager
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
-    KeywordSetting,
     WBUserCabinet,
 )
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.client_bot.modules.default_settings import apply_common_defaults_settings_for_adv
 from app.client_bot.user_interface.services.auto_management_mode import (
@@ -27,12 +28,16 @@ from app.client_bot.user_interface.services.auto_management_mode import (
 )
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
+from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
 from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
     backfill_v3_hard_statuses_and_states_consistency,
+)
+from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
+    PlanFactReader,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     WBShopDataManager,
@@ -42,18 +47,17 @@ from app.modules.token_monitoring.services.token_info_service import TokenInfoSe
 from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-
-from .. import states
-from ..views import callbacks, messages
-from ..views.messages.main_adv_setting_menu import AdvSettingMenu
-from ..views.messages.main_adv_setting_menu.auto_management_landing import (
+from ... import states
+from ...views import callbacks, messages
+from ...views.messages.main_adv_setting_menu import AdvSettingMenu
+from ...views.messages.main_adv_setting_menu.auto_management_landing import (
     AutoManagementHowItWorks,
     AutoManagementLanding,
 )
-from ..views.messages.main_adv_setting_menu.minus_phrases_setting import (
+from ...views.messages.main_adv_setting_menu.minus_phrases_setting import (
     MinusPhrasesSettingScreen,
 )
-from ... import const
+
 
 sm = get_async_session_maker
 
@@ -80,7 +84,7 @@ async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
     return has_active_read_only_token and not token_status.valid_tokens
 
  # TODO: Переделать в WBCabinet.get()
-async def _get_wb_user_cabinet(
+async def get_wb_user_cabinet(
     wb_user_cabinet_original_id: int,
 ) -> WBUserCabinet:
     """Load WBUserCabinet by id for campaign and landing navigation."""
@@ -97,7 +101,7 @@ async def _get_wb_user_cabinet(
 
 # TODO: переделать в тестируемую функцию
 
-async def _get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
+async def get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
     """Load AdvSetting by id for campaign menu and paid-landing handlers."""
     async with sm(read_only=True) as session:
         result = await session.execute(
@@ -111,16 +115,18 @@ async def _get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
     return adv_setting
 
 
-async def _get_adv_setting_or_none(adv_setting_original_id: int) -> AdvSetting:
+async def get_adv_setting_or_none(adv_setting_original_id: int) -> AdvSetting:
     """Backward-compatible alias for tests patching the legacy helper name."""
-    return await _get_adv_setting(adv_setting_original_id)
+    return await get_adv_setting(adv_setting_original_id)
 
 
-async def _get_wb_user_cabinet_or_none(
+async def get_wb_user_cabinet_or_none(
     wb_user_cabinet_original_id: int,
 ) -> WBUserCabinet:
     """Backward-compatible alias for tests patching the legacy helper name."""
-    return await _get_wb_user_cabinet(wb_user_cabinet_original_id)
+    return await get_wb_user_cabinet(wb_user_cabinet_original_id)
+
+
 
 
 
@@ -322,10 +328,10 @@ async def open_auto_management_landing(
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+    wb_user_cabinet = await get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting_or_none(
+    adv_setting = await get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -343,10 +349,10 @@ async def open_auto_management_how_it_works(
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+    wb_user_cabinet = await get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting_or_none(
+    adv_setting = await get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -364,10 +370,10 @@ async def back_from_auto_management_landing(
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+    wb_user_cabinet = await get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting_or_none(
+    adv_setting = await get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
@@ -385,19 +391,19 @@ async def open_minus_phrases_setting_screen(
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+    wb_user_cabinet = await get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting_or_none(
+    adv_setting = await get_adv_setting_or_none(
         callback_data.adv_setting_original_id
     )
 
     await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
-async def _update_and_get_adv_setting(session: AsyncSession,
-                                      new_status: bool,
-                                      adv_setting_original_id: int) -> AdvSetting:
+async def update_and_get_adv_setting(session: AsyncSession,
+                                     new_status: bool,
+                                     adv_setting_original_id: int) -> AdvSetting:
     stmt = (
         update(AdvSetting)
         .where(AdvSetting.id == adv_setting_original_id)
@@ -431,13 +437,13 @@ async def toggle_minus_phrases_setting(
     chat_id = callback.message.chat.id
     new_status = callback_data.action == "on"
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+    wb_user_cabinet = await get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
     async with sm(read_only=False) as session:
-        adv_setting =  await _update_and_get_adv_setting(session,
-                                                         new_status,
-                                                         callback_data.adv_setting_original_id)
+        adv_setting =  await update_and_get_adv_setting(session,
+                                                        new_status,
+                                                        callback_data.adv_setting_original_id)
 
     await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
 
@@ -453,10 +459,10 @@ async def back_from_minus_phrases_setting(
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
+    wb_user_cabinet = await get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    adv_setting = await _get_adv_setting(
+    adv_setting = await get_adv_setting(
         callback_data.adv_setting_original_id
     )
 
@@ -479,7 +485,8 @@ async def turn_adv_on(
     adv_original_id = callback_data.adv_original_id
     # TODO: Упростить эту функцию, разбить, покрыть тестами, в том числе интгериационными
     async with sm(read_only=False) as session:
-        session.begin()
+        #TODO: Как то тут бегин работал без await? или нет. Вынести в тест и проверить
+        await session.begin()
         stmt = (
             select(WBUserCabinet)
             .join(WBUserCabinet.wb_cabinet)
@@ -627,7 +634,6 @@ async def apply_campaign_defaults(
     callback: types.CallbackQuery,
     callback_data: callbacks.ApplyCampaignDefaults,
     bot: aiogram.Bot,
-    state: FSMContext,
 ) -> None:
     if callback.message is None:
         raise ValueError('Нет сообщения')
@@ -714,11 +720,16 @@ async def wb_update_minus_keywords(
             )
             hub: WBManagerHub  = factory.get_wb_manager_hub(shop_id)
             tasks_manager = TasksManager(max_workers=1)
+            redis_client_wrapper = cast(
+                RedisClient,
+                cast(Any, container).redis_client_wrapper(),
+            )
             wb_shop_data_manager = WBShopDataManager(
                 wb_cabinet=wb_cabinet,
                 tasks_manager=tasks_manager,
                 wb_api_data_manager=hub.wb_data_manager,
                 wb_manager=hub.wb_manager,
+                plan_fact_reader=PlanFactReader(redis_client=redis_client_wrapper),
             )
             complex_advs = await wb_shop_data_manager.get_complex_advs(
                 load_extras=False
@@ -819,49 +830,9 @@ async def reset_shop_non_relevant_phrases(
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-
     async with sm(read_only=False) as session:
-        adv_setting_ids_subquery = (
-            select(AdvSetting.id)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        )
-        v3_adv_setting_ids_subquery = (
-            select(AdvSetting.id)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-            .where(AdvSetting.automatic_version == 3)
-        )
-        stmt_non_v3 = (
-            update(KeywordSetting)
-            .where(
-                KeywordSetting.adv_setting_id.in_(adv_setting_ids_subquery),
-                KeywordSetting.adv_setting_id.notin_(v3_adv_setting_ids_subquery),
-                KeywordSetting.hard_status == const.BLACK_LIST,
-            )
-            .values(hard_status=const.AUTO_MODE)
-        )
-        stmt_v3 = (
-            update(KeywordSetting)
-            .where(
-                KeywordSetting.adv_setting_id.in_(v3_adv_setting_ids_subquery),
-                KeywordSetting.hard_status == const.BLACK_LIST,
-            )
-            .values(
-                hard_status=const.AUTO_MODE,
-                strategy_mode=KeywordStrategyMode.OFF,
-            )
-        )
-        update_non_v3_result = cast(
-            CursorResult[Any], await session.execute(stmt_non_v3)
-        )
-        update_v3_result = cast(CursorResult[Any], await session.execute(stmt_v3))
-        updated_count = int(update_non_v3_result.rowcount or 0) + int(
-            update_v3_result.rowcount or 0
-        )
-        await session.commit()
+         from .utils import update_keywords
+         updated_count = await update_keywords(session, wb_user_cabinet_original_id)
 
     await bot.send_message(
         chat_id,
