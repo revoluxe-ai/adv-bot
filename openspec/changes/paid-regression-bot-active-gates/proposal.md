@@ -24,7 +24,7 @@
 ### New Capabilities
 
 - `paid-regression-suite`: контрактные тесты, гарантирующие неизменность paid-поведения при `bot_active=True` (включение бота, billing, shop-runner ACT, UI toggles с проверкой баланса).
-- `bot-active-act-gates`: инварианты free/paid границы — при `bot_active=False` WB write из перечня ACT не вызывается; при включённых флагах автоматики утечки нет.
+- `bot-active-act-gates`: инварианты free/paid границы — при `bot_active=False` WB write из перечня ACT не вызывается; при включённых флагах автоматики и непустых входных данных для write-path утечки нет.
 - `shop-runner-record-act-matrix`: спецификация разделения корутин shop-runner на запись (RECORD) и мутации (ACT) для кабинетов с валидным токеном.
 
 ### Modified Capabilities
@@ -33,7 +33,7 @@
 
 ## Impact
 
-- **Тестовая инфраструктура:** новые каталоги `tests/paid_regression/`, `tests/bot_active_gates/`, маркеры в `pytest.ini`, общие фикстуры `ComplexAdv` / `AdvSetting` с `bot_active` и включёнными auto-flags; `WBApi` через корневую `access_mock`; client_bot handler-тесты — callable mock для `sm(read_only=...)`.
+- **Тестовая инфраструктура:** новые каталоги `tests/paid_regression/`, `tests/bot_active_gates/`, маркеры в `pytest.ini`, общие фикстуры `ComplexAdv` / `AdvSetting` с `bot_active` и включёнными auto-flags; ACT gate-тесты должны давать непустые downstream inputs там, где пустой список создаёт ранний выход; `WBApi` через корневую `access_mock`; client_bot handler-тесты — callable mock для `sm(read_only=...)`.
 - **Shop-runner (контракт, не код в этом change):** `CoroutinesManager`, `WBShopDataManager._get_active_advs`, корутины `update_common_bid_in_search_adv`, `update_individual_keyword_target_places`, `update_top_key_in_advs`, `white_list_tail_trimmer`, `auto_shelf_bid_control`, `update_cluster_bids`, `adv_settings_auto_update`, snapshot updater batch filter.
 - **Billing / client_bot:** косвенно — paid regression включает существующие billing и turn-bot-on тесты в curated list; прямых изменений кода нет.
 - **CI / workflow:** рекомендуемая команда pre-merge для free-веток; опционально отдельный job на `paid_regression`.

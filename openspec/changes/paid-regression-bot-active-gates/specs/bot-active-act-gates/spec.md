@@ -8,6 +8,7 @@ When bot active is disabled on a campaign, the system MUST NOT apply common bid 
 
 - **WHEN** shop-runner runs common search bid update for a campaign with bot active disabled
 - **AND** common bid automation is enabled for that campaign
+- **AND** the test supplies a non-empty WB adverts DTO/search input that would reach the common-bid write manager if the bot-active guard were missing
 - **THEN** no common search bid mutation is sent to Wildberries
 
 ### Requirement: Inactive bot blocks keyword target place WB write
@@ -70,11 +71,12 @@ When bot active is disabled, the system MUST NOT execute other paid automation W
 
 ### Requirement: Gate tests use enabled flags to detect leaks
 
-Bot active gate tests MUST configure automation flags as enabled while bot active is disabled, so that missing gates are detected as test failures.
+Bot active gate tests MUST configure automation flags as enabled while bot active is disabled, and MUST provide non-empty downstream inputs for coroutines that otherwise return early, so that missing gates are detected as test failures.
 
 #### Scenario: Leak detection with flags on
 
 - **WHEN** a gate test runs with bot active disabled and all relevant automation flags enabled
+- **AND** the mocked loader/resolver inputs make the WB write path reachable except for the bot-active gate
 - **AND** implementation incorrectly performs a WB write
 - **THEN** the gate test fails
 

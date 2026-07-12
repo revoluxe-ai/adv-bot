@@ -47,6 +47,7 @@
 - `WBApi` в conftest собирать через корневую фикстуру `access_mock` (токены WB), не голый `MagicMock`.
 - Для одного тика корутины — `unwrap_coroutine()` снимает `while_coroutine_decorator`.
 - `auto_shelf_bid_control`: корутина всегда вызывает `run_tasks`; gate проверяется по **пустому** списку handlers или отсутствию WB setter в handler.
+- `update_common_bid_in_search_adv`: не стабить `get_wb_advs_dto` в `[]` для inactive gate. Тест должен вернуть непустой DTO/search input и настроить resolver так, чтобы при отсутствии `bot_active` gate код дошёл бы до `UpdateCommotBidInSearchAdvsManager.update_common_bid_in_search_adv`; иначе `assert_not_called()` проверяет только ранний выход по пустым данным.
 
 **Альтернатива:** integration с реальным Redis/CH — отложена на P1 для RECORD path.
 
@@ -147,6 +148,7 @@
 ```text
 GIVEN ComplexAdv with bot_active=False
 AND all relevant auto flags enabled (whitelist, target_place, shelf control, common bid)
+AND downstream write inputs are non-empty when the coroutine would otherwise exit early
 WHEN coroutine X runs
 THEN WB write dependency mock was NOT called
 ```
