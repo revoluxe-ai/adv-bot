@@ -39,12 +39,13 @@ def _make_auto_adv(
     automatic_version: int,
     wl: bool,
     tp: bool,
+    bot_active: bool = True,
 ) -> AdvSetting:
     return AdvSetting(
         adv_id=adv_id,
         name=f"auto_{adv_id}",
         wb_cabinet_id=wb_cabinet_id,
-        bot_active=True,
+        bot_active=bot_active,
         active_status="any",
         _search_adv_id=search_adv_id,  # noqa: SLF001
         automatic_version=automatic_version,
@@ -71,6 +72,43 @@ async def test_auto_mode_applies_new_tariffs_when_any_part_auto_enabled(
     )
 
     async_session.add_all([search, auto])
+    await async_session.flush()
+
+    details = await Pricer().get_tariff_details(async_session, shop_id)
+
+    assert details.count == 1
+    assert details.mode == TariffMode.AUTO
+    assert details.price_per_adv == float(tariffs_for_auto_setting[1])
+    assert details.total_per_month == float(tariffs_for_auto_setting[1])
+
+
+async def test_tariff_counts_only_bot_active_auto_advs(
+    async_session: AsyncSession,
+    wb_cabinet: WBCabinet,
+):
+    wb_cabinet_id = 1
+    shop_id = "test_shop_id"
+
+    search = _make_search_adv(adv_id=90701, wb_cabinet_id=wb_cabinet_id)
+    active_auto = _make_auto_adv(
+        adv_id=90702,
+        wb_cabinet_id=wb_cabinet_id,
+        search_adv_id=search.adv_id,
+        automatic_version=2,
+        wl=True,
+        tp=False,
+    )
+    inactive_auto = _make_auto_adv(
+        adv_id=90703,
+        wb_cabinet_id=wb_cabinet_id,
+        search_adv_id=search.adv_id,
+        automatic_version=2,
+        wl=True,
+        tp=False,
+        bot_active=False,
+    )
+
+    async_session.add_all([search, active_auto, inactive_auto])
     await async_session.flush()
 
     details = await Pricer().get_tariff_details(async_session, shop_id)
@@ -227,4 +265,3 @@ async def test_auto_tariff_thresholds_apply_to_total_count(
     assert details.mode == TariffMode.AUTO
     assert details.price_per_adv == float(tariffs_for_auto_setting[10])
     assert details.total_per_month == 4 * float(tariffs_for_auto_setting[10])
-
