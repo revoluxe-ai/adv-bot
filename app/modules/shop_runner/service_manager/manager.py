@@ -591,6 +591,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self, only_bot_active: bool = False) -> None:
+        """Update top-key whitelist automation only for paid non-v3 candidates."""
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
             FirstKeyUpdaterError,
             FirstKeyUpdater,
@@ -604,6 +605,7 @@ class CoroutinesManager:
             adv
             for adv in advs
             if adv.auto_update_white_list
+            and adv.bot_active
             and not is_v3_campaign(adv.auto_updater_version)
         ]
 
@@ -777,6 +779,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(15, 60)
     async def update_minus_phrases_in_advs(self, only_bot_active: bool = False) -> None:
+        """Update WB minus phrases only for paid campaigns with the feature enabled."""
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
 
         wb_manager_hub = self._wb_manager_hub
@@ -788,7 +791,9 @@ class CoroutinesManager:
             only_bot_active=only_bot_active,
         )
         complex_advs = [
-            adv for adv in complex_advs if adv.auto_update_minus_phrases
+            adv
+            for adv in complex_advs
+            if adv.bot_active and adv.auto_update_minus_phrases
         ]
         handlers: list[Callable[[], Awaitable[Any]]] = [
             lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
@@ -1099,6 +1104,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 5, 60)
     async def update_cluster_bids(self, only_bot_active: bool = False) -> None:
+        """Update cluster bids only for paid campaigns with bidder enabled."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
@@ -1131,7 +1137,7 @@ class CoroutinesManager:
                 bot_active=trace_adv.bot_active if trace_adv is not None else None,
                 bidder_active=trace_adv.bidder_active if trace_adv is not None else None,
             )
-        advs = [adv for adv in all_advs if adv.bidder_active]
+        advs = [adv for adv in all_advs if adv.bot_active and adv.bidder_active]
         if trace_adv_id is not None and is_trace_cell(
             shop_id=self.shop_id, adv_id=trace_adv_id
         ):
@@ -1497,7 +1503,7 @@ class CoroutinesManager:
         manager = PlanFactManager()
         await manager.process_and_save_pre_complex_advs(pre_advs)
         adv_ids = _collect_plan_fact_refresh_adv_ids(pre_advs)
-        await self._plan_fact_reader.refresh_cache_from_clickhouse(adv_ids)
+        _ = await self._plan_fact_reader.refresh_cache_from_clickhouse(adv_ids)
         return None
     def _log_auto_budget_result(
         self,
@@ -1564,6 +1570,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 15, 15)
     async def update_common_bid_in_search_adv(self, only_bot_active: bool = False) -> None:
+        """Update common search bids only for paid, active automation candidates."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
 
@@ -1587,13 +1594,21 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
-        complex_advs = [adv for adv in complex_advs if
-                adv.bidder_active and
-                adv.updater_common_bid_in_search_adv_active_status and
-                adv.search_adv_active_status is True]
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if adv.bot_active
+            and adv.bidder_active
+            and adv.updater_common_bid_in_search_adv_active_status
+            and adv.search_adv_active_status is True
+        ]
+        if not complex_advs:
+            return None
         complex_advs, _ = await self._split_advs_by_stats_freshness(
             complex_advs, operation_name="update_common_bid_in_search_adv"
         )
+        if not complex_advs:
+            return None
         search_adv_bids = await resolver.get_merged_bids(complex_advs)
         advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(
             complex_advs, search_adv_bids_override=search_adv_bids
@@ -1736,7 +1751,9 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
-        complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
+        complex_advs = [
+            adv for adv in complex_advs if adv.bot_active and adv.auto_update_white_list
+        ]
         complex_advs = [
             adv
             for adv in complex_advs
@@ -1776,6 +1793,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_individual_keyword_target_places(self, only_bot_active: bool = False) -> None:
+        """Update individual keyword target places only for paid non-v3 campaigns."""
         from .services.keywords_target_place_updater import KeywordTargetPlaceUpdater
         from app.modules.predict_keywords_target_place import (build_predict_keywords_target_place,
                                                                PredictKeywordsTargetPlace)
@@ -1786,7 +1804,9 @@ class CoroutinesManager:
         if not complex_advs:
             return None
         complex_advs = [
-            adv for adv in complex_advs if adv.individual_keywords_target_place_mode
+            adv
+            for adv in complex_advs
+            if adv.bot_active and adv.individual_keywords_target_place_mode
         ]
         from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
             is_v3_campaign,
