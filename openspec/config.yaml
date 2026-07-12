@@ -1,0 +1,87 @@
+schema: spec-driven
+
+context: |
+  Проект:
+    WB Sky — коммерческий продукт для автоматизации и анализа внутренней рекламы Wildberries.
+
+  Бизнес-цель:
+    Проект должен приносить владельцу доход, помогать продавцам улучшать рекламу
+    и снижать нагрузку на поддержку через понятные self-service сценарии,
+    встроенные объяснения, диагностику и подсказки внутри бота.
+
+  Текущее состояние:
+    В проекте уже есть paid automation product.
+    Free bot находится в разработке и должен стать полезным входным freemium-слоем,
+    а не пустой демо-версией.
+
+  Главный принцип:
+    Free bot должен быть полезным, но не должен бесплатно отдавать paid automation core.
+
+  Важные доменные зоны:
+    Высокорисковыми считаются изменения, которые затрагивают:
+      - превышение расхода сверх нормы
+      - необоснованное (не понятное пользователю) отсутствие трафика, что вызывает гнев у пользователей
+      - ошибки в списании платы за бот, в том числе отсутствие, в том числе излишние
+
+  Free/Paid граница:
+    во free сейчас не должно быть только: обновление ставок в shelf-кампаниях, обновление общей ставки поисковых рк,
+  обновление целевых позиций ключей, автообновление shelf-ставки (автокампания, полочная РК), но ручное изменение доступно,
+  обновление целевой позиции ключей, обновление белого списка (весь функционал авто-адпейтеров не доступне и не применяется)
+
+    Read-only аналитика, диагностика, объяснения, preview, export, onboarding,
+    navigation, lead capture и paid offer routing должны быть во Free bot - используем возможности по-максимуму
+
+    Все действия, которые меняют состояние рекламы на Wildberries должны быть на free по умолчанию (при создании РК выключены)
+
+    В Free режиме WB write-действия должны быть выключены по умолчанию,
+    если отдельный spec явно не разрешает ручное действие с preview,
+    объяснением и явным подтверждением пользователя.
+
+  Обратная совместимость:
+    Paid bot и существующий paid-интерфейс нельзя ломать без отдельного proposal.
+    Backend может быть общим, но Free/Paid поведение должно разделяться через access guards.
+
+rules:
+  language:
+    - Все OpenSpec artifacts для WB Sky писать на русском языке.
+    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
+    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
+
+  proposal:
+    - Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea.
+    - Один change должен иметь один intent.
+    - Proposal должен объяснять зачем и в каких границах делается изменение.
+    - Не писать в proposal список файлов, классов, функций или SQL-запросов.
+    - Явно указывать out of scope.
+
+  specs:
+    - Описывать observable behavior, а не implementation.
+    - Использовать GIVEN/WHEN/THEN scenarios.
+    - Не включать classes, functions, SQLAlchemy, Redis, file paths или implementation details.
+    - Чётко отделять Free value от Paid automation.
+    - Чётко отделять read-only поведение от write-path.
+    - Не создавать отдельный spec под каждое меню, экран, keyboard, file или handler.
+    - Specs должны описывать stable product behavior или access boundary.
+    - Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation.
+    - Manual self-service actions нельзя описывать как automatic optimization.
+
+  design:
+    - Перед техническими изменениями изучать существующую реализацию.
+    - Переиспользовать существующие project patterns, если нет явно описанной причины отклониться.
+    - Описывать affected components, side effects, access guards, validation plan, rollback idea и performance considerations.
+    - Технические детали, data flow, queries, modules и file changes писать в design, а не в spec.
+    - Для любого write-path описывать preview, explicit confirmation, affected records, recovery/rollback idea и tests.
+    - Перед изменениями Free/Paid поведения найти и классифицировать все WB-impacting write paths.
+
+  tasks:
+    - Tasks должны быть маленькими, последовательными, проверяемыми.
+    - Включать characterization tests перед изменением рискованного или неясного поведения.
+    - Включать regression tests для bug fixes.
+    - Включать targeted tests для каждой новой или изменённой decision function.
+    - Включать tests для business invariants и forbidden side effects.
+    - Не добавлять поверхностные tests, которые проверяют только существование результата.
+
+  validation:
+    - openspec validate проверяет структуру artifacts, но не доказывает правильность business logic.
+    - Реализацию нужно отдельно проверять на соответствие proposal/spec/design/tasks.
+    - Passing tests не означает, что spec хороший.
