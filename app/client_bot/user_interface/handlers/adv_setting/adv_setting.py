@@ -66,7 +66,6 @@ sm = get_async_session_maker
 
 router = Router()
 
-
 logger = logging.getLogger(__name__)
 
 pricer = Pricer()

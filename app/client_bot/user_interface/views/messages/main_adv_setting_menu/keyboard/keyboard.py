@@ -9,7 +9,6 @@ from app.client_bot.user_interface.views import callbacks
 from .automatic_version_ui import (
     automatic_version_main_menu_button,
     normalize_automatic_version_ui,
-    show_relevant_phrase_toggle,
 )
 from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from .v3_calibration_step_ui import v3_calibration_step_main_button
@@ -196,16 +195,14 @@ def get_adv_setting_keyboard(
 
     # TODO: Из free удалить все не не релевантных фраз, это только автомат
     # TODO: сделать для free отдельное описание Рел не рел Фраз
-    if show_relevant_phrase_toggle(
-            normalize_automatic_version_ui(adv_setting.automatic_version)
-    ):
-        relevant_button = InlineKeyboardButton(
-            text="Управление релевантными и нерелевантными фразами",
-            callback_data=ManageRelevantAndNonRelevantPhrases(
-                adv_setting_original_id=adv_setting.id  # type:ignore
-            ).pack(),
-        )
-        _ = builder.row(relevant_button)
+
+    relevant_button = InlineKeyboardButton(
+        text="Управление релевантными и нерелевантными фразами",
+        callback_data=ManageRelevantAndNonRelevantPhrases(
+            adv_setting_original_id=adv_setting.id  # type:ignore
+        ).pack(),
+    )
+    _ = builder.row(relevant_button)
 
     indiv_place_mode = bool(adv_setting.individual_keywords_target_place_mode)
     if indiv_place_mode:
