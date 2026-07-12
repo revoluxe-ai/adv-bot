@@ -49,15 +49,9 @@ from ...views.messages.main_adv_setting_menu import AdvSettingMenu
 from .... import const
 
 
-from ..views.messages.main_adv_setting_menu.minus_phrases_setting import (
-    MinusPhrasesSettingScreen,
-)
-from ... import const
-
 sm = get_async_session_maker
 
 router = Router()
-
 
 logger = logging.getLogger(__name__)
 
