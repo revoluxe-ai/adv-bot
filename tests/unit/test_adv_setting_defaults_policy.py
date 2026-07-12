@@ -34,7 +34,6 @@ COMMON_EXPECTED_FIELDS = {
     "bidder_coroutine_type",
     "orders_source_for_auto_mode",
     "sales_predict_method",
-    "auto_update_minus_phrases",
     "auto_budget_watchdog_enabled",
     "use_common_budget",
     "target_ctr_mode",
@@ -50,6 +49,7 @@ MODE_SPECIFIC_EXPECTED_FIELDS = {
     "white_list_mode",
     "auto_update_white_list",
     "auto_update_target_place",
+    "auto_update_minus_phrases",
     "bidder_for_auto",
 }
 
@@ -130,6 +130,7 @@ def test_free_and_paid_overlays_cover_same_mode_specific_fields() -> None:
 
 
 def test_policy_field_sets_match_expected_contract() -> None:
+    """Spec paid-minus-phrases-default: minus-phrases flag принадлежит mode overlays."""
     common_fields = CommonCampaignDefaultsPolicy.field_names()
     free_fields = FreeModeDefaultsPolicy.field_names()
     paid_fields = PaidModeDefaultsPolicy.field_names()
@@ -245,6 +246,7 @@ def test_common_plus_paid_defaults_apply_current_paid_start_behavior(
     adv_setting: AdvSetting,
     wb_cabinet: WBCabinet,
 ) -> None:
+    """Spec paid-minus-phrases-default: paid-start включает minus-phrases automation."""
     apply_common_defaults_settings_for_adv(adv_setting, wb_cabinet)
     apply_paid_auto_management_transition(adv_setting, wb_cabinet)
 
@@ -256,13 +258,14 @@ def test_common_plus_paid_defaults_apply_current_paid_start_behavior(
     assert adv_setting.auto_update_white_list is False
     assert adv_setting.auto_update_target_place is True
     assert adv_setting.bidder_for_auto is False
-    assert adv_setting.auto_update_minus_phrases is False
+    assert adv_setting.auto_update_minus_phrases is True
 
 
 def test_free_overlay_sets_only_free_mode_fields(
     adv_setting: AdvSetting,
     wb_cabinet: WBCabinet,
 ) -> None:
+    """Spec paid-minus-phrases-default: free overlay выключает minus-phrases automation."""
     adv_setting.bidder_active = True
     adv_setting.max_cpm = 777
     adv_setting.auto_update_minus_phrases = True
@@ -278,7 +281,7 @@ def test_free_overlay_sets_only_free_mode_fields(
 
     assert adv_setting.bidder_active is False
     assert adv_setting.max_cpm == 777
-    assert adv_setting.auto_update_minus_phrases is True
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_transition_wrappers_keep_backward_compatible_behavior(
