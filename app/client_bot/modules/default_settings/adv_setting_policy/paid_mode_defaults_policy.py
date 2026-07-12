@@ -10,7 +10,7 @@ from .field_policy import FieldPolicy
 
 
 class PaidModeDefaultsPolicy(AdvSettingDefaultsPolicy):
-    """PAID mode overlay for explicit auto-management enable."""
+    """PAID overlay включает mode-specific defaults для spec paid-minus-phrases-default."""
 
     name = "paid_mode_overlay"
 
@@ -44,6 +44,12 @@ class PaidModeDefaultsPolicy(AdvSettingDefaultsPolicy):
             apply_if=lambda adv, wb_cabinet: True,
             value=lambda adv, wb_cabinet: True,
             reason="Не включаем auto target-place автоматически без отдельного product-решения.",
+        ),
+        FieldPolicy(
+            field=AdvSetting.auto_update_minus_phrases,
+            apply_if=lambda adv, wb_cabinet: True,
+            value=lambda adv, wb_cabinet: True,
+            reason="Spec paid-minus-phrases-default: PAID mode включает автообновление минус-фраз.",
         ),
         FieldPolicy(
             field=AdvSetting.bidder_for_auto,

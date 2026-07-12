@@ -27,7 +27,7 @@ def apply_free_mode_transition(
     adv_setting: AdvSetting,
     wb_cabinet: WBCabinet,
 ) -> None:
-    """Switch the campaign into explicit FREE mode and apply the FREE overlay."""
+    """Переключить РК в FREE mode и применить overlay для spec paid-minus-phrases-default."""
     adv_setting.bot_active = False
     FreeModeDefaultsPolicy.apply(adv_setting, wb_cabinet)
 
@@ -36,7 +36,7 @@ def apply_paid_auto_management_transition(
     adv_setting: AdvSetting,
     wb_cabinet: WBCabinet,
 ) -> None:
-    """Switch the campaign into explicit PAID auto-management mode and apply the PAID overlay."""
+    """Переключить РК в PAID mode и применить overlay для spec paid-minus-phrases-default."""
     adv_setting.bot_active = True
     PaidModeDefaultsPolicy.apply(adv_setting, wb_cabinet)
 
