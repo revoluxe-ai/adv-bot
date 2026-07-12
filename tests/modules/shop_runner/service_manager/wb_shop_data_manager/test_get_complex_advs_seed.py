@@ -18,11 +18,13 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_m
 async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> None:
     wb_cabinet = MagicMock()
     wb_cabinet.shop_id = "shop-1"
+    plan_fact_reader = MagicMock()
     manager = WBShopDataManager(
         wb_cabinet=wb_cabinet,
         tasks_manager=None,
         wb_api_data_manager=MagicMock(),
         wb_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
     )
 
     adv1 = MagicMock()
@@ -63,11 +65,8 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
             "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.PlanFactProvider.get_plan_data",
             side_effect=plans,
         ),
-        patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.PlanFactReader.get_latest_plan_facts",
-            new=AsyncMock(return_value=summaries),
-        ),
     ):
+        plan_fact_reader.get_latest_plan_facts = AsyncMock(return_value=summaries)
         complex_advs = await manager.get_complex_advs()
 
     assert len(complex_advs) == 2
@@ -81,11 +80,13 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
 async def test_get_complex_advs_returns_base_list_when_min_bids_cache_fails() -> None:
     wb_cabinet = MagicMock()
     wb_cabinet.shop_id = "shop-1"
+    plan_fact_reader = MagicMock()
     manager = WBShopDataManager(
         wb_cabinet=wb_cabinet,
         tasks_manager=None,
         wb_api_data_manager=MagicMock(),
         wb_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
     )
 
     adv = MagicMock()
@@ -114,11 +115,8 @@ async def test_get_complex_advs_returns_base_list_when_min_bids_cache_fails() ->
             "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.PlanFactProvider.get_plan_data",
             side_effect=plans,
         ),
-        patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.PlanFactReader.get_latest_plan_facts",
-            new=AsyncMock(return_value=summaries),
-        ),
     ):
+        plan_fact_reader.get_latest_plan_facts = AsyncMock(return_value=summaries)
         complex_advs = await manager.get_complex_advs()
 
     assert len(complex_advs) == 1
