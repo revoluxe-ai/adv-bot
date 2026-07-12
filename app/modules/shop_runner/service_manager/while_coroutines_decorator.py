@@ -133,8 +133,11 @@ def while_coroutine_decorator(
             while True:
                 try:
                     try:
-                        await asyncio.wait_for(*args, **kwargs, timeout=10*60)
+                        task = asyncio.create_task(func(*args, **kwargs))
+                        await asyncio.wait_for(task, timeout=10 * 60)
                     except asyncio.TimeoutError:
+                        if task.done() and not task.cancelled():
+                            raise
                         logger.error(
                             "while_coroutine_decorator: timeout for %s, shop_id=%s",
                             func.__name__,
