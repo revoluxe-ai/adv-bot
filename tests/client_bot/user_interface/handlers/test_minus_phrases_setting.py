@@ -68,11 +68,11 @@ async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=SimpleNamespace(id=55)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(return_value=adv),
         ),
         patch(
@@ -112,11 +112,11 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
             _MockSessionMaker(async_session),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=SimpleNamespace(id=55)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(return_value=adv),
         ),
         patch(
@@ -159,11 +159,11 @@ async def test_back_from_minus_phrases_setting_returns_to_campaign_menu(
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting",
             AsyncMock(return_value=adv),
         ),
         patch(
