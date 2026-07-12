@@ -15,7 +15,6 @@ from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactM
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
 )
-from app.core.redis_manager.redis_client import redis_client as legacy_redis_client
 from app.utils.ch_semaphore import run_ch_with_timeout
 from app.utils.click_house.client import get_clickhouse_client
 
@@ -47,12 +46,8 @@ class PlanFactSummary:
 class PlanFactCacheManager:
     """Redis cache for ``PlanFactSummary`` keyed by ``adv_id``."""
 
-    def __init__(self, redis_client: RedisClient | None = None) -> None:
-        self._client: RedisClient = (
-            redis_client
-            if redis_client is not None
-            else legacy_redis_client
-        )
+    def __init__(self, redis_client: RedisClient) -> None:
+        self._client = redis_client
 
     @staticmethod
     def _get_key(adv_id: int) -> str:
@@ -100,12 +95,12 @@ class PlanFactCacheManager:
         normalized_adv_ids = [int(adv_id) for adv_id in adv_ids]
         if not normalized_adv_ids:
             return {}, set()
-        raw_list = await self._client.mget(  # pyright: ignore # mypy: ignore
+        raw_list = await self._client.mget(
             [self._get_key(adv_id) for adv_id in normalized_adv_ids]
         )
         hits: dict[int, PlanFactSummary] = {}
         invalid_adv_ids: set[int] = set()
-        for adv_id, raw in zip(normalized_adv_ids, raw_list, strict=True): # pyright: ignore
+        for adv_id, raw in zip(normalized_adv_ids, raw_list, strict=True):
             if raw is None:
                 continue
             try:
@@ -121,11 +116,11 @@ class PlanFactCacheManager:
 
     async def get_one(self, adv_id: int) -> tuple[PlanFactSummary | None, bool]:
         """Return cached summary and invalid-payload flag."""
-        raw = await self._client.get(self._get_key(int(adv_id)))  # pyright: ignore # mypy: ignore
+        raw = await self._client.get(self._get_key(int(adv_id)))
         if raw is None:
             return None, False
         try:
-            return self._deserialize(raw), False # pyright: ignore
+            return self._deserialize(raw), False
         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
             return None, True
 
@@ -133,19 +128,19 @@ class PlanFactCacheManager:
         """Persist summaries with the hard 15-minute TTL."""
         if not summaries:
             return 0
-        async with self._client.pipeline() as pipe:  # pyright: ignore # mypy: ignore
+        async with self._client.write_pipeline() as pipe:
             for summary in summaries:
-                pipe.set( # pyright: ignore
+                pipe.set(
                     self._get_key(summary.adv_id),
                     self._serialize(summary),
                     ex=PLAN_FACT_CACHE_TTL_SECONDS,
                 )
-            await pipe.execute() # pyright: ignore
+            await pipe.execute()
         return len(summaries)
 
     async def set_one(self, summary: PlanFactSummary) -> None:
         """Persist one summary with the hard 15-minute TTL."""
-        await self._client.set(  # mypy: ignore # pyright: ignore
+        await self._client.set(
             self._get_key(summary.adv_id),
             self._serialize(summary),
             ex=PLAN_FACT_CACHE_TTL_SECONDS,
@@ -157,9 +152,19 @@ class PlanFactReader:
     def __init__(
         self,
         *,
+        redis_client: RedisClient | None = None,
         cache_manager: PlanFactCacheManager | None = None,
     ) -> None:
-        self._cache_manager = cache_manager or PlanFactCacheManager()
+        if cache_manager is not None:
+            self._cache_manager = cache_manager
+            return
+        if redis_client is None:
+            from app.modules.cluster_bids_redis.redis_client_provider import (
+                get_redis_client,
+            )
+
+            redis_client = get_redis_client()
+        self._cache_manager = PlanFactCacheManager(redis_client)
 
     @staticmethod
     def _load_query() -> str:
@@ -330,7 +335,7 @@ class PlanFactReader:
         adv_count = len({int(adv_id) for adv_id in adv_ids})
         started = time.perf_counter()
         logger.debug(
-            "plan_fact_clickhouse_fallback_start adv_count=%s timeout_sec=%s source=updater_refresh",
+            "plan_fact_warmup_start adv_count=%s timeout_sec=%s",
             adv_count,
             PLAN_FACT_CH_FALLBACK_TIMEOUT_SECONDS,
         )
@@ -341,7 +346,7 @@ class PlanFactReader:
         except TimeoutError:
             duration_ms = (time.perf_counter() - started) * 1000
             logger.warning(
-                "plan_fact_clickhouse_fallback_timeout adv_count=%s duration_ms=%.2f timeout_sec=%s",
+                "plan_fact_warmup_timeout adv_count=%s duration_ms=%.2f timeout_sec=%s",
                 adv_count,
                 duration_ms,
                 PLAN_FACT_CH_FALLBACK_TIMEOUT_SECONDS,
@@ -351,7 +356,7 @@ class PlanFactReader:
         except Exception as exc:  # noqa: BLE001
             duration_ms = (time.perf_counter() - started) * 1000
             logger.error(
-                "plan_fact_clickhouse_fallback_error adv_count=%s duration_ms=%.2f timeout_sec=%s exc_type=%s",
+                "plan_fact_warmup_error adv_count=%s duration_ms=%.2f timeout_sec=%s exc_type=%s",
                 adv_count,
                 duration_ms,
                 PLAN_FACT_CH_FALLBACK_TIMEOUT_SECONDS,
@@ -361,7 +366,7 @@ class PlanFactReader:
             return {}
         duration_ms = (time.perf_counter() - started) * 1000
         logger.debug(
-            "plan_fact_clickhouse_fallback_success adv_count=%s duration_ms=%.2f result_count=%s",
+            "plan_fact_warmup_success adv_count=%s duration_ms=%.2f result_count=%s",
             adv_count,
             duration_ms,
             len(summaries_by_adv_id),
