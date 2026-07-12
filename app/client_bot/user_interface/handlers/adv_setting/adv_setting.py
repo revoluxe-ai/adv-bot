@@ -4,7 +4,8 @@ from typing import Any, Sequence, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result
+from sqlalchemy import Result, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -42,6 +43,13 @@ from app.modules.token_monitoring.services.token_info_service import TokenInfoSe
 from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.auto_management_landing import (
+    AutoManagementHowItWorks,
+    AutoManagementLanding,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu.minus_phrases_setting import (
+    MinusPhrasesSettingScreen,
+)
 
 from ... import states
 from ...views import callbacks, messages
@@ -385,12 +393,12 @@ async def open_minus_phrases_setting_screen(
         callback_data.adv_setting_original_id
     )
 
-    await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
+    await  MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
-async def _update_and_get_adv_setting(session: AsyncSession,
-                                      new_status: bool,
-                                      adv_setting_original_id: int) -> AdvSetting:
+async def update_and_get_adv_setting(session: AsyncSession,
+                                     new_status: bool,
+                                     adv_setting_original_id: int) -> AdvSetting:
     stmt = (
         update(AdvSetting)
         .where(AdvSetting.id == adv_setting_original_id)
@@ -428,9 +436,9 @@ async def toggle_minus_phrases_setting(
         callback_data.wb_user_cabinet_original_id
     )
     async with sm(read_only=False) as session:
-        adv_setting =  await _update_and_get_adv_setting(session,
-                                                         new_status,
-                                                         callback_data.adv_setting_original_id)
+        adv_setting =  await update_and_get_adv_setting(session,
+                                                        new_status,
+                                                        callback_data.adv_setting_original_id)
 
     await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
 
