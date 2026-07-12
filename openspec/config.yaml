@@ -118,6 +118,7 @@ rules:
     - "Писать на русском языке."
     - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
     - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
+    - "создавать большие MagicMock-замены доменных моделей без проверки tests/factories и существующих fixtures"
 
   tasks:
     - "Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов."
@@ -132,9 +133,3 @@ rules:
     - "Писать на русском языке."
     - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
 
-  validation:
-    - "openspec validate проверяет структуру artifacts, но не доказывает правильность business logic."
-    - "openspec schema validate проверяет custom schema structure/templates/dependencies, но не доказывает правильность product behavior."
-    - "Реализацию нужно отдельно проверять на соответствие proposal/specs/design/tasks."
-    - "Passing tests не означает, что spec хороший."
-    - "Valid spec не означает, что implementation правильный."
