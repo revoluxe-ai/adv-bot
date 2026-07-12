@@ -41,6 +41,13 @@
 
 **Почему:** быстро, без Docker, стабильно в CI; ловит утечки gate при включённых флагах.
 
+**Детали реализации (выявлены при apply):**
+
+- Патчить **модуль-источник** lazy import (например `app.modules.shop_runner...CommonSaleStatUpdaterContainer`), а не имя в `manager.py` — иначе mock не срабатывает.
+- `WBApi` в conftest собирать через корневую фикстуру `access_mock` (токены WB), не голый `MagicMock`.
+- Для одного тика корутины — `unwrap_coroutine()` снимает `while_coroutine_decorator`.
+- `auto_shelf_bid_control`: корутина всегда вызывает `run_tasks`; gate проверяется по **пустому** списку handlers или отсутствию WB setter в handler.
+
 **Альтернатива:** integration с реальным Redis/CH — отложена на P1 для RECORD path.
 
 ### 3. `is_paid_actions_enabled(adv) -> adv.bot_active` как будущий helper (только в тестах сейчас)
@@ -57,9 +64,15 @@
 
 ### 5. Curated list для paid regression (гибрид)
 
-**Решение:** новые contract-тесты P0 + `tests/paid_regression/CURATED.md` со списком существующих путей (`modules/billing`, `toggle_cabinet_active`, `test_message_tariff`, turn-bot-on когда появится).
+**Решение:** новые contract-тесты P0 + `tests/paid_regression/CURATED.md` со списком существующих путей (`modules/billing`, `balance_manager/test_handlers_comprehensive`, turn-bot-on в dedicated suite).
 
 **Почему:** не дублировать 400+ тестов; явный минимальный набор для free PR.
+
+### 7. RECORD-тесты без отдельного marker
+
+**Решение:** отдельный marker `record_when_inactive` **не вводим**; RECORD gate-тесты живут в `tests/bot_active_gates/` с тем же `@pytest.mark.bot_active_gates` и `@pytest.mark.xfail(reason="loader refactor pending")`.
+
+**Почему:** один каталог и одна команда запуска; xfail явно отделяет «целевой контракт» от «обязан быть GREEN сейчас» (ACT P0).
 
 ### 6. Четыре обязательные ACT-категории (приоритет P0 gates)
 
@@ -76,9 +89,10 @@
 
 | Компонент | Роль в change |
 |-----------|----------------|
-| `pytest.ini` | маркеры `paid_regression`, `bot_active_gates`, опционально `record_when_inactive` |
+| `pytest.ini` | маркеры `paid_regression`, `bot_active_gates` |
 | `tests/paid_regression/` | новые + README |
-| `tests/bot_active_gates/` | новые + README |
+| `tests/bot_active_gates/` | новые + README + `helpers.py` |
+| `tests/conftest.py` | корневая `access_mock` — обязательна для WBApi в suite-фикстурах |
 | `CoroutinesManager` | объект тестов (мок shop data manager) |
 | `WBShopDataManager._get_active_advs` | документируется в матрице; код не меняется |
 | `AutoShelfBidControlManager._is_eligible` | образец существующего gate-теста |
@@ -153,11 +167,25 @@ WHEN update_keywords_stamp runs
 THEN stamp manager update WAS invoked
 ```
 
+**Client_bot turn on/off (paid regression):**
+
+Handlers вызывают `async with sm(read_only=False) as session:` — `sm` в patch **должен быть callable**, возвращающий async context manager, а не сам context manager:
+
+```python
+patch("...adv_setting.sm", MagicMock(side_effect=lambda **_: _session_cm(session)))
+```
+
+`AdvSettingMenu` / `ShopMenu`: `return_value=AsyncMock()` — handler делает `await Menu(...)(...)`.
+
+**Pricer (paid regression):**
+
+Тест tariff count: patch `Pricer.fetch_bot_active_advs` → `[]`, assert `get_tariff_details(...).count == 0` (не legacy `get_tariff_context_for_shop`).
+
 ## Validation plan
 
-1. `poetry run pytest tests/bot_active_gates -m bot_active_gates -v` — ACT gates GREEN.
+1. `poetry run pytest tests/bot_active_gates -m bot_active_gates -v` — ACT gates GREEN (2 xfail на RECORD допустимы).
 2. `poetry run pytest tests/paid_regression -m paid_regression -v` — all GREEN.
-3. `poetry run pytest tests/modules/billing tests/modules/shop_menu/test_message_tariff.py -m unit -v` — curated adjunct.
+3. `poetry run pytest tests/modules/billing tests/modules/balance_manager/test_handlers_comprehensive.py -m unit -q` — curated adjunct.
 4. Документировать в README: какие тесты `xfail` и когда снимать.
 
 ## Migration Plan
@@ -181,5 +209,5 @@ THEN stamp manager update WAS invoked
 
 1. Включать ли `auto_shelf_bid_increment_stats` в P0 gates (пишет ли WB напрямую)?
 2. `cache_current_cluster_bids` — RECORD или ACT? (read-only с WB, write Redis — считаем RECORD.)
-3. Нужен ли отдельный marker `record_when_inactive` vs один `bot_active_gates` с xfail?
+3. ~~Нужен ли отдельный marker `record_when_inactive`?~~ **Решено:** нет, xfail на `bot_active_gates` (см. Decision 7).
 4. Follow-up: новое поле `tier` vs переиспользование `bot_active` для free/paid — решить до production free.

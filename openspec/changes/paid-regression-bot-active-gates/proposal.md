@@ -33,11 +33,11 @@
 
 ## Impact
 
-- **Тестовая инфраструктура:** новые каталоги `tests/paid_regression/`, `tests/bot_active_gates/`, маркеры в `pytest.ini`, общие фикстуры `ComplexAdv` / `AdvSetting` с `bot_active` и включёнными auto-flags.
+- **Тестовая инфраструктура:** новые каталоги `tests/paid_regression/`, `tests/bot_active_gates/`, маркеры в `pytest.ini`, общие фикстуры `ComplexAdv` / `AdvSetting` с `bot_active` и включёнными auto-flags; `WBApi` через корневую `access_mock`; client_bot handler-тесты — callable mock для `sm(read_only=...)`.
 - **Shop-runner (контракт, не код в этом change):** `CoroutinesManager`, `WBShopDataManager._get_active_advs`, корутины `update_common_bid_in_search_adv`, `update_individual_keyword_target_places`, `update_top_key_in_advs`, `white_list_tail_trimmer`, `auto_shelf_bid_control`, `update_cluster_bids`, `adv_settings_auto_update`, snapshot updater batch filter.
 - **Billing / client_bot:** косвенно — paid regression включает существующие billing и turn-bot-on тесты в curated list; прямых изменений кода нет.
 - **CI / workflow:** рекомендуемая команда pre-merge для free-веток; опционально отдельный job на `paid_regression`.
-- **Риск:** низкий для production (только тесты и docs); gate-тесты на RECORD при inactive могут падать до follow-up рефакторинга — явно помечены `xfail` или отдельным marker `record_when_inactive` до зелёного статуса.
+- **Риск:** низкий для production (только тесты и docs); gate-тесты на RECORD при inactive помечены `@pytest.mark.xfail` в том же suite `bot_active_gates` (отдельный marker `record_when_inactive` не используется) до follow-up рефакторинга loader.
 
 ## Intent
 
