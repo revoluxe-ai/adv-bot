@@ -53,3 +53,13 @@ The project MUST maintain an inventory of Wildberries-impacting write paths used
 
 - **WHEN** a developer adds a new automation that mutates WB ad state
 - **THEN** they update the record-act matrix and add or extend bot active gate tests
+
+### Requirement: Top-key whitelist path is paid v2 only
+
+The `update_top_key_in_advs` ACT path MUST be treated as applicable only for paid v2 / non-v3 campaigns. V3 whitelist behavior belongs to `adv_settings_auto_update` / `process_adv_v3`.
+
+#### Scenario: V2 and v3 whitelist paths stay separated
+
+- **WHEN** a maintainer reviews whitelist ACT coverage
+- **THEN** `update_top_key_in_advs` is listed as paid v2 / non-v3 only
+- **AND** v3 whitelist coverage points to `adv_settings_auto_update` / `process_adv_v3`
