@@ -16,7 +16,7 @@
 
 ## 3. Bot-active ACT gates (P0 — MUST be GREEN now)
 
-- [ ] 3.1 `test_no_common_bid_when_inactive.py`: `update_common_bid_in_search_adv` — non-vacuous inactive gate: `get_complex_advs` returns inactive adv, `get_wb_advs_dto` returns non-empty search DTO/input, resolver returns current bids that would reach `UpdateCommotBidInSearchAdvsManager.update_common_bid_in_search_adv`; assert manager / WB modifier not called only after the write path is otherwise reachable
+- [x] 3.1 `test_no_common_bid_when_inactive.py`: `update_common_bid_in_search_adv` — non-vacuous inactive gate: `get_complex_advs` returns inactive adv, `get_wb_advs_dto` returns non-empty search DTO/input, resolver returns current bids that would reach `UpdateCommotBidInSearchAdvsManager.update_common_bid_in_search_adv`; assert manager / WB modifier not called only after the write path is otherwise reachable
 - [x] 3.2 `test_no_target_place_when_inactive.py`: `update_individual_keyword_target_places` — mock `KeywordTargetPlaceUpdater` / WB path not called
 - [x] 3.3 `test_no_whitelist_top_key_when_inactive.py`: `update_top_key_in_advs` — `FirstKeyUpdater.top_key_auto_update` not called
 - [x] 3.4 `test_no_whitelist_trimmer_when_inactive.py`: `white_list_tail_trimmer` — `WhiteListTrimmer.trim` not called
@@ -49,7 +49,7 @@
 
 ## 7. Валидация и документация
 
-- [ ] 7.1 Прогнать `poetry run pytest tests/bot_active_gates -m bot_active_gates -v` — P0 gates GREEN (xfail только RECORD) после исправления non-vacuous common-bid gate
+- [x] 7.1 Прогнать `poetry run pytest tests/bot_active_gates -m bot_active_gates -v` — P0 gates GREEN (xfail только RECORD) после исправления non-vacuous common-bid gate
 - [x] 7.2 Прогнать `poetry run pytest tests/paid_regression -m paid_regression -v` — all GREEN
 - [x] 7.3 Прогнать curated adjunct: `poetry run pytest tests/modules/billing tests/modules/balance_manager/test_handlers_comprehensive.py -m unit -q`
 - [x] 7.4 Добавить в `AGENTS.md` или `tests/paid_regression/README.md` секцию «Pre-merge для free-веток» с двумя командами
