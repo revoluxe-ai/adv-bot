@@ -1,4 +1,6 @@
+# итоговый валидный конфиг
 schema: spec-driven
+profile: core
 
 context: |
   Проект:
@@ -19,10 +21,18 @@ context: |
 
   Важные доменные зоны:
     Высокорисковыми считаются изменения, которые затрагивают:
-      - ставки: CPO/CPA, V3, ApplyManager, lifecycle кампаний, автозапуск / автоостановку,
-        WB API write actions, БД и миграции, превышение расхода сверх нормы,
-        необоснованное или непонятное пользователю отсутствие трафика,
-        ошибки в списании платы за бот, работу с большим количеством РК: тысячи и десятки тысяч.
+      - ставки;
+      - CPO/CPA;
+      - V3/V2 updater logic;
+      - ApplyManager;
+      - lifecycle кампаний;
+      - автозапуск / автоостановку;
+      - WB API write actions;
+      - БД и миграции;
+      - превышение расхода сверх нормы;
+      - необоснованное или непонятное пользователю отсутствие трафика;
+      - ошибки списания платы за бот;
+      - работу с большим количеством РК: тысячи и десятки тысяч.
 
   Free/Paid граница:
     Free bot должен максимально использовать read-only value:
@@ -30,18 +40,22 @@ context: |
       - диагностика;
       - объяснения;
       - preview;
-      - export-import excel;
+      - export/import Excel;
       - onboarding;
       - navigation;
       - lead capture;
-      - paid offer routing. и т.д.
+      - paid offer routing;
+      - другие read-only сценарии, если они не выполняют WB write actions
+        и не отдают paid automation core.
 
     Paid automation core не должен бесплатно отдаваться во Free:
       - автоматическое обновление ставок в shelf-кампаниях;
       - автоматическое обновление общей ставки поисковых РК;
       - автоматическое обновление целевых позиций ключей;
-      - автоматическая остановка Авто кампании по повышенной ставке (сейчас не так, надо изменить);
-      - автоматическое обновление белого списка и целевых позиций..
+      - автоматическое обновление whitelist;
+      - автоматическая остановка или запуск кампаний;
+      - auto-updaters, влияющие на рекламу, ставки, ключи, whitelist,
+        target place или campaign lifecycle.
 
     Manual self-service во Free:
       Ручное изменение может быть допустимо только если отдельный spec явно описывает
@@ -62,53 +76,65 @@ context: |
     чтобы пользователь мог разобраться, получить пользу, дойти до платного
     сценария и решить типовые проблемы без личного участия владельца.
 
+  Current/Future boundary:
+    Видение на будущее не является текущим поведением системы.
+    Нельзя писать production-код под future vision без отдельного OpenSpec change.
+
 rules:
   proposal:
-    - Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea.
-    - Один change должен иметь один intent.
-    - Proposal должен объяснять зачем и в каких границах делается изменение.
-    - Не писать в proposal список файлов, классов, функций или SQL-запросов.
-    - Явно указывать out of scope.
-    - Писать на русском языке.
-    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
-    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
+    - "Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea."
+    - "Один change должен иметь один intent."
+    - "Proposal должен объяснять зачем и в каких границах делается изменение."
+    - "Не писать в proposal список файлов, классов, функций или SQL-запросов."
+    - "Явно указывать out of scope."
+    - "Не смешивать current behavior и future desired behavior."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+    - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
 
   specs:
-    - Любое изменение считать high-risk, если оно затрагивает ставки, CPO/CPA, V3/V2 апдейтеры, ApplyManager, lifecycle кампаний, автозапуск / автоостановку, WB API write actions, БД и миграции, paid/free boundary, списание платы за бот, управление активностью ключей - перерасход-недорасход, управление ставкой ключей - слишком большая ставка, поломка биддера (перестал менять ставки).
-    - Описывать observable behavior, а не implementation.
-    - Использовать GIVEN/WHEN/THEN scenarios.
-    - Не включать classes, functions, SQLAlchemy, Redis, file paths или implementation details.
-    - Чётко отделять Free value от Paid automation.
-    - Чётко отделять read-only поведение от write-path.
-    - Не создавать отдельный spec под каждое меню, экран, keyboard, file или handler.
-    - Specs должны описывать stable product behavior или access boundary.
-    - Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation.
-    - Manual self-service actions нельзя описывать как automatic optimization.
-    - Писать на русском языке.
-    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
-    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
+    - "Любое изменение считать high-risk, если оно затрагивает ставки, CPO/CPA, V3/V2 updater logic, ApplyManager, lifecycle кампаний, автозапуск / автоостановку, WB API write actions, БД и миграции, paid/free boundary, списание платы за бот, управление активностью ключей, перерасход/недорасход, управление ставкой ключей или bidder behavior."
+    - "Описывать observable behavior, а не implementation."
+    - "Использовать GIVEN/WHEN/THEN scenarios."
+    - "Не включать classes, functions, SQLAlchemy, Redis, file paths или implementation details."
+    - "Чётко отделять Free value от Paid automation."
+    - "Чётко отделять read-only поведение от write-path."
+    - "Не создавать отдельный spec под каждое меню, экран, keyboard, file или handler."
+    - "Specs должны описывать stable product behavior или access boundary."
+    - "Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation."
+    - "Manual self-service actions нельзя описывать как automatic optimization."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+    - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
 
   design:
-    - Перед техническими изменениями изучать существующую реализацию.
-    - Использовать стек: Python 3.11, SqlAlchemy + Postgres, dependency injection, clickhouse, Redis (смотри внимательно практику использования)
-    - Переиспользовать существующие project patterns, если нет явно описанной причины отклониться.
-    - Описывать affected components, side effects, access guards, validation plan, rollback idea и performance considerations.
-    - Технические детали, data flow, queries, modules и file changes писать в design, а не в spec.
-    - Для любого write-path описывать preview, explicit confirmation, affected records, recovery/rollback idea и tests.
-    - Перед изменениями Free/Paid поведения найти и классифицировать все WB-impacting write paths.
-    - Писать на русском языке.
-    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
-    - Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя.
+    - "Перед техническими изменениями изучать существующую реализацию."
+    - "Учитывать текущий стек проекта: Python 3.11, SQLAlchemy + PostgreSQL, dependency-injector, ClickHouse, Redis; перед использованием смотреть текущую практику в затронутом участке."
+    - "Переиспользовать существующие project patterns, если нет явно описанной причины отклониться."
+    - "Описывать affected components, side effects, access guards, validation plan, rollback idea и performance considerations."
+    - "Технические детали, data flow, queries, modules и file changes писать в design, а не в spec."
+    - "Для любого write-path описывать preview, explicit confirmation, affected records, recovery/rollback idea и tests."
+    - "Перед изменениями Free/Paid поведения найти и классифицировать все WB-impacting write paths."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+    - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
 
   tasks:
-    - Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов.
-    - Сначала добавлять или обновлять regression/characterization tests, затем менять production code.
-    - Тест не должен мокать функцию, фильтрацию или decision logic, поведение которой он проверяет.
-    - Tasks должны быть маленькими, последовательными, проверяемыми.
-    - Включать characterization tests перед изменением рискованного или неясного поведения.
-    - Включать regression tests для bug fixes.
-    - Включать targeted tests для каждой новой или изменённой decision function.
-    - Включать tests для business invariants и forbidden side effects.
-    - Не добавлять поверхностные tests, которые проверяют только существование результата.
-    - Писать на русском языке.
-    - Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED.
+    - "Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов."
+    - "Сначала добавлять или обновлять regression/characterization tests, затем менять production code."
+    - "Тест не должен мокать функцию, фильтрацию или decision logic, поведение которой он проверяет."
+    - "Tasks должны быть маленькими, последовательными, проверяемыми."
+    - "Включать characterization tests перед изменением рискованного или неясного поведения."
+    - "Включать regression tests для bug fixes."
+    - "Включать targeted tests для каждой новой или изменённой decision function."
+    - "Включать tests для business invariants и forbidden side effects."
+    - "Не добавлять поверхностные tests, которые проверяют только существование результата."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+
+  validation:
+    - "openspec validate проверяет структуру artifacts, но не доказывает правильность business logic."
+    - "openspec schema validate проверяет custom schema structure/templates/dependencies, но не доказывает правильность product behavior."
+    - "Реализацию нужно отдельно проверять на соответствие proposal/specs/design/tasks."
+    - "Passing tests не означает, что spec хороший."
+    - "Valid spec не означает, что implementation правильный."
