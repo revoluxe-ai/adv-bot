@@ -80,6 +80,13 @@ context: |
     Видение на будущее не является текущим поведением системы.
     Нельзя писать production-код под future vision без отдельного OpenSpec change.
 
+  Architecture Decision Registry:
+    Постоянные архитектурные решения живут в openspec/decisions/.
+    Design.md может описывать применение решения в конкретном change, но
+    reusable ownership/layering/write-path/domain-invariant решения должны быть
+    вынесены в registry и процитированы по path.
+    Перед proposal/design/apply/verify/archive искать openspec/decisions/**/*.md.
+
 rules:
   proposal:
     - "Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea."
@@ -91,6 +98,7 @@ rules:
     - "Писать на русском языке."
     - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
     - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
+    - "Если change затрагивает ownership, layering, write-path или domain invariant, proposal должен учитывать relevant decisions из openspec/decisions/ и не объявлять change apply-ready при unresolved architecture placement без accepted/proposed decision."
 
   specs:
     - "Любое изменение считать high-risk, если оно затрагивает ставки, CPO/CPA, V3/V2 updater logic, ApplyManager, lifecycle кампаний, автозапуск / автоостановку, WB API write actions, БД и миграции, paid/free boundary, списание платы за бот, управление активностью ключей, перерасход/недорасход, управление ставкой ключей или bidder behavior."
@@ -106,6 +114,11 @@ rules:
 
   design:
     - "Перед техническими изменениями изучать существующую реализацию."
+    - "Перед design искать openspec/decisions/**/*.md и учитывать relevant accepted/proposed decisions."
+    - "Design должен содержать обязательную секцию ## Architecture Decision References со ссылками на relevant decisions по path или явным Architecture Decision Missing."
+    - "Design должен содержать обязательную секцию ## Ownership & Placement с указанием owner layer, forbidden layers и rationale."
+    - "Design checklist должен включать: existing decisions searched; relevant decisions cited; new decision proposed if missing; implementation layer matches decision."
+    - "Если новый факт меняет reusable architecture ownership/layering/write-path/domain invariant, обновить или создать proposed decision в openspec/decisions/, а не прятать это только в design.md."
     - "Учитывать текущий стек проекта: Python 3.11, SQLAlchemy + PostgreSQL, dependency-injector, ClickHouse, Redis; перед использованием смотреть текущую практику в затронутом участке."
     - "Переиспользовать существующие project patterns, если нет явно описанной причины отклониться."
     - "Описывать affected components, side effects, access guards, validation plan, rollback idea и performance considerations."
@@ -131,3 +144,18 @@ rules:
     - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
     - "Для каждой новой функции метода, в том числе теста делай докстринг на русском с англицизмами со названием spec и обоснованием зачем эта функция вообще нужна и зачем она делает то, что делает"
     - "При изменении функции метода, в том числе теста  в месте изменении подробное описание обоснование этого изменения и указание названия spec"
+
+
+  decisions:
+    - "Architecture decision является permanent artifact, а не частью design.md."
+    - "Decision фиксирует reusable architecture ownership/layering/write-path/domain invariant."
+    - "Decision должен отвечать: почему этот тип логики принадлежит этому слою и какие слои запрещены."
+    - "Decision должен иметь status: proposed, accepted, superseded или deprecated."
+    - "Внутри openspec/changes/<change>/decisions/ decisions могут быть proposed; при archive reusable decisions промотятся в openspec/decisions/ со status accepted."
+    - "Не создавать decision для одноразовой implementation detail."
+    - "Не дублировать spec behavior в decision."
+    - "Не дублировать tasks в decision."
+    - "Decision должен содержать Context, Decision, Applies to, Allowed, Forbidden, Examples, Related specs, Related changes, Review checklist."
+    - "Если change затрагивает ownership, layering, write-path или domain invariant и relevant accepted decision отсутствует, создать proposed decision или явно написать Architecture Decision Missing."
+    - "Если implementation противоречит accepted decision, /opsx:apply и /opsx:verify должны возвращать NO_GO."
+    - "Писать на русском языке."

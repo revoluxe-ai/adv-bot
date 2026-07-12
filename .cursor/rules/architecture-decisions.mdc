@@ -1,0 +1,45 @@
+---
+description: OpenSpec Architecture Decision Registry lookup and enforcement
+globs: ["openspec/**/*.md", ".cursor/commands/opsx-*.md", ".github/prompts/opsx-*.prompt.md"]
+alwaysApply: true
+---
+# Architecture Decision Registry
+
+## Контекст применения
+
+Правило действует для всех OpenSpec changes и `/opsx:*` workflow. Registry в
+`openspec/decisions/` является постоянным source of truth для ownership,
+layering, write-path placement и domain invariants.
+
+## Основные принципы
+
+1. Перед proposal/design/apply/verify/archive искать
+   `openspec/decisions/**/*.md`.
+2. Если задача затрагивает ownership, layering, write-path или domain invariant,
+   найденные решения цитировать по path.
+3. Если relevant decision отсутствует, явно писать `Architecture Decision Missing`.
+4. Если корректный placement зависит от нового reusable architecture rule,
+   создать proposed decision artifact в `openspec/changes/<change>/decisions/`
+   до implementation-readiness, используя `rules.decisions`.
+5. Если code placement противоречит accepted decision, останавливать workflow с
+   `NO_GO`; passing tests не являются достаточным доказательством.
+6. При archive reusable proposed decisions промотятся из
+   `openspec/changes/<change>/decisions/` в `openspec/decisions/`; если
+   промотить нечего, workflow явно пишет это.
+
+## Обязательные design-секции
+
+`design.md` для затронутого change должен включать:
+
+- `## Architecture Decision References`
+- `## Ownership & Placement`
+- checklist:
+  - existing decisions searched;
+  - relevant decisions cited;
+  - new decision proposed if missing;
+  - implementation layer matches decision.
+
+## Связанные файлы
+
+- `openspec/decisions/index.md`
+- `openspec/decisions/_template/decision.md`

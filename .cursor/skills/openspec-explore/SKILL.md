@@ -18,6 +18,8 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Architecture Decision Lookup:** When the exploration touches ownership, layering, write paths, or domain invariants, search `openspec/decisions/**/*.md` before recommending placement. Output `Architecture Decisions Found` with relevant paths and statuses. If none are relevant but the topic needs architecture placement, output `Architecture Decision Missing` and explain what decision should be proposed before implementation.
+
 ---
 
 ## The Stance
@@ -120,13 +122,15 @@ If the user mentions a change or you detect one is relevant:
     |----------------------------|--------------------------------|
     | New requirement discovered | `specs/<capability>/spec.md` |
     | Requirement changed        | `specs/<capability>/spec.md` |
-    | Design decision made       | `design.md`                  |
+    | Change-local design decision | `design.md`                |
+    | Reusable architecture decision | `openspec/decisions/<slug>/decision.md` |
     | Scope changed              | `proposal.md`                |
     | New work identified        | `tasks.md`                   |
     | Assumption invalidated     | Relevant artifact              |
 
    Example offers:
-   - "That's a design decision. Capture it in design.md?"
+   - "That's a change-local design decision. Capture it in design.md?"
+   - "That's a reusable architecture decision. Capture it in `openspec/decisions/`?"
    - "This is a new requirement. Add it to specs?"
    - "This changes scope. Update the proposal?"
 

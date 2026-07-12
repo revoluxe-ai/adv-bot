@@ -18,6 +18,8 @@ When ready to implement, run /opsx:apply
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Architecture Decision Lookup:** Before generating proposal/design/tasks, search `openspec/decisions/**/*.md` and read relevant accepted decisions. Proposal and design artifacts must account for decisions found. If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Do not claim the change is apply-ready while architecture placement is unresolved without an accepted or proposed decision.
+
 **Input**: The argument after `/opsx:propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Steps**
@@ -46,13 +48,22 @@ When ready to implement, run /opsx:apply
    - `artifacts`: list of all artifacts with their status and dependencies
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context. Use these instead of assuming repo-local paths.
 
-4. **Create artifacts in sequence until apply-ready**
+4. **Perform Architecture Decision Lookup**
+
+   - Search and read `openspec/decisions/**/*.md`.
+   - Check `artifactPaths.decisions.existingOutputPaths` for already-proposed decisions in the change.
+   - Output `Architecture Decisions Found` with relevant decision paths and statuses.
+   - If the requested change needs architecture placement but no relevant decision exists, output `Architecture Decision Missing`.
+   - Create or update a proposed `decisions/<slug>/decision.md` artifact before implementation-readiness when placement depends on a reusable architecture rule. Get `openspec instructions decisions --change "<name>" --json` first and follow its `rules.decisions`.
+
+5. **Create artifacts in sequence until apply-ready**
 
    Use the **TodoWrite tool** to track progress through the artifacts.
 
    Loop through artifacts in dependency order (artifacts with no pending dependencies first):
 
    a. **For each artifact that is `ready` (dependencies satisfied)**:
+      - If the ready artifact is `decisions`, skip it unless Architecture Decision Lookup found `Architecture Decision Missing` or unresolved architecture placement that requires a proposed decision.
       - Get instructions:
         ```bash
         openspec instructions <artifact-id> --change "<name>" --json
@@ -78,7 +89,7 @@ When ready to implement, run /opsx:apply
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -97,12 +108,17 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- For `design.md`, include `## Architecture Decision References`, `## Ownership & Placement`, and a checklist covering: existing decisions searched; relevant decisions cited; new decision proposed if missing; implementation layer matches decision.
+- For `decisions/**/*.md`, create files only when needed and follow `rules.decisions` from `openspec instructions decisions --change "<name>" --json`.
+- Cite relevant decisions by path in proposal/design output.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
 
 **Guardrails**
 - Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)
+- Do not create the optional `decisions` artifact for every change.
+- Do not treat a change as apply-ready if architecture placement is unresolved without an accepted or proposed decision.
 - Always read dependency artifacts before creating a new one
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
