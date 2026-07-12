@@ -103,9 +103,6 @@ rules:
     - "Specs должны описывать stable product behavior или access boundary."
     - "Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation."
     - "Manual self-service actions нельзя описывать как automatic optimization."
-    - "Писать на русском языке."
-    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
-    - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
 
   design:
     - "Перед техническими изменениями изучать существующую реализацию."
