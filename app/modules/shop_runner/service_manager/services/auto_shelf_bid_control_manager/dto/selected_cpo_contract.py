@@ -45,7 +45,7 @@ def _as_object_sequence(value: object) -> Sequence[object] | None:
     return None
 
 
-def _as_object_dict(value: object) -> dict[str, object] | None:
+def as_object_dict(value: object) -> dict[str, object] | None:
     if not isinstance(value, Mapping):
         return None
     return {str(key): item for key, item in value.items()}
@@ -127,7 +127,7 @@ def resolve_selected_cpo_contract_from_view(
             reason="selected_bid_not_synced",
         )
 
-    recommendation = _as_object_dict(view.rec_bid_recommendation)
+    recommendation = as_object_dict(view.rec_bid_recommendation)
     if recommendation is None:
         return _unavailable_contract(
             selected_bid_minor=selected_bid_minor,
@@ -143,7 +143,7 @@ def resolve_selected_cpo_contract_from_view(
         )
 
     for raw_row in plan_ranked_rows:
-        row = _as_object_dict(raw_row)
+        row = as_object_dict(raw_row)
         if row is None:
             continue
         bid_raw = row.get("bid")
@@ -192,14 +192,14 @@ def extract_selected_cpo_details_from_view(
     selected_bid_minor = view.expected_enforced_bid_minor
     if selected_bid_minor is None:
         return None, "selected_bid_missing"
-    recommendation = _as_object_dict(view.rec_bid_recommendation)
+    recommendation = as_object_dict(view.rec_bid_recommendation)
     if recommendation is None:
         return None, "recommendation_missing"
     plan_ranked_rows = _as_object_sequence(recommendation.get("plan_ranked"))
     if plan_ranked_rows is None:
         return None, "plan_ranked_missing"
     for raw_row in plan_ranked_rows:
-        row = _as_object_dict(raw_row)
+        row = as_object_dict(raw_row)
         if row is None:
             continue
         bid_raw = row.get("bid")

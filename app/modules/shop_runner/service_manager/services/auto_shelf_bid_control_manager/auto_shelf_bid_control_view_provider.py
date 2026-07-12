@@ -65,7 +65,7 @@ from .dto.decision_snapshot_dto import (
 )
 from .dto.selected_cpo_contract import (
     extract_selected_cpo_details_from_view,
-    _as_object_dict,
+    as_object_dict,
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
@@ -1153,7 +1153,7 @@ class AutoShelfBidControlViewProvider:
             # prefer top plan_ranked row CPO when available (best recommendation)
             plan_ranked_list = cast(list[object], rec_bid_recommendation.get("plan_ranked", []))
             if plan_ranked_list:
-                top_row = _as_object_dict(plan_ranked_list[0])
+                top_row = as_object_dict(plan_ranked_list[0])
                 if top_row is not None:
                     cpo_val = (
                         top_row.get("cpo_rub")
