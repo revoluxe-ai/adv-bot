@@ -30,6 +30,7 @@ def _callback_data() -> callbacks.AutoManagementLanding:
 
 
 async def test_open_status_button_shows_landing_and_does_not_toggle_bot_active() -> None:
+    """Spec `client-bot-handler-compatibility` keeps landing navigation read-only."""
     bot = AsyncMock()
     wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
     adv_setting = SimpleNamespace(id=77, bot_active=False)
@@ -37,11 +38,11 @@ async def test_open_status_button_shows_landing_and_does_not_toggle_bot_active()
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
@@ -61,6 +62,7 @@ async def test_open_status_button_shows_landing_and_does_not_toggle_bot_active()
 
 
 async def test_how_it_works_handler_opens_details_screen() -> None:
+    """Spec `client-bot-handler-compatibility` opens the detail view for the same campaign."""
     bot = AsyncMock()
     wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
     adv_setting = SimpleNamespace(id=77, bot_active=True)
@@ -68,11 +70,11 @@ async def test_how_it_works_handler_opens_details_screen() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
@@ -95,6 +97,7 @@ async def test_how_it_works_handler_opens_details_screen() -> None:
 
 
 async def test_back_handler_returns_to_campaign_menu() -> None:
+    """Spec `client-bot-handler-compatibility` returns back to the campaign menu."""
     bot = AsyncMock()
     wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
     adv_setting = SimpleNamespace(id=77, bot_active=True)
@@ -102,11 +105,11 @@ async def test_back_handler_returns_to_campaign_menu() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
@@ -129,6 +132,7 @@ async def test_back_handler_returns_to_campaign_menu() -> None:
 
 
 async def test_back_from_how_it_works_returns_to_landing() -> None:
+    """Spec `client-bot-handler-compatibility` allows round-tripping between views."""
     bot = AsyncMock()
     wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
     adv_setting = SimpleNamespace(id=77, bot_active=False)
@@ -137,11 +141,11 @@ async def test_back_from_how_it_works_returns_to_landing() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
@@ -184,10 +188,11 @@ async def test_back_from_how_it_works_returns_to_landing() -> None:
 
 
 async def test_open_status_button_raises_runtime_error_when_cabinet_missing() -> None:
+    """Spec `client-bot-handler-compatibility` fails safely when cabinet context is missing."""
     bot = AsyncMock()
 
     with patch(
-        "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+        "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
         AsyncMock(
             side_effect=RuntimeError(
                 "WBUserCabinet not found for original_id=55"
@@ -204,16 +209,17 @@ async def test_open_status_button_raises_runtime_error_when_cabinet_missing() ->
 
 
 async def test_back_handler_raises_runtime_error_when_adv_missing() -> None:
+    """Spec `client-bot-handler-compatibility` fails safely when campaign context is missing."""
     bot = AsyncMock()
     wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.get_adv_setting_or_none",
             AsyncMock(
                 side_effect=RuntimeError(
                     "AdvSetting not found for original_id=77"

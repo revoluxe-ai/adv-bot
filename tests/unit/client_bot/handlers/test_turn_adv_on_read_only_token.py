@@ -105,7 +105,7 @@ def _build_session_objects() -> tuple[MagicMock, SimpleNamespace, SimpleNamespac
     result_adv.scalar_one.return_value = adv
 
     session = MagicMock()
-    session.begin = MagicMock()
+    session.begin = AsyncMock()
     session.commit = AsyncMock()
     session.execute = AsyncMock(
         side_effect=[
@@ -118,7 +118,7 @@ def _build_session_objects() -> tuple[MagicMock, SimpleNamespace, SimpleNamespac
 
 
 async def test_turn_adv_on_blocks_read_only_token_activation() -> None:
-    """Read-only token blocks bot activation before bot_active commit."""
+    """Spec `client-bot-handler-compatibility` blocks paid activation for read-only tokens."""
     callback = _build_callback()
     callback_data = _build_callback_data()
     bot = AsyncMock()
@@ -164,7 +164,7 @@ async def test_turn_adv_on_blocks_read_only_token_activation() -> None:
 
 
 async def test_turn_adv_on_keeps_paid_enable_path_for_normal_token() -> None:
-    """Normal token enables paid mode and applies only the narrow paid-start defaults."""
+    """Spec `client-bot-handler-compatibility` preserves the normal paid enable path."""
     callback = _build_callback()
     callback_data = _build_callback_data()
     bot = AsyncMock()
@@ -227,7 +227,7 @@ async def test_turn_adv_on_keeps_paid_enable_path_for_normal_token() -> None:
 
 
 async def test_turn_adv_on_skips_v3_backfill_when_campaign_already_on_v3() -> None:
-    """Existing V3 campaigns should not trigger redundant backfill on paid enable."""
+    """Spec `client-bot-handler-compatibility` skips redundant V3 backfill when already enabled."""
     callback = _build_callback()
     callback_data = _build_callback_data()
     bot = AsyncMock()
@@ -281,7 +281,7 @@ async def test_turn_adv_on_skips_v3_backfill_when_campaign_already_on_v3() -> No
 
 
 async def test_turn_adv_off_applies_free_transition() -> None:
-    """Turn-off should return the campaign into FREE/manual mode."""
+    """Spec `client-bot-handler-compatibility` returns the campaign to free/manual mode."""
     callback = _build_callback()
     callback_data = _build_callback_data()
     bot = AsyncMock()

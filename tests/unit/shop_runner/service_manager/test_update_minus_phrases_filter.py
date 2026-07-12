@@ -14,6 +14,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.asyncio]
 
 
 async def test_update_minus_phrases_uses_dedicated_flag_not_white_list() -> None:
+    """Spec `shop-runner-minus-phrase-contract` keeps minus-phrase sync eligibility strict."""
     manager = CoroutinesManager.__new__(CoroutinesManager)
     manager._wb_manager_hub = SimpleNamespace()
     manager._tasks_manager = MagicMock()
@@ -23,12 +24,14 @@ async def test_update_minus_phrases_uses_dedicated_flag_not_white_list() -> None
                 SimpleNamespace(
                     adv_id=1,
                     shop_id="shop-1",
+                    bot_active=False,
                     auto_update_minus_phrases=False,
                     auto_update_white_list=True,
                 ),
                 SimpleNamespace(
                     adv_id=2,
                     shop_id="shop-1",
+                    bot_active=True,
                     auto_update_minus_phrases=True,
                     auto_update_white_list=False,
                 ),
