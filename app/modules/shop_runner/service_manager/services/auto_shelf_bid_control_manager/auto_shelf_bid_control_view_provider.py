@@ -1161,7 +1161,14 @@ class AutoShelfBidControlViewProvider:
                         else top_row.get("expected_order_cost_rub")
                     )
                     try:
-                        best_cpo_bid_rub_value = float(cpo_val) if cpo_val is not None else None
+                        if (
+                            cpo_val is not None
+                            and not isinstance(cpo_val, bool)
+                            and isinstance(cpo_val, (int, float, str))
+                        ):
+                            best_cpo_bid_rub_value = float(cpo_val)
+                        else:
+                            best_cpo_bid_rub_value = None
                     except (TypeError, ValueError):
                         best_cpo_bid_rub_value = None
 

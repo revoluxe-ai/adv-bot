@@ -12,6 +12,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime
 from collections.abc import Mapping, Sequence
+from typing import cast
 
 from .control_view_dto import AutoShelfBidControlViewDTO
 
@@ -41,14 +42,15 @@ def _as_object_sequence(value: object) -> Sequence[object] | None:
     if isinstance(value, (str, bytes, bytearray)):
         return None
     if isinstance(value, Sequence):
-        return value
+        return cast(Sequence[object], value)
     return None
 
 
 def as_object_dict(value: object) -> dict[str, object] | None:
     if not isinstance(value, Mapping):
         return None
-    return {str(key): item for key, item in value.items()}
+    object_mapping = cast(Mapping[object, object], value)
+    return {str(key): item for key, item in object_mapping.items()}
 
 
 def _coerce_finite_float(value: object) -> float | None:
