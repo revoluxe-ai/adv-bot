@@ -18,7 +18,7 @@
 
 - [x] 3.1 `test_no_common_bid_when_inactive.py`: `update_common_bid_in_search_adv` — non-vacuous inactive gate: `get_complex_advs` returns inactive adv, `get_wb_advs_dto` returns non-empty search DTO/input, resolver returns current bids that would reach `UpdateCommotBidInSearchAdvsManager.update_common_bid_in_search_adv`; assert manager / WB modifier not called only after the write path is otherwise reachable
 - [x] 3.2 `test_no_target_place_when_inactive.py`: `update_individual_keyword_target_places` — mock `KeywordTargetPlaceUpdater` / WB path not called
-- [x] 3.3 `test_no_whitelist_top_key_when_inactive.py`: `update_top_key_in_advs` — `FirstKeyUpdater.top_key_auto_update` not called
+- [x] 3.3 `test_no_whitelist_top_key_when_inactive.py`: `update_top_key_in_advs` — paid v2 / non-v3 path only; `FirstKeyUpdater.top_key_auto_update` not called for inactive adv
 - [x] 3.4 `test_no_whitelist_trimmer_when_inactive.py`: `white_list_tail_trimmer` — `WhiteListTrimmer.trim` not called
 - [x] 3.5 `test_no_shelf_bid_when_inactive.py`: `auto_shelf_bid_control` — `_set_target_bid` / `_persist_state_then_set_bid` not called (паттерн из `test_auto_shelf_bid_control_manager.py`)
 - [x] 3.6 `test_no_cluster_bids_when_inactive.py`: `update_cluster_bids` — `update_cluster_bids_manager.update_cluster_bids` not invoked with inactive adv

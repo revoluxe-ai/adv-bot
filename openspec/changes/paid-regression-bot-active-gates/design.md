@@ -81,7 +81,7 @@
 |-----------|-------------------|
 | Общая ставка search | `update_common_bid_in_search_adv` |
 | Target place ключей | `update_individual_keyword_target_places`, `adv_settings_auto_update` (v3) |
-| Whitelist | `update_top_key_in_advs`, `white_list_tail_trimmer`, v3 whitelist в `process_adv_v3` |
+| Whitelist | `update_top_key_in_advs` (paid v2 / non-v3 only), `white_list_tail_trimmer`, v3 whitelist в `process_adv_v3` |
 | Shelf bid | `auto_shelf_bid_control` → `_set_target_bid` / `_persist_state_then_set_bid` |
 
 Расширение P0: `update_cluster_bids`, `update_minus_phrases_in_advs`, `update_cpm_bid`.
@@ -124,7 +124,7 @@
 - `adv_settings_auto_update` (v2/v3 automation)
 - `update_minus_phrases_in_advs`
 - `update_cluster_bids`
-- `update_top_key_in_advs`
+- `update_top_key_in_advs` (paid v2 / non-v3 only)
 - `update_common_bid_in_search_adv`
 - `auto_shelf_bid_control`
 - `auto_shelf_bid_increment_stats` (если пишет WB)
@@ -159,6 +159,20 @@ THEN WB write dependency mock was NOT called
 GIVEN ComplexAdv with bot_active=True and flags enabled
 WHEN coroutine X runs (with mocked WB success)
 THEN WB write dependency mock WAS called (or manager reached apply path)
+```
+
+**Top-key whitelist (paid v2 only):**
+
+```text
+GIVEN ComplexAdv with bot_active=True
+AND auto updater version is v2 / non-v3
+AND auto whitelist update is enabled
+WHEN update_top_key_in_advs runs
+THEN the first-key whitelist updater path is eligible
+
+GIVEN ComplexAdv with automatic_version=3
+WHEN whitelist automation is tested
+THEN coverage belongs to adv_settings_auto_update / process_adv_v3, not update_top_key_in_advs
 ```
 
 **Recording (inactive, xfail until loader refactor):**
