@@ -76,6 +76,7 @@ def _patch_process_adv_v3_normal(persist_mock: AsyncMock) -> dict[str, object]:
             return_value=False
         ),
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_keyword_changes": AsyncMock(),
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_keyword_decision_trace": AsyncMock(),
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_tick_report": persist_mock,
     }
 

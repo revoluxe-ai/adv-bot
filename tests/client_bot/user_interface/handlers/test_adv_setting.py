@@ -11,12 +11,16 @@ from app.client_bot.user_interface.handlers.adv_setting import (
     reset_shop_non_relevant_phrases,
     wb_update_minus_keywords,
 )
+from app.client_bot.user_interface.handlers.adv_setting.utils.keyword_updater import (
+    update_keywords,
+)
 from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
@@ -61,13 +65,20 @@ async def _create_user_and_shop(
     return wb_user_cabinet, wb_cabinet
 
 
-async def _create_adv(session: AsyncSession, *, wb_cabinet: WBCabinet, suffix: str) -> AdvSetting:
+async def _create_adv(
+    session: AsyncSession,
+    *,
+    wb_cabinet: WBCabinet,
+    suffix: str,
+    automatic_version: int = 2,
+) -> AdvSetting:
     adv = AdvSetting(
         adv_id=100000 + abs(hash(suffix)) % 900000,
         name=f"adv_{suffix}",
         wb_cabinet_id=wb_cabinet.id,
         active_status="started",
         bot_active=True,
+        automatic_version=automatic_version,
     )
     session.add(adv)
     await session.flush()
@@ -87,6 +98,88 @@ async def _get_keyword_statuses(
     )
     rows = result.scalars().all()
     return {row.id: row.hard_status for row in rows}
+
+
+async def _get_keyword_rows(
+    session: AsyncSession, keyword_ids: list[int]
+) -> dict[int, KeywordSetting]:
+    session.expire_all()
+    result = await session.execute(
+        select(KeywordSetting).where(KeywordSetting.id.in_(keyword_ids))
+    )
+    rows = result.scalars().all()
+    return {row.id: row for row in rows}
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_update_keywords_returns_rowcount_and_updates_v3_modes(
+    async_session: AsyncSession,
+) -> None:
+    target_uc, target_cabinet = await _create_user_and_shop(
+        async_session, user_telegram_id=500005, shop_suffix="updater_target"
+    )
+    _, other_cabinet = await _create_user_and_shop(
+        async_session, user_telegram_id=500006, shop_suffix="updater_other"
+    )
+    non_v3_adv = await _create_adv(
+        async_session,
+        wb_cabinet=target_cabinet,
+        suffix="updater_non_v3",
+        automatic_version=2,
+    )
+    v3_adv = await _create_adv(
+        async_session,
+        wb_cabinet=target_cabinet,
+        suffix="updater_v3",
+        automatic_version=3,
+    )
+    other_adv = await _create_adv(
+        async_session,
+        wb_cabinet=other_cabinet,
+        suffix="updater_other",
+        automatic_version=3,
+    )
+
+    non_v3_black = KeywordSetting(
+        text="target_non_v3_black",
+        adv_setting_id=non_v3_adv.id,
+        hard_status=const.BLACK_LIST,
+        strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+    )
+    v3_black = KeywordSetting(
+        text="target_v3_black",
+        adv_setting_id=v3_adv.id,
+        hard_status=const.BLACK_LIST,
+        strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+    )
+    target_auto = KeywordSetting(
+        text="target_already_auto",
+        adv_setting_id=non_v3_adv.id,
+        hard_status=const.AUTO_MODE,
+        strategy_mode=KeywordStrategyMode.OPTIMUM,
+    )
+    other_black = KeywordSetting(
+        text="other_cabinet_black",
+        adv_setting_id=other_adv.id,
+        hard_status=const.BLACK_LIST,
+        strategy_mode=KeywordStrategyMode.MAX_CONVERSION,
+    )
+    keywords = [non_v3_black, v3_black, target_auto, other_black]
+    async_session.add_all(keywords)
+    await async_session.commit()
+
+    updated_count = await update_keywords(async_session, target_uc.id)
+
+    rows = await _get_keyword_rows(async_session, [kw.id for kw in keywords])
+    assert updated_count == 2
+    assert rows[non_v3_black.id].hard_status == const.AUTO_MODE
+    assert rows[non_v3_black.id].strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+    assert rows[v3_black.id].hard_status == const.AUTO_MODE
+    assert rows[v3_black.id].strategy_mode == KeywordStrategyMode.OFF
+    assert rows[target_auto.id].hard_status == const.AUTO_MODE
+    assert rows[target_auto.id].strategy_mode == KeywordStrategyMode.OPTIMUM
+    assert rows[other_black.id].hard_status == const.BLACK_LIST
+    assert rows[other_black.id].strategy_mode == KeywordStrategyMode.MAX_CONVERSION
 
 
 async def test_reset_shop_non_relevant_phrases_updates_only_target_shop(async_session: AsyncSession) -> None:
@@ -213,6 +306,7 @@ async def test_wb_update_minus_keywords_raises_runtime_error_when_complex_adv_mi
     hub = SimpleNamespace(wb_data_manager=MagicMock(), wb_manager=MagicMock())
     factory = SimpleNamespace(get_wb_manager_hub=MagicMock(return_value=hub))
     container = SimpleNamespace(
+        redis_client_wrapper=MagicMock(return_value=MagicMock()),
         module_resources=SimpleNamespace(
             wb_manager_hub_factory_container=SimpleNamespace(
                 wb_manager_hub_factory=MagicMock(return_value=factory)
@@ -268,6 +362,7 @@ async def test_wb_update_minus_keywords_keeps_soft_message_for_bot_inactive(
     hub = SimpleNamespace(wb_data_manager=MagicMock(), wb_manager=MagicMock())
     factory = SimpleNamespace(get_wb_manager_hub=MagicMock(return_value=hub))
     container = SimpleNamespace(
+        redis_client_wrapper=MagicMock(return_value=MagicMock()),
         module_resources=SimpleNamespace(
             wb_manager_hub_factory_container=SimpleNamespace(
                 wb_manager_hub_factory=MagicMock(return_value=factory)

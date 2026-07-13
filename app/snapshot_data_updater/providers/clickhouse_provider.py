@@ -1,7 +1,7 @@
 """ClickHouse snapshot provider: Stub и Live (read-only batch).
 
 Live делегирует в существующие компоненты shop_runner:
-- ``PlanFactReader.get_latest_plan_facts`` — plan/fact;
+- ``PlanFactReader.refresh_cache_from_clickhouse`` — plan/fact warmup/write-through;
 - ``ClickHouseManager.get_cluster_texts_for_adv_ids`` — norm_query кластеров.
 """
 
@@ -66,10 +66,8 @@ class ClickHouseSnapshotProviderLive:
     ) -> dict[int, PlanFactSnapshotDTO]:
         if not adv_ids:
             return {}
-        from app.utils.ch_semaphore import run_ch_with_timeout
-
-        summaries = await run_ch_with_timeout(
-            self._plan_fact_reader.get_latest_plan_facts(list(adv_ids))
+        summaries = await self._plan_fact_reader.refresh_cache_from_clickhouse(
+            list(adv_ids)
         )
         out: dict[int, PlanFactSnapshotDTO] = {}
         for adv_id, summary in summaries.items():

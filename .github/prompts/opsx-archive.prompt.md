@@ -6,6 +6,8 @@ Archive a completed change in the experimental workflow.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Architecture Decision Lookup:** Before archiving, search `openspec/decisions/**/*.md` and read proposed decisions from `artifactPaths.decisions.existingOutputPaths`. Use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving the change into `changes/archive` when they are reusable architecture source of truth. If there is nothing reusable to promote, explicitly output `Reusable architecture promotions: none`. Do not archive when `design.md` contains a permanent architecture decision that has not been moved to `openspec/decisions/` or a proposed decision artifact.
+
 **Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
@@ -28,7 +30,9 @@ Archive a completed change in the experimental workflow.
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context
    - `artifacts`: List of artifacts with their status (`done` or other)
 
-   **If any artifacts are not `done`:**
+   The `decisions` artifact is optional. If `artifactPaths.decisions.existingOutputPaths` is empty and Architecture Decision Lookup does not require a proposed decision, do not count `decisions` as an incomplete artifact.
+
+   **If any non-optional artifacts are not `done`:**
    - Display warning listing incomplete artifacts
    - Prompt user for confirmation to continue
    - Proceed if user confirms
@@ -61,7 +65,17 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
 
-5. **Perform the archive**
+5. **Perform Architecture Decision Archive Gate**
+
+   - Search and read `openspec/decisions/**/*.md`.
+   - Read proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
+   - Get `openspec instructions decisions --change "<name>" --json` when proposed decisions exist or archive analysis requires a proposed decision, and apply `rules.decisions`.
+   - Output `Architecture Decisions Found` with relevant decision paths and statuses.
+   - Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving `changeRoot` when they should become reusable source of truth; report promoted paths.
+   - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions that are not captured in `openspec/decisions/` or a proposed decision artifact, return `NO_GO` and do not archive.
+   - If no proposed decision needs promotion, output `Reusable architecture promotions: none` and proceed.
+
+6. **Perform the archive**
 
    Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
@@ -78,7 +92,7 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
-6. **Display summary**
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
@@ -149,6 +163,8 @@ Target archive directory already exists.
 
 **Guardrails**
 - Always prompt for change selection if not provided
+- Do not archive if reusable architecture decisions remain only in design.md
+- Explicitly report `Reusable architecture promotions: none` when there is nothing to promote
 - Use artifact graph (openspec status --json) for completion checking
 - Don't block archive on warnings - just inform and confirm
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)

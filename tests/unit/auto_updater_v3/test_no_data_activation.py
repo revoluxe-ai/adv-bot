@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from dataclasses import replace
-from unittest.mock import PropertyMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -233,51 +233,41 @@ def test_plan_no_data_skips_when_v2_cpo_and_ch_profile() -> None:
 
 
 @pytest.mark.unit
-def test_no_data_singleton_state_without_matrix_uses_fact_pay_for_order() -> None:
+def test_no_data_with_campaign_fact_stays_gap() -> None:
+    """Campaign fact не заменяет ключевой GAP без operational pay_for_order."""
     kw = _kw(ks_id=7, text="nd", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
     adv_state = replace(AdvState.empty(), fact_pay_for_order=123.0)
     dto = build_update_context([ctx], adv_state=adv_state).prepared.keywords[0]
 
-    assert len(dto.ladder_states) == 1
-    state = dto.ladder_states[0]
-    assert state.synthetic_no_data
-    assert not state.is_gap
-    assert state.cpo == 123.0
-    assert state.stage == V3LadderStageKind.MIN_CPA
-    assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
+    assert len(dto.ladder_states) == 2
+    assert any(state.is_gap for state in dto.ladder_states)
+    assert not any(state.synthetic_no_data for state in dto.ladder_states)
     assert dto.stored_mode == KeywordStrategyMode.OFF
     assert dto.current_mode == KeywordStrategyMode.OFF
 
 
 @pytest.mark.unit
-def test_no_data_singleton_prefers_fact_pay_for_order_over_keyword_pay_for_order() -> None:
-    kw = _kw(ks_id=10, text="nd_fact_priority", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
-    ctx = KeywordV3Context(keyword=kw, position_profile=None)
+def test_no_data_with_ch_profile_stays_gap_with_campaign_fact() -> None:
+    """CH-профиль без PFO не переводит ключ в FULL/MIN singleton."""
+    kw = _kw(
+        ks_id=10,
+        text="nd_fact_priority",
+        mode=KeywordStrategyMode.OFF,
+        conv=0.0,
+        cpm_set_bid=0,
+    )
+    ctx = KeywordV3Context(keyword=kw, position_profile=_sample_profile())
     adv_state = replace(AdvState.empty(), fact_pay_for_order=222.0)
-
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_dto._prepared_builder.is_keyword_no_data",
-            return_value=True,
-        ),
-        patch.object(CalculatedKeyword, "pay_for_order", new_callable=PropertyMock, return_value=111.0),
-    ):
-        update_ctx = build_update_context([ctx], adv_state=adv_state)
+    update_ctx = build_update_context([ctx], adv_state=adv_state)
 
     dto = update_ctx.prepared.keywords[0]
-    assert len(dto.ladder_states) == 1
-    state = dto.ladder_states[0]
-    assert state.cpo == 222.0
-    assert state.cpo != 111.0
-    assert state.stage == V3LadderStageKind.MIN_CPA
-    assert state.strategy_mode == KeywordStrategyMode.MIN_CPA
-    assert state.target_position == 0
-    assert state.synthetic_no_data is True
-    assert not state.is_gap
+    assert len(dto.ladder_states) == 2
+    assert any(state.is_gap for state in dto.ladder_states)
+    assert not any(state.synthetic_no_data for state in dto.ladder_states)
     assert dto.stored_mode == KeywordStrategyMode.OFF
     assert dto.current_mode == KeywordStrategyMode.OFF
-    assert dto.is_no_data_singleton()
+    assert not dto.is_no_data_singleton()
 
     current, potential = StatesListGenerator(update_ctx.adv_state).get_current_states(
         update_ctx.keywords
@@ -286,15 +276,11 @@ def test_no_data_singleton_prefers_fact_pay_for_order_over_keyword_pay_for_order
     assert potential == []
 
     down = pick_effective_down_ladder_state(dto)
-    assert down is not None
-    assert down.stage == V3LadderStageKind.OFF
-    assert down.strategy_mode == KeywordStrategyMode.OFF
-    assert down.target_position == 0
-    assert down.synthetic_no_data is True
+    assert down is None
 
 
 @pytest.mark.unit
-def test_no_data_singleton_enters_current_pool_and_not_potential_pool() -> None:
+def test_no_data_gap_stays_out_of_current_and_potential_pools() -> None:
     kw = _kw(ks_id=9, text="nd2", mode=KeywordStrategyMode.OFF, conv=0.0, cpm_set_bid=0)
     ctx = KeywordV3Context(keyword=kw, position_profile=None)
     adv_state = replace(AdvState.empty(), fact_pay_for_order=321.0)

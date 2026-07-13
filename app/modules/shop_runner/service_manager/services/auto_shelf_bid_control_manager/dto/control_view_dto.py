@@ -122,10 +122,18 @@ class AutoShelfBidControlViewDTO:
     expected_enforced_bid_minor: int | None = None
     primary_status: str | None = None
     bid_sync_detail: str | None = None
+    # New diagnostics fields
+    best_cpo_bid_rub: float | None = None
+    current_bid_rub: float | None = None
+    expected_bid_rub: float | None = None
+    selected_cpo_rub: float | None = None
+    bid_sync_status: str | None = None
+    unavailable_reason: str | None = None
     can_count_progress: bool = False
     main_target_explanation: str | None = None
     rec_bid_recommendation: dict[str, object] | None = None
     legacy_cycle_next_test_bid_minor: int | None = None
+    state_updated_at: datetime | None = None
     auto_shelf_bid_control_strategy: AutoShelfBidControlStrategy = (
         AutoShelfBidControlStrategy.PLAN_DISTANCE
     )

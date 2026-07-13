@@ -25,6 +25,7 @@ def wb_cabinet() -> WBCabinet:
 def test_apply_paid_auto_management_mode_sets_only_paid_mode_fields(
     wb_cabinet: WBCabinet,
 ) -> None:
+    """Spec paid-minus-phrases-default: paid transition включает minus-phrases flag."""
     adv_setting = AdvSetting(
         bot_active=False,
         automatic_version=2,
@@ -35,7 +36,7 @@ def test_apply_paid_auto_management_mode_sets_only_paid_mode_fields(
         bidder_active=False,
         max_place=5,
         max_cpm=2200,
-        auto_update_minus_phrases=True,
+        auto_update_minus_phrases=False,
     )
 
     apply_paid_auto_management_transition(adv_setting, wb_cabinet)
@@ -75,6 +76,7 @@ def test_paid_auto_management_transition_keeps_current_bidder_path(
 def test_apply_free_auto_management_mode_sets_only_free_mode_fields(
     wb_cabinet: WBCabinet,
 ) -> None:
+    """Spec paid-minus-phrases-default: free transition выключает minus-phrases flag."""
     adv_setting = AdvSetting(
         bot_active=True,
         automatic_version=3,
@@ -99,7 +101,7 @@ def test_apply_free_auto_management_mode_sets_only_free_mode_fields(
     assert adv_setting.bidder_active is False
     assert adv_setting.max_place == 11
     assert adv_setting.max_cpm == 3300
-    assert adv_setting.auto_update_minus_phrases is True
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_free_transition_does_not_use_bot_active_as_bidder_path_selector(
@@ -196,6 +198,7 @@ def test_apply_free_auto_management_mode_resets_paid_white_list_mode_to_safe_fre
 def test_apply_paid_auto_management_transition_sets_bot_active_true(
     wb_cabinet: WBCabinet,
 ) -> None:
+    """Spec paid-minus-phrases-default: bot activation включает minus-phrases automation."""
     adv_setting = AdvSetting(bot_active=False, bidder_active=False)
 
     apply_paid_auto_management_transition(adv_setting, wb_cabinet)
@@ -204,16 +207,19 @@ def test_apply_paid_auto_management_transition_sets_bot_active_true(
     assert adv_setting.bidder_active is True
     assert adv_setting.auto_update_target_place is True
     assert adv_setting.auto_update_white_list is False
+    assert adv_setting.auto_update_minus_phrases is True
 
 
 def test_apply_free_mode_transition_sets_bot_active_false(
     wb_cabinet: WBCabinet,
 ) -> None:
+    """Spec paid-minus-phrases-default: free transition выключает paid write flags."""
     adv_setting = AdvSetting(
         bot_active=True,
         bidder_active=True,
         auto_update_target_place=True,
         auto_update_white_list=True,
+        auto_update_minus_phrases=True,
     )
 
     apply_free_mode_transition(adv_setting, wb_cabinet)
@@ -222,6 +228,7 @@ def test_apply_free_mode_transition_sets_bot_active_false(
     assert adv_setting.bidder_active is False
     assert adv_setting.auto_update_target_place is False
     assert adv_setting.auto_update_white_list is False
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_backward_compatible_transition_wrappers_call_same_behavior(

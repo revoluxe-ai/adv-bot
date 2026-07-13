@@ -230,7 +230,7 @@ def _dto(
 def _adv_state(**overrides: object) -> AdvState:
     base = replace(
         AdvState.empty(),
-        resolve=550.0,
+        resolve=250.0,
         resolve_valid=True,
         max_pay_for_order=550.0,
     )
@@ -375,6 +375,35 @@ def test_rebalance_one_cycle_down_donor_up_recipient() -> None:
     assert ctx.keywords[1].current_mode == KeywordStrategyMode.MIN_CPA
     assert len(ctx.keywords[0].next_state) == 1
     assert len(ctx.keywords[1].next_state) == 1
+
+
+@pytest.mark.unit
+def test_rebalance_reload_keeps_potential_filter_above_resolve() -> None:
+    """Reloaded list2 не должен выбирать UP-ступени с ladder CPO ниже resolve."""
+    donor = _dto(
+        ks_id=1,
+        mode=KeywordStrategyMode.MAX_CONVERSION,
+        ladder=_ladder_states(1, min_cpo=500.0, opt_cpo=650.0, max_cpo=800.0),
+        conv=_DONOR_CONV,
+    )
+    recipient = _dto(
+        ks_id=2,
+        mode=KeywordStrategyMode.OFF,
+        target_place=0,
+        ladder=_ladder_states(2, min_cpo=450.0, opt_cpo=560.0, max_cpo=700.0),
+        conv=_RECIPIENT_CONV,
+    )
+    ctx = UpdateContextManager().from_prepared(
+        KeywordsPreparedList(keywords=[donor, recipient]),
+        adv_state=_adv_state(resolve=550.0),
+    )
+
+    RebalanceExecutor().execute(ctx)
+
+    assert len(donor.next_state) == 1
+    assert len(recipient.next_state) == 1
+    assert recipient.next_state[0].new_mode is KeywordMode.OPTIMUM
+    assert recipient.current_mode == KeywordStrategyMode.OPTIMUM
 
 
 @pytest.mark.unit

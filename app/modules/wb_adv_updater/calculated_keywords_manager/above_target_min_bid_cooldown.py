@@ -66,7 +66,8 @@ def is_above_target_at_min_bid(pre_kw: PreCalculatedKeyword, min_bid_for_adv: in
     target = pre_kw.keyword_setting.target_place
     if target is None:
         return False
-    cpm = int(pre_kw.cpm)
+    cpm_raw = pre_kw.cpm
+    cpm = int(cpm_raw)
     if cpm <= 0:
         return False
     pos = current_position_for_rule(pre_kw)

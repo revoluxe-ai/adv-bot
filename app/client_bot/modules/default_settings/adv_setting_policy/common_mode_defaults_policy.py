@@ -15,7 +15,7 @@ from .field_policy import FieldPolicy
 
 
 class CommonCampaignDefaultsPolicy(AdvSettingDefaultsPolicy):
-    """Common campaign defaults independent from FREE/PAID mode."""
+    """Общие defaults без mode-specific полей spec paid-minus-phrases-default."""
 
     name = "common_campaign_defaults"
 
@@ -45,13 +45,6 @@ class CommonCampaignDefaultsPolicy(AdvSettingDefaultsPolicy):
             value=lambda adv, wb_cabinet: FactMethods.BY_CARTS,
             reason="Базовый метод прогноза.",
         ),
-        FieldPolicy(
-            field=AdvSetting.auto_update_minus_phrases,
-            apply_if=lambda adv, wb_cabinet: True,
-            value=lambda adv, wb_cabinet: False,
-            reason="Новые РК безопасно стартуют без автообновления минус-фраз.",
-        ),
-
         FieldPolicy(
             field=AdvSetting.auto_budget_watchdog_enabled,
             apply_if=lambda adv, wb_cabinet: True,

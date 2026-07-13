@@ -23,6 +23,7 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.shared.domains.wb.enums import (
     AdvType,
 )
+from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
@@ -773,15 +774,6 @@ class AutoBudgetService:
         period = timedelta(seconds=settings.UPDATE_FULL_ADV_STAT_PERIOD)
         last_auto = await self._get_last_full_stat_update(adv_id_auto)
         last_search = await self._get_last_full_stat_update(adv_id_search)
-        if last_auto is None or last_search is None:
-            if not force_after_start_rejection:
-                return AutoBudgetEnsureResult(
-                    status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
-                    campaign_type=AdvType.AUTO,
-                    adv_id=adv_id_auto,
-                    spend_today=0.0,
-                    reason="Missing full adv stats for one or both campaigns",
-                )
         if last_auto is not None and last_search is not None:
             stats_stale_common = (
                 now_msk > last_auto + period or now_msk > last_search + period
@@ -869,6 +861,34 @@ class AutoBudgetService:
         b_auto = budget_auto or 0
         b_search = budget_search or 0
         combined_budget = b_auto + b_search
+        threshold = self._stale_stats_wb_total_threshold()
+        search_status_raw = getattr(adv, "search_adv_active_status_str", None)
+        search_status = (
+            search_status_raw.value
+            if isinstance(search_status_raw, WBAdvActiveStatus)
+            else search_status_raw
+        )
+        search_cold_start_needs_budget = (
+            search_status
+            in (
+                WBAdvActiveStatus.PAUSE.value,
+                WBAdvActiveStatus.READY_FOR_START.value,
+            )
+            and b_search < threshold
+        )
+        if (
+            (last_auto is None or last_search is None)
+            and not force_after_start_rejection
+            and not search_cold_start_needs_budget
+        ):
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS,
+                campaign_type=AdvType.AUTO,
+                adv_id=adv_id_auto,
+                spend_today=spend_today,
+                budget_total_before=int(combined_budget),
+                reason="Missing full adv stats for one or both campaigns",
+            )
         if (
             self._min_balance > 0
             and b_auto >= self._min_balance
@@ -909,6 +929,9 @@ class AutoBudgetService:
         ):
             target_adv_id = adv_id_auto
             target_campaign_type = AdvType.AUTO
+        elif search_cold_start_needs_budget:
+            target_adv_id = adv_id_search
+            target_campaign_type = AdvType.SEARCH
         elif (budget_auto or 0) <= (budget_search or 0):
             target_adv_id = adv_id_auto
             target_campaign_type = AdvType.AUTO

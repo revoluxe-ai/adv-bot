@@ -87,3 +87,5 @@ clickhouse-data/
 k8s/xray-client/README.md
 k8s/xray-client/config.json
 !openspec/**
+openspec/tools/__pycache__/
+openspec/tools/__pycache__/

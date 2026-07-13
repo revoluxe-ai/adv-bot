@@ -603,6 +603,27 @@ class V3TickReportBack(CallbackData, prefix="v3_tick_report_back"):
     adv_setting_original_id: int
 
 
+class KeywordV3DecisionTraceOpen(CallbackData, prefix="kw_v3_dec_open"):
+    """Открыть экран последнего V3-решения по ключу (admin debug)."""
+
+    keyword_setting_original_id: int
+    page: int = 1
+
+
+class KeywordV3DecisionTraceRefresh(CallbackData, prefix="kw_v3_dec_refresh"):
+    """Обновить экран последнего V3-решения по ключу."""
+
+    keyword_setting_original_id: int
+    page: int = 1
+
+
+class KeywordV3DecisionTraceBack(CallbackData, prefix="kw_v3_dec_back"):
+    """Вернуться к карточке ключа из экрана V3-решения."""
+
+    keyword_setting_original_id: int
+    page: int = 1
+
+
 class ChangeAutoUpdateExponentStatus(
     CallbackData, prefix="change_auto_update_exponent"
 ):
@@ -617,6 +638,12 @@ class ChangeAutoAddOnlyRelevantPhraseStatus(
     adv_id: int
     wb_user_cabinet_original_id: int
     new_status: bool
+
+
+class ManageRelevantAndNonRelevantPhrases(
+    CallbackData, prefix="manage_rel_nonrel_phrases"
+):
+    adv_setting_original_id: int
 
 
 class ChangeRecSystemModeStatus(CallbackData, prefix="change_rec_system_mode"):

@@ -64,12 +64,14 @@ class WBShopDataManager:
         tasks_manager: TasksManager,
         wb_api_data_manager : WBDataManager,
         wb_manager: WBManager | None,
+        plan_fact_reader: PlanFactReader,
     ):
         self._wb_cabinet: WBCabinet = wb_cabinet
         self.shop_id: str = wb_cabinet.shop_id
         self._tasks_manager: TasksManager | None = tasks_manager
         self._wb_api_data_manager = wb_api_data_manager
         self._wb_manager = wb_manager
+        self._plan_fact_reader = plan_fact_reader
         self._traffic_clicks_manager = TrafficClicksManager()
 
     @single_run()
@@ -324,7 +326,7 @@ class WBShopDataManager:
         if skip_plan_fact:
             plan_fact_reader = None
         else:
-            plan_fact_reader = PlanFactReader()
+            plan_fact_reader = self._plan_fact_reader
 
         if search_adv_ids:
             search_adv_task = self.__get_adv_id_to_search_adv_map(search_adv_ids)

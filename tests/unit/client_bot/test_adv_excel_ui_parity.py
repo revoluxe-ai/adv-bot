@@ -13,7 +13,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
 
 
 ADV_UI_HANDLER_BY_FIELD: dict[str, str] = {
-    "bot_active": "app/client_bot/user_interface/handlers/adv_setting.py",
+    "bot_active": "app/client_bot/user_interface/handlers/adv_setting/adv_setting.py",
     "auto_shelf_bid_control_enabled": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
     "max_cpm": "app/client_bot/user_interface/handlers/cpm_builder.py",
     "min_views_for_ml_predict": "app/client_bot/user_interface/handlers/min_views_for_ml_predict_ctr.py",

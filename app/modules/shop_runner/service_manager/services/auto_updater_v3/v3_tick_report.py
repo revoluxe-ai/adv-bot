@@ -275,6 +275,10 @@ class V3PhaseStats(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+def _empty_phase_stats() -> list[V3PhaseStats]:
+    return []
+
+
 class V3TickReportSnapshot(BaseModel):
     """Полный отчёт последнего тика V3 для Telegram UI."""
 
@@ -288,7 +292,7 @@ class V3TickReportSnapshot(BaseModel):
     fact_cpa: float | None = None
     resolve: float | None = None
     max_pay_for_order: float | None = None
-    phases: list[V3PhaseStats] = Field(default_factory=list)
+    phases: list[V3PhaseStats] = Field(default_factory=_empty_phase_stats)
     hard_status_counts: dict[str, int] = Field(default_factory=dict)
     aggression_score_before: int = 0
     aggression_score_after: int = 0

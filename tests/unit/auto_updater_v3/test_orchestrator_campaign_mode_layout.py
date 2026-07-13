@@ -67,4 +67,6 @@ def test_operable_filter_in_data_manager_before_normal_pipeline() -> None:
     assert "prepare_v3_operable_ladder_contexts" not in data_src
     assert "prepare_v3_operable_ladder_contexts" not in orch
     assert "build_for_tick" in orch
-    assert ".run_preamble(update_ctx)" in orch
+    assert ".run_preamble(" in orch
+    assert "update_ctx" in orch
+    assert "trace_collector=trace_collector" in orch

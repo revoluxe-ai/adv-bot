@@ -11,7 +11,7 @@ from .white_list_mode_rules import FREE_SAFE_WHITE_LIST_MODES
 
 
 class FreeModeDefaultsPolicy(AdvSettingDefaultsPolicy):
-    """FREE mode overlay for manual/self-service campaign behavior."""
+    """FREE overlay выключает paid automation для spec paid-minus-phrases-default."""
 
     name = "free_mode_overlay"
 
@@ -49,6 +49,12 @@ class FreeModeDefaultsPolicy(AdvSettingDefaultsPolicy):
             apply_if=lambda adv, wb_cabinet: True,
             value=lambda adv, wb_cabinet: False,
             reason="Paid auto target-place выключен во FREE.",
+        ),
+        FieldPolicy(
+            field=AdvSetting.auto_update_minus_phrases,
+            apply_if=lambda adv, wb_cabinet: True,
+            value=lambda adv, wb_cabinet: False,
+            reason="Spec paid-minus-phrases-default: FREE mode выключает paid WB write automation минус-фраз.",
         ),
         FieldPolicy(
             field=AdvSetting.bidder_for_auto,

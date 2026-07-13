@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_manager import (
@@ -70,6 +71,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword
     build_keyword_changes_snapshot,
     merge_keyword_changes_into_tick_snapshot,
     persist_v3_keyword_changes,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_decision_trace import (
+    KeywordDecisionTraceCollector,
+    build_keyword_decision_trace_snapshot,
+    persist_keyword_decision_trace,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager import (
@@ -136,6 +142,7 @@ async def process_adv_v3(
 
     tick_data: TickData | None = None
     pipeline_result: PreamblePipelineRunResult | None = None
+    trace_collector: KeywordDecisionTraceCollector | None = None
     sync_force_zero = False
     calibration_executed = False
 
@@ -185,7 +192,13 @@ async def process_adv_v3(
         elif tick_data.campaign_mode == CampaignMode.NORMAL and tick_data.dto is not None:
             assert tick_data.tick_input is not None
             update_ctx = ctx_mgr.build_for_tick(tick_data, tick_report=tick_report)
-            pipeline_result = UpdatePipelineManager().run_preamble(update_ctx)
+            tick_started_at = datetime.now(timezone.utc)
+            trace_collector = KeywordDecisionTraceCollector()
+            trace_collector.start_tick(tick_started_at=tick_started_at)
+            pipeline_result = UpdatePipelineManager().run_preamble(
+                update_ctx,
+                trace_collector=trace_collector,
+            )
             calibration_executed = pipeline_result.calibration_executed
             _sync_tick_data_after_pipeline(tick_data, pipeline_result)
 
@@ -315,6 +328,19 @@ async def process_adv_v3(
                     await persist_v3_keyword_changes(
                         tick_data.complex_adv.adv_setting,
                         audit,
+                    )
+                if pipeline_result is not None and trace_collector is not None:
+                    adv_setting = tick_data.complex_adv.adv_setting
+                    tick_finished_at = datetime.now(timezone.utc)
+                    trace_snapshot = build_keyword_decision_trace_snapshot(
+                        trace_collector,
+                        adv_id=int(complex_adv.adv_id),
+                        tick_finished_at=tick_finished_at,
+                        nmids=list(adv_setting.nmids or []),
+                    )
+                    await persist_keyword_decision_trace(
+                        adv_setting,
+                        trace_snapshot,
                     )
                 await persist_v3_tick_report(
                     tick_data.complex_adv.adv_setting,

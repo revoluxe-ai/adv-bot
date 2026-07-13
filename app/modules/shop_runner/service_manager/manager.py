@@ -66,6 +66,9 @@ from .services.auto_shelf_bid_control_manager import (
     AutoShelfBidControlManager,
     AutoShelfBidSetter,
 )
+from .services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
+    AutoShelfBidControlViewProvider,
+)
 from .services.plan_fact_controller.plan_fact_reader import PlanFactReader
 from .wb_shop_data_manager import WBShopDataManager
 from .wb_shop_data_manager import ComplexAdv
@@ -129,6 +132,14 @@ def _cluster_stats_diagnostic_enabled() -> bool:
 T = TypeVar("T")
 
 
+def _collect_plan_fact_refresh_adv_ids(pre_advs: list[PreComplexAdv]) -> list[int]:
+    """Собирает уникальные adv_id для немедленного refresh plan-fact кеша.
+
+    Сортировка нужна для стабильных тестов и предсказуемого порядка чтения из CH.
+    """
+    return sorted({int(pre_adv.adv_id) for pre_adv in pre_advs})
+
+
 class CoroutinesManager:
     def __init__(
         self,
@@ -146,11 +157,15 @@ class CoroutinesManager:
         if wb_manager_hub is None:
             wb_manager_hub = WBManagerHubFactory.get_wb_manager_from_context()  # fallback for tests
         self._wb_manager_hub = wb_manager_hub
+        self._plan_fact_reader = plan_fact_reader or PlanFactReader(
+            redis_client=redis_client_wrapper
+        )
         self._wb_shop_data_manager = WBShopDataManager(
             wb_cabinet,
             tasks_manager=tasks_manager,
             wb_api_data_manager=wb_manager_hub.wb_data_manager,
             wb_manager=wb_manager_hub.wb_manager,
+            plan_fact_reader=self._plan_fact_reader,
         )
 
         self._wb_api = wb_api
@@ -179,7 +194,6 @@ class CoroutinesManager:
         )
         self._auto_budget_service = AutoBudgetService(redis_client_wrapper)
         self._tasks_manager = tasks_manager
-        self._plan_fact_reader = plan_fact_reader or PlanFactReader()
         self._increment_fact_data_manager = IncrementFactDataManager(
             redis_client_wrapper,
         )
@@ -187,6 +201,10 @@ class CoroutinesManager:
             redis_client=redis_client_wrapper,
             wb_manager_hub=self._wb_manager_hub,
             auto_recommendations_bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
+        )
+        self._auto_shelf_bid_control_view_provider = AutoShelfBidControlViewProvider(
+            redis_client=redis_client_wrapper,
+            plan_fact_reader=self._plan_fact_reader,
         )
         self._auto_shelf_bid_control_manager = AutoShelfBidControlManager(
             bid_cache_manager=self._redis_auto_recommendations_bid_value_manager,
@@ -573,6 +591,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self, only_bot_active: bool = False) -> None:
+        """Update top-key whitelist automation only for paid non-v3 candidates."""
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
             FirstKeyUpdaterError,
             FirstKeyUpdater,
@@ -586,6 +605,7 @@ class CoroutinesManager:
             adv
             for adv in advs
             if adv.auto_update_white_list
+            and adv.bot_active
             and not is_v3_campaign(adv.auto_updater_version)
         ]
 
@@ -759,6 +779,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(15, 60)
     async def update_minus_phrases_in_advs(self, only_bot_active: bool = False) -> None:
+        """Update WB minus phrases only for paid campaigns with the feature enabled."""
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
 
         wb_manager_hub = self._wb_manager_hub
@@ -770,7 +791,9 @@ class CoroutinesManager:
             only_bot_active=only_bot_active,
         )
         complex_advs = [
-            adv for adv in complex_advs if adv.auto_update_minus_phrases
+            adv
+            for adv in complex_advs
+            if adv.bot_active and adv.auto_update_minus_phrases
         ]
         handlers: list[Callable[[], Awaitable[Any]]] = [
             lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
@@ -927,6 +950,7 @@ class CoroutinesManager:
             wb_modifier=wb_manager_hub.wb_modifier,
             tasks_manager=self._tasks_manager,
             plan_fact_reader=self._plan_fact_reader,
+            auto_shelf_bid_control_view_provider=self._auto_shelf_bid_control_view_provider,
             redis_campaign_activity_reason_manager=self._redis_campaign_activity_reason_manager,
             budget_ensure_before_start_retry=self._ensure_budget_for_campaign_start_retry,
         )
@@ -1080,6 +1104,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 5, 60)
     async def update_cluster_bids(self, only_bot_active: bool = False) -> None:
+        """Update cluster bids only for paid campaigns with bidder enabled."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
@@ -1088,6 +1113,7 @@ class CoroutinesManager:
             shop_id=self.shop_id,
             redis_client=wb_manager_hub.redis_client_wrapper,
             tasks_manager=self._tasks_manager,
+            plan_fact_reader=self._plan_fact_reader,
         )
         update_clusters_bid_manager = container.update_cluster_bids_manager()
         all_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
@@ -1111,7 +1137,7 @@ class CoroutinesManager:
                 bot_active=trace_adv.bot_active if trace_adv is not None else None,
                 bidder_active=trace_adv.bidder_active if trace_adv is not None else None,
             )
-        advs = [adv for adv in all_advs if adv.bidder_active]
+        advs = [adv for adv in all_advs if adv.bot_active and adv.bidder_active]
         if trace_adv_id is not None and is_trace_cell(
             shop_id=self.shop_id, adv_id=trace_adv_id
         ):
@@ -1463,6 +1489,7 @@ class CoroutinesManager:
     @while_coroutine_decorator(5 * 60, 60)
     async def update_plan_fact_stats(self, only_bot_active: bool = False) -> None:
         """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
+        # TODO: Перенести запись данных в CH в единый пайплайн под updater.py для единнобразия
         from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
 
         pre_advs: list[PreComplexAdv] = (
@@ -1475,6 +1502,8 @@ class CoroutinesManager:
 
         manager = PlanFactManager()
         await manager.process_and_save_pre_complex_advs(pre_advs)
+        adv_ids = _collect_plan_fact_refresh_adv_ids(pre_advs)
+        _ = await self._plan_fact_reader.refresh_cache_from_clickhouse(adv_ids)
         return None
     def _log_auto_budget_result(
         self,
@@ -1541,6 +1570,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 15, 15)
     async def update_common_bid_in_search_adv(self, only_bot_active: bool = False) -> None:
+        """Update common search bids only for paid, active automation candidates."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
 
@@ -1564,13 +1594,21 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
-        complex_advs = [adv for adv in complex_advs if
-                adv.bidder_active and
-                adv.updater_common_bid_in_search_adv_active_status and
-                adv.search_adv_active_status is True]
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if adv.bot_active
+            and adv.bidder_active
+            and adv.updater_common_bid_in_search_adv_active_status
+            and adv.search_adv_active_status is True
+        ]
+        if not complex_advs:
+            return None
         complex_advs, _ = await self._split_advs_by_stats_freshness(
             complex_advs, operation_name="update_common_bid_in_search_adv"
         )
+        if not complex_advs:
+            return None
         search_adv_bids = await resolver.get_merged_bids(complex_advs)
         advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(
             complex_advs, search_adv_bids_override=search_adv_bids
@@ -1713,7 +1751,9 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
-        complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
+        complex_advs = [
+            adv for adv in complex_advs if adv.bot_active and adv.auto_update_white_list
+        ]
         complex_advs = [
             adv
             for adv in complex_advs
@@ -1753,6 +1793,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_individual_keyword_target_places(self, only_bot_active: bool = False) -> None:
+        """Update individual keyword target places only for paid non-v3 campaigns."""
         from .services.keywords_target_place_updater import KeywordTargetPlaceUpdater
         from app.modules.predict_keywords_target_place import (build_predict_keywords_target_place,
                                                                PredictKeywordsTargetPlace)
@@ -1763,7 +1804,9 @@ class CoroutinesManager:
         if not complex_advs:
             return None
         complex_advs = [
-            adv for adv in complex_advs if adv.individual_keywords_target_place_mode
+            adv
+            for adv in complex_advs
+            if adv.bot_active and adv.individual_keywords_target_place_mode
         ]
         from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
             is_v3_campaign,

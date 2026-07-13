@@ -233,6 +233,7 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
             f"{_TL}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
             f"{_ORCH}.persist_v3_tick_report": AsyncMock(),
             f"{_ORCH}.persist_v3_keyword_changes": AsyncMock(),
+            f"{_ORCH}.persist_keyword_decision_trace": AsyncMock(),
         }
     )
     try:

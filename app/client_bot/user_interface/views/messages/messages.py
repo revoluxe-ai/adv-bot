@@ -507,13 +507,23 @@ class CabinetNameTooLong(Text):
 class KeywordSettingMessage(TextWithKeyboard):
     parse_mode = ParseMode.MARKDOWN
 
-    def __init__(self, bot: Bot, chat_id: int, keyword_setting_id: int, last_page: int):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        keyword_setting_id: int,
+        last_page: int = 1,
+        *,
+        telegram_user_id: int | None = None,
+    ):
         super().__init__(bot, chat_id)
         self._keyword_original_id = keyword_setting_id
         self._page = last_page
         self._chat_id = chat_id
+        self._telegram_user_id = telegram_user_id
         self._v3_profile_block: str | None = None
         self._v3_keyword_changes: V3KeywordChangesSnapshot | None = None
+
 
     @staticmethod
     async def _get_calculated_keyword(
@@ -698,6 +708,8 @@ class KeywordSettingMessage(TextWithKeyboard):
             self._keyword_setting,
             self._adv_setting,
             self._page,
+            telegram_user_id=self._telegram_user_id,
+            keyword_display_status=self._display_status_from_db_and_cache(),
         )
 
 
@@ -1382,6 +1394,60 @@ class WaitingForRelevantPhrases(Text):
     @property
     def text(self) -> str:
         return "Введите фразы, которые вы хотите добавить в кампанию в качестве релевантных фраз:"
+
+
+class RelevantPhraseManagementMenuMessage(TextWithKeyboard):
+    parse_mode = ParseMode.HTML
+
+    def __init__(self, bot: Bot, chat_id: int, adv: AdvSetting):
+        super().__init__(bot, chat_id)
+        self._adv = adv
+
+    @property
+    def text(self) -> str:
+        only_relevant = bool(getattr(self._adv, "auto_add_only_relevant_phrase", False))
+        text = (
+           """
+           Внимание, пожалуйста, прочитайте, как именно работает управление релевантными и нерелевантными фразами.
+
+Есть два режима управления фразами.
+
+<b>Обычный режим</b> используется по умолчанию. В этом режиме бот может автоматически добавлять новые фразы, кроме тех, которые заранее помечены как нерелевантные.
+
+<b>Нерелевантные фразы</b> — это фразы, которые явно не относятся к товару или могут ввести покупателя в заблуждение. Лучше добавлять сюда только те фразы, которые на 100% не подходят товару или даже противоречат ему. Например, пользователь может перейти по такой фразе, случайно купить товар, а потом понять, что это не то, что он искал.
+
+Не стоит добавлять в нерелевантные все фразы, которые просто кажутся сомнительными. Часто фраза выглядит нерелевантной, но на практике даёт корзины и заказы. С такими фразами бот обычно разберётся сам по статистике, если у вас выставлена нормальная максимальная себестоимость заказа.
+
+В обычном режиме используются кнопки управления нерелевантными фразами и шаблонами нерелевантных фраз.
+
+<b>Режим «только релевантные фразы»</b> работает строже. В этом режиме бот может автоматически добавлять только те фразы, которые уже помечены как релевантные.
+
+Если включить этот режим, но не настроить релевантные фразы или шаблоны релевантных фраз, автоматическое добавление новых фраз может фактически остановиться.
+
+В режиме «только релевантные фразы» используются кнопки управления релевантными фразами и шаблонами релевантных фраз.
+
+Переключение режима меняет набор кнопок ниже.
+
+Белый список и ручное добавление фраз в белый список для этой задачи не рекомендуются. Лучше использовать релевантные/нерелевантные фразы и шаблоны.
+
+
+           """
+        )
+
+        text += '🚨'
+        if only_relevant:
+            text += "Сейчас включен режим «только релевантные фразы»."
+        else:
+            text += "Сейчас включен обычный режим с нерелевантными фразами."
+        return text
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.keyboard import (
+            get_relevant_phrase_management_keyboard,
+        )
+
+        return get_relevant_phrase_management_keyboard(self._adv)
 
 
 async def process_cabinet_balance_topup(

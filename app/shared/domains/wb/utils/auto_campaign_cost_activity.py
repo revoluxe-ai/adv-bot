@@ -1,13 +1,14 @@
-"""Единое решение об активности автокампании по среднему CPO vs resolve.
+"""Единое решение об активности автокампании по среднему и total CPO vs resolve.
 
-При ``avg_cost > resolve`` кампания считается неактивной — watchdog ставит
-автокампанию на паузу, UI показывает предупреждение.
-
-При ``auto_shelf_bid_control_enabled`` cost-rule не применяется.
+Кампания считается неактивной только при подтверждённом нарушении:
+``avg_cost > resolve`` и ``fact_pay_for_order > resolve``. При нормальном
+``avg_cost`` total CPO не требуется. При высоком ``avg_cost`` без плохого total
+CPO результат остаётся неопределённым.
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
@@ -29,12 +30,52 @@ if TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models import AdvSetting
 
 
-def _cost_rule_controls_auto_campaign(adv_setting: AdvSetting) -> bool:
-    """True, если cost-rule (пауза автокампании по среднему CPO) применяется.
+def _as_finite_cost_number(value: object) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    result = float(value)
+    if not math.isfinite(result):
+        return None
+    return result
 
-    Не применяется при ``auto_shelf_bid_control_enabled``.
-    """
-    return not adv_setting.auto_shelf_bid_control_enabled
+
+def _resolve_cost_activity(
+    *,
+    target_cost: object,
+    avg_cost: object,
+    fact_pay_for_order: object,
+) -> bool | None:
+    """Return cost-rule activity decision using the watchdog total-CPO guard."""
+    target_cost_value = _as_finite_cost_number(target_cost)
+    avg_cost_value = _as_finite_cost_number(avg_cost)
+    if target_cost_value is None or avg_cost_value is None:
+        return None
+    if avg_cost_value <= target_cost_value:
+        return True
+
+    fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
+    if fact_pay_for_order_value is None:
+        return None
+    if fact_pay_for_order_value > target_cost_value:
+        return False
+    return None
+
+
+def _plan_fact_summary_has_finite_fact_data(plan_fact_summary: object) -> bool:
+    fact_predict_orders = getattr(plan_fact_summary, "fact_predict_orders", None)
+    if _as_finite_cost_number(fact_predict_orders) is None:
+        return False
+    fact_original_orders = getattr(plan_fact_summary, "fact_original_orders", None)
+    if (
+        fact_original_orders is not None
+        and _as_finite_cost_number(fact_original_orders) is None
+    ):
+        return False
+    fact_pay_for_order = getattr(plan_fact_summary, "fact_pay_for_order", None)
+    return (
+        fact_pay_for_order is None
+        or _as_finite_cost_number(fact_pay_for_order) is not None
+    )
 
 
 @dataclass(frozen=True)
@@ -55,16 +96,22 @@ async def get_auto_campaign_cost_activity_metrics(
     plan_fact_reader: PlanFactReader | None = None,
     days_for_avg: int = 7,
 ) -> AutoCampaignCostActivityMetrics:
-    """Build cost metrics and activity decision for an auto campaign."""
+    """Build cost metrics and the tri-state cost activity decision."""
     reader = plan_fact_reader or PlanFactReader()
     plan = PlanFactProvider.get_plan_data(adv_setting)
     plan_fact_summary = await reader.get_latest_plan_fact(adv_setting.adv_id)
 
     cost_threshold_kind: Literal["target", "max"] | None = None
+    fact_predict_orders = (
+        plan_fact_summary.fact_predict_orders
+        if plan_fact_summary is not None
+        else None
+    )
+    fact_predict_orders_value = _as_finite_cost_number(fact_predict_orders)
     if (
         plan is None
         or plan_fact_summary is None
-        or plan_fact_summary.fact_predict_orders is None
+        or fact_predict_orders_value is None
     ):
         target_cost = None
     else:
@@ -72,32 +119,44 @@ async def get_auto_campaign_cost_activity_metrics(
             plan.orders,
             plan.target_pay_for_order,
             plan.max_pay_for_order,
-            plan_fact_summary.fact_predict_orders,
+            fact_predict_orders_value,
         )
         if resolved is None:
             target_cost = None
             cost_threshold_kind = None
         else:
             target_cost, cost_threshold_kind = resolved
+            target_cost = _as_finite_cost_number(target_cost)
+            if target_cost is None:
+                cost_threshold_kind = None
     avg_cost = await full_wb_adv_stat.get_additional_cost_per_order_for_adv(
         adv_setting.adv_id,
         days=days_for_avg,
     )
+    avg_cost = _as_finite_cost_number(avg_cost)
     ch_ts = (
         plan_fact_summary.plan_fact_ch_ts_msk
         if plan_fact_summary is not None
         else None
     )
-    is_active: bool | None
-    if not _cost_rule_controls_auto_campaign(adv_setting):
-        is_active = True
-    elif target_cost is None or avg_cost is None:
-        is_active = None
-    else:
-        is_active = avg_cost <= target_cost
+    fact_pay_for_order = (
+        plan_fact_summary.fact_pay_for_order
+        if plan_fact_summary is not None
+        else None
+    )
+    fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
+    is_active = _resolve_cost_activity(
+        target_cost=target_cost,
+        avg_cost=avg_cost,
+        fact_pay_for_order=fact_pay_for_order_value,
+    )
 
     campaign_sales_state: SalesStates | None = None
-    if plan is not None:
+    if (
+        plan is not None
+        and plan_fact_summary is not None
+        and _plan_fact_summary_has_finite_fact_data(plan_fact_summary)
+    ):
         fact = fact_data_from_plan_fact_summary(plan_fact_summary, adv_setting)
         if fact is not None:
             campaign_sales_state = detect_campaign_state(plan, fact)
@@ -110,11 +169,7 @@ async def get_auto_campaign_cost_activity_metrics(
         plan_fact_ch_ts_msk=ch_ts,
         cost_threshold_kind=cost_threshold_kind,
         campaign_sales_state=campaign_sales_state,
-        fact_pay_for_order=(
-            plan_fact_summary.fact_pay_for_order
-            if plan_fact_summary is not None
-            else None
-        ),
+        fact_pay_for_order=fact_pay_for_order_value,
     )
 
 
@@ -124,7 +179,7 @@ async def is_auto_campaign_active(
     plan_fact_reader: PlanFactReader | None = None,
     days_for_avg: int = 7,
 ) -> bool | None:
-    """Return auto-campaign activity by cost rule."""
+    """Return the tri-state auto-campaign activity by cost rule."""
     metrics = await get_auto_campaign_cost_activity_metrics(
         adv_setting,
         plan_fact_reader=plan_fact_reader,

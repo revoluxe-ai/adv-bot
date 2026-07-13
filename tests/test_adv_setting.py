@@ -1,5 +1,5 @@
 import pytest
-from app.client_bot.user_interface.handlers.adv_setting import _update_and_get_adv_setting
+from app.client_bot.user_interface.handlers.adv_setting import update_and_get_adv_setting
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,7 @@ async def test_update_and_get_adv_setting_success(async_session: AsyncSession):
     await async_session.commit()
 
     # Act
-    updated_adv_setting = await _update_and_get_adv_setting(async_session, new_status=True, adv_setting_original_id=1)
+    updated_adv_setting = await update_and_get_adv_setting(async_session, new_status=True, adv_setting_original_id=1)
 
     # Assert
     assert updated_adv_setting.auto_update_minus_phrases is True
@@ -29,7 +29,7 @@ async def test_update_and_get_adv_setting_success(async_session: AsyncSession):
 async def test_update_and_get_adv_setting_not_found(async_session: AsyncSession):
     # Act & Assert
     with pytest.raises(RuntimeError, match="AdvSetting not found for original_id=999"):
-        await _update_and_get_adv_setting(async_session, new_status=True, adv_setting_original_id=999)
+        await update_and_get_adv_setting(async_session, new_status=True, adv_setting_original_id=999)
 
 
 
@@ -44,4 +44,4 @@ async def test_update_and_get_adv_setting_commit_failure(async_session: AsyncSes
 
     # Act & Assert
     with pytest.raises(RuntimeError):
-        await _update_and_get_adv_setting(async_session, new_status=True, adv_setting_original_id=2)
+        await update_and_get_adv_setting(async_session, new_status=True, adv_setting_original_id=2)
