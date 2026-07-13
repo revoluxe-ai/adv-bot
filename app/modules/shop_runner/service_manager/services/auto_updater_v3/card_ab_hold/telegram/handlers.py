@@ -9,11 +9,15 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.enter_status import (
+    build_enter_poll_status_lines,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     normalize_card_ab_hold_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
+    CardAbHoldLastAbortRedisCache,
     CardAbHoldSignalKind,
     CardAbHoldSignalRedisCache,
     CardAbHoldSignalSnapshot,
@@ -107,7 +111,11 @@ async def open_card_ab_hold_menu(
 async def enable_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldEnable
 ) -> None:
-    """ENTER: PENDING_SETUP + Redis ENTER signal (spec card-ab-hold-mode)."""
+    """ENTER: gate bot_active, PG PENDING_SETUP, Redis ENTER, poll last-abort/ACTIVE.
+
+    Spec card-ab-hold-mode. Immediate setup job out of MVP — UI показывает PENDING
+    и результат poll Ordinary abort / ACTIVE.
+    """
     async with sm() as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
@@ -120,14 +128,16 @@ async def enable_card_ab_hold(
         await CardAbHoldSignalRedisCache(adv).set_signal(
             CardAbHoldSignalSnapshot(signal=CardAbHoldSignalKind.ENTER)
         )
+        abort = await CardAbHoldLastAbortRedisCache(adv).get_abort()
+        await session.refresh(adv)
+        status = build_enter_poll_status_lines(
+            mode=adv.card_ab_hold_mode,
+            abort_safe=abort.safe if abort is not None else None,
+            abort_can_continue=abort.can_continue if abort is not None else None,
+        )
         logger.info("[adv_id=%s] CardAbHold ENTER → PENDING_SETUP", adv.adv_id)
         await query.answer("Подготовка A/B Hold…")
-        await _edit_screen(
-            query,
-            f"{_INSTRUCTION}\nСтатус: pending_setup\n"
-            "Обычный апдейтер будет остановлен; setup на следующем тике.",
-            adv.id,
-        )
+        await _edit_screen(query, f"{_INSTRUCTION}\n{status}", adv.id)
 
 
 @card_ab_hold_router.callback_query(CardAbHoldDisable.filter())

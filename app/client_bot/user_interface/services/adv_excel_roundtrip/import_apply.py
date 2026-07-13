@@ -48,8 +48,10 @@ from app.modules.sales_plan_settings.v3_raise_max_cpo import (
     skip_excel_substitute_fact_cpo_for_max,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
-    CardAbHoldMode,
     normalize_card_ab_hold_mode,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
+    can_apply_card_ab_hold_mode_via_excel,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
     DEFAULT_CURRENCY,
@@ -303,7 +305,10 @@ async def apply_adv_excel_rows(
                     continue
                 if field == "card_ab_hold_mode":
                     mode = normalize_card_ab_hold_mode(str(val))
-                    if mode != CardAbHoldMode.OFF and not bool(adv.bot_active):
+                    if not can_apply_card_ab_hold_mode_via_excel(
+                        bot_active=bool(adv.bot_active),
+                        requested_mode=mode,
+                    ):
                         raise AdvExcelImportError(
                             f"Строка {i}, колонка {h}: A/B Hold только при bot_active=True "
                             "(spec card-ab-hold-mode)"
