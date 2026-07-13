@@ -74,8 +74,10 @@ Even with `GO_ON_PROTECTED_BRANCH`, never push.
 
 Inspect changed OpenSpec files:
 
-```bash
-find openspec/changes -maxdepth 3 -type f | sort
+```powershell
+Get-ChildItem -Path .\openspec\changes -Recurse -File -Depth 2 |
+  Sort-Object FullName |
+  ForEach-Object { $_.FullName }
 ```
 
 If exactly one `openspec/changes/<change-id>/` is touched, use that as the OpenSpec change-id.
