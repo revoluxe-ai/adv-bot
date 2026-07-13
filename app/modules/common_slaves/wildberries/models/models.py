@@ -732,6 +732,13 @@ class AdvSetting(BaseTable):
         server_default=text("1"),
         comment="V3 RESOLVE_CALIBRATION_TRIM: cap effective ladder DOWN steps per keyword per tick",
     )
+    card_ab_hold_mode: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="off",
+        server_default=text("'off'"),
+        comment="A/B Hold mode: off | pending_setup | active (spec card-ab-hold-mode)",
+    )
 
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
