@@ -553,9 +553,13 @@ class CoroutinesManager:
         )
         # TODO: Убрал фильтрацию в качестве быстрого фикса, т.к. новая модель v3 отключала все ключи, и потом не включала, потому что стата кластеров не свежая, а она не свежая, потому что ключи все OFF
         handlers: list[Callable[[], Awaitable[Any]]] = []
-        for adv in advs_filtred:
-            ab_mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
-            # Spec card-ab-hold-mode / decision write-path: exclusion ordinary V3.
+        # Spec/decision card-ab-hold §2a: setup/hold из полного advs (не только
+        # advs_filtred) — иначе PENDING зависает при stale после ENTER.
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_ab_hold_pipeline_candidates,
+        )
+
+        for adv, ab_mode in filter_ab_hold_pipeline_candidates(advs):
             if ab_mode == CardAbHoldMode.PENDING_SETUP:
                 handlers.append(
                     functools.partial(
@@ -573,6 +577,12 @@ class CoroutinesManager:
                         wb_shop_data_manager=self._wb_shop_data_manager,
                     )
                 )
+                continue
+
+        for adv in advs_filtred:
+            ab_mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+            # Spec card-ab-hold-mode / decision write-path: exclusion ordinary V3.
+            if ab_mode != CardAbHoldMode.OFF:
                 continue
             ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
             if ver == 2:

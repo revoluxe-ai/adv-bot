@@ -71,13 +71,38 @@ def filter_bidder_eligible_by_ab_hold(advs: Sequence[TAdv]) -> list[TAdv]:
     return [adv for adv in advs if should_allow_bidder_on_ab_hold(adv.card_ab_hold_mode)]
 
 
+def filter_ab_hold_pipeline_candidates(
+    advs: Sequence[TAdv],
+) -> list[tuple[TAdv, CardAbHoldMode]]:
+    """Кампании для setup/hold из **полного** списка (не ``advs_filtred``).
+
+    Decision §2a: PENDING→setup, ACTIVE→hold; stale не отсекает post-enter.
+    Returns:
+        Пары (adv, mode) только для PENDING_SETUP / ACTIVE.
+    """
+    out: list[tuple[TAdv, CardAbHoldMode]] = []
+    for adv in advs:
+        mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+        if mode in (CardAbHoldMode.PENDING_SETUP, CardAbHoldMode.ACTIVE):
+            out.append((adv, mode))
+    return out
+
+
 def can_apply_card_ab_hold_mode_via_excel(
     *,
     bot_active: bool,
     requested_mode: CardAbHoldMode | str | None,
+    stats_fresh_enough: bool = True,
 ) -> bool:
-    """Excel may apply non-OFF mode только при ``bot_active=True`` (spec paid-only)."""
+    """Excel may apply non-OFF mode только при ``bot_active`` и здоровой стате.
+
+    Spec paid-only + enable blocked when stats freshness fails.
+    ``stats_fresh_enough`` вычисляет вызывающий (тот же freshness класс, что enable UI).
+    OFF всегда разрешён (EXIT / сброс).
+    """
     mode = normalize_card_ab_hold_mode(requested_mode)
     if mode == CardAbHoldMode.OFF:
         return True
-    return bool(bot_active)
+    if not bool(bot_active):
+        return False
+    return bool(stats_fresh_enough)
