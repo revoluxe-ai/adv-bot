@@ -11,6 +11,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     normalize_card_ab_hold_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
+    can_apply_card_ab_hold_mode_via_excel,
+    filter_bidder_eligible_by_ab_hold,
+    filter_structural_act_candidates,
     should_allow_bidder_on_ab_hold,
     should_allow_structural_act,
     should_run_ab_hold,
@@ -27,7 +30,10 @@ __all__ = [
     "AB_HOLD_MIN_VIEWS",
     "AbHoldSetupAction",
     "CardAbHoldMode",
+    "can_apply_card_ab_hold_mode_via_excel",
     "classify_ab_hold_setup_keyword",
+    "filter_bidder_eligible_by_ab_hold",
+    "filter_structural_act_candidates",
     "is_ab_hold_structural_freeze",
     "normalize_card_ab_hold_mode",
     "should_allow_bidder_on_ab_hold",

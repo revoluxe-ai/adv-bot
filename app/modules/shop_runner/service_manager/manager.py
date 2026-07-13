@@ -626,8 +626,8 @@ class CoroutinesManager:
             load_extras=False
         )
         advs = [adv for adv in advs if adv.bot_active]
-        from .services.auto_updater_v3.card_ab_hold.mode import (
-            is_ab_hold_structural_freeze,
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
         )
 
         advs_with_whitelist = [
@@ -635,8 +635,9 @@ class CoroutinesManager:
             for adv in advs
             if adv.auto_update_white_list
             and not is_v3_campaign(adv.auto_updater_version)
-            and not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
         ]
+        # Spec card-ab-hold-mode: filter before FirstKeyUpdater / WB write boundary.
+        advs_with_whitelist = filter_structural_act_candidates(advs_with_whitelist)
 
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs_with_whitelist:
@@ -1343,16 +1344,12 @@ class CoroutinesManager:
         )
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs = [adv for adv in complex_advs if adv.is_part_auto_setting_active]
-        from .services.auto_updater_v3.card_ab_hold.mode import (
-            is_ab_hold_structural_freeze,
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
         )
 
         # Spec card-ab-hold-mode: no emergency structural mutations on PENDING/ACTIVE.
-        complex_advs = [
-            adv
-            for adv in complex_advs
-            if not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
-        ]
+        complex_advs = filter_structural_act_candidates(complex_advs)
         if not complex_advs:
             return None
         _, stale_over_6h = await self._split_advs_by_stats_freshness(
@@ -1765,16 +1762,13 @@ class CoroutinesManager:
             load_extras=False
         )
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        from .services.auto_updater_v3.card_ab_hold.mode import (
-            is_ab_hold_structural_freeze,
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
         )
 
         complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
-        complex_advs = [
-            adv
-            for adv in complex_advs
-            if not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
-        ]
+        # Spec card-ab-hold-mode: trim candidates filtered before WhiteListTrimmer.write.
+        complex_advs = filter_structural_act_candidates(complex_advs)
         complex_advs = [
             adv
             for adv in complex_advs
@@ -1823,16 +1817,17 @@ class CoroutinesManager:
         if not complex_advs:
             return None
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        from .services.auto_updater_v3.card_ab_hold.mode import (
-            is_ab_hold_structural_freeze,
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
         )
 
         complex_advs = [
             adv
             for adv in complex_advs
             if adv.individual_keywords_target_place_mode
-            and not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
         ]
+        # Spec card-ab-hold-mode: filter before KeywordTargetPlaceUpdater write path.
+        complex_advs = filter_structural_act_candidates(complex_advs)
         from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
             is_v3_campaign,
         )
