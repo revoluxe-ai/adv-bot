@@ -253,7 +253,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
         patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
         patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
     ):
-        await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
+        await apply_campaign_defaults(callback_query, callback_data, mock_bot)
 
     # Проверяем, что дефолтные значения применились
     # Нужно начать новую транзакцию, так как хэндлер использует свою сессию
@@ -267,12 +267,10 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     # Common defaults не должны менять mode-specific поля.
     default_fields = [
-        "bidder_active",
         "bidder_mode",
         "bidder_coroutine_type",
         "orders_source_for_auto_mode",
         "sales_predict_method",
-        "auto_update_minus_phrases",
         "auto_budget_watchdog_enabled",
         "use_common_budget",
         "target_ctr_mode",
@@ -284,6 +282,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
         assert hasattr(updated_adv_setting, key), f"AdvSetting missing attribute {key}"
         assert getattr(updated_adv_setting, key) == getattr(expected_defaults, key), f"Mismatch for {key}"
 
+    assert updated_adv_setting.bidder_active == adv_setting.bidder_active
     assert updated_adv_setting.bidder_for_auto == adv_setting.bidder_for_auto
     assert updated_adv_setting.automatic_version == adv_setting.automatic_version
     assert (
@@ -293,6 +292,11 @@ async def test_apply_campaign_defaults_single_active_campaign(
     assert (
         updated_adv_setting.auto_update_target_place
         == adv_setting.auto_update_target_place
+    )
+    # Spec paid-minus-phrases-default: common defaults leave minus-phrases automation untouched.
+    assert (
+        updated_adv_setting.auto_update_minus_phrases
+        == adv_setting.auto_update_minus_phrases
     )
 
 
@@ -340,7 +344,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
         patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
         patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
     ):
-        await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
+        await apply_campaign_defaults(callback_query, callback_data, mock_bot)
 
     # Проверяем, что настройки изменились согласно дефолтам
     # А те, что не должны были измениться, остались прежними
@@ -354,12 +358,10 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
 
     # Common defaults не должны менять mode-specific поля.
     default_fields = [
-        "bidder_active",
         "bidder_mode",
         "bidder_coroutine_type",
         "orders_source_for_auto_mode",
         "sales_predict_method",
-        "auto_update_minus_phrases",
         "auto_budget_watchdog_enabled",
         "use_common_budget",
         "target_ctr_mode",
@@ -370,6 +372,10 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     for key in default_fields:
         assert getattr(updated_adv_setting, key) == getattr(defaults_v1, key), f"Mismatch for {key} (expected default)"
 
+    assert (
+        updated_adv_setting.bidder_active
+        == initial_adv_setting_state["bidder_active"]
+    )
     assert (
         updated_adv_setting.bidder_for_auto
         == initial_adv_setting_state["bidder_for_auto"]
@@ -385,6 +391,11 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     assert (
         updated_adv_setting.auto_update_target_place
         == initial_adv_setting_state["auto_update_target_place"]
+    )
+    # Spec paid-minus-phrases-default: common defaults leave minus-phrases automation untouched.
+    assert (
+        updated_adv_setting.auto_update_minus_phrases
+        == initial_adv_setting_state["auto_update_minus_phrases"]
     )
 
 
@@ -667,12 +678,10 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
 
     expected_defaults = CampaignDefaultsV1()
     default_fields = [
-        "bidder_active",
         "bidder_mode",
         "bidder_coroutine_type",
         "orders_source_for_auto_mode",
         "sales_predict_method",
-        "auto_update_minus_phrases",
         "auto_budget_watchdog_enabled",
         "use_common_budget",
         "target_ctr_mode",
@@ -684,6 +693,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         assert hasattr(updated_adv_active_1, key), f"AdvSetting missing attribute {key}"
         assert getattr(updated_adv_active_1, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_1"
 
+    assert updated_adv_active_1.bidder_active == adv_active_1.bidder_active
     assert updated_adv_active_1.bidder_for_auto == adv_active_1.bidder_for_auto
     assert updated_adv_active_1.automatic_version == adv_active_1.automatic_version
     assert (
@@ -694,6 +704,11 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         updated_adv_active_1.auto_update_target_place
         == adv_active_1.auto_update_target_place
     )
+    # Spec paid-minus-phrases-default: common defaults leave minus-phrases automation untouched.
+    assert (
+        updated_adv_active_1.auto_update_minus_phrases
+        == adv_active_1.auto_update_minus_phrases
+    )
 
     updated_adv_active_2 = await async_session.execute(
         select(AdvSetting).where(AdvSetting.id == adv_active_2.id)
@@ -703,6 +718,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         assert hasattr(updated_adv_active_2, key), f"AdvSetting missing attribute {key}"
         assert getattr(updated_adv_active_2, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_2"
 
+    assert updated_adv_active_2.bidder_active == adv_active_2.bidder_active
     assert updated_adv_active_2.bidder_for_auto == adv_active_2.bidder_for_auto
     assert updated_adv_active_2.automatic_version == adv_active_2.automatic_version
     assert (
@@ -712,4 +728,8 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
     assert (
         updated_adv_active_2.auto_update_target_place
         == adv_active_2.auto_update_target_place
+    )
+    assert (
+        updated_adv_active_2.auto_update_minus_phrases
+        == adv_active_2.auto_update_minus_phrases
     )

@@ -58,10 +58,6 @@ def test_apply_common_campaign_defaults() -> None:
     )
     assert adv_setting.sales_predict_method == defaults_v1.sales_predict_method
     assert (
-        adv_setting.auto_update_minus_phrases
-        == defaults_v1.auto_update_minus_phrases
-    )
-    assert (
         adv_setting.auto_budget_watchdog_enabled
         == defaults_v1.auto_budget_watchdog_enabled
     )
@@ -71,6 +67,8 @@ def test_apply_common_campaign_defaults() -> None:
     assert adv_setting.reset_place == defaults_v1.reset_place
     assert adv_setting.max_place == 1
     assert adv_setting.max_cpm == 5000
+    # Spec paid-minus-phrases-default: common defaults must not touch mode-specific minus-phrases automation.
+    assert adv_setting.auto_update_minus_phrases is True
 
 
 
