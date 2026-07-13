@@ -162,12 +162,14 @@ def test_excel_parse_card_ab_hold_mode() -> None:
 
 @pytest.mark.unit
 def test_excel_enable_rejected_when_bot_inactive() -> None:
-    """1.8: gate enable A/B Hold при bot_active=False (логика import_apply)."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
-        normalize_card_ab_hold_mode,
+    """1.8: enable A/B Hold при bot_active=False не применяется (shared excel gate)."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
+        can_apply_card_ab_hold_mode_via_excel,
     )
 
-    adv = SimpleNamespace(bot_active=False)
-    mode = normalize_card_ab_hold_mode("active")
-    assert mode != CardAbHoldMode.OFF
-    assert not bool(adv.bot_active)
+    assert (
+        can_apply_card_ab_hold_mode_via_excel(
+            bot_active=False, requested_mode="active"
+        )
+        is False
+    )
