@@ -166,6 +166,7 @@ rules:
 
   tasks:
     - "Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов."
+    - "Если делается сообщение в боте, то обязательно нужно делать тесты на длину текста, чтобы не выходили за рамки лимитов "
     - "Сначала добавлять или обновлять regression/characterization tests, затем менять production code."
     - "Тест не должен мокать функцию, фильтрацию или decision logic, поведение которой он проверяет."
     - "Async tests MUST NOT вручную patch shared module-level dependencies around awaited code: запрещён прямой `module.attr = fake` перед `await` с ручным `try/finally` restore."
@@ -185,7 +186,10 @@ rules:
     - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
     - "Для каждой новой функции метода, в том числе теста делай докстринг на русском с англицизмами со названием spec и обоснованием зачем эта функция вообще нужна и зачем она делает то, что делает"
     - "При изменении функции метода, в том числе теста  в месте изменении подробное описание обоснование этого изменения и указание названия spec"
-
+    - "If a change creates or modifies Telegram bot messages, captions, callback answers, inline keyboards, polls, invoices, or checklist text, tasks.md MUST include Telegram payload-limit tests."
+    - "Telegram message-limit tests MUST follow openspec/policies/telegram_bot_api_limits.md."
+    - "Tests MUST render messages with worst-case dynamic data and assert Telegram limits after formatting/entity parsing."
+    - "callback_data MUST be checked by UTF-8 byte length, not Python len(str)."
 
   decisions:
     - "Architecture decision является permanent artifact, а не частью design.md."
