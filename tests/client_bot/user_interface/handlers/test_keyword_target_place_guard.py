@@ -174,7 +174,11 @@ async def test_keyword_target_place_submit_updates_value_when_auto_update_disabl
         {"keyword_setting_for_target_place": keyword_id, "last_keyword_setting_page": 1}
     )
     bot = AsyncMock()
-    message = SimpleNamespace(chat=SimpleNamespace(id=42), text="9")
+    message = SimpleNamespace(
+        chat=SimpleNamespace(id=42),
+        text="9",
+        from_user=SimpleNamespace(id=42),
+    )
     mock_sm = _MockSessionMaker(async_session)
     updated_message = AsyncMock()
     keyword_screen = AsyncMock()
@@ -195,5 +199,11 @@ async def test_keyword_target_place_submit_updates_value_when_auto_update_disabl
     updated = await _get_keyword(async_session, keyword_id)
     assert updated.target_place == 9
     updated_message.assert_awaited_once()
-    keyword_screen_cls.assert_called_once_with(bot, 42, keyword_id, 1)
+    keyword_screen_cls.assert_called_once_with(
+        bot,
+        42,
+        keyword_id,
+        1,
+        telegram_user_id=42,
+    )
     keyword_screen.assert_awaited_once()
