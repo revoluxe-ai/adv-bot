@@ -17,6 +17,8 @@ from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory
 
 pytestmark = [pytest.mark.unit, pytest.mark.paid_regression, pytest.mark.asyncio]
 
+_HANDLER_MODULE = "app.client_bot.user_interface.handlers.adv_setting.adv_setting"
+
 
 def _session_cm(session: MagicMock):
     @asynccontextmanager
@@ -57,20 +59,26 @@ async def test_turn_adv_off_sets_bot_inactive() -> None:
         call_index += 1
         return _session_cm(session)
 
+    async def _deactivate(_session: MagicMock, _adv, _wb_cabinet) -> None:
+        _adv.bot_active = False
+
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            f"{_HANDLER_MODULE}.sm",
             MagicMock(side_effect=sm_factory),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            f"{_HANDLER_MODULE}.deactivate_adv_free_mode",
+            new=AsyncMock(side_effect=_deactivate),
+        ),
+        patch(
+            f"{_HANDLER_MODULE}.AdvSettingMenu",
             return_value=AsyncMock(),
         ),
     ):
         await turn_adv_off(call, callback_data, bot)
 
     assert adv.bot_active is False
-    session_write.commit.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -91,11 +99,11 @@ async def test_turn_adv_off_all_sets_all_inactive() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            f"{_HANDLER_MODULE}.sm",
             MagicMock(side_effect=lambda **_: _session_cm(session)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu",
+            f"{_HANDLER_MODULE}.ShopMenu",
             return_value=AsyncMock(),
         ),
     ):

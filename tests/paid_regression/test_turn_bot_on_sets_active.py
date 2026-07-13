@@ -9,10 +9,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.client_bot.user_interface.handlers.adv_setting.adv_setting import turn_adv_on
+from app.client_bot.user_interface.services.adv_auto_management_activation import (
+    PaidActivationEligibility,
+)
 from app.client_bot.user_interface.views import callbacks
 from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory
 
 pytestmark = [pytest.mark.unit, pytest.mark.paid_regression, pytest.mark.asyncio]
+
+_HANDLER_MODULE = "app.client_bot.user_interface.handlers.adv_setting.adv_setting"
 
 
 def _session_cm(session: MagicMock):
@@ -58,36 +63,30 @@ async def test_turn_bot_on_sets_bot_active_when_balance_ok() -> None:
     )
     session.commit = AsyncMock()
 
+    async def _activate(_session: MagicMock, _adv, _wb_cabinet) -> None:
+        _adv.bot_active = True
+
     adv_menu_instance = AsyncMock()
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            f"{_HANDLER_MODULE}.sm",
             MagicMock(side_effect=lambda **_: _session_cm(session)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
-            new=AsyncMock(return_value=3000),
+            f"{_HANDLER_MODULE}.check_paid_activation_eligibility",
+            new=AsyncMock(return_value=PaidActivationEligibility(allowed=True)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
-            return_value=100.0,
+            f"{_HANDLER_MODULE}.activate_adv_paid_mode",
+            new=AsyncMock(side_effect=_activate),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
-            new=AsyncMock(return_value=(500.0, 0.0)),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._shop_has_read_only_only_tokens",
-            new=AsyncMock(return_value=False),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            f"{_HANDLER_MODULE}.AdvSettingMenu",
             return_value=adv_menu_instance,
         ),
     ):
         await turn_adv_on(callback, state, callback_data, bot)
 
     assert adv.bot_active is True
-    session.commit.assert_awaited_once()
     adv_menu_instance.assert_awaited_once()

@@ -9,10 +9,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.client_bot.user_interface.handlers.adv_setting.adv_setting import turn_adv_on
+from app.client_bot.user_interface.services.adv_auto_management_activation import (
+    PaidActivationBlockReason,
+    PaidActivationEligibility,
+)
 from app.client_bot.user_interface.views import callbacks
 from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory
 
 pytestmark = [pytest.mark.unit, pytest.mark.paid_regression, pytest.mark.asyncio]
+
+_HANDLER_MODULE = "app.client_bot.user_interface.handlers.adv_setting.adv_setting"
 
 
 def _session_cm(session: MagicMock):
@@ -48,31 +54,30 @@ async def test_turn_bot_on_rejects_insufficient_balance() -> None:
     adv_result.scalar_one.return_value = adv
     session.execute = AsyncMock(side_effect=[wb_uc_result, adv_result])
     session.commit = AsyncMock()
+    activate_mock = AsyncMock()
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            f"{_HANDLER_MODULE}.sm",
             MagicMock(side_effect=lambda **_: _session_cm(session)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
-            new=AsyncMock(return_value=3000),
+            f"{_HANDLER_MODULE}.check_paid_activation_eligibility",
+            new=AsyncMock(
+                return_value=PaidActivationEligibility(
+                    allowed=False,
+                    block_reason=PaidActivationBlockReason.ZERO_BALANCE,
+                )
+            ),
         ),
+        patch(f"{_HANDLER_MODULE}.activate_adv_paid_mode", activate_mock),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
-            return_value=100.0,
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
-            new=AsyncMock(return_value=(0.0, 0.0)),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu",
+            f"{_HANDLER_MODULE}.ShopMenu",
             return_value=AsyncMock(),
         ),
     ):
         await turn_adv_on(callback, state, callback_data, bot)
 
     assert adv.bot_active is False
-    session.commit.assert_not_awaited()
+    activate_mock.assert_not_awaited()
     bot.send_message.assert_awaited()

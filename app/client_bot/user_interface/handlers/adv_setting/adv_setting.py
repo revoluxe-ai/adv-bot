@@ -14,17 +14,20 @@ from sqlalchemy.orm import selectinload, joinedload
 
 from app.client_bot import const
 from app.core.di.wb_manager_hub import WBManagerHub, WBManagerHubFactory
-from app.modules import balance_manager
-from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.client_bot.modules.default_settings import apply_common_defaults_settings_for_adv
+from app.client_bot.user_interface.services.adv_auto_management_activation import (
+    activate_adv_paid_mode,
+    check_paid_activation_eligibility,
+    deactivate_adv_free_mode,
+    get_paid_activation_block_message,
+)
 from app.client_bot.user_interface.services.auto_management_mode import (
     apply_free_mode_transition,
-    apply_paid_auto_management_transition,
 )
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
@@ -33,9 +36,6 @@ from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
-from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
-    backfill_v3_hard_statuses_and_states_consistency,
-)
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -43,7 +43,6 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
     WBShopDataManager,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
-from app.modules.token_monitoring.services.token_info_service import TokenInfoService
 from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
@@ -65,23 +64,6 @@ router = Router()
 
 
 logger = logging.getLogger(__name__)
-
-pricer = Pricer()
-
-READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE = (
-    "У этого токена только права чтения. Автоуправление недоступно. "
-    "Вы можете пользоваться аналитикой или заменить токен на ключ с правами управления продвижением."
-)
-
-
-async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
-    """Return True when the shop has only active read-only tokens for analytics."""
-    token_status = await TokenInfoService().get_shop_token_status(shop_id)
-    has_active_read_only_token = any(
-        token.is_read_only and token.is_valid and not token.is_expired
-        for token in token_status.all_tokens
-    )
-    return has_active_read_only_token and not token_status.valid_tokens
 
  # TODO: Переделать в WBCabinet.get()
 async def get_wb_user_cabinet(
@@ -483,9 +465,7 @@ async def turn_adv_on(
 
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     adv_original_id = callback_data.adv_original_id
-    # TODO: Упростить эту функцию, разбить, покрыть тестами, в том числе интгериационными
     async with sm(read_only=False) as session:
-        #TODO: Как то тут бегин работал без await? или нет. Вынести в тест и проверить
         await session.begin()
         stmt = (
             select(WBUserCabinet)
@@ -501,59 +481,31 @@ async def turn_adv_on(
             .where(AdvSetting.id == adv_original_id)
         )
         result_for_adv_setting = await session.execute(stmt)
-        adv: AdvSetting = result_for_adv_setting .scalar_one()
+        adv: AdvSetting = result_for_adv_setting.scalar_one()
         wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-        tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
-            session, wb_cabinet.shop_id
-        )
-        price_for_adv_for_day = pricer.get_tariff_for_day(int(tariff_for_month))
-        balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
-            wb_cabinet.id
-        )
-        sum_balance = balance + bonus
-        if sum_balance <= 0:
+
+        eligibility = await check_paid_activation_eligibility(session, wb_cabinet)
+        if not eligibility.allowed:
+            assert eligibility.block_reason is not None
             await bot.send_message(
                 callback.message.chat.id,
-                "Недостаточно средств на балансе кабинета для запуска. Пополните баланс.",
+                get_paid_activation_block_message(eligibility.block_reason),
             )
             await ShopMenu(
                 bot, callback.message.chat.id, state, wb_user_cabinet_original_id
             )()
             return
-        if not sum_balance >= price_for_adv_for_day:
-            await bot.send_message(callback.message.chat.id, "Недостаточно средств")
-            await ShopMenu(
-                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
-            )()
-            return
-        if await _shop_has_read_only_only_tokens(wb_cabinet.shop_id):
-            await bot.send_message(
-                callback.message.chat.id, READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE
-            )
-            await ShopMenu(
-                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
-            )()
-            return
+
         await bot.send_message(callback.message.chat.id, "Включаю бота")
-        switched_to_v3 = adv.automatic_version != 3
-        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
-        apply_paid_auto_management_transition(adv, wb_cabinet)
-        await session.commit()
-        if switched_to_v3:
-            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
-            await backfill_v3_hard_statuses_and_states_consistency(
-                dry_run=False,
-                adv_setting_id=adv.id,
-            )
-        wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+        await activate_adv_paid_mode(session, adv, wb_cabinet)
+
         await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
         await state.update_data(adv_original_id=adv.id)
-        wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
         stmt = select(WBUserCabinet).where(
             WBUserCabinet.id == wb_user_cabinet_original_id
         )
         result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result.scalar_one()
+        wb_user_cabinet = result.scalar_one()
         await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
     return
 
@@ -618,9 +570,7 @@ async def turn_adv_off(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
         )
         adv_setting: AdvSetting = result.scalar_one()
-        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
-        apply_free_mode_transition(adv_setting, wb_user_cabinet.wb_cabinet)
-        await session.commit()
+        await deactivate_adv_free_mode(session, adv_setting, wb_user_cabinet.wb_cabinet)
 
     await AdvSettingMenu(
         bot,
