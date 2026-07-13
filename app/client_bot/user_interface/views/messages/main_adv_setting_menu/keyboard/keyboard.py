@@ -46,6 +46,13 @@ from app.client_bot.user_interface.handlers.time_settings.callbacks import TS
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
+    CardAbHoldMenu,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
+    card_ab_hold_status_label,
+    is_card_ab_hold_ui_visible,
+)
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
@@ -379,6 +386,16 @@ def get_adv_setting_keyboard(
         _ = builder.row(v3_tick_report_main_button(adv_setting))
         _ = builder.row(v3_calibration_step_main_button(adv_setting))
         _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))
+
+    if is_card_ab_hold_ui_visible(adv_setting):
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=card_ab_hold_status_label(adv_setting),
+                callback_data=CardAbHoldMenu(
+                    adv_setting_original_id=adv_setting.id
+                ).pack(),
+            )
+        )
 
     button = InlineKeyboardButton(
         text="Шаблоны не релевантных фраз",

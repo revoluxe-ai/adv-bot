@@ -21,6 +21,10 @@ from app.modules.common_slaves.wildberries.models.models import (
     Strategy,
     WhiteListMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    CardAbHoldMode,
+    normalize_card_ab_hold_mode,
+)
 
 ExcelColumnKind = Literal["RO", "EDIT"]
 TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
@@ -89,6 +93,7 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "automatic_version",
         "aggressiveness",
         "keyword_calibration_max_step",
+        "card_ab_hold_mode",
         "white_list_mode",
         "individual_keywords_target_place_mode",
         "target_position_mode",
@@ -271,6 +276,7 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "automatic_version": "Версия автоматики",
     "aggressiveness": "V3: агрессивность раскрутки (1–3, вне полок)",
     "keyword_calibration_max_step": "V3: макс. шаг калибратора",
+    "card_ab_hold_mode": "Режим A/B карточки (off|pending_setup|active)",
     "white_list_mode": "Режим белого списка",
     "individual_keywords_target_place_mode": "Режим целевой позиции по ключам",
     "target_position_mode": "Режим целевой позиции",
@@ -347,6 +353,16 @@ def parse_edit_value(field: str, raw: Any) -> Any:
         if not s:
             raise ValueError("Пустое значение")
         return float(s)
+
+    if field == "card_ab_hold_mode":
+        allowed = {m.value for m in CardAbHoldMode}
+        raw_s = str(raw).strip().lower()
+        if raw_s not in allowed:
+            raise ValueError(
+                f"Недопустимый card_ab_hold_mode: {raw!r}. "
+                f"Допустимо: {', '.join(sorted(allowed))}"
+            )
+        return normalize_card_ab_hold_mode(raw_s).value
 
     return str(raw).strip()
 
