@@ -1,4 +1,5 @@
-[project.scripts]
+# TODO: переделать в новый стиль
+[tool.poetry.scripts]
 check-openspec = "openspec.tools.check_openspec:main"
 
 
@@ -8,7 +9,10 @@ version = "0.1.0"
 description = ""
 authors = ["Andrey <vkitaebiz@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "app" }]  # если у тебя основная папка называется app
+packages = [
+    { include = "app" },
+    { include = "openspec" },
+]
 
 [tool.black]
 exclude = '''
