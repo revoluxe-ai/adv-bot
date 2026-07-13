@@ -58,10 +58,10 @@ def _build_token_status(*, is_read_only_only: bool) -> TokenStatusReport:
         shop_id="shop_77",
         expires=datetime.now(UTC) + timedelta(days=30),
         categories={
-            "РљРѕРЅС‚РµРЅС‚",
-            "РЎС‚Р°С‚РёСЃС‚РёРєР°",
-            "РђРЅР°Р»РёС‚РёРєР°",
-            "РџСЂРѕРґРІРёР¶РµРЅРёРµ",
+            "Контент",
+            "Статистика",
+            "Аналитика",
+            "Продвижение",
         },
         is_read_only=is_read_only_only,
         is_valid=True,
@@ -77,7 +77,7 @@ def _build_token_status(*, is_read_only_only: bool) -> TokenStatusReport:
         valid_tokens=valid_tokens,
         expired_tokens=[],
         available_permissions=set() if is_read_only_only else token.categories,
-        missing_permissions={"РџСЂРѕРґРІРёР¶РµРЅРёРµ"} if is_read_only_only else set(),
+        missing_permissions={"Продвижение"} if is_read_only_only else set(),
         has_all_required_permissions=not is_read_only_only,
         expiring_tokens=[],
     )
