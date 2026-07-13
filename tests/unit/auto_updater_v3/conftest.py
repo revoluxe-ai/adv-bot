@@ -61,6 +61,12 @@ def _stub_v3_orchestrator_baseline_loaders(request: pytest.FixtureRequest):
             "app.modules.shop_runner.service_manager.services.v3_point_order_cpo.load_rec_orders_per_view_for_v3",
             new=AsyncMock(return_value=0.01),
         ),
+        # card-ab-hold-mode: interrupt читает Redis; в unit suite DI Provide не wired.
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.interrupt.abort_ordinary_v3_if_enter_signaled",
+            new=AsyncMock(return_value=False),
+        ),
     ):
         yield
 
