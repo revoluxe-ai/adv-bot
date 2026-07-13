@@ -87,7 +87,86 @@ context: |
     вынесены в registry и процитированы по path.
     Перед proposal/design/apply/verify/archive искать openspec/decisions/**/*.md.
 
+explore:
+  language: ru
+  worklog:
+    enabled: true
+    path: "DOTO/WORKLOG.md"
+    read_if_exists: true
+    missing_is_not_blocker: true
+    trust_level: "raw_notes"
+    purpose:
+      - "research_context"
+      - "candidate_tasks"
+      - "known_bugs"
+      - "open_questions"
+      - "affected_files_hints"
+      - "validation_hints"
+      - "prior_agent_findings"
+    output_section: "WORKLOG Findings"
+
+verify:
+  default_mode: strict
+  language: ru
+  final_marker:
+    enabled: true
+    go: "✅ GO"
+    no_go: "❌ NO_GO"
+    position: "last_line"
+  verdict:
+    require_single_overall_verdict: true
+    no_go_if_targeted_test_fails: true
+    no_go_if_task_checked_but_validation_fails: true
+    no_go_if_archive_blocker_exists: true
+    no_go_if_placement_violation_exists: true
+  archive_blockers:
+    - failed_targeted_tests
+    - placement_violations
+    - missing_required_decision
+    - task_validation_mismatch
+    - stale_reference_model
+    - unresolved_open_questions
+  output:
+    language: ru
+    require_sections:
+      - Итоговый вердикт
+      - Поведение
+      - Архитектурное размещение
+      - Тесты
+      - Согласованность tasks
+      - Готовность к archive
+      - Следующая команда
+    forbid_followup_write_offer: true
+
 rules:
+  explore:
+    - "Explore должен отвечать на русском языке, кроме путей, команд, имён файлов, классов, функций и OpenSpec keywords."
+    - "Explore должен читать настройки из openspec/config.yaml секции explore."
+    - "Если explore.worklog.enabled=true и файл explore.worklog.path существует, Explore должен прочитать его до финального вывода."
+    - "WORKLOG является raw notes, а не source of truth."
+    - "Explore должен извлекать из WORKLOG не только TODO, но и баги, гипотезы, prior findings, affected file hints, команды, ошибки, open questions и возможные follow-up задачи."
+    - "Любой вывод из WORKLOG должен быть помечен как Worklog-derived и сверяться с repository evidence."
+    - "Explore не должен слепо превращать каждую строку WORKLOG в задачу."
+    - "Explore должен отделять подтверждённые факты репозитория от заметок из WORKLOG."
+    - "Если WORKLOG упоминает файл/модуль/тест, Explore должен проверить его в репозитории, если это возможно."
+    - "Если WORKLOG отсутствует, Explore должен явно написать: WORKLOG not found, continuing without it."
+    - "Explore не должен менять WORKLOG.md."
+    - "Explore должен выводить секцию WORKLOG Findings даже если полезных находок нет."
+
+  verify:
+    - "Verify является read-only audit command после /opsx-apply и до /opsx-archive."
+    - "Verify должен читать настройки из openspec/config.yaml секции verify."
+    - "Verify должен отвечать на русском языке, кроме путей, команд, имён файлов, имён классов, имён функций и OpenSpec keywords."
+    - "Verify должен выдавать единый Итоговый вердикт: GO или NO_GO."
+    - "Если focused/targeted test падает, Итоговый вердикт должен быть NO_GO."
+    - "Если tasks отмечены [x], но validation/test/check падает, Verify должен писать Task completion mismatch."
+    - "Если archive невозможен, Итоговый вердикт должен быть NO_GO."
+    - "Verify не должен предлагать самостоятельно исправить код вопросом вида 'Want me to fix?'."
+    - "Вместо предложения правки Verify должен указать следующую команду: /opsx-apply, /opsx-update или manual fix."
+    - "Последняя строка ответа Verify всегда должна быть ровно одним маркером: ✅ GO или ❌ NO_GO."
+    - "Passing tests недостаточно, если implementation нарушает architecture decisions."
+    - "Archive ready не может быть yes при failed tests, placement violations или unresolved architecture blockers."
+
   proposal:
     - "Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea."
     - "Один change должен иметь один intent."
