@@ -199,4 +199,4 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен stats freshness asymmetry)
-- [ ] implementation layer matches decision *(нужен `/opsx:apply` для delta freshness gate + schedule)*
+- [x] implementation layer matches decision *(delta §7: enable freshness gate + schedule с полного advs)*
