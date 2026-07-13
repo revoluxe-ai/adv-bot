@@ -148,6 +148,7 @@ rules:
     - "Specs должны описывать stable product behavior или access boundary."
     - "Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation."
     - "Manual self-service actions нельзя описывать как automatic optimization."
+    - "Если функционал сложный и велик риск ошибки, нужно объяснять пользователю как получить помощь в случае проблем"
 
   design:
     - "Перед техническими изменениями изучать существующую реализацию."
@@ -166,6 +167,7 @@ rules:
     - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
     - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
     - "создавать большие MagicMock-замены доменных моделей без проверки tests/factories и существующих fixtures"
+
 
   tasks:
     - "Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов."
@@ -207,3 +209,4 @@ rules:
     - "Если change затрагивает ownership, layering, write-path или domain invariant и relevant accepted decision отсутствует, создать proposed decision или явно написать Architecture Decision Missing."
     - "Если implementation противоречит accepted decision, /opsx:apply и /opsx:verify должны возвращать NO_GO."
     - "Писать на русском языке."
+    - "Если нужна поддержка, то ссылка на телеграм администратора здесь const.SUPPORT_LINK "
