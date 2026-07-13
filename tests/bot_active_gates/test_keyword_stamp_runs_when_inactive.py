@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.bot_active_gates.helpers import unwrap_coroutine
+from tests.bot_active_gates.helpers import (
+    contains_adv_setting_identity,
+    make_fixture_loader_session_factory,
+    unwrap_coroutine,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.bot_active_gates, pytest.mark.asyncio]
 
@@ -20,8 +24,12 @@ async def test_inactive_adv_included_in_get_complex_advs_for_recording(
     manager = coroutines_manager_gate
     real_dm = manager._wb_shop_data_manager
     real_get = real_dm.get_complex_advs
-    result = await real_get(load_extras=False)
-    assert any(not adv.bot_active for adv in result)
+    with patch(
+        "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.sm",
+        new=make_fixture_loader_session_factory(inactive_complex_adv),
+    ):
+        result = await real_get(load_extras=False, skip_plan_fact=True)
+    assert contains_adv_setting_identity(result, inactive_complex_adv.adv_setting)
 
 
 async def test_keyword_stamp_coroutine_does_not_filter_bot_active_when_advs_provided(

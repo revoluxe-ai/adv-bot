@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tests.bot_active_gates.helpers import unwrap_coroutine
+from tests.bot_active_gates.helpers import (
+    contains_adv_setting_identity,
+    make_fixture_loader_session_factory,
+    unwrap_coroutine,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.bot_active_gates, pytest.mark.asyncio]
 
@@ -18,8 +22,15 @@ async def test_common_sale_stat_end_to_end_includes_inactive_adv(
 ) -> None:
     manager = coroutines_manager_gate
     real_dm = manager._wb_shop_data_manager
-    advs = await real_dm.get_complex_advs(load_extras=False)
-    assert inactive_complex_adv in advs or any(not a.bot_active for a in advs)
+    with patch(
+        "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.sm",
+        new=make_fixture_loader_session_factory(inactive_complex_adv),
+    ):
+        advs = await real_dm.get_complex_advs(
+            load_extras=False,
+            skip_plan_fact=True,
+        )
+    assert contains_adv_setting_identity(advs, inactive_complex_adv.adv_setting)
 
 
 async def test_common_sale_stat_coroutine_processes_inactive_when_in_list(

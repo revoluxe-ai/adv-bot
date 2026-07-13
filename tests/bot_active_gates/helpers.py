@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -23,12 +23,77 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from tests.factories.adv_factory import AdvSettingFactory
 
 
+class _FixtureScalarResult:
+    def __init__(self, rows: Sequence[AdvSetting]) -> None:
+        self._rows = list(rows)
+
+    def all(self) -> list[AdvSetting]:
+        return list(self._rows)
+
+
+class _FixtureExecuteResult:
+    def __init__(self, rows: Sequence[AdvSetting]) -> None:
+        self._rows = rows
+
+    def scalars(self) -> _FixtureScalarResult:
+        return _FixtureScalarResult(self._rows)
+
+
+class _FixtureLoaderSession:
+    def __init__(self, inactive_complex_adv: ComplexAdv) -> None:
+        self._inactive_complex_adv = inactive_complex_adv
+
+    async def execute(self, statement: object) -> _FixtureExecuteResult:
+        sql = str(statement)
+        if "WHERE advsetting.adv_id IN" in sql:
+            search_adv = self._inactive_complex_adv.search_adv
+            return _FixtureExecuteResult([search_adv] if search_adv is not None else [])
+        if "advsetting.bot_active IS true" in sql:
+            return _FixtureExecuteResult([])
+        return _FixtureExecuteResult([self._inactive_complex_adv.adv_setting])
+
+
+class _FixtureLoaderSessionContext:
+    def __init__(self, inactive_complex_adv: ComplexAdv) -> None:
+        self._session = _FixtureLoaderSession(inactive_complex_adv)
+
+    async def __aenter__(self) -> _FixtureLoaderSession:
+        return self._session
+
+    async def __aexit__(
+        self,
+        exc_type: object,
+        exc: object,
+        traceback: object,
+    ) -> None:
+        return None
+
+
 def unwrap_coroutine(method: Callable[..., Any]) -> Callable[..., Awaitable[Any]]:
     """Снять ``while_coroutine_decorator`` для одного тика в unit-тестах."""
     inner = getattr(method, "__wrapped__", None)
     if inner is None:
         return method  # type: ignore[return-value]
     return inner
+
+
+def contains_adv_setting_identity(
+    complex_advs: Sequence[ComplexAdv],
+    adv_setting: AdvSetting,
+) -> bool:
+    """Проверить, что real builder вернул ComplexAdv именно для этой AdvSetting."""
+    return any(adv.adv_setting is adv_setting for adv in complex_advs)
+
+
+def make_fixture_loader_session_factory(
+    inactive_complex_adv: ComplexAdv,
+) -> Callable[..., _FixtureLoaderSessionContext]:
+    """Собрать fake ``sm(...)`` для проверки loader-фильтра на конкретной fixture."""
+
+    def _session_factory(*_: object, **__: object) -> _FixtureLoaderSessionContext:
+        return _FixtureLoaderSessionContext(inactive_complex_adv)
+
+    return _session_factory
 
 
 def make_adv_setting(*, bot_active: bool = False, **overrides: object) -> AdvSetting:
