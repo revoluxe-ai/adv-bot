@@ -543,9 +543,37 @@ class CoroutinesManager:
         )
         control_system_v2 = AdvControlSystem(max_last_period=2)
         from .services.auto_updater_v3 import process_adv_v3
+        from .services.auto_updater_v3.card_ab_hold.mode import (
+            CardAbHoldMode,
+            normalize_card_ab_hold_mode,
+        )
+        from .services.auto_updater_v3.card_ab_hold.pipelines import (
+            process_ab_hold,
+            process_ab_setup,
+        )
         # TODO: Убрал фильтрацию в качестве быстрого фикса, т.к. новая модель v3 отключала все ключи, и потом не включала, потому что стата кластеров не свежая, а она не свежая, потому что ключи все OFF
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in advs_filtred:
+            ab_mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+            # Spec card-ab-hold-mode / decision write-path: exclusion ordinary V3.
+            if ab_mode == CardAbHoldMode.PENDING_SETUP:
+                handlers.append(
+                    functools.partial(
+                        process_ab_setup,
+                        adv,
+                        wb_shop_data_manager=self._wb_shop_data_manager,
+                    )
+                )
+                continue
+            if ab_mode == CardAbHoldMode.ACTIVE:
+                handlers.append(
+                    functools.partial(
+                        process_ab_hold,
+                        adv,
+                        wb_shop_data_manager=self._wb_shop_data_manager,
+                    )
+                )
+                continue
             ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
             if ver == 2:
                 handlers.append(
@@ -555,6 +583,9 @@ class CoroutinesManager:
 
 
         for adv in advs:
+            ab_mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+            if ab_mode != CardAbHoldMode.OFF:
+                continue
             ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
             if ver == 3:
                 handlers.append(
@@ -565,6 +596,8 @@ class CoroutinesManager:
                     )
                 )
         for adv in advs:
+            if normalize_card_ab_hold_mode(adv.card_ab_hold_mode) != CardAbHoldMode.OFF:
+                continue
             if adv.auto_updater_version not in [2, 3]:
                 logger.error('Установлена не поддерживаемая версия автоапдейтера '
                              'shop_id %s', self.shop_id)
@@ -593,11 +626,16 @@ class CoroutinesManager:
             load_extras=False
         )
         advs = [adv for adv in advs if adv.bot_active]
+        from .services.auto_updater_v3.card_ab_hold.mode import (
+            is_ab_hold_structural_freeze,
+        )
+
         advs_with_whitelist = [
             adv
             for adv in advs
             if adv.auto_update_white_list
             and not is_v3_campaign(adv.auto_updater_version)
+            and not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
         ]
 
         handlers: list[Callable[[], Awaitable[Any]]] = []
@@ -1305,6 +1343,16 @@ class CoroutinesManager:
         )
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
         complex_advs = [adv for adv in complex_advs if adv.is_part_auto_setting_active]
+        from .services.auto_updater_v3.card_ab_hold.mode import (
+            is_ab_hold_structural_freeze,
+        )
+
+        # Spec card-ab-hold-mode: no emergency structural mutations on PENDING/ACTIVE.
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
+        ]
         if not complex_advs:
             return None
         _, stale_over_6h = await self._split_advs_by_stats_freshness(
@@ -1717,7 +1765,16 @@ class CoroutinesManager:
             load_extras=False
         )
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        from .services.auto_updater_v3.card_ab_hold.mode import (
+            is_ab_hold_structural_freeze,
+        )
+
         complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
+        ]
         complex_advs = [
             adv
             for adv in complex_advs
@@ -1766,8 +1823,15 @@ class CoroutinesManager:
         if not complex_advs:
             return None
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        from .services.auto_updater_v3.card_ab_hold.mode import (
+            is_ab_hold_structural_freeze,
+        )
+
         complex_advs = [
-            adv for adv in complex_advs if adv.individual_keywords_target_place_mode
+            adv
+            for adv in complex_advs
+            if adv.individual_keywords_target_place_mode
+            and not is_ab_hold_structural_freeze(adv.card_ab_hold_mode)
         ]
         from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
             is_v3_campaign,

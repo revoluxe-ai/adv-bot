@@ -1,3 +1,6 @@
+from app.client_bot.modules.default_settings.adv_setting_policy.common_mode_defaults_policy import (
+    CommonModeDefaultsPolicy,
+)
 from app.client_bot.modules.default_settings.default_models.common_default import (
     CampaignDefaultsV1,
 )
@@ -12,11 +15,15 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     Применяет дефолтные настройки к объекту AdvSetting через прямой маппинг свойств.
     Использует явное присваивание свойство в свойство для безопасности типизации.
 
+    ``card_ab_hold_mode`` — из ``CommonModeDefaultsPolicy`` (accepted
+    ``mode-defaults-policy-ownership``), не из transition-helper.
+
     Args:
         adv_setting: Объект AdvSetting, к которому применяются дефолтные настройки
         wb_cabinet: Объект WBCabinet, из которого берем дефолтные настройки
     """
     defaults_v1 = CampaignDefaultsV1()
+    common_mode = CommonModeDefaultsPolicy()
 
     # Прямой маппинг свойств из CampaignDefaultsV1 в AdvSetting
     adv_setting.bidder_active = defaults_v1.bidder_active
@@ -35,6 +42,7 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     adv_setting.target_ctr_mode = defaults_v1.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = defaults_v1.new_auto_min_ctr_mode
     adv_setting.reset_place = defaults_v1.reset_place
+    adv_setting.card_ab_hold_mode = common_mode.card_ab_hold_mode
     if adv_setting.max_place is None:
         adv_setting.max_place = 1
 

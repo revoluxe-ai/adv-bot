@@ -158,6 +158,18 @@ async def process_adv_v3(
             max_last_period=max_last_period,
             tick_report=tick_report,
         )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt import (
+            abort_ordinary_v3_if_enter_signaled,
+        )
+
+        # Spec card-ab-hold-mode: interrupt after load (before preamble/apply).
+        if await abort_ordinary_v3_if_enter_signaled(complex_adv.adv_setting):
+            logger.info(
+                "[adv_id=%s] v3: aborted after load (CardAbHold ENTER)",
+                complex_adv.adv_id,
+            )
+            return
+
         if is_campaign_full_stop(tick_data.campaign_mode):
             logger.info(
                 "[adv_id=%s] v3 NOT_READY: full stop (no bootstrap, flush, sync)",
@@ -206,7 +218,12 @@ async def process_adv_v3(
             tick_data.tick_input is not None
             and needs_apply_manager(tick_data.campaign_mode)
         ):
-            if tick_data.dto is None:
+            if await abort_ordinary_v3_if_enter_signaled(complex_adv.adv_setting):
+                logger.info(
+                    "[adv_id=%s] v3: skipped apply after CardAbHold ENTER interrupt",
+                    complex_adv.adv_id,
+                )
+            elif tick_data.dto is None:
                 logger.warning(
                     "[adv_id=%s] v3: no WBAdvDTO, skip post-gate and snapshot "
                     "(retry next cycle)",
