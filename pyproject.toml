@@ -199,18 +199,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 
-[tool.ruff]
-# Exclude generated promotion clients from ruff checks
-exclude = [
-  "app/core/mp/wb/_api_client/clients/promotion/generated/",
-  "app/core/mp/wb/_api_client/clients/promotion/generated/*",
-  "alembic/versions",
-  "alembic/versions/*",
-  'k8s/*',
-    'tests/*',
-    'alembic_/versions/*',
-    '*test*'
-]
+
 line-length = 88
 target-version = "py311"
 preview = true   # <-- теперь здесь, не в .lint
