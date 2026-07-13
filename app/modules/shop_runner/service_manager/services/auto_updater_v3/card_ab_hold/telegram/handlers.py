@@ -28,6 +28,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldEnable,
     CardAbHoldMenu,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
+    build_ab_hold_enable_blocked_alert,
+    build_ab_hold_enable_blocked_by_stats_message,
+    evaluate_ab_hold_enable_stats,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold,
     is_card_ab_hold_ui_visible,
@@ -111,10 +116,11 @@ async def open_card_ab_hold_menu(
 async def enable_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldEnable
 ) -> None:
-    """ENTER: gate bot_active, PG PENDING_SETUP, Redis ENTER, poll last-abort/ACTIVE.
+    """ENTER: gate bot_active + stats freshness, PG PENDING_SETUP, Redis ENTER.
 
-    Spec card-ab-hold-mode. Immediate setup job out of MVP — UI показывает PENDING
-    и результат poll Ordinary abort / ACTIVE.
+    Spec card-ab-hold-mode / decision write-path §2a: при проблемной стате —
+    enable no-op, сразу причина + ограничение + ``SUPPORT_LINK``.
+    Immediate setup job out of MVP — UI показывает PENDING и poll LastAbort/ACTIVE.
     """
     async with sm() as session:
         adv = await session.scalar(
@@ -122,6 +128,15 @@ async def enable_card_ab_hold(
         )
         if adv is None or not can_enable_card_ab_hold(adv):
             await query.answer("Доступно только при включённом боте", show_alert=True)
+            return
+        stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(adv)
+        if not stats_ok:
+            blocked = build_ab_hold_enable_blocked_by_stats_message(stats_reason)
+            await query.answer(
+                build_ab_hold_enable_blocked_alert(stats_reason),
+                show_alert=True,
+            )
+            await _edit_screen(query, f"{_INSTRUCTION}\n{blocked}", adv.id)
             return
         adv.card_ab_hold_mode = CardAbHoldMode.PENDING_SETUP.value
         await session.commit()

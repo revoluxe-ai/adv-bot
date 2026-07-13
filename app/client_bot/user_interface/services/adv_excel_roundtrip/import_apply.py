@@ -53,6 +53,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
     can_apply_card_ab_hold_mode_via_excel,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
+    evaluate_ab_hold_enable_stats,
+    user_facing_stats_block_reason,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
     DEFAULT_CURRENCY,
     DEFAULT_MAX_BID_MINOR,
@@ -305,12 +309,26 @@ async def apply_adv_excel_rows(
                     continue
                 if field == "card_ab_hold_mode":
                     mode = normalize_card_ab_hold_mode(str(val))
+                    stats_ok = True
+                    stats_reason: str | None = None
+                    if mode.value != "off":
+                        stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(
+                            adv
+                        )
                     if not can_apply_card_ab_hold_mode_via_excel(
                         bot_active=bool(adv.bot_active),
                         requested_mode=mode,
+                        stats_fresh_enough=stats_ok,
                     ):
+                        if not adv.bot_active:
+                            detail = "A/B Hold только при bot_active=True"
+                        else:
+                            detail = (
+                                "A/B Hold blocked by stats freshness: "
+                                f"{user_facing_stats_block_reason(stats_reason)}"
+                            )
                         raise AdvExcelImportError(
-                            f"Строка {i}, колонка {h}: A/B Hold только при bot_active=True "
+                            f"Строка {i}, колонка {h}: {detail} "
                             "(spec card-ab-hold-mode)"
                         )
                     setattr(adv, field, mode.value)
