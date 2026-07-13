@@ -176,13 +176,13 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 ## Open Questions
 
-1. Точный source field views для «недельного окна» в CalculatedKeyword (какой атрибут/окно CH) — зафиксировать в apply по фактическому UI-источнику карточки ключа.
-2. Нужен ли immediate setup job после клика (не ждать цикл 5 мин) в MVP — предпочтительно да для UX; если нет, UI обязан показать PENDING до ACTIVE.
-3. Список hold guard executors: минимальный набор `ResetOverMaxCpo` + `PayForOrderOverMaxOffOnDeepOverspend` vs ещё clamp по resolve — default: только max/overspend guards (без resolve clamp), уточнить при apply если понадобится.
+1. ~~Точный source field views~~ — **Resolved in apply:** `CalculatedKeyword.views` ← `cluster_stat.views` (тот же источник карточки ключа / calculated keywords cache).
+2. ~~Immediate setup job~~ — **Resolved MVP:** immediate setup job **не** запускается из bot; UI ставит `PENDING_SETUP`, пишет Redis ENTER, poll `LastAbort`/PG mode; setup на тике shop-runner. UX обязан показывать PENDING (сделано).
+3. ~~Hold guard executors~~ — **Resolved MVP:** hold использует deep-overspend + PFO>max OFF (`hold_guards.py`), без resolve clamp / без полного `ResetOverMaxCpo` ladder trim. Полный V3 executor pair — optional follow-up, не blocker archive.
 
 ## Review Checklist
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`)
-- [ ] implementation layer matches decision
+- [x] implementation layer matches decision
