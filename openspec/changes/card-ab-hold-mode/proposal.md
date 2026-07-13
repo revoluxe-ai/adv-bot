@@ -18,6 +18,8 @@
 ### Desired behavior
 
 - Режим доступен **только paid**: при `bot_active is False` пункт меню / экран A/B Hold MUST быть **скрыт**; включение режима через UI, Excel или иные пути MUST NOT выполняться (reject / no-op). При `bot_active is True` — доступен экран инструкции и кнопки включить / выключить / назад.
+- **Включение (enable) дополнительно ограничено здоровьем статы РК:** если кампания не проходит тот же класс проверки свежести/получения статистики, что `_split_advs_by_stats_freshness` / `advs_filtred`, enable MUST NOT выполняться. В UI пользователь MUST сразу видеть **причину**, текст **ограничения** и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в коде нет `ADMIN`; whitelist — `ADMINS`; публичная ссылка — `SUPPORT_LINK`).
+- **После успешного переключения** (PENDING_SETUP / ACTIVE) сбои свежести статы **не** должны блокировать scheduling `process_ab_setup` / `process_ab_hold` (не оставлять вечный PENDING из‑за `advs_filtred`).
 - **ENTER:** система один раз готовит профиль РК, затем переводит кампанию в hold.
 - **Критерий setup (ENTER):**
   - PASS: `pay_for_order` ключа **≤ max CPO плана** (не resolve) **и** показов за недельное окно статистики ключа (тот же источник, что в карточке ключа) **≥ 100**;
@@ -27,18 +29,20 @@
 - **EXIT:** режим снимается — снова **включается обновление целевых позиций** и обычные апдейтеры; snapshot/restore настроек не требуется.
 - Координация между bot-подом и shop-runner-подом идёт через Redis-сигнал прерывания: текущий normal-тик может быть остановлен до apply с ответом «остановлено, безопасно, можно продолжать».
 - В справке MUST быть: перед включением прогреть РК с не зажатым max CPO и запасом плана продаж; полки рекомендуется выключить (не hard block — на усмотрение пользователя, если без полок нет трафика); не менять цену на период теста.
-- Настройка режима MUST быть доступна в Excel roundtrip **только для paid** (`bot_active is True`); для inactive — колонку не применять / скрывать по тому же paid-boundary.
+- Настройка режима MUST быть доступна в Excel roundtrip **только для paid** (`bot_active is True`); для inactive — колонку не применять / скрывать по тому же paid-boundary; Excel enable также MUST NOT при провале freshness gate.
 
 ### Scope in
 
 - Paid-only access: UI скрыт при `bot_active is False`; write/enable пути гейтятся тем же условием.
+- Enable gate на freshness/health статы РК + явный UI-ответ (причина, ограничение, `SUPPORT_LINK`).
+- После PENDING/ACTIVE: setup/hold не зависят от `advs_filtred` freshness filter.
 - Paid bot UI: экран инструкции + вкл/выкл режима.
 - Состояния режима кампании (выкл / подготовка / активен).
 - Setup ENTER + hold + exit для V3 (paid automation).
 - Cross-pod Redis coordination (signal / abort ack / setup lock) по project Redis-паттернам.
 - ACT-защита параллельных structural write-путей на время режима.
-- Excel-колонка режима (paid-only).
-- Тесты-first: gates structural freeze + paid visibility (`bot_active=False` → скрыто / не включается).
+- Excel-колонка режима (paid-only + freshness gate).
+- Тесты-first: gates structural freeze + paid visibility (`bot_active=False` → скрыто / не включается) + freshness enable gate + post-enter schedule.
 
 ### Out of scope
 
@@ -67,7 +71,7 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 
 ### New Capabilities
 
-- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — ENTER (pay_for_order ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая фактическая), HOLD (обновление ЦП выкл, биддер работает, guard перерасхода), EXIT (снова ЦП + апдейтеры, без restore), UI-инструкция, Excel, cross-pod interrupt.
+- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (pay_for_order ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая фактическая), HOLD (обновление ЦП выкл, биддер работает, guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), EXIT (снова ЦП + апдейтеры, без restore), UI-инструкция, Excel, cross-pod interrupt.
 
 ### Modified Capabilities
 

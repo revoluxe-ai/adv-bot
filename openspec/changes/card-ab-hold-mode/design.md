@@ -16,8 +16,10 @@
 - EXIT: снова обновление ЦП + ordinary апдейтеры; без restore snapshot.
 - Cross-pod Redis: signal ENTER/EXIT, last-abort ack, setup lock NX.
 - Paid-only UI (скрыть при `bot_active is False`) + reject enable.
-- Excel-колонка режима (paid-only).
-- Tests-first gates: structural freeze, paid visibility, interrupt до apply.
+- Enable gate на stats freshness/health (тот же класс, что `advs_filtred`); UI: причина + ограничение + `const.SUPPORT_LINK`.
+- После PENDING/ACTIVE: setup/hold scheduling не зависит от попадания в `advs_filtred`.
+- Excel-колонка режима (paid-only + freshness gate).
+- Tests-first gates: structural freeze, paid visibility, interrupt до apply, freshness enable + post-enter schedule.
 
 **Non-Goals:**
 
@@ -31,7 +33,7 @@
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze, PG vs Redis, paid-only enable, bidder MUST оставаться работающим.
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze, PG vs Redis, paid-only enable, bidder MUST оставаться работающим; **дополнен** асимметрией stats freshness (gate на enable; post-enter setup/hold не режутся `advs_filtred`) и UI-ответом с `SUPPORT_LINK`.
 
 Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
 
@@ -42,9 +44,9 @@ Architecture Decision Missing: нет (для этого change placement зак
 - Shop-runner A/B Hold automation path: `process_ab_setup` / `process_ab_hold` (отдельные entrypoints рядом с V3, не «ветка глубоко внутри NORMAL preamble» как единственный контроль).
 - PG durable mode на `AdvSetting` (или эквивалентное поле кампании): source of truth OFF / PENDING_SETUP / ACTIVE.
 - Redis coordination layer: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project patterns.
-- Paid UI / handlers: экран инструкции + вкл/выкл; gate `bot_active`.
+- Paid UI / handlers: экран инструкции + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`.
 - Mode policy overlays: default «выкл».
-- Excel schema: EDIT-колонка режима, apply только paid.
+- Excel schema: EDIT-колонка режима, apply только paid **и** при прохождении freshness gate.
 
 **Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (или единый dispatcher), ACT structural guards на whitelist/target-place/emergency, hold guard executors (overspend / PFO > max), bidder/cluster bids, Apply path только для setup/hold allowed mutations.
 
@@ -70,11 +72,17 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 ### 2. Scheduling exclusion + отдельные entrypoints
 
-**Выбор:** при PENDING_SETUP → только setup; при ACTIVE → только hold; ordinary V3 structural не schedule’ится.
+**Выбор:** при PENDING_SETUP → только setup; при ACTIVE → только hold; ordinary V3 structural не schedule’ится. Setup/hold ставятся из **полного** eligible списка `advs` (как ordinary V3), а не только из `advs_filtred`. Freshness-фильтр ordinary V2 / cluster-bids остаётся своим контрактом.
 
-**Почему:** физически не вызывать NORMAL preamble на hold-РК.
+**Почему:** Bugbot/продукт — PENDING не должен вечно висеть из‑за stale после ENTER; после переключения сбои статы «уже не так критичны» для продолжения setup/hold. Вход в тест при больной стате запрещён отдельно (см. §2a / UI).
 
-**Альтернатива:** один `process_adv_v3` с огромной внутренней веткой — отклонена decision’ом (forbidden «sole if»).
+**Альтернатива:** один `process_adv_v3` с огромной внутренней веткой — отклонена decision’ом (forbidden «sole if»). Setup только из `advs_filtred` — отклонена (stuck PENDING).
+
+### 2a. Stats freshness gate на enable (не на post-enter)
+
+**Выбор:** enable (UI / Excel / любой write → PENDING) MUST NOT, если РК не проходит freshness/health класс `_split_advs_by_stats_freshness` (не попала бы в fresh automation set). UI при блокировке MUST сразу показать: (1) причину, (2) что включение теста ограничено, (3) рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK`. В репозитории нет `const.ADMIN`; whitelist админов — `const.ADMINS`; публичная ссылка для пользователя — `SUPPORT_LINK` (как в других handler’ах: «обратитесь в поддержку → {SUPPORT_LINK}»).
+
+**Почему:** ENTER/setup на «мёртвой» стате даёт массовый FAIL→OFF и грязный старт теста; после входа блокировать hold/setup freshness’ом хуже, чем слабее overspend на stale.
 
 ### 3. ENTER criterion
 
@@ -110,11 +118,11 @@ Check-points interrupt: после load и **обязательно до apply**
 
 ### 7. Paid UI write-path
 
-**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие); при клике: gate `bot_active`, PG PENDING_SETUP, Redis ENTER, poll last-abort / ACTIVE; «Выключить» → EXIT signal + PG OFF.
+**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие); при клике: gate `bot_active`, **gate stats freshness**, при fail — alert (причина + ограничение + `SUPPORT_LINK`) без PENDING; при ok — PG PENDING_SETUP, Redis ENTER, poll last-abort / ACTIVE; «Выключить» → EXIT signal + PG OFF.
 
 **Affected records:** KeywordsSetting (status/БС/ЦП) на ENTER; AdvSetting mode field; bidder продолжает писать ставки в HOLD.
 
-**Recovery:** EXIT всегда доступен paid-пользователю; TTL Redis; при зависшем PENDING_SETUP — повторный setup под lock или EXIT.
+**Recovery:** EXIT всегда доступен paid-пользователю; TTL Redis; при зависшем PENDING_SETUP — повторный setup под lock или EXIT (setup не режется freshness filter после enter).
 
 ### 8. Defaults
 
@@ -139,8 +147,10 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 | Path | Gate |
 |------|------|
-| UI / enable / Excel apply | `bot_active is True` |
+| UI / enable / Excel apply | `bot_active is True` **и** stats freshness/health pass |
+| UI enable blocked by stats | show reason + restriction + `const.SUPPORT_LINK` |
 | Ordinary V3 schedule | mode == OFF |
+| A/B setup / hold schedule | mode PENDING/ACTIVE; **не** требовать `advs_filtred` |
 | Structural ACT (WL/TP/enable/emergency keys) | mode not in PENDING_SETUP, ACTIVE |
 | Bidder / cluster bids | allowed if paid bot+bidder flags as today |
 | Hold guards | ACTIVE only |
@@ -151,6 +161,8 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Unit: interrupt → no apply when signal ENTER.
 - Gate: ACTIVE → top-key / individual TP / trim not called; cluster bids still eligible.
 - Gate: `bot_active=False` → UI hidden / enable no-op.
+- Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
+- Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
 - EXIT → ordinary V3 снова в schedule.
 - Не мокать decision function под тестом; write-gate доказывает фильтрацию до write boundary.
 
@@ -162,10 +174,11 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 ## Risks / Trade-offs
 
-- [Risk] Ключи с малой статистикой уйдут в OFF на ENTER. → Mitigation: справка про прогрев; порог 100 views; max CPO не зажимать перед входом.
+- [Risk] Ключи с малой статистикой уйдут в OFF на ENTER. → Mitigation: справка про прогрев; порог 100 views; max CPO не зажимать перед входом; **не пускать enable при проблемной стате РК**.
 - [Risk] In-flight normal уже в apply при клике. → Mitigation: signal + check before apply; UI «Подготовка…»; короткий poll timeout.
 - [Risk] Пропущенный ACT без guard. → Mitigation: gate-suite + decision Forbidden; review новых корутин.
 - [Risk] Пользователь путает с Safe mode. → Mitigation: отдельный UI/название A/B Hold; out of scope Safe mode.
+- [Risk] Setup/hold на stale после enter слабее охраняют overspend. → Acceptable trade-off vs stuck PENDING; enable уже отрезал «холодный» вход.
 
 ## Migration Plan
 
@@ -179,10 +192,11 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 1. ~~Точный source field views~~ — **Resolved in apply:** `CalculatedKeyword.views` ← `cluster_stat.views` (тот же источник карточки ключа / calculated keywords cache).
 2. ~~Immediate setup job~~ — **Resolved MVP:** immediate setup job **не** запускается из bot; UI ставит `PENDING_SETUP`, пишет Redis ENTER, poll `LastAbort`/PG mode; setup на тике shop-runner. UX обязан показывать PENDING (сделано).
 3. ~~Hold guard executors~~ — **Resolved MVP:** hold использует deep-overspend + PFO>max OFF (`hold_guards.py`), без resolve clamp / без полного `ResetOverMaxCpo` ladder trim. Полный V3 executor pair — optional follow-up, не blocker archive.
+4. ~~Setup vs stale `advs_filtred`~~ — **Resolved (update):** enable блокируется freshness/health статы + UI reason/`SUPPORT_LINK`; после PENDING/ACTIVE setup/hold schedule из полного `advs`, не только `advs_filtred`.
 
 ## Review Checklist
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`)
-- [x] implementation layer matches decision
+- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен stats freshness asymmetry)
+- [ ] implementation layer matches decision *(нужен `/opsx:apply` для delta freshness gate + schedule)*

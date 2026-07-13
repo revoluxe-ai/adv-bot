@@ -104,3 +104,43 @@ Excel roundtrip MUST allow editing the A/B Hold mode setting only for campaigns 
 - **GIVEN** a campaign does not have paid bot management active
 - **WHEN** an Excel import requests enabling A/B Hold for that campaign
 - **THEN** A/B Hold is not enabled for that campaign
+
+### Requirement: Enable is blocked when campaign stats freshness fails
+The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through UI, Excel, or other write paths when the campaign fails the same statistics freshness / retrieval health class used by shop-runner automation filtering (`_split_advs_by_stats_freshness` / not admitted to the fresh automation set). After the mode is already PENDING_SETUP or ACTIVE, setup and hold ticks MUST still be scheduled even if the campaign would be excluded from that fresh set; post-enter stats failures MUST NOT leave the campaign stuck without a setup tick solely due to the freshness filter.
+
+#### Scenario: Enable rejected when stats are not fresh
+- **GIVEN** a campaign has paid bot management active
+- **AND** the campaign fails the stats freshness / retrieval health check used for automation filtering
+- **WHEN** the user attempts to enable A/B Hold
+- **THEN** A/B Hold is not enabled
+- **AND** the campaign mode remains off
+
+#### Scenario: Enable shows reason, restriction, and support link
+- **GIVEN** enable is blocked because of stats freshness / retrieval problems
+- **WHEN** the user attempts to enable A/B Hold from the paid UI
+- **THEN** the user immediately sees the blocking reason
+- **AND** sees that enabling the test is restricted for this campaign
+- **AND** sees a recommendation to contact support / admin including the URL from `app.client_bot.const.SUPPORT_LINK`
+- **AND** the message does not silently fail without explanation
+
+#### Scenario: Setup still runs after enter when stats become stale
+- **GIVEN** a campaign is already in PENDING_SETUP
+- **AND** the campaign would currently be excluded from the fresh automation set
+- **WHEN** shop-runner schedules A/B Hold automation
+- **THEN** the A/B Hold setup path is still eligible to run for that campaign
+- **AND** the campaign is not left without a setup tick solely because of the freshness filter
+
+#### Scenario: Hold still runs when stats are stale
+- **GIVEN** a campaign is already in active A/B Hold
+- **AND** the campaign would currently be excluded from the fresh automation set
+- **WHEN** shop-runner schedules A/B Hold automation
+- **THEN** the A/B Hold hold path remains eligible to run for that campaign
+
+### Requirement: Excel enable respects stats freshness gate
+Excel roundtrip MUST NOT apply A/B Hold enable when the campaign fails the stats freshness / retrieval health check. Excel MAY omit the detailed Telegram alert copy, but MUST NOT enable the mode.
+
+#### Scenario: Excel enable rejected when stats freshness fails
+- **GIVEN** a campaign has paid bot management active
+- **AND** the campaign fails the stats freshness / retrieval health check
+- **WHEN** an Excel import requests enabling A/B Hold for that campaign
+- **THEN** A/B Hold is not enabled for that campaign

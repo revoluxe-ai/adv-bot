@@ -16,6 +16,8 @@ A/B Hold — отдельный paid automation write-path с durable состо
 
 1. **Ownership pipeline:** setup ENTER и hold-тик принадлежат выделенному A/B Hold automation path в shop-runner (отдельные entrypoints / pipeline для setup и hold). Ordinary V3 NORMAL preamble не является владельцем структурных изменений на время PENDING_SETUP / ACTIVE.
 2. **Scheduling:** при состоянии режима PENDING_SETUP или ACTIVE кампания MUST NOT планироваться в ordinary V3 structural update; запускаются только setup (пока PENDING_SETUP) или hold (пока ACTIVE).
+2a. **Stats freshness asymmetry:** включение режима (UI / Excel / любой enable → PENDING_SETUP) MUST быть запрещено, если кампания не проходит тот же класс проверки свежести/доступности статы, что `_split_advs_by_stats_freshness` / попадание в `advs_filtred` (проблемы получения статистики по РК). После успешного переключения (PENDING_SETUP или ACTIVE) setup/hold MUST планироваться из полного eligible списка кампаний и MUST NOT блокироваться отсутствием в `advs_filtred` — сбои свежести статы после входа не должны оставлять РК в вечном PENDING и не должны отменять hold-тик только из‑за freshness gate.
+2b. **Enable UX on stats block:** при отказе enable из‑за проблем статы пользователь MUST сразу видеть причину, текст ограничения и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в кодовой базе нет singular `ADMIN`; whitelist админов — `ADMINS`; публичная ссылка поддержки для пользователя — `SUPPORT_LINK`).
 3. **Structural freeze:** пока режим PENDING_SETUP или ACTIVE, структурные ACT-пути MUST NOT менять whitelist, целевые позиции, разгон/enable ключей и emergency structural mutations. Bidder path (ставки к уже зафиксированным ЦП) MUST оставаться разрешённым.
 4. **Durable vs ephemeral:** PG-состояние режима (OFF / PENDING_SETUP / ACTIVE) — source of truth «в каком режиме живёт кампания». Redis signal / last-abort / setup-lock — только cross-pod координация прерывания и single-flight setup; Redis не заменяет PG-режим.
 5. **Interrupt:** cooperative abort normal/hold тика через Redis signal читается в shop-runner; штатный early return до apply считается безопасным («остановлено, можно продолжать»). Abort mid-apply недопустим как штатный путь.
@@ -36,6 +38,9 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Hold: только overspend/guard-подобная защита относительно max CPO; bidder продолжает работать к зафиксированным ЦП.
 - Redis `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project Redis-паттернам (`AdvSettingRedisCache` + `RedisLockManager`).
 - UI и enable только при `bot_active is True`.
+- Enable дополнительно gate’ится на fresh/healthy stats (тот же freshness-класс, что исключает РК из ordinary automation при stale).
+- Setup/hold scheduling для PENDING_SETUP / ACTIVE из полного eligible `advs` (не только `advs_filtred`).
+- Alert/текст при blocked enable: причина + ограничение + `const.SUPPORT_LINK`.
 - Дефолт «режим выкл» через paid/free mode policy overlays.
 
 ## Forbidden
@@ -48,19 +53,25 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Прерывать после успешного apply как штатный «safe abort».
 - Отдавать UI или enable режима при `bot_active is False`.
 - Задавать дефолт режима прямым присваиванием в transition-helper / handler в обход mode policy overlays.
+- Включать A/B Hold (PENDING), когда кампания не проходит freshness/stats-health gate.
+- Планировать setup/hold **только** из `advs_filtred`, оставляя PENDING без тика при stale stats.
+- Silent enable-fail без причины и без рекомендации со `SUPPORT_LINK`.
 
 ## Examples
 
 Good:
 
-- Клиент включает A/B Hold → PG `PENDING_SETUP` + Redis signal ENTER → ordinary V3 тик abort до apply → setup фиксирует ЦП на текущих → PG `ACTIVE` → дальше только hold + bidder.
+- Клиент включает A/B Hold при fresh stats → PG `PENDING_SETUP` + Redis signal ENTER → ordinary V3 тик abort до apply → setup фиксирует ЦП на текущих → PG `ACTIVE` → дальше только hold + bidder.
+- Клиент жмёт «Включить» при stale/stats problem → enable no-op; alert с reason + «обратитесь в поддержку» + `SUPPORT_LINK`; PG остаётся OFF.
 - Parallel `update_top_key_in_advs` / individual target-place updater видит ACTIVE и не выполняет structural write.
+- PENDING_SETUP при последующем stale всё равно получает `process_ab_setup` (не застревает из‑за `advs_filtred`).
 
 Bad:
 
 - Только `if card_ab_hold_mode` внутри ordinary preamble без exclusion scheduling и без gates на соседних ACT-корутинах.
 - Выключить `bot_active`, чтобы «не мешать тесту» (биддер тоже останавливается).
 - Хранить режим только в Redis без PG.
+- Enable при проблемах статы «втихую» или setup только для fresh → вечный PENDING.
 
 ## Related specs
 
