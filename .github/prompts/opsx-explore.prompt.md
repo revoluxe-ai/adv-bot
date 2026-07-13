@@ -6,11 +6,61 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 
 **IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
 
-**This is a stance, not a workflow.** There are no fixed steps, no required sequence, no mandatory outputs. You're a thinking partner helping the user explore.
+**This is a stance with a mandatory context pass.** Exploration stays read-only and adaptive, but this project requires config/WORKLOG loading and final evidence separation when you summarize findings.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Architecture Decision Lookup:** When the exploration touches ownership, layering, write paths, or domain invariants, search `openspec/decisions/**/*.md` before recommending placement. Output `Architecture Decisions Found` with relevant paths and statuses. If none are relevant but the topic needs architecture placement, output `Architecture Decision Missing` and explain what decision should be proposed before implementation.
+
+**Project config and WORKLOG:** At the start of exploration, read `openspec/config.yaml`, parse the `explore` section, and follow `rules.explore`.
+
+If `explore.worklog.enabled=true` and `explore.worklog.read_if_exists=true`, check `explore.worklog.path`. When the file exists, read it before the final output. When it does not exist and `explore.worklog.missing_is_not_blocker=true`, explicitly write: `WORKLOG not found, continuing without it.`
+
+Treat WORKLOG as raw notes, not source of truth. Do not modify `DOTO/WORKLOG.md`. Extract useful context beyond TODOs:
+- Worklog-derived candidate tasks
+- Worklog-derived known bugs / drift
+- Worklog-derived affected file hints
+- Worklog-derived validation hints
+- Worklog-derived open questions
+- Worklog-derived prior agent findings
+
+Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked against repository evidence where possible. If WORKLOG names a file, module, class, function, command, error, or test, inspect the repository/OpenSpec artifacts before presenting it as confirmed. Do not blindly turn every WORKLOG line into a task.
+
+**Required research flow:**
+1. Read `openspec/config.yaml`.
+2. Parse `explore.worklog`.
+3. If `explore.worklog.path` exists, read it before final output.
+4. Extract Worklog-derived candidate tasks, known bugs, affected file hints, validation hints, open questions, and prior agent findings.
+5. Inspect repository files and OpenSpec artifacts relevant to the requested task.
+6. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
+7. Do not modify production code.
+8. Do not modify WORKLOG.
+
+**Required final output format:**
+
+## Short Decision
+Короткий вывод по исследованию.
+
+## Repository Evidence
+Что подтверждено файлами репозитория.
+
+## WORKLOG Findings
+Что найдено в `DOTO/WORKLOG.md`. Always include this section, even when there are no useful findings.
+- Candidate Tasks
+- Known Bugs / Drift
+- Affected File Hints
+- Validation Hints
+- Open Questions
+- Prior Agent Findings
+
+## Confirmed vs Unconfirmed
+Что подтверждено репозиторием, а что пока только заметка из WORKLOG.
+
+## Recommended Workflow
+Один из вариантов: short handoff / core OpenSpec / expanded OpenSpec.
+
+## Next Action
+Что делать дальше.
 
 **Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
