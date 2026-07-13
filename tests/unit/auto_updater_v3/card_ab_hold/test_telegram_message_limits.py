@@ -20,6 +20,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
+    build_ab_hold_enable_blocked_by_stats_message,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
     handlers,
 )
@@ -32,6 +35,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     card_ab_hold_status_label,
 )
+from app.client_bot import const
 
 # Telegram Bot API limits (openspec/policies/telegram_bot_api_limits.md).
 _TG_MESSAGE_TEXT_MAX = 4096
@@ -206,3 +210,16 @@ def test_ab_hold_menu_button_label_has_no_placeholders(
     label = card_ab_hold_status_label(adv)  # type: ignore[arg-type]
     assert label == expected_label
     _assert_no_raw_placeholders(label)
+
+
+@pytest.mark.unit
+def test_ab_hold_stats_blocked_message_within_telegram_limits() -> None:
+    """7.2: blocked enable screen ≤4096 и содержит SUPPORT_LINK."""
+    text = build_ab_hold_enable_blocked_by_stats_message(
+        "full_adv_stat_update stale for adv_id=2147483647"
+    )
+    assert len(text) <= _TG_MESSAGE_TEXT_MAX
+    assert const.SUPPORT_LINK in text
+    _assert_no_raw_placeholders(text)
+    screen = f"{handlers._INSTRUCTION}\n{text}"
+    assert len(screen) <= _TG_MESSAGE_TEXT_MAX

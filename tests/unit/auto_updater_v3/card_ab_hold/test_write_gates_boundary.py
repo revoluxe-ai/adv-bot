@@ -152,6 +152,38 @@ def test_import_apply_uses_excel_ab_hold_gate() -> None:
 
     src = inspect.getsource(import_apply.apply_adv_excel_rows)
     assert "can_apply_card_ab_hold_mode_via_excel" in src
+    assert "evaluate_ab_hold_enable_stats" in src
+
+
+@pytest.mark.unit
+def test_enable_handler_checks_stats_freshness_gate() -> None:
+    """7.1/7.2 wiring: enable_card_ab_hold вызывает evaluate + blocked message."""
+    import inspect
+
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
+        handlers,
+    )
+
+    src = inspect.getsource(handlers.enable_card_ab_hold)
+    assert "evaluate_ab_hold_enable_stats" in src
+    assert "build_ab_hold_enable_blocked_by_stats_message" in src
+    assert "SUPPORT_LINK" in inspect.getsource(
+        __import__(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate",
+            fromlist=["build_ab_hold_enable_blocked_by_stats_message"],
+        )
+    )
+
+
+@pytest.mark.unit
+def test_manager_schedules_ab_hold_from_full_advs_helper() -> None:
+    """7.3 wiring: adv_settings_auto_update использует filter_ab_hold_pipeline_candidates."""
+    import inspect
+
+    from app.modules.shop_runner.service_manager.manager import CoroutinesManager
+
+    src = inspect.getsource(CoroutinesManager.adv_settings_auto_update)
+    assert "filter_ab_hold_pipeline_candidates" in src
 
 
 @pytest.mark.unit
