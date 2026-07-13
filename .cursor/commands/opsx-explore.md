@@ -15,7 +15,11 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 
 **Architecture Decision Lookup:** When the exploration touches ownership, layering, write paths, or domain invariants, search `openspec/decisions/**/*.md` before recommending placement. Output `Architecture Decisions Found` with relevant paths and statuses. If none are relevant but the topic needs architecture placement, output `Architecture Decision Missing` and explain what decision should be proposed before implementation.
 
-**Project config and WORKLOG:** At the start of exploration, read `openspec/config.yaml`, parse the `explore` section, and follow `rules.explore`.
+**Project config, policy, and WORKLOG:** At the start of exploration, read:
+- `openspec/config.yaml` for shared OpenSpec context and `rules.explore`
+- `openspec/policies/EXPLORE_POLICY.md` for Explore command policy
+
+Apply `rules.explore` from config and the `explore` policy from `EXPLORE_POLICY.md`.
 
 If `explore.worklog.enabled=true` and `explore.worklog.read_if_exists=true`, check `explore.worklog.path`. When the file exists, read it before the final output. When it does not exist and `explore.worklog.missing_is_not_blocker=true`, explicitly write: `WORKLOG not found, continuing without it.`
 
@@ -30,14 +34,15 @@ Treat WORKLOG as raw notes, not source of truth. Do not modify `DOTO/WORKLOG.md`
 Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked against repository evidence where possible. If WORKLOG names a file, module, class, function, command, error, or test, inspect the repository/OpenSpec artifacts before presenting it as confirmed. Do not blindly turn every WORKLOG line into a task.
 
 **Required research flow:**
-1. Read `openspec/config.yaml`.
-2. Parse `explore.worklog`.
-3. If `explore.worklog.path` exists, read it before final output.
-4. Extract Worklog-derived candidate tasks, known bugs, affected file hints, validation hints, open questions, and prior agent findings.
-5. Inspect repository files and OpenSpec artifacts relevant to the requested task.
-6. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
-7. Do not modify production code.
-8. Do not modify WORKLOG.
+1. Read `openspec/config.yaml` for shared OpenSpec context and `rules.explore`.
+2. Read `openspec/policies/EXPLORE_POLICY.md` for Explore command policy.
+3. Parse `explore.worklog` from `openspec/policies/EXPLORE_POLICY.md`.
+4. If `explore.worklog.path` exists, read it before final output.
+5. Extract Worklog-derived candidate tasks, known bugs, affected file hints, validation hints, open questions, and prior agent findings.
+6. Inspect repository files and OpenSpec artifacts relevant to the requested task.
+7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
+8. Do not modify production code.
+9. Do not modify WORKLOG.
 
 **Required final output format:**
 

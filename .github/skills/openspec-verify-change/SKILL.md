@@ -1,7 +1,7 @@
 ---
 name: openspec-verify-change
-description: Read-only audit of an OpenSpec change before archive using openspec/config.yaml verify settings.
-allowed-tools: Bash(openspec:*), Bash(poetry run pytest:*), Bash(git diff:*), Bash(rg:*)
+description: Read-only audit of an OpenSpec change before archive using openspec/config.yaml rules and VERIFY_POLICY.md settings.
+allowed-tools: Bash(openspec:*), Bash(python openspec/tools/check_config_contract.py:*), Bash(poetry run pytest:*), Bash(git diff:*), Bash(rg:*)
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -15,9 +15,17 @@ Verify является read-only audit command после `/opsx-apply` и до
 
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
-**Обязательная настройка:** перед выводом результата прочитай `openspec/config.yaml` и примени:
-- top-level секцию `verify`
-- `rules.verify`
+**OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:
+```bash
+python openspec/tools/check_config_contract.py
+```
+Если команда возвращает non-zero, выведи unknown top-level keys / rules contract violations из output, не продолжай verify и ставь `NO_GO`.
+
+**Обязательная настройка:** перед выводом результата прочитай:
+- `openspec/config.yaml` для shared OpenSpec context и `rules.verify`
+- `openspec/policies/VERIFY_POLICY.md` для Verify command policy
+
+Примени `rules.verify` из config и `verify` policy из `VERIFY_POLICY.md`.
 
 Если настройки отсутствуют или неполные, явно напиши это в разделе `Итоговый вердикт` и используй strict fallback:
 - язык ответа: русский
@@ -39,14 +47,23 @@ Verify является read-only audit command после `/opsx-apply` и до
 
 2. **Load verify settings**
 
+   Сначала проверь contract `openspec/config.yaml`:
+   ```bash
+   python openspec/tools/check_config_contract.py
+   ```
+
+   Если contract check падает, зафиксируй unknown keys / rules contract violations, не продолжай verify и верни `NO_GO`.
+
    Прочитай `openspec/config.yaml` как UTF-8. Извлеки:
+   - `rules.verify`
+
+   Прочитай `openspec/policies/VERIFY_POLICY.md` как UTF-8. Извлеки:
    - `verify.default_mode`
    - `verify.language`
    - `verify.final_marker`
    - `verify.verdict`
    - `verify.archive_blockers`
    - `verify.output`
-   - `rules.verify`
 
    Используй эти настройки как источник truth для verdict и формата ответа.
 
@@ -88,6 +105,11 @@ Verify является read-only audit command после `/opsx-apply` и до
    - implementation layer matches cited architecture decisions
    - forbidden layers do not own logic reserved for another layer
    - tests prove behavior and do not hide placement violations
+   - async tests do not manually mutate shared module-level dependencies around awaited code
+   - tests do not stub the pipeline so the real guard is never exercised
+   - write-gate regression tests prove the guarded entity is filtered before candidate/handler/write boundary, not only that a final mock was not called
+   - regression tests fail if the intended guard is removed
+   - gates with both blocked and allowed behavior have a paired positive case
    - archive blockers from `verify.archive_blockers`
 
 7. **Run relevant checks**
@@ -111,6 +133,11 @@ Verify является read-only audit command после `/opsx-apply` и до
    - required architecture decision is missing
    - unresolved open question blocks archive
    - stale reference model blocks archive
+   - async test manually mutates module-level state around `await` with `module.attr = fake` and manual `try/finally` restore
+   - test stubs the pipeline so the real guard is never exercised
+   - write-gate regression only asserts `assert_not_called()` or `count == 0` without proving the guarded entity was filtered before candidate/handler/write boundary
+   - regression test would still pass if the intended guard were removed
+   - gate has both blocked and allowed behavior but lacks a paired positive case
 
    Do not write a success claim that conflicts with the overall verdict. `Archive ready: yes` is forbidden when tests failed, placement violations exist, or architecture blockers are unresolved.
 
@@ -187,5 +214,9 @@ or
 - Instead of offering a write action, state the next command: `/opsx-apply`, `/opsx-update`, or `manual fix`.
 - Do not mark verification successful when placement violates an accepted decision.
 - Do not treat passing tests as sufficient architecture proof.
+- Block async tests that manually mutate shared module-level dependencies around awaited code, especially shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings, and global flags.
+- Block tests that stub the pipeline so the real guard is never exercised.
+- Block write-gate tests that only assert `assert_not_called()` or `count == 0` without proving candidate/handler/write-boundary filtering.
+- Block regression tests that would still pass if the intended guard were removed.
 - Use exact file/function references for placement findings.
 - Keep one overall verdict. No mixed top-level success plus archive `NO_GO`.
