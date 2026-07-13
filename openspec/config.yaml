@@ -1,0 +1,202 @@
+# итоговый валидный конфиг
+schema: spec-driven
+#profile: core - не нужно, но требует валидатор, потому тут
+
+context: |
+  Проект:
+    WB Sky — коммерческий продукт для автоматизации и анализа внутренней рекламы Wildberries.
+
+  Бизнес-цель:
+    Проект должен приносить владельцу доход, помогать продавцам улучшать рекламу
+    и снижать нагрузку на поддержку через понятные self-service сценарии,
+    встроенные объяснения, диагностику и подсказки внутри бота.
+
+  Текущее состояние:
+    В проекте уже есть paid automation product.
+    Free bot находится в разработке и должен стать полезным входным freemium-слоем,
+    а не пустой демо-версией.
+
+  Главный принцип:
+    Free bot должен быть полезным, но не должен бесплатно отдавать paid automation core.
+
+  Важные доменные зоны:
+    Высокорисковыми считаются изменения, которые затрагивают:
+      - ставки;
+      - CPO/CPA;
+      - V3/V2 updater logic;
+      - ApplyManager;
+      - lifecycle кампаний;
+      - автозапуск / автоостановку;
+      - WB API write actions;
+      - БД и миграции;
+      - превышение расхода сверх нормы;
+      - необоснованное или непонятное пользователю отсутствие трафика;
+      - ошибки списания платы за бот;
+      - работу с большим количеством РК: тысячи и десятки тысяч.
+
+  Free/Paid граница:
+    Free bot должен максимально использовать read-only value:
+      - аналитика;
+      - диагностика;
+      - объяснения;
+      - preview;
+      - export/import Excel;
+      - onboarding;
+      - navigation;
+      - lead capture;
+      - paid offer routing;
+      - другие read-only сценарии, если они не выполняют WB write actions
+        и не отдают paid automation core.
+
+    Paid automation core не должен бесплатно отдаваться во Free:
+      - автоматическое обновление ставок в shelf-кампаниях;
+      - автоматическое обновление общей ставки поисковых РК;
+      - автоматическое обновление целевых позиций ключей;
+      - автоматическое обновление whitelist;
+      - автоматическая остановка или запуск кампаний;
+      - auto-updaters, влияющие на рекламу, ставки, ключи, whitelist,
+        target place или campaign lifecycle.
+
+    Manual self-service во Free:
+      Ручное изменение может быть допустимо только если отдельный spec явно описывает
+      preview, объяснение, affected records и explicit confirmation пользователя.
+
+    Default:
+      В Free режиме все WB write-действия выключены по умолчанию.
+
+  Обратная совместимость:
+    Paid bot и существующий paid-интерфейс нельзя ломать без отдельного proposal.
+    Backend может быть общим, но Free/Paid поведение должно разделяться через access guards.
+
+  Видение на будущее:
+    В перспективе adv-bot должен развиваться не просто как платный инструмент
+    автоуправления рекламой, а как self-service продукт с бесплатной версией,
+    партнёрской программой, встроенным обучением пользователя и AI-first
+    поддержкой. Цель — снизить ручную нагрузку владельца и сделать так,
+    чтобы пользователь мог разобраться, получить пользу, дойти до платного
+    сценария и решить типовые проблемы без личного участия владельца.
+
+  Current/Future boundary:
+    Видение на будущее не является текущим поведением системы.
+    Нельзя писать production-код под future vision без отдельного OpenSpec change.
+
+  Architecture Decision Registry:
+    Постоянные архитектурные решения живут в openspec/decisions/.
+    Design.md может описывать применение решения в конкретном change, но
+    reusable ownership/layering/write-path/domain-invariant решения должны быть
+    вынесены в registry и процитированы по path.
+    Перед proposal/design/apply/verify/archive искать openspec/decisions/**/*.md.
+
+rules:
+  explore:
+    - "Explore должен отвечать на русском языке, кроме путей, команд, имён файлов, классов, функций и OpenSpec keywords."
+    - "Explore должен читать настройки из openspec/policies/EXPLORE_POLICY.md."
+    - "Если explore.worklog.enabled=true и файл explore.worklog.path существует, Explore должен прочитать его до финального вывода."
+    - "WORKLOG является raw notes, а не source of truth."
+    - "Explore должен извлекать из WORKLOG не только TODO, но и баги, гипотезы, prior findings, affected file hints, команды, ошибки, open questions и возможные follow-up задачи."
+    - "Любой вывод из WORKLOG должен быть помечен как Worklog-derived и сверяться с repository evidence."
+    - "Explore не должен слепо превращать каждую строку WORKLOG в задачу."
+    - "Explore должен отделять подтверждённые факты репозитория от заметок из WORKLOG."
+    - "Если WORKLOG упоминает файл/модуль/тест, Explore должен проверить его в репозитории, если это возможно."
+    - "Если WORKLOG отсутствует, Explore должен явно написать: WORKLOG not found, continuing without it."
+    - "Explore не должен менять WORKLOG.md."
+    - "Explore должен выводить секцию WORKLOG Findings даже если полезных находок нет."
+
+  verify:
+    - "Verify является read-only audit command после /opsx-apply и до /opsx-archive."
+    - "Verify должен читать настройки из openspec/policies/VERIFY_POLICY.md."
+    - "Verify должен отвечать на русском языке, кроме путей, команд, имён файлов, имён классов, имён функций и OpenSpec keywords."
+    - "Verify должен выдавать единый Итоговый вердикт: GO или NO_GO."
+    - "Если focused/targeted test падает, Итоговый вердикт должен быть NO_GO."
+    - "Если tasks отмечены [x], но validation/test/check падает, Verify должен писать Task completion mismatch."
+    - "Если archive невозможен, Итоговый вердикт должен быть NO_GO."
+    - "Verify не должен предлагать самостоятельно исправить код вопросом вида 'Want me to fix?'."
+    - "Вместо предложения правки Verify должен указать следующую команду: /opsx-apply, /opsx-update или manual fix."
+    - "Последняя строка ответа Verify всегда должна быть ровно одним маркером: ✅ GO или ❌ NO_GO."
+    - "Passing tests недостаточно, если implementation нарушает architecture decisions."
+    - "Archive ready не может быть yes при failed tests, placement violations или unresolved architecture blockers."
+    - "Verify должен ставить NO_GO, если async test вручную мутирует shared module-level dependency вокруг await: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore."
+    - "Verify должен блокировать такие async test patches особенно для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags."
+    - "Verify должен ставить NO_GO, если тест стабит pipeline так, что real guard не достигает candidate/handler/write boundary."
+    - "Verify должен ставить NO_GO, если write-gate regression проверяет только `assert_not_called()` или `count == 0`, но не доказывает, что guarded entity была отфильтрована до candidate/handler/write boundary."
+    - "Verify должен ставить NO_GO, если regression test продолжит проходить при удалении intended guard."
+    - "Если gate имеет blocked и allowed behavior, Verify должен требовать paired positive case или фиксировать blocker."
+
+  proposal:
+    - "Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea."
+    - "Один change должен иметь один intent."
+    - "Proposal должен объяснять зачем и в каких границах делается изменение."
+    - "Не писать в proposal список файлов, классов, функций или SQL-запросов."
+    - "Явно указывать out of scope."
+    - "Не смешивать current behavior и future desired behavior."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+    - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
+    - "Если change затрагивает ownership, layering, write-path или domain invariant, proposal должен учитывать relevant decisions из openspec/decisions/ и не объявлять change apply-ready при unresolved architecture placement без accepted/proposed decision."
+
+  specs:
+    - "Любое изменение считать high-risk, если оно затрагивает ставки, CPO/CPA, V3/V2 updater logic, ApplyManager, lifecycle кампаний, автозапуск / автоостановку, WB API write actions, БД и миграции, paid/free boundary, списание платы за бот, управление активностью ключей, перерасход/недорасход, управление ставкой ключей или bidder behavior."
+    - "Описывать observable behavior, а не implementation."
+    - "Использовать GIVEN/WHEN/THEN scenarios."
+    - "Не включать classes, functions, SQLAlchemy, Redis, file paths или implementation details."
+    - "Чётко отделять Free value от Paid automation."
+    - "Чётко отделять read-only поведение от write-path."
+    - "Не создавать отдельный spec под каждое меню, экран, keyboard, file или handler."
+    - "Specs должны описывать stable product behavior или access boundary."
+    - "Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation."
+    - "Manual self-service actions нельзя описывать как automatic optimization."
+
+  design:
+    - "Перед техническими изменениями изучать существующую реализацию."
+    - "Перед design искать openspec/decisions/**/*.md и учитывать relevant accepted/proposed decisions."
+    - "Design должен содержать обязательную секцию ## Architecture Decision References со ссылками на relevant decisions по path или явным Architecture Decision Missing."
+    - "Design должен содержать обязательную секцию ## Ownership & Placement с указанием owner layer, forbidden layers и rationale."
+    - "Design checklist должен включать: existing decisions searched; relevant decisions cited; new decision proposed if missing; implementation layer matches decision."
+    - "Если новый факт меняет reusable architecture ownership/layering/write-path/domain invariant, обновить или создать proposed decision в openspec/decisions/, а не прятать это только в design.md."
+    - "Учитывать текущий стек проекта: Python 3.11, SQLAlchemy + PostgreSQL, dependency-injector, ClickHouse, Redis; перед использованием смотреть текущую практику в затронутом участке."
+    - "Переиспользовать существующие project patterns, если нет явно описанной причины отклониться."
+    - "Описывать affected components, side effects, access guards, validation plan, rollback idea и performance considerations."
+    - "Технические детали, data flow, queries, modules и file changes писать в design, а не в spec."
+    - "Для любого write-path описывать preview, explicit confirmation, affected records, recovery/rollback idea и tests."
+    - "Перед изменениями Free/Paid поведения найти и классифицировать все WB-impacting write paths."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+    - "Если пользователь формулирует смысл по-русски, сохранять русский смысл и не расширять его от себя."
+    - "создавать большие MagicMock-замены доменных моделей без проверки tests/factories и существующих fixtures"
+
+  tasks:
+    - "Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов."
+    - "Сначала добавлять или обновлять regression/characterization tests, затем менять production code."
+    - "Тест не должен мокать функцию, фильтрацию или decision logic, поведение которой он проверяет."
+    - "Async tests MUST NOT вручную patch shared module-level dependencies around awaited code: запрещён прямой `module.attr = fake` перед `await` с ручным `try/finally` restore."
+    - "Это особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags."
+    - "Предпочитать самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client."
+    - "Использовать pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объяснять почему более узкий patch point невозможен."
+    - "Write-gate regression tests должны доказывать, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван."
+    - "Regression tests должны падать при удалении guarded condition."
+    - "Если gate имеет blocked и allowed behavior, tasks должны добавить или потребовать paired positive case."
+    - "Tasks должны быть маленькими, последовательными, проверяемыми."
+    - "Включать characterization tests перед изменением рискованного или неясного поведения."
+    - "Включать regression tests для bug fixes."
+    - "Включать targeted tests для каждой новой или изменённой decision function."
+    - "Включать tests для business invariants и forbidden side effects."
+    - "Не добавлять поверхностные tests, которые проверяют только существование результата."
+    - "Писать на русском языке."
+    - "Английские structural keywords допустимы только там, где они нужны OpenSpec: MUST, MUST NOT, SHOULD, GIVEN, WHEN, THEN, ADDED, MODIFIED, REMOVED."
+    - "Для каждой новой функции метода, в том числе теста делай докстринг на русском с англицизмами со названием spec и обоснованием зачем эта функция вообще нужна и зачем она делает то, что делает"
+    - "При изменении функции метода, в том числе теста  в месте изменении подробное описание обоснование этого изменения и указание названия spec"
+
+
+  decisions:
+    - "Architecture decision является permanent artifact, а не частью design.md."
+    - "Decision фиксирует reusable architecture ownership/layering/write-path/domain invariant."
+    - "Decision должен отвечать: почему этот тип логики принадлежит этому слою и какие слои запрещены."
+    - "Decision должен иметь status: proposed, accepted, superseded или deprecated."
+    - "Внутри openspec/changes/<change>/decisions/ decisions могут быть proposed; при archive reusable decisions промотятся в openspec/decisions/ со status accepted."
+    - "Не создавать decision для одноразовой implementation detail."
+    - "Не дублировать spec behavior в decision."
+    - "Не дублировать tasks в decision."
+    - "Decision должен содержать Context, Decision, Applies to, Allowed, Forbidden, Examples, Related specs, Related changes, Review checklist."
+    - "Если change затрагивает ownership, layering, write-path или domain invariant и relevant accepted decision отсутствует, создать proposed decision или явно написать Architecture Decision Missing."
+    - "Если implementation противоречит accepted decision, /opsx:apply и /opsx:verify должны возвращать NO_GO."
+    - "Писать на русском языке."
