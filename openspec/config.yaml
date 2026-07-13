@@ -1,6 +1,6 @@
 # итоговый валидный конфиг
 schema: spec-driven
-profile: core
+#profile: core - не нужно, но требует валидатор, потому тут
 
 context: |
   Проект:
@@ -87,61 +87,10 @@ context: |
     вынесены в registry и процитированы по path.
     Перед proposal/design/apply/verify/archive искать openspec/decisions/**/*.md.
 
-explore:
-  language: ru
-  worklog:
-    enabled: true
-    path: "DOTO/WORKLOG.md"
-    read_if_exists: true
-    missing_is_not_blocker: true
-    trust_level: "raw_notes"
-    purpose:
-      - "research_context"
-      - "candidate_tasks"
-      - "known_bugs"
-      - "open_questions"
-      - "affected_files_hints"
-      - "validation_hints"
-      - "prior_agent_findings"
-    output_section: "WORKLOG Findings"
-
-verify:
-  default_mode: strict
-  language: ru
-  final_marker:
-    enabled: true
-    go: "✅ GO"
-    no_go: "❌ NO_GO"
-    position: "last_line"
-  verdict:
-    require_single_overall_verdict: true
-    no_go_if_targeted_test_fails: true
-    no_go_if_task_checked_but_validation_fails: true
-    no_go_if_archive_blocker_exists: true
-    no_go_if_placement_violation_exists: true
-  archive_blockers:
-    - failed_targeted_tests
-    - placement_violations
-    - missing_required_decision
-    - task_validation_mismatch
-    - stale_reference_model
-    - unresolved_open_questions
-  output:
-    language: ru
-    require_sections:
-      - Итоговый вердикт
-      - Поведение
-      - Архитектурное размещение
-      - Тесты
-      - Согласованность tasks
-      - Готовность к archive
-      - Следующая команда
-    forbid_followup_write_offer: true
-
 rules:
   explore:
     - "Explore должен отвечать на русском языке, кроме путей, команд, имён файлов, классов, функций и OpenSpec keywords."
-    - "Explore должен читать настройки из openspec/config.yaml секции explore."
+    - "Explore должен читать настройки из openspec/policies/EXPLORE_POLICY.md."
     - "Если explore.worklog.enabled=true и файл explore.worklog.path существует, Explore должен прочитать его до финального вывода."
     - "WORKLOG является raw notes, а не source of truth."
     - "Explore должен извлекать из WORKLOG не только TODO, но и баги, гипотезы, prior findings, affected file hints, команды, ошибки, open questions и возможные follow-up задачи."
@@ -155,7 +104,7 @@ rules:
 
   verify:
     - "Verify является read-only audit command после /opsx-apply и до /opsx-archive."
-    - "Verify должен читать настройки из openspec/config.yaml секции verify."
+    - "Verify должен читать настройки из openspec/policies/VERIFY_POLICY.md."
     - "Verify должен отвечать на русском языке, кроме путей, команд, имён файлов, имён классов, имён функций и OpenSpec keywords."
     - "Verify должен выдавать единый Итоговый вердикт: GO или NO_GO."
     - "Если focused/targeted test падает, Итоговый вердикт должен быть NO_GO."
@@ -166,6 +115,12 @@ rules:
     - "Последняя строка ответа Verify всегда должна быть ровно одним маркером: ✅ GO или ❌ NO_GO."
     - "Passing tests недостаточно, если implementation нарушает architecture decisions."
     - "Archive ready не может быть yes при failed tests, placement violations или unresolved architecture blockers."
+    - "Verify должен ставить NO_GO, если async test вручную мутирует shared module-level dependency вокруг await: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore."
+    - "Verify должен блокировать такие async test patches особенно для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags."
+    - "Verify должен ставить NO_GO, если тест стабит pipeline так, что real guard не достигает candidate/handler/write boundary."
+    - "Verify должен ставить NO_GO, если write-gate regression проверяет только `assert_not_called()` или `count == 0`, но не доказывает, что guarded entity была отфильтрована до candidate/handler/write boundary."
+    - "Verify должен ставить NO_GO, если regression test продолжит проходить при удалении intended guard."
+    - "Если gate имеет blocked и allowed behavior, Verify должен требовать paired positive case или фиксировать blocker."
 
   proposal:
     - "Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea."
@@ -213,6 +168,13 @@ rules:
     - "Для high-risk и behavior-changing changes tasks должны начинаться с tests-first шагов."
     - "Сначала добавлять или обновлять regression/characterization tests, затем менять production code."
     - "Тест не должен мокать функцию, фильтрацию или decision logic, поведение которой он проверяет."
+    - "Async tests MUST NOT вручную patch shared module-level dependencies around awaited code: запрещён прямой `module.attr = fake` перед `await` с ручным `try/finally` restore."
+    - "Это особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags."
+    - "Предпочитать самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client."
+    - "Использовать pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объяснять почему более узкий patch point невозможен."
+    - "Write-gate regression tests должны доказывать, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван."
+    - "Regression tests должны падать при удалении guarded condition."
+    - "Если gate имеет blocked и allowed behavior, tasks должны добавить или потребовать paired positive case."
     - "Tasks должны быть маленькими, последовательными, проверяемыми."
     - "Включать characterization tests перед изменением рискованного или неясного поведения."
     - "Включать regression tests для bug fixes."
