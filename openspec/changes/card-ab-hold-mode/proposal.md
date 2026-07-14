@@ -2,13 +2,13 @@
 
 При A/B-тесте карточки (инфографика / главное фото) CTR и конверсия зависят не только от креатива, но и от рекламного профиля РК: состав ключей, белый список, целевые позиции, ставки и **минус-фразы**. Пока идёт обычный автоапдейтер — или пользователь меняет минус-фразы в боте / кабинете WB — тест становится «грязным»: непонятно, что дало прирост — креатив или смена рекламного профиля. Клиентам нужен self-service сценарий: зафиксировать целевые позиции и минус-профиль, отключить обновление ЦП, оставить биддер работающим — без ручной сборки legacy-флагов и без полного отключения бота.
 
-Дополнительно (confirmed prod bug): Excel мог выставить `card_ab_hold_mode=active` без ENTER minus sync+snapshot — hold restore и UI ready становились небезопасными. Excel write-path режима убираем из MVP.
+Дополнительно (confirmed prod bug): Excel мог выставить `card_ab_hold_mode=active` без ENTER allowed-set snapshot — hold enforcement и UI ready становились небезопасными. Excel write-path режима убираем из MVP.
 
 ## What Changes
 
 ### Intent
 
-Один paid automation-режим **A/B Hold**: один раз привести РК к стабильному профилю для теста карточки; на период теста **зафиксировать позиции** (целевая позиция = текущая фактическая), **зафиксировать минус-фразы** (PG snapshot + restore при drift) и **отключить обновление целевых позиций**, при этом **биддер продолжает работать**; UI сообщает «можно запускать A/B» **только после** полного setup (ACTIVE); enable/disable **только через paid Telegram UI**; при выключении режима снова включить обновление ЦП, ordinary апдейтеры и ordinary minus auto-update — без restore keyword-profile / Excel snapshot (minus PG snapshot clear/archive).
+Один paid automation-режим **A/B Hold**: один раз привести РК к стабильному профилю для теста карточки; на период теста **зафиксировать позиции** (целевая позиция = текущая фактическая), **зафиксировать разрешённый (relevant) набор фраз** (PG allowed-set snapshot; во время hold исключать любые новые/не-разрешённые фразы, чтобы поверхность трат оставалась постоянной — минус как производный enforcement) и **отключить обновление целевых позиций**, при этом **биддер продолжает работать**; UI сообщает «можно запускать A/B» **только после** полного setup (ACTIVE); enable/disable **только через paid Telegram UI**; при выключении режима снова включить обновление ЦП, ordinary апдейтеры и ordinary minus auto-update — без restore keyword-profile / Excel snapshot (minus PG snapshot clear/archive).
 
 ### Current behavior
 
@@ -24,17 +24,17 @@
 - **Excel MUST NOT** экспортировать / импортировать / применять `card_ab_hold_mode` в MVP (колонки нет; leftover payload ignored). Идея Excel-колонки — **future**, не текущий контракт.
 - **Включение (enable) дополнительно ограничено здоровьем статы РК:** если кампания не проходит тот же класс проверки свежести/получения статистики, что `_split_advs_by_stats_freshness` / `advs_filtred`, enable MUST NOT выполняться. В UI пользователь MUST сразу видеть **причину**, текст **ограничения** и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в коде нет `ADMIN`; whitelist — `ADMINS`; публичная ссылка — `SUPPORT_LINK`).
 - **После успешного переключения** (PENDING_SETUP / ACTIVE) сбои свежести статы **не** должны блокировать scheduling `process_ab_setup` / `process_ab_hold` (не оставлять вечный PENDING из‑за `advs_filtred`).
-- **ENTER:** система один раз готовит профиль РК (включая минус-фразы), затем переводит кампанию в hold (**ACTIVE**). Прямой `ACTIVE` любым non-setup путём — Forbidden. Telegram Enable при уже `PENDING_SETUP` / `ACTIVE` — **no-op** (не demote в PENDING, не rewrite Redis ENTER, не re-run ENTER force minus sync); новый ENTER только после EXIT → `OFF`.
+- **ENTER:** система один раз готовит профиль РК (включая минус-фразы), затем переводит кампанию в hold (**ACTIVE**). Прямой `ACTIVE` любым non-setup путём — Forbidden. Telegram Enable при уже `PENDING_SETUP` / `ACTIVE` — **no-op** (не demote в PENDING, не rewrite Redis ENTER, не re-run ENTER force allowed-set sync); новый ENTER только после EXIT → `OFF`.
 - **Критерий setup (ENTER):**
   - PASS: `pay_for_order` ключа **≤ max CPO плана** (не resolve) **и** показов за недельное окно статистики ключа (тот же источник, что в карточке ключа) **≥ 100**;
   - FAIL (иначе, включая отсутствие `pay_for_order`): ключ **OFF** (выключается / снимается с БС);
   - для PASS: целевая позиция фиксируется на **текущей** позиции; состав БС после setup считается зафиксированным;
-  - **минус-фразы:** сначала успешно довести до актуального состояния (одна setup sync/mutation, не ordinary recalculation loop); сохранить snapshot в PG (**новая Alembic migration**); только после этого (и остального setup) mode MAY → **ACTIVE**.
-- **UI readiness:** интерфейс MUST NOT сообщать, что режим включён и можно запускать A/B, пока mode ≠ **ACTIVE** после полного setup (включая минус + snapshot). PENDING / «запрос принят» без ACTIVE — не «можно тестировать»; координация исключает гонку с незавершённым setup.
-- **HOLD:** целевые позиции остаются теми, что зафиксированы на ENTER; **обновление целевых позиций выключено**; **биддер продолжает работать**; структурные изменения БС / разгон / enable ключей не выполняются; ordinary recalculation минус-фраз **не** выполняется; при drift от PG snapshot — restore на WB (ручные правки = нарушение freeze); допускаются только защиты от перерасхода относительно max CPO; manual bot refresh «Обновить минус-слова» при freeze MUST NOT врать success — MUST сообщить blocked / отключите A/B Hold.
+  - **разрешённые фразы (allowed-set freeze):** зафиксировать разрешённый набор фраз кампании (relevant-фразы + получившийся GOOD/whitelist профиль ключей) как durable PG allowed-set snapshot (**новая Alembic migration**); одной setup sync/mutation привести WB к этому состоянию (исключить всё вне allowed-set в пределах WB minus cap, не ordinary recalculation loop); только после успешной записи snapshot и остального setup mode MAY → **ACTIVE**. Заморозке подлежит **источник** (allowed-set); минус-фразы — производный механизм исключения.
+- **UI readiness:** интерфейс MUST NOT сообщать, что режим включён и можно запускать A/B, пока mode ≠ **ACTIVE** после полного setup (включая allowed-set snapshot). PENDING / «запрос принят» без ACTIVE — не «можно тестировать»; координация исключает гонку с незавершённым setup.
+- **HOLD:** целевые позиции остаются теми, что зафиксированы на ENTER; **обновление целевых позиций выключено**; **биддер продолжает работать**; структурные изменения БС / разгон / enable ключей не выполняются; ordinary recalculation (пересчёт GOOD/BAD по свежей стате и изменение allowed-set) **не** выполняется — allowed-set заморожен; **отдельно** hold-protection исключает любые новые/не-разрешённые фразы, появившиеся после ENTER, и восстанавливает разрешённые фразы, снятые вручную, — удерживая поверхность трат равной замороженному allowed-set (минус как enforcement, в пределах WB minus cap; при превышении cap или open-match РК — видимая деградация, а не тихий чистый hold); ручные правки = нарушение freeze, перезаписываются; допускаются только защиты от перерасхода относительно max CPO; manual bot refresh «Обновить минус-слова» при freeze MUST NOT врать success — MUST сообщить blocked / отключите A/B Hold.
 - **EXIT:** режим снимается (Telegram disable) — снова **включается обновление целевых позиций**, ordinary structural апдейтеры и ordinary minus auto-update; PG minus snapshot clear/archive; restore keyword-profile / Excel snapshot **не** требуется.
 - Координация между bot-подом и shop-runner-подом идёт через Redis-сигнал прерывания: текущий normal-тик может быть остановлен до apply с ответом «остановлено, безопасно, можно продолжать».
-- В справке MUST быть: перед включением прогреть РК с не зажатым max CPO и запасом плана продаж; полки рекомендуется выключить (не hard block); не менять цену на период теста; **«Во время A/B Hold минус-фразы фиксируются. Ручные изменения в кабинете WB могут быть возвращены ботом к зафиксированному состоянию. Чтобы изменить минус-фразы, отключите A/B Hold.»**
+- В справке MUST быть: перед включением прогреть РК с не зажатым max CPO и запасом плана продаж; полки рекомендуется выключить (не hard block); не менять цену на период теста; **«Во время A/B Hold набор рекламных фраз зафиксирован: новые фразы автоматически исключаются, а ручные изменения в кабинете WB могут быть возвращены ботом к зафиксированному набору. Чтобы изменить набор фраз, отключите A/B Hold.»** (текст MUST оставаться scoped/best-effort и не обещать полную заморозку всех фраз вне зависимости от типа РК / лимита минус-фраз WB)
 
 ### Scope in
 
@@ -43,20 +43,20 @@
 - После PENDING/ACTIVE: setup/hold не зависят от `advs_filtred` freshness filter.
 - Paid bot UI: экран инструкции (вкл. текст минус-freeze) + Disable/Back; Enable при OFF (MAY hide при PENDING/ACTIVE); ready-to-test только после ACTIVE; Enable handler idempotent; honest UX на manual minus refresh при freeze (не «Минус-слова обновлены»).
 - Состояния режима кампании (выкл / подготовка / активен).
-- Setup ENTER + hold + exit для V3 (paid automation), включая minus sync → PG snapshot → ACTIVE.
-- PG durable minus-phrase snapshot (**новая migration**) + restore-on-drift + clear на EXIT.
+- Setup ENTER + hold + exit для V3 (paid automation), включая allowed-set capture → PG snapshot → ACTIVE.
+- PG durable allowed-set snapshot (**новая migration**) + hold enforcement (исключение новых/не-разрешённых фраз, в пределах WB minus cap; иначе видимая деградация) + clear на EXIT.
 - Gate ordinary `update_minus_phrases` / recalculation при PENDING_SETUP / ACTIVE.
 - Cross-pod Redis coordination (signal / abort ack / setup lock) по project Redis-паттернам.
 - ACT-защита параллельных structural write-путей на время режима (WL/TP/enable/emergency + minus).
 - **Удаление Excel `card_ab_hold_mode` column/apply** (ignore leftover payload).
-- Тесты-first: structural freeze + minus snapshot/restore + UI not-ready on PENDING + paid visibility + freshness enable + post-enter schedule + Excel import ignore.
+- Тесты-first: structural freeze + allowed-set snapshot/enforcement (вкл. WB cap visible degradation) + UI not-ready on PENDING + paid visibility + freshness enable + post-enter schedule + Excel import ignore.
 
 ### Out of scope
 
 - Встроенный A/B инструмент Wildberries и интерпретация его метрик.
 - Управление ценой товара и price-management клиента.
 - Hard-block режима полок (только рекомендация в справке).
-- Обязательный backup/restore keyword-settings / Excel snapshot при выходе (минус PG snapshot — **in scope**, это freeze-механизм, не Excel backup).
+- Обязательный backup/restore keyword-settings / Excel snapshot при выходе (allowed-set PG snapshot — **in scope**, это freeze-механизм, не Excel backup).
 - Safe mode / pull-down при ухудшении экономики (отдельная идея из WORKLOG).
 - Free bot / `bot_active is False`: режим — paid automation core; UI MUST быть скрыт; enable MUST NOT выполняться.
 - Изменение алгоритма обычного V3 preamble вне ветки A/B Hold.
@@ -64,7 +64,7 @@
 
 ### Risk
 
-High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write actions (вкл. set minus), перерасход / отсутствие трафика, гонка UI ready vs PENDING, Excel→ACTIVE без snapshot (mitigated by removing Excel path). Ошибки setup могут массово выключить ключи с малой статистикой; ошибки hold могут «протечь» в normal updater / ordinary minus или перезаписать ручные минус-правки; слишком ранний UI «можно тестировать» загрязняет эксперимент. Нужна координация multi-pod и regression gates.
+High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write actions (вкл. set minus), перерасход / отсутствие трафика, гонка UI ready vs PENDING, Excel→ACTIVE без snapshot (mitigated by removing Excel path). Ошибки setup могут массово выключить ключи с малой статистикой; ошибки hold могут «протечь» в normal updater / ordinary recalc allowed-set, не исключить новые фразы (грязный тест) или перезаписать осознанные ручные правки; при превышении WB minus cap / open-match РК чистота hold не гарантирована (нужна видимая деградация); слишком ранний UI «можно тестировать» загрязняет эксперимент. Нужна координация multi-pod и regression gates.
 
 ### Rollback idea
 
@@ -73,13 +73,13 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 ### Architecture Decision References
 
 - Relevant accepted: `openspec/decisions/mode-defaults-policy-ownership/decision.md` — дефолт режима A/B Hold (выкл) и related paid/free overlays (в т.ч. minus defaults) принадлежат declarative mode policy overlays, а не transition-helper.
-- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 minus PG snapshot + restore + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
+- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — Telegram-only enable/disable, **Enable idempotent while PENDING/ACTIVE**, **keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain)**, enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (PFO ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая; minus sync → PG snapshot → ACTIVE), HOLD (ЦП freeze, биддер ON, minus freeze+restore, guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), UI ready только после ACTIVE, EXIT (снова ЦП + апдейтеры + ordinary minus; clear minus snapshot; без keyword-profile restore), UI-инструкция (текст минус-freeze), **без Excel column**, cross-pod interrupt.
+- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — Telegram-only enable/disable, **Enable idempotent while PENDING/ACTIVE**, **keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain)**, enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (PFO ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая; allowed-set capture → PG snapshot → ACTIVE), HOLD (ЦП freeze, биддер ON, allowed-set freeze + enforcement исключения новых/не-разрешённых фраз [WB cap → visible degradation], guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), UI ready только после ACTIVE, EXIT (снова ЦП + апдейтеры + ordinary minus + allowed-set recalc; clear allowed-set snapshot; без keyword-profile restore), UI-инструкция (текст фиксации набора фраз, scoped/best-effort), **без Excel column**, cross-pod interrupt.
 
 ### Modified Capabilities
 
@@ -87,4 +87,4 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 
 ## Impact
 
-Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent + hide Enable on PENDING/ACTIVE), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path.
+Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (allowed-set snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent + hide Enable on PENDING/ACTIVE), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path.

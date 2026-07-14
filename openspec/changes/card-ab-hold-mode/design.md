@@ -12,24 +12,24 @@
 
 - Durable режим кампании: OFF / PENDING_SETUP / ACTIVE в PG.
 - ENTER: setup по `pay_for_order ≤ max CPO` и `views ≥ 100` (окно как в карточке ключа); FAIL → OFF; PASS → ЦП := текущая фактическая; БС фиксируется по итогу setup.
-- ENTER minus: одна setup sync/mutation минус-фраз → PG snapshot (новая Alembic migration) → только затем setup MAY → ACTIVE.
-- HOLD: обновление ЦП выкл; биддер ON; structural ACT freeze (WL/TP/enable/emergency + ordinary minus recalc); drift минус-фраз → restore snapshot; только guard перерасхода vs max CPO.
-- UI readiness: «режим включён / можно запускать A/B» только после ACTIVE (полный setup, в т.ч. минус + snapshot); не на PENDING; без гонки.
-- EXIT: снова обновление ЦП + ordinary апдейтеры + ordinary minus auto-update; clear/archive PG minus snapshot; без restore keyword-profile / Excel snapshot.
+- ENTER allowed-set: зафиксировать разрешённый набор фраз → PG allowed-set snapshot (новая Alembic migration) → одна setup sync привести WB к allowed-set → только затем setup MAY → ACTIVE.
+- HOLD: обновление ЦП выкл; биддер ON; structural ACT freeze (WL/TP/enable/emergency + ordinary allowed-set recalc); hold enforcement исключает новые/не-разрешённые фразы к замороженному allowed-set (минус как enforcement, WB cap → иначе видимая деградация); только guard перерасхода vs max CPO.
+- UI readiness: «режим включён / можно запускать A/B» только после ACTIVE (полный setup, в т.ч. allowed-set snapshot); не на PENDING; без гонки.
+- EXIT: снова обновление ЦП + ordinary апдейтеры + ordinary minus auto-update + allowed-set recalc; clear/archive PG allowed-set snapshot; без restore keyword-profile / Excel snapshot.
 - Cross-pod Redis: signal ENTER/EXIT, last-abort ack, setup lock NX.
 - Paid-only Telegram UI (скрыть при `bot_active is False`) + reject enable.
 - Enable gate на stats freshness/health (тот же класс, что `advs_filtred`); UI: причина + ограничение + `const.SUPPORT_LINK`.
 - После PENDING/ACTIVE: setup/hold scheduling не зависит от попадания в `advs_filtred`.
 - **Excel: колонка/apply `card_ab_hold_mode` убраны из MVP** (ignore leftover payload; future option).
-- Instruction: минус-фразы фиксируются; ручные правки в WB MAY быть возвращены; изменить минус → отключить A/B Hold.
-- Tests-first gates: structural freeze, minus snapshot/restore, UI not-ready on PENDING, paid visibility, interrupt до apply, freshness enable + post-enter schedule + Excel ignore.
+- Instruction: набор рекламных фраз зафиксирован (новые исключаются); ручные правки в WB MAY быть возвращены; изменить набор → отключить A/B Hold; без обещания полной заморозки вне scope типа РК / WB cap.
+- Tests-first gates: structural freeze, allowed-set snapshot/enforcement (вкл. WB cap visible degradation), UI not-ready on PENDING, paid visibility, interrupt до apply, freshness enable + post-enter schedule + Excel ignore.
 
 **Non-Goals:**
 
 - Встроенный A/B WB, price management, hard-block полок, Safe mode.
 - Free path / enable при `bot_active is False`.
 - Переписывание ordinary V3 preamble вне отдельного hold/setup path.
-- Обязательный Excel backup / restore keyword-settings при EXIT (минус snapshot — отдельный freeze-механизм, не Excel backup).
+- Обязательный Excel backup / restore keyword-settings при EXIT (allowed-set snapshot — отдельный freeze-механизм, не Excel backup).
 - **Excel enable/disable/edit A/B Hold** — future / out of MVP (идея сохранена; текущий контракт — только Telegram).
 
 ## Architecture Decision References
@@ -37,7 +37,7 @@
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** minus PG snapshot + restore + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain).
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain).
 
 Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
 
@@ -47,14 +47,14 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 - Shop-runner A/B Hold automation path: `process_ab_setup` / `process_ab_hold` (отдельные entrypoints рядом с V3, не «ветка глубоко внутри NORMAL preamble» как единственный контроль).
 - PG durable mode на `AdvSetting` (или эквивалентное поле кампании): source of truth OFF / PENDING_SETUP / ACTIVE.
-- PG durable minus-phrase snapshot на кампании (новое поле, **новая migration**): SoT зафиксированного набора для freeze/restore; Redis не SoT snapshot.
-- Minus freeze path: setup sync → snapshot; во время PENDING/ACTIVE — без ordinary `update_minus_phrases` recalculation; при drift — restore snapshot на WB (owner: A/B Hold path + gate на `MinusPhraseManager` / manager coroutine).
+- PG durable allowed-set snapshot на кампании (новое поле, **новая migration**): SoT зафиксированного разрешённого набора фраз; Redis не SoT snapshot.
+- Allowed-set freeze path: capture allowed-set → snapshot → setup sync привести WB к allowed-set; во время PENDING/ACTIVE — без ordinary recalculation allowed-set; hold-protection исключает не-разрешённые фразы (минус как enforcement) в пределах WB cap, иначе видимая деградация (owner: A/B Hold path + gate на `MinusPhraseManager` / manager coroutine).
 - Redis coordination layer: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project patterns.
 - Paid UI / handlers: **единственный** enable/disable write-path MVP; экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**. Manual «Обновить минус-слова» при PENDING/ACTIVE: manager skip → Telegram non-success (blocked / отключите A/B Hold), не «Минус-слова обновлены».
 - Mode policy overlays: default «выкл».
 - Excel schema: **remove** `card_ab_hold_mode` EDIT column; import ignore/no-op если поле всё же пришло; `can_apply_card_ab_hold_mode_via_excel` → always deny non-absent / remove enable path.
 
-**Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (или единый dispatcher), ACT structural guards на whitelist/target-place/emergency/minus ordinary recalc, hold guard executors (overspend / PFO > max), minus restore-to-snapshot, bidder/cluster bids, Apply path только для setup/hold allowed mutations.
+**Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (или единый dispatcher), ACT structural guards на whitelist/target-place/emergency/minus ordinary recalc, hold guard executors (overspend / PFO > max), allowed-set enforcement (minus non-allowed), bidder/cluster bids, Apply path только для setup/hold allowed mutations.
 
 **Forbidden layers:**
 
@@ -62,7 +62,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 - Прямое присваивание mode default в transition-helper/handler.
 - Остановка биддера / `bot_active=False` как реализация hold.
 - Structural ACT (БС / ЦП update / enable / ordinary minus recalculation) во время PENDING_SETUP / ACTIVE.
-- UI «можно запускать A/B» на PENDING_SETUP или до успешного minus snapshot.
+- UI «можно запускать A/B» на PENDING_SETUP или до успешного allowed-set snapshot.
 - Redis как единственный source of truth режима или minus snapshot без PG.
 - Excel export/import/apply `card_ab_hold_mode` (вкл. direct ACTIVE / PENDING / OFF).
 - Любой non-setup переход в ACTIVE (§8 / §9).
@@ -103,21 +103,23 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 ### 4. HOLD invariants
 
-**Выбор:** ЦП не обновляются; биддер продолжает работать к зафиксированным ЦП; нет WL add/remove/trim/enable/calibration UP; нет ordinary minus recalculation; при drift минус-фраз от PG snapshot — restore на WB; только guard перерасхода vs max CPO (reuse overspend/PFO-off семантику).
+**Выбор:** ЦП не обновляются; биддер продолжает работать к зафиксированным ЦП; нет WL add/remove/trim/enable/calibration UP; нет ordinary minus recalculation (allowed-set заморожен); hold-protection исключает новые/не-разрешённые фразы и восстанавливает снятые разрешённые к замороженному allowed-set (минус как enforcement, в пределах WB minus cap; иначе видимая деградация); только guard перерасхода vs max CPO (reuse overspend/PFO-off семантику).
 
-**Почему:** позиции и минус-профиль стабильны для теста; трафик не обрывается отключением биддера; ручные правки в WB/боте не должны «загрязнять» A/B.
+**Почему:** позиции и разрешённый набор фраз стабильны для теста; трафик не обрывается отключением биддера; новые фразы и ручные правки в WB/боте не должны «загрязнять» A/B.
 
-### 4a. Minus-phrases: setup snapshot + freeze restore
+### 4a. Allowed-phrase-set freeze + hold enforcement
 
-**Выбор:** на ENTER до ACTIVE — жёсткий порядок: (1) одна setup sync/mutation минус-фраз до актуального состояния; (2) PG snapshot (новое поле, новая migration); (3) остальной setup (ключи/ЦП/БС); (4) ACTIVE. Во время PENDING/ACTIVE ordinary `update_minus_phrases` recalc MUST NOT; drift → restore snapshot. EXIT → clear/archive snapshot; ordinary minus снова разрешён.
+**Выбор:** primary invariant — замораживается **разрешённый (relevant) набор фраз** (relevant-фразы + получившийся GOOD/whitelist профиль ключей), а не список минус-фраз; минус — производный enforcement. Переиспользуется существующая модель `auto_add_only_relevant_phrase` / `relevant_phrases` / `NOT_RELEVANT_PHRASE` (не-разрешённая фраза → BAD → минус). На ENTER до ACTIVE — жёсткий порядок: (1) зафиксировать allowed-set и записать durable PG allowed-set snapshot (новое поле, новая migration); (2) одной setup sync/mutation привести WB к allowed-set (исключить всё вне набора в пределах WB minus cap); (3) остальной setup (ключи/ЦП/БС); (4) ACTIVE. Во время PENDING/ACTIVE ordinary `update_minus_phrases` recalc (изменение allowed-set по свежей стате) MUST NOT — allowed-set заморожен; **отдельно** hold-protection исключает любые новые/не-разрешённые фразы и восстанавливает снятые разрешённые, удерживая поверхность трат = allowed-set. EXIT → clear/archive snapshot; ordinary minus + recalc снова разрешены.
 
-**Почему:** минус-фразы меняют выдачу так же, как состав БС; без freeze тест карточки грязный. PG snapshot переживает рестарт; Redis не SoT списка.
+**Почему:** новые фразы появляются постоянно (стата пересчитывает GOOD/BAD); заморозка одного минус-листа не мешает новым фразам откручиваться и загрязнять тест. Замораживать надо источник (allowed-set), а минус применять как enforcement. PG snapshot переживает рестарт; Redis не SoT набора.
 
-**Альтернатива:** только «не трогать минус без snapshot» — отклонена (drift в кабинете WB остаётся). Хранить snapshot только в Redis — отклонена (нет durable SoT).
+**WB minus cap (видимая деградация):** enforcement ограничен лимитом WB (~1000 фраз/nmid). Если для удержания allowed-set нужно исключить больше, чем допускает cap (или тип РК — open-match без доказанной controllability), система деградирует **видимо** (лог + честный статус, что hold не гарантирован), не заявляя чистый hold молча.
+
+**Альтернатива:** snapshot минус-листа + restore-on-drift (изначальный дизайн) — отклонена: замораживает производный негатив, новые фразы протекают и тест грязный. Хранить allowed-set только в Redis — отклонена (нет durable SoT).
 
 ### 4b. UI readiness after ACTIVE only
 
-**Выбор:** UI MUST показывать PENDING/«подготовка» пока setup идёт; сообщение «режим включён / можно запускать A/B» — только после PG mode == ACTIVE (полный setup, в т.ч. минус + snapshot). Setup lock / interrupt исключают ready при abort.
+**Выбор:** UI MUST показывать PENDING/«подготовка» пока setup идёт; сообщение «режим включён / можно запускать A/B» — только после PG mode == ACTIVE (полный setup, в т.ч. allowed-set snapshot). Setup lock / interrupt исключают ready при abort.
 
 **Почему:** иначе пользователь стартует тест на незафиксированном минус-профиле (гонка с PENDING).
 
@@ -141,9 +143,9 @@ Check-points interrupt: после load и **обязательно до apply**
 
 ### 7. Paid UI write-path
 
-**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие; текст MUST включать freeze минус-фраз / restore / «чтобы изменить минус — отключите A/B Hold»); при клике: gate `bot_active`, **gate stats freshness**, при fail — alert (причина + ограничение + `SUPPORT_LINK`) без PENDING; если mode уже `PENDING_SETUP` или `ACTIVE` — **no-op** (не demote, не Redis ENTER, не re-ENTER force sync; decision §10); при ok и mode `OFF` — PG PENDING_SETUP, Redis ENTER, poll last-abort / **ACTIVE**; UI «можно запускать A/B» только после ACTIVE; «Выключить» → EXIT signal + PG OFF + clear minus snapshot (единственный MVP путь обратно в `OFF` перед новым ENTER). Клавиатура экрана: **Disable + Back всегда**; **Enable MUST при `OFF`**; при `PENDING_SETUP` / `ACTIVE` UI **MAY скрыть** Enable (decision §11) — сахар против случайного нажатия; handler no-op (§10) остаётся обязательным при stale callback.
+**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие; текст MUST включать фиксацию набора фраз [новые исключаются] / restore из WB / «чтобы изменить набор — отключите A/B Hold», scoped/best-effort без обещания полной заморозки вне типа РК / WB cap); при клике: gate `bot_active`, **gate stats freshness**, при fail — alert (причина + ограничение + `SUPPORT_LINK`) без PENDING; если mode уже `PENDING_SETUP` или `ACTIVE` — **no-op** (не demote, не Redis ENTER, не re-ENTER force sync; decision §10); при ok и mode `OFF` — PG PENDING_SETUP, Redis ENTER, poll last-abort / **ACTIVE**; UI «можно запускать A/B» только после ACTIVE; «Выключить» → EXIT signal + PG OFF + clear allowed-set snapshot (единственный MVP путь обратно в `OFF` перед новым ENTER). Клавиатура экрана: **Disable + Back всегда**; **Enable MUST при `OFF`**; при `PENDING_SETUP` / `ACTIVE` UI **MAY скрыть** Enable (decision §11) — сахар против случайного нажатия; handler no-op (§10) остаётся обязательным при stale callback.
 
-**Affected records:** KeywordsSetting (status/БС/ЦП) на ENTER; AdvSetting mode field; AdvSetting minus-phrase snapshot field; bidder продолжает писать ставки в HOLD; WB minus set на setup sync / restore.
+**Affected records:** KeywordsSetting (status/БС/ЦП) на ENTER; AdvSetting mode field; AdvSetting allowed-set snapshot field; bidder продолжает писать ставки в HOLD; WB minus set на setup sync / hold enforcement.
 
 **Recovery:** EXIT всегда доступен paid-пользователю; TTL Redis; при зависшем PENDING_SETUP — повторный setup под lock или EXIT (setup не режется freshness filter после enter); UI не показывает ready, пока не ACTIVE.
 
@@ -155,15 +157,15 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 **Выбор:** убрать `card_ab_hold_mode` из Excel schema export/import/apply целиком. Leftover payload → ignore. Future change может вернуть колонку с корректным path только → PENDING (не ACTIVE) + interrupt/setup; сейчас — out.
 
-**Почему:** prod bug — Excel `active` обходил ENTER minus sync+snapshot; `process_ab_setup` не бежит на ACTIVE; restore/ready врут. Полное удаление из Excel проще и безопаснее coercion.
+**Почему:** prod bug — Excel `active` обходил ENTER allowed-set snapshot; `process_ab_setup` не бежит на ACTIVE; enforcement/ready врут. Полное удаление из Excel проще и безопаснее coercion.
 
 **Альтернатива:** coerce Excel enable → `pending_setup` only — отклонена пользователем (убераем Excel совсем на сейчас).
 
 ## Affected components (ориентир)
 
 - PG migration #1 (уже): поле режима на кампании + default OFF.
-- PG migration #2 (**новая**): durable snapshot минус-фраз на кампании + clear на EXIT.
-- Shop-runner: dispatcher `adv_settings_auto_update`; setup/hold pipelines (вкл. minus sync+snapshot); interrupt checks; ACT guards (top-key WL, individual TP, WL trim non-v3, stats emergency structural, ordinary minus recalc); minus restore-on-drift.
+- PG migration #2 (**новая**): durable allowed-set snapshot на кампании + clear на EXIT.
+- Shop-runner: dispatcher `adv_settings_auto_update`; setup/hold pipelines (вкл. allowed-set capture+snapshot+sync); interrupt checks; ACT guards (top-key WL, individual TP, WL trim non-v3, stats emergency structural, ordinary allowed-set recalc); allowed-set enforcement on drift (minus non-allowed, WB cap → visible degradation).
 - Redis caches + lock.
 - Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE.
 - Excel roundtrip: **remove** column + ignore apply for `card_ab_hold_mode`.
@@ -174,7 +176,8 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - ENTER может массово OFF ключи с `views < 100` или PFO > max.
 - HOLD снижает «подстройку» экономики (нет calibraton/enable) — ожидаемо для теста.
 - Bidder продолжает траты по зафиксированным позициям.
-- Ручные правки минус-фраз в WB/боте во время hold будут перезаписаны snapshot’ом.
+- Новые/не-разрешённые фразы во время hold исключаются; ручные правки в WB/боте перезаписываются к замороженному allowed-set.
+- При превышении WB minus cap / open-match РК hold — best-effort с видимой деградацией (лог + честный статус), не гарантированная чистая поверхность.
 - Пользователи больше не смогут включать/выключать A/B Hold через Excel (только Telegram).
 
 ## Access guards
@@ -188,8 +191,8 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 | Ordinary V3 schedule | mode == OFF |
 | A/B setup / hold schedule | mode PENDING/ACTIVE; **не** требовать `advs_filtred` |
 | Structural ACT (WL/TP/enable/emergency keys) | mode not in PENDING_SETUP, ACTIVE |
-| Ordinary minus recalculation | mode not in PENDING_SETUP, ACTIVE |
-| Minus restore-to-snapshot | PENDING_SETUP / ACTIVE when drift detected |
+| Ordinary minus recalculation / allowed-set recalc | mode not in PENDING_SETUP, ACTIVE |
+| Allowed-set enforcement (minus non-allowed) | PENDING_SETUP / ACTIVE when drift detected; within WB minus cap else visible degradation |
 | Bidder / cluster bids | allowed if paid bot+bidder flags as today |
 | Hold guards | ACTIVE only |
 | Non-setup ACTIVE write | Forbidden |
@@ -199,10 +202,11 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Unit: ENTER pass/fail matrix (PFO, views, None).
 - Unit: interrupt → no apply when signal ENTER.
 - Gate: ACTIVE → top-key / individual TP / trim not called; cluster bids still eligible.
-- Gate: PENDING/ACTIVE → ordinary minus recalc not applied; drift → restore snapshot.
-- Gate: setup failure on minus sync/snapshot → no ACTIVE; UI not ready.
+- Gate: PENDING/ACTIVE → ordinary allowed-set recalc not applied; new non-allowed phrase → excluded; removed allowed phrase → restored.
+- Gate: enforcement exceeding WB minus cap / open-match → visible degradation (log + honest status), not silent clean hold.
+- Gate: setup failure on allowed-set capture/snapshot → no ACTIVE; UI not ready.
 - Gate: UI ready-to-test only after ACTIVE; PENDING never shows ready-to-test.
-- Gate: EXIT → ordinary minus eligible again; snapshot cleared/archived.
+- Gate: EXIT → ordinary minus + allowed-set recalc eligible again; allowed-set snapshot cleared/archived.
 - Gate: `bot_active=False` → UI hidden / enable no-op.
 - Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
 - Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
@@ -228,15 +232,16 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [Risk] Excel → ACTIVE без snapshot (prod). → Mitigation: decision §9 — remove Excel column/apply entirely; regression tests import ignore.
 - [Risk] Пользователь путает с Safe mode. → Mitigation: отдельный UI/название A/B Hold; out of scope Safe mode.
 - [Risk] Setup/hold на stale после enter слабее охраняют overspend. → Acceptable trade-off vs stuck PENDING; enable уже отрезал «холодный» вход.
-- [Risk] Restore минус перезапишет осознанную ручную правку. → Acceptable: инструкция + «чтобы менять минус — отключите Hold».
+- [Risk] Enforcement перезапишет осознанную ручную правку. → Acceptable: инструкция + «чтобы менять набор — отключите Hold».
+- [Risk] Allowed-set требует > WB minus cap исключений / open-match РК → hold не гарантирован. → Mitigation: видимая деградация (лог + честный статус), scoped wording; не обещать полную заморозку.
 - [Risk] Нет Excel bulk enable. → Acceptable MVP; Telegram-only; Excel return = future change.
 - [Risk] Случайный Enable mid-hold. → Mitigation: §10 handler no-op + §11 MAY hide Enable на PENDING/ACTIVE.
 
 ## Migration Plan
 
 1. Deploy migration режима (field default OFF) — уже в change.
-2. Deploy **новая** migration minus-phrase snapshot field — no freeze behavior until runner/UI wired.
-3. Deploy runner (setup snapshot + restore + gate ordinary minus) + Redis + UI (instruction + ready after ACTIVE).
+2. Deploy **новая** migration allowed-set snapshot field — no freeze behavior until runner/UI wired.
+3. Deploy runner (allowed-set snapshot + hold enforcement + gate ordinary recalc) + Redis + UI (instruction + ready after ACTIVE).
 4. Rollout paid UI entry; **remove** Excel `card_ab_hold_mode` column/apply if still present.
 5. Rollback: mode OFF + disable UI; clear snapshots; Redis TTL cleanup; ordinary V3 / minus без exclusion.
 
@@ -246,7 +251,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 2. ~~Immediate setup job~~ — **Resolved MVP:** immediate setup job **не** запускается из bot; UI ставит `PENDING_SETUP`, пишет Redis ENTER, poll `LastAbort`/PG mode; setup на тике shop-runner. UX показывает PENDING; **ready-to-test только после ACTIVE** (уточнено update минус-freeze).
 3. ~~Hold guard executors~~ — **Resolved MVP:** hold использует deep-overspend + PFO>max OFF (`hold_guards.py`), без resolve clamp / без полного `ResetOverMaxCpo` ladder trim. Полный V3 executor pair — optional follow-up, не blocker archive.
 4. ~~Setup vs stale `advs_filtred`~~ — **Resolved (update):** enable блокируется freshness/health статы + UI reason/`SUPPORT_LINK`; после PENDING/ACTIVE setup/hold schedule из полного `advs`, не только `advs_filtred`.
-5. ~~Minus freeze storage~~ — **Resolved (update):** durable PG snapshot на кампании (новая migration); sync→snapshot до ACTIVE; restore on drift; clear/archive on EXIT.
+5. ~~Minus freeze storage~~ — **Resolved (update):** durable PG **allowed-set** snapshot на кампании (новая migration); capture allowed-set→snapshot до ACTIVE; hold enforcement (исключение не-разрешённых фраз, в пределах WB cap; иначе видимая деградация); clear/archive on EXIT. Заморозка allowed-set — primary invariant, минус — derived enforcement.
 6. ~~Excel A/B Hold column~~ — **Resolved (update):** убрать из Excel schema/apply в MVP (decision §9); enable/disable только Telegram; future option отдельно.
 
 ## Review Checklist
@@ -254,4 +259,4 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard)
-- [x] implementation layer matches decision *(plan delta §9 Excel remove — applied; §10 Enable idempotent — code applied; §11 hide Enable — code applied via `/opsx:apply`)*
+- [ ] implementation layer matches decision *(§8 REDEFINED: freeze allowed-set + hold enforcement instead of minus snapshot/restore — implementation NOT yet updated, pending `/opsx:apply`; §9 Excel remove, §10 Enable idempotent, §11 hide Enable — previously applied)*

@@ -54,17 +54,21 @@
 - [x] 7.4 Tests: paired — enable blocked when stale + сообщение содержит reason/`SUPPORT_LINK`; PENDING+stale всё равно eligible для setup; ACTIVE+stale eligible для hold.
 - [x] 7.5 Docstrings / ссылка на updated spec requirements (enable blocked when stats freshness fails; post-enter schedule).
 
-## 8. Minus-phrases freeze + UI readiness after ACTIVE (update)
+## 8. Allowed-phrase-set freeze + hold enforcement + UI readiness after ACTIVE (update — decision §8 REDEFINED)
 
-- [x] 8.1 Tests-first: setup MUST sync минус → PG snapshot → ACTIVE; fail sync/snapshot → no ACTIVE / UI not ready.
-- [x] 8.2 Tests-first: PENDING/ACTIVE → ordinary `update_minus_phrases` recalc не применяется; drift → restore snapshot; paired positive при mode OFF.
-- [x] 8.3 Tests-first: UI ready-to-test / «можно запускать A/B» только при ACTIVE; PENDING не показывает ready; EXIT clear/archive snapshot + ordinary minus снова eligible.
-- [x] 8.4 Alembic **новая** migration: durable PG поле snapshot минус-фраз на кампании (+ модель/DTO); не переиспользовать уже применённую migration режима.
-- [x] 8.5 ENTER setup: довести минус до актуального (одна setup sync/mutation) → записать PG snapshot → только затем завершить setup / mode → ACTIVE (decision §8).
-- [x] 8.6 Gate ordinary minus recalculation в manager / MinusPhraseManager при PENDING_SETUP / ACTIVE; hold/setup path: restore-to-snapshot при drift.
-- [x] 8.7 EXIT: clear/archive PG minus snapshot; ordinary minus auto-update снова разрешён; без keyword-profile restore.
-- [x] 8.8 UI: текст инструкции про фиксацию минус-фраз / restore из WB / «чтобы изменить — отключите A/B Hold»; ready message только после ACTIVE (исключая гонку с PENDING).
-- [x] 8.9 Docstrings + focused pytest на 8.1–8.3; сверка placement с decision §8.
+> Supersedes the earlier minus-snapshot/restore design of this section. Frozen unit = allowed (relevant) phrase set; minus = derived enforcement only. Checkboxes reset to unbuilt: the previously-implemented minus-snapshot behavior no longer matches decision §8 and must be redone via `/opsx:apply`.
+
+- [ ] 8.1 Tests-first: setup MUST capture allowed-set → PG allowed-set snapshot → ACTIVE; fail capture/snapshot → no ACTIVE / UI not ready.
+- [ ] 8.2 Tests-first: PENDING/ACTIVE → ordinary `update_minus_phrases` recalc (изменение allowed-set) не применяется; **новая не-разрешённая фраза → исключается**; снятая вручную разрешённая фраза → восстанавливается; paired positive при mode OFF.
+- [ ] 8.3 Tests-first: UI ready-to-test / «можно запускать A/B» только при ACTIVE; PENDING не показывает ready; EXIT clear/archive allowed-set snapshot + ordinary minus/recalc снова eligible.
+- [ ] 8.4 Alembic migration: durable PG поле **allowed-set** snapshot на кампании (relevant-фразы + GOOD/whitelist тексты) (+ модель/DTO); переопределить/переименовать ранее введённое snapshot-поле; не переиспользовать migration режима.
+- [ ] 8.5 ENTER setup: зафиксировать allowed-set (переиспользуя `auto_add_only_relevant_phrase` / `relevant_phrases` / `NOT_RELEVANT_PHRASE`) → записать PG allowed-set snapshot → одной setup sync привести WB к allowed-set (исключить вне набора в пределах WB minus cap) → только затем mode → ACTIVE (decision §8).
+- [ ] 8.6 Gate ordinary recalculation allowed-set в manager / MinusPhraseManager при PENDING_SETUP / ACTIVE; **отдельный** hold-enforcement path: исключать новые/не-разрешённые фразы и восстанавливать снятые разрешённые к замороженному allowed-set (минус как enforcement, hold-protection ≠ ordinary recalc).
+- [ ] 8.7 WB minus cap / open-match: если enforcement замороженного allowed-set превышает cap (или тип РК open-match без доказанной controllability) — **видимая деградация** (лог ERROR/WARN + честный статус, что hold не гарантирован); MUST NOT молча заявлять чистый hold.
+- [ ] 8.8 EXIT: clear/archive PG allowed-set snapshot; ordinary minus auto-update + allowed-set recalc снова разрешены; без keyword-profile restore.
+- [ ] 8.9 UI: текст инструкции про фиксацию **набора фраз** (новые исключаются) / restore из WB / «чтобы изменить набор — отключите A/B Hold»; scoped/best-effort wording (не обещать полную заморозку вне типа РК / WB cap); ready message только после ACTIVE (исключая гонку с PENDING).
+- [ ] 8.10 Regression test (доказывает исправление bug): в ACTIVE hold новая не-разрешённая фраза исключается, снятая разрешённая восстанавливается; enforcement ≠ ordinary recalc; при превышении WB cap — видимая деградация, не тихий success.
+- [ ] 8.11 Docstrings + focused pytest на 8.1–8.3 / 8.10; сверка placement с decision §8 (allowed-set — primary invariant, minus — derived).
 
 ## 9. Remove Excel A/B Hold write-path (update — decision §9)
 
