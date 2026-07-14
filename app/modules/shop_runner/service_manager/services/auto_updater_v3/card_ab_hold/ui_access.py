@@ -37,6 +37,18 @@ def is_card_ab_hold_enable_noop(
     return mode in (CardAbHoldMode.PENDING_SETUP, CardAbHoldMode.ACTIVE)
 
 
+def should_offer_card_ab_hold_enable_control(
+    mode: CardAbHoldMode | str | None,
+) -> bool:
+    """True: показать кнопку Enable на экране A/B Hold.
+
+    Decision §11: Enable MUST при ``OFF``; при PENDING/ACTIVE UI MAY
+    скрыть Enable (Disable/Back остаются). Скрытие — сахар; §10 no-op
+    остаётся safety net при stale callback.
+    """
+    return normalize_card_ab_hold_mode(mode) == CardAbHoldMode.OFF
+
+
 def card_ab_hold_enable_noop_answer(adv_setting: AdvSetting | object) -> str:
     """Короткий callback answer при Enable no-op (лимит TG answerCallbackQuery)."""
     mode = normalize_card_ab_hold_mode(

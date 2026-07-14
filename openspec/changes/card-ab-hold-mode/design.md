@@ -254,4 +254,4 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard)
-- [x] implementation layer matches decision *(plan delta §9 Excel remove — applied; §10 Enable idempotent — code applied; §11 hide Enable — plan only → `/opsx:apply`)*
+- [x] implementation layer matches decision *(plan delta §9 Excel remove — applied; §10 Enable idempotent — code applied; §11 hide Enable — code applied via `/opsx:apply`)*

@@ -41,6 +41,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     card_ab_hold_enable_noop_answer,
     is_card_ab_hold_enable_noop,
     is_card_ab_hold_ui_visible,
+    should_offer_card_ab_hold_enable_control,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
 
@@ -65,10 +66,17 @@ _INSTRUCTION = (
 )
 
 
-def _screen_keyboard(adv_id: int) -> InlineKeyboardMarkup:
-    """Клавиатура экрана A/B Hold (вкл / выкл / назад)."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+def _screen_keyboard(
+    adv_id: int, mode: CardAbHoldMode | str | None
+) -> InlineKeyboardMarkup:
+    """Клавиатура экрана A/B Hold (decision §11).
+
+    Enable — только при ``OFF``; при PENDING/ACTIVE кнопка скрыта.
+    Disable и Back всегда. Handler Enable при stale callback — §10 no-op.
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+    if should_offer_card_ab_hold_enable_control(mode):
+        rows.append(
             [
                 InlineKeyboardButton(
                     text="Включить режим A/B",
@@ -76,32 +84,43 @@ def _screen_keyboard(adv_id: int) -> InlineKeyboardMarkup:
                         adv_setting_original_id=adv_id
                     ).pack(),
                 )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="Выключить режим A/B",
-                    callback_data=CardAbHoldDisable(
-                        adv_setting_original_id=adv_id
-                    ).pack(),
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="← Назад",
-                    callback_data=CardAbHoldBack(
-                        adv_setting_original_id=adv_id
-                    ).pack(),
-                )
-            ],
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="Выключить режим A/B",
+                callback_data=CardAbHoldDisable(
+                    adv_setting_original_id=adv_id
+                ).pack(),
+            )
         ]
     )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="← Назад",
+                callback_data=CardAbHoldBack(
+                    adv_setting_original_id=adv_id
+                ).pack(),
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-async def _edit_screen(query: CallbackQuery, text: str, adv_id: int) -> None:
+async def _edit_screen(
+    query: CallbackQuery,
+    text: str,
+    adv_id: int,
+    mode: CardAbHoldMode | str | None,
+) -> None:
     """Редактировать message экрана, если это доступный ``Message``."""
     msg = query.message
     if isinstance(msg, Message):
-        await msg.edit_text(text, reply_markup=_screen_keyboard(adv_id))
+        await msg.edit_text(
+            text, reply_markup=_screen_keyboard(adv_id, mode)
+        )
 
 
 @card_ab_hold_router.callback_query(CardAbHoldMenu.filter())
@@ -117,7 +136,9 @@ async def open_card_ab_hold_menu(
             await query.answer("Доступно только при включённом боте", show_alert=True)
             return
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
-        await _edit_screen(query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id)
+        await _edit_screen(
+            query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id, mode
+        )
         await query.answer()
 
 
@@ -143,7 +164,7 @@ async def enable_card_ab_hold(
             mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
             await query.answer(card_ab_hold_enable_noop_answer(adv), show_alert=True)
             await _edit_screen(
-                query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id
+                query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id, mode
             )
             logger.info(
                 "[adv_id=%s] CardAbHold Enable no-op (already %s)",
@@ -158,7 +179,12 @@ async def enable_card_ab_hold(
                 build_ab_hold_enable_blocked_alert(stats_reason),
                 show_alert=True,
             )
-            await _edit_screen(query, f"{_INSTRUCTION}\n{blocked}", adv.id)
+            await _edit_screen(
+                query,
+                f"{_INSTRUCTION}\n{blocked}",
+                adv.id,
+                CardAbHoldMode.OFF,
+            )
             return
         adv.card_ab_hold_mode = CardAbHoldMode.PENDING_SETUP.value
         await session.commit()
@@ -174,7 +200,12 @@ async def enable_card_ab_hold(
         )
         logger.info("[adv_id=%s] CardAbHold ENTER → PENDING_SETUP", adv.adv_id)
         await query.answer("Подготовка A/B Hold…")
-        await _edit_screen(query, f"{_INSTRUCTION}\n{status}", adv.id)
+        await _edit_screen(
+            query,
+            f"{_INSTRUCTION}\n{status}",
+            adv.id,
+            normalize_card_ab_hold_mode(adv.card_ab_hold_mode),
+        )
 
 
 @card_ab_hold_router.callback_query(CardAbHoldDisable.filter())
@@ -196,7 +227,9 @@ async def disable_card_ab_hold(
         await cache.clear()
         logger.info("[adv_id=%s] CardAbHold EXIT → OFF (minus snapshot cleared)", adv.adv_id)
         await query.answer("Режим A/B выключен")
-        await _edit_screen(query, f"{_INSTRUCTION}\nСтатус: off", adv.id)
+        await _edit_screen(
+            query, f"{_INSTRUCTION}\nСтатус: off", adv.id, CardAbHoldMode.OFF
+        )
 
 
 @card_ab_hold_router.callback_query(CardAbHoldBack.filter())

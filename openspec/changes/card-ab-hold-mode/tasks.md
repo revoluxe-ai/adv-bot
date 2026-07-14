@@ -90,6 +90,6 @@
 
 ## 12. Telegram keyboard MAY hide Enable while PENDING/ACTIVE (update — decision §11)
 
-- [ ] 12.1 Tests-first: OPEN screen / `_screen_keyboard` — OFF → Enable+Disable+Back; PENDING/ACTIVE → Disable+Back, Enable absent (or documented optional show + handler no-op still covered by §10).
-- [ ] 12.2 Mode-aware keyboard builder: omit Enable when mode ∈ {PENDING_SETUP, ACTIVE}; always include Disable+Back; OFF keeps Enable.
-- [ ] 12.3 Focused pytest; сверка со spec screen controls + decision §11; §10 handler tests remain green.
+- [x] 12.1 Tests-first: OPEN screen / `_screen_keyboard` — OFF → Enable+Disable+Back; PENDING/ACTIVE → Disable+Back, Enable absent (or documented optional show + handler no-op still covered by §10).
+- [x] 12.2 Mode-aware keyboard builder: omit Enable when mode ∈ {PENDING_SETUP, ACTIVE}; always include Disable+Back; OFF keeps Enable.
+- [x] 12.3 Focused pytest; сверка со spec screen controls + decision §11; §10 handler tests remain green.

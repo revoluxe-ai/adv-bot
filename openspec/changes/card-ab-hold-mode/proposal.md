@@ -87,4 +87,4 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 
 ## Impact
 
-Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent + optional hide Enable), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path. План опережает код по §11: нужен `/opsx:apply` для mode-aware keyboard.
+Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent + hide Enable on PENDING/ACTIVE), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path.
