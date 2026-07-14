@@ -246,19 +246,7 @@ class AdvertApi(ABC_WB_API):
     #         all_advs.extend(advs)
     #     return all_advs
 
-    @try_except_decorator(1, 6)
-    async def set_minus_phrases(self, adv_setting: AdvSetting, phrases: list):
-        if len(phrases) > 1000:
-            phrases.sort(key=lambda x: len(x), reverse=True)
-            phrases = phrases[:1000]
-            logger.debug("Больше 1000 минус-фраз, обрезаем до 1000")
-        url = f"https://advert-api.wildberries.ru/adv/v1/auto/set-excluded?id={adv_setting.adv_id}"
-        data = {"excluded": phrases}
 
-        await requests(
-            self.session, "POST", url, json_data=data, headers=self.headers.standart
-        )
-        logger.debug("Минус-фразы установлены")
 
     # async def create_adv_company(
     #     self, nmids: list, budget_type: int, budget: int
