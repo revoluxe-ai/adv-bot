@@ -38,6 +38,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold,
+    card_ab_hold_enable_noop_answer,
+    is_card_ab_hold_enable_noop,
     is_card_ab_hold_ui_visible,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -127,6 +129,7 @@ async def enable_card_ab_hold(
 
     Spec card-ab-hold-mode / decision write-path §2a: при проблемной стате —
     enable no-op, сразу причина + ограничение + ``SUPPORT_LINK``.
+    Decision §10 / Enable idempotent: PENDING/ACTIVE → no demote, no ENTER rewrite.
     Immediate setup job out of MVP — UI показывает PENDING и poll LastAbort/ACTIVE.
     """
     async with sm() as session:
@@ -135,6 +138,18 @@ async def enable_card_ab_hold(
         )
         if adv is None or not can_enable_card_ab_hold(adv):
             await query.answer("Доступно только при включённом боте", show_alert=True)
+            return
+        if is_card_ab_hold_enable_noop(adv):
+            mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+            await query.answer(card_ab_hold_enable_noop_answer(adv), show_alert=True)
+            await _edit_screen(
+                query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id
+            )
+            logger.info(
+                "[adv_id=%s] CardAbHold Enable no-op (already %s)",
+                adv.adv_id,
+                mode.value,
+            )
             return
         stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(adv)
         if not stats_ok:

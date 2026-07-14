@@ -117,6 +117,6 @@ Bad:
 - [x] existing decisions searched
 - [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`)
 - [x] new decision proposed because accepted decision was missing for hold write-path
-- [x] implementation layer matches decision *(delta §9 Excel out — code via `/opsx-apply`; delta §10 Enable idempotent — code pending `/opsx-apply` / `/opsx-fix-bug GO`)*
+- [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`)*
 - [x] tests verify structural freeze without masking placement violations
 - [x] paid-only gate enforced for UI and enable paths
