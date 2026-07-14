@@ -149,6 +149,17 @@ rules:
     - "Любое Free bot write action должно явно отличать ручное user-confirmed действие от automation."
     - "Manual self-service actions нельзя описывать как automatic optimization."
     - "Если функционал сложный и велик риск ошибки, нужно объяснять пользователю как получить помощь в случае проблем"
+    - "Для любых freeze/hold/experiment features spec MUST перечислять все mutable state boundaries, которые могут менять условия эксперимента: whitelist, blacklist/minus phrases, keyword status/enable, target places, bids, budgets, setup/hold writes, external API writes, DB/Redis coordination."
+    - "Для каждого mutable state boundary spec MUST явно указать статус: frozen, allowed, restored/enforced, ignored, or out-of-scope. Нельзя ограничиваться перечислением текущих функций/корутин."
+    - "Spec MUST разделять semantic boundary и implementation path: например, blacklist/minus phrases должны описываться как traffic-shaping state, даже если write выполняется отдельной coroutine/helper."
+    - "Для freeze state spec MUST описывать drift policy: что делать, если пользователь, WB UI, другой worker или внешний процесс изменил frozen state вручную."
+    - "Если frozen state должен сохраняться, spec MUST указать snapshot/source-of-truth: где хранится эталон, когда создаётся, когда обновляется, когда очищается, и кто имеет право его менять."
+    - "Spec MUST явно перечислить allowed behavior во время freeze/hold: какие writes остаются разрешёнными и почему они не загрязняют эксперимент."
+    - "Spec MUST явно перечислить forbidden behavior во время freeze/hold: какие writes не должны доходить до candidate/filter, handler/adapter, DB/WB/Redis write boundary."
+    - "Spec MUST требовать paired regression tests для каждого frozen boundary: protected state blocked/restored, OFF or normal state still allowed."
+    - "Spec MUST включать тест или inventory-check, который сверяет runtime-reachable writers с freeze decision; sibling gated path не считается доказательством защиты другого path."
+    - "Если feature меняет экспериментальный режим, spec MUST содержать user-facing behavior: что пользователь увидит, какие ручные изменения будут перезаписаны, и как безопасно выйти из режима."
+
 
   design:
     - "Перед техническими изменениями изучать существующую реализацию."
