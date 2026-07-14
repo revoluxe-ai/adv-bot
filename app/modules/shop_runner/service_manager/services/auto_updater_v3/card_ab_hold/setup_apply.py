@@ -54,6 +54,7 @@ async def apply_ab_hold_setup_mutations(
     keywords: list[CalculatedKeyword],
     max_pay_for_order: float,
     allowed_phrases_snapshot: list[str] | None = None,
+    degraded: bool = False,
 ) -> tuple[int, int]:
     """Применить ENTER: OFF на FAIL, ЦП на PASS; allowed-set snapshot + mode → ACTIVE.
 
@@ -61,6 +62,9 @@ async def apply_ab_hold_setup_mutations(
         allowed_phrases_snapshot: PG snapshot разрешённого (allowed/relevant) набора
             фраз (decision §8, primary invariant). MUST быть зафиксирован до ACTIVE;
             минус — производный enforcement, не хранится здесь.
+        degraded: честная деградация hold (decision §8) — enforcement allowed-set
+            превысил WB minus cap на ENTER. Персистится вместе с mode → ACTIVE, чтобы
+            UI не заявлял чистый hold (durable SoT для рендера в bot-поде).
 
     Returns:
         (pass_count, fail_count)
@@ -110,16 +114,50 @@ async def apply_ab_hold_setup_mutations(
             .values(
                 card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
                 card_ab_hold_allowed_phrases_snapshot=snapshot,
+                card_ab_hold_degraded=degraded,
             )
         )
         _ = await session.execute(stmt_mode)
         await session.commit()
 
     logger.info(
-        "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s → ACTIVE",
+        "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s degraded=%s → ACTIVE",
         adv_id,
         len(pass_updates),
         len(fail_ids),
         len(snapshot),
+        degraded,
     )
     return len(pass_updates), len(fail_ids)
+
+
+async def persist_ab_hold_degraded_flag(
+    *,
+    adv_setting_id: int,
+    degraded: bool,
+) -> None:
+    """Персистить honest degradation flag A/B Hold в PG (decision §8, durable SoT).
+
+    HOLD-тик (``process_ab_hold``) считает деградацию каждый тик, но mode остаётся
+    ACTIVE и отдельного PG-write у тика нет. Флаг durable в PG, т.к. UI-рендер
+    (bot-под) читает его независимо от shop-runner-пода, где считается enforcement.
+    Self-healing: при чистом enforcement (cap не превышен) флаг снимается.
+
+    Args:
+        adv_setting_id: PG id кампании (``AdvSetting.id``).
+        degraded: True — enforcement не гарантирует чистый hold (WB minus cap /
+            open-match); False — поверхность равна замороженному allowed-set.
+    """
+    async with sm(read_only=False) as session:
+        stmt = (
+            update(AdvSetting)
+            .where(AdvSetting.id == adv_setting_id)
+            .values(card_ab_hold_degraded=degraded)
+        )
+        _ = await session.execute(stmt)
+        await session.commit()
+    logger.info(
+        "[adv_setting_id=%s] ab_hold degraded flag persisted degraded=%s",
+        adv_setting_id,
+        degraded,
+    )

@@ -30,6 +30,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_apply import (
     apply_ab_hold_setup_mutations,
+    persist_ab_hold_degraded_flag,
 )
 from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.redis_lock_manager import (
     RedisLockManager,
@@ -104,6 +105,7 @@ async def process_ab_setup(
         # Одна setup sync (не ordinary loop): привести WB к allowed-set —
         # исключить всё наблюдаемое вне набора в пределах WB minus cap.
         enforce = await minus_mgr.enforce_frozen_allowed_set(complex_adv, allowed_texts)
+        degraded = bool(enforce["cap_exceeded"])
 
         pass_n, fail_n = await apply_ab_hold_setup_mutations(
             adv_id=int(complex_adv.adv_id),
@@ -111,10 +113,12 @@ async def process_ab_setup(
             keywords=keywords,
             max_pay_for_order=plan_max,
             allowed_phrases_snapshot=allowed_texts,
+            degraded=degraded,
         )
         complex_adv.adv_setting.card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
         complex_adv.adv_setting.card_ab_hold_allowed_phrases_snapshot = allowed_texts
-        if enforce["cap_exceeded"]:
+        complex_adv.adv_setting.card_ab_hold_degraded = degraded
+        if degraded:
             logger.error(
                 "[adv_id=%s] ab_setup allowed-set enforcement degraded on %s target(s): "
                 "hold NOT guaranteed clean (WB minus cap / open-match)",
@@ -158,7 +162,18 @@ async def process_ab_hold(
         _wb_api_manager_hub=wb_manager_hub
     ).minus_phrase_manager()
     enforce = await minus_mgr.enforce_frozen_allowed_set(complex_adv, allowed)
-    if enforce["cap_exceeded"]:
+    degraded = bool(enforce["cap_exceeded"])
+    # decision §8: честная деградация MUST быть durable, чтобы UI (bot-под) не
+    # заявлял чистый hold. Пишем в PG только при смене флага (self-healing включён).
+    if degraded != bool(
+        getattr(complex_adv.adv_setting, "card_ab_hold_degraded", False)
+    ):
+        await persist_ab_hold_degraded_flag(
+            adv_setting_id=int(complex_adv.adv_setting.id),
+            degraded=degraded,
+        )
+        complex_adv.adv_setting.card_ab_hold_degraded = degraded
+    if degraded:
         logger.error(
             "[adv_id=%s] ab_hold allowed-set enforcement degraded on %s target(s): "
             "hold NOT guaranteed clean (WB minus cap / open-match)",
