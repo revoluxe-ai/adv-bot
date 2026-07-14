@@ -31,7 +31,8 @@ A/B Hold — отдельный paid automation write-path с durable состо
    - **PENDING_SETUP / ACTIVE:** ordinary recalculation / auto-update минус-фраз MUST NOT; при drift текущих минус-фраз от snapshot бот MUST вернуть snapshot на WB; ручные правки в боте или кабинете WB считаются нарушением freeze и перезаписываются. Bot callback ordinary minus refresh («Обновить минус-слова») при freeze MUST NOT сообщать success; MUST объяснить, что минус зафиксирован и для изменений нужен EXIT / disable A/B Hold. Silent no-op с «Минус-слова обновлены» — Forbidden.
    - **EXIT → OFF:** ordinary auto-update минус-фраз снова разрешён; snapshot clear/archive; UI снимает статус готовности теста.
    - Snapshot минус-фраз — durable SoT в PG рядом с mode; Redis не заменяет PG-snapshot списка минус-фраз.
-9. **Excel write-path (MVP — out):** Excel roundtrip MUST NOT экспортировать, импортировать или применять `card_ab_hold_mode` (колонки нет; если значение всё же попало в payload — apply MUST NO-OP / ignore). Excel MUST NOT переводить режим в `pending_setup`, `active` или `off`. Единственный enable/disable write-path в MVP — **paid Telegram UI** (ENABLE → PENDING_SETUP + Redis ENTER → setup → ACTIVE; DISABLE → OFF + clear minus snapshot). Прямой переход в `ACTIVE` любым non-setup путём (в т.ч. бывший Excel setattr) — **Forbidden** (§8). Excel-колонка / Excel enable A/B Hold — **future / out of MVP** (идея сохранена, не текущий контракт).
+9. **Excel write-path (MVP — out):** Excel roundtrip MUST NOT экспортировать, импортировать или применять `card_ab_hold_mode` (колонки нет; если значение всё же попало в payload — apply MUST NO-OP / ignore). Excel MUST NOT переводить режим в `pending_setup`, `active` или `off`. Единственный enable/disable write-path в MVP — **paid Telegram UI** (ENABLE from `OFF` → PENDING_SETUP + Redis ENTER → setup → ACTIVE; DISABLE → OFF + clear minus snapshot). Прямой переход в `ACTIVE` любым non-setup путём (в т.ч. бывший Excel setattr) — **Forbidden** (§8). Excel-колонка / Excel enable A/B Hold — **future / out of MVP** (идея сохранена, не текущий контракт).
+10. **Telegram Enable idempotent while PENDING_SETUP / ACTIVE:** Enable MUST NO-OP (mode unchanged; no Redis ENTER rewrite; no re-trigger of ENTER `force_ab_hold_setup_sync`) when mode is already `PENDING_SETUP` or `ACTIVE`. Demote `ACTIVE`→`PENDING_SETUP` via Enable — **Forbidden** (ломает minus freeze / re-runs ENTER sync mid-hold). EXIT → `OFF` (+ clear snapshot) — единственный MVP path перед новым ENTER. In-flight shop-runner setup при стабильном `PENDING_SETUP` (lock) — Allowed и не считается re-ENTER от Enable.
 
 ## Applies to
 
@@ -49,6 +50,7 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Hold: только overspend/guard-подобная защита относительно max CPO; bidder продолжает работать к зафиксированным ЦП.
 - Redis `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project Redis-паттернам (`AdvSettingRedisCache` + `RedisLockManager`).
 - UI и enable только при `bot_active is True` через paid Telegram handlers.
+- Enable from `OFF` (+ stats gate) → `PENDING_SETUP` + Redis ENTER; Enable while already `PENDING_SETUP` / `ACTIVE` → no-op (§10).
 - Enable дополнительно gate’ится на fresh/healthy stats (тот же freshness-класс, что исключает РК из ordinary automation при stale).
 - Setup/hold scheduling для PENDING_SETUP / ACTIVE из полного eligible `advs` (не только `advs_filtred`).
 - Alert/текст при blocked enable: причина + ограничение + `const.SUPPORT_LINK`.
@@ -76,6 +78,7 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Планировать setup/hold **только** из `advs_filtred`, оставляя PENDING без тика при stale stats.
 - Silent enable-fail без причины и без рекомендации со `SUPPORT_LINK`.
 - Excel export/import/apply колонки `card_ab_hold_mode` в MVP (включая enable `pending_setup`/`active` и disable `off` через Excel).
+- Telegram Enable demote `ACTIVE`→`PENDING_SETUP` (или rewrite ENTER / restart force setup sync) while already `PENDING_SETUP` / `ACTIVE`.
 - Прямой setattr / import `card_ab_hold_mode=active` (или `pending_setup`) минуя Telegram ENTER + `process_ab_setup` (§8).
 
 ## Examples
@@ -99,6 +102,7 @@ Bad:
 - UI пишет «можно запускать A/B» сразу после PENDING_SETUP, до sync/snapshot минус-фраз и ACTIVE.
 - Во время ACTIVE продолжает ordinary `update_minus_phrases` recalculation и игнорирует drift от snapshot.
 - Excel import `card_ab_hold_mode=active` (или `pending_setup`) через `can_apply_card_ab_hold_mode_via_excel` + setattr — ACTIVE без ENTER minus sync/snapshot.
+- Telegram Enable на ACTIVE (или повторный Enable на PENDING) demote/rewrite ENTER и заново гоняет force minus sync mid-hold.
 
 ## Related specs
 
@@ -113,6 +117,6 @@ Bad:
 - [x] existing decisions searched
 - [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`)
 - [x] new decision proposed because accepted decision was missing for hold write-path
-- [x] implementation layer matches decision *(delta §9 Excel out — code via `/opsx-apply`)*
+- [x] implementation layer matches decision *(delta §9 Excel out — code via `/opsx-apply`; delta §10 Enable idempotent — code pending `/opsx-apply` / `/opsx-fix-bug GO`)*
 - [x] tests verify structural freeze without masking placement violations
 - [x] paid-only gate enforced for UI and enable paths

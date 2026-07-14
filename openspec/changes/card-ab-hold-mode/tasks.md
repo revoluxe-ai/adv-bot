@@ -81,3 +81,9 @@
 - [x] 10.1 Tests-first: ACTIVE/PENDING + ordinary update → no set_minus + non-success freeze message; OFF → success path.
 - [x] 10.2 `update_minus_phrases` returns skip/status; `wb_update_minus_keywords` uses it for Telegram copy.
 - [x] 10.3 Focused pytest; сверка со scenario Manual bot minus update.
+
+## 11. Telegram Enable idempotent while PENDING/ACTIVE (update — decision §10)
+
+- [ ] 11.1 Tests-first: ACTIVE + Enable → mode stays ACTIVE, no Redis ENTER; PENDING + Enable → mode stays PENDING; OFF + Enable → PENDING + ENTER (paired).
+- [ ] 11.2 `enable_card_ab_hold` / `ui_access`: no-op when mode ∈ {PENDING_SETUP, ACTIVE}; no demote, no ENTER rewrite.
+- [ ] 11.3 Focused pytest; сверка со spec «Telegram Enable is idempotent» / decision §10.

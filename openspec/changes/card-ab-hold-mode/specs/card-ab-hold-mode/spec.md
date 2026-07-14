@@ -177,6 +177,30 @@ Excel roundtrip MUST NOT export, import, or apply the A/B Hold mode setting (`ca
 - **THEN** the campaign mode is left unchanged by Excel apply
 - **AND** EXIT remains available only via the paid Telegram disable path in MVP
 
+### Requirement: Telegram Enable is idempotent while preparing or holding
+When the campaign mode is already `PENDING_SETUP` or `ACTIVE`, the paid Telegram Enable action MUST be a no-op for mode and ENTER signaling: it MUST NOT demote the mode back to `PENDING_SETUP`, MUST NOT write a new Redis ENTER signal, and MUST NOT cause a re-run of ENTER `force_ab_hold_setup_sync` / minus setup sync solely from that Enable press. EXIT (Telegram disable → `OFF` + clear minus snapshot) remains the only in-MVP path back to `OFF` before a new ENTER is allowed. Shop-runner may still continue an in-flight setup while mode stays `PENDING_SETUP` (single-flight lock); that is not a re-ENTER from Enable.
+
+#### Scenario: Enable while ACTIVE does not re-enter
+- **GIVEN** a campaign is in `ACTIVE` A/B Hold with a stored minus-phrase snapshot
+- **WHEN** the user presses Enable on the A/B Hold screen
+- **THEN** the campaign mode remains `ACTIVE`
+- **AND** Redis ENTER is not written for that press
+- **AND** ENTER setup force minus sync is not re-triggered by that press
+
+#### Scenario: Enable while PENDING_SETUP does not restart ENTER
+- **GIVEN** a campaign is in `PENDING_SETUP`
+- **WHEN** the user presses Enable again
+- **THEN** the campaign mode remains `PENDING_SETUP`
+- **AND** Redis ENTER is not rewritten solely to restart ENTER from that press
+- **AND** the UI does not treat the press as a fresh enable from `OFF`
+
+#### Scenario: Enable from OFF still starts ENTER
+- **GIVEN** a campaign is in `OFF` with paid bot management active and stats freshness gate passing
+- **WHEN** the user presses Enable
+- **THEN** the campaign mode becomes `PENDING_SETUP`
+- **AND** Redis ENTER MAY be written
+- **AND** shop-runner setup MAY run the one-time ENTER minus sync → snapshot → `ACTIVE` path
+
 ### Requirement: Enable is blocked when campaign stats freshness fails
 The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through the paid Telegram UI (or any other in-MVP enable write path) when the campaign fails the same statistics freshness / retrieval health class used by shop-runner automation filtering (`_split_advs_by_stats_freshness` / not admitted to the fresh automation set). Excel is not an enable path in MVP. After the mode is already PENDING_SETUP or ACTIVE, setup and hold ticks MUST still be scheduled even if the campaign would be excluded from that fresh set; post-enter stats failures MUST NOT leave the campaign stuck without a setup tick solely due to the freshness filter.
 

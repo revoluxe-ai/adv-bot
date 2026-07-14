@@ -37,7 +37,7 @@
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** minus PG snapshot + restore + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP.
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** minus PG snapshot + restore + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE.
 
 Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
 
@@ -141,7 +141,7 @@ Check-points interrupt: после load и **обязательно до apply**
 
 ### 7. Paid UI write-path
 
-**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие; текст MUST включать freeze минус-фраз / restore / «чтобы изменить минус — отключите A/B Hold»); при клике: gate `bot_active`, **gate stats freshness**, при fail — alert (причина + ограничение + `SUPPORT_LINK`) без PENDING; при ok — PG PENDING_SETUP, Redis ENTER, poll last-abort / **ACTIVE**; UI «можно запускать A/B» только после ACTIVE; «Выключить» → EXIT signal + PG OFF + clear minus snapshot.
+**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие; текст MUST включать freeze минус-фраз / restore / «чтобы изменить минус — отключите A/B Hold»); при клике: gate `bot_active`, **gate stats freshness**, при fail — alert (причина + ограничение + `SUPPORT_LINK`) без PENDING; если mode уже `PENDING_SETUP` или `ACTIVE` — **no-op** (не demote, не Redis ENTER, не re-ENTER force sync; decision §10); при ok и mode `OFF` — PG PENDING_SETUP, Redis ENTER, poll last-abort / **ACTIVE**; UI «можно запускать A/B» только после ACTIVE; «Выключить» → EXIT signal + PG OFF + clear minus snapshot (единственный MVP путь обратно в `OFF` перед новым ENTER).
 
 **Affected records:** KeywordsSetting (status/БС/ЦП) на ENTER; AdvSetting mode field; AdvSetting minus-phrase snapshot field; bidder продолжает писать ставки в HOLD; WB minus set на setup sync / restore.
 
@@ -207,6 +207,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
 - Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
 - Gate: Excel import `active` / `pending_setup` / `off` → mode unchanged; schema has no column.
+- Gate: Enable while ACTIVE/PENDING → mode unchanged, no Redis ENTER rewrite; OFF → PENDING.
 - EXIT → ordinary V3 снова в schedule.
 - Не мокать decision function под тестом; write-gate доказывает фильтрацию до write boundary.
 
@@ -250,5 +251,5 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out of MVP)
-- [x] implementation layer matches decision *(plan delta §9 Excel remove — code via `/opsx-apply`)*
+- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out of MVP + §10 Enable idempotent)
+- [x] implementation layer matches decision *(plan delta §9 Excel remove — applied; §10 Enable idempotent — code via `/opsx-apply` / fix-bug GO)*

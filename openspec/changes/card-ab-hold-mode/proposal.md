@@ -24,7 +24,7 @@
 - **Excel MUST NOT** экспортировать / импортировать / применять `card_ab_hold_mode` в MVP (колонки нет; leftover payload ignored). Идея Excel-колонки — **future**, не текущий контракт.
 - **Включение (enable) дополнительно ограничено здоровьем статы РК:** если кампания не проходит тот же класс проверки свежести/получения статистики, что `_split_advs_by_stats_freshness` / `advs_filtred`, enable MUST NOT выполняться. В UI пользователь MUST сразу видеть **причину**, текст **ограничения** и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в коде нет `ADMIN`; whitelist — `ADMINS`; публичная ссылка — `SUPPORT_LINK`).
 - **После успешного переключения** (PENDING_SETUP / ACTIVE) сбои свежести статы **не** должны блокировать scheduling `process_ab_setup` / `process_ab_hold` (не оставлять вечный PENDING из‑за `advs_filtred`).
-- **ENTER:** система один раз готовит профиль РК (включая минус-фразы), затем переводит кампанию в hold (**ACTIVE**). Прямой `ACTIVE` любым non-setup путём — Forbidden.
+- **ENTER:** система один раз готовит профиль РК (включая минус-фразы), затем переводит кампанию в hold (**ACTIVE**). Прямой `ACTIVE` любым non-setup путём — Forbidden. Telegram Enable при уже `PENDING_SETUP` / `ACTIVE` — **no-op** (не demote в PENDING, не rewrite Redis ENTER, не re-run ENTER force minus sync); новый ENTER только после EXIT → `OFF`.
 - **Критерий setup (ENTER):**
   - PASS: `pay_for_order` ключа **≤ max CPO плана** (не resolve) **и** показов за недельное окно статистики ключа (тот же источник, что в карточке ключа) **≥ 100**;
   - FAIL (иначе, включая отсутствие `pay_for_order`): ключ **OFF** (выключается / снимается с БС);
@@ -73,13 +73,13 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 ### Architecture Decision References
 
 - Relevant accepted: `openspec/decisions/mode-defaults-policy-ownership/decision.md` — дефолт режима A/B Hold (выкл) и related paid/free overlays (в т.ч. minus defaults) принадлежат declarative mode policy overlays, а не transition-helper.
-- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 minus PG snapshot + restore + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, PG vs Redis, paid-only Telegram enable.
+- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 minus PG snapshot + restore + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — Telegram-only enable/disable, enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (PFO ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая; minus sync → PG snapshot → ACTIVE), HOLD (ЦП freeze, биддер ON, minus freeze+restore, guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), UI ready только после ACTIVE, EXIT (снова ЦП + апдейтеры + ordinary minus; clear minus snapshot; без keyword-profile restore), UI-инструкция (текст минус-freeze), **без Excel column**, cross-pod interrupt.
+- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — Telegram-only enable/disable, **Enable idempotent while PENDING/ACTIVE**, enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (PFO ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая; minus sync → PG snapshot → ACTIVE), HOLD (ЦП freeze, биддер ON, minus freeze+restore, guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), UI ready только после ACTIVE, EXIT (снова ЦП + апдейтеры + ordinary minus; clear minus snapshot; без keyword-profile restore), UI-инструкция (текст минус-freeze), **без Excel column**, cross-pod interrupt.
 
 ### Modified Capabilities
 
@@ -87,4 +87,4 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 
 ## Impact
 
-Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path. План снова впереди кода: нужен `/opsx-apply` для delta «Excel out».
+Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path. План опережает код по §10: нужен `/opsx-apply` или `/opsx-fix-bug GO` для Enable idempotent.
