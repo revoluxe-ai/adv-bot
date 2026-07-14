@@ -137,6 +137,8 @@ def test_manager_wires_structural_filter_before_act_writes() -> None:
         "white_list_tail_trimmer",
         "update_individual_keyword_target_places",
         "handle_stats_stale_emergency",
+        "update_minus_phrases_in_advs",
+        "delete_keywords_from_wl_by_mean_auto_ctr",
     )
     for name in wired:
         src = inspect.getsource(getattr(CoroutinesManager, name))
@@ -205,3 +207,4 @@ def test_enter_poll_status_lines_for_abort_and_pending() -> None:
         abort_can_continue=None,
     )
     assert "pending_setup" in pending
+    assert "можно запускать A/B" not in pending.lower()

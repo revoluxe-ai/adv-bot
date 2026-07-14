@@ -64,6 +64,8 @@ _REQUIRED_INSTRUCTION_PHRASES = (
     "HOLD",
     "EXIT",
     "биддер",
+    "минус-фразы фиксируются",
+    "отключите A/B Hold",
 )
 
 
