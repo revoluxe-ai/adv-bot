@@ -739,6 +739,16 @@ class AdvSetting(BaseTable):
         server_default=text("'off'"),
         comment="A/B Hold mode: off | pending_setup | active (spec card-ab-hold-mode)",
     )
+    card_ab_hold_minus_phrases_snapshot: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+        server_default=text("'[]'"),
+        comment=(
+            "A/B Hold PG snapshot минус-фраз [{adv_id, nmid, phrases[]}] "
+            "(spec card-ab-hold-mode §8)"
+        ),
+    )
 
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
