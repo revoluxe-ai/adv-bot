@@ -160,8 +160,14 @@ def test_ab_hold_callback_answers_within_telegram_limit(answer: str) -> None:
 
 @pytest.mark.unit
 def test_ab_hold_screen_keyboard_shape_and_callback_data_bytes() -> None:
-    """Клавиатура: 3 кнопки; callback_data ≤ 64 байт на worst-case adv_id."""
-    kb = handlers._screen_keyboard(_WORST_CASE_ADV_SETTING_ID)
+    """Клавиатура OFF: 3 кнопки; callback_data ≤ 64 байт на worst-case adv_id.
+
+    Decision §11: полная клавиатура (Enable+Disable+Back) — только при ``OFF``;
+    это worst-case для проверки лимита callback_data всех трёх callback-типов.
+    """
+    kb = handlers._screen_keyboard(
+        _WORST_CASE_ADV_SETTING_ID, CardAbHoldMode.OFF
+    )
     rows = kb.inline_keyboard
     assert len(rows) == 3
     assert [btn.text for row in rows for btn in row] == [
