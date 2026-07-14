@@ -33,6 +33,17 @@ def _write_config(root: Path, data: dict) -> Path:
     return config_path
 
 
+def _write_openspec_config(root: Path, data: dict) -> Path:
+    """Пишет test-only openspec/config.yaml для проверки section guard."""
+    config_path = root / "openspec" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    return config_path
+
+
 def _base_config() -> dict:
     """Возвращает минимальный guard config, пригодный для большинства tests."""
     return {
@@ -65,6 +76,37 @@ def _base_config() -> dict:
     }
 
 
+def _config_section_guard_config() -> dict:
+    """Возвращает guard config с лимитами для openspec/config.yaml sections."""
+    config_data = _base_config()
+    config_data["artifact_limits"] = [
+        {
+            "pattern": "openspec/config.yaml",
+            "green_chars": 1000,
+            "warn_chars": 2000,
+            "fail_chars": 2001,
+        }
+    ]
+    config_data["config_section_limits"] = {
+        "context": {
+            "green_chars": 5,
+            "warn_chars": 9,
+            "fail_chars": 10,
+        },
+        "rules": {
+            "green_chars": 10,
+            "warn_chars": 20,
+            "fail_chars": 21,
+        },
+        "rules.*": {
+            "green_chars": 5,
+            "warn_chars": 9,
+            "fail_chars": 10,
+        },
+    }
+    return config_data
+
+
 def test_load_config_parses_valid_yaml(tmp_path: Path) -> None:
     """Проверяет, что valid YAML превращается в typed guard config."""
     mod = _load_guard_module()
@@ -85,6 +127,24 @@ def test_invalid_yaml_exits_2(tmp_path: Path) -> None:
     config_path.write_text("token_estimate: [", encoding="utf-8")
 
     assert mod.run(["--strict"], config_path=config_path, repo_root=tmp_path) == 2
+
+
+def test_invalid_openspec_config_yaml_exits_2(tmp_path: Path) -> None:
+    """Фиксирует exit code 2 для битого openspec/config.yaml."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    target = tmp_path / "openspec" / "config.yaml"
+    target.parent.mkdir(parents=True)
+    target.write_text("context: [", encoding="utf-8")
+
+    assert (
+        mod.run(
+            ["--file", "openspec/config.yaml", "--strict"],
+            config_path=config_path,
+            repo_root=tmp_path,
+        )
+        == 2
+    )
 
 
 def test_counts_utf8_russian_chars_and_estimates_tokens(tmp_path: Path) -> None:
@@ -230,6 +290,139 @@ def test_file_cli_checks_single_path(tmp_path: Path) -> None:
     (workflow_dir / "ok.md").write_text("abc", encoding="utf-8")
 
     assert mod.run(["--file", "workflow/ok.md", "--strict"], config_path=config_path, repo_root=tmp_path) == 0
+
+
+def test_config_context_section_warn_and_fail(tmp_path: Path) -> None:
+    """Проверяет WARN и FAIL budgets для openspec/config.yaml::context."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    target = _write_openspec_config(tmp_path, {"context": "123456"})
+    config = mod.load_config(config_path)
+
+    warn_result = {
+        result.name: result for result in mod.check_config_sections(config, target)
+    }["openspec/config.yaml::context"]
+    target = _write_openspec_config(tmp_path, {"context": "1234567890"})
+    fail_result = {
+        result.name: result for result in mod.check_config_sections(config, target)
+    }["openspec/config.yaml::context"]
+
+    assert warn_result.status == "WARN"
+    assert fail_result.status == "FAIL"
+
+
+def test_config_rules_total_section_warn_and_fail(tmp_path: Path) -> None:
+    """Проверяет WARN и FAIL budgets для openspec/config.yaml::rules."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    target = _write_openspec_config(tmp_path, {"rules": {"alpha": "1"}})
+    config = mod.load_config(config_path)
+
+    warn_result = {
+        result.name: result for result in mod.check_config_sections(config, target)
+    }["openspec/config.yaml::rules"]
+    target = _write_openspec_config(
+        tmp_path,
+        {"rules": {"alpha": "1", "beta": "2"}},
+    )
+    fail_result = {
+        result.name: result for result in mod.check_config_sections(config, target)
+    }["openspec/config.yaml::rules"]
+
+    assert warn_result.status == "WARN"
+    assert fail_result.status == "FAIL"
+
+
+def test_config_rules_artifact_section_warn_and_fail(tmp_path: Path) -> None:
+    """Проверяет WARN и FAIL budgets для rules.<artifact> pseudo-targets."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    target = _write_openspec_config(
+        tmp_path,
+        {
+            "rules": {
+                "alpha": "123456",
+                "beta": "1234567890",
+            }
+        },
+    )
+    config = mod.load_config(config_path)
+
+    results = {
+        result.name: result for result in mod.check_config_sections(config, target)
+    }
+
+    assert results["openspec/config.yaml::rules.alpha"].status == "WARN"
+    assert results["openspec/config.yaml::rules.beta"].status == "FAIL"
+
+
+def test_config_missing_optional_sections_do_not_fail(tmp_path: Path) -> None:
+    """Проверяет, что отсутствие optional context/rules не создает section errors."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    _write_openspec_config(tmp_path, {"other": "value"})
+    config = mod.load_config(config_path)
+
+    results = mod.check_file(config, tmp_path, Path("openspec/config.yaml"))
+
+    assert [result.name for result in results] == ["openspec/config.yaml"]
+    assert all(result.status != "FAIL" for result in results)
+
+
+def test_config_whole_file_and_section_results_are_both_present(
+    tmp_path: Path,
+) -> None:
+    """Доказывает, что whole-file artifact check не заменен section checks."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    _write_openspec_config(
+        tmp_path,
+        {
+            "context": "abc",
+            "rules": {"verify": "abc"},
+        },
+    )
+    config = mod.load_config(config_path)
+
+    names = [
+        result.name
+        for result in mod.check_file(config, tmp_path, Path("openspec/config.yaml"))
+    ]
+
+    assert names == [
+        "openspec/config.yaml",
+        "openspec/config.yaml::context",
+        "openspec/config.yaml::rules",
+        "openspec/config.yaml::rules.verify",
+    ]
+
+
+def test_file_cli_includes_config_sections(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Проверяет, что --file openspec/config.yaml выводит section pseudo-targets."""
+    mod = _load_guard_module()
+    config_path = _write_config(tmp_path, _config_section_guard_config())
+    _write_openspec_config(
+        tmp_path,
+        {
+            "context": "abc",
+            "rules": {"verify": "abc"},
+        },
+    )
+
+    exit_code = mod.run(
+        ["--file", "openspec/config.yaml", "--strict"],
+        config_path=config_path,
+        repo_root=tmp_path,
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "path=openspec/config.yaml " in output
+    assert "path=openspec/config.yaml::context " in output
+    assert "path=openspec/config.yaml::rules.verify " in output
 
 
 def test_cli_misuse_exits_2(tmp_path: Path) -> None:

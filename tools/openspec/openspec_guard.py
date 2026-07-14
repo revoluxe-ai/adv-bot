@@ -17,6 +17,8 @@ EXIT_FAIL = 1
 EXIT_ERROR = 2
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().with_name("openspec_guard.yaml")
 DEFAULT_REPO_ROOT = Path(__file__).resolve().parents[2]
+OPENSPEC_CONFIG_REL_PATH = "openspec/config.yaml"
+RULES_ARTIFACT_LIMIT_KEY = "rules.*"
 STATUS_GREEN = "GREEN"
 STATUS_WARN = "WARN"
 STATUS_FAIL = "FAIL"
@@ -89,6 +91,7 @@ class GuardConfig:
     fail_on_broken_glob: bool
     artifact_limits: tuple[ArtifactLimit, ...]
     artifact_baselines: Mapping[str, Baseline]
+    config_section_limits: Mapping[str, SizeLimit]
     scenarios: Mapping[str, Scenario]
 
 
@@ -255,6 +258,13 @@ def load_config(config_path: Path) -> GuardConfig:
             default_growth,
         )
 
+    config_section_limits: dict[str, SizeLimit] = {}
+    for name, item in _as_mapping(root.get("config_section_limits", {}), "config_section_limits").items():
+        config_section_limits[str(name)] = _load_limit(
+            _as_mapping(item, f"config_section_limits.{name}"),
+            f"config_section_limits.{name}",
+        )
+
     scenario_defaults = _as_mapping(root.get("scenario_defaults", {}), "scenario_defaults")
     default_scenario_limit = _load_limit(scenario_defaults, "scenario_defaults")
     default_reserved = _load_reserved_chars(
@@ -297,6 +307,7 @@ def load_config(config_path: Path) -> GuardConfig:
         fail_on_broken_glob=fail_on_broken_glob,
         artifact_limits=tuple(artifact_limits),
         artifact_baselines=artifact_baselines,
+        config_section_limits=config_section_limits,
         scenarios=scenarios,
     )
 
@@ -314,6 +325,84 @@ def read_chars(path: Path) -> int:
         raise ReadError(f"cannot decode {path} as UTF-8: {exc}") from exc
     except OSError as exc:
         raise ReadError(f"cannot read {path}: {exc}") from exc
+
+
+def _read_yaml_mapping(path: Path, label: str) -> Mapping[str, Any]:
+    """Read a UTF-8 YAML file and return its root mapping."""
+    try:
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ReadError(f"cannot decode {path} as UTF-8: {exc}") from exc
+    except yaml.YAMLError as exc:
+        raise ReadError(f"invalid YAML in {label}: {exc}") from exc
+    except OSError as exc:
+        raise ReadError(f"cannot read {path}: {exc}") from exc
+    return _as_mapping(loaded, label)
+
+
+def _section_chars(value: Any) -> int:
+    """Count a parsed YAML section using stable text serialization."""
+    if isinstance(value, str):
+        return len(value)
+    return len(yaml.safe_dump(value, allow_unicode=True, sort_keys=True))
+
+
+def _limit_for_config_section(config: GuardConfig, section_name: str) -> SizeLimit:
+    """Find the YAML-configured limit for a config section pseudo-target."""
+    limit = config.config_section_limits.get(section_name)
+    if limit is not None:
+        return limit
+    if section_name.startswith("rules."):
+        wildcard_limit = config.config_section_limits.get(RULES_ARTIFACT_LIMIT_KEY)
+        if wildcard_limit is not None:
+            return wildcard_limit
+    raise ConfigError(f"missing config_section_limits entry for {section_name}")
+
+
+def _result_for_config_section(
+    config: GuardConfig,
+    section_name: str,
+    value: Any,
+) -> CheckResult:
+    """Build one OpenSpec config section check result."""
+    chars = _section_chars(value)
+    limit = _limit_for_config_section(config, section_name)
+    status, reason = _evaluate_status(chars, limit, None)
+    return CheckResult(
+        kind="section",
+        name=f"{OPENSPEC_CONFIG_REL_PATH}::{section_name}",
+        status=status,
+        chars=chars,
+        estimated_tokens=estimate_tokens(chars, config.chars_per_token),
+        reason=reason,
+    )
+
+
+def check_config_sections(config: GuardConfig, config_path: Path) -> list[CheckResult]:
+    """Check optional section budgets inside openspec/config.yaml."""
+    data = _read_yaml_mapping(config_path, OPENSPEC_CONFIG_REL_PATH)
+    results: list[CheckResult] = []
+
+    context = data.get("context")
+    if context is not None:
+        results.append(_result_for_config_section(config, "context", context))
+
+    rules = data.get("rules")
+    if rules is None:
+        return results
+    if not isinstance(rules, Mapping):
+        raise ReadError(f"{OPENSPEC_CONFIG_REL_PATH}::rules must be a mapping.")
+
+    results.append(_result_for_config_section(config, "rules", rules))
+    for artifact_name in sorted(rules):
+        results.append(
+            _result_for_config_section(
+                config,
+                f"rules.{artifact_name}",
+                rules[artifact_name],
+            )
+        )
+    return results
 
 
 def _expand_pattern(
@@ -393,6 +482,8 @@ def check_artifacts(config: GuardConfig, repo_root: Path) -> list[CheckResult]:
                 continue
             seen.add(path)
             results.append(_result_for_artifact(path, repo_root, config, artifact_limit))
+            if _normalize_rel_path(path, repo_root) == OPENSPEC_CONFIG_REL_PATH:
+                results.extend(check_config_sections(config, path))
     return results
 
 
@@ -409,7 +500,10 @@ def check_file(config: GuardConfig, repo_root: Path, file_path: Path) -> list[Ch
             fail_on_broken_glob=config.fail_on_broken_glob,
         )
         if target in matches:
-            return [_result_for_artifact(target, repo_root, config, artifact_limit)]
+            results = [_result_for_artifact(target, repo_root, config, artifact_limit)]
+            if _normalize_rel_path(target, repo_root) == OPENSPEC_CONFIG_REL_PATH:
+                results.extend(check_config_sections(config, target))
+            return results
 
     rel_path = _normalize_rel_path(target, repo_root)
     raise ConfigError(f"file is outside configured artifact limits: {rel_path}")

@@ -78,6 +78,11 @@ artifact_baselines:
     allowed_growth_chars: 0
     status: WARN
 
+  ".cursor/commands/opsx-learn-from-bug.md":
+    baseline_chars: 13325
+    allowed_growth_chars: 0
+    status: WARN
+
   ".cursor/commands/opsx-onboard.md":
     baseline_chars: 14605
     allowed_growth_chars: 0
@@ -148,6 +153,22 @@ artifact_baselines:
     allowed_growth_chars: 0
     status: WARN
 
+config_section_limits:
+  context:
+    green_chars: 3000
+    warn_chars: 4000
+    fail_chars: 4001
+
+  rules:
+    green_chars: 10000
+    warn_chars: 14000
+    fail_chars: 14001
+
+  "rules.*":
+    green_chars: 2500
+    warn_chars: 3500
+    fail_chars: 3501
+
 scenario_defaults:
   green_chars: 60000
   warn_chars: 80000
@@ -159,7 +180,7 @@ scenario_defaults:
 
 scenarios:
   opsx_propose:
-    baseline_chars: 72816
+    baseline_chars: 73017
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
@@ -172,7 +193,7 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_continue:
-    baseline_chars: 71269
+    baseline_chars: 71471
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
@@ -185,13 +206,34 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_update:
-    baseline_chars: 72800
+    baseline_chars: 73000
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
       - "openspec/schemas/**/schema.yaml"
       - "openspec/schemas/**/templates/*.md"
       - ".cursor/commands/opsx-update.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_ff:
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - "openspec/schemas/**/templates/*.md"
+      - ".cursor/commands/opsx-ff.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_sync:
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - ".cursor/commands/opsx-sync.md"
       - ".cursor/rules/architecture-decisions.mdc"
       - ".cursor/rules/documentation.mdc"
       - ".cursor/rules/rules-management.mdc"
