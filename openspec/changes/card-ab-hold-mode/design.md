@@ -50,7 +50,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 - PG durable minus-phrase snapshot на кампании (новое поле, **новая migration**): SoT зафиксированного набора для freeze/restore; Redis не SoT snapshot.
 - Minus freeze path: setup sync → snapshot; во время PENDING/ACTIVE — без ordinary `update_minus_phrases` recalculation; при drift — restore snapshot на WB (owner: A/B Hold path + gate на `MinusPhraseManager` / manager coroutine).
 - Redis coordination layer: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project patterns.
-- Paid UI / handlers: **единственный** enable/disable write-path MVP; экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**.
+- Paid UI / handlers: **единственный** enable/disable write-path MVP; экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**. Manual «Обновить минус-слова» при PENDING/ACTIVE: manager skip → Telegram non-success (blocked / отключите A/B Hold), не «Минус-слова обновлены».
 - Mode policy overlays: default «выкл».
 - Excel schema: **remove** `card_ab_hold_mode` EDIT column; import ignore/no-op если поле всё же пришло; `can_apply_card_ab_hold_mode_via_excel` → always deny non-absent / remove enable path.
 

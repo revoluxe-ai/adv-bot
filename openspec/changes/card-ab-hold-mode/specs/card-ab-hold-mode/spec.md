@@ -98,6 +98,15 @@ While a campaign is preparing or holding for A/B Hold (PENDING_SETUP or ACTIVE),
 - **WHEN** ordinary minus-phrase auto-update would recalculate the set
 - **THEN** that ordinary recalculation path does not apply a new calculated set for that campaign
 
+#### Scenario: Manual bot minus update does not report success during freeze
+- **GIVEN** a campaign is in PENDING_SETUP or ACTIVE A/B Hold
+- **WHEN** the user triggers the bot action to refresh/update minus phrases
+  («Обновить минус-слова» / ordinary `update_minus_phrases` without setup force)
+- **THEN** the ordinary path does not apply a new minus set to Wildberries
+- **AND** the UI does not report that minus phrases were successfully updated
+- **AND** the UI informs the user that minus phrases are fixed and that
+  changing them requires disabling A/B Hold
+
 #### Scenario: Drift from snapshot is restored
 - **GIVEN** a campaign is in ACTIVE A/B Hold with a stored minus-phrase snapshot
 - **AND** current Wildberries minus phrases differ from that snapshot

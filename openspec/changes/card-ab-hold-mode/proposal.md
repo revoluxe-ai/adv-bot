@@ -31,7 +31,7 @@
   - для PASS: целевая позиция фиксируется на **текущей** позиции; состав БС после setup считается зафиксированным;
   - **минус-фразы:** сначала успешно довести до актуального состояния (одна setup sync/mutation, не ordinary recalculation loop); сохранить snapshot в PG (**новая Alembic migration**); только после этого (и остального setup) mode MAY → **ACTIVE**.
 - **UI readiness:** интерфейс MUST NOT сообщать, что режим включён и можно запускать A/B, пока mode ≠ **ACTIVE** после полного setup (включая минус + snapshot). PENDING / «запрос принят» без ACTIVE — не «можно тестировать»; координация исключает гонку с незавершённым setup.
-- **HOLD:** целевые позиции остаются теми, что зафиксированы на ENTER; **обновление целевых позиций выключено**; **биддер продолжает работать**; структурные изменения БС / разгон / enable ключей не выполняются; ordinary recalculation минус-фраз **не** выполняется; при drift от PG snapshot — restore на WB (ручные правки = нарушение freeze); допускаются только защиты от перерасхода относительно max CPO.
+- **HOLD:** целевые позиции остаются теми, что зафиксированы на ENTER; **обновление целевых позиций выключено**; **биддер продолжает работать**; структурные изменения БС / разгон / enable ключей не выполняются; ordinary recalculation минус-фраз **не** выполняется; при drift от PG snapshot — restore на WB (ручные правки = нарушение freeze); допускаются только защиты от перерасхода относительно max CPO; manual bot refresh «Обновить минус-слова» при freeze MUST NOT врать success — MUST сообщить blocked / отключите A/B Hold.
 - **EXIT:** режим снимается (Telegram disable) — снова **включается обновление целевых позиций**, ordinary structural апдейтеры и ordinary minus auto-update; PG minus snapshot clear/archive; restore keyword-profile / Excel snapshot **не** требуется.
 - Координация между bot-подом и shop-runner-подом идёт через Redis-сигнал прерывания: текущий normal-тик может быть остановлен до apply с ответом «остановлено, безопасно, можно продолжать».
 - В справке MUST быть: перед включением прогреть РК с не зажатым max CPO и запасом плана продаж; полки рекомендуется выключить (не hard block); не менять цену на период теста; **«Во время A/B Hold минус-фразы фиксируются. Ручные изменения в кабинете WB могут быть возвращены ботом к зафиксированному состоянию. Чтобы изменить минус-фразы, отключите A/B Hold.»**
@@ -41,7 +41,7 @@
 - Paid-only access: UI скрыт при `bot_active is False`; Telegram enable/disable гейтятся тем же условием.
 - Enable gate на freshness/health статы РК + явный UI-ответ (причина, ограничение, `SUPPORT_LINK`).
 - После PENDING/ACTIVE: setup/hold не зависят от `advs_filtred` freshness filter.
-- Paid bot UI: экран инструкции (вкл. текст минус-freeze) + вкл/выкл; ready-to-test только после ACTIVE.
+- Paid bot UI: экран инструкции (вкл. текст минус-freeze) + вкл/выкл; ready-to-test только после ACTIVE; honest UX на manual minus refresh при freeze (не «Минус-слова обновлены»).
 - Состояния режима кампании (выкл / подготовка / активен).
 - Setup ENTER + hold + exit для V3 (paid automation), включая minus sync → PG snapshot → ACTIVE.
 - PG durable minus-phrase snapshot (**новая migration**) + restore-on-drift + clear на EXIT.
