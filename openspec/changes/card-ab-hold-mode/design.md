@@ -4,7 +4,7 @@
 
 Сегодня ordinary V3 (`adv_settings_auto_update` → `process_adv_v3`) и параллельные ACT-корутины (whitelist top-key, individual target place, emergency, и т.д.) могут менять ключи/БС/ЦП в любой тик. Bot и shop-runner крутятся в разных подах — нужен Redis cooperative interrupt, чтобы ENTER не смешался с уже идущим normal apply.
 
-Стек: Python 3.11, SQLAlchemy + PostgreSQL, Redis (паттерн `AdvSettingRedisCache` / `RedisCacheBase`, lock через `RedisLockManager`), Telegram paid UI, Excel roundtrip. Режим — paid automation core: UI и enable только при `bot_active is True`.
+Стек: Python 3.11, SQLAlchemy + PostgreSQL, Redis (паттерн `AdvSettingRedisCache` / `RedisCacheBase`, lock через `RedisLockManager`), Telegram paid UI. Режим — paid automation core: enable/disable только через Telegram при `bot_active is True`. Excel roundtrip **не** является write-path режима в MVP (future).
 
 ## Goals / Non-Goals
 
@@ -17,12 +17,12 @@
 - UI readiness: «режим включён / можно запускать A/B» только после ACTIVE (полный setup, в т.ч. минус + snapshot); не на PENDING; без гонки.
 - EXIT: снова обновление ЦП + ordinary апдейтеры + ordinary minus auto-update; clear/archive PG minus snapshot; без restore keyword-profile / Excel snapshot.
 - Cross-pod Redis: signal ENTER/EXIT, last-abort ack, setup lock NX.
-- Paid-only UI (скрыть при `bot_active is False`) + reject enable.
+- Paid-only Telegram UI (скрыть при `bot_active is False`) + reject enable.
 - Enable gate на stats freshness/health (тот же класс, что `advs_filtred`); UI: причина + ограничение + `const.SUPPORT_LINK`.
 - После PENDING/ACTIVE: setup/hold scheduling не зависит от попадания в `advs_filtred`.
-- Excel-колонка режима (paid-only + freshness gate).
+- **Excel: колонка/apply `card_ab_hold_mode` убраны из MVP** (ignore leftover payload; future option).
 - Instruction: минус-фразы фиксируются; ручные правки в WB MAY быть возвращены; изменить минус → отключить A/B Hold.
-- Tests-first gates: structural freeze, minus snapshot/restore, UI not-ready on PENDING, paid visibility, interrupt до apply, freshness enable + post-enter schedule.
+- Tests-first gates: structural freeze, minus snapshot/restore, UI not-ready on PENDING, paid visibility, interrupt до apply, freshness enable + post-enter schedule + Excel ignore.
 
 **Non-Goals:**
 
@@ -30,13 +30,14 @@
 - Free path / enable при `bot_active is False`.
 - Переписывание ordinary V3 preamble вне отдельного hold/setup path.
 - Обязательный Excel backup / restore keyword-settings при EXIT (минус snapshot — отдельный freeze-механизм, не Excel backup).
+- **Excel enable/disable/edit A/B Hold** — future / out of MVP (идея сохранена; текущий контракт — только Telegram).
 
 ## Architecture Decision References
 
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** minus PG snapshot + restore + UI readiness только после ACTIVE.
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** minus PG snapshot + restore + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP.
 
 Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
 
@@ -49,9 +50,9 @@ Architecture Decision Missing: нет (для этого change placement зак
 - PG durable minus-phrase snapshot на кампании (новое поле, **новая migration**): SoT зафиксированного набора для freeze/restore; Redis не SoT snapshot.
 - Minus freeze path: setup sync → snapshot; во время PENDING/ACTIVE — без ordinary `update_minus_phrases` recalculation; при drift — restore snapshot на WB (owner: A/B Hold path + gate на `MinusPhraseManager` / manager coroutine).
 - Redis coordination layer: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project patterns.
-- Paid UI / handlers: экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**.
+- Paid UI / handlers: **единственный** enable/disable write-path MVP; экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**.
 - Mode policy overlays: default «выкл».
-- Excel schema: EDIT-колонка режима, apply только paid **и** при прохождении freshness gate.
+- Excel schema: **remove** `card_ab_hold_mode` EDIT column; import ignore/no-op если поле всё же пришло; `can_apply_card_ab_hold_mode_via_excel` → always deny non-absent / remove enable path.
 
 **Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (или единый dispatcher), ACT structural guards на whitelist/target-place/emergency/minus ordinary recalc, hold guard executors (overspend / PFO > max), minus restore-to-snapshot, bidder/cluster bids, Apply path только для setup/hold allowed mutations.
 
@@ -63,8 +64,10 @@ Architecture Decision Missing: нет (для этого change placement зак
 - Structural ACT (БС / ЦП update / enable / ordinary minus recalculation) во время PENDING_SETUP / ACTIVE.
 - UI «можно запускать A/B» на PENDING_SETUP или до успешного minus snapshot.
 - Redis как единственный source of truth режима или minus snapshot без PG.
+- Excel export/import/apply `card_ab_hold_mode` (вкл. direct ACTIVE / PENDING / OFF).
+- Любой non-setup переход в ACTIVE (§8 / §9).
 
-**Rationale:** соответствует proposed `card-ab-hold-write-path-ownership` (§3 + §8) и accepted `mode-defaults-policy-ownership`.
+**Rationale:** соответствует proposed `card-ab-hold-write-path-ownership` (§3 + §8 + §9) и accepted `mode-defaults-policy-ownership`.
 
 ## Decisions
 
@@ -86,7 +89,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 ### 2a. Stats freshness gate на enable (не на post-enter)
 
-**Выбор:** enable (UI / Excel / любой write → PENDING) MUST NOT, если РК не проходит freshness/health класс `_split_advs_by_stats_freshness` (не попала бы в fresh automation set). UI при блокировке MUST сразу показать: (1) причину, (2) что включение теста ограничено, (3) рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK`. В репозитории нет `const.ADMIN`; whitelist админов — `const.ADMINS`; публичная ссылка для пользователя — `SUPPORT_LINK` (как в других handler’ах: «обратитесь в поддержку → {SUPPORT_LINK}»).
+**Выбор:** enable (**Telegram UI only** → PENDING) MUST NOT, если РК не проходит freshness/health класс `_split_advs_by_stats_freshness` (не попала бы в fresh automation set). UI при блокировке MUST сразу показать: (1) причину, (2) что включение теста ограничено, (3) рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK`. В репозитории нет `const.ADMIN`; whitelist админов — `const.ADMINS`; публичная ссылка для пользователя — `SUPPORT_LINK` (как в других handler’ах: «обратитесь в поддержку → {SUPPORT_LINK}»). Excel не enable-path в MVP.
 
 **Почему:** ENTER/setup на «мёртвой» стате даёт массовый FAIL→OFF и грязный старт теста; после входа блокировать hold/setup freshness’ом хуже, чем слабее overspend на stale.
 
@@ -148,6 +151,14 @@ Check-points interrupt: после load и **обязательно до apply**
 
 Default OFF через mode overlays (`mode-defaults-policy-ownership`); free overlay удерживает OFF / не включает режим.
 
+### 9. Excel out of MVP (decision §9)
+
+**Выбор:** убрать `card_ab_hold_mode` из Excel schema export/import/apply целиком. Leftover payload → ignore. Future change может вернуть колонку с корректным path только → PENDING (не ACTIVE) + interrupt/setup; сейчас — out.
+
+**Почему:** prod bug — Excel `active` обходил ENTER minus sync+snapshot; `process_ab_setup` не бежит на ACTIVE; restore/ready врут. Полное удаление из Excel проще и безопаснее coercion.
+
+**Альтернатива:** coerce Excel enable → `pending_setup` only — отклонена пользователем (убераем Excel совсем на сейчас).
+
 ## Affected components (ориентир)
 
 - PG migration #1 (уже): поле режима на кампании + default OFF.
@@ -155,7 +166,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Shop-runner: dispatcher `adv_settings_auto_update`; setup/hold pipelines (вкл. minus sync+snapshot); interrupt checks; ACT guards (top-key WL, individual TP, WL trim non-v3, stats emergency structural, ordinary minus recalc); minus restore-on-drift.
 - Redis caches + lock.
 - Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE.
-- Excel roundtrip schema/column.
+- Excel roundtrip: **remove** column + ignore apply for `card_ab_hold_mode`.
 - Unit/gate tests (`ab_hold_gates` по духу `bot_active_gates`).
 
 ## Side effects
@@ -164,14 +175,16 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - HOLD снижает «подстройку» экономики (нет calibraton/enable) — ожидаемо для теста.
 - Bidder продолжает траты по зафиксированным позициям.
 - Ручные правки минус-фраз в WB/боте во время hold будут перезаписаны snapshot’ом.
+- Пользователи больше не смогут включать/выключать A/B Hold через Excel (только Telegram).
 
 ## Access guards
 
 | Path | Gate |
 |------|------|
-| UI / enable / Excel apply | `bot_active is True` **и** stats freshness/health pass |
+| UI / enable | `bot_active is True` **и** stats freshness/health pass |
 | UI enable blocked by stats | show reason + restriction + `const.SUPPORT_LINK` |
 | UI ready-to-test copy | mode == ACTIVE after full setup (incl. minus snapshot) |
+| Excel apply `card_ab_hold_mode` | **MUST NOT** (ignore / no column) |
 | Ordinary V3 schedule | mode == OFF |
 | A/B setup / hold schedule | mode PENDING/ACTIVE; **не** требовать `advs_filtred` |
 | Structural ACT (WL/TP/enable/emergency keys) | mode not in PENDING_SETUP, ACTIVE |
@@ -179,6 +192,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 | Minus restore-to-snapshot | PENDING_SETUP / ACTIVE when drift detected |
 | Bidder / cluster bids | allowed if paid bot+bidder flags as today |
 | Hold guards | ACTIVE only |
+| Non-setup ACTIVE write | Forbidden |
 
 ## Validation plan
 
@@ -192,6 +206,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Gate: `bot_active=False` → UI hidden / enable no-op.
 - Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
 - Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
+- Gate: Excel import `active` / `pending_setup` / `off` → mode unchanged; schema has no column.
 - EXIT → ordinary V3 снова в schedule.
 - Не мокать decision function под тестом; write-gate доказывает фильтрацию до write boundary.
 
@@ -208,16 +223,18 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [Risk] In-flight normal уже в apply при клике. → Mitigation: signal + check before apply; UI «Подготовка…»; короткий poll timeout.
 - [Risk] Пропущенный ACT без guard (вкл. minus). → Mitigation: gate-suite + decision Forbidden; review `update_minus_phrases_in_advs`.
 - [Risk] UI сообщает ready на PENDING. → Mitigation: poll только ACTIVE; decision §8 Forbidden; paired UI test.
+- [Risk] Excel → ACTIVE без snapshot (prod). → Mitigation: decision §9 — remove Excel column/apply entirely; regression tests import ignore.
 - [Risk] Пользователь путает с Safe mode. → Mitigation: отдельный UI/название A/B Hold; out of scope Safe mode.
 - [Risk] Setup/hold на stale после enter слабее охраняют overspend. → Acceptable trade-off vs stuck PENDING; enable уже отрезал «холодный» вход.
 - [Risk] Restore минус перезапишет осознанную ручную правку. → Acceptable: инструкция + «чтобы менять минус — отключите Hold».
+- [Risk] Нет Excel bulk enable. → Acceptable MVP; Telegram-only; Excel return = future change.
 
 ## Migration Plan
 
 1. Deploy migration режима (field default OFF) — уже в change.
 2. Deploy **новая** migration minus-phrase snapshot field — no freeze behavior until runner/UI wired.
 3. Deploy runner (setup snapshot + restore + gate ordinary minus) + Redis + UI (instruction + ready after ACTIVE).
-4. Rollout paid UI entry.
+4. Rollout paid UI entry; **remove** Excel `card_ab_hold_mode` column/apply if still present.
 5. Rollback: mode OFF + disable UI; clear snapshots; Redis TTL cleanup; ordinary V3 / minus без exclusion.
 
 ## Open Questions
@@ -227,10 +244,11 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 3. ~~Hold guard executors~~ — **Resolved MVP:** hold использует deep-overspend + PFO>max OFF (`hold_guards.py`), без resolve clamp / без полного `ResetOverMaxCpo` ladder trim. Полный V3 executor pair — optional follow-up, не blocker archive.
 4. ~~Setup vs stale `advs_filtred`~~ — **Resolved (update):** enable блокируется freshness/health статы + UI reason/`SUPPORT_LINK`; после PENDING/ACTIVE setup/hold schedule из полного `advs`, не только `advs_filtred`.
 5. ~~Minus freeze storage~~ — **Resolved (update):** durable PG snapshot на кампании (новая migration); sync→snapshot до ACTIVE; restore on drift; clear/archive on EXIT.
+6. ~~Excel A/B Hold column~~ — **Resolved (update):** убрать из Excel schema/apply в MVP (decision §9); enable/disable только Telegram; future option отдельно.
 
 ## Review Checklist
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен stats freshness asymmetry + §8 minus freeze / UI readiness)
-- [x] implementation layer matches decision *(plan delta: minus snapshot + restore + UI ready after ACTIVE — code via `/opsx-apply`)*
+- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out of MVP)
+- [x] implementation layer matches decision *(plan delta §9 Excel remove — code via `/opsx-apply`)*

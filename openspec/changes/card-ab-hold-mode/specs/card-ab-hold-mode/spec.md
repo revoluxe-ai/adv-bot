@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: A/B Hold is paid-only
-The system MUST expose and enable the card A/B Hold mode only for campaigns with paid bot management active. When paid bot management is inactive, the A/B Hold entry MUST be hidden and enable MUST NOT be executed through UI, Excel, or other write paths.
+The system MUST expose and enable the card A/B Hold mode only for campaigns with paid bot management active, and only through the paid Telegram UI enable/disable path in MVP. When paid bot management is inactive, the A/B Hold entry MUST be hidden and enable MUST NOT be executed. Excel roundtrip MUST NOT be an enable, disable, or edit path for A/B Hold mode in MVP.
 
 #### Scenario: Inactive bot hides A/B Hold
 - **GIVEN** a campaign does not have paid bot management active
@@ -147,21 +147,34 @@ When A/B Hold is disabled, the system MUST leave the held keyword profile as-is 
 - **AND** the PostgreSQL minus-phrase snapshot is cleared or archived
 - **AND** the system does not restore a previous keyword-settings snapshot as part of exit
 
-### Requirement: Excel exposes A/B Hold only for paid campaigns
-Excel roundtrip MUST allow editing the A/B Hold mode setting only for campaigns with paid bot management active. For inactive paid bot management, Excel MUST NOT apply A/B Hold enable.
+### Requirement: Excel MUST NOT expose or apply A/B Hold mode
+Excel roundtrip MUST NOT export, import, or apply the A/B Hold mode setting (`card_ab_hold_mode`) in MVP. The Excel schema MUST NOT include an A/B Hold edit column. If an import payload still contains `card_ab_hold_mode` (including `off`, `pending_setup`, or `active`), the system MUST ignore it and MUST NOT change the campaign mode. Excel enable/edit of A/B Hold is deferred to a future change.
 
-#### Scenario: Excel enable rejected when bot inactive
-- **GIVEN** a campaign does not have paid bot management active
-- **WHEN** an Excel import requests enabling A/B Hold for that campaign
-- **THEN** A/B Hold is not enabled for that campaign
+#### Scenario: Excel import of active does not change mode
+- **GIVEN** a campaign has any current A/B Hold mode
+- **WHEN** an Excel import requests `card_ab_hold_mode=active`
+- **THEN** the campaign mode is left unchanged
+- **AND** no ACTIVE transition without setup snapshot is performed
+
+#### Scenario: Excel import of pending_setup does not enable
+- **GIVEN** a campaign is off
+- **WHEN** an Excel import requests `card_ab_hold_mode=pending_setup`
+- **THEN** A/B Hold is not enabled
+- **AND** the campaign mode remains off
+
+#### Scenario: Excel import of off does not disable via Excel
+- **GIVEN** a campaign is in active A/B Hold
+- **WHEN** an Excel import requests `card_ab_hold_mode=off`
+- **THEN** the campaign mode is left unchanged by Excel apply
+- **AND** EXIT remains available only via the paid Telegram disable path in MVP
 
 ### Requirement: Enable is blocked when campaign stats freshness fails
-The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through UI, Excel, or other write paths when the campaign fails the same statistics freshness / retrieval health class used by shop-runner automation filtering (`_split_advs_by_stats_freshness` / not admitted to the fresh automation set). After the mode is already PENDING_SETUP or ACTIVE, setup and hold ticks MUST still be scheduled even if the campaign would be excluded from that fresh set; post-enter stats failures MUST NOT leave the campaign stuck without a setup tick solely due to the freshness filter.
+The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through the paid Telegram UI (or any other in-MVP enable write path) when the campaign fails the same statistics freshness / retrieval health class used by shop-runner automation filtering (`_split_advs_by_stats_freshness` / not admitted to the fresh automation set). Excel is not an enable path in MVP. After the mode is already PENDING_SETUP or ACTIVE, setup and hold ticks MUST still be scheduled even if the campaign would be excluded from that fresh set; post-enter stats failures MUST NOT leave the campaign stuck without a setup tick solely due to the freshness filter.
 
 #### Scenario: Enable rejected when stats are not fresh
 - **GIVEN** a campaign has paid bot management active
 - **AND** the campaign fails the stats freshness / retrieval health check used for automation filtering
-- **WHEN** the user attempts to enable A/B Hold
+- **WHEN** the user attempts to enable A/B Hold from the paid UI
 - **THEN** A/B Hold is not enabled
 - **AND** the campaign mode remains off
 
@@ -186,11 +199,11 @@ The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through UI
 - **WHEN** shop-runner schedules A/B Hold automation
 - **THEN** the A/B Hold hold path remains eligible to run for that campaign
 
-### Requirement: Excel enable respects stats freshness gate
-Excel roundtrip MUST NOT apply A/B Hold enable when the campaign fails the stats freshness / retrieval health check. Excel MAY omit the detailed Telegram alert copy, but MUST NOT enable the mode.
+### Requirement: ACTIVE without ENTER setup snapshot is forbidden
+The system MUST NOT transition a campaign to ACTIVE A/B Hold except via successful `process_ab_setup` / setup apply that includes minus-phrase sync and PostgreSQL snapshot persistence (decision §8). Direct writes of `active` (including Excel or other non-setup paths) MUST NOT create a held campaign.
 
-#### Scenario: Excel enable rejected when stats freshness fails
-- **GIVEN** a campaign has paid bot management active
-- **AND** the campaign fails the stats freshness / retrieval health check
-- **WHEN** an Excel import requests enabling A/B Hold for that campaign
-- **THEN** A/B Hold is not enabled for that campaign
+#### Scenario: Non-setup ACTIVE write is rejected or ignored
+- **GIVEN** a write path other than A/B Hold ENTER setup attempts to set mode to active
+- **WHEN** that write is processed
+- **THEN** the campaign does not become ACTIVE without the ENTER minus snapshot
+- **AND** ordinary hold restore does not treat an empty/missing snapshot as a successful freeze

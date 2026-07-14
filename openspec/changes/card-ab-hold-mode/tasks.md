@@ -65,3 +65,13 @@
 - [x] 8.7 EXIT: clear/archive PG minus snapshot; ordinary minus auto-update снова разрешён; без keyword-profile restore.
 - [x] 8.8 UI: текст инструкции про фиксацию минус-фраз / restore из WB / «чтобы изменить — отключите A/B Hold»; ready message только после ACTIVE (исключая гонку с PENDING).
 - [x] 8.9 Docstrings + focused pytest на 8.1–8.3; сверка placement с decision §8.
+
+## 9. Remove Excel A/B Hold write-path (update — decision §9)
+
+> Supersedes Excel enable/edit intent of 1.8 / 5.5 / Excel parts of 7.1: MVP = Telegram-only; Excel column/apply removed (future option separately).
+
+- [ ] 9.1 Tests-first: Excel import `active` / `pending_setup` / `off` → mode unchanged; schema MUST NOT expose EDIT column `card_ab_hold_mode`.
+- [ ] 9.2 Remove `card_ab_hold_mode` from Excel schema export/import (fields, labels, parse).
+- [ ] 9.3 `import_apply`: MUST NOT apply `card_ab_hold_mode` (ignore/no-op); disable Excel enable path (`can_apply_card_ab_hold_mode_via_excel` always deny non-ignore / remove call path).
+- [ ] 9.4 Update/remove obsolete Excel enable + Excel freshness tests; wiring assert no mode apply via Excel.
+- [ ] 9.5 Docstrings + focused pytest; сверка placement с decision §9 / spec «Excel MUST NOT expose or apply».
