@@ -12,19 +12,30 @@ The system MUST expose and enable the card A/B Hold mode only for campaigns with
 #### Scenario: Active paid bot can open A/B Hold screen
 - **GIVEN** a campaign has paid bot management active
 - **WHEN** the user opens the A/B Hold mode screen for that campaign
-- **THEN** the system shows the mode instruction and enable/disable controls
+- **THEN** the system shows the mode instruction and disable/back controls
+- **AND** the Enable control is shown when mode is `OFF` (and MAY be hidden when mode is already `PENDING_SETUP` or `ACTIVE`)
 
 ### Requirement: A/B Hold screen includes instruction and controls
-The system MUST provide a dedicated A/B Hold screen with instruction text and controls to enable the mode, disable the mode, and return to the campaign menu. The instruction MUST warn that before enable the campaign SHOULD have warm-up traffic under a non-squeezed max CPO and a sufficient sales plan, that shelf mode is recommended off (user choice if shelves are required for traffic), and that price SHOULD NOT be changed during the test. The instruction MUST also state that during A/B Hold minus phrases are fixed, that manual changes in the Wildberries cabinet MAY be restored by the bot to the fixed snapshot, and that to change minus phrases the user MUST disable A/B Hold.
+The system MUST provide a dedicated A/B Hold screen with instruction text, a control to disable the mode, and a control to return to the campaign menu. The Enable control MUST be available when mode is `OFF` and the user is allowed to start ENTER. When mode is already `PENDING_SETUP` or `ACTIVE`, the UI MAY hide the Enable control (Disable and Back MUST remain). If Enable is still shown while mode is `PENDING_SETUP` or `ACTIVE`, pressing it MUST remain idempotent per the Telegram Enable idempotent requirement. The instruction MUST warn that before enable the campaign SHOULD have warm-up traffic under a non-squeezed max CPO and a sufficient sales plan, that shelf mode is recommended off (user choice if shelves are required for traffic), and that price SHOULD NOT be changed during the test. The instruction MUST also state that during A/B Hold minus phrases are fixed, that manual changes in the Wildberries cabinet MAY be restored by the bot to the fixed snapshot, and that to change minus phrases the user MUST disable A/B Hold.
 
-#### Scenario: User opens instruction screen
+#### Scenario: User opens instruction screen while OFF
 - **GIVEN** a campaign has paid bot management active
+- **AND** the campaign mode is `OFF`
 - **WHEN** the user opens the A/B Hold screen
 - **THEN** the instruction text is visible
-- **AND** enable, disable, and back controls are available
+- **AND** Enable, Disable, and Back controls are available
 - **AND** the instruction states that minus phrases are fixed during A/B Hold
 - **AND** the instruction states that manual WB cabinet changes to minus phrases MAY be restored by the bot
 - **AND** the instruction states that changing minus phrases requires disabling A/B Hold
+
+#### Scenario: User opens instruction screen while ACTIVE or PENDING_SETUP
+- **GIVEN** a campaign has paid bot management active
+- **AND** the campaign mode is `PENDING_SETUP` or `ACTIVE`
+- **WHEN** the user opens the A/B Hold screen
+- **THEN** the instruction text is visible
+- **AND** Disable and Back controls are available
+- **AND** the Enable control MAY be hidden
+- **AND** if Enable is shown, pressing it does not demote mode or re-signal ENTER
 
 ### Requirement: ENTER setup classifies keywords by pay_for_order and views
 When A/B Hold is enabled, the system MUST run a one-time setup that classifies keywords against the campaign plan max CPO (not resolve) and weekly keyword views from the same statistics source as the keyword card.
@@ -178,7 +189,7 @@ Excel roundtrip MUST NOT export, import, or apply the A/B Hold mode setting (`ca
 - **AND** EXIT remains available only via the paid Telegram disable path in MVP
 
 ### Requirement: Telegram Enable is idempotent while preparing or holding
-When the campaign mode is already `PENDING_SETUP` or `ACTIVE`, the paid Telegram Enable action MUST be a no-op for mode and ENTER signaling: it MUST NOT demote the mode back to `PENDING_SETUP`, MUST NOT write a new Redis ENTER signal, and MUST NOT cause a re-run of ENTER `force_ab_hold_setup_sync` / minus setup sync solely from that Enable press. EXIT (Telegram disable → `OFF` + clear minus snapshot) remains the only in-MVP path back to `OFF` before a new ENTER is allowed. Shop-runner may still continue an in-flight setup while mode stays `PENDING_SETUP` (single-flight lock); that is not a re-ENTER from Enable.
+When the campaign mode is already `PENDING_SETUP` or `ACTIVE`, the paid Telegram Enable action — if reachable (button shown or callback still invoked) — MUST be a no-op for mode and ENTER signaling: it MUST NOT demote the mode back to `PENDING_SETUP`, MUST NOT write a new Redis ENTER signal, and MUST NOT cause a re-run of ENTER `force_ab_hold_setup_sync` / minus setup sync solely from that Enable press. The UI MAY hide Enable in these modes; hiding is optional sugar and MUST NOT replace the handler no-op (stale callback / keyboard race). EXIT (Telegram disable → `OFF` + clear minus snapshot) remains the only in-MVP path back to `OFF` before a new ENTER is allowed. Shop-runner may still continue an in-flight setup while mode stays `PENDING_SETUP` (single-flight lock); that is not a re-ENTER from Enable.
 
 #### Scenario: Enable while ACTIVE does not re-enter
 - **GIVEN** a campaign is in `ACTIVE` A/B Hold with a stored minus-phrase snapshot

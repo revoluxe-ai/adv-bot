@@ -20,7 +20,7 @@
 
 ### Desired behavior
 
-- Режим доступен **только paid** и **только через Telegram UI**: при `bot_active is False` пункт меню / экран A/B Hold MUST быть **скрыт**; enable MUST NOT выполняться. При `bot_active is True` — экран инструкции и кнопки включить / выключить / назад.
+- Режим доступен **только paid** и **только через Telegram UI**: при `bot_active is False` пункт меню / экран A/B Hold MUST быть **скрыт**; enable MUST NOT выполняться. При `bot_active is True` — экран инструкции; **Disable / Back всегда**; **Enable обязательно при mode `OFF`**; при `PENDING_SETUP` / `ACTIVE` Enable **MAY быть скрыт** (Disable/Back остаются); если Enable всё же нажат — **idempotent no-op** (§10).
 - **Excel MUST NOT** экспортировать / импортировать / применять `card_ab_hold_mode` в MVP (колонки нет; leftover payload ignored). Идея Excel-колонки — **future**, не текущий контракт.
 - **Включение (enable) дополнительно ограничено здоровьем статы РК:** если кампания не проходит тот же класс проверки свежести/получения статистики, что `_split_advs_by_stats_freshness` / `advs_filtred`, enable MUST NOT выполняться. В UI пользователь MUST сразу видеть **причину**, текст **ограничения** и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в коде нет `ADMIN`; whitelist — `ADMINS`; публичная ссылка — `SUPPORT_LINK`).
 - **После успешного переключения** (PENDING_SETUP / ACTIVE) сбои свежести статы **не** должны блокировать scheduling `process_ab_setup` / `process_ab_hold` (не оставлять вечный PENDING из‑за `advs_filtred`).
@@ -41,7 +41,7 @@
 - Paid-only access: UI скрыт при `bot_active is False`; Telegram enable/disable гейтятся тем же условием.
 - Enable gate на freshness/health статы РК + явный UI-ответ (причина, ограничение, `SUPPORT_LINK`).
 - После PENDING/ACTIVE: setup/hold не зависят от `advs_filtred` freshness filter.
-- Paid bot UI: экран инструкции (вкл. текст минус-freeze) + вкл/выкл; ready-to-test только после ACTIVE; honest UX на manual minus refresh при freeze (не «Минус-слова обновлены»).
+- Paid bot UI: экран инструкции (вкл. текст минус-freeze) + Disable/Back; Enable при OFF (MAY hide при PENDING/ACTIVE); ready-to-test только после ACTIVE; Enable handler idempotent; honest UX на manual minus refresh при freeze (не «Минус-слова обновлены»).
 - Состояния режима кампании (выкл / подготовка / активен).
 - Setup ENTER + hold + exit для V3 (paid automation), включая minus sync → PG snapshot → ACTIVE.
 - PG durable minus-phrase snapshot (**новая migration**) + restore-on-drift + clear на EXIT.
@@ -73,13 +73,13 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 ### Architecture Decision References
 
 - Relevant accepted: `openspec/decisions/mode-defaults-policy-ownership/decision.md` — дефолт режима A/B Hold (выкл) и related paid/free overlays (в т.ч. minus defaults) принадлежат declarative mode policy overlays, а не transition-helper.
-- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 minus PG snapshot + restore + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
+- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 minus PG snapshot + restore + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — Telegram-only enable/disable, **Enable idempotent while PENDING/ACTIVE**, enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (PFO ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая; minus sync → PG snapshot → ACTIVE), HOLD (ЦП freeze, биддер ON, minus freeze+restore, guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), UI ready только после ACTIVE, EXIT (снова ЦП + апдейтеры + ordinary minus; clear minus snapshot; без keyword-profile restore), UI-инструкция (текст минус-freeze), **без Excel column**, cross-pod interrupt.
+- `card-ab-hold-mode`: paid-only режим A/B Hold (`bot_active is True`; при False — UI скрыт, enable запрещён) — Telegram-only enable/disable, **Enable idempotent while PENDING/ACTIVE**, **keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain)**, enable gate freshness статы + UI reason/`SUPPORT_LINK`, ENTER (PFO ≤ max CPO + ≥100 показов, FAIL→OFF, ЦП := текущая; minus sync → PG snapshot → ACTIVE), HOLD (ЦП freeze, биддер ON, minus freeze+restore, guard перерасхода; post-enter без блокировки только из‑за `advs_filtred`), UI ready только после ACTIVE, EXIT (снова ЦП + апдейтеры + ordinary minus; clear minus snapshot; без keyword-profile restore), UI-инструкция (текст минус-freeze), **без Excel column**, cross-pod interrupt.
 
 ### Modified Capabilities
 
@@ -87,4 +87,4 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 
 ## Impact
 
-Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path. План опережает код по §10: нужен `/opsx-apply` или `/opsx-fix-bug GO` для Enable idempotent.
+Затрагивает paid automation shop-runner (планирование V3 vs hold/setup, gate `update_minus_phrases`), координацию bot ↔ runner через Redis, состояние кампании в БД (minus snapshot), Telegram UI (инструкция + ready after ACTIVE + Enable idempotent + optional hide Enable), **Excel roundtrip (remove column/apply)**, тестовый контур write-gates. Не расширяет Free path. План опережает код по §11: нужен `/opsx:apply` для mode-aware keyboard.

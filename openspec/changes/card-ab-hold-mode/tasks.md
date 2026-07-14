@@ -87,3 +87,9 @@
 - [x] 11.1 Tests-first: ACTIVE + Enable → mode stays ACTIVE, no Redis ENTER; PENDING + Enable → mode stays PENDING; OFF + Enable → PENDING + ENTER (paired).
 - [x] 11.2 `enable_card_ab_hold` / `ui_access`: no-op when mode ∈ {PENDING_SETUP, ACTIVE}; no demote, no ENTER rewrite.
 - [x] 11.3 Focused pytest; сверка со spec «Telegram Enable is idempotent» / decision §10.
+
+## 12. Telegram keyboard MAY hide Enable while PENDING/ACTIVE (update — decision §11)
+
+- [ ] 12.1 Tests-first: OPEN screen / `_screen_keyboard` — OFF → Enable+Disable+Back; PENDING/ACTIVE → Disable+Back, Enable absent (or documented optional show + handler no-op still covered by §10).
+- [ ] 12.2 Mode-aware keyboard builder: omit Enable when mode ∈ {PENDING_SETUP, ACTIVE}; always include Disable+Back; OFF keeps Enable.
+- [ ] 12.3 Focused pytest; сверка со spec screen controls + decision §11; §10 handler tests remain green.
