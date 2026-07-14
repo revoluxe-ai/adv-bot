@@ -487,3 +487,18 @@ Do not invent confirmed test paths. Mark them as proposed if not verified.
 The final answer MUST make the routing decision obvious in the first three lines.
 
 The user must be able to copy the next command without rereading the whole analysis.
+
+
+## Static Analysis Gate
+
+If pyright, mypy, ruff typing rules, or another static analysis check fails during investigation, classify the failure before fixing it.
+
+Report:
+
+```text
+static_analysis_failure: yes/no
+tool: pyright/mypy/other
+command:
+caused_by_current_diff: yes/no/unknown
+runtime_bug_revealed: yes/no/unknown
+openspec_contract_issue: yes/no/unknown
