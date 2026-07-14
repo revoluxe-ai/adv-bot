@@ -47,7 +47,6 @@ ADV_UI_HANDLER_BY_FIELD: dict[str, str] = {
     "sales_predict_method": "app/client_bot/user_interface/handlers/sales_predict_method_toggle.py",
     "automatic_version": "app/modules/shop_runner/service_manager/auto_updater_version_toggle/telegram/handlers.py",
     "aggressiveness": "app/modules/shop_runner/service_manager/v3_rollout_aggressiveness_toggle/telegram/handlers.py",
-    "card_ab_hold_mode": "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py",
     "keyword_calibration_max_step": "app/modules/v3_calibration_step_setting/telegram_handler.py",
     "white_list_mode": "app/client_bot/user_interface/handlers/white_list_mode_toggle.py",
     "individual_keywords_target_place_mode": "app/client_bot/user_interface/handlers/individual_keywords_target_place_toggle.py",
@@ -67,6 +66,14 @@ SHELF_UI_HANDLER_BY_FIELD: dict[str, str] = {
     "auto_shelf_min_bid_distance_rub": "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
 }
 
+# decision §9: A/B Hold — Telegram-only (not Excel EDIT). Kept for UI existence check.
+TELEGRAM_ONLY_ADV_FIELDS: dict[str, str] = {
+    "card_ab_hold_mode": (
+        "app/modules/shop_runner/service_manager/services/"
+        "auto_updater_v3/card_ab_hold/telegram/handlers.py"
+    ),
+}
+
 
 @pytest.mark.unit
 def test_excel_editable_fields_match_ui_mapping() -> None:
@@ -80,5 +87,17 @@ def test_excel_shelf_fields_match_ui_mapping() -> None:
 
 @pytest.mark.unit
 def test_ui_mapping_files_exist() -> None:
-    for path in {**ADV_UI_HANDLER_BY_FIELD, **SHELF_UI_HANDLER_BY_FIELD}.values():
+    for path in {
+        **ADV_UI_HANDLER_BY_FIELD,
+        **SHELF_UI_HANDLER_BY_FIELD,
+        **TELEGRAM_ONLY_ADV_FIELDS,
+    }.values():
         assert Path(path).exists(), f"UI handler not found: {path}"
+
+
+@pytest.mark.unit
+def test_card_ab_hold_is_telegram_only_not_excel_edit() -> None:
+    """§9: card_ab_hold_mode has UI but is not an Excel EDIT column."""
+    assert "card_ab_hold_mode" in TELEGRAM_ONLY_ADV_FIELDS
+    assert "card_ab_hold_mode" not in EDITABLE_ADV_SETTING_COLUMNS
+    assert "card_ab_hold_mode" not in ADV_UI_HANDLER_BY_FIELD

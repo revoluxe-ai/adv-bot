@@ -73,40 +73,37 @@ def test_blocked_message_has_reason_restriction_and_support_link() -> None:
 
 
 @pytest.mark.unit
-def test_excel_enable_rejects_stale_stats() -> None:
-    """7.1 Excel: non-OFF при stale → False; OFF ok; bot_active False → False."""
-    assert (
-        can_apply_card_ab_hold_mode_via_excel(
-            bot_active=True,
-            requested_mode=CardAbHoldMode.PENDING_SETUP,
-            stats_fresh_enough=False,
+def test_excel_gate_always_false_including_stale_and_fresh() -> None:
+    """§9 Excel: gate always False (supersedes 7.1 Excel enable freshness matrix)."""
+    for mode in (
+        CardAbHoldMode.PENDING_SETUP,
+        CardAbHoldMode.ACTIVE,
+        CardAbHoldMode.OFF,
+    ):
+        assert (
+            can_apply_card_ab_hold_mode_via_excel(
+                bot_active=True,
+                requested_mode=mode,
+                stats_fresh_enough=False,
+            )
+            is False
         )
-        is False
-    )
-    assert (
-        can_apply_card_ab_hold_mode_via_excel(
-            bot_active=True,
-            requested_mode=CardAbHoldMode.PENDING_SETUP,
-            stats_fresh_enough=True,
+        assert (
+            can_apply_card_ab_hold_mode_via_excel(
+                bot_active=True,
+                requested_mode=mode,
+                stats_fresh_enough=True,
+            )
+            is False
         )
-        is True
-    )
-    assert (
-        can_apply_card_ab_hold_mode_via_excel(
-            bot_active=False,
-            requested_mode=CardAbHoldMode.ACTIVE,
-            stats_fresh_enough=True,
+        assert (
+            can_apply_card_ab_hold_mode_via_excel(
+                bot_active=False,
+                requested_mode=mode,
+                stats_fresh_enough=True,
+            )
+            is False
         )
-        is False
-    )
-    assert (
-        can_apply_card_ab_hold_mode_via_excel(
-            bot_active=False,
-            requested_mode=CardAbHoldMode.OFF,
-            stats_fresh_enough=False,
-        )
-        is True
-    )
 
 
 @pytest.mark.unit

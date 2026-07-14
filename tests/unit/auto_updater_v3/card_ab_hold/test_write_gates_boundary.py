@@ -95,7 +95,7 @@ def test_bidder_eligible_keeps_active_hold_campaigns() -> None:
 
 @pytest.mark.unit
 def test_excel_enable_rejected_when_bot_inactive_via_shared_gate() -> None:
-    """1.8: тот же gate, что ``import_apply`` — enable при bot_active=False запрещён."""
+    """§9: Excel gate always denies (incl. bot_active=False and active request)."""
     assert (
         can_apply_card_ab_hold_mode_via_excel(
             bot_active=False, requested_mode="active"
@@ -108,16 +108,15 @@ def test_excel_enable_rejected_when_bot_inactive_via_shared_gate() -> None:
         )
         is False
     )
-    # paired: OFF всегда можно записать; enable при paid bot — ok
     assert (
         can_apply_card_ab_hold_mode_via_excel(bot_active=False, requested_mode="off")
-        is True
+        is False
     )
     assert (
         can_apply_card_ab_hold_mode_via_excel(
             bot_active=True, requested_mode="active"
         )
-        is True
+        is False
     )
 
 
@@ -146,15 +145,15 @@ def test_manager_wires_structural_filter_before_act_writes() -> None:
 
 
 @pytest.mark.unit
-def test_import_apply_uses_excel_ab_hold_gate() -> None:
-    """1.8 wiring: import_apply вызывает can_apply_card_ab_hold_mode_via_excel."""
+def test_import_apply_does_not_apply_ab_hold_via_excel() -> None:
+    """§9 wiring: import_apply no longer applies card_ab_hold_mode."""
     import inspect
 
     from app.client_bot.user_interface.services.adv_excel_roundtrip import import_apply
 
     src = inspect.getsource(import_apply.apply_adv_excel_rows)
-    assert "can_apply_card_ab_hold_mode_via_excel" in src
-    assert "evaluate_ab_hold_enable_stats" in src
+    assert "can_apply_card_ab_hold_mode_via_excel" not in src
+    assert "evaluate_ab_hold_enable_stats" not in src
 
 
 @pytest.mark.unit

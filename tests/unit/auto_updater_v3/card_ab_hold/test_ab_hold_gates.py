@@ -148,21 +148,8 @@ def test_setup_lock_redis_key_prefix() -> None:
 
 
 @pytest.mark.unit
-def test_excel_parse_card_ab_hold_mode() -> None:
-    """5.5: parse EDIT values for mode."""
-    from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
-        parse_edit_value,
-    )
-
-    assert parse_edit_value("card_ab_hold_mode", "active") == "active"
-    assert parse_edit_value("card_ab_hold_mode", "OFF") == "off"
-    with pytest.raises(ValueError):
-        parse_edit_value("card_ab_hold_mode", "safe")
-
-
-@pytest.mark.unit
-def test_excel_enable_rejected_when_bot_inactive() -> None:
-    """1.8: enable A/B Hold при bot_active=False не применяется (shared excel gate)."""
+def test_excel_enable_rejected_for_all_modes_decision_section_9() -> None:
+    """§9: Excel apply gate always False (supersedes 1.8 paid-only excel enable)."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
         can_apply_card_ab_hold_mode_via_excel,
     )
@@ -170,6 +157,12 @@ def test_excel_enable_rejected_when_bot_inactive() -> None:
     assert (
         can_apply_card_ab_hold_mode_via_excel(
             bot_active=False, requested_mode="active"
+        )
+        is False
+    )
+    assert (
+        can_apply_card_ab_hold_mode_via_excel(
+            bot_active=True, requested_mode="off"
         )
         is False
     )
