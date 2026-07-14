@@ -120,6 +120,7 @@ rules:
     - "Verify должен ставить NO_GO, если тест стабит pipeline так, что real guard не достигает candidate/handler/write boundary."
     - "Verify должен ставить NO_GO, если write-gate regression проверяет только `assert_not_called()` или `count == 0`, но не доказывает, что guarded entity была отфильтрована до candidate/handler/write boundary."
     - "Verify должен ставить NO_GO, если regression test продолжит проходить при удалении intended guard."
+    - "Verify должен ставить NO_GO / Task completion mismatch, если spec требует observable degraded/honest status или user-facing success/failure message, но код только логирует/возвращает значение без durable source-of-truth и user-visible render; log/return/source-inspection не доказывают observable contract."
     - "Если gate имеет blocked и allowed behavior, Verify должен требовать paired positive case или фиксировать blocker."
     - "Block the change if Telegram message/caption/callback/button text was changed without payload-limit tests."
     - "Block if callback_data length is checked as characters instead of UTF-8 bytes."
