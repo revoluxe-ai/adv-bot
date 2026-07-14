@@ -749,6 +749,18 @@ class AdvSetting(BaseTable):
             "[text, ...]; минус — производный enforcement (spec card-ab-hold-mode §8)"
         ),
     )
+    card_ab_hold_degraded: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+        comment=(
+            "A/B Hold honest degradation (spec card-ab-hold-mode §8): True когда "
+            "enforcement замороженного allowed-set не может гарантировать чистый hold "
+            "(превышен WB minus cap / open-match). Durable SoT для честного UI-статуса; "
+            "self-healing — снимается на тике, где cap не превышен."
+        ),
+    )
 
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
