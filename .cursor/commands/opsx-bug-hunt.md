@@ -311,3 +311,4 @@ Need from user:
 - Do not use expensive deep reasoning until cheap scan finds concrete suspects.
 - Do not mix diff review and invariant bug hunt.
 - Do not commit, push, deploy, restart, migrate, or touch secrets.
+- Treat an empty/degenerate captured collection that still reaches a success/terminal/write boundary (e.g. empty allowed-set → ACTIVE/ready) as a candidate finding, not a safe no-op; require a behavioral regression on each sibling path sharing the invariant.

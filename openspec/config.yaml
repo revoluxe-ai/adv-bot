@@ -161,6 +161,7 @@ rules:
     - "Spec MUST требовать paired regression tests для каждого frozen boundary: protected state blocked/restored, OFF or normal state still allowed."
     - "Spec MUST включать тест или inventory-check, который сверяет runtime-reachable writers с freeze decision; sibling gated path не считается доказательством защиты другого path."
     - "Если feature меняет экспериментальный режим, spec MUST содержать user-facing behavior: что пользователь увидит, какие ручные изменения будут перезаписаны, и как безопасно выйти из режима."
+    - "Для freeze/hold/experiment features spec MUST включать сценарий пустого/вырожденного captured-набора (пустой allowed-set, ноль ключей) на каждом write→success boundary; такое состояние MUST NOT считаться успешной заморозкой/ready."
 
 
   design:
