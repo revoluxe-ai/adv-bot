@@ -10,6 +10,9 @@
 
 Таким образом импорт придерживается политики "fail-fast + единый UX ошибок":
 файл отклоняется целиком, а диагностика уходит в технический контур.
+
+A/B Hold (``card_ab_hold_mode``): не применяется через Excel в MVP
+(decision ``card-ab-hold-write-path-ownership`` §9) — только Telegram UI.
 """
 
 from __future__ import annotations
@@ -46,16 +49,6 @@ from app.modules.sales_plan_settings.v3_raise_max_cpo import (
     MaxCpoDecreaseSideEffect,
     resolve_flag_after_max_cpo_decrease,
     skip_excel_substitute_fact_cpo_for_max,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
-    normalize_card_ab_hold_mode,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
-    can_apply_card_ab_hold_mode_via_excel,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
-    evaluate_ab_hold_enable_stats,
-    user_facing_stats_block_reason,
 )
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
     DEFAULT_CURRENCY,
@@ -307,32 +300,8 @@ async def apply_adv_excel_rows(
                         max_cpo_decrease_effects.append(side_effect)
                         raise_max_auto_disabled = True
                     continue
-                if field == "card_ab_hold_mode":
-                    mode = normalize_card_ab_hold_mode(str(val))
-                    stats_ok = True
-                    stats_reason: str | None = None
-                    if mode.value != "off":
-                        stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(
-                            adv
-                        )
-                    if not can_apply_card_ab_hold_mode_via_excel(
-                        bot_active=bool(adv.bot_active),
-                        requested_mode=mode,
-                        stats_fresh_enough=stats_ok,
-                    ):
-                        if not adv.bot_active:
-                            detail = "A/B Hold только при bot_active=True"
-                        else:
-                            detail = (
-                                "A/B Hold blocked by stats freshness: "
-                                f"{user_facing_stats_block_reason(stats_reason)}"
-                            )
-                        raise AdvExcelImportError(
-                            f"Строка {i}, колонка {h}: {detail} "
-                            "(spec card-ab-hold-mode)"
-                        )
-                    setattr(adv, field, mode.value)
-                    continue
+                # card_ab_hold_mode: decision §9 — not in EDITABLE_ADV_SETTING_COLUMNS;
+                # leftover Excel columns are ignored (Telegram-only enable/disable).
                 if skip_excel_substitute_fact_cpo_for_max(
                     field=field,
                     raise_max_auto_disabled=raise_max_auto_disabled,
