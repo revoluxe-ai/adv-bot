@@ -61,6 +61,10 @@ from app.shared.domains.wb.utils.wb_campaign_meta import (
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     is_ab_hold_structural_freeze,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
+    AbHoldEnforceResult,
+    enforce_allowed_set,
+)
 from .click_house_manager import ClickHouseManager
 
 logger = logging.getLogger(__name__)
@@ -120,6 +124,51 @@ class MinusPhraseManager:
             )
             raise e
         return True
+
+    async def enforce_frozen_allowed_set(
+        self,
+        complex_adv: ComplexAdv,
+        allowed_texts: object | None,
+    ) -> AbHoldEnforceResult:
+        """Hold enforcement: WB-минус = наблюдаемые фразы вне замороженного allowed-set.
+
+        Spec card-ab-hold-mode HOLD / decision §8: отдельный от ordinary recalc путь
+        (hold-protection ≠ recalculation allowed-set). Новые/не-разрешённые фразы
+        исключаются, снятые вручную разрешённые восстанавливаются; при превышении
+        WB minus cap — видимая деградация (см. ``enforce_allowed_set``).
+
+        Args:
+            complex_adv: РК для перечисления (adv_id, nmid) целей.
+            allowed_texts: замороженный allowed-set (PG snapshot).
+
+        Returns:
+            ``AbHoldEnforceResult`` (targets/written/cap_exceeded).
+        """
+        wb_modifier = self._wb_api.wb_modifier
+
+        async def _get_minus(adv_id: int, nmid: int) -> list[str]:
+            return list(await wb_modifier.get_minus_phrases_for_adv(adv_id, nmid))
+
+        async def _get_observed(adv_id: int, nmid: int) -> list[str]:
+            texts = await self._click_house.get_cluster_texts_for_adv_nmid(adv_id, nmid)
+            return [str(t) for t in texts]
+
+        async def _set_minus(adv_id: int, nmid: int, phrases: list[str]) -> None:
+            _ = await wb_modifier.set_minus_phrases_with_fallback_for_adv(
+                adv_id=adv_id,
+                nmid=nmid,
+                phrases=phrases,
+                update_redis_timestamp_manager=self._update_redis_timestamp_manager,
+            )
+
+        return await enforce_allowed_set(
+            complex_adv,
+            allowed=allowed_texts,
+            get_minus=_get_minus,
+            set_minus=_set_minus,
+            get_observed=_get_observed,
+        )
+
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         """Собрать BAD-ключи и параллельно обновить auto + search ветки."""
         keywords = await complex_adv.get_keywords()

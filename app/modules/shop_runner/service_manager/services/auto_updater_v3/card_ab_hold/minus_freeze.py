@@ -1,19 +1,26 @@
-"""A/B Hold freeze минус-фраз: PG snapshot, drift detect, restore (decision §8).
+"""A/B Hold: freeze разрешённого набора фраз (allowed-set) + enforcement (decision §8).
 
-Spec ``card-ab-hold-mode``: ENTER sync → snapshot → ACTIVE; PENDING/ACTIVE —
-без ordinary recalculation; drift → restore; EXIT — clear snapshot.
+Primary invariant spec ``card-ab-hold-mode``: замораживается **разрешённый**
+(relevant/GOOD) набор фраз кампании, а не список минус-фраз. Минус — производный
+механизм исключения: во время hold любые новые/не-разрешённые фразы исключаются
+(минусуются), а разрешённые фразы, снятые вручную, восстанавливаются. Enforcement
+ограничен лимитом WB (~1000 фраз/nmid); при превышении — **видимая деградация**
+(caller MUST не заявлять чистый hold молча).
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from typing import Any, TypedDict, cast
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     is_ab_hold_structural_freeze,
     normalize_card_ab_hold_mode,
+)
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
+    KeywordStatus,
 )
 from app.shared.domains.wb.utils.wb_campaign_meta import (
     wb_campaign_meta_known,
@@ -25,11 +32,17 @@ logger = logging.getLogger(__name__)
 
 GetMinusFn = Callable[[int, int], Awaitable[list[str]]]
 SetMinusFn = Callable[[int, int, list[str]], Awaitable[Any]]
+GetObservedTextsFn = Callable[[int, int], Awaitable[list[str]]]
+
+# WB лимит минус-фраз на nmid (normquery set-minus). Если для удержания
+# замороженного allowed-set нужно исключить больше фраз — enforcement не может
+# гарантировать чистый hold → видимая деградация (см. ``enforce_allowed_set``).
+WB_MINUS_CAP = 1000
 
 # Spec scenario: Manual bot minus update does not report success during freeze.
 AB_HOLD_MANUAL_MINUS_UPDATE_BLOCKED_MSG = (
-    "Минус-слова не обновлены: при A/B Hold они зафиксированы. "
-    "Чтобы изменить минус-фразы, отключите A/B Hold."
+    "Минус-слова не обновлены: при A/B Hold набор фраз зафиксирован. "
+    "Чтобы изменить набор фраз, отключите A/B Hold."
 )
 MINUS_PHRASES_UPDATED_SUCCESS_MSG = "Минус-слова обновлены."
 
@@ -48,76 +61,91 @@ def user_message_after_ordinary_minus_update(*, applied: bool) -> str:
     return AB_HOLD_MANUAL_MINUS_UPDATE_BLOCKED_MSG
 
 
-class MinusSnapshotEntry(TypedDict):
-    """Одна запись snapshot: минус-фразы для пары (adv_id, nmid)."""
+class AbHoldEnforceResult(TypedDict):
+    """Итог enforcement allowed-set по всем (adv_id, nmid) целям hold.
 
-    adv_id: int
-    nmid: int
-    phrases: list[str]
+    Attributes:
+        targets: сколько (adv_id, nmid) целей обработано.
+        written: сколько целей потребовало set-minus write (drift).
+        cap_exceeded: цели, где не-разрешённых фраз > WB_MINUS_CAP (hold degraded).
+    """
+
+    targets: int
+    written: int
+    cap_exceeded: list[tuple[int, int]]
 
 
-def empty_minus_snapshot() -> list[MinusSnapshotEntry]:
-    """Пустой snapshot (EXIT / default)."""
+def empty_allowed_snapshot() -> list[str]:
+    """Пустой allowed-set snapshot (EXIT / default)."""
     return []
 
 
-def _as_int(value: object) -> int:
-    """Привести object к int или raise TypeError/ValueError."""
-    if isinstance(value, bool):
-        raise TypeError("bool is not a valid int for snapshot ids")
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        return int(value)
-    raise TypeError(f"unsupported snapshot id type: {type(value)!r}")
-
-
-def normalize_minus_snapshot(raw: object | None) -> list[MinusSnapshotEntry]:
-    """Нормализовать JSONB snapshot к списку записей.
+def normalize_allowed_snapshot(raw: object | None) -> list[str]:
+    """Нормализовать JSONB allowed-set к отсортированному списку уникальных строк.
 
     Args:
-        raw: значение из PG / in-memory (list|None|прочее).
+        raw: значение из PG / in-memory (list|tuple|set|None|прочее).
 
     Returns:
-        Валидные ``MinusSnapshotEntry``; битые элементы отбрасываются.
+        Отсортированные уникальные непустые тексты; иное → [].
     """
-    if raw is None:
+    if not isinstance(raw, (list, tuple, set)):
         return []
-    if not isinstance(raw, list):
-        return []
-    raw_list = cast(list[object], raw)
-    out: list[MinusSnapshotEntry] = []
-    for item_obj in raw_list:
-        if not isinstance(item_obj, dict):
+    out: set[str] = set()
+    for item in cast(Iterable[object], raw):
+        if item is None:
             continue
-        item = cast(dict[str, object], item_obj)
-        try:
-            adv_id = _as_int(item["adv_id"])
-            nmid = _as_int(item["nmid"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        phrases_obj = item.get("phrases", [])
-        phrases: list[str] = []
-        if isinstance(phrases_obj, list):
-            phrases_list = cast(list[object], phrases_obj)
-            for p in phrases_list:
-                if p is None:
-                    continue
-                text = str(p)
-                if text:
-                    phrases.append(text)
-            phrases = sorted(set(phrases))
-        out.append({"adv_id": adv_id, "nmid": nmid, "phrases": phrases})
-    return out
+        text = str(item)
+        if text:
+            out.add(text)
+    return sorted(out)
 
 
-def minus_phrases_drift(current: Sequence[str], snapshot: Sequence[str]) -> bool:
-    """True, если текущий набор минус-фраз отличается от snapshot."""
-    return set(current) != set(snapshot)
+def capture_allowed_phrase_set(keywords: Sequence[Any]) -> list[str]:
+    """Зафиксировать разрешённый набор фраз на ENTER (spec §8, primary invariant).
+
+    Allowed = тексты ключей со статусом != BAD (GOOD / недостаточно показов):
+    именно этим фразам разрешено тратить. Всё остальное (BAD, не-релевантные,
+    новые после ENTER) во время hold исключается как производный минус.
+
+    Args:
+        keywords: ``CalculatedKeyword``-подобные объекты с ``.status`` и ``.text``.
+
+    Returns:
+        Отсортированные уникальные разрешённые тексты фраз.
+    """
+    allowed: set[str] = set()
+    for kw in keywords:
+        if getattr(kw, "status", None) == KeywordStatus.BAD:
+            continue
+        text = str(getattr(kw, "text", "") or "")
+        if text:
+            allowed.add(text)
+    return sorted(allowed)
+
+
+def compute_enforced_minus(
+    observed_texts: Sequence[str],
+    allowed_texts: Sequence[str],
+) -> tuple[list[str], bool]:
+    """Целевой минус для одного nmid = наблюдаемые фразы вне allowed-set.
+
+    Args:
+        observed_texts: фразы, которые могут тратить (кластерные тексты + текущий минус).
+        allowed_texts: замороженный разрешённый набор.
+
+    Returns:
+        (capped_minus, cap_exceeded). ``capped_minus`` отсортирован и обрезан до
+        ``WB_MINUS_CAP``; ``cap_exceeded`` True, если не-разрешённых фраз больше cap
+        — caller MUST деградировать видимо (не заявлять чистый hold).
+    """
+    allowed_set = set(allowed_texts)
+    non_allowed = sorted({str(t) for t in observed_texts if str(t)} - allowed_set)
+    return non_allowed[:WB_MINUS_CAP], len(non_allowed) > WB_MINUS_CAP
 
 
 def should_skip_ordinary_minus_recalculation(mode: CardAbHoldMode | str | None) -> bool:
-    """Ordinary ``update_minus_phrases`` MUST NOT при PENDING_SETUP / ACTIVE."""
+    """Ordinary ``update_minus_phrases`` recalc (меняющий allowed-set) MUST NOT при freeze."""
     return is_ab_hold_structural_freeze(mode)
 
 
@@ -127,7 +155,7 @@ def is_ab_hold_ready_for_tests(mode: CardAbHoldMode | str | None) -> bool:
 
 
 def iter_minus_phrase_wb_targets(complex_adv: Any) -> list[tuple[int, int]]:
-    """Пары (adv_id, nmid) для capture/restore, зеркало skip-логики MinusPhraseManager.
+    """Пары (adv_id, nmid) для enforcement, зеркало skip-логики MinusPhraseManager.
 
     Auto: skip только ``wb_is_manual_shelf_only``.
     Search: skip если meta known и не supports normquery.
@@ -150,56 +178,61 @@ def iter_minus_phrase_wb_targets(complex_adv: Any) -> list[tuple[int, int]]:
     return targets
 
 
-async def capture_minus_snapshot(
+async def enforce_allowed_set(
     complex_adv: Any,
     *,
-    get_minus: GetMinusFn,
-) -> list[MinusSnapshotEntry]:
-    """Считать текущие минус-фразы с WB и собрать PG snapshot.
-
-    Spec ENTER: после setup-sync сохранить актуальное состояние.
-    """
-    entries: list[MinusSnapshotEntry] = []
-    for adv_id, nmid in iter_minus_phrase_wb_targets(complex_adv):
-        phrases = await get_minus(adv_id, nmid)
-        entries.append(
-            {
-                "adv_id": adv_id,
-                "nmid": nmid,
-                "phrases": sorted({str(p) for p in phrases}),
-            }
-        )
-    return entries
-
-
-async def restore_minus_snapshot_if_drift(
-    complex_adv: Any,
-    *,
-    snapshot: object | None,
+    allowed: object | None,
     get_minus: GetMinusFn,
     set_minus: SetMinusFn,
-) -> int:
-    """Вернуть WB к snapshot при drift. Returns: число restore-write.
+    get_observed: GetObservedTextsFn,
+) -> AbHoldEnforceResult:
+    """Привести WB-минус каждого (adv_id, nmid) к «всё вне замороженного allowed-set».
 
-    Spec HOLD: ручные правки = нарушение freeze → overwrite.
+    Hold-protection (отдельно от ordinary recalc): наблюдаемые фразы (кластерные
+    тексты ∪ текущий минус) вне allowed-set исключаются; разрешённые фразы, снятые
+    вручную, восстанавливаются (их нет в целевом минусе, поэтому set-minus их убирает).
+    Ограничено ``WB_MINUS_CAP``; превышение — видимая деградация (log ERROR +
+    ``cap_exceeded``), hold не гарантирован для такой РК.
+
+    Args:
+        complex_adv: РК для перечисления (adv_id, nmid) целей.
+        allowed: замороженный allowed-set (JSONB list или нормализуемое значение).
+        get_minus: чтение текущих минус-фраз WB для (adv_id, nmid).
+        set_minus: запись минус-фраз WB для (adv_id, nmid).
+        get_observed: наблюдаемые кластерные тексты для (adv_id, nmid).
+
+    Returns:
+        ``AbHoldEnforceResult`` с числом целей/записей и списком cap-degraded целей.
     """
-    entries = normalize_minus_snapshot(snapshot)
-    if not entries:
-        return 0
-    restored = 0
-    for entry in entries:
-        adv_id = entry["adv_id"]
-        nmid = entry["nmid"]
-        expected = entry["phrases"]
-        current = await get_minus(adv_id, nmid)
-        if not minus_phrases_drift(current, expected):
-            continue
-        await set_minus(adv_id, nmid, list(expected))
-        restored += 1
-        logger.info(
-            "[adv_id=%s] ab_hold minus restore nmid=%s phrases=%s",
-            adv_id,
-            nmid,
-            len(expected),
-        )
-    return restored
+    allowed_texts = normalize_allowed_snapshot(allowed)
+    allowed_set = set(allowed_texts)
+    targets = iter_minus_phrase_wb_targets(complex_adv)
+    written = 0
+    cap_exceeded: list[tuple[int, int]] = []
+    for adv_id, nmid in targets:
+        current = [str(p) for p in await get_minus(adv_id, nmid)]
+        observed = [str(p) for p in await get_observed(adv_id, nmid)]
+        universe = set(observed) | set(current)
+        desired, exceeded = compute_enforced_minus(sorted(universe), allowed_texts)
+        if exceeded:
+            cap_exceeded.append((adv_id, nmid))
+            logger.error(
+                "[adv_id=%s] ab_hold allowed-set enforcement exceeds WB minus cap "
+                "nmid=%s non_allowed=%s cap=%s: hold NOT guaranteed clean (degraded)",
+                adv_id,
+                nmid,
+                len(universe - allowed_set),
+                WB_MINUS_CAP,
+            )
+        if set(desired) != set(current):
+            await set_minus(adv_id, nmid, list(desired))
+            written += 1
+            logger.info(
+                "[adv_id=%s] ab_hold enforce nmid=%s minus=%s allowed=%s observed=%s",
+                adv_id,
+                nmid,
+                len(desired),
+                len(allowed_set),
+                len(universe),
+            )
+    return {"targets": len(targets), "written": written, "cap_exceeded": cap_exceeded}

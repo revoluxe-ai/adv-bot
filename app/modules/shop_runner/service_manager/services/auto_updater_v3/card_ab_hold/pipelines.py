@@ -16,8 +16,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     select_ab_hold_overspend_off_keyword_ids,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
-    capture_minus_snapshot,
-    restore_minus_snapshot_if_drift,
+    capture_allowed_phrase_set,
+    normalize_allowed_snapshot,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
@@ -37,7 +37,6 @@ from app.modules.shop_runner.service_manager.services.increment_fact_data_manage
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
-from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
 if TYPE_CHECKING:
     from app.core.di.wb_manager_hub import WBManagerHub
@@ -55,11 +54,12 @@ async def process_ab_setup(
     wb_shop_data_manager: "WBShopDataManager",
     wb_manager_hub: "WBManagerHub",
 ) -> None:
-    """ENTER setup-tick: minus sync+snapshot → OFF/ЦП → mode ACTIVE.
+    """ENTER setup-tick: capture allowed-set → snapshot → enforce → OFF/ЦП → ACTIVE.
 
-    Spec card-ab-hold-mode ENTER / decision §8. Без ordinary NORMAL preamble.
-    Single-flight через ``RedisLockManager`` / ``CardAbHoldSetupLock:{adv_id}``.
-    Без успешного minus sync+snapshot ACTIVE не выставляется.
+    Spec card-ab-hold-mode ENTER / decision §8 (primary invariant = allowed-set).
+    Без ordinary NORMAL preamble. Single-flight через ``RedisLockManager`` /
+    ``CardAbHoldSetupLock:{adv_id}``. Без зафиксированного allowed-set snapshot
+    ACTIVE не выставляется; минус приводится к «всё вне allowed-set» (enforcement).
     """
     _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
@@ -94,35 +94,40 @@ async def process_ab_setup(
             )
             return
 
+        # Decision §8: primary invariant — заморозить разрешённый (allowed) набор
+        # фраз (тексты ключей status != BAD), а не список минус-фраз.
+        allowed_texts = capture_allowed_phrase_set(keywords)
+
         minus_mgr = MinusPhraseManagerContainer(
             _wb_api_manager_hub=wb_manager_hub
         ).minus_phrase_manager()
-        # Decision §8: одна setup sync (не ordinary loop), bypass freeze gate.
-        await minus_mgr.update_minus_phrases(
-            complex_adv, force_ab_hold_setup_sync=True
-        )
-        wb_modifier = wb_manager_hub.wb_modifier
-
-        async def _get_minus(adv_id: int, nmid: int) -> list[str]:
-            return list(await wb_modifier.get_minus_phrases_for_adv(adv_id, nmid))
-
-        snapshot = await capture_minus_snapshot(complex_adv, get_minus=_get_minus)
+        # Одна setup sync (не ordinary loop): привести WB к allowed-set —
+        # исключить всё наблюдаемое вне набора в пределах WB minus cap.
+        enforce = await minus_mgr.enforce_frozen_allowed_set(complex_adv, allowed_texts)
 
         pass_n, fail_n = await apply_ab_hold_setup_mutations(
             adv_id=int(complex_adv.adv_id),
             adv_setting_id=int(complex_adv.adv_setting.id),
             keywords=keywords,
             max_pay_for_order=plan_max,
-            minus_phrases_snapshot=snapshot,
+            allowed_phrases_snapshot=allowed_texts,
         )
         complex_adv.adv_setting.card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
-        complex_adv.adv_setting.card_ab_hold_minus_phrases_snapshot = snapshot
+        complex_adv.adv_setting.card_ab_hold_allowed_phrases_snapshot = allowed_texts
+        if enforce["cap_exceeded"]:
+            logger.error(
+                "[adv_id=%s] ab_setup allowed-set enforcement degraded on %s target(s): "
+                "hold NOT guaranteed clean (WB minus cap / open-match)",
+                complex_adv.adv_id,
+                len(enforce["cap_exceeded"]),
+            )
         logger.info(
-            "[adv_id=%s] ab_setup done pass=%s fail=%s minus=%s → ACTIVE",
+            "[adv_id=%s] ab_setup done pass=%s fail=%s allowed=%s enforce_written=%s → ACTIVE",
             complex_adv.adv_id,
             pass_n,
             fail_n,
-            len(snapshot),
+            len(allowed_texts),
+            enforce["written"],
         )
     finally:
         await lock_mgr.release(lock_key, token)
@@ -134,38 +139,32 @@ async def process_ab_hold(
     wb_shop_data_manager: "WBShopDataManager",
     wb_manager_hub: "WBManagerHub",
 ) -> None:
-    """HOLD-тик: minus restore-on-drift + overspend/PFO-off; bidder вне path.
+    """HOLD-тик: allowed-set enforcement + overspend/PFO-off; bidder вне path.
 
     Spec card-ab-hold-mode HOLD / decision §8. Ordinary V3 не вызывается.
+    Hold-protection (≠ ordinary recalc) удерживает поверхность трат равной
+    замороженному allowed-set: новые/не-разрешённые фразы исключаются, снятые
+    разрешённые восстанавливаются; при превышении WB minus cap — видимая деградация.
     """
     _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
     if mode != CardAbHoldMode.ACTIVE:
         return
 
-    wb_modifier = wb_manager_hub.wb_modifier
-    update_ts = AdvActiveKeywordUpdateStateManager()
-
-    async def _get_minus(adv_id: int, nmid: int) -> list[str]:
-        return list(await wb_modifier.get_minus_phrases_for_adv(adv_id, nmid))
-
-    async def _set_minus(adv_id: int, nmid: int, phrases: list[str]) -> None:
-        _ = await wb_modifier.set_minus_phrases_with_fallback_for_adv(
-            adv_id=adv_id,
-            nmid=nmid,
-            phrases=phrases,
-            update_redis_timestamp_manager=update_ts,
+    allowed = normalize_allowed_snapshot(
+        getattr(complex_adv.adv_setting, "card_ab_hold_allowed_phrases_snapshot", None)
+    )
+    minus_mgr = MinusPhraseManagerContainer(
+        _wb_api_manager_hub=wb_manager_hub
+    ).minus_phrase_manager()
+    enforce = await minus_mgr.enforce_frozen_allowed_set(complex_adv, allowed)
+    if enforce["cap_exceeded"]:
+        logger.error(
+            "[adv_id=%s] ab_hold allowed-set enforcement degraded on %s target(s): "
+            "hold NOT guaranteed clean (WB minus cap / open-match)",
+            complex_adv.adv_id,
+            len(enforce["cap_exceeded"]),
         )
-
-    snapshot = getattr(
-        complex_adv.adv_setting, "card_ab_hold_minus_phrases_snapshot", None
-    )
-    _ = await restore_minus_snapshot_if_drift(
-        complex_adv,
-        snapshot=snapshot,
-        get_minus=_get_minus,
-        set_minus=_set_minus,
-    )
 
     plan_max = float(
         getattr(complex_adv.adv_setting, "max_price_for_order", None) or 0

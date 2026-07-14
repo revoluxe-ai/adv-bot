@@ -1,11 +1,13 @@
-"""Add card_ab_hold_minus_phrases_snapshot to AdvSetting
+"""Add card_ab_hold_allowed_phrases_snapshot to AdvSetting
 
 Revision ID: d4e5f6a7b8c9
 Revises: b8c4ac80176c
 Create Date: 2026-07-14
 
 Spec card-ab-hold-mode §8 / decision write-path §8: durable PG snapshot
-минус-фраз на время A/B Hold (не переиспользовать migration режима).
+**разрешённого (allowed/relevant) набора фраз** на время A/B Hold (primary
+invariant). Минус-лист — производный enforcement, не замораживаемая сущность.
+Не переиспользовать migration режима.
 """
 
 from typing import Sequence, Union
@@ -24,17 +26,18 @@ def upgrade() -> None:
     op.add_column(
         "advsetting",
         sa.Column(
-            "card_ab_hold_minus_phrases_snapshot",
+            "card_ab_hold_allowed_phrases_snapshot",
             postgresql.JSONB(astext_type=sa.Text()),
             server_default=sa.text("'[]'"),
             nullable=False,
             comment=(
-                "A/B Hold: snapshot минус-фраз "
-                "[{adv_id, nmid, phrases[]}] (spec card-ab-hold-mode §8)"
+                "A/B Hold: snapshot разрешённого (allowed/relevant) набора фраз "
+                "[text, ...]; минус — производный enforcement "
+                "(spec card-ab-hold-mode §8)"
             ),
         ),
     )
 
 
 def downgrade() -> None:
-    op.drop_column("advsetting", "card_ab_hold_minus_phrases_snapshot")
+    op.drop_column("advsetting", "card_ab_hold_allowed_phrases_snapshot")

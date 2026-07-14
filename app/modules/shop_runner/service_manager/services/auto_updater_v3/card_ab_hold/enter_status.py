@@ -34,7 +34,7 @@ def build_enter_poll_status_lines(
     if is_ab_hold_ready_for_tests(m):
         lines.append("Setup завершён, режим ACTIVE (HOLD).")
         lines.append(
-            "Можно запускать A/B-тесты: минус-фразы и целевые позиции зафиксированы."
+            "Можно запускать A/B-тесты: набор фраз и целевые позиции зафиксированы."
         )
     elif m == CardAbHoldMode.PENDING_SETUP:
         lines.append(
@@ -43,6 +43,6 @@ def build_enter_poll_status_lines(
         )
         lines.append(
             "Пока статус не ACTIVE — не запускайте A/B-тест: "
-            "минус-фразы ещё не зафиксированы."
+            "набор фраз ещё не зафиксирован."
         )
     return "\n".join(lines)

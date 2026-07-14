@@ -259,4 +259,4 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard)
-- [ ] implementation layer matches decision *(§8 REDEFINED: freeze allowed-set + hold enforcement instead of minus snapshot/restore — implementation NOT yet updated, pending `/opsx:apply`; §9 Excel remove, §10 Enable idempotent, §11 hide Enable — previously applied)*
+- [x] implementation layer matches decision *(§8 REDEFINED applied: allowed-set snapshot (`card_ab_hold_allowed_phrases_snapshot`) + `MinusPhraseManager.enforce_frozen_allowed_set` hold enforcement + WB-cap visible degradation replace minus snapshot/restore; §9 Excel remove, §10 Enable idempotent, §11 hide Enable — previously applied)*

@@ -21,9 +21,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier im
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
-    MinusSnapshotEntry,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_decision import (
     AbHoldSetupAction,
     classify_ab_hold_setup_keyword,
@@ -56,13 +53,14 @@ async def apply_ab_hold_setup_mutations(
     adv_setting_id: int,
     keywords: list[CalculatedKeyword],
     max_pay_for_order: float,
-    minus_phrases_snapshot: list[MinusSnapshotEntry] | None = None,
+    allowed_phrases_snapshot: list[str] | None = None,
 ) -> tuple[int, int]:
-    """Применить ENTER: OFF на FAIL, ЦП на PASS; minus snapshot + mode → ACTIVE.
+    """Применить ENTER: OFF на FAIL, ЦП на PASS; allowed-set snapshot + mode → ACTIVE.
 
     Args:
-        minus_phrases_snapshot: PG snapshot минус-фраз (decision §8). MUST быть
-            передан после успешного sync; без него setup не должен вызываться.
+        allowed_phrases_snapshot: PG snapshot разрешённого (allowed/relevant) набора
+            фраз (decision §8, primary invariant). MUST быть зафиксирован до ACTIVE;
+            минус — производный enforcement, не хранится здесь.
 
     Returns:
         (pass_count, fail_count)
@@ -83,8 +81,8 @@ async def apply_ab_hold_setup_mutations(
         if place is not None:
             pass_updates.append((ks_id, place))
 
-    snapshot: list[MinusSnapshotEntry] = (
-        list(minus_phrases_snapshot) if minus_phrases_snapshot is not None else []
+    snapshot: list[str] = (
+        list(allowed_phrases_snapshot) if allowed_phrases_snapshot is not None else []
     )
     off_hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
     async with sm(read_only=False) as session:
@@ -111,14 +109,14 @@ async def apply_ab_hold_setup_mutations(
             .where(AdvSetting.id == adv_setting_id)
             .values(
                 card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
-                card_ab_hold_minus_phrases_snapshot=snapshot,
+                card_ab_hold_allowed_phrases_snapshot=snapshot,
             )
         )
         _ = await session.execute(stmt_mode)
         await session.commit()
 
     logger.info(
-        "[adv_id=%s] ab_setup applied pass=%s fail=%s minus_entries=%s → ACTIVE",
+        "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s → ACTIVE",
         adv_id,
         len(pass_updates),
         len(fail_ids),
