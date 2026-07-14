@@ -62,11 +62,18 @@ def card_ab_hold_enable_noop_answer(adv_setting: AdvSetting | object) -> str:
 
 
 def card_ab_hold_status_label(adv_setting: AdvSetting) -> str:
-    """Текст статуса режима для кнопки меню."""
+    """Текст статуса режима для кнопки меню.
+
+    При ACTIVE + honest degradation (decision §8: enforcement не гарантирует чистый
+    hold) label MUST NOT заявлять чистый «ВКЛ» — отражаем деградацию, чтобы UI не
+    врал (spec scenario «Enforcement exceeding the WB minus cap degrades visibly»).
+    """
     mode = normalize_card_ab_hold_mode(
         getattr(adv_setting, "card_ab_hold_mode", None)
     )
     if mode == CardAbHoldMode.ACTIVE:
+        if bool(getattr(adv_setting, "card_ab_hold_degraded", False)):
+            return "A/B Hold: ВКЛ (чистота не гарантируется)"
         return "A/B Hold: ВКЛ"
     if mode == CardAbHoldMode.PENDING_SETUP:
         return "A/B Hold: подготовка…"

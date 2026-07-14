@@ -198,6 +198,7 @@ async def enable_card_ab_hold(
             mode=adv.card_ab_hold_mode,
             abort_safe=abort.safe if abort is not None else None,
             abort_can_continue=abort.can_continue if abort is not None else None,
+            degraded=bool(getattr(adv, "card_ab_hold_degraded", False)),
         )
         logger.info("[adv_id=%s] CardAbHold ENTER → PENDING_SETUP", adv.adv_id)
         await query.answer("Подготовка A/B Hold…")
