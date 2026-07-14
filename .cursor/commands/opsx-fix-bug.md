@@ -3,7 +3,7 @@ description: "Fix a scoped Bugbot/Codex/GitHub review bug with mandatory diagnos
 argument-hint: "[GO] <bug report / review comment / failing test / log>"
 ---
 
-# /fix-bug
+# /opsx-fix-bug
 
 You handle scoped bugfixes reported by Bugbot, Codex, GitHub review, CI, or targeted tests.
 
