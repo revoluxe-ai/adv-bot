@@ -69,6 +69,8 @@
 - [x] 8.9 UI: текст инструкции про фиксацию **набора фраз** (новые исключаются) / restore из WB / «чтобы изменить набор — отключите A/B Hold»; scoped/best-effort wording (не обещать полную заморозку вне типа РК / WB cap); ready message только после ACTIVE (исключая гонку с PENDING).
 - [x] 8.10 Regression test (доказывает исправление bug): в ACTIVE hold новая не-разрешённая фраза исключается, снятая разрешённая восстанавливается; enforcement ≠ ordinary recalc; при превышении WB cap — видимая деградация, не тихий success.
 - [x] 8.11 Docstrings + focused pytest на 8.1–8.3 / 8.10; сверка placement с decision §8 (allowed-set — primary invariant, minus — derived).
+- [x] 8.12 Honest degradation durable SoT (decision §8, owner = A/B Hold write-path): новое PG-поле `card_ab_hold_degraded` (+ Alembic migration) на `AdvSetting`; `process_ab_setup` персистит вместе с mode → ACTIVE, `process_ab_hold` — durable флаг из `enforce["cap_exceeded"]` со self-healing (снятие, когда cap не превышен). Закрывает разрыв «enforcement логировал cap_exceeded, но не персистил».
+- [x] 8.13 Honest status в UI читает durable флаг: `build_enter_poll_status_lines(degraded=…)` и `card_ab_hold_status_label` при ACTIVE + degraded НЕ заявляют чистый hold; regression — paired degraded/not-degraded + write-boundary тест реального PG update поля (`test_minus_freeze.py`).
 
 ## 9. Remove Excel A/B Hold write-path (update — decision §9)
 
