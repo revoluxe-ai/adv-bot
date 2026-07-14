@@ -10,11 +10,18 @@ skip ordinary recalc, ready-only-ACTIVE, hold enforcement (новая не-ра�
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.enter_status import (
     build_enter_poll_status_lines,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.pipelines import (
+    process_ab_hold,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
+    card_ab_hold_status_label,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
     WB_MINUS_CAP,
@@ -200,13 +207,32 @@ def test_ui_ready_for_ab_tests_only_when_active() -> None:
     assert "не запускайте A/B" in pending
     assert "набор фраз ещё не зафиксирован" in pending
 
-    active = build_enter_poll_status_lines(
+    active_clean = build_enter_poll_status_lines(
         mode="active",
         abort_safe=None,
         abort_can_continue=None,
+        degraded=False,
     )
-    assert "Можно запускать A/B-тесты" in active
-    assert "зафиксированы" in active
+    assert "Можно запускать A/B-тесты" in active_clean
+    assert "зафиксированы" in active_clean
+
+
+@pytest.mark.unit
+def test_enter_status_active_degraded_does_not_claim_clean_hold() -> None:
+    """8.7/8.10 (bug fix): ACTIVE + degraded ⇒ честный статус, не «чистый» hold.
+
+    Spec scenario «Enforcement exceeding the WB minus cap degrades visibly»:
+    система MUST NOT молча заявлять чистый hold. Падал бы до фикса — параметра
+    ``degraded`` не было и ACTIVE безусловно печатал «Можно запускать A/B-тесты…».
+    """
+    active_degraded = build_enter_poll_status_lines(
+        mode="active",
+        abort_safe=None,
+        abort_can_continue=None,
+        degraded=True,
+    )
+    assert "Можно запускать A/B-тесты" not in active_degraded
+    assert "не гарантируется" in active_degraded
 
 
 @pytest.mark.unit
@@ -276,3 +302,158 @@ def test_instruction_mentions_allowed_set_and_scope() -> None:
     assert "набор" in text and "фраз" in text
     assert "отключите A/B Hold" in text
     assert "не гарантируется" in text
+
+
+@pytest.mark.unit
+def test_status_label_reflects_degradation() -> None:
+    """8.7/8.10 (bug fix): ACTIVE + degraded — label не заявляет чистый «ВКЛ».
+
+    Меню-кнопка (``card_ab_hold_status_label``) — вторая user-facing поверхность
+    honest-status инварианта. Падал бы до фикса — label читал только mode.
+    """
+    clean = SimpleNamespace(card_ab_hold_mode="active", card_ab_hold_degraded=False)
+    degraded = SimpleNamespace(card_ab_hold_mode="active", card_ab_hold_degraded=True)
+    assert card_ab_hold_status_label(clean) == "A/B Hold: ВКЛ"  # type: ignore[arg-type]
+    label_degraded = card_ab_hold_status_label(degraded)  # type: ignore[arg-type]
+    assert label_degraded != "A/B Hold: ВКЛ"
+    assert "не гарантируется" in label_degraded
+
+
+# --- Write-boundary: honest degradation persisted to PG from hold tick ---
+
+_PIPELINES = (
+    "app.modules.shop_runner.service_manager.services."
+    "auto_updater_v3.card_ab_hold.pipelines"
+)
+_SETUP_APPLY = (
+    "app.modules.shop_runner.service_manager.services."
+    "auto_updater_v3.card_ab_hold.setup_apply"
+)
+
+
+class _RecordingSession:
+    """Async-сессия, записывающая исполненные statements (без реальной БД)."""
+
+    def __init__(self, recorder: list[object]) -> None:
+        self._recorder = recorder
+
+    async def execute(self, stmt: object) -> None:
+        self._recorder.append(stmt)
+
+    async def commit(self) -> None:
+        self._recorder.append("commit")
+
+    async def __aenter__(self) -> "_RecordingSession":
+        return self
+
+    async def __aexit__(self, *_exc: object) -> bool:
+        return False
+
+
+def _fake_session_maker(recorder: list[object]):
+    """Фабрика session-maker, возвращающая ``_RecordingSession`` (совместимо с ``sm``)."""
+
+    def _sm(*_a: object, **_kw: object) -> _RecordingSession:
+        return _RecordingSession(recorder)
+
+    return _sm
+
+
+def _hold_complex_adv(*, current_degraded: bool) -> SimpleNamespace:
+    """ACTIVE-кампания для hold-тика; ``max_price_for_order=0`` → return после persist."""
+    adv_setting = SimpleNamespace(
+        id=555,
+        card_ab_hold_mode="active",
+        card_ab_hold_allowed_phrases_snapshot=["good1"],
+        card_ab_hold_degraded=current_degraded,
+        max_price_for_order=0,
+    )
+    return SimpleNamespace(
+        adv_id=9,
+        card_ab_hold_mode="active",
+        adv_setting=adv_setting,
+        fact_pay_for_order=None,
+    )
+
+
+async def _run_hold_with_enforce(
+    *,
+    current_degraded: bool,
+    cap_exceeded: list[tuple[int, int]],
+) -> tuple[list[object], SimpleNamespace]:
+    """Прогнать ``process_ab_hold`` с mocked enforce и recording-сессией."""
+    recorder: list[object] = []
+    complex_adv = _hold_complex_adv(current_degraded=current_degraded)
+
+    mgr = MagicMock()
+    mgr.enforce_frozen_allowed_set = AsyncMock(
+        return_value={"targets": 1, "written": 0, "cap_exceeded": cap_exceeded}
+    )
+    container = MagicMock()
+    container.minus_phrase_manager.return_value = mgr
+
+    with (
+        patch(f"{_PIPELINES}.MinusPhraseManagerContainer", MagicMock(return_value=container)),
+        patch(f"{_SETUP_APPLY}.sm", _fake_session_maker(recorder)),
+    ):
+        await process_ab_hold(
+            complex_adv,  # type: ignore[arg-type]
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+        )
+    return recorder, complex_adv
+
+
+def _degraded_update_stmts(recorder: list[object]) -> list[object]:
+    """Statements, реально пишущие card_ab_hold_degraded в PG (не 'commit')."""
+    return [
+        s
+        for s in recorder
+        if s != "commit" and "card_ab_hold_degraded" in str(s)
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hold_persists_degradation_to_pg_when_cap_exceeded() -> None:
+    """8.7/8.10 (bug fix, write boundary): cap_exceeded ⇒ реальный PG update поля.
+
+    Падал бы до фикса — тик считал cap_exceeded и логировал, но никуда не
+    персистил (UI не имел durable источника честного статуса). Проверяем реальный
+    ``session.execute`` с ``card_ab_hold_degraded=True``, не только return value.
+    """
+    recorder, complex_adv = await _run_hold_with_enforce(
+        current_degraded=False,
+        cap_exceeded=[(9, 101)],
+    )
+    stmts = _degraded_update_stmts(recorder)
+    assert len(stmts) == 1
+    assert stmts[0].compile().params.get("card_ab_hold_degraded") is True  # type: ignore[attr-defined]
+    assert "commit" in recorder
+    assert complex_adv.adv_setting.card_ab_hold_degraded is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hold_self_heals_degradation_flag_when_cap_ok() -> None:
+    """8.7 (paired, self-healing): ранее degraded, cap не превышен ⇒ флаг снят в PG."""
+    recorder, complex_adv = await _run_hold_with_enforce(
+        current_degraded=True,
+        cap_exceeded=[],
+    )
+    stmts = _degraded_update_stmts(recorder)
+    assert len(stmts) == 1
+    assert stmts[0].compile().params.get("card_ab_hold_degraded") is False  # type: ignore[attr-defined]
+    assert complex_adv.adv_setting.card_ab_hold_degraded is False
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hold_no_pg_write_when_degradation_unchanged() -> None:
+    """8.7: чистый hold и флаг уже False ⇒ без лишнего PG write (idempotent tick)."""
+    recorder, complex_adv = await _run_hold_with_enforce(
+        current_degraded=False,
+        cap_exceeded=[],
+    )
+    assert _degraded_update_stmts(recorder) == []
+    assert complex_adv.adv_setting.card_ab_hold_degraded is False
