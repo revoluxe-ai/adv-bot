@@ -1,74 +1,98 @@
 ---
-description: "Triage and fix bug reports with reachability, invariant, write-boundary and regression-test gates."
+description: "Разобрать и, только если безопасно, исправить баг-репорт через reachability, invariant, write-boundary и regression-test gates."
 argument-hint: "GO [bug report / Bugbot verdict / CI failure / manual finding]"
 ---
 
 # /opsx-fix-bug
 
-Use this command to triage and, only when safe, fix a concrete bug report from Bugbot, Cursor, Codex, CI, manual review, logs, or user observation.
+Используй эту команду для разбора и исправления конкретного баг-репорта от Bugbot, Cursor, Codex, CI, ручного ревью, логов или наблюдения пользователя.
 
-A bug report is a hypothesis, not a fix instruction.
+Баг-репорт — это гипотеза, а не инструкция к фиксу.
 
-The command must validate reachability, invariant ownership, write-boundary impact, and regression-test quality before changing production code.
+Перед любыми изменениями команда обязана проверить достижимость runtime-пути, владельца инварианта, write-boundary impact и качество regression-теста.
 
-## User input
+## Язык ответа
+
+Всегда отвечай пользователю на русском языке.
+
+Допустимы только технические английские токены, если они являются командами, enum-значениями, именами файлов, именами функций, именами тестов, git-хешами или литералами из кода.
+
+Примеры допустимых технических токенов:
+
+```text
+GO
+fix_now
+plan_only
+false_positive
+needs_entrypoint_map
+needs_openspec_update
+runtime_reachable
+filter_structural_act_candidates
+poetry run pytest ...
+```
+
+Все пояснения, выводы, причины, риски, next action, review checklist и hunter feedback должны быть на русском.
+
+Запрещено выдавать англоязычные секции вроде `Verdict`, `Decision`, `Minimal fix plan`, `Next action`. Используй русские заголовки из output contract ниже.
+
+## Ввод пользователя
 
 ```text
 $ARGUMENTS
 ```
 
-## Write permission
+## Разрешение на запись
 
-You may modify files only when the user input contains the exact standalone token:
+Можно изменять файлы только если ввод пользователя содержит точный отдельный токен:
 
 ```text
 GO
 ```
 
-If `GO` is absent:
+Если `GO` отсутствует:
 
-- do not modify files;
-- do not stage files;
-- do not commit;
-- do not push;
-- do not run destructive commands;
-- output only analysis, plan, tests, and the next exact prompt/action.
+- не изменяй файлы;
+- не делай stage;
+- не делай commit;
+- не делай push;
+- не запускай разрушительные команды;
+- выдай только анализ, план, тесты и точное следующее действие.
 
-Even when `GO` is present, do not edit production code unless the final verdict is `fix_now`.
+Даже если `GO` есть, не редактируй production-код, пока итоговый вердикт не стал `fix_now`.
 
-Never deploy, restart services, touch production data, run migrations, edit secrets, merge, rebase, force-push, change Kubernetes/infra/CI, or perform unrelated refactors.
+Никогда не делай deploy, restart сервисов, работу с production data, миграции, изменение secrets, merge, rebase, force-push, изменение Kubernetes/infra/CI или unrelated refactor.
 
-## Primary objective
+## Главная цель
 
-Do not patch the function named by the report until you prove that it is the correct runtime boundary.
+Не патчить функцию, на которую указал баг-репорт, пока не доказано, что это правильная runtime-граница.
 
-Before fixing, determine whether the reported path is:
+Перед фиксом определить, является ли указанный путь:
 
-1. reachable from a real runtime entrypoint;
-2. reachable only from tests/dev scripts;
-3. dead or legacy code;
-4. unreachable, but pointing to a real missing invariant in a sibling path;
-5. already guarded elsewhere;
-6. a false positive caused by stale code, stale tests, or incomplete static analysis.
+1. достижимым из реального runtime entrypoint;
+2. достижимым только из тестов или dev scripts;
+3. dead/legacy code;
+4. недостижимым, но указывающим на реальный пропущенный инвариант в sibling path;
+5. уже защищённым в другом месте;
+6. false positive из-за stale code, stale tests или неполного static analysis.
 
-If runtime reachability is unknown, stop before implementation.
+Если runtime reachability неизвестна, остановись до implementation.
 
-## Mandatory first pass: report forensics
+## Обязательный первый проход: bug forensics
 
-Inspect, read-only first:
+Сначала read-only проверь:
 
-1. the reported file/function/class;
-2. all direct callers;
-3. all indirect callers up to runtime entrypoints;
+1. указанный файл/функцию/класс;
+2. всех прямых callers;
+3. всех косвенных callers до runtime entrypoints;
 4. scheduler/job/bot/API entrypoints;
-5. tests that call the reported function directly;
-6. feature flags, modes, guards, enum states and eligibility filters;
+5. тесты, которые вызывают указанную функцию напрямую;
+6. feature flags, modes, guards, enum states и eligibility filters;
 7. write boundaries: WB API writes, DB writes, Redis writes, ClickHouse writes, Telegram writes;
-8. existing regression tests around the same invariant.
+8. существующие regression tests вокруг того же инварианта.
 
-Use repository search. Do not rely on sibling code similarity as reachability evidence.
+Используй поиск по репозиторию. Не используй похожесть sibling-кода как доказательство reachability.
 
-Suggested read-only commands:
+Рекомендуемые read-only команды:
 
 ```bash
 git branch --show-current
@@ -77,12 +101,12 @@ rg -n "<reported_function>|<reported_class>|<reported_symbol>" .
 rg -n "<related_invariant_symbol>|<write_adapter>|<handler_name>" app tests openspec .cursor .github
 ```
 
-## Reachability classification
+## Классификация достижимости
 
-Every bug report must include this classification before any fix plan:
+Каждый баг-репорт должен получить эту классификацию до любого fix plan:
 
 ```text
-Reachability:
+Достижимость:
 - runtime_reachable: yes/no/unknown
 - runtime_entrypoints:
   - ...
@@ -98,28 +122,28 @@ Reachability:
   - entrypoint -> caller -> reported function -> handler/write boundary
 ```
 
-If the evidence chain is missing, the verdict must not be `fix_now`.
+Если evidence chain отсутствует, вердикт не может быть `fix_now`.
 
 ## Hard stop: reachability unknown
 
-If the report claims a missing guard in a function, but runtime reachability is not proven, verdict must be:
+Если репорт заявляет пропущенный guard в функции, но runtime reachability не доказана, вердикт обязан быть:
 
 ```text
 needs_entrypoint_map
 ```
 
-In this case:
+В этом случае:
 
-- do not output `fix_now`;
-- do not suggest `GO to apply`;
-- do not propose production code changes as the primary next step;
-- output the exact searches/files needed to prove or disprove reachability;
-- consider updating the bug-hunter rule to require entrypoint evidence.
+- не выдавай `fix_now`;
+- не предлагай `GO to apply`;
+- не предлагай production-code changes как основное следующее действие;
+- выдай точные поисковые команды/файлы, которые нужны для доказательства или опровержения reachability;
+- предложи обновить bug-hunter rule, чтобы он требовал entrypoint evidence.
 
-Required evidence before a fix:
+Доказательства, обязательные перед фиксом:
 
 ```text
-Entrypoint chain:
+Цепочка entrypoint:
 - scheduler/job/bot/API entrypoint:
 - manager coroutine caller:
 - direct call site:
@@ -127,24 +151,24 @@ Entrypoint chain:
 - handler/write boundary:
 ```
 
-If no such chain is found:
+Если такая цепочка не найдена:
 
 ```text
-Decision:
-- reported path is not proven runtime-reachable
-- do not patch the reported helper/coroutine yet
-- update bug-hunter to check reachability before reporting
-- optionally add dead-code or entrypoint-inventory task
+Решение:
+- reported path не доказан как runtime-reachable
+- пока не патчить reported helper/coroutine
+- обновить bug-hunter, чтобы он проверял reachability перед report
+- опционально создать отдельную задачу на dead-code или entrypoint inventory
 ```
 
-## Bugbot report validation
+## Проверка Bugbot report
 
-Bugbot reports are suspicious until proven.
+Bugbot report подозрителен, пока не доказан.
 
-Before accepting Bugbot severity:
+Перед принятием Bugbot severity:
 
-1. Search all call sites of the reported function.
-2. Classify each call site:
+1. Найди все call sites указанной функции.
+2. Классифицируй каждый call site:
    - runtime scheduler/job;
    - bot/API handler;
    - service/manager production path;
@@ -152,108 +176,108 @@ Before accepting Bugbot severity:
    - dev script;
    - dead/legacy;
    - unknown.
-3. If only test-only/dead/unknown callers exist, downgrade to `false_positive` or `needs_entrypoint_map`.
-4. Do not use sibling methods as reachability evidence.
-5. Do not treat a missing local guard as a production bug unless a real write boundary can be reached.
-6. Do not patch dead code just to silence Bugbot.
+3. Если есть только test-only/dead/unknown callers, понизь до `false_positive` или `needs_entrypoint_map`.
+4. Не используй sibling methods как reachability evidence.
+5. Не считай missing local guard production-багом, пока не доказан путь к реальному write boundary.
+6. Не патчь dead code только чтобы успокоить Bugbot.
 
-## Mandatory invariant analysis
+## Обязательный invariant analysis
 
-Extract the domain invariant behind the report.
+Извлеки доменный инвариант за баг-репортом.
 
-Bad framing:
-
-```text
-Add filter X inside function Y.
-```
-
-Good framing:
+Плохая формулировка:
 
 ```text
-During protected state Z, no structural mutation may reach candidate construction, handler creation, adapter call, or external write boundary from any runtime-reachable path.
+Добавить filter X в function Y.
 ```
 
-Always distinguish:
+Хорошая формулировка:
 
-- reported local symptom;
-- real domain invariant;
-- owner module of the invariant;
-- all known write paths that could violate it;
-- existing guards;
+```text
+В protected state Z структурная мутация не должна доходить до candidate construction, handler creation, adapter call или external write boundary из любого runtime-reachable path.
+```
+
+Всегда разделяй:
+
+- локальный symptom из report;
+- реальный domain invariant;
+- owner module инварианта;
+- все известные write paths, которые могут его нарушить;
+- существующие guards;
 - missing guards;
-- sibling paths that only suggest a pattern;
-- tests that prove the invariant at the correct boundary.
+- sibling paths, которые дают только pattern evidence;
+- tests, которые доказывают invariant на правильной границе.
 
 ## Decision matrix
 
 ### Case A: reachable bug
 
-Use verdict `fix_now` only if:
+Используй вердикт `fix_now` только если:
 
-- the path is runtime-reachable;
-- the invariant is violated;
-- a write boundary or externally visible side effect is reachable;
-- the fix can be scoped to the current bug;
-- a regression test can fail before the fix and pass after it.
+- путь runtime-reachable;
+- инвариант нарушен;
+- write boundary или внешний side effect достижим;
+- fix можно ограничить текущим bug scope;
+- regression test может падать до фикса и проходить после.
 
-Then:
+Тогда:
 
-- add or update the regression test;
-- patch the narrowest correct boundary;
-- prefer shared guard/candidate filter over duplicated local checks;
-- verify both blocked and allowed behavior.
+- добавь или обнови regression test;
+- патчь самую узкую правильную границу;
+- предпочитай shared guard/candidate filter вместо локального дублирования;
+- проверь blocked и allowed behavior.
 
 ### Case B: unreachable reported path, invariant protected elsewhere
 
-Use verdict `false_positive` or `plan_only`.
+Используй вердикт `false_positive` или `plan_only`.
 
-Do not change production logic just to satisfy the report.
+Не меняй production logic только ради report.
 
-Correct actions may be:
+Корректные действия:
 
-- update bug-hunter rules;
-- add entrypoint inventory;
-- remove or document dead code only under a separate explicit task;
-- update stale tests.
+- обновить bug-hunter rules;
+- добавить entrypoint inventory;
+- удалить или задокументировать dead code только отдельной явной задачей;
+- обновить stale tests.
 
 ### Case C: unreachable reported path, sibling path may violate same invariant
 
-Use verdict `needs_entrypoint_map` or `plan_only`.
+Используй вердикт `needs_entrypoint_map` или `plan_only`.
 
-Do not patch the literal reported function yet.
+Пока не патчь literal reported function.
 
-Instead:
+Вместо этого:
 
-- inspect sibling runtime entrypoints;
-- identify real write paths;
-- fix only the reachable violating path;
-- add regression tests against the real entrypoint/write boundary.
+- проверь sibling runtime entrypoints;
+- найди реальные write paths;
+- исправляй только reachable violating path;
+- добавь regression tests против реального entrypoint/write boundary.
 
 ### Case D: direct unit-test-only path
 
-If only tests call the function:
+Если функцию вызывают только тесты:
 
-- do not assume production impact;
-- decide whether the test represents intended public behavior;
-- if yes, rewrite the test around a real entrypoint or documented boundary;
-- if no, update/delete the stale test with explanation.
+- не считай это production impact;
+- реши, представляет ли тест intended public behavior;
+- если да, перепиши тест вокруг реального entrypoint или documented boundary;
+- если нет, обнови/удали stale test с объяснением.
 
 ### Case E: process gap, not code bug
 
-If the main issue is missing ownership/entrypoint documentation, use verdict `needs_openspec_update`.
+Если главная проблема — отсутствующая ownership/entrypoint документация, используй вердикт `needs_openspec_update`.
 
-Do not hide the process gap by making a local code patch.
+Не маскируй process gap локальным code patch.
 
-## Output before GO
+## Output contract без GO
 
-When `GO` is absent, output exactly this structure:
+Если `GO` отсутствует, выдай ровно такую структуру и на русском языке:
 
 ```text
-Verdict:
+Вердикт:
 - fix_now / plan_only / false_positive / needs_entrypoint_map / needs_openspec_update
 
-Bug classification:
-- source:
+Классификация бага:
+- источник:
 - reported file/function:
 - reported severity:
 - accepted severity:
@@ -261,7 +285,7 @@ Bug classification:
 - invariant:
 - affected write boundary:
 
-Reachability:
+Достижимость:
 - runtime_reachable:
 - runtime_entrypoints:
 - direct_callers:
@@ -271,11 +295,11 @@ Reachability:
 - write_boundary_reachable:
 - evidence_chain:
 
-Decision:
-- why this is or is not a real production bug:
-- why the reported fix is or is not at the right boundary:
+Решение:
+- почему это production bug или не production bug:
+- почему предложенный fix находится или не находится на правильной границе:
 
-Minimal fix plan:
+Минимальный fix plan:
 - files allowed:
 - files forbidden:
 - exact behavior change:
@@ -299,34 +323,34 @@ Bug-hunter / OpenSpec updates:
 Stop conditions:
 - ...
 
-Next action:
-- exact command or prompt to run next
+Следующее действие:
+- точная команда или prompt, который надо выполнить дальше
 ```
 
-If verdict is `needs_entrypoint_map`, `Next action` must not be `GO to apply`.
+Если вердикт `needs_entrypoint_map`, `Следующее действие` не должно быть `GO to apply`.
 
-It must be a read-only entrypoint discovery prompt/command.
+Оно должно быть read-only prompt/command для поиска entrypoints.
 
-## Behavior with GO
+## Поведение с GO
 
-When `GO` is present:
+Когда `GO` есть:
 
-1. perform the same forensics first;
-2. if verdict is not `fix_now`, do not edit production code;
-3. if verdict is `fix_now`, add/update regression tests before or with the fix;
-4. keep the diff minimal;
-5. do not patch dead code unless explicitly justified;
-6. do not touch forbidden files/actions;
-7. run the targeted verification command if available;
-8. report changed files, tests run, and unresolved risks.
+1. сначала выполни тот же forensics;
+2. если вердикт не `fix_now`, не редактируй production code;
+3. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
+4. держи diff минимальным;
+5. не патчь dead code без явного обоснования;
+6. не трогай forbidden files/actions;
+7. запусти targeted verification command, если он доступен;
+8. отчитайся по changed files, tests run и unresolved risks.
 
-If the bug requires broader behavior changes than the current report covers, stop and request/spec an OpenSpec change instead of expanding scope silently.
+Если баг требует более широкого изменения поведения, чем покрывает текущий report, остановись и предложи OpenSpec change вместо silent scope expansion.
 
 ## Testing rules
 
-Regression tests must prove the invariant at the correct boundary.
+Regression tests должны доказывать invariant на правильной границе.
 
-For write-gate bugs, tests must prove that the forbidden entity does not reach one of:
+Для write-gate bugs тесты должны доказать, что запрещённая entity не доходит до одного из уровней:
 
 - candidate list;
 - handler construction;
@@ -338,25 +362,25 @@ For write-gate bugs, tests must prove that the forbidden entity does not reach o
 - Telegram output;
 - scheduler/runtime entrypoint.
 
-Weak tests are forbidden as the main proof:
+Слабые тесты запрещены как главное доказательство:
 
-- only `assert_not_called()` without proving the call path;
-- only `count == 0`;
-- mocking the guard/filter being tested;
-- direct testing of a dead helper without proving runtime reachability;
-- source-inspection-only tests as the only regression;
-- tests that still pass if the intended guard is removed.
+- только `assert_not_called()` без доказательства call path;
+- только `count == 0`;
+- mock guard/filter, который как раз проверяется;
+- direct test dead helper без доказательства runtime reachability;
+- source-inspection-only test как единственный regression;
+- тест, который всё ещё проходит после удаления нужного guard.
 
-Prefer paired tests:
+Предпочитай paired tests:
 
-- blocked case: protected entity must not reach the write boundary;
-- allowed case: normal entity still reaches the write boundary.
+- blocked case: protected entity не должна дойти до write boundary;
+- allowed case: normal entity всё ещё должна доходить до write boundary.
 
-Source-inspection wiring tests are allowed only as secondary guardrails. They are not enough to prove production impact.
+Source-inspection wiring tests допустимы только как secondary guardrails. Они недостаточны для доказательства production impact.
 
 ## WB Sky high-risk areas
 
-For bugs touching these areas, be stricter:
+Для багов в этих зонах будь строже:
 
 - campaign state;
 - bidding;
@@ -369,31 +393,31 @@ For bugs touching these areas, be stricter:
 - paid/free boundary;
 - Telegram callback/UI write behavior.
 
-For these areas, always identify:
+Для этих зон всегда определи:
 
 ```text
 runtime entrypoint -> manager/service -> candidate/filter -> handler/adapter -> write boundary
 ```
 
-Do not accept a fix plan that only says вЂњadd guard in helperвЂќ.
+Не принимай fix plan, который сводится к “add guard in helper”.
 
 ## Specific rule: A/B Hold / structural freeze
 
-For A/B Hold, freeze, setup, pending, active, hold, structural-act, whitelist, blacklist, keyword or bid mutation reports:
+Для reports про A/B Hold, freeze, setup, pending, active, hold, structural-act, whitelist, blacklist, keyword или bid mutation:
 
-- identify the state/mode being protected;
-- identify whether the campaign can reach the mutation path from a runtime tick;
-- identify the exact mutation boundary;
-- verify protected states are blocked;
-- verify normal states still proceed;
-- do not use sibling ACT paths as proof of reachability;
-- do not patch service internals if the invariant belongs at manager/candidate/write-boundary level.
+- определи state/mode, который защищается;
+- определи, может ли campaign попасть в mutation path из runtime tick;
+- определи точную mutation boundary;
+- проверь, что protected states blocked;
+- проверь, что normal states still proceed;
+- не используй sibling ACT paths как доказательство reachability;
+- не патчь service internals, если invariant принадлежит manager/candidate/write-boundary level.
 
 ## Specific rule: entrypoint inventory
 
-If the bug exposes that entrypoints are not documented, propose an entrypoint inventory update.
+Если баг вскрывает, что entrypoints не задокументированы, предложи обновить entrypoint inventory.
 
-The inventory should record:
+Inventory должен фиксировать:
 
 ```text
 Entrypoint name:
@@ -405,11 +429,11 @@ Entrypoint name:
 - tests covering it:
 ```
 
-Do not create a large documentation refactor inside a bugfix unless explicitly requested.
+Не создавай большой documentation refactor внутри bugfix, если пользователь явно этого не попросил.
 
 ## Specific rule: hunter feedback loop
 
-If Bugbot, opsx-hunt-bug, or another hunter misses or misclassifies the issue, output a hunter update note:
+Если Bugbot, opsx-hunt-bug или другой hunter пропустил или неправильно классифицировал проблему, выдай hunter update note:
 
 ```text
 Hunter feedback:
@@ -420,20 +444,22 @@ Hunter feedback:
 - suggested fixture/test:
 ```
 
-The goal is to prevent the same class of bug from reaching Bugbot again.
+Текст значений должен быть на русском, кроме имён функций, файлов, тестов и технических токенов.
+
+Цель — не дать тому же классу багов снова дойти до Bugbot.
 
 ## Final output after GO
 
-When changes were made, output:
+Если изменения внесены, выдай:
 
 ```text
-Verdict:
+Вердикт:
 - fixed / not_fixed
 
-Changed files:
+Изменённые файлы:
 - ...
 
-What changed:
+Что изменено:
 - ...
 
 Regression tests:
@@ -443,7 +469,7 @@ Verification:
 - command:
 - result:
 
-Remaining risks:
+Оставшиеся риски:
 - ...
 
 Follow-up:
@@ -452,30 +478,30 @@ Follow-up:
 - review checklist:
 ```
 
-When no changes were made because the verdict was not `fix_now`, output:
+Если изменения не внесены, потому что вердикт не `fix_now`, выдай:
 
 ```text
-Verdict:
+Вердикт:
 - no_code_change
 
-Reason:
+Причина:
 - ...
 
-Next correct action:
+Следующее правильное действие:
 - ...
 ```
 
 ## Review checklist
 
-Before finishing, verify:
+Перед завершением проверь:
 
-- the diff matches the invariant, not just the report text;
-- reachability was proven or explicitly marked unknown;
-- no unrelated files changed;
-- no dead-code-only patch was made without justification;
-- regression test fails before the fix;
-- test reaches the real boundary;
-- allowed behavior still works;
-- forbidden behavior is blocked;
-- source-inspection test is not the only proof for a production bug;
-- Bugbot/hunter/OpenSpec updates are proposed when the gap is process-level.
+- diff соответствует invariant, а не только тексту report;
+- reachability доказана или явно отмечена как unknown;
+- unrelated files не изменены;
+- dead-code-only patch не сделан без обоснования;
+- regression test падает до fix;
+- test доходит до real boundary;
+- allowed behavior продолжает работать;
+- forbidden behavior blocked;
+- source-inspection test не является единственным proof для production bug;
+- Bugbot/hunter/OpenSpec updates предложены, если gap находится на process-level.
