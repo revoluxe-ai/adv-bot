@@ -15,6 +15,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     is_ab_hold_campaign_deep_overspend,
     select_ab_hold_overspend_off_keyword_ids,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
+    capture_minus_snapshot,
+    restore_minus_snapshot_if_drift,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     normalize_card_ab_hold_mode,
@@ -30,8 +34,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.redis_lock_manager import (
     RedisLockManager,
 )
+from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
+    MinusPhraseManagerContainer,
+)
+from app.modules.wb_update_state_manager import AdvActiveKeywordUpdateStateManager
 
 if TYPE_CHECKING:
+    from app.core.di.wb_manager_hub import WBManagerHub
     from app.modules.shop_runner.service_manager.wb_shop_data_manager import (
         ComplexAdv,
         WBShopDataManager,
@@ -44,11 +53,13 @@ async def process_ab_setup(
     complex_adv: "ComplexAdv",
     *,
     wb_shop_data_manager: "WBShopDataManager",
+    wb_manager_hub: "WBManagerHub",
 ) -> None:
-    """ENTER setup-tick: классификация + OFF/ЦП persist; mode → ACTIVE.
+    """ENTER setup-tick: minus sync+snapshot → OFF/ЦП → mode ACTIVE.
 
-    Spec card-ab-hold-mode ENTER. Без ordinary NORMAL preamble.
+    Spec card-ab-hold-mode ENTER / decision §8. Без ordinary NORMAL preamble.
     Single-flight через ``RedisLockManager`` / ``CardAbHoldSetupLock:{adv_id}``.
+    Без успешного minus sync+snapshot ACTIVE не выставляется.
     """
     _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
@@ -83,18 +94,35 @@ async def process_ab_setup(
             )
             return
 
+        minus_mgr = MinusPhraseManagerContainer(
+            _wb_api_manager_hub=wb_manager_hub
+        ).minus_phrase_manager()
+        # Decision §8: одна setup sync (не ordinary loop), bypass freeze gate.
+        await minus_mgr.update_minus_phrases(
+            complex_adv, force_ab_hold_setup_sync=True
+        )
+        wb_modifier = wb_manager_hub.wb_modifier
+
+        async def _get_minus(adv_id: int, nmid: int) -> list[str]:
+            return list(await wb_modifier.get_minus_phrases_for_adv(adv_id, nmid))
+
+        snapshot = await capture_minus_snapshot(complex_adv, get_minus=_get_minus)
+
         pass_n, fail_n = await apply_ab_hold_setup_mutations(
             adv_id=int(complex_adv.adv_id),
             adv_setting_id=int(complex_adv.adv_setting.id),
             keywords=keywords,
             max_pay_for_order=plan_max,
+            minus_phrases_snapshot=snapshot,
         )
         complex_adv.adv_setting.card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
+        complex_adv.adv_setting.card_ab_hold_minus_phrases_snapshot = snapshot
         logger.info(
-            "[adv_id=%s] ab_setup done pass=%s fail=%s → ACTIVE",
+            "[adv_id=%s] ab_setup done pass=%s fail=%s minus=%s → ACTIVE",
             complex_adv.adv_id,
             pass_n,
             fail_n,
+            len(snapshot),
         )
     finally:
         await lock_mgr.release(lock_key, token)
@@ -104,15 +132,40 @@ async def process_ab_hold(
     complex_adv: "ComplexAdv",
     *,
     wb_shop_data_manager: "WBShopDataManager",
+    wb_manager_hub: "WBManagerHub",
 ) -> None:
-    """HOLD-тик: only overspend/PFO-off guard; bidder вне этого path.
+    """HOLD-тик: minus restore-on-drift + overspend/PFO-off; bidder вне path.
 
-    Spec card-ab-hold-mode HOLD. Ordinary V3 не вызывается.
+    Spec card-ab-hold-mode HOLD / decision §8. Ordinary V3 не вызывается.
     """
     _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
     if mode != CardAbHoldMode.ACTIVE:
         return
+
+    wb_modifier = wb_manager_hub.wb_modifier
+    update_ts = AdvActiveKeywordUpdateStateManager()
+
+    async def _get_minus(adv_id: int, nmid: int) -> list[str]:
+        return list(await wb_modifier.get_minus_phrases_for_adv(adv_id, nmid))
+
+    async def _set_minus(adv_id: int, nmid: int, phrases: list[str]) -> None:
+        _ = await wb_modifier.set_minus_phrases_with_fallback_for_adv(
+            adv_id=adv_id,
+            nmid=nmid,
+            phrases=phrases,
+            update_redis_timestamp_manager=update_ts,
+        )
+
+    snapshot = getattr(
+        complex_adv.adv_setting, "card_ab_hold_minus_phrases_snapshot", None
+    )
+    _ = await restore_minus_snapshot_if_drift(
+        complex_adv,
+        snapshot=snapshot,
+        get_minus=_get_minus,
+        set_minus=_set_minus,
+    )
 
     plan_max = float(
         getattr(complex_adv.adv_setting, "max_price_for_order", None) or 0

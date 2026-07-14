@@ -566,6 +566,7 @@ class CoroutinesManager:
                         process_ab_setup,
                         adv,
                         wb_shop_data_manager=self._wb_shop_data_manager,
+                        wb_manager_hub=self._wb_manager_hub,
                     )
                 )
                 continue
@@ -575,6 +576,7 @@ class CoroutinesManager:
                         process_ab_hold,
                         adv,
                         wb_shop_data_manager=self._wb_shop_data_manager,
+                        wb_manager_hub=self._wb_manager_hub,
                     )
                 )
                 continue
@@ -712,6 +714,16 @@ class CoroutinesManager:
                 operation_name="delete_keywords_from_wl_by_mean_auto_ctr",
             )
         )
+        # Spec card-ab-hold-mode: filter before WL mutation / WB write boundary.
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
+        )
+
+        complex_advs_with_white_list_by_mean_auto_ctr_active = (
+            filter_structural_act_candidates(
+                complex_advs_with_white_list_by_mean_auto_ctr_active
+            )
+        )
 
         handlers: list[Callable[[], Awaitable[Any]]] = []
         for adv in complex_advs_with_white_list_by_mean_auto_ctr_active:
@@ -819,6 +831,10 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(15, 60)
     async def update_minus_phrases_in_advs(self):
+        """Ordinary minus recalc; A/B Hold PENDING/ACTIVE исключены (decision §8)."""
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
+        )
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
 
         wb_manager_hub = self._wb_manager_hub
@@ -829,6 +845,8 @@ class CoroutinesManager:
             load_extras=False
         )
         complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        # Spec card-ab-hold-mode §8: filter before MinusPhraseManager / WB write.
+        complex_advs = filter_structural_act_candidates(complex_advs)
         handlers: list[Callable[[], Awaitable[Any]]] = [
             lambda complex_adv_=adv: minus_phrase_manager.update_minus_phrases(
                 complex_adv_

@@ -58,6 +58,9 @@ from app.shared.domains.wb.utils.wb_campaign_meta import (
     wb_is_manual_shelf_only,
     wb_supports_normquery_minus_phrases,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from .click_house_manager import ClickHouseManager
 
 logger = logging.getLogger(__name__)
@@ -80,7 +83,28 @@ class MinusPhraseManager:
         self._click_house = click_house_manager
         self._update_redis_timestamp_manager = update_redis_timestamp_manager
 
-    async def update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
+    async def update_minus_phrases(
+        self,
+        complex_adv: ComplexAdv,
+        *,
+        force_ab_hold_setup_sync: bool = False,
+    ) -> None:
+        """Ordinary sync минус-фраз; при A/B Hold freeze — skip (кроме ENTER setup).
+
+        Spec card-ab-hold-mode / decision §8: PENDING/ACTIVE блокируют ordinary
+        recalculation. ``force_ab_hold_setup_sync=True`` — одна setup-мутация на ENTER.
+        """
+        if not force_ab_hold_setup_sync and is_ab_hold_structural_freeze(
+            complex_adv.card_ab_hold_mode
+        ):
+            logger.info(
+                "Пропуск ordinary minus recalc (A/B Hold freeze) "
+                "shop_id=%s adv_id=%s mode=%s",
+                complex_adv.shop_id,
+                complex_adv.adv_id,
+                complex_adv.card_ab_hold_mode,
+            )
+            return
         try:
             await self._update_minus_phrases(complex_adv)
         except Exception as e:
@@ -92,7 +116,6 @@ class MinusPhraseManager:
                 exc_info=True,
             )
             raise e
-
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         """Собрать BAD-ключи и параллельно обновить auto + search ветки."""
         keywords = await complex_adv.get_keywords()
