@@ -154,6 +154,7 @@ rules:
     - "Spec MUST разделять semantic boundary и implementation path: например, blacklist/minus phrases должны описываться как traffic-shaping state, даже если write выполняется отдельной coroutine/helper."
     - "Для freeze state spec MUST описывать drift policy: что делать, если пользователь, WB UI, другой worker или внешний процесс изменил frozen state вручную."
     - "Если frozen state должен сохраняться, spec MUST указать snapshot/source-of-truth: где хранится эталон, когда создаётся, когда обновляется, когда очищается, и кто имеет право его менять."
+    - "For freeze/hold behavior whose goal is a stable behavior surface, specs MUST freeze the causal source-of-truth input, not a point-in-time derived output; restore/enforce behavior MUST preserve that source-of-truth invariant and MUST explicitly justify any derived-snapshot shortcut."
     - "Spec MUST явно перечислить allowed behavior во время freeze/hold: какие writes остаются разрешёнными и почему они не загрязняют эксперимент."
     - "Spec MUST явно перечислить forbidden behavior во время freeze/hold: какие writes не должны доходить до candidate/filter, handler/adapter, DB/WB/Redis write boundary."
     - "Spec MUST требовать paired regression tests для каждого frozen boundary: protected state blocked/restored, OFF or normal state still allowed."
