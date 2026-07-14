@@ -53,3 +53,15 @@
 - [x] 7.3 Scheduling: `process_ab_setup` / `process_ab_hold` из полного eligible `advs` (не только `advs_filtred`); V2 freshness контракт не ломать без нужды.
 - [x] 7.4 Tests: paired — enable blocked when stale + сообщение содержит reason/`SUPPORT_LINK`; PENDING+stale всё равно eligible для setup; ACTIVE+stale eligible для hold.
 - [x] 7.5 Docstrings / ссылка на updated spec requirements (enable blocked when stats freshness fails; post-enter schedule).
+
+## 8. Minus-phrases freeze + UI readiness after ACTIVE (update)
+
+- [ ] 8.1 Tests-first: setup MUST sync минус → PG snapshot → ACTIVE; fail sync/snapshot → no ACTIVE / UI not ready.
+- [ ] 8.2 Tests-first: PENDING/ACTIVE → ordinary `update_minus_phrases` recalc не применяется; drift → restore snapshot; paired positive при mode OFF.
+- [ ] 8.3 Tests-first: UI ready-to-test / «можно запускать A/B» только при ACTIVE; PENDING не показывает ready; EXIT clear/archive snapshot + ordinary minus снова eligible.
+- [ ] 8.4 Alembic **новая** migration: durable PG поле snapshot минус-фраз на кампании (+ модель/DTO); не переиспользовать уже применённую migration режима.
+- [ ] 8.5 ENTER setup: довести минус до актуального (одна setup sync/mutation) → записать PG snapshot → только затем завершить setup / mode → ACTIVE (decision §8).
+- [ ] 8.6 Gate ordinary minus recalculation в manager / MinusPhraseManager при PENDING_SETUP / ACTIVE; hold/setup path: restore-to-snapshot при drift.
+- [ ] 8.7 EXIT: clear/archive PG minus snapshot; ordinary minus auto-update снова разрешён; без keyword-profile restore.
+- [ ] 8.8 UI: текст инструкции про фиксацию минус-фраз / restore из WB / «чтобы изменить — отключите A/B Hold»; ready message только после ACTIVE (исключая гонку с PENDING).
+- [ ] 8.9 Docstrings + focused pytest на 8.1–8.3; сверка placement с decision §8.

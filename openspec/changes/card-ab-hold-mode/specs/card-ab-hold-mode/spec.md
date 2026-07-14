@@ -15,13 +15,16 @@ The system MUST expose and enable the card A/B Hold mode only for campaigns with
 - **THEN** the system shows the mode instruction and enable/disable controls
 
 ### Requirement: A/B Hold screen includes instruction and controls
-The system MUST provide a dedicated A/B Hold screen with instruction text and controls to enable the mode, disable the mode, and return to the campaign menu. The instruction MUST warn that before enable the campaign SHOULD have warm-up traffic under a non-squeezed max CPO and a sufficient sales plan, that shelf mode is recommended off (user choice if shelves are required for traffic), and that price SHOULD NOT be changed during the test.
+The system MUST provide a dedicated A/B Hold screen with instruction text and controls to enable the mode, disable the mode, and return to the campaign menu. The instruction MUST warn that before enable the campaign SHOULD have warm-up traffic under a non-squeezed max CPO and a sufficient sales plan, that shelf mode is recommended off (user choice if shelves are required for traffic), and that price SHOULD NOT be changed during the test. The instruction MUST also state that during A/B Hold minus phrases are fixed, that manual changes in the Wildberries cabinet MAY be restored by the bot to the fixed snapshot, and that to change minus phrases the user MUST disable A/B Hold.
 
 #### Scenario: User opens instruction screen
 - **GIVEN** a campaign has paid bot management active
 - **WHEN** the user opens the A/B Hold screen
 - **THEN** the instruction text is visible
 - **AND** enable, disable, and back controls are available
+- **AND** the instruction states that minus phrases are fixed during A/B Hold
+- **AND** the instruction states that manual WB cabinet changes to minus phrases MAY be restored by the bot
+- **AND** the instruction states that changing minus phrases requires disabling A/B Hold
 
 ### Requirement: ENTER setup classifies keywords by pay_for_order and views
 When A/B Hold is enabled, the system MUST run a one-time setup that classifies keywords against the campaign plan max CPO (not resolve) and weekly keyword views from the same statistics source as the keyword card.
@@ -50,7 +53,7 @@ When A/B Hold is enabled, the system MUST run a one-time setup that classifies k
 - **THEN** the keyword is turned OFF for the held profile
 
 ### Requirement: HOLD freezes target places and keeps bidder running
-While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming or keyword enable/rollout growth. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF.
+While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming, keyword enable/rollout growth, or ordinary minus-phrase recalculation. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF.
 
 #### Scenario: Target places stay fixed while bidder continues
 - **GIVEN** a campaign is in active A/B Hold after successful setup
@@ -70,8 +73,53 @@ While A/B Hold is active after setup, the system MUST NOT update keyword target 
 - **THEN** that keyword MAY be turned OFF to protect spend
 - **AND** target-place auto-updates remain disabled
 
+### Requirement: ENTER setup freezes minus phrases via PG snapshot before ACTIVE
+When A/B Hold enter setup runs, the system MUST bring minus phrases to an up-to-date state with one setup sync/mutation (not an ordinary recalculation loop), MUST persist that set as a durable PostgreSQL snapshot on the campaign (new migration field), and MUST NOT mark setup complete or transition the mode to ACTIVE until that snapshot write succeeds together with the rest of setup. Redis MUST NOT be the source of truth for the minus-phrase snapshot.
+
+#### Scenario: Setup completes only after minus sync and snapshot
+- **GIVEN** a campaign is in PENDING_SETUP
+- **WHEN** A/B Hold enter setup runs successfully
+- **THEN** minus phrases are brought to an up-to-date state once
+- **AND** that set is stored as a PostgreSQL snapshot for the campaign
+- **AND** the mode transitions to ACTIVE only after the snapshot and the rest of setup succeed
+
+#### Scenario: Setup does not become ACTIVE without minus snapshot
+- **GIVEN** a campaign is in PENDING_SETUP
+- **AND** minus-phrase sync or PostgreSQL snapshot persistence fails
+- **WHEN** A/B Hold enter setup attempts to finish
+- **THEN** the mode does not transition to ACTIVE as a completed setup
+- **AND** the UI does not report that A/B tests may start
+
+### Requirement: HOLD restores minus-phrase snapshot on drift
+While a campaign is preparing or holding for A/B Hold (PENDING_SETUP or ACTIVE), the system MUST NOT run ordinary minus-phrase auto-update recalculation. If current minus phrases differ from the stored PostgreSQL snapshot, the system MUST restore the snapshot to Wildberries. Manual minus-phrase edits by the user in the bot or Wildberries cabinet are freeze violations and MUST be overwritten by restore.
+
+#### Scenario: Ordinary minus recalculation is skipped during hold
+- **GIVEN** a campaign is in PENDING_SETUP or ACTIVE A/B Hold
+- **WHEN** ordinary minus-phrase auto-update would recalculate the set
+- **THEN** that ordinary recalculation path does not apply a new calculated set for that campaign
+
+#### Scenario: Drift from snapshot is restored
+- **GIVEN** a campaign is in ACTIVE A/B Hold with a stored minus-phrase snapshot
+- **AND** current Wildberries minus phrases differ from that snapshot
+- **WHEN** A/B Hold minus-phrase freeze protection runs
+- **THEN** the system restores the snapshot minus phrases to Wildberries
+
+### Requirement: UI reports A/B ready only after ACTIVE setup
+The system MUST NOT tell the user that A/B Hold is enabled and that A/B tests may start until the campaign mode is ACTIVE after successful full setup (including minus-phrase sync and PostgreSQL snapshot). A PENDING_SETUP or “request accepted” state alone MUST NOT be presented as ready-to-test. Cross-pod interrupt and setup lock MUST prevent a ready UI response while setup is incomplete or aborted.
+
+#### Scenario: Ready message waits for ACTIVE
+- **GIVEN** the user enables A/B Hold and setup is still PENDING_SETUP
+- **WHEN** the UI reports mode status
+- **THEN** the UI does not state that A/B tests may start
+- **AND** the ready-to-test message appears only after the mode becomes ACTIVE
+
+#### Scenario: Interrupted setup never shows ready
+- **GIVEN** enter setup is interrupted or fails before ACTIVE
+- **WHEN** the UI reports mode status
+- **THEN** the UI does not state that the mode is fully enabled for starting A/B tests
+
 ### Requirement: Ordinary structural auto-update is suspended during A/B Hold preparation and hold
-While a campaign is preparing or holding for A/B Hold, the system MUST NOT run ordinary structural campaign auto-update that changes whitelist membership, target places, or keyword enable/rollout outside the A/B Hold setup and hold protection paths.
+While a campaign is preparing or holding for A/B Hold, the system MUST NOT run ordinary structural campaign auto-update that changes whitelist membership, target places, keyword enable/rollout, or ordinary minus-phrase recalculation outside the A/B Hold setup and hold protection paths (including minus-phrase snapshot restore).
 
 #### Scenario: Ordinary auto-update skips structural work during hold
 - **GIVEN** a campaign is preparing or holding for A/B Hold
@@ -87,15 +135,17 @@ When the user enables A/B Hold, the system MUST coordinate across bot and runner
 - **THEN** the in-progress structural update stops without applying those structural writes
 - **AND** the system reports that the stop is safe and enter setup may continue
 
-### Requirement: EXIT restores ordinary target-place updates without restore
-When A/B Hold is disabled, the system MUST leave the held keyword profile as-is without restoring a prior snapshot, and MUST allow automatic target-place updates and ordinary structural auto-update again.
+### Requirement: EXIT restores ordinary target-place and minus updates without profile restore
+When A/B Hold is disabled, the system MUST leave the held keyword profile as-is without restoring a prior keyword-settings snapshot, MUST allow automatic target-place updates and ordinary structural auto-update again, MUST allow ordinary minus-phrase auto-update again, and MUST clear or archive the PostgreSQL minus-phrase snapshot for the campaign.
 
 #### Scenario: User disables A/B Hold
 - **GIVEN** a campaign is in active A/B Hold
 - **WHEN** the user disables A/B Hold
 - **THEN** automatic target-place updates are allowed again
 - **AND** ordinary structural auto-update may run again
-- **AND** the system does not restore a previous settings snapshot as part of exit
+- **AND** ordinary minus-phrase auto-update may run again
+- **AND** the PostgreSQL minus-phrase snapshot is cleared or archived
+- **AND** the system does not restore a previous keyword-settings snapshot as part of exit
 
 ### Requirement: Excel exposes A/B Hold only for paid campaigns
 Excel roundtrip MUST allow editing the A/B Hold mode setting only for campaigns with paid bot management active. For inactive paid bot management, Excel MUST NOT apply A/B Hold enable.
