@@ -94,15 +94,11 @@ def can_apply_card_ab_hold_mode_via_excel(
     requested_mode: CardAbHoldMode | str | None,
     stats_fresh_enough: bool = True,
 ) -> bool:
-    """Excel may apply non-OFF mode только при ``bot_active`` и здоровой стате.
+    """Excel MUST NOT apply A/B Hold mode (decision §9 / MVP out).
 
-    Spec paid-only + enable blocked when stats freshness fails.
-    ``stats_fresh_enough`` вычисляет вызывающий (тот же freshness класс, что enable UI).
-    OFF всегда разрешён (EXIT / сброс).
+    Always returns False. Enable/disable — только paid Telegram UI.
+    Leftover Excel payload is ignored by schema (no EDIT column) / import_apply.
+    Args kept for call-site compatibility until callers are fully removed.
     """
-    mode = normalize_card_ab_hold_mode(requested_mode)
-    if mode == CardAbHoldMode.OFF:
-        return True
-    if not bool(bot_active):
-        return False
-    return bool(stats_fresh_enough)
+    _ = (bot_active, requested_mode, stats_fresh_enough)
+    return False
