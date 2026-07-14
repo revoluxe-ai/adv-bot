@@ -9,6 +9,9 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from sqlalchemy import select
 
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
+    empty_minus_snapshot,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.enter_status import (
     build_enter_poll_status_lines,
 )
@@ -50,9 +53,13 @@ _INSTRUCTION = (
     "• рекомендуется выключить полки (если без них нет трафика — на ваше усмотрение);\n"
     "• не меняйте цену на период теста.\n\n"
     "ENTER: ключи с pay_for_order ≤ max CPO и ≥100 показов остаются; "
-    "остальные OFF; ЦП = текущая позиция.\n"
+    "остальные OFF; ЦП = текущая позиция; минус-фразы синхронизируются и "
+    "фиксируются.\n"
     "HOLD: обновление ЦП выкл, биддер продолжает работать.\n"
-    "EXIT: снова обновление ЦП и апдейтеры (без restore).\n"
+    "Во время A/B Hold минус-фразы фиксируются. Ручные изменения в кабинете WB "
+    "могут быть возвращены ботом к зафиксированному состоянию. "
+    "Чтобы изменить минус-фразы, отключите A/B Hold.\n"
+    "EXIT: снова обновление ЦП, апдейтеры и минус-фраз (без restore профиля ключей).\n"
 )
 
 
@@ -159,7 +166,7 @@ async def enable_card_ab_hold(
 async def disable_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldDisable
 ) -> None:
-    """EXIT: OFF + cleanup signal (spec card-ab-hold-mode, без restore)."""
+    """EXIT: OFF + clear minus snapshot + cleanup signal (spec §8, без keyword restore)."""
     async with sm() as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
@@ -168,10 +175,11 @@ async def disable_card_ab_hold(
             await query.answer("Доступно только при включённом боте", show_alert=True)
             return
         adv.card_ab_hold_mode = CardAbHoldMode.OFF.value
+        adv.card_ab_hold_minus_phrases_snapshot = empty_minus_snapshot()
         await session.commit()
         cache = CardAbHoldSignalRedisCache(adv)
         await cache.clear()
-        logger.info("[adv_id=%s] CardAbHold EXIT → OFF", adv.adv_id)
+        logger.info("[adv_id=%s] CardAbHold EXIT → OFF (minus snapshot cleared)", adv.adv_id)
         await query.answer("Режим A/B выключен")
         await _edit_screen(query, f"{_INSTRUCTION}\nСтатус: off", adv.id)
 
