@@ -230,8 +230,12 @@ async def test_minus_manager_skips_ordinary_recalc_on_active() -> None:
         shop_id=1,
         adv_id=2,
     )
-    await mgr.update_minus_phrases(adv)  # type: ignore[arg-type]
+    skipped = await mgr.update_minus_phrases(adv)  # type: ignore[arg-type]
+    assert skipped is False
     mgr._update_minus_phrases.assert_not_called()
 
-    await mgr.update_minus_phrases(adv, force_ab_hold_setup_sync=True)  # type: ignore[arg-type]
+    forced = await mgr.update_minus_phrases(
+        adv, force_ab_hold_setup_sync=True
+    )  # type: ignore[arg-type]
+    assert forced is True
     mgr._update_minus_phrases.assert_awaited_once()

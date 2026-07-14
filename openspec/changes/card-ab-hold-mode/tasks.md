@@ -78,6 +78,6 @@
 
 ## 10. Honest UX: freeze no-op on «Обновить минус-слова» (clarify)
 
-- [ ] 10.1 Tests-first: ACTIVE/PENDING + ordinary update → no set_minus + non-success freeze message; OFF → success path.
-- [ ] 10.2 `update_minus_phrases` returns skip/status; `wb_update_minus_keywords` uses it for Telegram copy.
-- [ ] 10.3 Focused pytest; сверка со scenario Manual bot minus update.
+- [x] 10.1 Tests-first: ACTIVE/PENDING + ordinary update → no set_minus + non-success freeze message; OFF → success path.
+- [x] 10.2 `update_minus_phrases` returns skip/status; `wb_update_minus_keywords` uses it for Telegram copy.
+- [x] 10.3 Focused pytest; сверка со scenario Manual bot minus update.

@@ -88,23 +88,26 @@ class MinusPhraseManager:
         complex_adv: ComplexAdv,
         *,
         force_ab_hold_setup_sync: bool = False,
-    ) -> None:
+    ) -> bool:
         """Ordinary sync минус-фраз; при A/B Hold freeze — skip (кроме ENTER setup).
 
         Spec card-ab-hold-mode / decision §8: PENDING/ACTIVE блокируют ordinary
         recalculation. ``force_ab_hold_setup_sync=True`` — одна setup-мутация на ENTER.
+
+        Returns:
+            True — ordinary sync выполнялся (или был forced setup sync);
+            False — skip из‑за structural freeze (для honest Telegram UX).
         """
-        if not force_ab_hold_setup_sync and is_ab_hold_structural_freeze(
-            complex_adv.card_ab_hold_mode
-        ):
+        ab_mode = getattr(complex_adv, "card_ab_hold_mode", None)
+        if not force_ab_hold_setup_sync and is_ab_hold_structural_freeze(ab_mode):
             logger.info(
                 "Пропуск ordinary minus recalc (A/B Hold freeze) "
                 "shop_id=%s adv_id=%s mode=%s",
                 complex_adv.shop_id,
                 complex_adv.adv_id,
-                complex_adv.card_ab_hold_mode,
+                ab_mode,
             )
-            return
+            return False
         try:
             await self._update_minus_phrases(complex_adv)
         except Exception as e:
@@ -116,6 +119,7 @@ class MinusPhraseManager:
                 exc_info=True,
             )
             raise e
+        return True
     async def _update_minus_phrases(self, complex_adv: ComplexAdv) -> None:
         """Собрать BAD-ключи и параллельно обновить auto + search ветки."""
         keywords = await complex_adv.get_keywords()

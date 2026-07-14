@@ -26,6 +26,27 @@ logger = logging.getLogger(__name__)
 GetMinusFn = Callable[[int, int], Awaitable[list[str]]]
 SetMinusFn = Callable[[int, int, list[str]], Awaitable[Any]]
 
+# Spec scenario: Manual bot minus update does not report success during freeze.
+AB_HOLD_MANUAL_MINUS_UPDATE_BLOCKED_MSG = (
+    "Минус-слова не обновлены: при A/B Hold они зафиксированы. "
+    "Чтобы изменить минус-фразы, отключите A/B Hold."
+)
+MINUS_PHRASES_UPDATED_SUCCESS_MSG = "Минус-слова обновлены."
+
+
+def user_message_after_ordinary_minus_update(*, applied: bool) -> str:
+    """Telegram copy после ordinary ``update_minus_phrases`` (spec §10 / decision §8).
+
+    Args:
+        applied: True если ordinary sync реально выполнялся; False при freeze skip.
+
+    Returns:
+        Success или blocked-сообщение; silent no-op с success Forbidden.
+    """
+    if applied:
+        return MINUS_PHRASES_UPDATED_SUCCESS_MSG
+    return AB_HOLD_MANUAL_MINUS_UPDATE_BLOCKED_MSG
+
 
 class MinusSnapshotEntry(TypedDict):
     """Одна запись snapshot: минус-фразы для пары (adv_id, nmid)."""

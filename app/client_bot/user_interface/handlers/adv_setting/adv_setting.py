@@ -21,6 +21,9 @@ from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_menu.message import ShopMenu
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
+    user_message_after_ordinary_minus_update,
+)
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
@@ -451,6 +454,7 @@ async def wb_update_minus_keywords(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
+    """Ручное «Обновить минус-слова»; при A/B Hold freeze — non-success UX (spec §10)."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
@@ -518,8 +522,14 @@ async def wb_update_minus_keywords(
                 minus_phrase_manager = MinusPhraseManagerContainer(
                     _wb_api_manager_hub=hub
                 ).minus_phrase_manager()
-                await minus_phrase_manager.update_minus_phrases(complex_adv)
-                await bot.send_message(chat_id, "Минус-слова обновлены.")
+                # Spec §10 / decision §8: freeze skip → non-success Telegram copy.
+                applied = await minus_phrase_manager.update_minus_phrases(
+                    complex_adv
+                )
+                await bot.send_message(
+                    chat_id,
+                    user_message_after_ordinary_minus_update(applied=applied),
+                )
     except Exception:
         logger.exception("Ошибка обновления минус-слов для adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(
