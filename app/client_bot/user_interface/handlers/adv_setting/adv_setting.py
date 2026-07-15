@@ -24,6 +24,9 @@ from app.modules.shop_menu.message import ShopMenu
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
     user_message_after_ordinary_minus_update,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
@@ -420,13 +423,25 @@ async def apply_campaign_defaults(
         )
         adv_setting: AdvSetting = result.scalar_one()
 
-        # Применяем дефолты через ORM
-        apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
-        await session.commit()
+        # spec card-ab-hold-mode «Shared defaults MUST NOT disable or mutate A/B
+        # Hold on a held campaign» / decision §13: «Применить дефолты» — не
+        # disable-path. Для PENDING_SETUP/ACTIVE не применяем дефолты (иначе
+        # un-owned disable: mode→off + stale snapshot + сброс V3/structural).
+        # Отключение A/B Hold — только owned Telegram EXIT на экране режима.
+        if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+            await bot.send_message(
+                chat_id,
+                "Кампания в режиме A/B Hold — дефолтные настройки не применены. "
+                "Сначала выключите A/B Hold на экране режима, затем повторите.",
+            )
+        else:
+            # Применяем дефолты через ORM
+            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+            await session.commit()
 
-        await bot.send_message(
-            chat_id, "Дефолтные настройки применены успешно!"
-        )
+            await bot.send_message(
+                chat_id, "Дефолтные настройки применены успешно!"
+            )
 
         # Обновить меню кампании
         wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
@@ -574,19 +589,31 @@ async def apply_defaults_for_shop(
         result: Result[tuple[AdvSetting]] = await session.execute(stmt)
         adv_settings: Sequence[AdvSetting] = result.scalars().all()
 
-        # Применяем дефолты через ORM для каждой активной кампании
+        # Применяем дефолты через ORM для каждой активной кампании.
+        # spec card-ab-hold-mode / decision §13: held (PENDING_SETUP/ACTIVE)
+        # кампании пропускаем — «Применить дефолты» не отключает A/B Hold
+        # (disable только через owned Telegram EXIT); non-held получают дефолты.
         updated_count = 0
+        skipped_ab_hold = 0
         for adv_setting in adv_settings:
+            if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+                skipped_ab_hold += 1
+                continue
             apply_defaults_to_adv_setting(adv_setting,
                                          adv_setting.wb_cabinet)
             updated_count += 1
 
         await session.commit()
 
-    await bot.send_message(
-        chat_id,
-        f"Дефолтные настройки применены к {updated_count} активным кампаниям магазина.",
+    message_text = (
+        f"Дефолтные настройки применены к {updated_count} активным кампаниям магазина."
     )
+    if skipped_ab_hold:
+        message_text += (
+            f"\nПропущено кампаний в режиме A/B Hold: {skipped_ab_hold}. "
+            "Чтобы применить дефолты к ним, сначала выключите A/B Hold."
+        )
+    await bot.send_message(chat_id, message_text)
 
     # Вернуть пользователя в меню магазина
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
