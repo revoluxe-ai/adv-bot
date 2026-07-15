@@ -54,7 +54,7 @@ artifact_limits:
 
 artifact_baselines:
   "openspec/config.yaml":
-    baseline_chars: 16867
+    baseline_chars: 18335
     allowed_growth_chars: 0
     status: WARN
 
@@ -180,7 +180,7 @@ scenario_defaults:
 
 scenarios:
   opsx_propose:
-    baseline_chars: 73017
+    baseline_chars: 74485
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
@@ -193,7 +193,7 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_continue:
-    baseline_chars: 71471
+    baseline_chars: 72939
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
@@ -206,7 +206,7 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_update:
-    baseline_chars: 73000
+    baseline_chars: 74468
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
@@ -240,7 +240,7 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_verify:
-    baseline_chars: 76839
+    baseline_chars: 78307
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
