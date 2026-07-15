@@ -258,6 +258,34 @@ The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through th
 - **WHEN** shop-runner schedules A/B Hold automation
 - **THEN** the A/B Hold hold path remains eligible to run for that campaign
 
+### Requirement: Enable warns when candidate test keywords have too few recent impressions
+When the user attempts to enable A/B Hold from the paid UI and the stats freshness gate passes, the system MUST evaluate the aggregate recent impressions (last-24h window from the same campaign statistics source used for keyword cards) of the keywords that would carry the test. If that aggregate is below the minimum recent-impressions threshold, the system MUST NOT enable silently: it MUST show the reason (too few recent impressions for a reliable A/B test), recommend increasing the plan max CPO and retrying, and present an explicit choice to launch anyway or cancel. The mode MUST remain `OFF` until the user chooses. Choosing launch-anyway proceeds to `PENDING_SETUP` (ENTER). Choosing cancel leaves the mode `OFF` without signaling ENTER. This is a soft warning gate (the user MAY proceed at their own risk), distinct from the stats-freshness hard block and from the empty allowed-set non-ready rule. When the aggregate meets or exceeds the threshold, enable proceeds without this warning.
+
+#### Scenario: Low recent impressions warns with a choice
+- **GIVEN** a campaign has paid bot management active, passes the stats freshness gate, and mode is `OFF`
+- **AND** the aggregate recent impressions (last 24h) of the candidate test keywords are below the minimum threshold
+- **WHEN** the user presses Enable
+- **THEN** the campaign mode is not changed yet (stays `OFF`)
+- **AND** the user sees the reason (too few recent impressions), a recommendation to raise the plan max CPO and try again, and an explicit choice to launch anyway or cancel
+
+#### Scenario: Launch anyway proceeds to setup
+- **GIVEN** the low recent-impressions warning is shown
+- **WHEN** the user chooses launch anyway
+- **THEN** the campaign mode becomes `PENDING_SETUP`
+- **AND** the ENTER setup path may run despite the low-impressions warning
+
+#### Scenario: Cancel keeps the campaign OFF
+- **GIVEN** the low recent-impressions warning is shown
+- **WHEN** the user chooses cancel
+- **THEN** the campaign mode remains `OFF`
+- **AND** ENTER is not signaled
+
+#### Scenario: Sufficient recent impressions enable without warning
+- **GIVEN** the aggregate recent impressions (last 24h) of the candidate test keywords meet or exceed the minimum threshold
+- **WHEN** the user presses Enable
+- **THEN** the low recent-impressions warning is not shown
+- **AND** enable proceeds per the normal enable path
+
 ### Requirement: ACTIVE without ENTER setup snapshot is forbidden
 The system MUST NOT transition a campaign to ACTIVE A/B Hold except via successful `process_ab_setup` / setup apply that includes allowed-set capture and PostgreSQL snapshot persistence (decision §8). Direct writes of `active` (including Excel or other non-setup paths) MUST NOT create a held campaign.
 

@@ -24,6 +24,7 @@
 - **Excel MUST NOT** экспортировать / импортировать / применять `card_ab_hold_mode` в MVP (колонки нет; leftover payload ignored). Идея Excel-колонки — **future**, не текущий контракт.
 - **Включение (enable) дополнительно ограничено здоровьем статы РК:** если кампания не проходит тот же класс проверки свежести/получения статистики, что `_split_advs_by_stats_freshness` / `advs_filtred`, enable MUST NOT выполняться. В UI пользователь MUST сразу видеть **причину**, текст **ограничения** и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в коде нет `ADMIN`; whitelist — `ADMINS`; публичная ссылка — `SUPPORT_LINK`).
 - **После успешного переключения** (PENDING_SETUP / ACTIVE) сбои свежести статы **не** должны блокировать scheduling `process_ab_setup` / `process_ab_hold` (не оставлять вечный PENDING из‑за `advs_filtred`).
+- **Мягкое предупреждение о слабом объёме теста (soft-gate):** при enable, если суммарные недавние показы (окно последних 24ч) ключей-кандидатов теста ниже порога, система MUST NOT включать молча — показывает **причину** (мало показов для надёжного A/B), **рекомендацию** поднять план max CPO и повторить попытку, и **выбор** «всё равно запустить» / «отмена» (пользователь MAY продолжить на свой риск). Это отдельный soft-gate, не hard block (в отличие от freshness) и не пустой allowed-set.
 - **ENTER:** система один раз готовит профиль РК (включая минус-фразы), затем переводит кампанию в hold (**ACTIVE**). Прямой `ACTIVE` любым non-setup путём — Forbidden. Telegram Enable при уже `PENDING_SETUP` / `ACTIVE` — **no-op** (не demote в PENDING, не rewrite Redis ENTER, не re-run ENTER force allowed-set sync); новый ENTER только после EXIT → `OFF`.
 - **Критерий setup (ENTER):**
   - PASS: `pay_for_order` ключа **≤ max CPO плана** (не resolve) **и** показов за недельное окно статистики ключа (тот же источник, что в карточке ключа) **≥ 100**;
@@ -40,6 +41,7 @@
 
 - Paid-only access: UI скрыт при `bot_active is False`; Telegram enable/disable гейтятся тем же условием.
 - Enable gate на freshness/health статы РК + явный UI-ответ (причина, ограничение, `SUPPORT_LINK`).
+- Enable soft-gate на объём теста: предупреждение при низких суммарных показах (24ч) ключей-кандидатов + рекомендация поднять max CPO + выбор «всё равно запустить / отмена» (реюз CH-показов по ключам).
 - После PENDING/ACTIVE: setup/hold не зависят от `advs_filtred` freshness filter.
 - Paid bot UI: экран инструкции (вкл. текст минус-freeze) + Disable/Back; Enable при OFF (MAY hide при PENDING/ACTIVE); ready-to-test только после ACTIVE; Enable handler idempotent; honest UX на manual minus refresh при freeze (не «Минус-слова обновлены»).
 - Состояния режима кампании (выкл / подготовка / активен).
@@ -73,7 +75,7 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 ### Architecture Decision References
 
 - Relevant accepted: `openspec/decisions/mode-defaults-policy-ownership/decision.md` — дефолт режима A/B Hold (выкл) и related paid/free overlays (в т.ч. minus defaults) принадлежат declarative mode policy overlays, а не transition-helper.
-- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§8 allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
+- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§2c launch-validity soft-gate (низкий объём показов 24ч → warn + max-CPO recommendation + launch-anyway/cancel)**, **§8 allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, PG vs Redis, paid-only Telegram enable.
 
 ## Capabilities
 

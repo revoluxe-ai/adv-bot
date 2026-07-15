@@ -99,3 +99,14 @@
 - [x] 12.1 Tests-first: OPEN screen / `_screen_keyboard` — OFF → Enable+Disable+Back; PENDING/ACTIVE → Disable+Back, Enable absent (or documented optional show + handler no-op still covered by §10).
 - [x] 12.2 Mode-aware keyboard builder: omit Enable when mode ∈ {PENDING_SETUP, ACTIVE}; always include Disable+Back; OFF keeps Enable.
 - [x] 12.3 Focused pytest; сверка со spec screen controls + decision §11; §10 handler tests remain green.
+
+## 13. Launch validity soft-gate: low 24h views warning (update — decision §2c)
+
+> Новый enable-поток: попытка запуска → оценка объёма показов ключей-кандидатов за 24ч → при проблеме → информация + рекомендация (поднять max CPO) + выбор «всё равно запустить / отмена». Soft-gate (не hard block), distinct от §2a freshness и §8 empty allowed-set. Пороговая константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`.
+
+- [ ] 13.1 Tests-first (integration, real/test CH): агрегат суммарных показов ключей-кандидатов за последние 24ч через реюз `full_wb_adv_stat.get_keywords_views_by_days` (MV `default_db.mv_clusters_daily_agg`); граничные значения вокруг порога 1000 (ниже / равно / выше).
+- [ ] 13.2 Tests-first: enable при `Σ 24h views < порога` → mode остаётся `OFF`; сообщение содержит причину (мало показов), рекомендацию поднять план max CPO и повторить, и inline-выбор «Всё равно запустить» / «Отмена». Paired: `Σ ≥ порога` → enable без предупреждения (обычный путь §7).
+- [ ] 13.3 Tests-first: «Всё равно запустить» (confirm-callback) → `PENDING_SETUP` + Redis ENTER; «Отмена» → остаётся `OFF`, ENTER не пишется.
+- [ ] 13.4 Telegram payload-limit тесты (`openspec/policies/telegram_bot_api_limits.md`): worst-case текст предупреждения + `callback_data` кнопок confirm/cancel в пределах Bot API байт-лимитов.
+- [ ] 13.5 Реализация: read-only CH-агрегат показов за 24ч (реюз `full_wb_adv_stat`); чистая пороговая функция + константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`; wiring в `enable_card_ab_hold` (soft-gate после §2a freshness, до записи PENDING/ENTER); copy рекомендации (поднять max CPO); confirm-callback «launch anyway». Кандидаты — тот же набор ключей, что setup (non-BAD / would-carry-test).
+- [ ] 13.6 RU-docstrings со ссылкой на spec (requirement «Enable warns when candidate test keywords have too few recent impressions») и decision §2c; прогон integration + focused unit; `pyright-strict` на затронутых путях.

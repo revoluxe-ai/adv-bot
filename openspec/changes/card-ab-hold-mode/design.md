@@ -37,7 +37,7 @@
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§8** allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain).
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§2c** launch validity soft-gate (низкий объём показов 24ч → warn + raise-max-CPO recommendation + launch-anyway/cancel); **§8** allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain).
 
 Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
 
@@ -92,6 +92,14 @@ Architecture Decision Missing: нет (для этого change placement зак
 **Выбор:** enable (**Telegram UI only** → PENDING) MUST NOT, если РК не проходит freshness/health класс `_split_advs_by_stats_freshness` (не попала бы в fresh automation set). UI при блокировке MUST сразу показать: (1) причину, (2) что включение теста ограничено, (3) рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK`. В репозитории нет `const.ADMIN`; whitelist админов — `const.ADMINS`; публичная ссылка для пользователя — `SUPPORT_LINK` (как в других handler’ах: «обратитесь в поддержку → {SUPPORT_LINK}»). Excel не enable-path в MVP.
 
 **Почему:** ENTER/setup на «мёртвой» стате даёт массовый FAIL→OFF и грязный старт теста; после входа блокировать hold/setup freshness’ом хуже, чем слабее overspend на stale.
+
+### 2c. Launch validity soft-gate (низкий объём показов за 24ч)
+
+**Выбор:** новый шаг enable-потока (**Telegram UI only**), decision §2c: **попытка запуска → оценка → при проблеме → информация + рекомендация + выбор**. После прохождения freshness (§2a), но до записи `PENDING_SETUP` + Redis ENTER, handler агрегирует суммарные показы ключей-кандидатов теста за окно последних 24ч. Источник — существующая CH-инфраструктура показов по ключам `get_keywords_views_by_days(adv_ids, start, end)` в `app/modules/shop_runner/wb_stat_manager/clickhouse_manager/full_wb_adv_stat.py` (MV `default_db.mv_clusters_daily_agg`), с окном последних суток; кандидаты — те же ключи, что фигурируют в setup (non-BAD / would-carry-test набор, полученный тем же UI-источником, что карточка ключей `fetch_keywords_from_database`). Порог — константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000` (суммарно за 24ч). Если `Σ показов < порога`: mode остаётся `OFF`, а пользователю показывается сообщение с (1) причиной (мало показов для надёжного A/B), (2) рекомендацией поднять план max CPO и повторить попытку, (3) inline-выбором «Всё равно запустить» / «Отмена». «Всё равно запустить» (отдельный confirm-callback) → `PENDING_SETUP` + Redis ENTER; «Отмена» → остаётся `OFF`, ENTER не пишется. При `Σ ≥ порога` предупреждение не показывается, enable идёт обычным путём (§7). Это **soft-gate** (пользователь MAY продолжить на свой риск), в отличие от freshness hard-block (§2a) и пустого allowed-set (не-ready, §8).
+
+**Почему:** тест на ключах с крайне низким объёмом показов даёт статистически ненадёжный A/B; но объём — не повод жёстко блокировать (в отличие от больной статы), поэтому предупреждение + осознанный выбор + практичная рекомендация (поднять max CPO → больше ключей проходят ENTER-критерий и больше трафика набегает → выше объём для теста). Реюз `full_wb_adv_stat` / `mv_clusters_daily_agg` избегает нового CH-контракта.
+
+**Альтернатива:** hard-block enable при низком объёме — отклонена (пользователь должен иметь право запустить на свой риск). Молчаливый enable без предупреждения — отклонена (finding: пользователь не видит, что тест заведомо слабый).
 
 ### 3. ENTER criterion
 
@@ -167,7 +175,8 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - PG migration #2 (**новая**): durable allowed-set snapshot на кампании + clear на EXIT.
 - Shop-runner: dispatcher `adv_settings_auto_update`; setup/hold pipelines (вкл. allowed-set capture+snapshot+sync); interrupt checks; ACT guards (top-key WL, individual TP, WL trim non-v3, stats emergency structural, ordinary allowed-set recalc); allowed-set enforcement on drift (minus non-allowed, WB cap → visible degradation).
 - Redis caches + lock.
-- Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE.
+- ClickHouse read (реюз `full_wb_adv_stat.get_keywords_views_by_days` / `mv_clusters_daily_agg`): суммарные показы ключей-кандидатов за 24ч для launch-validity soft-gate (§2c).
+- Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE; **low-24h-views warning + confirm-callback «Всё равно запустить» / «Отмена»** (§2c).
 - Excel roundtrip: **remove** column + ignore apply for `card_ab_hold_mode`.
 - Unit/gate tests (`ab_hold_gates` по духу `bot_active_gates`).
 
@@ -186,6 +195,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 |------|------|
 | UI / enable | `bot_active is True` **и** stats freshness/health pass |
 | UI enable blocked by stats | show reason + restriction + `const.SUPPORT_LINK` |
+| UI enable low 24h views (Σ candidate keyword views < `AB_HOLD_MIN_TOTAL_VIEWS_24H`) | soft warn: reason + raise-max-CPO recommendation + choice launch-anyway/cancel; mode stays `OFF` until confirm (§2c) |
 | UI ready-to-test copy | mode == ACTIVE after full setup (incl. minus snapshot) |
 | Excel apply `card_ab_hold_mode` | **MUST NOT** (ignore / no column) |
 | Ordinary V3 schedule | mode == OFF |
@@ -209,6 +219,9 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Gate: EXIT → ordinary minus + allowed-set recalc eligible again; allowed-set snapshot cleared/archived.
 - Gate: `bot_active=False` → UI hidden / enable no-op.
 - Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
+- Integration (real/test CH): 24h candidate-keyword views aggregate over `mv_clusters_daily_agg`; boundary around `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`.
+- Gate (§2c): enable with Σ 24h views < threshold → mode stays `OFF`, message has reason + raise-max-CPO recommendation + launch-anyway/cancel choice; launch-anyway → PENDING_SETUP + ENTER; cancel → OFF, no ENTER; Σ ≥ threshold → enable without warning (paired).
+- Telegram payload-limit: worst-case low-views warning text + confirm-callback `callback_data` within Bot API byte limits.
 - Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
 - Gate: Excel import `active` / `pending_setup` / `off` → mode unchanged; schema has no column.
 - Gate: Enable while ACTIVE/PENDING → mode unchanged, no Redis ENTER rewrite; OFF → PENDING.
@@ -253,10 +266,12 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 4. ~~Setup vs stale `advs_filtred`~~ — **Resolved (update):** enable блокируется freshness/health статы + UI reason/`SUPPORT_LINK`; после PENDING/ACTIVE setup/hold schedule из полного `advs`, не только `advs_filtred`.
 5. ~~Minus freeze storage~~ — **Resolved (update):** durable PG **allowed-set** snapshot на кампании (новая migration); capture allowed-set→snapshot до ACTIVE; hold enforcement (исключение не-разрешённых фраз, в пределах WB cap; иначе видимая деградация); clear/archive on EXIT. Заморозка allowed-set — primary invariant, минус — derived enforcement.
 6. ~~Excel A/B Hold column~~ — **Resolved (update):** убрать из Excel schema/apply в MVP (decision §9); enable/disable только Telegram; future option отдельно.
+7. Launch validity soft-gate (decision §2c) — **Planned (update, not yet applied):** enable агрегирует показы ключей-кандидатов за 24ч (реюз `full_wb_adv_stat.get_keywords_views_by_days` / `mv_clusters_daily_agg`); Σ < `AB_HOLD_MIN_TOTAL_VIEWS_24H` (=1000) → warn + рекомендация поднять max CPO + выбор запустить/отмена. Реализация — tasks §13.
 
 ## Review Checklist
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard)
+- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §2c launch-validity soft-gate + §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard)
 - [x] implementation layer matches decision *(§8 REDEFINED applied: allowed-set snapshot (`card_ab_hold_allowed_phrases_snapshot`) + `MinusPhraseManager.enforce_frozen_allowed_set` hold enforcement + WB-cap visible degradation replace minus snapshot/restore; §9 Excel remove, §10 Enable idempotent, §11 hide Enable — previously applied)*
+- [ ] §2c launch-validity soft-gate — **planned, not yet applied** (owner: bot enable write-path; impl + integration tests in tasks §13)
