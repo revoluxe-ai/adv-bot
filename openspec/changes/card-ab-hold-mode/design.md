@@ -278,6 +278,6 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §2c launch-validity soft-gate + §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard)
-- [x] implementation layer matches decision *(§8 REDEFINED applied: allowed-set snapshot (`card_ab_hold_allowed_phrases_snapshot`) + `MinusPhraseManager.enforce_frozen_allowed_set` hold enforcement + WB-cap visible degradation replace minus snapshot/restore; §9 Excel remove, §10 Enable idempotent, §11 hide Enable — previously applied)*
+- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §2c launch-validity soft-gate + §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard + §12 V3-only/V2-block + §13 shared-defaults not-a-disable-path)
+- [x] implementation layer matches decision *(§8 REDEFINED applied: allowed-set snapshot (`card_ab_hold_allowed_phrases_snapshot`) + `MinusPhraseManager.enforce_frozen_allowed_set` hold enforcement + WB-cap visible degradation replace minus snapshot/restore; §9 Excel remove, §10 Enable idempotent, §11 hide Enable, §12 V3-only + V2 downgrade block (tasks §14), §13 shared-defaults not-a-disable-path guard (tasks §15) — applied; §2c launch-validity soft-gate — not yet applied, tasks §13)*
 - [ ] §2c launch-validity soft-gate — **planned, not yet applied** (owner: bot enable write-path; impl + integration tests in tasks §13)
