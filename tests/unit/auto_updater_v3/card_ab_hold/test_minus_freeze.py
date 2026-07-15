@@ -19,6 +19,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.pipelines import (
     process_ab_hold,
+    process_ab_setup,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     card_ab_hold_status_label,
@@ -457,3 +458,129 @@ async def test_hold_no_pg_write_when_degradation_unchanged() -> None:
     )
     assert _degraded_update_stmts(recorder) == []
     assert complex_adv.adv_setting.card_ab_hold_degraded is False
+
+
+# --- ENTER guard: пустой allowed-set не должен давать «чистый» ACTIVE (finding #3) ---
+
+
+def _setup_complex_adv() -> SimpleNamespace:
+    """PENDING_SETUP-кампания для ENTER-тика ``process_ab_setup`` (spec §8).
+
+    Spec card-ab-hold-mode «ACTIVE without ENTER setup snapshot is forbidden».
+    ``adv_setting.id`` нужен для apply-вызова; ``max_price_for_order>0`` проходит
+    plan_max-гейт, чтобы выполнение дошло до ветки allowed-set.
+    """
+    adv_setting = SimpleNamespace(
+        id=555,
+        nmids=[101],
+        max_price_for_order=100,
+        card_ab_hold_mode="pending_setup",
+        card_ab_hold_allowed_phrases_snapshot=None,
+        card_ab_hold_degraded=False,
+    )
+    return SimpleNamespace(
+        adv_id=9,
+        shop_id=1,
+        card_ab_hold_mode="pending_setup",
+        adv_setting=adv_setting,
+        search_adv=None,
+    )
+
+
+async def _run_setup_with_keywords(
+    keywords: list[SimpleNamespace],
+) -> tuple[AsyncMock, AsyncMock, AsyncMock, SimpleNamespace]:
+    """Прогнать ``process_ab_setup`` с mocked Redis-lock / enforce / apply.
+
+    Spec §8: проверяем, дошло ли выполнение до WB-enforce и PG-apply write boundary.
+    Returns:
+        (enforce_mock, apply_mock, release_mock, complex_adv).
+    """
+    complex_adv = _setup_complex_adv()
+    complex_adv.get_keywords = AsyncMock(return_value=keywords)
+
+    lock_mgr = MagicMock()
+    lock_mgr.acquire = AsyncMock(return_value=True)
+    lock_mgr.release = AsyncMock(return_value=None)
+
+    enforce_mock = AsyncMock(
+        return_value={"targets": 1, "written": 0, "cap_exceeded": []}
+    )
+    mgr = MagicMock()
+    mgr.enforce_frozen_allowed_set = enforce_mock
+    container = MagicMock()
+    container.minus_phrase_manager.return_value = mgr
+
+    apply_mock = AsyncMock(return_value=(1, 0))
+
+    with (
+        patch(
+            f"{_PIPELINES}.CardAbHoldSignalRedisCache",
+            MagicMock(return_value=SimpleNamespace(client=MagicMock())),
+        ),
+        patch(f"{_PIPELINES}.RedisLockManager", MagicMock(return_value=lock_mgr)),
+        patch(
+            f"{_PIPELINES}.MinusPhraseManagerContainer",
+            MagicMock(return_value=container),
+        ),
+        patch(f"{_PIPELINES}.apply_ab_hold_setup_mutations", apply_mock),
+    ):
+        await process_ab_setup(
+            complex_adv,  # type: ignore[arg-type]
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+        )
+    return enforce_mock, apply_mock, lock_mgr.release, complex_adv
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_setup_empty_allowed_set_aborts_before_active() -> None:
+    """8.5 (bug fix, finding #3): пустой allowed-set ⇒ НЕ ACTIVE, НЕ freeze-to-zero.
+
+    Spec «ACTIVE without ENTER setup snapshot is forbidden» / «hold enforcement does
+    not treat an empty/missing allowed-set snapshot as a successful freeze». Все ключи
+    BAD → ``capture_allowed_phrase_set == []``. Падал бы до фикса: enforce/apply
+    вызывались и mode → ACTIVE. После фикса: ни ``enforce_frozen_allowed_set`` (WB
+    freeze-to-zero), ни ``apply_ab_hold_setup_mutations`` (PG ACTIVE) не вызваны, mode
+    остаётся PENDING_SETUP, snapshot не выставлен, lock снят.
+    """
+    keywords = [
+        SimpleNamespace(status=KeywordStatus.BAD, text="bad1"),
+        SimpleNamespace(status=KeywordStatus.BAD, text="bad2"),
+    ]
+    enforce_mock, apply_mock, release_mock, complex_adv = (
+        await _run_setup_with_keywords(keywords)
+    )
+    enforce_mock.assert_not_called()
+    apply_mock.assert_not_called()
+    assert (
+        complex_adv.adv_setting.card_ab_hold_mode
+        == CardAbHoldMode.PENDING_SETUP.value
+    )
+    assert complex_adv.adv_setting.card_ab_hold_allowed_phrases_snapshot is None
+    release_mock.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_setup_non_empty_allowed_set_reaches_active() -> None:
+    """8.5 (paired allowed-case): непустой allowed-set ⇒ enforce+apply+ACTIVE.
+
+    Доказывает, что guard finding #3 блокирует ТОЛЬКО вырожденный вход, а нормальный
+    ENTER по-прежнему доходит до WB-enforce и PG-apply write boundary и выставляет
+    ACTIVE (без этого allowed-case ``assert_not_called`` в blocked-тесте был бы
+    бессмысленным — guard мог бы «глушить» вообще всё).
+    """
+    keywords = [
+        SimpleNamespace(status=KeywordStatus.GOOD, text="good1"),
+        SimpleNamespace(status=KeywordStatus.BAD, text="bad1"),
+    ]
+    enforce_mock, apply_mock, release_mock, complex_adv = (
+        await _run_setup_with_keywords(keywords)
+    )
+    enforce_mock.assert_awaited_once()
+    apply_mock.assert_awaited_once()
+    assert complex_adv.adv_setting.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
+    assert complex_adv.adv_setting.card_ab_hold_allowed_phrases_snapshot == ["good1"]
+    release_mock.assert_awaited_once()
