@@ -103,6 +103,14 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 **Альтернатива:** hard-block enable при низком объёме — отклонена (пользователь должен иметь право запустить на свой риск). Молчаливый enable без предупреждения — отклонена (finding: пользователь не видит, что тест заведомо слабый).
 
+### 2d. ENTER hard-gate: plan max CPO must be positive (decision §14a)
+
+**Выбор:** enable (**Telegram UI only** → PENDING) MUST быть заблокирован, если план `max_price_for_order` отсутствует или ≤ 0. Mode остаётся `OFF`; UI показывает причину (нужен положительный план max CPO) + рекомендацию задать и повторить. Проверяется вместе с §2a freshness и §12 V3-only, **до** §2c soft-gate (нет смысла предупреждать про объём, если max CPO = 0).
+
+**Почему:** `process_ab_setup` использует `max_price_for_order` для классификации ключей; при отсутствии / ≤ 0 setup-тик детерминированно делает early return каждый тик и никогда не доходит до ACTIVE, а кампания при этом исключена из ordinary automation — вечный semi-frozen PENDING. Дешевле и честнее отсечь это на enable (аналогично freshness hard-block §2a), чем оставлять пользователя в PENDING без причины.
+
+**Альтернатива:** оставить проверку max CPO только на setup-тике (early return, stay PENDING) — отклонена (молчаливый вечный PENDING). Мягкое предупреждение вместо hard-block — отклонена (без положительного max CPO тест в принципе не соберётся).
+
 ### 3. ENTER criterion
 
 **Выбор:** PASS iff `pay_for_order is not None` и `pay_for_order ≤ plan.max_pay_for_order` и `views ≥ 100` (тот же источник показов, что карточка ключа / CalculatedKeyword за недельное окно). FAIL → OFF. PASS → set target_place = current WB position; зафиксировать БС-состав по итогу setup.
@@ -133,6 +141,14 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 **Почему:** иначе пользователь стартует тест на незафиксированном минус-профиле (гонка с PENDING).
 
+### 4c. PENDING_SETUP liveness: actionable status + EXIT recovery (decision §14b/§14c)
+
+**Выбор:** пока PENDING_SETUP, если setup не может прогрессировать по детерминированной причине, детектируемой только на setup-тике (пустой allowed-set / нет non-BAD ключей; либо max CPO пропал после enable), UI-статус MUST называть конкретную причину и действие (поднять max CPO / нет подходящих ключей / отключить A/B Hold), а не только generic «Подготовка…». Транзиентные причины (lock contention, единичный stale-тик, warmup кэша ключей) MAY оставлять generic preparing. EXIT доступен всегда при PENDING_SETUP → OFF (возврат в ordinary automation). Канал причины — reuse `CardAbHoldLastAbort`-подобного Redis-признака (writer = shop-runner, reader = UI poll), **без новой миграции**. Owned авто-abort зависшего PENDING → OFF — **SHOULD / future** (нужен durable `pending_since` + watchdog), вне MVP.
+
+**Почему:** PENDING_SETUP исключает кампанию из ordinary automation (§2/§3); молчаливый вечный PENDING = semi-frozen limbo без сигнала пользователю. MVP-минимум: видимая причина + всегда доступный EXIT — без новой миграции. Часть детерминированных причин (max CPO) отсекается ещё раньше на enable (§2d); 4c покрывает то, что можно узнать только на setup-тике.
+
+**Альтернатива:** авто-abort-to-OFF с новым timestamp+watchdog как MUST — отклонена в MVP (лишняя миграция; EXIT + reason достаточно). Ничего не менять (generic «Подготовка…») — отклонена (finding: молчаливый вечный PENDING).
+
 ### 5. EXIT
 
 **Выбор:** PG → OFF; снова разрешены обновление ЦП, ordinary structural апдейтеры и ordinary minus auto-update; minus PG snapshot clear/archive; без restore keyword-profile / Excel snapshot.
@@ -157,7 +173,7 @@ Check-points interrupt: после load и **обязательно до apply**
 
 **Affected records:** KeywordsSetting (status/БС/ЦП) на ENTER; AdvSetting mode field; AdvSetting allowed-set snapshot field; bidder продолжает писать ставки в HOLD; WB minus set на setup sync / hold enforcement.
 
-**Recovery:** EXIT всегда доступен paid-пользователю; TTL Redis; при зависшем PENDING_SETUP — повторный setup под lock или EXIT (setup не режется freshness filter после enter); UI не показывает ready, пока не ACTIVE.
+**Recovery:** EXIT всегда доступен paid-пользователю; TTL Redis; при зависшем PENDING_SETUP — повторный setup под lock или EXIT (setup не режется freshness filter после enter); UI не показывает ready, пока не ACTIVE. Детерминированные блокеры setup: `max_price_for_order ≤ 0` отсекается hard-gate на enable (§2d/§14a); прочие (пустой allowed-set / нет non-BAD ключей) surфейсятся actionable-причиной в статусе (§4c/§14b) с всегда доступным EXIT; owned авто-abort зависшего PENDING → OFF — SHOULD/future (§14c).
 
 ### 8. Defaults
 
@@ -178,7 +194,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Shop-runner: dispatcher `adv_settings_auto_update`; setup/hold pipelines (вкл. allowed-set capture+snapshot+sync); interrupt checks; ACT guards (top-key WL, individual TP, WL trim non-v3, stats emergency structural, ordinary allowed-set recalc); allowed-set enforcement on drift (minus non-allowed, WB cap → visible degradation).
 - Redis caches + lock.
 - ClickHouse read (реюз `full_wb_adv_stat.get_keywords_views_by_days` / `mv_clusters_daily_agg`): суммарные показы ключей-кандидатов за 24ч для launch-validity soft-gate (§2c).
-- Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE; **low-24h-views warning + confirm-callback «Всё равно запустить» / «Отмена»** (§2c).
+- Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE; **low-24h-views warning + confirm-callback «Всё равно запустить» / «Отмена»** (§2c); **max-CPO hard-gate reason на enable** (§2d) + **actionable PENDING-status причина при детерминированном блоке setup** (§4c, reader Redis `CardAbHoldLastAbort`-подобного признака).
 - Excel roundtrip: **remove** column + ignore apply for `card_ab_hold_mode`.
 - Unit/gate tests (`ab_hold_gates` по духу `bot_active_gates`).
 
@@ -200,8 +216,10 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 | Auto-updater version → V2 | blocked while mode ∈ {PENDING_SETUP, ACTIVE} (EXIT → OFF first) |
 | V2 `change_adv_strategy` (MIN_CPO/MAX_CONV) | вне A/B Hold freeze; held V3-профиль не зависит от campaign strategy objective |
 | UI enable blocked by stats | show reason + restriction + `const.SUPPORT_LINK` |
+| UI enable when plan max CPO ≤ 0 / missing | hard block: mode stays `OFF` + reason «нужен положительный план max CPO» (§2d/§14a) |
 | UI enable low 24h views (Σ candidate keyword views < `AB_HOLD_MIN_TOTAL_VIEWS_24H`) | soft warn: reason + raise-max-CPO recommendation + choice launch-anyway/cancel; mode stays `OFF` until confirm (§2c) |
 | UI ready-to-test copy | mode == ACTIVE after full setup (incl. minus snapshot) |
+| PENDING_SETUP status on deterministic setup block | actionable reason + action (raise max CPO / no eligible keywords / EXIT), not generic «Подготовка…»; EXIT always available (§4c/§14b/§14c) |
 | Excel apply `card_ab_hold_mode` | **MUST NOT** (ignore / no column) |
 | Shared defaults / «Применить дефолты» on held campaign | **MUST NOT** disable/mutate (mode preserved; disable только owned Telegram EXIT §13) |
 | Ordinary V3 schedule | mode == OFF |
@@ -227,6 +245,8 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
 - Integration (real/test CH): 24h candidate-keyword views aggregate over `mv_clusters_daily_agg`; boundary around `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`.
 - Gate (§2c): enable with Σ 24h views < threshold → mode stays `OFF`, message has reason + raise-max-CPO recommendation + launch-anyway/cancel choice; launch-anyway → PENDING_SETUP + ENTER; cancel → OFF, no ENTER; Σ ≥ threshold → enable without warning (paired).
+- Gate (§2d): enable with `max_price_for_order ≤ 0` / missing → mode stays `OFF` + reason (нужен положительный план max CPO); paired positive `> 0` → gate passes (enable proceeds to §2c/normal path).
+- Gate (§4c): PENDING_SETUP with deterministic block (empty allowed-set / missing max CPO) → status surfaces specific reason + action; transient reason → generic preparing acceptable; EXIT while PENDING → OFF + ordinary automation eligible.
 - Telegram payload-limit: worst-case low-views warning text + confirm-callback `callback_data` within Bot API byte limits.
 - Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
 - Gate: Excel import `active` / `pending_setup` / `off` → mode unchanged; schema has no column.
@@ -255,6 +275,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 - [Risk] Allowed-set требует > WB minus cap исключений / open-match РК → hold не гарантирован. → Mitigation: видимая деградация (лог + честный статус), scoped wording; не обещать полную заморозку.
 - [Risk] Нет Excel bulk enable. → Acceptable MVP; Telegram-only; Excel return = future change.
 - [Risk] Случайный Enable mid-hold. → Mitigation: §10 handler no-op + §11 MAY hide Enable на PENDING/ACTIVE.
+- [Risk] Детерминированный блок setup (`max_price_for_order ≤ 0` / пустой allowed-set) → молчаливый вечный PENDING (semi-frozen, вне ordinary automation). → Mitigation: §2d enable hard-gate по max CPO + §4c actionable non-ready статус + всегда доступный EXIT; owned авто-abort = SHOULD/future.
 
 ## Migration Plan
 
@@ -273,11 +294,13 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 5. ~~Minus freeze storage~~ — **Resolved (update):** durable PG **allowed-set** snapshot на кампании (новая migration); capture allowed-set→snapshot до ACTIVE; hold enforcement (исключение не-разрешённых фраз, в пределах WB cap; иначе видимая деградация); clear/archive on EXIT. Заморозка allowed-set — primary invariant, минус — derived enforcement.
 6. ~~Excel A/B Hold column~~ — **Resolved (update):** убрать из Excel schema/apply в MVP (decision §9); enable/disable только Telegram; future option отдельно.
 7. Launch validity soft-gate (decision §2c) — **Resolved (applied, tasks §13):** enable агрегирует показы ключей-кандидатов за 24ч (реюз `full_wb_adv_stat.get_keywords_views_by_days` / `mv_clusters_daily_agg`) в `launch_validity_gate.py`; Σ < `AB_HOLD_MIN_TOTAL_VIEWS_24H` (=1000) → warn + рекомендация поднять max CPO + inline-выбор «Всё равно запустить» (`CardAbHoldLaunchAnyway`) / «Отмена» (`CardAbHoldCancel`); wiring в `_handle_ab_hold_enable` после §2a freshness, до записи PENDING/ENTER.
+8. PENDING_SETUP liveness (decision §14) — **Resolved (update, pending apply tasks §16):** enable hard-gate `max_price_for_order > 0` (§2d/§14a); actionable non-ready причина для детерминированных блоков setup vs generic preparing (§4c/§14b); MVP recovery = actionable reason + always-available EXIT (§14c); owned авто-abort-to-OFF (durable `pending_since` timestamp + watchdog) = SHOULD/future (без новой миграции в MVP).
 
 ## Review Checklist
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §2c launch-validity soft-gate + §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard + §12 V3-only/V2-block + §13 shared-defaults not-a-disable-path)
-- [x] implementation layer matches decision *(§8 REDEFINED applied: allowed-set snapshot (`card_ab_hold_allowed_phrases_snapshot`) + `MinusPhraseManager.enforce_frozen_allowed_set` hold enforcement + WB-cap visible degradation replace minus snapshot/restore; §9 Excel remove, §10 Enable idempotent, §11 hide Enable, §12 V3-only + V2 downgrade block (tasks §14), §13 shared-defaults not-a-disable-path guard (tasks §15), §2c launch-validity soft-gate (tasks §13) — applied)*
+- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §2c launch-validity soft-gate + §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard + §12 V3-only/V2-block + §13 shared-defaults not-a-disable-path + §14 PENDING liveness)
+- [x] implementation layer matches decision *(§8 REDEFINED applied: allowed-set snapshot (`card_ab_hold_allowed_phrases_snapshot`) + `MinusPhraseManager.enforce_frozen_allowed_set` hold enforcement + WB-cap visible degradation replace minus snapshot/restore; §9 Excel remove, §10 Enable idempotent, §11 hide Enable, §12 V3-only + V2 downgrade block (tasks §14), §13 shared-defaults not-a-disable-path guard (tasks §15), §2c launch-validity soft-gate (tasks §13) — applied; §14 PENDING liveness — proposed, pending `/opsx:apply` (tasks §16))*
 - [x] §2c launch-validity soft-gate — **applied** (owner: bot enable write-path; `launch_validity_gate.py` + `_handle_ab_hold_enable` wiring + launch-anyway/cancel handlers + unit/integration/payload-limit tests in tasks §13)
+- [ ] §14 PENDING_SETUP liveness — **proposed, pending apply** (owner: bot enable write-path + A/B Hold setup/status; max-CPO enable hard-gate §2d/§14a + actionable PENDING status §4c/§14b + EXIT recovery §14c; owned auto-abort = SHOULD/future; tasks §16)

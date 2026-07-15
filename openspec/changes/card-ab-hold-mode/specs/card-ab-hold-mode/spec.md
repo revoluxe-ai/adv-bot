@@ -295,6 +295,47 @@ When the user attempts to enable A/B Hold from the paid UI and the stats freshne
 - **THEN** the low recent-impressions warning is not shown
 - **AND** enable proceeds per the normal enable path
 
+### Requirement: Enable is blocked when plan max CPO is missing or non-positive
+A/B Hold ENTER setup classifies keywords against the campaign plan max CPO; without a positive plan max CPO the setup tick deterministically cannot progress and would leave the campaign in PENDING_SETUP indefinitely while excluded from ordinary automation. The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through the paid Telegram UI when the campaign plan `max_price_for_order` is missing or less than or equal to zero. The mode MUST remain `OFF`, and the user MUST see the reason (a positive plan max CPO is required) and a recommendation to set it and retry. This is a hard gate evaluated together with the stats-freshness and V3-only gates, before the low-recent-impressions soft warning.
+
+#### Scenario: Enable blocked when plan max CPO is missing or non-positive
+- **GIVEN** a campaign has paid bot management active, is on V3, and passes the stats freshness gate
+- **AND** the campaign plan max CPO (`max_price_for_order`) is missing or is less than or equal to zero
+- **WHEN** the user attempts to enable A/B Hold from the paid UI
+- **THEN** A/B Hold is not enabled
+- **AND** the campaign mode remains `OFF`
+- **AND** the user sees that a positive plan max CPO is required and is recommended to set it and retry
+
+#### Scenario: Enable proceeds when plan max CPO is positive
+- **GIVEN** a campaign has paid bot management active, is on V3, passes the stats freshness gate, and mode is `OFF`
+- **AND** the campaign plan max CPO is greater than zero
+- **WHEN** the user presses Enable
+- **THEN** the plan-max-CPO gate does not block enable
+- **AND** enable proceeds per the normal enable path (subject to the low-recent-impressions soft warning)
+
+### Requirement: PENDING_SETUP setup blockers are surfaced and recoverable
+While a campaign is in PENDING_SETUP it is excluded from ordinary structural automation, so the system MUST NOT leave it in a silent, indefinite semi-frozen state when setup cannot make progress. When A/B Hold enter setup cannot complete for a deterministic reason detectable only at the setup tick (for example an empty allowed-set / no non-BAD keyword surface, or a plan max CPO that became missing or non-positive after enable), the UI status MUST surface the specific blocking reason and the recommended action (raise plan max CPO, no eligible keywords, or disable A/B Hold), rather than only a generic "preparing" message. Transient reasons (setup lock contention, a single stale tick, keyword-cache warmup) MAY keep a generic preparing status. The user MUST always be able to recover: EXIT (disable → `OFF`) MUST remain available while PENDING_SETUP, returning the campaign to ordinary automation. An owned automatic abort of a stuck PENDING_SETUP to `OFF` is out of MVP scope; the MVP guarantee is a visible actionable reason plus an always-available EXIT.
+
+#### Scenario: Deterministic setup block shows an actionable reason
+- **GIVEN** a campaign is in PENDING_SETUP
+- **AND** setup cannot progress for a deterministic reason (for example the allowed-set is empty / no eligible keywords, or the plan max CPO is missing or non-positive)
+- **WHEN** the UI reports mode status
+- **THEN** the status states the specific blocking reason and the recommended action
+- **AND** the status does not present the campaign as ready-to-test
+
+#### Scenario: Transient setup delay may stay generic
+- **GIVEN** a campaign is in PENDING_SETUP
+- **AND** setup has not completed only for a transient reason (setup lock contention, a single stale tick, or keyword-cache warmup)
+- **WHEN** the UI reports mode status
+- **THEN** a generic preparing status is acceptable
+- **AND** the next setup tick retries setup
+
+#### Scenario: EXIT recovers a stuck PENDING_SETUP
+- **GIVEN** a campaign is in PENDING_SETUP and setup is blocked
+- **WHEN** the user disables A/B Hold (EXIT)
+- **THEN** the campaign mode becomes `OFF`
+- **AND** ordinary automation is eligible again for that campaign
+
 ### Requirement: ACTIVE without ENTER setup snapshot is forbidden
 The system MUST NOT transition a campaign to ACTIVE A/B Hold except via successful `process_ab_setup` / setup apply that includes allowed-set capture and PostgreSQL snapshot persistence (decision §8). Direct writes of `active` (including Excel or other non-setup paths) MUST NOT create a held campaign.
 
