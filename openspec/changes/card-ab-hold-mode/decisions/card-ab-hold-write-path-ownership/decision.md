@@ -52,6 +52,7 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Отдельные setup/hold entrypoints вне ordinary V3 NORMAL preamble.
 - Exclusion кампании из ordinary structural V3 scheduling при PENDING_SETUP / ACTIVE.
 - Hold: только overspend/guard-подобная защита относительно max CPO; bidder продолжает работать к зафиксированным ЦП.
+- `ensure_campaigns_active` (`auto_budget_watchdog`) — ортогональный ОБРАТИМЫЙ activity-lifecycle (budget/spend/balance/schedule/rec_system run↔pause): при PENDING_SETUP / ACTIVE Allowed и НЕ structural-freeze нарушение, т.к. не мутирует allowed-set / ЦП / whitelist / enable / minus и возвращает РК в то же замороженное состояние; bidder eligibility сохраняется отдельно (`filter_bidder_eligible_by_ab_hold`). MUST NOT расширять этот путь до мутации frozen-сущностей.
 - Redis `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project Redis-паттернам (`AdvSettingRedisCache` + `RedisLockManager`).
 - UI и enable только при `bot_active is True` через paid Telegram handlers.
 - Enable from `OFF` (+ stats gate) → `PENDING_SETUP` + Redis ENTER; Enable while already `PENDING_SETUP` / `ACTIVE` → no-op (§10).
