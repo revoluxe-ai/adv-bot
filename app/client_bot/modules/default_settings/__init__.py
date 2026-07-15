@@ -18,10 +18,29 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     ``card_ab_hold_mode`` — из ``CommonModeDefaultsPolicy`` (accepted
     ``mode-defaults-policy-ownership``), не из transition-helper.
 
+    Shared defaults / «Применить дефолты» — **не** enable/disable path A/B Hold
+    (spec ``card-ab-hold-mode`` «Shared defaults MUST NOT disable or mutate A/B
+    Hold on a held campaign» / decision ``card-ab-hold-write-path-ownership`` §13):
+    для кампании в ``PENDING_SETUP`` / ``ACTIVE`` функция — **no-op**, чтобы не
+    выполнить un-owned disable (mode→off + stale allowed-set snapshot + сброс V3 /
+    structural флагов в обход freeze). Отключение A/B Hold — только owned paid
+    Telegram EXIT. Для ``OFF`` дефолты применяются как обычно.
+
     Args:
         adv_setting: Объект AdvSetting, к которому применяются дефолтные настройки
         wb_cabinet: Объект WBCabinet, из которого берем дефолтные настройки
     """
+    # Inline-import (документированное исключение no-inline-imports): этот модуль
+    # импортируется очень рано (wb_db_manager / model init), а top-level импорт
+    # пакета `auto_updater_v3` вызывает циклический импорт. На runtime (вызов из
+    # handler) пакет уже инициализирован.
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+        is_ab_hold_structural_freeze,
+    )
+
+    if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+        return
+
     defaults_v1 = CampaignDefaultsV1()
     common_mode = CommonModeDefaultsPolicy()
 
