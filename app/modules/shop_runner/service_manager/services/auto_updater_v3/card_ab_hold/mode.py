@@ -17,6 +17,19 @@ class CardAbHoldMode(StrEnum):
     ACTIVE = "active"
 
 
+class CardAbHoldSetupBlockKind(StrEnum):
+    """Детерминированная причина, по которой ENTER setup не может завершиться.
+
+    Spec ``card-ab-hold-mode`` / decision §14b: пока mode PENDING_SETUP кампания
+    исключена из ordinary automation; если setup детерминированно не прогрессирует,
+    UI MUST показать конкретную причину и действие (а не generic «Подготовка…»).
+    Значения — durable-safe строки для Redis-канала причины блока (без миграции PG).
+    """
+
+    EMPTY_ALLOWED_SET = "empty_allowed_set"
+    MISSING_MAX_CPO = "missing_max_cpo"
+
+
 def normalize_card_ab_hold_mode(raw: str | CardAbHoldMode | None) -> CardAbHoldMode:
     """Нормализовать сырое значение БД/UI к ``CardAbHoldMode`` (default OFF).
 

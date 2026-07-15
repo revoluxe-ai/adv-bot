@@ -518,6 +518,12 @@ async def _run_setup_with_keywords(
             f"{_PIPELINES}.CardAbHoldSignalRedisCache",
             MagicMock(return_value=SimpleNamespace(client=MagicMock())),
         ),
+        patch(
+            f"{_PIPELINES}.CardAbHoldSetupBlockRedisCache",
+            MagicMock(
+                return_value=MagicMock(set_block=AsyncMock(), clear=AsyncMock())
+            ),
+        ),
         patch(f"{_PIPELINES}.RedisLockManager", MagicMock(return_value=lock_mgr)),
         patch(
             f"{_PIPELINES}.MinusPhraseManagerContainer",

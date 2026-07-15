@@ -21,6 +21,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
     CardAbHoldLastAbortRedisCache,
+    CardAbHoldSetupBlockRedisCache,
     CardAbHoldSignalKind,
     CardAbHoldSignalRedisCache,
     CardAbHoldSignalSnapshot,
@@ -47,7 +48,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     can_enable_card_ab_hold,
     can_enable_card_ab_hold_on_version,
     card_ab_hold_enable_noop_answer,
+    card_ab_hold_requires_max_cpo_message,
     card_ab_hold_requires_v3_message,
+    has_positive_plan_max_cpo,
     is_card_ab_hold_enable_noop,
     is_card_ab_hold_ui_visible,
     should_offer_card_ab_hold_enable_control,
@@ -133,6 +136,29 @@ async def _edit_screen(
         )
 
 
+async def _screen_status_text(
+    adv: AdvSetting, mode: CardAbHoldMode
+) -> str:
+    """Текст статуса для экрана A/B Hold (decision §14b).
+
+    Для ``PENDING_SETUP`` показывает actionable-причину детерминированного блока
+    setup (пустой allowed-set / нет плана max CPO) из Redis-канала
+    ``CardAbHoldSetupBlock`` — кампания не должна молча висеть в вечном PENDING
+    (spec «PENDING_SETUP setup blockers are surfaced and recoverable»). Для прочих
+    режимов — краткий статус (готовность теста — только ACTIVE, decision §8).
+    """
+    if mode != CardAbHoldMode.PENDING_SETUP:
+        return f"Статус: {mode.value}"
+    block = await CardAbHoldSetupBlockRedisCache(adv).get_block()
+    return build_enter_poll_status_lines(
+        mode=mode,
+        abort_safe=None,
+        abort_can_continue=None,
+        degraded=bool(getattr(adv, "card_ab_hold_degraded", False)),
+        block_kind=block.kind if block is not None else None,
+    )
+
+
 def _low_views_warning_keyboard(adv_id: int) -> InlineKeyboardMarkup:
     """Клавиатура soft-warning низкого объёма показов (decision §2c).
 
@@ -185,9 +211,8 @@ async def open_card_ab_hold_menu(
             await query.answer("Доступно только при включённом боте", show_alert=True)
             return
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
-        await _edit_screen(
-            query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id, mode
-        )
+        status = await _screen_status_text(adv, mode)
+        await _edit_screen(query, f"{_INSTRUCTION}\n{status}", adv.id, mode)
         await query.answer()
 
 
@@ -241,6 +266,22 @@ async def _handle_ab_hold_enable(
                 "[adv_id=%s] CardAbHold Enable blocked: not V3 (automatic_version=%s)",
                 adv.adv_id,
                 getattr(adv, "automatic_version", None),
+            )
+            return
+        if not has_positive_plan_max_cpo(adv):
+            reason = card_ab_hold_requires_max_cpo_message()
+            await query.answer(reason, show_alert=True)
+            await _edit_screen(
+                query,
+                f"{_INSTRUCTION}\n{reason}",
+                adv.id,
+                CardAbHoldMode.OFF,
+            )
+            logger.info(
+                "[adv_id=%s] CardAbHold Enable blocked: plan max CPO missing/≤0 "
+                "(max_price_for_order=%s)",
+                adv.adv_id,
+                getattr(adv, "max_price_for_order", None),
             )
             return
         stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(adv)
@@ -363,6 +404,9 @@ async def disable_card_ab_hold(
         await session.commit()
         cache = CardAbHoldSignalRedisCache(adv)
         await cache.clear()
+        # decision §14c: EXIT — путь восстановления из зависшего PENDING; снимаем и
+        # причину блока setup, чтобы стало ясно — ordinary automation снова активна.
+        await CardAbHoldSetupBlockRedisCache(adv).clear()
         logger.info(
             "[adv_id=%s] CardAbHold EXIT → OFF (allowed-set snapshot cleared)", adv.adv_id
         )

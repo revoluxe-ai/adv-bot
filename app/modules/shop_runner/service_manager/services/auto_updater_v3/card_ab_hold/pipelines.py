@@ -21,10 +21,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
+    CardAbHoldSetupBlockKind,
     normalize_card_ab_hold_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
     SETUP_LOCK_TTL_SEC,
+    CardAbHoldSetupBlockRedisCache,
+    CardAbHoldSetupBlockSnapshot,
     CardAbHoldSignalRedisCache,
     setup_lock_redis_key,
 )
@@ -73,6 +76,8 @@ async def process_ab_setup(
         return
 
     signal_cache = CardAbHoldSignalRedisCache(complex_adv.adv_setting)
+    # decision §14b: канал actionable-причины блока setup для UI (без PG-миграции).
+    block_cache = CardAbHoldSetupBlockRedisCache(complex_adv.adv_setting)
     lock_mgr = RedisLockManager(signal_cache.client)
     lock_key = setup_lock_redis_key(int(complex_adv.adv_id))
     token = f"{complex_adv.shop_id}:{uuid4()}"
@@ -89,9 +94,17 @@ async def process_ab_setup(
             getattr(complex_adv.adv_setting, "max_price_for_order", None) or 0
         )
         if plan_max <= 0:
+            # decision §14a/§14b: обычно отсекается hard-gate на enable; если план
+            # max CPO пропал уже после ENTER — фиксируем детерминированную причину,
+            # чтобы UI PENDING показал actionable-текст, а не generic «Подготовка…».
             logger.warning(
                 "[adv_id=%s] ab_setup: max_price_for_order missing, skip",
                 complex_adv.adv_id,
+            )
+            await block_cache.set_block(
+                CardAbHoldSetupBlockSnapshot(
+                    kind=CardAbHoldSetupBlockKind.MISSING_MAX_CPO
+                )
             )
             return
 
@@ -114,6 +127,13 @@ async def process_ab_setup(
                 "freeze невозможен, mode остаётся PENDING_SETUP (не ACTIVE)",
                 complex_adv.adv_id,
             )
+            # decision §14b: детерминированный блок — surface actionable-причину в
+            # статусе PENDING (не молчаливый вечный PENDING).
+            await block_cache.set_block(
+                CardAbHoldSetupBlockSnapshot(
+                    kind=CardAbHoldSetupBlockKind.EMPTY_ALLOWED_SET
+                )
+            )
             return
 
         minus_mgr = MinusPhraseManagerContainer(
@@ -135,6 +155,8 @@ async def process_ab_setup(
         complex_adv.adv_setting.card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
         complex_adv.adv_setting.card_ab_hold_allowed_phrases_snapshot = allowed_texts
         complex_adv.adv_setting.card_ab_hold_degraded = degraded
+        # decision §14b: setup завершён (→ ACTIVE) — снять причину блока PENDING.
+        await block_cache.clear()
         if degraded:
             logger.error(
                 "[adv_id=%s] ab_setup allowed-set enforcement degraded on %s target(s): "

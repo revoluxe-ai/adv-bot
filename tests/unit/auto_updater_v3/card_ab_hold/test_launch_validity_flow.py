@@ -31,12 +31,17 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 
 
 def _make_off_adv() -> SimpleNamespace:
-    """OFF V3 paid кампания, проходящая bot_active/no-op/V3 gates."""
+    """OFF V3 paid кампания, проходящая bot_active/no-op/V3/max-CPO gates.
+
+    ``max_price_for_order`` > 0 обязателен: с §16 (decision §14a) enable hard-gate’ит
+    отсутствующий/непозитивный план max CPO раньше объёмного soft-gate.
+    """
     return SimpleNamespace(
         id=42,
         adv_id=4242,
         bot_active=True,
         automatic_version=3,
+        max_price_for_order=100,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,
         search_adv_id=None,

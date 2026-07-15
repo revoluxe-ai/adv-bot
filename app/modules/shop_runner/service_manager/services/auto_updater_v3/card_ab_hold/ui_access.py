@@ -42,6 +42,37 @@ def card_ab_hold_requires_v3_message() -> str:
     )
 
 
+def has_positive_plan_max_cpo(adv_setting: AdvSetting | object) -> bool:
+    """True, если план max CPO задан и строго > 0 (decision §14a / spec).
+
+    ENTER setup классифицирует ключи против плана ``max_price_for_order``; без
+    положительного значения ``process_ab_setup`` детерминированно делает early
+    return на каждом тике и никогда не доходит до ACTIVE, а кампания при этом уже
+    исключена из ordinary automation — вечный semi-frozen PENDING_SETUP. Hard-gate
+    на enable отсекает это до записи ``PENDING_SETUP`` (spec «Enable is blocked when
+    plan max CPO is missing or non-positive»).
+    """
+    raw = getattr(adv_setting, "max_price_for_order", None)
+    if raw is None:
+        return False
+    try:
+        return float(raw) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def card_ab_hold_requires_max_cpo_message() -> str:
+    """Причина блокировки enable, когда план max CPO не задан / ≤ 0 (decision §14a).
+
+    В пределах лимита ``answerCallbackQuery`` (≤200) — используется и как alert,
+    и как текст экрана.
+    """
+    return (
+        "Для A/B Hold нужен положительный план max CPO. "
+        "Задайте план (макс. CPO) в настройках РК и повторите включение."
+    )
+
+
 def is_card_ab_hold_enable_noop(
     adv_setting: AdvSetting | object,
 ) -> bool:
