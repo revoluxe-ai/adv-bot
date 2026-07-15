@@ -23,13 +23,19 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
     build_ab_hold_enable_blocked_by_stats_message,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
+    build_ab_hold_low_views_alert,
+    build_ab_hold_low_views_warning_message,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
     handlers,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
     CardAbHoldBack,
+    CardAbHoldCancel,
     CardAbHoldDisable,
     CardAbHoldEnable,
+    CardAbHoldLaunchAnyway,
     CardAbHoldMenu,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
@@ -51,6 +57,7 @@ _CALLBACK_ANSWERS = (
     "A/B Hold уже включён",
     "Идёт подготовка A/B Hold…",
     "Режим A/B выключен",
+    "Включение отменено",
 )
 
 _CLOSED_SCREEN = (
@@ -233,3 +240,44 @@ def test_ab_hold_stats_blocked_message_within_telegram_limits() -> None:
     _assert_no_raw_placeholders(text)
     screen = f"{handlers._INSTRUCTION}\n{text}"
     assert len(screen) <= _TG_MESSAGE_TEXT_MAX
+
+
+@pytest.mark.unit
+def test_ab_hold_low_views_warning_message_within_telegram_limits() -> None:
+    """13.4: worst-case warning (§2c) ≤4096; без сырых placeholder."""
+    text = build_ab_hold_low_views_warning_message(_WORST_CASE_ADV_SETTING_ID)
+    assert len(text) <= _TG_MESSAGE_TEXT_MAX
+    _assert_no_raw_placeholders(text)
+    assert "max CPO" in text
+
+
+@pytest.mark.unit
+def test_ab_hold_low_views_alert_within_callback_answer_limit() -> None:
+    """13.4: короткий alert (§2c) ≤200 символов."""
+    alert = build_ab_hold_low_views_alert(_WORST_CASE_ADV_SETTING_ID)
+    assert len(alert) <= _TG_CALLBACK_ANSWER_MAX
+    _assert_no_raw_placeholders(alert)
+
+
+@pytest.mark.unit
+def test_ab_hold_low_views_keyboard_callback_data_bytes() -> None:
+    """13.4: launch-anyway / cancel callback_data ≤64 байт на worst-case adv id."""
+    kb = handlers._low_views_warning_keyboard(_WORST_CASE_ADV_SETTING_ID)
+    rows = kb.inline_keyboard
+    assert [btn.text for row in rows for btn in row] == [
+        "Всё равно запустить",
+        "Отмена",
+    ]
+    expected_packs = [
+        CardAbHoldLaunchAnyway(
+            adv_setting_original_id=_WORST_CASE_ADV_SETTING_ID
+        ).pack(),
+        CardAbHoldCancel(
+            adv_setting_original_id=_WORST_CASE_ADV_SETTING_ID
+        ).pack(),
+    ]
+    actual_packs = [btn.callback_data for row in rows for btn in row]
+    assert actual_packs == expected_packs
+    for packed in actual_packs:
+        assert packed is not None
+        assert 1 <= len(packed.encode("utf-8")) <= _TG_CALLBACK_DATA_BYTES_MAX

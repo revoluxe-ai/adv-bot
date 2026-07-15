@@ -165,7 +165,7 @@ def test_enable_handler_checks_stats_freshness_gate() -> None:
         handlers,
     )
 
-    src = inspect.getsource(handlers.enable_card_ab_hold)
+    src = inspect.getsource(handlers._handle_ab_hold_enable)
     assert "evaluate_ab_hold_enable_stats" in src
     assert "build_ab_hold_enable_blocked_by_stats_message" in src
     assert "SUPPORT_LINK" in inspect.getsource(

@@ -54,7 +54,7 @@ def test_enable_noop_answers_distinguish_active_and_pending() -> None:
 @pytest.mark.unit
 def test_enable_handler_checks_noop_before_enter_writes() -> None:
     """11.2 wiring: no-op gate до setattr PENDING / Redis ENTER / stats continue path."""
-    src = inspect.getsource(handlers.enable_card_ab_hold)
+    src = inspect.getsource(handlers._handle_ab_hold_enable)
     assert "is_card_ab_hold_enable_noop" in src
     assert src.index("is_card_ab_hold_enable_noop") < src.index(
         "card_ab_hold_mode = CardAbHoldMode.PENDING_SETUP"
