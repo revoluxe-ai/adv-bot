@@ -38,7 +38,7 @@
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§2c** launch validity soft-gate (низкий объём показов 24ч → warn + raise-max-CPO recommendation + launch-anyway/cancel); **§8** allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain).
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§2c** launch validity soft-gate (низкий объём показов 24ч → warn + raise-max-CPO recommendation + launch-anyway/cancel); **§8** allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain); **§13** shared campaign-defaults application («Применить дефолты» / `apply_defaults_to_adv_setting`) — не disable-path: MUST NOT disable/mutate A/B Hold на held-кампании (mode preserved; disable только owned Telegram EXIT).
 
 Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
 
@@ -67,6 +67,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 - Redis как единственный source of truth режима или minus snapshot без PG.
 - Excel export/import/apply `card_ab_hold_mode` (вкл. direct ACTIVE / PENDING / OFF).
 - Любой non-setup переход в ACTIVE (§8 / §9).
+- Отключение / сброс A/B Hold held-кампании через shared defaults / «Применить дефолты» в обход owned Telegram EXIT (decision §13).
 
 **Rationale:** соответствует proposed `card-ab-hold-write-path-ownership` (§3 + §8 + §9) и accepted `mode-defaults-policy-ownership`.
 
@@ -202,6 +203,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 | UI enable low 24h views (Σ candidate keyword views < `AB_HOLD_MIN_TOTAL_VIEWS_24H`) | soft warn: reason + raise-max-CPO recommendation + choice launch-anyway/cancel; mode stays `OFF` until confirm (§2c) |
 | UI ready-to-test copy | mode == ACTIVE after full setup (incl. minus snapshot) |
 | Excel apply `card_ab_hold_mode` | **MUST NOT** (ignore / no column) |
+| Shared defaults / «Применить дефолты» on held campaign | **MUST NOT** disable/mutate (mode preserved; disable только owned Telegram EXIT §13) |
 | Ordinary V3 schedule | mode == OFF |
 | A/B setup / hold schedule | mode PENDING/ACTIVE; **не** требовать `advs_filtred` |
 | Structural ACT (WL/TP/enable/emergency keys) | mode not in PENDING_SETUP, ACTIVE |

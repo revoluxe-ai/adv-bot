@@ -121,3 +121,12 @@
 - [x] 14.4 Реализация downgrade-block: `toggle_auto_updater_version` блокирует `new_version == 2` при активном режиме (читает `card_ab_hold_mode`), сообщение пользователю.
 - [x] 14.5 Tests-first (регресс исходного finding): в `ACTIVE`/`PENDING_SETUP` (V3) авто-смена `AdvSetting.strategy` НЕ меняет held keyword bidding profile; A/B Hold НЕ добавляет freeze-гард в `change_adv_strategy` (strategy остаётся V2-scope). Примечание: полная гарантия зависит от отдельной развязки `strategy_mode` (вне change).
 - [x] 14.6 RU-docstrings со ссылкой на spec requirement «A/B Hold requires the V3 auto-updater and is mutually exclusive with V2» + decision §12; focused pytest (`tests/unit/auto_updater_v3/`, client_bot version-toggle) + `pyright-strict` на затронутых путях.
+
+## 15. Shared defaults MUST NOT disable/mutate A/B Hold on held campaign (update — decision §13)
+
+> «Применить дефолты» (single + shop-wide) и shared `apply_defaults_to_adv_setting` — не enable/disable path A/B Hold. Held (PENDING_SETUP/ACTIVE) кампания: mode / allowed-set snapshot / coupled structural fields этим путём не трогаются; disable — только owned Telegram EXIT.
+
+- [ ] 15.1 Tests-first (fail before fix): `apply_defaults_to_adv_setting` на held-кампании (ACTIVE и PENDING_SETUP) НЕ ставит `card_ab_hold_mode=off`, НЕ оставляет непустой allowed-set snapshot, НЕ сбивает `automatic_version` на не-V3; paired positive: `OFF` кампания получает полный набор дефолтов (write-boundary assert на значении полей).
+- [ ] 15.2 Tests-first (handler-level): `apply_campaign_defaults` / `apply_defaults_for_shop` на held-кампании не выполняют un-owned disable; shop-wide — held пропущены/сохранены, не-held получают дефолты.
+- [ ] 15.3 Реализация: guard в `apply_defaults_to_adv_setting` — при `is_ab_hold_structural_freeze(card_ab_hold_mode)` не мутировать A/B-Hold-owned/coupled поля; UX в handlers (single → сообщение «выключите A/B Hold на экране режима»; shop-wide → пропуск held + честный counter). Не дублировать owned EXIT-контракт вне A/B Hold модуля.
+- [ ] 15.4 RU-docstrings со ссылкой на spec requirement «Shared defaults MUST NOT disable or mutate A/B Hold on a held campaign» + decision §13; focused pytest + `pyright-strict` на затронутых путях.

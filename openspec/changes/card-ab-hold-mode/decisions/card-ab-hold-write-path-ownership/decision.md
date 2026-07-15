@@ -37,6 +37,7 @@ A/B Hold — отдельный paid automation write-path с durable состо
 10. **Telegram Enable idempotent while PENDING_SETUP / ACTIVE:** Enable MUST NO-OP (mode unchanged; no Redis ENTER rewrite; no re-trigger of ENTER `force_ab_hold_setup_sync`) when mode is already `PENDING_SETUP` or `ACTIVE`. Demote `ACTIVE`→`PENDING_SETUP` via Enable — **Forbidden** (ломает minus freeze / re-runs ENTER sync mid-hold). EXIT → `OFF` (+ clear snapshot) — единственный MVP path перед новым ENTER. In-flight shop-runner setup при стабильном `PENDING_SETUP` (lock) — Allowed и не считается re-ENTER от Enable. Handler no-op remains the safety net even if the button is still visible or a stale callback arrives.
 11. **Telegram keyboard MAY hide Enable while PENDING_SETUP / ACTIVE:** A/B Hold screen keyboard MUST always offer Disable and Back. Enable MUST be offered when mode is `OFF` (subject to paid/access gates). When mode is `PENDING_SETUP` or `ACTIVE`, the UI MAY omit the Enable button to reduce accidental presses; this is Allowed UX and does not change write ownership. Hiding Enable MUST NOT be the sole protection — §10 handler no-op remains mandatory.
 12. **A/B Hold — только V3 auto-updater + взаимоисключение с V2:** enable A/B Hold MUST быть разрешён только при `automatic_version == 3`; enable на не-V3 РК — no-op (mode остаётся `OFF`) + причина «A/B Hold требует V3». Пока mode `PENDING_SETUP` / `ACTIVE`, переключение версии авто-апдейтера на V2 MUST быть заблокировано (сначала EXIT → `OFF`). Owner: paid Telegram enable handler (`enable_card_ab_hold` / `ui_access`) — V3-gate рядом с paid/freshness gates; `auto_updater_version_toggle` handler — downgrade-block при активном режиме. Авто-переключатель стратегии РК (`change_adv_strategy`, MIN_CPO/MAX_CONV) — **V2-scope** и вне structural freeze §3: A/B Hold не добавляет отдельный freeze-гард на этот путь, а held V3-профиль MUST NOT управляться этим campaign-level strategy objective. Развязка V3 keyword `strategy_mode` от `AdvSetting.strategy` — отдельная задача вне этого change (не в scope decision).
+13. **Shared defaults application ≠ A/B Hold disable path:** shared campaign-defaults application (`apply_defaults_to_adv_setting`, «Применить дефолты» single/shop-wide handlers) MUST NOT disable/mutate A/B Hold на кампании в `PENDING_SETUP` / `ACTIVE`: MUST NOT форсить `card_ab_hold_mode=off`, MUST NOT очищать / оставлять stale allowed-set snapshot, MUST NOT сбрасывать A/B-Hold-coupled структурные поля (`automatic_version`→non-V3, whitelist/target-place automation, bidder profile) в обход freeze / V3-only. Disable — только owned paid Telegram EXIT (§9). Для `OFF`-кампаний defaults применяются как обычно. §7 (default off via overlays для новых / сброса) не отменяется; §13 запрещает именно un-owned disable held-кампании.
 
 ## Applies to
 
@@ -94,6 +95,7 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Прямой setattr / import `card_ab_hold_mode=active` (или `pending_setup`) минуя Telegram ENTER + `process_ab_setup` (§8).
 - Включать A/B Hold на не-V3 РК (`automatic_version != 3`) или переключать РК на V2, пока mode `PENDING_SETUP` / `ACTIVE`.
 - Добавлять A/B Hold freeze-гард на V2 `change_adv_strategy` или позволять campaign strategy objective менять held V3-профиль.
+- Отключать / сбрасывать A/B Hold held-кампании (`PENDING_SETUP` / `ACTIVE`) через shared defaults / «Применить дефолты» в обход owned Telegram EXIT (§13).
 
 ## Examples
 
@@ -118,6 +120,7 @@ Bad:
 - Excel import `card_ab_hold_mode=active` (или `pending_setup`) через `can_apply_card_ab_hold_mode_via_excel` + setattr — ACTIVE без ENTER allowed-set snapshot.
 - Telegram Enable на ACTIVE (или повторный Enable на PENDING) demote/rewrite ENTER и заново гоняет force setup sync mid-hold.
 - Enforcement замороженного allowed-set требует больше фраз, чем WB minus cap, но бот молча рапортует чистый hold вместо видимой деградации.
+- «Применить дефолты» (single или shop-wide) на `ACTIVE` РК молча ставит `off`, оставляет непустой allowed-set snapshot и сбивает `automatic_version` на V2 (un-owned disable в обход EXIT).
 
 ## Related specs
 
@@ -132,6 +135,6 @@ Bad:
 - [x] existing decisions searched
 - [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`)
 - [x] new decision proposed because accepted decision was missing for hold write-path
-- [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`; delta §11 hide Enable — applied via `/opsx:apply`)*
+- [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`; delta §11 hide Enable — applied via `/opsx:apply`; delta §13 shared-defaults not a disable path — proposed, not yet applied, tracked in tasks §15)*
 - [x] tests verify structural freeze without masking placement violations
 - [x] paid-only gate enforced for UI and enable paths

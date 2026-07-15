@@ -337,3 +337,26 @@ A/B Hold is a V3 auto-updater feature. The system MUST allow enabling A/B Hold o
 - **GIVEN** a campaign is in `ACTIVE` A/B Hold on the V3 auto-updater
 - **WHEN** the automatic campaign strategy objective would change between MIN_CPO and MAX_CONV
 - **THEN** the held campaign's frozen keyword bidding profile is not changed by that campaign strategy switch
+
+### Requirement: Shared defaults MUST NOT disable or mutate A/B Hold on a held campaign
+The shared campaign-defaults application path — the "Применить дефолты" / "apply defaults" actions (single campaign and shop-wide) and the shared `apply_defaults_to_adv_setting` helper — is NOT an A/B Hold enable/disable path. When a campaign's mode is `PENDING_SETUP` or `ACTIVE`, this path MUST NOT change `card_ab_hold_mode` (MUST NOT force it to `off`), MUST NOT clear or leave the allowed-set snapshot stale, and MUST NOT reset the A/B-Hold-coupled structural fields (auto-updater version, whitelist/target-place automation, bidder profile) in a way that breaks the freeze or the V3-only invariant. Disabling A/B Hold remains available only through the owned paid Telegram EXIT path (mode → `off` + clear allowed-set snapshot), the single enable/disable write path in MVP. When a campaign's mode is `OFF`, applying defaults proceeds normally.
+
+#### Scenario: Apply defaults on a held campaign preserves A/B Hold
+- **GIVEN** a campaign is in `PENDING_SETUP` or `ACTIVE` A/B Hold with a stored allowed-set snapshot
+- **WHEN** the user triggers "apply defaults" for that single campaign
+- **THEN** the campaign mode is not changed to `off` by this path
+- **AND** the allowed-set snapshot is not cleared or left stale by this path
+- **AND** the A/B-Hold-coupled structural fields are not reset in a way that breaks the freeze or the V3-only requirement
+- **AND** disabling A/B Hold remains available only via the owned paid Telegram EXIT
+
+#### Scenario: Shop-wide apply defaults does not disable held campaigns
+- **GIVEN** a shop has a mix of campaigns, some in `PENDING_SETUP`/`ACTIVE` A/B Hold and some `OFF`
+- **WHEN** the user triggers shop-wide "apply defaults"
+- **THEN** the held campaigns are not switched to `off` and their allowed-set snapshots are not cleared or left stale by this path
+- **AND** the `OFF` campaigns still receive the defaults
+
+#### Scenario: Apply defaults on an OFF campaign applies normally
+- **GIVEN** a campaign has A/B Hold mode `OFF`
+- **WHEN** the user triggers "apply defaults"
+- **THEN** the campaign defaults are applied as usual
+- **AND** the A/B Hold mode remains `OFF`
