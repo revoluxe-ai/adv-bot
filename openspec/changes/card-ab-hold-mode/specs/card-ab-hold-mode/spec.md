@@ -65,7 +65,7 @@ When A/B Hold is enabled, the system MUST run a one-time setup that classifies k
 - **THEN** the keyword is turned OFF for the held profile
 
 ### Requirement: HOLD freezes target places and keeps bidder running
-While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming, keyword enable/rollout growth, or ordinary minus-phrase recalculation. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF.
+While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming, keyword enable/rollout growth, or ordinary minus-phrase recalculation. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF. "Keeping the bidder running" means the bidder path MUST remain eligible during hold and the freeze MUST NOT be implemented by stopping the bidder or the whole campaign; it does NOT forbid the orthogonal campaign activity-control watchdog (ordinary auto-budget / schedule start-pause) from starting or pausing the campaign for reversible operational reasons (daily budget/spend limit, cabinet balance, time schedule, rec_system mode), because those actions do not change the frozen allowed-set, target places, whitelist, keyword enable, or minus set.
 
 #### Scenario: Target places stay fixed while bidder continues
 - **GIVEN** a campaign is in active A/B Hold after successful setup
@@ -84,6 +84,15 @@ While A/B Hold is active after setup, the system MUST NOT update keyword target 
 - **WHEN** hold protection runs
 - **THEN** that keyword MAY be turned OFF to protect spend
 - **AND** target-place auto-updates remain disabled
+
+#### Scenario: Orthogonal activity control may still start or pause the campaign
+- **GIVEN** a campaign is in active A/B Hold with campaign activity control enabled (auto_budget_watchdog)
+- **AND** an orthogonal, reversible operational condition applies (daily budget/spend limit, cabinet balance, time schedule, or rec_system mode)
+- **WHEN** the ordinary campaign activity-control watchdog runs during hold
+- **THEN** it MAY start or pause the campaign for that operational reason
+- **AND** this is not a structural-freeze violation, because it does not mutate the frozen allowed-set, target places, whitelist, keyword enable, or minus set
+- **AND** the campaign returns to the same frozen state when the operational condition clears
+- **AND** this activity-control path MUST NOT be extended to mutate any frozen entity
 
 ### Requirement: ENTER setup freezes the allowed phrase set via PG snapshot before ACTIVE
 The frozen unit of A/B Hold is the campaign's allowed (relevant) phrase set — the relevant phrases plus the resulting GOOD/whitelisted keyword profile — NOT the minus-phrase list. The minus list is only the derived enforcement mechanism that keeps non-allowed phrases out. When A/B Hold enter setup runs, the system MUST capture the allowed phrase set and persist it as a durable PostgreSQL snapshot on the campaign (new migration field), MUST bring Wildberries to that state with one setup sync/mutation (excluding, within the WB minus cap, phrases outside the allowed set — not an ordinary recalculation loop), and MUST NOT mark setup complete or transition the mode to ACTIVE until that allowed-set snapshot write succeeds together with the rest of setup. Redis MUST NOT be the source of truth for the allowed-set snapshot.
