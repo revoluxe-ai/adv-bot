@@ -99,6 +99,23 @@ async def process_ab_setup(
         # фраз (тексты ключей status != BAD), а не список минус-фраз.
         allowed_texts = capture_allowed_phrase_set(keywords)
 
+        # Spec card-ab-hold-mode «ACTIVE without ENTER setup snapshot is forbidden»
+        # (line: «hold enforcement does not treat an empty/missing allowed-set
+        # snapshot as a successful freeze») + decision §8: пустой allowed-set — это
+        # НЕ валидная заморозка, а вырожденное состояние (все ключи BAD / ключей нет
+        # / shelf-only без keyword-surface). Enforcement с allowed=∅ заминусовал бы
+        # всё наблюдаемое (freeze-to-zero), а mode ушёл бы в ACTIVE, и UI заявил бы
+        # чистый testable hold. Поэтому НЕ enforce и НЕ переводим в ACTIVE: остаёмся
+        # в PENDING_SETUP (visible non-ready); следующий тик повторит попытку, когда
+        # появятся non-BAD ключи. Lock снимается в finally.
+        if not allowed_texts:
+            logger.error(
+                "[adv_id=%s] ab_setup aborted: allowed-set пуст (нет non-BAD ключей) — "
+                "freeze невозможен, mode остаётся PENDING_SETUP (не ACTIVE)",
+                complex_adv.adv_id,
+            )
+            return
+
         minus_mgr = MinusPhraseManagerContainer(
             _wb_api_manager_hub=wb_manager_hub
         ).minus_phrase_manager()
