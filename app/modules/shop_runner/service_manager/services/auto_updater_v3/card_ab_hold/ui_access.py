@@ -7,6 +7,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldMode,
     normalize_card_ab_hold_mode,
 )
+from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
+    is_v3_campaign,
+)
 
 
 def is_card_ab_hold_ui_visible(adv_setting: AdvSetting) -> bool:
@@ -20,6 +23,23 @@ def is_card_ab_hold_ui_visible(adv_setting: AdvSetting) -> bool:
 def can_enable_card_ab_hold(adv_setting: AdvSetting) -> bool:
     """Разрешить enable A/B Hold только для paid-active кампании."""
     return bool(adv_setting.bot_active)
+
+
+def can_enable_card_ab_hold_on_version(adv_setting: AdvSetting | object) -> bool:
+    """A/B Hold — только V3 auto-updater (decision §12 / spec V3-only).
+
+    Отдельный gate от ``can_enable_card_ab_hold`` (paid ``bot_active``): даёт
+    свою причину, если РК не на V3 (``automatic_version != 3``).
+    """
+    return is_v3_campaign(getattr(adv_setting, "automatic_version", None))
+
+
+def card_ab_hold_requires_v3_message() -> str:
+    """Причина блокировки enable, когда РК не на V3 (decision §12)."""
+    return (
+        "A/B Hold доступен только для V3 авто-апдейтера. "
+        "Переключите РК на V3 и повторите включение."
+    )
 
 
 def is_card_ab_hold_enable_noop(
