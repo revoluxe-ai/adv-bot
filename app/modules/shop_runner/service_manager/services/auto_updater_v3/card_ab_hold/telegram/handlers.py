@@ -38,7 +38,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold,
+    can_enable_card_ab_hold_on_version,
     card_ab_hold_enable_noop_answer,
+    card_ab_hold_requires_v3_message,
     is_card_ab_hold_enable_noop,
     is_card_ab_hold_ui_visible,
     should_offer_card_ab_hold_enable_control,
@@ -171,6 +173,21 @@ async def enable_card_ab_hold(
                 "[adv_id=%s] CardAbHold Enable no-op (already %s)",
                 adv.adv_id,
                 mode.value,
+            )
+            return
+        if not can_enable_card_ab_hold_on_version(adv):
+            reason = card_ab_hold_requires_v3_message()
+            await query.answer(reason, show_alert=True)
+            await _edit_screen(
+                query,
+                f"{_INSTRUCTION}\n{reason}",
+                adv.id,
+                CardAbHoldMode.OFF,
+            )
+            logger.info(
+                "[adv_id=%s] CardAbHold Enable blocked: not V3 (automatic_version=%s)",
+                adv.adv_id,
+                getattr(adv, "automatic_version", None),
             )
             return
         stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(adv)
