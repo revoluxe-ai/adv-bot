@@ -25,3 +25,15 @@ class CardAbHoldBack(CallbackData, prefix="card_ab_hold_back"):
     """Назад к меню РК."""
 
     adv_setting_original_id: int
+
+
+class CardAbHoldLaunchAnyway(CallbackData, prefix="card_ab_hold_launch"):
+    """§2c: «Всё равно запустить» при низком объёме показов → ENTER."""
+
+    adv_setting_original_id: int
+
+
+class CardAbHoldCancel(CallbackData, prefix="card_ab_hold_cancel"):
+    """§2c: «Отмена» soft-warning низкого объёма → остаётся OFF."""
+
+    adv_setting_original_id: int

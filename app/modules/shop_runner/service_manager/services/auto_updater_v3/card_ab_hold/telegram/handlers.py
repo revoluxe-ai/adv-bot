@@ -27,14 +27,21 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
     CardAbHoldBack,
+    CardAbHoldCancel,
     CardAbHoldDisable,
     CardAbHoldEnable,
+    CardAbHoldLaunchAnyway,
     CardAbHoldMenu,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
     build_ab_hold_enable_blocked_alert,
     build_ab_hold_enable_blocked_by_stats_message,
     evaluate_ab_hold_enable_stats,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
+    build_ab_hold_low_views_alert,
+    build_ab_hold_low_views_warning_message,
+    evaluate_ab_hold_launch_view_volume,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold,
@@ -126,6 +133,45 @@ async def _edit_screen(
         )
 
 
+def _low_views_warning_keyboard(adv_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура soft-warning низкого объёма показов (decision §2c).
+
+    «Всё равно запустить» → ENTER (пользователь принял риск); «Отмена» →
+    остаётся ``OFF``, ENTER не пишется.
+    """
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Всё равно запустить",
+                    callback_data=CardAbHoldLaunchAnyway(
+                        adv_setting_original_id=adv_id
+                    ).pack(),
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="Отмена",
+                    callback_data=CardAbHoldCancel(
+                        adv_setting_original_id=adv_id
+                    ).pack(),
+                )
+            ],
+        ]
+    )
+
+
+async def _edit_low_views_warning(
+    query: CallbackQuery, text: str, adv_id: int
+) -> None:
+    """Показать soft-warning объёма с выбором «запустить / отмена» (§2c)."""
+    msg = query.message
+    if isinstance(msg, Message):
+        await msg.edit_text(
+            text, reply_markup=_low_views_warning_keyboard(adv_id)
+        )
+
+
 @card_ab_hold_router.callback_query(CardAbHoldMenu.filter())
 async def open_card_ab_hold_menu(
     query: CallbackQuery, callback_data: CardAbHoldMenu
@@ -145,20 +191,27 @@ async def open_card_ab_hold_menu(
         await query.answer()
 
 
-@card_ab_hold_router.callback_query(CardAbHoldEnable.filter())
-async def enable_card_ab_hold(
-    query: CallbackQuery, callback_data: CardAbHoldEnable
+async def _handle_ab_hold_enable(
+    query: CallbackQuery,
+    adv_setting_original_id: int,
+    *,
+    skip_view_volume_gate: bool,
 ) -> None:
-    """ENTER: gate bot_active + stats freshness, PG PENDING_SETUP, Redis ENTER.
+    """Общий enable-путь ENTER для кнопок «Включить» и «Всё равно запустить».
 
-    Spec card-ab-hold-mode / decision write-path §2a: при проблемной стате —
-    enable no-op, сразу причина + ограничение + ``SUPPORT_LINK``.
-    Decision §10 / Enable idempotent: PENDING/ACTIVE → no demote, no ENTER rewrite.
-    Immediate setup job out of MVP — UI показывает PENDING и poll LastAbort/ACTIVE.
+    Spec card-ab-hold-mode / decision write-path:
+    §2a — при проблемной стате enable no-op, причина + ограничение + ``SUPPORT_LINK``;
+    §2c — при низком объёме показов (24ч) soft-warning с выбором (mode остаётся
+    ``OFF``); ``skip_view_volume_gate=True`` — пользователь уже подтвердил запуск
+    «на свой риск», объёмный гейт пропускается (остальные gates перепроверяются
+    на случай stale callback);
+    §10 / Enable idempotent — PENDING/ACTIVE → no demote, no ENTER rewrite;
+    §12 — только V3. Immediate setup job out of MVP: UI показывает PENDING и poll
+    LastAbort/ACTIVE.
     """
     async with sm() as session:
         adv = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
+            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         )
         if adv is None or not can_enable_card_ab_hold(adv):
             await query.answer("Доступно только при включённом боте", show_alert=True)
@@ -204,6 +257,23 @@ async def enable_card_ab_hold(
                 CardAbHoldMode.OFF,
             )
             return
+        if not skip_view_volume_gate:
+            sufficient, total_views = await evaluate_ab_hold_launch_view_volume(adv)
+            if not sufficient:
+                await query.answer(
+                    build_ab_hold_low_views_alert(total_views), show_alert=True
+                )
+                await _edit_low_views_warning(
+                    query,
+                    build_ab_hold_low_views_warning_message(total_views),
+                    adv.id,
+                )
+                logger.info(
+                    "[adv_id=%s] CardAbHold Enable low 24h views=%s → warn+choice",
+                    adv.adv_id,
+                    total_views,
+                )
+                return
         adv.card_ab_hold_mode = CardAbHoldMode.PENDING_SETUP.value
         await session.commit()
         await CardAbHoldSignalRedisCache(adv).set_signal(
@@ -224,6 +294,55 @@ async def enable_card_ab_hold(
             f"{_INSTRUCTION}\n{status}",
             adv.id,
             normalize_card_ab_hold_mode(adv.card_ab_hold_mode),
+        )
+
+
+@card_ab_hold_router.callback_query(CardAbHoldEnable.filter())
+async def enable_card_ab_hold(
+    query: CallbackQuery, callback_data: CardAbHoldEnable
+) -> None:
+    """Кнопка «Включить»: ENTER с полным набором gates, включая §2c объём (24ч)."""
+    await _handle_ab_hold_enable(
+        query, callback_data.adv_setting_original_id, skip_view_volume_gate=False
+    )
+
+
+@card_ab_hold_router.callback_query(CardAbHoldLaunchAnyway.filter())
+async def launch_card_ab_hold_anyway(
+    query: CallbackQuery, callback_data: CardAbHoldLaunchAnyway
+) -> None:
+    """§2c «Всё равно запустить»: ENTER несмотря на низкий объём показов.
+
+    Пользователь осознанно принял риск слабого A/B: объёмный soft-gate
+    пропускается, остальные gates (bot_active/no-op/V3/freshness) перепроверяются
+    на случай stale callback.
+    """
+    await _handle_ab_hold_enable(
+        query, callback_data.adv_setting_original_id, skip_view_volume_gate=True
+    )
+
+
+@card_ab_hold_router.callback_query(CardAbHoldCancel.filter())
+async def cancel_card_ab_hold_enable(
+    query: CallbackQuery, callback_data: CardAbHoldCancel
+) -> None:
+    """§2c «Отмена» soft-warning объёма: mode остаётся OFF, ENTER не пишется."""
+    async with sm() as session:
+        adv = await session.scalar(
+            select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
+        )
+        if adv is None or not is_card_ab_hold_ui_visible(adv):
+            await query.answer("Доступно только при включённом боте", show_alert=True)
+            return
+        mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+        logger.info(
+            "[adv_id=%s] CardAbHold Enable cancelled at low-views warning (mode=%s)",
+            adv.adv_id,
+            mode.value,
+        )
+        await query.answer("Включение отменено")
+        await _edit_screen(
+            query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id, mode
         )
 
 
