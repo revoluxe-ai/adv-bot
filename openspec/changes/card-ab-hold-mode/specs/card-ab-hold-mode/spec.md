@@ -154,7 +154,7 @@ The system MUST NOT tell the user that A/B Hold is enabled and that A/B tests ma
 - **THEN** the UI does not state that the mode is fully enabled for starting A/B tests
 
 ### Requirement: Ordinary structural auto-update is suspended during A/B Hold preparation and hold
-While a campaign is preparing or holding for A/B Hold, the system MUST NOT run ordinary structural campaign auto-update that changes whitelist membership, target places, keyword enable/rollout, or ordinary minus-phrase recalculation outside the A/B Hold setup and hold protection paths (including allowed-set enforcement that excludes non-allowed phrases).
+While a campaign is preparing or holding for A/B Hold, the system MUST NOT run ordinary structural campaign auto-update that changes whitelist membership, target places, keyword enable/rollout, or ordinary minus-phrase recalculation outside the A/B Hold setup and hold protection paths (including allowed-set enforcement that excludes non-allowed phrases). A/B Hold applies only to campaigns on the V3 auto-updater; the V2-era campaign strategy objective auto-switch (MIN_CPO ↔ MAX_CONV, the `change_adv_strategy` path) is NOT part of this structural freeze and MUST NOT get a separate A/B Hold freeze gate — it is instead governed by the A/B-Hold-requires-V3 requirement below, and the held V3 profile MUST NOT be driven by that campaign-level strategy objective.
 
 #### Scenario: Ordinary auto-update skips structural work during hold
 - **GIVEN** a campaign is preparing or holding for A/B Hold
@@ -294,3 +294,37 @@ The system MUST NOT transition a campaign to ACTIVE A/B Hold except via successf
 - **WHEN** that write is processed
 - **THEN** the campaign does not become ACTIVE without the ENTER minus snapshot
 - **AND** hold enforcement does not treat an empty/missing allowed-set snapshot as a successful freeze
+
+### Requirement: A/B Hold requires the V3 auto-updater and is mutually exclusive with V2
+A/B Hold is a V3 auto-updater feature. The system MUST allow enabling A/B Hold only for a campaign whose auto-updater version is V3. When the user attempts to enable A/B Hold from the paid Telegram UI for a campaign that is not on V3, the system MUST NOT transition the mode toward `PENDING_SETUP`: the mode MUST remain `OFF` and the user MUST see that A/B Hold requires the V3 auto-updater. While a campaign is `PENDING_SETUP` or `ACTIVE`, the system MUST NOT switch its auto-updater version to V2; switching to V2 MUST be blocked until A/B Hold is disabled (EXIT → `OFF`). Because A/B Hold runs only on V3 campaigns, the V2-era campaign strategy objective auto-switch (MIN_CPO ↔ MAX_CONV) is out of A/B Hold scope: it MUST NOT change the held V3 campaign's frozen keyword bidding profile, and no separate A/B Hold freeze gate is added on that V2 strategy path.
+
+#### Scenario: Enable blocked when campaign is not on V3
+- **GIVEN** a campaign has paid bot management active and passes the stats freshness gate
+- **AND** the campaign auto-updater version is not V3
+- **WHEN** the user attempts to enable A/B Hold from the paid UI
+- **THEN** A/B Hold is not enabled
+- **AND** the campaign mode remains `OFF`
+- **AND** the user is told that A/B Hold requires the V3 auto-updater
+
+#### Scenario: Enable proceeds on a V3 campaign
+- **GIVEN** a campaign has paid bot management active, passes the stats freshness gate, and is on the V3 auto-updater
+- **AND** the campaign mode is `OFF`
+- **WHEN** the user presses Enable
+- **THEN** the campaign mode becomes `PENDING_SETUP`
+- **AND** ENTER MAY proceed per the normal enable path
+
+#### Scenario: Version downgrade to V2 blocked during A/B Hold
+- **GIVEN** a campaign is in `PENDING_SETUP` or `ACTIVE` A/B Hold
+- **WHEN** the user attempts to switch the campaign auto-updater version to V2
+- **THEN** the auto-updater version is not changed
+- **AND** the user is told to disable A/B Hold before switching to V2
+
+#### Scenario: Version downgrade to V2 allowed after EXIT
+- **GIVEN** a campaign has A/B Hold disabled (mode `OFF`)
+- **WHEN** the user switches the campaign auto-updater version to V2
+- **THEN** the auto-updater version change is applied
+
+#### Scenario: Campaign strategy auto-switch does not affect the held V3 profile
+- **GIVEN** a campaign is in `ACTIVE` A/B Hold on the V3 auto-updater
+- **WHEN** the automatic campaign strategy objective would change between MIN_CPO and MAX_CONV
+- **THEN** the held campaign's frozen keyword bidding profile is not changed by that campaign strategy switch

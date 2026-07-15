@@ -110,3 +110,14 @@
 - [ ] 13.4 Telegram payload-limit тесты (`openspec/policies/telegram_bot_api_limits.md`): worst-case текст предупреждения + `callback_data` кнопок confirm/cancel в пределах Bot API байт-лимитов.
 - [ ] 13.5 Реализация: read-only CH-агрегат показов за 24ч (реюз `full_wb_adv_stat`); чистая пороговая функция + константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`; wiring в `enable_card_ab_hold` (soft-gate после §2a freshness, до записи PENDING/ENTER); copy рекомендации (поднять max CPO); confirm-callback «launch anyway». Кандидаты — тот же набор ключей, что setup (non-BAD / would-carry-test).
 - [ ] 13.6 RU-docstrings со ссылкой на spec (requirement «Enable warns when candidate test keywords have too few recent impressions») и decision §2c; прогон integration + focused unit; `pyright-strict` на затронутых путях.
+
+## 14. A/B Hold — только V3 + взаимоисключение с V2 (update — decision §12)
+
+> A/B Hold — V3-only фича. Enable блокируется на не-V3 РК; пока PENDING/ACTIVE запрещён downgrade на V2. Авто-переключатель стратегии РК (`change_adv_strategy`, MIN_CPO/MAX_CONV) — V2-scope и вне A/B Hold freeze (отдельный гард НЕ добавляем). Развязка V3 keyword `strategy_mode` от `AdvSetting.strategy` — отдельная задача вне этого change.
+
+- [ ] 14.1 Tests-first: `enable_card_ab_hold` при `automatic_version != 3` → mode остаётся `OFF`, Redis ENTER не пишется, сообщение «A/B Hold требует V3»; paired positive: V3 + gates pass → `PENDING_SETUP`.
+- [ ] 14.2 Tests-first: `toggle_auto_updater_version(new_version=2)` при `card_ab_hold_mode ∈ {PENDING_SETUP, ACTIVE}` → `automatic_version` не меняется + подсказка «отключите A/B Hold»; paired positive: `OFF` → downgrade применяется.
+- [ ] 14.3 Реализация V3-gate: `can_enable_card_ab_hold` / `enable_card_ab_hold` проверяют `automatic_version == 3` (рядом с paid + freshness gates), reason-alert; UI-видимость экрана не ломать.
+- [ ] 14.4 Реализация downgrade-block: `toggle_auto_updater_version` блокирует `new_version == 2` при активном режиме (читает `card_ab_hold_mode`), сообщение пользователю.
+- [ ] 14.5 Tests-first (регресс исходного finding): в `ACTIVE`/`PENDING_SETUP` (V3) авто-смена `AdvSetting.strategy` НЕ меняет held keyword bidding profile; A/B Hold НЕ добавляет freeze-гард в `change_adv_strategy` (strategy остаётся V2-scope). Примечание: полная гарантия зависит от отдельной развязки `strategy_mode` (вне change).
+- [ ] 14.6 RU-docstrings со ссылкой на spec requirement «A/B Hold requires the V3 auto-updater and is mutually exclusive with V2» + decision §12; focused pytest (`tests/unit/auto_updater_v3/`, client_bot version-toggle) + `pyright-strict` на затронутых путях.

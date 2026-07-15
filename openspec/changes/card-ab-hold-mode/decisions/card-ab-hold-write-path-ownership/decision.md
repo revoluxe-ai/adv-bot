@@ -36,6 +36,7 @@ A/B Hold — отдельный paid automation write-path с durable состо
 9. **Excel write-path (MVP — out):** Excel roundtrip MUST NOT экспортировать, импортировать или применять `card_ab_hold_mode` (колонки нет; если значение всё же попало в payload — apply MUST NO-OP / ignore). Excel MUST NOT переводить режим в `pending_setup`, `active` или `off`. Единственный enable/disable write-path в MVP — **paid Telegram UI** (ENABLE from `OFF` → PENDING_SETUP + Redis ENTER → setup → ACTIVE; DISABLE → OFF + clear allowed-set snapshot). Прямой переход в `ACTIVE` любым non-setup путём (в т.ч. бывший Excel setattr) — **Forbidden** (§8). Excel-колонка / Excel enable A/B Hold — **future / out of MVP** (идея сохранена, не текущий контракт).
 10. **Telegram Enable idempotent while PENDING_SETUP / ACTIVE:** Enable MUST NO-OP (mode unchanged; no Redis ENTER rewrite; no re-trigger of ENTER `force_ab_hold_setup_sync`) when mode is already `PENDING_SETUP` or `ACTIVE`. Demote `ACTIVE`→`PENDING_SETUP` via Enable — **Forbidden** (ломает minus freeze / re-runs ENTER sync mid-hold). EXIT → `OFF` (+ clear snapshot) — единственный MVP path перед новым ENTER. In-flight shop-runner setup при стабильном `PENDING_SETUP` (lock) — Allowed и не считается re-ENTER от Enable. Handler no-op remains the safety net even if the button is still visible or a stale callback arrives.
 11. **Telegram keyboard MAY hide Enable while PENDING_SETUP / ACTIVE:** A/B Hold screen keyboard MUST always offer Disable and Back. Enable MUST be offered when mode is `OFF` (subject to paid/access gates). When mode is `PENDING_SETUP` or `ACTIVE`, the UI MAY omit the Enable button to reduce accidental presses; this is Allowed UX and does not change write ownership. Hiding Enable MUST NOT be the sole protection — §10 handler no-op remains mandatory.
+12. **A/B Hold — только V3 auto-updater + взаимоисключение с V2:** enable A/B Hold MUST быть разрешён только при `automatic_version == 3`; enable на не-V3 РК — no-op (mode остаётся `OFF`) + причина «A/B Hold требует V3». Пока mode `PENDING_SETUP` / `ACTIVE`, переключение версии авто-апдейтера на V2 MUST быть заблокировано (сначала EXIT → `OFF`). Owner: paid Telegram enable handler (`enable_card_ab_hold` / `ui_access`) — V3-gate рядом с paid/freshness gates; `auto_updater_version_toggle` handler — downgrade-block при активном режиме. Авто-переключатель стратегии РК (`change_adv_strategy`, MIN_CPO/MAX_CONV) — **V2-scope** и вне structural freeze §3: A/B Hold не добавляет отдельный freeze-гард на этот путь, а held V3-профиль MUST NOT управляться этим campaign-level strategy objective. Развязка V3 keyword `strategy_mode` от `AdvSetting.strategy` — отдельная задача вне этого change (не в scope decision).
 
 ## Applies to
 
@@ -66,6 +67,8 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - UI «режим включён / можно запускать A/B» только после transition в ACTIVE (полный setup done).
 - Clear/archive PG allowed-set snapshot на EXIT → OFF.
 - Ignore / no-op `card_ab_hold_mode` в Excel import/export schema (MVP).
+- Enable A/B Hold только при `automatic_version == 3`; блок переключения на V2, пока mode `PENDING_SETUP` / `ACTIVE` (EXIT → OFF сначала).
+- Трактовать `change_adv_strategy` (MIN_CPO/MAX_CONV) как V2-scope вне A/B Hold freeze; held V3-профиль не зависит от campaign strategy objective.
 
 ## Forbidden
 
@@ -88,6 +91,8 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Excel export/import/apply колонки `card_ab_hold_mode` в MVP (включая enable `pending_setup`/`active` и disable `off` через Excel).
 - Telegram Enable demote `ACTIVE`→`PENDING_SETUP` (или rewrite ENTER / restart force setup sync) while already `PENDING_SETUP` / `ACTIVE`.
 - Прямой setattr / import `card_ab_hold_mode=active` (или `pending_setup`) минуя Telegram ENTER + `process_ab_setup` (§8).
+- Включать A/B Hold на не-V3 РК (`automatic_version != 3`) или переключать РК на V2, пока mode `PENDING_SETUP` / `ACTIVE`.
+- Добавлять A/B Hold freeze-гард на V2 `change_adv_strategy` или позволять campaign strategy objective менять held V3-профиль.
 
 ## Examples
 

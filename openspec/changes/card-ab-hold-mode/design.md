@@ -19,6 +19,7 @@
 - Cross-pod Redis: signal ENTER/EXIT, last-abort ack, setup lock NX.
 - Paid-only Telegram UI (скрыть при `bot_active is False`) + reject enable.
 - Enable gate на stats freshness/health (тот же класс, что `advs_filtred`); UI: причина + ограничение + `const.SUPPORT_LINK`.
+- A/B Hold — только V3 auto-updater: enable при `automatic_version != 3` blocked (mode остаётся OFF + причина); пока PENDING/ACTIVE — запрет переключения на V2 (сначала EXIT → OFF). V2 `change_adv_strategy` (MIN_CPO/MAX_CONV) — вне A/B Hold freeze; held V3-профиль не управляется этим полем.
 - После PENDING/ACTIVE: setup/hold scheduling не зависит от попадания в `advs_filtred`.
 - **Excel: колонка/apply `card_ab_hold_mode` убраны из MVP** (ignore leftover payload; future option).
 - Instruction: набор рекламных фраз зафиксирован (новые исключаются); ручные правки в WB MAY быть возвращены; изменить набор → отключить A/B Hold; без обещания полной заморозки вне scope типа РК / WB cap.
@@ -193,7 +194,10 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 
 | Path | Gate |
 |------|------|
-| UI / enable | `bot_active is True` **и** stats freshness/health pass |
+| UI / enable | `bot_active is True` **и** stats freshness/health pass **и** `automatic_version == 3` |
+| UI enable on non-V3 | no-op (mode stays `OFF`) + reason «A/B Hold требует V3» |
+| Auto-updater version → V2 | blocked while mode ∈ {PENDING_SETUP, ACTIVE} (EXIT → OFF first) |
+| V2 `change_adv_strategy` (MIN_CPO/MAX_CONV) | вне A/B Hold freeze; held V3-профиль не зависит от campaign strategy objective |
 | UI enable blocked by stats | show reason + restriction + `const.SUPPORT_LINK` |
 | UI enable low 24h views (Σ candidate keyword views < `AB_HOLD_MIN_TOTAL_VIEWS_24H`) | soft warn: reason + raise-max-CPO recommendation + choice launch-anyway/cancel; mode stays `OFF` until confirm (§2c) |
 | UI ready-to-test copy | mode == ACTIVE after full setup (incl. minus snapshot) |
