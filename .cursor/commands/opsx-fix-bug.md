@@ -208,6 +208,10 @@ Bugbot report подозрителен, пока не доказан.
 - sibling paths, которые дают только pattern evidence;
 - tests, которые доказывают invariant на правильной границе.
 
+## Boundary-ownership gate (перед вердиктом выше `plan_only`)
+
+Сопоставь reported write boundary с границей, которой ВЛАДЕЕТ named invariant. Reported boundary, которая ортогональна и обратима (resume/self-heal) и НЕ мутирует замороженную сущность → `false_positive` (или cited allowed-adjudication из accepted decision), не `fix_now`/`needs_openspec_update`. Не патчь границу, которой invariant не владеет — это «починка другой проблемы».
+
 ## Decision matrix
 
 ### Case A: reachable bug

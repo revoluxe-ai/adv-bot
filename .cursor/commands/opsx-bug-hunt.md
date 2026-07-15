@@ -200,7 +200,8 @@ For `dead legacy`, recommend removal or cleanup task, not defensive patching.
 
 - invariant is not violated;
 - or another proven guard already prevents the issue;
-- or the finding is based on an invalid assumption.
+- or the finding is based on an invalid assumption;
+- or an accepted decision cites THIS exact path/boundary as a narrowly-scoped allowed exception (cite path+line); applies only to that boundary — a NEW frozen-entity mutation on the same path is a fresh finding. No citation → stays a finding (detection not weakened).
 
 ## Fix policy
 
