@@ -135,6 +135,6 @@ Bad:
 - [x] existing decisions searched
 - [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`)
 - [x] new decision proposed because accepted decision was missing for hold write-path
-- [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`; delta §11 hide Enable — applied via `/opsx:apply`; delta §12 V3-only + V2 downgrade block — applied (tasks §14); delta §13 shared-defaults not a disable path — applied (tasks §15); delta §2c launch-validity soft-gate — proposed, not yet applied (tasks §13))*
+- [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`; delta §11 hide Enable — applied via `/opsx:apply`; delta §12 V3-only + V2 downgrade block — applied (tasks §14); delta §13 shared-defaults not a disable path — applied (tasks §15); delta §2c launch-validity soft-gate — applied (tasks §13: `launch_validity_gate.py` + enable wiring + launch-anyway/cancel handlers))*
 - [x] tests verify structural freeze without masking placement violations
 - [x] paid-only gate enforced for UI and enable paths
