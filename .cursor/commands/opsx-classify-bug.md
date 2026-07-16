@@ -271,11 +271,7 @@ test_only_callers:
 dead_or_legacy_path: yes/no/unknown
 ```
 
-Sibling-path evidence MUST NOT be treated as runtime reachability proof.
-
-A function existing near a real path is not enough.
-
-A test-only path is not production reachability.
+Sibling/near/test-only ≠ production reachability. «ignores PG mode»: `implementation_bug` iff PG not on scheduler; else `false_positive` or interrupt race (Redis/`finally`).
 
 ### Step 4 — Identify the observable boundary
 

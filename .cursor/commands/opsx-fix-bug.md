@@ -409,13 +409,9 @@ runtime entrypoint -> manager/service -> candidate/filter -> handler/adapter -> 
 
 Для reports про A/B Hold, freeze, setup, pending, active, hold, structural-act, whitelist, blacklist, keyword или bid mutation:
 
-- определи state/mode, который защищается;
-- определи, может ли campaign попасть в mutation path из runtime tick;
-- определи точную mutation boundary;
-- проверь, что protected states blocked;
-- проверь, что normal states still proceed;
-- не используй sibling ACT paths как доказательство reachability;
-- не патчь service internals, если invariant принадлежит manager/candidate/write-boundary level.
+- state/mode, mutation boundary, reachability; protected blocked/OFF proceeds; sibling ACT ≠ reachability; не патчь helper если owner — manager/candidate/write-boundary.
+- Scheduling (PG SoT) vs Redis ENTER; local PG miss ≠ fix_now если schedule режет non-OFF; stale ComplexAdv.mode ≠ «игнор PG»; no fresh read — wrong boundary.
+- Interrupt: structural exits (apply + finally sync/target-place).
 
 ## Specific rule: entrypoint inventory
 
