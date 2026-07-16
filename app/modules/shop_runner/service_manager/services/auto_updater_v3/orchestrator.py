@@ -19,6 +19,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_mana
     ApplyManager,
     V3ApplyInput,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt import (
+    abort_ordinary_v3_if_enter_signaled,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager import (
     DataUpdateManager,
     TickData,
@@ -145,6 +148,8 @@ async def process_adv_v3(
     trace_collector: KeywordDecisionTraceCollector | None = None
     sync_force_zero = False
     calibration_executed = False
+    # CardAbHold interrupt: skip finally TP sync (structural write) after abort.
+    ab_hold_interrupted = False
 
     try:
         keywords = await complex_adv.get_keywords()
@@ -158,12 +163,10 @@ async def process_adv_v3(
             max_last_period=max_last_period,
             tick_report=tick_report,
         )
-        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt import (
-            abort_ordinary_v3_if_enter_signaled,
-        )
 
         # Spec card-ab-hold-mode: interrupt after load (before preamble/apply).
         if await abort_ordinary_v3_if_enter_signaled(complex_adv.adv_setting):
+            ab_hold_interrupted = True
             logger.info(
                 "[adv_id=%s] v3: aborted after load (CardAbHold ENTER)",
                 complex_adv.adv_id,
@@ -219,6 +222,7 @@ async def process_adv_v3(
             and needs_apply_manager(tick_data.campaign_mode)
         ):
             if await abort_ordinary_v3_if_enter_signaled(complex_adv.adv_setting):
+                ab_hold_interrupted = True
                 logger.info(
                     "[adv_id=%s] v3: skipped apply after CardAbHold ENTER interrupt",
                     complex_adv.adv_id,
@@ -369,7 +373,11 @@ async def process_adv_v3(
                     complex_adv.adv_id,
                     exc_info=True,
                 )
-        if tick_data is not None and not is_campaign_full_stop(tick_data.campaign_mode):
+        if (
+            tick_data is not None
+            and not is_campaign_full_stop(tick_data.campaign_mode)
+            and not ab_hold_interrupted
+        ):
             await apply_mgr.sync_target_places_if_needed(
                 tick_data,
                 sync_force_zero=sync_force_zero,
