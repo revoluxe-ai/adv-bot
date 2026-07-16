@@ -115,6 +115,11 @@ async def test_interrupt_enter_before_apply_sets_safe_abort(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt.CardAbHoldLastAbortRedisCache",
         lambda _adv: abort_cache,
     )
+    # Redis path must short-circuit before PG read.
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt._fetch_durable_card_ab_hold_mode",
+        AsyncMock(side_effect=AssertionError("PG must not be read on ENTER")),
+    )
 
     aborted = await abort_ordinary_v3_if_enter_signaled(adv)  # type: ignore[arg-type]
     assert aborted is True
@@ -122,6 +127,7 @@ async def test_interrupt_enter_before_apply_sets_safe_abort(
     snap: CardAbHoldLastAbortSnapshot = abort_cache.set_abort.await_args.args[0]
     assert snap.safe is True
     assert snap.can_continue is True
+    assert snap.reason == "enter_requested"
     signal_cache.clear.assert_awaited_once()
 
 
@@ -130,15 +136,61 @@ async def test_interrupt_enter_before_apply_sets_safe_abort(
 async def test_interrupt_without_enter_does_not_abort(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Interrupt без ENTER → apply path может продолжить."""
-    adv = SimpleNamespace(adv_id=7)
+    """Interrupt без ENTER и PG OFF → apply path может продолжить."""
+    adv = SimpleNamespace(adv_id=7, card_ab_hold_mode="off")
     signal_cache = MagicMock()
     signal_cache.get_signal = AsyncMock(return_value=None)
     monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt.CardAbHoldSignalRedisCache",
         lambda _adv: signal_cache,
     )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt._fetch_durable_card_ab_hold_mode",
+        AsyncMock(return_value=CardAbHoldMode.OFF),
+    )
     assert await abort_ordinary_v3_if_enter_signaled(adv) is False  # type: ignore[arg-type]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "pg_mode",
+    [CardAbHoldMode.PENDING_SETUP, CardAbHoldMode.ACTIVE],
+)
+async def test_interrupt_aborts_on_durable_pg_freeze_without_redis(
+    monkeypatch: pytest.MonkeyPatch,
+    pg_mode: CardAbHoldMode,
+) -> None:
+    """Commit→Redis окно: Redis пуст, но PG уже PENDING/ACTIVE → abort до apply."""
+    adv = SimpleNamespace(adv_id=99, card_ab_hold_mode="off")
+    signal_cache = MagicMock()
+    signal_cache.get_signal = AsyncMock(return_value=None)
+    signal_cache.clear = AsyncMock()
+    abort_cache = MagicMock()
+    abort_cache.set_abort = AsyncMock()
+
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt.CardAbHoldSignalRedisCache",
+        lambda _adv: signal_cache,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt.CardAbHoldLastAbortRedisCache",
+        lambda _adv: abort_cache,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.interrupt._fetch_durable_card_ab_hold_mode",
+        AsyncMock(return_value=pg_mode),
+    )
+
+    aborted = await abort_ordinary_v3_if_enter_signaled(adv)  # type: ignore[arg-type]
+    assert aborted is True
+    signal_cache.clear.assert_not_called()
+    abort_cache.set_abort.assert_awaited_once()
+    snap: CardAbHoldLastAbortSnapshot = abort_cache.set_abort.await_args.args[0]
+    assert snap.reason == "durable_mode_freeze"
+    assert snap.safe is True
+    assert snap.can_continue is True
+    assert adv.card_ab_hold_mode == pg_mode.value
 
 
 @pytest.mark.unit

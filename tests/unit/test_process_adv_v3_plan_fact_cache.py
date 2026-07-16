@@ -24,7 +24,7 @@ _TL = "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_led
 _V3_CPO = "app.modules.shop_runner.service_manager.services.v3_point_order_cpo"
 _AB_HOLD_INTERRUPT = (
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
-    "card_ab_hold.interrupt.abort_ordinary_v3_if_enter_signaled"
+    "orchestrator.abort_ordinary_v3_if_enter_signaled"
 )
 
 
