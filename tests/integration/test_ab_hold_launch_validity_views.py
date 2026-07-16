@@ -1,12 +1,11 @@
-"""Integration (CH aggregate path): объём показов кандидатов за 24ч (§2c / 13.1).
+"""Integration (CH aggregate path): campaign-level proxy Σ (§2c / 13.1).
 
-Проверяет, что launch-validity soft-gate агрегирует показы ключей-кандидатов через
-реюз ``full_wb_adv_stat.get_keywords_views_by_days`` (MV ``mv_clusters_daily_agg``)
-и сравнивает с порогом ``AB_HOLD_MIN_TOTAL_VIEWS_24H``. ClickHouse-клиент подменён
-контролируемым dummy, чтобы прогнать реальный путь построения/парсинга запроса без
-docker-CH; граничные значения вокруг 1000.
+Проверяет launch-validity soft-gate через реюз
+``full_wb_adv_stat.get_keywords_views_by_days`` (MV ``mv_clusters_daily_agg``)
+и порог ``AB_HOLD_MIN_TOTAL_VIEWS_24H``. ClickHouse-клиент подменён dummy;
+граничные значения вокруг 1000.
 
-Класс: integration (path CH). Регрессия — неверная агрегация окна 24ч / порога.
+Класс: integration (path CH). Регрессия — неверная агрегация calendar-day cover.
 """
 
 from __future__ import annotations
@@ -17,6 +16,9 @@ import pytest
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
     launch_validity_gate as gate,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
+    LaunchViewVolumeOutcome,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import (
     full_wb_adv_stat,
@@ -83,8 +85,12 @@ async def test_launch_view_volume_aggregate_boundary_over_ch(
         adv_id = 4242
         search_adv_id = None
 
-    sufficient, total = await gate.evaluate_ab_hold_launch_view_volume(
+    result = await gate.evaluate_ab_hold_launch_view_volume(
         _Adv(), now=now
     )
-    assert total == total_views
-    assert sufficient is expected_sufficient
+    assert result.total_views == total_views
+    assert result.is_sufficient is expected_sufficient
+    if expected_sufficient:
+        assert result.outcome == LaunchViewVolumeOutcome.SUFFICIENT
+    else:
+        assert result.outcome == LaunchViewVolumeOutcome.LOW

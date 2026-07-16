@@ -26,6 +26,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
     build_ab_hold_low_views_alert,
     build_ab_hold_low_views_warning_message,
+    build_ab_hold_views_unavailable_alert,
+    build_ab_hold_views_unavailable_message,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
     handlers,
@@ -255,6 +257,25 @@ def test_ab_hold_low_views_warning_message_within_telegram_limits() -> None:
 def test_ab_hold_low_views_alert_within_callback_answer_limit() -> None:
     """13.4: короткий alert (§2c) ≤200 символов."""
     alert = build_ab_hold_low_views_alert(_WORST_CASE_ADV_SETTING_ID)
+    assert len(alert) <= _TG_CALLBACK_ANSWER_MAX
+    _assert_no_raw_placeholders(alert)
+
+
+@pytest.mark.unit
+def test_ab_hold_views_unavailable_message_within_telegram_limits() -> None:
+    """17.4: CH-error message (§2c) ≤4096; без сырых placeholder."""
+    text = build_ab_hold_views_unavailable_message()
+    assert len(text) <= _TG_MESSAGE_TEXT_MAX
+    _assert_no_raw_placeholders(text)
+    assert "временно недоступна" in text
+    screen = f"{handlers._INSTRUCTION}\n{text}"
+    assert len(screen) <= _TG_MESSAGE_TEXT_MAX
+
+
+@pytest.mark.unit
+def test_ab_hold_views_unavailable_alert_within_callback_answer_limit() -> None:
+    """17.4: CH-error alert (§2c) ≤200 символов."""
+    alert = build_ab_hold_views_unavailable_alert()
     assert len(alert) <= _TG_CALLBACK_ANSWER_MAX
     _assert_no_raw_placeholders(alert)
 

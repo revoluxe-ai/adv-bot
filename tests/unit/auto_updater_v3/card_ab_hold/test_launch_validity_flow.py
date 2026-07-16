@@ -23,6 +23,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
     handlers,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
+    LaunchViewVolumeEvaluation,
+    LaunchViewVolumeOutcome,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
     CardAbHoldCancel,
     CardAbHoldEnable,
@@ -86,7 +90,12 @@ async def test_enable_low_views_warns_and_stays_off() -> None:
         patch.object(
             handlers,
             "evaluate_ab_hold_launch_view_volume",
-            new=AsyncMock(return_value=(False, 300)),
+            new=AsyncMock(
+                return_value=LaunchViewVolumeEvaluation(
+                    outcome=LaunchViewVolumeOutcome.LOW,
+                    total_views=300,
+                )
+            ),
         ),
         patch.object(
             handlers,
@@ -113,7 +122,12 @@ async def test_enable_sufficient_views_proceeds_to_pending() -> None:
     session, session_cm = _make_session(adv)
     query = _make_query()
     set_signal = AsyncMock()
-    view_eval = AsyncMock(return_value=(True, 5000))
+    view_eval = AsyncMock(
+        return_value=LaunchViewVolumeEvaluation(
+            outcome=LaunchViewVolumeOutcome.SUFFICIENT,
+            total_views=5000,
+        )
+    )
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
@@ -152,7 +166,12 @@ async def test_launch_anyway_proceeds_without_volume_check() -> None:
     session, session_cm = _make_session(adv)
     query = _make_query()
     set_signal = AsyncMock()
-    view_eval = AsyncMock(return_value=(False, 10))
+    view_eval = AsyncMock(
+        return_value=LaunchViewVolumeEvaluation(
+            outcome=LaunchViewVolumeOutcome.LOW,
+            total_views=10,
+        )
+    )
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
@@ -181,6 +200,51 @@ async def test_launch_anyway_proceeds_without_volume_check() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     session.commit.assert_awaited()
     set_signal.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enable_ch_error_shows_distinct_reason_and_stays_off() -> None:
+    """17.1: CH unavailable → mode OFF, ENTER не пишется, distinct reason (не low warn)."""
+    adv = _make_off_adv()
+    session, session_cm = _make_session(adv)
+    query = _make_query()
+    set_signal = AsyncMock()
+
+    with (
+        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(
+            handlers,
+            "evaluate_ab_hold_enable_stats",
+            new=AsyncMock(return_value=(True, None)),
+        ),
+        patch.object(
+            handlers,
+            "evaluate_ab_hold_launch_view_volume",
+            new=AsyncMock(
+                return_value=LaunchViewVolumeEvaluation(
+                    outcome=LaunchViewVolumeOutcome.UNAVAILABLE,
+                    total_views=0,
+                )
+            ),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldSignalRedisCache",
+            return_value=MagicMock(set_signal=set_signal),
+        ),
+    ):
+        await handlers.enable_card_ab_hold(
+            query, CardAbHoldEnable(adv_setting_original_id=42)
+        )
+
+    assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
+    session.commit.assert_not_awaited()
+    set_signal.assert_not_awaited()
+    query.answer.assert_awaited()
+    alert = query.answer.await_args.args[0]
+    assert "недоступна" in alert
+    assert "Мало показов" not in alert
 
 
 @pytest.mark.unit

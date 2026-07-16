@@ -27,6 +27,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     build_enter_poll_status_lines,
     setup_block_reason_line,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
+    LaunchViewVolumeEvaluation,
+    LaunchViewVolumeOutcome,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     CardAbHoldSetupBlockKind,
@@ -131,7 +135,12 @@ async def test_enable_blocked_when_max_cpo_missing_or_non_positive(
     query = _make_query()
     set_signal = AsyncMock()
     stats_eval = AsyncMock(return_value=(True, None))
-    volume_eval = AsyncMock(return_value=(True, 9999))
+    volume_eval = AsyncMock(
+        return_value=LaunchViewVolumeEvaluation(
+            outcome=LaunchViewVolumeOutcome.SUFFICIENT,
+            total_views=9999,
+        )
+    )
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
@@ -178,7 +187,12 @@ async def test_enable_positive_max_cpo_proceeds_to_pending() -> None:
         patch.object(
             handlers,
             "evaluate_ab_hold_launch_view_volume",
-            new=AsyncMock(return_value=(True, 9999)),
+            new=AsyncMock(
+                return_value=LaunchViewVolumeEvaluation(
+                    outcome=LaunchViewVolumeOutcome.SUFFICIENT,
+                    total_views=9999,
+                )
+            ),
         ),
         patch.object(
             handlers,

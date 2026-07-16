@@ -1,10 +1,10 @@
-"""Launch-validity soft-gate: объём показов ключей-кандидатов за 24ч (§2c).
+"""Launch-validity soft-gate: campaign-level proxy Σ keyword views (§2c).
 
-Spec ``card-ab-hold-mode`` — Requirement «Enable warns when candidate test
-keywords have too few recent impressions». Decision §2c: soft-gate (не hard
-block); порог ``AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000``.
+Spec ``card-ab-hold-mode`` — Requirement «Enable warns when campaign recent
+keyword impressions are too low». Decision §2c: soft-gate; calendar-day MV
+cover last-24h wall-clock; CH-error → distinct reason.
 
-Класс: unit. Boundary вокруг порога + чистый агрегат (CH-функция замокана).
+Класс: unit. Boundary вокруг порога + CH error vs measured zero.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
     AB_HOLD_MIN_TOTAL_VIEWS_24H,
+    LaunchViewVolumeOutcome,
 )
 
 
@@ -49,7 +50,7 @@ def test_low_recent_impressions_boundary(
 
 @pytest.mark.unit
 def test_sum_recent_keyword_views_sums_days() -> None:
-    """Сумма посуточного CH-агрегата за окно."""
+    """Сумма посуточного CH-агрегата за calendar-day cover."""
     views_by_day: dict[date, int] = {
         date(2026, 7, 14): 400,
         date(2026, 7, 15): 600,
@@ -60,7 +61,7 @@ def test_sum_recent_keyword_views_sums_days() -> None:
 
 @pytest.mark.unit
 def test_candidate_adv_ids_includes_search_and_dedups() -> None:
-    """Кандидаты — кампания + парный поисковый adv, без дублей."""
+    """Campaign-level proxy: adv + парный search, без дублей."""
     adv = SimpleNamespace(adv_id=100, search_adv_id=200)
     assert gate.candidate_views_adv_ids(adv) == [100, 200]
     only_main = SimpleNamespace(adv_id=100, search_adv_id=None)
@@ -74,31 +75,30 @@ def test_candidate_adv_ids_includes_search_and_dedups() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("daily_views", "expected_total", "expected_sufficient"),
+    ("daily_views", "expected_total", "expected_outcome"),
     [
-        ({date(2026, 7, 14): 400, date(2026, 7, 15): 599}, 999, False),
-        ({date(2026, 7, 14): 400, date(2026, 7, 15): 600}, 1000, True),
-        ({date(2026, 7, 14): 400, date(2026, 7, 15): 601}, 1001, True),
+        ({date(2026, 7, 14): 400, date(2026, 7, 15): 599}, 999, LaunchViewVolumeOutcome.LOW),
+        ({date(2026, 7, 14): 400, date(2026, 7, 15): 600}, 1000, LaunchViewVolumeOutcome.SUFFICIENT),
+        ({date(2026, 7, 14): 400, date(2026, 7, 15): 601}, 1001, LaunchViewVolumeOutcome.SUFFICIENT),
     ],
 )
 async def test_evaluate_launch_view_volume_boundary(
     daily_views: dict[date, int],
     expected_total: int,
-    expected_sufficient: bool,
+    expected_outcome: LaunchViewVolumeOutcome,
 ) -> None:
-    """13.1: агрегат за 24ч через CH reuse → boundary вокруг 1000."""
+    """13.1: measured aggregate за calendar-day cover → boundary вокруг 1000."""
     adv = SimpleNamespace(adv_id=100, search_adv_id=None)
     with patch.object(
         gate.full_wb_adv_stat,
         "get_keywords_views_by_days",
         new=AsyncMock(return_value=daily_views),
     ) as ch_call:
-        sufficient, total = await gate.evaluate_ab_hold_launch_view_volume(
+        result = await gate.evaluate_ab_hold_launch_view_volume(
             adv, now=datetime(2026, 7, 15, 12, 0, 0)
         )
-    assert total == expected_total
-    assert sufficient is expected_sufficient
-    # реюз именно adv-агрегата (без нового CH-контракта)
+    assert result.total_views == expected_total
+    assert result.outcome == expected_outcome
     ch_call.assert_awaited_once()
     called_ids = ch_call.await_args.args[0]
     assert called_ids == [100]
@@ -106,8 +106,45 @@ async def test_evaluate_launch_view_volume_boundary(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_measured_zero_views_is_low_not_unavailable() -> None:
+    """17.1 paired: CH success с нулевыми сутками → LOW, не UNAVAILABLE."""
+    adv = SimpleNamespace(adv_id=100, search_adv_id=None)
+    zero_days = {date(2026, 7, 14): 0, date(2026, 7, 15): 0}
+    with patch.object(
+        gate.full_wb_adv_stat,
+        "get_keywords_views_by_days",
+        new=AsyncMock(return_value=zero_days),
+    ):
+        result = await gate.evaluate_ab_hold_launch_view_volume(
+            adv, now=datetime(2026, 7, 15, 12, 0, 0)
+        )
+    assert result.outcome == LaunchViewVolumeOutcome.LOW
+    assert result.total_views == 0
+    assert not result.is_unavailable
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_ch_error_marks_unavailable_not_low() -> None:
+    """17.1: CH error (пустой dict при adv_id) → UNAVAILABLE, не LOW."""
+    adv = SimpleNamespace(adv_id=100, search_adv_id=None)
+    with patch.object(
+        gate.full_wb_adv_stat,
+        "get_keywords_views_by_days",
+        new=AsyncMock(return_value={}),
+    ):
+        result = await gate.evaluate_ab_hold_launch_view_volume(
+            adv, now=datetime(2026, 7, 15, 12, 0, 0)
+        )
+    assert result.outcome == LaunchViewVolumeOutcome.UNAVAILABLE
+    assert result.is_unavailable
+    assert not result.is_sufficient
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_aggregate_returns_zero_without_adv_ids() -> None:
-    """Нет adv_id → 0 без обращения к CH."""
+    """Нет adv_id → measured 0 без обращения к CH."""
     adv = SimpleNamespace(adv_id=None, search_adv_id=None)
     with patch.object(
         gate.full_wb_adv_stat,
@@ -120,6 +157,20 @@ async def test_aggregate_returns_zero_without_adv_ids() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_aggregate_returns_none_on_ch_error() -> None:
+    """17.1: CH error → None (не 0)."""
+    adv = SimpleNamespace(adv_id=100, search_adv_id=None)
+    with patch.object(
+        gate.full_wb_adv_stat,
+        "get_keywords_views_by_days",
+        new=AsyncMock(return_value={}),
+    ):
+        total = await gate.aggregate_candidate_views_24h(adv)
+    assert total is None
+
+
+@pytest.mark.unit
 def test_low_views_warning_message_has_reason_recommendation_and_choice() -> None:
     """13.2: сообщение содержит причину, рекомендацию (max CPO) и выбор."""
     msg = gate.build_ab_hold_low_views_warning_message(300)
@@ -127,6 +178,20 @@ def test_low_views_warning_message_has_reason_recommendation_and_choice() -> Non
     assert "300" in msg
     assert "1000" in msg
     assert "max CPO" in msg
+    assert "календарные сутки MV" in msg
     assert "запустить" in msg.lower()
     assert "отмен" in msg.lower()
     assert "{" not in msg and "}" not in msg
+
+
+@pytest.mark.unit
+def test_views_unavailable_message_is_distinct_from_low_warning() -> None:
+    """17.1: CH-error copy не содержит low-impressions framing."""
+    msg = gate.build_ab_hold_views_unavailable_message()
+    alert = gate.build_ab_hold_views_unavailable_alert()
+    low_msg = gate.build_ab_hold_low_views_warning_message(0)
+    assert "временно недоступна" in msg
+    assert "Мало показов" not in msg
+    assert "Мало показов" in low_msg
+    assert "недоступна" in alert
+    assert len(alert) <= 200
