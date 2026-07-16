@@ -15,7 +15,7 @@
 - ENTER allowed-set: зафиксировать разрешённый набор фраз → PG allowed-set snapshot (новая Alembic migration) → одна setup sync привести WB к allowed-set → только затем setup MAY → ACTIVE.
 - HOLD: обновление ЦП выкл; биддер ON; structural ACT freeze (WL/TP/enable/emergency + ordinary allowed-set recalc); hold enforcement исключает новые/не-разрешённые фразы к замороженному allowed-set (минус как enforcement, WB cap → иначе видимая деградация); только guard перерасхода vs max CPO.
 - UI readiness: «режим включён / можно запускать A/B» только после ACTIVE (полный setup, в т.ч. allowed-set snapshot); не на PENDING; без гонки.
-- EXIT: снова обновление ЦП + ordinary апдейтеры + ordinary minus auto-update + allowed-set recalc; clear/archive PG allowed-set snapshot; без restore keyword-profile / Excel snapshot.
+- EXIT: снова обновление ЦП + ordinary апдейтеры + ordinary minus auto-update + allowed-set recalc; clear PG allowed-set snapshot + clear coordination Redis state; без restore keyword-profile / Excel snapshot; `card_ab_hold_degraded` в OFF может оставаться non-operative residue (deferred cleanup).
 - Cross-pod Redis: signal ENTER/EXIT, last-abort ack, setup lock NX.
 - Paid-only Telegram UI (скрыть при `bot_active is False`) + reject enable.
 - Enable gate на stats freshness/health (тот же класс, что `advs_filtred`); UI: причина + ограничение + `const.SUPPORT_LINK`.
@@ -52,6 +52,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 - Allowed-set freeze path: capture allowed-set → snapshot → setup sync привести WB к allowed-set; во время PENDING/ACTIVE — без ordinary recalculation allowed-set; hold-protection исключает не-разрешённые фразы (минус как enforcement) в пределах WB cap, иначе видимая деградация (owner: A/B Hold path + gate на `MinusPhraseManager` / manager coroutine).
 - Redis coordination layer: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project patterns.
 - Paid UI / handlers: **единственный** enable/disable write-path MVP; экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**. Manual «Обновить минус-слова» при PENDING/ACTIVE: manager skip → Telegram non-success (blocked / отключите A/B Hold), не «Минус-слова обновлены».
+- Telegram manual target-place write boundary: handler manual input загружает `AdvSetting` и проверяет structural-freeze guard до PG write/commit; при `PENDING_SETUP`/`ACTIVE` запись `KeywordSetting.target_place` не выполняется, FSM очищается, пользователю отправляется explanatory message; при `OFF` существующий write path manual target_place остаётся неизменным.
 - Mode policy overlays: default «выкл».
 - Excel schema: **remove** `card_ab_hold_mode` EDIT column; import ignore/no-op если поле всё же пришло; `can_apply_card_ab_hold_mode_via_excel` → always deny non-absent / remove enable path.
 
@@ -64,7 +65,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 - Остановка биддера / `bot_active=False` как реализация hold.
 - Structural ACT (БС / ЦП update / enable / ordinary minus recalculation) во время PENDING_SETUP / ACTIVE.
 - UI «можно запускать A/B» на PENDING_SETUP или до успешного allowed-set snapshot.
-- Redis как единственный source of truth режима или minus snapshot без PG.
+- Redis как единственный source of truth режима или allowed-set snapshot без PG.
 - Excel export/import/apply `card_ab_hold_mode` (вкл. direct ACTIVE / PENDING / OFF).
 - Любой non-setup переход в ACTIVE (§8 / §9).
 - Отключение / сброс A/B Hold held-кампании через shared defaults / «Применить дефолты» в обход owned Telegram EXIT (decision §13).
@@ -127,7 +128,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 ### 4a. Allowed-phrase-set freeze + hold enforcement
 
-**Выбор:** primary invariant — замораживается **разрешённый (relevant) набор фраз** (relevant-фразы + получившийся GOOD/whitelist профиль ключей), а не список минус-фраз; минус — производный enforcement. Переиспользуется существующая модель `auto_add_only_relevant_phrase` / `relevant_phrases` / `NOT_RELEVANT_PHRASE` (не-разрешённая фраза → BAD → минус). На ENTER до ACTIVE — жёсткий порядок: (1) зафиксировать allowed-set и записать durable PG allowed-set snapshot (новое поле, новая migration); (2) одной setup sync/mutation привести WB к allowed-set (исключить всё вне набора в пределах WB minus cap); (3) остальной setup (ключи/ЦП/БС); (4) ACTIVE. Во время PENDING/ACTIVE ordinary `update_minus_phrases` recalc (изменение allowed-set по свежей стате) MUST NOT — allowed-set заморожен; **отдельно** hold-protection исключает любые новые/не-разрешённые фразы и восстанавливает снятые разрешённые, удерживая поверхность трат = allowed-set. EXIT → clear/archive snapshot; ordinary minus + recalc снова разрешены.
+**Выбор:** primary invariant — замораживается **разрешённый (relevant) набор фраз** (relevant-фразы + получившийся GOOD/whitelist профиль ключей), а не список минус-фраз; минус — производный enforcement. Переиспользуется существующая модель `auto_add_only_relevant_phrase` / `relevant_phrases` / `NOT_RELEVANT_PHRASE` (не-разрешённая фраза → BAD → минус). На ENTER до ACTIVE — жёсткий порядок: (1) зафиксировать allowed-set и записать durable PG allowed-set snapshot (новое поле, новая migration); (2) одной setup sync/mutation привести WB к allowed-set (исключить всё вне набора в пределах WB minus cap); (3) остальной setup (ключи/ЦП/БС); (4) ACTIVE. Во время PENDING/ACTIVE ordinary `update_minus_phrases` recalc (изменение allowed-set по свежей стате) MUST NOT — allowed-set заморожен; **отдельно** hold-protection исключает любые новые/не-разрешённые фразы и восстанавливает снятые разрешённые, удерживая поверхность трат = allowed-set. EXIT → clear allowed-set snapshot; ordinary minus + recalc снова разрешены.
 
 **Почему:** новые фразы появляются постоянно (стата пересчитывает GOOD/BAD); заморозка одного минус-листа не мешает новым фразам откручиваться и загрязнять тест. Замораживать надо источник (allowed-set), а минус применять как enforcement. PG snapshot переживает рестарт; Redis не SoT набора.
 
@@ -151,7 +152,7 @@ Architecture Decision Missing: нет (для этого change placement зак
 
 ### 5. EXIT
 
-**Выбор:** PG → OFF; снова разрешены обновление ЦП, ordinary structural апдейтеры и ordinary minus auto-update; minus PG snapshot clear/archive; без restore keyword-profile / Excel snapshot.
+**Выбор:** EXIT ставит PG mode → OFF, очищает PG allowed-set snapshot и coordination Redis state (ENTER/EXIT/setup polling), после чего снова разрешены обновление ЦП, ordinary structural апдейтеры и ordinary minus auto-update; без restore keyword-profile / Excel snapshot. `card_ab_hold_degraded` в OFF может оставаться как неоперативный residue; отдельная auto-cleanup этого residue отложена (deferred cleanup).
 
 **Почему:** простой контракт для пользователя; minus freeze снят явно.
 
@@ -219,7 +220,7 @@ Default OFF через mode overlays (`mode-defaults-policy-ownership`); free ov
 | UI enable when plan max CPO ≤ 0 / missing | hard block: mode stays `OFF` + reason «нужен положительный план max CPO» (§2d/§14a) |
 | UI enable low measured campaign views (Σ calendar-day MV cover last-24h wall-clock < `AB_HOLD_MIN_TOTAL_VIEWS_24H`) | soft warn: reason + raise-max-CPO recommendation + choice launch-anyway/cancel; mode stays `OFF` until confirm (§2c) |
 | UI enable when CH volume query unavailable / errors | soft reason (volume stats temporarily unavailable); mode stays `OFF`; no ENTER; MUST NOT present as measured low impressions (§2c) |
-| UI ready-to-test copy | mode == ACTIVE after full setup (incl. minus snapshot) |
+| UI ready-to-test copy | mode == ACTIVE after full setup (incl. allowed-set snapshot) |
 | PENDING_SETUP status on deterministic setup block | actionable reason + action (raise max CPO / no eligible keywords / EXIT), not generic «Подготовка…»; EXIT always available (§4c/§14b/§14c) |
 | Excel apply `card_ab_hold_mode` | **MUST NOT** (ignore / no column) |
 | Shared defaults / «Применить дефолты» on held campaign | **MUST NOT** disable/mutate (mode preserved; disable только owned Telegram EXIT §13) |

@@ -8,7 +8,7 @@
 
 ### Intent
 
-Один paid automation-режим **A/B Hold**: один раз привести РК к стабильному профилю для теста карточки; на период теста **зафиксировать позиции** (целевая позиция = текущая фактическая), **зафиксировать разрешённый (relevant) набор фраз** (PG allowed-set snapshot; во время hold исключать любые новые/не-разрешённые фразы, чтобы поверхность трат оставалась постоянной — минус как производный enforcement) и **отключить обновление целевых позиций**, при этом **биддер продолжает работать**; UI сообщает «можно запускать A/B» **только после** полного setup (ACTIVE); enable/disable **только через paid Telegram UI**; при выключении режима снова включить обновление ЦП, ordinary апдейтеры и ordinary minus auto-update — без restore keyword-profile / Excel snapshot (minus PG snapshot clear/archive).
+Один paid automation-режим **A/B Hold**: один раз привести РК к стабильному профилю для теста карточки; на период теста **зафиксировать позиции** (целевая позиция = текущая фактическая), **зафиксировать разрешённый (relevant) набор фраз** (PG allowed-set snapshot; во время hold исключать любые новые/не-разрешённые фразы, чтобы поверхность трат оставалась постоянной — минус как производный enforcement) и **отключить обновление целевых позиций**, при этом **биддер продолжает работать**; UI сообщает «можно запускать A/B» **только после** полного setup (ACTIVE); enable/disable **только через paid Telegram UI**; при выключении режима снова включить обновление ЦП, ordinary апдейтеры и ordinary minus auto-update — без restore keyword-profile / Excel snapshot (allowed-set snapshot clear).
 
 ### Current behavior
 
@@ -16,7 +16,6 @@
 - Ordinary auto-update минус-фраз и ручные правки в боте / кабинете WB могут менять минус-набор во время теста без привязки к hold.
 - Типичный «ручной» обход — выключить `bot_active` целиком: тогда останавливается и updater. Это не подходит для A/B: **биддер в режиме A/B Hold останавливать нельзя — он MUST продолжать работать**; полный off бота как способ «заморозить» РК недопустим.
 - Ручное выключение отдельных auto-флагов для V3 не даёт явного «ЦП зафиксированы + обновление ЦП выкл + биддер ON + минус зафиксирован» и не гарантирует чистый setup; между подами bot и shop-runner нет согласованного прерывания текущего тика.
-- Excel roundtrip мог применять `card_ab_hold_mode` (в т.ч. `active`) минуя `process_ab_setup` / minus snapshot.
 
 ### Desired behavior
 
@@ -35,7 +34,8 @@
 - **UI readiness:** интерфейс MUST NOT сообщать, что режим включён и можно запускать A/B, пока mode ≠ **ACTIVE** после полного setup (включая allowed-set snapshot). PENDING / «запрос принят» без ACTIVE — не «можно тестировать»; координация исключает гонку с незавершённым setup.
 - **Liveness PENDING_SETUP:** кампания MUST NOT застревать в молчаливом вечном PENDING (semi-frozen: вне ordinary automation, не ACTIVE). Детерминированный блок setup, видимый только на тике (пустой allowed-set / нет non-BAD ключей; либо пропавший после enable max CPO), MUST surфейситься **actionable-причиной и действием** (поднять max CPO / нет подходящих ключей / отключить A/B Hold), а не generic «Подготовка…»; **EXIT доступен всегда** (→ OFF, возврат ordinary automation). Owned авто-abort зависшего PENDING → **future**.
 - **HOLD:** целевые позиции остаются теми, что зафиксированы на ENTER; **обновление целевых позиций выключено**; **биддер продолжает работать**; структурные изменения БС / разгон / enable ключей не выполняются; ordinary recalculation (пересчёт GOOD/BAD по свежей стате и изменение allowed-set) **не** выполняется — allowed-set заморожен; **отдельно** hold-protection исключает любые новые/не-разрешённые фразы, появившиеся после ENTER, и восстанавливает разрешённые фразы, снятые вручную, — удерживая поверхность трат равной замороженному allowed-set (минус как enforcement, в пределах WB minus cap; при превышении cap или open-match РК — видимая деградация, а не тихий чистый hold); ручные правки = нарушение freeze, перезаписываются; допускаются только защиты от перерасхода относительно max CPO; manual bot refresh «Обновить минус-слова» при freeze MUST NOT врать success — MUST сообщить blocked / отключите A/B Hold.
-- **EXIT:** режим снимается (Telegram disable) — снова **включается обновление целевых позиций**, ordinary structural апдейтеры и ordinary minus auto-update; PG minus snapshot clear/archive; restore keyword-profile / Excel snapshot **не** требуется.
+- **EXIT:** режим снимается (Telegram disable) — снова **включается обновление целевых позиций**, ordinary structural апдейтеры и ordinary minus auto-update; PG allowed-set snapshot clear; restore keyword-profile / Excel snapshot **не** требуется.
+- **Manual Telegram target_place write-path:** при `PENDING_SETUP`/`ACTIVE` ручная запись `KeywordSetting.target_place` блокируется до PG write/commit, FSM очищается и пользователь получает объяснение; при `OFF` поведение manual target_place остаётся прежним.
 - Координация между bot-подом и shop-runner-подом идёт через Redis-сигнал прерывания: текущий normal-тик может быть остановлен до apply с ответом «остановлено, безопасно, можно продолжать».
 - В справке MUST быть: перед включением прогреть РК с не зажатым max CPO и запасом плана продаж; полки рекомендуется выключить (не hard block); не менять цену на период теста; **«Во время A/B Hold набор рекламных фраз зафиксирован: новые фразы автоматически исключаются, а ручные изменения в кабинете WB могут быть возвращены ботом к зафиксированному набору. Чтобы изменить набор фраз, отключите A/B Hold.»** (текст MUST оставаться scoped/best-effort и не обещать полную заморозку всех фраз вне зависимости от типа РК / лимита минус-фраз WB)
 
@@ -76,7 +76,7 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 
 ### Rollback idea
 
-Выключить режим на кампании (Telegram EXIT) или не включать на новых; при проблеме — откат релиза: поле режима по умолчанию выкл, minus snapshot unused/cleared, Redis-ключи с TTL сами истекают, ordinary V3 и ordinary minus scheduling восстанавливаются.
+Выключить режим на кампании (Telegram EXIT) или не включать на новых; при проблеме — откат релиза: поле режима по умолчанию выкл, allowed-set snapshot cleared, Redis-ключи с TTL сами истекают, ordinary V3 и ordinary minus scheduling восстанавливаются.
 
 ### Architecture Decision References
 

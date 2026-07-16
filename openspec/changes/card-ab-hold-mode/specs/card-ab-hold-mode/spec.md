@@ -180,16 +180,19 @@ When the user enables A/B Hold, the system MUST coordinate across bot and runner
 - **AND** the system reports that the stop is safe and enter setup may continue
 
 ### Requirement: EXIT restores ordinary target-place and minus updates without profile restore
-When A/B Hold is disabled, the system MUST leave the held keyword profile as-is without restoring a prior keyword-settings snapshot, MUST allow automatic target-place updates and ordinary structural auto-update again, MUST allow ordinary minus-phrase auto-update and allowed-set recalculation again, and MUST clear or archive the PostgreSQL allowed-set snapshot for the campaign.
+When A/B Hold is disabled, EXIT MUST set mode to `OFF`, MUST clear the PostgreSQL allowed-set snapshot for the campaign, MUST clear coordination Redis state used for ENTER/EXIT/setup polling, MUST allow automatic target-place updates and ordinary structural auto-update again, MUST allow ordinary minus-phrase auto-update and allowed-set recalculation again, and MUST leave the held keyword profile as-is without restoring a prior keyword-settings snapshot. The `card_ab_hold_degraded` flag may remain in `OFF` as non-operative residue; automatic cleanup of that residue is deferred and is not required for EXIT completion in MVP.
 
 #### Scenario: User disables A/B Hold
 - **GIVEN** a campaign is in active A/B Hold
 - **WHEN** the user disables A/B Hold
-- **THEN** automatic target-place updates are allowed again
+- **THEN** the campaign mode becomes `OFF`
+- **AND** automatic target-place updates are allowed again
 - **AND** ordinary structural auto-update may run again
 - **AND** ordinary minus-phrase auto-update and allowed-set recalculation may run again
-- **AND** the PostgreSQL allowed-set snapshot is cleared or archived
+- **AND** the PostgreSQL allowed-set snapshot is cleared
+- **AND** A/B Hold coordination Redis state is cleared
 - **AND** the system does not restore a previous keyword-settings snapshot as part of exit
+- **AND** `card_ab_hold_degraded` MAY remain set in `OFF` as non-operative residue
 
 ### Requirement: Excel MUST NOT expose or apply A/B Hold mode
 Excel roundtrip MUST NOT export, import, or apply the A/B Hold mode setting (`card_ab_hold_mode`) in MVP. The Excel schema MUST NOT include an A/B Hold edit column. If an import payload still contains `card_ab_hold_mode` (including `off`, `pending_setup`, or `active`), the system MUST ignore it and MUST NOT change the campaign mode. Excel enable/edit of A/B Hold is deferred to a future change.
@@ -235,6 +238,21 @@ When the campaign mode is already `PENDING_SETUP` or `ACTIVE`, the paid Telegram
 - **THEN** the campaign mode becomes `PENDING_SETUP`
 - **AND** Redis ENTER MAY be written
 - **AND** shop-runner setup MAY run the one-time ENTER allowed-set capture → snapshot → `ACTIVE` path
+
+### Requirement: Manual Telegram target-place write is blocked during A/B Hold freeze
+While the campaign mode is `PENDING_SETUP` or `ACTIVE`, manual Telegram input that writes `KeywordSetting.target_place` MUST be blocked before database write/commit. The handler MUST clear FSM state after blocked input and MUST send an explanatory message that target place changes are unavailable until A/B Hold is disabled. When mode is `OFF`, existing manual target-place behavior remains allowed.
+
+#### Scenario: Manual target-place input is blocked in PENDING_SETUP or ACTIVE
+- **GIVEN** a campaign mode is `PENDING_SETUP` or `ACTIVE`
+- **WHEN** the user sends manual target-place value from Telegram
+- **THEN** `KeywordSetting.target_place` is not written
+- **AND** FSM state for that input flow is cleared
+- **AND** the user receives an explanatory message about disabling A/B Hold first
+
+#### Scenario: Manual target-place input remains allowed in OFF
+- **GIVEN** a campaign mode is `OFF`
+- **WHEN** the user sends manual target-place value from Telegram
+- **THEN** existing manual target-place behavior is applied
 
 ### Requirement: Enable is blocked when campaign stats freshness fails
 The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through the paid Telegram UI (or any other in-MVP enable write path) when the campaign fails the same statistics freshness / retrieval health class used by shop-runner automation filtering (`_split_advs_by_stats_freshness` / not admitted to the fresh automation set). Excel is not an enable path in MVP. After the mode is already PENDING_SETUP or ACTIVE, setup and hold ticks MUST still be scheduled even if the campaign would be excluded from that fresh set; post-enter stats failures MUST NOT leave the campaign stuck without a setup tick solely due to the freshness filter.
@@ -351,7 +369,7 @@ The system MUST NOT transition a campaign to ACTIVE A/B Hold except via successf
 #### Scenario: Non-setup ACTIVE write is rejected or ignored
 - **GIVEN** a write path other than A/B Hold ENTER setup attempts to set mode to active
 - **WHEN** that write is processed
-- **THEN** the campaign does not become ACTIVE without the ENTER minus snapshot
+- **THEN** the campaign does not become ACTIVE without the ENTER allowed-set snapshot
 - **AND** hold enforcement does not treat an empty/missing allowed-set snapshot as a successful freeze
 
 ### Requirement: A/B Hold requires the V3 auto-updater and is mutually exclusive with V2

@@ -7,7 +7,7 @@
 - [x] 1.5 Добавить write-gate: bidder / cluster bids остаются допустимы при ACTIVE (биддер MUST работать).
 - [x] 1.6 Добавить тест interrupt: signal ENTER до apply → structural apply не вызывается, результат «safe / can continue».
 - [x] 1.7 Добавить тест EXIT: после выключения ordinary target-place update снова eligible; snapshot restore не требуется.
-- [x] 1.8 Добавить тест Excel apply: enable A/B Hold при `bot_active=False` не применяется.
+- [x] 1.8 Superseded by Telegram-only MVP (§9): Excel enable/apply path removed; no Excel write-path is implemented.
 
 ## 2. Модель состояния и defaults
 
@@ -36,7 +36,7 @@
 - [x] 5.2 Handler enable: gate `bot_active`, PG PENDING_SETUP, Redis ENTER, poll last-abort / ACTIVE; docstring со ссылкой на spec.
 - [x] 5.3 Handler disable: EXIT → PG OFF + signal cleanup; без restore.
 - [x] 5.4 Скрыть entry при `bot_active=False`.
-- [x] 5.5 Excel EDIT-колонка режима; apply только при `bot_active=True`.
+- [x] 5.5 Superseded by Telegram-only MVP (§9): Excel edit/apply path removed; no Excel write-path is implemented.
 
 ## 6. Документация и проверка
 
@@ -150,3 +150,9 @@
 - [x] 17.2 Реализация: enable soft-gate различает measured volume vs CH error (не `sum({}) == 0` как low volume); copy/alert для CH-error path; mode `OFF`, без ENTER; launch-anyway остаётся только для measured low-volume path (или явно перепроверить freshness/volume на confirm — не расширять silent enable при CH fail).
 - [x] 17.3 Выровнять RU copy/docstrings/UI strings с SoT: «календарные дни / сутки MV, покрывающие последние 24ч wall-clock» (или эквивалент), не обещать true rolling 24h; ссылка на spec requirement «Enable warns when campaign recent keyword impressions are too low» + decision §2c.
 - [x] 17.4 Focused pytest (unit + integration path) + `pyright-strict` на затронутых путях; payload-limit для нового CH-error alert/message если добавлен отдельный текст.
+
+## 18. Manual Telegram target_place freeze (update)
+
+- [x] 18.1 Tests-first: ручной Telegram input `target_place` при `PENDING_SETUP`/`ACTIVE` блокируется до write boundary, FSM очищается, пользователю показывается explanatory message; paired positive: при `OFF` manual write-path остаётся разрешён.
+- [x] 18.2 Реализация write boundary в handler manual target_place: загружает `AdvSetting`, проверяет structural-freeze guard до PG update/commit, blocked path не пишет `KeywordSetting.target_place`.
+- [x] 18.3 Regression test: `tests/unit/client_bot/test_keyword_target_place_ab_hold_guard.py`.
