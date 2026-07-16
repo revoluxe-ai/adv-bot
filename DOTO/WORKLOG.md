@@ -194,3 +194,60 @@ DONE
 Встроить в Cursor Codex, посмотреть что там за возможности
 - навести порядок в веткаххх!!!!
 провести ревизию доков в проекте
+
+<!-- LEARNING_ENTRY_BEGIN -->
+
+## LEARN-20260716-103045-pending-liveness
+
+- status: captured
+- optimization_status: pending
+- captured_at: 2026-07-16T10:30:45+03:00
+- source: opsx-learn-from-bug
+- change_id: card-ab-hold-mode
+- affected_area: card_ab_hold / PENDING_SETUP liveness / process_ab_setup / enable-flow
+- promoted_to: none
+
+### Raw learning input
+
+Нашли очень опасный баг, по запаху: что-то нашел Багbot, затем начали проверять через команду bug-hunt, он квалифицировал как баг за пределами scope или что-то вроде этого, но потом я сбросил отчеты во внешний чат и выявили более глубокий и потенциально очень опасный баг.
+
+1. Пользователь нажимает Enable A/B Hold.
+2. Enable-flow проходит текущие гейты.
+3. Код пишет card_ab_hold_mode = PENDING_SETUP / ENTER.
+4. ordinary automation начинает исключать campaign, потому что mode != OFF.
+5. На ближайшем setup tick process_ab_setup проверяет max_price_for_order.
+6. Если max_price_for_order missing или <= 0 — setup просто return.
+7. mode остаётся PENDING_SETUP.
+8. На следующем тике повторяется то же самое.
+9. Пользователь видит generic "Подготовка…", но не видит причину.
+
+Bugbot (Cursor): Missing max CPO stalls PENDING — Medium. Симптом: при missing/non-positive max_price_for_order process_ab_setup return без снятия PENDING_SETUP.
+
+Классификация по workflow:
+- /opsx-fix-bug (literal early return в pipelines.py): false_positive — код соблюдает spec «не ACTIVE без snapshot»; sibling precedent пустой allowed-set → остаётся PENDING (test_setup_empty_allowed_set_aborts_before_active).
+- /opsx-bug-hunt (PENDING_SETUP liveness invariant): needs_openspec_update — реальный liveness-hazard, но контракт слабый.
+- /opsx-classify-bug: spec_bug — код следует принятым артефактам; виноват контракт, не early return.
+
+Достижимость PROVEN:
+- entrypoint: WBShopUpdateManager.adv_settings_auto_update @while_coroutine_decorator(5*60)
+- chain: filter_ab_hold_pipeline_candidates(advs) → process_ab_setup
+- ordinary exclusion PROVEN: manager.py V2/V3 loops continue if ab_mode != OFF; filter_structural_act_candidates drops PENDING/ACTIVE
+
+Детерминированные блокеры setup (indefinite PENDING при excluded automation):
+- plan_max <= 0 (max_price_for_order missing) — deterministic/user-fixable; ENTER не гейтит max CPO (гейты: bot_active, no-op, V3, freshness §2a, view-volume §2c)
+- empty allowed_texts — mixed transient vs deterministic (all BAD / no keyword surface)
+
+Нет: timestamp PENDING entry (models.py только card_ab_hold_mode/snapshot/degraded); owned setup-abort-to-OFF (только Telegram EXIT); actionable UI reason в enter_status (generic «Подготовка…»).
+
+Правильный invariant (liveness):
+Для durable mode/state, гейтящего ordinary automation, spec MUST: gate deterministic prerequisites до входа; post-entry deterministic blockers — user-visible actionable reason + bounded recovery / explicit retry class / owned abort; transient retry только если явно классифицирован; deterministic non-transient MUST NOT оставлять silent indefinite limbo при excluded automation.
+
+Next command: /opsx-update card-ab-hold-mode (ENTER-гейт max_price_for_order>0; actionable PENDING status; recovery semantics). НЕ патчить process_ab_setup «move off PENDING» — неверная граница.
+
+Попытка /opsx-learn-from-bug GO learning patch (config.yaml rules.specs + opsx-bug-hunt.md): REVERT — guard strict ввёл новые FAIL (config.yaml grew baseline +619; opsx-bug-hunt.md 8087>8001; scenarios opsx_continue/propose/update/verify). База уже over budget: rules.specs ~3512>3501 fail, rules section >14001. Пользователь: переполнение файлов проигнорируй при capture.
+
+Предложенный текст learning patch (pending optimization):
+- rules.specs: liveness semantics для durable mode, исключающего ordinary automation (4 пункта: entry gate prerequisites; post-entry actionable + recovery/retry/abort; transient explicit; no silent limbo)
+- opsx-bug-hunt hard rule: durable state excluding automation = liveness surface; deterministic indefinite trap without entry gate/actionable reason/recovery/abort = candidate finding even without forbidden write
+
+<!-- LEARNING_ENTRY_END -->
