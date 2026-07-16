@@ -251,3 +251,76 @@ Next command: /opsx-update card-ab-hold-mode (ENTER-гейт max_price_for_order
 - opsx-bug-hunt hard rule: durable state excluding automation = liveness surface; deterministic indefinite trap without entry gate/actionable reason/recovery/abort = candidate finding even without forbidden write
 
 <!-- LEARNING_ENTRY_END -->
+
+<!-- LEARNING_ENTRY_BEGIN -->
+
+## LEARN-20260716-103130-dead-surface
+
+- status: captured
+- optimization_status: pending
+- captured_at: 2026-07-16T10:31:30+03:00
+- source: opsx-learn-from-bug
+- change_id: card-ab-hold-mode
+- affected_area: card_ab_hold / scheduling.py / dead surface after implementation
+- promoted_to: none
+
+### Raw learning input
+
+3. [dead legacy] should_schedule_ordinary_updater is exported but never called
+
+File: card_ab_hold/scheduling.py:38 (+ export in __init__.py)
+Evidence: no call site in app/**. Ordinary V2/V3 exclusion is actually done via inline normalize_card_ab_hold_mode(...) != OFF checks in adv_settings_auto_update (587, 599, 611) — which are correct and cover both versions.
+Risk: none functionally; only dead surface that can mislead future edits.
+Recommended action: cleanup task (remove or wire it in), not a hotfix. No fix under this hunt.
+
+Это уже не в первые раз: мертный код после имплементации. Тратим на это время.
+
+Пользователь: Так это не баг в чистов виде? Править ничего не надо?
+
+Ответ workflow: да, не production-баг. Вердикт plan_only / no_fix. Инвариант (ordinary V2/V3 только при OFF) уже enforced инлайном в manager.py:587/599/611. Мёртвый предикат unreachable из runtime.
+
+Sibling dead surface (тот же паттерн, hunt отметил только 1 из 3):
+- should_schedule_ordinary_updater (scheduling.py:38)
+- should_run_ab_setup (scheduling.py:28)
+- should_run_ab_hold (scheduling.py:33)
+Все три: определены + экспортированы + callers только tests/**; runtime заменён filter_ab_hold_pipeline_candidates (manager.py:562) и inline != OFF.
+
+Вариант A cleanup: удалить 3 предиката + exports + осиротевшие тест-ассерты; manager не трогать.
+Вариант B wire-in: централизовать в scheduling.py по аналогии с filter_ab_hold_pipeline_candidates; семантика без изменений.
+
+Learning patch APPLIED (GO):
+- target: .cursor/commands/opsx-apply.md Guardrails +1 буллет (~220 chars):
+  "After implementing tasks, treat any new production/exported symbol whose only callers are tests as dead surface: wire it into a runtime-reachable path or remove it before completion. Passing tests do not prove wiring."
+
+Follow-up (пользователь выбрал cleanup_first):
+1) Сначала reduction-only чистка pre-existing guard FAIL (config.yaml::rules, rules.specs, scenario opsx_verify baseline stale) — без бампа baseline, ~285 chars уплотнения rules.specs.
+2) Потом enforceable verify-backstop: rules.verify NO_GO + opsx-verify.md + бамп openspec_guard.yaml baselines.
+
+Пользователь: /opsx-learn-from-bug Проведи обучение, переполнение файлов проигноруй
+
+Предложенный текст learning patch (pending optimization, после cleanup):
+- rules.verify: Verify должен ставить NO_GO, если change добавил production/exported символ, у которого единственные callers — тесты (dead surface); test-only reachability не доказывает wiring.
+- opsx-verify.md: одна проверка step 6 + NO_GO step 8 (dead surface / test-only reachability).
+
+<!-- LEARNING_ENTRY_END -->
+
+
+
+### Deferred: ClickHouse enable-path performance risk
+
+Discovered during `card-ab-hold-mode` review.
+
+The change reuses existing ClickHouse freshness and keyword-view readers. Static review found:
+
+* `clusters_adv_stats` freshness query filters by `adv_id`, while `adv_id` is not in the table `ORDER BY` prefix;
+* reused enable-path reads have semaphore/acquire protection but may lack a bounded operation timeout.
+
+Disposition:
+
+* pre-existing shared ClickHouse debt;
+* not a blocker for `card-ab-hold-mode` without production `EXPLAIN indexes=1`, `system.query_log` metrics or an observed timeout;
+* do not add an index, projection, MV or schema change inside the current change;
+* investigate separately after release;
+* consider reuse of `mv_clusters_daily_agg.ts_state` only after proving semantic equivalence.
+
+Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
