@@ -42,6 +42,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.launch_validity_gate import (
     build_ab_hold_low_views_alert,
     build_ab_hold_low_views_warning_message,
+    build_ab_hold_views_unavailable_alert,
+    build_ab_hold_views_unavailable_message,
     evaluate_ab_hold_launch_view_volume,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
@@ -226,8 +228,9 @@ async def _handle_ab_hold_enable(
 
     Spec card-ab-hold-mode / decision write-path:
     §2a — при проблемной стате enable no-op, причина + ограничение + ``SUPPORT_LINK``;
-    §2c — при низком объёме показов (24ч) soft-warning с выбором (mode остаётся
-    ``OFF``); ``skip_view_volume_gate=True`` — пользователь уже подтвердил запуск
+    §2c — при низком measured объёме (calendar-day MV cover) soft-warning с выбором
+    (mode остаётся ``OFF``); при CH error — distinct soft reason без low-impressions
+    copy; ``skip_view_volume_gate=True`` — пользователь уже подтвердил запуск
     «на свой риск», объёмный гейт пропускается (остальные gates перепроверяются
     на случай stale callback);
     §10 / Enable idempotent — PENDING/ACTIVE → no demote, no ENTER rewrite;
@@ -299,8 +302,24 @@ async def _handle_ab_hold_enable(
             )
             return
         if not skip_view_volume_gate:
-            sufficient, total_views = await evaluate_ab_hold_launch_view_volume(adv)
-            if not sufficient:
+            volume_eval = await evaluate_ab_hold_launch_view_volume(adv)
+            if volume_eval.is_unavailable:
+                await query.answer(
+                    build_ab_hold_views_unavailable_alert(), show_alert=True
+                )
+                await _edit_screen(
+                    query,
+                    f"{_INSTRUCTION}\n{build_ab_hold_views_unavailable_message()}",
+                    adv.id,
+                    CardAbHoldMode.OFF,
+                )
+                logger.info(
+                    "[adv_id=%s] CardAbHold Enable volume stats unavailable (CH)",
+                    adv.adv_id,
+                )
+                return
+            if not volume_eval.is_sufficient:
+                total_views = volume_eval.total_views
                 await query.answer(
                     build_ab_hold_low_views_alert(total_views), show_alert=True
                 )
@@ -310,7 +329,7 @@ async def _handle_ab_hold_enable(
                     adv.id,
                 )
                 logger.info(
-                    "[adv_id=%s] CardAbHold Enable low 24h views=%s → warn+choice",
+                    "[adv_id=%s] CardAbHold Enable low measured views=%s → warn+choice",
                     adv.adv_id,
                     total_views,
                 )
@@ -342,7 +361,7 @@ async def _handle_ab_hold_enable(
 async def enable_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldEnable
 ) -> None:
-    """Кнопка «Включить»: ENTER с полным набором gates, включая §2c объём (24ч)."""
+    """Кнопка «Включить»: ENTER с полным набором gates, включая §2c объём (MV cover)."""
     await _handle_ab_hold_enable(
         query, callback_data.adv_setting_original_id, skip_view_volume_gate=False
     )
