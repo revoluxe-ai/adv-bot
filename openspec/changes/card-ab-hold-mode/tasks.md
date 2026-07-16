@@ -100,16 +100,16 @@
 - [x] 12.2 Mode-aware keyboard builder: omit Enable when mode ∈ {PENDING_SETUP, ACTIVE}; always include Disable+Back; OFF keeps Enable.
 - [x] 12.3 Focused pytest; сверка со spec screen controls + decision §11; §10 handler tests remain green.
 
-## 13. Launch validity soft-gate: low 24h views warning (update — decision §2c)
+## 13. Launch validity soft-gate: campaign-level volume warning (update — decision §2c)
 
-> Новый enable-поток: попытка запуска → оценка объёма показов ключей-кандидатов за 24ч → при проблеме → информация + рекомендация (поднять max CPO) + выбор «всё равно запустить / отмена». Soft-gate (не hard block), distinct от §2a freshness и §8 empty allowed-set. Пороговая константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`.
+> Enable-поток: оценка **campaign-level proxy** Σ keyword views (реюз `get_keywords_views_by_days` / `mv_clusters_daily_agg`, `adv_id` + search) за **календарные дни MV**, покрывающие last-24h wall-clock → при measured low volume → информация + рекомендация (поднять max CPO) + выбор «всё равно запустить / отмена». Soft-gate (не hard block), distinct от §2a freshness и §8 empty allowed-set. Порог `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000` (имя историческое; семантика = calendar-day cover). Keyword-filtered setup candidates / true rolling 24h — out of MVP. CH-error distinct reason — tasks §17 (reconcile 2026-07-16).
 
-- [x] 13.1 Tests-first (integration, real/test CH): агрегат суммарных показов ключей-кандидатов за последние 24ч через реюз `full_wb_adv_stat.get_keywords_views_by_days` (MV `default_db.mv_clusters_daily_agg`); граничные значения вокруг порога 1000 (ниже / равно / выше).
-- [x] 13.2 Tests-first: enable при `Σ 24h views < порога` → mode остаётся `OFF`; сообщение содержит причину (мало показов), рекомендацию поднять план max CPO и повторить, и inline-выбор «Всё равно запустить» / «Отмена». Paired: `Σ ≥ порога` → enable без предупреждения (обычный путь §7).
+- [x] 13.1 Tests-first (integration, real/test CH): campaign-level агрегат через реюз `full_wb_adv_stat.get_keywords_views_by_days` (MV `default_db.mv_clusters_daily_agg`); граничные значения вокруг порога 1000 (ниже / равно / выше).
+- [x] 13.2 Tests-first: enable при measured `Σ < порога` → mode остаётся `OFF`; сообщение содержит причину (мало показов), рекомендацию поднять план max CPO и повторить, и inline-выбор «Всё равно запустить» / «Отмена». Paired: `Σ ≥ порога` → enable без предупреждения (обычный путь §7).
 - [x] 13.3 Tests-first: «Всё равно запустить» (confirm-callback) → `PENDING_SETUP` + Redis ENTER; «Отмена» → остаётся `OFF`, ENTER не пишется.
 - [x] 13.4 Telegram payload-limit тесты (`openspec/policies/telegram_bot_api_limits.md`): worst-case текст предупреждения + `callback_data` кнопок confirm/cancel в пределах Bot API байт-лимитов.
-- [x] 13.5 Реализация: read-only CH-агрегат показов за 24ч (реюз `full_wb_adv_stat`); чистая пороговая функция + константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`; wiring в `enable_card_ab_hold` (soft-gate после §2a freshness, до записи PENDING/ENTER); copy рекомендации (поднять max CPO); confirm-callback «launch anyway». Кандидаты — тот же набор ключей, что setup (non-BAD / would-carry-test).
-- [x] 13.6 RU-docstrings со ссылкой на spec (requirement «Enable warns when candidate test keywords have too few recent impressions») и decision §2c; прогон integration + focused unit; `pyright-strict` на затронутых путях.
+- [x] 13.5 Реализация: read-only CH campaign-level агрегат (реюз `full_wb_adv_stat`); чистая пороговая функция + константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`; wiring в `enable_card_ab_hold` (soft-gate после §2a freshness, до записи PENDING/ENTER); copy рекомендации (поднять max CPO); confirm-callback «launch anyway». Метрика MVP = campaign-level proxy (не setup non-BAD filter).
+- [x] 13.6 RU-docstrings со ссылкой на spec (requirement «Enable warns when campaign recent keyword impressions are too low») и decision §2c; прогон integration + focused unit; `pyright-strict` на затронутых путях.
 
 ## 14. A/B Hold — только V3 + взаимоисключение с V2 (update — decision §12)
 
@@ -141,3 +141,12 @@
 - [x] 16.4 Реализация actionable статуса: setup-путь помечает детерминированную причину блока через reuse `CardAbHoldLastAbort`-подобного Redis-признака (writer = shop-runner setup, reader = UI poll) — **без новой миграции**; `enter_status` / status label отражают причину; generic — только для транзиентных.
 - [x] 16.5 Tests-first: EXIT при зависшем PENDING_SETUP → `OFF` + ordinary automation снова eligible (paired с существующими EXIT-тестами); подтвердить, что MVP не вводит авто-abort (owned auto-abort = future, без `pending_since` миграции).
 - [x] 16.6 RU-docstrings со ссылкой на spec requirements («Enable is blocked when plan max CPO is missing or non-positive», «PENDING_SETUP setup blockers are surfaced and recoverable») + decision §14; focused pytest (`tests/unit/auto_updater_v3/card_ab_hold/`, client_bot enable) + `pyright-strict` на затронутых путях.
+
+## 17. §2c metric reconcile delta: CH-error distinct reason + honest grain copy (update — decision §2c)
+
+> После `/opsx:update` 2026-07-16 SoT метрики = campaign-level proxy + calendar-day MV cover last-24h + CH-error ≠ 0 views. Wiring §13 уже на proxy/calendar grain; код всё ещё может трактовать CH fail → `{}` → 0 → low-impressions warn и говорить «24ч» в copy/docstrings. Owner — bot enable write-path (`launch_validity_gate` + `_handle_ab_hold_enable`). Не менять shared CH helper контракт для всех callers без нужды: предпочтительно детектить error на enable-границе / обертке soft-gate.
+
+- [ ] 17.1 Tests-first: CH unavailable / query error на soft-gate §2c → mode остаётся `OFF`, ENTER не пишется, пользователь видит **distinct soft reason** (объём временно недоступен); MUST NOT показывать measured low-impressions warning; MUST NOT coerce error → 0 views. Paired: успешный measured Σ < порога → прежний low-impressions warn+choice.
+- [ ] 17.2 Реализация: enable soft-gate различает measured volume vs CH error (не `sum({}) == 0` как low volume); copy/alert для CH-error path; mode `OFF`, без ENTER; launch-anyway остаётся только для measured low-volume path (или явно перепроверить freshness/volume на confirm — не расширять silent enable при CH fail).
+- [ ] 17.3 Выровнять RU copy/docstrings/UI strings с SoT: «календарные дни / сутки MV, покрывающие последние 24ч wall-clock» (или эквивалент), не обещать true rolling 24h; ссылка на spec requirement «Enable warns when campaign recent keyword impressions are too low» + decision §2c.
+- [ ] 17.4 Focused pytest (unit + integration path) + `pyright-strict` на затронутых путях; payload-limit для нового CH-error alert/message если добавлен отдельный текст.

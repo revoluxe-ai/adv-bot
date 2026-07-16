@@ -25,7 +25,7 @@
 - **Включение (enable) дополнительно ограничено здоровьем статы РК:** если кампания не проходит тот же класс проверки свежести/получения статистики, что `_split_advs_by_stats_freshness` / `advs_filtred`, enable MUST NOT выполняться. В UI пользователь MUST сразу видеть **причину**, текст **ограничения** и рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK` (в коде нет `ADMIN`; whitelist — `ADMINS`; публичная ссылка — `SUPPORT_LINK`).
 - **После успешного переключения** (PENDING_SETUP / ACTIVE) сбои свежести статы **не** должны блокировать scheduling `process_ab_setup` / `process_ab_hold` (не оставлять вечный PENDING из‑за `advs_filtred`).
 - **Жёсткий гейт плана max CPO на enable:** если план `max_price_for_order` отсутствует или ≤ 0, enable MUST NOT переводить в `PENDING_SETUP` (mode остаётся `OFF`) — иначе setup-тик детерминированно не сможет завершиться, а кампания уже исключена из ordinary automation (вечный semi-frozen PENDING). Пользователь видит **причину** (нужен положительный план max CPO) и **рекомендацию** задать и повторить. Гейт рядом с freshness (§2a) и V3-only (§12), **до** soft-gate объёма (§2c).
-- **Мягкое предупреждение о слабом объёме теста (soft-gate):** при enable, если суммарные недавние показы (окно последних 24ч) ключей-кандидатов теста ниже порога, система MUST NOT включать молча — показывает **причину** (мало показов для надёжного A/B), **рекомендацию** поднять план max CPO и повторить попытку, и **выбор** «всё равно запустить» / «отмена» (пользователь MAY продолжить на свой риск). Это отдельный soft-gate, не hard block (в отличие от freshness) и не пустой allowed-set.
+- **Мягкое предупреждение о слабом объёме теста (soft-gate):** при enable, если **измеренная** Σ показов keyword-clusters кампании (**campaign-level proxy** через `get_keywords_views_by_days` / `mv_clusters_daily_agg`; зерно — календарные дни MV, покрывающие last-24h wall-clock) ниже порога, система MUST NOT включать молча — показывает **причину** (мало показов для надёжного A/B), **рекомендацию** поднять план max CPO и повторить, и **выбор** «всё равно запустить» / «отмена» (пользователь MAY продолжить на свой риск). При CH unavailable / query error — **отдельный soft reason** (объём временно недоступен), mode `OFF`, без ENTER; MUST NOT трактовать ошибку как 0 показов. Keyword-filtered Σ по setup-кандидатам и true rolling 24h — out of MVP / future. Это отдельный soft-gate, не hard block (в отличие от freshness) и не пустой allowed-set.
 - **ENTER:** система один раз готовит профиль РК (включая минус-фразы), затем переводит кампанию в hold (**ACTIVE**). Прямой `ACTIVE` любым non-setup путём — Forbidden. Telegram Enable при уже `PENDING_SETUP` / `ACTIVE` — **no-op** (не demote в PENDING, не rewrite Redis ENTER, не re-run ENTER force allowed-set sync); новый ENTER только после EXIT → `OFF`.
 - **Критерий setup (ENTER):**
   - PASS: `pay_for_order` ключа **≤ max CPO плана** (не resolve) **и** показов за недельное окно статистики ключа (тот же источник, что в карточке ключа) **≥ 100**;
@@ -43,7 +43,7 @@
 
 - Paid-only access: UI скрыт при `bot_active is False`; Telegram enable/disable гейтятся тем же условием.
 - Enable gate на freshness/health статы РК + явный UI-ответ (причина, ограничение, `SUPPORT_LINK`).
-- Enable soft-gate на объём теста: предупреждение при низких суммарных показах (24ч) ключей-кандидатов + рекомендация поднять max CPO + выбор «всё равно запустить / отмена» (реюз CH-показов по ключам).
+- Enable soft-gate на объём теста: campaign-level proxy Σ (calendar-day MV cover last-24h) + рекомендация поднять max CPO + выбор «всё равно запустить / отмена»; CH-error → distinct soft reason (реюз `get_keywords_views_by_days`).
 - Enable hard-gate плана max CPO (`> 0`): при отсутствии / ≤ 0 — mode остаётся `OFF` + actionable причина (нужен положительный план max CPO).
 - Liveness PENDING_SETUP: actionable non-ready причина при детерминированном блоке setup (пустой allowed-set / нет non-BAD ключей / пропавший max CPO) + всегда доступный EXIT (owned авто-abort — future, без новой миграции в MVP).
 - После PENDING/ACTIVE: setup/hold не зависят от `advs_filtred` freshness filter.
@@ -67,6 +67,8 @@
 - Free bot / `bot_active is False`: режим — paid automation core; UI MUST быть скрыт; enable MUST NOT выполняться.
 - Изменение алгоритма обычного V3 preamble вне ветки A/B Hold.
 - **Excel enable/disable/edit A/B Hold** — **future** (идея сохранена; не MVP).
+- Keyword-filtered launch-validity Σ только по setup non-BAD / would-carry-test ключам — **future** (MVP = campaign-level proxy).
+- True rolling 24h hour-buckets для soft-gate объёма поверх daily MV — **future** (MVP = calendar-day cover last-24h wall-clock).
 
 ### Risk
 
@@ -79,7 +81,7 @@ High-risk зона: ставки, CPO/CPA, V3 updater, ApplyManager, WB write ac
 ### Architecture Decision References
 
 - Relevant accepted: `openspec/decisions/mode-defaults-policy-ownership/decision.md` — дефолт режима A/B Hold (выкл) и related paid/free overlays (в т.ч. minus defaults) принадлежат declarative mode policy overlays, а не transition-helper.
-- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§2c launch-validity soft-gate (низкий объём показов 24ч → warn + max-CPO recommendation + launch-anyway/cancel)**, **§8 allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, **§14 PENDING_SETUP liveness (max-CPO enable hard-gate + actionable PENDING reason + EXIT recovery; owned auto-abort future)**, PG vs Redis, paid-only Telegram enable.
+- Proposed (this change): `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — ownership setup/hold write-path, structural freeze ACT, **§2c launch-validity soft-gate (campaign-level proxy + calendar-day MV cover last-24h → warn + max-CPO recommendation + launch-anyway/cancel; CH-error → distinct soft reason)**, **§8 allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness after ACTIVE**, **§9 Excel write-path out of MVP**, **§10 Telegram Enable idempotent while PENDING/ACTIVE**, **§11 MAY hide Enable keyboard while PENDING/ACTIVE**, **§14 PENDING_SETUP liveness (max-CPO enable hard-gate + actionable PENDING reason + EXIT recovery; owned auto-abort future)**, PG vs Redis, paid-only Telegram enable.
 
 ## Capabilities
 

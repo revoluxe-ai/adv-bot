@@ -267,12 +267,12 @@ The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through th
 - **WHEN** shop-runner schedules A/B Hold automation
 - **THEN** the A/B Hold hold path remains eligible to run for that campaign
 
-### Requirement: Enable warns when candidate test keywords have too few recent impressions
-When the user attempts to enable A/B Hold from the paid UI and the stats freshness gate passes, the system MUST evaluate the aggregate recent impressions (last-24h window from the same campaign statistics source used for keyword cards) of the keywords that would carry the test. If that aggregate is below the minimum recent-impressions threshold, the system MUST NOT enable silently: it MUST show the reason (too few recent impressions for a reliable A/B test), recommend increasing the plan max CPO and retrying, and present an explicit choice to launch anyway or cancel. The mode MUST remain `OFF` until the user chooses. Choosing launch-anyway proceeds to `PENDING_SETUP` (ENTER). Choosing cancel leaves the mode `OFF` without signaling ENTER. This is a soft warning gate (the user MAY proceed at their own risk), distinct from the stats-freshness hard block and from the empty allowed-set non-ready rule. When the aggregate meets or exceeds the threshold, enable proceeds without this warning.
+### Requirement: Enable warns when campaign recent keyword impressions are too low
+When the user attempts to enable A/B Hold from the paid UI and the stats freshness gate passes, the system MUST evaluate the aggregate recent keyword-cluster impressions of the campaign as a **campaign-level proxy** (sum over `adv_id` and paired `search_adv_id` via the same ClickHouse campaign keyword-stats path used for keyword cards — `get_keywords_views_by_days` / `mv_clusters_daily_agg`). The evaluation window MUST use the **calendar-day grain** of that daily aggregate covering the last-24h wall-clock interval (not true rolling hour buckets, and not a filter limited to setup non-BAD / would-carry-test keywords). If that measured aggregate is below the minimum recent-impressions threshold, the system MUST NOT enable silently: it MUST show the reason (too few recent impressions for a reliable A/B test), recommend increasing the plan max CPO and retrying, and present an explicit choice to launch anyway or cancel. The mode MUST remain `OFF` until the user chooses. Choosing launch-anyway proceeds to `PENDING_SETUP` (ENTER). Choosing cancel leaves the mode `OFF` without signaling ENTER. If the ClickHouse volume query is unavailable or errors, the system MUST show a **distinct soft reason** that volume statistics are temporarily unavailable, keep mode `OFF`, and MUST NOT signal ENTER; it MUST NOT treat the error as zero impressions and MUST NOT present the low-impressions warning as if the volume was successfully measured. This is a soft warning gate (the user MAY proceed at their own risk when volume was measured low), distinct from the stats-freshness hard block and from the empty allowed-set non-ready rule. When the measured aggregate meets or exceeds the threshold, enable proceeds without this warning.
 
 #### Scenario: Low recent impressions warns with a choice
 - **GIVEN** a campaign has paid bot management active, passes the stats freshness gate, and mode is `OFF`
-- **AND** the aggregate recent impressions (last 24h) of the candidate test keywords are below the minimum threshold
+- **AND** the measured campaign-level aggregate recent keyword impressions (calendar days covering last-24h wall-clock) are below the minimum threshold
 - **WHEN** the user presses Enable
 - **THEN** the campaign mode is not changed yet (stays `OFF`)
 - **AND** the user sees the reason (too few recent impressions), a recommendation to raise the plan max CPO and try again, and an explicit choice to launch anyway or cancel
@@ -290,10 +290,19 @@ When the user attempts to enable A/B Hold from the paid UI and the stats freshne
 - **AND** ENTER is not signaled
 
 #### Scenario: Sufficient recent impressions enable without warning
-- **GIVEN** the aggregate recent impressions (last 24h) of the candidate test keywords meet or exceed the minimum threshold
+- **GIVEN** the measured campaign-level aggregate recent keyword impressions (calendar days covering last-24h wall-clock) meet or exceed the minimum threshold
 - **WHEN** the user presses Enable
 - **THEN** the low recent-impressions warning is not shown
 - **AND** enable proceeds per the normal enable path
+
+#### Scenario: ClickHouse volume error shows a distinct soft reason
+- **GIVEN** a campaign has paid bot management active, passes the stats freshness gate, and mode is `OFF`
+- **AND** the campaign volume query against ClickHouse is unavailable or errors
+- **WHEN** the user presses Enable
+- **THEN** the campaign mode remains `OFF`
+- **AND** ENTER is not signaled
+- **AND** the user sees a distinct soft reason that volume statistics are temporarily unavailable
+- **AND** the user does not see the measured low-impressions warning presented as if volume was successfully measured
 
 ### Requirement: Enable is blocked when plan max CPO is missing or non-positive
 A/B Hold ENTER setup classifies keywords against the campaign plan max CPO; without a positive plan max CPO the setup tick deterministically cannot progress and would leave the campaign in PENDING_SETUP indefinitely while excluded from ordinary automation. The system MUST NOT enable A/B Hold (transition toward PENDING_SETUP) through the paid Telegram UI when the campaign plan `max_price_for_order` is missing or less than or equal to zero. The mode MUST remain `OFF`, and the user MUST see the reason (a positive plan max CPO is required) and a recommendation to set it and retry. This is a hard gate evaluated together with the stats-freshness and V3-only gates, before the low-recent-impressions soft warning.
