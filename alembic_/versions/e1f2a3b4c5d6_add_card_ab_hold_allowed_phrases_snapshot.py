@@ -1,6 +1,6 @@
 """Add card_ab_hold_allowed_phrases_snapshot to AdvSetting
 
-Revision ID: d4e5f6a7b8c9
+Revision ID: e1f2a3b4c5d6
 Revises: b8c4ac80176c
 Create Date: 2026-07-14
 
@@ -16,7 +16,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = "d4e5f6a7b8c9"
+revision: str = "e1f2a3b4c5d6"
 down_revision: Union[str, None] = "b8c4ac80176c"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

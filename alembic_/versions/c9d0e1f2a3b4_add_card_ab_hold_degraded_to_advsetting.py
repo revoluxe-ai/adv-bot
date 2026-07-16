@@ -1,7 +1,7 @@
 """Add card_ab_hold_degraded to AdvSetting
 
 Revision ID: c9d0e1f2a3b4
-Revises: d4e5f6a7b8c9
+Revises: e1f2a3b4c5d6
 Create Date: 2026-07-14
 
 Spec card-ab-hold-mode §8 / decision write-path §8: durable PG-флаг честной
@@ -18,7 +18,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "c9d0e1f2a3b4"
-down_revision: Union[str, None] = "d4e5f6a7b8c9"
+down_revision: Union[str, None] = "e1f2a3b4c5d6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
