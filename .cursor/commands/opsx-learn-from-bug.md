@@ -1,459 +1,278 @@
 # /opsx-learn-from-bug
 
-Purpose: turn a reviewed bug/finding into a small, human-approved Learning Patch for the OpenSpec/Cursor workflow base.
+Purpose: safely append a reviewed bug, finding, correction, or engineering lesson to an existing learning/worklog file without analysing, optimizing, routing, or promoting it.
 
-This command has two modes:
+This command is an ingestion command only.
 
-- default mode: PLAN ONLY / READ-ONLY
-- GO mode: apply only an explicitly approved Learning Patch
+It preserves the supplied knowledge so separate optimization and verification commands can process it later.
 
-Never treat this command as permission to change product code, product specs, active OpenSpec changes, CI, DB, infra, secrets, or unrelated docs.
+## Modes
 
-## Input
+- default: PREVIEW ONLY / READ-ONLY
+- GO: append one new learning entry to the explicitly provided target file
 
-The user should provide a Bug Learning Packet.
+GO mode is active only when the user invokes:
 
-Required input:
+- `/opsx-learn-from-bug GO`
+- `/opsx-learn-from-bug:GO`
 
-- Bug/finding text:
-  - original bugbot / verify / review / user finding
-  - symptom
-  - affected workflow or module
-- Final classification:
-  - confirmed bug / false diagnosis / spec drift / sibling bug
-  - fix_now / no_fix / needs_base_update
-- Correct invariant:
-  - 1–3 lines describing what the agent should have understood
-- Why it was missed:
-  - wrong command reasoning?
-  - missing artifact quality rule?
-  - missing template field?
-  - missing verify check?
-  - missing project/domain context?
-  - existing rule ignored?
-- Existing base evidence:
-  - relevant `.cursor/commands/*.md`
-  - relevant `openspec/config.yaml` context
-  - relevant `openspec/config.yaml` artifact rules
-  - relevant `openspec/schemas/**/templates/*.md`
-  - relevant verify / classify / bug-hunt command
-- Patch limits:
-  - max files touched: 2 by default
-  - max added chars: 700 by default
-  - max new bullets: 3
-  - no optimization
-  - no unrelated cleanup
+## Required input
 
-If required input is missing, do not guess. Return `needs_human_decision`.
+The user MUST provide:
 
-## Allowed target files
+- target file:
+  - exact existing learning/worklog path;
+- learning input:
+  - bug;
+  - finding;
+  - correction;
+  - review result;
+  - agent mistake;
+  - missed invariant;
+  - or complete Bug Learning Packet.
 
-In PLAN mode, read-only inspection may include:
+Optional metadata:
 
-- `.cursor/commands/*.md`
-- `.cursor/rules/**/*.md`
-- `.cursor/rules/**/*.mdc`
-- `openspec/config.yaml`
-- `openspec/schemas/**/templates/*.md`
-- `tools/openspec/openspec_guard.yaml`
-- `tools/openspec/openspec_guard.py`
+- source command;
+- OpenSpec change-id;
+- affected module;
+- final classification;
+- related diff, tests, logs, or files.
 
-In GO mode, edits are allowed only to explicitly approved target files from this list:
+Missing optional metadata MUST NOT block capture.
 
-- `.cursor/commands/*.md`
-- `.cursor/rules/**/*.md`
-- `.cursor/rules/**/*.mdc`
-- `openspec/config.yaml`
-- `openspec/schemas/**/templates/*.md`
+If the target file is not explicitly provided or does not exist, return:
 
-Forbidden files and actions:
-
-- product code
-- `openspec/specs/**`
-- `openspec/changes/**`
-- `.github/**`
-- README / AGENTS / CODEX / CLAUDE / broad docs
-- CI/CD
-- DB / migrations / infra / secrets
-- commit / push / deploy
-- artifact optimization unless explicitly requested as a separate task
-
-## Core model
-
-Use this model to decide where knowledge belongs:
-
-- Command = procedure of thinking / decision-making.
-- Artifact rule = quality criterion for an artifact.
-- Template = required output structure / required fields.
-- Verify command = post-fact check that the result satisfies the rule.
-- Context = compact project/domain model that helps multiple commands and artifacts interpret rules correctly.
-
-Do not duplicate the same sentence in multiple places. If two layers need the same idea, write each layer in its own role:
-
-- Command: forces the agent to check X before deciding.
-- Rule: forbids accepting an artifact unless X is represented.
-- Template: provides a field where X must be written.
-- Verify: checks X after implementation/review.
-- Context: explains the domain model that makes X meaningful across workflows.
-
-## Routing rules
-
-Use this decision table.
-
-Case 1: wrong command reasoning
-
-Condition:
-- The agent made a bad classification, bad workflow decision, or wrong apply/verify decision.
-
-Target:
-- the relevant `.cursor/commands/opsx-*.md`.
-
-Example:
-- Bug classifier treated setup-stage missing restore as a confirmed bug without proving a stored snapshot was reachable.
-
-Patch type:
-- add one decision check to the command.
-
-Case 2: missing artifact quality criterion
-
-Condition:
-- The artifact existed, but it did not have a rule that made weak output unacceptable.
-
-Target:
-- `openspec/config.yaml` per-artifact rule, such as `rules.design`, `rules.tasks`, `rules.proposal`, or equivalent existing structure.
-
-Patch type:
-- add one atomic MUST / MUST NOT rule.
-
-Case 3: missing required output field
-
-Condition:
-- The needed knowledge did not appear because the artifact template had no place for it.
-
-Target:
-- `openspec/schemas/**/templates/*.md`.
-
-Patch type:
-- add one small field/section to the template.
-
-Case 4: verify missed it
-
-Condition:
-- The artifact/rule existed, but the review/verify workflow did not check it.
-
-Target:
-- `.cursor/commands/opsx-verify.md` or the specific verify-like command.
-
-Patch type:
-- add one verification check.
-
-Case 5: missing project/domain context
-
-Condition:
-- The agent had the right local rule or command structure, but missed the broader domain model needed to interpret it.
-- The same model would help multiple commands or artifact types.
-- The knowledge is stable project/domain context, not a one-off bug lesson.
-
-Target:
-- `openspec/config.yaml` context section or equivalent existing project-context structure.
-
-Patch type:
-- add or replace one compact context line.
-
-Examples of valid context:
-- Stateful WB Sky features often use lifecycle baselines: setup creates the baseline, active protects it, exit clears or archives it.
-- WB Sky campaign-state transitions are behavior boundaries; setup, active protection, and exit must not be treated as equivalent states.
-
-Examples of invalid context:
-- a specific bugbot finding;
-- a specific regression test;
-- a specific file path;
-- a command-only decision rule;
-- a long case narrative;
-- a rule that belongs in `rules.design`, `opsx-classify-bug`, or `opsx-verify`.
-
-Case 6: both command and rule already exist, but the bug still passed
-
-Do not automatically add more text.
-
-First diagnose:
-
-- Was the command too vague?
-- Was the rule too generic?
-- Was there no template field for the rule to land in?
-- Did verify fail to check it?
-- Was the missing piece actually domain context?
-- Was the prompt bundle too large and the agent ignored lower-priority context?
-
-Then propose either:
-
-- strengthen one existing command check;
-- strengthen one existing artifact rule;
-- replace a weak line with a sharper one;
-- add a missing template field;
-- add a verify check;
-- add a small context line only if the missing model is cross-workflow.
-
-Net growth should be <= 300 chars unless explicitly justified.
-
-## Context rules
-
-Context is the last broad layer, not a dumping ground.
-
-MUST consider context only when at least one is true:
-
-- the same missed model appears in 2+ workflows;
-- the same missed model affects 2+ artifact types;
-- local command/rule/template text would become duplicated without a shared context line;
-- the missing knowledge is stable WB Sky domain or architecture context.
-
-MUST NOT add context for:
-
-- a one-off bug;
-- a specific implementation path;
-- a temporary workaround;
-- a specific test case;
-- a command-only procedure;
-- a quality criterion that belongs in artifact rules;
-- a required field that belongs in a template.
-
-Context addition budget:
-
-- max 250 added chars;
-- max 1 new bullet;
-- prefer replacing or merging with existing nearby context;
-- if similar context already exists, strengthen it instead of adding a new line;
-- if context would require more than 250 chars, return `needs_human_decision`.
-
-Relationship between rules and context:
-
-- Rules do not automatically flow into context.
-- Context may be created only as a compact abstraction of repeated local rules or repeated agent failures.
-- If a local rule is only useful for one command or one artifact type, keep it local.
-- If a local rule becomes repeated across commands/artifacts, propose a context line and simplify future local wording.
-
-## Learning Patch size budget
-
-A Learning Patch is the minimum base update after one bug.
-
-Default hard limits:
-
-- one missed invariant only;
-- max 2 target files;
-- max 700 added chars;
-- max 3 new bullets;
-- no unrelated cleanup;
-- no broad rewrite;
-- no new command unless the user explicitly requested this command creation task.
-
-Context exception:
-
-- max 3 target files only if the user explicitly approves a context addition together with local command/rule/template changes;
-- max 900 added chars total;
-- context part max 250 chars;
-- must explain why two files are insufficient.
-
-Size classification:
-
-- <= 500 added chars: OK
-- 501–900 added chars: WARN, justify why needed
-- > 900 added chars: STOP, propose separate optimization or redesign task
-
-If the patch exceeds the limit, return `needs_human_decision`.
-
-## PLAN mode
-
-Default mode is PLAN ONLY / READ-ONLY.
-
-Steps:
-
-1. Parse the Bug Learning Packet.
-2. Identify the missed invariant.
-3. Inspect only relevant workflow-base files.
-4. Determine whether the miss is:
-   - wrong command reasoning;
-   - missing artifact rule;
-   - missing template field;
-   - missing verify check;
-   - missing project/domain context;
-   - existing rule ignored;
-   - not enough evidence.
-5. Check whether a relevant rule/check/field/context line already exists.
-6. Decide the smallest valid Learning Patch.
-7. Estimate files touched and added chars.
-8. Do not edit files.
-
-Output format:
-
+```text
 Verdict:
-- learn_patch / no_change / needs_human_decision
+- needs_target_file
+```
 
-Checked:
-- command files:
-- context:
-- artifact rules:
-- templates:
-- verify workflow:
-- guard config:
+MUST NOT guess or create the target path.
 
-Diagnosis:
-- missed invariant:
-- wrong command reasoning:
-- missing artifact rule:
-- missing template field:
-- missing verify check:
-- missing context:
-- existing rule ignored:
+## Core behavior
 
-Existing base evidence:
-- command:
-- context:
-- rule:
-- template:
-- verify:
+The command MUST:
 
-Routing decision:
-- command target:
-- rule target:
-- template target:
-- verify target:
-- context target:
-- why these targets:
-- why not more:
+1. Read only the explicitly provided target file.
+2. Preserve the supplied learning input verbatim.
+3. Generate a unique learning entry ID.
+4. Append exactly one entry at the end of the target file.
+5. Preserve all existing content and formatting.
+6. Mark the entry as pending optimization.
+7. Report whether the append caused a configured size-limit overflow.
 
-Proposed Learning Patch:
-- target files:
-- exact additions:
-- replacements, if any:
-- added chars estimate:
-- context chars estimate:
-- why not more:
+The command MUST NOT:
 
-GO packet:
-- approved target files:
-- exact additions:
-- max files touched:
-- max added chars:
-- forbidden files:
-- verification commands:
+- diagnose why the bug was missed;
+- decide where the knowledge belongs;
+- classify knowledge as command, rule, template, context, or verify logic;
+- inspect unrelated commands, rules, templates, specs, or source code;
+- deduplicate entries;
+- merge entries;
+- rewrite existing entries;
+- shorten or summarize the supplied input;
+- fix grammar inside the supplied input;
+- optimize the target file;
+- promote knowledge into other artifacts;
+- edit product code;
+- edit OpenSpec changes or specs;
+- commit, push, merge, deploy, restart services, or modify infrastructure.
 
-Risks:
-- risk:
-- mitigation:
+Even when an identical entry appears to exist, append the new entry. Deduplication belongs to a separate optimization command.
 
-Stop conditions:
-- condition:
+## Entry format
+
+Append this structure:
+
+```text
+<!-- LEARNING_ENTRY_BEGIN -->
+
+## LEARN-<YYYYMMDD-HHMMSS>-<short-id>
+
+- status: captured
+- optimization_status: pending
+- captured_at: <ISO-8601 timestamp>
+- source: <provided source or not_provided>
+- change_id: <provided change-id or not_provided>
+- affected_area: <provided area or not_provided>
+- promoted_to: none
+
+### Raw learning input
+
+<exact user-supplied learning input without rewriting, shortening, or omission>
+
+<!-- LEARNING_ENTRY_END -->
+```
+
+The raw learning input MUST remain byte-for-byte equivalent where practical.
+
+Only newline normalization required by the existing file format is allowed.
+
+## Append rules
+
+Before appending:
+
+1. Confirm the target file exists.
+2. Confirm the target is a regular writable text file.
+3. Read the final part of the file only as needed to preserve newline separation.
+4. Do not inspect or modify previous learning entries.
+
+When appending:
+
+- add one blank line before the entry if required;
+- append the complete entry atomically where supported;
+- do not replace the whole file if a safe append operation is available;
+- do not sort sections;
+- do not move existing content;
+- do not remove duplicates;
+- do not reformat headings.
+
+If the append fails, do not leave a partial learning entry.
+
+## Size overflow behavior
+
+A configured size limit MUST NOT block capture.
+
+After a successful append:
+
+1. Check the target using the existing file-size or OpenSpec guard, if one is configured.
+2. If the limit is not exceeded, return `captured`.
+3. If the limit is exceeded, keep the appended entry and return `captured_with_overflow`.
+4. Do not rollback the append because of size overflow.
+5. Do not optimize the file during this command.
+6. Recommend the separate optimizer command as the next workflow step.
+
+If no configured limit can be found, report:
+
+```text
+overflow_check: unavailable
+```
+
+Do not invent a limit.
+
+If the guard fails for a reason unrelated to size overflow, keep the successfully appended entry and return `captured_with_guard_failure`.
+
+## PREVIEW mode
+
+Default mode is read-only.
+
+Do not edit any file.
+
+Output:
+
+```text
+Verdict:
+- preview_ready / needs_target_file
+
+Target:
+- file:
+
+Prepared entry:
+- id:
+- source:
+- change_id:
+- affected_area:
+- raw input chars:
+
+Write status:
+- not_applied
+
+Required action:
+- invoke `/opsx-learn-from-bug GO` to append this exact entry
+```
+
+Do not analyse or improve the learning input during preview.
 
 ## GO mode
 
-GO mode is active only when the user explicitly invokes:
+Before writing:
 
-- `/opsx-learn-from-bug:GO`
-- `/opsx-learn-from-bug GO`
+1. Re-read the explicitly approved target file.
+2. Confirm it still exists and is writable.
+3. Confirm the prepared raw input has not been shortened.
+4. Confirm no file other than the target will be edited.
 
-GO mode must apply only an approved Learning Patch from the previous PLAN output.
+Then append the entry.
 
-Before editing:
+After writing, run when available:
 
-1. Re-read the approved target files.
-2. Confirm target lines are still relevant.
-3. Confirm max files touched <= 2 unless the approved patch explicitly uses the context exception.
-4. Confirm estimated added chars <= 700 unless the approved patch explicitly uses the context exception.
-5. Confirm context addition, if any, is <= 250 chars and max 1 bullet.
-6. Confirm no forbidden files are needed.
-7. If any condition fails, stop.
+```bash
+git diff --check -- "<target-file>"
+```
 
-Allowed GO behavior:
+If the repository contains a configured file guard that supports the target, run its file-specific check.
 
-- apply only the approved additions/replacements;
-- keep edits minimal;
-- preserve existing structure and style;
-- do not optimize neighboring text;
-- do not rewrite unrelated sections.
+Do not run broad tests, product tests, or unrelated repository validation.
 
-After editing, run:
+## GO output
 
-- `poetry run python tools/openspec/openspec_guard.py --strict`
-- `git diff --check`
-
-If tests or guard commands are unavailable, report exactly what is missing.
-
-GO output format:
-
+```text
 Verdict:
-- applied / blocked / needs_human_decision
+- captured / captured_with_overflow / captured_with_guard_failure / blocked
 
-Changed files:
+Target:
 - file:
 
-Patch summary:
-- missed invariant:
-- command update:
-- context update:
-- rule update:
-- template update:
-- verify update:
-- added chars:
-- context chars:
+Captured entry:
+- id:
+- raw input chars:
+- appended chars:
+- status: captured
+- optimization_status: pending
+
+Overflow:
+- check:
+- configured limit:
+- current size:
+- exceeded by:
 
 Verification:
-- guard:
 - diff check:
+- file guard:
 
-Diff summary:
-- file:
-- lines changed:
+Files changed:
+- target file only:
 
-Risks:
-- risk:
+Next step:
+- none / run the separate learning optimizer
+```
 
-Stop conditions triggered:
-- condition:
+## Stop conditions
 
-## Required behavior
+Stop without writing when:
 
-MUST keep the patch scoped to one missed invariant.
+- the target path was not explicitly provided;
+- the target file does not exist;
+- the target is not writable;
+- appending would require modifying another file;
+- the raw learning input is unavailable;
+- the command cannot guarantee that the existing file will be preserved;
+- a partial append cannot be prevented or safely recovered.
 
-MUST prefer exact, enforceable wording over explanatory prose.
+Do not stop merely because:
 
-MUST use MUST / MUST NOT / SHOULD only for artifact rules.
+- the target is already oversized;
+- the new entry duplicates an older entry;
+- the input is poorly structured;
+- classification is missing;
+- the correct promotion target is unknown;
+- optimization has not yet been performed.
 
-MUST write command additions as decision checks, not artifact-quality rules.
+## Required invariants
 
-MUST write template additions as fields/sections, not long instructions.
+MUST preserve the original learning input.
 
-MUST write context additions as compact stable project/domain model, not commands or rules.
+MUST append rather than optimize.
 
-MUST NOT add the same sentence to command, context, and config rules.
+MUST touch only the explicitly provided target file.
 
-MUST NOT turn one bug into broad context unless the missing model is cross-workflow.
+MUST keep the new entry after a size-limit overflow.
 
-MUST NOT update product specs or active changes.
+MUST mark every new entry as `optimization_status: pending`.
 
-MUST NOT optimize current oversized files during this command.
+MUST NOT treat capture as approval to modify commands, rules, templates, context, specs, code, tests, CI, DB, or infrastructure.
 
-MUST NOT continue if the right target is unclear.
+MUST NOT claim that knowledge was promoted, deduplicated, verified, or integrated.
 
-## Example routing
-
-Bug learning:
-
-- Finding: setup-stage missing restore was classified as confirmed bug.
-- Correct invariant: restore requires a stored non-empty snapshot; setup creates the snapshot; active hold protects it.
-- Broader model: stateful WB Sky features may have lifecycle baselines.
-
-Patch:
-
-- command update:
-  - target: `.cursor/commands/opsx-classify-bug.md`
-  - addition: Require proof of non-empty snapshot/baseline reachability before classifying setup-stage missing restore/check as confirmed bug.
-
-- artifact rule or template update:
-  - target: `openspec/config.yaml` rules.design or `openspec/schemas/**/templates/design.md`
-  - addition: Stateful snapshot/baseline design MUST define setup stage, baseline creation point, active protection phase, cleanup/exit behavior, and forbidden re-entry transitions.
-
-- context update:
-  - target: `openspec/config.yaml` context
-  - addition only if repeated across workflows: Stateful WB Sky features often use lifecycle baselines: setup creates baseline, active protects it, exit clears or archives it.
-
-Only apply context if the missing lifecycle-baseline model is useful outside this one bug. If this is one isolated finding, keep the patch local to command/rule/template.
+Capture and optimization are separate workflow stages.
