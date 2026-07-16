@@ -191,3 +191,6 @@ DONE
 (1) V3-gate для A/B Hold и запрет downgrade на V2 при PENDING_SETUP/ACTIVE реализованы в card-ab-hold-mode section 14.
 (2) change_adv_strategy / AdvSetting.strategy не чинить внутри card-ab-hold-mode.
 (3) Остаточный архитектурный долг: V3 keyword strategy_mode жёстко связан с AdvSetting.strategy. Разбирать отдельным change: decouple-v3-keyword-strategy-mode-from-adv-strategy.
+Встроить в Cursor Codex, посмотреть что там за возможности
+- навести порядок в веткаххх!!!!
+провести ревизию доков в проекте
