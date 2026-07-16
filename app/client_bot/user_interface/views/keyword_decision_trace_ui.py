@@ -12,10 +12,10 @@ from app.client_bot.user_interface.services.keyword_decision_trace_loader import
 )
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     NON_V3_DECISION_TRACE_MESSAGE,
-    _DECISION_ACTION_LABEL,
-    _REASON_NOT_IN_JOURNAL,
-    _escape_markdown_v1,
-    _format_decisive_step_body,
+    DECISION_ACTION_LABEL,
+    REASON_NOT_IN_JOURNAL,
+    escape_markdown_v1,
+    format_decisive_step_body,
     keyword_v3_decision_trace_button_label,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_decision_trace.models import (
@@ -54,8 +54,8 @@ def format_keyword_decision_trace_screen(view: KeywordDecisionTraceViewData) -> 
     if view.source == "non_v3":
         return NON_V3_DECISION_TRACE_MESSAGE
 
-    safe_nmid = _escape_markdown_v1(view.nmid_display)
-    safe_keyword = _escape_markdown_v1(view.keyword_text.replace("\n", " ").strip())
+    safe_nmid = escape_markdown_v1(view.nmid_display)
+    safe_keyword = escape_markdown_v1(view.keyword_text.replace("\n", " ").strip())
     status_label = _display_status_label(view.display_status)
 
     lines = [
@@ -204,7 +204,7 @@ def _summary_lines(entry: KeywordDecisionTraceEntry) -> list[str]:
     if entry.decisive_reason_ru:
         lines.append(f"Почему: {entry.decisive_reason_ru}")
     elif not any(s.status in (TraceStepStatus.APPLY, TraceStepStatus.BLOCK) for s in entry.steps):
-        lines.append(f"Почему: {_REASON_NOT_IN_JOURNAL}")
+        lines.append(f"Почему: {REASON_NOT_IN_JOURNAL}")
     return lines
 
 
@@ -212,13 +212,13 @@ def _legacy_decisive_lines(
     decisive: V3KeywordStepRecord | str,
     tick_at: datetime | None,
 ) -> list[str]:
-    parts = _format_decisive_step_body(decisive)
+    parts = format_decisive_step_body(decisive)
     if parts is None:
         return ["нет записанного решения"]
     _short, title, body = parts
     lines = [f"{title}: {body}"]
     if isinstance(decisive, V3KeywordStepRecord):
-        decision = _DECISION_ACTION_LABEL.get(decisive.action, decisive.action)
+        decision = DECISION_ACTION_LABEL.get(decisive.action, decisive.action)
         lines.append(f"Решение: {decision}")
         lines.append(f"Executor: {decisive.executor_name}")
     if tick_at is not None:

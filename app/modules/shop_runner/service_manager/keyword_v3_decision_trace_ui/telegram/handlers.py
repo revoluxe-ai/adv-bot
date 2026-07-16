@@ -37,7 +37,7 @@ _ACCESS_DENIED = "Нет доступа"
 
 async def _require_admin(callback: CallbackQuery) -> bool:
     """Проверка admin/debug доступа для callback."""
-    if callback.from_user is None:
+    if not callback.from_user:
         return False
     if not is_bot_admin(callback.from_user.id):
         await callback.answer(_ACCESS_DENIED, show_alert=True)

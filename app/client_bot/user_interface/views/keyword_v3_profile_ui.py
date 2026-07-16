@@ -73,7 +73,7 @@ _PROFILE_UNAVAILABLE = (
 _MARKDOWN_V1_ESCAPE = re.compile(r"([_*`\[])")
 
 
-def _escape_markdown_v1(text: str) -> str:
+def escape_markdown_v1(text: str) -> str:
     """Экранирование для ``ParseMode.MARKDOWN`` (не MarkdownV2)."""
     return _MARKDOWN_V1_ESCAPE.sub(r"\\\1", text)
 
@@ -280,7 +280,7 @@ def _executor_name_from_short_label(short_label: str) -> str:
     return short_label
 
 
-def _format_decisive_step_body(
+def format_decisive_step_body(
     decisive: V3KeywordStepRecord | str,
 ) -> tuple[str, str, str] | None:
     """Короткая метка, title_ru и тело строки для решающего шага."""
@@ -322,7 +322,7 @@ def format_keyword_v3_last_tick_executor_line(
     decisive = last_decisive_step(entry)
     if decisive is None:
         return ""
-    parts = _format_decisive_step_body(decisive)
+    parts = format_decisive_step_body(decisive)
     if parts is None:
         return ""
     short, title, body = parts
@@ -340,11 +340,11 @@ _NO_CHANGING_EXECUTOR_NOTE = (
     "trace-модулем."
 )
 
-_REASON_NOT_IN_JOURNAL = (
+REASON_NOT_IN_JOURNAL = (
     "Причина не зафиксирована в текущем журнале решений."
 )
 
-_DECISION_ACTION_LABEL: dict[str, str] = {
+DECISION_ACTION_LABEL: dict[str, str] = {
     "UP": "UP",
     "DOWN": "DOWN",
     "FORCE_OFF": "FORCE_OFF",
@@ -374,16 +374,16 @@ def _decision_fields_from_decisive(
     decisive: V3KeywordStepRecord | str,
 ) -> tuple[str, str, str | None]:
     """Executor (RU title), решение и причина из решающего шага audit."""
-    parts = _format_decisive_step_body(decisive)
+    parts = format_decisive_step_body(decisive)
     if parts is None:
         return "нет записанного решения", "нет изменений", None
     _short, title, body = parts
     if isinstance(decisive, V3KeywordStepRecord):
-        decision = _DECISION_ACTION_LABEL.get(decisive.action, decisive.action)
+        decision = DECISION_ACTION_LABEL.get(decisive.action, decisive.action)
         tech = decisive.executor_name
         executor_line = f"{title} ({tech})"
         return executor_line, decision, body
-    return title, _DECISION_ACTION_LABEL["TARGET_PLACE"], body
+    return title, DECISION_ACTION_LABEL["TARGET_PLACE"], body
 
 
 def format_keyword_v3_decision_trace_screen(
@@ -451,7 +451,7 @@ def format_keyword_v3_profile_block(data: KeywordV3ProfileData | None) -> str:
         return _PROFILE_UNAVAILABLE
 
     if data.load_failure:
-        reason = _escape_markdown_v1(data.load_failure)
+        reason = escape_markdown_v1(data.load_failure)
         return f"📊 *Профиль ключа (V3):* недоступен — {reason}\n"
 
     header = "📊 *Профиль ключа (V3):*"
@@ -523,7 +523,7 @@ def _format_stage_line(data: KeywordV3ProfileData, mode: KeywordStrategyMode) ->
             raw = _INVALID_REASON_SHORT.get(
                 cand.invalid_reason, cand.invalid_reason
             )
-            reason = f" ({_escape_markdown_v1(raw)})"
+            reason = f" ({escape_markdown_v1(raw)})"
         return f"{star}{letter} — —{reason}"
 
     pos = int(cand.position) if cand.position is not None else "—"
