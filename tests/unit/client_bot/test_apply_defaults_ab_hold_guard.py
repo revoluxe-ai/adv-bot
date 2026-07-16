@@ -1,0 +1,269 @@
+"""Unit-тесты: shared defaults / «Применить дефолты» ↔ A/B Hold guard.
+
+Spec ``card-ab-hold-mode`` требование «Shared defaults MUST NOT disable or mutate
+A/B Hold on a held campaign» / decision ``card-ab-hold-write-path-ownership`` §13:
+«Применить дефолты» (`apply_defaults_to_adv_setting` + handlers) — **не**
+enable/disable path A/B Hold. Для кампании в ``PENDING_SETUP`` / ``ACTIVE`` этот
+путь не отключает и не мутирует режим (mode / allowed-set snapshot / coupled
+structural флаги сохраняются); disable — только owned paid Telegram EXIT.
+
+Покрывает:
+- 15.1 helper no-op на held (ACTIVE/PENDING) + paired positive apply на OFF;
+- 15.2 handler-level: single refuse (без un-owned disable, без commit) + apply на
+  OFF; shop-wide skip held (сохранены) + apply non-held + honest counter.
+
+Падали бы до фикса: helper безусловно форсил ``card_ab_hold_mode='off'`` +
+сбрасывал ``automatic_version``; handlers коммитили это как success.
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
+from app.client_bot.modules.default_settings.default_models.common_default import (
+    CampaignDefaultsV1,
+)
+from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
+    apply_campaign_defaults,
+    apply_defaults_for_shop,
+)
+from app.client_bot.user_interface.views.callbacks import (
+    ApplyCampaignDefaults,
+    ApplyDefaultsForShop,
+)
+
+_HANDLER = "app.client_bot.user_interface.handlers.adv_setting.adv_setting"
+
+
+# --- 15.1: helper (write boundary = поля AdvSetting) ---
+
+
+def _held_adv(mode: str) -> SimpleNamespace:
+    """Held-кампания (V3, ACTIVE/PENDING) со снапшотом — маркеры un-owned disable."""
+    return SimpleNamespace(
+        id=1,
+        card_ab_hold_mode=mode,
+        card_ab_hold_allowed_phrases_snapshot=["good1", "good2"],
+        automatic_version=3,
+        auto_update_white_list=False,
+        auto_update_target_place=False,
+        bidder_active=False,
+        max_place=7,
+        max_cpm=42,
+        wb_cabinet=SimpleNamespace(default_max_cpm=999),
+    )
+
+
+def _off_adv() -> SimpleNamespace:
+    """OFF-кампания со «стартовыми» значениями, отличными от дефолтов."""
+    return SimpleNamespace(
+        id=2,
+        card_ab_hold_mode="off",
+        card_ab_hold_allowed_phrases_snapshot=[],
+        automatic_version=3,
+        bidder_active=False,
+        bidder_for_auto=False,
+        bidder_mode=None,
+        bidder_coroutine_type=None,
+        orders_source_for_auto_mode=None,
+        sales_predict_method=None,
+        auto_update_white_list=False,
+        auto_update_target_place=False,
+        auto_budget_watchdog_enabled=False,
+        use_common_budget=False,
+        target_ctr_mode=True,
+        new_auto_min_ctr_mode=True,
+        reset_place=False,
+        max_place=1,
+        max_cpm=5,
+        wb_cabinet=SimpleNamespace(default_max_cpm=999),
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("mode", ["active", "pending_setup"])
+def test_helper_noop_on_held_campaign(mode: str) -> None:
+    """15.1: held → helper no-op (mode/snapshot/coupled поля не тронуты)."""
+    adv = _held_adv(mode)
+    apply_defaults_to_adv_setting(adv, adv.wb_cabinet)  # type: ignore[arg-type]
+    assert adv.card_ab_hold_mode == mode
+    assert adv.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
+    assert adv.automatic_version == 3
+    assert adv.auto_update_white_list is False
+    assert adv.auto_update_target_place is False
+
+
+@pytest.mark.unit
+def test_helper_applies_defaults_on_off_campaign() -> None:
+    """15.1 paired positive: OFF → полный набор дефолтов применён."""
+    defaults = CampaignDefaultsV1()
+    adv = _off_adv()
+    apply_defaults_to_adv_setting(adv, adv.wb_cabinet)  # type: ignore[arg-type]
+    assert adv.automatic_version == defaults.automatic_version  # 2
+    assert adv.auto_update_white_list == defaults.auto_update_white_list  # True
+    assert adv.auto_update_target_place == defaults.auto_update_target_place
+    assert adv.card_ab_hold_mode == "off"
+
+
+# --- 15.2: handler-level (write boundary = commit + значения полей) ---
+
+
+class _Result:
+    """Минимальный async-result: scalar_one/scalar/scalars под нужды handlers."""
+
+    def __init__(
+        self,
+        *,
+        adv: object | None = None,
+        wb_user_cabinet: object | None = None,
+        advs: list[object] | None = None,
+    ) -> None:
+        self._adv = adv
+        self._wbc = wb_user_cabinet
+        self._advs = advs
+
+    def scalar_one(self) -> object | None:
+        return self._adv
+
+    def scalar_one_or_none(self) -> object | None:
+        return self._adv
+
+    def scalar(self) -> object | None:
+        return self._wbc
+
+    def scalars(self) -> SimpleNamespace:
+        advs = list(self._advs or [])
+        return SimpleNamespace(all=lambda: advs)
+
+
+class _Session:
+    """Async-сессия, записывающая execute/commit (без реальной БД)."""
+
+    def __init__(self, result: _Result, recorder: list[str]) -> None:
+        self._result = result
+        self._recorder = recorder
+
+    async def execute(self, _stmt: object) -> _Result:
+        self._recorder.append("execute")
+        return self._result
+
+    async def commit(self) -> None:
+        self._recorder.append("commit")
+
+    async def __aenter__(self) -> "_Session":
+        return self
+
+    async def __aexit__(self, *_exc: object) -> bool:
+        return False
+
+
+def _session_maker(result: _Result, recorder: list[str]):
+    """Фабрика, совместимая с ``sm`` / ``sm(read_only=...)``."""
+
+    def _sm(*_a: object, **_kw: object) -> _Session:
+        return _Session(result, recorder)
+
+    return _sm
+
+
+def _callback(chat_id: int = 100) -> SimpleNamespace:
+    """Минимальный CallbackQuery: только ``message.chat.id``."""
+    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_campaign_defaults_blocks_held_campaign() -> None:
+    """15.2: single handler на held → нет un-owned disable, нет commit, mode сохранён."""
+    adv = _held_adv("active")
+    wb_user_cabinet = SimpleNamespace(id=2)
+    recorder: list[str] = []
+    result = _Result(adv=adv, wb_user_cabinet=wb_user_cabinet)
+    bot = AsyncMock()
+
+    with (
+        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(f"{_HANDLER}.AdvSettingMenu", MagicMock(return_value=AsyncMock())),
+    ):
+        await apply_campaign_defaults(
+            _callback(),  # type: ignore[arg-type]
+            ApplyCampaignDefaults(
+                adv_setting_original_id=1, wb_user_cabinet_original_id=2
+            ),
+            bot,
+        )
+
+    assert adv.card_ab_hold_mode == "active"
+    assert adv.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
+    assert adv.automatic_version == 3
+    assert "commit" not in recorder
+    sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
+    assert "A/B Hold" in sent
+    assert "успешно" not in sent
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_campaign_defaults_applies_off_campaign() -> None:
+    """15.2 paired positive: single handler на OFF → дефолты применены + commit."""
+    adv = _off_adv()
+    wb_user_cabinet = SimpleNamespace(id=2)
+    recorder: list[str] = []
+    result = _Result(adv=adv, wb_user_cabinet=wb_user_cabinet)
+    bot = AsyncMock()
+
+    with (
+        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(f"{_HANDLER}.AdvSettingMenu", MagicMock(return_value=AsyncMock())),
+    ):
+        await apply_campaign_defaults(
+            _callback(),  # type: ignore[arg-type]
+            ApplyCampaignDefaults(
+                adv_setting_original_id=2, wb_user_cabinet_original_id=2
+            ),
+            bot,
+        )
+
+    assert adv.automatic_version == 2
+    assert adv.card_ab_hold_mode == "off"
+    assert "commit" in recorder
+    sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
+    assert "успешно" in sent
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_defaults_for_shop_skips_held_applies_rest() -> None:
+    """15.2: shop-wide → held сохранены (не отключены), non-held получают дефолты."""
+    held = _held_adv("active")
+    off = _off_adv()
+    recorder: list[str] = []
+    result = _Result(advs=[held, off])
+    bot = AsyncMock()
+    state = MagicMock()
+
+    with (
+        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(f"{_HANDLER}.ShopMenu", MagicMock(return_value=AsyncMock())),
+    ):
+        await apply_defaults_for_shop(
+            _callback(),  # type: ignore[arg-type]
+            ApplyDefaultsForShop(wb_user_cabinet_original_id=2),
+            bot,
+            state,
+        )
+
+    # held сохранён — un-owned disable не выполнен
+    assert held.card_ab_hold_mode == "active"
+    assert held.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
+    assert held.automatic_version == 3
+    # non-held получил дефолты
+    assert off.automatic_version == 2
+    # honest counter: 1 применён, 1 пропущен
+    sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
+    assert "применены к 1" in sent
+    assert "Пропущено кампаний в режиме A/B Hold: 1" in sent

@@ -1,7 +1,7 @@
-#[tool.poetry.scripts]
-#pyright = "app.pyright_entry:main"
-#pyright-strict = "app.pyright_strict_entry:main"
-#
+# TODO: переделать в новый стиль
+[tool.poetry.scripts]
+check-openspec = "openspec.tools.check_openspec:main"
+
 
 [tool.poetry]
 name = "adv-bot"
@@ -9,7 +9,10 @@ version = "0.1.0"
 description = ""
 authors = ["Andrey <vkitaebiz@gmail.com>"]
 readme = "README.md"
-packages = [{ include = "app" }]  # если у тебя основная папка называется app
+packages = [
+    { include = "app" },
+    { include = "openspec" },
+]
 
 [tool.black]
 exclude = '''
@@ -199,18 +202,7 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 
-[tool.ruff]
-# Exclude generated promotion clients from ruff checks
-exclude = [
-  "app/core/mp/wb/_api_client/clients/promotion/generated/",
-  "app/core/mp/wb/_api_client/clients/promotion/generated/*",
-  "alembic/versions",
-  "alembic/versions/*",
-  'k8s/*',
-    'tests/*',
-    'alembic_/versions/*',
-    '*test*'
-]
+
 line-length = 88
 target-version = "py311"
 preview = true   # <-- теперь здесь, не в .lint

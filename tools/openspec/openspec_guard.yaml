@@ -1,0 +1,254 @@
+token_estimate:
+  chars_per_token: 3
+
+defaults:
+  fail_on_missing_includes: false
+  fail_on_broken_glob: false
+  baseline_allowed_growth_chars: 0
+
+artifact_limits:
+  - pattern: "openspec/config.yaml"
+    green_chars: 9000
+    warn_chars: 15000
+    fail_chars: 15001
+
+  - pattern: "openspec/schemas/**/schema.yaml"
+    green_chars: 3000
+    warn_chars: 5000
+    fail_chars: 5001
+
+  - pattern: "openspec/schemas/**/templates/*.md"
+    green_chars: 3000
+    warn_chars: 5000
+    fail_chars: 5001
+
+  - pattern: ".cursor/commands/*.md"
+    green_chars: 6000
+    warn_chars: 8000
+    fail_chars: 8001
+
+  - pattern: ".cursor/commands/templates/*.md"
+    green_chars: 3000
+    warn_chars: 5000
+    fail_chars: 5001
+
+  - pattern: ".cursor/skills/**/SKILL.md"
+    green_chars: 6000
+    warn_chars: 8000
+    fail_chars: 8001
+
+  - pattern: ".cursor/skills/**/templates/*.md"
+    green_chars: 3000
+    warn_chars: 5000
+    fail_chars: 5001
+
+  - pattern: ".cursor/rules/**/*.md"
+    green_chars: 4500
+    warn_chars: 7000
+    fail_chars: 7001
+
+  - pattern: ".cursor/rules/**/*.mdc"
+    green_chars: 4500
+    warn_chars: 7000
+    fail_chars: 7001
+
+artifact_baselines:
+  "openspec/config.yaml":
+    baseline_chars: 18335
+    allowed_growth_chars: 0
+    status: WARN
+
+  "openspec/schemas/spec-driven/schema.yaml":
+    baseline_chars: 8861
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/commands/opsx-classify-bug.md":
+    baseline_chars: 9718
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/commands/opsx-explore.md":
+    baseline_chars: 10192
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/commands/opsx-invariant.md":
+    baseline_chars: 10211
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/commands/opsx-learn-from-bug.md":
+    baseline_chars: 13325
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/commands/opsx-onboard.md":
+    baseline_chars: 14605
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/commands/opsx-verify.md":
+    baseline_chars: 8993
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/openspec-explore/SKILL.md":
+    baseline_chars: 13201
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/openspec-onboard/SKILL.md":
+    baseline_chars: 14752
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/openspec-verify-change/SKILL.md":
+    baseline_chars: 9241
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-analyze/SKILL.md":
+    baseline_chars: 11632
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-checklist/SKILL.md":
+    baseline_chars: 21104
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-clarify/SKILL.md":
+    baseline_chars: 18038
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-constitution/SKILL.md":
+    baseline_chars: 9331
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-converge/SKILL.md":
+    baseline_chars: 12613
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-implement/SKILL.md":
+    baseline_chars: 12126
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-specify/SKILL.md":
+    baseline_chars: 18599
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/skills/speckit-tasks/SKILL.md":
+    baseline_chars: 10917
+    allowed_growth_chars: 0
+    status: WARN
+
+  ".cursor/rules/devops.mdc":
+    baseline_chars: 10650
+    allowed_growth_chars: 0
+    status: WARN
+
+config_section_limits:
+  context:
+    green_chars: 3000
+    warn_chars: 4000
+    fail_chars: 4001
+
+  rules:
+    green_chars: 10000
+    warn_chars: 14000
+    fail_chars: 14001
+
+  "rules.*":
+    green_chars: 2500
+    warn_chars: 3500
+    fail_chars: 3501
+
+scenario_defaults:
+  green_chars: 60000
+  warn_chars: 80000
+  fail_chars: 80001
+  reserved_chars:
+    user_arguments: 6000
+    repo_diff_log: 12000
+    output: 6000
+
+scenarios:
+  opsx_propose:
+    baseline_chars: 74485
+    allowed_growth_chars: 0
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - "openspec/schemas/**/templates/*.md"
+      - ".cursor/commands/opsx-propose.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_continue:
+    baseline_chars: 72939
+    allowed_growth_chars: 0
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - "openspec/schemas/**/templates/*.md"
+      - ".cursor/commands/opsx-continue.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_update:
+    baseline_chars: 74468
+    allowed_growth_chars: 0
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - "openspec/schemas/**/templates/*.md"
+      - ".cursor/commands/opsx-update.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_ff:
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - "openspec/schemas/**/templates/*.md"
+      - ".cursor/commands/opsx-ff.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_sync:
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - ".cursor/commands/opsx-sync.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+
+  opsx_verify:
+    baseline_chars: 78307
+    allowed_growth_chars: 0
+    includes:
+      - "openspec/config.yaml"
+      - "openspec/schemas/**/schema.yaml"
+      - ".cursor/commands/opsx-verify.md"
+      - ".cursor/rules/architecture-decisions.mdc"
+      - ".cursor/rules/documentation.mdc"
+      - ".cursor/rules/rules-management.mdc"
+      - ".cursor/rules/terminal.mdc"
+      - ".cursor/rules/TESTING_RULES.mdc"
+      - ".cursor/rules/testing-rules.mdc"

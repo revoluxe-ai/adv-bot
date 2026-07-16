@@ -45,7 +45,7 @@ class KeywordV3DecisionTraceScreen(TextWithKeyboard):
         assert self._keyboard is not None
         return self._keyboard
 
-    async def __call__(self, *args, **kwargs) -> None:
+    async def __call__(self, *args: object, **kwargs: object) -> None:
         """Загрузить ViewData и отправить экран."""
         view = await load_keyword_decision_trace_view(
             keyword_setting_id=self._keyword_setting_original_id,

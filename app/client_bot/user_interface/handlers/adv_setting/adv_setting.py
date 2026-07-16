@@ -21,6 +21,12 @@ from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.shop_menu.message import ShopMenu
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
+    user_message_after_ordinary_minus_update,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
@@ -417,13 +423,25 @@ async def apply_campaign_defaults(
         )
         adv_setting: AdvSetting = result.scalar_one()
 
-        # Применяем дефолты через ORM
-        apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
-        await session.commit()
+        # spec card-ab-hold-mode «Shared defaults MUST NOT disable or mutate A/B
+        # Hold on a held campaign» / decision §13: «Применить дефолты» — не
+        # disable-path. Для PENDING_SETUP/ACTIVE не применяем дефолты (иначе
+        # un-owned disable: mode→off + stale snapshot + сброс V3/structural).
+        # Отключение A/B Hold — только owned Telegram EXIT на экране режима.
+        if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+            await bot.send_message(
+                chat_id,
+                "Кампания в режиме A/B Hold — дефолтные настройки не применены. "
+                "Сначала выключите A/B Hold на экране режима, затем повторите.",
+            )
+        else:
+            # Применяем дефолты через ORM
+            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+            await session.commit()
 
-        await bot.send_message(
-            chat_id, "Дефолтные настройки применены успешно!"
-        )
+            await bot.send_message(
+                chat_id, "Дефолтные настройки применены успешно!"
+            )
 
         # Обновить меню кампании
         wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
@@ -451,6 +469,7 @@ async def wb_update_minus_keywords(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
+    """Ручное «Обновить минус-слова»; при A/B Hold freeze — non-success UX (spec §10)."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
@@ -518,8 +537,14 @@ async def wb_update_minus_keywords(
                 minus_phrase_manager = MinusPhraseManagerContainer(
                     _wb_api_manager_hub=hub
                 ).minus_phrase_manager()
-                await minus_phrase_manager.update_minus_phrases(complex_adv)
-                await bot.send_message(chat_id, "Минус-слова обновлены.")
+                # Spec §10 / decision §8: freeze skip → non-success Telegram copy.
+                applied = await minus_phrase_manager.update_minus_phrases(
+                    complex_adv
+                )
+                await bot.send_message(
+                    chat_id,
+                    user_message_after_ordinary_minus_update(applied=applied),
+                )
     except Exception:
         logger.exception("Ошибка обновления минус-слов для adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(
@@ -564,19 +589,31 @@ async def apply_defaults_for_shop(
         result: Result[tuple[AdvSetting]] = await session.execute(stmt)
         adv_settings: Sequence[AdvSetting] = result.scalars().all()
 
-        # Применяем дефолты через ORM для каждой активной кампании
+        # Применяем дефолты через ORM для каждой активной кампании.
+        # spec card-ab-hold-mode / decision §13: held (PENDING_SETUP/ACTIVE)
+        # кампании пропускаем — «Применить дефолты» не отключает A/B Hold
+        # (disable только через owned Telegram EXIT); non-held получают дефолты.
         updated_count = 0
+        skipped_ab_hold = 0
         for adv_setting in adv_settings:
+            if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+                skipped_ab_hold += 1
+                continue
             apply_defaults_to_adv_setting(adv_setting,
                                          adv_setting.wb_cabinet)
             updated_count += 1
 
         await session.commit()
 
-    await bot.send_message(
-        chat_id,
-        f"Дефолтные настройки применены к {updated_count} активным кампаниям магазина.",
+    message_text = (
+        f"Дефолтные настройки применены к {updated_count} активным кампаниям магазина."
     )
+    if skipped_ab_hold:
+        message_text += (
+            f"\nПропущено кампаний в режиме A/B Hold: {skipped_ab_hold}. "
+            "Чтобы применить дефолты к ним, сначала выключите A/B Hold."
+        )
+    await bot.send_message(chat_id, message_text)
 
     # Вернуть пользователя в меню магазина
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()

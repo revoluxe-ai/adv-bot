@@ -25,6 +25,9 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     normalize_automatic_version_ui,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
+    is_switch_to_version_blocked_by_ab_hold,
+)
 from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
     backfill_v3_status_mode_consistency,
 )
@@ -172,6 +175,18 @@ async def toggle_auto_updater_version(
             if callback_query.message is not None:
                 await bot.send_message(
                     callback_query.message.chat.id, "Кампания не найдена."
+                )
+            return
+
+        if is_switch_to_version_blocked_by_ab_hold(
+            new_version=new_version,
+            mode=getattr(adv_before, "card_ab_hold_mode", None),
+        ):
+            if callback_query.message is not None:
+                await bot.send_message(
+                    callback_query.message.chat.id,
+                    "Нельзя переключить на V2, пока включён режим A/B Hold. "
+                    "Сначала отключите A/B Hold (EXIT), затем меняйте версию.",
                 )
             return
 

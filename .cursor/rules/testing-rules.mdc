@@ -8,6 +8,7 @@ alwaysApply: false
 2. Не запускай bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
 3. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
 4. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза; если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
+4a. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через `rg -n "<symbol>"` по всем call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.
 5. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
 6. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
 7. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
@@ -40,3 +41,13 @@ alwaysApply: false
      - какой продовый симптом предотвращён,
      - какой тест упадёт при возврате бага,
      - какие допущения зависят от runtime/prod конфигурации.
+
+10. Async test isolation:
+   - Async tests MUST NOT вручную patch shared module-level dependencies around awaited code.
+   - Forbidden pattern: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore.
+   - Это особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags.
+   - Предпочитай самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client.
+   - Используй pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объясняй почему более узкий patch point невозможен.
+   - Write-gate regression tests MUST prove, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван.
+   - Regression tests MUST fail, если guarded condition удалена.
+   - Если gate имеет blocked и allowed behavior, добавь или потребуй paired positive case.

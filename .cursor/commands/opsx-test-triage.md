@@ -1,0 +1,114 @@
+# /opsx-test-triage
+
+This is a local WB Sky OpenSpec workflow command.
+It is not an upstream OpenSpec command.
+
+Diagnose failing tests before any fix.
+
+## Purpose
+
+This command only analyzes why tests failed.
+
+Do not edit files.
+Do not fix code.
+Do not fix tests.
+Do not commit.
+Do not update snapshots.
+Do not weaken assertions.
+
+First classify the failure and produce a copy-pasteable NEXT PROMPT.
+
+## Policy source
+
+Before triage, inspect and follow:
+
+- `openspec/policies/test-triage.md`
+
+If this policy file exists, treat it as the source of truth for test failure classification rules.
+
+If the command and policy conflict:
+- follow `openspec/policies/test-triage.md`;
+- mention the conflict in the response;
+- do not modify files.
+
+## Language
+
+- Final response MUST be in Russian.
+- Keep classification enum values in English.
+- Be concise and strict.
+
+## Classification
+
+Classify the failure as exactly one:
+
+- CODE_BUG: production code is wrong.
+- TEST_OBSOLETE: test is outdated because accepted behavior changed.
+- SPEC_CHANGED_BUT_NOT_UPDATED: behavior changed but OpenSpec/spec/tasks were not updated.
+- BAD_TEST: test checks the wrong thing or does not catch the real regression.
+- FLAKY_OR_ENV: async/env/timing/db/redis/clickhouse/order problem.
+- AMBIGUOUS: not enough evidence.
+
+## Required work
+
+1. Find the failing test.
+2. Find the exact assertion/error.
+3. Explain what behavior the test protects.
+4. Compare:
+   - test expectation;
+   - current code behavior;
+   - recent diff;
+   - OpenSpec/spec/tasks, if provided.
+5. Decide what is wrong: code, test, spec, env, or evidence.
+6. Do not fix anything yet.
+
+## Output format
+
+1. Вердикт:
+2. Упавший тест:
+3. Команда, которая упала:
+4. Что тест защищает:
+5. Использованная policy:
+6. Доказательства:
+7. Классификация:
+8. Риск:
+9. Минимальное следующее действие:
+10. Что нельзя делать:
+
+11. Prompt для следующего агента:
+
+[BEGIN NEXT PROMPT]
+Задача:
+[точное действие после triage]
+
+Triage verdict:
+[CODE_BUG / TEST_OBSOLETE / SPEC_CHANGED_BUT_NOT_UPDATED / BAD_TEST / FLAKY_OR_ENV / AMBIGUOUS]
+
+Evidence:
+[доказательства]
+
+Allowed files:
+[какие файлы можно менять]
+
+Forbidden actions:
+- no unrelated changes
+- no commit/push/deploy without GO
+- no weakening assertions
+- no snapshot update without explanation
+- no DB/migration/infra changes unless explicitly approved
+
+Required behavior:
+[что должно быть верно после фикса]
+
+Required tests:
+[какие тесты добавить/исправить/запустить]
+
+Verification commands:
+[команды проверки]
+
+Stop conditions:
+- stop if evidence contradicts the triage verdict
+- stop if affected scope expands
+- stop if DB/infra/paid boundary/campaign state risk appears unexpectedly
+[END NEXT PROMPT]
+
+11. Команда проверки:

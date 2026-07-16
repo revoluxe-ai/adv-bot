@@ -372,6 +372,14 @@ class ComplexAdv:
         return int(self._adv_setting.aggressiveness)
 
     @property
+    def card_ab_hold_mode(self) -> str:
+        """Durable A/B Hold mode (spec ``card-ab-hold-mode``): off/pending_setup/active."""
+        raw = getattr(self._adv_setting, "card_ab_hold_mode", None)
+        if raw is None:
+            return "off"
+        return str(raw)
+
+    @property
     def keyword_calibration_max_step(self) -> int:
         return int(self._adv_setting.keyword_calibration_max_step)
 

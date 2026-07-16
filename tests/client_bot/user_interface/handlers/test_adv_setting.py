@@ -211,11 +211,12 @@ async def test_reset_shop_non_relevant_phrases_updates_only_target_shop(async_se
     mock_sm = _MockSessionMaker(async_session)
 
     shop_menu_instance = AsyncMock()
+    # Patch where the handler looks up names (submodule), not the re-export package.
     with patch(
-        "app.client_bot.user_interface.handlers.adv_setting.ShopMenu",
+        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu",
         MagicMock(return_value=shop_menu_instance),
     ) as shop_menu_cls, patch(
-        "app.client_bot.user_interface.handlers.adv_setting.sm",
+        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
         mock_sm,
     ):
         await reset_shop_non_relevant_phrases(
@@ -264,11 +265,12 @@ async def test_reset_shop_non_relevant_phrases_handles_empty_case(async_session:
     mock_sm = _MockSessionMaker(async_session)
 
     shop_menu_instance = AsyncMock()
+    # Patch where the handler looks up names (submodule), not the re-export package.
     with patch(
-        "app.client_bot.user_interface.handlers.adv_setting.ShopMenu",
+        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu",
         MagicMock(return_value=shop_menu_instance),
     ), patch(
-        "app.client_bot.user_interface.handlers.adv_setting.sm",
+        "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
         mock_sm,
     ):
         await reset_shop_non_relevant_phrases(

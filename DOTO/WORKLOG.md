@@ -158,3 +158,169 @@ DONE
 3. сбор контактов;
 4. простая инструкция по настройке max CPO;
 5. продажи/рассылки по новым лидам.
+
+Внедрить в свою работу vim
+
+
+Сделать, наконец, норм alembic migration flow с проверкой - тестом миграции на локали, а потом примерение миграции уже в проде
+
+Добавить фиксацию ошибок в получении статистики, дабы валидировать в том числе аб-тест мод
+Проанализировать расход токенов и продумать стратегию экономии - высокий риск, может стопорнуться разработка.
+Пересобрать и структурировать WORKLOG
+Разобраться как собирает туду и WORKLOG opnx-explrer
+Сделать скрипт-анализатор команд и config, который будет проверять не раздулись ли они слишком сильно
+Сделать 2-уровневую (а то и трех) партнерку, чтобы у партнеров была мотивация привлекать других партнеров.
+
+
+разобраться со старыми ветками, стешем они неимоверно разрослись, скоро стрельнем себе в ногу
+
+связать openspec разработку в четкий граф и согласовать все входы-выходы между командами - сильно ускорит разработку
+перейти на pyright без strict, а то стрельнем в ногу.
+
+
+## BUG (out_of_scope от card-ab-hold-mode, разбирать отдельным change): V3 keyword strategy_mode жёстко связан с AdvSetting.strategy
+
+- Дата: 2026-07-15, ветка implement-ab-wb-card-test-mode. Классификация: out_of_scope / needs_openspec_update (нужен отдельный OpenSpec change + decision, а не патч в текущем change). Вторая часть (сам декаплинг кода) — разбираю в другом чате.
+- Симптом (ошибка дизайна): активный strategy_mode ключей БС (hard_status=2) и фикс.фраз (hard_status=4) в V3 берётся из AdvSetting.strategy (MIN_CPO→MIN_CPA, MAX_CONV→MAX_CONVERSION). Источник — app/modules/shop_runner/service_manager/services/v3_status_mode_sync.py (docstring 1-10, keyword_strategy_mode_for_adv_strategy). Надо развязать: по фикс.фразам позиции/режим должны выставляться руками или на автомате, НЕ через авто-переключатель стратегии РК.
+- Кто пишет AdvSetting.strategy: корутина change_adv_strategy (manager.py:1894) — БЕЗ V3-фильтра, гейт только auto_update_strategy (default true) → крутит поле и у V3-РК ~каждые 60с. То есть флип MIN_CPO↔MAX_CONV латентно протекает в strategy_mode ключей БС/фикс.фраз при следующем keyword-write/sync/backfill.
+- Достижимость: PROVEN. 8+ живых call sites синка: keywords_manager.py:107, wb_adv_updater/data_manager.py:671/713/811/818, relevant_phrase_manager.py:85, wb_manager.py:364, manager.py:1447, white_list_trimmer.py:71, v3_status_mode_backfill.py:46; ручные правки add_white_phrases.py:121, keyword_settings.py:736.
+- Корневая причина (кто виноват, процессно, без персонального блейма): связка внесена БЕЗ Architecture Decision про ownership стратегии («кто владеет V3 keyword strategy_mode и связан ли он с V2 AdvSetting.strategy»). Коммиты: 080929364 (revoluxe-ai, 2026-05-26 «Add V3 strategy_mode synchronization and backfill logic»), 6e39cded4 (2026-06-04 «Add explicit adv_strategy parameter to sync calls»), b3cba16ec (2026-06-18). Change card-ab-hold-mode проблему НЕ создал — только вскрыл при freeze-анализе write-boundary.
+- Нужный фикс (для отдельного change): развязать V3 keyword strategy_mode от AdvSetting.strategy; для фикс.фраз/БС — ручная или авто-установка независимо от change_adv_strategy. Оформить как OpenSpec proposal + decision v3-keyword-strategy-mode-ownership. Regression: флип AdvSetting.strategy не меняет strategy_mode фикс.фраз/БС; ручная/авто-установка позиций сохраняется. Verify: poetry run pytest tests\unit\test_v3_status_mode_sync.py -q.
+- Связанные находки этой сессии (тоже НЕ вносились в код, отдельным решением): (1) change_adv_strategy не морозит AdvSetting.strategy во время A/B Hold PENDING/ACTIVE — нет filter_structural_act_candidates, в отличие от 6 siblings (spec-scope gap: strategy не перечислен в freeze-скоупе spec.md/decision §3); (2) предложено: A/B Hold enable требует automatic_version==3 (сейчас гейт только bot_active); (3) при card_ab_hold_mode ∈ {PENDING_SETUP, ACTIVE} запретить переход на V2 (toggle_auto_updater_version сейчас без гарда). Требуют /opsx-update card-ab-hold-mode + продуктовое решение Q: должен ли change_adv_strategy вообще работать для V3.
+Связанные находки этой сессии:
+(1) V3-gate для A/B Hold и запрет downgrade на V2 при PENDING_SETUP/ACTIVE реализованы в card-ab-hold-mode section 14.
+(2) change_adv_strategy / AdvSetting.strategy не чинить внутри card-ab-hold-mode.
+(3) Остаточный архитектурный долг: V3 keyword strategy_mode жёстко связан с AdvSetting.strategy. Разбирать отдельным change: decouple-v3-keyword-strategy-mode-from-adv-strategy.
+Встроить в Cursor Codex, посмотреть что там за возможности
+- навести порядок в веткаххх!!!!
+провести ревизию доков в проекте
+
+<!-- LEARNING_ENTRY_BEGIN -->
+
+## LEARN-20260716-103045-pending-liveness
+
+- status: captured
+- optimization_status: pending
+- captured_at: 2026-07-16T10:30:45+03:00
+- source: opsx-learn-from-bug
+- change_id: card-ab-hold-mode
+- affected_area: card_ab_hold / PENDING_SETUP liveness / process_ab_setup / enable-flow
+- promoted_to: none
+
+### Raw learning input
+
+Нашли очень опасный баг, по запаху: что-то нашел Багbot, затем начали проверять через команду bug-hunt, он квалифицировал как баг за пределами scope или что-то вроде этого, но потом я сбросил отчеты во внешний чат и выявили более глубокий и потенциально очень опасный баг.
+
+1. Пользователь нажимает Enable A/B Hold.
+2. Enable-flow проходит текущие гейты.
+3. Код пишет card_ab_hold_mode = PENDING_SETUP / ENTER.
+4. ordinary automation начинает исключать campaign, потому что mode != OFF.
+5. На ближайшем setup tick process_ab_setup проверяет max_price_for_order.
+6. Если max_price_for_order missing или <= 0 — setup просто return.
+7. mode остаётся PENDING_SETUP.
+8. На следующем тике повторяется то же самое.
+9. Пользователь видит generic "Подготовка…", но не видит причину.
+
+Bugbot (Cursor): Missing max CPO stalls PENDING — Medium. Симптом: при missing/non-positive max_price_for_order process_ab_setup return без снятия PENDING_SETUP.
+
+Классификация по workflow:
+- /opsx-fix-bug (literal early return в pipelines.py): false_positive — код соблюдает spec «не ACTIVE без snapshot»; sibling precedent пустой allowed-set → остаётся PENDING (test_setup_empty_allowed_set_aborts_before_active).
+- /opsx-bug-hunt (PENDING_SETUP liveness invariant): needs_openspec_update — реальный liveness-hazard, но контракт слабый.
+- /opsx-classify-bug: spec_bug — код следует принятым артефактам; виноват контракт, не early return.
+
+Достижимость PROVEN:
+- entrypoint: WBShopUpdateManager.adv_settings_auto_update @while_coroutine_decorator(5*60)
+- chain: filter_ab_hold_pipeline_candidates(advs) → process_ab_setup
+- ordinary exclusion PROVEN: manager.py V2/V3 loops continue if ab_mode != OFF; filter_structural_act_candidates drops PENDING/ACTIVE
+
+Детерминированные блокеры setup (indefinite PENDING при excluded automation):
+- plan_max <= 0 (max_price_for_order missing) — deterministic/user-fixable; ENTER не гейтит max CPO (гейты: bot_active, no-op, V3, freshness §2a, view-volume §2c)
+- empty allowed_texts — mixed transient vs deterministic (all BAD / no keyword surface)
+
+Нет: timestamp PENDING entry (models.py только card_ab_hold_mode/snapshot/degraded); owned setup-abort-to-OFF (только Telegram EXIT); actionable UI reason в enter_status (generic «Подготовка…»).
+
+Правильный invariant (liveness):
+Для durable mode/state, гейтящего ordinary automation, spec MUST: gate deterministic prerequisites до входа; post-entry deterministic blockers — user-visible actionable reason + bounded recovery / explicit retry class / owned abort; transient retry только если явно классифицирован; deterministic non-transient MUST NOT оставлять silent indefinite limbo при excluded automation.
+
+Next command: /opsx-update card-ab-hold-mode (ENTER-гейт max_price_for_order>0; actionable PENDING status; recovery semantics). НЕ патчить process_ab_setup «move off PENDING» — неверная граница.
+
+Попытка /opsx-learn-from-bug GO learning patch (config.yaml rules.specs + opsx-bug-hunt.md): REVERT — guard strict ввёл новые FAIL (config.yaml grew baseline +619; opsx-bug-hunt.md 8087>8001; scenarios opsx_continue/propose/update/verify). База уже over budget: rules.specs ~3512>3501 fail, rules section >14001. Пользователь: переполнение файлов проигнорируй при capture.
+
+Предложенный текст learning patch (pending optimization):
+- rules.specs: liveness semantics для durable mode, исключающего ordinary automation (4 пункта: entry gate prerequisites; post-entry actionable + recovery/retry/abort; transient explicit; no silent limbo)
+- opsx-bug-hunt hard rule: durable state excluding automation = liveness surface; deterministic indefinite trap without entry gate/actionable reason/recovery/abort = candidate finding even without forbidden write
+
+<!-- LEARNING_ENTRY_END -->
+
+<!-- LEARNING_ENTRY_BEGIN -->
+
+## LEARN-20260716-103130-dead-surface
+
+- status: captured
+- optimization_status: pending
+- captured_at: 2026-07-16T10:31:30+03:00
+- source: opsx-learn-from-bug
+- change_id: card-ab-hold-mode
+- affected_area: card_ab_hold / scheduling.py / dead surface after implementation
+- promoted_to: none
+
+### Raw learning input
+
+3. [dead legacy] should_schedule_ordinary_updater is exported but never called
+
+File: card_ab_hold/scheduling.py:38 (+ export in __init__.py)
+Evidence: no call site in app/**. Ordinary V2/V3 exclusion is actually done via inline normalize_card_ab_hold_mode(...) != OFF checks in adv_settings_auto_update (587, 599, 611) — which are correct and cover both versions.
+Risk: none functionally; only dead surface that can mislead future edits.
+Recommended action: cleanup task (remove or wire it in), not a hotfix. No fix under this hunt.
+
+Это уже не в первые раз: мертный код после имплементации. Тратим на это время.
+
+Пользователь: Так это не баг в чистов виде? Править ничего не надо?
+
+Ответ workflow: да, не production-баг. Вердикт plan_only / no_fix. Инвариант (ordinary V2/V3 только при OFF) уже enforced инлайном в manager.py:587/599/611. Мёртвый предикат unreachable из runtime.
+
+Sibling dead surface (тот же паттерн, hunt отметил только 1 из 3):
+- should_schedule_ordinary_updater (scheduling.py:38)
+- should_run_ab_setup (scheduling.py:28)
+- should_run_ab_hold (scheduling.py:33)
+Все три: определены + экспортированы + callers только tests/**; runtime заменён filter_ab_hold_pipeline_candidates (manager.py:562) и inline != OFF.
+
+Вариант A cleanup: удалить 3 предиката + exports + осиротевшие тест-ассерты; manager не трогать.
+Вариант B wire-in: централизовать в scheduling.py по аналогии с filter_ab_hold_pipeline_candidates; семантика без изменений.
+
+Learning patch APPLIED (GO):
+- target: .cursor/commands/opsx-apply.md Guardrails +1 буллет (~220 chars):
+  "After implementing tasks, treat any new production/exported symbol whose only callers are tests as dead surface: wire it into a runtime-reachable path or remove it before completion. Passing tests do not prove wiring."
+
+Follow-up (пользователь выбрал cleanup_first):
+1) Сначала reduction-only чистка pre-existing guard FAIL (config.yaml::rules, rules.specs, scenario opsx_verify baseline stale) — без бампа baseline, ~285 chars уплотнения rules.specs.
+2) Потом enforceable verify-backstop: rules.verify NO_GO + opsx-verify.md + бамп openspec_guard.yaml baselines.
+
+Пользователь: /opsx-learn-from-bug Проведи обучение, переполнение файлов проигноруй
+
+Предложенный текст learning patch (pending optimization, после cleanup):
+- rules.verify: Verify должен ставить NO_GO, если change добавил production/exported символ, у которого единственные callers — тесты (dead surface); test-only reachability не доказывает wiring.
+- opsx-verify.md: одна проверка step 6 + NO_GO step 8 (dead surface / test-only reachability).
+
+<!-- LEARNING_ENTRY_END -->
+
+
+
+### Deferred: ClickHouse enable-path performance risk
+
+Discovered during `card-ab-hold-mode` review.
+
+The change reuses existing ClickHouse freshness and keyword-view readers. Static review found:
+
+* `clusters_adv_stats` freshness query filters by `adv_id`, while `adv_id` is not in the table `ORDER BY` prefix;
+* reused enable-path reads have semaphore/acquire protection but may lack a bounded operation timeout.
+
+Disposition:
+
+* pre-existing shared ClickHouse debt;
+* not a blocker for `card-ab-hold-mode` without production `EXPLAIN indexes=1`, `system.query_log` metrics or an observed timeout;
+* do not add an index, projection, MV or schema change inside the current change;
+* investigate separately after release;
+* consider reuse of `mv_clusters_daily_agg.ts_state` only after proving semantic equivalence.
+
+Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
