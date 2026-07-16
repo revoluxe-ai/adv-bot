@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
-from app import settings
+from app.settings import settings
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (

@@ -33,6 +33,9 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     sync_keyword_setting_mode_for_v3,
 )
@@ -967,8 +970,10 @@ async def keyword_target_place_value(
         return
 
     async with _sm(read_only=False) as session:
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.id == keyword_setting_original_id
+        stmt = (
+            select(KeywordSetting)
+            .options(selectinload(KeywordSetting.adv_setting))
+            .where(KeywordSetting.id == keyword_setting_original_id)
         )
         result = await session.execute(stmt)
         keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
@@ -977,6 +982,19 @@ async def keyword_target_place_value(
                 message.chat.id,
                 "Не удалось найти ключ. Повторите выбор ключевого слова.",
             )
+            await state.set_state()
+            return
+        adv_setting = keyword_setting.adv_setting
+        if adv_setting is not None and is_ab_hold_structural_freeze(
+            adv_setting.card_ab_hold_mode
+        ):
+            await bot.send_message(
+                message.chat.id,
+                "Кампания в режиме A/B Hold — целевая позиция ключа "
+                "заморожена. Чтобы изменить позиции, выключите A/B Hold "
+                "на экране режима.",
+            )
+            await state.update_data(keyword_setting_for_target_place=None)
             await state.set_state()
             return
         keyword_setting.target_place = target_place
