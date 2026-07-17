@@ -129,13 +129,36 @@ async def _edit_screen(
     text: str,
     adv_id: int,
     mode: CardAbHoldMode | str | None,
-) -> None:
-    """Редактировать message экрана, если это доступный ``Message``."""
+) -> bool:
+    """Отправить экран A/B Hold отдельным сообщением.
+
+    Owner decision для hotfix: исходное callback-сообщение не редактируем
+    (ни ``edit_text``, ни ``edit_caption``), чтобы не падать на media/unsupported
+    payloads. Возвращает ``True``, если экран успешно отправлен.
+    """
     msg = query.message
-    if isinstance(msg, Message):
-        await msg.edit_text(
-            text, reply_markup=_screen_keyboard(adv_id, mode)
+    if msg is None:
+        logger.warning(
+            "CardAbHold screen render skipped: callback message is unavailable"
         )
+        await query.answer(
+            "Не удалось открыть экран A/B Hold: сообщение недоступно.",
+            show_alert=True,
+        )
+        return False
+    if not isinstance(msg, Message):
+        logger.warning(
+            "CardAbHold screen render skipped: unsupported callback message type=%s",
+            type(msg).__name__,
+        )
+        await query.answer(
+            "Не удалось открыть экран A/B Hold: неподдерживаемый тип сообщения.",
+            show_alert=True,
+        )
+        return False
+
+    await msg.answer(text, reply_markup=_screen_keyboard(adv_id, mode))
+    return True
 
 
 async def _screen_status_text(
@@ -214,7 +237,11 @@ async def open_card_ab_hold_menu(
             return
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         status = await _screen_status_text(adv, mode)
-        await _edit_screen(query, f"{_INSTRUCTION}\n{status}", adv.id, mode)
+        rendered = await _edit_screen(
+            query, f"{_INSTRUCTION}\n{status}", adv.id, mode
+        )
+        if not rendered:
+            return
         await query.answer()
 
 
