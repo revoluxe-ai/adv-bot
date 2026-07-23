@@ -42,7 +42,8 @@ Architecture Decision Missing: нет для этого обновления —
 
 - A/B Hold epoch/setup write-path (shop-runner, тот же owner, что существующие `process_ab_setup` / `process_ab_hold` entrypoints): владеет WARM_UP-таймером, epoch/generation-нумерацией, durable PENDING intent → WB sync → активный hold порядком, retry-логикой (тот же generation, без пересчёта).
 - A/B Hold confirmation write-path (Telegram confirm-хендлеры → durable PG запись): владеет confirmed keyword set / confirmed target places / confirmed Auto participation / confirmed Auto bid; читает факт-позицию из существующего read-model, не хранит её как подтверждённый параметр.
-- PG durable поля: режим кампании (OFF/PENDING/ACTIVE-класс, уже существует), allowed-set snapshot (уже существует), + новые durable поля WARM_UP-таймера, epoch/generation, confirmed-параметров (детали полей/миграций — implementation-decision будущего `/opsx:apply`, не этого design; здесь фиксируется только owner и порядок).
+- PG durable поля: режим кампании (OFF/PENDING/ACTIVE-класс, уже существует), allowed-set snapshot (уже существует), + **planned Alembic fields** (см. `tasks.md` §19.5 / §22.5): `card_ab_hold_phase`, `card_ab_hold_warmup_started_at`, `card_ab_hold_warmup_duration_hours`, `card_ab_hold_generation`, `card_ab_hold_wb_sync_idempotency_key`, `card_ab_hold_pending_intent_json`, `card_ab_hold_sync_status`, `card_ab_hold_confirmed_keywords_json`, `card_ab_hold_confirmed_target_places_json`, `card_ab_hold_confirmed_auto_participation`, `card_ab_hold_confirmed_auto_bid`. Owner и порядок фиксируются здесь; имена колонок — planning SoT для apply (не код). **Legacy rows:** NULL/0 defaults on new columns MUST NOT activate epoch lifecycle (§18.5 / Migration Plan).
+- **Legacy gate (pre-apply REQUIRED):** `process_ab_setup` → auto-ACTIVE и `setup_apply` TP-write на ENTER PASS — Forbidden относительно owner-флоу; MUST быть phase-gated до apply §19+ (`tasks.md` §18.4).
 - Redis coordination layer (уже существует: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock`) — координация cross-pod, не SoT для confirmed-параметров или generation.
 - Существующий daily-budget/activity-control controller (`ensure_campaigns_active` / auto-budget watchdog) — не меняется этим change; A/B Hold только честно описывает его поведение (stop threshold, overshoot без гарантированной границы, суточный сброс) как ортогональный путь.
 - Mode policy overlays — дефолт «выкл» (без изменений, Accepted decision).
@@ -156,15 +157,30 @@ Architecture Decision Missing: нет для этого обновления —
 
 ## Migration Plan
 
-1. Этот `/opsx-update` обновляет только планирующие артефакты (`proposal.md`, `design.md`, `specs/card-ab-hold-mode/spec.md`, `tasks.md`, три decision-файла); код/тесты/миграции не создаются и не изменяются.
-2. `/opsx:apply` для новых задач (`tasks.md` §19+) заблокирован до явной авторизации владельцем.
-3. При авторизации: реализация в порядке зависимостей — durable WARM_UP-таймер/эпоха/generation-поля → confirm-write-path (keyword/TP/Auto) → durable PENDING intent → WB sync/retry → freeze Search/Auto bid при stale-стате → честный daily-budget disclosure в UI-копирайте (после отдельного UX-контракта) → ручной тест владельца → лимитированная бета.
+1. Этот `/opsx-update` обновляет только планирующие артефакты (`proposal.md`, `design.md`, `specs/card-ab-hold-mode/spec.md`, `tasks.md`, три decision-файла); код/тесты/миграции не создаются и не изменяются. **OP-006 pre-apply planning fixes (2026-07-23):** §18.4 legacy gate; §4.1 TP wording; Alembic field names в §19.5/§22.5; AutoResetBidService в §21.3/§21.4; OD-05 остаётся единственным open owner decision. **OP-008 pre-apply planning fixes (2026-07-23):** PG idempotency/uniqueness contract (§22.5); legacy in-flight policy (§18.5); writer inventory; UX S3 keyboard; explicit test tasks.
+2. `/opsx:apply` для новых задач (`tasks.md` §18.4 и §19+) заблокирован до явной авторизации владельцем.
+3. При авторизации: реализация в порядке зависимостей — **§18.4 gate legacy auto-ACTIVE/auto-TP** → durable WARM_UP-таймер/эпоха/generation-поля → confirm-write-path (keyword/TP/Auto) → durable PENDING intent → WB sync/retry → freeze Search/Auto bid при stale-стате (вкл. `AutoResetBidService`) → честный daily-budget disclosure в UI-копирайте (по UX-контракту) → ручной тест владельца → лимитированная бета.
 4. Широкое включение для всех paid-пользователей — только после OD-05.
-5. Rollback: как в применённом MVP-1 (EXIT → OFF, allowed-set snapshot clear, Redis TTL cleanup) плюс — durable WARM_UP-таймер/PENDING intent без завершённой синхронизации не создают побочных WB-эффектов и очищаются при EXIT/rollback.
+5. Rollback: как в применённом MVP-1 (EXIT → OFF, allowed-set snapshot clear, Redis TTL cleanup) плюс — durable WARM_UP-таймер/PENDING intent без завершённой синхронизации не создают побочных WB-эффектов и очищаются при EXIT/rollback. **Rollback migration MUST NOT** drop or null-out legacy `card_ab_hold_mode`, `allowed_phrases_snapshot`, or `card_ab_hold_degraded` in a way that destroys in-flight legacy hold state.
+
+### Legacy / in-flight migration policy (OP-008)
+
+Applies to campaigns already in MVP-1 hold at migration time and to any row where new epoch columns arrive via Alembic with NULL/0 defaults.
+
+| Rule | Contract |
+|---|---|
+| No auto-conversion | Existing MVP-1 campaigns (`card_ab_hold_mode` ∈ {`PENDING_SETUP`, `ACTIVE`} with `card_ab_hold_phase` NULL) **MUST NOT** auto-convert to epoch-managed generation on migration or process restart. |
+| NULL phase = legacy | `card_ab_hold_phase` NULL means **legacy-MVP-1 semantics** until EXIT or controlled re-enter under fail-closed feature flag (§25). |
+| New flow entry | New epoch flow (WARM_UP → confirms → PENDING intent → WB sync → ACTIVE) only via fail-closed feature flag + explicit owner entry — not via migration defaults. |
+| ACTIVE legacy continues | Already `ACTIVE` legacy campaigns continue legacy hold behavior (`process_ab_hold`, allowed-set enforcement, legacy setup path where still gated) until explicit EXIT; prefer EXIT-only transition to new flow for MVP (no silent in-place epoch upgrade). |
+| Process restart | Process restart / shop-runner redeploy **MUST NOT** change flow version for a row; durable PG fields are SoT. |
+| Migration defaults inert | New columns (`card_ab_hold_phase`, `card_ab_hold_generation`, `card_ab_hold_pending_intent_json`, `card_ab_hold_sync_status`, `card_ab_hold_wb_sync_idempotency_key`, confirmed-* columns, warmup timer fields) with NULL / 0 / `none` defaults **MUST NOT** activate the new lifecycle on existing rows. |
+| No automatic backfill | Automatic backfill of confirmed parameters (keyword set, TP map, Auto participation/bid) from live WB/PG state **FORBIDDEN** for legacy rows — would fake user confirms. |
+| Rollback safety | Downgrade migration MUST preserve legacy mode, allowed-set snapshot, and degraded flag; MUST NOT destroy in-flight legacy hold. |
 
 ## Open Questions
 
-1. Точные названия и миграции новых durable PG-полей (WARM_UP timer, epoch/generation, confirmed keyword/TP/Auto snapshot) — implementation-деталь будущего `/opsx:apply`, не этого design.
+1. ~~Точные названия новых durable PG-полей~~ — **RESOLVED (OP-006 planning):** planned names зафиксированы в `tasks.md` §19.5 / §22.5 и Ownership & Placement выше; Alembic SQL создаётся только при `/opsx:apply`.
 2. Ретрай-каденс и лимит попыток WB-синхронизации при partial sync (сколько раз/как часто повторять до эскалации actionable-статуса пользователю) — implementation-деталь будущего `/opsx:apply`; текущий design фиксирует только инвариант «тот же generation, без пересчёта».
 3. Точный UX-контракт и тексты Telegram-сообщений (в т.ч. текст про честный overshoot) — создан отдельным последующим `/opsx-continue`: `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` (контракт) и `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md` (иллюстративные тексты, не binding — implementation MAY скорректировать формулировки при `/opsx:apply`, сохраняя инварианты).
 4. Критерий/процедура принятия OD-05 (кто, когда, по каким метрикам бета-теста) — owner decision, вне scope этого design; фиксируется только то, что OD-05 — единственный гейт широкого включения.

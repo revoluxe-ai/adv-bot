@@ -106,7 +106,7 @@ because the copy in the storyboard (`telegram-storyboard.md`) is written to matc
 | S1 (keyword confirm) | per-page: `[✓/✗ <keyword 1>]` … `[✓/✗ <keyword 10>]` / `[◀ Стр.]` `[Стр. ▶]` (only if >1 page) / `[Подтвердить набор]` / `[← Назад]` `[Отмена]` |
 | S1b (mid-WARM_UP edit) | same rows as S1, with a header line stating this edit will restart WARM_UP |
 | S2 (WARM_UP duration) | `[24ч (по умолчанию)]` / `[Увеличить: +24ч]` `[Увеличить: +48ч]` / `[Подтвердить длительность]` / `[← Назад]` `[Отмена]` |
-| S3 (WARM_UP progress) | `[Обновить статус]` / `[Выключить A/B тест]` / `[← Назад]` |
+| S3 (WARM_UP progress) | `[Обновить статус]` / `[Изменить набор ключей]` / `[Выключить A/B тест]` / `[← Назад]` |
 | W3-propose | per-page: `[<keyword i>: факт K → цель N]` (display-only row) … / `[◀ Стр.]` `[Стр. ▶]` (only if >1 page) / `[Подтвердить целевые позиции]` / `[← Назад]` `[Отмена]` |
 | W3-confirmed (read-only) | per-page: `[<keyword i>: факт K → цель N (зафиксировано)]` (display-only) / `[◀ Стр.]` `[Стр. ▶]` / `[Выключить A/B тест]` / `[← Назад]` |
 | A1 (Auto participation) | `[Да, участвует]` `[Нет, не участвует]` / `[← Назад]` `[Отмена]` |
