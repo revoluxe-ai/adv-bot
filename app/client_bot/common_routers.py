@@ -29,6 +29,7 @@ from app.modules.shop_runner.service_manager.v3_rollout_aggressiveness_toggle im
     v3_rollout_aggressiveness_toggle_router,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
+    card_ab_hold_confirm_router,
     card_ab_hold_router,
 )
 from app.modules.shop_runner.service_manager.v3_tick_report_ui import (
@@ -125,6 +126,7 @@ common_router.include_routers(auto_updater_target_place_setting_router)
 common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(v3_rollout_aggressiveness_toggle_router)
 common_router.include_routers(card_ab_hold_router)
+common_router.include_routers(card_ab_hold_confirm_router)
 common_router.include_routers(v3_calibration_step_setting_router)
 common_router.include_routers(v3_tick_report_ui_router)
 common_router.include_routers(keyword_v3_decision_trace_ui_router)

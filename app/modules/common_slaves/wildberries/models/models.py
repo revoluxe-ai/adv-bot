@@ -761,6 +761,79 @@ class AdvSetting(BaseTable):
             "self-healing — снимается на тике, где cap не превышен."
         ),
     )
+    card_ab_hold_phase: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        default=None,
+        comment=(
+            "A/B Hold epoch phase (§18.5/§19.5): NULL=legacy MVP-1; non-NULL=epoch-managed "
+            "(awaiting_keyword_confirm|warm_up|…|ready_active)"
+        ),
+    )
+    card_ab_hold_warmup_started_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="A/B Hold WARM_UP timer start (timestamptz); NULL when not in WARM_UP",
+    )
+    card_ab_hold_warmup_duration_hours: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=24,
+        server_default=text("24"),
+        comment="A/B Hold WARM_UP duration hours (default/min 24; MUST NOT go below 24)",
+    )
+    card_ab_hold_generation: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        comment="A/B Hold epoch generation (monotonic; 0=no epoch intent yet)",
+    )
+    card_ab_hold_wb_sync_idempotency_key: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        default=None,
+        unique=True,
+        comment="A/B Hold WB sync idempotency key '{adv_id}:{generation}' (NULL until intent)",
+    )
+    card_ab_hold_pending_intent_json: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="A/B Hold durable PENDING intent snapshot (confirmed params + generation)",
+    )
+    card_ab_hold_sync_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="none",
+        server_default=text("'none'"),
+        comment="A/B Hold WB sync status: none|pending|partial|complete",
+    )
+    card_ab_hold_confirmed_keywords_json: Mapped[list | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed keyword set (epoch SoT)",
+    )
+    card_ab_hold_confirmed_target_places_json: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed target places map keyword→TP (epoch SoT)",
+    )
+    card_ab_hold_confirmed_auto_participation: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed Auto participation (epoch SoT)",
+    )
+    card_ab_hold_confirmed_auto_bid: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed Auto bid (epoch SoT)",
+    )
 
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),

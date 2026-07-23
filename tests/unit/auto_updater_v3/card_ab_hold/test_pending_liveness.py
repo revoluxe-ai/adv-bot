@@ -123,6 +123,26 @@ def _make_query() -> MagicMock:
     return query
 
 
+def _make_enable_success_mocks(
+    adv: SimpleNamespace,
+    session_cm: MagicMock,
+) -> tuple[AsyncMock, MagicMock, SimpleNamespace]:
+    refreshed = SimpleNamespace(
+        **{
+            **adv.__dict__,
+            "card_ab_hold_mode": CardAbHoldMode.PENDING_SETUP.value,
+        }
+    )
+    refresh_session = MagicMock()
+    refresh_session.scalar = AsyncMock(return_value=refreshed)
+    refresh_cm = MagicMock()
+    refresh_cm.__aenter__ = AsyncMock(return_value=refresh_session)
+    refresh_cm.__aexit__ = AsyncMock(return_value=None)
+    start_epoch = AsyncMock(return_value=True)
+    sm_side_effect = MagicMock(side_effect=[session_cm, refresh_cm])
+    return start_epoch, sm_side_effect, refreshed
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 @pytest.mark.parametrize("bad_max_cpo", [0, -1, None])
@@ -176,9 +196,13 @@ async def test_enable_positive_max_cpo_proceeds_to_pending() -> None:
     session, session_cm = _make_session(adv)
     query = _make_query()
     set_signal = AsyncMock()
+    start_epoch, sm_side_effect, refreshed = _make_enable_success_mocks(
+        adv, session_cm
+    )
 
     with (
-        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "sm", sm_side_effect),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
         patch.object(
             handlers,
             "evaluate_ab_hold_enable_stats",
@@ -209,8 +233,8 @@ async def test_enable_positive_max_cpo_proceeds_to_pending() -> None:
             query, CardAbHoldEnable(adv_setting_original_id=42)
         )
 
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
-    session.commit.assert_awaited()
+    start_epoch.assert_awaited_once()
+    assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
 
 
@@ -221,7 +245,7 @@ def test_max_cpo_gate_runs_before_freshness_volume_and_pending_write() -> None:
     gate_at = src.find("has_positive_plan_max_cpo")
     freshness_at = src.find("evaluate_ab_hold_enable_stats")
     volume_at = src.find("evaluate_ab_hold_launch_view_volume")
-    pending_at = src.find("PENDING_SETUP.value")
+    pending_at = src.find("start_epoch_on_enable")
     enter_at = src.find("set_signal")
     assert gate_at != -1
     assert gate_at < freshness_at < volume_at < pending_at

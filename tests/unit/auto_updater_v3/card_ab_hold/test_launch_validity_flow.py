@@ -71,6 +71,27 @@ def _make_query() -> MagicMock:
     return query
 
 
+def _make_enable_success_mocks(
+    adv: SimpleNamespace,
+    session_cm: MagicMock,
+) -> tuple[AsyncMock, MagicMock, SimpleNamespace]:
+    """Mocks для успешного ENTER: start_epoch_on_enable + refresh session."""
+    refreshed = SimpleNamespace(
+        **{
+            **adv.__dict__,
+            "card_ab_hold_mode": CardAbHoldMode.PENDING_SETUP.value,
+        }
+    )
+    refresh_session = MagicMock()
+    refresh_session.scalar = AsyncMock(return_value=refreshed)
+    refresh_cm = MagicMock()
+    refresh_cm.__aenter__ = AsyncMock(return_value=refresh_session)
+    refresh_cm.__aexit__ = AsyncMock(return_value=None)
+    start_epoch = AsyncMock(return_value=True)
+    sm_side_effect = MagicMock(side_effect=[session_cm, refresh_cm])
+    return start_epoch, sm_side_effect, refreshed
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_enable_low_views_warns_and_stays_off() -> None:
@@ -128,9 +149,13 @@ async def test_enable_sufficient_views_proceeds_to_pending() -> None:
             total_views=5000,
         )
     )
+    start_epoch, sm_side_effect, refreshed = _make_enable_success_mocks(
+        adv, session_cm
+    )
 
     with (
-        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "sm", sm_side_effect),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
         patch.object(
             handlers,
             "evaluate_ab_hold_enable_stats",
@@ -153,8 +178,8 @@ async def test_enable_sufficient_views_proceeds_to_pending() -> None:
         )
 
     view_eval.assert_awaited_once()
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
-    session.commit.assert_awaited()
+    start_epoch.assert_awaited_once()
+    assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
 
 
@@ -173,8 +198,13 @@ async def test_launch_anyway_proceeds_without_volume_check() -> None:
         )
     )
 
+    start_epoch, sm_side_effect, refreshed = _make_enable_success_mocks(
+        adv, session_cm
+    )
+
     with (
-        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "sm", sm_side_effect),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
         patch.object(
             handlers,
             "evaluate_ab_hold_enable_stats",
@@ -197,8 +227,8 @@ async def test_launch_anyway_proceeds_without_volume_check() -> None:
         )
 
     view_eval.assert_not_awaited()
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
-    session.commit.assert_awaited()
+    start_epoch.assert_awaited_once()
+    assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
 
 
@@ -277,11 +307,11 @@ async def test_cancel_keeps_off_and_no_enter() -> None:
 
 @pytest.mark.unit
 def test_view_volume_gate_runs_after_freshness_before_pending_write() -> None:
-    """13.5 wiring: объёмный gate — после freshness и до записи PENDING_SETUP."""
+    """13.5 wiring: объёмный gate — после freshness и до ``start_epoch_on_enable``."""
     src = inspect.getsource(handlers._handle_ab_hold_enable)
     freshness_at = src.find("evaluate_ab_hold_enable_stats")
     volume_at = src.find("evaluate_ab_hold_launch_view_volume")
-    pending_at = src.find("PENDING_SETUP.value")
+    pending_at = src.find("start_epoch_on_enable")
     assert -1 < freshness_at < volume_at < pending_at
     assert "skip_view_volume_gate" in src
 
