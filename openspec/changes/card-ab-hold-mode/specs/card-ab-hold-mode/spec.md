@@ -206,12 +206,20 @@ When the campaign mode is already `PENDING_SETUP` or `ACTIVE`, the paid Telegram
 - **AND** Redis ENTER is not rewritten solely to restart ENTER from that press
 - **AND** the UI does not treat the press as a fresh enable from `OFF`
 
-#### Scenario: Enable from OFF still starts ENTER
+#### Scenario: Enable from OFF starts PENDING epoch path, not direct ACTIVE
 - **GIVEN** a campaign is in `OFF` with paid bot management active and stats freshness gate passing
+- **AND** the new epoch flow is authorized (feature flag / owner entry per `tasks.md` §25; `card_ab_hold_phase` not NULL legacy-MVP-1 semantics)
 - **WHEN** the user presses Enable
 - **THEN** the campaign mode becomes `PENDING_SETUP`
 - **AND** Redis ENTER MAY be written
-- **AND** shop-runner setup MAY run the one-time ENTER allowed-set capture → snapshot → `ACTIVE` path
+- **AND** the campaign enters the owner epoch path: keyword-set confirm → durable WARM_UP → TP confirm → Auto participation confirm → Auto bid confirm → durable PENDING intent → WB sync → `ACTIVE`
+- **AND** shop-runner MUST NOT translate Enable into direct `ACTIVE` or one-shot legacy `process_ab_setup` → `ACTIVE` without completed confirms and durable PENDING intent (legacy one-shot path gated by `tasks.md` §18.4; `card_ab_hold_phase` NULL = legacy-MVP-1 until EXIT or controlled re-enter)
+
+#### Scenario: Enable from OFF on legacy in-flight MVP-1 campaign keeps legacy semantics
+- **GIVEN** a campaign was ACTIVE under legacy MVP-1 before epoch migration (`card_ab_hold_phase` NULL, allowed-set snapshot present)
+- **WHEN** the user presses Enable while mode is already `ACTIVE` or `PENDING_SETUP`
+- **THEN** existing idempotent Enable behavior applies (decision §10)
+- **AND** the campaign MUST NOT auto-convert to epoch-managed generation without explicit EXIT and fail-closed feature-flagged re-enter (§18.5 / Migration Plan)
 
 ### Requirement: Manual Telegram target-place write is blocked during A/B Hold freeze
 While the campaign mode is `PENDING_SETUP` or `ACTIVE`, manual Telegram input that writes `KeywordSetting.target_place` MUST be blocked before database write/commit. The handler MUST clear FSM state after blocked input and MUST send an explanatory message that target place changes are unavailable until A/B Hold is disabled. When mode is `OFF`, existing manual target-place behavior remains allowed.

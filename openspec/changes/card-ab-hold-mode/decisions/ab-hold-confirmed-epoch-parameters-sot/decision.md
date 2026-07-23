@@ -20,7 +20,7 @@ Proposed
 4. **Keyword bidder — только holder подтверждённых target places.** Биддер во время ACTIVE использует исключительно подтверждённые (confirmed, durable) target places этой эпохи как цель ставок; биддер MUST NOT самостоятельно добавлять или возвращать ключи и MUST NOT изменять target place — эти действия принадлежат исключительно write-path подтверждения новой эпохи.
 5. **Auto participation confirm — отдельное подтверждение.** Участие типа кампании Auto в текущей эпохе A/B Hold MUST подтверждаться явным пользовательским действием, отдельным от подтверждения Search keyword set/TP. Подтверждение Auto participation MUST NOT подразумеваться автоматически из подтверждения ключевого набора Search.
 6. **Auto bid confirm — отдельное явное подтверждение.** Значение/стратегия ставки Auto на эпоху MUST подтверждаться отдельным явным действием пользователя, независимым от Auto participation confirm и от Search TP confirm. Confirmed Auto bid — durable параметр эпохи, наравне с confirmed target places.
-7. **Auto bid мутаторы заморожены в ACTIVE.** После перехода в ACTIVE ordinary auto-update мутаторы ставки Auto MUST NOT изменять подтверждённую ставку Auto этой эпохи. Изменение возможно только через EXIT и новую эпоху (новый полный цикл подтверждений) либо иным явным owned-путём, эквивалентным EXIT.
+7. **Auto bid мутаторы заморожены в ACTIVE.** После перехода в ACTIVE ordinary auto-update мутаторы ставки Auto MUST NOT изменять подтверждённую ставку Auto этой эпохи. **В scope freeze явно входят:** `AutoResetBidService.ensure_auto_bids_minimum` (shop-runner `manager.py`) и прочие Auto CPM writers того же тика; manual Telegram `change_auto_bid` при ACTIVE — либо block+explain, либо только через EXIT+новую эпоху. Изменение confirmed Auto bid возможно только через EXIT и новую эпоху (новый полный цикл подтверждений) либо иным явным owned-путём, эквивалентным EXIT.
 8. **Owner layer.** Хранение и владение подтверждёнными epoch-параметрами принадлежит A/B Hold confirmation write-path (Telegram confirm-хендлеры → durable PG запись, тот же owner, что epoch/generation lifecycle из `ab-hold-epoch-lifecycle-and-generation-ownership`). Ordinary Search/Auto auto-updaters и display/formatting-слой не владеют confirmation state: display-слой только читает факт и confirmed target place раздельно, а не решает, что подтверждено.
 
 ## Applies to
@@ -28,7 +28,7 @@ Proposed
 - Capability `card-ab-hold-mode`: подтверждение набора ключей, TP confirm, Auto participation confirm, Auto bid confirm.
 - Отображение «ключ → факт-позиция → предложенное target place» на любом экране/сообщении A/B Hold.
 - Keyword bidder path во время ACTIVE (holder confirmed target places).
-- Ordinary Auto bid auto-update mutators при ACTIVE A/B Hold.
+- Ordinary Auto bid auto-update mutators при ACTIVE A/B Hold (включая `AutoResetBidService.ensure_auto_bids_minimum`).
 - Существующий allowed-set snapshot mechanism (`card-ab-hold-write-path-ownership` §8) как enforcement-слой, наполняемый подтверждённым набором ключей эпохи.
 
 ## Allowed
@@ -46,7 +46,7 @@ Proposed
 - Слияние факт-позиции и target place в одно отображаемое или хранимое значение/поле.
 - Пересчёт confirmed target place на ENTER, на retry WB-синхронизации или из-за обычного дрейфа факт-позиции.
 - Подразумевание Auto participation confirm из Search keyword set confirm (или наоборот).
-- Изменение confirmed Auto bid ordinary auto-update мутатором во время ACTIVE.
+- Изменение confirmed Auto bid ordinary auto-update мутатором во время ACTIVE (в т.ч. `AutoResetBidService.ensure_auto_bids_minimum`).
 - Добавление/возврат ключей биддером или изменение target place биддером напрямую.
 - Хранение confirmed epoch-параметров только в display/formatting-слое или только в Redis без durable PG SoT.
 
@@ -63,7 +63,7 @@ Bad:
 - Показ единственного числа «Позиция: 12» без указания, что это факт или предложение.
 - ENTER-тик молча пересчитывает и перезаписывает уже подтверждённый target place на новую фактическую позицию.
 - Подтверждение keyword set автоматически трактуется как подтверждение участия Auto.
-- Ordinary auto-update ставок меняет подтверждённую ставку Auto, пока кампания ACTIVE.
+- Ordinary auto-update ставок меняет подтверждённую ставку Auto, пока кампания ACTIVE (пример: `AutoResetBidService.ensure_auto_bids_minimum` без ab_hold guard).
 
 ## Related specs
 
