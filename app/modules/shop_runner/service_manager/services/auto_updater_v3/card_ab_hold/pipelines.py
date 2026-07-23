@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     CardAbHoldSetupBlockKind,
+    is_epoch_managed_ab_hold,
     normalize_card_ab_hold_mode,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
@@ -34,6 +35,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_apply import (
     apply_ab_hold_setup_mutations,
     persist_ab_hold_degraded_flag,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stale_stats_freeze import (
+    should_freeze_keyword_and_bid_mutations,
 )
 from app.modules.shop_runner.service_manager.services.increment_fact_data_manager.redis_lock_manager import (
     RedisLockManager,
@@ -64,6 +68,10 @@ async def process_ab_setup(
     Без ordinary NORMAL preamble. Single-flight через ``RedisLockManager`` /
     ``CardAbHoldSetupLock:{adv_id}``. Без зафиксированного allowed-set snapshot
     ACTIVE не выставляется; минус приводится к «всё вне allowed-set» (enforcement).
+
+    §18.4 / §18.5: если ``card_ab_hold_phase`` non-NULL (epoch-managed), legacy
+    auto-ACTIVE и ENTER TP-write Forbidden — setup-тик no-op (epoch path owns
+    ACTIVE via PENDING intent → WB sync). ``phase IS NULL`` = legacy MVP-1.
     """
     _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
@@ -72,6 +80,15 @@ async def process_ab_setup(
             "[adv_id=%s] ab_setup skip: mode=%s",
             complex_adv.adv_id,
             mode.value,
+        )
+        return
+
+    if is_epoch_managed_ab_hold(complex_adv.adv_setting):
+        # tasks §18.4: epoch-managed MUST NOT reach ACTIVE via legacy process_ab_setup.
+        logger.info(
+            "[adv_id=%s] ab_setup skip auto-ACTIVE: epoch-managed phase=%s",
+            complex_adv.adv_id,
+            getattr(complex_adv.adv_setting, "card_ab_hold_phase", None),
         )
         return
 
@@ -181,6 +198,7 @@ async def process_ab_hold(
     *,
     wb_shop_data_manager: "WBShopDataManager",
     wb_manager_hub: "WBManagerHub",
+    stats_fresh: bool = True,
 ) -> None:
     """HOLD-тик: allowed-set enforcement + overspend/PFO-off; bidder вне path.
 
@@ -188,10 +206,25 @@ async def process_ab_hold(
     Hold-protection (≠ ordinary recalc) удерживает поверхность трат равной
     замороженному allowed-set: новые/не-разрешённые фразы исключаются, снятые
     разрешённые восстанавливаются; при превышении WB minus cap — видимая деградация.
+
+    §23: при stale stats keyword inclusion/exclusion и overspend-OFF MUST NOT
+    выполняться (freeze ≠ stop кампании).
     """
     _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
     if mode != CardAbHoldMode.ACTIVE:
+        return
+
+    phase = getattr(complex_adv.adv_setting, "card_ab_hold_phase", None)
+    if should_freeze_keyword_and_bid_mutations(
+        mode=mode,
+        phase=phase,
+        stats_fresh=stats_fresh,
+    ):
+        logger.info(
+            "[adv_id=%s] ab_hold: stale stats freeze — skip enforcement (§23)",
+            complex_adv.adv_id,
+        )
         return
 
     allowed = normalize_allowed_snapshot(

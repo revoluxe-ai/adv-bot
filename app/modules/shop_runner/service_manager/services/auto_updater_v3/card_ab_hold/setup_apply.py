@@ -1,6 +1,12 @@
-"""Persist ENTER-мутаций A/B Hold (OFF + ЦП := текущая позиция).
+"""Persist ENTER-мутаций A/B Hold (legacy MVP-1: OFF + optional ЦП).
 
-Spec ``card-ab-hold-mode``: FAIL → OFF; PASS → target_place = WB position.
+Spec ``card-ab-hold-mode`` / tasks §18.4:
+- Legacy (``epoch_managed=False``): FAIL → OFF; PASS → target_place = WB position;
+  mode → ACTIVE (historical MVP-1).
+- Epoch-managed (``epoch_managed=True``): FAIL → OFF Allowed; PASS MUST NOT write
+  target_place; MUST NOT set mode ACTIVE (TP only after confirm; ACTIVE only after
+  PENDING intent → WB sync).
+
 Использует тот же SQLAlchemy update-паттерн, что ``WhiteListTrimmer`` —
 без full NORMAL preamble (decision write-path ownership).
 """
@@ -37,9 +43,10 @@ logger = logging.getLogger(__name__)
 
 
 def ab_hold_target_place_from_keyword(keyword: CalculatedKeyword) -> int | None:
-    """ЦП из фактической позиции ключа (то же округление, что not-full migrate).
+    """Предложенная ЦП из фактической позиции ключа (чистое предложение).
 
-    Spec card-ab-hold-mode: PASS → target_place := current WB place.
+    Spec: после WARM_UP factual vs proposed TP — два поля; confirmed TP только
+    после явного confirm. Функция не пишет в PG.
     """
     pos = float(keyword.position)
     if pos <= 0:
@@ -55,22 +62,26 @@ async def apply_ab_hold_setup_mutations(
     max_pay_for_order: float,
     allowed_phrases_snapshot: list[str] | None = None,
     degraded: bool = False,
+    epoch_managed: bool = False,
 ) -> tuple[int, int]:
-    """Применить ENTER: OFF на FAIL, ЦП на PASS; allowed-set snapshot + mode → ACTIVE.
+    """Применить ENTER-классификацию; ACTIVE/TP — только для legacy MVP-1.
 
     Args:
         allowed_phrases_snapshot: PG snapshot разрешённого (allowed/relevant) набора
-            фраз (decision §8, primary invariant). MUST быть зафиксирован до ACTIVE;
-            минус — производный enforcement, не хранится здесь.
+            фраз (decision §8, primary invariant). MUST быть зафиксирован до ACTIVE
+            на legacy-пути; минус — производный enforcement, не хранится здесь.
         degraded: честная деградация hold (decision §8) — enforcement allowed-set
-            превысил WB minus cap на ENTER. Персистится вместе с mode → ACTIVE, чтобы
-            UI не заявлял чистый hold (durable SoT для рендера в bot-поде).
+            превысил WB minus cap на ENTER. Персистится вместе с mode → ACTIVE
+            на legacy-пути.
+        epoch_managed: True (§18.4) — не писать ``target_place`` на PASS и не
+            переводить mode → ACTIVE (epoch path owns confirms / intent / sync).
 
     Returns:
         (pass_count, fail_count)
     """
     fail_ids: list[int] = []
     pass_updates: list[tuple[int, int]] = []
+    pass_count = 0
     for kw in keywords:
         action = classify_ab_hold_setup_keyword(
             pay_for_order=kw.pay_for_order,
@@ -80,6 +91,10 @@ async def apply_ab_hold_setup_mutations(
         ks_id = int(kw.keyword_setting_original_id)
         if action == AbHoldSetupAction.FAIL_OFF:
             fail_ids.append(ks_id)
+            continue
+        pass_count += 1
+        if epoch_managed:
+            # §18.4.2: TP only after explicit tp_confirm — never on ENTER PASS.
             continue
         place = ab_hold_target_place_from_keyword(kw)
         if place is not None:
@@ -101,34 +116,38 @@ async def apply_ab_hold_setup_mutations(
                 )
             )
             _ = await session.execute(stmt_off)
-        for ks_id, place in pass_updates:
-            stmt_tp = (
-                update(KeywordSetting)
-                .where(KeywordSetting.id == ks_id)
-                .values(target_place=place)
+        if not epoch_managed:
+            for ks_id, place in pass_updates:
+                stmt_tp = (
+                    update(KeywordSetting)
+                    .where(KeywordSetting.id == ks_id)
+                    .values(target_place=place)
+                )
+                _ = await session.execute(stmt_tp)
+            stmt_mode = (
+                update(AdvSetting)
+                .where(AdvSetting.id == adv_setting_id)
+                .values(
+                    card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+                    card_ab_hold_allowed_phrases_snapshot=snapshot,
+                    card_ab_hold_degraded=degraded,
+                )
             )
-            _ = await session.execute(stmt_tp)
-        stmt_mode = (
-            update(AdvSetting)
-            .where(AdvSetting.id == adv_setting_id)
-            .values(
-                card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
-                card_ab_hold_allowed_phrases_snapshot=snapshot,
-                card_ab_hold_degraded=degraded,
-            )
-        )
-        _ = await session.execute(stmt_mode)
+            _ = await session.execute(stmt_mode)
         await session.commit()
 
     logger.info(
-        "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s degraded=%s → ACTIVE",
+        "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s "
+        "degraded=%s epoch_managed=%s → %s",
         adv_id,
-        len(pass_updates),
+        pass_count,
         len(fail_ids),
         len(snapshot),
         degraded,
+        epoch_managed,
+        "PENDING (epoch gate)" if epoch_managed else "ACTIVE",
     )
-    return len(pass_updates), len(fail_ids)
+    return pass_count, len(fail_ids)
 
 
 async def persist_ab_hold_degraded_flag(

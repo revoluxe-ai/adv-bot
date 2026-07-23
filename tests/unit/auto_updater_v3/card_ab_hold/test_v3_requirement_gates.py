@@ -93,7 +93,7 @@ def test_enable_handler_runs_v3_gate_before_pending_and_enter_write() -> None:
 
     src = inspect.getsource(handlers._handle_ab_hold_enable)
     gate_at = src.find("can_enable_card_ab_hold_on_version")
-    pending_write_at = src.find("PENDING_SETUP.value")
+    pending_write_at = src.find("start_epoch_on_enable")
     enter_write_at = src.find("set_signal")
     assert gate_at != -1
     assert pending_write_at != -1 and gate_at < pending_write_at

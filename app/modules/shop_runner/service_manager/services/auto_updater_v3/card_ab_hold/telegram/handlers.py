@@ -46,6 +46,12 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     build_ab_hold_views_unavailable_message,
     evaluate_ab_hold_launch_view_volume,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_lifecycle import (
+    clear_epoch_fields_values,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
+    start_epoch_on_enable,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold,
     can_enable_card_ab_hold_on_version,
@@ -129,32 +135,40 @@ async def _edit_screen(
     text: str,
     adv_id: int,
     mode: CardAbHoldMode | str | None,
+    *,
+    alert_if_unavailable: bool = True,
 ) -> bool:
     """Отправить экран A/B Hold отдельным сообщением.
 
     Owner decision для hotfix: исходное callback-сообщение не редактируем
     (ни ``edit_text``, ни ``edit_caption``), чтобы не падать на media/unsupported
     payloads. Возвращает ``True``, если экран успешно отправлен.
+
+    Args:
+        alert_if_unavailable: если False — не вызывать ``query.answer`` при skip
+            (caller уже ответил toast/alert; иначе второй answer перетирает UX).
     """
     msg = query.message
     if msg is None:
         logger.warning(
             "CardAbHold screen render skipped: callback message is unavailable"
         )
-        await query.answer(
-            "Не удалось открыть экран A/B Hold: сообщение недоступно.",
-            show_alert=True,
-        )
+        if alert_if_unavailable:
+            await query.answer(
+                "Не удалось открыть экран A/B Hold: сообщение недоступно.",
+                show_alert=True,
+            )
         return False
     if not isinstance(msg, Message):
         logger.warning(
             "CardAbHold screen render skipped: unsupported callback message type=%s",
             type(msg).__name__,
         )
-        await query.answer(
-            "Не удалось открыть экран A/B Hold: неподдерживаемый тип сообщения.",
-            show_alert=True,
-        )
+        if alert_if_unavailable:
+            await query.answer(
+                "Не удалось открыть экран A/B Hold: неподдерживаемый тип сообщения.",
+                show_alert=True,
+            )
         return False
 
     await msg.answer(text, reply_markup=_screen_keyboard(adv_id, mode))
@@ -275,7 +289,11 @@ async def _handle_ab_hold_enable(
             mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
             await query.answer(card_ab_hold_enable_noop_answer(adv), show_alert=True)
             await _edit_screen(
-                query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id, mode
+                query,
+                f"{_INSTRUCTION}\nСтатус: {mode.value}",
+                adv.id,
+                mode,
+                alert_if_unavailable=False,
             )
             logger.info(
                 "[adv_id=%s] CardAbHold Enable no-op (already %s)",
@@ -291,6 +309,7 @@ async def _handle_ab_hold_enable(
                 f"{_INSTRUCTION}\n{reason}",
                 adv.id,
                 CardAbHoldMode.OFF,
+                alert_if_unavailable=False,
             )
             logger.info(
                 "[adv_id=%s] CardAbHold Enable blocked: not V3 (automatic_version=%s)",
@@ -306,6 +325,7 @@ async def _handle_ab_hold_enable(
                 f"{_INSTRUCTION}\n{reason}",
                 adv.id,
                 CardAbHoldMode.OFF,
+                alert_if_unavailable=False,
             )
             logger.info(
                 "[adv_id=%s] CardAbHold Enable blocked: plan max CPO missing/≤0 "
@@ -326,6 +346,7 @@ async def _handle_ab_hold_enable(
                 f"{_INSTRUCTION}\n{blocked}",
                 adv.id,
                 CardAbHoldMode.OFF,
+                alert_if_unavailable=False,
             )
             return
         if not skip_view_volume_gate:
@@ -339,6 +360,7 @@ async def _handle_ab_hold_enable(
                     f"{_INSTRUCTION}\n{build_ab_hold_views_unavailable_message()}",
                     adv.id,
                     CardAbHoldMode.OFF,
+                    alert_if_unavailable=False,
                 )
                 logger.info(
                     "[adv_id=%s] CardAbHold Enable volume stats unavailable (CH)",
@@ -361,13 +383,26 @@ async def _handle_ab_hold_enable(
                     total_views,
                 )
                 return
-        adv.card_ab_hold_mode = CardAbHoldMode.PENDING_SETUP.value
-        await session.commit()
+        adv_setting_id = int(adv.id)
+        adv_id = int(adv.adv_id)
+        shop_id = getattr(adv, "shop_id", None)
+
+    await start_epoch_on_enable(
+        adv_setting_id,
+        adv_id=adv_id,
+        shop_id=shop_id,
+    )
+    async with sm() as session:
+        adv = await session.scalar(
+            select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+        )
+        if adv is None:
+            await query.answer("Кампания не найдена", show_alert=True)
+            return
         await CardAbHoldSignalRedisCache(adv).set_signal(
             CardAbHoldSignalSnapshot(signal=CardAbHoldSignalKind.ENTER)
         )
         abort = await CardAbHoldLastAbortRedisCache(adv).get_abort()
-        await session.refresh(adv)
         status = build_enter_poll_status_lines(
             mode=adv.card_ab_hold_mode,
             abort_safe=abort.safe if abort is not None else None,
@@ -381,6 +416,7 @@ async def _handle_ab_hold_enable(
             f"{_INSTRUCTION}\n{status}",
             adv.id,
             normalize_card_ab_hold_mode(adv.card_ab_hold_mode),
+            alert_if_unavailable=False,
         )
 
 
@@ -429,7 +465,11 @@ async def cancel_card_ab_hold_enable(
         )
         await query.answer("Включение отменено")
         await _edit_screen(
-            query, f"{_INSTRUCTION}\nСтатус: {mode.value}", adv.id, mode
+            query,
+            f"{_INSTRUCTION}\nСтатус: {mode.value}",
+            adv.id,
+            mode,
+            alert_if_unavailable=False,
         )
 
 
@@ -437,7 +477,11 @@ async def cancel_card_ab_hold_enable(
 async def disable_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldDisable
 ) -> None:
-    """EXIT: OFF + clear allowed-set snapshot + cleanup signal (spec §8, без keyword restore)."""
+    """EXIT: OFF + clear allowed-set snapshot + epoch fields + cleanup signal.
+
+    Spec §8 / §22.5: без keyword restore; epoch phase/timer/intent/confirmed
+    сбрасываются в той же PG-транзакции, что и mode→OFF.
+    """
     async with sm() as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
@@ -447,6 +491,8 @@ async def disable_card_ab_hold(
             return
         adv.card_ab_hold_mode = CardAbHoldMode.OFF.value
         adv.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
+        for field, value in clear_epoch_fields_values().items():
+            setattr(adv, field, value)
         await session.commit()
         cache = CardAbHoldSignalRedisCache(adv)
         await cache.clear()
@@ -458,7 +504,11 @@ async def disable_card_ab_hold(
         )
         await query.answer("Режим A/B выключен")
         await _edit_screen(
-            query, f"{_INSTRUCTION}\nСтатус: off", adv.id, CardAbHoldMode.OFF
+            query,
+            f"{_INSTRUCTION}\nСтатус: off",
+            adv.id,
+            CardAbHoldMode.OFF,
+            alert_if_unavailable=False,
         )
 
 

@@ -7,8 +7,11 @@ Spec: ``card-ab-hold-mode``. Paid automation path для стабильного 
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
+    CardAbHoldPhase,
     is_ab_hold_structural_freeze,
+    is_epoch_managed_ab_hold,
     normalize_card_ab_hold_mode,
+    normalize_card_ab_hold_phase,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
     can_apply_card_ab_hold_mode_via_excel,
@@ -35,6 +38,7 @@ __all__ = [
     "AB_HOLD_MIN_VIEWS",
     "AbHoldSetupAction",
     "CardAbHoldMode",
+    "CardAbHoldPhase",
     "allows_ab_hold_enable_for_stats_state",
     "build_ab_hold_enable_blocked_by_stats_message",
     "can_apply_card_ab_hold_mode_via_excel",
@@ -43,7 +47,9 @@ __all__ = [
     "filter_bidder_eligible_by_ab_hold",
     "filter_structural_act_candidates",
     "is_ab_hold_structural_freeze",
+    "is_epoch_managed_ab_hold",
     "normalize_card_ab_hold_mode",
+    "normalize_card_ab_hold_phase",
     "should_allow_bidder_on_ab_hold",
     "should_allow_structural_act",
     "should_run_ab_hold",

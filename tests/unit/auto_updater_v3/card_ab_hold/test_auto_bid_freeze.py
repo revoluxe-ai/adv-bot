@@ -1,0 +1,145 @@
+"""Unit-тесты A/B Hold Auto bid freeze (spec §21 / decision epoch parameters)."""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from app.client_bot.user_interface.handlers.change_auto_bid import (
+    open_change_auto_bid,
+    set_auto_bid,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.auto_bid_freeze import (
+    AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG,
+    is_ab_hold_auto_bid_manual_blocked,
+    should_freeze_auto_bid_mutations,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    CardAbHoldMode,
+)
+
+_HANDLER = "app.client_bot.user_interface.handlers.change_auto_bid"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        (CardAbHoldMode.OFF, False),
+        ("off", False),
+        (CardAbHoldMode.PENDING_SETUP, False),
+        ("pending_setup", False),
+        (CardAbHoldMode.ACTIVE, True),
+        ("active", True),
+        (None, False),
+    ],
+)
+def test_should_freeze_auto_bid_mutations_active_only(
+    mode: CardAbHoldMode | str | None,
+    expected: bool,
+) -> None:
+    """Ordinary Auto bid freeze только при ACTIVE (не PENDING_SETUP)."""
+    assert should_freeze_auto_bid_mutations(mode) is expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        (CardAbHoldMode.OFF, False),
+        (CardAbHoldMode.PENDING_SETUP, True),
+        (CardAbHoldMode.ACTIVE, True),
+    ],
+)
+def test_is_ab_hold_auto_bid_manual_blocked_structural_freeze(
+    mode: CardAbHoldMode,
+    expected: bool,
+) -> None:
+    """Ручной change_auto_bid blocked в PENDING_SETUP и ACTIVE."""
+    assert is_ab_hold_auto_bid_manual_blocked(mode) is expected
+
+
+def _adv_setting(*, mode: str, adv_id: int = 501) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=1,
+        adv_id=adv_id,
+        nmids=[10],
+        cpm=900,
+        card_ab_hold_mode=mode,
+        wb_cabinet=SimpleNamespace(shop_id="shop-1"),
+    )
+
+
+def _session_with_adv(adv: SimpleNamespace) -> AsyncMock:
+    session = AsyncMock()
+    session.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=adv))
+    )
+    return session
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["pending_setup", "active"])
+async def test_open_change_auto_bid_blocked_on_ab_hold(mode: str) -> None:
+    """open_change_auto_bid → explain и без FSM/min_bids при freeze."""
+    adv = _adv_setting(mode=mode)
+    session = _session_with_adv(adv)
+    mock_sm = MagicMock()
+    mock_sm.return_value.__aenter__ = AsyncMock(return_value=session)
+    mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    callback = SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=42)),
+        from_user=SimpleNamespace(id=7),
+        bot=AsyncMock(),
+    )
+    callback_data = SimpleNamespace(adv_original_id=1, action="open")
+    state = AsyncMock()
+
+    with patch(f"{_HANDLER}.sm", mock_sm):
+        await open_change_auto_bid(callback, callback_data, state)
+
+    callback.bot.send_message.assert_awaited_once_with(
+        42, AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG
+    )
+    state.set_state.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_auto_bid_blocked_on_ab_hold_active() -> None:
+    """set_auto_bid → без WB write при ACTIVE hold."""
+    adv = _adv_setting(mode="active")
+    session = _session_with_adv(adv)
+    mock_sm = MagicMock()
+    mock_sm.return_value.__aenter__ = AsyncMock(return_value=session)
+    mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    message = SimpleNamespace(
+        chat=SimpleNamespace(id=42),
+        text="500",
+        from_user=SimpleNamespace(id=7),
+        bot=AsyncMock(),
+    )
+    state = AsyncMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "effective_min": 150,
+            "adv_original_id": 1,
+            "auto_adv_id": 501,
+            "nmids": [10],
+        }
+    )
+
+    with patch(f"{_HANDLER}.sm", mock_sm), patch(
+        f"{_HANDLER}.DIManager.create", AsyncMock()
+    ):
+        await set_auto_bid(message, state)
+
+    message.bot.send_message.assert_awaited_once_with(
+        42, AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG
+    )
+    state.clear.assert_awaited_once()

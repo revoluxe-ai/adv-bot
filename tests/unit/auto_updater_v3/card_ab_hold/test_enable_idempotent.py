@@ -53,13 +53,12 @@ def test_enable_noop_answers_distinguish_active_and_pending() -> None:
 
 @pytest.mark.unit
 def test_enable_handler_checks_noop_before_enter_writes() -> None:
-    """11.2 wiring: no-op gate до setattr PENDING / Redis ENTER / stats continue path."""
+    """11.2 wiring: no-op gate до start_epoch_on_enable / Redis ENTER."""
     src = inspect.getsource(handlers._handle_ab_hold_enable)
     assert "is_card_ab_hold_enable_noop" in src
-    assert src.index("is_card_ab_hold_enable_noop") < src.index(
-        "card_ab_hold_mode = CardAbHoldMode.PENDING_SETUP"
-    )
-    assert src.index("is_card_ab_hold_enable_noop") < src.index("set_signal")
+    assert src.index("is_card_ab_hold_enable_noop") < src.index("start_epoch_on_enable")
+    assert src.index("start_epoch_on_enable") < src.index("set_signal")
+    assert "card_ab_hold_phase =" not in src
 
 
 @pytest.mark.unit
@@ -148,3 +147,81 @@ async def test_enable_pending_does_not_rewrite_enter_signal() -> None:
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
     assert "подготовка" in query.answer.await_args.args[0].lower()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enable_success_calls_start_epoch_on_enable_not_manual_phase() -> None:
+    """ENTER после gates вызывает ``start_epoch_on_enable``; phase не setattr в handler."""
+    adv = SimpleNamespace(
+        id=9,
+        adv_id=99,
+        shop_id=1,
+        bot_active=True,
+        automatic_version=3,
+        max_price_for_order=100.0,
+        card_ab_hold_mode=CardAbHoldMode.OFF.value,
+        card_ab_hold_degraded=False,
+    )
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=adv)
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+
+    refreshed = SimpleNamespace(
+        id=9,
+        adv_id=99,
+        bot_active=True,
+        card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
+        card_ab_hold_degraded=False,
+    )
+    refresh_session = MagicMock()
+    refresh_session.scalar = AsyncMock(return_value=refreshed)
+    refresh_cm = MagicMock()
+    refresh_cm.__aenter__ = AsyncMock(return_value=refresh_session)
+    refresh_cm.__aexit__ = AsyncMock(return_value=None)
+
+    query = MagicMock()
+    query.answer = AsyncMock()
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    callback = CardAbHoldEnable(adv_setting_original_id=9)
+
+    start_epoch = AsyncMock(return_value=True)
+    set_signal = AsyncMock()
+
+    with (
+        patch.object(handlers, "sm", side_effect=[session_cm, refresh_cm]),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
+        patch.object(
+            handlers,
+            "evaluate_ab_hold_enable_stats",
+            new_callable=AsyncMock,
+            return_value=(True, None),
+        ),
+        patch.object(
+            handlers,
+            "evaluate_ab_hold_launch_view_volume",
+            new_callable=AsyncMock,
+        ) as eval_volume,
+        patch.object(
+            handlers,
+            "CardAbHoldSignalRedisCache",
+            return_value=MagicMock(set_signal=set_signal),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldLastAbortRedisCache",
+            return_value=MagicMock(get_abort=AsyncMock(return_value=None)),
+        ),
+        patch.object(handlers, "_edit_screen", new_callable=AsyncMock),
+    ):
+        eval_volume.return_value.is_unavailable = False
+        eval_volume.return_value.is_sufficient = True
+        await handlers.enable_card_ab_hold(query, callback)
+
+    start_epoch.assert_awaited_once_with(9, adv_id=99, shop_id=1)
+    set_signal.assert_awaited_once()
+    assert start_epoch.await_args.kwargs["adv_id"] == 99

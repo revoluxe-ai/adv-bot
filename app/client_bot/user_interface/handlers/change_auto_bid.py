@@ -12,6 +12,10 @@ from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.mp.wb.api.excs import ApiForbiddenError
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.auto_bid_freeze import (
+    AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG,
+    is_ab_hold_auto_bid_manual_blocked,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -68,6 +72,10 @@ async def open_change_auto_bid(
 
     if not adv_setting:
         await callback.bot.send_message(chat_id, "Рекламная кампания не найдена.")
+        return
+
+    if is_ab_hold_auto_bid_manual_blocked(adv_setting.card_ab_hold_mode):
+        await callback.bot.send_message(chat_id, AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG)
         return
 
     if not adv_setting.adv_id:
@@ -197,6 +205,11 @@ async def set_auto_bid(message: types.Message, state: FSMContext):
 
     if not adv_setting:
         await message.bot.send_message(chat_id, "Рекламная кампания не найдена.")
+        await state.clear()
+        return
+
+    if is_ab_hold_auto_bid_manual_blocked(adv_setting.card_ab_hold_mode):
+        await message.bot.send_message(chat_id, AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG)
         await state.clear()
         return
 
