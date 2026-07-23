@@ -38,32 +38,6 @@ The system MUST provide a dedicated A/B Hold screen with instruction text, a con
 - **AND** the Enable control MAY be hidden
 - **AND** if Enable is shown, pressing it does not demote mode or re-signal ENTER
 
-### Requirement: ENTER setup classifies keywords by pay_for_order and views
-When A/B Hold is enabled, the system MUST run a one-time setup that classifies keywords against the campaign plan max CPO (not resolve) and weekly keyword views from the same statistics source as the keyword card.
-
-#### Scenario: Keyword passes setup
-- **GIVEN** paid bot management is active
-- **AND** a keyword has pay_for_order less than or equal to plan max CPO
-- **AND** that keyword has at least 100 views in the weekly keyword-card statistics window
-- **WHEN** A/B Hold enter setup runs
-- **THEN** the keyword remains active for the held profile
-- **AND** the keyword target place is set to the keyword's current actual place
-
-#### Scenario: Keyword fails on expensive pay_for_order
-- **GIVEN** a keyword has pay_for_order greater than plan max CPO
-- **WHEN** A/B Hold enter setup runs
-- **THEN** the keyword is turned OFF for the held profile
-
-#### Scenario: Keyword fails on insufficient views
-- **GIVEN** a keyword has fewer than 100 views in the weekly keyword-card statistics window
-- **WHEN** A/B Hold enter setup runs
-- **THEN** the keyword is turned OFF for the held profile
-
-#### Scenario: Keyword fails when pay_for_order is missing
-- **GIVEN** a keyword has no pay_for_order value
-- **WHEN** A/B Hold enter setup runs
-- **THEN** the keyword is turned OFF for the held profile
-
 ### Requirement: HOLD freezes target places and keeps bidder running
 While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming, keyword enable/rollout growth, or ordinary minus-phrase recalculation. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF. "Keeping the bidder running" means the bidder path MUST remain eligible during hold and the freeze MUST NOT be implemented by stopping the bidder or the whole campaign; it does NOT forbid the orthogonal campaign activity-control watchdog (ordinary auto-budget / schedule start-pause) from starting or pausing the campaign for reversible operational reasons (daily budget/spend limit, cabinet balance, time schedule, rec_system mode), because those actions do not change the frozen allowed-set, target places, whitelist, keyword enable, or minus set.
 
@@ -363,15 +337,6 @@ While a campaign is in PENDING_SETUP it is excluded from ordinary structural aut
 - **THEN** the campaign mode becomes `OFF`
 - **AND** ordinary automation is eligible again for that campaign
 
-### Requirement: ACTIVE without ENTER setup snapshot is forbidden
-The system MUST NOT transition a campaign to ACTIVE A/B Hold except via successful `process_ab_setup` / setup apply that includes allowed-set capture and PostgreSQL snapshot persistence (decision §8). Direct writes of `active` (including Excel or other non-setup paths) MUST NOT create a held campaign.
-
-#### Scenario: Non-setup ACTIVE write is rejected or ignored
-- **GIVEN** a write path other than A/B Hold ENTER setup attempts to set mode to active
-- **WHEN** that write is processed
-- **THEN** the campaign does not become ACTIVE without the ENTER allowed-set snapshot
-- **AND** hold enforcement does not treat an empty/missing allowed-set snapshot as a successful freeze
-
 ### Requirement: A/B Hold requires the V3 auto-updater and is mutually exclusive with V2
 A/B Hold is a V3 auto-updater feature. The system MUST allow enabling A/B Hold only for a campaign whose auto-updater version is V3. When the user attempts to enable A/B Hold from the paid Telegram UI for a campaign that is not on V3, the system MUST NOT transition the mode toward `PENDING_SETUP`: the mode MUST remain `OFF` and the user MUST see that A/B Hold requires the V3 auto-updater. While a campaign is `PENDING_SETUP` or `ACTIVE`, the system MUST NOT switch its auto-updater version to V2; switching to V2 MUST be blocked until A/B Hold is disabled (EXIT → `OFF`). Because A/B Hold runs only on V3 campaigns, the V2-era campaign strategy objective auto-switch (MIN_CPO ↔ MAX_CONV) is out of A/B Hold scope: it MUST NOT change the held V3 campaign's frozen keyword bidding profile, and no separate A/B Hold freeze gate is added on that V2 strategy path.
 
@@ -428,3 +393,305 @@ The shared campaign-defaults application path — the "Применить деф
 - **WHEN** the user triggers "apply defaults"
 - **THEN** the campaign defaults are applied as usual
 - **AND** the A/B Hold mode remains `OFF`
+
+### Requirement: Explicit keyword-set confirmation starts a durable WARM_UP stage
+Confirming A/B Hold participation MUST require the user to explicitly confirm the campaign's keyword set before any target place is proposed or fixed. That confirmation MUST start a durable pre-epoch WARM_UP stage. Manually changing the confirmed keyword set while WARM_UP is running MUST end the running WARM_UP timer and MUST start a new WARM_UP timer for the changed set; the elapsed time of the previous timer MUST NOT carry over.
+
+#### Scenario: Keyword-set confirmation starts WARM_UP
+- **GIVEN** a campaign has paid bot management active and passes the existing enable gates (freshness, V3-only, plan max CPO, launch-volume soft-gate)
+- **WHEN** the user explicitly confirms the campaign's keyword set for A/B Hold
+- **THEN** the campaign enters the WARM_UP stage
+- **AND** no target place is proposed or fixed yet
+
+#### Scenario: Manual keyword-set change during WARM_UP restarts the timer
+- **GIVEN** a campaign is in the WARM_UP stage with a running warm-up timer
+- **WHEN** the user manually changes the confirmed keyword set
+- **THEN** the running warm-up timer ends without completing
+- **AND** a new warm-up timer starts for the changed keyword set
+- **AND** elapsed time from the previous timer is not carried over
+
+### Requirement: WARM_UP duration defaults to 24 hours and MUST NOT be reduced below 24 hours
+The WARM_UP stage MUST have a default duration of 24 hours and a minimum duration of 24 hours. The user MAY increase the WARM_UP duration for a campaign. The system MUST NOT allow the user to configure a WARM_UP duration shorter than 24 hours, and the system MUST NOT itself shorten an in-progress WARM_UP below 24 hours from its start.
+
+#### Scenario: Default WARM_UP duration is 24 hours
+- **GIVEN** the user starts WARM_UP without changing the duration
+- **WHEN** the WARM_UP stage begins
+- **THEN** the WARM_UP duration is 24 hours
+
+#### Scenario: User increases WARM_UP duration
+- **GIVEN** the user starts WARM_UP
+- **WHEN** the user sets a WARM_UP duration longer than 24 hours
+- **THEN** the WARM_UP stage uses the longer, user-chosen duration
+
+#### Scenario: User cannot reduce WARM_UP below 24 hours
+- **GIVEN** the user is configuring the WARM_UP duration
+- **WHEN** the user attempts to set a duration shorter than 24 hours
+- **THEN** the system rejects the shorter duration
+- **AND** the WARM_UP duration remains at least 24 hours
+
+### Requirement: WARM_UP freezes automatic keyword growth while allowing safety exclusion
+While a campaign is in the WARM_UP stage, the system MUST NOT automatically add new keywords to the confirmed keyword set and MUST NOT automatically return a keyword that was excluded. The system MAY still exclude a keyword during WARM_UP for safety reasons unrelated to experiment growth (for example, overspend protection relative to plan max CPO). WARM_UP MUST NOT fix a target place for any keyword; target place fixation happens only after WARM_UP through the separate target-place confirmation requirement below. The existing keyword-level view threshold (at least 100 views in the weekly keyword-card statistics window) and the existing campaign-level launch-volume threshold used at enable time keep their existing semantics as eligibility/soft-gate conditions and are NOT the WARM_UP duration.
+
+#### Scenario: No automatic keyword addition during WARM_UP
+- **GIVEN** a campaign is in the WARM_UP stage
+- **WHEN** ordinary automation would otherwise add a new keyword to the campaign
+- **THEN** that keyword is not added to the confirmed keyword set during WARM_UP
+
+#### Scenario: No automatic return of an excluded keyword during WARM_UP
+- **GIVEN** a keyword was excluded from the confirmed keyword set before or during WARM_UP
+- **WHEN** ordinary automation would otherwise return that keyword
+- **THEN** the keyword is not automatically returned during WARM_UP
+
+#### Scenario: Safety exclusion remains allowed during WARM_UP
+- **GIVEN** a campaign is in the WARM_UP stage
+- **AND** a keyword triggers an overspend-protection condition relative to plan max CPO
+- **WHEN** the safety exclusion check runs
+- **THEN** that keyword MAY be excluded during WARM_UP for that safety reason
+
+#### Scenario: Target place is not fixed during WARM_UP
+- **GIVEN** a campaign is in the WARM_UP stage
+- **WHEN** the WARM_UP stage is in progress
+- **THEN** no keyword target place is fixed as a confirmed epoch parameter
+
+### Requirement: After WARM_UP the system displays factual position and proposed target place as separate fields
+Once WARM_UP completes, for each keyword in the confirmed keyword set the system MUST display the keyword's factual current position and, separately, a proposed target place computed by `ab_hold_target_place_from_keyword(position)` from that factual position. Factual position and target place are separate semantic fields and MUST be displayed and tracked separately, even where their numeric values coincide after rounding or clamping. The system MUST NOT merge factual position and target place into a single displayed or stored value.
+
+#### Scenario: Post-warm-up display shows factual position and proposed target place separately
+- **GIVEN** WARM_UP has completed for a campaign's confirmed keyword set
+- **WHEN** the user views the post-warm-up screen for a keyword
+- **THEN** the keyword's factual current position is shown
+- **AND** a proposed target place computed from that factual position is shown as a separate field
+- **AND** the two fields are not merged into one value
+
+#### Scenario: Numeric coincidence does not merge the fields
+- **GIVEN** a keyword's factual position and its proposed target place happen to be numerically equal after rounding or clamping
+- **WHEN** the post-warm-up screen displays the keyword
+- **THEN** factual position and target place are still presented as two distinct fields
+
+### Requirement: Target place requires explicit confirmation and becomes immutable for the epoch
+Fixing a keyword's target place as a confirmed epoch parameter MUST require an explicit user confirmation of the proposed target place shown after WARM_UP. Once confirmed, the target place MUST become durable and MUST remain immutable for the current epoch: neither a later ENTER/setup tick nor a retry of activation MUST recalculate it. Ordinary drift of the keyword's factual position after confirmation MUST NOT reopen the confirmation and MUST NOT trigger recalculation of the confirmed target place for that epoch. Changing a confirmed target place is possible only by starting a new epoch (for example after EXIT and a new ENTER, or after a keyword-set change that restarts WARM_UP and the full confirmation sequence).
+
+#### Scenario: User confirms a proposed target place
+- **GIVEN** the post-warm-up screen shows a proposed target place for a keyword
+- **WHEN** the user explicitly confirms that target place
+- **THEN** the target place becomes a durable confirmed parameter of the current epoch
+
+#### Scenario: Confirmed target place is not recalculated on a later setup tick or retry
+- **GIVEN** a keyword has a confirmed target place for the current epoch
+- **WHEN** a later A/B Hold setup tick or an activation retry runs for that epoch
+- **THEN** the confirmed target place is not recalculated or overwritten
+
+#### Scenario: Ordinary position drift after confirmation does not reopen confirmation
+- **GIVEN** a keyword has a confirmed target place for the current epoch
+- **AND** the keyword's factual position later drifts away from that confirmed target place
+- **WHEN** the system observes the drifted factual position
+- **THEN** the confirmation is not reopened
+- **AND** the confirmed target place for that epoch is not recalculated
+
+### Requirement: Keyword bidder only holds confirmed target places
+While a campaign is holding an active A/B Hold epoch, the keyword bidder MUST direct bids only toward the confirmed target places of that epoch. The bidder MUST NOT add a keyword to the confirmed keyword set, MUST NOT return an excluded keyword, and MUST NOT change a confirmed target place.
+
+#### Scenario: Bidder targets the confirmed target place
+- **GIVEN** a campaign is in an active A/B Hold epoch with confirmed target places
+- **WHEN** the bidder updates bids during hold
+- **THEN** bids are directed toward the confirmed target places
+- **AND** the bidder does not add, return, or retarget any keyword outside those confirmed target places
+
+### Requirement: Auto participation requires a separate explicit confirmation
+Whether the campaign's Auto (automatic) advertising participates in the current A/B Hold epoch MUST be confirmed by a separate explicit user action, distinct from confirming the Search keyword set or Search target places. Confirming the Search keyword set MUST NOT be treated as implying Auto participation confirmation, and confirming Auto participation MUST NOT be treated as implying Search confirmation.
+
+#### Scenario: Auto participation is confirmed independently of Search
+- **GIVEN** the user has confirmed the Search keyword set for the epoch
+- **WHEN** the user is asked to confirm Auto participation
+- **THEN** a separate explicit confirmation action is required
+- **AND** the Search keyword-set confirmation alone does not confirm Auto participation
+
+### Requirement: Auto bid requires a separate explicit confirmation and is frozen while ACTIVE
+The Auto bid value for the current epoch MUST be confirmed by a separate explicit user action, distinct from the Auto participation confirmation and from any Search confirmation. Once the campaign is in an active A/B Hold epoch, ordinary Auto bid auto-update mutators MUST NOT change the confirmed Auto bid.
+
+#### Scenario: Auto bid is confirmed independently of Auto participation
+- **GIVEN** the user has confirmed Auto participation for the epoch
+- **WHEN** the user is asked to confirm the Auto bid for the epoch
+- **THEN** a separate explicit confirmation action is required for the Auto bid value
+
+#### Scenario: Ordinary Auto bid auto-update does not change the confirmed bid while ACTIVE
+- **GIVEN** a campaign is in an active A/B Hold epoch with a confirmed Auto bid
+- **WHEN** ordinary Auto bid auto-update would otherwise change the bid
+- **THEN** the confirmed Auto bid for that epoch is not changed by that ordinary auto-update path
+
+### Requirement: Activation requires a durable PENDING intent recorded before any WB mutation
+After the keyword set, target places, Auto participation, and Auto bid are all confirmed for an epoch, the system MUST persist a durable PENDING activation intent (the confirmed parameters together with an epoch identifier) before performing any Wildberries write for that epoch. The system MUST NOT perform a Wildberries mutation of the confirmed parameters based on an intent that has not yet been durably recorded.
+
+#### Scenario: PENDING intent is recorded before any WB write
+- **GIVEN** all confirmations (keyword set, target places, Auto participation, Auto bid) are complete for an epoch
+- **WHEN** the system prepares to synchronize Wildberries for that epoch
+- **THEN** a durable PENDING activation intent is recorded first
+- **AND** the first Wildberries write for that epoch happens only after that durable record exists
+
+### Requirement: Partial Wildberries synchronization is recoverable and keeps the campaign non-ACTIVE
+If Wildberries synchronization for an epoch's confirmed parameters completes only partially, the campaign MUST remain in a non-ACTIVE state with the same durable PENDING intent and the same epoch identifier preserved. The campaign MUST NOT be presented as an active, ready-to-test A/B Hold epoch while synchronization for that epoch is incomplete.
+
+#### Scenario: Partial sync leaves the campaign non-ACTIVE with the same intent preserved
+- **GIVEN** Wildberries synchronization for an epoch was attempted and only partially completed
+- **WHEN** the system evaluates the campaign's A/B Hold status
+- **THEN** the campaign is not treated as an active, ready-to-test A/B Hold epoch
+- **AND** the durable PENDING intent and epoch identifier from that attempt are preserved
+
+### Requirement: Retry reuses the same epoch and confirmed parameters without recalculation
+When the system retries Wildberries synchronization after an incomplete attempt, the retry MUST reuse the same epoch identifier and the same confirmed parameters (keyword set, target places, Auto participation, Auto bid) recorded in the durable PENDING intent. The retry MUST NOT recalculate target places, MUST NOT recalculate or re-request confirmation of the Auto bid, and MUST NOT start a new epoch. A new epoch is created only through a new full confirmation sequence (for example after EXIT and a new ENTER, or after a keyword-set change that restarts WARM_UP).
+
+#### Scenario: Retry reuses the same epoch without recalculating confirmed parameters
+- **GIVEN** a Wildberries synchronization attempt for an epoch was incomplete
+- **WHEN** the system retries synchronization for that epoch
+- **THEN** the retry uses the same epoch identifier and the same confirmed keyword set, target places, Auto participation, and Auto bid
+- **AND** no target place or Auto bid is recalculated as part of the retry
+- **AND** no new epoch is started by the retry
+
+### Requirement: Stale or missing statistics freeze keyword and bid mutations without stopping the campaign
+While a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch, if the campaign or a keyword has stale or missing statistics, the system MUST NOT make a keyword inclusion/exclusion decision and MUST NOT make a Search or Auto bid mutation based on that stale or missing data; both classes of decision MUST freeze for the affected keyword or campaign until fresh statistics are available. Stale or missing statistics alone MUST NOT be a reason to stop the campaign; freezing inclusion/exclusion and bid mutation decisions is distinct from, and MUST NOT be treated as equivalent to, stopping the campaign.
+
+#### Scenario: Stale statistics freeze keyword inclusion/exclusion decisions
+- **GIVEN** a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch
+- **AND** a keyword's statistics are stale or missing
+- **WHEN** an inclusion or exclusion decision for that keyword would otherwise run
+- **THEN** that decision is frozen for the affected keyword until fresh statistics are available
+
+#### Scenario: Stale statistics freeze Search and Auto bid mutations
+- **GIVEN** a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch
+- **AND** the campaign's statistics are stale or missing
+- **WHEN** a Search or Auto bid mutation would otherwise run
+- **THEN** that mutation is frozen for the affected campaign until fresh statistics are available
+
+#### Scenario: Stale statistics alone do not stop the campaign
+- **GIVEN** a campaign has stale or missing statistics during WARM_UP, awaiting confirmation, or an active A/B Hold epoch
+- **WHEN** the system evaluates the campaign's operational state
+- **THEN** the campaign is not stopped solely because of the stale or missing statistics
+
+### Requirement: Daily budget control remains a reused stop-threshold, not a new financial-safety mechanism
+A/B Hold MUST reuse the existing daily budget / campaign activity-control behavior as-is: it is a stop threshold, not a hard cap, and spend MAY overshoot that threshold because of statistics reporting delay, worker cadence, in-flight spend, concurrent write paths, and top-up not clipped to remaining daily room; there is no guaranteed numeric upper bound on that overshoot. The daily budget resets each day, and spend MAY resume the next day after the reset. A/B Hold MUST NOT introduce an absolute test budget, an epoch spend cap, a velocity cap, a generic financial safety latch, a new emergency-stop subsystem, or global refill/restart suppression as part of this capability.
+
+#### Scenario: Spend may exceed the daily stop threshold
+- **GIVEN** a campaign is in an active A/B Hold epoch under the existing daily budget control
+- **WHEN** spend approaches the daily stop threshold
+- **THEN** spend MAY exceed that threshold before the campaign stops for the day
+- **AND** the system does not guarantee a numeric upper bound on that overshoot
+
+#### Scenario: Spend resumes after the daily reset
+- **GIVEN** a campaign stopped for the day under the daily budget control while in an active A/B Hold epoch
+- **WHEN** the daily budget resets
+- **THEN** spend MAY resume the next day
+- **AND** this resumption is not a violation of the A/B Hold epoch's frozen parameters
+
+#### Scenario: No new financial-safety mechanism is introduced
+- **GIVEN** a campaign is in an active A/B Hold epoch
+- **WHEN** daily budget control is evaluated for that campaign
+- **THEN** no absolute test budget, epoch spend cap, velocity cap, financial safety latch, emergency-stop subsystem, or global refill/restart suppression is applied as part of A/B Hold
+
+### Requirement: Confirmation screens paginate keyword lists at a fixed page size
+Any A/B Hold confirmation screen that lists keywords (for example the post-warm-up factual-position/target-place display or the confirmed keyword-set review) MUST paginate that list with a page size of 10 keywords per page.
+
+#### Scenario: Keyword list is paginated at 10 per page
+- **GIVEN** a confirmation screen lists more than 10 keywords
+- **WHEN** the user views the list
+- **THEN** the screen shows at most 10 keywords per page
+- **AND** the user can navigate to additional pages to see the remaining keywords
+
+### Requirement: Back preserves the confirmation draft; Cancel is a separate explicit action
+During the A/B Hold confirmation sequence (keyword-set confirm, post-warm-up target-place confirm, Auto participation confirm, Auto bid confirm), a Back control MUST preserve the user's in-progress draft for the current confirmation step so the user can return to it. Cancel MUST be a separate, explicitly distinct action from Back; choosing Cancel MUST discard the in-progress confirmation attempt rather than preserve it. The current `card_ab_hold` MVP-1 screen is not the reference for this confirmation sequence; the full screen-by-screen UX contract is defined separately.
+
+#### Scenario: Back preserves the in-progress draft
+- **GIVEN** the user is partway through a confirmation step with an in-progress draft
+- **WHEN** the user presses Back
+- **THEN** the in-progress draft for that step is preserved
+- **AND** the user can resume from where they left off
+
+#### Scenario: Cancel discards the confirmation attempt
+- **GIVEN** the user is partway through a confirmation step with an in-progress draft
+- **WHEN** the user chooses Cancel as a separate explicit action from Back
+- **THEN** the in-progress confirmation attempt is discarded
+- **AND** the draft is not preserved for that attempt
+
+### Requirement: Broad enablement is gated behind owner manual test, limited beta, and an explicit owner decision
+Rollout of the WARM_UP/confirmation/epoch flow MUST proceed through an owner manual test on the owner's own or test campaigns, then a limited opt-in beta with structured feedback collection from opted-in paid users, before broad enablement for all paid users. Broad enablement for all paid users MUST NOT proceed until the owner has explicitly accepted the sole open owner decision gating this rollout (OD-05).
+
+#### Scenario: Owner manual test precedes any beta rollout
+- **GIVEN** the WARM_UP/confirmation/epoch flow has been implemented
+- **WHEN** rollout begins
+- **THEN** the owner performs a manual test before any user is opted into a beta
+
+#### Scenario: Limited opt-in beta collects structured feedback before broad enablement
+- **GIVEN** the owner manual test has completed
+- **WHEN** the flow is made available to a limited set of opted-in paid users
+- **THEN** feedback from that beta is collected in a structured way
+- **AND** broad enablement is not performed solely because the beta started
+
+#### Scenario: Broad enablement is blocked until OD-05 is accepted
+- **GIVEN** the limited opt-in beta has produced feedback
+- **WHEN** broad enablement for all paid users is considered
+- **THEN** broad enablement does not proceed until the owner explicitly accepts OD-05
+
+### Requirement: A/B Hold epoch mutable-state boundaries have an explicit status
+The A/B Hold epoch introduces mutable state boundaries beyond the existing allowed-set/minus-phrase boundary already governed by this capability. Each of the following boundaries MUST have an explicit, spec-defined status: confirmed keyword set (frozen once confirmed; changing it during WARM_UP restarts WARM_UP; changing it after activation requires a new epoch), confirmed target places (frozen/immutable within the epoch after confirmation; not reopened by drift), Auto participation (confirmed, fixed for the epoch), Auto bid (confirmed, frozen from ordinary auto-update while ACTIVE), keyword inclusion/exclusion decisions under stale/missing statistics (frozen, not decided), Search/Auto bid mutations under stale/missing statistics (frozen, not decided), Wildberries write actions for the epoch (forbidden before the durable PENDING intent exists; allowed only for the recorded epoch's confirmed parameters), daily budget / campaign activity-control (explicitly out of scope for new freezing — the existing reused stop-threshold behavior continues unchanged, including its ability to pause/resume the campaign for operational reasons).
+
+#### Scenario: Every new epoch boundary has a defined status
+- **GIVEN** a reviewer inspects the A/B Hold epoch behavior for this capability
+- **WHEN** they check the status of confirmed keyword set, confirmed target places, Auto participation, Auto bid, keyword inclusion/exclusion under stale stats, Search/Auto bid mutation under stale stats, Wildberries write timing, and daily budget control
+- **THEN** each boundary has one of frozen, allowed, restored/enforced, or out-of-scope explicitly documented for it
+- **AND** none of these boundaries is left undocumented
+
+## MODIFIED Requirements
+
+### Requirement: ENTER setup classifies keywords by pay_for_order and views
+When A/B Hold is enabled, the system MUST run a one-time setup that classifies keywords against the campaign plan max CPO (not resolve) and weekly keyword views from the same statistics source as the keyword card. A keyword that passes this classification becomes eligible to enter the WARM_UP stage and, after WARM_UP, the target-place confirmation step; passing this classification MUST NOT by itself fix a target place. Target place fixation happens only through the separate WARM_UP and target-place confirmation requirements, not as part of this classification.
+
+#### Scenario: Keyword passes setup
+- **GIVEN** paid bot management is active
+- **AND** a keyword has pay_for_order less than or equal to plan max CPO
+- **AND** that keyword has at least 100 views in the weekly keyword-card statistics window
+- **WHEN** A/B Hold enter setup runs
+- **THEN** the keyword remains active for the held profile
+- **AND** the keyword becomes eligible for the WARM_UP stage and the post-warm-up target-place confirmation step
+- **AND** the keyword's target place is not fixed by this classification alone
+
+#### Scenario: Keyword fails on expensive pay_for_order
+- **GIVEN** a keyword has pay_for_order greater than plan max CPO
+- **WHEN** A/B Hold enter setup runs
+- **THEN** the keyword is turned OFF for the held profile
+
+#### Scenario: Keyword fails on insufficient views
+- **GIVEN** a keyword has fewer than 100 views in the weekly keyword-card statistics window
+- **WHEN** A/B Hold enter setup runs
+- **THEN** the keyword is turned OFF for the held profile
+
+#### Scenario: Keyword fails when pay_for_order is missing
+- **GIVEN** a keyword has no pay_for_order value
+- **WHEN** A/B Hold enter setup runs
+- **THEN** the keyword is turned OFF for the held profile
+
+### Requirement: ACTIVE without ENTER setup snapshot is forbidden
+The system MUST NOT transition a campaign to ACTIVE A/B Hold except via a completed epoch: successful `process_ab_setup` / setup apply that includes allowed-set capture and PostgreSQL snapshot persistence (decision §8), a completed WARM_UP of at least the configured duration (minimum 24 hours), explicit confirmation of target places, explicit confirmation of Auto participation, explicit confirmation of Auto bid, a durable PENDING activation intent recorded before any Wildberries mutation for that epoch, and a Wildberries synchronization for that epoch confirmed as fully successful (not partial). Direct writes of `active` (including Excel or other non-setup, non-epoch paths) MUST NOT create a held campaign. A retry of Wildberries synchronization for an already-recorded epoch MAY still lead to ACTIVE once that retry fully succeeds, without repeating the confirmation steps and without recalculating the confirmed parameters.
+
+#### Scenario: Non-setup ACTIVE write is rejected or ignored
+- **GIVEN** a write path other than A/B Hold ENTER setup attempts to set mode to active
+- **WHEN** that write is processed
+- **THEN** the campaign does not become ACTIVE without the ENTER allowed-set snapshot
+- **AND** hold enforcement does not treat an empty/missing allowed-set snapshot as a successful freeze
+
+#### Scenario: ACTIVE requires a completed WARM_UP and full confirmation sequence
+- **GIVEN** a campaign has an ENTER allowed-set snapshot but WARM_UP has not yet completed, or target places / Auto participation / Auto bid have not all been explicitly confirmed
+- **WHEN** the system evaluates whether the campaign may become ACTIVE
+- **THEN** the campaign does not become ACTIVE
+- **AND** the UI does not report that A/B tests may start
+
+#### Scenario: ACTIVE requires a fully successful, not partial, Wildberries synchronization
+- **GIVEN** all confirmations are complete and a durable PENDING intent exists for an epoch
+- **AND** the Wildberries synchronization for that epoch is only partially complete
+- **WHEN** the system evaluates whether the campaign may become ACTIVE
+- **THEN** the campaign does not become ACTIVE
+- **AND** the same durable PENDING intent and epoch identifier remain available for retry
+
+#### Scenario: A successful retry of the same epoch may reach ACTIVE without repeating confirmations
+- **GIVEN** a Wildberries synchronization retry for an already-recorded epoch completes fully and successfully
+- **WHEN** the system evaluates the campaign's A/B Hold status
+- **THEN** the campaign becomes ACTIVE for that epoch
+- **AND** the confirmation steps and confirmed parameters were not repeated or recalculated to reach that result

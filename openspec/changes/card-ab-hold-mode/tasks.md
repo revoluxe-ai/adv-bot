@@ -156,3 +156,75 @@
 - [x] 18.1 Tests-first: ручной Telegram input `target_place` при `PENDING_SETUP`/`ACTIVE` блокируется до write boundary, FSM очищается, пользователю показывается explanatory message; paired positive: при `OFF` manual write-path остаётся разрешён.
 - [x] 18.2 Реализация write boundary в handler manual target_place: загружает `AdvSetting`, проверяет structural-freeze guard до PG update/commit, blocked path не пишет `KeywordSetting.target_place`.
 - [x] 18.3 Regression test: `tests/unit/client_bot/test_keyword_target_place_ab_hold_guard.py`.
+
+> **Apply blocked (owner-approved expanded scope, `/opsx-update`, 2026-07-23).** Секции 19–25 ниже — новые, **не отмеченные** задачи, зафиксированные этим планирующим обновлением поверх применённого фундамента §1–§18. `/opsx:apply` для секций 19–25 **заблокирован до явной авторизации владельцем** (semantic SoT = owner-approved product requirements + CONTROL decisions, **не** `REQ-AB-HOLD-BUDGET-SAFETY-001`). Секции 19–24 могут применяться после авторизации в любом порядке, совместимом с зависимостями внутри секции; **широкое включение** (rollout beyond owner manual test / limited beta) заблокировано до принятия owner-decision **OD-05** (задача 25.3) — OD-05 остаётся единственным открытым owner decision этого обновления. Ни одна задача в 19–25 не должна быть отмечена `[x]` до реальной реализации и прохождения review checklist соответствующих decisions.
+
+## 19. WARM_UP: durable pre-epoch стадия (decision `ab-hold-epoch-lifecycle-and-generation-ownership`)
+
+- [ ] 19.1 Tests-first: явное подтверждение набора ключей запускает WARM_UP; default duration = 24ч; paired: пользователь увеличивает длительность → применяется; попытка уменьшить ниже 24ч → отклонена (и для новой, и для уже идущей эпохи).
+- [ ] 19.2 Tests-first: во время WARM_UP — нет авто-добавления новых ключей, нет авто-возврата исключённых; safety-исключение (overspend-guard) допускается и не блокируется WARM_UP-инвариантом; target place не фиксируется ни на одном тике WARM_UP.
+- [ ] 19.3 Tests-first: ручное изменение состава подтверждённого набора ключей во время WARM_UP завершает текущий таймер и запускает новый (полная длительность заново, остаток не переносится); paired: изменение набора после завершения WARM_UP (на confirm-шаге) обрабатывается отдельно (§20/§21), не как WARM_UP-reset.
+- [ ] 19.4 Tests-first: существующие пороги «≥100 показов/ключ» (eligibility) и «≥1000 показов кампании» (soft-gate объёма на enable, `AB_HOLD_MIN_TOTAL_VIEWS_24H`) не меняются и не трактуются как длительность WARM_UP; paired regression, доказывающий, что смена WARM_UP-длительности не влияет на эти пороги и наоборот.
+- [ ] 19.5 Реализация durable WARM_UP-таймера и его владения A/B Hold epoch/setup write-path (не ordinary preamble, не Telegram-хендлер как SoT); согласовать поле(я)/миграцию с §15 `card-ab-hold-write-path-ownership` и `ab-hold-epoch-lifecycle-and-generation-ownership`.
+- [ ] 19.6 RU-docstrings со ссылкой на spec requirements «Explicit keyword-set confirmation starts a durable WARM_UP stage», «WARM_UP duration defaults to 24 hours…», «WARM_UP freezes automatic keyword growth…» + decision `ab-hold-epoch-lifecycle-and-generation-ownership`; focused pytest + `pyright-strict` на затронутых путях.
+
+## 20. Факт-позиция vs target place: раздельное отображение и явный TP confirm (decision `ab-hold-confirmed-epoch-parameters-sot`)
+
+- [ ] 20.1 Tests-first: после WARM_UP экран/сообщение показывает по каждому ключу факт-позицию и отдельно предложенный target place через `ab_hold_target_place_from_keyword(position)`; поля не сливаются в одно значение даже при числовом совпадении после округления/clamping.
+- [ ] 20.2 Tests-first: подтверждение target place — явное действие пользователя; после подтверждения значение durable и immutable в пределах эпохи; ENTER/setup-тик и retry WB-синхронизации НЕ пересчитывают подтверждённый target place (paired: до подтверждения предложение может отличаться от итогового факта на момент показа — это ожидаемо).
+- [ ] 20.3 Tests-first (drift): обычный дрейф факт-позиции ключа после подтверждения НЕ переоткрывает подтверждение и НЕ запускает пересчёт confirmed target place для текущей эпохи.
+- [ ] 20.4 Tests-first: keyword bidder в ACTIVE — только holder подтверждённых target places; write-gate доказывает, что биддер не добавляет/не возвращает ключи и не изменяет target place самостоятельно.
+- [ ] 20.5 Реализация: чистая функция `ab_hold_target_place_from_keyword(position)` (реюз, если уже существует эквивалент; иначе — новая чистая функция без побочных эффектов) + durable хранение confirmed target place per эпоха, owner — A/B Hold confirmation write-path (не display-слой, не ordinary auto-updater).
+- [ ] 20.6 RU-docstrings со ссылкой на spec requirements «After WARM_UP the system displays factual position…», «Target place requires explicit confirmation…», «Keyword bidder only holds confirmed target places» + decision `ab-hold-confirmed-epoch-parameters-sot`; focused pytest + `pyright-strict`.
+
+## 21. Auto participation confirm + Auto bid confirm; заморозка Auto bid мутаторов в ACTIVE (decision `ab-hold-confirmed-epoch-parameters-sot`)
+
+- [ ] 21.1 Tests-first: подтверждение участия Auto — отдельное явное действие, не подразумеваемое подтверждением набора ключей Search; paired: подтверждение Auto participation не подразумевает подтверждение Search.
+- [ ] 21.2 Tests-first: подтверждение ставки Auto — отдельное явное действие, независимое от Auto participation confirm и от Search TP confirm.
+- [ ] 21.3 Tests-first: write-gate — в ACTIVE ordinary Auto bid auto-update MUST NOT изменять подтверждённую ставку Auto этой эпохи; paired positive при `OFF` / до подтверждения — ordinary Auto bid auto-update работает как обычно.
+- [ ] 21.4 Реализация раздельных confirm-шагов Auto participation / Auto bid + durable хранение confirmed-значений per эпоха; freeze-гард на ordinary Auto bid auto-update при ACTIVE (owner — тот же A/B Hold confirmation write-path).
+- [ ] 21.5 RU-docstrings со ссылкой на spec requirements «Auto participation requires a separate explicit confirmation», «Auto bid requires a separate explicit confirmation and is frozen while ACTIVE» + decision `ab-hold-confirmed-epoch-parameters-sot`; focused pytest + `pyright-strict`.
+
+## 22. Durable PENDING intent → WB sync → ACTIVE; partial-sync recovery; same-generation retry (decision `ab-hold-epoch-lifecycle-and-generation-ownership`)
+
+- [ ] 22.1 Tests-first: после завершения всех подтверждений (keyword set, TP, Auto participation, Auto bid) durable PENDING intent (параметры + generation) MUST быть записан в PostgreSQL **до** первой попытки WB-мутации этой эпохи; write-gate доказывает отсутствие WB-мутации при отсутствующем durable intent.
+- [ ] 22.2 Tests-first: partial/failed WB-синхронизация → кампания остаётся non-ACTIVE с сохранённым тем же generation и тем же durable intent; UI/статус не сообщает ready-to-test.
+- [ ] 22.3 Tests-first: retry WB-синхронизации переиспользует тот же generation и те же confirmed-параметры без пересчёта TP/Auto bid и без создания новой эпохи; paired: успешный retry переводит кампанию в ACTIVE без повторного прохождения confirm-шагов.
+- [ ] 22.4 Tests-first: новая эпоха/generation создаётся только через новый полный цикл подтверждений (новый ENTER после EXIT, либо перезапуск подтверждений после изменения набора ключей по §19.3); regression, доказывающий, что retry НЕ продвигает generation.
+- [ ] 22.5 Реализация durable epoch/generation-модели + порядка PENDING intent → WB sync → ACTIVE + retry-пути; owner — A/B Hold epoch/setup write-path (не ordinary preamble).
+- [ ] 22.6 RU-docstrings со ссылкой на spec requirements «Activation requires a durable PENDING intent…», «Partial Wildberries synchronization is recoverable…», «Retry reuses the same epoch…», «ACTIVE without ENTER setup snapshot is forbidden» (MODIFIED) + decision `ab-hold-epoch-lifecycle-and-generation-ownership`; focused pytest + `pyright-strict`.
+
+## 23. Stale/missing статистика: заморозка keyword inclusion/exclusion и Search/Auto bid-мутаций без остановки кампании (update — decision `card-ab-hold-write-path-ownership` §17)
+
+- [ ] 23.1 Tests-first: во время WARM_UP / ожидания подтверждения / ACTIVE при stale/missing статистике по ключу — решение о включении/исключении этого ключа замирает (не принимается на неизвестных данных); paired positive при fresh статистике — решение принимается как обычно.
+- [ ] 23.2 Tests-first: во время WARM_UP / ожидания подтверждения / ACTIVE при stale/missing статистике по кампании — мутации ставки Search и мутации ставки/участия Auto замирают; paired positive при fresh статистике.
+- [ ] 23.3 Tests-first (regression на устранение противоречия): stale/missing статистика **сама по себе** не останавливает кампанию — write-gate доказывает, что freeze мутаций и остановка кампании — разные, независимо проверяемые пути; кампания не помечается stopped только по причине freeze.
+- [ ] 23.4 Реализация freeze-гарда для keyword inclusion/exclusion и Search/Auto bid-мутаций на общем freshness-классе (реюз `_split_advs_by_stats_freshness`-подобной проверки, не дублировать §2a enable-gate); явно не трогать существующий campaign-stop / activity-control путь.
+- [ ] 23.5 RU-docstrings со ссылкой на spec requirements «Stale or missing statistics freeze keyword and bid mutations without stopping the campaign» + decision `card-ab-hold-write-path-ownership` §17; focused pytest + `pyright-strict`.
+
+## 24. Telegram confirmation UX (planning-level): пагинация 10, Back сохраняет черновик, Cancel — отдельное действие (update)
+
+> **UX planning status (этот `/opsx-continue`, 2026-07-23): DONE.** Полный UX-контракт и Telegram storyboard созданы: `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` (экраны S0/S1/S1b/S2/S3/W3-propose/W3-confirmed/A1/A2/P1/P2/H1, клавиатуры, callback/action-каталог, переходы, Back/Cancel resolution rule, pagination=10, fail-closed stale-callback protocol, error/read-only состояния, mapping на PENDING intent/WB sync/ACTIVE/partial-sync) и `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md` (сценарии по экранам с иллюстративными RU-текстами). Это планирующие документы (не implementation, не code, не миграции); они закрывают DEFERRED_TO_OPSX_CONTINUE из `proposal.md`/`design.md`. Задачи 24.1–24.5 ниже остаются **не отмеченными** — `/opsx:apply` конкретной реализации (пагинация в коде, FSM Back/Cancel, payload-limit тесты) по-прежнему заблокирован до owner-авторизации (см. блок «Apply blocked» перед §19) и выполняется по этому контракту, а не заменяется им.
+
+- [ ] 24.1 Tests-first: список ключей на confirm-экранах (после WARM_UP, обзор подтверждённого набора) пагинируется по 10 элементов на страницу; тест навигации между страницами.
+- [ ] 24.2 Tests-first: кнопка «Назад» сохраняет черновик текущего шага подтверждения (не отбрасывает прогресс); «Отмена» — отдельное явное действие, отличное от «Назад», отбрасывающее черновик текущей попытки.
+- [ ] 24.3 Реализация пагинации confirm-экранов (page size = 10) + различие Back/Cancel в FSM confirm-флоу по контракту `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` (§5–§9) и сценариям `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md`; existing `card_ab_hold` MVP-1 screen — не референс (новый confirm-флоу — отдельный набор экранов).
+- [ ] 24.4 Telegram payload-limit тесты (`openspec/policies/telegram_bot_api_limits.md`) для новых confirm-сообщений и callback_data (пагинация, Back/Cancel), worst-case динамические данные, UTF-8 byte length для `callback_data`.
+- [ ] 24.5 RU-docstrings со ссылкой на spec requirements «Confirmation screens paginate keyword lists at a fixed page size», «Back preserves the confirmation draft; Cancel is a separate explicit action»; focused pytest + `pyright-strict`.
+
+## 25. Раскатка: ручной тест владельца → лимитированная opt-in бета → OD-05 (update)
+
+- [ ] 25.1 Подготовить чек-лист ручного теста владельца (owner manual test) на собственных/тестовых кампаниях перед любым бета-доступом; зафиксировать критерии успеха/провала теста.
+- [ ] 25.2 Реализовать механизм ограниченного opt-in доступа (feature flag / allowlist кампаний или пользователей) для limited beta + структурированный сбор фидбэка (форма/канал обратной связи); тест на то, что beta-доступ не включается автоматически всем paid-пользователям.
+- [ ] 25.3 **Owner decision OD-05** — единственное открытое owner-решение этого обновления: широкое включение (broad enablement) для всех paid-пользователей MUST NOT происходить до явного принятия OD-05 владельцем; зафиксировать gate в коде (allowlist/flag) и в проверке readiness перед снятием ограничения.
+- [ ] 25.4 Tests-first: попытка широкого включения без принятого OD-05 → блокируется (regression, доказывающий гейт, а не только документацию).
+- [ ] 25.5 RU-docstrings со ссылкой на spec requirement «Broad enablement is gated behind owner manual test, limited beta, and an explicit owner decision»; focused pytest + `pyright-strict`.
+
+## Telegram UI / Message Safety (для секции 24)
+
+- [ ] Identify every changed Telegram payload surface для нового confirm-флоу (WARM_UP статус, факт/target place экран, Auto participation/bid confirm, пагинация, Back/Cancel).
+- [ ] Add/update tests with worst-case dynamic placeholder data (длинные названия ключей, максимальное число страниц, крайние числовые значения позиций/ставок).
+- [ ] Assert Telegram Bot API limits from `openspec/policies/telegram_bot_api_limits.md`.
+- [ ] Assert valid parse_mode / escaping.
+- [ ] Assert callback_data length in UTF-8 bytes (пагинация, Back/Cancel, confirm-кнопки).
+- [ ] Assert no raw technical text leaks to user (generation id, internal epoch identifiers, PG field names).

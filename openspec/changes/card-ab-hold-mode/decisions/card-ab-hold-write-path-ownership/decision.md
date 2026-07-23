@@ -43,6 +43,13 @@ A/B Hold — отдельный paid automation write-path с durable состо
     - **14b. Actionable non-ready status:** пока PENDING_SETUP, если setup не может прогрессировать по детерминированной причине, детектируемой только на setup-тике (например пустой allowed-set / нет non-BAD keyword-поверхности, либо max CPO пропал после enable), UI-статус MUST называть конкретную причину и рекомендованное действие (поднять max CPO / нет подходящих ключей / отключить A/B Hold), а не только generic «Подготовка…». Транзиентные причины (lock contention, единичный stale-тик, warmup кэша ключей) MAY оставлять generic preparing-статус.
     - **14c. Bounded recovery (MVP — EXIT-owned):** детерминированный блок setup MUST NOT удерживать кампанию в молчаливом semi-frozen состоянии вечно. MVP-минимум: EXIT всегда доступен (§9) **и** actionable-причина (14b) присутствует, так что пользователь всегда может восстановиться (исправить max CPO и дождаться следующего тика, либо EXIT → OFF → ordinary automation). Owned авто-abort-to-OFF после ограниченного числа/длительности детерминированных неудач setup — **SHOULD / future** (потребует durable `pending_since` timestamp + setup-watchdog; вне текущего MVP-scope). Silent indefinite PENDING без причины и без доступного EXIT — Forbidden.
 
+> **Update (owner product flow — WARM_UP / confirm / epoch):** §3 «ENTER criterion» и §4 «HOLD invariants» описывают исторически применённую MVP-1 модель, в которой target place фиксировался синхронно с автоматической PASS/FAIL классификацией на ENTER. Owner-approved продуктовое требование (не `REQ-AB-HOLD-BUDGET-SAFETY-001`) заменяет момент фиксации target place: целевая позиция теперь фиксируется **только** после отдельной durable стадии WARM_UP (default/min 24 часа) и явного подтверждения пользователем (keyword-set confirm → WARM_UP → TP confirm → Auto participation confirm → Auto bid confirm → durable PENDING intent → WB sync → ACTIVE), а не автоматически на ENTER-тике. §3/§4 остаются источником критерия eligibility ключа (`pay_for_order ≤ max CPO`, `views ≥ 100`) и общего инварианта «биддер продолжает работать к зафиксированным целям», но фраза «PASS → set target_place = current WB position» **больше не описывает текущий owner-approved контракт фиксации TP** — она замещена §15/§16 и `ab-hold-epoch-lifecycle-and-generation-ownership` / `ab-hold-confirmed-epoch-parameters-sot`. Silent auto-ENTER-классификация без явных подтверждений keyword+TP+Auto, фиксация TP без durable WARM_UP и HOLD без durable WARM_UP — Forbidden (см. §15/§16 Forbidden).
+
+15. **WARM_UP / epoch / generation lifecycle (см. `ab-hold-epoch-lifecycle-and-generation-ownership`).** Durable pre-epoch стадия WARM_UP (default/min = 24 часа, пользователь MAY увеличить, MUST NOT уменьшить ниже 24ч), запускаемая явным подтверждением набора ключей; ручное изменение набора ключей во время WARM_UP завершает текущий таймер и запускает новый; во время WARM_UP MUST NOT авто-добавление ключей и MUST NOT авто-возврат исключённых, safety-исключение Allowed, target place не фиксируется. Порядок до ACTIVE: durable PENDING intent (все confirmed-параметры + generation) записывается в PG **до** первой WB-мутации этой generation; partial/failed WB sync оставляет кампанию non-ACTIVE с сохранённым generation; retry переиспользует тот же generation и confirmed-параметры без пересчёта TP/Auto bid и без создания новой эпохи. Owner — A/B Hold epoch/setup write-path, не ordinary preamble и не Telegram-хендлер напрямую.
+16. **Confirmed epoch parameters SoT (см. `ab-hold-confirmed-epoch-parameters-sot`).** Подтверждённый набор ключей, подтверждённые target places, подтверждённое участие Auto и подтверждённая ставка Auto — durable epoch-параметры, отдельные от факт-состояния WB. Факт-позиция ключа (текущая наблюдаемая) и target place (предложенный через `ab_hold_target_place_from_keyword(position)`, затем подтверждённый) — раздельные семантические поля на экране и в хранилище; их числовые значения MAY совпасть после округления/clamping, но это MUST NOT становиться причиной слияния полей. После подтверждения target place durable и immutable внутри эпохи; ENTER/setup MUST NOT его пересчитывать; обычный дрейф факт-позиции MUST NOT переоткрывать подтверждение. Keyword bidder в ACTIVE — только holder подтверждённых target places (не добавляет/не возвращает ключи, не меняет target place). Auto participation confirm и Auto bid confirm — отдельные явные подтверждения, не подразумеваемые друг из друга и не подразумеваемые из Search keyword confirm; после ACTIVE ordinary Auto bid auto-update MUST NOT менять подтверждённую ставку Auto.
+17. **Stale/missing stats freeze распространяется на Search/Auto bid-мутаторы (не только §2a enable-gate).** Отдельно от §2a (enable-gate на freshness) и §2c (soft-gate объёма), пока кампания в WARM_UP, PENDING или ACTIVE, при stale/missing статистике по ключу или кампании: (a) включение и исключение ключей (keyword inclusion/exclusion, в т.ч. hold-enforcement §8 и safety-исключение WARM_UP) MUST замереть для затронутого ключа/кампании — не выполнять решение на «неизвестных» данных; (b) мутации ставки Search и мутации ставки/участия Auto (`change_adv_strategy`-класс путей, ordinary bid auto-update) MUST замереть по той же причине. Freeze охватывает решения (включение/исключение, изменение ставки), а не existence кампании: stale/missing статистика **MUST NOT** быть самостоятельной причиной остановки кампании — это отдельный, более сильный шаг, не покрываемый одним лишь stats-freeze. Freeze reconciles с §2a/§14a/§14b (enable/PENDING-gates остаются отдельными, более ранними проверками) и с §15/§16: WARM_UP-таймер продолжает идти при stale stats (freeze не останавливает время, только мутации), а уже подтверждённые (durable) target place/Auto bid не пересчитываются независимо от freshness — freeze здесь защищает **несостоявшиеся** решения (какие ключи войдут/выйдут, как измениться ставка), а не подтверждённые epoch-параметры (которые в любом случае immutable по §16).
+18. **Daily budget / activity-control — ортогональный reuse существующего контроллера, не отдельная финансовая safety-модель.** A/B Hold переиспользует существующий daily budget / campaign activity-control controller (например `ensure_campaigns_active` / auto-budget watchdog, см. §3 Allowed «orthogonal reversible activity-control») как есть: стоп-порог (stop threshold), а не жёсткий cap; перерасход (overshoot) относительно порога возможен и не гарантированно ограничен числом ввиду задержки статы, каданса воркера, in-flight трат, конкурентных write-путей и top-up, не обрезаемого до остатка бюджета; суточный сброс (daily reset) и возобновление трат на следующий день после сброса — ожидаемое поведение, не дефект. Этот decision и его дочерние (`ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`) MUST NOT вводить абсолютный бюджет теста, epoch spend cap, velocity cap, generic «financial latch», новую emergency-stop подсистему или global refill/restart suppression как часть A/B Hold write-path. Любая evidence-driven emergency-stop / monitoring-alerting инициатива — отдельный out-of-scope follow-on (не артефакт этого `opsx-continue`).
+
 ## Applies to
 
 - Capability `card-ab-hold-mode`.
@@ -51,6 +58,9 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Excel `adv_excel_roundtrip` — **запрет** колонки/apply `card_ab_hold_mode` в MVP (future option).
 - Cross-pod координация bot ↔ shop-runner для ENTER/EXIT.
 - PG durable allowed-set snapshot (новая migration) и enforcement-write на WB (исключение не-разрешённых фраз, восстановление снятых разрешённых) при drift, в пределах WB minus cap.
+- WARM_UP-таймер, epoch/generation lifecycle и confirmed epoch-параметры (§15/§16) — совместно с `ab-hold-epoch-lifecycle-and-generation-ownership` и `ab-hold-confirmed-epoch-parameters-sot`.
+- Stale/missing stats freeze для Search/Auto ставки и keyword inclusion/exclusion (§17) во время WARM_UP/PENDING/ACTIVE.
+- Daily budget / activity-control watchdog reuse (§18) как ортогональный, не изменяемый этим change путь.
 
 ## Allowed
 
@@ -77,6 +87,13 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Трактовать `change_adv_strategy` (MIN_CPO/MAX_CONV) как V2-scope вне A/B Hold freeze; held V3-профиль не зависит от campaign strategy objective.
 - Enable hard-gate по плану `max_price_for_order > 0` (иначе mode остаётся `OFF` + actionable reason) рядом с §2a/§12, до §2c soft-gate (§14a).
 - Actionable non-ready статус PENDING при детерминированном блоке setup (конкретная причина + действие); generic «Подготовка…» — только для транзиентных причин (§14b).
+- Durable WARM_UP-таймер (default/min 24ч, MAY увеличить) как отдельная pre-epoch стадия перед TP/Auto confirm (§15).
+- Safety-исключение ключа во время WARM_UP по причинам, не связанным с ростом/оптимизацией.
+- Сброс WARM_UP-таймера на новый отсчёт при ручном изменении набора ключей во время WARM_UP (§15).
+- Явное раздельное отображение факт-позиции и предложенного/подтверждённого target place; явные раздельные подтверждения TP, Auto participation, Auto bid (§16).
+- Durable PENDING intent (confirmed-параметры + generation) в PG до первой WB-мутации эпохи; retry той же generation без пересчёта TP/Auto bid (§15).
+- Freeze keyword inclusion/exclusion и Search/Auto bid-мутаций при stale/missing статистике, без остановки кампании только по этой причине (§17).
+- Reuse существующего daily budget / activity-control controller как есть, включая честное overshoot/daily-reset поведение (§18).
 
 ## Forbidden
 
@@ -106,6 +123,15 @@ A/B Hold — отдельный paid automation write-path с durable состо
 - Отключать / сбрасывать A/B Hold held-кампании (`PENDING_SETUP` / `ACTIVE`) через shared defaults / «Применить дефолты» в обход owned Telegram EXIT (§13).
 - Enable → `PENDING_SETUP` при отсутствующем / ≤ 0 плане `max_price_for_order` (детерминированный вечный PENDING) без hard-gate (§14a).
 - Молчаливый вечный `PENDING_SETUP` при детерминированном блоке setup — без actionable-причины (generic «Подготовка…») и без доступного EXIT (§14b/§14c).
+- Тихая авто-классификация ENTER, фиксирующая target place без durable WARM_UP и без явных подтверждений keyword + TP + Auto (§15/§16 — заменяет прежнее §3 «PASS → set target_place = current WB position» как текущий контракт).
+- HOLD/ACTIVE без предшествующего durable WARM_UP.
+- Уменьшение WARM_UP ниже 24 часов; авто-добавление или авто-возврат ключей во время WARM_UP.
+- Слияние факт-позиции и target place в одно поле/значение; пересчёт confirmed target place на ENTER, retry или из-за обычного дрейфа позиции.
+- Продвижение generation или пересчёт TP/Auto bid на retry WB-синхронизации; переход в ACTIVE при partial sync.
+- Абсолютный тестовый бюджет, epoch spend cap, velocity cap, generic financial latch, новая emergency-stop подсистема или global refill/restart suppression как часть A/B Hold write-path (§18).
+- Трактовка daily budget controller как hard/epoch cap с гарантированным overshoot-пределом (§18).
+- Перевод keyword inclusion/exclusion или Search/Auto bid-мутации в решение при stale/missing статистике вместо freeze (§17); либо остановка кампании исключительно по причине stale/missing статистики.
+- Framing, будто `REQ-AB-HOLD-BUDGET-SAFETY-001` или параллельная финансовая safety-модель — текущий scope этого change.
 
 ## Examples
 
@@ -133,6 +159,8 @@ Bad:
 - Telegram Enable на ACTIVE (или повторный Enable на PENDING) demote/rewrite ENTER и заново гоняет force setup sync mid-hold.
 - Enforcement замороженного allowed-set требует больше фраз, чем WB minus cap, но бот молча рапортует чистый hold вместо видимой деградации.
 - «Применить дефолты» (single или shop-wide) на `ACTIVE` РК молча ставит `off`, оставляет непустой allowed-set snapshot и сбивает `automatic_version` на V2 (un-owned disable в обход EXIT).
+- Enable-хендлер фиксирует target place сразу после прохождения PFO/views-классификации, минуя WARM_UP и отдельные TP/Auto подтверждения.
+- Экран показывает одно число «Позиция: 12» без разделения на факт и предложение/подтверждённый target place.
 
 ## Related specs
 
@@ -141,12 +169,15 @@ Bad:
 ## Related changes
 
 - `openspec/changes/card-ab-hold-mode/`
+- `openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md` (proposed; WARM_UP/epoch/generation, cited в §15)
+- `openspec/changes/card-ab-hold-mode/decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md` (proposed; confirmed keyword/TP/Auto SoT, cited в §16)
 
 ## Review checklist
 
 - [x] existing decisions searched
-- [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`)
+- [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`, `ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`)
 - [x] new decision proposed because accepted decision was missing for hold write-path
 - [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`; delta §11 hide Enable — applied via `/opsx:apply`; delta §12 V3-only + V2 downgrade block — applied (tasks §14); delta §13 shared-defaults not a disable path — applied (tasks §15); delta §2c launch-validity soft-gate — **applied** (tasks §13 + §17: campaign-level proxy + calendar-day MV + CH-error distinct reason); delta §14 PENDING_SETUP liveness — **applied via `/opsx:apply`** (tasks §16: max-CPO enable hard-gate `has_positive_plan_max_cpo` + actionable PENDING status via `CardAbHoldSetupBlock` Redis channel + EXIT recovery; owned auto-abort = SHOULD/future))*
+- [ ] delta §15 WARM_UP/epoch/generation, §16 confirmed epoch-parameters SoT, §17 stale-stats Search/Auto freeze, §18 daily-budget orthogonal reuse — **not yet applied**; apply заблокирован до owner-авторизации (см. `tasks.md` §19-§25); OD-05 остаётся единственным открытым owner decision для broad enablement
 - [x] tests verify structural freeze without masking placement violations
 - [x] paid-only gate enforced for UI and enable paths
