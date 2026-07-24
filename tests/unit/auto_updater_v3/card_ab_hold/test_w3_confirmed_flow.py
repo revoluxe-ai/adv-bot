@@ -1,4 +1,9 @@
-"""Unit-тесты W3-confirmed UX между TP confirm и A1 (ux contract §7)."""
+"""Unit-тесты W3-confirmed UX между TP confirm и A1 (ux contract §7).
+
+Также regression: W3 fact/proposed TP берутся из live read-model позиций,
+а не из фантомного ``card_ab_hold_factual_positions_json`` на AdvSetting
+(decision ``ab-hold-confirmed-epoch-parameters-sot`` §2).
+"""
 
 from __future__ import annotations
 
@@ -46,7 +51,6 @@ def _make_adv(*, phase: str) -> SimpleNamespace:
         card_ab_hold_phase=phase,
         card_ab_hold_confirmed_keywords_json=["alpha", "beta"],
         card_ab_hold_confirmed_target_places_json={"alpha": 5, "beta": 8},
-        card_ab_hold_factual_positions_json={"alpha": 7.0, "beta": 10.0},
         card_ab_hold_generation=0,
         card_ab_hold_sync_status=None,
         card_ab_hold_degraded=False,
@@ -75,6 +79,82 @@ def _make_query() -> MagicMock:
     return query
 
 
+_LIVE_POSITIONS = {"alpha": 14.4, "beta": 9.2}
+
+
+@pytest.mark.unit
+def test_tp_rows_use_passed_live_positions_not_adv_attr() -> None:
+    """Fact/proposed берутся из positions-аргумента; фантомный attr на adv игнорируется."""
+    adv = SimpleNamespace(
+        card_ab_hold_confirmed_keywords_json=["alpha", "beta"],
+        card_ab_hold_confirmed_target_places_json={},
+        card_ab_hold_factual_positions_json={"alpha": 99.0, "beta": 99.0},
+    )
+    rows = confirm_handlers._tp_rows_from_adv(adv, _LIVE_POSITIONS)
+    assert rows == [("alpha", 14, 14), ("beta", 9, 9)]
+
+
+@pytest.mark.unit
+def test_tp_rows_empty_positions_do_not_invent_facts() -> None:
+    """Без live positions fact/target остаются 0 — не silent fallback к phantom attr."""
+    adv = SimpleNamespace(
+        card_ab_hold_confirmed_keywords_json=["alpha"],
+        card_ab_hold_confirmed_target_places_json={},
+        card_ab_hold_factual_positions_json={"alpha": 7.0},
+    )
+    rows = confirm_handlers._tp_rows_from_adv(adv, {})
+    assert rows == [("alpha", 0, 0)]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_tp_confirm_all_persists_proposed_from_live_positions() -> None:
+    """tp_confirm_all пишет proposed TP из live positions, не нули."""
+    state = _make_fsm()
+    adv = _make_adv(phase=CardAbHoldPhase.AWAITING_TP_CONFIRM.value)
+    adv.card_ab_hold_confirmed_target_places_json = {}
+    adv_after = _adv_after_tp_confirm(adv)
+    query = _make_query()
+    callback_data = CahTpConfirmAll(
+        adv_setting_original_id=adv.id,
+        step=ConfirmStep.W3_PROPOSE.value,
+        revision=1,
+        page=0,
+    )
+    confirm_mock = AsyncMock()
+
+    with (
+        patch.object(
+            confirm_handlers,
+            "_load_adv",
+            new=AsyncMock(side_effect=[adv, adv_after]),
+        ),
+        patch.object(
+            confirm_handlers,
+            "_load_factual_positions",
+            new=AsyncMock(return_value=_LIVE_POSITIONS),
+        ),
+        patch.object(
+            confirm_handlers,
+            "confirm_target_places",
+            new=confirm_mock,
+        ),
+        patch.object(
+            confirm_handlers,
+            "is_card_ab_hold_ui_visible",
+            return_value=True,
+        ),
+        patch.object(
+            confirm_handlers,
+            "_check_stale",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        await confirm_handlers.on_tp_confirm_all(query, callback_data, state)
+
+    confirm_mock.assert_awaited_once_with(42, {"alpha": 14, "beta": 9})
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_tp_confirm_all_sets_w3_confirmed_and_renders_read_only() -> None:
@@ -95,6 +175,11 @@ async def test_tp_confirm_all_sets_w3_confirmed_and_renders_read_only() -> None:
             confirm_handlers,
             "_load_adv",
             new=AsyncMock(side_effect=[adv, adv_after]),
+        ),
+        patch.object(
+            confirm_handlers,
+            "_load_factual_positions",
+            new=AsyncMock(return_value=_LIVE_POSITIONS),
         ),
         patch.object(
             confirm_handlers,
@@ -150,6 +235,11 @@ async def test_back_from_a1_lands_on_w3_confirmed_not_propose() -> None:
         ),
         patch.object(
             confirm_handlers,
+            "_load_factual_positions",
+            new=AsyncMock(return_value=_LIVE_POSITIONS),
+        ),
+        patch.object(
+            confirm_handlers,
             "is_card_ab_hold_ui_visible",
             return_value=True,
         ),
@@ -184,10 +274,17 @@ async def test_render_after_restart_shows_w3_confirmed_from_durable_tp() -> None
     assert is_w3_confirmed_visible(draft) is False
     assert should_show_w3_confirmed_read_only(adv, draft) is True
 
-    with patch.object(
-        confirm_handlers,
-        "is_card_ab_hold_ui_visible",
-        return_value=True,
+    with (
+        patch.object(
+            confirm_handlers,
+            "is_card_ab_hold_ui_visible",
+            return_value=True,
+        ),
+        patch.object(
+            confirm_handlers,
+            "_load_factual_positions",
+            new=AsyncMock(return_value=_LIVE_POSITIONS),
+        ),
     ):
         await confirm_handlers._render_for_adv(query, adv, state)
 
