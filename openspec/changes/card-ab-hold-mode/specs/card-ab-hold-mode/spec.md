@@ -555,6 +555,19 @@ When the system retries Wildberries synchronization after an incomplete attempt,
 - **AND** no target place or Auto bid is recalculated as part of the retry
 - **AND** no new epoch is started by the retry
 
+### Requirement: After successful Wildberries sync, later ticks finish activation without re-entering Wildberries
+When Wildberries synchronization for an epoch is durably marked fully successful (`card_ab_hold_sync_status=complete`) and the campaign mode is still not ACTIVE (the in-PENDING phase MAY remain `WB_SYNC`), a subsequent shop-runner epoch tick MUST only finish activation (transition toward ACTIVE). That tick MUST NOT re-apply the confirmed epoch intent to the durable store, MUST NOT re-run Wildberries synchronization for that generation, and MUST NOT perform further Wildberries mutations for that generation. Incomplete synchronization states (`pending` / `partial`) remain eligible for Wildberries retry as specified in the retry requirement above. Generation and idempotency semantics are unchanged; ACTIVE remains Allowed only after a fully successful Wildberries synchronization for that generation.
+
+#### Scenario: Complete sync residual activates without re-entering Wildberries
+- **GIVEN** Wildberries synchronization for the current epoch/generation is durably marked complete (`card_ab_hold_sync_status=complete`)
+- **AND** the campaign mode is still not ACTIVE
+- **AND** the phase MAY remain `WB_SYNC`
+- **WHEN** the next shop-runner epoch tick runs
+- **THEN** the system only finishes activation
+- **AND** it does not re-apply the confirmed epoch intent to the durable store
+- **AND** it does not re-synchronize that generation to Wildberries
+- **AND** it does not perform further Wildberries mutations for that generation
+
 ### Requirement: Stale or missing statistics freeze keyword and bid mutations without stopping the campaign
 While a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch, if the campaign or a keyword has stale or missing statistics, the system MUST NOT make a keyword inclusion/exclusion decision and MUST NOT make a Search or Auto bid mutation based on that stale or missing data; both classes of decision MUST freeze for the affected keyword or campaign until fresh statistics are available. Stale or missing statistics alone MUST NOT be a reason to stop the campaign; freezing inclusion/exclusion and bid mutation decisions is distinct from, and MUST NOT be treated as equivalent to, stopping the campaign.
 
