@@ -166,8 +166,18 @@ def _keyword_candidates(adv: AdvSetting) -> list[str]:
     )
 
 
-def _tp_rows_from_adv(adv: AdvSetting) -> list[tuple[str, int, int]]:
-    """Строки W3: keyword → (fact, target)."""
+def _tp_rows_from_adv(
+    adv: AdvSetting,
+    positions: dict[str, float],
+) -> list[tuple[str, int, int]]:
+    """Строки W3: keyword → (fact, target).
+
+    Fact — live read-model (передаётся снаружи), не durable epoch SoT.
+    Target — confirmed TP эпохи, иначе proposed из ``positions``.
+
+    Decision ``ab-hold-confirmed-epoch-parameters-sot`` §2: факт обновляется
+    при каждом отображении и MUST NOT читаться из фантомного PG-поля на AdvSetting.
+    """
     keywords = cast(
         list[str],
         list(getattr(adv, "card_ab_hold_confirmed_keywords_json", None) or []),
@@ -176,19 +186,31 @@ def _tp_rows_from_adv(adv: AdvSetting) -> list[tuple[str, int, int]]:
         dict[str, int],
         dict(getattr(adv, "card_ab_hold_confirmed_target_places_json", None) or {}),
     )
-    positions_raw: Any = getattr(adv, "card_ab_hold_factual_positions_json", None) or {}
-    positions: dict[str, float] = (
-        cast(dict[str, float], positions_raw)
-        if isinstance(positions_raw, dict)
-        else {}
-    )
     proposed = propose_target_places_from_positions(positions)
     rows: list[tuple[str, int, int]] = []
     for kw in keywords:
-        fact = int(positions.get(kw, 0) or 0)
+        raw_fact = float(positions.get(kw, 0) or 0)
+        fact = int(raw_fact) if raw_fact > 0 else 0
         target = int(confirmed_tp.get(kw, proposed.get(kw, fact)))
         rows.append((kw, fact, target))
     return rows
+
+
+async def _load_factual_positions(adv: AdvSetting) -> dict[str, float]:
+    """Текущие наблюдаемые позиции ключей (Telegram UI read-model).
+
+    Источник — тот же путь, что keyword-клавиатура бота
+    (``fetch_keywords_from_database`` / CH+PG), не Redis-only snapshot и не
+    колонка AdvSetting. Сырая ``cluster_stat.position`` (без floor-to-1),
+    чтобы proposed TP мог отфильтровать non-positive.
+    """
+    from app.client_bot.utils import get_keywords_for_keyboard
+
+    keywords = await get_keywords_for_keyboard(adv)
+    out: dict[str, float] = {}
+    for kw in keywords:
+        out[str(kw.text)] = float(kw.cluster_stat.position)
+    return out
 
 
 async def _render_w3_confirmed(
@@ -200,7 +222,8 @@ async def _render_w3_confirmed(
     page: int,
 ) -> None:
     """Read-only W3-confirmed после durable TP confirm (§7)."""
-    rows = _tp_rows_from_adv(adv)
+    positions = await _load_factual_positions(adv)
+    rows = _tp_rows_from_adv(adv, positions)
     page_rows, norm_page, total_pages = paginate(rows, page)
     text = build_w3_confirmed_text(
         rows=page_rows, page=norm_page, total_pages=total_pages
@@ -387,7 +410,8 @@ async def _render_for_adv(
         return
 
     if phase == CardAbHoldPhase.AWAITING_TP_CONFIRM:
-        rows = _tp_rows_from_adv(adv)
+        positions = await _load_factual_positions(adv)
+        rows = _tp_rows_from_adv(adv, positions)
         page = int(draft.get("page") or 0)
         page_rows, norm_page, total_pages = paginate(rows, page)
         text = build_w3_propose_text(
@@ -692,9 +716,10 @@ async def on_tp_confirm_all(
     ):
         await _render_for_adv(query, adv, state)
         return
+    positions = await _load_factual_positions(adv)
     tp_map = {
         kw: target
-        for kw, _fact, target in _tp_rows_from_adv(adv)
+        for kw, _fact, target in _tp_rows_from_adv(adv, positions)
     }
     await confirm_target_places(int(adv.id), tp_map)
     await set_w3_confirmed_visible(state, int(adv.id), True)
