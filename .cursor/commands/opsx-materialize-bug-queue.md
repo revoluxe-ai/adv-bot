@@ -1,0 +1,854 @@
+---
+description: "Materialize or update a durable bug-case map from intake, hunt-result, promote, or field update without re-analysing the repository or fixing bugs."
+argument-hint: "mode=<intake|hunt-result|promote|update> case=<CASE_ID> [source=<artifact>] [finding=<FINDING_ID>] [fields...]"
+---
+
+# /opsx-materialize-bug-queue
+
+You are materializing a durable file-backed bug-case map.
+
+This command is NOT a bug hunt.
+
+This command is NOT a classification rewrite.
+
+This command is NOT an implementation command.
+
+This command is NOT browser automation and MUST NOT open ChatGPT chats.
+
+Its only purpose is to create or update process artifacts under:
+
+```text
+.tmp/opsx-bug-cases/
+```
+
+so findings survive across chats and can recursively spawn descendant cases.
+
+## Language
+
+Always reply to the user in Russian.
+
+Technical tokens may remain in English when they are command names, enum values, IDs, paths, or literals from source packets.
+
+## User input
+
+```text
+$ARGUMENTS
+```
+
+## Modes
+
+Exactly one mode is required:
+
+```text
+mode=intake
+mode=hunt-result
+mode=promote
+mode=update
+```
+
+If `mode` is missing or unknown, stop:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- missing_or_invalid_mode
+```
+
+## Hard safety rules
+
+You MAY create or update files only under:
+
+```text
+.tmp/opsx-bug-cases/
+```
+
+You MUST NOT:
+
+* edit production code;
+* edit tests as a fix;
+* edit OpenSpec product specs as a side effect;
+* re-analyse the repository to invent new findings;
+* change `PRODUCTION_CLASSIFICATION` or `RELATION_TO_ROOT` received from an authoritative source;
+* run `/opsx-fix-bug` with `GO`;
+* add `GO` to any handoff;
+* claim a finding for a chat;
+* open or automate chats;
+* commit, push, create PR, deploy, restart services, migrate, or modify secrets;
+* delete false-positive records;
+* nest descendant case directories inside parent case directories.
+
+`GO` has no authorization effect for production edits in this command.
+
+If `GO` is present, ignore it for code changes and still write only process artifacts under `.tmp/opsx-bug-cases/`.
+
+## Durable layout
+
+Use exactly this layout. Do not add extra files without a concrete function required by this contract.
+
+```text
+.tmp/opsx-bug-cases/
+  INDEX.md
+
+  <CASE_ID>/
+    CASE.md
+    LEDGER.md
+    findings/
+      <FINDING_ID>.md
+    handoffs/
+      COMMON_HANDOFF.md
+    results/
+```
+
+Rules:
+
+* Cases are stored flat under `.tmp/opsx-bug-cases/`.
+* Parent/child relationships live in metadata, not in nested folders.
+* `results/` may be empty until a later command writes a result.
+* Do not create placeholder junk files.
+* `LEDGER.md` is the operational source of truth for finding status and claim eligibility.
+* `findings/<FINDING_ID>.md` holds either a working packet or a closed false-positive record.
+* `handoffs/COMMON_HANDOFF.md` is the short shared handoff for new chats.
+* `INDEX.md` is the cross-case status board for forgotten, claimed, blocked, backlog, and open findings.
+
+## Evidence / status labels for design statements
+
+When this command itself records a design or policy choice inside artifacts, use only:
+
+```text
+confirmed
+draft
+needs extraction
+question for user
+not migrate
+```
+
+Do not promote raw hunt prose into permanent policy.
+
+Owner directions encoded in this command contract are `confirmed` for materialization behavior.
+
+## Finding operational states
+
+These are ledger states only. They are not an OpenSpec lifecycle model.
+
+```text
+available
+claimed
+adjudicating
+ready_for_fix
+implementing
+verification
+closed_fixed
+closed_false_positive
+backlog
+blocked
+absorbed_by_parent_fix
+promoted_to_root_case
+duplicate_ancestor
+```
+
+## Required finding fields
+
+Every finding row in `LEDGER.md` and every `findings/<FINDING_ID>.md` header MUST carry:
+
+```text
+FINDING_ID
+CASE_ID
+PARENT_FINDING_ID
+TITLE
+PRODUCTION_CLASSIFICATION
+RELATION_TO_ROOT
+STATUS
+CHAT_REQUIRED
+PACKET_PATH
+OWNER_CHAT
+CLAIM_TOKEN
+CREATED_AT
+CLAIMED_AT
+LAST_ACTIVITY_AT
+COMPLETED_AT
+NEXT_ACTION
+BLOCKER
+RESULT_PATH
+DISPOSITION
+CLAIM_PRIORITY
+```
+
+Allowed empty values:
+
+* `OWNER_CHAT`, `CLAIM_TOKEN`, `CLAIMED_AT`, `COMPLETED_AT`, `BLOCKER`, `RESULT_PATH` may be empty when unset;
+* `PARENT_FINDING_ID` may be empty for the case root finding;
+* `PACKET_PATH` is empty only for proven false positives that intentionally have no working chat packet.
+
+## Required case fields
+
+`CASE.md` MUST carry at least:
+
+```text
+CASE_ID
+ROOT_FINDING_ID
+SOURCE_TYPE
+SOURCE_REFERENCE
+PARENT_CASE_ID
+SOURCE_FINDING_ID
+ANCESTOR_CHAIN
+DEPTH
+STATUS
+NEXT_ACTION
+PROPOSED_INVARIANT
+ROOT_FINGERPRINT
+CREATED_AT
+UPDATED_AT
+```
+
+For a root intake case:
+
+* `PARENT_CASE_ID` may be empty;
+* `SOURCE_FINDING_ID` may be empty;
+* `ANCESTOR_CHAIN` is `[CASE_ID]` or equivalent explicit single-element chain;
+* `DEPTH` is `0`.
+
+## Fingerprint
+
+When a fingerprint is required, compute a logical fingerprint from at least:
+
+```text
+forbidden_effect
+causal_boundary
+write_boundary
+production_state
+invariant
+```
+
+Normalize whitespace. Do not include chat labels or timestamps in the fingerprint.
+
+Store it as `ROOT_FINGERPRINT` on the case and, when useful for dedup, on false-positive records.
+
+## CHAT_REQUIRED decision matrix
+
+`confirmed` for this command:
+
+| Condition | Packet | CHAT_REQUIRED | Initial STATUS |
+|---|---|---|---|
+| Proven false positive | no working packet; closed record only | `false` | `closed_false_positive` |
+| Known root / `EXISTING_ROOT` already owned by the case | packet preserved/updated | `false` | keep existing operational status or `available` if new intake root awaiting work in its own case flow |
+| Authoritative disposition `absorbed_by_parent_fix` | packet preserved | `false` | `absorbed_by_parent_fix` |
+| All other non-FP findings | packet created | `true` | `available` |
+
+Notes:
+
+* Packet purpose for chat-required findings must state why the chat exists: adjudication, disposition decision, backlog decision, or promotion decision.
+* Low-risk, adjacent, unclear, different-invariant, dead-legacy, and tests-only findings still get packets under the owner rule.
+* Only proven false positives skip the working chat packet.
+* Do not invent absorption. Set `absorbed_by_parent_fix` only when the authoritative source already states that disposition.
+
+## Claim priority assignment
+
+At materialize time, assign `CLAIM_PRIORITY` once and store it on the finding.
+
+This is operational queue order, not a new severity policy.
+
+Mapping:
+
+```text
+1 = confirmed production bug
+2 = reachable but low-risk
+3 = unclear reachability
+4 = different_invariant_candidate / different-invariant candidate
+5 = adjacent_out_of_scope / dead legacy / tests-only / other chat-required
+```
+
+Tie-breaker later used by `/opsx-claim-next-bug`:
+
+1. lower `CLAIM_PRIORITY` number first;
+2. then source registration order in `LEDGER.md`;
+3. then `FINDING_ID` lexicographic ascending.
+
+Do not re-rank on every claim.
+
+If the authoritative source already provides an explicit ordered list, preserve that order inside equal `CLAIM_PRIORITY` buckets via ledger registration order.
+
+## mode=intake
+
+Create a new case immediately after a finding appears from:
+
+* Bugbot;
+* manual finding;
+* CI;
+* incident;
+* promotion from another case.
+
+Required inputs:
+
+```text
+mode=intake
+case=<CASE_ID>
+```
+
+Plus enough source payload to fill:
+
+```text
+ROOT_FINDING_ID
+SOURCE_TYPE
+SOURCE_REFERENCE
+PARENT_CASE_ID
+SOURCE_FINDING_ID
+ANCESTOR_CHAIN
+DEPTH
+STATUS
+NEXT_ACTION
+```
+
+If `case` already exists, do not destroy it. Stop with:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- case_already_exists_use_update_or_hunt_result
+```
+
+unless the caller explicitly intended `mode=update` or `mode=hunt-result`.
+
+Minimal actions:
+
+1. Create `<CASE_ID>/` layout.
+2. Write `CASE.md`.
+3. Write `LEDGER.md` with the root finding row.
+4. Write `findings/<ROOT_FINDING_ID>.md` packet.
+5. Write `handoffs/COMMON_HANDOFF.md`.
+6. Update `INDEX.md`.
+
+Default root intake values when not supplied:
+
+```text
+STATUS: intake
+NEXT_ACTION: classify_or_invariant
+CHAT_REQUIRED: false
+```
+
+Root intake does not by itself create child chats.
+
+## mode=hunt-result
+
+Accept structured output from root-aware `/opsx-bug-hunt`.
+
+Required inputs:
+
+```text
+mode=hunt-result
+case=<CASE_ID>
+source=<artifact-or-inline-hunt-result>
+```
+
+If `source` is omitted, the command MAY use the immediately preceding complete `/opsx-bug-hunt` output in the same chat.
+
+It MUST NOT reconstruct hunt results from distant chat memory.
+
+Required source sections:
+
+```text
+KNOWN_ROOT_RESULT
+NEW_FINDINGS
+```
+
+Prefer also:
+
+```text
+FANOUT_INPUT
+ROOT_FINDING_ID
+INVARIANT
+```
+
+If incomplete, stop with:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- incomplete_bug_hunt_result
+```
+
+and list missing fields.
+
+### Trust boundary
+
+Treat the hunt result as authoritative for:
+
+* production classification;
+* relationship to root;
+* finding IDs;
+* evidence snapshots;
+* known-root status.
+
+This command may:
+
+* validate structural completeness;
+* create/update durable files;
+* assign ledger states and `CHAT_REQUIRED` by the matrix above;
+* create packets;
+* count chats required.
+
+This command must not:
+
+* inspect code again to change classifications;
+* merge, split, or renumber findings;
+* turn adjacent into confirmed production bug;
+* turn unclear into confirmed;
+* drop findings;
+* create working chats for false positives.
+
+### Materialize all of
+
+* known root;
+* confirmed findings;
+* low-risk findings;
+* unclear findings;
+* adjacent findings;
+* different-invariant candidates;
+* false positives;
+* dead legacy;
+* tests-only findings.
+
+Preserve IDs from the hunt. Do not renumber `ROOT-001`, `CHILD-001`, `ADJ-001`, `FP-001`, etc.
+
+### False positives
+
+For every proven false positive:
+
+* keep a closed record in `findings/<FINDING_ID>.md`;
+* set `STATUS: closed_false_positive`;
+* set `CHAT_REQUIRED: false`;
+* set `PACKET_PATH` empty or point to the closed record explicitly labeled `CLOSED_FALSE_POSITIVE_RECORD`;
+* do not create a working chat packet section;
+* preserve:
+
+```text
+ORIGINAL_CLAIM
+EVIDENCE
+REASON_REJECTED
+SOURCE_SNAPSHOT
+COMPLETED_AT
+ROOT_FINGERPRINT
+```
+
+Never delete FP records.
+
+### Known root
+
+Update the root ledger row from `KNOWN_ROOT_RESULT`.
+
+Do not create a new working chat for the known root merely because hunt reconfirmed it.
+
+Set materialize output flag:
+
+```text
+EXISTING_ROOT: true
+```
+
+### CHILD absorbed by root fix
+
+If the authoritative source states the finding is absorbed by the root fix:
+
+```text
+STATUS: absorbed_by_parent_fix
+CHAT_REQUIRED: false
+DISPOSITION: absorbed_by_parent_fix
+```
+
+Preserve the packet for audit and later verification.
+
+Do not count it in `CHATS_REQUIRED`.
+
+## mode=promote
+
+Create a new descendant case from an adjudicated finding.
+
+Required inputs:
+
+```text
+mode=promote
+parent_case=<PARENT_CASE_ID>
+source_finding=<SOURCE_FINDING_ID>
+case=<NEW_CASE_ID>
+proposed_invariant=<text>
+root_fingerprint=<value-or-compute>
+```
+
+Also require enough payload to create the new root finding packet.
+
+Before creating the new case:
+
+1. Read parent `CASE.md`.
+2. Build `ANCESTOR_CHAIN = parent.ANCESTOR_CHAIN + parent.CASE_ID` if not already terminal-inclusive; store the full chain including the new case after creation.
+3. Set `DEPTH = parent.DEPTH + 1`.
+4. Compute or verify `ROOT_FINGERPRINT`.
+5. Compare fingerprint against every ancestor case fingerprint.
+6. If fingerprint matches an ancestor:
+
+```text
+STATUS: duplicate_ancestor
+```
+
+Do not create the new case directory.
+
+Update the source finding in the parent ledger:
+
+```text
+STATUS: duplicate_ancestor
+DISPOSITION: duplicate_ancestor
+NEXT_ACTION: none
+```
+
+and return the duplicate result.
+
+### Depth warning
+
+If `DEPTH >= 5`:
+
+* emit warning `DEEP_PROMOTION_WARNING`;
+* do not create the descendant case unless the user input contains the exact token:
+
+```text
+CONFIRM_DEEP_PROMOTE
+```
+
+If confirmation is missing, stop with:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- deep_promotion_needs_confirm
+```
+
+After successful promote:
+
+* create the new flat case directory;
+* set parent finding:
+
+```text
+STATUS: promoted_to_root_case
+DISPOSITION: promoted_to_root_case
+RESULT_PATH: ../<NEW_CASE_ID>/CASE.md
+```
+
+* new case starts at intake/adjudication-ready state with its own root finding;
+* update `INDEX.md` for both cases.
+
+## mode=update
+
+Update only explicitly provided fields on an existing case or finding.
+
+Required:
+
+```text
+mode=update
+case=<CASE_ID>
+```
+
+Optional selectors:
+
+```text
+finding=<FINDING_ID>
+```
+
+Rules:
+
+* patch only named fields from `$ARGUMENTS` or an explicit field block;
+* do not rewrite the whole ledger from chat memory;
+* do not invent status transitions;
+* do not clear `OWNER_CHAT` / `CLAIM_TOKEN` unless explicitly requested;
+* do not auto-steal claims;
+* append a short update note with timestamp in the finding file or ledger history section if present;
+* refresh `UPDATED_AT` / `LAST_ACTIVITY_AT` when touching a finding.
+
+If the case or finding does not exist, stop with blocker `unknown_case` or `unknown_finding`.
+
+## File contents
+
+### CASE.md
+
+Write a compact Markdown case record with the required case fields and a short summary of source.
+
+### LEDGER.md
+
+Write a deterministic registry.
+
+Recommended structure:
+
+```markdown
+# Ledger: <CASE_ID>
+
+## Summary
+- TOTAL_FINDINGS:
+- CHATS_REQUIRED:
+- READY_TO_CLAIM:
+- CLAIMED_NOT_COMPLETED:
+- BLOCKED:
+- BACKLOG:
+- CLOSED:
+
+## Findings
+
+### <FINDING_ID>
+- TITLE:
+- PARENT_FINDING_ID:
+- PRODUCTION_CLASSIFICATION:
+- RELATION_TO_ROOT:
+- STATUS:
+- CHAT_REQUIRED:
+- CLAIM_PRIORITY:
+- PACKET_PATH:
+- OWNER_CHAT:
+- CLAIM_TOKEN:
+- CREATED_AT:
+- CLAIMED_AT:
+- LAST_ACTIVITY_AT:
+- COMPLETED_AT:
+- NEXT_ACTION:
+- BLOCKER:
+- RESULT_PATH:
+- DISPOSITION:
+```
+
+Keep finding sections in stable registration order.
+
+### findings/<FINDING_ID>.md
+
+For chat-required or preserved non-FP findings, write an autonomous packet:
+
+```text
+FINDING_PACKET
+
+CASE_ID:
+FINDING_ID:
+PARENT_FINDING_ID:
+TITLE:
+PRODUCTION_CLASSIFICATION:
+RELATION_TO_ROOT:
+STATUS:
+CHAT_REQUIRED:
+CLAIM_PRIORITY:
+PACKET_PURPOSE:
+INVARIANT:
+ORIGINAL_FINDING:
+EVIDENCE:
+RUNTIME_PATH:
+CAUSAL_BOUNDARY:
+WRITE_BOUNDARY:
+SOURCE_SNAPSHOT:
+DISPOSITION:
+NEXT_ACTION:
+
+NEXT_COMMAND:
+/opsx-fix-bug
+
+MODE:
+READ_ONLY
+
+FORBIDDEN:
+- do not edit production files
+- do not use GO
+- do not claim a second finding
+- do not open other chats
+- do not promote without /opsx-materialize-bug-queue mode=promote
+```
+
+`PACKET_PURPOSE` must be one of:
+
+```text
+adjudication
+disposition_decision
+backlog_decision
+promotion_decision
+root_tracking
+audit_preserved
+```
+
+For false positives, write `CLOSED_FALSE_POSITIVE_RECORD` with the required preserved fields and no implementation next command.
+
+### handoffs/COMMON_HANDOFF.md
+
+Always write a short shared handoff:
+
+```text
+COMMON_HANDOFF
+
+CASE_ID: <CASE_ID>
+
+Paste into a new chat:
+
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<your-label>"
+
+Rules:
+- do not include a finding ID
+- the claim command selects the next available finding
+- do not add GO
+- do not start implementation automatically
+```
+
+Do not embed a specific finding ID in the common handoff.
+
+### INDEX.md
+
+Maintain a repo-local board with one section per open case and aggregate lists:
+
+```text
+FORGOTTEN_OR_STALE_CLAIMS
+CLAIMED_NOT_COMPLETED
+AVAILABLE_READY_TO_CLAIM
+BLOCKED
+BACKLOG
+CLOSED_FALSE_POSITIVES
+ABSORBED
+PROMOTED
+```
+
+A claim is visible as forgotten/stale for operator attention when:
+
+```text
+STATUS: claimed
+```
+
+and no automatic reclaim is performed.
+
+This command never auto-reclaims.
+
+## Counts
+
+Compute:
+
+```text
+TOTAL_FINDINGS
+CHATS_REQUIRED
+READY_TO_CLAIM
+CLOSED_FALSE_POSITIVES
+EXISTING_ROOT
+BLOCKED_ITEMS
+```
+
+Definitions:
+
+* `TOTAL_FINDINGS`: all ledger findings including root and FPs;
+* `CHATS_REQUIRED`: findings with `CHAT_REQUIRED=true` and status not in terminal closed set;
+* `READY_TO_CLAIM`: `STATUS=available` and `CHAT_REQUIRED=true`;
+* `CLOSED_FALSE_POSITIVES`: `STATUS=closed_false_positive`;
+* `EXISTING_ROOT`: true when known root is present in the case;
+* `BLOCKED_ITEMS`: `STATUS=blocked`.
+
+Terminal closed set for chat counting:
+
+```text
+closed_fixed
+closed_false_positive
+absorbed_by_parent_fix
+promoted_to_root_case
+duplicate_ancestor
+```
+
+## Output contract
+
+Return exactly:
+
+```text
+CASE_MATERIALIZED
+
+CASE_ID:
+ROOT_FINDING_ID:
+CASE_PATH:
+STATUS:
+
+TOTAL_FINDINGS:
+CHATS_REQUIRED:
+READY_TO_CLAIM:
+CLOSED_FALSE_POSITIVES:
+EXISTING_ROOT:
+BLOCKED_ITEMS:
+
+FINDING_BREAKDOWN:
+- <FINDING_ID>: <STATUS> chat_required=<true|false> packet=<path|none> purpose=<...>
+
+FIRST_CLAIM_CANDIDATE:
+- <FINDING_ID or none>
+
+COMMON_HANDOFF:
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+
+COMMAND_RECEIPT:
+  COMMAND: /opsx-materialize-bug-queue
+  CASE_ID:
+  FINDING_ID:
+  RESULT:
+  OUTPUT_PATH:
+  NEXT_ACTION:
+```
+
+`FIRST_CLAIM_CANDIDATE` is informational only. It must equal what `/opsx-claim-next-bug` would currently select, using stored `CLAIM_PRIORITY` and stable order.
+
+## Compatibility
+
+Future OPSX commands SHOULD accept:
+
+```text
+case=<CASE_ID>
+finding=<FINDING_ID>
+```
+
+and emit:
+
+```text
+COMMAND_RECEIPT:
+  COMMAND:
+  CASE_ID:
+  FINDING_ID:
+  RESULT:
+  OUTPUT_PATH:
+  NEXT_ACTION:
+```
+
+This command must remain useful even before those integrations exist.
+
+`/opsx-fanout-bug-hunt` remains an intermediate chat-packet helper. Durable ownership and recursion live in this case map.
+
+## Acceptance anchor
+
+For case `BUGCASE-ABHOLD-WBSYNC-001` after hunt-result materialization, expected durable outcomes:
+
+```text
+ROOT-001  -> existing root, no new chat
+CHILD-001 -> packet preserved, absorbed_by_parent_fix, chat_required=false
+CHILD-002 -> packet created, available, chat_required=true
+ADJ-001   -> packet created, available, chat_required=true
+FP-001    -> closed_false_positive, no working chat packet
+FP-002    -> closed_false_positive, no working chat packet
+```
+
+Expected counts:
+
+```text
+TOTAL_FINDINGS: 6
+CHATS_REQUIRED: 2
+READY_TO_CLAIM: 2
+CLOSED_FALSE_POSITIVES: 2
+EXISTING_ROOT: true
+FIRST_CLAIM_CANDIDATE: CHILD-002
+```
+
+## Hard rules
+
+* No repository re-analysis for new bugs.
+* No classification mutation.
+* No finding loss.
+* No working chat for proven false positives.
+* No nested case directories.
+* No cycle creation when ancestor fingerprint matches.
+* No deep promote at `DEPTH >= 5` without `CONFIRM_DEEP_PROMOTE`.
+* No production edits.
+* No `GO` in handoffs.
+* No automatic claim.
+* No automatic stale-claim takeover.
