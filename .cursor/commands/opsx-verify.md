@@ -232,7 +232,9 @@ Compatibility mode: legacy
 
 ### 5. Architecture Decision Lookup
 
-* Search and read `openspec/decisions/**/*.md`.
+* Resolve decision paths from change context/`artifactPaths` / user-supplied paths first.
+* Read `openspec/decisions/index.md` only if still needed to locate candidates.
+* Further search under `openspec/decisions/` only for remaining gaps (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP`). Never dump the full tree.
 * Read proposed decisions from `contextFiles.decisions` or `artifactPaths.decisions.existingOutputPaths`, if any.
 * Output relevant decisions by path and status in `Архитектурное размещение`.
 * If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, mark `missing_required_decision`.

@@ -75,7 +75,7 @@ Archive a completed change in the experimental workflow.
 
 5. **Perform Architecture Decision Archive Gate**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Read proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
    - Get `openspec instructions decisions --change "<name>" --json` when proposed decisions exist or archive analysis requires a proposed decision, and apply `rules.decisions`.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
