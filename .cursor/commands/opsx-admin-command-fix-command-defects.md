@@ -10,7 +10,11 @@ argument-hint: "[paste FIX_PLAN_READY packet]"
 
 Apply confirmed command-contract defects from a `FIX_PLAN_READY` packet.
 
-This command edits **process contracts only** (`.cursor/commands/**`, `.cursor/rules/**` process rules, related shared OPSX contracts). It does **not** edit production code, OpenSpec product specs, or tasks unless the packet explicitly lists them.
+This command edits **process contracts only** (`.cursor/commands/**`,
+`.cursor/rules/**`, `.cursor/skills/**`, `.cursor/agents/**`,
+`.cursor/static-check/**`, `.agents/**`, related shared OPSX contracts,
+and mirrors when listed). It does **not** edit production code, OpenSpec
+product specs, or tasks unless the packet explicitly lists them.
 
 Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md` (including **Read / tool I/O budgets**).
 
