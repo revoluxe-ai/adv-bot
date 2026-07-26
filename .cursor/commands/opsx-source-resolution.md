@@ -52,6 +52,16 @@ openspec/changes/<CHANGE_ID>/specs/
 openspec/changes/<CHANGE_ID>/decisions/
 ```
 
+### Canonical OPSX pipeline graph paths
+
+Owned by `/opsx-pipeline` (`UPDATE GO` writes; `NAVIGATE` / `UPDATE` read).
+Navigation snapshot only — not a second lifecycle authority.
+
+```text
+.cursor/pipeline/GRAPH.md
+.cursor/pipeline/META.md
+```
+
 ## B. BOUNDED FALLBACK SEARCH
 
 Fallback search is allowed only when one of these is true:

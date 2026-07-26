@@ -17,6 +17,18 @@ The goal is to create a pipeline that is:
 
 This command analyzes process design, not production code.
 
+## Not the operator navigator
+
+This command builds an **ephemeral** `CURRENT_GRAPH` for analysis and
+improvement proposals only. It is always `READ_ONLY` and never persists a
+traversal map.
+
+Day-to-day navigation of the **as-is** not-admin pipeline (including known
+flaws), and materialization of the approved graph via `UPDATE` / `UPDATE GO`,
+belongs exclusively to `/opsx-pipeline`.
+
+Do not treat this command’s chat graph as the durable operator map.
+
 ------------------------------------------------------------------------
 
 # Core evaluation question
