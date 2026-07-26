@@ -34,6 +34,7 @@ poetry run pytest ...
 case=
 intake=
 finding=
+claim_token=
 COMMAND_RECEIPT
 ```
 
@@ -58,6 +59,54 @@ GO
 ```
 
 Оставшийся текст считай raw bug report / finding payload.
+
+## Claim ownership gate (mandatory)
+
+Ownership, закреплённый `/opsx-claim-next-bug`, обязан проверяться здесь.
+Парсинг `claim_token=` **недостаточен**: токен сравнивается с durable `CLAIM_TOKEN`.
+
+### Когда gate обязателен
+
+Если передан `finding=<FINDING_ID>`:
+
+1. Прочитай exact path
+   `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
+   (при необходимости сверка строки в `LEDGER.md` того же case).
+2. Если у finding `STATUS: claimed` **и** поле `CLAIM_TOKEN` непустое:
+   - вход **обязан** содержать `claim_token=<TOKEN>`;
+   - `<TOKEN>` обязан **точно** совпасть с `CLAIM_TOKEN` finding/ledger
+     (без нормализации, без «похоже», без угадывания);
+   - только после match продолжай adjudication / `mode=update` / `GO`.
+3. Если `STATUS` не `claimed` **или** `CLAIM_TOKEN` пуст — `claim_token`
+   опционален (legacy raw report / unclaimed finding).
+
+### Blockers (hard stop)
+
+| Условие | Blocker |
+|---|---|
+| `finding=` claimed + non-empty `CLAIM_TOKEN`, но `claim_token=` отсутствует | `blocked_missing_claim_token` |
+| `claim_token=` не равен durable `CLAIM_TOKEN` | `blocked_claim_token_mismatch` |
+| передан `claim_token=`, но нет `finding=` | `blocked_claim_token_without_finding` |
+| `finding=` claimed, а переданный token от другого finding/case | `blocked_claim_token_mismatch` |
+
+При любом blocker из таблицы:
+
+* не начинай forensics / adjudication по чужому claim;
+* не делай `mode=update` по этому finding;
+* не применяй production/`GO` edits;
+* верни `Вердикт: blocked`, `RESULT: blocked` в `COMMAND_RECEIPT`,
+  укажи `FINDING_ID`, ожидаемый owner path и pasteable next step:
+  `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
+  либо повтор `/opsx-fix-bug` с корректным `claim_token=` из claim packet.
+
+### Запреты
+
+* Не принимать adjudication/update по `finding=` со статусом `claimed`,
+  обходя `claim_token` (в том числе «я тот же чат», «токен потерян»,
+  «достаточно case+finding»).
+* Не подставлять `CLAIM_TOKEN` из `OWNER_CHAT`, timestamp или filename.
+* Не считать handoff `/opsx-claim-next-bug` выполненным ownership proof
+  без повторной сверки durable token в этом запуске.
 
 ## Разрешение на запись
 
@@ -131,10 +180,12 @@ Owner: `.cursor/commands/opsx-fix-types.md`.
 Если переданы `case` / `intake` / `finding` / exact path / receipt `OUTPUT_PATH`:
 
 1. сначала прочитай canonical/exact path;
-2. не ищи эти artifacts через `rg` / `find` / glob / Task-explore по всему repo;
-3. **не** запускай `git status` / `git branch` до чтения durable source и не делай их обязательными для read-only adjudication без GO;
-4. forensics/`rg` разрешены только для **символов кода**, указанных packet'ом после успешного чтения durable source;
-5. в output заполни `SOURCE_RESOLUTION` и `EXECUTION_PREFLIGHT`.
+2. если передан `finding=` — немедленно выполни **Claim ownership gate**
+   (сверка `claim_token` ↔ durable `CLAIM_TOKEN`) до forensics и до любых writes;
+3. не ищи эти artifacts через `rg` / `find` / glob / Task-explore по всему repo;
+4. **не** запускай `git status` / `git branch` до чтения durable source и не делай их обязательными для read-only adjudication без GO;
+5. forensics/`rg` разрешены только для **символов кода**, указанных packet'ом после успешного чтения durable source;
+6. в output заполни `SOURCE_RESOLUTION` и `EXECUTION_PREFLIGHT`.
 
 Canonical paths:
 
@@ -169,11 +220,12 @@ Intake обязан быть на диске до глубокого анали�
 
 ### Если `case` и `intake` присутствуют
 
-1. Прочитай durable intake из `.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md`.
-2. Используй `RAW_REPORT` / symptom / context из intake как source of truth для сигнала.
-3. Выполни read-only adjudication.
-4. Выбери ровно один `PERSISTENCE_DECISION` и persist через `mode=update`.
-5. Верни output contract и `COMMAND_RECEIPT`.
+1. Если также передан `finding=` — сначала **Claim ownership gate**; при blocker остановись.
+2. Прочитай durable intake из `.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md`.
+3. Используй `RAW_REPORT` / symptom / context из intake как source of truth для сигнала.
+4. Выполни read-only adjudication.
+5. Выбери ровно один `PERSISTENCE_DECISION` и persist через `mode=update`.
+6. Верни output contract и `COMMAND_RECEIPT`.
 
 ### Persistence decision после adjudication
 
@@ -731,15 +783,16 @@ COMMAND_RECEIPT:
 Когда `GO` есть:
 
 1. если `case`/`intake` отсутствуют, всё равно сначала создай durable intake через shared `mode=intake`, затем forensics;
-2. выполни тот же forensics;
-3. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
-4. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
-5. держи diff минимальным;
-6. не патчь dead code без явного обоснования;
-7. не трогай forbidden files/actions;
-8. запусти targeted verification command, если он доступен;
-9. отчитайся по changed files, tests run, durable case/intake/finding ids и unresolved risks;
-10. заверши `COMMAND_RECEIPT` с `CASE_ID` / `INTAKE_ID` / `FINDING_ID` / `PERSISTENCE_DECISION`.
+2. если передан `finding=` — **Claim ownership gate** до forensics и до любого production edit; mismatch/missing → `blocked`, без code changes;
+3. выполни тот же forensics;
+4. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
+5. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
+6. держи diff минимальным;
+7. не патчь dead code без явного обоснования;
+8. не трогай forbidden files/actions;
+9. запусти targeted verification command, если он доступен;
+10. отчитайся по changed files, tests run, durable case/intake/finding ids и unresolved risks;
+11. заверши `COMMAND_RECEIPT` с `CASE_ID` / `INTAKE_ID` / `FINDING_ID` / `PERSISTENCE_DECISION`.
 
 Если баг требует более широкого изменения поведения, чем покрывает текущий report, остановись и предложи OpenSpec change вместо silent scope expansion.
 
@@ -888,6 +941,7 @@ Follow-up:
 
 Перед завершением проверь:
 
+- если передан `finding=` со `STATUS: claimed` и non-empty `CLAIM_TOKEN` — входной `claim_token=` сверен exact match, иначе stop с `blocked_missing_claim_token` / `blocked_claim_token_mismatch`;
 - raw intake записан до глубокого анализа, если case/intake не были переданы;
 - выбран ровно один `PERSISTENCE_DECISION`: `new_finding` или `duplicate_intake`;
 - при `new_finding` создан новый finding с `SOURCE_INTAKE_ID` = текущий intake;
@@ -959,4 +1013,18 @@ INTAKE-002
 → SOURCE_INTAKE_ID: INTAKE-002
 
 7. запрещённый исход останавливается blocker'ом cross_intake_finding_update_without_relation
+```
+
+## Acceptance scenario (claim ownership)
+
+```text
+1. /opsx-claim-next-bug case=BUGCASE-X chat_label="chat-a"
+   → FINDING_ID=CHILD-002, CLAIM_TOKEN=CLAIM/BUGCASE-X/CHILD-002/<ts>
+2. /opsx-fix-bug case=BUGCASE-X intake=... finding=CHILD-002
+   (без claim_token) → blocked_missing_claim_token; no adjudication writes
+3. /opsx-fix-bug ... finding=CHILD-002 claim_token=WRONG
+   → blocked_claim_token_mismatch; no production/GO path
+4. /opsx-fix-bug ... finding=CHILD-002 claim_token=CLAIM/BUGCASE-X/CHILD-002/<ts>
+   → gate pass; read-only adjudication allowed
+5. параллельный чат с тем же finding= без валидного token не обходит ownership
 ```
