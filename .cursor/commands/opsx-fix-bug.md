@@ -11,7 +11,7 @@ argument-hint: "[case=<CASE_ID>] [intake=<INTAKE_ID>] [finding=<FINDING_ID>] [cl
 
 Перед любыми изменениями production-кода или tests команда обязана проверить достижимость runtime-пути, владельца инварианта, write-boundary impact и качество regression-теста.
 
-Перед глубоким анализом сырой bug signal обязан быть записан в durable case map, если `case`/`intake` ещё не переданы.
+Перед глубоким анализом сырой bug signal обязан быть на диске в durable case map: либо через переданные `case`/`intake`, либо через same-chat resume из prior `COMMAND_RECEIPT`, либо (только first-run без resume) через `/opsx-materialize-bug-queue mode=intake`. Follow-up `GO` без IDs не создаёт новый case.
 
 ## Язык ответа
 
@@ -130,7 +130,7 @@ GO
 
 Разрешённые process-writes без `GO`:
 
-* создать raw intake через shared contract `/opsx-materialize-bug-queue mode=intake`;
+* создать raw intake через shared contract `/opsx-materialize-bug-queue mode=intake` **только** после Resume gate, когда prior same-chat receipt отсутствует (истинный first-run);
 * обновить case/intake/finding/ledger/INDEX через `/opsx-materialize-bug-queue mode=update`;
 * сохранить `SOURCE_INTAKE_ID` и recovery fields.
 
@@ -200,7 +200,24 @@ Canonical paths:
 
 ### Если `case` и `intake` отсутствуют
 
-Без `GO` выполни в одном запуске:
+Сначала **same-chat receipt resume** (human-first). Не создавай новый case, пока не исключено продолжение уже записанного сигнала.
+
+#### Resume gate (обязателен до `mode=intake`)
+
+1. Если в **этом же чате** уже есть завершённый `COMMAND_RECEIPT` от `/opsx-fix-bug` с непустыми `CASE_ID` и `INTAKE_ID` (и опционально `FINDING_ID` / `claim_token`), и текущий ввод — продолжение того же сигнала (типично follow-up `GO`, повтор того же report, или «продолжи» без новых IDs):
+   - **не** вызывай `/opsx-materialize-bug-queue mode=intake`;
+   - продолжай с IDs из этого receipt как будто они были переданы во вводе;
+   - при наличии `FINDING_ID` в receipt и `STATUS: claimed` — применяй **Claim ownership gate** (нужен matching `claim_token=` из ввода или из того же receipt, если он там сохранён).
+2. Запрещено угадывать case по «похожему тексту» в `INDEX.md` или по другим чатам. Resume только из explicit IDs во вводе или из prior receipt **этого** чата.
+3. Если resume невозможен (нет prior receipt / receipt без IDs):
+   - при токене `GO` **и** пустом/отсутствующем новом raw bug payload (типичный follow-up только `GO`) → stop с blocker `blocked_needs_case_intake`;
+     не создавай новый case; верни pasteable next из `.tmp/opsx-bug-cases/INDEX.md` recovery row или попроси вставить `case=`/`intake=` из предыдущего receipt;
+   - при токене `GO` **и** непустом новом raw bug payload без prior receipt (редкий one-shot) → first-run `mode=intake` ниже, затем forensics; это **не** путь для повторного GO по уже adjudicated сигналу;
+   - без `GO` (истинный first-run) → создай новый intake через `mode=intake` ниже.
+
+#### First-run (только без resume)
+
+Выполни в одном запуске:
 
 1. Persist raw intake через shared contract:
 
@@ -216,7 +233,7 @@ Canonical paths:
 5. Обнови INDEX recovery row через тот же materialize contract.
 6. Верни обычный output contract без `GO` плюс `COMMAND_RECEIPT`.
 
-Intake обязан быть на диске до глубокого анализа. Не начинай широкий forensics, пока raw intake не записан.
+Intake обязан быть на диске до глубокого анализа. Не начинай широкий forensics, пока raw intake не записан (через resume existing paths или через first-run `mode=intake`).
 
 ### Если `case` и `intake` присутствуют
 
@@ -782,7 +799,7 @@ COMMAND_RECEIPT:
 
 Когда `GO` есть:
 
-1. если `case`/`intake` отсутствуют, всё равно сначала создай durable intake через shared `mode=intake`, затем forensics;
+1. если `case`/`intake` отсутствуют — сначала **Resume gate** (same-chat prior `COMMAND_RECEIPT`); при успешном resume продолжай forensics на этих IDs; **не** вызывай `mode=intake` и **не** создавай новый case. Если resume невозможен и ввод — follow-up только `GO` без raw payload → `blocked_needs_case_intake` (без production edits и без нового case). Если resume невозможен, но есть новый raw bug payload → допустим one-shot first-run `mode=intake`, затем forensics;
 2. если передан `finding=` — **Claim ownership gate** до forensics и до любого production edit; mismatch/missing → `blocked`, без code changes;
 3. выполни тот же forensics;
 4. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
@@ -965,6 +982,8 @@ Follow-up:
 - при `research_candidate_only` сохранены `EVIDENCE_GAP` и `REQUIRED_EXTRACTION`;
 - `AUTO_MATERIALIZE` всегда `false`;
 - adjacent note не создал новый intake/finding/case автоматически;
+- при omitted `case`/`intake` сначала выполнен Resume gate (same-chat prior `COMMAND_RECEIPT`); follow-up `GO` без IDs не создал новый case;
+- при follow-up `GO` без IDs, без usable prior receipt и без нового raw payload — `blocked_needs_case_intake`, без `mode=intake`;
 - `COMMAND_RECEIPT` содержит `CASE_ID`, `INTAKE_ID`, `FINDING_ID`, `PERSISTENCE_DECISION`.
 
 ## Acceptance scenario (durable intake)
@@ -974,6 +993,7 @@ Follow-up:
 ```text
 raw user bug report
 → /opsx-fix-bug <report>          # без GO, без case/intake
+→ Resume gate: no prior receipt → first-run
 → mode=intake пишет intakes/<INTAKE_ID>.md до глубокого анализа
 → CASE_ID и INTAKE_ID созданы
 → read-only adjudication
@@ -984,6 +1004,21 @@ raw user bug report
 → продолжение из .tmp/opsx-bug-cases/INDEX.md через pasteable NEXT_ACTION
 ```
 
+## Acceptance scenario (same-chat GO resume — no duplicate case)
+
+```text
+1. /opsx-fix-bug <report>          # без GO, без case/intake
+   → first-run mode=intake
+   → COMMAND_RECEIPT: CASE_ID=BUGCASE-X, INTAKE_ID=INTAKE-001, FINDING_ID=...
+2. в том же чате: /opsx-fix-bug GO   # IDs из receipt опущены
+   → Resume gate: reuse CASE_ID/INTAKE_ID из prior COMMAND_RECEIPT
+   → НЕ вызывать mode=intake
+   → НЕ создавать второй case / INTAKE-002 для того же сигнала
+3. в новом чате: /opsx-fix-bug GO     # без case/intake, без prior receipt, без raw payload
+   → blocked_needs_case_intake
+   → pasteable next из INDEX.md или из старого receipt
+4. запрещено: same-chat GO follow-up без IDs → mode=intake → второй BUGCASE для того же сигнала
+```
 ## Acceptance scenario (intake dedup / linkage)
 
 ```text
