@@ -79,7 +79,7 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
 
 4. **Read context files**
 
-   Read every file path listed under `contextFiles` from the apply instructions output.
+   Read `contextFiles` paths under execution-preflight Read I/O budgets (prefer sequential; parallel max 2; section Read for large artifacts when only part is needed).
    The files depend on the schema being used:
    - **spec-driven**: proposal, specs, design, tasks, and optional decisions when present
    - Other schemas: follow the contextFiles from CLI output

@@ -55,7 +55,7 @@ When ready to implement, run /opsx:apply
 
 4. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Check `artifactPaths.decisions.existingOutputPaths` for already-proposed decisions in the change.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - If the requested change needs architecture placement but no relevant decision exists, output `Architecture Decision Missing`.

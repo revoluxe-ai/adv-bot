@@ -62,7 +62,9 @@ Implement tasks from an OpenSpec change.
 
 4. **Read context files**
 
-   Read every file path listed under `contextFiles` from the apply instructions output.
+   Read file paths listed under `contextFiles` from the apply instructions output,
+   under execution-preflight Read I/O budgets (prefer sequential; parallel max 2;
+   large artifacts via section Read when only a part is needed).
    The files depend on the schema being used:
    - **spec-driven**: proposal, specs, design, tasks, and optional decisions when present
    - Other schemas: follow the contextFiles from CLI output
@@ -80,7 +82,9 @@ Implement tasks from an OpenSpec change.
 
 6. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve paths from `contextFiles.decisions` / `artifactPaths.decisions` / user-supplied paths first.
+   - Read `openspec/decisions/index.md` only if still needed to locate candidates.
+   - Search/read further under `openspec/decisions/` **only** for remaining gaps after direct context (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Never dump the full decision tree.
    - Read existing proposed decisions from `contextFiles.decisions` or `artifactPaths.decisions.existingOutputPaths`, if any.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - If the change touches ownership, layering, write paths, or domain invariants with no relevant decision, output `Architecture Decision Missing` and pause unless the artifacts already include a proposed decision.
