@@ -146,7 +146,9 @@ async def process_ab_epoch(
         intent_raw = getattr(adv_setting, "card_ab_hold_pending_intent_json", None)
         generation: int | None = None
         if isinstance(intent_raw, dict):
-            generation = int(intent_raw.get("generation", 0) or 0)
+            # getattr → object; cast mirrors pending/WB_SYNC path (intent: dict[str, Any]).
+            intent_complete = cast(dict[str, Any], intent_raw)
+            generation = int(intent_complete.get("generation", 0) or 0)
         await _apply_activation_to_complex_adv(
             complex_adv,
             generation=generation,
