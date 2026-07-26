@@ -179,7 +179,7 @@ Bad:
 - [x] relevant decisions cited (`openspec/decisions/mode-defaults-policy-ownership/decision.md`, `ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`)
 - [x] new decision proposed because accepted decision was missing for hold write-path
 - [x] implementation layer matches decision *(delta §9 Excel out — applied; delta §10 Enable idempotent — applied via `/opsx-fix-bug GO`; delta §11 hide Enable — applied via `/opsx:apply`; delta §12 V3-only + V2 downgrade block — applied (tasks §14); delta §13 shared-defaults not a disable path — applied (tasks §15); delta §2c launch-validity soft-gate — **applied** (tasks §13 + §17: campaign-level proxy + calendar-day MV + CH-error distinct reason); delta §14 PENDING_SETUP liveness — **applied via `/opsx:apply`** (tasks §16: max-CPO enable hard-gate `has_positive_plan_max_cpo` + actionable PENDING status via `CardAbHoldSetupBlock` Redis channel + EXIT recovery; owned auto-abort = SHOULD/future))*
-- [ ] delta §15 WARM_UP/epoch/generation, §16 confirmed epoch-parameters SoT, §17 stale-stats Search/Auto freeze, §18 daily-budget orthogonal reuse — **not yet applied**; apply заблокирован до owner-авторизации (см. `tasks.md` §19-§25); OD-05 остаётся единственным открытым owner decision для broad enablement
+- [x] delta §15 WARM_UP/epoch/generation, §16 confirmed epoch-parameters SoT, §17 stale-stats Search/Auto freeze, §18 daily-budget orthogonal reuse — **applied via `/opsx:apply` §19–§25**; OD-05 **acceptance** for broad enable remains OPEN (env default false; see `rollout/od05-readiness.md` + `evaluate_card_ab_hold_broad_enable_readiness`)
 - [x] tests verify structural freeze without masking placement violations
 - [x] paid-only gate enforced for UI and enable paths
 

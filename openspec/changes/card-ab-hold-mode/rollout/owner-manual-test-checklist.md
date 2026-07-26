@@ -68,4 +68,5 @@
 | Result | PASS / FAIL |
 | Notes | |
 
-**Broad enablement:** blocked until OD-05 closed and this checklist PASS on staging/test cohort.
+**Broad enablement:** blocked until OD-05 closed and this checklist PASS on staging/test cohort.  
+See also: `rollout/od05-readiness.md` (readiness API + sign-off; OD-05 remains OPEN until owner accepts).
