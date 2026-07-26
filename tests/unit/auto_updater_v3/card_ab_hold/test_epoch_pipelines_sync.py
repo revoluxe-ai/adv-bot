@@ -24,10 +24,12 @@ def _sync_adv(
     intent: dict | None,
     generation: int = 1,
     sync_status: str = "pending",
+    phase: str | None = None,
 ) -> SimpleNamespace:
+    """Собрать ComplexAdv-подобный stub с production enum values."""
     adv_setting = SimpleNamespace(
         id=99,
-        card_ab_hold_phase=CardAbHoldPhase.PENDING_INTENT.value,
+        card_ab_hold_phase=phase or CardAbHoldPhase.PENDING_INTENT.value,
         card_ab_hold_sync_status=sync_status,
         card_ab_hold_pending_intent_json=intent,
         card_ab_hold_generation=generation,
@@ -168,4 +170,171 @@ async def test_stale_stats_skips_wb_sync() -> None:
             stats_fresh=False,
         )
     mock_wb.assert_not_called()
+    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_complete_residual_activates_without_wb_reentry() -> None:
+    """Residual complete + WB_SYNC: activate-only, без PG/WB re-apply."""
+    adv = _sync_adv(
+        intent=_INTENT,
+        sync_status=CardAbHoldSyncStatus.COMPLETE.value,
+        phase=CardAbHoldPhase.WB_SYNC.value,
+    )
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ) as mock_pg,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ) as mock_wb,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_activate,
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+            stats_fresh=True,
+        )
+    mock_pg.assert_not_called()
+    mock_wb.assert_not_called()
+    mock_activate.assert_awaited_once_with(99)
+    assert adv.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
+    assert adv.adv_setting.card_ab_hold_phase == CardAbHoldPhase.READY_ACTIVE.value
+    assert (
+        adv.adv_setting.card_ab_hold_sync_status
+        == CardAbHoldSyncStatus.COMPLETE.value
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_complete_residual_stale_stats_still_activates() -> None:
+    """§23 freeze не блокирует activate-only после durable complete."""
+    adv = _sync_adv(
+        intent=_INTENT,
+        sync_status=CardAbHoldSyncStatus.COMPLETE.value,
+        phase=CardAbHoldPhase.WB_SYNC.value,
+    )
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ) as mock_wb,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ) as mock_pg,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_activate,
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+            stats_fresh=False,
+        )
+    mock_wb.assert_not_called()
+    mock_pg.assert_not_called()
+    mock_activate.assert_awaited_once_with(99)
+    assert adv.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_pending_still_enters_wb_sync() -> None:
+    """Allowed sibling: pending остаётся eligible для WB sync."""
+    adv = _sync_adv(
+        intent=_INTENT,
+        sync_status=CardAbHoldSyncStatus.PENDING.value,
+        phase=CardAbHoldPhase.PENDING_INTENT.value,
+    )
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ) as mock_pg,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ) as mock_wb,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.mark_wb_sync_status",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            return_value=True,
+        ),
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+            stats_fresh=True,
+        )
+    mock_pg.assert_awaited_once()
+    mock_wb.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_activate_exception_after_complete_keeps_complete() -> None:
+    """CHILD-002: ошибка activation после COMPLETE не демоитит в PARTIAL."""
+    adv = _sync_adv(intent=_INTENT)
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.mark_wb_sync_status",
+            new_callable=AsyncMock,
+        ) as mock_mark,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("activate boom"),
+        ),
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+            stats_fresh=True,
+        )
+    mock_mark.assert_awaited_once_with(99, CardAbHoldSyncStatus.COMPLETE)
+    assert (
+        adv.adv_setting.card_ab_hold_sync_status
+        == CardAbHoldSyncStatus.COMPLETE.value
+    )
     assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
