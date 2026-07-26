@@ -47,8 +47,36 @@ If `REQUIRED_FOR` is empty or not needed for the current decision, **skip** the 
 | `rg` / targeted search | per source-resolution budget | not a default preflight |
 | `find` inventories | forbidden by default | fallback only with EVIDENCE_GAP |
 | test discovery / pytest collect | defer until test command needs it | |
+| `Read` / file open | see **Read / tool I/O budgets** below | hang class separate from git |
+| parallel `Read` batch | max **2** concurrent | never dump whole command-set |
 
 Commands MAY tighten these budgets; they MUST NOT remove budgets for optional ops.
+
+## Read / tool I/O budgets
+
+Third hang class (after unbounded search and unconditional git): **mass or stuck file Reads**.
+
+Hard rules for every OPSX command:
+
+1. Prefer `Grep` / path inventory over full-file `Read` when only a token, gate, or section is needed.
+2. Read **exact listed paths** first (defect FILES, `artifactPaths`, user paths, receipt paths).
+3. Do **not** preload sibling process docs “for context” unless a field in the current decision requires them.
+4. Parallel `Read`: at most **2** concurrent calls. Never open an entire `.cursor/commands/opsx-*.md` set in one turn.
+5. Large process files (`opsx-invariant`, `opsx-fix-bug`, `opsx-verify`, `opsx-materialize-bug-queue`, `opsx-learn-from-bug`, `opsx-admin-command-design-command`, `opsx-admin-command-analyze-pipeline`, …): use `Read` with `limit`/`offset` (default first pass ≤ **120** lines or a Grep hit ± context). Full-file read only when REQUIRED_FOR the decision.
+6. After each required file is understood, **act** (patch / classify / extract) before opening the next unrelated file.
+7. If a `Read` does not return within ~**30s**, stop waiting; do not stack more Reads on the same turn. Record:
+
+```text
+READ_IO_RESULT:
+- path:
+- status: ok | timeout | deferred | skipped
+- required_for_decision: true | false
+```
+
+8. Timeout on optional context → continue. Timeout on a required defect/artifact path → command-compatible blocker (`blocked_preflight_timeout` / `EVIDENCE_GAP`), not silent hang.
+9. Subagents that extract “ALL opsx commands” MUST use Grep-first + sequential bounded Read, not parallel full-file dumps.
+
+`FULL_OPSX_AUDIT` / pipeline analysis / command-set review are **not** exemptions.
 
 ## Failure / timeout behavior
 
@@ -101,7 +129,7 @@ Default:
 * never run git status as step 0 before reading known case/finding.
 
 ### C. Git-mutating / PR / split / commit workflows
-Examples: `/opsx-commit`, `/opsx-create-pr`, `/opsx-split-for-pr`.
+Examples: `/opsx-commit`, `/opsx-admin-command-commit`, `/opsx-create-pr`, `/opsx-split-for-pr`.
 
 Default:
 
@@ -135,5 +163,6 @@ EXECUTION_PREFLIGHT:
 * No unconditional “always run git status first”.
 * Optional preflight must not gate the main read-only decision.
 * Timeout → continue or blocker by `required_for_decision`, never silent hang.
+* No mass parallel file Reads; Grep/section-first; parallel Read max 2.
 * Do not invent a second status taxonomy when the command already has blockers.
 * Keep companion source-resolution rules for artifact rediscovery.
