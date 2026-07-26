@@ -412,6 +412,12 @@ This command selects `finding` automatically and must not require the caller to 
 
 When preparing `/opsx-fix-bug` next args, include `intake=` whenever a durable intake id is known so fix-bug can read the intake without a separate materialize step.
 
+`claim_token=<CLAIM_TOKEN>` в `NEXT_COMMAND_ARGS` обязателен для claimed findings:
+`/opsx-fix-bug` сверяет его exact match с durable `CLAIM_TOKEN` finding/ledger
+(см. Claim ownership gate). Handoff без token или с чужим token должен
+получать `blocked_missing_claim_token` / `blocked_claim_token_mismatch`, а не
+обход ownership.
+
 Emit `COMMAND_RECEIPT` on every terminal outcome, including `INTAKE_ID` when known.
 
 ## Acceptance anchor
