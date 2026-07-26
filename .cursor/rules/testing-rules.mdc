@@ -1,53 +1,140 @@
 ---
-description: Тестирование проекта
-globs: 
+description: Canonical test-design and execution policy for WB Sky (Poetry gates, reality/mocking, write-gates, lifecycle)
+globs:
 alwaysApply: false
 ---
-Ты - опытный тестировщик. Твоя задача  - не писать код, а тестировать проект.
+
+# Тестирование проекта (canonical)
+
+Единственный canonical Cursor rule для test-design и test-execution в этом репозитории.
+
+Authority split (не дублировать полный policy в commands):
+
+- `.cursor/rules/testing-rules.mdc` — общий test-design / execution policy
+- `openspec/config.yaml` → `rules.tasks` — обязательства при генерации tasks
+- `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
+- `/opsx-apply` — implementation + materialization обязательных tests
+- `/opsx-verify` — независимая adequacy-проверка и archive verdict `GO` / `NO_GO`
+
+Устаревший файл `.cursor/rules/TESTING_RULES.mdc` — только migration pointer; не использовать как policy.
+
+## Роль
+
+Это правило применяется при написании, правке и запуске тестов, а также при `/opsx-apply`, `/opsx-test` и любой работе, где нужно доказать observable behavior.
+
+Оно **не** запрещает писать production code в writer-сессиях (`/opsx-apply` и аналоги).
+
+## Execution gates
+
 1. Все project commands запускай только через Poetry: `poetry run ...`
-2. Не запускай bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
-3. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
-4. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза; если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
-4a. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через `rg -n "<symbol>"` по всем call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.
-5. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
-6. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
-7. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
-8. Если я попрошу внести изменения в правила, редактируй текущее правило
+2. Не запускай bare `pytest`, `ruff`, `black`, `pyright`, `pyright-strict`
+3. Всегда запускай тесты из корня репозитория: `poetry run pytest ...`
+4. Не запускай тесты через `cd tests` + bare `pytest` или аналоги
+5. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
+6. `ruff` и `black` не являются обязательными gates, если задача явно не просит lint/format
+7. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
+8. На Windows PowerShell не используй bash-синтаксис: `||`, `&&`, `grep`, `sed`, `awk`, `true` как no-op
 
-9. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
-   - Перед изменениями составь failure matrix:
-     - happy path
-     - recoverable failures (fallback/partial success)
-     - non-recoverable failures (must bubble up)
-     - idempotency на повторном запуске
-     - cross-iteration behavior (следующий тик/цикл)
-     - видимость логов при production LOG_LEVEL
-   - Обязательный минимальный набор тестов:
-     - unit-тесты парсера/экстрактора на edge-cases
-     - unit-тесты termination retry/fallback loop
-     - integration-style тест orchestration слоя, который использует результат fallback
-     - regression-тест, воспроизводящий найденный продовый баг
-     - idempotency-тест: второй запуск не должен повторять невалидные запросы
-   - Контракт между слоями:
-     - если нижний слой трансформирует payload (например, удаляет невалидные элементы),
-       верхний слой обязан использовать transformed/applied результат в последующих сравнениях
-       и решениях; сравнение только с исходным target запрещено.
-   - Blocking gate перед завершением задачи:
-     - нельзя завершать задачу без зелёных targeted `poetry run pytest` и regression-теста для инцидента.
-   - Логирование:
-     - recoverable ошибки не должны спамиться как hard ERROR в циклах;
-       нужен summary-лог по сущности (attempts, dropped items, applied items).
-   - В финальном отчёте обязательно укажи:
-     - какой продовый симптом предотвращён,
-     - какой тест упадёт при возврате бага,
-     - какие допущения зависят от runtime/prod конфигурации.
+## Targeted и adjacent coverage
 
-10. Async test isolation:
-   - Async tests MUST NOT вручную patch shared module-level dependencies around awaited code.
-   - Forbidden pattern: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore.
-   - Это особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags.
-   - Предпочитай самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client.
-   - Используй pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объясняй почему более узкий patch point невозможен.
-   - Write-gate regression tests MUST prove, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван.
-   - Regression tests MUST fail, если guarded condition удалена.
-   - Если gate имеет blocked и allowed behavior, добавь или потребуй paired positive case.
+1. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза.
+2. Если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
+3. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через поиск call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.
+
+## Failure matrix (fallback / retry / error-handling / state transitions)
+
+Перед изменениями в этих зонах составь failure matrix:
+
+- happy path
+- recoverable failures (fallback / partial success)
+- non-recoverable failures (must bubble up)
+- idempotency на повторном запуске
+- cross-iteration / next-tick behavior
+- видимость логов при production `LOG_LEVEL`
+
+Минимальный набор, когда применимо:
+
+- unit-тесты парсера/экстрактора на edge-cases
+- unit-тесты termination retry/fallback loop
+- orchestration-seam тест, который использует результат fallback
+- regression-тест, воспроизводящий найденный продовый баг
+- idempotency-тест: повторный запуск не должен повторять невалидные внешние эффекты
+
+Контракт между слоями: если нижний слой трансформирует payload, верхний слой обязан использовать transformed/applied результат; сравнение только с исходным target запрещено.
+
+Blocking gate перед завершением implementation-задачи: нельзя отмечать owning task выполненной без зелёных targeted tests (и regression-теста для инцидента, если он в scope).
+
+В финальном отчёте по такой задаче укажи:
+
+- какой продовый симптом предотвращён
+- какой тест упадёт при возврате бага
+- какие допущения зависят от runtime/prod конфигурации
+
+## Async test isolation
+
+- Async tests MUST NOT вручную patch shared module-level dependencies around awaited code.
+- Forbidden pattern: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore.
+- Особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags.
+- Предпочитай самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client.
+- Используй pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объясняй почему более узкий patch point невозможен.
+
+## Write-gate и paired behavior
+
+- Write-gate regression tests MUST prove, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван (`assert_not_called()` / `count == 0` недостаточно сами по себе).
+- Regression tests MUST fail, если intended guard удалена.
+- Если gate имеет blocked и allowed behavior, добавь или потребуй paired positive case.
+
+## Reality constraints
+
+- Не создавай phantom model/DTO fields, которых нет в production schema.
+- Не создавай impossible state combinations.
+- Сохраняй production field types, identity semantics и ownership.
+- Не подменяй live source of truth удобным fixture field из неправильного storage/ownership layer.
+- Lightweight stubs и `SimpleNamespace` допустимы только если relevant production shape соблюдена.
+- Test name и green status сами по себе не доказывают coverage, production wiring или full spec conformity.
+- Passing tests не доказывают, что symbol runtime-reachable вне tests.
+
+## Mocking constraints
+
+- Causal boundary, поведение которой проверяется, нельзя полностью mock-ать.
+- Внешнюю destructive dependency (WB write, billing, destructive side effect) можно mock-ать **после** causal boundary, если orchestration path и input shape сохранены.
+- Нельзя заранее передавать в test результат, который должна вычислить проверяемая production boundary, и выдавать это за proof границы.
+- Нельзя stub-ать pipeline так, что real guard никогда не достигается.
+
+## Minimum test level
+
+Выбирай минимальный уровень по boundary, достаточный доказать observable behavior, causal path и protected boundary:
+
+- `unit_component`
+- `orchestration_seam`
+- `runtime_entrypoint`
+- `boundary_adapter`
+- `integration`
+
+Full E2E не требуется автоматически.
+
+Для lifecycle / retry / state-machine / scheduler invariants проверяй residual и repeated invocation (next-tick, retry after durable status, partial completion), когда это применимо к protected behavior.
+
+## `TEST_COVERAGE_PACKET` (change-specific)
+
+- Packet создаёт `/opsx-invariant`; apply materializes обязательства; verify независимо проверяет adequacy.
+- Packet остаётся change-specific artifact; не превращай этот rule в второй packet contract.
+- Отсутствие packet не блокирует legacy apply.
+- Статус packet (`provisional` / `not_materialized` / `not_applicable`) сам по себе не блокирует implementation и не является archive verdict.
+- Не выдумывай mandatory scenarios без evidence из spec / decision / task / invariant / materialized packet.
+- Не меняй invariant ради удобства теста.
+- Final adequacy и archive readiness объявляет только `/opsx-verify`.
+
+## Устаревшее (запрещено переносить)
+
+Не требовать и не восстанавливать:
+
+- `tests/test_models.py`
+- `TestUser` / `TestWBToken` как обязательные mock models
+- fixture `test_async_db` как универсальный contract
+- blanket «всегда использовать mock models»
+- role restriction «не писать код, только тестировать»
+
+## Редактирование правил
+
+Если владелец просит изменить test policy, редактируй этот файл (canonical), а не `.cursor/rules/TESTING_RULES.mdc`.

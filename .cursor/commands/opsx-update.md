@@ -11,7 +11,7 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_update --strict`. Stop on non-zero exit and report the guard output.
 
-**Architecture Decision Lookup:** When revising artifacts, also check `openspec/decisions/**/*.md` and `artifactPaths.decisions.existingOutputPaths`. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
+**Architecture Decision Lookup:** When revising artifacts, resolve `artifactPaths.decisions.existingOutputPaths` first, then only needed accepted decisions under `openspec/decisions/`. Follow `.cursor/commands/opsx-source-resolution.md`; do not rediscover the selected change by scanning all changes. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
 
 **Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 

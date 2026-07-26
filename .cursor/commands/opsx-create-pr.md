@@ -11,6 +11,7 @@ Before preparing or creating the PR, inspect and follow:
 
 - `openspec/policies/pr-context.md`
 
+Read that exact path directly (`.cursor/commands/opsx-source-resolution.md`). Do not search the repo to rediscover the policy when the path is known.
 If this policy file exists, treat it as the source of truth for PR context rules.
 
 If this command and the policy conflict:
@@ -147,7 +148,16 @@ Stop before PR creation if:
 
 ## Required read-only checks before PR
 
-Run:
+Follow `.cursor/commands/opsx-execution-preflight.md`.
+
+Git ops below are typically **REQUIRED_FOR** PR creation. Still apply TIME_BUDGET and FAILURE_BEHAVIOR; never hang silently.
+
+```text
+TIME_BUDGET: branch/status 5s/10s; log 10s; fetch 30s; diff/log vs target 15s; gh 20s
+FAILURE_BEHAVIOR: blocked_preflight_timeout or stop with named missing fact; no retry loop
+```
+
+Preferred order — local facts first; remote only when needed:
 
 ```bash
 git branch --show-current
@@ -156,7 +166,7 @@ git remote -v
 git log --oneline -10
 ```
 
-Check target branch:
+Check target branch (REQUIRED_FOR base validation):
 
 ```bash
 git fetch --all --prune
@@ -183,6 +193,7 @@ Check GitHub auth:
 gh auth status
 ```
 
+Skip or defer any step whose result is already known from a fresh prior receipt in the same invocation.
 ## PR title rules
 
 Title must describe behavior or intent, not files.

@@ -46,16 +46,36 @@ Forbidden unless explicitly approved:
 
 ## Pre-check
 
-Before writing tests, inspect the current repo state read-only:
+Before writing tests, inspect only what is REQUIRED_FOR the test-authoring decision.
+
+Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`.
 
 ```bash
-git branch --show-current
+# OPTIONAL metadata — SKIP_IF not required; TIME_BUDGET branch 5s / status 10s
+# git branch --show-current
+# git status --short
+```
+
+If `change=<id>` is provided, read only:
+
+```text
+openspec/changes/<id>/proposal.md
+openspec/changes/<id>/design.md
+openspec/changes/<id>/tasks.md
+openspec/changes/<id>/specs/
+```
+
+Then inspect only owner modules / existing tests referenced by the request.
+
+Do **not** default to:
+
+```bash
 git status --short
 find tests -maxdepth 5 -type f | sort
 find app -maxdepth 6 -type f | sort
 ```
 
-Then inspect only relevant owner files, existing tests, fixtures, factories, and pytest config.
+Those inventories / git status are bounded fallback only after `EVIDENCE_GAP` (unknown test location or dirty-tree claim) with budgets from the execution-preflight contract. Include `SOURCE_RESOLUTION` and `EXECUTION_PREFLIGHT` in the final output.
 
 ## Classify the request
 

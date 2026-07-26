@@ -114,6 +114,8 @@ $ARGUMENTS
 Извлеки из `$ARGUMENTS`:
 
 * `change`: OpenSpec change ID.
+* `case`: durable bug CASE_ID, if present.
+* `finding` / `source_finding`: durable FINDING_ID or packet path.
 * `desc`: пользовательское описание ожидаемого поведения.
 * `bug`: конкретный bug report, Bugbot finding, CI finding или manual finding.
 * `classification`: ранее полученная классификация, если она явно передана.
@@ -122,6 +124,17 @@ $ARGUMENTS
 * `head`: branch или commit для анализа.
 * `scope`: paths или modules, ограничивающие анализ.
 * `target`: `bug-hunt`, `fix-bug` или `both`.
+
+## Source resolution (mandatory)
+
+Следуй `.cursor/commands/opsx-source-resolution.md`.
+Также следуй `.cursor/commands/opsx-execution-preflight.md`: не запускай unconditional `git status`/`git branch` до чтения exact change/finding; git только если REQUIRED_FOR base/head/dirty claim.
+
+* `change=<id>` → читай только `openspec/changes/<id>/...` exact paths; не делай inventory всего `openspec/` без `EVIDENCE_GAP`.
+* `case`/`finding` → сначала `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
+* `scope=` ограничивает любой последующий code search.
+* Budget: ≤ 3 targeted searches на незакрытый evidence target после direct reads.
+* В финальном output включи `SOURCE_RESOLUTION` и при необходимости `EXECUTION_PREFLIGHT`.
 
 Не используй distant chat history как единственное evidence для:
 
@@ -156,6 +169,8 @@ change=<change-id>
 * `openspec/changes/<change-id>/tasks.md`, если существует;
 * `openspec/changes/<change-id>/specs/**`, если существуют;
 * `openspec/changes/<change-id>/decisions/**`, если существуют.
+
+Не запускай `find openspec` / repo-wide inventory, когда `change-id` уже известен.
 
 ### Вариант B: описание пользователя
 

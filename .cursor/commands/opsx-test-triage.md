@@ -24,6 +24,7 @@ Before triage, inspect and follow:
 
 - `openspec/policies/test-triage.md`
 
+Read that exact path directly (`.cursor/commands/opsx-source-resolution.md`). If failing test paths are provided, open those exact paths first; do not inventory all tests to rediscover them.
 If this policy file exists, treat it as the source of truth for test failure classification rules.
 
 If the command and policy conflict:
