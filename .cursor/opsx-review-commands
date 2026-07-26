@@ -1,0 +1,607 @@
+# /opsx-review-commands
+
+## Purpose
+
+Perform an independent, evidence-based review of OpenSpec/OPSX Cursor command instructions.
+
+This command reviews process-control instructions, not production-code behavior. It identifies defects that can change, block, bypass, corrupt, or make the OPSX workflow operationally ambiguous.
+
+The command is universal: findings must be derived from the selected repository snapshot and current command contracts. Do not assume that a defect seen in an earlier command version still exists.
+
+## Language
+
+Respond in the user's language. Preserve exact repository terms, identifiers, paths, status values, command names, and quoted fragments.
+
+## Invocation
+
+```text
+/opsx-review-commands mode=SINGLE_COMMAND_REVIEW target=.cursor/commands/opsx-apply.md
+/opsx-review-commands mode=COMMAND_SET_REVIEW targets=.cursor/commands/opsx-apply.md,.cursor/commands/opsx-verify.md
+/opsx-review-commands mode=FULL_OPSX_AUDIT target=.cursor/commands
+/opsx-review-commands mode=REGRESSION_REVIEW target=.cursor/commands/opsx-apply.md base=<BASE_REF> head=<HEAD_REF>
+```
+
+Optional inputs:
+
+```text
+focus=<category-or-question>
+known_defect=<exact prior finding or evidence file>
+return_to=<exact route or URL>
+lookup_budget=<positive integer>
+```
+
+Defaults:
+
+```text
+mode=SINGLE_COMMAND_REVIEW when one file is supplied
+mode=COMMAND_SET_REVIEW when multiple files are supplied
+mode=FULL_OPSX_AUDIT only when explicitly requested
+lookup_budget=3 for SINGLE_COMMAND_REVIEW
+lookup_budget=5 for COMMAND_SET_REVIEW
+lookup_budget=8 for FULL_OPSX_AUDIT
+lookup_budget=5 for REGRESSION_REVIEW
+```
+
+Do not infer `FULL_OPSX_AUDIT` merely because the target is broad or ambiguous. If mode or target cannot be resolved deterministically, return `BLOCKED`.
+
+## Review boundary
+
+Always start and remain in `READ_ONLY`.
+
+Do not:
+
+- edit, create, delete, rename, move, or format repository files;
+- create patches or implementation plans;
+- run commands whose purpose is to mutate repository state;
+- mark tasks complete;
+- commit, push, merge, rebase, switch branches, create PRs, deploy, or modify production state;
+- execute the reviewed command in its mutating mode;
+- review production code for ordinary implementation bugs;
+- expand the target beyond the selected command/process-control surface without an evidence-based conflict edge.
+
+A user request to review is not permission to fix. A separate explicit write request is required outside this command.
+
+## Review object
+
+In scope:
+
+- `.cursor/commands/opsx-*.md`;
+- shared command contracts directly referenced by reviewed commands;
+- OpenSpec workflow instructions directly governing reviewed command behavior;
+- relevant `openspec/decisions/**` records;
+- command input/output contracts;
+- GO/NO_GO and write boundaries;
+- task, spec, decision, handoff, route, snapshot, and lifecycle behavior.
+
+Out of scope unless directly required to prove a command defect:
+
+- production-code correctness;
+- general architecture review;
+- style, wording, formatting, verbosity, or naming preferences;
+- speculative future workflow design;
+- unrelated commands or decisions;
+- deprecated or generated mirrors that are not part of the active operational surface.
+
+## Required modes
+
+### `SINGLE_COMMAND_REVIEW`
+
+Review one command for internal consistency, executable contract, authority alignment, safety boundaries, failure behavior, and useful output.
+
+Cross-file reading is allowed only for direct references, shared contracts, relevant decisions, or a concrete conflict edge discovered in the target.
+
+### `COMMAND_SET_REVIEW`
+
+Review the selected commands both individually and as a set.
+
+Build a bounded interaction map covering only shared state, shared artifacts, lifecycle transitions, command chaining, GO semantics, handoff fields, and authority ownership that connect the selected commands.
+
+### `FULL_OPSX_AUDIT`
+
+Review all active `.cursor/commands/opsx-*.md` files.
+
+Use staged loading:
+
+1. inventory and classify commands;
+2. extract compact contracts;
+3. cluster commands by shared artifacts and lifecycle edges;
+4. inspect high-risk intersections;
+5. load exact fragments only for candidate findings;
+6. load relevant decisions within the lookup budget.
+
+Do not place every full command into context at once when compact contract extraction is sufficient.
+
+If context or tool limits prevent complete coverage, do not return `PASS`. Return either:
+
+- `REVIEW_COMPLETE` with `FILES_NOT_REVIEWED` and a non-PASS verdict when reviewed evidence already proves defects; or
+- `BLOCKED` when no defensible overall verdict can be issued.
+
+### `REGRESSION_REVIEW`
+
+Determine whether a diff reintroduces a previously identified command defect or violates an explicit prior command contract.
+
+Required inputs:
+
+- target file or command set;
+- `base` and `head`, or an available diff;
+- `known_defect`, prior finding, accepted contract, or exact regression criterion.
+
+Do not invent the prior defect from memory. If the regression criterion is unavailable or ambiguous, return `BLOCKED`.
+
+Review the changed lines plus the minimum surrounding contract and connected authority needed to judge the regression.
+
+## Snapshot preflight
+
+Before substantive review, collect without mutating state:
+
+```text
+branch
+HEAD
+working-tree status
+resolved review files
+base/head for REGRESSION_REVIEW
+```
+
+Record worktree as one of:
+
+```text
+CLEAN
+DIRTY_RELEVANT
+DIRTY_UNRELATED
+UNKNOWN
+```
+
+Rules:
+
+- Dirty worktree is not automatically a defect or blocker.
+- `DIRTY_RELEVANT` means uncommitted changes affect a reviewed file, a loaded authority source, or the requested diff baseline.
+- In `DIRTY_RELEVANT`, review the actual visible content and explicitly state that findings apply to the working-tree snapshot.
+- If the tool cannot determine which content is being reviewed, return `BLOCKED`.
+- Never clean, stash, restore, or reset the worktree.
+
+All repo claims are valid only for the recorded snapshot.
+
+## Source resolution
+
+Use direct, context-first resolution.
+
+1. Read the explicitly targeted files.
+2. Follow exact references contained in those files.
+3. Load shared contracts only when referenced or necessary to interpret an exact behavior.
+4. Load decisions only for a concrete unresolved authority question.
+5. Use bounded fallback search only when direct resolution fails.
+
+Do not recursively read all `openspec/decisions/**`.
+
+Decision lookup budget counts distinct decision files loaded. Default budgets are defined in `Invocation`.
+
+A decision may be loaded only when all are recorded:
+
+```text
+candidate command claim
+unresolved authority question
+reason this decision may govern it
+expected impact on verdict
+```
+
+Stop decision lookup when:
+
+- the authority question is resolved;
+- remaining candidate decisions cannot change classification or severity;
+- the lookup budget is exhausted.
+
+If the budget is exhausted before a material authority question is resolved, classify the candidate as `RISK` or return `BLOCKED`; do not promote it to a confirmed defect.
+
+## Compact command contract extraction
+
+For every reviewed command, extract only evidence-supported fields:
+
+```text
+command:
+declared purpose:
+accepted inputs:
+default mode:
+read boundary:
+write boundary:
+GO/NO_GO semantics:
+source-resolution behavior:
+decision-lookup behavior:
+artifacts read:
+artifacts written:
+state identifiers consumed:
+state identifiers returned:
+task/spec/decision mutation rules:
+failure and stale-state behavior:
+next-action contract:
+handoff/return contract:
+shared contracts referenced:
+```
+
+Use `NOT_SPECIFIED` rather than filling gaps by inference.
+
+The extracted contract is review working data, not a new authority source.
+
+## Defect taxonomy
+
+Check only categories that can produce operational impact:
+
+1. `INTRA_COMMAND_CONTRADICTION`
+2. `INTER_COMMAND_CONTRADICTION`
+3. `DECISION_CONFLICT`
+4. `UNBOUNDED_LOOKUP`
+5. `AMBIGUOUS_NEXT_ACTION`
+6. `MISSING_OR_AMBIGUOUS_GATE`
+7. `WRITE_BEFORE_APPROVAL`
+8. `READ_WRITE_MODE_MIXING`
+9. `REVIEW_OR_ARBITRATION_BYPASS`
+10. `UNAUTHORIZED_AUTHORITY_CREATION`
+11. `PREMATURE_TASK_COMPLETION`
+12. `STATE_IDENTITY_LOSS`
+13. `INCOMPLETE_HANDOFF_OR_RETURN`
+14. `NON_EXECUTABLE_OR_CYCLIC_INSTRUCTION`
+15. `SCOPE_EXPANSION_PERMISSION`
+16. `DECLARED_ACTUAL_BEHAVIOR_MISMATCH`
+17. `MISSING_FRESHNESS_CHECK`
+18. `UNDEFINED_DIRTY_MISSING_OR_STALE_BEHAVIOR`
+19. `DUPLICATE_AUTHORITY`
+20. `FORMALLY_SUCCESSFUL_BUT_USELESS_OUTPUT`
+21. `OTHER_PROCESS_CONTROL_DEFECT`
+
+Do not create a finding merely because a command is long, strict, repetitive, or uses semantic judgment. Prove the failure path and operational consequence.
+
+## Finding classification
+
+### `CONFIRMED_DEFECT`
+
+Use only when all conditions hold:
+
+- exact command text or connected authority provides direct evidence;
+- the conflicting or missing contract is identifiable;
+- at least one realistic execution path triggers harmful, blocked, bypassed, corrupted, stale, or materially ambiguous behavior;
+- no unresolved authority question could reasonably reverse the finding;
+- exact `file:line` evidence is available.
+
+### `RISK`
+
+Use when evidence shows a credible operational hazard but at least one material condition is unresolved, conditional, semantic, environment-dependent, or outside the lookup budget.
+
+### `IMPROVEMENT`
+
+Use only for a change that improves clarity or robustness without evidence of current harmful behavior.
+
+Improvements must not appear under `CONFIRMED_DEFECTS` or affect the defect verdict.
+
+### Rejected false positive
+
+Record plausible candidates rejected after review, especially when:
+
+- strictness is intentional;
+- duplicate wording is controlled overlap rather than competing authority;
+- semantic judgment is required by the task;
+- dirty worktree behavior is already deterministic;
+- a referenced shared contract resolves an apparent omission;
+- no operational impact can be demonstrated.
+
+## Evidence test for each confirmed defect
+
+For every confirmed defect, answer:
+
+```text
+What instruction is followed?
+What other instruction or required behavior conflicts with it?
+Under what concrete execution condition does the conflict occur?
+What observable process failure follows?
+Why is this not merely wording preference?
+Which authority source governs, if any?
+```
+
+Quote only the minimum conflicting fragments. Preserve exact text.
+
+## Severity
+
+Assign the highest supported level, not the most alarming level.
+
+### `CRITICAL`
+
+A normal or plausible execution path can bypass a locked approval/evaluator/arbitration boundary, perform unauthorized destructive or production-affecting writes, or irreversibly corrupt authoritative process state without a required gate.
+
+### `HIGH`
+
+A normal or plausible path can perform unauthorized repository writes, lose or misattribute task/change identity, mark incomplete work complete, bypass a required reviewer, archive/sync the wrong state, or produce materially incorrect lifecycle progression.
+
+### `MEDIUM`
+
+The defect can block valid work, cause stale or incomplete review, create inconsistent command behavior, produce an unusable handoff, trigger unbounded material lookup, or require manual recovery, but does not meet `HIGH`.
+
+### `LOW`
+
+There is proven operational friction or ambiguity with limited blast radius and a straightforward recovery path.
+
+Cosmetic issues have no severity and must be omitted.
+
+## Cross-command review method
+
+For `COMMAND_SET_REVIEW` and `FULL_OPSX_AUDIT`, compare commands only across concrete shared edges:
+
+```text
+same artifact
+same lifecycle transition
+same GO token or gate
+same task checkbox
+same decision authority
+same route/handoff field
+same branch/HEAD/SHA identity
+producer → consumer chain
+reviewer/evaluator/arbitration chain
+```
+
+Do not perform all-pairs prose comparison.
+
+For each shared edge, identify:
+
+```text
+producer contract
+consumer contract
+state passed
+state validation
+write authority
+failure behavior
+```
+
+A difference is not a conflict unless both commands can govern the same execution state or handoff.
+
+## Freshness review
+
+Check whether each reviewed command obtains enough current repository identity for the decisions it makes.
+
+Do not require branch/HEAD/worktree mechanically from every command. Require them only when stale or misidentified state could materially change that command's behavior.
+
+A missing freshness check is a defect only when:
+
+- the command relies on repository state that may have changed;
+- the state is not otherwise pinned or validated;
+- acting on stale state has a demonstrated operational consequence.
+
+## Missing files and unresolved references
+
+When a required file is missing:
+
+1. verify the path was resolved correctly;
+2. determine whether the reviewed command defines missing-file behavior;
+3. distinguish optional absence from required evidence loss;
+4. do not create or substitute a file;
+5. return `BLOCKED` only when the missing evidence prevents a defensible review verdict.
+
+A missing optional source is not automatically a command defect.
+
+## PASS rule
+
+`PASS` means:
+
+- all files declared in `REVIEW_SCOPE` were reviewed;
+- all material direct references needed for interpretation were resolved or explicitly non-material;
+- no confirmed defects were found;
+- no unresolved risk is severe enough to prevent reliance on the reviewed contract;
+- coverage limitations are explicitly listed.
+
+`PASS` does not mean the command is optimal, complete for all future cases, or free of cosmetic issues.
+
+## BLOCKED rule
+
+Return `STATUS: BLOCKED` and `VERDICT: BLOCKED` only when a defensible review cannot be completed because of a material evidence failure, such as:
+
+- target cannot be resolved;
+- reviewed content cannot be identified due to conflicting snapshots;
+- required regression criterion is missing;
+- required referenced authority is unavailable and can change the verdict;
+- context/tool limits prevent enough coverage for the requested overall verdict.
+
+Do not use `BLOCKED` merely because defects exist, the worktree is dirty, or some optional files are absent.
+
+## Required output
+
+Return exactly this top-level structure:
+
+```text
+STATUS:
+REVIEW_COMPLETE | BLOCKED
+
+MODE:
+SINGLE_COMMAND_REVIEW | COMMAND_SET_REVIEW | FULL_OPSX_AUDIT | REGRESSION_REVIEW
+
+REVIEW_SCOPE:
+- requested_target:
+- resolved_files:
+- focus:
+- exclusions:
+
+REPOSITORY_SNAPSHOT:
+- branch:
+- HEAD:
+- worktree:
+- base:
+- head:
+- snapshot_note:
+
+VERDICT:
+PASS | DEFECTS_FOUND | BLOCKED
+
+EXECUTIVE_SUMMARY:
+...
+
+CONFIRMED_DEFECTS:
+1.
+   severity:
+   category:
+   location:
+   conflicting_location:
+   evidence:
+   execution_condition:
+   operational_impact:
+   recommended_fix:
+   confidence:
+
+RISKS:
+1.
+   severity_if_real:
+   category:
+   location:
+   evidence:
+   unresolved_fact:
+   operational_impact:
+   validation_needed:
+
+IMPROVEMENTS:
+...
+
+FALSE_POSITIVES_REJECTED:
+1.
+   candidate:
+   reason_rejected:
+   evidence:
+
+DECISION_LOOKUPS:
+- decision:
+  reason_loaded:
+  authority_question:
+  impact:
+
+COVERAGE:
+- reviewed:
+- not_reviewed:
+- lookup_budget_used:
+- limitations:
+
+FILES_NOT_REVIEWED:
+...
+
+NEXT_ACTION:
+...
+
+RETURN_CONTRACT:
+- return_to:
+- attach:
+
+DO_NOT:
+- do not edit files;
+- do not create patches;
+- do not mark task checkboxes;
+- do not commit, push, merge, create PRs, or deploy;
+- do not run implementation;
+- do not expand scope.
+```
+
+Use `NONE` for empty sections. Never omit a top-level section.
+
+## NEXT_ACTION contract
+
+Return exactly one physical next action.
+
+Priority:
+
+1. For `DEFECTS_FOUND`: one ready-to-use prompt requesting a separate bounded correction of the highest-severity coherent defect set.
+2. For `PASS`: one exact next command appropriate to the caller's stated workflow; if no caller workflow is supplied, return `STOP — no command correction is required for the reviewed scope.`
+3. For `BLOCKED`: one exact command or prompt that obtains the minimum missing evidence.
+
+The next action must state:
+
+```text
+action
+where to run or paste it
+expected result
+what to return
+what not to do
+```
+
+Do not provide multiple alternatives.
+
+## RETURN_CONTRACT
+
+If `return_to` was supplied, preserve it exactly.
+
+Attach or return:
+
+- the complete review output;
+- reviewed snapshot identifiers;
+- exact affected files;
+- diff or prior finding reference for `REGRESSION_REVIEW`;
+- no patch unless a later separately authorized command creates one.
+
+Never invent a route, URL, task ID, correlation ID, or recipient.
+
+## Self-review before final output
+
+Before returning, verify:
+
+1. Review stayed read-only.
+2. Scope contains only command/process-control behavior.
+3. Every confirmed defect has exact `file:line` evidence.
+4. Every confirmed defect has a concrete execution condition and observable impact.
+5. Risks are not promoted through inference.
+6. Decision lookup stayed within budget.
+7. A shared contract was not duplicated as a new authority.
+8. Dirty/missing/stale state was handled explicitly.
+9. `PASS` is not issued with material unreviewed scope.
+10. `NEXT_ACTION` is singular and executable.
+11. No fix, patch, checkbox, commit, PR, or implementation was performed.
+
+If any check fails, correct the report while remaining read-only. If evidence cannot support correction, return `BLOCKED`.
+
+## Examples
+
+### Correct invocation
+
+```text
+/opsx-review-commands mode=COMMAND_SET_REVIEW targets=.cursor/commands/opsx-apply.md,.cursor/commands/opsx-verify.md focus="task completion and decision lookup" return_to=<EXACT_RETURN_ROUTE>
+```
+
+### Example confirmed defect
+
+```text
+CONFIRMED_DEFECTS:
+1.
+   severity: MEDIUM
+   category: INTRA_COMMAND_CONTRADICTION
+   location: .cursor/commands/example.md:40-44
+   conflicting_location: .cursor/commands/example.md:91-96
+   evidence: "Use bounded lookup with a maximum of 3 decisions" conflicts with "Read all openspec/decisions/**/*.md before continuing".
+   execution_condition: The command reaches decision lookup with more than three decision files present.
+   operational_impact: The later instruction defeats the bounded contract, expands context unpredictably, and can change placement or gate decisions using unrelated records.
+   recommended_fix: Replace the recursive read with the shared bounded/context-first resolution contract and preserve an explicit lookup budget.
+   confidence: HIGH
+```
+
+### Example result without defects
+
+```text
+STATUS:
+REVIEW_COMPLETE
+
+VERDICT:
+PASS
+
+CONFIRMED_DEFECTS:
+NONE
+
+RISKS:
+NONE
+
+NEXT_ACTION:
+STOP — no command correction is required for the reviewed scope.
+```
+
+### Example blocked result
+
+```text
+STATUS:
+BLOCKED
+
+VERDICT:
+BLOCKED
+
+EXECUTIVE_SUMMARY:
+REGRESSION_REVIEW cannot determine whether the defect returned because no base/head diff or prior regression criterion was supplied.
+
+NEXT_ACTION:
+Run `/opsx-review-commands mode=REGRESSION_REVIEW target=.cursor/commands/opsx-apply.md base=<BASE_REF> head=<HEAD_REF> known_defect=<EXACT_PRIOR_FINDING>` in Cursor; return the complete review; do not edit files or run implementation.
+```
