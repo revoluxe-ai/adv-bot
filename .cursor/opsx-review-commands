@@ -21,6 +21,40 @@ REGRESSION_REVIEW
 Never: - edit files; - create patches; - fix findings; - commit; -
 push; - change tasks.
 
+## Tool I/O contract (mandatory — hang prevention)
+
+Follow `.cursor/commands/opsx-execution-preflight.md` **Read / tool I/O budgets**
+and `.cursor/commands/opsx-source-resolution.md`.
+
+Hard rules for this reviewer:
+
+1. Prefer `Grep` / filename inventory over full-file `Read`.
+2. Parallel `Read`: max **2**. Never open the full `.cursor/commands/opsx-*.md`
+   set in one turn.
+3. Large files: `Read` with `limit`/`offset` (≤ 120 lines first pass) or Grep
+   hit ± context. Full-file only when REQUIRED_FOR a confirmed defect claim.
+4. Do **not** launch a subagent that “extracts contracts from ALL opsx-*.md”
+   via parallel full Reads. If COMMAND_SET / FULL audit needs breadth:
+   - inventory filenames once;
+   - Grep for high-risk tokens across the set;
+   - sequentially Read only hit files / sections.
+5. Never preload `opsx-admin-command-analyze-pipeline.md`, `opsx-learn-from-bug.md`,
+   `opsx-admin-command-design-command.md`, or other large siblings “for orientation”
+   unless they are in scope or Grep-hit for the active question.
+6. Read timeout / stall → stop stacking Reads; continue with evidence on hand
+   or return `BLOCKED` / `EVIDENCE_GAP` for the missing required path.
+
+### Mode budgets (files fully/section-read)
+
+| Mode | Max section-Reads | Notes |
+|---|---|---|
+| SINGLE_COMMAND_REVIEW | 3 | target + ≤2 direct cited deps |
+| COMMAND_SET_REVIEW | 5 | after Grep filter |
+| FULL_OPSX_AUDIT | 8 | Grep-first; sequential; not 27 parallel |
+| REGRESSION_REVIEW | 5 | changed files + cited consumers |
+
+These caps count substantive `Read` opens, not Grep or `Test-Path`.
+
 ## Semantic contract review
 
 Check producer and consumer compatibility.
@@ -43,6 +77,10 @@ Extract: - inputs; - outputs; - GO/NO_GO; - artifacts; - state
 identifiers; - machine tokens emitted; - machine tokens accepted; -
 producer-consumer mappings; - handoff contracts.
 
+Extract only for files actually opened under the mode budget. For
+unopened inventory members, report `NOT_OPENED_BUDGET` — do not invent
+contracts.
+
 ## Decision lookup
 
 Use context-first lookup.
@@ -58,10 +96,22 @@ Return: STATUS MODE REVIEW_SCOPE REPOSITORY_SNAPSHOT VERDICT
 CONFIRMED_DEFECTS RISKS FALSE_POSITIVES_REJECTED DECISION_LOOKUPS
 COVERAGE NEXT_ACTION
 
+Include:
+
+```text
+READ_IO:
+- inventory_count:
+- greps_used:
+- files_section_read:
+- parallel_max_used:
+- deferred_not_opened:
+```
+
 Every confirmed defect requires: - file:line; - evidence; - execution
 condition; - operational impact; - confidence.
 
 ## Self review
 
 Before returning: - remain read-only; - prove defects with evidence; -
-separate risks from defects; - keep scope bounded.
+separate risks from defects; - keep scope bounded; - stay inside Read I/O
+budgets.

@@ -13,11 +13,19 @@ layering, write-path placement и domain invariants.
 
 ## Основные принципы
 
-1. Перед proposal/design/apply/verify/archive искать
-   `openspec/decisions/**/*.md`.
+1. Перед proposal/design/apply/verify/archive резолвить architecture decisions
+   **context-first** (см. `.cursor/commands/opsx-source-resolution.md` и
+   Read I/O budgets в `.cursor/commands/opsx-execution-preflight.md`):
+   - сначала exact paths из change context / `artifactPaths.decisions` /
+     user-supplied paths / `openspec/decisions/index.md` при необходимости;
+   - затем только declared / referenced decisions;
+   - `openspec/decisions/**/*.md` — только bounded fallback после
+     `EVIDENCE_GAP` (типичный budget ≤ 3 targeted lookups), не полный
+     рекурсивный dump всех decision-файлов.
 2. Если задача затрагивает ownership, layering, write-path или domain invariant,
    найденные решения цитировать по path.
-3. Если relevant decision отсутствует, явно писать `Architecture Decision Missing`.
+3. Если нужное решение не найдено после context-first + bounded fallback,
+   явно писать `Architecture Decision Missing` / `EVIDENCE_GAP`.
 4. Если корректный placement зависит от нового reusable architecture rule,
    создать proposed decision artifact в `openspec/changes/<change>/decisions/`
    до implementation-readiness, используя `rules.decisions`.
@@ -34,7 +42,7 @@ layering, write-path placement и domain invariants.
 - `## Architecture Decision References`
 - `## Ownership & Placement`
 - checklist:
-  - existing decisions searched;
+  - context-first decision lookup performed (bounded fallback only if needed);
   - relevant decisions cited;
   - new decision proposed if missing;
   - implementation layer matches decision.
