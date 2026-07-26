@@ -52,6 +52,49 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+async def _apply_activation_to_complex_adv(
+    complex_adv: "ComplexAdv",
+    *,
+    generation: int | None = None,
+) -> bool:
+    """Завершить activation после durable ``sync_status=complete``.
+
+    Не трогает WB / intent apply. Ошибки activation логируются и не демоитят
+    ``complete`` в ``partial`` (invariant ab-hold-complete-sync-activate-only).
+
+    Args:
+        complex_adv: кампания с epoch-полями на ``adv_setting``.
+        generation: опциональный generation для лога.
+
+    Returns:
+        True, если PG-переход в ACTIVE выполнен.
+    """
+    adv_setting_id = int(complex_adv.adv_setting.id)
+    try:
+        activated = await activate_after_successful_sync(adv_setting_id)
+    except Exception as exc:
+        logger.error(
+            "[adv_id=%s] ab_epoch: activation after complete failed generation=%s: %s",
+            complex_adv.adv_id,
+            generation,
+            exc,
+            exc_info=True,
+        )
+        return False
+    if activated:
+        complex_adv.adv_setting.card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
+        complex_adv.adv_setting.card_ab_hold_phase = (
+            CardAbHoldPhase.READY_ACTIVE.value
+        )
+        cast(Any, complex_adv).card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
+        logger.info(
+            "[adv_id=%s] ab_epoch: generation=%s complete → ACTIVE (activate-only)",
+            complex_adv.adv_id,
+            generation,
+        )
+    return activated
+
+
 async def process_ab_epoch(
     complex_adv: "ComplexAdv",
     *,
@@ -61,11 +104,16 @@ async def process_ab_epoch(
 ) -> None:
     """Epoch-managed tick для ``PENDING_SETUP`` (§19 WARM_UP / §22 WB sync).
 
+    После durable ``card_ab_hold_sync_status=complete`` tick только завершает
+    activation и не повторяет intent/WB sync для той же generation; ``pending`` /
+    ``partial`` остаются eligible для WB retry. Phase MAY оставаться ``WB_SYNC``.
+
     Args:
         complex_adv: кампания с ``adv_setting`` epoch-полями.
         wb_shop_data_manager: контекст shop-runner (reserved для parity с setup/hold).
         wb_manager_hub: WB write-path для sync intent.
-        stats_fresh: False при stale/missing stats — keyword/WB мутации §23 skip.
+        stats_fresh: False при stale/missing stats — keyword/WB мутации §23 skip
+            (не блокирует activate-only после complete).
     """
     _ = wb_shop_data_manager
     if not is_epoch_managed_ab_hold(complex_adv.adv_setting):
@@ -93,6 +141,18 @@ async def process_ab_epoch(
     sync_status = normalize_card_ab_hold_sync_status(
         getattr(adv_setting, "card_ab_hold_sync_status", None)
     )
+    # Residual complete: activate-only before needs_sync / §23 freeze / WB body.
+    if sync_status == CardAbHoldSyncStatus.COMPLETE:
+        intent_raw = getattr(adv_setting, "card_ab_hold_pending_intent_json", None)
+        generation: int | None = None
+        if isinstance(intent_raw, dict):
+            generation = int(intent_raw.get("generation", 0) or 0)
+        await _apply_activation_to_complex_adv(
+            complex_adv,
+            generation=generation,
+        )
+        return
+
     needs_sync = phase in (
         CardAbHoldPhase.PENDING_INTENT,
         CardAbHoldPhase.WB_SYNC,
@@ -138,18 +198,6 @@ async def process_ab_epoch(
         )
         await mark_wb_sync_status(adv_setting_id, CardAbHoldSyncStatus.COMPLETE)
         adv_setting.card_ab_hold_sync_status = CardAbHoldSyncStatus.COMPLETE.value
-        activated = await activate_after_successful_sync(adv_setting_id)
-        if activated:
-            complex_adv.adv_setting.card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
-            complex_adv.adv_setting.card_ab_hold_phase = (
-                CardAbHoldPhase.READY_ACTIVE.value
-            )
-            cast(Any, complex_adv).card_ab_hold_mode = CardAbHoldMode.ACTIVE.value
-            logger.info(
-                "[adv_id=%s] ab_epoch: generation=%s WB sync complete → ACTIVE",
-                complex_adv.adv_id,
-                generation,
-            )
     except Exception as exc:
         logger.error(
             "[adv_id=%s] ab_epoch: WB sync partial/fail generation=%s: %s",
@@ -161,6 +209,13 @@ async def process_ab_epoch(
         await mark_wb_sync_status(adv_setting_id, CardAbHoldSyncStatus.PARTIAL)
         adv_setting.card_ab_hold_sync_status = CardAbHoldSyncStatus.PARTIAL.value
         adv_setting.card_ab_hold_phase = CardAbHoldPhase.WB_SYNC.value
+        return
+
+    # Durable complete: activation errors must not reopen WB via PARTIAL.
+    await _apply_activation_to_complex_adv(
+        complex_adv,
+        generation=generation,
+    )
 
 
 async def apply_confirmed_intent_to_pg(
