@@ -2,11 +2,15 @@
 
 Новая lifecycle (phase non-NULL) MUST NOT включаться по умолчанию. Broad enable
 для всех paid — только после OD-05; до этого — env flag + явный allowlist.
+
+Spec requirement: «Broad enablement is gated behind owner manual test, limited
+beta, and an explicit owner decision» — см. ``evaluate_card_ab_hold_broad_enable_readiness``.
 """
 
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from typing import Iterable
 
 
@@ -83,8 +87,60 @@ def is_card_ab_hold_broad_enable_authorized() -> bool:
     """OD-05 gate: broad enable без явного env MUST оставаться False.
 
     Env: ``CARD_AB_HOLD_OD05_BROAD_ENABLE_ACCEPTED`` (default unset → False).
+
+    Spec: Broad enablement is gated behind owner manual test, limited beta,
+    and an explicit owner decision (OD-05).
     """
     return _parse_truthy(os.environ.get("CARD_AB_HOLD_OD05_BROAD_ENABLE_ACCEPTED"))
+
+
+@dataclass(frozen=True)
+class CardAbHoldBroadEnableReadiness:
+    """Снимок readiness перед снятием ограничения broad enable (§25 / OD-05).
+
+    ``broad_enable_allowed`` истинно **только** при принятом OD-05.
+    Master flag и allowlist сами по себе не открывают всех paid-пользователей.
+    """
+
+    od05_accepted: bool
+    epoch_master_flag_enabled: bool
+    allowlist_adv_count: int
+    allowlist_shop_count: int
+    broad_enable_allowed: bool
+    blocking_reasons: tuple[str, ...]
+
+
+def evaluate_card_ab_hold_broad_enable_readiness() -> CardAbHoldBroadEnableReadiness:
+    """Проверка readiness перед снятием ограничения broad enable (OD-05).
+
+    Spec requirement: «Broad enablement is gated behind owner manual test,
+    limited beta, and an explicit owner decision».
+
+    Allowlist / master flag — limited beta / pilot, не broad. Без
+    ``CARD_AB_HOLD_OD05_BROAD_ENABLE_ACCEPTED`` результат всегда
+    ``broad_enable_allowed=False``.
+
+    Returns:
+        Иммутабельный снимок текущего env-состояния и blocking reasons.
+    """
+    od05 = is_card_ab_hold_broad_enable_authorized()
+    master = is_card_ab_hold_epoch_flow_enabled()
+    adv_count = len(card_ab_hold_epoch_allowlist_adv_ids())
+    shop_count = len(card_ab_hold_epoch_allowlist_shop_ids())
+    reasons: list[str] = []
+    if not od05:
+        reasons.append(
+            "OD-05 not accepted "
+            "(CARD_AB_HOLD_OD05_BROAD_ENABLE_ACCEPTED unset/false)"
+        )
+    return CardAbHoldBroadEnableReadiness(
+        od05_accepted=od05,
+        epoch_master_flag_enabled=master,
+        allowlist_adv_count=adv_count,
+        allowlist_shop_count=shop_count,
+        broad_enable_allowed=od05,
+        blocking_reasons=tuple(reasons),
+    )
 
 
 def can_enter_epoch_managed_ab_hold(
