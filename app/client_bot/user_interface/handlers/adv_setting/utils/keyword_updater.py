@@ -1,6 +1,4 @@
-from typing import Any, cast
-
-from sqlalchemy import select, update, CursorResult
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
@@ -44,8 +42,8 @@ async def update_keywords(session: AsyncSession,
             strategy_mode=KeywordStrategyMode.OFF,
         )
     )
-    update_non_v3_result = cast(CursorResult[Any], await session.execute(stmt_non_v3))
-    update_v3_result = cast(CursorResult[Any], await session.execute(stmt_v3))
+    update_non_v3_result = await session.execute(stmt_non_v3)
+    update_v3_result = await session.execute(stmt_v3)
     update_non_v3_result_count = update_non_v3_result.rowcount
     update_v3_result_count = update_v3_result.rowcount
     updated_count = update_v3_result_count + update_non_v3_result_count
