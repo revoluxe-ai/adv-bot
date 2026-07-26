@@ -3,10 +3,14 @@
 Также regression: W3 fact/proposed TP берутся из live read-model позиций,
 а не из фантомного ``card_ab_hold_factual_positions_json`` на AdvSetting
 (decision ``ab-hold-confirmed-epoch-parameters-sot`` §2).
+
+На d999e49 suite пропустил баг, потому что fixture сам сажал фантомное
+поле на SimpleNamespace — тесты зеленели без колонки, migration и write-path.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,7 +19,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message
+from sqlalchemy import inspect as sa_inspect
 
+from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     CardAbHoldPhase,
@@ -80,6 +86,50 @@ def _make_query() -> MagicMock:
 
 
 _LIVE_POSITIONS = {"alpha": 14.4, "beta": 9.2}
+
+_EPOCH_MIGRATION = (
+    Path(__file__).resolve().parents[4]
+    / "alembic_"
+    / "versions"
+    / "d0e1f2a3b4c5_add_card_ab_hold_epoch_lifecycle_fields.py"
+)
+
+
+@pytest.mark.unit
+def test_advsetting_has_no_factual_positions_column_or_migration() -> None:
+    """Reality gate: фантомного ``card_ab_hold_factual_positions_json`` нет в ORM/migration.
+
+    Без этого fixture может посадить attr на stub и скрыть missing write-path.
+    """
+    cols = sa_inspect(AdvSetting).columns
+    assert "card_ab_hold_factual_positions_json" not in cols
+    assert not hasattr(AdvSetting, "card_ab_hold_factual_positions_json")
+    migration = _EPOCH_MIGRATION.read_text(encoding="utf-8")
+    assert "card_ab_hold_factual_positions_json" not in migration
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_load_factual_positions_uses_keyboard_read_model() -> None:
+    """``_load_factual_positions`` читает live keyboard path, не AdvSetting attr."""
+    adv = SimpleNamespace(
+        id=42,
+        card_ab_hold_factual_positions_json={"alpha": 99.0},
+    )
+    kw_alpha = SimpleNamespace(
+        text="alpha", cluster_stat=SimpleNamespace(position=14.4)
+    )
+    kw_beta = SimpleNamespace(
+        text="beta", cluster_stat=SimpleNamespace(position=9.2)
+    )
+    with patch(
+        "app.client_bot.utils.get_keywords_for_keyboard",
+        new=AsyncMock(return_value=[kw_alpha, kw_beta]),
+    ) as mock_fetch:
+        positions = await confirm_handlers._load_factual_positions(adv)
+
+    mock_fetch.assert_awaited_once_with(adv)
+    assert positions == {"alpha": 14.4, "beta": 9.2}
 
 
 @pytest.mark.unit

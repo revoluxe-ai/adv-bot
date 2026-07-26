@@ -2,6 +2,10 @@
 
 Blocked: ACTIVE/PENDING Enable не demote и не пишет Redis ENTER.
 Allowed: OFF Enable → путь ENTER (wiring: predicate false + handler order).
+
+На d999e49 shop-allowlist bug прошёл suite: success-fixture сажал ``shop_id``
+прямо на AdvSetting-stub (фантом), а feature_flag тестировал allowlist
+изолированно с уже переданным ``shop_id`` — wiring Enable→cabinet не проверялся.
 """
 
 from __future__ import annotations
@@ -11,7 +15,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import inspect as sa_inspect
 
+from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
 )
@@ -52,6 +58,12 @@ def test_enable_noop_answers_distinguish_active_and_pending() -> None:
 
 
 @pytest.mark.unit
+def test_advsetting_orm_has_no_shop_id_column() -> None:
+    """Reality gate: ``shop_id`` живёт на WBCabinet, не на AdvSetting."""
+    assert "shop_id" not in sa_inspect(AdvSetting).columns
+
+
+@pytest.mark.unit
 def test_enable_handler_checks_noop_before_enter_writes() -> None:
     """11.2 wiring: no-op gate до start_epoch_on_enable / Redis ENTER."""
     src = inspect.getsource(handlers._handle_ab_hold_enable)
@@ -59,6 +71,16 @@ def test_enable_handler_checks_noop_before_enter_writes() -> None:
     assert src.index("is_card_ab_hold_enable_noop") < src.index("start_epoch_on_enable")
     assert src.index("start_epoch_on_enable") < src.index("set_signal")
     assert "card_ab_hold_phase =" not in src
+
+
+@pytest.mark.unit
+def test_enable_handler_wires_shop_id_via_wb_cabinet_not_adv_getattr() -> None:
+    """ROOT-001 wiring: cabinet.shop_id + coerce; запрет ``getattr(adv, \"shop_id\")``."""
+    src = inspect.getsource(handlers._handle_ab_hold_enable)
+    assert "wb_cabinet" in src
+    assert "coerce_shop_id_for_epoch_allowlist" in src
+    assert 'getattr(adv, "shop_id"' not in src
+    assert "getattr(adv, 'shop_id'" not in src
 
 
 @pytest.mark.unit

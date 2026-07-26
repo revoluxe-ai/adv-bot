@@ -10,6 +10,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.feature_flag import (
     can_enter_epoch_managed_ab_hold,
     coerce_shop_id_for_epoch_allowlist,
+    evaluate_card_ab_hold_broad_enable_readiness,
     is_card_ab_hold_broad_enable_authorized,
     is_card_ab_hold_epoch_flow_enabled,
 )
@@ -81,6 +82,37 @@ def test_od05_without_master_flag_still_closed(
     assert is_card_ab_hold_broad_enable_authorized() is True
     assert is_card_ab_hold_epoch_flow_enabled() is False
     assert can_enter_epoch_managed_ab_hold(adv_id=1, shop_id=1) is False
+
+
+@pytest.mark.unit
+def test_broad_enable_readiness_blocked_without_od05(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """§25.3/25.4: broad enable без OD-05 блокируется даже при flag+allowlist."""
+    monkeypatch.setenv("CARD_AB_HOLD_EPOCH_FLOW_ENABLED", "true")
+    monkeypatch.setenv("CARD_AB_HOLD_EPOCH_ALLOWLIST_ADV_IDS", "1,2,3")
+    monkeypatch.setenv("CARD_AB_HOLD_EPOCH_ALLOWLIST_SHOP_IDS", "10")
+    snap = evaluate_card_ab_hold_broad_enable_readiness()
+    assert snap.od05_accepted is False
+    assert snap.epoch_master_flag_enabled is True
+    assert snap.allowlist_adv_count == 3
+    assert snap.allowlist_shop_count == 1
+    assert snap.broad_enable_allowed is False
+    assert any("OD-05" in reason for reason in snap.blocking_reasons)
+    # Allowlist ≠ broad: non-listed campaign still closed.
+    assert can_enter_epoch_managed_ab_hold(adv_id=999, shop_id=999) is False
+
+
+@pytest.mark.unit
+def test_broad_enable_readiness_allowed_only_with_od05(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Readiness снимает блок broad enable только после явного OD-05."""
+    monkeypatch.setenv("CARD_AB_HOLD_OD05_BROAD_ENABLE_ACCEPTED", "yes")
+    snap = evaluate_card_ab_hold_broad_enable_readiness()
+    assert snap.od05_accepted is True
+    assert snap.broad_enable_allowed is True
+    assert snap.blocking_reasons == ()
 
 
 @pytest.mark.unit
