@@ -338,3 +338,81 @@ async def test_activate_exception_after_complete_keeps_complete() -> None:
         == CardAbHoldSyncStatus.COMPLETE.value
     )
     assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_next_tick_after_activate_boom_is_activate_only_no_wb_reentry() -> None:
+    """Bugbot COMPLETE residual: после activate boom next tick не re-sync WB.
+
+    На d999e49 suite покрывал только same-tick success (COMPLETE+activate в одном
+    вызове). Residual ``COMPLETE`` + ``WB_SYNC`` + ``PENDING_SETUP`` на следующем
+    тике оставался без теста → ``needs_sync`` снова гонял PG/WB apply.
+    """
+    adv = _sync_adv(intent=_INTENT)
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ) as mock_pg,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ) as mock_wb,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.mark_wb_sync_status",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("activate boom"),
+        ),
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+            stats_fresh=True,
+        )
+
+    # Durable COMPLETE + phase всё ещё WB_SYNC (activation не сдвинула phase).
+    adv.adv_setting.card_ab_hold_sync_status = CardAbHoldSyncStatus.COMPLETE.value
+    adv.adv_setting.card_ab_hold_phase = CardAbHoldPhase.WB_SYNC.value
+    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ) as mock_pg2,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ) as mock_wb2,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_activate2,
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+            stats_fresh=True,
+        )
+
+    mock_pg.assert_awaited_once()
+    mock_wb.assert_awaited_once()
+    mock_pg2.assert_not_called()
+    mock_wb2.assert_not_called()
+    mock_activate2.assert_awaited_once_with(99)
+    assert adv.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
