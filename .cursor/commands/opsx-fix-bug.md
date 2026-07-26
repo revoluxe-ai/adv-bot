@@ -99,6 +99,20 @@ GO
 
 Никогда не делай deploy, restart сервисов, работу с production data, миграции, изменение secrets, merge, rebase, force-push, изменение Kubernetes/infra/CI или unrelated refactor.
 
+## Type-check routing
+
+Если вход — пакетный сырой вывод `pyright` / `pyright-strict` / `mypy` (или явный typing-only packet без behavioral defect) — не разбирай его как production bug здесь.
+
+Верни:
+
+```text
+NEXT_ACTION: /opsx-fix-types
+```
+
+Owner: `.cursor/commands/opsx-fix-types.md`.
+
+`/opsx-fix-bug` остаётся владельцем behavioral production bugs. Если typing fix вскроет behavioral regression — возвращайся сюда уже с bug signal, без автоматического `GO`.
+
 ## Durable intake и case map
 
 Единственный authoritative storage:

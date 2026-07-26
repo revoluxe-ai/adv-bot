@@ -24,6 +24,18 @@ $ARGUMENTS
 - Prefer minimal targeted tests over broad rewrites.
 - Do not create fake passing tests that only assert trivial behavior.
 
+## Type-check routing
+
+If the user input is raw `pyright` / `pyright-strict` / `mypy` output, a saved type-check log, or an explicit request to fix static typing diagnostics — do **not** triage or fix typing here.
+
+Return immediately:
+
+```text
+NEXT_ACTION: /opsx-fix-types
+```
+
+Owner command: `.cursor/commands/opsx-fix-types.md`. Do not invent a manual typing plan inside `/opsx-test`.
+
 ## Allowed edits
 
 Allowed:
