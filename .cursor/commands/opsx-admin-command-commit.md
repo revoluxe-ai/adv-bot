@@ -62,7 +62,9 @@ Shared OPSX process contracts that live under `.cursor/commands/` (for example
 `opsx-execution-preflight.md`, `opsx-source-resolution.md`) are in scope.
 Materialized operator pipeline graph under `.cursor/pipeline/` (from
 `/opsx-pipeline UPDATE GO`) is in scope.
-Static-check worker contracts under `.cursor/static-check/` are in scope.
+Static-check infra under `.cursor/static-check/` is in scope in full:
+contracts, check packs, registry, base prompts/rules, **and** agent runner
+scripts (e.g. `bin/run.sh`).
 All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
