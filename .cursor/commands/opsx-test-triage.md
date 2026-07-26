@@ -18,6 +18,18 @@ Do not weaken assertions.
 
 First classify the failure and produce a copy-pasteable NEXT PROMPT.
 
+## Type-check routing
+
+If the failure packet is `pyright` / `pyright-strict` / `mypy` diagnostics (not a pytest assertion failure) — do **not** classify it with the pytest taxonomy below.
+
+Return immediately:
+
+```text
+NEXT_ACTION: /opsx-fix-types
+```
+
+Owner command: `.cursor/commands/opsx-fix-types.md`.
+
 ## Policy source
 
 Before triage, inspect and follow:

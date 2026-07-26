@@ -185,6 +185,112 @@ Applies to campaigns already in MVP-1 hold at migration time and to any row wher
 3. Точный UX-контракт и тексты Telegram-сообщений (в т.ч. текст про честный overshoot) — создан отдельным последующим `/opsx-continue`: `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` (контракт) и `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md` (иллюстративные тексты, не binding — implementation MAY скорректировать формулировки при `/opsx:apply`, сохраняя инварианты).
 4. Критерий/процедура принятия OD-05 (кто, когда, по каким метрикам бета-теста) — owner decision, вне scope этого design; фиксируется только то, что OD-05 — единственный гейт широкого включения.
 
+## Practice Applicability Map (pilot v0.1)
+
+```yaml
+change_id: card-ab-hold-mode
+
+practice_baseline:
+  branch: operator/TASK-WB-AB-TESTING-COMPLETE-IMPLEMENTATION-001
+  head_sha: bc2223605f53fb28539e761f13b6fa144fc9bea4
+  date: 2026-07-26
+
+baseline_note: >
+  Dated pilot evidence based on draft Practices v0.1.
+  This is not project-wide policy and does not affect archive readiness.
+
+applicable_practices:
+  - practice_id: call-chains
+    applicability_reason: >
+      Change owns multiple entrypoints and strategies (Telegram enable/confirm,
+      shop-runner epoch/setup/hold, ordinary V3 interrupt) that reach PG, Redis,
+      and WB write resources; canonical chains and owner bypass must stay
+      traceable.
+    selected_rule_ids:
+      - CALL-001
+      - CALL-002
+    evidence_locators:
+      - openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md
+      - openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md
+      - app/modules/shop_runner/service_manager/manager.py::adv_settings_auto_update
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/pipelines.py::process_ab_setup
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/pipelines.py::process_ab_hold
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_pipelines.py::process_ab_epoch
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py::enable_card_ab_hold
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/orchestrator.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_legacy_setup_epoch_gate.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_write_gates_boundary.py
+    enforcement:
+      - textual
+      - ai_review
+    result: not_verified
+    deviations: []
+
+  - practice_id: testing
+    applicability_reason: >
+      Change adds state-changing write gates, freezes, and failure/replay-sensitive
+      epoch paths; write-gate and honesty-of-assurance evidence must be locatable
+      without treating local tests as full CI or production proof.
+    selected_rule_ids:
+      - TEST-002
+      - TEST-004
+    evidence_locators:
+      - openspec/changes/card-ab-hold-mode/tasks.md
+      - tests/unit/auto_updater_v3/card_ab_hold/test_write_gates_boundary.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_pipelines_sync.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_concurrent_generation.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_auto_bid_freeze.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_stale_stats_freeze.py
+      - .cursor/rules/testing-rules.mdc
+      - openspec/policies/VERIFY_POLICY.md
+    enforcement:
+      - textual
+      - ai_review
+    result: not_verified
+    deviations: []
+
+  - practice_id: data-integrity
+    applicability_reason: >
+      Epoch lifecycle persists durable PG intent before WB sync, uses generation
+      and idempotency keys, and requires activate-only completion semantics across
+      PG/Redis/WB stores.
+    selected_rule_ids:
+      - DATA-001
+      - DATA-003
+      - DATA-004
+    evidence_locators:
+      - openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md
+      - openspec/changes/card-ab-hold-mode/decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py::create_pending_intent_for_generation
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py::activate_after_successful_sync
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_pipelines.py::process_ab_epoch
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_pipelines.py::sync_intent_to_wb
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/redis_coordination.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_pipelines_sync.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_concurrent_generation.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_lifecycle_pure.py
+    enforcement:
+      - textual
+      - ai_review
+    result: not_verified
+    deviations: []
+
+practice_candidates: []
+
+not_migrate:
+  - OD-05
+  - ROOT-001 and BUGCASE verdicts
+  - absence of CI or pre-commit
+  - monitoring scope
+  - active task completion state
+  - .tmp paths
+  - raw extraction or Navigator dumps
+  - proposed-but-not-accepted decisions as practices
+```
+
 ## Review Checklist
 
 - [x] existing decisions searched
