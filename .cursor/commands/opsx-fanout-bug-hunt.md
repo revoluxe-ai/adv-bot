@@ -25,12 +25,22 @@ Its only purpose is to transform an already structured bug-hunt result into:
 
 The command itself does not physically create chats unless a separate browser automation explicitly consumes its manifest.
 
+## Source resolution (mandatory)
+
+Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`.
+
+If `root_case_id` / source artifact / preceding hunt output path is provided:
+
+* read that exact source only;
+* do not open a new repository investigation to rediscover findings;
+* do not run git status/branch;
+* if source is missing, return blocker / `blocked_needs_exact_source` rather than exploring.
+
 ## User input
 
 ```text
 $ARGUMENTS
 ```
-
 ## Purpose
 
 After `/opsx-bug-hunt`:

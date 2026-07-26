@@ -1,6 +1,6 @@
 ---
 description: "Materialize or update a durable bug-case map from intake, hunt-result, promote, or field update without re-analysing the repository or fixing bugs."
-argument-hint: "mode=<intake|hunt-result|promote|update> case=<CASE_ID> [source=<artifact>] [finding=<FINDING_ID>] [fields...]"
+argument-hint: "mode=<intake|hunt-result|promote|update> [case=<CASE_ID>] [intake=<INTAKE_ID>] [source=<artifact>] [finding=<FINDING_ID>] [fields...]"
 ---
 
 # /opsx-materialize-bug-queue
@@ -21,7 +21,26 @@ Its only purpose is to create or update process artifacts under:
 .tmp/opsx-bug-cases/
 ```
 
-so findings survive across chats and can recursively spawn descendant cases.
+so raw intakes and findings survive across chats and can recursively spawn descendant cases.
+
+Authoritative storage is only:
+
+```text
+.tmp/opsx-bug-cases/**
+```
+
+## Source resolution (mandatory)
+
+Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`.
+
+When `case` / `intake` / `finding` are provided:
+
+* resolve only under `.tmp/opsx-bug-cases/<CASE_ID>/...` canonical paths;
+* do not search the wider repository for these artifacts;
+* do not run git status/branch as a gate for materialize;
+* if the canonical path is missing, return `blocked` / `unknown_case` / `unknown_finding` / `unknown_intake` rather than repo-wide rediscovery.
+
+`mode=intake` records a raw signal before adjudication. It does not assert that a production bug is confirmed.
 
 ## Language
 
@@ -94,6 +113,8 @@ Use exactly this layout. Do not add extra files without a concrete function requ
   <CASE_ID>/
     CASE.md
     LEDGER.md
+    intakes/
+      <INTAKE_ID>.md
     findings/
       <FINDING_ID>.md
     handoffs/
@@ -107,10 +128,65 @@ Rules:
 * Parent/child relationships live in metadata, not in nested folders.
 * `results/` may be empty until a later command writes a result.
 * Do not create placeholder junk files.
+* `intakes/<INTAKE_ID>.md` holds the durable raw signal before adjudication.
 * `LEDGER.md` is the operational source of truth for finding status and claim eligibility.
 * `findings/<FINDING_ID>.md` holds either a working packet or a closed false-positive record.
 * `handoffs/COMMON_HANDOFF.md` is the short shared handoff for new chats.
-* `INDEX.md` is the cross-case status board for forgotten, claimed, blocked, backlog, and open findings.
+* `INDEX.md` is the cross-case recovery board and status board for forgotten, claimed, blocked, backlog, and open findings.
+
+## INTAKE object
+
+Intake is a raw signal. It is not a confirmed finding.
+
+Every `intakes/<INTAKE_ID>.md` MUST carry:
+
+```text
+CASE_ID
+INTAKE_ID
+CREATED_AT
+SOURCE_TYPE
+SOURCE_REFERENCE
+RAW_REPORT
+OBSERVED_SYMPTOM
+KNOWN_CONTEXT
+STATUS
+LAST_ACTIVITY_AT
+NEXT_ACTION
+```
+
+Initial status:
+
+```text
+intake_recorded
+```
+
+When closed as a duplicate of an earlier intake/finding, also record:
+
+```text
+DISPOSITION: duplicate_intake
+CANONICAL_INTAKE_ID
+RELATED_FINDING_ID
+RESULT_PATH
+```
+
+and set:
+
+```text
+STATUS: closed_duplicate
+```
+
+Intake MUST NOT assert:
+
+* that a production bug is confirmed;
+* root cause;
+* invariant;
+* how many separate findings exist;
+* that a fix is required;
+* `PRODUCTION_CLASSIFICATION` or `RELATION_TO_ROOT`.
+
+`RAW_REPORT` MUST preserve the user/Bugbot/CI text verbatim (or the closest durable copy available in the current invocation).
+
+Closing an intake as `closed_duplicate` is a linkage decision about the signal, not a claim that the canonical finding is newly proven.
 
 ## Evidence / status labels for design statements
 
@@ -155,6 +231,7 @@ Every finding row in `LEDGER.md` and every `findings/<FINDING_ID>.md` header MUS
 ```text
 FINDING_ID
 CASE_ID
+SOURCE_INTAKE_ID
 PARENT_FINDING_ID
 TITLE
 PRODUCTION_CLASSIFICATION
@@ -179,6 +256,7 @@ Allowed empty values:
 
 * `OWNER_CHAT`, `CLAIM_TOKEN`, `CLAIMED_AT`, `COMPLETED_AT`, `BLOCKER`, `RESULT_PATH` may be empty when unset;
 * `PARENT_FINDING_ID` may be empty for the case root finding;
+* `SOURCE_INTAKE_ID` may be empty only for legacy findings created before intake objects existed; new findings MUST set it when an intake exists;
 * `PACKET_PATH` is empty only for proven false positives that intentionally have no working chat packet.
 
 ## Required case fields
@@ -187,6 +265,7 @@ Allowed empty values:
 
 ```text
 CASE_ID
+PRIMARY_INTAKE_ID
 ROOT_FINDING_ID
 SOURCE_TYPE
 SOURCE_REFERENCE
@@ -195,19 +274,25 @@ SOURCE_FINDING_ID
 ANCESTOR_CHAIN
 DEPTH
 STATUS
+CURRENT_STAGE
 NEXT_ACTION
 PROPOSED_INVARIANT
 ROOT_FINGERPRINT
 CREATED_AT
 UPDATED_AT
+LAST_COMMAND
 ```
 
-For a root intake case:
+For a raw intake case before any finding:
 
+* `PRIMARY_INTAKE_ID` is set;
+* `ROOT_FINDING_ID` may be empty;
 * `PARENT_CASE_ID` may be empty;
 * `SOURCE_FINDING_ID` may be empty;
 * `ANCESTOR_CHAIN` is `[CASE_ID]` or equivalent explicit single-element chain;
-* `DEPTH` is `0`.
+* `DEPTH` is `0`;
+* `STATUS` / `CURRENT_STAGE` start as `intake_recorded`;
+* `PROPOSED_INVARIANT` and `ROOT_FINGERPRINT` may be empty until adjudication/hunt supplies them.
 
 ## Fingerprint
 
@@ -271,65 +356,88 @@ If the authoritative source already provides an explicit ordered list, preserve 
 
 ## mode=intake
 
-Create a new case immediately after a finding appears from:
+Create a durable raw intake before adjudication.
+
+Typical sources:
 
 * Bugbot;
 * manual finding;
 * CI;
 * incident;
-* promotion from another case.
+* promotion from another case;
+* automatic call from `/opsx-fix-bug` when `case`/`intake` are absent.
 
-Required inputs:
+Required logical inputs:
 
 ```text
 mode=intake
-case=<CASE_ID>
+RAW_REPORT
 ```
 
-Plus enough source payload to fill:
+`RAW_REPORT` may come from `$ARGUMENTS`, an explicit field block, or the immediate bug text in the same invocation.
+
+Optional inputs:
 
 ```text
-ROOT_FINDING_ID
+case=<CASE_ID>
+intake=<INTAKE_ID>
 SOURCE_TYPE
 SOURCE_REFERENCE
-PARENT_CASE_ID
-SOURCE_FINDING_ID
-ANCESTOR_CHAIN
-DEPTH
-STATUS
-NEXT_ACTION
+OBSERVED_SYMPTOM
+KNOWN_CONTEXT
 ```
 
-If `case` already exists, do not destroy it. Stop with:
+Auto-generation when omitted:
+
+* `CASE_ID`: `BUGCASE-<SHORT>-<UTC>` where `<SHORT>` is a compact slug from symptom/source (fallback `MANUAL`) and `<UTC>` is `YYYYMMDDTHHMMSSZ`;
+* `INTAKE_ID`: next free `INTAKE-NNN` inside the case (`INTAKE-001` for a new case).
+
+Defaults when omitted:
 
 ```text
-Verdict:
-- blocked
-
-Blocker:
-- case_already_exists_use_update_or_hunt_result
+SOURCE_TYPE: manual
+SOURCE_REFERENCE: invocation payload
+OBSERVED_SYMPTOM: first non-empty line / short summary of RAW_REPORT
+KNOWN_CONTEXT: empty
+STATUS: intake_recorded
+NEXT_ACTION: /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID>
 ```
 
-unless the caller explicitly intended `mode=update` or `mode=hunt-result`.
+If `case=<CASE_ID>` points to an existing case:
+
+* do not destroy the case;
+* append a new intake file with a new `INTAKE_ID`;
+* update `PRIMARY_INTAKE_ID` only when the caller explicitly requests it or no primary intake exists;
+* do not invent findings.
+
+If `case` is omitted, create a new case directory.
 
 Minimal actions:
 
-1. Create `<CASE_ID>/` layout.
-2. Write `CASE.md`.
-3. Write `LEDGER.md` with the root finding row.
-4. Write `findings/<ROOT_FINDING_ID>.md` packet.
-5. Write `handoffs/COMMON_HANDOFF.md`.
-6. Update `INDEX.md`.
+1. Create `<CASE_ID>/` layout including `intakes/`, `findings/`, `handoffs/`, `results/` when the case is new.
+2. Write `intakes/<INTAKE_ID>.md` with the required intake fields and verbatim `RAW_REPORT`.
+3. Write or update `CASE.md` with `PRIMARY_INTAKE_ID`, `STATUS=intake_recorded`, `CURRENT_STAGE=intake_recorded`, `LAST_COMMAND=/opsx-materialize-bug-queue mode=intake`, and pasteable `NEXT_ACTION`.
+4. Write or update `LEDGER.md` with summary counts; do **not** create a finding row by default.
+5. Write `handoffs/COMMON_HANDOFF.md` when the case is new.
+6. Update `INDEX.md` recovery row for the case.
 
-Default root intake values when not supplied:
+Default behavior:
+
+* no `findings/<FINDING_ID>.md`;
+* no `ROOT_FINDING_ID` assignment;
+* no production classification;
+* no invariant;
+* no child chats.
+
+Compatibility escape hatch only when the caller explicitly passes:
 
 ```text
-STATUS: intake
-NEXT_ACTION: classify_or_invariant
-CHAT_REQUIRED: false
+create_root_finding=true
 ```
 
-Root intake does not by itself create child chats.
+Then a root finding packet may be created in addition to the intake. Default remains intake-only.
+
+Raw intake does not by itself create child chats or claimable findings.
 
 ## mode=hunt-result
 
@@ -542,7 +650,7 @@ RESULT_PATH: ../<NEW_CASE_ID>/CASE.md
 
 ## mode=update
 
-Update only explicitly provided fields on an existing case or finding.
+Update only explicitly provided fields on an existing case, intake, or finding.
 
 Required:
 
@@ -554,6 +662,7 @@ case=<CASE_ID>
 Optional selectors:
 
 ```text
+intake=<INTAKE_ID>
 finding=<FINDING_ID>
 ```
 
@@ -564,10 +673,129 @@ Rules:
 * do not invent status transitions;
 * do not clear `OWNER_CHAT` / `CLAIM_TOKEN` unless explicitly requested;
 * do not auto-steal claims;
-* append a short update note with timestamp in the finding file or ledger history section if present;
-* refresh `UPDATED_AT` / `LAST_ACTIVITY_AT` when touching a finding.
+* append a short update note with timestamp in the intake/finding file or ledger history section if present;
+* refresh `UPDATED_AT` / `LAST_ACTIVITY_AT` when touching a case, intake, or finding;
+* refresh `INDEX.md` recovery fields when stage, next action, blockers, or finding counts change.
 
-If the case or finding does not exist, stop with blocker `unknown_case` or `unknown_finding`.
+### Creating or updating a finding after adjudication
+
+`/opsx-fix-bug` without `GO` persists adjudication through this mode (not a separate mode).
+
+When the field block includes a new or updated finding, write or patch:
+
+```text
+FINDING_ID
+SOURCE_INTAKE_ID
+TITLE
+PRODUCTION_CLASSIFICATION
+RELATION_TO_ROOT
+STATUS
+CHAT_REQUIRED
+PACKET_PATH
+CLAIM_PRIORITY
+NEXT_ACTION
+...plus other provided finding fields
+```
+
+Rules for adjudication persistence:
+
+* `SOURCE_INTAKE_ID` MUST be set when the case has a known intake;
+* do not create a finding during `mode=intake` by default; create/update it here after adjudication;
+* if `FINDING_ID` is omitted for a new finding, allocate the next free id (`ROOT-001` for the first finding in the case, otherwise the next stable typed id supplied by the caller);
+* update `CASE.md` `ROOT_FINDING_ID` when the first root finding is created;
+* set `CURRENT_STAGE` appropriately (for example `adjudicated`);
+* set `LAST_COMMAND` to the command that requested the update;
+* set pasteable `NEXT_ACTION` on case and INDEX.
+
+### Cross-intake finding update guard
+
+Before updating an **existing** finding when `intake=<INTAKE_ID>` is present (or implied as the current intake):
+
+1. Read the finding's existing `SOURCE_INTAKE_ID`.
+2. Compare with the current intake id.
+
+Allowed without special relation:
+
+```text
+existing SOURCE_INTAKE_ID == current INTAKE_ID
+```
+
+or the finding is being newly created with:
+
+```text
+SOURCE_INTAKE_ID: <current INTAKE_ID>
+```
+
+If existing `SOURCE_INTAKE_ID` differs from current `INTAKE_ID`:
+
+* allow the update **only** when the caller explicitly passes:
+
+```text
+relation=duplicate_intake
+```
+
+* and then **do not modify** the canonical finding body/classification/status;
+* instead update only:
+
+  * the current intake (`STATUS=closed_duplicate`, `DISPOSITION=duplicate_intake`, `CANONICAL_INTAKE_ID`, `RELATED_FINDING_ID`);
+  * ledger intake row;
+  * `INDEX.md` recovery fields;
+  * separate result file `results/<INTAKE_ID>-duplicate-check.md`.
+
+Required duplicate fields:
+
+```text
+relation=duplicate_intake
+canonical_intake=<CANONICAL_INTAKE_ID>
+related_finding=<RELATED_FINDING_ID>
+```
+
+If a caller attempts to patch a finding whose `SOURCE_INTAKE_ID` differs from the current intake **without** `relation=duplicate_intake`, stop:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- cross_intake_finding_update_without_relation
+```
+
+Do not silently reassign `SOURCE_INTAKE_ID` of an existing finding to a newer intake.
+
+Do not treat textual similarity alone as authorization for `relation=duplicate_intake`; that decision belongs to `/opsx-fix-bug` adjudication evidence.
+
+### Duplicate-intake update path
+
+When `relation=duplicate_intake`:
+
+1. Verify `related_finding` exists.
+2. Verify canonical finding `SOURCE_INTAKE_ID` equals `canonical_intake` (or document legacy empty `SOURCE_INTAKE_ID` explicitly in the duplicate-check result).
+3. Leave the canonical finding unchanged.
+4. Update current intake to `closed_duplicate`.
+5. Write `results/<INTAKE_ID>-duplicate-check.md` with:
+
+```text
+DUPLICATE_INTAKE_CHECK
+
+CASE_ID:
+INTAKE_ID:
+CANONICAL_INTAKE_ID:
+RELATED_FINDING_ID:
+LITERAL_CLAIM_MATCH:
+BOUNDARY_MATCH:
+ADJUDICATION_RESULT_MATCH:
+NEW_EVIDENCE_SCOPE: false
+REASON:
+COMPLETED_AT:
+```
+
+6. Refresh INDEX / ledger / case timestamps and pasteable `NEXT_ACTION`.
+
+If the case does not exist, stop with blocker `unknown_case`.
+
+If `finding=<FINDING_ID>` is supplied and the finding file/row does not exist, creating it is allowed when the field block provides the required finding fields and `SOURCE_INTAKE_ID` equals the current intake (or the current intake is being linked as the source).
+
+If `intake=<INTAKE_ID>` is supplied and the intake does not exist, stop with blocker `unknown_intake` unless the caller is explicitly creating that intake via field block in the same update (prefer `mode=intake` for new intakes).
 
 ## File contents
 
@@ -585,6 +813,7 @@ Recommended structure:
 # Ledger: <CASE_ID>
 
 ## Summary
+- TOTAL_INTAKES:
 - TOTAL_FINDINGS:
 - CHATS_REQUIRED:
 - READY_TO_CLAIM:
@@ -593,10 +822,25 @@ Recommended structure:
 - BACKLOG:
 - CLOSED:
 
+## Intakes
+
+### <INTAKE_ID>
+- STATUS:
+- SOURCE_TYPE:
+- CREATED_AT:
+- LAST_ACTIVITY_AT:
+- NEXT_ACTION:
+- DISPOSITION:
+- CANONICAL_INTAKE_ID:
+- RELATED_FINDING_ID:
+- RESULT_PATH:
+- PACKET_PATH: intakes/<INTAKE_ID>.md
+
 ## Findings
 
 ### <FINDING_ID>
 - TITLE:
+- SOURCE_INTAKE_ID:
 - PARENT_FINDING_ID:
 - PRODUCTION_CLASSIFICATION:
 - RELATION_TO_ROOT:
@@ -616,8 +860,33 @@ Recommended structure:
 - DISPOSITION:
 ```
 
-Keep finding sections in stable registration order.
+Keep intake and finding sections in stable registration order.
 
+### intakes/<INTAKE_ID>.md
+
+Write a durable raw intake record:
+
+```text
+INTAKE_RECORD
+
+CASE_ID:
+INTAKE_ID:
+CREATED_AT:
+SOURCE_TYPE:
+SOURCE_REFERENCE:
+RAW_REPORT:
+OBSERVED_SYMPTOM:
+KNOWN_CONTEXT:
+STATUS: intake_recorded
+LAST_ACTIVITY_AT:
+NEXT_ACTION: /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID>
+DISPOSITION:
+CANONICAL_INTAKE_ID:
+RELATED_FINDING_ID:
+RESULT_PATH:
+```
+
+For duplicate closure, set `STATUS: closed_duplicate` and fill disposition linkage fields.
 ### findings/<FINDING_ID>.md
 
 For chat-required or preserved non-FP findings, write an autonomous packet:
@@ -627,6 +896,7 @@ FINDING_PACKET
 
 CASE_ID:
 FINDING_ID:
+SOURCE_INTAKE_ID:
 PARENT_FINDING_ID:
 TITLE:
 PRODUCTION_CLASSIFICATION:
@@ -696,12 +966,39 @@ Do not embed a specific finding ID in the common handoff.
 
 ### INDEX.md
 
-Maintain a repo-local board with one section per open case and aggregate lists:
+Maintain a repo-local recovery board.
+
+Every open case MUST expose a recovery row with:
+
+```text
+CASE_ID
+INTAKE_ID
+RAW_SUMMARY
+CURRENT_STAGE
+LAST_COMMAND
+LAST_ACTIVITY_AT
+OPEN_FINDINGS
+READY_FOR_FIX
+BLOCKERS
+NEXT_ACTION
+```
+
+Rules for the recovery row:
+
+* `INTAKE_ID` is the primary/latest open intake for continuation;
+* `RAW_SUMMARY` is a short durable summary of `RAW_REPORT` (recommended ≤ 200 chars);
+* `CURRENT_STAGE` mirrors case stage (`intake_recorded`, `adjudicated`, `hunt_materialized`, etc.);
+* `LAST_COMMAND` is the last OPSX command that wrote the case map;
+* `NEXT_ACTION` MUST be an exact pasteable command (not prose);
+* after chat loss, opening `INDEX.md` MUST be enough to continue.
+
+Also maintain aggregate lists:
 
 ```text
 FORGOTTEN_OR_STALE_CLAIMS
 CLAIMED_NOT_COMPLETED
 AVAILABLE_READY_TO_CLAIM
+READY_FOR_FIX
 BLOCKED
 BACKLOG
 CLOSED_FALSE_POSITIVES
@@ -724,6 +1021,7 @@ This command never auto-reclaims.
 Compute:
 
 ```text
+TOTAL_INTAKES
 TOTAL_FINDINGS
 CHATS_REQUIRED
 READY_TO_CLAIM
@@ -734,6 +1032,7 @@ BLOCKED_ITEMS
 
 Definitions:
 
+* `TOTAL_INTAKES`: all intake records under `intakes/`;
 * `TOTAL_FINDINGS`: all ledger findings including root and FPs;
 * `CHATS_REQUIRED`: findings with `CHAT_REQUIRED=true` and status not in terminal closed set;
 * `READY_TO_CLAIM`: `STATUS=available` and `CHAT_REQUIRED=true`;
@@ -759,10 +1058,12 @@ Return exactly:
 CASE_MATERIALIZED
 
 CASE_ID:
+INTAKE_ID:
 ROOT_FINDING_ID:
 CASE_PATH:
 STATUS:
 
+TOTAL_INTAKES:
 TOTAL_FINDINGS:
 CHATS_REQUIRED:
 READY_TO_CLAIM:
@@ -782,20 +1083,36 @@ COMMON_HANDOFF:
 COMMAND_RECEIPT:
   COMMAND: /opsx-materialize-bug-queue
   CASE_ID:
+  INTAKE_ID:
   FINDING_ID:
   RESULT:
   OUTPUT_PATH:
   NEXT_ACTION:
+
+SOURCE_RESOLUTION:
+- mode: exact_path | canonical_id | referenced_source | bounded_fallback
+- primary_path:
+- fallback_used: true | false
+- search_operations: 0
+- search_scope: .tmp/opsx-bug-cases/<CASE_ID>
+- unresolved_gap:
 ```
+
+For `mode=intake` by default:
+
+* `ROOT_FINDING_ID` and `FINDING_ID` may be empty;
+* `TOTAL_FINDINGS` may be `0`;
+* `NEXT_ACTION` must be pasteable `/opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID>`.
 
 `FIRST_CLAIM_CANDIDATE` is informational only. It must equal what `/opsx-claim-next-bug` would currently select, using stored `CLAIM_PRIORITY` and stable order.
 
 ## Compatibility
 
-Future OPSX commands SHOULD accept:
+OPSX commands that continue a case SHOULD accept:
 
 ```text
 case=<CASE_ID>
+intake=<INTAKE_ID>
 finding=<FINDING_ID>
 ```
 
@@ -805,13 +1122,14 @@ and emit:
 COMMAND_RECEIPT:
   COMMAND:
   CASE_ID:
+  INTAKE_ID:
   FINDING_ID:
   RESULT:
   OUTPUT_PATH:
   NEXT_ACTION:
 ```
 
-This command must remain useful even before those integrations exist.
+`/opsx-fix-bug` without `GO` MUST use this command's `mode=intake` contract to create a missing intake, then `mode=update` to persist the adjudicated finding. It must not invent a second storage layout.
 
 `/opsx-fanout-bug-hunt` remains an intermediate chat-packet helper. Durable ownership and recursion live in this case map.
 
@@ -852,3 +1170,8 @@ FIRST_CLAIM_CANDIDATE: CHILD-002
 * No `GO` in handoffs.
 * No automatic claim.
 * No automatic stale-claim takeover.
+* `mode=intake` stores raw intake before adjudication and does not create a finding by default.
+* Do not update an existing finding whose `SOURCE_INTAKE_ID` differs from the current intake unless `relation=duplicate_intake` is explicit; then leave the canonical finding unchanged.
+* Reject cross-intake finding patches without relation with blocker `cross_intake_finding_update_without_relation`.
+* Do not migrate or rewrite existing cases unless explicitly requested by a later command.
+* Do not invent a second authoritative storage outside `.tmp/opsx-bug-cases/**`.

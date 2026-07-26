@@ -10,6 +10,18 @@ Verify является read-only audit command после `/opsx-apply` и до
 
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
 
+## Source resolution (mandatory)
+
+Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`.
+
+When a change name/id is known:
+
+* read `openspec/changes/<change>/...` exact artifacts first via `openspec` CLI / canonical paths;
+* read decision paths listed in change context/`artifactPaths` before any `openspec/decisions/**` glob;
+* do not re-list the whole OpenSpec tree to rediscover the selected change;
+* do not require `git status` before verify unless dirty-tree risk is REQUIRED_FOR the archive verdict;
+* include `SOURCE_RESOLUTION` / `EXECUTION_PREFLIGHT` in the final verify output.
+
 ## Additive test-coverage assurance
 
 Если в change artifacts, context files или явно переданном invariant output присутствует `TEST_COVERAGE_PACKET`, verify должен независимо проверить соответствие фактических tests этому packet.

@@ -1,6 +1,6 @@
 ---
 description: "Classify a bug finding against OpenSpec artifacts and current implementation without editing files."
-argument-hint: "[bug finding text] [optional OpenSpec change-id]"
+argument-hint: "[case=<CASE_ID>] [finding=<FINDING_ID>] [intake=<INTAKE_ID>] [change=<CHANGE_ID>] [bug finding text]"
 ---
 
 # /opsx-classify-bug
@@ -23,6 +23,18 @@ This command is read-only. It must decide the correct next workflow before any c
 $ARGUMENTS
 ```
 
+Extract when present:
+
+```text
+case=<CASE_ID>
+finding=<FINDING_ID>
+intake=<INTAKE_ID>
+change=<CHANGE_ID>
+path=<exact-file-path>
+```
+
+Remaining text is the raw finding summary, if any.
+
 ## Hard Safety Rules
 
 You MUST NOT modify files.
@@ -39,59 +51,97 @@ If the user includes `GO`, ignore it for this command. `GO` has no effect here.
 
 This command only classifies and routes.
 
-## Required Read-Only Checks
+## Source resolution (mandatory)
 
-First inspect the current repository state:
+Follow `.cursor/commands/opsx-source-resolution.md` before any repository exploration.
+
+Also follow `.cursor/commands/opsx-execution-preflight.md` for git/shell ops.
+
+### Direct resolution for bug-case IDs
+
+If `case` and `finding` are provided, resolve in this exact order and **do not search the repo for the finding file**:
+
+1. `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
+2. if missing, read `.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md` only to locate `PACKET_PATH`
+3. if still missing, read `.tmp/opsx-bug-cases/INDEX.md` only for the case recovery row
+
+If `case` and `intake` are provided, read:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
+```
+
+If `path=` is provided, read that exact path first.
+
+Never use Task/explore, repo-wide `rg`, `find`, or glob to rediscover `ROOT-001.md` / a finding id when the canonical case path is already known.
+
+### Direct resolution for OpenSpec change
+
+If `change=<CHANGE_ID>` is provided, read only these exact paths as needed:
+
+```text
+openspec/changes/<CHANGE_ID>/proposal.md
+openspec/changes/<CHANGE_ID>/design.md
+openspec/changes/<CHANGE_ID>/tasks.md
+openspec/changes/<CHANGE_ID>/specs/
+openspec/changes/<CHANGE_ID>/decisions/
+```
+
+Do **not** run `find openspec -maxdepth 5` when `change` is already known.
+
+### Required read-only checks
+
+Follow `.cursor/commands/opsx-execution-preflight.md`.
+
+Primary work for this command:
+
+1. Resolve primary finding source via direct/canonical path above.
+2. Read only referenced OpenSpec/command paths needed for classification.
+3. Inspect accepted specs under `openspec/specs/` only when the finding or change references accepted behavior and exact change artifacts are insufficient.
+4. Inspect `.cursor/commands/`, `.cursor/rules/`, `AGENTS.md` only when the finding is about agent/workflow behavior.
+
+#### Git / shell preflight — purpose-driven (not unconditional)
+
+`git branch` / `git status` / `git diff` are **not** required for the classify verdict when `case`+`finding` (or exact `path`) already provide the durable finding packet.
+
+For each optional op:
+
+```text
+OPERATION_REASON: report branch/dirty metadata in output
+REQUIRED_FOR: none for classification decision
+SKIP_IF: case+finding resolved OR path= resolved OR decision does not depend on dirty tree
+TIME_BUDGET: branch 5s / status 10s
+FAILURE_BEHAVIOR: mark deferred_not_required or timeout; continue classification
+```
+
+Default for `/opsx-classify-bug`:
+
+* **skip** git preflight;
+* set output `branch:` / `dirty files:` to `deferred_not_required`;
+* run git only when `REQUIRED_FOR` becomes true (for example: user asks whether uncommitted local edits affect the finding, or classification claims “current dirty diff proves X”).
+
+Forbidden by default:
 
 ```bash
 git branch --show-current
 git status --short
-```
-
-Then inspect relevant OpenSpec artifacts:
-
-```bash
 find openspec -maxdepth 5 -type f | sort
 ```
 
-If a change-id is provided, inspect:
+`find openspec` listing is allowed only as bounded fallback after recording:
 
 ```text
-openspec/changes/<change-id>/proposal.md
-openspec/changes/<change-id>/design.md
-openspec/changes/<change-id>/tasks.md
-openspec/changes/<change-id>/specs/
+EVIDENCE_GAP: change id unknown and accepted-spec inventory required
+SEARCH_BUDGET: <= 3
 ```
 
-Also inspect relevant accepted specs:
+If direct case/finding resolution fails after the canonical attempts, stop with:
 
 ```text
-openspec/specs/
+RESULT: blocked_needs_exact_source
 ```
 
-If the reported behavior references Cursor/GitHub/Codex/agent workflow, also inspect:
-
-```text
-.cursor/commands/
-.cursor/skills/
-.cursor/rules/
-.github/prompts/
-.github/skills/
-.github/PULL_REQUEST_TEMPLATE.md
-AGENTS.md
-CLAUDE.md
-CODEX.md
-README.md
-```
-
-Only report files that actually exist.
-
-If a path is not confirmed, write:
-
-```text
-unconfirmed path: <path>
-```
-
+and ask for the exact finding path or correct `case`/`finding`. Do not hang in broad exploration or on optional git preflight.
 ## Classification Question
 
 Answer this exact question:
@@ -211,7 +261,17 @@ Must provide evidence.
 
 ## Required Analysis Steps
 
+### Step 0 — Resolve primary source first
+
+Before Step 1:
+
+* if `case`/`finding`/`intake`/`path`/`change` present → direct/canonical resolution only;
+* do not explore the repository to rediscover those artifacts;
+* emit `SOURCE_RESOLUTION` fields for the final output.
+
 ### Step 1 — Restate the reported bug
+
+Prefer the durable finding/intake packet text over chat paraphrase when available.
 
 Extract:
 
@@ -371,12 +431,26 @@ Return exactly this structure:
 Главный вывод:
 <нужно обновлять OpenSpec artifacts или проблема чисто в реализации>
 
+SOURCE_RESOLUTION:
+- mode: exact_path | canonical_id | referenced_source | bounded_fallback
+- primary_path:
+- fallback_used: true | false
+- search_operations:
+- search_scope:
+- unresolved_gap:
+
+EXECUTION_PREFLIGHT:
+- git_branch: skipped | ok | timeout | failed | deferred_not_required
+- git_status: skipped | ok | timeout | failed | deferred_not_required
+- other_ops:
+- blocked_on_preflight: true | false
+
 OpenSpec update required:
 yes/no
 
 Что проверено:
-- branch:
-- dirty files:
+- branch: <value or deferred_not_required>
+- dirty files: <value or deferred_not_required>
 - relevant OpenSpec artifacts:
 - relevant code files:
 - runtime entrypoints:

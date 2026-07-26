@@ -25,6 +25,8 @@ $ARGUMENTS
 
 Analyze the current working tree and create safe atomic local commits by logical zones.
 
+**Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md`. If an OpenSpec change-id is provided or exactly one `openspec/changes/<id>/` is touched, read that change via canonical paths only; do not inventory all changes.
+
 Commit subjects MUST be in English with a short Russian explanation in parentheses:
 
 ```text
@@ -42,7 +44,19 @@ Primary body text should be English. Russian may appear in parentheses for clari
 
 ## Mandatory preflight
 
-Run:
+Follow `.cursor/commands/opsx-execution-preflight.md`.
+
+These git ops are **REQUIRED_FOR** commit planning (branch protection + change inventory). Apply budgets; on timeout return `blocked_preflight_timeout` rather than hanging.
+
+```text
+OPERATION_REASON: atomic commit plan + protected-branch gate
+REQUIRED_FOR: commit decision
+SKIP_IF: never for /opsx-commit when GO path is taken (preview may use status/diff only)
+TIME_BUDGET: branch 5s; status 10s; each diff 15s
+FAILURE_BEHAVIOR: blocked_preflight_timeout / report missing fact; no retry loop
+```
+
+Run the smallest set that answers the need:
 
 ```bash
 git branch --show-current
@@ -53,6 +67,7 @@ git diff --cached --stat
 git diff --cached --name-status
 ```
 
+Do not run `git fetch` here unless remote state becomes REQUIRED_FOR.
 Block execution if current branch is:
 
 ```text

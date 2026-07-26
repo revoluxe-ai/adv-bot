@@ -127,6 +127,21 @@ ROOT_FIX_STATUS:
 
 The packet may be supplied inline or by reference to a previously materialized artifact.
 
+## Source resolution (mandatory)
+
+Follow `.cursor/commands/opsx-source-resolution.md`.
+Also follow `.cursor/commands/opsx-execution-preflight.md`.
+
+If `root_finding` is a path, `case+finding`, or packet reference:
+
+1. read that exact source first;
+2. do not rediscover the root packet via repo-wide search;
+3. use packet-provided symbols/paths to bound Pass 1 searches;
+4. respect optional `scope=`;
+5. do **not** require `git status` before packet resolution; run git only when `base`/`head`/dirty-tree facts are REQUIRED_FOR the hunt decision;
+6. Pass 1 search budget: ≤ 3 targeted `rg` operations per unresolved symbol/boundary class before stopping or asking for `EVIDENCE_GAP` / `deep`;
+7. include `SOURCE_RESOLUTION` and `EXECUTION_PREFLIGHT` in the final hunt output.
+
 A chat-only recollection is not a reliable root packet.
 
 If the packet is incomplete in a way that prevents deterministic root matching, stop with:
@@ -200,19 +215,25 @@ Find:
 * tests that imply intended coverage;
 * accepted or proposed OpenSpec requirements and decisions.
 
-Recommended commands:
+Recommended commands (purpose-driven):
 
 ```bash
-git branch --show-current
-git status --short
+# REQUIRED_FOR base/head identity only when those args are used
 git rev-parse <base>
 git rev-parse <head>
 git diff --name-only <base>...<head>
-rg -n "<invariant keywords>" app tests openspec
-rg -n "<root function/class/callback names>" app tests scripts openspec
-rg -n "<write boundary names>" app tests
+
+# OPTIONAL: branch/status — SKIP_IF not required for hunt decision; TIME_BUDGET 5s/10s
+# git branch --show-current
+# git status --short
+
+# after root packet resolved; prefer packet-scoped roots / scope=
+rg -n "<invariant keywords>" <scoped-roots>
+rg -n "<root function/class/callback names>" <scoped-roots>
+rg -n "<write boundary names>" <scoped-roots>
 ```
 
+Do not start with repo-wide rediscovery of the root finding id/path or with unconditional `git status`.
 Do not assume that a clean working tree means the inspected snapshot is the intended pre-fix snapshot.
 
 Confirm `PRE_FIX_REF` from the root packet where relevant.

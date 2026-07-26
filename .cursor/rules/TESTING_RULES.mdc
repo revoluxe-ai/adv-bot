@@ -1,19 +1,14 @@
-# Правила тестирования проекта
+---
+description: DEPRECATED migration pointer — use testing-rules.mdc
+alwaysApply: false
+---
 
-## КРИТИЧЕСКИ ВАЖНЫЕ ПРАВИЛА
-- **ВСЕ команды проекта** запускать через Poetry: `poetry run ...`
-- **НИКОГДА** не запускать bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
-- **DEFAULT quality gates**: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
-- **НЕ считать** `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
-- Если добавлен новый Python module/file, **сначала** обновить список/набор файлов для `pyright-strict`, **потом** запускать `poetry run pyright-strict`
-- На Windows PowerShell **не использовать** bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
-- **ОБЯЗАТЕЛЬНО** активировать виртуальное окружение перед запуском тестов командой: `.\\.venv\\Scripts\\Activate.ps1`, если это требуется для локальной среды
-- **ВСЕГДА** запускать тесты из корня проекта через `poetry run pytest ...`
-- **НИКОГДА** не запускать тесты через `cd tests && pytest` или подобные команды
-- **ВСЕГДА** выполнять тесты в контексте корневой директории проекта
-- **ВАЖНО**: При использовании фикстуры `test_async_db` не используйте конструкцию `async with test_async_db as session:`, вместо этого напрямую используйте `session = test_async_db`
-- **КРИТИЧНО**: В тестах ВСЕГДА использовать моки моделей (TestUser, TestWBToken и т.д.) из tests/test_models.py вместо реальных моделей из приложения. Это помогает избежать проблем с циклическими зависимостями и делает тесты более изолированными.
-- **ASYNC TEST ISOLATION**: Async tests MUST NOT вручную patch shared module-level dependencies around awaited code. Forbidden pattern: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore.
-- **ASYNC PATCH BOUNDARY**: Это особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags. Предпочитайте самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client.
-- **MONKEYPATCH EXCEPTION**: pytest `monkeypatch` для module-level patching допустим только когда это unavoidable, с явным объяснением почему более узкий patch point невозможен.
-- **WRITE-GATE REGRESSIONS**: Write-gate regression tests MUST prove, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван. Regression tests MUST fail при удалении guarded condition; если gate имеет blocked и allowed behavior, нужен paired positive case.
+# DEPRECATED — migration pointer
+
+Canonical Cursor test-design/execution rule:
+
+`.cursor/rules/testing-rules.mdc`
+
+Do not treat this file as testing policy.
+Do not copy obsolete clauses from older revisions of this file.
+All test-design and execution rules live only in `testing-rules.mdc`.

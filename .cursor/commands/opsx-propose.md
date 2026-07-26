@@ -20,7 +20,7 @@ When ready to implement, run /opsx:apply
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_propose --strict`. Stop on non-zero exit and report the guard output.
 
-**Architecture Decision Lookup:** Before generating proposal/design/tasks, search `openspec/decisions/**/*.md` and read relevant accepted decisions. Proposal and design artifacts must account for decisions found. If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Do not claim the change is apply-ready while architecture placement is unresolved without an accepted or proposed decision.
+**Architecture Decision Lookup:** Before generating proposal/design/tasks, resolve any user-supplied change/decision paths first. Otherwise search `openspec/decisions/**/*.md` under a bounded budget and follow `.cursor/commands/opsx-source-resolution.md`. Proposal and design artifacts must account for decisions found. If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Do not claim the change is apply-ready while architecture placement is unresolved without an accepted or proposed decision.
 
 **Input**: The argument after `/opsx:propose` is the change name (kebab-case), OR a description of what the user wants to build.
 

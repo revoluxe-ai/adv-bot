@@ -119,7 +119,11 @@ Expected files:
 .tmp/opsx-bug-cases/<CASE_ID>/handoffs/COMMON_HANDOFF.md
 ```
 
-If `CASE.md` or `LEDGER.md` is missing, stop with:
+## Source resolution (mandatory)
+
+Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`.
+
+Resolve only the canonical paths above for the provided `case`. Do not search the repository for `CASE_ID` / finding packets. Do not run git status/branch for claim. If `CASE.md` or `LEDGER.md` is missing after direct path checks, stop with:
 
 ```text
 Verdict:
@@ -294,6 +298,7 @@ NEXT_COMMAND:
 
 NEXT_COMMAND_ARGS:
 case=<CASE_ID>
+intake=<INTAKE_ID>
 finding=<FINDING_ID>
 claim_token=<CLAIM_TOKEN>
 
@@ -303,6 +308,7 @@ Finding <FINDING_ID> принят и закреплён за этим чатом
 
 PACKET_SUMMARY:
 - TITLE:
+- SOURCE_INTAKE_ID:
 - PRODUCTION_CLASSIFICATION:
 - RELATION_TO_ROOT:
 - PACKET_PURPOSE:
@@ -322,11 +328,26 @@ PACKET_SUMMARY:
 COMMAND_RECEIPT:
   COMMAND: /opsx-claim-next-bug
   CASE_ID:
+  INTAKE_ID:
   FINDING_ID:
   RESULT: claimed
   OUTPUT_PATH:
   NEXT_ACTION: read_only_adjudication
+
+SOURCE_RESOLUTION:
+- mode: canonical_id
+- primary_path:
+- fallback_used: false
+- search_operations: 0
+- search_scope: .tmp/opsx-bug-cases/<CASE_ID>
+- unresolved_gap:
 ```
+
+`intake=<INTAKE_ID>` в `NEXT_COMMAND_ARGS` и `INTAKE_ID` в receipt:
+
+* бери из `SOURCE_INTAKE_ID` finding packet/ledger, если поле задано;
+* иначе из `PRIMARY_INTAKE_ID` в `CASE.md`, если задано;
+* иначе оставь пустым (legacy case without intake object).
 
 Load the full packet content from `PACKET_PATH` into the chat context.
 
@@ -382,13 +403,16 @@ Accept and propagate when present:
 
 ```text
 case=<CASE_ID>
+intake=<INTAKE_ID>
 finding=<FINDING_ID>
 claim_token=<CLAIM_TOKEN>
 ```
 
 This command selects `finding` automatically and must not require the caller to pass it.
 
-Emit `COMMAND_RECEIPT` on every terminal outcome.
+When preparing `/opsx-fix-bug` next args, include `intake=` whenever a durable intake id is known so fix-bug can read the intake without a separate materialize step.
+
+Emit `COMMAND_RECEIPT` on every terminal outcome, including `INTAKE_ID` when known.
 
 ## Acceptance anchor
 
