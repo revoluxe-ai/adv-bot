@@ -1,0 +1,319 @@
+---
+description: "Propose and (with GO) create semantic local commits for OPSX/Cursor commands, rules, skills, and their mirrors."
+argument-hint: "GO [optional topic hint]"
+---
+
+# /opsx-admin-command-commit
+
+Exclusive owner of local commits for **process surfaces** (commands, rules, skills, prompt/skill mirrors).
+
+You are allowed to create local git commits ONLY when the user input contains the exact token `GO`.
+
+If `GO` is absent:
+- do not modify files;
+- do not stage files;
+- do not commit;
+- output only the proposed commit plan.
+
+Never push, merge, rebase, force-push, deploy, restart services, run migrations against production, or touch secrets.
+
+Product/code/OpenSpec product commits belong to `/opsx-commit`, not this command.
+
+## User input
+
+```text
+$ARGUMENTS
+```
+
+## Purpose
+
+Analyze dirty **process-surface** files and create safe atomic local commits **by meaning**.
+
+Two phases:
+
+1. **Plan** (no `GO`) — group files, propose commit subjects/bodies, report redirects.
+2. **Execute** (`GO`) — stage and commit approved in-scope groups only.
+
+**Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md`.
+**Execution budgets:** Follow `.cursor/commands/opsx-execution-preflight.md` (git-mutating class).
+
+## In-scope surfaces (exclusive)
+
+Only these paths may be staged/committed by this command:
+
+```text
+.cursor/commands/**
+.cursor/rules/**
+.cursor/skills/**
+.cursor/opsx-review-commands
+.github/skills/**
+.github/prompts/**
+.agents/skills/**
+```
+
+Shared OPSX process contracts that live under `.cursor/commands/` (for example
+`opsx-execution-preflight.md`, `opsx-source-resolution.md`) are in scope.
+
+Everything else is **out of scope** for this command.
+
+## Out of scope (redirect)
+
+Never stage or commit:
+
+- product/app/code
+- tests
+- DB/migrations
+- CI/infra (except the surfaces listed above)
+- `openspec/changes/**` product change packets
+- ordinary project docs outside the surfaces above
+
+If such files are dirty:
+
+```text
+OUT_OF_SCOPE_REDIRECT:
+NEXT_ACTION: /opsx-commit
+```
+
+Leave them untouched.
+
+## Mandatory preflight
+
+These git ops are **REQUIRED_FOR** commit planning (branch protection + inventory).
+Apply budgets; on timeout return `blocked_preflight_timeout` rather than hanging.
+
+```text
+OPERATION_REASON: process-surface commit plan + protected-branch gate
+REQUIRED_FOR: commit decision
+SKIP_IF: never when GO path is taken (preview may use status/diff only)
+TIME_BUDGET: branch 5s; status 10s; each diff 15s
+FAILURE_BEHAVIOR: blocked_preflight_timeout / report missing fact; no retry loop
+```
+
+Run the smallest set that answers the need:
+
+```bash
+git branch --show-current
+git status --short
+git diff --stat
+git diff --name-status
+git diff --cached --stat
+git diff --cached --name-status
+```
+
+Do not run `git fetch` unless remote state becomes REQUIRED_FOR.
+
+Block execution if current branch is:
+
+```text
+main
+master
+prod
+production
+```
+
+unless the user input contains:
+
+```text
+GO_ON_PROTECTED_BRANCH
+```
+
+Even with `GO_ON_PROTECTED_BRANCH`, never push.
+
+## Semantic grouping rules
+
+Classify every **in-scope** changed file into meaning groups. Prefer fewer clear commits over noise, but never merge unrelated concerns.
+
+Preferred grouping:
+
+```text
+1. one logical OPSX/Cursor command + its mirrors/companions
+   (e.g. .cursor/commands/opsx-verify.md + .github/prompts/opsx-verify.prompt.md
+    + matching skill copies that changed for the same intent)
+2. admin-command family packet that was designed/fixed together
+3. shared process contracts (preflight, source-resolution, review pointers)
+   — separate commit if they changed independently
+4. rules that are not tied to a single command change — separate
+5. unrelated process edits — separate commits by concern
+```
+
+Do **not**:
+
+- dump all `.cursor/commands/**` into one commit when intents differ;
+- mix verify/apply/archive lifecycle edits with unrelated admin-tooling edits
+  unless they are one disclosed companion packet;
+- include out-of-scope files to “finish the tree”.
+
+If a file mixes independent concerns and interactive staging is impractical:
+
+- leave it unstaged;
+- report `requires manual git add -p`;
+- continue with safe whole-file groups.
+
+## Staging rules
+
+Prefer whole-file staging when the file belongs to one meaning group.
+
+Before every commit:
+
+```bash
+git diff --cached --stat
+git diff --cached --name-status
+git diff --cached
+```
+
+If the staged diff contains out-of-scope or unrelated process changes, unstage and stop that group:
+
+```bash
+git restore --staged <file>
+```
+
+## Commit message format
+
+Subjects MUST be English with a short Russian explanation in parentheses:
+
+```text
+type(scope): English summary (русское пояснение)
+```
+
+Preferred types for this command:
+
+```text
+docs
+chore
+fix
+refactor
+```
+
+Preferred scopes:
+
+```text
+commands
+rules
+skills
+prompts
+opsx-admin
+opsx-process
+```
+
+Examples:
+
+```text
+chore(commands): split verify handoff contract (разделить контракт handoff verify)
+fix(opsx-admin): clarify defect fix NEXT_ACTION (уточнить NEXT_ACTION после fix)
+docs(skills): mirror openspec-apply skill updates (синхронизировать skill openspec-apply)
+```
+
+Body (English primary; Russian allowed in parentheses):
+
+```text
+What:
+- ...
+
+Why:
+- ...
+
+How:
+- ...
+
+Verification:
+- ...
+
+Risk:
+- ...
+```
+
+Create commits with multiple `-m` arguments (same pattern as `/opsx-commit`).
+
+## Verification rules
+
+For process-only commits:
+
+- focused automated tests are usually not inferred;
+- commit is allowed with `Verification: not run - process contract change`;
+- if the change claims a redirect/GO gate, do a quick Grep self-check that the
+  named tokens exist in the touched files before committing that group.
+
+## Execution mode
+
+### No `GO` → plan only
+
+```text
+STATUS: PLAN_READY
+
+Commit plan:
+- proposed commits (subject + files + why this split)
+- commands that would be run
+- out-of-scope files (redirect to /opsx-commit)
+- files requiring manual git add -p
+- suspicious/unrelated process files
+
+WHAT_HAPPENED:
+WHY:
+CURRENT_STATE:
+OWNER_DECISION_REQUIRED: yes — accept plan or adjust groups
+NEXT_ACTION: /opsx-admin-command-commit GO
+DO_NOT_DO_YET: push; /opsx-commit for in-scope process files; mix product files into GO
+```
+
+### With `GO` → execute plan
+
+For each in-scope group:
+
+1. Stage files for that group only.
+2. Inspect staged diff.
+3. Optional Grep self-check when gate/redirect tokens are claimed.
+4. Commit with detailed message.
+5. Continue to next group.
+
+If a group requires manual `git add -p`:
+- skip that group;
+- continue with safe groups;
+- report skipped files.
+
+Stop immediately on staging/commit failure; leave working tree as-is; report.
+
+## Final report (after GO)
+
+```text
+STATUS: COMMITTED | PARTIAL | BLOCKED
+
+Done:
+- commits created:
+
+Skipped:
+- files requiring manual add -p:
+- groups not committed:
+
+OUT_OF_SCOPE_REDIRECT:
+- files left for /opsx-commit:
+
+Verification:
+- passed:
+- failed:
+- not run:
+
+WHAT_HAPPENED:
+WHY:
+CURRENT_STATE:
+OWNER_DECISION_REQUIRED:
+NEXT_ACTION:
+- if product files remain dirty: /opsx-commit
+- else optional: /opsx-create-pr (do not push)
+DO_NOT_DO_YET: push; rebase; force-push
+```
+
+## Absolute prohibitions
+
+Never run:
+
+```bash
+git push
+git push --force
+git rebase
+git merge
+git reset --hard
+git clean -fd
+```
+
+Never commit paths outside the in-scope surfaces list.
+Never re-decide product commit grouping for `/opsx-commit`.

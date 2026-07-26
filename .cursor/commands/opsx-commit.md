@@ -1,5 +1,5 @@
 ---
-description: "Analyze current diff, split it into atomic groups, stage files, and create commits with detailed bilingual messages."
+description: "Atomic local commits for product/code/OpenSpec/docs. Process surfaces (commands/rules/skills) redirect to /opsx-admin-command-commit."
 argument-hint: "GO [optional OpenSpec change-id / context]"
 ---
 
@@ -23,9 +23,42 @@ $ARGUMENTS
 
 ## Purpose
 
-Analyze the current working tree and create safe atomic local commits by logical zones.
+Analyze the current working tree and create safe atomic local commits by logical zones
+for **product/code/OpenSpec/docs** changes.
+
+Process surfaces (commands, rules, skills, prompt/skill mirrors) are **out of scope**.
+They belong exclusively to `/opsx-admin-command-commit`.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md`. If an OpenSpec change-id is provided or exactly one `openspec/changes/<id>/` is touched, read that change via canonical paths only; do not inventory all changes.
+
+## Process-surface exclusion (mandatory)
+
+Never stage or commit these paths; leave them untouched and redirect:
+
+```text
+.cursor/commands/**
+.cursor/rules/**
+.cursor/skills/**
+.cursor/opsx-review-commands
+.github/skills/**
+.github/prompts/**
+.agents/skills/**
+```
+
+If any of these are dirty:
+
+```text
+OUT_OF_SCOPE_REDIRECT:
+NEXT_ACTION: /opsx-admin-command-commit
+```
+
+If the dirty tree is **only** process surfaces, do not invent product commits:
+
+```text
+STATUS: OUT_OF_SCOPE_REDIRECT
+NEXT_ACTION: /opsx-admin-command-commit
+DO_NOT_DO_YET: commit process files via /opsx-commit
+```
 
 Commit subjects MUST be in English with a short Russian explanation in parentheses:
 
@@ -117,19 +150,24 @@ Use these files to detect unrelated changes.
 
 ## Classification zones
 
-Classify every changed file into one zone:
+Classify every **in-scope** changed file into one zone.
+Process-surface paths listed above are never classified here — report redirect only.
 
 ```text
-1. openspec-artifacts
+1. openspec-specs
 2. db-models-migrations
 3. domain-business-logic
 4. bot-ui-callbacks-messages
 5. async-jobs-workers
 6. tests
-7. docs-prompts-commands
+7. docs
 8. ci-infra
 9. unrelated-or-suspicious
 ```
+
+Zone `docs` means ordinary project documentation only.
+It does **not** include `.cursor/commands/**`, `.cursor/skills/**`, `.cursor/rules/**`,
+`.github/prompts/**`, `.github/skills/**`, or `.agents/skills/**`.
 
 ## Automatic commit grouping
 
@@ -142,11 +180,12 @@ Create commits in this preferred order:
 4. bot UI/callbacks/messages
 5. async jobs/workers
 6. tests
-7. docs/prompts/commands
+7. docs
 8. chore/cleanup
 ```
 
 Do not include `unrelated-or-suspicious` files in any automatic commit.
+Do not include process-surface files in any automatic commit.
 
 If suspicious files exist:
 - leave them unstaged;
@@ -236,7 +275,7 @@ spec(openspec): document invite partner rollout (описать запуск п�
 feat(invites): add invite activation flow (добавить поток активации инвайтов)
 fix(campaigns): preserve bot_active on landing open (сохранить bot_active при открытии лендинга)
 test(invites): cover invite activation regressions (покрыть регрессии активации инвайтов)
-chore(commands): add atomic commit command (добавить команду атомарных коммитов)
+chore(docs): refresh contributor setup notes (обновить заметки по setup)
 ```
 
 Use detailed body:
@@ -296,6 +335,7 @@ Commit plan:
 - commands that would be run
 - suspicious files
 - tests to run
+- process-surface files left for /opsx-admin-command-commit
 ```
 
 If `GO` is present, execute the commit plan.
@@ -331,12 +371,16 @@ Skipped:
 - suspicious/unrelated files:
 - groups not committed:
 
+OUT_OF_SCOPE_REDIRECT:
+- process-surface files left for /opsx-admin-command-commit:
+
 Verification:
 - passed:
 - failed:
 - not run:
 
 Next:
+- if process surfaces remain dirty: /opsx-admin-command-commit
 - recommended final verify command
 - recommended PR command, but do not push
 ```
