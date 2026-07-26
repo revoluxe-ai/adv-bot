@@ -247,7 +247,7 @@
 
 - [x] 25.1 Подготовить чек-лист ручного теста владельца (owner manual test) на собственных/тестовых кампаниях перед любым бета-доступом; зафиксировать критерии успеха/провала теста.
 - [x] 25.2 Реализовать механизм ограниченного opt-in доступа (feature flag / allowlist кампаний или пользователей) для limited beta + структурированный сбор фидбэка (форма/канал обратной связи); тест на то, что beta-доступ не включается автоматически всем paid-пользователям.
-- [ ] 25.3 **Owner decision OD-05** — единственное открытое owner-решение этого обновления: широкое включение (broad enablement) для всех paid-пользователей MUST NOT происходить до явного принятия OD-05 владельцем; зафиксировать gate в коде (allowlist/flag) и в проверке readiness перед снятием ограничения.
+- [x] 25.3 **Owner decision OD-05** — единственное открытое owner-решение этого обновления: широкое включение (broad enablement) для всех paid-пользователей MUST NOT происходить до явного принятия OD-05 владельцем; зафиксировать gate в коде (allowlist/flag) и в проверке readiness перед снятием ограничения. *(gate + `evaluate_card_ab_hold_broad_enable_readiness` + `rollout/od05-readiness.md`; OD-05 acceptance itself remains OPEN / env default false — see readiness Status)*
 - [x] 25.4 Tests-first: попытка широкого включения без принятого OD-05 → блокируется (regression, доказывающий гейт, а не только документацию).
 - [x] 25.5 RU-docstrings со ссылкой на spec requirement «Broad enablement is gated behind owner manual test, limited beta, and an explicit owner decision»; focused pytest + `pyright-strict`.
 
