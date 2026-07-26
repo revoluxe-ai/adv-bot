@@ -52,6 +52,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
     start_epoch_on_enable,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.feature_flag import (
+    coerce_shop_id_for_epoch_allowlist,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold,
     can_enable_card_ab_hold_on_version,
@@ -385,7 +388,10 @@ async def _handle_ab_hold_enable(
                 return
         adv_setting_id = int(adv.id)
         adv_id = int(adv.adv_id)
-        shop_id = getattr(adv, "shop_id", None)
+        # AdvSetting не имеет shop_id; allowlist читает WBCabinet.shop_id (joined).
+        cabinet = getattr(adv, "wb_cabinet", None)
+        raw_shop_id = getattr(cabinet, "shop_id", None) if cabinet is not None else None
+        shop_id = coerce_shop_id_for_epoch_allowlist(raw_shop_id)
 
     await start_epoch_on_enable(
         adv_setting_id,

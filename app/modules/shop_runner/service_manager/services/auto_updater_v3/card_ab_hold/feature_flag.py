@@ -57,6 +57,28 @@ def card_ab_hold_epoch_allowlist_shop_ids() -> frozenset[int]:
     return _parse_id_set(os.environ.get("CARD_AB_HOLD_EPOCH_ALLOWLIST_SHOP_IDS"))
 
 
+def coerce_shop_id_for_epoch_allowlist(raw: object | None) -> int | None:
+    """Нормализовать ``WBCabinet.shop_id`` (str) к int для allowlist.
+
+    Non-numeric / empty / bool → ``None`` (fail-closed shop hit, без crash).
+    ``AdvSetting`` не имеет колонки ``shop_id``; источник — joined relation.
+    """
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return int(raw)
+    try:
+        text = str(raw).strip()
+    except Exception:
+        return None
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
 def is_card_ab_hold_broad_enable_authorized() -> bool:
     """OD-05 gate: broad enable без явного env MUST оставаться False.
 
