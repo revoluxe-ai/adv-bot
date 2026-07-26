@@ -1,11 +1,12 @@
 ---
-description: "Propose and (with GO) create semantic local commits for OPSX/Cursor commands, rules, skills, and their mirrors."
+description: "Propose and (with GO) create semantic local commits for AI/process artifacts (commands, rules, skills, agents, static-check, mirrors)."
 argument-hint: "GO [optional topic hint]"
 ---
 
 # /opsx-admin-command-commit
 
-Exclusive owner of local commits for **process surfaces** (commands, rules, skills, prompt/skill mirrors).
+Exclusive owner of local commits for **AI / process surfaces** (Cursor/agent commands,
+rules, skills, agents, static-check, prompt/skill mirrors, and root agent guides).
 
 You are allowed to create local git commits ONLY when the user input contains the exact token `GO`.
 
@@ -45,17 +46,24 @@ Only these paths may be staged/committed by this command:
 .cursor/commands/**
 .cursor/rules/**
 .cursor/skills/**
+.cursor/agents/**
+.cursor/static-check/**
 .cursor/pipeline/**
 .cursor/opsx-review-commands
+.agents/**
 .github/skills/**
 .github/prompts/**
-.agents/skills/**
+.github/copilot-instructions.md
+.github/git-commit-instructions.md
+AGENTS.md
 ```
 
 Shared OPSX process contracts that live under `.cursor/commands/` (for example
 `opsx-execution-preflight.md`, `opsx-source-resolution.md`) are in scope.
 Materialized operator pipeline graph under `.cursor/pipeline/` (from
 `/opsx-pipeline UPDATE GO`) is in scope.
+Static-check worker contracts under `.cursor/static-check/` are in scope.
+All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
 
@@ -66,7 +74,9 @@ Never stage or commit:
 - product/app/code
 - tests
 - DB/migrations
-- CI/infra (except the surfaces listed above)
+- CI/infra (including `.github/workflows/**`, except the surfaces listed above)
+- local IDE prefs such as `.cursor/settings.json`
+- archives / junk under `.cursor/` (e.g. `commands.zip`)
 - `openspec/changes/**` product change packets
 - ordinary project docs outside the surfaces above
 
@@ -135,8 +145,12 @@ Preferred grouping:
 2. admin-command family packet that was designed/fixed together
 3. shared process contracts (preflight, source-resolution, review pointers)
    — separate commit if they changed independently
-4. rules that are not tied to a single command change — separate
-5. unrelated process edits — separate commits by concern
+4. rules / AGENTS.md / github agent instruction files — separate if not tied
+   to a single command change
+5. agents skills/guides (.agents/**, .cursor/agents/**) — by intent
+6. static-check infra (.cursor/static-check/**) — separate unless companion
+   to the same disclosed packet
+7. unrelated process edits — separate commits by concern
 ```
 
 Do **not**:
@@ -193,7 +207,9 @@ Preferred scopes:
 commands
 rules
 skills
+agents
 prompts
+static-check
 opsx-admin
 opsx-process
 ```

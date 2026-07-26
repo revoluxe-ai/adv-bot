@@ -1,5 +1,5 @@
 ---
-description: "Atomic local commits for product/code/OpenSpec/docs. Process surfaces (commands/rules/skills) redirect to /opsx-admin-command-commit."
+description: "Atomic local commits for product/code/OpenSpec/docs. AI/process surfaces redirect to /opsx-admin-command-commit."
 argument-hint: "GO [optional OpenSpec change-id / context]"
 ---
 
@@ -26,7 +26,8 @@ $ARGUMENTS
 Analyze the current working tree and create safe atomic local commits by logical zones
 for **product/code/OpenSpec/docs** changes.
 
-Process surfaces (commands, rules, skills, prompt/skill mirrors) are **out of scope**.
+Process surfaces (AI/process artifacts: commands, rules, skills, agents,
+static-check, prompt/skill mirrors, root agent guides) are **out of scope**.
 They belong exclusively to `/opsx-admin-command-commit`.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md`. If an OpenSpec change-id is provided or exactly one `openspec/changes/<id>/` is touched, read that change via canonical paths only; do not inventory all changes.
@@ -39,11 +40,16 @@ Never stage or commit these paths; leave them untouched and redirect:
 .cursor/commands/**
 .cursor/rules/**
 .cursor/skills/**
+.cursor/agents/**
+.cursor/static-check/**
 .cursor/pipeline/**
 .cursor/opsx-review-commands
+.agents/**
 .github/skills/**
 .github/prompts/**
-.agents/skills/**
+.github/copilot-instructions.md
+.github/git-commit-instructions.md
+AGENTS.md
 ```
 
 If any of these are dirty:
@@ -167,8 +173,11 @@ Process-surface paths listed above are never classified here — report redirect
 ```
 
 Zone `docs` means ordinary project documentation only.
-It does **not** include `.cursor/commands/**`, `.cursor/skills/**`, `.cursor/rules/**`,
-`.cursor/pipeline/**`, `.github/prompts/**`, `.github/skills/**`, or `.agents/skills/**`.
+It does **not** include `.cursor/commands/**`, `.cursor/skills/**`,
+`.cursor/rules/**`, `.cursor/agents/**`, `.cursor/static-check/**`,
+`.cursor/pipeline/**`, `.agents/**`, `.github/prompts/**`, `.github/skills/**`,
+`.github/copilot-instructions.md`, `.github/git-commit-instructions.md`,
+or `AGENTS.md`.
 
 ## Automatic commit grouping
 

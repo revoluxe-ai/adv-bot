@@ -561,7 +561,8 @@ DO_NOT_DO_YET:
 - authority remains unambiguous;
 - the next human action is explicit.
 
-When process-surface files changed (`.cursor/commands/**`, rules, skills, mirrors),
+When process-surface files changed (`.cursor/commands/**`, rules, skills, agents,
+static-check, mirrors, `AGENTS.md`),
 `NEXT_ACTION` MUST point to `/opsx-admin-command-commit` (not `/opsx-commit`).
 
 ---
