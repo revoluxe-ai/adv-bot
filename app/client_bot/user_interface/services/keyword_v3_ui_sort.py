@@ -6,10 +6,15 @@ import logging
 from typing import cast
 
 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
-    _build_complex_adv,
-    _load_wb_cabinet,
-    _positions_size_for_adv,
+    build_complex_adv,
+    load_wb_cabinet,
+    positions_size_for_adv,
 )
+
+# Patch-compatible aliases для unit tests (patch path на этом модуле).
+_build_complex_adv = build_complex_adv
+_load_wb_cabinet = load_wb_cabinet
+_positions_size_for_adv = positions_size_for_adv
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
 from app.core.di.wb_manager_hub import WBManagerHubFactory
