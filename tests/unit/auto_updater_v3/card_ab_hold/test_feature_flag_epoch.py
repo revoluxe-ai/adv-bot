@@ -9,6 +9,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.feature_flag import (
     can_enter_epoch_managed_ab_hold,
+    coerce_shop_id_for_epoch_allowlist,
     is_card_ab_hold_broad_enable_authorized,
     is_card_ab_hold_epoch_flow_enabled,
 )
@@ -86,3 +87,23 @@ def test_od05_without_master_flag_still_closed(
 def test_assert_allowlist_ids_helper() -> None:
     """Тестовый хелпер нормализует id."""
     assert feature_flag.assert_allowlist_ids([1, 2, 2]) == frozenset({1, 2})
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("7", 7),
+        (" 42 ", 42),
+        (7, 7),
+        (None, None),
+        ("", None),
+        ("   ", None),
+        ("not-a-number", None),
+        (True, None),
+        (False, None),
+    ],
+)
+def test_coerce_shop_id_for_epoch_allowlist(raw: object, expected: int | None) -> None:
+    """WBCabinet.shop_id (str) → int; non-numeric / bool → None (fail-closed)."""
+    assert coerce_shop_id_for_epoch_allowlist(raw) == expected

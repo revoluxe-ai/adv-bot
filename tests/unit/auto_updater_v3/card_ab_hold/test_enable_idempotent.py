@@ -156,7 +156,7 @@ async def test_enable_success_calls_start_epoch_on_enable_not_manual_phase() -> 
     adv = SimpleNamespace(
         id=9,
         adv_id=99,
-        shop_id=1,
+        wb_cabinet=SimpleNamespace(shop_id="1"),
         bot_active=True,
         automatic_version=3,
         max_price_for_order=100.0,
@@ -225,3 +225,120 @@ async def test_enable_success_calls_start_epoch_on_enable_not_manual_phase() -> 
     start_epoch.assert_awaited_once_with(9, adv_id=99, shop_id=1)
     set_signal.assert_awaited_once()
     assert start_epoch.await_args.kwargs["adv_id"] == 99
+
+
+def _off_adv_for_enable(
+    *,
+    adv_setting_id: int = 10,
+    adv_id: int = 100,
+    wb_cabinet: object | None = None,
+) -> SimpleNamespace:
+    """AdvSetting-like stub без ``shop_id`` — только ORM path ``wb_cabinet.shop_id``."""
+    return SimpleNamespace(
+        id=adv_setting_id,
+        adv_id=adv_id,
+        wb_cabinet=wb_cabinet,
+        bot_active=True,
+        automatic_version=3,
+        max_price_for_order=100.0,
+        card_ab_hold_mode=CardAbHoldMode.OFF.value,
+        card_ab_hold_degraded=False,
+    )
+
+
+async def _run_enable_success_path(
+    adv: SimpleNamespace,
+    *,
+    start_epoch: AsyncMock,
+) -> None:
+    """Прогнать Enable после успешных gates; вернуть control через patched start_epoch."""
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=adv)
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+
+    refreshed = SimpleNamespace(
+        id=adv.id,
+        adv_id=adv.adv_id,
+        bot_active=True,
+        card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
+        card_ab_hold_degraded=False,
+    )
+    refresh_session = MagicMock()
+    refresh_session.scalar = AsyncMock(return_value=refreshed)
+    refresh_cm = MagicMock()
+    refresh_cm.__aenter__ = AsyncMock(return_value=refresh_session)
+    refresh_cm.__aexit__ = AsyncMock(return_value=None)
+
+    query = MagicMock()
+    query.answer = AsyncMock()
+    query.message = MagicMock(answer=AsyncMock())
+    callback = CardAbHoldEnable(adv_setting_original_id=int(adv.id))
+
+    with (
+        patch.object(handlers, "sm", side_effect=[session_cm, refresh_cm]),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
+        patch.object(
+            handlers,
+            "evaluate_ab_hold_enable_stats",
+            new_callable=AsyncMock,
+            return_value=(True, None),
+        ),
+        patch.object(
+            handlers,
+            "evaluate_ab_hold_launch_view_volume",
+            new_callable=AsyncMock,
+        ) as eval_volume,
+        patch.object(
+            handlers,
+            "CardAbHoldSignalRedisCache",
+            return_value=MagicMock(set_signal=AsyncMock()),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldLastAbortRedisCache",
+            return_value=MagicMock(get_abort=AsyncMock(return_value=None)),
+        ),
+        patch.object(handlers, "_edit_screen", new_callable=AsyncMock),
+    ):
+        eval_volume.return_value.is_unavailable = False
+        eval_volume.return_value.is_sufficient = True
+        await handlers.enable_card_ab_hold(query, callback)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enable_passes_wb_cabinet_shop_id_to_start_epoch() -> None:
+    """Regression ROOT-001: shop allowlist wiring через ``wb_cabinet.shop_id``, не ``adv.shop_id``."""
+    adv = _off_adv_for_enable(wb_cabinet=SimpleNamespace(shop_id="7"))
+    assert not hasattr(adv, "shop_id")
+    start_epoch = AsyncMock(return_value=True)
+
+    await _run_enable_success_path(adv, start_epoch=start_epoch)
+
+    start_epoch.assert_awaited_once_with(10, adv_id=100, shop_id=7)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enable_non_numeric_wb_cabinet_shop_id_passes_none() -> None:
+    """Non-numeric cabinet.shop_id → shop_id=None (fail-closed shop allowlist, no crash)."""
+    adv = _off_adv_for_enable(wb_cabinet=SimpleNamespace(shop_id="not-a-number"))
+    start_epoch = AsyncMock(return_value=True)
+
+    await _run_enable_success_path(adv, start_epoch=start_epoch)
+
+    start_epoch.assert_awaited_once_with(10, adv_id=100, shop_id=None)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_enable_missing_wb_cabinet_passes_shop_id_none() -> None:
+    """Нет joined cabinet → shop_id=None; epoch только через adv_id/OD-05."""
+    adv = _off_adv_for_enable(wb_cabinet=None)
+    start_epoch = AsyncMock(return_value=True)
+
+    await _run_enable_success_path(adv, start_epoch=start_epoch)
+
+    start_epoch.assert_awaited_once_with(10, adv_id=100, shop_id=None)
