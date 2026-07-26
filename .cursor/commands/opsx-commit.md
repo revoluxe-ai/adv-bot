@@ -39,6 +39,7 @@ Never stage or commit these paths; leave them untouched and redirect:
 .cursor/commands/**
 .cursor/rules/**
 .cursor/skills/**
+.cursor/pipeline/**
 .cursor/opsx-review-commands
 .github/skills/**
 .github/prompts/**
@@ -167,7 +168,7 @@ Process-surface paths listed above are never classified here — report redirect
 
 Zone `docs` means ordinary project documentation only.
 It does **not** include `.cursor/commands/**`, `.cursor/skills/**`, `.cursor/rules/**`,
-`.github/prompts/**`, `.github/skills/**`, or `.agents/skills/**`.
+`.cursor/pipeline/**`, `.github/prompts/**`, `.github/skills/**`, or `.agents/skills/**`.
 
 ## Automatic commit grouping
 

@@ -45,6 +45,7 @@ Only these paths may be staged/committed by this command:
 .cursor/commands/**
 .cursor/rules/**
 .cursor/skills/**
+.cursor/pipeline/**
 .cursor/opsx-review-commands
 .github/skills/**
 .github/prompts/**
@@ -53,6 +54,8 @@ Only these paths may be staged/committed by this command:
 
 Shared OPSX process contracts that live under `.cursor/commands/` (for example
 `opsx-execution-preflight.md`, `opsx-source-resolution.md`) are in scope.
+Materialized operator pipeline graph under `.cursor/pipeline/` (from
+`/opsx-pipeline UPDATE GO`) is in scope.
 
 Everything else is **out of scope** for this command.
 
