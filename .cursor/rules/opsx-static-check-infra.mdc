@@ -1,7 +1,6 @@
 ---
-description: Invariants for /opsx-static-check thin agents and packs
+description: Invariants for /opsx-static-check Task workers and packs
 globs:
-  - .cursor/agents/opsx-sc-*.md
   - .cursor/static-check/**/*
   - .cursor/commands/opsx-static-check.md
   - .cursor/skills/opsx-static-check-infra/**/*
@@ -10,9 +9,13 @@ alwaysApply: false
 
 # opsx-static-check infra invariants
 
-1. Cursor agent files under `.cursor/agents/opsx-sc-*.md` stay **thin**: frontmatter + LOAD list + “return packet”. No embedded tool command matrices.
+1. Workers launch via Cursor Task enum (`registry.task_type`, primary `shell`). Never try custom `opsx-sc-*` agent names as Task `subagent_type`.
 2. Check details live only in `.cursor/static-check/checks/<id>/`.
 3. Composition of MODE/waves lives only in `.cursor/static-check/registry.yaml`.
-4. Workers are READ_ONLY; no autofix; no archive `GO`/`NO_GO`.
+4. Workers/orchestrator are READ_ONLY; no autofix; no archive `GO`/`NO_GO`; **no self-repair** of check infra during a check run.
 5. Do not reintroduce a second SoT (`opsx-static-check-workers/` or fat agent copies).
-6. Shell: Poetry from repo root; PowerShell-safe one-liners by default; git-bash only per `base/shell.md`.
+6. Canonical human cmds via runner: `bash .cursor/static-check/bin/run.sh -- …`.
+7. Preflight is **optional** (`PREFLIGHT` token only); default off.
+8. Wave B (`pytest-full`) only if `pytest-unit` STATUS=PASS.
+9. Prompt body comes from `.cursor/static-check/base/worker-prompt.md` + pack LOAD list.
+10. WAIT contract: incomplete until Final report; never stop chat after fan-out / partial READY; resume on each Task notification until all wave packets are in.
