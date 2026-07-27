@@ -312,21 +312,31 @@ Store it as `ROOT_FINGERPRINT` on the case and, when useful for dedup, on false-
 
 ## CHAT_REQUIRED decision matrix
 
-`confirmed` for this command:
+`confirmed` for this command.
+
+Align with `/opsx-fanout-bug-hunt` `CREATE_CHILD_CHAT` eligibility and forbids.
+Durable ledger owns storage/recursion, but **must not** mark a finding
+claimable (`CHAT_REQUIRED=true` + `STATUS=available`) when fanout forbids
+a child chat for that class.
 
 | Condition | Packet | CHAT_REQUIRED | Initial STATUS |
 |---|---|---|---|
 | Proven false positive | no working packet; closed record only | `false` | `closed_false_positive` |
 | Known root / `EXISTING_ROOT` already owned by the case | packet preserved/updated | `false` | keep existing operational status or `available` if new intake root awaiting work in its own case flow |
 | Authoritative disposition `absorbed_by_parent_fix` | packet preserved | `false` | `absorbed_by_parent_fix` |
-| All other non-FP findings | packet created | `true` | `available` |
+| Child-chat eligible: `CHILD_CHAT_RECOMMENDED=true` (or equivalent hunt fields) **and** `RELATION_TO_ROOT=same_invariant_different_path` **and** production classification ∈ {`confirmed production bug`, `reachable but low-risk`, `unclear reachability`} | packet created | `true` | `available` |
+| Fanout backlog-class forbids: `adjacent_out_of_scope` / adjacent; `dead legacy`; `tests-only` (fanout `BACKLOG_ONLY` / `CLEANUP_BACKLOG` / `TEST_COVERAGE_BACKLOG`) | packet/record created | `false` | `backlog` |
+| `different_invariant_candidate` / different-invariant (fanout `CREATE_SEPARATE_ROOT_CANDIDATE` — not a child claim chat on this case) | packet/record created | `false` | `backlog` (or case-local separate-root tracking; never `available`+`CHAT_REQUIRED=true` on this case) |
+| Non-FP finding with `CHILD_CHAT_RECOMMENDED=false` (or missing recommendation) that is not otherwise absorbed/FP/root | packet/record created | `false` | `backlog` |
 
 Notes:
 
-* Packet purpose for chat-required findings must state why the chat exists: adjudication, disposition decision, backlog decision, or promotion decision.
-* Low-risk, adjacent, unclear, different-invariant, dead-legacy, and tests-only findings still get packets under the owner rule.
-* Only proven false positives skip the working chat packet.
+* Packet purpose for chat-required findings must state why the chat exists: adjudication, disposition decision, or promotion decision. Backlog packets record backlog/cleanup/test-coverage/separate-root purpose **without** making the finding claimable.
+* Adjacent, dead-legacy, tests-only, and different-invariant findings still get packets under the owner rule, but **not** working claimable chats (`CHAT_REQUIRED=false`, `STATUS=backlog`).
+* Low-risk and unclear findings are claimable **only** when they meet the child-chat-eligible row (including `CHILD_CHAT_RECOMMENDED=true`). Do not promote them solely because they are non-FP.
+* Only proven false positives skip the working chat packet entirely; backlog-class still keeps a durable packet/record.
 * Do not invent absorption. Set `absorbed_by_parent_fix` only when the authoritative source already states that disposition.
+* Never let durable ownership override fanout “no child chat” rules by writing `CHAT_REQUIRED=true` for backlog-class forbids.
 
 ## Claim priority assignment
 
@@ -341,7 +351,7 @@ Mapping:
 2 = reachable but low-risk
 3 = unclear reachability
 4 = different_invariant_candidate / different-invariant candidate
-5 = adjacent_out_of_scope / dead legacy / tests-only / other chat-required
+5 = adjacent_out_of_scope / dead legacy / tests-only / other backlog (CHAT_REQUIRED=false)
 ```
 
 Tie-breaker later used by `/opsx-claim-next-bug`:
@@ -1137,7 +1147,12 @@ COMMAND_RECEIPT:
 
 `/opsx-fix-bug` without `GO` MUST use this command's `mode=intake` contract to create a missing intake, then `mode=update` to persist the adjudicated finding. It must not invent a second storage layout.
 
-`/opsx-fanout-bug-hunt` remains an intermediate chat-packet helper. Durable ownership and recursion live in this case map.
+`/opsx-fanout-bug-hunt` remains an intermediate chat-packet helper. Durable
+ownership and recursion live in this case map. Durable `CHAT_REQUIRED` /
+claimable `STATUS` assignments **must** stay aligned with fanout
+`CREATE_CHILD_CHAT` eligibility and forbids: backlog-class findings
+(adjacent / dead legacy / tests-only) and separate-root candidates must not
+become claimable chats merely because this map owns persistence.
 
 ## Acceptance anchor
 
@@ -1147,7 +1162,7 @@ For case `BUGCASE-ABHOLD-WBSYNC-001` after hunt-result materialization, expected
 ROOT-001  -> existing root, no new chat
 CHILD-001 -> packet preserved, absorbed_by_parent_fix, chat_required=false
 CHILD-002 -> packet created, available, chat_required=true
-ADJ-001   -> packet created, available, chat_required=true
+ADJ-001   -> packet created, backlog, chat_required=false
 FP-001    -> closed_false_positive, no working chat packet
 FP-002    -> closed_false_positive, no working chat packet
 ```
@@ -1156,8 +1171,9 @@ Expected counts:
 
 ```text
 TOTAL_FINDINGS: 6
-CHATS_REQUIRED: 2
-READY_TO_CLAIM: 2
+CHATS_REQUIRED: 1
+READY_TO_CLAIM: 1
+BACKLOG: 1
 CLOSED_FALSE_POSITIVES: 2
 EXISTING_ROOT: true
 FIRST_CLAIM_CANDIDATE: CHILD-002
@@ -1169,6 +1185,7 @@ FIRST_CLAIM_CANDIDATE: CHILD-002
 * No classification mutation.
 * No finding loss.
 * No working chat for proven false positives.
+* No claimable chat (`CHAT_REQUIRED=true` + `STATUS=available`) for fanout backlog-class forbids: adjacent / dead legacy / tests-only; nor for different-invariant as a child claim on this case.
 * No nested case directories.
 * No cycle creation when ancestor fingerprint matches.
 * No deep promote at `DEPTH >= 5` without `CONFIRM_DEEP_PROMOTE`.
