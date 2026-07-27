@@ -31,8 +31,32 @@ The PR must explain the task, not just the diff:
 - what changed;
 - how the behavior should work after merge;
 - what must not change;
-- what Bugbot/reviewer should inspect;
+- what Bugbot/reviewer should inspect (**residual** only — see project hunt gate);
 - how the change was verified.
+
+## Project bug-hunt gate (pre-Bugbot)
+
+External Bugbot is a **residual** safety net. Primary discovery for product /
+behavioral diffs belongs to `/opsx-project-bug-hunt`.
+
+Before preparing or creating a PR that changes product/runtime behavior
+(not pure docs/process-only):
+
+1. Prefer a same-chat or pasted `PROJECT_BUG_HUNT_RECEIPT` from
+   `/opsx-project-bug-hunt` for this `base..head` (target/base = PR base,
+   head = current branch tip).
+2. If the receipt is missing:
+   - do **not** push/create the PR even when `GO` is present;
+   - set pasteable `NEXT_ACTION` to
+     `/opsx-project-bug-hunt base=<target> head=<current-branch> …`;
+   - allow skip only when the user message contains the exact token
+     `OVERRIDE_SKIP_PROJECT_BUG_HUNT` (record that override in the PR body
+     risks section).
+3. Pure process/docs PRs (only `.cursor/**`, `docs/**`, `openspec/**` with no
+   `app/` / `tests/` product runtime) may omit the receipt.
+4. In `## Что проверить Bugbot / reviewer`, list only **residual** risks the
+   project hunt marked unclear / low-risk / out-of-budget — not a full first-pass
+   audit dump.
 
 ## Language
 
@@ -310,11 +334,13 @@ If `GO` is absent:
 If `GO` is present:
 
 1. Validate that target/base branch was explicitly provided.
-2. Run all required checks again.
-3. Rebuild/confirm PR title and body.
-4. Write PR body to a temporary file.
-5. Push current branch.
-6. Create PR with `gh pr create`.
+2. Enforce **Project bug-hunt gate** (receipt or
+   `OVERRIDE_SKIP_PROJECT_BUG_HUNT` or process/docs-only exception).
+3. Run all required checks again.
+4. Rebuild/confirm PR title and body.
+5. Write PR body to a temporary file.
+6. Push current branch.
+7. Create PR with `gh pr create`.
 
 ## Commands after explicit GO only
 

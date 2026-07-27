@@ -373,7 +373,9 @@ Create a durable raw intake before adjudication.
 
 Typical sources:
 
-* Bugbot;
+* Bugbot (residual external safety net);
+* `/opsx-project-bug-hunt` structured findings (primary project-tuned hunter;
+  prefer one intake per finding `RAW_REPORT` from that command's output);
 * manual finding;
 * CI;
 * incident;
