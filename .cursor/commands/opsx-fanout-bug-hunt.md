@@ -259,6 +259,15 @@ A child chat is for read-only adjudication first.
 
 It is not implementation authorization.
 
+Cross-contract (durable materialize): `/opsx-materialize-bug-queue` owns
+persistence, but its `CHAT_REQUIRED` / claimable `STATUS` **must not**
+override these forbids. For `BACKLOG_ONLY`, `CLEANUP_BACKLOG`, and
+`TEST_COVERAGE_BACKLOG`, materialize MUST write `CHAT_REQUIRED=false` and
+`STATUS=backlog` (packet/record allowed; not `READY_TO_CLAIM`). For
+`CREATE_SEPARATE_ROOT_CANDIDATE`, do not mark the finding as a child claim
+chat on this case (`CHAT_REQUIRED=false` here). Only `CREATE_CHILD_CHAT`-
+eligible items may become `CHAT_REQUIRED=true` + `STATUS=available`.
+
 ### BACKLOG_ONLY
 
 Use when:
@@ -266,6 +275,8 @@ Use when:
 * relationship is `adjacent_out_of_scope`;
 * item may be useful but does not violate the current invariant;
 * no immediate child adjudication is required.
+
+Durable handoff: materialize as backlog, not a claimable child chat.
 
 ### CLOSE_FALSE_POSITIVE
 
@@ -284,7 +295,10 @@ Use when:
 
 * production classification is `dead legacy`.
 
-Do not treat cleanup as a production bugfix.
+Do not treat cleanup as a production bug fix.
+
+Durable handoff: materialize as backlog (`CHAT_REQUIRED=false`), not a
+claimable child chat.
 
 ### TEST_COVERAGE_BACKLOG
 
@@ -292,6 +306,9 @@ Use when:
 
 * production classification is `tests-only`;
 * the item represents a potentially useful test or fixture concern but has no production path.
+
+Durable handoff: materialize as backlog (`CHAT_REQUIRED=false`), not a
+claimable child chat.
 
 ### CREATE_SEPARATE_ROOT_CANDIDATE
 
@@ -304,6 +321,9 @@ This is not a child of the current invariant for implementation purposes.
 Prepare a separate root-candidate packet.
 
 Do not automatically launch another bug hunt.
+
+Durable handoff: do not mark as a child claim chat on this case
+(`CHAT_REQUIRED=false` here; separate-root tracking / backlog only).
 
 ### BLOCKED_INCOMPLETE_PACKET
 
@@ -704,6 +724,9 @@ Next action:
 * Do not create a child chat for false positives.
 * Do not create a child chat for adjacent out-of-scope observations.
 * Do not create a child chat for dead legacy or tests-only findings.
+* Durable materialize must not override the three forbids above: those
+  findings get `CHAT_REQUIRED=false` + `STATUS=backlog`, never claimable
+  child chats (`READY_TO_CLAIM`).
 * Do not merge findings merely because one patch may fix both.
 * Do not split findings without source evidence.
 * Do not include GO in generated packets.
