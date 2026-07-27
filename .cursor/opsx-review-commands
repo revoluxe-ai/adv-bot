@@ -127,6 +127,22 @@ file while `available`+`CHAT_REQUIRED` handoff requires claim-first; rejecting
 as FP without opening `opsx-fix-bug.md` and `opsx-claim-next-bug.md` /
 materialize handoff sections is a process defect of this reviewer.
 
+Exact-cell claim-first (must not recur / not FP when both sides opened):
+
+1. **Cell match:** Consumer claim-first trigger MUST equal the producer /
+   claim eligibility cell: `STATUS=available` ∧ `CHAT_REQUIRED=true`.
+   Over-broad triggers (`STATUS≠claimed`, or any non-available non-claimed
+   set such as `blocked` / `backlog` / `absorbed_*`) are a **confirmed
+   defect** (claim-next will refuse → loop), not alignment.
+2. **Separate pre-claim blocker:** Pre-claim refusal MUST use a distinct
+   blocker (canonical: `blocked_needs_claim_first`), not reuse
+   `blocked_missing_claim_token` / token-mismatch family (those apply only
+   after a durable claim exists).
+3. **Pasteable + no invent:** For the pre-claim cell, pasteable next MUST be
+   `/opsx-claim-next-bug` only — never “retry `/opsx-fix-bug` with
+   `claim_token=`” (token does not exist yet). Consumer MUST NOT invent or
+   write `CLAIM_TOKEN`.
+
 ## Semantic contract review
 
 Check producer and consumer compatibility.
@@ -134,6 +150,10 @@ Check producer and consumer compatibility.
 Detect: - enum mismatch; - status token mismatch; - disposition
 mismatch; - output/input schema drift; - gate matrix mismatch
 (STATUS × CHAT_REQUIRED × claim_token).
+
+For claim / chat-required handoffs, matrix compatibility means **exact
+cell** agreement (eligibility ↔ consumer hard-stop), not “any unclaimed
+status.” See Exact-cell claim-first under Gate FALSE_POSITIVES.
 
 Example:
 
