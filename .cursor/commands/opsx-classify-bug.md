@@ -423,7 +423,9 @@ why_existing_spec_is_sufficient:
 
 ### Step 7 — Decide next command
 
-Choose exactly one. For implementation routes, prefer in this order:
+Choose exactly one. For implementation routes, prefer in this order
+(Authority: `/opsx-claim-next-bug` § Producer pasteable-Next contract
+(claim-first)):
 
 1. `/opsx-claim-next-bug` when case map exists and finding is unclaimed /
    claimable (`STATUS=available`, `CHAT_REQUIRED=true`) or claimed without a
@@ -602,6 +604,8 @@ The user must be able to copy the next command without rereading the whole analy
 emit `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`. Prefer
 `/opsx-fix-bug` with durable `case=` / `intake=` / `finding=` /
 `claim_token=` only when that token is already known — never invent it.
+Authority: `/opsx-claim-next-bug` § Producer pasteable-Next contract
+(claim-first).
 
 
 ## Static Analysis Gate
