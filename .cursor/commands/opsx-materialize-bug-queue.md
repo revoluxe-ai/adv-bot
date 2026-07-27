@@ -1,6 +1,6 @@
 ---
 description: "Materialize or update a durable bug-case map from intake, hunt-result, promote, or field update without re-analysing the repository or fixing bugs."
-argument-hint: "mode=<intake|hunt-result|promote|update> [case=<CASE_ID>] [intake=<INTAKE_ID>] [source=<artifact>] [finding=<FINDING_ID>] [repair=mint_missing_claim_token|release_corrupt_claim] [fields...]"
+argument-hint: "mode=<intake|hunt-result|promote|update|fanin_assemble> [case=<CASE_ID>] [intake=<INTAKE_ID>] [source=<artifact>] [finding=<FINDING_ID>] [repair=mint_missing_claim_token|release_corrupt_claim] [fields...]"
 ---
 
 # /opsx-materialize-bug-queue
@@ -63,6 +63,7 @@ mode=intake
 mode=hunt-result
 mode=promote
 mode=update
+mode=fanin_assemble
 ```
 
 If `mode` is missing or unknown, stop:
@@ -207,6 +208,7 @@ Owner directions encoded in this command contract are `confirmed` for materializ
 ## Finding operational states
 
 These are ledger states only. They are not an OpenSpec lifecycle model.
+**Claim `STATUS` vocabulary is unchanged** by orchestration companions.
 
 ```text
 available
@@ -223,6 +225,57 @@ absorbed_by_parent_fix
 promoted_to_root_case
 duplicate_ancestor
 duplicate_root_observation
+```
+
+## Bug-episode shared schemas (reference)
+
+```text
+.cursor/pipeline/contracts/bug-episode/
+```
+
+Policy SoT: `.cursor/pipeline/ORCHESTRATION_MVP.md`.
+
+```text
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+```
+
+## Parallel EPISODE_TERMINAL (claim STATUS unchanged)
+
+Episode terminals live in a **parallel** field. Do **not** rename or replace
+claim `STATUS` values to encode them.
+
+```text
+EPISODE_TERMINAL:
+  FIXED | REJECTED | DUPLICATE | DEFERRED | BLOCKED | TIMEOUT
+  | TEST_NOT_REPRODUCING | RED_NOT_APPLICABLE
+```
+
+Map: `.cursor/pipeline/contracts/bug-episode/TERMINAL_STATUS_MAP.md`.
+
+## BRANCH_REGISTRY (runtime instance)
+
+Schema definition:
+`.cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md`
+
+**Only** runtime instance:
+
+```text
+.tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+  ## BRANCH_REGISTRY
+```
+
+Do **not** create a sibling `BRANCH_REGISTRY.md` file in the case map.
+
+LEDGER summary / BRANCH_REGISTRY header should carry hunt counters when known:
+
+```text
+HUNT_PASSES_EXECUTED
+MAX_DEPTH_SEEN
+ACTIVE_BRANCH_COUNT
+MAX_HUNT_PASSES: 3
+MAX_DEPTH_FROM_ROOT: 3
+MAX_ACTIVE_BRANCHES: 3
 ```
 
 ## Required finding fields
@@ -251,7 +304,18 @@ BLOCKER
 RESULT_PATH
 DISPOSITION
 CLAIM_PRIORITY
+EPISODE_TERMINAL
+RED_EVIDENCE_PATH
+GREEN_EVIDENCE_PATH
+OWNER_GO_RECEIPT_PATH
+FIX_EVIDENCE_PATH
+TEST_ID
+TEST_CONTENT_SHA256
+FANIN_PATH
 ```
+
+Evidence path fields and `EPISODE_TERMINAL` may be empty until RED/GREEN/GO/FANIN
+are recorded. Claim `STATUS` / `CHAT_REQUIRED` / `CLAIM_TOKEN` rules are unchanged.
 
 Allowed empty values:
 
@@ -665,6 +729,105 @@ RESULT_PATH: ../<NEW_CASE_ID>/CASE.md
 * new case starts at intake/adjudication-ready state with its own root finding;
 * update `INDEX.md` for both cases.
 
+
+## mode=fanin_assemble
+
+Assemble read-only fan-in rollup for a root episode.
+
+Required:
+
+```text
+mode=fanin_assemble
+case=<ROOT_CASE_ID>
+```
+
+Schema: `.cursor/pipeline/contracts/bug-episode/FANIN.md`.
+
+### Write boundary (HARD)
+
+```text
+PRODUCTION_READ_ONLY: YES
+COMMAND_AND_GRAPH_READ_ONLY: YES
+
+CASE_MAP_WRITE_ALLOWED:
+  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+
+ALL_OTHER_WRITES: DENIED
+```
+
+This mode MUST NOT:
+
+* edit production code or tests;
+* edit `.cursor/commands/**`, GRAPH, META, or ORCHESTRATION markers to ACTIVE;
+* create `/opsx-fan-in-*`;
+* mutate LEDGER finding claim `STATUS`, `CLAIM_TOKEN`, OWNER fields
+  (read LEDGER / BRANCH_REGISTRY only);
+* write any other case-map path (including intakes/, findings/, INDEX.md);
+* exercise Owner authority or close the error class;
+* claim `LEARNING_READY` as `FANIN_READY`.
+
+### Preconditions
+
+Fan-in assemble is forbidden until:
+
+* `ROOT_CASE_ID` present and case map exists;
+* `ROOT_FINDING_ID` / root invariant known (from CASE.md / root finding);
+* `HUNT_PASSES_EXECUTED ≤ MAX_HUNT_PASSES` (default 3);
+* `## BRANCH_REGISTRY` lists all started branches;
+* every started branch has `EPISODE_TERMINAL` ∈ episode terminal set;
+* `LIMITS_CHECK` can be evaluated.
+
+If preconditions fail, write `results/FANIN.md` with
+`STATUS: FANIN_INCOMPLETE` **only if** the caller explicitly requests a
+partial assemble receipt; otherwise stop with:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- fanin_preconditions_not_met
+```
+
+Preferred: always write `FANIN.md` with either `FANIN_READY` or
+`FANIN_INCOMPLETE` so the lesson gate has a durable path — but never write
+any path other than `results/FANIN.md`.
+
+### Output
+
+Write exactly:
+
+```text
+.tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+```
+
+Include required FANIN fields from the schema (STATUS, BRANCH_SUMMARY,
+CHECKS 1–6, LIMITS_CHECK, etc.).
+
+```text
+FANIN_READY
+  iff assembly complete
+  ∧ all started branches terminal
+  ∧ checks 3–6 PASS
+  ∧ checks 1–2 PASS or N/A with Owner-noted exceptions
+```
+
+Else `FANIN_INCOMPLETE`.
+
+Pasteable next when `FANIN_READY`:
+
+```text
+/opsx-learn-from-bug case=<ROOT_CASE_ID> FANIN_PATH=.tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+```
+
+When incomplete:
+
+```text
+LESSON_CANDIDATE_ONLY
+CLASS_STATUS: OPEN
+CLASS_LEVEL_GO_WRITE: FORBIDDEN
+```
+
 ## mode=update
 
 Update only explicitly provided fields on an existing case, intake, or finding.
@@ -933,6 +1096,29 @@ Recommended structure:
 - BLOCKER:
 - RESULT_PATH:
 - DISPOSITION:
+- EPISODE_TERMINAL:
+- RED_EVIDENCE_PATH:
+- GREEN_EVIDENCE_PATH:
+- OWNER_GO_RECEIPT_PATH:
+- FIX_EVIDENCE_PATH:
+- TEST_ID:
+- FANIN_PATH:
+
+## BRANCH_REGISTRY
+
+Schema: `.cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md`.
+
+Header counters when known:
+
+```text
+HUNT_PASSES_EXECUTED:
+MAX_DEPTH_SEEN:
+ACTIVE_BRANCH_COUNT:
+```
+
+One row per started branch (FINDING_ID, PARENT, DEPTH, EPISODE_TERMINAL,
+evidence paths, OWNER_PRODUCTION_GO, …).
+
 ```
 
 Keep intake and finding sections in stable registration order.
@@ -1072,6 +1258,16 @@ Rules for the recovery row:
 * `LAST_COMMAND` is the last OPSX command that wrote the case map;
 * `NEXT_ACTION` MUST be an exact pasteable command (not prose);
 * after chat loss, opening `INDEX.md` MUST be enough to continue.
+
+Recovery `NEXT_ACTION` may use orchestration stages when companions apply
+(still not ACTIVE until GO_ACTIVATE):
+
+```text
+red_pending              → /opsx-test case=<CASE_ID> finding=<FINDING_ID>
+production_go_ready      → /opsx-fix-bug … claim_token=…   # Owner GO only after RED
+FANIN_READY              → /opsx-learn-from-bug … FANIN_PATH=…
+LESSON_CANDIDATE_ONLY    → Owner FINAL / keep candidate-only
+```
 
 Also maintain aggregate lists:
 

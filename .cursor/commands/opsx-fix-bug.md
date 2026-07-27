@@ -212,15 +212,62 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 
 ## Разрешение на запись
 
-### Production code и tests
+### Orchestration companion markers
 
-Можно изменять production code и tests только если ввод пользователя содержит точный отдельный токен:
+```text
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+GREEN_WRITER: /opsx-test verify mode
+```
+
+Claim ownership gates (`CHAT_REQUIRED`, `CLAIM_TOKEN`, claim-first,
+duplicate / absorbed rules) are **unchanged**.
+
+### Production code (Owner GO)
+
+Можно изменять **production code** только если ввод пользователя содержит точный отдельный токен:
 
 ```text
 GO
 ```
 
-и итоговый вердикт стал `fix_now`.
+и итоговый вердикт стал `fix_now`, **и** выполнен RED-before-GO gate ниже.
+
+### Tests — removed from production GO
+
+`GO` **does not** authorize test edits.
+
+* RED authoring / test changes: only `/opsx-test` (bug-regression mode).
+* GREEN evidence: only `/opsx-test verify mode`.
+* After Owner production GO, `/opsx-fix-bug` may re-run the same pytest
+  `TEST_ID` as an **extra check only** — no test mutate, no GREEN write,
+  no self-approval of `NON_WEAKEN_DELTA` (Owner only).
+
+### RED-before-GO gate (production)
+
+Production GO is allowed only when all hold:
+
+```text
+BUG_CONFIRMED
+AND FIX_NOW
+AND (
+  RED_CONFIRMED
+  OR RED_NOT_APPLICABLE_APPROVED
+)
+```
+
+Durable proof:
+
+* `RED_EVIDENCE_PATH` with `STATUS: RED_CONFIRMED`, or
+* Owner-recorded `RED_NOT_APPLICABLE_APPROVED` with exception packet
+  (ORCHESTRATION §1.5).
+
+`RED_NOT_APPLICABLE_APPROVED` alone does **not** allow GO without
+`BUG_CONFIRMED` and `FIX_NOW`.
+
+If `GO` is present but RED gate fails → hard stop
+`blocked_needs_red_before_go` (no production edits). Incomplete exception
+packet → `blocked_red_not_applicable_incomplete`.
 
 ### Process artifacts без GO
 
@@ -246,7 +293,7 @@ GO
 
 Пользователь не обязан помнить или вручную запускать отдельную materialization-команду перед `/opsx-fix-bug`.
 
-Даже если `GO` есть, не редактируй production-код, пока итоговый вердикт не стал `fix_now`.
+Даже если `GO` есть, не редактируй production-код, пока итоговый вердикт не стал `fix_now` **и** RED-before-GO gate не пройден.
 
 Никогда не делай deploy, restart сервисов, работу с production data, миграции, изменение secrets, merge, rebase, force-push, изменение Kubernetes/infra/CI или unrelated refactor.
 
@@ -745,12 +792,26 @@ AUTO_MATERIALIZE: false
 - fix можно ограничить текущим bug scope;
 - regression test может падать до фикса и проходить после.
 
-Тогда:
+Тогда **без GO**:
 
-- добавь или обнови regression test;
-- патчь самую узкую правильную границу;
+- **не** предлагай `/opsx-fix-bug GO` как следующий шаг;
+- pasteable next **must** be:
+
+```text
+/opsx-test case=<CASE_ID> finding=<FINDING_ID>
+```
+
+- regression test authoring / RED evidence belongs to `/opsx-test`;
+- production patch waits for Owner GO after `RED_CONFIRMED`
+  (or `RED_NOT_APPLICABLE_APPROVED`).
+
+Тогда **с Owner GO** (после RED gate):
+
+- патчь самую узкую правильную **production** границу;
+- **не** редактируй tests;
 - предпочитай shared guard/candidate filter вместо локального дублирования;
-- проверь blocked и allowed behavior.
+- optional: re-run same `TEST_ID` as check only;
+- GREEN confirmation → `/opsx-test … verify` (this command is not GREEN writer).
 
 ### Case B: unreachable reported path, invariant protected elsewhere
 
@@ -932,7 +993,16 @@ COMMAND_RECEIPT:
 * `SOURCE_INTAKE_ID` finding = текущий `INTAKE_ID`;
 * `CANONICAL_INTAKE_ID` / `RELATED_FINDING_ID` пусты.
 
-`NEXT_ACTION` в receipt обязан соответствовать `FOLLOW_UP_SCOPE`:
+`NEXT_ACTION` в receipt обязан соответствовать `FOLLOW_UP_SCOPE`, **кроме**
+вердикта `fix_now` без GO — тогда pasteable next **обязан** быть:
+
+```text
+/opsx-test case=<CASE_ID> finding=<FINDING_ID>
+```
+
+(не `/opsx-fix-bug GO`).
+
+Для других вердиктов:
 
 - `none` → `none`;
 - `invariant_candidate` → точный handoff в `/opsx-invariant`;
@@ -954,15 +1024,18 @@ COMMAND_RECEIPT:
 2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (п.2 DUP-/duplicate_root → `blocked_finding_status_not_actionable`; claim-first при `available`+`CHAT_REQUIRED=true` → `blocked_needs_claim_first`; п.4 statuses → `blocked_finding_status_not_actionable`; для `claimed` — всегда: пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`; иначе token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing/corrupt-claim/needs_claim_first/status_not_actionable → `blocked`, без code changes;
 3. выполни тот же forensics;
 4. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
-5. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
-6. держи diff минимальным;
-7. не патчь dead code без явного обоснования;
-8. не трогай forbidden files/actions;
-9. запусти targeted verification command, если он доступен;
-10. отчитайся по changed files, tests run, durable case/intake/finding ids и unresolved risks;
-11. заверши `COMMAND_RECEIPT` с `CASE_ID` / `INTAKE_ID` / `FINDING_ID` /
+5. если вердикт `fix_now`, сначала проверь RED-before-GO gate; при fail —
+   `blocked_needs_red_before_go`, без production edits;
+6. production-only patch; **test freeze** — не редактируй tests;
+7. держи diff минимальным;
+8. не патчь dead code без явного обоснования;
+9. не трогай forbidden files/actions;
+10. optional: re-run same `TEST_ID` as check only; GREEN →
+    `/opsx-test case=… finding=… verify`;
+11. отчитайся по changed files, optional pytest check, durable ids;
+12. заверши `COMMAND_RECEIPT` с `CASE_ID` / `INTAKE_ID` / `FINDING_ID` /
     `CLAIM_TOKEN` (echo matched token после успешного claim gate; иначе
-    пусто) / `PERSISTENCE_DECISION`.
+    пусто) / `PERSISTENCE_DECISION` / `RED_EVIDENCE_PATH`.
 
 Если баг требует более широкого изменения поведения, чем покрывает текущий report, остановись и предложи OpenSpec change вместо silent scope expansion.
 

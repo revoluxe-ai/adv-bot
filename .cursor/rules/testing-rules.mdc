@@ -138,3 +138,16 @@ Full E2E не требуется автоматически.
 ## Редактирование правил
 
 Если владелец просит изменить test policy, редактируй этот файл (canonical), а не `.cursor/rules/TESTING_RULES.mdc`.
+
+
+## Bug-episode RED-before-GO (soft note)
+
+When companions for `.cursor/pipeline/ORCHESTRATION_MVP.md` are in use
+(candidate/activated), product-bug production GO expects durable RED proof
+via `/opsx-test` (`case=`/`finding=`) or Owner `RED_NOT_APPLICABLE_APPROVED`
+together with `BUG_CONFIRMED` ∧ `FIX_NOW`. Do not weaken assertions to force
+green. Sole GREEN writer: `/opsx-test verify mode`.
+
+```text
+RUNTIME_ENFORCEMENT: NOT_ACTIVE until Owner GO_ACTIVATE
+```

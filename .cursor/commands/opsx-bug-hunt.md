@@ -208,6 +208,48 @@ A finding is NOT a root duplicate merely because:
 
 A different gate, early return, adapter, callback, scheduler path, or state transition is a distinct candidate finding even when it shares the same invariant and owner module.
 
+
+## Episode hunt bounds (orchestration MVP)
+
+Schema/policy: `.cursor/pipeline/ORCHESTRATION_MVP.md` §3;
+`.cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md`.
+
+```text
+MAX_HUNT_PASSES=3
+MAX_DEPTH_FROM_ROOT=3
+MAX_ACTIVE_BRANCHES=3
+PASS_3=MANDATORY_STOP
+NEW_INVARIANT_FROM_BRANCH=FORBIDDEN
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+```
+
+| Limit | Meaning |
+|-------|---------|
+| `MAX_HUNT_PASSES` | At most three hunt expansion passes per episode |
+| `PASS_3=MANDATORY_STOP` | After the third pass, **no new working branches** of the current episode are created |
+| `MAX_DEPTH_FROM_ROOT` | Child/finding causal depth from root ≤ 3 |
+| `MAX_ACTIVE_BRANCHES` | Concurrent claimable/working branches ≤ 3 (enforced with fanout) |
+
+After pass 3, residual findings that cannot continue as working branches:
+
+```text
+DEFERRED | BLOCKED | TIMEOUT
+```
+
+`different_invariant_candidate` / another invariant from a child branch:
+
+```text
+CREATE_SEPARATE_ROOT_CANDIDATE
+```
+
+Do **not** retarget the current episode invariant mid-flight
+(`NEW_INVARIANT_FROM_BRANCH=FORBIDDEN`). The separate-root candidate is
+**not** started inside the current episode.
+
+Echo pass/depth counters into durable BRANCH_REGISTRY via materialize when
+materializing hunt results.
+
 ## Cost policy
 
 Use a cheap-first workflow.
@@ -268,6 +310,10 @@ For each candidate:
 5. determine whether separate adjudication is required.
 
 ### Pass 3 — deep mode
+
+Episode orchestration: pass index 3 is also `PASS_3=MANDATORY_STOP` —
+after this expansion pass, do not create new working branches for the
+current episode (residuals → `DEFERRED`/`BLOCKED`/`TIMEOUT`).
 
 Only if `deep` is present or the user explicitly asks.
 
@@ -801,6 +847,11 @@ It does not mean:
 
 ## Hard rules
 
+* `MAX_HUNT_PASSES=3` / `MAX_DEPTH_FROM_ROOT=3` / `PASS_3=MANDATORY_STOP` —
+  no new working branches after pass 3; residuals terminal as
+  `DEFERRED`/`BLOCKED`/`TIMEOUT`.
+* `NEW_INVARIANT_FROM_BRANCH=FORBIDDEN` — different invariant ⇒
+  `CREATE_SEPARATE_ROOT_CANDIDATE` only (out of episode).
 * No invariant → no wide scan.
 * No root finding packet → no root-aware hunt.
 * No reachability → no production bug.
