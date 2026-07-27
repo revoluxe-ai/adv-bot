@@ -345,9 +345,17 @@ SOURCE_RESOLUTION:
 
 `intake=<INTAKE_ID>` в `NEXT_COMMAND_ARGS` и `INTAKE_ID` в receipt:
 
-* бери из `SOURCE_INTAKE_ID` finding packet/ledger, если поле задано;
-* иначе из `PRIMARY_INTAKE_ID` в `CASE.md`, если задано;
-* иначе оставь пустым (legacy case without intake object).
+* бери из `SOURCE_INTAKE_ID` finding packet/ledger, если поле задано
+  (non-empty) — **никогда** не оставляй `intake=` пустым, если этот id
+  известен;
+* иначе из `PRIMARY_INTAKE_ID` в `CASE.md`, если задано (non-empty);
+* иначе оставь `intake=` пустым / опусти значение (legacy case without
+  intake object) **и** явно укажи в `PACKET_SUMMARY` / handoff note, что
+  `/opsx-fix-bug` обязан идти по ветке `case` + `finding` без `intake`
+  (finding-first; **не** invent/`mode=intake` новый intake для этого
+  finding).
+
+Не эмить «пустой intake» как сигнал «создай новый intake».
 
 Load the full packet content from `PACKET_PATH` into the chat context.
 
@@ -410,7 +418,12 @@ claim_token=<CLAIM_TOKEN>
 
 This command selects `finding` automatically and must not require the caller to pass it.
 
-When preparing `/opsx-fix-bug` next args, include `intake=` whenever a durable intake id is known so fix-bug can read the intake without a separate materialize step.
+When preparing `/opsx-fix-bug` next args, include non-empty `intake=`
+whenever a durable intake id is known (`SOURCE_INTAKE_ID` or
+`PRIMARY_INTAKE_ID`) so fix-bug can read the intake without a separate
+materialize step. If neither is known, omit a usable intake id and rely on
+fix-bug’s `case` + `finding` without `intake` branch (finding-first; no
+spurious `mode=intake`).
 
 `claim_token=<CLAIM_TOKEN>` в `NEXT_COMMAND_ARGS` обязателен для claimed findings:
 `/opsx-fix-bug` сверяет его exact match с durable `CLAIM_TOKEN` finding/ledger
@@ -452,6 +465,12 @@ If adjudication of `CHILD-002` later requires a new invariant, promotion is perf
 
 not by this claim command.
 
+Empty-intake handoff: if `CHILD-002` (or any claimed finding) has
+`SOURCE_INTAKE_ID` set, `NEXT_COMMAND_ARGS` must carry that non-empty
+`intake=`. If both `SOURCE_INTAKE_ID` and `PRIMARY_INTAKE_ID` are absent,
+empty `intake=` is allowed only as finding-first signal — fix-bug must not
+create a new intake for that finding.
+
 ## Hard rules
 
 * Exactly one finding per successful claim.
@@ -463,3 +482,4 @@ not by this claim command.
 * No case creation.
 * Forgotten claims stay visible.
 * Ready to continue means packet loaded + read-only next command prepared, not implementation started.
+* Never emit empty `intake=` when `SOURCE_INTAKE_ID` or `PRIMARY_INTAKE_ID` is known; empty intake never means «create new intake».

@@ -338,9 +338,31 @@ relation: absent
 cross_intake_finding_update_without_relation
 ```
 
+### Если передан `case` + `finding` без `intake`
+
+Приоритетнее ветки «только `case` без `intake`». Типичный handoff от
+`/opsx-claim-next-bug`, когда `intake=` опущено или пусто.
+
+1. Выполни **Claim ownership gate** (если finding claimed).
+2. Прочитай finding packet
+   `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
+3. Разреши intake в этом порядке:
+   - non-empty `SOURCE_INTAKE_ID` из finding packet/ledger → используй как
+     `intake=` и продолжай как ветка `case` + `intake` + `finding`;
+   - иначе non-empty `PRIMARY_INTAKE_ID` из `CASE.md` → то же;
+   - иначе **finding-first legacy path**: выполни adjudication по finding
+     packet (и `RAW_REPORT`/поля packet); **запрещено** вызывать
+     `mode=intake` и создавать новый intake для этого claimed/existing
+     finding.
+4. Не падай в «только `case` без `intake`» пока есть `finding=`.
+
 ### Если передан только `case` или только `intake`
 
-* только `case` без `intake`: используй `PRIMARY_INTAKE_ID` из `CASE.md`, если он есть; иначе создай новый intake в этом case через `mode=intake`;
+* только `case` без `intake` **и без** `finding=`: используй
+  `PRIMARY_INTAKE_ID` из `CASE.md`, если он есть; иначе создай новый
+  intake в этом case через `mode=intake`;
+* `case` + `finding` без `intake` → см. секцию выше (не создавать
+  spurious intake);
 * только `intake` без `case`: stop с blocker `missing_case_for_intake`, не угадывай case.
 
 ### Запрет требовать отдельный intake-командный шаг
@@ -1012,6 +1034,9 @@ Follow-up:
 - `AUTO_MATERIALIZE` всегда `false`;
 - adjacent note не создал новый intake/finding/case автоматически;
 - при omitted `case`/`intake` сначала выполнен Resume gate (same-chat prior `COMMAND_RECEIPT`); follow-up `GO` без IDs не создал новый case;
+- при `case` + `finding` без `intake` intake разрешён из finding
+  `SOURCE_INTAKE_ID` / `PRIMARY_INTAKE_ID`, иначе finding-first без
+  `mode=intake` (не создан spurious intake);
 - при follow-up `GO` без IDs, без usable prior receipt и без нового raw payload — `blocked_needs_case_intake`, без `mode=intake`;
 - `COMMAND_RECEIPT` содержит `CASE_ID`, `INTAKE_ID`, `FINDING_ID`,
   `PERSISTENCE_DECISION`, и `CLAIM_TOKEN` (non-empty после успешного claim
