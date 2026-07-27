@@ -7,7 +7,7 @@ argument-hint: "[FAST|FULL] [PREFLIGHT]"
 
 Единая точка статических проверок.
 
-Оркестратор читает registry, запускает Task workers параллельно (fan-out), **ждёт все packets**, синтезирует пересечения и печатает STATUS + PROBLEMS + один NEXT_ACTION.
+Оркестратор читает registry, запускает Task workers параллельно (fan-out), собирает packets (fan-in), синтезирует пересечения и печатает STATUS + PROBLEMS + один NEXT_ACTION.
 
 SoT инфраструктуры: `.cursor/static-check/`.
 Методология расширения: skill `opsx-static-check-infra` (не во время обычного check-run).
@@ -50,7 +50,7 @@ Read-only quality gate. Не заменяет `/opsx-verify`, `/opsx-fix-types`,
 - Не объявлять archive `GO`/`NO_GO`.
 - Не создавать durable artifacts по умолчанию.
 - При BLOCKED/FAIL: только отчёт + NEXT ACTION для **человека** / другой команды. **Этот** run ничего не патчит.
-- **Completion gate:** run незавершён, пока не напечатан Final report (`STATUS` + `CHECKS` + `NEXT ACTION`). «Жду packets» — не финальный ответ.
+- **Completion gate:** run считается незавершённым, пока не напечатан блок Final report (`STATUS` + `CHECKS` + `NEXT ACTION`). Сообщение «жду packets» / progress — **не** финальный ответ.
 
 Shared contracts: `.cursor/commands/opsx-source-resolution.md`, `.cursor/commands/opsx-execution-preflight.md` (общий opsx preflight ≠ optional PREFLIGHT этой команды).
 
@@ -85,7 +85,7 @@ Checks: [ ] ...
 
 Если `PREFLIGHT` не задан → сразу fan-out.
 
-### 3. Fan-out + WAIT (from registry waves)
+### 3. Fan-out (from registry waves)
 
 **Primary launch (mandatory):** Task tool with `subagent_type` = registry `task_type` (default `shell`).
 
@@ -93,29 +93,11 @@ Checks: [ ] ...
 - Fill REPO_ROOT / MODE / CHECK_ID; load packs via that template.
 - Invoke tools only via `bash .cursor/static-check/bin/run.sh -- …` (see `base/shell.md`).
 - Do **not** invent `bash -lc 'source ...; cmd'`.
-- Do **not** attempt custom project agent names (`opsx-sc-*` or any non-Task-enum id).
+- Do **not** attempt custom project agent names (`opsx-sc-*` or any non-Task-enum id) — they are invalid for Task and must not be tried first.
 
-If registry `task_type` unavailable in live Task enum → one fallback to `generalPurpose` with the **same** prompt.
+If registry `task_type` is unavailable in the live Task enum → one fallback to `generalPurpose` with the **same** prompt. Never invent undeclared tool wrappers.
 
-Task prompt MUST match `base/worker-prompt.md`.
-
-#### Parallel launch
-
-- Wave с `parallel: true`: в **одном** turn запустить **все** checks волны (`run_in_background: true`).
-- Держать чеклист `[ ] check_id` до packet каждого worker.
-
-#### WAIT contract (обязательно)
-
-1. После fan-out **нельзя** печатать Final report и нельзя считать команду сделанной.
-2. «Жду packets…» — только progress, **не** terminal answer.
-3. End turn после launch — только чтобы получить Task completion notifications (пауза ожидания, не конец команды).
-4. На **каждое** notification/packet:
-   - `WORKER READY: <id> → <STATUS> (findings=<n>)`;
-   - отметить checkbox;
-   - волна неполная → продолжать ждать (не спрашивать пользователя);
-   - волна полная → **сразу** в том же turn: Wave B (если надо) или fan-in + Final report.
-5. Запрещено бросать chat после частичных READY и ждать пинка от пользователя.
-6. Wave B не стартует, пока Wave A checklist не закрыт.
+Task prompt MUST match `base/worker-prompt.md` (required body).
 
 Progress:
 
@@ -123,8 +105,8 @@ Progress:
 WORKER READY: <check_id> → <STATUS> (findings=<n>)
 ```
 
-Wave B (`pytest-full`) только если `pytest-unit` STATUS=PASS. Иначе `pytest-full: SKIPPED` → synthesis.
-Wave B тоже под WAIT: без packet/SKIPPED Final report не печатать.
+Wave B (`pytest-full`) starts **only if** `pytest-unit` packet `STATUS=PASS` (`registry require_status: PASS`).
+If unit is FAIL/BLOCKED/ERROR → mark `pytest-full: SKIPPED` and continue to synthesis.
 
 ### 4. Fan-in + synthesize
 
@@ -155,6 +137,5 @@ Error UX: Problem / Cause / Action (never bare FAILED).
 - PREFLIGHT off unless explicitly requested?
 - No self-repair of command/infra during this run?
 - Fan-out via Task `shell` (registry `task_type`) — no custom agent names?
-- Waited for **all** wave packets before Final report (no early chat stop)?
 - Registry-driven waves?
 - One NEXT_ACTION?

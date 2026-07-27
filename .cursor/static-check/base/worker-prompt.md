@@ -32,7 +32,7 @@ Working directory: <abs REPO_ROOT>
 ## Launch
 
 - `run_in_background: true` for parallel wave members (launch **all** wave checks in one orchestrator turn)
-- Prefer `task_type: shell` from registry
+- Prefer `task_type: shell` from registry (reliable on this Cursor Task enum)
 - Fallback only if `shell` unavailable: `generalPurpose` with the **same** prompt body
 
 ## Orchestrator wait (mandatory)
