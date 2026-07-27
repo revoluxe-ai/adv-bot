@@ -323,6 +323,7 @@ a child chat for that class.
 |---|---|---|---|
 | Proven false positive | no working packet; closed record only | `false` | `closed_false_positive` |
 | Known root / `EXISTING_ROOT` already owned by the case | packet preserved/updated | `false` | keep existing operational status or `available` if new intake root awaiting work in its own case flow |
+| `duplicate_root` / same-causal-path duplicate of known root / `DUP-*` observation (fanout `duplicate_root_emitted_as_new_finding` class) | optional closed/observation record only (fold into root evidence); never a working child packet | `false` | observation / absorbed-into-root style — **never** `available` |
 | Authoritative disposition `absorbed_by_parent_fix` | packet preserved | `false` | `absorbed_by_parent_fix` |
 | Child-chat eligible: `CHILD_CHAT_RECOMMENDED=true` (or equivalent hunt fields) **and** `RELATION_TO_ROOT=same_invariant_different_path` **and** production classification ∈ {`confirmed production bug`, `reachable but low-risk`, `unclear reachability`} | packet created | `true` | `available` |
 | Fanout backlog-class forbids: `adjacent_out_of_scope` / adjacent; `dead legacy`; `tests-only` (fanout `BACKLOG_ONLY` / `CLEANUP_BACKLOG` / `TEST_COVERAGE_BACKLOG`) | packet/record created | `false` | `backlog` |
@@ -333,10 +334,11 @@ Notes:
 
 * Packet purpose for chat-required findings must state why the chat exists: adjudication, disposition decision, or promotion decision. Backlog packets record backlog/cleanup/test-coverage/separate-root purpose **without** making the finding claimable.
 * Adjacent, dead-legacy, tests-only, and different-invariant findings still get packets under the owner rule, but **not** working claimable chats (`CHAT_REQUIRED=false`, `STATUS=backlog`).
+* `duplicate_root` / `DUP-*` observations are part of the known root case: keep an optional closed/observation record if useful for evidence, but **never** `CHAT_REQUIRED=true` or `STATUS=available`.
 * Low-risk and unclear findings are claimable **only** when they meet the child-chat-eligible row (including `CHILD_CHAT_RECOMMENDED=true`). Do not promote them solely because they are non-FP.
 * Only proven false positives skip the working chat packet entirely; backlog-class still keeps a durable packet/record.
 * Do not invent absorption. Set `absorbed_by_parent_fix` only when the authoritative source already states that disposition.
-* Never let durable ownership override fanout “no child chat” rules by writing `CHAT_REQUIRED=true` for backlog-class forbids.
+* Never let durable ownership override fanout “no child chat” rules by writing `CHAT_REQUIRED=true` for backlog-class forbids or for `duplicate_root` / `DUP-*`.
 
 ## Claim priority assignment
 
@@ -529,9 +531,11 @@ This command must not:
 * different-invariant candidates;
 * false positives;
 * dead legacy;
-* tests-only findings.
+* tests-only findings;
+* optional `duplicate_root` / `DUP-*` observation records (evidence only; never claimable).
 
-Preserve IDs from the hunt. Do not renumber `ROOT-001`, `CHILD-001`, `ADJ-001`, `FP-001`, etc.
+Preserve IDs from the hunt. Do not renumber `ROOT-001`, `CHILD-001`, `ADJ-001`, `FP-001`, `DUP-001`, etc.
+Never promote a `DUP-*` or `duplicate_root` observation to a claimable `CHILD-*` / `STATUS=available` row.
 
 ### False positives
 
@@ -1226,6 +1230,7 @@ ROOT-001  -> existing root, no new chat
 CHILD-001 -> packet preserved, absorbed_by_parent_fix, chat_required=false
 CHILD-002 -> packet created, available, chat_required=true
 ADJ-001   -> packet created, backlog, chat_required=false
+DUP-001   -> observation/closed record only, chat_required=false, never available
 FP-001    -> closed_false_positive, no working chat packet
 FP-002    -> closed_false_positive, no working chat packet
 ```
@@ -1233,7 +1238,7 @@ FP-002    -> closed_false_positive, no working chat packet
 Expected counts:
 
 ```text
-TOTAL_FINDINGS: 6
+TOTAL_FINDINGS: 7
 CHATS_REQUIRED: 1
 READY_TO_CLAIM: 1
 BACKLOG: 1
@@ -1258,6 +1263,7 @@ Corrupt-claim repair:
 * No finding loss.
 * No working chat for proven false positives.
 * No claimable chat (`CHAT_REQUIRED=true` + `STATUS=available`) for fanout backlog-class forbids: adjacent / dead legacy / tests-only; nor for different-invariant as a child claim on this case.
+* No claimable chat for `duplicate_root` / same-causal-path duplicates of the known root / `DUP-*` observations (fanout `duplicate_root_emitted_as_new_finding` class).
 * No nested case directories.
 * No cycle creation when ancestor fingerprint matches.
 * No deep promote at `DEPTH >= 5` without `CONFIRM_DEEP_PROMOTE`.
