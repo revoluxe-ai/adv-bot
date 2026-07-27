@@ -92,7 +92,7 @@ python openspec/tools/check_config_contract.py
    - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Read proposed decisions from `contextFiles.decisions` or `artifactPaths.decisions.existingOutputPaths`, if any.
    - Output relevant decisions by path and status in `Архитектурное размещение`.
-   - If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, mark `missing_required_decision`.
+   - If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, mark `Architecture Decision Missing`.
    - If proposed decisions exist, get `openspec instructions decisions --change "<name>" --json` and apply `rules.decisions`.
    - Compare implementation placement against accepted/proposed decisions.
    - Passing tests не являются proof, если placement нарушает accepted decision.
