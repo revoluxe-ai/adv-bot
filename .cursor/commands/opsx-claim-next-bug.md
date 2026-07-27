@@ -330,6 +330,7 @@ COMMAND_RECEIPT:
   CASE_ID:
   INTAKE_ID:
   FINDING_ID:
+  CLAIM_TOKEN:
   RESULT: claimed
   OUTPUT_PATH:
   NEXT_ACTION: read_only_adjudication
@@ -342,6 +343,13 @@ SOURCE_RESOLUTION:
 - search_scope: .tmp/opsx-bug-cases/<CASE_ID>
 - unresolved_gap:
 ```
+
+`CLAIM_TOKEN` в `COMMAND_RECEIPT`:
+
+* после успешного claim — echo того же token, что в body / `NEXT_COMMAND_ARGS`
+  (`CLAIM/<CASE_ID>/<FINDING_ID>/<CLAIMED_AT>`);
+* на `none_available` / blocked outcomes — пусто, если receipt всё же
+  эмитится.
 
 `intake=<INTAKE_ID>` в `NEXT_COMMAND_ARGS` и `INTAKE_ID` в receipt:
 
@@ -431,7 +439,8 @@ spurious `mode=intake`).
 получать `blocked_missing_claim_token` / `blocked_claim_token_mismatch`, а не
 обход ownership.
 
-Emit `COMMAND_RECEIPT` on every terminal outcome, including `INTAKE_ID` when known.
+Emit `COMMAND_RECEIPT` on every terminal outcome, including `INTAKE_ID` when
+known and `CLAIM_TOKEN` after a successful claim (echo matched token).
 
 ## Acceptance anchor
 
@@ -483,3 +492,4 @@ create a new intake for that finding.
 * Forgotten claims stay visible.
 * Ready to continue means packet loaded + read-only next command prepared, not implementation started.
 * Never emit empty `intake=` when `SOURCE_INTAKE_ID` or `PRIMARY_INTAKE_ID` is known; empty intake never means «create new intake».
+* Successful claim `COMMAND_RECEIPT` MUST include non-empty `CLAIM_TOKEN` matching body / `NEXT_COMMAND_ARGS`.
