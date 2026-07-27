@@ -7,14 +7,14 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 24
+- inventory_count: 25
 - fingerprint_strength: names_only
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-27 (later): ADL Bugbot instance closed in contracts
-  (exhaust→EVIDENCE_GAP+NO_GO); cleared /opsx-apply pending known_flaws.
-  F6 routing rule kept. Prior: process-contract Bugbot → admin fix-command-
-  defects (not /opsx-fix-bug). F1/F2 contract-addressed. Bodies still
+  UPDATE GO 2026-07-27T05:00Z: three learning branches recorded (soft);
+  process lesson path → admin promote-process-lesson → design-command;
+  learn-from-bug = product/logic only. Inventory 25 names_only
+  fingerprint f013cfe340ab4996. F6 kept. F3/F5 still open. Bodies still
   partially NOT_OPENED_BUDGET.
 
 ## States
@@ -39,10 +39,12 @@
 - adjudicating: `/opsx-fix-bug` without GO / `/opsx-classify-bug`
 - fix_now_ready: fix-bug verdict `fix_now`; awaiting GO
 - fixed_or_closed: adjudication complete
-- learning_candidate: `/opsx-learn-from-bug` phase-1
+- learning_candidate: `/opsx-learn-from-bug` phase-1 (**product/logic only**)
 - invariant_defined: invariant packet ready for hunt/fix
 - command_defect_signal: off-graph — Bugbot/review on process contracts
   (`.cursor/commands/**`, rules/skills/static-check, mirrors); not a not-admin edge
+- process_lesson_candidate: off-graph — after process FIXED / process Bugbot;
+  `/opsx-admin-command-promote-process-lesson` (not `/opsx-learn-from-bug`)
 
 ### Typing / quality / ship
 - typing_packet: pyright/mypy → `/opsx-fix-types`
@@ -216,14 +218,16 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-learn-from-bug
-- purpose: transferable process lesson adjudication
+- purpose: product/logic bug → transferable lesson to **existing** process target
 - input_state: fixed_or_closed | learning_candidate
 - output_state: learning_candidate | fixed_or_closed
 - artifacts_read: case/finding / prior classify/fix output
-- artifacts_written: approved target only with GO
+- artifacts_written: approved existing target only with GO
 - decision_owner: owner approval for writes
 - next_typical: /opsx-learn-from-bug GO | none
-- known_flaws: NOT_OPENED_BUDGET detail
+- known_flaws: |
+  NOT_OPENED_BUDGET detail; MUST NOT own F6/command-contract lessons
+  (redirect advisory: `/opsx-admin-command-promote-process-lesson`)
 
 ### /opsx-fix-types
 - purpose: pyright/mypy typing fixes with GO
@@ -328,8 +332,45 @@ typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
 implementing|impl_done --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
-# command_defect_signal --/opsx-admin-command-fix-command-defects--> (admin APPLY/READ_ONLY)
+# command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
+# FIXED --/opsx-admin-command-promote-process-lesson--> process_lesson_candidate
+# process_lesson_candidate --DESIGN_BRIEF_READY--> /opsx-admin-command-design-command
+# process_lesson_candidate --EXTEND_EXISTING--> /opsx-admin-command-fix-command-defects
 ```
+
+## Soft recommendations (advisory only)
+
+NAVIGATE may surface these; they are **not** forced edges and **not**
+lifecycle authority.
+
+### Three learning branches (do not mix)
+
+1. **typing** → `/opsx-fix-types` / `/opsx-static-check` — no learning command
+2. **logic/product** → `/opsx-fix-bug` → `/opsx-learn-from-bug`
+3. **commands/process (F6)** → `/opsx-admin-command-fix-command-defects`
+   → optional `/opsx-admin-command-promote-process-lesson`
+   → `/opsx-admin-command-design-command` if `DESIGN_BRIEF_READY`
+
+### New command (admin path — soft)
+
+When a **process gap** looks like a missing command (not a one-line fix):
+
+1. Prefer `/opsx-admin-command-promote-process-lesson` if evidence is a
+   process Bugbot / FIXED packet (emits `DESIGN_BRIEF_READY`).
+2. Or paste the problem into `/opsx-admin-command-design-command` directly.
+3. Wait for design need verdict (`NEW_COMMAND_REQUIRED` vs improve existing).
+4. Owner `GO OPTION_*` → implement companions → `/opsx-admin-command-commit`.
+5. Optional: `/opsx-pipeline UPDATE` → `UPDATE GO` to refresh this graph.
+
+Do **not** invent a new not-admin `/opsx-*` to “learn process contracts”.
+Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
+
+### After process FIXED
+
+- Primary: `/opsx-admin-command-commit` if process files changed.
+- Soft: `/opsx-admin-command-promote-process-lesson` when the defect class
+  looks transferable (guardrail gap, wrong branch, durable handoff omission,
+  ADL exhaust, etc.).
 
 ## Known pipeline flaws
 
@@ -366,7 +407,10 @@ implementing|impl_done --/opsx-test--> tests_authored
 - id: F6 COMMAND_CONTRACT_DEFECT_OFF_GRAPH
   where: NAVIGATE / bug subgraph vs admin process surfaces
   symptom: Bugbot/review on `.cursor/commands/**` was routed to `/opsx-fix-bug` as bug_signal_raw
-  operator_workaround: treat as `command_defect_signal`; use `/opsx-admin-command-fix-command-defects` (READ_ONLY then GO); do not open product bug case map
+  operator_workaround: |
+    treat as `command_defect_signal`; `/opsx-admin-command-fix-command-defects`
+    (READ_ONLY then GO); do not open product bug case map; after FIXED, soft
+    `/opsx-admin-command-promote-process-lesson` (not `/opsx-learn-from-bug`)
   do_not_pretend_fixed: false (routing recorded; example ADL apply instance closed in contracts 2026-07-27 — F6 still applies to future process Bugbots)
 
 ## Terminal / recovery
@@ -376,4 +420,8 @@ implementing|impl_done --/opsx-test--> tests_authored
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
-- Admin surfaces (analyze-pipeline, fix-command-defects, design-command, admin-commit, opsx-review-commands): off-graph by design
+- Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
+  → `DESIGN_BRIEF_READY` → `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
+- Admin surfaces (analyze-pipeline, fix-command-defects, promote-process-lesson,
+  design-command, admin-commit, opsx-review-commands): off-graph by design
+- Uncommitted process edits after design/fix: `/opsx-admin-command-commit` (not `/opsx-commit`)
