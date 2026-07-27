@@ -100,7 +100,11 @@ async def test_card_ab_hold_back_reloads_adv_setting_menu_not_closed_dead_end() 
     with (
         patch.object(handlers, "Message", _FakeMessage),
         patch.object(handlers, "sm", return_value=session_cm),
-        patch.object(handlers, "AdvSettingMenu", mock_menu_cls),
+        patch.object(
+            handlers,
+            "_load_adv_setting_menu",
+            return_value=mock_menu_cls,
+        ),
         patch.object(
             handlers,
             "get_wb_user_cabinet_for_adv_and_telegram",
@@ -125,3 +129,25 @@ async def test_card_ab_hold_back_reloads_adv_setting_menu_not_closed_dead_end() 
         f"{_CLOSED_COPY!r}; получено: {closed_payloads!r}"
     )
     msg.delete.assert_not_awaited()
+
+
+@pytest.mark.unit
+def test_adv_setting_menu_keyboard_imports_without_circular_import() -> None:
+    """Regression: keyboard/callbacks не должны ломаться circular import'ом.
+
+    verify NO_GO: top-level ``AdvSettingMenu`` в ``handlers`` ломал
+    ``get_adv_setting_keyboard`` и collection ``test_auto_bid_freeze``.
+    """
+    from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.keyboard import (
+        get_adv_setting_keyboard,
+    )
+
+    assert callable(get_adv_setting_keyboard)
+
+
+@pytest.mark.unit
+def test_change_auto_bid_module_imports_without_circular_import() -> None:
+    """Adjacent: ``change_auto_bid`` → AdvSettingMenu path остаётся импортируемым."""
+    from app.client_bot.user_interface.handlers import change_auto_bid as change_auto_bid_mod
+
+    assert callable(change_auto_bid_mod.open_change_auto_bid)
