@@ -4,6 +4,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot import const
+from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.const import ALWAYS_ON, AUTO_MODE, BLACK_LIST, TURN_OFF, WHITE_LIST
 from app.client_bot.user_interface.utils import (
     format_target_place_display,
@@ -31,6 +32,9 @@ from app.client_bot.user_interface.views.keyword_strategy_ui import (
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
     normalize_automatic_version_ui,
+)
+from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
+    keyword_v3_decision_trace_button_label,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater.auto_white_list_updater.telegram.callbacks import (
     RelevantKeywordStatusSetting,
@@ -708,6 +712,9 @@ def get_keyword_setting_keyboard(
     keyword: KeywordSetting,
     adv_setting: AdvSetting,
     page: int,
+    *,
+    telegram_user_id: int | None = None,
+    keyword_display_status: KeywordStatus | None = None,
 ) -> InlineKeyboardMarkup:
     adv_setting_original_id = adv_setting.id
     keyword_setting_original_id = keyword.id
@@ -828,6 +835,26 @@ def get_keyword_setting_keyboard(
             )
         ]
     )
+
+    if (
+        normalize_automatic_version_ui(adv_setting.automatic_version) == 3
+        and telegram_user_id is not None
+        and is_bot_admin(telegram_user_id)
+        and keyword_display_status is not None
+    ):
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=keyword_v3_decision_trace_button_label(
+                        keyword_display_status
+                    ),
+                    callback_data=callbacks.KeywordV3DecisionTraceOpen(
+                        keyword_setting_original_id=keyword_setting_original_id,
+                        page=page,
+                    ).pack(),
+                )
+            ]
+        )
 
     buttons.append(
         [

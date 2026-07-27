@@ -110,21 +110,6 @@ class WBModifier:
     def __init__(self, promotion_manager: "PromotionManager") -> None:
         self._promotion_manager: "PromotionManager" = promotion_manager
 
-    async def set_minus_phrases_for_adv(
-        self,
-        adv_id: int,
-        nmid: int,
-        phrases: list[str],
-        update_redis_timestamp_manager: AdvActiveKeywordUpdateStateManager,
-    ) -> None:
-        # TODO: WB походу сделал так, что можно ставить отдельно на каждый nmid внутри фразы РК. Надо адаптировать к этому бот
-        try:
-            await self._promotion_manager.set_minus_phrases(adv_id, nm_id=nmid, phrases=phrases)
-        except Exception as e:
-            logger.error('Ошибка обновления минус-фраз: %s', e, exc_info=True)
-            raise e
-        await update_redis_timestamp_manager.set_one(adv_id=adv_id)
-        return None
 
     async def set_minus_phrases_with_fallback_for_adv(
         self,

@@ -92,9 +92,12 @@ class RebalanceExecutor:
         if self._skip_reason is not None:
             return
         generator = StatesListGenerator(context.adv_state)
-        current_states, potential_states = generator.get_current_states(
-            context.keywords
+        resolve = float(context.adv_state.resolve)
+        current_states, potential_states = _filter_rebalance_candidates(
+            generator.get_current_states(context.keywords),
+            resolve=resolve,
         )
+
         if not current_states:
             self._skip_reason = SKIP_NO_CURRENT_ACTIVE
             return
@@ -103,8 +106,9 @@ class RebalanceExecutor:
             return
 
         for _ in range(_MAX_REBALANCE_CYCLES):
-            current_states, potential_states = generator.get_current_states(
-                context.keywords
+            current_states, potential_states = _filter_rebalance_candidates(
+                generator.get_current_states(context.keywords),
+                resolve=resolve,
             )
             if not current_states:
                 break
@@ -135,6 +139,19 @@ class RebalanceExecutor:
     @property
     def skip_reason(self) -> str | None:
         return self._skip_reason
+
+
+def _filter_rebalance_candidates(
+    states: tuple[list[StateBinding], list[StateBinding]],
+    *,
+    resolve: float,
+) -> tuple[list[StateBinding], list[StateBinding]]:
+    """Оставить только donor/recipient candidates с ladder CPO выше ``resolve``."""
+    current_states, potential_states = states
+    return (
+        [row for row in current_states if row[2] > resolve],
+        [row for row in potential_states if row[2] > resolve],
+    )
 
 
 def _phase_skip_reason(context: UpdateContext) -> str | None:

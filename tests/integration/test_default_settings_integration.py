@@ -161,7 +161,7 @@ async def setup_multiple_advs_data(async_session: AsyncSession):
 
 @pytest.mark.integration
 async def test_apply_campaign_defaults_single_active_campaign(
-    mock_bot, mock_state, async_session: AsyncSession, setup_adv_data
+    mock_bot, async_session: AsyncSession, setup_adv_data
 ):
     adv_setting = setup_adv_data["adv_setting"]
     wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
@@ -245,10 +245,16 @@ async def test_apply_campaign_defaults_single_active_campaign(
             pass
 
     with (
-        patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
-        patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            MockSessionMaker(async_session),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            return_value=mock_menu_instance,
+        ),
     ):
-        await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
+        await apply_campaign_defaults(callback_query, callback_data, mock_bot)
 
     # Проверяем, что дефолтные значения применились
     # Нужно начать новую транзакцию, так как хэндлер использует свою сессию
@@ -275,7 +281,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
 @pytest.mark.integration
 async def test_apply_campaign_defaults_single_inactive_campaign(
-    mock_bot, mock_state, async_session: AsyncSession, setup_adv_data
+    mock_bot, async_session: AsyncSession, setup_adv_data
 ):
     adv_setting_inactive = setup_adv_data["adv_setting_inactive"]
     wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
@@ -314,10 +320,16 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
 
     mock_menu_instance = AsyncMock()
     with (
-        patch("app.client_bot.user_interface.handlers.adv_setting.sm", MockSessionMaker(async_session)),
-        patch("app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu", return_value=mock_menu_instance),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            MockSessionMaker(async_session),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            return_value=mock_menu_instance,
+        ),
     ):
-        await apply_campaign_defaults(callback_query, callback_data, mock_bot, mock_state)
+        await apply_campaign_defaults(callback_query, callback_data, mock_bot)
 
     # Проверяем, что настройки изменились согласно дефолтам
     # А те, что не должны были измениться, остались прежними

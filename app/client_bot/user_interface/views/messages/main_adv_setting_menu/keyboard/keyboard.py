@@ -8,7 +8,6 @@ from app.client_bot.user_interface.views import callbacks
 from .automatic_version_ui import (
     automatic_version_main_menu_button,
     normalize_automatic_version_ui,
-    show_relevant_phrase_toggle,
 )
 from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from .v3_calibration_step_ui import v3_calibration_step_main_button
@@ -19,6 +18,7 @@ from app.client_bot.user_interface.views.callbacks import (
     OrdersSourceToggle,
     SalesPredictMethodToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
+    ManageRelevantAndNonRelevantPhrases,
     ChangeCommonBidInSearchAdvStatus,
     SetCommonBidManual,
     IndividualKeywordsTargetPlaceToggle,
@@ -46,9 +46,74 @@ from app.client_bot.user_interface.handlers.time_settings.callbacks import TS
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram.callbacks import (
     AutoUpdateTargetPlaceSetting as AutoUpdateTargetPlaceSettingCallBack,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
+    CardAbHoldMenu,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
+    card_ab_hold_status_label,
+    is_card_ab_hold_ui_visible,
+)
 from app.utils.db.session_maker import get_async_session_maker
 
 sm = get_async_session_maker
+
+
+def get_relevant_phrase_management_keyboard(adv_setting: AdvSetting):
+    """Собрать клавиатуру подменю управления релевантными и нерелевантными фразами."""
+    builder = InlineKeyboardBuilder()
+
+    if adv_setting.auto_add_only_relevant_phrase:
+        toggle_text = "Выключить добавление только релевантных фраз"
+        toggle_new_status = False
+        middle_text = "Добавить РЕЛЕВАНТНЫЕ фразы"
+        middle_callback = callbacks.AddRelevantPhrases(
+            adv_setting_id=adv_setting.id
+        ).pack()
+        templates_text = "Шаблоны релевантных фраз"
+        templates_callback = callbacks.AddRelevantPhraseTemplates(
+            adv_setting_id=adv_setting.id
+        ).pack()
+    else:
+        toggle_text = "Включить добавление только релевантных фраз"
+        toggle_new_status = True
+        middle_text = "Добавить НЕРЕЛЕВАНТНЫЕ фразы"
+        middle_callback = callbacks.AddBlackPhrasesTemplates(
+            adv_setting_id=adv_setting.id
+        ).pack()
+        templates_text = "Шаблоны нерелевантных фраз"
+        templates_callback = callbacks.AddBlackPhrasesTemplates(
+            adv_setting_id=adv_setting.id
+        ).pack()
+
+    builder.row(
+        InlineKeyboardButton(
+            text=toggle_text,
+            callback_data=ChangeAutoAddOnlyRelevantPhraseStatus(
+                adv_id=adv_setting.adv_id,
+                wb_user_cabinet_original_id=0,
+                new_status=toggle_new_status,
+            ).pack(),
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text=middle_text,
+            callback_data=middle_callback,
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text=templates_text,
+            callback_data=templates_callback,
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="Назад в меню",
+            callback_data=callbacks.Adv(adv_original_id=adv_setting.id).pack(),
+        )
+    )
+    return builder.as_markup()
 
 
 def get_adv_setting_keyboard(
@@ -89,6 +154,16 @@ def get_adv_setting_keyboard(
     from .buttoms import rec_system_button
     rec_bottom = rec_system_button.get(adv_setting, wb_user_cabinet)
     _ = builder.row(rec_bottom)
+
+    # TODO: Из free удалить все не не релевантных фраз, это только автомат
+    # TODO: сделать для free отдельное описание Рел не рел Фраз
+    relevant_button = InlineKeyboardButton(
+        text="Управление релевантными и нерелевантными фразами",
+        callback_data=ManageRelevantAndNonRelevantPhrases(
+            adv_setting_original_id=adv_setting.id  # type:ignore
+        ).pack(),
+    )
+    _ = builder.row(relevant_button)
 
     indiv_place_mode = bool(adv_setting.individual_keywords_target_place_mode)
     if indiv_place_mode:
@@ -275,28 +350,6 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    if show_relevant_phrase_toggle(
-        normalize_automatic_version_ui(adv_setting.automatic_version)
-    ):
-        # Кнопка для auto_add_only_relevant_phrase
-        if adv_setting.auto_add_only_relevant_phrase:
-            relevant_text = "Выключить добавление только релевантных фраз"
-            relevant_new_status = False
-        else:
-            relevant_text = "Включить добавление только релевантных фраз"
-            relevant_new_status = True
-
-        relevant_callback = ChangeAutoAddOnlyRelevantPhraseStatus(
-            adv_id=adv_setting.adv_id,
-            wb_user_cabinet_original_id=wb_user_cabinet.id,
-            new_status=relevant_new_status,
-        ).pack()
-        relevant_button = InlineKeyboardButton(
-            text=relevant_text, callback_data=relevant_callback
-        )
-        _ = builder.row(relevant_button)
-
-
     # Добавляем кнопку переключения источника заказов для автоуправления
     if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
         text = "Переключить на общую статистику заказов"
@@ -333,6 +386,16 @@ def get_adv_setting_keyboard(
         _ = builder.row(v3_tick_report_main_button(adv_setting))
         _ = builder.row(v3_calibration_step_main_button(adv_setting))
         _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))
+
+    if is_card_ab_hold_ui_visible(adv_setting):
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=card_ab_hold_status_label(adv_setting),
+                callback_data=CardAbHoldMenu(
+                    adv_setting_original_id=adv_setting.id
+                ).pack(),
+            )
+        )
 
     button = InlineKeyboardButton(
         text="Шаблоны не релевантных фраз",

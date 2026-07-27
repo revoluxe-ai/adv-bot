@@ -47,3 +47,6 @@ class CampaignDefaultsV1:
     target_ctr_mode: bool = False
     new_auto_min_ctr_mode: bool = False
     reset_place: bool = True
+
+    # A/B Hold default «выкл» живёт в CommonModeDefaultsPolicy
+    # (openspec/decisions/mode-defaults-policy-ownership); не дублируем здесь.

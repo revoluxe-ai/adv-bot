@@ -10,6 +10,9 @@
 
 Таким образом импорт придерживается политики "fail-fast + единый UX ошибок":
 файл отклоняется целиком, а диагностика уходит в технический контур.
+
+A/B Hold (``card_ab_hold_mode``): не применяется через Excel в MVP
+(decision ``card-ab-hold-write-path-ownership`` §9) — только Telegram UI.
 """
 
 from __future__ import annotations
@@ -297,6 +300,8 @@ async def apply_adv_excel_rows(
                         max_cpo_decrease_effects.append(side_effect)
                         raise_max_auto_disabled = True
                     continue
+                # card_ab_hold_mode: decision §9 — not in EDITABLE_ADV_SETTING_COLUMNS;
+                # leftover Excel columns are ignored (Telegram-only enable/disable).
                 if skip_excel_substitute_fact_cpo_for_max(
                     field=field,
                     raise_max_auto_disabled=raise_max_auto_disabled,

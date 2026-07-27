@@ -1280,6 +1280,142 @@ async def test_build_view_includes_rec_bid_recommendation(
 
 
 @pytest.mark.asyncio
+async def test_build_view_preserves_zero_plan_ranked_cpo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 100
+    adv.max_price_for_order = 200
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=None)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(
+        return_value=0.05
+    )
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    provider._rec_bid_recommendation_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={
+            "view": {
+                "plan_ranked": [
+                    {"bid": 12300, "cpo_rub": 0.0, "expected_order_cost_rub": 259.23}
+                ]
+            }
+        }
+    )  # type: ignore[attr-defined]
+
+    plan_fact_summary = MagicMock()
+    plan_fact_summary.fact_predict_orders = 10.0
+    plan_fact_summary.fact_pay_for_order = 150.0
+
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=plan_fact_summary)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.best_cpo_bid_rub == 0.0
+
+
+@pytest.mark.asyncio
+async def test_build_view_best_cpo_falls_back_when_cpo_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 100
+    adv.max_price_for_order = 200
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=None)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(
+        return_value=0.05
+    )
+
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=MagicMock(),
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    provider._rec_bid_recommendation_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={
+            "view": {
+                "plan_ranked": [
+                    {
+                        "bid": 12300,
+                        "cpo_rub": None,
+                        "expected_order_cost_rub": 259.23,
+                    }
+                ]
+            }
+        }
+    )  # type: ignore[attr-defined]
+
+    plan_fact_summary = MagicMock()
+    plan_fact_summary.fact_predict_orders = 10.0
+    plan_fact_summary.fact_pay_for_order = 150.0
+
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=plan_fact_summary)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert view.best_cpo_bid_rub == 259.23
+
+
+@pytest.mark.asyncio
 async def test_build_view_rec_bid_plan_context_uses_max_cost_when_plan_not_met(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1850,3 +1986,19 @@ async def test_view_provider_expected_none_can_count_progress_false(
     assert view.fresh_best_main_bid_minor is None
     assert view.qualified_tested_bids_count == 1
     assert view.can_count_progress is False
+
+
+@pytest.mark.asyncio
+async def test_parse_plan_ranked_preserves_zero_cpo() -> None:
+    """Zero `cpo_rub` in plan_ranked must be preserved (not treated as falsy)."""
+    rec_view = {
+        "plan_ranked": [
+            {"bid": 12300, "cpo_rub": 0.0, "expected_order_cost_rub": 259.23}
+        ]
+    }
+
+    forecasts = AutoShelfBidControlViewProvider._parse_plan_ranked_forecasts(
+        rec_view
+    )
+    assert 12300 in forecasts
+    assert forecasts[12300]["expected_order_cost_rub"] == 0.0

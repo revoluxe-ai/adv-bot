@@ -22,6 +22,17 @@ _NDA = "app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data
 _RP = "app.modules.shop_runner.service_manager.services.auto_updater_v3.resolve_threshold"
 _TL = "app.modules.shop_runner.service_manager.services.auto_updater_v3.tick_ledger"
 _V3_CPO = "app.modules.shop_runner.service_manager.services.v3_point_order_cpo"
+_AB_HOLD_INTERRUPT = (
+    "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+    "orchestrator.abort_ordinary_v3_if_enter_signaled"
+)
+
+
+@pytest.fixture(autouse=True)
+def _stub_card_ab_hold_interrupt() -> None:
+    """card-ab-hold-mode: файл вне auto_updater_v3/conftest — stub Redis interrupt."""
+    with patch(_AB_HOLD_INTERRUPT, new=AsyncMock(return_value=False)):
+        yield
 
 
 def _start_patches(patch_map: dict[str, object]) -> list:
@@ -233,6 +244,7 @@ async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
             f"{_TL}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
             f"{_ORCH}.persist_v3_tick_report": AsyncMock(),
             f"{_ORCH}.persist_v3_keyword_changes": AsyncMock(),
+            f"{_ORCH}.persist_keyword_decision_trace": AsyncMock(),
         }
     )
     try:

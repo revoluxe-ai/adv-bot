@@ -140,94 +140,66 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
         *,
         adv_trace: object | None = None,
     ) -> list[CalculatedKeyword]:
-        from app.modules.shop_runner.service_manager.coroutine_phase_trace import (
-            AdvPhaseTrace,
-        )
-
-        trace = adv_trace
-        if trace is None:
-            trace = AdvPhaseTrace.for_complex_adv(
-                coroutine="process_adv_v3", adv=complex_adv
-            )
-        assert isinstance(trace, AdvPhaseTrace)
         # TODO: Сделать на будущее более глобальные объекты для списков, в котором будут передаваться не только данные, но и метаданные
         # TODO: тут получаем только для одного артикула, возможно, что нал
-        with trace.phase("ckw_ch_get_all_stats"):
-            stats = await self._get_all_stats(complex_adv, min_days, min_views)
-        trace.marker("ckw_stats_loaded", extra={"stats_rows": len(stats)})
+
+        stats = await self._get_all_stats(complex_adv, min_days, min_views)
 
         from app.modules.keywords_manager.keywords_manager import KeywordsManager
         keyword_manager = KeywordsManager()
-        with trace.phase("ckw_create_keyword_settings"):
-            await keyword_manager.create_new_keyword_settings(complex_adv, stats)
-        with trace.phase("ckw_get_keyword_settings_pg"):
-            keyword_hard_statuses = await self._get_all_keyword_setting(complex_adv)
-        with trace.phase("ckw_create_pre_calculated_keywords"):
-            pre_calculated_keywords = self.__create_pre_calculated_keywords(
-                keyword_hard_statuses,
-                stats,
-                complex_adv,
-            )
+        await keyword_manager.create_new_keyword_settings(complex_adv, stats)
+        keyword_hard_statuses = await self._get_all_keyword_setting(complex_adv)
+        pre_calculated_keywords = self.__create_pre_calculated_keywords(
+            keyword_hard_statuses,
+            stats,
+            complex_adv,
+        )
         if not pre_calculated_keywords:
-            trace.marker("ckw_empty_pre_calculated")
             return []
         from app.modules.cpm_sources_resolver import CpmSourcesResolver
 
         texts = [s.text for s in stats]
-        with trace.phase("ckw_cpm_sources_resolver"):
-            all_sources_by_text = await CpmSourcesResolver.get_all_sources(
-                complex_adv, texts
-            )
-        with trace.phase("ckw_enrich_pre_calculated_cpm"):
-            pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
-                pre_calculated_keywords, all_sources_by_text
-            )
+        all_sources_by_text = await CpmSourcesResolver.get_all_sources(
+            complex_adv, texts
+        )
+        pre_calculated_keywords = self.__enrich_pre_calculated_with_cpm_sources(
+            pre_calculated_keywords, all_sources_by_text
+        )
         now = datetime.now(UTC)
-        with trace.phase("ckw_resolve_min_bid_for_adv"):
-            min_bid_for_adv = max_search_min_bid_for_complex_nmids(
-                list(complex_adv.nmids), complex_adv.min_nmids_bids
-            )
-            if min_bid_for_adv is None:
-                min_bid_for_adv = await self._fetch_min_search_bid_aggregate(complex_adv)
+        min_bid_for_adv = max_search_min_bid_for_complex_nmids(
+            list(complex_adv.nmids), complex_adv.min_nmids_bids
+        )
+        if min_bid_for_adv is None:
+            min_bid_for_adv = await self._fetch_min_search_bid_aggregate(complex_adv)
 
         cooldown_map: dict[str, AboveTargetCooldownEntry | None] | None = None
         cooldown_updates: dict[str, AboveTargetCooldownEntry | None] | None = None
         cooldown_redis_mgr: RedisAboveTargetMinBidCooldownManager | None = None
         if min_bid_for_adv is not None:
             cooldown_updates = {}
-            with trace.phase("ckw_cooldown_hub_and_redis_get"):
-                hub_kw = await self._get_wb_manager_hub(complex_adv)
-                cooldown_redis_mgr = RedisAboveTargetMinBidCooldownManager(
-                    hub_kw.redis_client_wrapper
-                )
-                pre_texts = [p.keyword_setting.text for p in pre_calculated_keywords]
-                cooldown_map = await cooldown_redis_mgr.get_many(
-                    complex_adv.adv_id, pre_texts
-                )
-
-        with trace.phase("ckw_build_calculated_keywords_list"):
-            calculated_keyword_list = await self.__get_calculated_keywords(
-                complex_adv,
-                pre_calculated_keywords,
-                min_bid_for_adv=min_bid_for_adv,
-                cooldown_map=cooldown_map,
-                cooldown_updates=cooldown_updates,
-                now=now,
+            hub_kw = await self._get_wb_manager_hub(complex_adv)
+            cooldown_redis_mgr = RedisAboveTargetMinBidCooldownManager(
+                hub_kw.redis_client_wrapper
             )
+            pre_texts = [p.keyword_setting.text for p in pre_calculated_keywords]
+            cooldown_map = await cooldown_redis_mgr.get_many(
+                complex_adv.adv_id, pre_texts
+            )
+
+        calculated_keyword_list = await self.__get_calculated_keywords(
+            complex_adv,
+            pre_calculated_keywords,
+            min_bid_for_adv=min_bid_for_adv,
+            cooldown_map=cooldown_map,
+            cooldown_updates=cooldown_updates,
+            now=now,
+        )
         if cooldown_redis_mgr is not None and cooldown_updates:
-            with trace.phase("ckw_cooldown_apply_updates"):
-                await cooldown_redis_mgr.apply_updates(
-                    complex_adv.adv_id, cooldown_updates
-                )
-
-        with trace.phase("ckw_set_calculated_keywords_redis_cache"):
-            await self._set_calculated_keywords_in_redis_cache(
-                complex_adv, calculated_keyword_list
+            await cooldown_redis_mgr.apply_updates(
+                complex_adv.adv_id, cooldown_updates
             )
-
-        trace.marker(
-            "ckw_calculated_keywords_built",
-            extra={"keywords_count": len(calculated_keyword_list)},
+        await self._set_calculated_keywords_in_redis_cache(
+            complex_adv, calculated_keyword_list
         )
         return calculated_keyword_list
 

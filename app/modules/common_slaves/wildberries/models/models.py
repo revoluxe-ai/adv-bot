@@ -732,6 +732,35 @@ class AdvSetting(BaseTable):
         server_default=text("1"),
         comment="V3 RESOLVE_CALIBRATION_TRIM: cap effective ladder DOWN steps per keyword per tick",
     )
+    card_ab_hold_mode: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="off",
+        server_default=text("'off'"),
+        comment="A/B Hold mode: off | pending_setup | active (spec card-ab-hold-mode)",
+    )
+    card_ab_hold_allowed_phrases_snapshot: Mapped[list] = mapped_column(
+        JSONB,
+        default=list,
+        nullable=False,
+        server_default=text("'[]'"),
+        comment=(
+            "A/B Hold PG snapshot разрешённого (allowed/relevant) набора фраз "
+            "[text, ...]; минус — производный enforcement (spec card-ab-hold-mode §8)"
+        ),
+    )
+    card_ab_hold_degraded: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+        comment=(
+            "A/B Hold honest degradation (spec card-ab-hold-mode §8): True когда "
+            "enforcement замороженного allowed-set не может гарантировать чистый hold "
+            "(превышен WB minus cap / open-match). Durable SoT для честного UI-статуса; "
+            "self-healing — снимается на тике, где cap не превышен."
+        ),
+    )
 
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),

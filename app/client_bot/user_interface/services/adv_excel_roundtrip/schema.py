@@ -30,7 +30,8 @@ TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 # v3: добавлена EDIT-колонка для cap шагов калибратора V3 — ``keyword_calibration_max_step``.
 # v4: добавлены колонки биддера полок ``auto_shelf_bid_control``.
 # v5: EDIT-колонка ``substitute_fact_cpo_for_max`` (V3 Raise MAX).
-EXCEL_TEMPLATE_VERSION = 5
+# v6: удалена EDIT-колонка ``card_ab_hold_mode`` (decision §9 / spec — Excel out of MVP).
+EXCEL_TEMPLATE_VERSION = 6
 
 # Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
 READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
