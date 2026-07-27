@@ -915,8 +915,11 @@ SOURCE_SNAPSHOT:
 DISPOSITION:
 NEXT_ACTION:
 
-NEXT_COMMAND:
-/opsx-fix-bug
+NEXT_COMMAND (when STATUS=available and CHAT_REQUIRED=true, pre-claim):
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<owner-label>"
+
+NEXT_COMMAND (only after claim, or for same-chat resume with matched claim_token):
+/opsx-fix-bug case=<CASE_ID> intake=<SOURCE_INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 
 MODE:
 READ_ONLY
@@ -927,7 +930,10 @@ FORBIDDEN:
 - do not claim a second finding
 - do not open other chats
 - do not promote without /opsx-materialize-bug-queue mode=promote
+- do not emit bare /opsx-fix-bug without case=/finding=/claim_token=
 ```
+
+When `CHAT_REQUIRED=true` and the finding is still `available` (unclaimed), `NEXT_COMMAND` MUST be `/opsx-claim-next-bug case=<CASE_ID> chat_label="…"` — never bare `/opsx-fix-bug`. After claim, `/opsx-claim-next-bug` supplies `/opsx-fix-bug` with durable ARGS including `claim_token=`.
 
 `PACKET_PURPOSE` must be one of:
 

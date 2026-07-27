@@ -425,8 +425,13 @@ RISK:
 REGRESSION_TEST:
 RECOMMENDED_ACTION:
 
+PREREQ:
+Durable finding must exist on disk via
+/opsx-materialize-bug-queue mode=hunt-result (or already materialized).
+Do not adjudicate from a chat-only packet without case-map rows.
+
 NEXT_COMMAND:
-/opsx-fix-bug
+/opsx-claim-next-bug case=<ROOT_CASE_ID> chat_label="<CHAT_TITLE>"
 
 MODE:
 READ_ONLY
@@ -441,7 +446,9 @@ FORBIDDEN:
 - do not restart services;
 - do not run migrations;
 - do not modify or restore Git stashes;
-- do not expand beyond this finding and inherited invariant.
+- do not expand beyond this finding and inherited invariant;
+- do not emit bare /opsx-fix-bug without case=/finding=/claim_token=;
+- do not skip /opsx-claim-next-bug when the finding is chat_required and unclaimed.
 
 REQUIRED_RETURN:
 - literal verdict;
@@ -460,6 +467,8 @@ The inherited invariant must be copied verbatim.
 The original finding must be preserved without silently strengthening or weakening it.
 
 Do not include `GO`.
+
+`NEXT_COMMAND` for `CREATE_CHILD_CHAT` MUST be `/opsx-claim-next-bug case=<ROOT_CASE_ID> chat_label="<CHAT_TITLE>"` (or the case that owns `FINDING_ID` after hunt-result). After a successful claim, `/opsx-claim-next-bug` already emits `/opsx-fix-bug` with `case=` / `intake=` / `finding=` / `claim_token=`. Never hand a child chat bare `/opsx-fix-bug`.
 
 ## Separate root candidate packet
 
@@ -480,7 +489,9 @@ STATUS:
 needs_independent_adjudication
 
 NEXT:
-Run /opsx-fix-bug without GO as a new root candidate.
+Run /opsx-fix-bug WITHOUT GO as a new root candidate, with durable IDs when known
+(case=<…> intake=<…>) or as a true first-run raw report that materializes intake —
+never bare `/opsx-fix-bug` alone.
 Do not treat this as a confirmed child of the current invariant.
 ```
 
