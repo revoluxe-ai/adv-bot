@@ -1,16 +1,17 @@
-# OPSX bug-episode orchestration MVP (draft process contract)
+# OPSX bug-episode orchestration MVP (live process contract)
 
 ```text
-STATUS: DRAFT_PROCESS_CONTRACT
-IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+STATUS: LIVE_PROCESS_CONTRACT
+IMPLEMENTATION_STATUS: LIVE_ACTIVATED
 VALIDATION_STATUS: INDEPENDENT_TEST_PASS
-LIVE_WORKSPACE_BEHAVIOR_CHANGED: NO
 CANDIDATE_WORKTREE_BEHAVIOR_CHANGED: YES
-RUNTIME_ENFORCEMENT: NOT_ACTIVE
-LIVE_COMMAND_BEHAVIOR_CHANGED: NO
-COMPANION_UPDATES_REQUIRED: PARTIAL_IN_CANDIDATE
-OWNER_APPROVAL_SCOPE: CONTRACT_ARTIFACT_ONLY
-GO_ACTIVATE: NOT_ISSUED
+LIVE_WORKSPACE_BEHAVIOR_CHANGED: YES
+RUNTIME_ENFORCEMENT: ACTIVE
+LIVE_COMMAND_BEHAVIOR_CHANGED: YES
+GO_ACTIVATE: ISSUED
+ACTIVATION_SOURCE_COMMIT: bcd132ccf62712f6dd0d00a18a0c26f7dc8c8179
+INDEPENDENT_TEST_RESULT: T1–T18 PASS
+TARGETED_RETEST_RESULT: PASS
 ```
 
 ## Document role
@@ -24,22 +25,21 @@ It is **not**:
 - an authority override of `/opsx-verify`, `/opsx-archive`, `/opsx-commit`,
   or command GO gates;
 - a replacement for `.cursor/pipeline/GRAPH.md` (GRAPH remains
-  `navigation_snapshot_only` until a separate `/opsx-pipeline` UPDATE GO).
+  `navigation_snapshot_only`; navigation advice never overrides command
+  gates, Owner authority, or durable case state).
 
-**Candidate companion state:** companion command/schema contracts exist
-**only** in the isolated candidate worktree
-(`opsx/orchestration-mvp-candidate`). They are **validated**
-(`VALIDATION_STATUS: INDEPENDENT_TEST_PASS`) but **not** merged, **not**
-active, and **not** permitted for real OPSX episodes. Do not claim
-`RUNTIME_ENFORCEMENT: ACTIVE` until Owner `GO_ACTIVATE`.
+**Live activation:** Owner issued `GO_ACTIVATE`. Companion command/schema
+contracts from the tested candidate are merged into the live workspace and
+are authoritative for live OPSX orchestration of product/logic bug episodes.
 
-Until `GO_ACTIVATE` promotes past this draft with
-`RUNTIME_ENFORCEMENT: ACTIVE`, live OPSX commands keep their **current**
-write-gates and handoffs. Operators may **voluntarily** follow this
-contract in the candidate tree; live enforcement is not claimed.
+```text
+ACTIVATION_SOURCE_COMMIT: bcd132ccf62712f6dd0d00a18a0c26f7dc8c8179
+INDEPENDENT_TEST_RESULT: T1–T18 PASS
+TARGETED_RETEST_RESULT: PASS
+```
 
-**Dual-truth risk:** this draft/candidate and live command text may
-disagree. Live commands win for runtime behavior until activation.
+**Dual-truth:** prior draft/candidate wording is superseded by this live
+contract and the activated companion command texts.
 
 ---
 
@@ -302,9 +302,13 @@ not silent open work.
 
 Fanout may still define `max_children` for packet preview. Episode
 orchestration uses the **stricter** of this contract’s active-branch limit
-and any fanout cap once companions enforce this file.
+and any fanout cap.
 
-Until companions: live fanout rules remain authoritative at runtime.
+After `GO_ACTIVATE`, the companion command contracts are authoritative
+for live OPSX orchestration.
+
+`GRAPH.md` remains a navigation snapshot and does not override
+command gates, Owner authority or durable case state.
 
 ---
 
@@ -618,39 +622,32 @@ Command-contract / process Bugbot lessons remain on
 
 ---
 
-## 10. Companion implementation status (candidate)
-
-Companions are **not** deferred and are **not** “implementation not started”.
+## 10. Companion implementation status (live)
 
 ```text
-IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+IMPLEMENTATION_STATUS: LIVE_ACTIVATED
 VALIDATION_STATUS: INDEPENDENT_TEST_PASS
 CANDIDATE_WORKTREE_BEHAVIOR_CHANGED: YES
-LIVE_WORKSPACE_BEHAVIOR_CHANGED: NO
-RUNTIME_ENFORCEMENT: NOT_ACTIVE
-LIVE_COMMAND_BEHAVIOR_CHANGED: NO
-GO_ACTIVATE: NOT_ISSUED
+LIVE_WORKSPACE_BEHAVIOR_CHANGED: YES
+RUNTIME_ENFORCEMENT: ACTIVE
+LIVE_COMMAND_BEHAVIOR_CHANGED: YES
+GO_ACTIVATE: ISSUED
+ACTIVATION_SOURCE_COMMIT: bcd132ccf62712f6dd0d00a18a0c26f7dc8c8179
+INDEPENDENT_TEST_RESULT: T1–T18 PASS
+TARGETED_RETEST_RESULT: PASS
 ```
 
-Candidate companion contracts (commands, schemas, soft testing-rules note)
-exist **only** in the isolated candidate worktree. They are validated but
-**not** merged, **not** active, and **not** permitted for real OPSX
-episodes.
+Companion contracts are live and authoritative for product/logic bug
+episodes. Creating `/opsx-fan-in-*` remains forbidden unless a later Owner
+design chooses slash UX.
 
-Still **forbidden** until Owner `GO_ACTIVATE`:
-
-- merge candidate → live;
-- `RUNTIME_ENFORCEMENT: ACTIVE`;
-- `LIVE_COMMAND_BEHAVIOR_CHANGED: YES`;
-- `/opsx-pipeline` UPDATE GO for orchestration GRAPH/META edges;
-- creating `/opsx-fan-in-*`.
-
-GRAPH/META remain deferred activation work (WAVE_6), not companion
-re-implementation.
+`GRAPH.md` / `META.md` are refreshed via `/opsx-pipeline UPDATE GO` as
+navigation snapshots only — they do not replace this contract or command
+gates.
 
 ---
 
-## Human return shape (when voluntarily following this draft)
+## Human return shape (live episode)
 
 ```text
 WHAT_HAPPENED:
@@ -665,7 +662,8 @@ DO_NOT_DO_YET:
 
 ## Self-check (this artifact)
 
-- [x] Marked `DRAFT_PROCESS_CONTRACT` / `NOT_ACTIVE` / `LIVE_COMMAND_BEHAVIOR_CHANGED: NO`
+- [x] Marked `LIVE_PROCESS_CONTRACT` / `RUNTIME_ENFORCEMENT: ACTIVE` /
+      `LIVE_COMMAND_BEHAVIOR_CHANGED: YES` / `GO_ACTIVATE: ISSUED`
 - [x] RED-before-GO defined (`OWNER_PRODUCTION_GO_ALLOWED_IF` grouping)
 - [x] RED/GREEN + anti-weaken defined
 - [x] Hunt bounds 3/3/3 + `PASS_3=MANDATORY_STOP` defined
@@ -678,7 +676,6 @@ DO_NOT_DO_YET:
 - [x] No new invariant inside episode
 - [x] `LEARNING_READY` ≠ `FANIN_READY`
 - [x] Owner-only production GO + final class verdict
-- [x] Companion status: `CANDIDATE_IMPLEMENTED` +
-      `INDEPENDENT_TEST_PASS`; not merged; not ACTIVE;
+- [x] Companion status: `LIVE_ACTIVATED` + `INDEPENDENT_TEST_PASS`;
       single runtime BRANCH_REGISTRY = LEDGER `## BRANCH_REGISTRY`
 )
