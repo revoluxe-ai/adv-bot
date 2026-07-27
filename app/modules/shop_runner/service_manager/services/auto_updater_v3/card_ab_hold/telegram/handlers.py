@@ -21,7 +21,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
+    CardAbHoldPhase,
     normalize_card_ab_hold_mode,
+    normalize_card_ab_hold_phase,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
     CardAbHoldLastAbortRedisCache,
@@ -37,6 +39,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldEnable,
     CardAbHoldLaunchAnyway,
     CardAbHoldMenu,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_callbacks import (
+    CahOpenCurrentStep,
+    ConfirmStep,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
     build_ab_hold_enable_blocked_alert,
@@ -95,12 +101,19 @@ _INSTRUCTION = (
 
 
 def _screen_keyboard(
-    adv_id: int, mode: CardAbHoldMode | str | None
+    adv_id: int,
+    mode: CardAbHoldMode | str | None,
+    *,
+    phase: CardAbHoldPhase | str | None = None,
 ) -> InlineKeyboardMarkup:
-    """Клавиатура экрана A/B Hold (decision §11).
+    """Клавиатура экрана A/B Hold (decision §11 / UX §5).
 
     Enable — только при ``OFF``; при PENDING/ACTIVE кнопка скрыта.
     Disable и Back всегда. Handler Enable при stale callback — §10 no-op.
+
+    При ``mode≠OFF`` и non-NULL epoch ``phase`` добавляется
+    «Открыть текущий шаг» (``CahOpenCurrentStep``) — мост в confirm-flow
+    (ROOT-001 / UX §5). Legacy MVP-1 (``phase`` NULL) Open не получает.
     """
     rows: list[list[InlineKeyboardButton]] = []
     if should_offer_card_ab_hold_enable_control(mode):
@@ -110,6 +123,21 @@ def _screen_keyboard(
                     text="Включить режим A/B",
                     callback_data=CardAbHoldEnable(
                         adv_setting_original_id=adv_id
+                    ).pack(),
+                )
+            ]
+        )
+    elif normalize_card_ab_hold_phase(phase) is not None:
+        # UX §5 S0 mode≠OFF + epoch-managed: deep-link в текущую phase-screen.
+        # revision=1 — default FSM revision (confirm_draft.get_revision).
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="Открыть текущий шаг",
+                    callback_data=CahOpenCurrentStep(
+                        adv_setting_original_id=adv_id,
+                        step=ConfirmStep.S1.value,
+                        revision=1,
                     ).pack(),
                 )
             ]
@@ -143,6 +171,7 @@ async def _edit_screen(
     adv_id: int,
     mode: CardAbHoldMode | str | None,
     *,
+    phase: CardAbHoldPhase | str | None = None,
     alert_if_unavailable: bool = True,
 ) -> bool:
     """Отправить экран A/B Hold отдельным сообщением.
@@ -152,6 +181,7 @@ async def _edit_screen(
     payloads. Возвращает ``True``, если экран успешно отправлен.
 
     Args:
+        phase: durable ``card_ab_hold_phase`` для S0 confirm-bridge (UX §5).
         alert_if_unavailable: если False — не вызывать ``query.answer`` при skip
             (caller уже ответил toast/alert; иначе второй answer перетирает UX).
     """
@@ -178,7 +208,9 @@ async def _edit_screen(
             )
         return False
 
-    await msg.answer(text, reply_markup=_screen_keyboard(adv_id, mode))
+    await msg.answer(
+        text, reply_markup=_screen_keyboard(adv_id, mode, phase=phase)
+    )
     return True
 
 
@@ -259,7 +291,11 @@ async def open_card_ab_hold_menu(
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         status = await _screen_status_text(adv, mode)
         rendered = await _edit_screen(
-            query, f"{_INSTRUCTION}\n{status}", adv.id, mode
+            query,
+            f"{_INSTRUCTION}\n{status}",
+            adv.id,
+            mode,
+            phase=getattr(adv, "card_ab_hold_phase", None),
         )
         if not rendered:
             return
@@ -300,6 +336,7 @@ async def _handle_ab_hold_enable(
                 f"{_INSTRUCTION}\nСтатус: {mode.value}",
                 adv.id,
                 mode,
+                phase=getattr(adv, "card_ab_hold_phase", None),
                 alert_if_unavailable=False,
             )
             logger.info(
@@ -426,6 +463,7 @@ async def _handle_ab_hold_enable(
             f"{_INSTRUCTION}\n{status}",
             adv.id,
             normalize_card_ab_hold_mode(adv.card_ab_hold_mode),
+            phase=getattr(adv, "card_ab_hold_phase", None),
             alert_if_unavailable=False,
         )
 
