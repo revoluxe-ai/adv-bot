@@ -101,6 +101,56 @@ Prefer durable case/finding over chat paraphrase.
 
 ## Phase 1 — ANALYZE (no GO)
 
+## Class-level lesson gate (orchestration MVP)
+
+Schema: `.cursor/pipeline/contracts/bug-episode/LESSON_GATE.md`.
+
+```text
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+```
+
+Finding-local / `local_case_note_only` **without** FANIN remains allowed and
+must not be labeled as class promotion.
+
+### Class-level confirmed lesson — preconditions
+
+Class-level lesson (eligible for Phase 2 GO write of a class rule) requires:
+
+```text
+FANIN_READY
+AND FANIN_PATH exists
+  (.tmp/opsx-bug-cases/<ROOT>/results/FANIN.md)
+AND coverage assessed
+AND FIXED branches contain RED/GO/FIX/GREEN evidence linkage
+```
+
+Also require durable FANIN checks consistent with
+`.cursor/pipeline/contracts/bug-episode/FANIN.md`.
+
+When preconditions fail → **mandatory**:
+
+```text
+LESSON_CANDIDATE_ONLY
+CLASS_STATUS: OPEN
+CLASS_LEVEL_GO_WRITE: FORBIDDEN
+```
+
+Root patch or a single finding alone **cannot** create a confirmed
+class-level lesson.
+
+Owner FINAL after `FANIN_READY` (surface in Phase 1 output when relevant):
+
+```text
+PROMOTE_CLASS_LESSON
+KEEP_LESSON_CANDIDATE_ONLY
+CLOSE_EPISODE_NO_CLASS_LESSON
+SPLIT_NEW_EPISODE
+```
+
+Fanout `LEARNING_READY=true` alone does **not** unlock class lesson.
+
+
 ### 1. Direct-first source load
 
 If `case` + `finding` provided, read in order:
@@ -296,6 +346,11 @@ PROPOSED_CHANGE:
 
 WRITE_ALLOWED: false
 
+LESSON_GATE_STATUS: LESSON_GATE_PASS | LESSON_CANDIDATE_ONLY | n/a
+CLASS_STATUS: OPEN | n/a | …
+CLASS_LEVEL_GO_WRITE: FORBIDDEN | allowed_after_owner_final | n/a
+FANIN_PATH:
+
 SOURCE_RESOLUTION:
 - mode:
 - primary_path:
@@ -317,6 +372,22 @@ NEXT_ACTION:
 When `needs_target_extraction`, `NEXT_ACTION` MUST be a ready read-only extraction prompt (≤3 searches, named roots, no file creation).
 
 ## Phase 2 — GO gate
+
+### Class-level GO additional gate
+
+Phase 2 GO that writes a **class-level** reusable rule is allowed only if
+Phase-1 packet shows `LESSON_GATE_PASS` (or equivalent) with
+`FANIN_PATH` + `FANIN_READY` + coverage + FIXED evidence linkage, **and**
+Owner FINAL `PROMOTE_CLASS_LESSON` (or `approval=` equivalent).
+
+Otherwise keep:
+
+```text
+CLASS_LEVEL_GO_WRITE: FORBIDDEN
+LESSON_CANDIDATE_ONLY
+CLASS_STATUS: OPEN
+```
+
 
 `/opsx-learn-from-bug GO` is allowed only if all are true:
 

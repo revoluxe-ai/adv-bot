@@ -644,6 +644,20 @@ Durable-empty vs chat-local-missing:
   `repair=mint_missing_claim_token` (or `release_corrupt_claim`); **not**
   claim-first eligibility loop / silent `none_available`.
 
+
+## Orchestration note (ownership unchanged)
+
+Claim eligibility remains exactly:
+
+```text
+STATUS: available
+CHAT_REQUIRED: true
+```
+
+RED-pending findings do **not** bypass claim-first. INDEX may mention
+`red_pending` / `production_go_ready` as recovery stages after claim, but
+ownership model is unchanged.
+
 ## Hard rules
 
 * Exactly one finding per successful claim.

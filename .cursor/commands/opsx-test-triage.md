@@ -125,3 +125,17 @@ Stop conditions:
 [END NEXT PROMPT]
 
 11. Команда проверки:
+
+
+## Orchestration RED status mapping (light)
+
+When triage feeds a bug-episode RED path, map classes:
+
+| Triage class | Typical RED / next |
+|---|---|
+| CODE_BUG | continue RED authoring toward `RED_CONFIRMED` |
+| BAD_TEST / wrong assertion | `RED_WRONG_REASON` or rewrite test via `/opsx-test` |
+| FLAKY_OR_ENV / setup | `TEST_SETUP_DEFECT` / `BLOCKED` |
+| TEST_OBSOLETE | do not force production GO |
+
+Do **not** emit production GO from triage.

@@ -1,13 +1,49 @@
 ---
 description: "Write targeted tests from the user's request without changing production code."
-argument-hint: "<test request / bug / behavior> [optional OpenSpec change-id]"
+argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDING_ID> [verify] [optional OpenSpec change-id]"
 ---
 
 # /opsx:test
 
 Write or update targeted tests based on the user's request.
 
-You are allowed to edit tests only.
+You are allowed to edit tests only (plus durable RED/GREEN evidence under the case map in bug-regression / verify modes).
+
+## Modes
+
+### Default (general test authoring)
+
+Unchanged: author/update tests from a free-form request. Production code forbidden.
+
+### Bug-regression mode (RED producer)
+
+When both are present:
+
+```text
+case=<CASE_ID>
+finding=<FINDING_ID>
+```
+
+and `verify` is **absent**, this command is the **RED producer** for the
+bug-episode orchestration contract
+(`.cursor/pipeline/contracts/bug-episode/RED_EVIDENCE.md`).
+
+### Verify mode (GREEN writer — sole)
+
+When `verify` is present with `case=` + `finding=`:
+
+```text
+GREEN_WRITER: /opsx-test verify mode
+```
+
+This is the **only** GREEN evidence writer. `/opsx-fix-bug` must not write
+GREEN packets or approve `NON_WEAKEN_DELTA`.
+
+```text
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+```
+
 
 User input:
 
@@ -23,6 +59,10 @@ $ARGUMENTS
 - If the requested test cannot be written without changing production code, stop and explain the smallest required production seam/change. Do not implement it.
 - Prefer minimal targeted tests over broad rewrites.
 - Do not create fake passing tests that only assert trivial behavior.
+- In bug-regression / verify modes: also allow durable writes under
+  `.tmp/opsx-bug-cases/<CASE_ID>/results/` for RED/GREEN evidence only
+  (and materialize field updates for evidence paths via
+  `/opsx-materialize-bug-queue mode=update`).
 
 ## Type-check routing
 
@@ -44,6 +84,9 @@ Allowed:
 - test fixtures under `tests/**`
 - test factories under `tests/**`
 - test-only helpers under `tests/**`
+- `.tmp/opsx-bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md` (bug-regression)
+- `.tmp/opsx-bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md` (verify mode only)
+- case-map evidence path fields via materialize `mode=update` (paths only)
 
 Forbidden unless explicitly approved:
 
@@ -190,9 +233,122 @@ poetry run pytest tests/path/to/test_file.py -vv
 
 Do not run unrelated slow suites unless required by the request.
 
+
+## Bug-regression mode (RED)
+
+Required inputs:
+
+```text
+case=<CASE_ID>
+finding=<FINDING_ID>
+```
+
+Resolve durable finding packet first
+(`.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`).
+
+### Allowed / forbidden
+
+**Allowed:** `tests/**` (+ fixtures), RED evidence under case map, materialize
+evidence-path updates.
+
+**Forbidden:** production / `app/**` changes; claim steal; `GO` production apply.
+
+### Required procedure
+
+1. Author or select a regression test that must fail on the unrepaired bug.
+2. Run targeted pytest **without** changing production.
+3. Compute:
+
+```text
+TEST_ID = <repo-relative-path>::<pytest-nodeid>
+TEST_CONTENT_SHA256 = sha256 of authoritative test source
+  (and assertion-defining fixtures if separate)
+PRODUCTION_HASH_BEFORE = hash/ref of production paths under test (unchanged)
+FAILURE_MATCH: YES | NO
+```
+
+4. Write durable RED evidence:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
+```
+
+Schema: `.cursor/pipeline/contracts/bug-episode/RED_EVIDENCE.md`.
+
+5. Update finding/LEDGER evidence fields via materialize `mode=update`
+   (`RED_EVIDENCE_PATH`, `TEST_ID`, `TEST_CONTENT_SHA256`).
+
+### Exact RED statuses
+
+Return exactly one:
+
+```text
+RED_CONFIRMED
+TEST_NOT_REPRODUCING
+RED_WRONG_REASON
+TEST_SETUP_DEFECT
+BUG_NOT_TESTABLE
+BLOCKED
+TIMEOUT
+```
+
+Rules:
+
+* `RED_CONFIRMED` only if the test failed **and** `FAILURE_MATCH: YES`
+  on unchanged production.
+* Immediate green ⇒ `TEST_NOT_REPRODUCING` (no production GO handoff).
+* Failed for wrong reason ⇒ `RED_WRONG_REASON`.
+* Fixture/setup broken ⇒ `TEST_SETUP_DEFECT`.
+* Automated RED not applicable ⇒ `BUG_NOT_TESTABLE` + exception packet
+  fields from ORCHESTRATION §1.5 (Owner may later set
+  `RED_NOT_APPLICABLE_APPROVED`; this command does not invent Owner approval).
+
+### Pasteable next after RED_CONFIRMED
+
+```text
+/opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+```
+
+Owner may append `GO` only when
+`BUG_CONFIRMED ∧ FIX_NOW ∧ (RED_CONFIRMED ∨ RED_NOT_APPLICABLE_APPROVED)`.
+
+## Verify mode (GREEN writer)
+
+Required:
+
+```text
+case=<CASE_ID>
+finding=<FINDING_ID>
+verify
+```
+
+### Rules
+
+1. Read RED evidence; require same `TEST_ID`.
+2. Re-run that exact `TEST_ID` (no assertion edits in this mode).
+3. Compare `TEST_CONTENT_SHA256` to RED.
+4. If hash differs without Owner-approved `NON_WEAKEN_DELTA` explaining
+   every change and preserving the failing expectation ⇒ return:
+
+```text
+GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW
+```
+
+   Do **not** write `STATUS: GREEN_CONFIRMED`.
+5. If pass + hash match (or approved non-weaken delta): write
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md
+```
+
+   Schema: `.cursor/pipeline/contracts/bug-episode/GREEN_EVIDENCE.md`.
+6. Update finding/LEDGER `GREEN_EVIDENCE_PATH` via materialize `mode=update`.
+
+Silent test weakening is forbidden.
+
 ## Output format
 
-Return:
+Return (default mode):
 
 ```text
 Result:
@@ -202,6 +358,22 @@ Result:
 - targeted command:
 - broader command, if needed:
 - remaining risks:
+```
+
+Return (bug-regression / verify):
+
+```text
+MODE: bug-regression | verify
+CASE_ID:
+FINDING_ID:
+TEST_ID:
+TEST_CONTENT_SHA256:
+FAILURE_MATCH:          # RED only
+STATUS:                 # RED_* or GREEN_* / GREEN_BLOCKED_*
+RED_EVIDENCE_PATH:      # or GREEN_EVIDENCE_PATH
+NEXT_ACTION:
+SOURCE_RESOLUTION:
+EXECUTION_PREFLIGHT:
 ```
 
 If tests fail because production code is currently wrong, do not fix production code. Report:

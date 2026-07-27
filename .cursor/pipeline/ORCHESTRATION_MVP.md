@@ -2,10 +2,15 @@
 
 ```text
 STATUS: DRAFT_PROCESS_CONTRACT
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+VALIDATION_STATUS: NOT_VALIDATED
+LIVE_WORKSPACE_BEHAVIOR_CHANGED: NO
+CANDIDATE_WORKTREE_BEHAVIOR_CHANGED: YES
 RUNTIME_ENFORCEMENT: NOT_ACTIVE
 LIVE_COMMAND_BEHAVIOR_CHANGED: NO
-COMPANION_UPDATES_REQUIRED: YES
+COMPANION_UPDATES_REQUIRED: PARTIAL_IN_CANDIDATE
 OWNER_APPROVAL_SCOPE: CONTRACT_ARTIFACT_ONLY
+GO_ACTIVATE: NOT_ISSUED
 ```
 
 ## Document role
@@ -20,6 +25,12 @@ It is **not**:
   or command GO gates;
 - a replacement for `.cursor/pipeline/GRAPH.md` (GRAPH remains
   `navigation_snapshot_only` until a separate `/opsx-pipeline` UPDATE GO).
+
+
+**Candidate implementation:** companion command/schema updates may
+exist only on branch `opsx/orchestration-mvp-candidate`. Live workspace
+commands remain unchanged until `GO_ACTIVATE`. Do not claim
+`RUNTIME_ENFORCEMENT: ACTIVE`.
 
 Until companion updates land and this document is promoted past
 `DRAFT_PROCESS_CONTRACT` with `RUNTIME_ENFORCEMENT: ACTIVE`, live OPSX
