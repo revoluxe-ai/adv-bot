@@ -5,7 +5,15 @@ argument-hint: "[GO] [case=<CASE_ID>] [finding=<FINDING_ID>] [intake=<INTAKE_ID>
 
 # /opsx-learn-from-bug
 
-Purpose: decide whether a reviewed bug contains a **transferable process lesson**, route it to the correct authority class, and only then optionally write an **approved** change to an **existing** process source.
+Purpose: decide whether a reviewed **product / logic** bug contains a
+**transferable process lesson**, route it to the correct authority class, and
+only then optionally write an **approved** change to an **existing** process
+source.
+
+**Branch boundary:** command-contract / process Bugbot lessons (F6 —
+`.cursor/commands/**`, rules, skills, static-check contracts) belong to
+`/opsx-admin-command-promote-process-lesson`, not this command. Typing stays on
+`/opsx-fix-types` / static-check (no learning command).
 
 This command is **not** a universal raw-incident sink.
 
@@ -426,4 +434,8 @@ MUST treat capture/write as separate from optimization/promotion into broader po
 - changing the current OpenSpec product change as a side effect;
 - migrating existing cases;
 - redesigning the whole OPSX lifecycle;
-- creating a new learning hierarchy.
+- creating a new learning hierarchy;
+- process-contract / command-defect learning (use
+  `/opsx-admin-command-promote-process-lesson`);
+- emitting `DESIGN_BRIEF_READY` for new admin commands (use promote →
+  `/opsx-admin-command-design-command`).

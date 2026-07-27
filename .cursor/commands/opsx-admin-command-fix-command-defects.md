@@ -184,7 +184,15 @@ FILES_NOT_TOUCHED:
 NEXT_ACTION:
 - if process files changed: /opsx-admin-command-commit
 - else: none
+- optional after FIXED (transferable process class?): /opsx-admin-command-promote-process-lesson
+  (separate from product /opsx-learn-from-bug)
 ```
+
+After a successful `FIXED` APPLY, if the defect class looks transferable
+(missing guardrail, wrong branch, durable-handoff omission, ADL/exhaust gap,
+etc.), prefer hinting `/opsx-admin-command-promote-process-lesson` so the owner
+can promote a process lesson → `DESIGN_BRIEF` without mixing into product
+`/opsx-learn-from-bug`.
 
 ## Self-review
 
