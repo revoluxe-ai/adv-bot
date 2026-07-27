@@ -7,16 +7,17 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 25
+- inventory_count: 26
 - fingerprint_strength: names_only
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-27T21:06Z: bug-subgraph claim-first vs known-root
-  skip-claim; durable STATUS ≠ graph fix_now_ready (F7); corrupt-claim
-  repair edge (F8); DUP-/duplicate_root refuse. Inventory 25 names_only
-  fingerprint 53817b8889613f9b4f813233b909c7d3. F3/F5 still open. Soft
-  three learning branches + F6 admin path kept. Bodies still partially
-  NOT_OPENED_BUDGET.
+  UPDATE GO 2026-07-27T21:39Z: index /opsx-project-bug-hunt as primary
+  pre-Bugbot discovery; create-pr receipt gate; Bugbot = residual;
+  learn-from-bug miss → project-hunt checklist; F9 closed. Prior
+  bug-subgraph claim-first vs known-root skip-claim; F7/F8 kept.
+  Inventory 26 names_only fingerprint 1dc8573e91e4a3fcc7680cd940272ffc.
+  F3/F5 still open. Soft three learning branches + F6 admin path kept.
+  Bodies still partially NOT_OPENED_BUDGET.
 
 ## States
 
@@ -33,7 +34,8 @@
 - planning_revise: `/opsx-update` / `/opsx-explore`
 
 ### Bug / case map
-- bug_signal_raw: product/behavioral Bugbot/CI/user signal (not process-contract)
+- bug_signal_raw: product/behavioral signal from `/opsx-project-bug-hunt`,
+  residual Bugbot, CI, or user (not process-contract; see F6)
 - intake_recorded: durable intake on disk
 - finding_queued: findings available in case map
 - finding_claimed: ownership via `/opsx-claim-next-bug` (only when claimable)
@@ -114,7 +116,7 @@
 - artifacts_read: tasks.md, design, decisions (context-first)
 - artifacts_written: production/code per tasks
 - decision_owner: implementer + architecture decisions
-- next_typical: /opsx-verify
+- next_typical: /opsx-verify | /opsx-project-bug-hunt
 - known_flaws: none recorded (ADL budget-exhaust→NO_GO closed 2026-07-27)
 
 ### /opsx-verify
@@ -206,8 +208,19 @@
 - next_typical: /opsx-bug-hunt | /opsx-fix-bug WITHOUT GO
 - known_flaws: NOT_OPENED_BUDGET detail
 
+### /opsx-project-bug-hunt
+- purpose: primary project-tuned discovery on base..head (WB Sky Bugbot analogue); feeds intake
+- input_state: implementing | impl_done | product_dirty | pr_ready
+- output_state: bug_signal_raw | pr_ready
+- artifacts_read: git diff base...head; change/ADL context-first; own checklist
+- artifacts_written: none by default; minimal confirmed fixes only with GO
+- decision_owner: project hunter
+- next_typical: /opsx-materialize-bug-queue mode=intake | /opsx-create-pr (after receipt)
+- known_flaws: |
+  must not absorb F6 or replace root-aware /opsx-bug-hunt; not a zero-Bugbot SLA
+
 ### /opsx-bug-hunt
-- purpose: root-aware invariant-focused hunt
+- purpose: root-aware invariant-focused sibling hunt (NOT primary pre-PR hunter)
 - input_state: invariant_defined | implementing
 - output_state: finding_queued
 - artifacts_read: root packet / code
@@ -233,10 +246,11 @@
 - artifacts_read: case/finding / prior classify/fix output
 - artifacts_written: approved existing target only with GO
 - decision_owner: owner approval for writes
-- next_typical: /opsx-learn-from-bug GO | none
+- next_typical: /opsx-learn-from-bug GO | /opsx-project-bug-hunt (re-verify miss class) | none
 - known_flaws: |
   NOT_OPENED_BUDGET detail; MUST NOT own F6/command-contract lessons
-  (redirect advisory: `/opsx-admin-command-promote-process-lesson`)
+  (redirect advisory: `/opsx-admin-command-promote-process-lesson`);
+  Bugbot residual miss → prefer target opsx-project-bug-hunt.md checklist
 
 ### /opsx-fix-types
 - purpose: pyright/mypy typing fixes with GO
@@ -285,7 +299,7 @@
 - artifacts_read: git status/diff
 - artifacts_written: git commits (product scope)
 - decision_owner: committer
-- next_typical: /opsx-create-pr | /opsx-admin-command-commit (process only; admin off-graph)
+- next_typical: /opsx-project-bug-hunt | /opsx-create-pr | /opsx-admin-command-commit (process only; admin off-graph)
 - known_flaws: none recorded
 
 ### /opsx-split-for-pr
@@ -295,18 +309,18 @@
 - artifacts_read: diff
 - artifacts_written: split plans / handoff prompts
 - decision_owner: splitter
-- next_typical: /opsx-create-pr
+- next_typical: /opsx-project-bug-hunt | /opsx-create-pr
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-create-pr
-- purpose: open a pull request
+- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only
 - input_state: pr_ready
 - output_state: pr_ready
-- artifacts_read: commits/diff vs base
+- artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT
 - artifacts_written: remote PR (via gh)
 - decision_owner: PR author
-- next_typical: none
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks)
+- known_flaws: receipt gate is command-owned (not soft graph advice)
 
 ### Explicitly excluded from graph
 - /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)
@@ -327,7 +341,12 @@ product_dirty --/opsx-commit--> pr_ready
 pr_ready --/opsx-split-for-pr--> pr_ready
 pr_ready --/opsx-create-pr--> pr_ready
 
+# primary project-tuned discovery (Bugbot = residual safety net)
+implementing|impl_done|product_dirty|pr_ready --/opsx-project-bug-hunt--> bug_signal_raw|pr_ready
+bug_signal_raw --/opsx-materialize-bug-queue mode=intake--> intake_recorded
+
 # product/behavioral only — process-contract Bugbot ≠ this edge (see F6)
+# residual Bugbot / CI / user may still enter here
 bug_signal_raw --/opsx-fix-bug (first-run mode=intake)--> intake_recorded
 intake_recorded --/opsx-fix-bug adjudication--> finding_queued|fix_now_ready
 
@@ -365,10 +384,19 @@ implementing|impl_done --/opsx-test--> tests_authored
 NAVIGATE may surface these; they are **not** forced edges and **not**
 lifecycle authority.
 
+### Pre-Bugbot primary hunt
+
+Before `/opsx-create-pr` on product/runtime diffs: `/opsx-project-bug-hunt
+base=<PR-base> head=<branch>`. Bugbot PR section = residual only.
+If Bugbot still finds product/logic: fix path → `/opsx-learn-from-bug`
+`target=.cursor/commands/opsx-project-bug-hunt.md` checklist → re-hunt.
+Do **not** use `/opsx-bug-hunt` as the first pre-PR sweep (needs root+invariant).
+
 ### Three learning branches (do not mix)
 
 1. **typing** → `/opsx-fix-types` / `/opsx-static-check` — no learning command
 2. **logic/product** → `/opsx-fix-bug` → `/opsx-learn-from-bug`
+   (hunter miss → prefer project-bug-hunt checklist)
 3. **commands/process (F6)** → `/opsx-admin-command-fix-command-defects`
    → optional `/opsx-admin-command-promote-process-lesson`
    → `/opsx-admin-command-design-command` if `DESIGN_BRIEF_READY`
@@ -385,7 +413,8 @@ When a **process gap** looks like a missing command (not a one-line fix):
 5. Optional: `/opsx-pipeline UPDATE` → `UPDATE GO` to refresh this graph.
 
 Do **not** invent a new not-admin `/opsx-*` to “learn process contracts”.
-Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
+Do **not** use `/opsx-bug-hunt` or `/opsx-project-bug-hunt` to discover
+command-contract classes (F6).
 
 ### After process FIXED
 
@@ -456,6 +485,12 @@ Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
     never invent CLAIM_TOKEN inside claim-next or fix-bug
   do_not_pretend_fixed: false (repair path in contracts; now indexed in GRAPH)
 
+- id: F9 GRAPH_MISSING_PROJECT_BUG_HUNT
+  where: .cursor/pipeline/GRAPH.md (pre 2026-07-27T21:39Z UPDATE)
+  symptom: NAVIGATE could not recommend primary pre-Bugbot hunter
+  operator_workaround: /opsx-project-bug-hunt directly; then UPDATE GO
+  do_not_pretend_fixed: false (closed by this materialization)
+
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
@@ -463,6 +498,8 @@ Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
 - Known-root skip-claim: `CHAT_REQUIRED=false` + durable `available` → fix-bug (±GO) without claim-next
 - Claimable queue: `available`+`CHAT_REQUIRED=true` → claim-next first (never invent token)
+- Pre-PR product/runtime: `/opsx-project-bug-hunt` receipt before `/opsx-create-pr`
+  (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
