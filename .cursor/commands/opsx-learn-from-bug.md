@@ -72,7 +72,7 @@ Phase-1 VERDICT values:
 ```text
 learning_candidate_ready
 no_learning_update
-local_note_only
+local_case_note_only
 needs_more_evidence
 owner_decision_required
 ```
@@ -248,7 +248,7 @@ Return exactly:
 
 ```text
 VERDICT:
-- learning_candidate_ready | no_learning_update | local_note_only | needs_more_evidence | owner_decision_required
+- learning_candidate_ready | no_learning_update | local_case_note_only | needs_more_evidence | owner_decision_required
 
 PRODUCT_FINDING:
 PROCESS_LESSON:
@@ -376,7 +376,7 @@ It MUST NOT automatically propose writing to `.cursor/worklogs/bug-learning.md`.
 
 ### A. Literal-only incident
 
-→ `no_learning_update` or `local_note_only`  
+→ `no_learning_update` or `local_case_note_only`  
 → GO not offered.
 
 ### B. Reusable lesson with existing target
