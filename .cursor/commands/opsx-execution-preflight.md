@@ -77,6 +77,10 @@ READ_IO_RESULT:
 9. Subagents that extract “ALL opsx commands” MUST use Grep-first + sequential bounded Read, not parallel full-file dumps.
 
 `FULL_OPSX_AUDIT` / pipeline analysis / command-set review are **not** exemptions.
+Reserved high-risk gate-pair section-Reads inside `/opsx-review-commands`
+(checklist / two-pass FULL) still count toward that command’s mode Read cap
+and still obey parallel `Read` ≤ **2** — they are prioritization, not a
+budget exemption.
 
 ## Failure / timeout behavior
 
