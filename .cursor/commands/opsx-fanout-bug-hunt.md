@@ -36,6 +36,31 @@ If `root_case_id` / source artifact / preceding hunt output path is provided:
 * do not run git status/branch;
 * if source is missing, return blocker / `blocked_needs_exact_source` rather than exploring.
 
+## Durable case-map gate (mandatory)
+
+Before emitting `Verdict: ready` or any claimable `/opsx-claim-next-bug`
+handoff (including coordinator "open child chat" instructions):
+
+1. Check the exact path `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` exists
+   (canonical path only; do not search the wider repository).
+   This existence check is allowed process I/O — it is **not** production-code
+   inspection and does **not** authorize rediscovery of findings.
+2. If the path is absent:
+   - `Verdict: blocked`
+   - `Blocker: durable_case_map_missing`
+   - Input validation: `case_map_present: false`
+   - `Next action`: exact pasteable
+     `/opsx-materialize-bug-queue mode=hunt-result case=<ROOT_CASE_ID> source=<same hunt source>`
+   - Do **not** instruct the browser/coordinator layer to open claim chats
+   - Draft registry / packets may still be shown for preview, but every
+     `CREATE_CHILD_CHAT` packet `NEXT_COMMAND` MUST be the materialize
+     command above — never `/opsx-claim-next-bug` while the case map is absent
+3. If the path is present: `case_map_present: true`; proceed with the normal
+   ready → claim / `FANOUT_MANIFEST` coordinator flow.
+
+A packet PREREQ note alone is **not** sufficient. Missing case map must block
+readiness and route to materialize.
+
 ## User input
 
 ```text
@@ -446,12 +471,17 @@ REGRESSION_TEST:
 RECOMMENDED_ACTION:
 
 PREREQ:
-Durable finding must exist on disk via
+GATE: `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` must exist (see Durable case-map gate).
+If absent → overall Verdict blocked (`durable_case_map_missing`); do not claim.
+Durable findings must exist on disk via
 /opsx-materialize-bug-queue mode=hunt-result (or already materialized).
 Do not adjudicate from a chat-only packet without case-map rows.
 
 NEXT_COMMAND:
+(when case map present)
 /opsx-claim-next-bug case=<ROOT_CASE_ID> chat_label="<CHAT_TITLE>"
+(when case map absent — preview packet only)
+/opsx-materialize-bug-queue mode=hunt-result case=<ROOT_CASE_ID> source=<same hunt source>
 
 MODE:
 READ_ONLY
@@ -488,7 +518,15 @@ The original finding must be preserved without silently strengthening or weakeni
 
 Do not include `GO`.
 
-`NEXT_COMMAND` for `CREATE_CHILD_CHAT` MUST be `/opsx-claim-next-bug case=<ROOT_CASE_ID> chat_label="<CHAT_TITLE>"` (or the case that owns `FINDING_ID` after hunt-result). After a successful claim, `/opsx-claim-next-bug` already emits `/opsx-fix-bug` with `case=` / `intake=` / `finding=` / `claim_token=`. Never hand a child chat bare `/opsx-fix-bug`.
+`NEXT_COMMAND` for `CREATE_CHILD_CHAT` MUST be
+`/opsx-claim-next-bug case=<ROOT_CASE_ID> chat_label="<CHAT_TITLE>"`
+(or the case that owns `FINDING_ID` after hunt-result) **only when** the
+durable case map exists (`case_map_present: true`). When
+`durable_case_map_missing`, `NEXT_COMMAND` MUST be
+`/opsx-materialize-bug-queue mode=hunt-result case=<ROOT_CASE_ID> source=<same hunt source>`
+instead — never a claimable claim-next-bug handoff. After a successful claim,
+`/opsx-claim-next-bug` already emits `/opsx-fix-bug` with `case=` / `intake=` /
+`finding=` / `claim_token=`. Never hand a child chat bare `/opsx-fix-bug`.
 
 ## Separate root candidate packet
 
@@ -672,6 +710,7 @@ Input validation:
 - duplicate IDs:
 - contradictions:
 - child limit:
+- case_map_present:
 
 Finding registry:
 
@@ -707,7 +746,10 @@ Summary:
 - deferred children:
 
 Next action:
-- pass FANOUT_MANIFEST to the browser/coordinator layer;
+- if `case_map_present: false`: exact
+  `/opsx-materialize-bug-queue mode=hunt-result case=<ROOT_CASE_ID> source=<same hunt source>`
+  (do not pass claim chats to the browser/coordinator yet);
+- else pass FANOUT_MANIFEST to the browser/coordinator layer;
 - or exact blocker to resolve.
 ```
 
@@ -716,7 +758,12 @@ Next action:
 * No root case ID → no fan-out.
 * No structured root-aware bug-hunt result → no fan-out.
 * Do not infer the root from the invariant alone.
-* Do not inspect repository code.
+* Do not inspect repository code (exact-path check of
+  `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` is allowed process I/O only).
+* No `Verdict: ready` and no claimable `/opsx-claim-next-bug` handoff when
+  `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` is absent — block with
+  `durable_case_map_missing` and route Next action / packet `NEXT_COMMAND` to
+  `/opsx-materialize-bug-queue mode=hunt-result`. A PREREQ note alone is not enough.
 * Do not repeat production reachability analysis.
 * Do not alter source classifications.
 * Do not alter source relationships to root.
