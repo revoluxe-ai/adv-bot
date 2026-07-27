@@ -1,6 +1,6 @@
 ---
 description: "Materialize or update a durable bug-case map from intake, hunt-result, promote, or field update without re-analysing the repository or fixing bugs."
-argument-hint: "mode=<intake|hunt-result|promote|update> [case=<CASE_ID>] [intake=<INTAKE_ID>] [source=<artifact>] [finding=<FINDING_ID>] [fields...]"
+argument-hint: "mode=<intake|hunt-result|promote|update> [case=<CASE_ID>] [intake=<INTAKE_ID>] [source=<artifact>] [finding=<FINDING_ID>] [repair=mint_missing_claim_token|release_corrupt_claim] [fields...]"
 ---
 
 # /opsx-materialize-bug-queue
@@ -681,11 +681,69 @@ Rules:
 * patch only named fields from `$ARGUMENTS` or an explicit field block;
 * do not rewrite the whole ledger from chat memory;
 * do not invent status transitions;
-* do not clear `OWNER_CHAT` / `CLAIM_TOKEN` unless explicitly requested;
+* do not clear `OWNER_CHAT` / `CLAIM_TOKEN` unless explicitly requested
+  **or** an explicit `repair=` corrupt-claim op below applies;
 * do not auto-steal claims;
 * append a short update note with timestamp in the intake/finding file or ledger history section if present;
 * refresh `UPDATED_AT` / `LAST_ACTIVITY_AT` when touching a case, intake, or finding;
 * refresh `INDEX.md` recovery fields when stage, next action, blockers, or finding counts change.
+
+### Corrupt-claim repair (`repair=`)
+
+Explicit ops for `STATUS=claimed` + empty/absent durable `CLAIM_TOKEN`.
+Claim-next cannot mint/repair this state; fix-bug must paste these, not
+claim-next. Never auto-reclaim; never silent steal; only when the caller
+passes the exact `repair=` token (or equivalent named field block).
+
+Required:
+
+```text
+mode=update
+case=<CASE_ID>
+finding=<FINDING_ID>
+repair=mint_missing_claim_token | release_corrupt_claim
+```
+
+Preconditions (both repair values):
+
+* finding exists;
+* `STATUS=claimed`;
+* durable `CLAIM_TOKEN` empty / absent.
+
+If preconditions fail → `blocked` / `repair_precondition_failed` (no partial writes).
+
+#### `repair=mint_missing_claim_token`
+
+Prefer when `OWNER_CHAT` is non-empty.
+
+* keep `STATUS=claimed` and `OWNER_CHAT`;
+* set `CLAIMED_AT` to existing value if present, else now (UTC ISO-8601);
+* write `CLAIM_TOKEN: CLAIM/<CASE_ID>/<FINDING_ID>/<CLAIMED_AT>`
+  (same form as `/opsx-claim-next-bug`);
+* refresh `LAST_ACTIVITY_AT` / INDEX;
+* pasteable `NEXT_ACTION`:
+  `/opsx-fix-bug case=<CASE_ID> intake=<…> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>`
+  (include non-empty `intake=` when known).
+
+If `OWNER_CHAT` is empty / absent → do not mint; stop with
+`blocked` / `repair_needs_owner_or_release` and recommend
+`repair=release_corrupt_claim`.
+
+#### `repair=release_corrupt_claim`
+
+Use when `OWNER_CHAT` is empty / unknown, or operator chooses re-queue.
+
+* set `STATUS=available` (only valid when `CHAT_REQUIRED=true`; if
+  `CHAT_REQUIRED=false`, stop with `repair_precondition_failed` — do not
+  invent claimable state);
+* clear `OWNER_CHAT`, `CLAIMED_AT`, `CLAIM_TOKEN`;
+* append a short ledger/finding note that corrupt claim was released;
+* refresh INDEX;
+* pasteable `NEXT_ACTION`:
+  `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`.
+
+Still: this command never auto-reclaims; `repair=` is the only allowed
+path to repair durable-empty claimed rows.
 
 ### Creating or updating a finding after adjudication
 
@@ -1032,6 +1090,11 @@ and no automatic reclaim is performed.
 
 This command never auto-reclaims.
 
+Corrupt claim (`STATUS=claimed` + empty/absent durable `CLAIM_TOKEN`) is
+repaired only via explicit `mode=update` `repair=mint_missing_claim_token`
+or `repair=release_corrupt_claim` (see mode=update). Never invent a token
+from chat memory without `repair=`.
+
 ## Counts
 
 Compute:
@@ -1179,6 +1242,15 @@ EXISTING_ROOT: true
 FIRST_CLAIM_CANDIDATE: CHILD-002
 ```
 
+Corrupt-claim repair:
+
+* `CHILD-002` `STATUS=claimed`, `OWNER_CHAT` set, `CLAIM_TOKEN` empty →
+  `mode=update … repair=mint_missing_claim_token` writes non-empty
+  `CLAIM_TOKEN=CLAIM/…` and keeps ownership; next is fix-bug with that token.
+* Same row with empty `OWNER_CHAT` → mint blocked; `repair=release_corrupt_claim`
+  returns `STATUS=available` (when `CHAT_REQUIRED=true`) for a later claim-next.
+* Without exact `repair=` → no auto mint / no auto reclaim.
+
 ## Hard rules
 
 * No repository re-analysis for new bugs.
@@ -1193,6 +1265,7 @@ FIRST_CLAIM_CANDIDATE: CHILD-002
 * No `GO` in handoffs.
 * No automatic claim.
 * No automatic stale-claim takeover.
+* Corrupt claimed rows (empty durable `CLAIM_TOKEN`) repair only via explicit `repair=mint_missing_claim_token` or `repair=release_corrupt_claim`; never invent tokens without `repair=`.
 * `mode=intake` stores raw intake before adjudication and does not create a finding by default.
 * Do not update an existing finding whose `SOURCE_INTAKE_ID` differs from the current intake unless `relation=duplicate_intake` is explicit; then leave the canonical finding unchanged.
 * Reject cross-intake finding patches without relation with blocker `cross_intake_finding_update_without_relation`.

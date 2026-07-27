@@ -151,9 +151,14 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
   - `blocked_finding_status_not_actionable` → **`none`**
     (не `/opsx-claim-next-bug` — статус ineligible; опционально
     указать path case INDEX/ledger);
-  - `blocked_claimed_without_durable_token` → **только**
-    `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
-    (не invent `CLAIM_TOKEN`; не предлагай retry с угаданным token);
+  - `blocked_claimed_without_durable_token` → **только** materialize
+    repair (не `/opsx-claim-next-bug` — claim-next не mint/repair empty
+    durable token на already-claimed):
+    `/opsx-materialize-bug-queue mode=update case=<CASE_ID> finding=<FINDING_ID> repair=mint_missing_claim_token`
+    (если `OWNER_CHAT` задан); иначе
+    `/opsx-materialize-bug-queue mode=update case=<CASE_ID> finding=<FINDING_ID> repair=release_corrupt_claim`
+    затем `/opsx-claim-next-bug …`. Не invent `CLAIM_TOKEN` в fix-bug;
+    не предлагай retry с угаданным token;
   - token blockers (`blocked_missing_claim_token` /
     `blocked_claim_token_mismatch` / `blocked_claim_token_without_finding`) →
     `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
@@ -1096,7 +1101,9 @@ Follow-up:
 - если передан / resumed `finding=` со `STATUS: claimed` и durable
   `CLAIM_TOKEN` пуст / absent — stop с
   `blocked_claimed_without_durable_token` (не invent token; не optional
-  ownership); pasteable next только `/opsx-claim-next-bug …`;
+  ownership); pasteable next только materialize
+  `repair=mint_missing_claim_token` или `repair=release_corrupt_claim`
+  (не `/opsx-claim-next-bug` для durable-empty);
 - если передан / resumed `finding=` со `STATUS: claimed` и non-empty durable
   `CLAIM_TOKEN` — предоставленный token (`claim_token=` во вводе **или**
   same-chat prior `COMMAND_RECEIPT.CLAIM_TOKEN`) сверен exact match, иначе
@@ -1237,6 +1244,13 @@ INTAKE-002
 7. «я тот же чат» без CLAIM_TOKEN в prior receipt → blocked_missing_claim_token
 8. finding STATUS=claimed, durable CLAIM_TOKEN пуст / absent
    → blocked_claimed_without_durable_token; no adjudication / update / GO
-   → next только /opsx-claim-next-bug …; НЕ invent CLAIM_TOKEN;
-     НЕ optional ownership через «достаточно case+finding»
+   → next только materialize repair:
+     /opsx-materialize-bug-queue mode=update case=… finding=… repair=mint_missing_claim_token
+     (OWNER_CHAT задан) или repair=release_corrupt_claim затем claim-next;
+     НЕ /opsx-claim-next-bug как единственный next при durable-empty;
+     НЕ invent CLAIM_TOKEN; НЕ optional ownership через «достаточно case+finding»
+9. finding STATUS=claimed, durable CLAIM_TOKEN непустой, но в этом чате
+   нет usable claim_token=/prior receipt CLAIM_TOKEN
+   → blocked_missing_claim_token; next /opsx-claim-next-bug … (echo via
+     owner_already_has_open_claim) или retry fix-bug с token из claim packet
 ```
