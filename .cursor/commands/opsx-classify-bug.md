@@ -161,8 +161,18 @@ Use when accepted OpenSpec artifacts already require the expected behavior, but 
 Required next action:
 
 ```text
-/opsx-fix-bug GO <finding summary>
+# Prefer when durable IDs are known (args / finding packet / claim):
+/opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+
+# If IDs unknown and no case map yet:
+/opsx-fix-bug <finding summary>
+
+# If case map exists but finding not claimed:
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 ```
+
+Classify MUST NOT include `GO`. Production edits require a later
+`/opsx-fix-bug GO` only after verdict `fix_now`.
 
 OpenSpec artifact update:
 
@@ -183,9 +193,12 @@ Use when the expected behavior is implied by a product invariant or accepted dec
 Required next action:
 
 ```text
-1. update the smallest relevant OpenSpec artifact line
-2. then run /opsx-fix-bug GO <finding summary>
+1. /opsx-update <change-id> <minimal spec clarification>
+2. then /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+   (or /opsx-fix-bug <finding summary> without GO if IDs unknown)
 ```
+
+Classify MUST NOT include `GO` on step 2.
 
 OpenSpec artifact update:
 
@@ -404,7 +417,9 @@ why_existing_spec_is_sufficient:
 Choose exactly one:
 
 ```text
-/opsx-fix-bug GO <summary>
+/opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+/opsx-fix-bug <summary>
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 /opsx-update <change-id> <summary>
 /opsx-propose <summary>
 stop: false positive
@@ -412,12 +427,15 @@ stop: need more repo evidence
 ```
 
 Do NOT choose more than one primary next command.
+Do NOT emit `/opsx-fix-bug GO …` from classify. `GO` belongs only to a later
+fix-bug run after verdict `fix_now`.
 
 If `implementation_bug_with_spec_gap`, the next command may include two ordered substeps:
 
 ```text
 1. /opsx-update <change-id> <minimal spec clarification>
-2. /opsx-fix-bug GO <summary>
+2. /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+   (or /opsx-fix-bug <summary> without GO if IDs unknown)
 ```
 
 ## Required Output Format
@@ -557,6 +575,9 @@ Do not invent confirmed test paths. Mark them as proposed if not verified.
 The final answer MUST make the routing decision obvious in the first three lines.
 
 The user must be able to copy the next command without rereading the whole analysis.
+
+`Next command` for implementation routes MUST be pasteable and MUST NOT include
+`GO`. Prefer durable `case=` / `intake=` / `finding=` / `claim_token=` when known.
 
 
 ## Static Analysis Gate
