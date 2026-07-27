@@ -38,6 +38,9 @@ If `root_case_id` / source artifact / preceding hunt output path is provided:
 
 ## Durable case-map gate (mandatory)
 
+Implements Durable Handoff Readiness (section **F**) in
+`.cursor/commands/opsx-source-resolution.md` for this command.
+
 Before emitting `Verdict: ready` or any claimable `/opsx-claim-next-bug`
 handoff (including coordinator "open child chat" instructions):
 
@@ -48,6 +51,7 @@ handoff (including coordinator "open child chat" instructions):
 2. If the path is absent:
    - `Verdict: blocked`
    - `Blocker: durable_case_map_missing`
+     (same class as claim’s `case_not_materialized`)
    - Input validation: `case_map_present: false`
    - `Next action`: exact pasteable
      `/opsx-materialize-bug-queue mode=hunt-result case=<ROOT_CASE_ID> source=<same hunt source>`

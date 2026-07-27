@@ -133,6 +133,11 @@ Blocker:
 - case_not_materialized
 ```
 
+(`case_not_materialized` is the same Durable Handoff Readiness class as
+producer `durable_case_map_missing` in `/opsx-fanout-bug-hunt` /
+`opsx-source-resolution.md` §F — claim remains the consumer safety net;
+it does not own producer readiness.)
+
 and recommend:
 
 ```text

@@ -11,6 +11,8 @@ Any OPSX command that references it MUST follow it before broad repository explo
 
 Companion contract: `.cursor/commands/opsx-execution-preflight.md` (purpose-driven shell/git budgets).
 This file covers **artifact resolution / rediscovery**, not execution hang risk.
+Section **F** additionally covers **durable handoff readiness** for producers that
+emit ready/claimable case-map handoffs (still not hang-budget policy).
 
 ## Resolution order
 
@@ -153,9 +155,48 @@ SOURCE_RESOLUTION:
 - unresolved_gap:
 ```
 
+## F. Durable Handoff Readiness (producer gate)
+
+Applies when an OPSX command is about to emit **any** of:
+
+* `Verdict: ready` that authorizes coordinator/claim-chat opening;
+* a claimable `NEXT_COMMAND` of `/opsx-claim-next-bug …`;
+* an equivalent handoff that assumes rows under `.tmp/opsx-bug-cases/<CASE_ID>/`
+  already exist for adjudication/claim.
+
+This section is **artifact readiness**, not hang-budget policy
+(see `opsx-execution-preflight.md` for I/O cost). It does **not** replace
+`/opsx-claim-next-bug` eligibility rules or `/opsx-materialize-bug-queue`
+write ownership.
+
+### Mandatory producer check
+
+1. Resolve the durable case directory by exact canonical path:
+   `.tmp/opsx-bug-cases/<CASE_ID>/` (or the specific `CASE.md` / `LEDGER.md`
+   paths the command already requires).
+2. Use a direct existence check only — no repo-wide rediscovery.
+3. If absent:
+   - do **not** emit ready claim/coordinator handoff;
+   - return a command-compatible blocker (examples:
+     `durable_case_map_missing`, `case_not_materialized` — same class);
+   - set Next action / packet `NEXT_COMMAND` to the writer, typically
+     `/opsx-materialize-bug-queue mode=hunt-result case=<CASE_ID> source=<…>`
+     (or `mode=intake` when that is the correct writer path);
+   - advisory `PREREQ:` prose in a packet is **not** a substitute for this gate.
+4. If present: proceed with the command’s normal ready/claim flow.
+
+### Scope limits
+
+* Does not authorize production-code inspection or finding rediscovery.
+* Does not create a second case-map storage layout.
+* Consumer commands (e.g. `/opsx-claim-next-bug`) remain a safety net when
+  files disappear between producer and claim — producers must still gate first.
+
 ## Hard rules
 
 * Exact path or stable ID wins over exploration.
 * Fallback is exceptional, bounded, and explained.
 * Exhausted budget → blocker, not more searching.
 * No second storage layout and no second status system.
+* Ready/claimable durable handoffs require section **F** exact-path existence;
+  `PREREQ` notes alone are never readiness.
