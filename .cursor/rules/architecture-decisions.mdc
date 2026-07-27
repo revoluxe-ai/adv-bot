@@ -33,6 +33,10 @@ layering, write-path placement и domain invariants.
    (или после зафиксированного расширения `EVIDENCE_GAP`) заключает, что
    релевантного decision нет; тогда явно писать
    `Architecture Decision Missing` / `EVIDENCE_GAP` и pause / propose.
+   Sibling OPSX commands (verify / apply / propose / update) and their
+   skill/prompt mirrors MUST emit the exact token
+   `Architecture Decision Missing` for ADL absence; local synonyms
+   (e.g. `missing_required_decision`) are forbidden.
 5. Если корректный placement зависит от нового reusable architecture rule,
    создать proposed decision artifact в `openspec/changes/<change>/decisions/`
    до implementation-readiness, используя `rules.decisions`.
