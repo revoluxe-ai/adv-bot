@@ -7,7 +7,14 @@ import logging
 from aiogram import Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
+from app.client_bot.user_interface.helpers.wb_user_cabinet import (
+    get_wb_user_cabinet_for_adv_and_telegram,
+)
+from app.client_bot.user_interface.views.messages.main_adv_setting_menu import (
+    AdvSettingMenu,
+)
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
     empty_allowed_snapshot,
@@ -522,11 +529,35 @@ async def disable_card_ab_hold(
 async def back_from_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldBack
 ) -> None:
-    """Закрыть экран A/B Hold (пользователь возвращается в меню РК вручную)."""
-    _ = callback_data
+    """Вернуться в меню настроек РК (``AdvSettingMenu``).
+
+    UX §7 / ROOT-001: S0/status Back → campaign menu. Старые A/B-сообщения
+    не удаляем и не редактируем в dead-end «Экран закрыт…».
+    """
     await query.answer()
     msg = query.message
-    if isinstance(msg, Message):
-        await msg.edit_text(
-            "Экран A/B Hold закрыт. Откройте меню рекламной кампании снова."
+    if not isinstance(msg, Message):
+        return
+    chat_id = msg.chat.id
+    bot = query.bot
+    telegram_user_id = query.from_user.id
+    adv_setting_original_id = callback_data.adv_setting_original_id
+    async with sm(read_only=True) as session:
+        adv_stmt = (
+            select(AdvSetting)
+            .options(joinedload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == adv_setting_original_id)
         )
+        adv = (await session.execute(adv_stmt)).scalar_one_or_none()
+        if adv is None:
+            await bot.send_message(chat_id, "Кампания не найдена.")
+            return
+        wb_user_cabinet = await get_wb_user_cabinet_for_adv_and_telegram(
+            session,
+            adv,
+            telegram_user_id,
+        )
+        if wb_user_cabinet is None:
+            await bot.send_message(chat_id, "Кабинет кампании не найден.")
+            return
+    await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
