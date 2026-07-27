@@ -80,9 +80,17 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
    `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
    (без «retry с `claim_token=`» — токена ещё нет).
    Не применяй этот blocker к другим non-claimed статусам
-   (`blocked`, `backlog`, `absorbed_*`, …) — там отдельный отказ
-   по статусу / existing path, не claim-first петля.
-3. Если у finding `STATUS: claimed` — token gate **всегда** обязателен
+   (`blocked`, `backlog`, `absorbed_*`, …) — для них п.3
+   (`blocked_finding_status_not_actionable`), не claim-first петля.
+3. **Status refusal (non-actionable):** если `STATUS` ∈
+   `{backlog, blocked, absorbed_by_parent_fix}` или иное
+   `absorbed_*` — hard stop `blocked_finding_status_not_actionable`
+   до forensics / `mode=update` / `GO`, **независимо** от
+   `CHAT_REQUIRED` (в т.ч. при `CHAT_REQUIRED: true` — без
+   fall-through). Не направляй на `/opsx-claim-next-bug` (ineligible).
+   Pasteable next: `none` (или читать
+   `.tmp/opsx-bug-cases/<CASE_ID>/` INDEX / ledger; не claim).
+4. Если у finding `STATUS: claimed` — token gate **всегда** обязателен
    (пустой durable `CLAIM_TOKEN` **не** ослабляет ownership):
    - если durable `CLAIM_TOKEN` пуст / absent → hard stop
      `blocked_claimed_without_durable_token` (corrupt claim state);
@@ -100,18 +108,21 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
    - только после match продолжай adjudication / `mode=update` / `GO`;
    - после успешного match echo matched token в исходящий
      `COMMAND_RECEIPT.CLAIM_TOKEN` (см. schema ниже).
-4. Если `STATUS` **не** `claimed` **и** (`CHAT_REQUIRED` = `false` /
-   отсутствует) — `claim_token` опционален (legacy raw report /
-   known-root / unclaimed non-queue finding); исходящий receipt
-   `CLAIM_TOKEN` оставляй пустым. `STATUS: claimed` + пустой durable
-   token **никогда** не попадает сюда (см. п.3 /
-   `blocked_claimed_without_durable_token`).
+5. Если `STATUS` **не** `claimed`, **не** из п.3
+   (`backlog` / `blocked` / `absorbed_*`), **и** (`CHAT_REQUIRED` =
+   `false` / отсутствует) — `claim_token` опционален (legacy raw
+   report / known-root / unclaimed non-queue finding); исходящий
+   receipt `CLAIM_TOKEN` оставляй пустым. `STATUS: claimed` + пустой
+   durable token **никогда** не попадает сюда (см. п.4 /
+   `blocked_claimed_without_durable_token`). Статусы п.3 **никогда**
+   не попадают сюда (см. `blocked_finding_status_not_actionable`).
 
 ### Blockers (hard stop)
 
 | Условие | Blocker |
 |---|---|
 | `finding=` + `CHAT_REQUIRED: true` + `STATUS: available` (ещё не claimed) | `blocked_needs_claim_first` |
+| `finding=` + `STATUS` ∈ {`backlog`, `blocked`, `absorbed_by_parent_fix`} / `absorbed_*` (любой `CHAT_REQUIRED`) | `blocked_finding_status_not_actionable` |
 | `finding=` claimed + durable `CLAIM_TOKEN` пуст / absent | `blocked_claimed_without_durable_token` |
 | `finding=` claimed + non-empty durable `CLAIM_TOKEN`, но нет `claim_token=` во вводе **и** нет usable non-empty `CLAIM_TOKEN` в same-chat prior `COMMAND_RECEIPT` | `blocked_missing_claim_token` |
 | предоставленный token (ввод или prior receipt) не равен durable `CLAIM_TOKEN` | `blocked_claim_token_mismatch` |
@@ -129,6 +140,9 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
   - `blocked_needs_claim_first` → **только**
     `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
     (не предлагай retry `/opsx-fix-bug` с `claim_token=`);
+  - `blocked_finding_status_not_actionable` → **`none`**
+    (не `/opsx-claim-next-bug` — статус ineligible; опционально
+    указать path case INDEX/ledger);
   - `blocked_claimed_without_durable_token` → **только**
     `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
     (не invent `CLAIM_TOKEN`; не предлагай retry с угаданным token);
@@ -142,6 +156,10 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 * Не принимать adjudication/update по `finding=` со статусом
   `available` и `CHAT_REQUIRED: true` без предварительного
   `/opsx-claim-next-bug` (обход claim-first запрещён).
+* Не принимать adjudication/update по `finding=` со статусом
+  `backlog` / `blocked` / `absorbed_*` (в т.ч. при
+  `CHAT_REQUIRED: true`) — только
+  `blocked_finding_status_not_actionable`, без fall-through.
 * Не принимать adjudication/update по `finding=` со статусом `claimed`,
   обходя token (в том числе «я тот же чат» **без** `CLAIM_TOKEN` в
   prior receipt, «токен потерян», «достаточно case+finding»).
@@ -152,7 +170,8 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 * Не считать handoff `/opsx-claim-next-bug` выполненным ownership proof
   без повторной сверки durable token в этом запуске.
 * Не применять `blocked_needs_claim_first` к non-available статусам
-  (`blocked`, `backlog`, `absorbed_*`, …) — claim-next их не возьмёт.
+  (`blocked`, `backlog`, `absorbed_*`, …) — claim-next их не возьмёт;
+  для них — `blocked_finding_status_not_actionable`.
 
 ## Разрешение на запись
 
@@ -227,7 +246,8 @@ Owner: `.cursor/commands/opsx-fix-types.md`.
 
 1. сначала прочитай canonical/exact path;
 2. если передан `finding=` — немедленно выполни **Claim ownership gate**
-   (для `claimed`: пустой durable `CLAIM_TOKEN` →
+   (claim-first / `blocked_finding_status_not_actionable` /
+   claimed-token cells; для `claimed`: пустой durable `CLAIM_TOKEN` →
    `blocked_claimed_without_durable_token`; иначе сверка предоставленного
    token из `claim_token=` или same-chat prior receipt `CLAIM_TOKEN` ↔
    durable `CLAIM_TOKEN`) до forensics и до любых writes;
@@ -257,7 +277,9 @@ Canonical paths:
    - **не** вызывай `/opsx-materialize-bug-queue mode=intake`;
    - продолжай с IDs из этого receipt как будто они были переданы во вводе;
    - при наличии `FINDING_ID` в receipt — применяй **Claim ownership gate**
-     (claim-first при `available`+`CHAT_REQUIRED=true`; для `claimed` —
+     (claim-first при `available`+`CHAT_REQUIRED=true`;
+     `backlog`/`blocked`/`absorbed_*` →
+     `blocked_finding_status_not_actionable`; для `claimed` —
      пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`;
      иначе matching `claim_token=` из текущего ввода **или** non-empty
      `CLAIM_TOKEN` из того же prior receipt; см. gate выше).
@@ -384,9 +406,11 @@ cross_intake_finding_update_without_relation
 `/opsx-claim-next-bug`, когда `intake=` опущено или пусто.
 
 1. Выполни **Claim ownership gate** (включая claim-first для
-   `available`+`CHAT_REQUIRED=true`; для `claimed` — всегда token gate,
-   включая `blocked_claimed_without_durable_token` при пустом durable
-   `CLAIM_TOKEN`). При любом gate blocker — остановись.
+   `available`+`CHAT_REQUIRED=true`; status refusal для
+   `backlog`/`blocked`/`absorbed_*` →
+   `blocked_finding_status_not_actionable`; для `claimed` — всегда
+   token gate, включая `blocked_claimed_without_durable_token` при
+   пустом durable `CLAIM_TOKEN`). При любом gate blocker — остановись.
 2. Прочитай finding packet
    `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
 3. Разреши intake в этом порядке:
@@ -891,7 +915,7 @@ COMMAND_RECEIPT:
 Когда `GO` есть:
 
 1. если `case`/`intake` отсутствуют — сначала **Resume gate** (same-chat prior `COMMAND_RECEIPT`); при успешном resume продолжай forensics на этих IDs (включая `FINDING_ID` / `CLAIM_TOKEN` из receipt, если есть); **не** вызывай `mode=intake` и **не** создавай новый case. Если resume невозможен и ввод — follow-up только `GO` без raw payload → `blocked_needs_case_intake` (без production edits и без нового case). Если resume невозможен, но есть новый raw bug payload → допустим one-shot first-run `mode=intake`, затем forensics;
-2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (claim-first при `available`+`CHAT_REQUIRED=true` → `blocked_needs_claim_first`; для `claimed` — всегда: пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`; иначе token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing/corrupt-claim/needs_claim_first → `blocked`, без code changes;
+2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (claim-first при `available`+`CHAT_REQUIRED=true` → `blocked_needs_claim_first`; `backlog`/`blocked`/`absorbed_*` → `blocked_finding_status_not_actionable`; для `claimed` — всегда: пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`; иначе token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing/corrupt-claim/needs_claim_first/status_not_actionable → `blocked`, без code changes;
 3. выполни тот же forensics;
 4. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
 5. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
@@ -1054,6 +1078,10 @@ Follow-up:
 - если передан / resumed `finding=` с `CHAT_REQUIRED: true` и
   `STATUS: available` — stop с `blocked_needs_claim_first` до forensics;
   pasteable next только `/opsx-claim-next-bug …` (не invent `CLAIM_TOKEN`);
+- если передан / resumed `finding=` со `STATUS` ∈
+  {`backlog`, `blocked`, `absorbed_*`} — stop с
+  `blocked_finding_status_not_actionable` (любой `CHAT_REQUIRED`);
+  pasteable next: `none` (не claim-next);
 - если передан / resumed `finding=` со `STATUS: claimed` и durable
   `CLAIM_TOKEN` пуст / absent — stop с
   `blocked_claimed_without_durable_token` (не invent token; не optional
@@ -1167,8 +1195,10 @@ INTAKE-002
    → blocked_needs_claim_first; no adjudication writes
    → next только /opsx-claim-next-bug case=BUGCASE-X chat_label="…"
    → НЕ blocked_missing_claim_token; НЕ invent CLAIM_TOKEN
-0b. finding STATUS=blocked|backlog|absorbed_* (+ CHAT_REQUIRED=true)
-   → НЕ blocked_needs_claim_first (нет claim-first петли)
+0b. finding STATUS=blocked|backlog|absorbed_* (любой CHAT_REQUIRED, в т.ч. true)
+   → blocked_finding_status_not_actionable; no adjudication writes
+   → pasteable next: none (НЕ /opsx-claim-next-bug; НЕ claim-first петля)
+   → НЕ blocked_needs_claim_first; НЕ fall-through при CHAT_REQUIRED=true
 1. /opsx-claim-next-bug case=BUGCASE-X chat_label="chat-a"
    → FINDING_ID=CHILD-002, CLAIM_TOKEN=CLAIM/BUGCASE-X/CHILD-002/<ts>
 2. /opsx-fix-bug case=BUGCASE-X intake=... finding=CHILD-002

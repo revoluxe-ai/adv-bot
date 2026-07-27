@@ -455,10 +455,13 @@ For materialized case `BUGCASE-ABHOLD-WBSYNC-001` with:
 ROOT-001  chat_required=false
 CHILD-001 absorbed_by_parent_fix chat_required=false
 CHILD-002 available chat_required=true priority=2
-ADJ-001   available chat_required=true priority=5
+ADJ-001   backlog chat_required=false
 FP-001    closed_false_positive
 FP-002    closed_false_positive
 ```
+
+(Aligned with `/opsx-materialize-bug-queue` / fanout: adjacent is
+non-claimable backlog — not `available`+`CHAT_REQUIRED=true`.)
 
 First successful claim must return:
 
@@ -467,7 +470,9 @@ FINDING_ID: CHILD-002
 STATUS: claimed
 ```
 
-After that claim, a second chat using the common handoff must receive `ADJ-001`, not `CHILD-002`.
+After that claim, a second chat using the common handoff must receive
+`CLAIM_STATUS: none_available` (ADJ-001 is backlog / not eligible — do
+**not** claim ADJ-001). List `ADJ-001` under `BACKLOG` in that response.
 
 If no available chat-required findings remain, `CLAIM_STATUS: none_available` must still list `CHILD-002` under `CLAIMED_NOT_COMPLETED` until explicitly completed or released.
 
