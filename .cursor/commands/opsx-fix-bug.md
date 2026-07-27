@@ -73,7 +73,16 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 1. Прочитай exact path
    `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
    (при необходимости сверка строки в `LEDGER.md` того же case).
-2. Если у finding `STATUS: claimed` **и** поле `CLAIM_TOKEN` непустое:
+2. **Claim-first (queue):** если `CHAT_REQUIRED: true` **и**
+   `STATUS: available` — hard stop `blocked_needs_claim_first`
+   до forensics / `mode=update` / `GO`. Не invent и не пиши
+   `CLAIM_TOKEN` из `/opsx-fix-bug`. Pasteable next **только**:
+   `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
+   (без «retry с `claim_token=`» — токена ещё нет).
+   Не применяй этот blocker к другим non-claimed статусам
+   (`blocked`, `backlog`, `absorbed_*`, …) — там отдельный отказ
+   по статусу / existing path, не claim-first петля.
+3. Если у finding `STATUS: claimed` **и** поле `CLAIM_TOKEN` непустое:
    - предоставленный token обязан быть ровно одним из:
      - `claim_token=<TOKEN>` в текущем вводе пользователя;
      - non-empty `CLAIM_TOKEN` в same-chat prior `COMMAND_RECEIPT`
@@ -86,14 +95,16 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
    - только после match продолжай adjudication / `mode=update` / `GO`;
    - после успешного match echo matched token в исходящий
      `COMMAND_RECEIPT.CLAIM_TOKEN` (см. schema ниже).
-3. Если `STATUS` не `claimed` **или** `CLAIM_TOKEN` пуст — `claim_token`
-   опционален (legacy raw report / unclaimed finding); исходящий
-   receipt `CLAIM_TOKEN` оставляй пустым.
+4. Если `CHAT_REQUIRED` = `false` / отсутствует **и** (`STATUS` не
+   `claimed` **или** `CLAIM_TOKEN` пуст) — `claim_token` опционален
+   (legacy raw report / known-root / unclaimed non-queue finding);
+   исходящий receipt `CLAIM_TOKEN` оставляй пустым.
 
 ### Blockers (hard stop)
 
 | Условие | Blocker |
 |---|---|
+| `finding=` + `CHAT_REQUIRED: true` + `STATUS: available` (ещё не claimed) | `blocked_needs_claim_first` |
 | `finding=` claimed + non-empty durable `CLAIM_TOKEN`, но нет `claim_token=` во вводе **и** нет usable non-empty `CLAIM_TOKEN` в same-chat prior `COMMAND_RECEIPT` | `blocked_missing_claim_token` |
 | предоставленный token (ввод или prior receipt) не равен durable `CLAIM_TOKEN` | `blocked_claim_token_mismatch` |
 | передан `claim_token=` во вводе, но нет `finding=` (и resume не восстановил `FINDING_ID`) | `blocked_claim_token_without_finding` |
@@ -101,24 +112,36 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 
 При любом blocker из таблицы:
 
-* не начинай forensics / adjudication по чужому claim;
+* не начинай forensics / adjudication по чужому claim / pre-claim queue finding;
 * не делай `mode=update` по этому finding;
 * не применяй production/`GO` edits;
 * верни `Вердикт: blocked`, `RESULT: blocked` в `COMMAND_RECEIPT`,
-  укажи `FINDING_ID`, ожидаемый owner path и pasteable next step:
-  `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
-  либо повтор `/opsx-fix-bug` с корректным `claim_token=` из claim packet.
+  укажи `FINDING_ID` и ожидаемый owner path;
+* pasteable next:
+  - `blocked_needs_claim_first` → **только**
+    `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
+    (не предлагай retry `/opsx-fix-bug` с `claim_token=`);
+  - token blockers (`blocked_missing_claim_token` /
+    `blocked_claim_token_mismatch` / `blocked_claim_token_without_finding`) →
+    `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
+    либо повтор `/opsx-fix-bug` с корректным `claim_token=` из claim packet.
 
 ### Запреты
 
+* Не принимать adjudication/update по `finding=` со статусом
+  `available` и `CHAT_REQUIRED: true` без предварительного
+  `/opsx-claim-next-bug` (обход claim-first запрещён).
 * Не принимать adjudication/update по `finding=` со статусом `claimed`,
   обходя token (в том числе «я тот же чат» **без** `CLAIM_TOKEN` в
   prior receipt, «токен потерян», «достаточно case+finding»).
-* Не подставлять `CLAIM_TOKEN` из `OWNER_CHAT`, timestamp или filename.
-  Same-chat prior `COMMAND_RECEIPT.CLAIM_TOKEN` допустим только как
-  echo ранее matched token, не как источник угадывания.
+* Не подставлять / invent / писать `CLAIM_TOKEN` из `OWNER_CHAT`,
+  timestamp, filename или из `/opsx-fix-bug`. Same-chat prior
+  `COMMAND_RECEIPT.CLAIM_TOKEN` допустим только как echo ранее matched
+  token, не как источник угадывания.
 * Не считать handoff `/opsx-claim-next-bug` выполненным ownership proof
   без повторной сверки durable token в этом запуске.
+* Не применять `blocked_needs_claim_first` к non-available статусам
+  (`blocked`, `backlog`, `absorbed_*`, …) — claim-next их не возьмёт.
 
 ## Разрешение на запись
 
@@ -220,7 +243,10 @@ Canonical paths:
 1. Если в **этом же чате** уже есть завершённый `COMMAND_RECEIPT` от `/opsx-fix-bug` с непустыми `CASE_ID` и `INTAKE_ID` (и опционально `FINDING_ID` / `CLAIM_TOKEN`), и текущий ввод — продолжение того же сигнала (типично follow-up `GO`, повтор того же report, или «продолжи» без новых IDs):
    - **не** вызывай `/opsx-materialize-bug-queue mode=intake`;
    - продолжай с IDs из этого receipt как будто они были переданы во вводе;
-   - при наличии `FINDING_ID` в receipt и finding `STATUS: claimed` — применяй **Claim ownership gate** (matching `claim_token=` из текущего ввода **или** non-empty `CLAIM_TOKEN` из того же prior receipt; см. gate выше).
+   - при наличии `FINDING_ID` в receipt — применяй **Claim ownership gate**
+     (claim-first при `available`+`CHAT_REQUIRED=true`; для `claimed` —
+     matching `claim_token=` из текущего ввода **или** non-empty
+     `CLAIM_TOKEN` из того же prior receipt; см. gate выше).
 2. Запрещено угадывать case по «похожему тексту» в `INDEX.md` или по другим чатам. Resume только из explicit IDs во вводе или из prior receipt **этого** чата.
 3. Если resume невозможен (нет prior receipt / receipt без IDs):
    - при токене `GO` **и** пустом/отсутствующем новом raw bug payload (типичный follow-up только `GO`) → stop с blocker `blocked_needs_case_intake`;
@@ -343,7 +369,9 @@ cross_intake_finding_update_without_relation
 Приоритетнее ветки «только `case` без `intake`». Типичный handoff от
 `/opsx-claim-next-bug`, когда `intake=` опущено или пусто.
 
-1. Выполни **Claim ownership gate** (если finding claimed).
+1. Выполни **Claim ownership gate** (включая claim-first для
+   `available`+`CHAT_REQUIRED=true` и token match для `claimed`).
+   При любом gate blocker — остановись.
 2. Прочитай finding packet
    `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
 3. Разреши intake в этом порядке:
@@ -845,7 +873,7 @@ COMMAND_RECEIPT:
 Когда `GO` есть:
 
 1. если `case`/`intake` отсутствуют — сначала **Resume gate** (same-chat prior `COMMAND_RECEIPT`); при успешном resume продолжай forensics на этих IDs (включая `FINDING_ID` / `CLAIM_TOKEN` из receipt, если есть); **не** вызывай `mode=intake` и **не** создавай новый case. Если resume невозможен и ввод — follow-up только `GO` без raw payload → `blocked_needs_case_intake` (без production edits и без нового case). Если resume невозможен, но есть новый raw bug payload → допустим one-shot first-run `mode=intake`, затем forensics;
-2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing → `blocked`, без code changes;
+2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (claim-first при `available`+`CHAT_REQUIRED=true` → `blocked_needs_claim_first`; для `claimed` — token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing/needs_claim_first → `blocked`, без code changes;
 3. выполни тот же forensics;
 4. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
 5. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
@@ -1005,6 +1033,9 @@ Follow-up:
 
 Перед завершением проверь:
 
+- если передан / resumed `finding=` с `CHAT_REQUIRED: true` и
+  `STATUS: available` — stop с `blocked_needs_claim_first` до forensics;
+  pasteable next только `/opsx-claim-next-bug …` (не invent `CLAIM_TOKEN`);
 - если передан / resumed `finding=` со `STATUS: claimed` и non-empty durable
   `CLAIM_TOKEN` — предоставленный token (`claim_token=` во вводе **или**
   same-chat prior `COMMAND_RECEIPT.CLAIM_TOKEN`) сверен exact match, иначе
@@ -1109,6 +1140,13 @@ INTAKE-002
 ## Acceptance scenario (claim ownership)
 
 ```text
+0. /opsx-fix-bug case=BUGCASE-X finding=CHILD-002
+   (STATUS=available, CHAT_REQUIRED=true; без claim)
+   → blocked_needs_claim_first; no adjudication writes
+   → next только /opsx-claim-next-bug case=BUGCASE-X chat_label="…"
+   → НЕ blocked_missing_claim_token; НЕ invent CLAIM_TOKEN
+0b. finding STATUS=blocked|backlog|absorbed_* (+ CHAT_REQUIRED=true)
+   → НЕ blocked_needs_claim_first (нет claim-first петли)
 1. /opsx-claim-next-bug case=BUGCASE-X chat_label="chat-a"
    → FINDING_ID=CHILD-002, CLAIM_TOKEN=CLAIM/BUGCASE-X/CHILD-002/<ts>
 2. /opsx-fix-bug case=BUGCASE-X intake=... finding=CHILD-002
