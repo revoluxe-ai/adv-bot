@@ -32,6 +32,19 @@ after verify I do not understand what to do next.
 I think I need a new command.
 ```
 
+**Also accepted** (preferred when coming from process-contract learning):
+
+```text
+STATUS: DESIGN_BRIEF_READY
+SOURCE: opsx-admin-command-promote-process-lesson
+...
+```
+
+Treat `DESIGN_BRIEF_READY` as structured problem input for Phase 1 need
+analysis. It does **not** skip IMPROVE_EXISTING_COMMAND vs NEW_COMMAND_REQUIRED
+adjudication. Process-only briefs stay on process surfaces (commands / rules /
+skills / static-check contracts) — never product `/opsx-learn-from-bug` scope.
+
 Do not require the user to know:
 
 - internal command names;
