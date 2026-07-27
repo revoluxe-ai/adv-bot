@@ -447,6 +447,54 @@ spurious `mode=intake`).
 Emit `COMMAND_RECEIPT` on every terminal outcome, including `INTAKE_ID` when
 known and `CLAIM_TOKEN` after a successful claim (echo matched token).
 
+## Producer pasteable-Next contract (claim-first)
+
+This section is the **authoritative producer-side contract** for any
+process command that emits a pasteable `Next command` toward bug-queue
+adjudication (`/opsx-fix-bug` with durable `case=` / `finding=`).
+
+Upstream routers (e.g. `/opsx-classify-bug`, materialize handoffs, fanout /
+hunt child handoffs) MUST align with this order. Consumer safety remains in
+`/opsx-fix-bug` Claim ownership gate (`blocked_needs_claim_first`).
+
+### Ordered pasteable Next
+
+1. **Claim-first** when the case map exists and the finding is unclaimed /
+   claimable (`STATUS=available`, `CHAT_REQUIRED=true`), or `STATUS=claimed`
+   without a usable `CLAIM_TOKEN` in this chat:
+
+```text
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+```
+
+2. **`/opsx-fix-bug` with token** only when durable `CLAIM_TOKEN` is already
+   known (this command’s claim packet / same-chat prior `COMMAND_RECEIPT`):
+
+```text
+/opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+```
+
+3. **Summary-only** when IDs / case map are unknown:
+
+```text
+/opsx-fix-bug <finding summary>
+```
+
+### Forbidden producer anti-patterns
+
+* Preferring `/opsx-fix-bug … claim_token=` merely because durable IDs
+  (`case=` / `finding=` / `intake=`) are known — for `available`+
+  `CHAT_REQUIRED=true` there is **no** token yet.
+* Inventing / guessing `CLAIM_TOKEN`.
+* Emitting `/opsx-fix-bug GO …` from a routing / classify / hunt handoff.
+* Skipping `/opsx-claim-next-bug` for an unclaimed chat-required finding.
+
+Producers MAY cite this section as:
+
+```text
+Authority: /opsx-claim-next-bug § Producer pasteable-Next contract (claim-first)
+```
+
 ## Acceptance anchor
 
 For materialized case `BUGCASE-ABHOLD-WBSYNC-001` with:
@@ -503,3 +551,4 @@ create a new intake for that finding.
 * Ready to continue means packet loaded + read-only next command prepared, not implementation started.
 * Never emit empty `intake=` when `SOURCE_INTAKE_ID` or `PRIMARY_INTAKE_ID` is known; empty intake never means «create new intake».
 * Successful claim `COMMAND_RECEIPT` MUST include non-empty `CLAIM_TOKEN` matching body / `NEXT_COMMAND_ARGS`.
+* Upstream pasteable-Next emitters MUST follow § Producer pasteable-Next contract (claim-first); never prefer fix-bug+token merely because durable IDs exist.
