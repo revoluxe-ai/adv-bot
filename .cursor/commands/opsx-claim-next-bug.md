@@ -237,7 +237,7 @@ CLAIM_STATUS:
 - blocked
 
 Blocker:
-- blocked_corrupt_claim_missing_token
+- blocked_claimed_without_durable_token
 
 FINDING_ID:
 CASE_ID:
@@ -272,7 +272,7 @@ Default is to refuse a second open claim for the same chat label.
 
 When scanning the case for eligibility / `CLAIMED_NOT_COMPLETED`, if any
 `STATUS=claimed` finding has empty / absent durable `CLAIM_TOKEN`, surface it
-under `BLOCKED` with `blocked_corrupt_claim_missing_token` and the same
+under `BLOCKED` with `blocked_claimed_without_durable_token` and the same
 materialize repair pasteable — do not hide it behind silent `none_available`.
 
 ## None available
@@ -590,7 +590,7 @@ Durable-empty vs chat-local-missing:
   same `chat_label` without chat-local token → `owner_already_has_open_claim`
   echoing that durable token (not invent; not materialize repair).
 * 1c: `CHILD-002` `STATUS=claimed` with empty/absent durable `CLAIM_TOKEN`
-  → `blocked_corrupt_claim_missing_token`; pasteable next materialize
+  → `blocked_claimed_without_durable_token`; pasteable next materialize
   `repair=mint_missing_claim_token` (or `release_corrupt_claim`); **not**
   claim-first eligibility loop / silent `none_available`.
 
@@ -608,4 +608,4 @@ Durable-empty vs chat-local-missing:
 * Never emit empty `intake=` when `SOURCE_INTAKE_ID` or `PRIMARY_INTAKE_ID` is known; empty intake never means «create new intake».
 * Successful claim `COMMAND_RECEIPT` MUST include non-empty `CLAIM_TOKEN` matching body / `NEXT_COMMAND_ARGS`.
 * Upstream pasteable-Next emitters MUST follow § Producer pasteable-Next contract (claim-first); never prefer fix-bug+token merely because durable IDs exist.
-* `STATUS=claimed` + empty durable `CLAIM_TOKEN` → `blocked_corrupt_claim_missing_token` + materialize repair pasteable; never mint token inside claim-next; never treat durable-empty as chat-local-missing (1b).
+* `STATUS=claimed` + empty durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token` + materialize repair pasteable; never mint token inside claim-next; never treat durable-empty as chat-local-missing (1b).
