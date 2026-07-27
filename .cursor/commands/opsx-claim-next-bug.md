@@ -156,6 +156,9 @@ CHAT_REQUIRED: true
 Ineligible examples:
 
 * known root with `CHAT_REQUIRED=false`;
+* `duplicate_root` / same-causal-path duplicate of `EXISTING_ROOT`;
+* `FINDING_ID` prefix `DUP-*` (observation-only; never claimable);
+* durable relation / class field indicating `duplicate_root`;
 * `closed_false_positive`;
 * `absorbed_by_parent_fix`;
 * already `claimed`;
@@ -163,6 +166,16 @@ Ineligible examples:
 * `backlog` without being `available`;
 * `promoted_to_root_case`;
 * `duplicate_ancestor`.
+
+If a ledger row wrongly shows `STATUS=available` and `CHAT_REQUIRED=true`
+but is `DUP-*`, `duplicate_root`, or otherwise a same-causal-path duplicate
+of the known root, treat it as ineligible (consumer safety net). Refuse the
+claim; do not invent a claim token. Prefer a pasteable materialize repair /
+source correction over claiming.
+
+Refuse using only durable fields already on the case map (`FINDING_ID`
+prefix, relation/class fields, `EXISTING_ROOT` linkage) — do not recompute
+hunt policy from free-text output during claim.
 
 ## Deterministic selection order
 
@@ -598,6 +611,8 @@ Durable-empty vs chat-local-missing:
 
 * Exactly one finding per successful claim.
 * No double claim.
+* No claim of `DUP-*` / `duplicate_root` / same-causal-path duplicates of
+  the known root — even if `STATUS`/`CHAT_REQUIRED` were wrongly set.
 * No stale-claim auto-steal.
 * No finding ID in the common handoff path.
 * No production edits.
