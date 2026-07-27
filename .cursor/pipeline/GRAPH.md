@@ -422,6 +422,10 @@ Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
   → `DESIGN_BRIEF_READY` → `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
-- Admin surfaces (analyze-pipeline, fix-command-defects, promote-process-lesson,
-  design-command, admin-commit, opsx-review-commands): off-graph by design
+- Admin surfaces (consult, analyze-pipeline, fix-command-defects,
+  promote-process-lesson, design-command, admin-commit, opsx-review-commands):
+  off-graph by design
+- Process ambiguity / command-relationship / admin misbehavior triage (before
+  knowing fix vs analyze vs design): `/opsx-admin-command-consult` (READ_ONLY;
+  routes to one specialized next step; does not own GRAPH.md)
 - Uncommitted process edits after design/fix: `/opsx-admin-command-commit` (not `/opsx-commit`)

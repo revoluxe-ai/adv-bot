@@ -29,6 +29,15 @@ belongs exclusively to `/opsx-pipeline`.
 
 Do not treat this command’s chat graph as the durable operator map.
 
+## Not the process consult desk
+
+Relationship questions, ownership ambiguity, and triage of “an admin/pipeline
+command behaved oddly” before knowing whether to fix, redesign, or design a
+new command belong to `/opsx-admin-command-consult`.
+
+Use this command when the human already wants pipeline redesign / usability
+analysis / improvement options — not as a general OPSX meta front-door.
+
 ------------------------------------------------------------------------
 
 # Core evaluation question

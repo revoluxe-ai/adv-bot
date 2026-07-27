@@ -19,6 +19,14 @@ A new command is acceptable only when it:
 - has compatible producer/consumer contracts;
 - can be safely implemented as one coherent change packet.
 
+## When not to use (front-door)
+
+If the human only needs to discuss how existing commands relate, triage odd
+admin/pipeline behavior, or discover which process command to run next —
+route to `/opsx-admin-command-consult` first. Use this command when the
+question is specifically “do we need a new/changed command?” (need analysis
+through design proposal), including after a `DESIGN_BRIEF_READY` packet.
+
 ---
 
 # Human input contract
