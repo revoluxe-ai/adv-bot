@@ -181,6 +181,14 @@ A finding is usually `duplicate_root` when it has:
 * the same write boundary;
 * substantially the same regression scenario.
 
+When a suspect is `duplicate_root`:
+
+* omit it from `NEW_FINDINGS` entirely;
+* do **not** assign a `CHILD-*` ID;
+* fold evidence into `KNOWN_ROOT_RESULT` (and optionally list under
+  `DUPLICATE_ROOT_OBSERVATIONS` with `DUP-NNN` observation IDs);
+* treat it as part of the known root case — never as a claimable child.
+
 A finding is NOT a root duplicate merely because:
 
 * it affects the same file;
@@ -395,7 +403,16 @@ adjacent_out_of_scope
 false_positive
 ```
 
+`duplicate_root` is a classification used during root comparison only.
+It is **not** a valid `NEW_FINDINGS` relationship.
+
 The known root itself is not placed in `NEW_FINDINGS`.
+`duplicate_root` suspects are also not placed in `NEW_FINDINGS`.
+
+Only items with a listed relationship above may appear in `NEW_FINDINGS`.
+Only `same_invariant_different_path` (and other non-duplicate relationships
+that remain after classification) may receive `CHILD-*` IDs when otherwise
+eligible — never a same-causal-path duplicate of the known root.
 
 ### Relationship rules
 
@@ -490,6 +507,7 @@ Order IDs by:
 Do not assign child IDs to:
 
 * the known root;
+* `duplicate_root` suspects (same causal path as the known root);
 * false positives;
 * dead legacy;
 * tests-only findings;
@@ -502,7 +520,11 @@ ADJ-001
 FP-001
 LEGACY-001
 TEST-001
+DUP-001
 ```
+
+`DUP-*` IDs are for `DUPLICATE_ROOT_OBSERVATIONS` / `KNOWN_ROOT_RESULT`
+evidence only. They must never appear in `NEW_FINDINGS` as claimable children.
 
 ## Child adjudication policy
 
@@ -518,6 +540,7 @@ Set `ADJUDICATION_REQUIRED: true` when:
 Set `CHILD_CHAT_RECOMMENDED: true` only when:
 
 * the item is not the known root;
+* the item is not a `duplicate_root` suspect;
 * it is a confirmed or plausibly reachable new finding;
 * separate adjudication or ownership is useful;
 * it is not merely adjacent, dead, tests-only, or false positive.
@@ -625,6 +648,10 @@ KNOWN_ROOT_RESULT:
 - MATCHED_WRITE_BOUNDARY:
 - EVIDENCE:
 - ACTION:
+
+DUPLICATE_ROOT_OBSERVATIONS:
+- (optional; DUP-* only; never CHILD-*; never claimable)
+- DUP-001: ...
 
 NEW_FINDINGS:
 
@@ -769,6 +796,8 @@ It does not mean:
 * No root finding packet → no root-aware hunt.
 * No reachability → no production bug.
 * The known root must never be emitted as a new child finding.
+* A `duplicate_root` suspect (same causal path as the known root) must never
+  enter `NEW_FINDINGS`, receive a `CHILD-*` ID, or become a claimable child.
 * Same file does not mean same bug.
 * Same invariant does not mean duplicate root.
 * Same proposed patch does not mean duplicate root.
