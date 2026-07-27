@@ -84,6 +84,8 @@ ordering rules.
 
 ## When not to use
 
+- Unclear which process/admin command applies, or need to discuss
+  command relationships / odd admin behavior → `/opsx-admin-command-consult`
 - Redesign or improve process contracts → `/opsx-admin-command-analyze-pipeline`
 - Fix command defects → `/opsx-admin-command-fix-command-defects`
 - Design a new command → `/opsx-admin-command-design-command`
@@ -315,6 +317,7 @@ BLOCKED_AMBIGUOUS_POSITION
 | Position ambiguous | `BLOCKED_AMBIGUOUS_POSITION` | ask one clarifying question OR `/opsx-pipeline UPDATE` |
 | Evidence budget exhausted on UPDATE | `BLOCKED_NEEDS_EVIDENCE` | narrow extraction request |
 | Redesign needed (not navigation) | stay navigational | `/opsx-admin-command-analyze-pipeline` |
+| Process ambiguity / which admin command? | stay navigational | `/opsx-admin-command-consult` |
 | After UPDATE GO | `GRAPH_MATERIALIZED` | `/opsx-admin-command-commit` |
 
 ## Anti-patterns (reject)

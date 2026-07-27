@@ -16,6 +16,11 @@ OPSX contracts, and mirrors when listed).
 Does **not** edit production code, OpenSpec product specs, or tasks unless the
 packet explicitly lists them.
 
+If the human is still unsure whether the issue is a contract defect, a
+pipeline redesign topic, a new-command need, or only a relationship question
+→ `/opsx-admin-command-consult` first. Use this command when the defect target
+is already identified (or a usable `FIX_PLAN_READY` / review packet exists).
+
 Follow `.cursor/commands/opsx-source-resolution.md` and
 `.cursor/commands/opsx-execution-preflight.md` (including **Read / tool I/O budgets**).
 

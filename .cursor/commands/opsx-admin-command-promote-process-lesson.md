@@ -20,7 +20,9 @@ It is **not**:
 - typing learning (use static-check / `/opsx-fix-types` gates — no lesson command);
 - product / logic learning (use `/opsx-learn-from-bug`);
 - a product bug fixer (use `/opsx-fix-bug`);
-- a silent auto-implementer of new commands.
+- a silent auto-implementer of new commands;
+- a general process front-door (use `/opsx-admin-command-consult` for
+  relationship / triage questions before a FIXED or Bugbot process packet).
 
 Follow `.cursor/commands/opsx-source-resolution.md` and
 `.cursor/commands/opsx-execution-preflight.md` (including Read / tool I/O budgets).
@@ -135,6 +137,7 @@ DO_NOT_DO_YET:
 ## Relationship to other branches
 
 ```text
+unclear process question → /opsx-admin-command-consult  (triage / route)
 typing  → /opsx-fix-types / static-check     (no promote-process-lesson)
 logic   → /opsx-fix-bug → /opsx-learn-from-bug
 process → /opsx-admin-command-fix-command-defects

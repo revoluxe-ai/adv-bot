@@ -57,6 +57,10 @@ openspec/changes/<CHANGE_ID>/decisions/
 Owned by `/opsx-pipeline` (`UPDATE GO` writes; `NAVIGATE` / `UPDATE` read).
 Navigation snapshot only — not a second lifecycle authority.
 
+`/opsx-admin-command-consult` may **read** these paths for relationship /
+triage answers; it must never write them. `/opsx-admin-command-analyze-pipeline`
+builds only an ephemeral chat graph and also must not write these paths.
+
 ```text
 .cursor/pipeline/GRAPH.md
 .cursor/pipeline/META.md
