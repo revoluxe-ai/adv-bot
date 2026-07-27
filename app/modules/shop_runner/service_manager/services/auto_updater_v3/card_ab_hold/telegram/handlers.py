@@ -12,9 +12,6 @@ from sqlalchemy.orm import joinedload
 from app.client_bot.user_interface.helpers.wb_user_cabinet import (
     get_wb_user_cabinet_for_adv_and_telegram,
 )
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu import (
-    AdvSettingMenu,
-)
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
     empty_allowed_snapshot,
@@ -525,6 +522,23 @@ async def disable_card_ab_hold(
         )
 
 
+def _load_adv_setting_menu() -> type:
+    """Ленивый импорт ``AdvSettingMenu`` (разрыв circular import).
+
+    ``main_adv_setting_menu.keyboard`` импортирует ``telegram.callbacks``,
+    а ``telegram/__init__`` тянет ``handlers``. Top-level import меню ломает
+    загрузку keyboard / ``change_auto_bid`` (verify NO_GO).
+
+    Returns:
+        Класс ``AdvSettingMenu`` для отправки меню настроек РК.
+    """
+    from app.client_bot.user_interface.views.messages.main_adv_setting_menu.adv_setting_menu import (
+        AdvSettingMenu,
+    )
+
+    return AdvSettingMenu
+
+
 @card_ab_hold_router.callback_query(CardAbHoldBack.filter())
 async def back_from_card_ab_hold(
     query: CallbackQuery, callback_data: CardAbHoldBack
@@ -539,7 +553,9 @@ async def back_from_card_ab_hold(
     if not isinstance(msg, Message):
         return
     chat_id = msg.chat.id
-    bot = query.bot
+    bot = msg.bot
+    if bot is None:
+        return
     telegram_user_id = query.from_user.id
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=True) as session:
@@ -560,4 +576,5 @@ async def back_from_card_ab_hold(
         if wb_user_cabinet is None:
             await bot.send_message(chat_id, "Кабинет кампании не найден.")
             return
-    await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
+    adv_setting_menu_cls = _load_adv_setting_menu()
+    await adv_setting_menu_cls(bot, chat_id, wb_user_cabinet, adv)()

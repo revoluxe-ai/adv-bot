@@ -259,3 +259,8 @@
 - [x] Assert valid parse_mode / escaping.
 - [x] Assert callback_data length in UTF-8 bytes (пагинация, Back/Cancel, confirm-кнопки).
 - [x] Assert no raw technical text leaks to user (generation id, internal epoch identifiers, PG field names).
+
+## 26. Verify remediation: circular import AdvSettingMenu (post-Back hotfix)
+
+- [x] 26.1 Lazy-import ``AdvSettingMenu`` в ``back_from_card_ab_hold`` (``_load_adv_setting_menu``); убрать top-level import, ломавший ``keyboard`` → ``telegram.callbacks`` → ``handlers``.
+- [x] 26.2 Regression: import ``get_adv_setting_keyboard`` и ``change_auto_bid`` без circular ImportError; Back по-прежнему вызывает меню; focused ``card_ab_hold`` suite + ``test_auto_bid_freeze`` green.
