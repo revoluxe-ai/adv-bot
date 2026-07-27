@@ -10,7 +10,12 @@
 - inventory_count: 24
 - fingerprint_strength: names_only
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
-- evidence_note: edges from UPDATE Grep + bounded section reads; some bodies NOT_OPENED_BUDGET
+- evidence_note: |
+  UPDATE GO 2026-07-27: owner confirmed process-contract Bugbot/findings
+  (`.cursor/commands/**` etc.) are off-graph →
+  `/opsx-admin-command-fix-command-defects`, not `/opsx-fix-bug`.
+  F1/F2 marked contract-addressed via Grep on classify/claim. Bodies still
+  partially NOT_OPENED_BUDGET.
 
 ## States
 
@@ -27,7 +32,7 @@
 - planning_revise: `/opsx-update` / `/opsx-explore`
 
 ### Bug / case map
-- bug_signal_raw: user/Bugbot/CI text
+- bug_signal_raw: product/behavioral Bugbot/CI/user signal (not process-contract)
 - intake_recorded: durable intake on disk
 - finding_queued: findings available in case map
 - finding_claimed: ownership via `/opsx-claim-next-bug`
@@ -36,6 +41,8 @@
 - fixed_or_closed: adjudication complete
 - learning_candidate: `/opsx-learn-from-bug` phase-1
 - invariant_defined: invariant packet ready for hunt/fix
+- command_defect_signal: off-graph — Bugbot/review on process contracts
+  (`.cursor/commands/**`, rules/skills/static-check, mirrors); not a not-admin edge
 
 ### Typing / quality / ship
 - typing_packet: pyright/mypy → `/opsx-fix-types`
@@ -104,7 +111,10 @@
 - artifacts_written: production/code per tasks
 - decision_owner: implementer + architecture decisions
 - next_typical: /opsx-verify
-- known_flaws: none recorded
+- known_flaws: |
+  pending process defect (Bugbot): Architecture Decision Lookup budget ≤3
+  without NO_GO on exhausted budget — route via
+  `/opsx-admin-command-fix-command-defects` (F6), not `/opsx-fix-bug`
 
 ### /opsx-verify
 - purpose: read-only audit before archive
@@ -153,18 +163,20 @@
 - artifacts_read: CASE/LEDGER/finding packet
 - artifacts_written: claim fields in case map
 - decision_owner: claimer chat_label
-- next_typical: /opsx-fix-bug WITHOUT GO (+ claim_token)
-- known_flaws: F2 CLAIM_RECEIPT_MISSING_CLAIM_TOKEN
+-   next_typical: /opsx-fix-bug WITHOUT GO (+ claim_token)
+- known_flaws: F2 addressed in contract (keep historical id)
 
 ### /opsx-fix-bug
-- purpose: adjudicate (and with GO+fix_now fix) a bug signal
+- purpose: adjudicate (and with GO+fix_now fix) a **product/behavioral** bug signal
 - input_state: bug_signal_raw | intake_recorded | finding_claimed | adjudicating | fix_now_ready
 - output_state: adjudicating | fix_now_ready | fixed_or_closed | learning_candidate | invariant_defined
 - artifacts_read: intakes/findings; code forensics
 - artifacts_written: .tmp/opsx-bug-cases/** without GO; production only with GO+fix_now
 - decision_owner: adjudicator + claim gate
 - next_typical: /opsx-fix-bug GO | /opsx-invariant | /opsx-learn-from-bug | /opsx-commit | none
-- known_flaws: consumer of F1 when classify handoff used
+- known_flaws: |
+  does not own process-contract defects (F6); if signal targets
+  `.cursor/commands/**` → exit to `/opsx-admin-command-fix-command-defects`
 
 ### /opsx-classify-bug
 - purpose: classify finding vs OpenSpec (read-only)
@@ -173,8 +185,8 @@
 - artifacts_read: finding packet / OpenSpec
 - artifacts_written: none
 - decision_owner: classifier
-- next_typical: /opsx-fix-bug (should be WITHOUT GO + IDs) | /opsx-update
-- known_flaws: F1 CLASSIFY_FIXBUG_GO_HANDOFF
+- next_typical: /opsx-fix-bug WITHOUT GO + durable IDs | /opsx-update
+- known_flaws: F1 addressed in contract (forbids GO on handoff)
 
 ### /opsx-invariant
 - purpose: named behavioral invariant + hunt/fix handoff packets
@@ -305,6 +317,7 @@ product_dirty --/opsx-commit--> pr_ready
 pr_ready --/opsx-split-for-pr--> pr_ready
 pr_ready --/opsx-create-pr--> pr_ready
 
+# product/behavioral only — process-contract Bugbot ≠ this edge (see F6)
 bug_signal_raw --/opsx-fix-bug (first-run)--> intake_recorded
 intake_recorded --/opsx-fix-bug adjudication--> finding_queued
 finding_queued --/opsx-claim-next-bug--> finding_claimed
@@ -317,6 +330,8 @@ fixed_or_closed --/opsx-learn-from-bug--> learning_candidate
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
 implementing|impl_done --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
+# off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
+# command_defect_signal --/opsx-admin-command-fix-command-defects--> (admin APPLY/READ_ONLY)
 ```
 
 ## Known pipeline flaws
@@ -325,13 +340,13 @@ implementing|impl_done --/opsx-test--> tests_authored
   where: opsx-classify-bug.md
   symptom: next action `/opsx-fix-bug GO <summary>` omits durable IDs/claim_token and jumps GO before adjudication
   operator_workaround: `/opsx-claim-next-bug` then `/opsx-fix-bug` WITHOUT GO with case/intake/finding/claim_token; GO only after `fix_now`
-  do_not_pretend_fixed: true
+  do_not_pretend_fixed: false (contract now forbids GO on classify handoff; Grep 2026-07-27)
 
 - id: F2 CLAIM_RECEIPT_MISSING_CLAIM_TOKEN
   where: opsx-claim-next-bug.md COMMAND_RECEIPT schema
   symptom: CLAIM_TOKEN in body/NEXT_COMMAND_ARGS but omitted from COMMAND_RECEIPT
   operator_workaround: copy `claim_token` from NEXT_COMMAND_ARGS / top-level CLAIM_TOKEN
-  do_not_pretend_fixed: true
+  do_not_pretend_fixed: false (COMMAND_RECEIPT schema requires CLAIM_TOKEN; Grep 2026-07-27)
 
 - id: F3 SLASH_ALIAS_DRIFT
   where: lifecycle command prose (`/opsx:apply` vs `/opsx-apply`)
@@ -351,10 +366,17 @@ implementing|impl_done --/opsx-test--> tests_authored
   operator_workaround: use `/opsx-new` + `/opsx-continue` or `/opsx-ff`
   do_not_pretend_fixed: true (graph exclusion ≠ file deletion)
 
+- id: F6 COMMAND_CONTRACT_DEFECT_OFF_GRAPH
+  where: NAVIGATE / bug subgraph vs admin process surfaces
+  symptom: Bugbot/review on `.cursor/commands/**` (e.g. opsx-apply Architecture Decision Lookup) was routed to `/opsx-fix-bug` as bug_signal_raw
+  operator_workaround: treat as `command_defect_signal`; use `/opsx-admin-command-fix-command-defects` (READ_ONLY then GO); do not open product bug case map
+  do_not_pretend_fixed: false (owner-confirmed routing recorded in this GRAPH; underlying apply defect still open until admin fix)
+
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
 - Bug recovery: `.tmp/opsx-bug-cases/INDEX.md` pasteable NEXT_ACTION
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
+- Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Admin surfaces (analyze-pipeline, fix-command-defects, design-command, admin-commit, opsx-review-commands): off-graph by design
