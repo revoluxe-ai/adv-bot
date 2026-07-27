@@ -174,6 +174,22 @@ when claim pair #2 is in scope, compare Запреты ↔ blockers ↔ acceptan
 outcomes for those statuses — not only the `available`+`CHAT_REQUIRED`
 claim-first cell.
 
+Known miss class (must not recur) — REVIEW_MISS_STATUS_REFUSAL_SET_INCOMPLETE:
+complements (does **not** replace)
+`REVIEW_MISS_PROSE_REFUSAL_WITHOUT_BLOCKER_CELL`. Cell presence for
+`backlog`|`blocked`|`absorbed_*` is not enough if fix-bug п.3 / blockers
+refusal set omits other claim-next **ineligible** or materialize-written
+terminal statuses (`closed_false_positive`, `closed_fixed`,
+`promoted_to_root_case`, `duplicate_ancestor`, and listed intermediate
+post-claim statuses when present). On FULL / REGRESSION when claim pair
+#2 / status-refusal is in scope: section-Read **both** fix-bug п.3
+(+ blockers / п.5 exclusion) **and** claim-next ineligible (plus
+materialize STATUS writers when Grep hits promoted/duplicate/closed).
+Missing overlap that leaves `finding=` fall-through (undefined when
+`CHAT_REQUIRED=true`) or п.5 optional-token (when `CHAT_REQUIRED=false`)
+is a **confirmed defect**, not FP. Both sides section-Read required for
+FP reject; else `RISKS` / `EVIDENCE_GAP` / `NOT_OPENED_BUDGET`.
+
 Exact-cell ownership-proof (must not recur / not FP when both sides
 opened; applies after a durable claim exists — separate from claim-first):
 
