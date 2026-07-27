@@ -161,15 +161,21 @@ Use when accepted OpenSpec artifacts already require the expected behavior, but 
 Required next action:
 
 ```text
-# Prefer when durable IDs are known (args / finding packet / claim):
+# Claim-first when case map exists and finding is unclaimed / claimable
+# (STATUS=available, CHAT_REQUIRED=true) or claimed without a usable token:
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+
+# Only after claim, when durable CLAIM_TOKEN is known (claim packet / prior receipt):
 /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 
 # If IDs unknown and no case map yet:
 /opsx-fix-bug <finding summary>
-
-# If case map exists but finding not claimed:
-/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 ```
+
+Never invent `claim_token`. Do not paste `/opsx-fix-bug … claim_token=` as
+the primary next command for an unclaimed `available`+`CHAT_REQUIRED=true`
+finding — that conflicts with fix-bug's claim-first gate
+(`blocked_needs_claim_first`).
 
 Classify MUST NOT include `GO`. Production edits require a later
 `/opsx-fix-bug GO` only after verdict `fix_now`.
@@ -194,7 +200,10 @@ Required next action:
 
 ```text
 1. /opsx-update <change-id> <minimal spec clarification>
-2. then /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+2. then claim-first if needed:
+   /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+   — or, only when CLAIM_TOKEN is already known:
+   /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
    (or /opsx-fix-bug <finding summary> without GO if IDs unknown)
 ```
 
@@ -414,12 +423,19 @@ why_existing_spec_is_sufficient:
 
 ### Step 7 — Decide next command
 
-Choose exactly one:
+Choose exactly one. For implementation routes, prefer in this order:
+
+1. `/opsx-claim-next-bug` when case map exists and finding is unclaimed /
+   claimable (`STATUS=available`, `CHAT_REQUIRED=true`) or claimed without a
+   usable `CLAIM_TOKEN` in this chat;
+2. `/opsx-fix-bug … claim_token=` only when durable `CLAIM_TOKEN` is already
+   known;
+3. `/opsx-fix-bug <summary>` when IDs / case map are unknown.
 
 ```text
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 /opsx-fix-bug <summary>
-/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 /opsx-update <change-id> <summary>
 /opsx-propose <summary>
 stop: false positive
@@ -429,12 +445,16 @@ stop: need more repo evidence
 Do NOT choose more than one primary next command.
 Do NOT emit `/opsx-fix-bug GO …` from classify. `GO` belongs only to a later
 fix-bug run after verdict `fix_now`.
+Do NOT invent `claim_token` or paste fix-bug+token as primary for an
+unclaimed `available`+`CHAT_REQUIRED=true` finding.
 
 If `implementation_bug_with_spec_gap`, the next command may include two ordered substeps:
 
 ```text
 1. /opsx-update <change-id> <minimal spec clarification>
-2. /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
+2. /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+   — or, only when CLAIM_TOKEN is already known:
+   /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
    (or /opsx-fix-bug <summary> without GO if IDs unknown)
 ```
 
@@ -577,7 +597,11 @@ The final answer MUST make the routing decision obvious in the first three lines
 The user must be able to copy the next command without rereading the whole analysis.
 
 `Next command` for implementation routes MUST be pasteable and MUST NOT include
-`GO`. Prefer durable `case=` / `intake=` / `finding=` / `claim_token=` when known.
+`GO`. Claim-first when the finding is unclaimed / claimable
+(`STATUS=available`, `CHAT_REQUIRED=true`) or claimed without a usable token:
+emit `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`. Prefer
+`/opsx-fix-bug` with durable `case=` / `intake=` / `finding=` /
+`claim_token=` only when that token is already known — never invent it.
 
 
 ## Static Analysis Gate
