@@ -73,30 +73,43 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 1. Прочитай exact path
    `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
    (при необходимости сверка строки в `LEDGER.md` того же case).
-2. **Claim-first (queue):** если `CHAT_REQUIRED: true` **и**
-   `STATUS: available` — hard stop `blocked_needs_claim_first`
+2. **Duplicate-root refuse (before claim-first):** если выполняется любое из:
+   - `FINDING_ID` с префиксом `DUP-*`;
+   - durable `RELATION_TO_ROOT` / class = `duplicate_root`;
+   - `STATUS: duplicate_root_observation`;
+   — hard stop `blocked_finding_status_not_actionable` до forensics /
+   `mode=update` / `GO`, **даже если** ошибочно
+   `STATUS: available` ∧ `CHAT_REQUIRED: true`.
+   Не направляй на `/opsx-claim-next-bug`. Pasteable next: `none`.
+   Не invent `CLAIM_TOKEN`. Это зеркало claim-next ineligible для
+   same-causal-path duplicates (не claim-first петля).
+3. **Claim-first (queue):** если `CHAT_REQUIRED: true` **и**
+   `STATUS: available` **и** п.2 не сработал — hard stop
+   `blocked_needs_claim_first`
    до forensics / `mode=update` / `GO`. Не invent и не пиши
    `CLAIM_TOKEN` из `/opsx-fix-bug`. Pasteable next **только**:
    `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
    (без «retry с `claim_token=`» — токена ещё нет).
    Не применяй этот blocker к другим non-claimed статусам
    (`blocked`, `backlog`, `absorbed_*`, `closed_*`, `promoted_*`,
-   intermediate post-claim, …) — для них п.3
+   `duplicate_root_observation`, intermediate post-claim, …) — для них п.4
    (`blocked_finding_status_not_actionable`), не claim-first петля.
-3. **Status refusal (non-actionable):** если `STATUS` ∈
+4. **Status refusal (non-actionable):** если `STATUS` ∈
    `{backlog, blocked, absorbed_by_parent_fix, closed_false_positive,
    closed_fixed, promoted_to_root_case, duplicate_ancestor,
+   duplicate_root_observation,
    adjudicating, ready_for_fix, implementing, verification}` или иное
    `absorbed_*` — hard stop `blocked_finding_status_not_actionable`
    до forensics / `mode=update` / `GO`, **независимо** от
    `CHAT_REQUIRED` (в т.ч. при `CHAT_REQUIRED: true` — без
-   fall-through; при `CHAT_REQUIRED: false` — **не** п.5 optional).
+   fall-through; при `CHAT_REQUIRED: false` — **не** п.6 optional).
    Не направляй на `/opsx-claim-next-bug` (ineligible).
    Pasteable next: `none` (или читать
    `.tmp/opsx-bug-cases/<CASE_ID>/` INDEX / ledger; не claim).
    Aligns with claim-next ineligible / materialize terminal writes
-   (`promoted_to_root_case`, `duplicate_ancestor`, closed FP, …).
-4. Если у finding `STATUS: claimed` — token gate **всегда** обязателен
+   (`promoted_to_root_case`, `duplicate_ancestor`,
+   `duplicate_root_observation`, closed FP, …).
+5. Если у finding `STATUS: claimed` — token gate **всегда** обязателен
    (пустой durable `CLAIM_TOKEN` **не** ослабляет ownership):
    - если durable `CLAIM_TOKEN` пуст / absent → hard stop
      `blocked_claimed_without_durable_token` (corrupt claim state);
@@ -114,23 +127,25 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
    - только после match продолжай adjudication / `mode=update` / `GO`;
    - после успешного match echo matched token в исходящий
      `COMMAND_RECEIPT.CLAIM_TOKEN` (см. schema ниже).
-5. Если `STATUS` **не** `claimed`, **не** из п.3
+6. Если `STATUS` **не** `claimed`, **не** из п.4
    (backlog / blocked / absorbed_* / closed_* / promoted /
-   duplicate_ancestor / adjudicating / ready_for_fix /
-   implementing / verification), **и** (`CHAT_REQUIRED` =
+   duplicate_ancestor / duplicate_root_observation / adjudicating /
+   ready_for_fix / implementing / verification), **не** класс п.2
+   (`DUP-*` / `duplicate_root`), **и** (`CHAT_REQUIRED` =
    `false` / отсутствует) — `claim_token` опционален (legacy raw
    report / known-root / unclaimed non-queue finding); исходящий
    receipt `CLAIM_TOKEN` оставляй пустым. `STATUS: claimed` + пустой
-   durable token **никогда** не попадает сюда (см. п.4 /
-   `blocked_claimed_without_durable_token`). Статусы п.3 **никогда**
-   не попадают сюда (см. `blocked_finding_status_not_actionable`).
+   durable token **никогда** не попадает сюда (см. п.5 /
+   `blocked_claimed_without_durable_token`). Статусы п.4 и класс п.2
+   **никогда** не попадают сюда (см. `blocked_finding_status_not_actionable`).
 
 ### Blockers (hard stop)
 
 | Условие | Blocker |
 |---|---|
-| `finding=` + `CHAT_REQUIRED: true` + `STATUS: available` (ещё не claimed) | `blocked_needs_claim_first` |
-| `finding=` + `STATUS` ∈ {`backlog`, `blocked`, `absorbed_by_parent_fix`} / `absorbed_*` / `closed_false_positive` / `closed_fixed` / `promoted_to_root_case` / `duplicate_ancestor` / `adjudicating` / `ready_for_fix` / `implementing` / `verification` (любой `CHAT_REQUIRED`) | `blocked_finding_status_not_actionable` |
+| `finding=` + (`FINDING_ID` `DUP-*` / relation\|class `duplicate_root` / `STATUS: duplicate_root_observation`) — любой `STATUS`/`CHAT_REQUIRED`, в т.ч. wrongly `available`+`true` | `blocked_finding_status_not_actionable` |
+| `finding=` + `CHAT_REQUIRED: true` + `STATUS: available` (ещё не claimed) **и** не класс п.2 | `blocked_needs_claim_first` |
+| `finding=` + `STATUS` ∈ {`backlog`, `blocked`, `absorbed_by_parent_fix`} / `absorbed_*` / `closed_false_positive` / `closed_fixed` / `promoted_to_root_case` / `duplicate_ancestor` / `duplicate_root_observation` / `adjudicating` / `ready_for_fix` / `implementing` / `verification` (любой `CHAT_REQUIRED`) | `blocked_finding_status_not_actionable` |
 | `finding=` claimed + durable `CLAIM_TOKEN` пуст / absent | `blocked_claimed_without_durable_token` |
 | `finding=` claimed + non-empty durable `CLAIM_TOKEN`, но нет `claim_token=` во вводе **и** нет usable non-empty `CLAIM_TOKEN` в same-chat prior `COMMAND_RECEIPT` | `blocked_missing_claim_token` |
 | предоставленный token (ввод или prior receipt) не равен durable `CLAIM_TOKEN` | `blocked_claim_token_mismatch` |
@@ -149,7 +164,7 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
     `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
     (не предлагай retry `/opsx-fix-bug` с `claim_token=`);
   - `blocked_finding_status_not_actionable` → **`none`**
-    (не `/opsx-claim-next-bug` — статус ineligible; опционально
+    (не `/opsx-claim-next-bug` — статус/класс ineligible; опционально
     указать path case INDEX/ledger);
   - `blocked_claimed_without_durable_token` → **только** materialize
     repair (не `/opsx-claim-next-bug` — claim-next не mint/repair empty
@@ -168,13 +183,19 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 
 * Не принимать adjudication/update по `finding=` со статусом
   `available` и `CHAT_REQUIRED: true` без предварительного
-  `/opsx-claim-next-bug` (обход claim-first запрещён).
+  `/opsx-claim-next-bug` (обход claim-first запрещён), **кроме**
+  класса п.2 (`DUP-*` / `duplicate_root` / `duplicate_root_observation`) —
+  для него только `blocked_finding_status_not_actionable`, не claim-next.
 * Не принимать adjudication/update по `finding=` со статусом
   `backlog` / `blocked` / `absorbed_*` / `closed_false_positive` /
   `closed_fixed` / `promoted_to_root_case` / `duplicate_ancestor` /
+  `duplicate_root_observation` /
   `adjudicating` / `ready_for_fix` / `implementing` / `verification`
   (в т.ч. при `CHAT_REQUIRED: true` **или** false) — только
-  `blocked_finding_status_not_actionable`, без fall-through и без п.5.
+  `blocked_finding_status_not_actionable`, без fall-through и без п.6.
+* Не принимать adjudication/update по `FINDING_ID` `DUP-*` или
+  relation/class `duplicate_root` (любой STATUS) — только
+  `blocked_finding_status_not_actionable`.
 * Не принимать adjudication/update по `finding=` со статусом `claimed`,
   обходя token (в том числе «я тот же чат» **без** `CLAIM_TOKEN` в
   prior receipt, «токен потерян», «достаточно case+finding»).
@@ -185,7 +206,8 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 * Не считать handoff `/opsx-claim-next-bug` выполненным ownership proof
   без повторной сверки durable token в этом запуске.
 * Не применять `blocked_needs_claim_first` к non-available статусам
-  (`blocked`, `backlog`, `absorbed_*`, `closed_*`, `promoted_*`, …) —
+  (`blocked`, `backlog`, `absorbed_*`, `closed_*`, `promoted_*`,
+  `duplicate_root_observation`, …) и к классу п.2 —
   claim-next их не возьмёт; для них — `blocked_finding_status_not_actionable`.
 
 ## Разрешение на запись
@@ -293,7 +315,7 @@ Canonical paths:
    - продолжай с IDs из этого receipt как будто они были переданы во вводе;
    - при наличии `FINDING_ID` в receipt — применяй **Claim ownership gate**
      (claim-first при `available`+`CHAT_REQUIRED=true`;
-     п.3 status refusal →
+     п.4 status refusal →
      `blocked_finding_status_not_actionable`; для `claimed` —
      пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`;
      иначе matching `claim_token=` из текущего ввода **или** non-empty
@@ -421,7 +443,7 @@ cross_intake_finding_update_without_relation
 `/opsx-claim-next-bug`, когда `intake=` опущено или пусто.
 
 1. Выполни **Claim ownership gate** (включая claim-first для
-   `available`+`CHAT_REQUIRED=true`; status refusal п.3 →
+   `available`+`CHAT_REQUIRED=true`; status refusal п.4 →
    `blocked_finding_status_not_actionable`; для `claimed` — всегда
    token gate, включая `blocked_claimed_without_durable_token` при
    пустом durable `CLAIM_TOKEN`). При любом gate blocker — остановись.
@@ -929,7 +951,7 @@ COMMAND_RECEIPT:
 Когда `GO` есть:
 
 1. если `case`/`intake` отсутствуют — сначала **Resume gate** (same-chat prior `COMMAND_RECEIPT`); при успешном resume продолжай forensics на этих IDs (включая `FINDING_ID` / `CLAIM_TOKEN` из receipt, если есть); **не** вызывай `mode=intake` и **не** создавай новый case. Если resume невозможен и ввод — follow-up только `GO` без raw payload → `blocked_needs_case_intake` (без production edits и без нового case). Если resume невозможен, но есть новый raw bug payload → допустим one-shot first-run `mode=intake`, затем forensics;
-2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (claim-first при `available`+`CHAT_REQUIRED=true` → `blocked_needs_claim_first`; п.3 statuses → `blocked_finding_status_not_actionable`; для `claimed` — всегда: пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`; иначе token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing/corrupt-claim/needs_claim_first/status_not_actionable → `blocked`, без code changes;
+2. если передан или resumed `finding=` — **Claim ownership gate** до forensics и до любого production edit (п.2 DUP-/duplicate_root → `blocked_finding_status_not_actionable`; claim-first при `available`+`CHAT_REQUIRED=true` → `blocked_needs_claim_first`; п.4 statuses → `blocked_finding_status_not_actionable`; для `claimed` — всегда: пустой durable `CLAIM_TOKEN` → `blocked_claimed_without_durable_token`; иначе token из ввода или prior receipt `CLAIM_TOKEN`); mismatch/missing/corrupt-claim/needs_claim_first/status_not_actionable → `blocked`, без code changes;
 3. выполни тот же forensics;
 4. если вердикт не `fix_now`, не редактируй production code; process-artifacts updates через `mode=update` всё ещё допустимы;
 5. если вердикт `fix_now`, добавь/обнови regression tests до фикса или вместе с фиксом;
@@ -1089,12 +1111,18 @@ Follow-up:
 
 Перед завершением проверь:
 
+- если передан / resumed `finding=` с `FINDING_ID` `DUP-*`, relation/class
+  `duplicate_root`, или `STATUS: duplicate_root_observation` — stop с
+  `blocked_finding_status_not_actionable` до forensics (даже при wrongly
+  `available`+`CHAT_REQUIRED=true`); pasteable next: `none` (не claim-next);
 - если передан / resumed `finding=` с `CHAT_REQUIRED: true` и
-  `STATUS: available` — stop с `blocked_needs_claim_first` до forensics;
+  `STATUS: available` (и не класс п.2 DUP-/duplicate_root) — stop с
+  `blocked_needs_claim_first` до forensics;
   pasteable next только `/opsx-claim-next-bug …` (не invent `CLAIM_TOKEN`);
 - если передан / resumed `finding=` со `STATUS` ∈
   {`backlog`, `blocked`, `absorbed_*`, `closed_false_positive`,
   `closed_fixed`, `promoted_to_root_case`, `duplicate_ancestor`,
+  `duplicate_root_observation`,
   `adjudicating`, `ready_for_fix`, `implementing`, `verification`} —
   stop с `blocked_finding_status_not_actionable` (любой `CHAT_REQUIRED`);
   pasteable next: `none` (не claim-next);
@@ -1215,15 +1243,21 @@ INTAKE-002
    → НЕ blocked_missing_claim_token; НЕ invent CLAIM_TOKEN
 0b. finding STATUS=blocked|backlog|absorbed_*|closed_false_positive|
    closed_fixed|promoted_to_root_case|duplicate_ancestor|
+   duplicate_root_observation|
    adjudicating|ready_for_fix|implementing|verification
    (любой CHAT_REQUIRED, в т.ч. true **или** false)
    → blocked_finding_status_not_actionable; no adjudication writes
    → pasteable next: none (НЕ /opsx-claim-next-bug; НЕ claim-first петля;
-     НЕ п.5 optional-token)
+     НЕ п.6 optional-token)
    → НЕ blocked_needs_claim_first; НЕ fall-through
-0c. finding STATUS=promoted_to_root_case|duplicate_ancestor
+0c. finding STATUS=promoted_to_root_case|duplicate_ancestor|
+   duplicate_root_observation
    (materialize-written; CHAT_REQUIRED обычно false)
-   → всё равно blocked_finding_status_not_actionable (не п.5)
+   → всё равно blocked_finding_status_not_actionable (не п.6)
+0d. finding=DUP-* (или relation/class=duplicate_root), даже STATUS=available
+   + CHAT_REQUIRED=true
+   → blocked_finding_status_not_actionable; pasteable none
+   → НЕ blocked_needs_claim_first; НЕ claim-first петля; НЕ п.6
 1. /opsx-claim-next-bug case=BUGCASE-X chat_label="chat-a"
    → FINDING_ID=CHILD-002, CLAIM_TOKEN=CLAIM/BUGCASE-X/CHILD-002/<ts>
 2. /opsx-fix-bug case=BUGCASE-X intake=... finding=CHILD-002

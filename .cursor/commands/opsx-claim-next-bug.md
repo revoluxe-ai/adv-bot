@@ -159,6 +159,7 @@ Ineligible examples:
 * `duplicate_root` / same-causal-path duplicate of `EXISTING_ROOT`;
 * `FINDING_ID` prefix `DUP-*` (observation-only; never claimable);
 * durable relation / class field indicating `duplicate_root`;
+* `STATUS: duplicate_root_observation`;
 * `closed_false_positive`;
 * `absorbed_by_parent_fix`;
 * already `claimed`;
@@ -170,12 +171,12 @@ Ineligible examples:
 If a ledger row wrongly shows `STATUS=available` and `CHAT_REQUIRED=true`
 but is `DUP-*`, `duplicate_root`, or otherwise a same-causal-path duplicate
 of the known root, treat it as ineligible (consumer safety net). Refuse the
-claim; do not invent a claim token. Prefer a pasteable materialize repair /
-source correction over claiming.
+claim; do not invent a claim token.
 
 Refuse using only durable fields already on the case map (`FINDING_ID`
-prefix, relation/class fields, `EXISTING_ROOT` linkage) — do not recompute
-hunt policy from free-text output during claim.
+prefix, relation/class fields, `STATUS=duplicate_root_observation`,
+`EXISTING_ROOT` linkage) — do not recompute hunt policy from free-text
+output during claim.
 
 ## Deterministic selection order
 
@@ -292,7 +293,43 @@ materialize repair pasteable — do not hide it behind silent `none_available`.
 
 If no eligible finding exists, do not invent work.
 
+If the only rows that *look* claimable-shaped
+(`STATUS=available` ∧ `CHAT_REQUIRED=true`) are ineligible solely as
+`DUP-*` / `duplicate_root` / `STATUS=duplicate_root_observation`
+(corrupt materialize), do **not** collapse to silent `none_available`.
 Return:
+
+```text
+CLAIM_STATUS:
+- blocked
+
+BLOCKED:
+- FINDING_ID / blocked_duplicate_root_not_claimable
+
+CASE_ID:
+CASE_PATH:
+
+CLAIMED_NOT_COMPLETED:
+- …
+
+BACKLOG:
+- …
+
+CLOSED:
+- …
+
+COMMON_HANDOFF:
+none
+
+NEXT_COMMAND:
+/opsx-materialize-bug-queue mode=hunt-result case=<CASE_ID> source=<corrected hunt>
+```
+
+Pasteable next is materialize source correction / re-materialize — **not**
+mint claim token, **not** `/opsx-fix-bug`.
+
+Otherwise, when no eligible finding exists and no such corrupt DUP-shaped
+rows exist, return:
 
 ```text
 CLAIM_STATUS:
@@ -611,8 +648,12 @@ Durable-empty vs chat-local-missing:
 
 * Exactly one finding per successful claim.
 * No double claim.
-* No claim of `DUP-*` / `duplicate_root` / same-causal-path duplicates of
-  the known root — even if `STATUS`/`CHAT_REQUIRED` were wrongly set.
+* No claim of `DUP-*` / `duplicate_root` / `STATUS=duplicate_root_observation`
+  / same-causal-path duplicates of the known root — even if
+  `STATUS`/`CHAT_REQUIRED` were wrongly set.
+* Corrupt claimable-shaped DUP-only queue →
+  `blocked_duplicate_root_not_claimable` (not silent `none_available`);
+  pasteable materialize re-hunt / source correction only.
 * No stale-claim auto-steal.
 * No finding ID in the common handoff path.
 * No production edits.
