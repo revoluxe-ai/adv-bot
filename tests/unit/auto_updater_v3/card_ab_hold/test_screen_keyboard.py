@@ -80,8 +80,8 @@ def test_screen_keyboard_pending_or_active_hides_enable(
 
 @pytest.mark.unit
 def test_edit_screen_passes_mode_into_keyboard() -> None:
-    """12.2 wiring: `_edit_screen` прокидывает mode в `_screen_keyboard`."""
+    """12.2 wiring: `_edit_screen` прокидывает mode (+phase) в `_screen_keyboard`."""
     src = inspect.getsource(handlers._edit_screen)
     assert "mode" in src
     assert "_screen_keyboard" in src
-    assert "reply_markup=_screen_keyboard(adv_id, mode)" in src
+    assert "reply_markup=_screen_keyboard(adv_id, mode, phase=phase)" in src
