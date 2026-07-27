@@ -228,7 +228,28 @@ Never give the same finding to two chats.
 
 If this `chat_label` already owns an uncompleted claimed finding in the same case, do not silently claim a second one.
 
-Return:
+If that open claim has empty / absent durable `CLAIM_TOKEN` (corrupt claim
+state), do **not** return a successful `owner_already_has_open_claim` echo
+and do **not** invent a token. Return:
+
+```text
+CLAIM_STATUS:
+- blocked
+
+Blocker:
+- blocked_corrupt_claim_missing_token
+
+FINDING_ID:
+CASE_ID:
+
+NEXT_COMMAND:
+/opsx-materialize-bug-queue mode=update case=<CASE_ID> finding=<FINDING_ID> repair=mint_missing_claim_token
+```
+
+(If `OWNER_CHAT` is empty / unknown, use `repair=release_corrupt_claim`
+instead, then a later `/opsx-claim-next-bug …`.)
+
+Otherwise, when durable `CLAIM_TOKEN` is non-empty, return:
 
 ```text
 CLAIM_STATUS:
@@ -248,6 +269,11 @@ allow_second_claim=true
 ```
 
 Default is to refuse a second open claim for the same chat label.
+
+When scanning the case for eligibility / `CLAIMED_NOT_COMPLETED`, if any
+`STATUS=claimed` finding has empty / absent durable `CLAIM_TOKEN`, surface it
+under `BLOCKED` with `blocked_corrupt_claim_missing_token` and the same
+materialize repair pasteable — do not hide it behind silent `none_available`.
 
 ## None available
 
@@ -459,13 +485,31 @@ hunt child handoffs) MUST align with this order. Consumer safety remains in
 
 ### Ordered pasteable Next
 
-1. **Claim-first** when the case map exists and the finding is unclaimed /
-   claimable (`STATUS=available`, `CHAT_REQUIRED=true`), or `STATUS=claimed`
-   without a usable `CLAIM_TOKEN` in this chat:
+1a. **Claim-first (unclaimed queue):** when the case map exists and the
+    finding is claimable (`STATUS=available`, `CHAT_REQUIRED=true`):
 
 ```text
 /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 ```
+
+1b. **Claimed + non-empty durable + missing chat-local token:** when
+    `STATUS=claimed`, durable `CLAIM_TOKEN` is non-empty, but this chat has
+    no usable `claim_token=` / prior `COMMAND_RECEIPT.CLAIM_TOKEN`:
+
+```text
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+```
+
+(`owner_already_has_open_claim` echoes the durable token — KEEP this path.)
+
+1c. **Claimed + empty / absent durable token (corrupt):** do **not** route to
+    claim-next (it cannot mint/repair). Paste materialize repair:
+
+```text
+/opsx-materialize-bug-queue mode=update case=<CASE_ID> finding=<FINDING_ID> repair=mint_missing_claim_token
+```
+
+(If `OWNER_CHAT` unset → `repair=release_corrupt_claim`, then claim-next.)
 
 2. **`/opsx-fix-bug` with token** only when durable `CLAIM_TOKEN` is already
    known (this command’s claim packet / same-chat prior `COMMAND_RECEIPT`):
@@ -488,6 +532,8 @@ hunt child handoffs) MUST align with this order. Consumer safety remains in
 * Inventing / guessing `CLAIM_TOKEN`.
 * Emitting `/opsx-fix-bug GO …` from a routing / classify / hunt handoff.
 * Skipping `/opsx-claim-next-bug` for an unclaimed chat-required finding.
+* Routing `STATUS=claimed` + empty/absent durable `CLAIM_TOKEN` to
+  `/opsx-claim-next-bug` (durable-empty ≠ chat-local-missing; use 1c).
 
 Producers MAY cite this section as:
 
@@ -538,6 +584,16 @@ Empty-intake handoff: if `CHILD-002` (or any claimed finding) has
 empty `intake=` is allowed only as finding-first signal — fix-bug must not
 create a new intake for that finding.
 
+Durable-empty vs chat-local-missing:
+
+* 1b: `CHILD-002` `STATUS=claimed` with non-empty durable `CLAIM_TOKEN`,
+  same `chat_label` without chat-local token → `owner_already_has_open_claim`
+  echoing that durable token (not invent; not materialize repair).
+* 1c: `CHILD-002` `STATUS=claimed` with empty/absent durable `CLAIM_TOKEN`
+  → `blocked_corrupt_claim_missing_token`; pasteable next materialize
+  `repair=mint_missing_claim_token` (or `release_corrupt_claim`); **not**
+  claim-first eligibility loop / silent `none_available`.
+
 ## Hard rules
 
 * Exactly one finding per successful claim.
@@ -552,3 +608,4 @@ create a new intake for that finding.
 * Never emit empty `intake=` when `SOURCE_INTAKE_ID` or `PRIMARY_INTAKE_ID` is known; empty intake never means «create new intake».
 * Successful claim `COMMAND_RECEIPT` MUST include non-empty `CLAIM_TOKEN` matching body / `NEXT_COMMAND_ARGS`.
 * Upstream pasteable-Next emitters MUST follow § Producer pasteable-Next contract (claim-first); never prefer fix-bug+token merely because durable IDs exist.
+* `STATUS=claimed` + empty durable `CLAIM_TOKEN` → `blocked_corrupt_claim_missing_token` + materialize repair pasteable; never mint token inside claim-next; never treat durable-empty as chat-local-missing (1b).
