@@ -2,10 +2,15 @@
 
 ```text
 STATUS: DRAFT_PROCESS_CONTRACT
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+VALIDATION_STATUS: INDEPENDENT_TEST_PASS
+LIVE_WORKSPACE_BEHAVIOR_CHANGED: NO
+CANDIDATE_WORKTREE_BEHAVIOR_CHANGED: YES
 RUNTIME_ENFORCEMENT: NOT_ACTIVE
 LIVE_COMMAND_BEHAVIOR_CHANGED: NO
-COMPANION_UPDATES_REQUIRED: YES
+COMPANION_UPDATES_REQUIRED: PARTIAL_IN_CANDIDATE
 OWNER_APPROVAL_SCOPE: CONTRACT_ARTIFACT_ONLY
+GO_ACTIVATE: NOT_ISSUED
 ```
 
 ## Document role
@@ -21,13 +26,20 @@ It is **not**:
 - a replacement for `.cursor/pipeline/GRAPH.md` (GRAPH remains
   `navigation_snapshot_only` until a separate `/opsx-pipeline` UPDATE GO).
 
-Until companion updates land and this document is promoted past
-`DRAFT_PROCESS_CONTRACT` with `RUNTIME_ENFORCEMENT: ACTIVE`, live OPSX
-commands keep their **current** write-gates and handoffs. Operators may
-**voluntarily** follow this contract; enforcement is not claimed.
+**Candidate companion state:** companion command/schema contracts exist
+**only** in the isolated candidate worktree
+(`opsx/orchestration-mvp-candidate`). They are **validated**
+(`VALIDATION_STATUS: INDEPENDENT_TEST_PASS`) but **not** merged, **not**
+active, and **not** permitted for real OPSX episodes. Do not claim
+`RUNTIME_ENFORCEMENT: ACTIVE` until Owner `GO_ACTIVATE`.
 
-**Dual-truth risk:** this draft and live command text may disagree. Live
-commands win for runtime behavior until companions are applied.
+Until `GO_ACTIVATE` promotes past this draft with
+`RUNTIME_ENFORCEMENT: ACTIVE`, live OPSX commands keep their **current**
+write-gates and handoffs. Operators may **voluntarily** follow this
+contract in the candidate tree; live enforcement is not claimed.
+
+**Dual-truth risk:** this draft/candidate and live command text may
+disagree. Live commands win for runtime behavior until activation.
 
 ---
 
@@ -300,16 +312,24 @@ Until companions: live fanout rules remain authoritative at runtime.
 
 ### 4.1 Authority location
 
-Authoritative episode branch table lives under the root case map:
+**Schema definition** (not a runtime instance):
 
 ```text
-.tmp/opsx-bug-cases/<ROOT_CASE_ID>/
-  LEDGER.md          # durable statuses (existing)
-  BRANCH_REGISTRY    # section in LEDGER.md and/or sibling file
-                     # (exact persistence shape = companion packet)
+.cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md
 ```
 
-Sources to merge (read-only assemble):
+**Single runtime BRANCH_REGISTRY** (only instance):
+
+```text
+RUNTIME_BRANCH_REGISTRY:
+  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+  section: ## BRANCH_REGISTRY
+```
+
+Do **not** create a sibling `BRANCH_REGISTRY.md` (or other second registry
+file) inside the case map.
+
+Sources to merge into that LEDGER section (read-only assemble):
 
 - durable LEDGER / finding statuses;
 - `/opsx-fanout-bug-hunt` registry / packets (preview seed only).
@@ -598,49 +618,35 @@ Command-contract / process Bugbot lessons remain on
 
 ---
 
-## 10. Required companion updates (separate subsequent packet)
+## 10. Companion implementation status (candidate)
 
-This OWNER_APPROVAL_SCOPE covers **only** this contract artifact.
-The following must **not** be edited under the present GO; they need a
-**separate** Owner GO packet (design/implement), e.g. OPTION_B style:
+Companions are **not** deferred and are **not** “implementation not started”.
 
-1. **`.cursor/commands/opsx-fix-bug.md`**
-   - Decouple tests from production under one GO.
-   - After `fix_now`, pasteable next → `/opsx-test` / RED, not production GO.
-   - Production GO path requires RED evidence or `RED_NOT_APPLICABLE_APPROVED`.
+```text
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+VALIDATION_STATUS: INDEPENDENT_TEST_PASS
+CANDIDATE_WORKTREE_BEHAVIOR_CHANGED: YES
+LIVE_WORKSPACE_BEHAVIOR_CHANGED: NO
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+LIVE_COMMAND_BEHAVIOR_CHANGED: NO
+GO_ACTIVATE: NOT_ISSUED
+```
 
-2. **`.cursor/commands/opsx-test.md`**
-   - Bug-case handoff (`case` / `finding`).
-   - Emit `RED_EVIDENCE` / durable `results/RED-*.md`.
-   - Explicit `FAILURE_MATCH`; forbid weaken-for-green.
+Candidate companion contracts (commands, schemas, soft testing-rules note)
+exist **only** in the isolated candidate worktree. They are validated but
+**not** merged, **not** active, and **not** permitted for real OPSX
+episodes.
 
-3. **`.cursor/commands/opsx-learn-from-bug.md`**
-   - Class-level path requires `FANIN_PATH` + `FANIN_READY`.
-   - Else force `LESSON_CANDIDATE_ONLY` / no class GO write.
+Still **forbidden** until Owner `GO_ACTIVATE`:
 
-4. **`.cursor/commands/opsx-materialize-bug-queue.md`**
-   - Persist BRANCH_REGISTRY fields, RED/GREEN paths, FANIN pointer.
-   - Durable terminals for `TIMEOUT`, `TEST_NOT_REPRODUCING`,
-     `RED_NOT_APPLICABLE` (or explicit map).
+- merge candidate → live;
+- `RUNTIME_ENFORCEMENT: ACTIVE`;
+- `LIVE_COMMAND_BEHAVIOR_CHANGED: YES`;
+- `/opsx-pipeline` UPDATE GO for orchestration GRAPH/META edges;
+- creating `/opsx-fan-in-*`.
 
-5. **`.cursor/commands/opsx-fanout-bug-hunt.md`**
-   - Keep `LEARNING_READY` ≠ `FANIN_READY`.
-   - Align expansion with hunt bounds when seeding registry.
-
-6. **`.cursor/commands/opsx-bug-hunt.md`** (as needed)
-   - Encode `MAX_HUNT_PASSES` / depth / active-branch stop conditions.
-
-7. **`.cursor/pipeline/GRAPH.md` + `META.md`**
-   - Only via `/opsx-pipeline` UPDATE GO: insert `red_*`, `fan_in_ready`,
-     and lesson edges; do not silent-edit.
-
-8. **Optional:** `.cursor/rules/testing-rules.mdc` soft note on RED-before-GO.
-
-9. **Explicit non-goal of companions unless Owner later asks:**
-   - Do **not** create `/opsx-fan-in-*` unless a later design chooses slash UX.
-
-Until that packet: `RUNTIME_ENFORCEMENT: NOT_ACTIVE`,
-`LIVE_COMMAND_BEHAVIOR_CHANGED: NO`.
+GRAPH/META remain deferred activation work (WAVE_6), not companion
+re-implementation.
 
 ---
 
@@ -672,5 +678,7 @@ DO_NOT_DO_YET:
 - [x] No new invariant inside episode
 - [x] `LEARNING_READY` ≠ `FANIN_READY`
 - [x] Owner-only production GO + final class verdict
-- [x] Companion list deferred to later packet
+- [x] Companion status: `CANDIDATE_IMPLEMENTED` +
+      `INDEPENDENT_TEST_PASS`; not merged; not ACTIVE;
+      single runtime BRANCH_REGISTRY = LEDGER `## BRANCH_REGISTRY`
 )

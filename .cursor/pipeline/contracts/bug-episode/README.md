@@ -1,0 +1,57 @@
+# Bug-episode shared schemas
+
+```text
+SCHEMA_ROOT: .cursor/pipeline/contracts/bug-episode/
+POLICY_SOT: .cursor/pipeline/ORCHESTRATION_MVP.md
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+```
+
+## Role
+
+This directory holds **field schemas** for product/logic bug episodes.
+
+Normative policy (RED-before-GO, hunt bounds, lesson gate, fan-in checks)
+lives in `ORCHESTRATION_MVP.md`. Commands **reference** these schemas; they
+must not invent a second schema root.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `RED_EVIDENCE.md` | RED evidence packet fields + statuses |
+| `GREEN_EVIDENCE.md` | GREEN evidence packet fields + anti-weaken |
+| `BRANCH_REGISTRY.md` | Schema definition for episode branch rows |
+| `FANIN.md` | FANIN.md assemble input/output contract |
+| `LESSON_GATE.md` | Class-level lesson gate preconditions |
+| `TERMINAL_STATUS_MAP.md` | Episode terminal ↔ durable LEDGER status |
+
+## BRANCH_REGISTRY shape (single runtime instance)
+
+```text
+SCHEMA DEFINITION:
+  .cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md
+
+RUNTIME INSTANCE (only):
+  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+    section "## BRANCH_REGISTRY"
+```
+
+Do **not** create a sibling `BRANCH_REGISTRY.md` file inside the case map.
+
+## Fan-in write boundary
+
+```text
+CASE_MAP_WRITE_ALLOWED:
+  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+ALL_OTHER_WRITES: DENIED
+Mechanism: /opsx-materialize-bug-queue mode=fanin_assemble
+NEW_SLASH: /opsx-fan-in-* FORBIDDEN
+```
+
+## Tokens that must stay distinct
+
+```text
+LEARNING_READY  ≠  FANIN_READY
+claim STATUS    ≠  EPISODE_TERMINAL   (parallel fields)
+```

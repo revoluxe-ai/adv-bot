@@ -101,6 +101,21 @@ Default:
 max_children=10
 ```
 
+Episode orchestration hard cap (stricter when companions apply):
+
+```text
+MAX_ACTIVE_BRANCHES=3
+```
+
+Use the **stricter** of `max_children` and `MAX_ACTIVE_BRANCHES` for
+`CREATE_CHILD_CHAT` / claimable working branches. Excess →
+`DEFERRED_CHILD_QUEUE` (not silent drop).
+
+```text
+RUNTIME_ENFORCEMENT: NOT_ACTIVE
+IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+```
+
 If `root_case_id` is missing, stop.
 
 If the source does not contain all of the following sections, stop:
@@ -675,6 +690,32 @@ action=CREATE_CHILD_CHAT
 
 This command does not run `/opsx-learn-from-bug`.
 
+### LEARNING_READY ≠ FANIN_READY (HARD)
+
+```text
+LEARNING_READY != FANIN_READY
+```
+
+Fanout `LEARNING_READY` means children have stable adjudication readiness
+for a learning **registry preview** only.
+
+It does **NOT** mean:
+
+* all started branches are episode-terminal;
+* RED/GREEN/GO linkage is complete;
+* `FANIN.md` exists or `FANIN_READY`;
+* class-level lesson is allowed;
+* the episode is finished.
+
+This command MUST NOT:
+
+* assemble or write `results/FANIN.md`;
+* declare episode completion;
+* perform fan-in;
+* treat `LEARNING_READY=true` as lesson-gate pass.
+
+Fan-in is only via `/opsx-materialize-bug-queue mode=fanin_assemble`.
+
 It must return a preliminary learning registry:
 
 ```text
@@ -782,6 +823,10 @@ Next action:
 
 ## Hard rules
 
+* `MAX_ACTIVE_BRANCHES=3` — stricter active claimable-branch cap;
+  excess deferred, not dropped.
+* `LEARNING_READY != FANIN_READY` — never claim fan-in / episode done.
+* Do not write FANIN.md or run fan-in from this command.
 * No root case ID → no fan-out.
 * No structured root-aware bug-hunt result → no fan-out.
 * Do not infer the root from the invariant alone.

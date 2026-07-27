@@ -1358,3 +1358,20 @@ ROOT_PACKET_STATUS: incomplete
 * minimum test level выбран boundary-based;
 * нет blanket E2E requirement;
 * наличие похожего test name не объявлено доказанным coverage.
+
+
+## Downstream hunt bounds (light)
+
+When handing off to `/opsx-bug-hunt`, note episode bounds:
+
+```text
+MAX_HUNT_PASSES=3
+MAX_DEPTH_FROM_ROOT=3
+MAX_ACTIVE_BRANCHES=3
+PASS_3=MANDATORY_STOP
+NEW_INVARIANT_FROM_BRANCH=FORBIDDEN
+```
+
+Do not invent production GO. RED/GREEN path remains
+`/opsx-test` → Owner GO → `/opsx-fix-bug GO` after companions activate.
+
