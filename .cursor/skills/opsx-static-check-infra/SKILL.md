@@ -25,7 +25,7 @@ Working team layout for this repo (keep it lean):
 
 | Layer | Owns |
 |-------|------|
-| Command | MODE UX, fan-out/WAIT/fan-in, human report |
+| Command | MODE UX, fan-out/fan-in, human report |
 | Registry | waves + `task_type` (Task enum) + pack path |
 | Pack | how to run/parse one check |
 | Skill | how to extend the system |
@@ -46,7 +46,6 @@ Workers **must** invoke via `bash .cursor/static-check/bin/run.sh -- ...` (see `
 Launch workers via Task `subagent_type` = registry `task_type` (`shell` primary).
 Optional `PREFLIGHT` token only; default off. Check runs must not edit infra to self-heal.
 Wave B only if `pytest-unit` STATUS=PASS.
-Orchestrator must WAIT for all wave packets before Final report.
 
 ## Do not
 
@@ -54,4 +53,4 @@ Orchestrator must WAIT for all wave packets before Final report.
 - Prefer custom project agent names that are not in the Cursor Task enum
 - Auto-delegate workers with vague “use proactively” for general coding
 - Run `pytest-full` in parallel with `pytest-unit`
-- End the orchestrator chat after fan-out / partial READY without Final report
+- End the orchestrator chat after fan-out / partial READY without Final report (WAIT contract in command + `base/worker-prompt.md`)

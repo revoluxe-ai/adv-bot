@@ -18,4 +18,4 @@ alwaysApply: false
 7. Preflight is **optional** (`PREFLIGHT` token only); default off.
 8. Wave B (`pytest-full`) only if `pytest-unit` STATUS=PASS.
 9. Prompt body comes from `.cursor/static-check/base/worker-prompt.md` + pack LOAD list.
-10. WAIT contract: incomplete until Final report; never stop chat after fan-out / partial READY; resume on each Task notification until all wave packets are in.
+10. Orchestrator **WAIT contract**: incomplete until Final report; never stop the chat after fan-out / partial WORKER READY; resume on each Task notification until all wave packets are in.
