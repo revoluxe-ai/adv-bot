@@ -251,7 +251,22 @@ Blocker:
 - root_emitted_as_new_finding
 ```
 
+If the hunt accidentally includes a `duplicate_root` suspect inside
+`NEW_FINDINGS` (same causal path as the known root, relationship
+`duplicate_root`, or a `DUP-*` / same-root observation promoted to a
+claimable child), return:
+
+```text
+Verdict:
+- blocked
+
+Blocker:
+- duplicate_root_emitted_as_new_finding
+```
+
 Do not fan out until the bug-hunt result is corrected.
+Do not `CREATE_CHILD_CHAT` for the known root or for any `duplicate_root`
+suspect.
 
 ## Routing actions
 
@@ -276,6 +291,7 @@ Use when all are true:
 
 * `CHILD_CHAT_RECOMMENDED=true`;
 * item is not the known root;
+* item is not a `duplicate_root` suspect (same causal path as the known root);
 * relationship is `same_invariant_different_path`;
 * production classification is:
 
@@ -371,7 +387,9 @@ Use when:
   * `false positive` with `CHILD_CHAT_RECOMMENDED=true`;
   * `adjacent_out_of_scope` with a requested current-scope implementation fix;
   * missing root relationship;
-  * duplicate finding IDs.
+  * duplicate finding IDs;
+  * `duplicate_root` (or same-causal-path duplicate of the known root)
+    present in `NEW_FINDINGS` or carrying a `CHILD-*` ID.
 
 ## Stable IDs
 
@@ -386,6 +404,7 @@ ADJ-001
 FP-001
 LEGACY-001
 TEST-001
+DUP-001
 ```
 
 If the source does not provide an ID, assign one deterministically by source order and category.
@@ -398,8 +417,12 @@ ADJ-
 FP-
 LEGACY-
 TEST-
+DUP-
 ROOTCAND-
 ```
+
+`DUP-*` are observation IDs for `duplicate_root` evidence only.
+Never treat `DUP-*` as claimable children or `CREATE_CHILD_CHAT` targets.
 
 Use three-digit numbering.
 
@@ -772,6 +795,9 @@ Next action:
 * Do not alter source classifications.
 * Do not alter source relationships to root.
 * Do not emit the known root as a child.
+* Do not emit a `duplicate_root` suspect (same causal path as the known root)
+  as a child or `CREATE_CHILD_CHAT` target; block with
+  `duplicate_root_emitted_as_new_finding` if present in `NEW_FINDINGS`.
 * Do not create a child chat for false positives.
 * Do not create a child chat for adjacent out-of-scope observations.
 * Do not create a child chat for dead legacy or tests-only findings.
