@@ -11,10 +11,10 @@
 - fingerprint_strength: names_only
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-27: owner confirmed process-contract Bugbot/findings
-  (`.cursor/commands/**` etc.) are off-graph →
-  `/opsx-admin-command-fix-command-defects`, not `/opsx-fix-bug`.
-  F1/F2 marked contract-addressed via Grep on classify/claim. Bodies still
+  UPDATE GO 2026-07-27 (later): ADL Bugbot instance closed in contracts
+  (exhaust→EVIDENCE_GAP+NO_GO); cleared /opsx-apply pending known_flaws.
+  F6 routing rule kept. Prior: process-contract Bugbot → admin fix-command-
+  defects (not /opsx-fix-bug). F1/F2 contract-addressed. Bodies still
   partially NOT_OPENED_BUDGET.
 
 ## States
@@ -111,10 +111,7 @@
 - artifacts_written: production/code per tasks
 - decision_owner: implementer + architecture decisions
 - next_typical: /opsx-verify
-- known_flaws: |
-  pending process defect (Bugbot): Architecture Decision Lookup budget ≤3
-  without NO_GO on exhausted budget — route via
-  `/opsx-admin-command-fix-command-defects` (F6), not `/opsx-fix-bug`
+- known_flaws: none recorded (ADL budget-exhaust→NO_GO closed 2026-07-27)
 
 ### /opsx-verify
 - purpose: read-only audit before archive
@@ -368,9 +365,9 @@ implementing|impl_done --/opsx-test--> tests_authored
 
 - id: F6 COMMAND_CONTRACT_DEFECT_OFF_GRAPH
   where: NAVIGATE / bug subgraph vs admin process surfaces
-  symptom: Bugbot/review on `.cursor/commands/**` (e.g. opsx-apply Architecture Decision Lookup) was routed to `/opsx-fix-bug` as bug_signal_raw
+  symptom: Bugbot/review on `.cursor/commands/**` was routed to `/opsx-fix-bug` as bug_signal_raw
   operator_workaround: treat as `command_defect_signal`; use `/opsx-admin-command-fix-command-defects` (READ_ONLY then GO); do not open product bug case map
-  do_not_pretend_fixed: false (owner-confirmed routing recorded in this GRAPH; underlying apply defect still open until admin fix)
+  do_not_pretend_fixed: false (routing recorded; example ADL apply instance closed in contracts 2026-07-27 — F6 still applies to future process Bugbots)
 
 ## Terminal / recovery
 
