@@ -234,10 +234,11 @@ Compatibility mode: legacy
 
 * Resolve decision paths from change context/`artifactPaths` / user-supplied paths first.
 * Read `openspec/decisions/index.md` only if still needed to locate candidates.
-* Further search under `openspec/decisions/` only for remaining gaps (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP`). Never dump the full tree.
+* Further search under `openspec/decisions/` only for remaining gaps (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Never dump the full tree.
+* If the ≤ 3 fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO`. Budget exhaustion is not proof that no decision exists; do **not** mark `Architecture Decision Missing`.
 * Read proposed decisions from `contextFiles.decisions` or `artifactPaths.decisions.existingOutputPaths`, if any.
 * Output relevant decisions by path and status in `Архитектурное размещение`.
-* If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, mark `Architecture Decision Missing`.
+* If the change touches ownership, layering, write paths, or domain invariants and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision, mark `Architecture Decision Missing`.
 * If proposed decisions exist, get:
 
 ```bash
@@ -556,7 +557,8 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * task is checked `[x]` but validation/test/check failed;
 * archive blocker exists;
 * placement violation exists;
-* required architecture decision is missing;
+* unresolved `EVIDENCE_GAP` after Architecture Decision Lookup budget exhaust (do not collapse this into Missing);
+* `Architecture Decision Missing` after conclusive in-budget lookup (or after a recorded `EVIDENCE_GAP` expansion);
 * unresolved open question blocks archive;
 * stale reference model blocks archive;
 * async test manually mutates module-level state around `await` with `module.attr = fake` and manual `try/finally` restore;

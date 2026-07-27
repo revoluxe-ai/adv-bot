@@ -53,10 +53,11 @@ When ready to implement, run /opsx:apply
 4. **Perform Architecture Decision Lookup**
 
    - Resolve user-supplied / `artifactPaths.decisions` paths first; prefer exact paths over a full walk.
-   - Read `openspec/decisions/index.md` only if needed; further `openspec/decisions/` lookup only for remaining gaps (budget ≤ 3 unless `EVIDENCE_GAP`). Never dump the full tree.
+   - Read `openspec/decisions/index.md` only if needed; further `openspec/decisions/` lookup only for remaining gaps (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Never dump the full tree.
+   - If the ≤ 3 fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without creating or editing artifacts. Budget exhaustion is not proof that no decision exists; do **not** emit `Architecture Decision Missing`.
    - Check `artifactPaths.decisions.existingOutputPaths` for already-proposed decisions in the change.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
-   - If the requested change needs architecture placement but no relevant decision exists, output `Architecture Decision Missing`.
+   - If the requested change needs architecture placement and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision, output `Architecture Decision Missing`.
    - Create or update a proposed `decisions/<slug>/decision.md` artifact before implementation-readiness when placement depends on a reusable architecture rule. Get `openspec instructions decisions --change "<name>" --json` first and follow its `rules.decisions`.
 
 5. **Create artifacts in sequence until apply-ready**

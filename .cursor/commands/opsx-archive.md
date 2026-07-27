@@ -71,12 +71,13 @@ Archive a completed change in the experimental workflow.
 5. **Perform Architecture Decision Archive Gate**
 
    - Resolve proposed decision paths from `artifactPaths.decisions.existingOutputPaths` first.
-   - Read only needed accepted decisions (index → exact paths; bounded fallback ≤ 3 if gaps remain). Never dump `openspec/decisions/**`.
+   - Read only needed accepted decisions (index → exact paths; bounded fallback ≤ 3 targeted lookups if gaps remain unless `EVIDENCE_GAP` is recorded). Never dump `openspec/decisions/**`.
+   - If the ≤ 3 fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without archiving. Budget exhaustion is not proof that no decision exists; do **not** emit `Architecture Decision Missing`.
    - Read proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
    - Get `openspec instructions decisions --change "<name>" --json` when proposed decisions exist or archive analysis requires a proposed decision, and apply `rules.decisions`.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving `changeRoot` when they should become reusable source of truth; report promoted paths.
-   - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions that are not captured in `openspec/decisions/` or a proposed decision artifact, return `NO_GO` and do not archive.
+   - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes they are not captured in `openspec/decisions/` or a proposed decision artifact, output `Architecture Decision Missing`, return `NO_GO`, and do not archive.
    - If no proposed decision needs promotion, output `Reusable architecture promotions: none` and proceed.
 
 6. **Perform the archive**

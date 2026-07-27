@@ -52,10 +52,11 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 4. **Perform Architecture Decision Lookup**
 
    - Resolve `artifactPaths.decisions.existingOutputPaths` first, then only needed accepted decisions.
-   - Further `openspec/decisions/` lookup only for remaining gaps (budget ≤ 3 unless `EVIDENCE_GAP`). Never dump the full tree.
+   - Further `openspec/decisions/` lookup only for remaining gaps (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Never dump the full tree.
+   - If the ≤ 3 fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without editing artifacts. Budget exhaustion is not proof that no decision exists; do **not** emit `Architecture Decision Missing`.
    - Read existing proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
-   - If the artifacts touch ownership, layering, write paths, or domain invariants with no relevant decision, output `Architecture Decision Missing`.
+   - If the artifacts touch ownership, layering, write paths, or domain invariants and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision, output `Architecture Decision Missing`.
    - Include the decision registry and proposed decisions in the coherence check alongside specs/design/tasks.
 
 5. **Read and reconcile**
