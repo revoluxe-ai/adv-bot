@@ -394,6 +394,19 @@ It MUST NOT automatically propose writing to `.cursor/worklogs/bug-learning.md`.
 → proposed change  
 → GO possible only after approval.
 
+### B2. Bugbot residual miss (product/logic)
+
+When the lesson is «Bugbot нашёл то, что primary hunter пропустил»:
+
+→ prefer existing target
+  `.cursor/commands/opsx-project-bug-hunt.md`
+  (checklist section `Project hunt checklist (learning target)`);
+→ disposition `candidate_source_update`;
+→ after GO, owner should re-run `/opsx-project-bug-hunt` on a similar
+  `base..head` to verify the new check would have caught the miss;
+→ do **not** route this class to F6 admin promote unless the miss was a
+  process-contract defect.
+
 ### C. Reusable lesson without confirmed target
 
 → `needs_target_extraction` or `owner_decision_required`  

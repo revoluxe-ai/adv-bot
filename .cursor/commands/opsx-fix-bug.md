@@ -1049,7 +1049,8 @@ Entrypoint name:
 
 ## Specific rule: hunter feedback loop
 
-Если Bugbot, opsx-hunt-bug или другой hunter пропустил или неправильно классифицировал проблему, выдай hunter update note:
+Если Bugbot, `/opsx-project-bug-hunt`, `/opsx-bug-hunt` или другой hunter
+пропустил или неправильно классифицировал проблему, выдай hunter update note:
 
 ```text
 Hunter feedback:
@@ -1058,11 +1059,15 @@ Hunter feedback:
 - example false positive/false negative:
 - suggested rule:
 - suggested fixture/test:
+- preferred_learning_target: .cursor/commands/opsx-project-bug-hunt.md
+  (section: Project hunt checklist (learning target))
+- pasteable_next: /opsx-learn-from-bug case=… finding=… target=.cursor/commands/opsx-project-bug-hunt.md
 ```
 
 Текст значений должен быть на русском, кроме имён функций, файлов, тестов и технических токенов.
 
-Цель — не дать тому же классу багов снова дойти до Bugbot.
+Цель — не дать тому же классу багов снова дойти до Bugbot: residual Bugbot
+miss усиливает **project** hunter checklist, не создаёт второй free-form audit.
 
 ## Final output after GO
 

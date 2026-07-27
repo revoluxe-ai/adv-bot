@@ -12,6 +12,10 @@ This command is NOT a normal diff review.
 
 This command is NOT a general repository audit.
 
+This command is NOT the primary pre-PR / Bugbot-analogue project hunter
+(`/opsx-project-bug-hunt` owns that). Use this command for **root-aware**,
+single-invariant sibling discovery after a known root packet.
+
 This command is NOT an implementation command.
 
 This command MUST distinguish:
@@ -64,6 +68,11 @@ Use this command when:
 * the root bug has an established causal boundary and production reachability chain;
 * old or adjacent code paths may violate the same invariant through a different path;
 * the user needs to distinguish the known root from genuinely new findings.
+
+Do **not** use this command as the first hunter before PR / Bugbot. For
+primary project-tuned discovery on `base..head` without a known root, use
+`/opsx-project-bug-hunt` first; return here only for same-invariant fan-out
+after a confirmed root.
 
 Examples:
 
