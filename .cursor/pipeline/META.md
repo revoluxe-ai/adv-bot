@@ -1,15 +1,15 @@
 # pipeline graph meta
 
-updated_at_utc: 2026-07-27T21:39:05Z
+updated_at_utc: 2026-07-27T23:44:00Z
 scope: ALL_NON_ADMIN_OPSX
-source_fingerprint: 1dc8573e91e4a3fcc7680cd940272ffc
+source_fingerprint: 36715089212461e01e2291eebdfa7777
 fingerprint_strength: names_only
 approved_by_token: UPDATE GO
 notes: |
-  UPDATE GO from same-chat UPDATE draft: index /opsx-project-bug-hunt as
-  primary pre-Bugbot discovery; create-pr PROJECT_BUG_HUNT_RECEIPT gate;
-  Bugbot residual; materialize intake from project hunt; learn-from-bug
-  miss → project-hunt checklist; F9 closed. Inventory 26 (propose still
-  excluded from recommend). Prior bug-subgraph claim-first / F7 / F8 kept.
-  Soft three learning branches + F6 admin path kept. F3/F5 still open.
+  UPDATE GO after Owner GO_ACTIVATE of orchestration MVP companions.
+  Added bug-episode navigation: RED→production_go_ready→fix→GREEN→
+  hunt/fanout→FANIN_READY→lesson gate. GRAPH remains
+  navigation_snapshot_only (not policy SoT / not claim authority).
+  No /opsx-fan-in-*. Inventory 26; propose still excluded from recommend.
+  Prior project-bug-hunt / claim-first / F1–F9 / F6 admin path kept.
   Bodies partially NOT_OPENED_BUDGET.

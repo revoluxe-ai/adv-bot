@@ -11,12 +11,12 @@
 - fingerprint_strength: names_only
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-27T21:39Z: index /opsx-project-bug-hunt as primary
-  pre-Bugbot discovery; create-pr receipt gate; Bugbot = residual;
-  learn-from-bug miss → project-hunt checklist; F9 closed. Prior
-  bug-subgraph claim-first vs known-root skip-claim; F7/F8 kept.
-  Inventory 26 names_only fingerprint 1dc8573e91e4a3fcc7680cd940272ffc.
-  F3/F5 still open. Soft three learning branches + F6 admin path kept.
+  UPDATE GO 2026-07-27T23:44Z (Owner GO_ACTIVATE): add bug-episode
+  orchestration navigation (RED→GO→GREEN→FANIN→lesson) from live
+  ORCHESTRATION_MVP + companion contracts. GRAPH remains snapshot only;
+  command gates / Owner / durable case state win. No /opsx-fan-in-*.
+  Prior 2026-07-27T21:39Z project-bug-hunt / claim-first / F1–F9 kept.
+  Inventory 26 names_only fingerprint 36715089212461e01e2291eebdfa7777.
   Bodies still partially NOT_OPENED_BUDGET.
 
 ## States
@@ -40,11 +40,27 @@
 - finding_queued: findings available in case map
 - finding_claimed: ownership via `/opsx-claim-next-bug` (only when claimable)
 - adjudicating: `/opsx-fix-bug` without GO / `/opsx-classify-bug`
-- fix_now_ready: **graph/nav label only** — verdict `fix_now`, awaiting GO;
-  NOT durable `STATUS: ready_for_fix` (that STATUS blocks fix-bug; see F7)
-- fixed_or_closed: adjudication complete / fixed with GO
+- fix_now_ready: **graph/nav label only** — verdict `fix_now`, awaiting RED
+  path then Owner production GO; NOT durable `STATUS: ready_for_fix` (F7)
+- red_pending: `/opsx-test case= finding=` authoring/running RED
+- RED_CONFIRMED: durable RED evidence with FAILURE_MATCH=YES
+- RED_NOT_APPLICABLE_APPROVED: Owner exception packet approved
+- red_fail_*: TEST_NOT_REPRODUCING | RED_WRONG_REASON | TEST_SETUP_DEFECT |
+  BUG_NOT_TESTABLE | BLOCKED | TIMEOUT (no production GO)
+- production_go_ready: BUG_CONFIRMED ∧ FIX_NOW ∧ (RED_CONFIRMED ∨
+  RED_NOT_APPLICABLE_APPROVED) — Owner may `/opsx-fix-bug GO`
+- fix_implementing: production-only repair under Owner GO (test freeze)
+- GREEN_CONFIRMED: `/opsx-test … verify` sole GREEN writer
+- fixed_or_closed: branch terminal / fixed with evidence linkage
 - learning_candidate: `/opsx-learn-from-bug` phase-1 (**product/logic only**)
+- lesson_candidate_only: FANIN incomplete / lesson gate fail-closed
+- class_closed: Owner FINAL closed or promoted class lesson
 - invariant_defined: invariant packet ready for hunt/fix
+- hunt_active: bounded `/opsx-bug-hunt` (MAX_HUNT_PASSES=3)
+- branches_active: fanout/claimable children under MAX_ACTIVE_BRANCHES=3
+- all_branches_terminal: every started branch has EPISODE_TERMINAL
+- FANIN_READY: `results/FANIN.md` assemble complete (materialize
+  `mode=fanin_assemble` only; no `/opsx-fan-in-*`)
 - command_defect_signal: off-graph — Bugbot/review on process contracts
   (`.cursor/commands/**`, rules/skills/static-check, mirrors); not a not-admin edge
 - process_lesson_candidate: off-graph — after process FIXED / process Bugbot;
@@ -150,18 +166,18 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-materialize-bug-queue
-- purpose: durable bug-case map (intake/update/hunt-result/promote) + corrupt-claim repair
-- input_state: bug_signal_raw | finding_queued | finding_claimed
-- output_state: intake_recorded | finding_queued | finding_claimed
+- purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair
+- input_state: bug_signal_raw | finding_queued | finding_claimed | all_branches_terminal | FANIN_READY
+- output_state: intake_recorded | finding_queued | finding_claimed | FANIN_READY | lesson_candidate_only
 - artifacts_read: .tmp/opsx-bug-cases/**
-- artifacts_written: .tmp/opsx-bug-cases/**
-- decision_owner: materialize contract
-- next_typical: /opsx-fix-bug case= intake= | /opsx-claim-next-bug | repair pasteable
+- artifacts_written: .tmp/opsx-bug-cases/** ; fanin_assemble writes ONLY results/FANIN.md
+- decision_owner: materialize contract (no Owner / class authority)
+- next_typical: /opsx-fix-bug case= intake= | /opsx-claim-next-bug | /opsx-learn-from-bug FANIN_PATH= | repair pasteable
 - known_flaws: F8 (repair path exists; operators may still invent tokens)
 
 ### /opsx-claim-next-bug
 - purpose: claim one eligible finding (`STATUS=available` ∧ `CHAT_REQUIRED=true` only)
-- input_state: finding_queued
+- input_state: finding_queued | branches_active
 - output_state: finding_claimed
 - artifacts_read: CASE/LEDGER/finding packet
 - artifacts_written: claim fields in case map (incl. durable CLAIM_TOKEN)
@@ -174,19 +190,21 @@
   (not invent token; not treat as owner_already_has success)
 
 ### /opsx-fix-bug
-- purpose: adjudicate (and with GO+fix_now fix) a **product/behavioral** bug signal
-- input_state: bug_signal_raw | intake_recorded | finding_claimed | finding_queued | adjudicating | fix_now_ready
-- output_state: adjudicating | fix_now_ready | fixed_or_closed | learning_candidate | invariant_defined
-- artifacts_read: intakes/findings; code forensics
-- artifacts_written: .tmp/opsx-bug-cases/** without GO; production only with GO+fix_now
-- decision_owner: adjudicator + claim gate
-- next_typical: /opsx-fix-bug GO | /opsx-claim-next-bug | /opsx-invariant | /opsx-learn-from-bug | /opsx-commit | none
+- purpose: adjudicate product/behavioral bugs; Owner GO = production-only after RED gate
+- input_state: bug_signal_raw | intake_recorded | finding_claimed | finding_queued | adjudicating | fix_now_ready | production_go_ready | fix_implementing
+- output_state: adjudicating | fix_now_ready | production_go_ready | fix_implementing | fixed_or_closed | learning_candidate | invariant_defined
+- artifacts_read: intakes/findings; RED evidence; code forensics
+- artifacts_written: .tmp/opsx-bug-cases/** without GO; production only with GO+fix_now+RED gate; tests forbidden under GO
+- decision_owner: adjudicator + claim gate + Owner GO + RED-before-GO
+- next_typical: /opsx-test case= finding= | /opsx-fix-bug GO (after RED) | /opsx-claim-next-bug | /opsx-invariant | /opsx-learn-from-bug | none
 - known_flaws: |
   F6: does not own process-contract defects → `/opsx-admin-command-fix-command-defects`;
   F7: durable STATUS ready_for_fix/adjudicating/implementing/verification blocks
   finding= path; F8: claimed+empty durable CLAIM_TOKEN → materialize repair;
   claim-first when available+CHAT_REQUIRED=true; skip-claim OK for known-root
-  CHAT_REQUIRED=false; DUP-/duplicate_root → blocked_finding_status_not_actionable
+  CHAT_REQUIRED=false; DUP-/duplicate_root → blocked_finding_status_not_actionable;
+  production GO blocked without RED_CONFIRMED | RED_NOT_APPLICABLE_APPROVED
+  (`blocked_needs_red_before_go`); not GREEN writer; no NON_WEAKEN_DELTA self-approve
 
 ### /opsx-classify-bug
 - purpose: classify finding vs OpenSpec (read-only)
@@ -221,36 +239,41 @@
 
 ### /opsx-bug-hunt
 - purpose: root-aware invariant-focused sibling hunt (NOT primary pre-PR hunter)
-- input_state: invariant_defined | implementing
-- output_state: finding_queued
+- input_state: invariant_defined | GREEN_CONFIRMED | hunt_active
+- output_state: hunt_active | finding_queued | branches_active
 - artifacts_read: root packet / code
 - artifacts_written: hunt findings (process) ; minimal fixes only with GO+confirmed
 - decision_owner: hunter
-- next_typical: /opsx-materialize-bug-queue | /opsx-claim-next-bug (never bare fix-bug)
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: /opsx-materialize-bug-queue | /opsx-fanout-bug-hunt | /opsx-claim-next-bug (never bare fix-bug)
+- known_flaws: |
+  NOT_OPENED_BUDGET detail; MAX_HUNT_PASSES=3 / MAX_DEPTH_FROM_ROOT=3 /
+  PASS_3=MANDATORY_STOP; NEW_INVARIANT_FROM_BRANCH=FORBIDDEN
 
 ### /opsx-fanout-bug-hunt
 - purpose: fan-out hunt registry for parallel adjudication
-- input_state: invariant_defined | finding_queued
-- output_state: finding_queued
+- input_state: invariant_defined | finding_queued | hunt_active
+- output_state: finding_queued | branches_active
 - artifacts_read: hunt sources
-- artifacts_written: fanout registry
+- artifacts_written: fanout registry (preview); durable via materialize
 - decision_owner: fanout operator
-- next_typical: /opsx-claim-next-bug (chat-required) | materialize (never bare fix-bug)
-- known_flaws: NOT_OPENED_BUDGET detail; duplicate_root → observation not claimable
+- next_typical: /opsx-claim-next-bug (chat-required) | materialize (never bare fix-bug; never FANIN)
+- known_flaws: |
+  NOT_OPENED_BUDGET detail; duplicate_root → observation not claimable;
+  MAX_ACTIVE_BRANCHES=3; LEARNING_READY != FANIN_READY; no fan-in assemble
 
 ### /opsx-learn-from-bug
 - purpose: product/logic bug → transferable lesson to **existing** process target
-- input_state: fixed_or_closed | learning_candidate
-- output_state: learning_candidate | fixed_or_closed
-- artifacts_read: case/finding / prior classify/fix output
-- artifacts_written: approved existing target only with GO
-- decision_owner: owner approval for writes
-- next_typical: /opsx-learn-from-bug GO | /opsx-project-bug-hunt (re-verify miss class) | none
+- input_state: fixed_or_closed | learning_candidate | FANIN_READY | lesson_candidate_only
+- output_state: learning_candidate | lesson_candidate_only | class_closed | fixed_or_closed
+- artifacts_read: case/finding / FANIN.md when class-level / prior classify/fix output
+- artifacts_written: approved existing target only with GO + lesson gate
+- decision_owner: owner approval for writes; class GO only after FANIN_READY
+- next_typical: /opsx-learn-from-bug GO (class only if LESSON_GATE_PASS) | /opsx-project-bug-hunt | none
 - known_flaws: |
   NOT_OPENED_BUDGET detail; MUST NOT own F6/command-contract lessons
   (redirect advisory: `/opsx-admin-command-promote-process-lesson`);
-  Bugbot residual miss → prefer target opsx-project-bug-hunt.md checklist
+  Bugbot residual miss → prefer target opsx-project-bug-hunt.md checklist;
+  without FANIN_READY → LESSON_CANDIDATE_ONLY + CLASS_LEVEL_GO_WRITE FORBIDDEN
 
 ### /opsx-fix-types
 - purpose: pyright/mypy typing fixes with GO
@@ -263,14 +286,14 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-test
-- purpose: write targeted tests without production edits
-- input_state: implementing | impl_done | tests_authored
-- output_state: tests_authored
-- artifacts_read: request / code under test
-- artifacts_written: tests only
-- decision_owner: tester
-- next_typical: /opsx-fix-types | /opsx-apply | none
-- known_flaws: NOT_OPENED_BUDGET detail
+- purpose: targeted tests; bug-regression RED producer; sole GREEN writer (verify)
+- input_state: implementing | impl_done | tests_authored | fix_now_ready | red_pending | fix_implementing | GREEN_CONFIRMED
+- output_state: tests_authored | red_pending | RED_CONFIRMED | red_fail_* | GREEN_CONFIRMED
+- artifacts_read: request / finding packet / RED evidence
+- artifacts_written: tests/** ; results/RED-*.md ; results/GREEN-*.md (verify only)
+- decision_owner: tester / regression author
+- next_typical: /opsx-fix-bug (after RED_CONFIRMED, Owner may GO) | /opsx-fix-types | none
+- known_flaws: NOT_OPENED_BUDGET detail; GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW on hash mismatch
 
 ### /opsx-test-triage
 - purpose: triage failing/noisy tests
@@ -357,7 +380,15 @@ finding_claimed --/opsx-fix-bug (no GO + claim_token)--> adjudicating|fix_now_re
 # known-root / non-queue (CHAT_REQUIRED=false; claim optional/skipped)
 finding_queued --/opsx-fix-bug [CHAT_REQUIRED=false known-root]--> adjudicating|fix_now_ready
 
-fix_now_ready --/opsx-fix-bug GO [iff fix_now]--> fixed_or_closed
+fix_now_ready --/opsx-test case= finding=--> red_pending
+red_pending --/opsx-test (RED run)--> RED_CONFIRMED|red_fail_*
+# Owner may approve RED_NOT_APPLICABLE_APPROVED (exception packet) instead of RED_CONFIRMED
+RED_CONFIRMED|RED_NOT_APPLICABLE_APPROVED --(Owner)--> production_go_ready
+# production GO only if BUG_CONFIRMED ∧ FIX_NOW ∧ (RED_CONFIRMED ∨ RED_NOT_APPLICABLE_APPROVED)
+production_go_ready --/opsx-fix-bug GO [iff fix_now + RED gate]--> fix_implementing
+fix_implementing --/opsx-test verify--> GREEN_CONFIRMED
+GREEN_CONFIRMED --> fixed_or_closed
+# legacy shortcut removed as typical: fix_now_ready --/opsx-fix-bug GO--> fixed_or_closed
 # durable STATUS for GO path: available+CHAT_REQUIRED=false OR claimed+token
 # — NOT durable ready_for_fix / adjudicating / implementing / verification (F7)
 
@@ -367,8 +398,15 @@ fix_now_ready --/opsx-fix-bug GO [iff fix_now]--> fixed_or_closed
 
 adjudicating --/opsx-classify-bug--> adjudicating|planning_revise
 adjudicating --/opsx-invariant--> invariant_defined
-invariant_defined --/opsx-bug-hunt|/opsx-fanout-bug-hunt--> finding_queued
-fixed_or_closed --/opsx-learn-from-bug--> learning_candidate
+GREEN_CONFIRMED|fixed_or_closed --/opsx-invariant--> invariant_defined
+invariant_defined --/opsx-bug-hunt--> hunt_active
+hunt_active --/opsx-fanout-bug-hunt|/opsx-materialize-bug-queue--> branches_active|finding_queued
+branches_active --/opsx-claim-next-bug--> finding_claimed
+# per-branch: claim → adjudicate → RED → Owner GO → GREEN → EPISODE_TERMINAL
+all_branches_terminal --/opsx-materialize-bug-queue mode=fanin_assemble--> FANIN_READY|lesson_candidate_only
+FANIN_READY --/opsx-learn-from-bug--> learning_candidate|class_closed
+# without FANIN_READY: lesson stays LESSON_CANDIDATE_ONLY (CLASS_LEVEL_GO_WRITE forbidden)
+fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
 implementing|impl_done --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
@@ -391,6 +429,27 @@ base=<PR-base> head=<branch>`. Bugbot PR section = residual only.
 If Bugbot still finds product/logic: fix path → `/opsx-learn-from-bug`
 `target=.cursor/commands/opsx-project-bug-hunt.md` checklist → re-hunt.
 Do **not** use `/opsx-bug-hunt` as the first pre-PR sweep (needs root+invariant).
+
+### Product bug-episode orchestration (live after GO_ACTIVATE)
+
+Typical advisory path (not forced; command contracts win):
+
+```text
+fix_now_ready
+  → /opsx-test case= finding= → red_pending → RED_CONFIRMED
+  → production_go_ready → /opsx-fix-bug GO → fix_implementing
+  → /opsx-test verify → GREEN_CONFIRMED → fixed_or_closed
+  → optional /opsx-invariant → hunt_active → branches_active
+  → all_branches_terminal → materialize mode=fanin_assemble → FANIN_READY
+  → /opsx-learn-from-bug (class) | lesson_candidate_only
+```
+
+Hard reminders for NAVIGATE:
+
+- claim-first unchanged for `available`+`CHAT_REQUIRED=true`
+- `LEARNING_READY` (fanout) ≠ `FANIN_READY`
+- no `/opsx-fan-in-*`; FANIN writer = materialize `mode=fanin_assemble` only
+- GRAPH is navigation snapshot — not policy SoT
 
 ### Three learning branches (do not mix)
 
@@ -498,6 +557,11 @@ command-contract classes (F6).
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
 - Known-root skip-claim: `CHAT_REQUIRED=false` + durable `available` → fix-bug (±GO) without claim-next
 - Claimable queue: `available`+`CHAT_REQUIRED=true` → claim-next first (never invent token)
+- After `fix_now` without GO: `/opsx-test case= finding=` (RED), not immediate production GO
+- Production GO: RED_CONFIRMED | RED_NOT_APPLICABLE_APPROVED + BUG_CONFIRMED ∧ FIX_NOW
+- GREEN: `/opsx-test … verify` only; fix-bug may re-run pytest but not write GREEN
+- Fan-in: `/opsx-materialize-bug-queue mode=fanin_assemble` → `results/FANIN.md` only
+- Class lesson: requires FANIN_READY; else LESSON_CANDIDATE_ONLY
 - Pre-PR product/runtime: `/opsx-project-bug-hunt` receipt before `/opsx-create-pr`
   (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
