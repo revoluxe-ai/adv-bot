@@ -154,6 +154,26 @@ Exact-cell claim-first (must not recur / not FP when both sides opened):
    `claim_token=`” (token does not exist yet). Consumer MUST NOT invent or
    write `CLAIM_TOKEN`.
 
+Known miss class (must not recur) — REVIEW_MISS_ACCEPTANCE_ANCHOR_DRIFT:
+same-`CASE_ID` acceptance / checklist text across `opsx-claim-next-bug.md`
+↔ `opsx-materialize-bug-queue.md` ↔ `opsx-fanout-bug-hunt.md` MUST agree
+on claimable `STATUS` × `CHAT_REQUIRED` (eligibility cell). Adjacent /
+`backlog` (and other non-available statuses) ≠ claimable. Drift between
+those acceptance anchors is a **confirmed defect**, not FP — but only
+after **both** sides of the compared pair were section-Read. Grep-only
+or one-side reject → `RISKS` / `EVIDENCE_GAP` / `NOT_OPENED_BUDGET`, never
+clean FP.
+
+Known miss class (must not recur) — REVIEW_MISS_PROSE_REFUSAL_WITHOUT_BLOCKER_CELL:
+«отдельный отказ» / «Запреты» / acceptance prose that refuses a gate cell
+**without** a matching blockers-table cell (+ acceptance outcome for that
+cell) is a **confirmed defect**, not FP. Especially: `CHAT_REQUIRED=true`
+fall-through on `backlog` | `blocked` | `absorbed_*` (prose says refuse,
+blockers omit the cell → claim-next / fix-bug loop). On FULL / REGRESSION
+when claim pair #2 is in scope, compare Запреты ↔ blockers ↔ acceptance
+outcomes for those statuses — not only the `available`+`CHAT_REQUIRED`
+claim-first cell.
+
 Exact-cell ownership-proof (must not recur / not FP when both sides
 opened; applies after a durable claim exists — separate from claim-first):
 
