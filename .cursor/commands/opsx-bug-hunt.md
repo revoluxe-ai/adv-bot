@@ -687,10 +687,13 @@ Need from user:
 
 ## Fan-out handoff requirements
 
-For every finding with `CHILD_CHAT_RECOMMENDED: true`, append a structured handoff:
+For every finding with `CHILD_CHAT_RECOMMENDED: true`, append a structured handoff.
+Align with `/opsx-fanout-bug-hunt` and `/opsx-materialize-bug-queue`: claim-first
+after durable materialization — never bare `/opsx-fix-bug`.
 
 ```text
 CHILD_CASE_PACKET:
+- CASE_ID: / ROOT_CASE_ID:
 - ROOT_FINDING_ID:
 - FINDING_ID:
 - PARENT_FINDING_ID:
@@ -704,19 +707,41 @@ CHILD_CASE_PACKET:
 - CAUSAL_BOUNDARY:
 - WRITE_BOUNDARY:
 - SOURCE_SNAPSHOT:
+- PREREQ:
 - ADJUDICATION_COMMAND:
 - FORBIDDEN_ACTIONS:
 ```
 
-`ADJUDICATION_COMMAND` should normally request:
+`PREREQ`: `.tmp/opsx-bug-cases/<CASE_ID>/` must exist (durable case map via
+`/opsx-materialize-bug-queue mode=hunt-result`, or already materialized). Do not
+adjudicate from a chat-only packet without case-map rows.
+
+`ADJUDICATION_COMMAND` / next command:
+
+* when case map present:
 
 ```text
-/opsx-fix-bug
+/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 ```
 
-without `GO`.
+* when case map absent (preview only — not claimable):
+
+```text
+/opsx-materialize-bug-queue mode=hunt-result case=<CASE_ID> source=<same hunt source>
+```
+
+Never emit bare `/opsx-fix-bug` (without `case=` / `finding=` / `claim_token=`).
+After a successful claim, `/opsx-claim-next-bug` supplies `/opsx-fix-bug` with
+durable ARGS including `claim_token=` — the hunt handoff must not skip that step.
 
 Do not include `GO` in a generated child handoff.
+
+`FORBIDDEN_ACTIONS` must include at least:
+
+* do not use `GO`;
+* do not emit bare `/opsx-fix-bug` without `case=` / `finding=` / `claim_token=`;
+* do not skip `/opsx-claim-next-bug` when the finding is chat-required and unclaimed;
+* do not adjudicate before durable materialization when the case map is absent.
 
 ## Learning readiness
 
