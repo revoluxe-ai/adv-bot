@@ -11,11 +11,12 @@
 - fingerprint_strength: names_only
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-27T05:00Z: three learning branches recorded (soft);
-  process lesson path → admin promote-process-lesson → design-command;
-  learn-from-bug = product/logic only. Inventory 25 names_only
-  fingerprint f013cfe340ab4996. F6 kept. F3/F5 still open. Bodies still
-  partially NOT_OPENED_BUDGET.
+  UPDATE GO 2026-07-27T21:06Z: bug-subgraph claim-first vs known-root
+  skip-claim; durable STATUS ≠ graph fix_now_ready (F7); corrupt-claim
+  repair edge (F8); DUP-/duplicate_root refuse. Inventory 25 names_only
+  fingerprint 53817b8889613f9b4f813233b909c7d3. F3/F5 still open. Soft
+  three learning branches + F6 admin path kept. Bodies still partially
+  NOT_OPENED_BUDGET.
 
 ## States
 
@@ -35,10 +36,11 @@
 - bug_signal_raw: product/behavioral Bugbot/CI/user signal (not process-contract)
 - intake_recorded: durable intake on disk
 - finding_queued: findings available in case map
-- finding_claimed: ownership via `/opsx-claim-next-bug`
+- finding_claimed: ownership via `/opsx-claim-next-bug` (only when claimable)
 - adjudicating: `/opsx-fix-bug` without GO / `/opsx-classify-bug`
-- fix_now_ready: fix-bug verdict `fix_now`; awaiting GO
-- fixed_or_closed: adjudication complete
+- fix_now_ready: **graph/nav label only** — verdict `fix_now`, awaiting GO;
+  NOT durable `STATUS: ready_for_fix` (that STATUS blocks fix-bug; see F7)
+- fixed_or_closed: adjudication complete / fixed with GO
 - learning_candidate: `/opsx-learn-from-bug` phase-1 (**product/logic only**)
 - invariant_defined: invariant packet ready for hunt/fix
 - command_defect_signal: off-graph — Bugbot/review on process contracts
@@ -146,36 +148,43 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-materialize-bug-queue
-- purpose: durable bug-case map (intake/update/hunt-result/promote)
-- input_state: bug_signal_raw | finding_queued
-- output_state: intake_recorded | finding_queued
+- purpose: durable bug-case map (intake/update/hunt-result/promote) + corrupt-claim repair
+- input_state: bug_signal_raw | finding_queued | finding_claimed
+- output_state: intake_recorded | finding_queued | finding_claimed
 - artifacts_read: .tmp/opsx-bug-cases/**
 - artifacts_written: .tmp/opsx-bug-cases/**
 - decision_owner: materialize contract
-- next_typical: /opsx-fix-bug case= intake= | /opsx-claim-next-bug
-- known_flaws: none recorded
+- next_typical: /opsx-fix-bug case= intake= | /opsx-claim-next-bug | repair pasteable
+- known_flaws: F8 (repair path exists; operators may still invent tokens)
 
 ### /opsx-claim-next-bug
-- purpose: claim one available chat-required finding
+- purpose: claim one eligible finding (`STATUS=available` ∧ `CHAT_REQUIRED=true` only)
 - input_state: finding_queued
 - output_state: finding_claimed
 - artifacts_read: CASE/LEDGER/finding packet
-- artifacts_written: claim fields in case map
+- artifacts_written: claim fields in case map (incl. durable CLAIM_TOKEN)
 - decision_owner: claimer chat_label
--   next_typical: /opsx-fix-bug WITHOUT GO (+ claim_token)
-- known_flaws: F2 addressed in contract (keep historical id)
+- next_typical: /opsx-fix-bug WITHOUT GO (+ claim_token)
+- known_flaws: |
+  F2 addressed in contract (keep historical id); ineligible:
+  known-root CHAT_REQUIRED=false, DUP-*/duplicate_root/duplicate_root_observation,
+  backlog/blocked/closed/promoted; corrupt claimed+empty token → materialize repair
+  (not invent token; not treat as owner_already_has success)
 
 ### /opsx-fix-bug
 - purpose: adjudicate (and with GO+fix_now fix) a **product/behavioral** bug signal
-- input_state: bug_signal_raw | intake_recorded | finding_claimed | adjudicating | fix_now_ready
+- input_state: bug_signal_raw | intake_recorded | finding_claimed | finding_queued | adjudicating | fix_now_ready
 - output_state: adjudicating | fix_now_ready | fixed_or_closed | learning_candidate | invariant_defined
 - artifacts_read: intakes/findings; code forensics
 - artifacts_written: .tmp/opsx-bug-cases/** without GO; production only with GO+fix_now
 - decision_owner: adjudicator + claim gate
-- next_typical: /opsx-fix-bug GO | /opsx-invariant | /opsx-learn-from-bug | /opsx-commit | none
+- next_typical: /opsx-fix-bug GO | /opsx-claim-next-bug | /opsx-invariant | /opsx-learn-from-bug | /opsx-commit | none
 - known_flaws: |
-  does not own process-contract defects (F6); if signal targets
-  `.cursor/commands/**` → exit to `/opsx-admin-command-fix-command-defects`
+  F6: does not own process-contract defects → `/opsx-admin-command-fix-command-defects`;
+  F7: durable STATUS ready_for_fix/adjudicating/implementing/verification blocks
+  finding= path; F8: claimed+empty durable CLAIM_TOKEN → materialize repair;
+  claim-first when available+CHAT_REQUIRED=true; skip-claim OK for known-root
+  CHAT_REQUIRED=false; DUP-/duplicate_root → blocked_finding_status_not_actionable
 
 ### /opsx-classify-bug
 - purpose: classify finding vs OpenSpec (read-only)
@@ -204,7 +213,7 @@
 - artifacts_read: root packet / code
 - artifacts_written: hunt findings (process) ; minimal fixes only with GO+confirmed
 - decision_owner: hunter
-- next_typical: /opsx-materialize-bug-queue | /opsx-fix-bug WITHOUT GO
+- next_typical: /opsx-materialize-bug-queue | /opsx-claim-next-bug (never bare fix-bug)
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-fanout-bug-hunt
@@ -214,8 +223,8 @@
 - artifacts_read: hunt sources
 - artifacts_written: fanout registry
 - decision_owner: fanout operator
-- next_typical: /opsx-fix-bug WITHOUT GO
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: /opsx-claim-next-bug (chat-required) | materialize (never bare fix-bug)
+- known_flaws: NOT_OPENED_BUDGET detail; duplicate_root → observation not claimable
 
 ### /opsx-learn-from-bug
 - purpose: product/logic bug → transferable lesson to **existing** process target
@@ -319,12 +328,25 @@ pr_ready --/opsx-split-for-pr--> pr_ready
 pr_ready --/opsx-create-pr--> pr_ready
 
 # product/behavioral only — process-contract Bugbot ≠ this edge (see F6)
-bug_signal_raw --/opsx-fix-bug (first-run)--> intake_recorded
-intake_recorded --/opsx-fix-bug adjudication--> finding_queued
+bug_signal_raw --/opsx-fix-bug (first-run mode=intake)--> intake_recorded
+intake_recorded --/opsx-fix-bug adjudication--> finding_queued|fix_now_ready
+
+# queue / child-chat only (CHAT_REQUIRED=true ∧ STATUS=available)
 finding_queued --/opsx-claim-next-bug--> finding_claimed
-finding_claimed --/opsx-fix-bug (no GO)--> adjudicating
+finding_claimed --/opsx-fix-bug (no GO + claim_token)--> adjudicating|fix_now_ready
+
+# known-root / non-queue (CHAT_REQUIRED=false; claim optional/skipped)
+finding_queued --/opsx-fix-bug [CHAT_REQUIRED=false known-root]--> adjudicating|fix_now_ready
+
+fix_now_ready --/opsx-fix-bug GO [iff fix_now]--> fixed_or_closed
+# durable STATUS for GO path: available+CHAT_REQUIRED=false OR claimed+token
+# — NOT durable ready_for_fix / adjudicating / implementing / verification (F7)
+
+# refuse / repair (orientation; not happy-path edges)
+# DUP-*|duplicate_root|duplicate_root_observation --X--> claim-next | fix-bug adjudication
+# claimed+empty CLAIM_TOKEN --/opsx-materialize-bug-queue repair=mint|release--> claimed|available
+
 adjudicating --/opsx-classify-bug--> adjudicating|planning_revise
-adjudicating --/opsx-fix-bug GO [iff fix_now]--> fixed_or_closed
 adjudicating --/opsx-invariant--> invariant_defined
 invariant_defined --/opsx-bug-hunt|/opsx-fanout-bug-hunt--> finding_queued
 fixed_or_closed --/opsx-learn-from-bug--> learning_candidate
@@ -413,11 +435,34 @@ Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
     `/opsx-admin-command-promote-process-lesson` (not `/opsx-learn-from-bug`)
   do_not_pretend_fixed: false (routing recorded; example ADL apply instance closed in contracts 2026-07-27 — F6 still applies to future process Bugbots)
 
+- id: F7 FIXBUG_STATUS_READY_FOR_FIX_DEAD_END
+  where: opsx-fix-bug.md claim ownership / status refusal
+  symptom: |
+    durable STATUS in {ready_for_fix, adjudicating, implementing, verification,
+    backlog, blocked, absorbed_*, closed_*, promoted_*, duplicate_ancestor,
+    duplicate_root_observation} → blocked_finding_status_not_actionable even with GO
+  operator_workaround: |
+    after adjudication without GO keep durable STATUS=available with
+    CHAT_REQUIRED=false (known-root) or STATUS=claimed with non-empty CLAIM_TOKEN;
+    do not map graph state fix_now_ready onto durable ready_for_fix
+  do_not_pretend_fixed: true (as-is contract quirk)
+
+- id: F8 CORRUPT_CLAIM_EMPTY_TOKEN
+  where: opsx-claim-next-bug / opsx-fix-bug / opsx-materialize-bug-queue repair=
+  symptom: STATUS=claimed + empty/absent durable CLAIM_TOKEN
+  operator_workaround: |
+    /opsx-materialize-bug-queue mode=update case=<CASE_ID> finding=<FINDING_ID>
+    repair=mint_missing_claim_token (OWNER_CHAT set) or repair=release_corrupt_claim;
+    never invent CLAIM_TOKEN inside claim-next or fix-bug
+  do_not_pretend_fixed: false (repair path in contracts; now indexed in GRAPH)
+
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
 - Bug recovery: `.tmp/opsx-bug-cases/INDEX.md` pasteable NEXT_ACTION
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
+- Known-root skip-claim: `CHAT_REQUIRED=false` + durable `available` → fix-bug (±GO) without claim-next
+- Claimable queue: `available`+`CHAT_REQUIRED=true` → claim-next first (never invent token)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
@@ -428,4 +473,4 @@ Do **not** use `/opsx-bug-hunt` to discover command-contract classes (F6).
 - Process ambiguity / command-relationship / admin misbehavior triage (before
   knowing fix vs analyze vs design): `/opsx-admin-command-consult` (READ_ONLY;
   routes to one specialized next step; does not own GRAPH.md)
-- Uncommitted process edits after design/fix: `/opsx-admin-command-commit` (not `/opsx-commit`)
+- Uncommitted process edits after design/fix/pipeline UPDATE GO: `/opsx-admin-command-commit` (not `/opsx-commit`)
