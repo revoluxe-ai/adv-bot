@@ -28,7 +28,7 @@
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
 - implementing: `/opsx-apply` in progress
-- impl_done: tasks complete; need verify
+- impl_done: tasks complete; soft-recommend coverage when production `.py`, then verify
 - verify_pass: archive-eligible after `/opsx-verify`
 - verify_fail: back to apply/update
 - archived: `/opsx-archive` done
@@ -91,6 +91,9 @@
 ### Typing / quality / ship
 - typing_packet: pyright/mypy → `/opsx-fix-types`
 - tests_authored: `/opsx-test`
+- coverage_pass: `/opsx-pyright-strict-coverage` — in-policy diff ⊆ strict include
+- coverage_gaps: missing include and/or HIT_EXCLUDE; needs GO or manual include
+- blocked_needs_base: coverage command missing/invalid `base=`
 - static_check_done: `/opsx-static-check` synthesized
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
@@ -154,8 +157,18 @@
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
 - artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
-- next_typical: /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
+- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
 - known_flaws: none recorded (ADL budget-exhaust→NO_GO closed 2026-07-27); task delta ≠ auto GO
+
+### /opsx-pyright-strict-coverage
+- purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude)
+- input_state: implementing | impl_done | product_dirty
+- output_state: coverage_pass | coverage_gaps | blocked_needs_base
+- artifacts_read: git diff base...head; pyrightconfig_strict.json
+- artifacts_written: none without GO; with GO only additive include[] entries
+- decision_owner: coverage auditor; include expansion only with owner GO
+- next_typical: /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy
 
 ### /opsx-materialize-bug-queue
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist
@@ -399,6 +412,9 @@ change_scaffolded --/opsx-continue--> artifacts_in_progress|apply_ready
 change_idea --/opsx-ff--> apply_ready
 artifacts_in_progress --/opsx-continue--> apply_ready
 apply_ready --/opsx-apply--> implementing|impl_done
+impl_done --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
+coverage_pass --/opsx-static-check--> static_check_done
+coverage_gaps --/opsx-pyright-strict-coverage GO|/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 impl_done --/opsx-verify--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
@@ -479,7 +495,7 @@ family_learning --/opsx-bug-team CLOSURE--> family_closed
 # resume: /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
-implementing|impl_done --/opsx-static-check--> static_check_done
+implementing|impl_done|coverage_pass --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
 # command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
@@ -492,6 +508,15 @@ implementing|impl_done --/opsx-test--> tests_authored
 
 NAVIGATE may surface these; they are **not** forced edges and **not**
 lifecycle authority.
+
+### Post-apply pyright-strict allowlist coverage
+
+After `/opsx-apply` when production Python changed (`app/**/*.py` or
+top-level production scripts): recommend
+`/opsx-pyright-strict-coverage base=<BASE>` before `/opsx-static-check`
+and `/opsx-verify`. `PASS` pyright-strict alone does **not** prove changed
+files are in `pyrightconfig_strict.json` include. Soft recommend — does not
+block archive by itself.
 
 ### Pre-Bugbot primary hunt
 
@@ -658,6 +683,9 @@ command-contract classes (F6).
 - Class lesson: requires FANIN_READY; else LESSON_CANDIDATE_ONLY
 - Pre-PR product/runtime: `/opsx-project-bug-hunt` receipt before `/opsx-create-pr`
   (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
+- After apply with production `.py`: soft recommend
+  `/opsx-pyright-strict-coverage base=<BASE>` before `/opsx-static-check` /
+  `/opsx-verify` (allowlist coverage ≠ checker PASS)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`

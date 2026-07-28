@@ -30,6 +30,7 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
 - `openspec/config.yaml` → `rules.tasks` → task-generation obligations
 - `/opsx-invariant` → `TEST_COVERAGE_PACKET` → change-specific test obligations
 - `/opsx-verify` → independent adequacy and archive verdict
+- `/opsx-pyright-strict-coverage` → post-apply recommend when production `.py` changed
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
@@ -74,7 +75,7 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
 
    **Handle states:**
    - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx:continue` / openspec-continue-change
-   - If `state: "all_done"`: congratulate, suggest `/opsx-verify <change-name>` (not archive readiness)
+   - If `state: "all_done"`: congratulate, then follow **Post-apply next-step recommend** in `.cursor/commands/opsx-apply.md` (not archive readiness)
    - Otherwise: proceed to implementation
 
 4. **Read context files**
@@ -132,7 +133,7 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
    Display:
    - Tasks completed this session
    - Overall progress: "N/M tasks complete"
-   - If all done: suggest `/opsx-verify <change-name>` as the next step (do not claim archive readiness)
+   - If all done: follow **Post-apply next-step recommend** in `.cursor/commands/opsx-apply.md` (do not claim archive readiness)
    - If paused: explain why and wait for guidance
 
 **Output During Implementation**
@@ -163,7 +164,15 @@ Working on task 4/7: <task description>
 - [x] Task 2
 ...
 
-Implementation tasks complete. Next: `/opsx-verify <change-name>`.
+Implementation tasks complete.
+
+If production Python changed (`app/**/*.py` or top-level production scripts):
+  Next: `/opsx-pyright-strict-coverage base=<BASE>`
+  Then: `/opsx-static-check` (after coverage PASS)
+  Then: `/opsx-verify <change-name>`
+Else:
+  Next: `/opsx-verify <change-name>`
+
 Do not claim archive readiness from apply alone.
 ```
 
@@ -200,7 +209,7 @@ What would you like to do?
 - Do not invent mandatory scenarios without evidence
 - Do not create phantom fields or impossible states; do not fully mock the causal boundary under test
 - Do not declare final adequacy or archive readiness
-- After completion / `all_done`, next step is `/opsx-verify <change-name>`
+- After completion / `all_done`, follow Post-apply next-step recommend in `/opsx-apply` (`/opsx-pyright-strict-coverage` when production `.py` changed, else `/opsx-verify <change-name>`)
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
