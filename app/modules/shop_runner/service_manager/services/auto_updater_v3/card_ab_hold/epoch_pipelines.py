@@ -34,6 +34,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     normalize_card_ab_hold_mode,
     normalize_card_ab_hold_phase,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
+    setup_apply as ab_hold_setup_apply,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stale_stats_freeze import (
     should_freeze_keyword_and_bid_mutations,
 )
@@ -287,6 +290,11 @@ async def sync_intent_to_wb(
 ) -> None:
     """Синхронизировать confirmed intent на WB (allowed-set + Auto CPM, §22).
 
+    При ``cap_exceeded`` MUST записать durable ``card_ab_hold_degraded`` через
+    shared ``persist_ab_hold_degraded_flag`` (decision §8 / tasks 8.12) **до**
+    того, как caller пометит sync COMPLETE и перейдёт в ACTIVE — иначе UI
+    заявит чистый hold при частичном enforcement.
+
     Raises:
         Exception: любая ошибка WB → caller помечает sync partial.
     """
@@ -301,10 +309,21 @@ async def sync_intent_to_wb(
     enforce = await minus_mgr.enforce_frozen_allowed_set(
         complex_adv, allowed_snapshot
     )
-    if enforce.get("cap_exceeded"):
+    degraded = bool(enforce.get("cap_exceeded"))
+    # decision §8: честная деградация MUST быть durable до COMPLETE→ACTIVE
+    # (тот же helper, что process_ab_hold / setup — не второй write-path).
+    if degraded != bool(
+        getattr(complex_adv.adv_setting, "card_ab_hold_degraded", False)
+    ):
+        await ab_hold_setup_apply.persist_ab_hold_degraded_flag(
+            adv_setting_id=int(complex_adv.adv_setting.id),
+            degraded=degraded,
+        )
+        complex_adv.adv_setting.card_ab_hold_degraded = degraded
+    if degraded:
         logger.warning(
             "[adv_id=%s] sync_intent_to_wb: allowed-set cap exceeded — "
-            "continuing with partial enforcement",
+            "continuing with partial enforcement (degraded persisted)",
             complex_adv.adv_id,
         )
 
