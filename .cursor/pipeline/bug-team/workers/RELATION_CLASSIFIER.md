@@ -1,0 +1,9 @@
+# Worker: RELATION_CLASSIFIER (V8/V9 shadow)
+
+```text
+WORKER_ID: RELATION_CLASSIFIER
+ACTIVATION_STATUS: SHADOW_V8
+POLICY: .cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json
+```
+
+`BLOCKS_FAMILY_CLOSURE` is derived from policy `RELATION_RULES` (NF-V9-003).

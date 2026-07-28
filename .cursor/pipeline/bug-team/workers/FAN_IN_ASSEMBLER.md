@@ -33,6 +33,10 @@ FORBIDDEN:
   LEDGER; ROUTE-TRACE; CASE; findings; INDEX; production; tests; OpenSpec; .cursor; checkpoint
 ```
 
+ACTIVE_V1 root fan-in. When V8 family fanout is Owner-enabled, prefer
+`FAMILY_FAN_IN_ASSEMBLER` / `results/FAMILY-FANIN.md` per
+`policy/BUG_FAMILY_FANOUT_POLICY.json` (do not duplicate rules here).
+
 ## TIMEOUT_SECONDS
 
 ```text
