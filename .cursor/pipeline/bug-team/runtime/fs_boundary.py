@@ -115,12 +115,18 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
     "FAN_IN_ASSEMBLER": ["results/FANIN.md"],  # ONLY (legacy ACTIVE_V1)
     "FAMILY_FAN_IN_ASSEMBLER": [
         "results/FAMILY-FANIN.md",
+        "results/FAMILY-FANIN.json",
+        # write_family_fanin updates FAMILY_STATUS → FANIN_READY
+        "family/FAMILY.json",
         "team/packets/",
         "team/heartbeats/",
     ],
     "INVARIANT_CAPTURE_WORKER": [
-        "family/INVARIANT.md",
-        "family/FAMILY.json",
+        # Full family skeleton + invariant proof (V9): INVARIANT.md/.json,
+        # ROOT-GREEN-PROOF.json, FAMILY.json, DEPENDENCIES/INTEGRATION/
+        # BRANCHES/LEARNING_PACKET, plus optional ROOT-GREEN-REUSED marker.
+        "family/",
+        "results/ROOT-GREEN-REUSED-",
         "team/packets/",
         "team/heartbeats/",
     ],
@@ -136,6 +142,8 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
     "INTEGRATION_OPERATOR": [
         "family/INTEGRATION.json",
         "family/DEPENDENCIES.json",
+        "family/FAMILY.json",
+        "family/BRANCHES.jsonl",
         "branches/",
         "results/FAMILY-GREEN-REPORT.md",
         "team/packets/",
@@ -143,6 +151,7 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
     ],
     "FAMILY_LEARNING_WORKER": [
         "family/LEARNING_PACKET.json",
+        "family/FAMILY.json",
         "results/LEARNING_REPORT.md",
         "team/packets/",
         "team/heartbeats/",
@@ -189,6 +198,8 @@ def path_allowed(worker_id: str, rel_path: str) -> bool:
             return True
         if rel.startswith("team/packets/") or rel.startswith("team/heartbeats/"):
             return True
+        if rel.startswith("family/") or "/family/" in rel:
+            return True
         if (rel.startswith("results/") or "/results/" in rel) and "FANIN.md" not in rel:
             return True
         return False
@@ -226,6 +237,9 @@ def evaluate_write_boundary(
         "team/CHECKPOINT.md",
         "team/intents/",
         "team/snapshots/",
+        # V10 host-owned identity / retry authority (written by finalize, not workers)
+        "team/executions/",
+        "team/retries/",
         "gates/",
         "results/ROUTE-TRACE.jsonl",
     ]
