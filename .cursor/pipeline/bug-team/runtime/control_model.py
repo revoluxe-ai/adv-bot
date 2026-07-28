@@ -202,7 +202,7 @@ def decide_auto_closure(
             "BLOCKING_FINDINGS": blocking,
             "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
         }
-    if closure_readiness != "READY_FOR_CLOSURE":
+    if closure_readiness not in ("READY_FOR_CLOSURE", "READY_FOR_FAMILY_CLOSURE"):
         return {
             "STATUS": "BLOCKED_FANIN_NOT_READY",
             "AUTO_CLOSURE": False,
