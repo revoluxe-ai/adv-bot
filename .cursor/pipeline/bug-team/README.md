@@ -55,4 +55,20 @@ pipeline**, not `.cursor/agents/*`.
 создаст case и выберет безопасный маршрут.
 ```
 
-See `.cursor/commands/opsx-bug-team.md`.
+## Corrective V2 additions (machine enforcement)
+
+```text
+ACTIVATION.json + runtime/activation.py     BF-007
+runtime/packets.py                          BF-002 UNKNOWN_FIELDS REJECT
+runtime/fs_boundary.py                      BF-003 filesystem snapshot diff
+runtime/owner_go.py                         BF-004 durable one-time GO
+runtime/route_trace.py                      BF-005 append-only v2
+runtime/timeout.py                          BF-006 honest cancellation limits
+runtime/orchestrator.py                     reusable prep/validate/record
+runtime/graph_fingerprint.py                BF-008 reproducible inventory
+harness/run_corrective_tests.py             CT-01..CT-18
+CORRECTIVE_LIVE_PROOF_REPORT.md             11/11 real Task proofs
+```
+
+Python harness does **not** replace Cursor Task dispatch. Host orchestrator
+must invoke the Task tool; harness validates packets/FS/trace/gates.

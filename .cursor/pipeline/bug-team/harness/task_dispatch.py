@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
-"""OPSX bug-team Candidate Task dispatch helpers.
+"""SIMULATED Task dispatch backend (NOT live runtime authority).
 
-Доказывает registry-driven Cursor Task worker model: каждый worker
-получает отдельный WORKER_EXECUTION_ID и запись в DISPATCH.jsonl.
-Оркестратор не симулирует роли в одном чате.
+```text
+EXECUTION_CLASS: SIMULATED_BACKEND
+LIVE_RUNTIME_AUTHORITY: NONE
+```
+
+Authoritative live path: ``runtime/live_task_hop.py``.
+This module must NOT be imported by the live orchestrator path.
+Retained only for controlled harness / simulated unit tests.
 """
 
 from __future__ import annotations

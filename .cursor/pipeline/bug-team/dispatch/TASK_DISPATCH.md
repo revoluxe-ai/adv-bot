@@ -132,14 +132,27 @@ Each inequality ⇒ distinct `WORKER_EXECUTION_ID` and distinct Cursor Task run.
 
 Timeout is **per Task subagent**, not one global command timer only.
 
+```text
+CURSOR_TASK_CANCELLATION: PARTIAL_INTERRUPT_ON_RESUME
+PROCESS_TREE_TERMINATION: BLOCKED_PLATFORM_TERMINATION_LIMITATION
+SAFE_TIMEOUT_ENFORCEMENT:
+  logical state isolation
+  dependent-wave stop
+  stale/late-output rejection
+  finite retry
+```
+
 On TIMEOUT:
 
-1. Mark that `WORKER_EXECUTION_ID` as TIMEOUT in DISPATCH.jsonl.
-2. Terminate that process tree (do not await forever).
-3. Keep partial output if any.
+1. Mark that `WORKER_EXECUTION_ID` as TIMEOUT in DISPATCH.jsonl / checkpoint ACTIVE_STATUS.
+2. Do **not** claim unconditional OS process-tree kill — platform limitation applies;
+   use `PARTIAL_INTERRUPT_ON_RESUME` when resuming/cancelling via Cursor Task.
+3. Keep partial output if any; reject late/stale finalize for that WEX.
 4. Do not dispatch dependent workers.
-5. Persist resumable CHECKPOINT.
+5. Persist resumable CHECKPOINT with new ACTIVE WEX on retry.
 6. Orchestrator must **not** fabricate the missing output packet.
+
+Live hop authority: `.cursor/pipeline/bug-team/runtime/live_task_hop.py`.
 
 ## Fan-out
 

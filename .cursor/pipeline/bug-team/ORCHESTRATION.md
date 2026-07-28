@@ -33,6 +33,11 @@ The host orchestrator must not perform worker duties itself.
 ## Lifecycle waves
 
 ```text
+CONTROL_MODEL (default after activation):
+  USER_REVIEWS_UNCOMMITTED_WORKTREE
+DEFAULT_EXECUTION_MODE:
+  CONTROLLED_LIVE_UNCOMMITTED
+
 WAVE_1:
   MATERIALIZER (Task)
   → DUPLICATE_CHECK / CLAIM_WORKER (Task)
@@ -42,34 +47,33 @@ WAVE_2:
 
 WAVE_3A — Route A:
   RED_TEST_WORKER (Task)
-  → STOP OWNER_PRODUCTION_GO_DECISION
-  → IMPLEMENTATION_EXECUTOR (Task)
-  → GREEN_VERIFIER (Task)   # distinct WEX from Executor
+  → validate local execution authority (no Owner GO stop)
+  → IMPLEMENTATION_EXECUTOR (Task)   # local uncommitted worktree writes
+  → GREEN_VERIFIER (Task)
 
 WAVE_3B — Route B:
   SPEC_UPDATE_WORKER (Task)
   → TASK_DELTA routing
   → RED_TEST_WORKER (Task)
-  → STOP OWNER_PRODUCTION_GO_DECISION
+  → validate local execution authority
   → IMPLEMENTATION_EXECUTOR (Task)
   → GREEN_VERIFIER (Task)
 
 WAVE_3C — Route C:
-  close recommendation without implementation (no RED/fix/GO)
+  close recommendation without implementation (no RED/fix)
 
 WAVE_3D — Route D:
-  durable ROUTE_TARGET_PROCESS_ID handoff
+  durable ROUTE_TARGET_PROCESS_ID handoff (no fake closure)
 
 WAVE_4:
   TASK_COMPLETION_WORKER (Task)
   → BOUNDED_HUNTER (Task)
   → FAN_IN_ASSEMBLER (Task)   # writes ONLY results/FANIN.md
-  → STOP OWNER_FINAL_CLOSURE_DECISION
-  → CLOSURE_OPERATOR (Task)
+  → auto CLOSURE_OPERATOR when READY_FOR_CLOSURE (no Owner closure stop)
+  → HUMAN_SUMMARY.md + terminal CLOSED + AWAITING_USER_REVIEW
 ```
 
-Next wave forbidden until prior output packet passes schema + status +
-authority validation.
+Legacy `EXECUTION_MODE=OWNER_GATED` still enforces Owner production/closure GO.
 
 ## Lifecycle (linear view)
 
@@ -79,13 +83,13 @@ BUG SIGNAL (free-form | context | signal= | case= resume)
 → CLAIM_WORKER (when claimable)
 → CLASSIFIER
 → Route A | B | C | D | INSUFFICIENT_EVIDENCE
-→ (Route A/B) RED → OWNER_PRODUCTION_GO_DECISION STOP
-→ IMPLEMENTATION_EXECUTOR (only after Owner GO)
+→ (Route A/B) RED → local authority → IMPLEMENTATION_EXECUTOR
 → GREEN_VERIFIER
 → TASK_COMPLETION_WORKER
 → BOUNDED_HUNTER
 → FAN_IN_ASSEMBLER
-→ OWNER_FINAL_CLOSURE_DECISION STOP
+→ CLOSURE_OPERATOR (auto) + HUMAN_SUMMARY
+→ USER reviews uncommitted worktree (no auto-commit)
 ```
 
 ## Canonical routes
@@ -171,31 +175,28 @@ ROUTE_RECONCILIATION
 
 Mismatch → `BLOCKED_ROUTE_MISMATCH`; no production GO; no episode close.
 
-## Owner gates
+## Owner / local authority gates
 
-### Production gate
+### Default: CONTROLLED_LIVE_UNCOMMITTED
+
+```text
+RED_CONFIRMED → validate local execution authority → IMPLEMENTATION_EXECUTOR
+FANIN READY_FOR_CLOSURE + BLOCKING_FINDINGS=NONE → auto CLOSURE_OPERATOR
+```
+
+Local worktree writes allowed after valid RED. No intermediate Owner GO / closure stop.
+Commit/push/deploy remain forbidden (user reviews uncommitted tree).
+
+### Legacy: OWNER_GATED
 
 ```text
 RED_CONFIRMED → STOP → OWNER_PRODUCTION_GO_DECISION
-```
-
-Without Owner GO forbid:
-
-```text
-production writes
-/opsx-apply production execution
-/opsx-fix-bug production execution
+FAN_IN_READY_FOR_OWNER_CLOSURE → STOP → OWNER_FINAL_CLOSURE_DECISION
 ```
 
 Bypass attempts → rejected (`OWNER_GATE_BYPASS_REJECTED`).
 
-### Closure gate
-
-```text
-FAN_IN_READY_FOR_OWNER_CLOSURE → STOP → OWNER_FINAL_CLOSURE_DECISION
-```
-
-Fan-In Assembler must not close the case.
+Fan-In Assembler must not close the case (CLOSURE_OPERATOR only).
 
 ## Claim authority
 
