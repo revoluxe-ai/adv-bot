@@ -611,7 +611,7 @@ When Wildberries synchronization for an epoch is durably marked fully successful
 - **AND** it does not perform further Wildberries mutations for that generation
 
 ### Requirement: Stale or missing statistics freeze keyword and bid mutations without stopping the campaign
-While a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch, if the campaign or a keyword has stale or missing statistics, the system MUST NOT make a keyword inclusion/exclusion decision and MUST NOT make a Search or Auto bid mutation based on that stale or missing data; both classes of decision MUST freeze for the affected keyword or campaign until fresh statistics are available. Stale or missing statistics alone MUST NOT be a reason to stop the campaign; freezing inclusion/exclusion and bid mutation decisions is distinct from, and MUST NOT be treated as equivalent to, stopping the campaign.
+While a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch, if the campaign or a keyword has stale or missing statistics, the system MUST NOT make a keyword inclusion/exclusion decision and MUST NOT make a Search or Auto bid mutation based on that stale or missing data; both classes of **decide** MUST freeze for the affected keyword or campaign until fresh statistics are available. Stale or missing statistics alone MUST NOT be a reason to stop the campaign; freezing inclusion/exclusion and bid mutation decisions is distinct from, and MUST NOT be treated as equivalent to, stopping the campaign. After a durable PENDING activation intent exists for the epoch, applying that intent's confirmed parameters to PostgreSQL and synchronizing them to Wildberries (apply snapshot) MUST NOT be blocked solely because statistics are stale or missing; decide-class freezes MAY still apply on the same tick.
 
 #### Scenario: Stale statistics freeze keyword inclusion/exclusion decisions
 - **GIVEN** a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold epoch
@@ -629,6 +629,13 @@ While a campaign is in WARM_UP, awaiting confirmation, or in an active A/B Hold 
 - **GIVEN** a campaign has stale or missing statistics during WARM_UP, awaiting confirmation, or an active A/B Hold epoch
 - **WHEN** the system evaluates the campaign's operational state
 - **THEN** the campaign is not stopped solely because of the stale or missing statistics
+
+#### Scenario: Stale statistics do not block apply of a recorded PENDING intent
+- **GIVEN** a durable PENDING activation intent exists for an epoch
+- **AND** the campaign or keyword statistics are stale or missing
+- **WHEN** shop-runner would apply that intent to PostgreSQL and synchronize it to Wildberries
+- **THEN** that apply snapshot and Wildberries synchronization MUST proceed (MUST NOT be skipped solely because of stale or missing statistics)
+- **AND** decide-class keyword inclusion/exclusion and ordinary Search/Auto bid mutations MUST still freeze until fresh statistics are available
 
 ### Requirement: Daily budget control remains a reused stop-threshold, not a new financial-safety mechanism
 A/B Hold MUST reuse the existing daily budget / campaign activity-control behavior as-is: it is a stop threshold, not a hard cap, and spend MAY overshoot that threshold because of statistics reporting delay, worker cadence, in-flight spend, concurrent write paths, and top-up not clipped to remaining daily room; there is no guaranteed numeric upper bound on that overshoot. The daily budget resets each day, and spend MAY resume the next day after the reset. A/B Hold MUST NOT introduce an absolute test budget, an epoch spend cap, a velocity cap, a generic financial safety latch, a new emergency-stop subsystem, or global refill/restart suppression as part of this capability.

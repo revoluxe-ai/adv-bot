@@ -233,6 +233,7 @@
 - [x] 23.4 Реализация freeze-гарда для keyword inclusion/exclusion и Search/Auto bid-мутаций на общем freshness-классе (реюз `_split_advs_by_stats_freshness`-подобной проверки, не дублировать §2a enable-gate); явно не трогать существующий campaign-stop / activity-control путь.
 - [x] 23.5 RU-docstrings со ссылкой на spec requirements «Stale or missing statistics freeze keyword and bid mutations without stopping the campaign» + decision `card-ab-hold-write-path-ownership` §17; focused pytest + `pyright-strict`.
 - [x] 23.6 Tests-first (OP-008): stale/missing stats during ACTIVE — keyword/bid mutations frozen (§23.1–23.2) while `ensure_campaigns_active` daily-budget path MAY still run/pause campaign (§18.5.7 / decision §18); regression proves freeze banner ≠ campaign stopped (UX contract §11 / storyboard S3).
+- [x] 23.7 PBH-005 carve-out (`/opsx-update` 2026-07-28 + `/opsx:apply`): after durable PENDING intent, `process_ab_epoch` MUST apply/sync despite `stats_fresh=False` (decide-class freeze remains in `stale_stats_freeze` / hold paths). Tests-first invert: `test_stale_stats_does_not_block_pending_intent_wb_sync`; paired residual `test_complete_residual_stale_stats_still_activates` unchanged.
 
 ## 24. Telegram confirmation UX (planning-level): пагинация 10, Back сохраняет черновик, Cancel — отдельное действие (update)
 
