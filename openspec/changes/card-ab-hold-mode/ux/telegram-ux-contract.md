@@ -72,10 +72,11 @@ from every phase and always returns to S0/`OFF` (§6).
 |---|---|---|---|
 | `OFF` (S0) | Enable | *(gates: §2a freshness, §12 V3, §14a max CPO, §2c volume — all unchanged MVP-1 behavior)* | mode → `PENDING_SETUP`, Redis ENTER signal written (existing) |
 | `PENDING_SETUP`, gates passed | shop-runner setup tick classifies eligible keywords (`pay_for_order ≤ max CPO`, `views ≥ 100`) | `AWAITING_KEYWORD_CONFIRM` (S1) | eligible-candidate read-model available; no snapshot yet |
-| S1 draft | Confirm keyword set | `WARM_UP` (S2 then S3) | confirmed keyword set becomes durable; populates the allowed-set snapshot (decision `ab-hold-confirmed-epoch-parameters-sot` §1); WARM_UP timer starts |
+| S1 draft | Confirm keyword set | `WARM_UP` config (**S2**) | confirmed keyword set becomes durable; populates the allowed-set snapshot (decision `ab-hold-confirmed-epoch-parameters-sot` §1); phase enters WARM_UP duration-configuration; `warmup_started_at` MUST remain NULL (timer MUST NOT start) |
+| S2 (WARM_UP duration) | Confirm duration (`warmup_duration_confirm`) | `WARM_UP` running (**S3**) | selected/default duration (≥24h) persisted; `warmup_started_at` set; WARM_UP timer starts at that duration |
 | S1 draft | Back | S1 (still `AWAITING_KEYWORD_CONFIRM`, closed to a summary view) | draft preserved |
 | S1 draft | Cancel → confirm dialog → Yes | `OFF` (S0) | epoch attempt aborted; no snapshot existed yet, nothing durable to clear (§8) |
-| S3 (WARM_UP running) | user manually edits keyword set (S1b) | S1b draft, then on confirm → `WARM_UP` restarted | prior confirmed keyword set replaced; **WARM_UP timer ends and a new timer starts from 0** (decision §4); elapsed time not carried over |
+| S3 (WARM_UP running) | user manually edits keyword set (S1b) | S1b draft, then on confirm → **S2** (duration config) | prior confirmed keyword set replaced; running timer ends (`warmup_started_at` cleared); next screen is S2; timer restarts only on subsequent `warmup_duration_confirm` (decision §4) |
 | S3 | WARM_UP timer elapses (≥ configured duration, min 24h) | `AWAITING_TP_CONFIRM` (W3-propose) | fact/proposed-TP read-model computed per keyword |
 | S3 | EXIT (Disable) | `OFF` (S0) | mode → `OFF`; WARM_UP timer discarded; allowed-set snapshot cleared (existing EXIT contract) |
 | W3-propose draft | Confirm all target places | `TP_CONFIRMED` (W3-confirmed), then `AWAITING_AUTO_PARTICIPATION_CONFIRM` (A1) | confirmed target places become durable and immutable for this epoch attempt (until a new epoch) |
@@ -104,7 +105,7 @@ because the copy in the storyboard (`telegram-storyboard.md`) is written to matc
 | S0, mode `OFF` | `[Включить A/B тест]` / `[← Назад]` |
 | S0, mode ≠ `OFF` (any later phase reachable from status poll) | `[Открыть текущий шаг]` (deep-links to the current phase screen) / `[Выключить A/B тест]` / `[← Назад]` |
 | S1 (keyword confirm) | per-page: `[✓/✗ <keyword 1>]` … `[✓/✗ <keyword 10>]` / `[◀ Стр.]` `[Стр. ▶]` (only if >1 page) / `[Подтвердить набор]` / `[← Назад]` `[Отмена]` |
-| S1b (mid-WARM_UP edit) | same rows as S1, with a header line stating this edit will restart WARM_UP |
+| S1b (mid-WARM_UP edit) | same rows as S1, with a header line stating this edit ends the running timer and returns to duration configuration (S2); timer restarts only after duration confirm |
 | S2 (WARM_UP duration) | `[24ч (по умолчанию)]` / `[Увеличить: +24ч]` `[Увеличить: +48ч]` / `[Подтвердить длительность]` / `[← Назад]` `[Отмена]` |
 | S3 (WARM_UP progress) | `[Обновить статус]` / `[Изменить набор ключей]` / `[Выключить A/B тест]` / `[← Назад]` |
 | W3-propose | per-page: `[<keyword i>: факт K → цель N]` (display-only row) … / `[◀ Стр.]` `[Стр. ▶]` (only if >1 page) / `[Подтвердить целевые позиции]` / `[← Назад]` `[Отмена]` |
@@ -132,9 +133,9 @@ the contract**.
 | `disable` (EXIT) | any phase screen | — | none (always available) | mode → `OFF`; see §4 table per-phase durable effect |
 | `keyword_toggle` | S1, S1b | `keyword_id`, `page` | screen shows a draft | flips one keyword's draft inclusion state; redraws same page; does not move phase |
 | `page_prev` / `page_next` | S1, S1b, W3-propose, W3-confirmed, H1-detail | `page` | more than one page exists | redraws same screen at `page ± 1`; never a phase transition; never touches Back/Cancel state |
-| `keyword_set_confirm` | S1, S1b | — | at least one keyword included | commits draft → durable confirmed keyword set; starts/restarts WARM_UP (S1) or ends+restarts WARM_UP timer (S1b) |
+| `keyword_set_confirm` | S1, S1b | — | at least one keyword included | commits draft → durable confirmed keyword set; enters WARM_UP duration-configuration (**S2**); MUST NOT set `warmup_started_at` / MUST NOT start the timer. On S1b: also ends any running timer (`warmup_started_at` cleared) before returning to S2 |
 | `warmup_duration_preset` | S2 | `hours` (≥24) | screen shows a draft | sets draft duration; redraws S2 |
-| `warmup_duration_confirm` | S2 | — | draft duration ≥ 24h | commits WARM_UP duration; WARM_UP timer starts at that duration |
+| `warmup_duration_confirm` | S2 | — | draft duration ≥ 24h | commits WARM_UP duration; sets `warmup_started_at`; WARM_UP timer starts (or restarts after S1b) at that duration; next screen is **S3** |
 | `warmup_status_refresh` | S3 | — | phase `WARM_UP` | redraws S3 from durable timer state; never mutates |
 | `keyword_edit_open` | S3 | — | phase `WARM_UP` | opens S1b (draft = current confirmed keyword set) |
 | `tp_confirm_all` | W3-propose | — | all keywords reviewed | commits confirmed target places (durable, immutable this epoch); moves to A1 |
@@ -259,14 +260,15 @@ This closes the same class of race the applied MVP-1 already partially covers fo
 
 | State | Screen | What is locked | What remains actionable |
 |---|---|---|---|
-| Confirmed keyword set (post-`keyword_set_confirm`, before a new S1b edit) | S3 status | Keyword set is durable; not directly editable from S3 | `keyword_edit_open` reopens it as a **new S1b draft** (which, on confirm, restarts WARM_UP per §4) — editing is explicit and always restarts the timer, never silent |
+| Confirmed keyword set (post-`keyword_set_confirm`, before a new S1b edit) | S3 status | Keyword set is durable; not directly editable from S3 | `keyword_edit_open` reopens it as a **new S1b draft** (which, on confirm, ends the running timer and returns to **S2** duration configuration per §4/§6; the new timer starts only after `warmup_duration_confirm`) — editing is explicit and never silently mutates the running timer |
 | Confirmed target places (post-`tp_confirm_all`) | **W3-confirmed** | Every keyword's TP is immutable for this epoch; no edit control exists anywhere in the UI for a confirmed TP within the same epoch | Pagination (view-only), Back destinations point here (§7), EXIT |
 | Confirmed Auto participation / Auto bid (post `auto_participation_confirm` / `auto_bid_confirm`) | A1/A2 status lines shown on P1/P2/H1 | Not editable within this epoch; ordinary Auto bid auto-update MUST NOT change it while `ACTIVE` (decision §16 / spec) | EXIT (starts a new epoch attempt from scratch after re-enable) |
 | `ACTIVE` hold (H1) | H1 | Target places, keyword set, Auto participation/bid, structural ACT paths all frozen (existing spec requirements) | Bidder keeps running (existing); EXIT; optional read-only detail pagination |
 
 A confirmed value never has an "edit" control rendered next to it anywhere after its own confirm step; the
-**only** way to change a confirmed keyword set is the explicit `keyword_edit_open` re-draft path (which
-restarts WARM_UP), and the **only** way to change a confirmed TP/Auto participation/Auto bid is a brand
+**only** way to change a confirmed keyword set is the explicit `keyword_edit_open` re-draft path (S1b
+confirm ends the current timer and returns to S2; the new timer starts only after duration confirmation),
+and the **only** way to change a confirmed TP/Auto participation/Auto bid is a brand
 new epoch (EXIT → re-enable, or the keyword-set-edit-during-WARM_UP path before TP was ever confirmed).
 
 ## 13. Mapping: UI phase ↔ PENDING intent / WB sync / ACTIVE / partial-sync recovery
