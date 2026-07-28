@@ -14,6 +14,9 @@ from sqlalchemy import select, update
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.common_bid_enter_reset import (
+    ensure_search_common_bid_reset_on_enter,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_lifecycle import (
     CardAbHoldSyncStatus,
     is_warmup_elapsed,
@@ -118,13 +121,19 @@ async def process_ab_epoch(
         stats_fresh: False при stale/missing stats — keyword/WB мутации §23 skip
             (не блокирует activate-only после complete).
     """
-    _ = wb_shop_data_manager
     if not is_epoch_managed_ab_hold(complex_adv.adv_setting):
         return
 
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
     if mode != CardAbHoldMode.PENDING_SETUP:
         return
+
+    # decision §19: ENTER one-shot common-bid reset (idempotent via Redis done).
+    _ = await ensure_search_common_bid_reset_on_enter(
+        complex_adv,
+        wb_manager_hub=wb_manager_hub,
+        wb_shop_data_manager=wb_shop_data_manager,
+    )
 
     adv_setting = complex_adv.adv_setting
     adv_setting_id = int(adv_setting.id)

@@ -32,6 +32,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldSignalRedisCache,
     setup_lock_redis_key,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.common_bid_enter_reset import (
+    ensure_search_common_bid_reset_on_enter,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_apply import (
     apply_ab_hold_setup_mutations,
     persist_ab_hold_degraded_flag,
@@ -72,8 +75,10 @@ async def process_ab_setup(
     §18.4 / §18.5: если ``card_ab_hold_phase`` non-NULL (epoch-managed), legacy
     auto-ACTIVE и ENTER TP-write Forbidden — setup-тик no-op (epoch path owns
     ACTIVE via PENDING intent → WB sync). ``phase IS NULL`` = legacy MVP-1.
+
+    Decision §19 / tasks §27: в начале тика owned one-shot Search common-bid
+    reset-to-min (идемпотентно; не ordinary updater).
     """
-    _ = wb_shop_data_manager
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
     if mode != CardAbHoldMode.PENDING_SETUP:
         logger.info(
@@ -82,6 +87,14 @@ async def process_ab_setup(
             mode.value,
         )
         return
+
+    # decision §19 / tasks §27: owned ENTER Search common-bid → WB min (once).
+    # До epoch early-return — иначе epoch-managed кампании никогда не сбросят.
+    _ = await ensure_search_common_bid_reset_on_enter(
+        complex_adv,
+        wb_manager_hub=wb_manager_hub,
+        wb_shop_data_manager=wb_shop_data_manager,
+    )
 
     if is_epoch_managed_ab_hold(complex_adv.adv_setting):
         # tasks §18.4: epoch-managed MUST NOT reach ACTIVE via legacy process_ab_setup.
