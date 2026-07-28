@@ -14,6 +14,7 @@ import logging
 from typing import Any, cast
 
 from aiogram import Router
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select
@@ -139,6 +140,49 @@ _GENERATION_PHASES = frozenset(
         CardAbHoldPhase.READY_ACTIVE,
     }
 )
+
+# A2 numeric-entry sub-flow (UX ``auto_bid_edit``): FSM state + draft flag.
+_CAH_AWAITING_AUTO_BID_STATE = "cah_awaiting_auto_bid_input"
+_CAH_AWAITING_AUTO_BID_ADV_KEY = "cah_awaiting_auto_bid_adv_id"
+_AUTO_BID_ENTRY_PROMPT = (
+    "Введите новую ставку Auto (число больше 0) и отправьте сообщение в чат."
+)
+
+
+def _resolve_auto_bid_entry_adv_id(adv_or_id: Any) -> int | None:
+    """Извлечь adv_setting_original_id из int / AdvSetting-like / None."""
+    if adv_or_id is None:
+        return None
+    if isinstance(adv_or_id, bool):
+        return None
+    if isinstance(adv_or_id, int):
+        return int(adv_or_id)
+    raw_id = getattr(adv_or_id, "id", None)
+    if raw_id is not None:
+        try:
+            return int(raw_id)
+        except (TypeError, ValueError):
+            return None
+    try:
+        return int(adv_or_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_auto_bid_text(text: str | None) -> float | None:
+    """Распарсить положительную ставку Auto из текста сообщения."""
+    if text is None:
+        return None
+    raw = str(text).strip().replace(",", ".")
+    if not raw:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    if value <= 0:
+        return None
+    return value
 
 
 def _default_auto_bid(adv: AdvSetting) -> float:
@@ -872,6 +916,13 @@ async def on_auto_bid_edit(
     callback_data: CahAutoBidEdit,
     state: FSMContext,
 ) -> None:
+    """A2 «Изменить значение»: открыть numeric-entry sub-flow для draft Auto bid.
+
+    UX ``auto_bid_edit`` — пользователь вводит ставку сообщением; значение
+    пишется в FSM-черновик (``draft["auto_bid"]``) через
+    ``on_auto_bid_numeric_message``, confirm по-прежнему через
+    ``CahAutoBidConfirm``.
+    """
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await query.answer("Доступно только при включённом боте", show_alert=True)
@@ -881,10 +932,77 @@ async def on_auto_bid_edit(
     ):
         await _render_for_adv(query, adv, state)
         return
-    await query.answer(
-        "Введите новую ставку Auto в чат (подflow — TODO в следующем apply)",
-        show_alert=True,
+    draft = await load_draft(state, int(adv.id))
+    current_bid = _draft_auto_bid(draft, adv)
+    draft["awaiting_auto_bid_input"] = True
+    await save_draft(state, int(adv.id), draft)
+    await state.update_data(**{_CAH_AWAITING_AUTO_BID_ADV_KEY: int(adv.id)})
+    await state.set_state(_CAH_AWAITING_AUTO_BID_STATE)
+    await query.answer()
+    prompt = (
+        f"{_AUTO_BID_ENTRY_PROMPT} Текущая: {current_bid:g}."
     )
+    if query.message is not None:
+        await query.message.answer(prompt)
+    elif query.bot is not None:
+        # Fallback: rare path without callback message object.
+        chat_id = getattr(getattr(query, "from_user", None), "id", None)
+        if chat_id is not None:
+            await query.bot.send_message(chat_id, prompt)
+
+
+@card_ab_hold_confirm_router.message(StateFilter(_CAH_AWAITING_AUTO_BID_STATE))
+async def on_auto_bid_numeric_message(
+    message: Message,
+    state: FSMContext,
+    adv_or_id: Any = None,
+) -> None:
+    """Принять числовой ввод ставки Auto в A2 numeric-entry и сохранить в draft.
+
+    Discoverable apply path для UX ``auto_bid_edit``: парсит текст сообщения и
+    пишет ``draft["auto_bid"]`` через ``save_draft``. Опциональный третий
+    аргумент — AdvSetting / id (unit-тесты / прямой вызов).
+
+    Args:
+        message: входящее сообщение с числом.
+        state: FSM пользователя (черновик confirm-flow).
+        adv_or_id: опционально id кампании или AdvSetting-like.
+    """
+    data = await state.get_data()
+    adv_id = _resolve_auto_bid_entry_adv_id(adv_or_id)
+    if adv_id is None:
+        adv_id = _resolve_auto_bid_entry_adv_id(data.get(_CAH_AWAITING_AUTO_BID_ADV_KEY))
+    if adv_id is None:
+        answer = getattr(message, "answer", None)
+        if callable(answer):
+            await answer("Сессия ввода ставки устарела. Нажмите «Изменить значение» снова.")
+        await state.set_state(None)
+        return
+
+    bid = _parse_auto_bid_text(getattr(message, "text", None))
+    answer = getattr(message, "answer", None)
+    if bid is None:
+        if callable(answer):
+            await answer(_AUTO_BID_ENTRY_PROMPT)
+        return
+
+    draft = await load_draft(state, adv_id)
+    draft["auto_bid"] = bid
+    draft["awaiting_auto_bid_input"] = False
+    draft["revision"] = int(draft.get("revision") or 1) + 1
+    await save_draft(state, adv_id, draft)
+    await state.set_state(None)
+    await state.update_data(**{_CAH_AWAITING_AUTO_BID_ADV_KEY: None})
+    if not callable(answer):
+        return
+    revision = int(draft["revision"])
+    text = build_a2_text(auto_bid=bid)
+    kb = build_a2_keyboard(adv_id=adv_id, revision=revision, auto_bid=bid)
+    try:
+        await answer(text, reply_markup=kb)
+    except TypeError:
+        # Unit SimpleNamespace / mocks without reply_markup support.
+        await answer(f"Ставка Auto в черновике: {bid:g}. Подтвердите на экране A2.")
 
 
 @card_ab_hold_confirm_router.callback_query(CahSyncStatusRefresh.filter())
