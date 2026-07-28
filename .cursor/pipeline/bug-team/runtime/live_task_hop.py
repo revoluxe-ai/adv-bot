@@ -18,7 +18,16 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import activation, control_model, fs_boundary, owner_decision_host, packets, retry_auth, route_trace
+from . import (
+    activation,
+    control_model,
+    execution_identity,
+    fs_boundary,
+    owner_decision_host,
+    packets,
+    retry_auth,
+    route_trace,
+)
 from .worker_contracts import (
     DEFAULT_TIMEOUTS,
     MAX_ATTEMPTS,
@@ -1884,44 +1893,108 @@ def finalize_live_hop(
                 checkpoint_advanced=False,
             )
 
+    # V10: real Cursor agent id required before terminal accept
+    if execution_identity.is_placeholder_agent(
+        str(actual_cursor_agent_id) if actual_cursor_agent_id is not None else None
+    ):
+        return _reject_finalize(
+            case_root,
+            intent,
+            checkpoint,
+            "BLOCKED_EXECUTION_IDENTITY_NOT_FINALIZED",
+            detail="CURSOR_AGENT_ID pending/placeholder/missing",
+            checkpoint_advanced=False,
+        )
+
     # DISPATCH.jsonl — never include OWNER_AUTHORITY_TOKEN
     dispatch_path = case_root / "team" / "DISPATCH.jsonl"
     dispatch_path.parent.mkdir(parents=True, exist_ok=True)
+    disp_record_id = execution_identity.dispatch_record_id_for(wex, int(intent["ATTEMPT"]))
+    dispatch_record = {
+        "DISPATCH_RECORD_ID": disp_record_id,
+        "ORCHESTRATION_ID": intent["ORCHESTRATION_ID"],
+        "WORKER_EXECUTION_ID": wex,
+        "WORKER_ID": worker_id,
+        "ATTEMPT": intent["ATTEMPT"],
+        "TASK_TOOL": "Cursor Task",
+        "SUBAGENT_TYPE": "generalPurpose",
+        "CURSOR_AGENT_ID": actual_cursor_agent_id,
+        "CURSOR_TASK_ID_OR_EQUIVALENT": actual_task_id_if_available
+        or actual_cursor_agent_id,
+        "INPUT_PACKET_PATH": str(in_path),
+        "INPUT_PACKET_RAW_SHA256": intent["INPUT_PACKET_RAW_SHA256"],
+        "INPUT_PACKET_CANONICAL_SHA256": intent["INPUT_PACKET_CANONICAL_SHA256"],
+        "OUTPUT_PACKET_PATH": str(out_path),
+        "OUTPUT_PACKET_RAW_SHA256": out_hashes["RAW_SHA256"],
+        "OUTPUT_PACKET_CANONICAL_SHA256": out_hashes["CANONICAL_SHA256"],
+        "PREPARED_AT": intent.get("PREPARED_AT"),
+        "TASK_STARTED_AT": intent.get("TASK_STARTED_AT") or started,
+        "TASK_FINISHED_AT": finished,
+        "FINALIZED_AT": finalized_at,
+        "DURATION_MS": duration_ms,
+        "STATUS": out_pkt.get("STATUS"),
+        "TERMINAL_STATUS": out_pkt.get("TERMINAL_STATUS"),
+        "WRITE_BOUNDARY_RESULT": wb_result,
+        "TRACE_EVENT_RESULT": trace_ok,
+        "LIVE_RUNTIME_AUTHORITY": AUTHORITATIVE_PATH,
+    }
     with dispatch_path.open("a", encoding="utf-8") as fh:
         fh.write(
-            json.dumps(
-                {
-                    "ORCHESTRATION_ID": intent["ORCHESTRATION_ID"],
-                    "WORKER_EXECUTION_ID": wex,
-                    "WORKER_ID": worker_id,
-                    "ATTEMPT": intent["ATTEMPT"],
-                    "TASK_TOOL": "Cursor Task",
-                    "SUBAGENT_TYPE": "generalPurpose",
-                    "CURSOR_AGENT_ID": actual_cursor_agent_id,
-                    "CURSOR_TASK_ID_OR_EQUIVALENT": actual_task_id_if_available
-                    or actual_cursor_agent_id,
-                    "INPUT_PACKET_PATH": str(in_path),
-                    "INPUT_PACKET_RAW_SHA256": intent["INPUT_PACKET_RAW_SHA256"],
-                    "INPUT_PACKET_CANONICAL_SHA256": intent["INPUT_PACKET_CANONICAL_SHA256"],
-                    "OUTPUT_PACKET_PATH": str(out_path),
-                    "OUTPUT_PACKET_RAW_SHA256": out_hashes["RAW_SHA256"],
-                    "OUTPUT_PACKET_CANONICAL_SHA256": out_hashes["CANONICAL_SHA256"],
-                    "PREPARED_AT": intent.get("PREPARED_AT"),
-                    "TASK_STARTED_AT": intent.get("TASK_STARTED_AT") or started,
-                    "TASK_FINISHED_AT": finished,
-                    "FINALIZED_AT": finalized_at,
-                    "DURATION_MS": duration_ms,
-                    "STATUS": out_pkt.get("STATUS"),
-                    "TERMINAL_STATUS": out_pkt.get("TERMINAL_STATUS"),
-                    "WRITE_BOUNDARY_RESULT": wb_result,
-                    "TRACE_EVENT_RESULT": trace_ok,
-                    "LIVE_RUNTIME_AUTHORITY": AUTHORITATIVE_PATH,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            )
-            + "\n"
+            json.dumps(dispatch_record, ensure_ascii=False, sort_keys=True) + "\n"
         )
+
+    # V10: seal identity + authoritative reconcile before checkpoint advance
+    try:
+        execution_identity.build_identity_from_finalize(
+            case_root=case_root,
+            intent=intent,
+            actual_cursor_agent_id=str(actual_cursor_agent_id),
+            in_path=in_path,
+            out_path=out_path,
+            in_pkt=in_pkt,
+            out_pkt=out_pkt,
+            dispatch_record=dispatch_record,
+            checkpoint_path=checkpoint_path,
+            branch_id=intent.get("BRANCH_ID"),
+        )
+        id_gate = execution_identity.validate_execution_identity(
+            identity_path=execution_identity.identity_path(case_root, wex),
+            dispatch_log_path=dispatch_path,
+            input_packet_path=in_path,
+            output_packet_path=out_path,
+            checkpoint_path=checkpoint_path,
+            expected_orchestration_id=intent["ORCHESTRATION_ID"],
+            expected_case_id=intent["CASE_ID"],
+            expected_finding_id=intent["FINDING_ID"],
+            expected_worker_execution_id=wex,
+            expected_branch_id=intent.get("BRANCH_ID"),
+            case_root=case_root,
+        )
+    except execution_identity.ExecutionIdentityError as exc:
+        return _reject_finalize(
+            case_root,
+            intent,
+            checkpoint,
+            "BLOCKED_EXECUTION_IDENTITY_NOT_FINALIZED",
+            detail=f"{exc.code}:{exc.detail}",
+            checkpoint_advanced=False,
+        )
+
+    if not id_gate.VALID:
+        try:
+            execution_identity.mark_identity_rejected(case_root, wex, id_gate.REASON_CODE)
+        except Exception:
+            pass
+        return _reject_finalize(
+            case_root,
+            intent,
+            checkpoint,
+            "BLOCKED_EXECUTION_IDENTITY_NOT_FINALIZED",
+            detail=id_gate.REASON_CODE,
+            checkpoint_advanced=False,
+        )
+
+    execution_identity.mark_identity_validated(case_root, wex)
 
     # Advance checkpoint; clear active
     completed = list(checkpoint.get("COMPLETED_HOPS") or [])
@@ -1935,6 +2008,8 @@ def finalize_live_hop(
             "ACTIVE_WORKER_EXECUTION_ID": None,
             "LAST_ACCEPTED_WEX": wex,
             "UPDATED_AT": finalized_at,
+            "LAST_IDENTITY_VALIDATION": "PASS",
+            "LAST_IDENTITY_WEX": wex,
         }
     )
     save_checkpoint(checkpoint_path, checkpoint)
@@ -1944,6 +2019,7 @@ def finalize_live_hop(
     intent["FINALIZED_AT"] = finalized_at
     intent["DURATION_MS"] = duration_ms
     intent["CURSOR_AGENT_ID"] = actual_cursor_agent_id
+    intent["EXECUTION_IDENTITY_VALIDATION"] = "PASS"
     intent_path.write_text(json.dumps(intent, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     return {
@@ -1954,6 +2030,7 @@ def finalize_live_hop(
         "DEPENDENT_WORKERS_DISPATCHED": False,
         "WORKER_EXECUTION_ID": wex,
         "CURSOR_AGENT_ID": actual_cursor_agent_id,
+        "EXECUTION_IDENTITY_VALIDATION": "PASS",
         "INPUT_PACKET_RAW_SHA256": intent["INPUT_PACKET_RAW_SHA256"],
         "INPUT_PACKET_CANONICAL_SHA256": intent["INPUT_PACKET_CANONICAL_SHA256"],
         "OUTPUT_PACKET_RAW_SHA256": out_hashes["RAW_SHA256"],

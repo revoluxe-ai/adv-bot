@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import activation, fs_boundary, owner_go, packets, route_trace, timeout
+from . import activation, execution_identity, fs_boundary, owner_go, packets, route_trace, timeout
 
 
 class OrchestratorRuntime:
@@ -136,6 +136,34 @@ class OrchestratorRuntime:
                 result.get("CHECKPOINT_GENERATION", self.checkpoint_generation + 1)
             )
         return result
+
+    def require_execution_identity(
+        self,
+        *,
+        worker_execution_id: str,
+        case_id: str,
+        finding_id: str,
+        input_packet_path: Path,
+        output_packet_path: Path,
+        branch_id: Any = None,
+    ) -> Dict[str, Any]:
+        """Gate dependent-wave advance on EXECUTION_IDENTITY_VALIDATION=PASS."""
+        result = execution_identity.gate_execution_identity_for_advance(
+            case_root=self.case_root,
+            worker_execution_id=worker_execution_id,
+            expected_orchestration_id=self.orchestration_id,
+            expected_case_id=case_id,
+            expected_finding_id=finding_id,
+            input_packet_path=Path(input_packet_path),
+            output_packet_path=Path(output_packet_path),
+            checkpoint_path=self.checkpoint_path,
+            dispatch_log_path=self.dispatch_path,
+            expected_branch_id=branch_id,
+        )
+        payload = result.as_dict()
+        if not result.VALID:
+            self.blocked_reason = f"BLOCKED_EXECUTION_IDENTITY_NOT_FINALIZED:{result.REASON_CODE}"
+        return payload
 
     def build_task_prompt(
         self,

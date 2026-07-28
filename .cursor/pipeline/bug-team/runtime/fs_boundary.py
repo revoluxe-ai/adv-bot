@@ -112,7 +112,41 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
         "results/",
     ],
     "BOUNDED_HUNTER": ["findings/", "team/packets/", "team/heartbeats/", "results/"],
-    "FAN_IN_ASSEMBLER": ["results/FANIN.md"],  # ONLY
+    "FAN_IN_ASSEMBLER": ["results/FANIN.md"],  # ONLY (legacy ACTIVE_V1)
+    "FAMILY_FAN_IN_ASSEMBLER": [
+        "results/FAMILY-FANIN.md",
+        "team/packets/",
+        "team/heartbeats/",
+    ],
+    "INVARIANT_CAPTURE_WORKER": [
+        "family/INVARIANT.md",
+        "family/FAMILY.json",
+        "team/packets/",
+        "team/heartbeats/",
+    ],
+    "RELATION_CLASSIFIER": [
+        "findings/",
+        "family/",
+        "results/LINKED-CASE-",
+        "results/OUT-OF-SCOPE-",
+        "results/INCONCLUSIVE-",
+        "team/packets/",
+        "team/heartbeats/",
+    ],
+    "INTEGRATION_OPERATOR": [
+        "family/INTEGRATION.json",
+        "family/DEPENDENCIES.json",
+        "branches/",
+        "results/FAMILY-GREEN-REPORT.md",
+        "team/packets/",
+        "team/heartbeats/",
+    ],
+    "FAMILY_LEARNING_WORKER": [
+        "family/LEARNING_PACKET.json",
+        "results/LEARNING_REPORT.md",
+        "team/packets/",
+        "team/heartbeats/",
+    ],
     "CLOSURE_OPERATOR": [
         "results/OWNER-CLOSURE-",
         "results/HUMAN_SUMMARY.md",
@@ -122,6 +156,7 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
         "LEDGER.md",
         "findings/",
         "INDEX.md",
+        "family/",
         "team/packets/",
         "team/heartbeats/",
         "results/",
