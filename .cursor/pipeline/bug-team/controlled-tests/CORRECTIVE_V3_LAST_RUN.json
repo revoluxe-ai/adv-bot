@@ -146,7 +146,7 @@
   },
   "V3-REG-NOT-ACTIVE": {
     "PASS": true,
-    "MSG": "NOT_ACTIVE normal invocation zero dispatch",
+    "MSG": "ACTIVE_V1 normal invocation allowed (post-activation)",
     "LABEL": "CONTRACT_STATIC"
   },
   "V3-REG-FANIN": {

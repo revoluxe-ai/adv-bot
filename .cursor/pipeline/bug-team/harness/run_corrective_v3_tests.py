@@ -944,6 +944,9 @@ def stale10() -> Result:
 
 def reg_not_active() -> Result:
     st, det = activation.check_invocation_gate(execution_mode="NORMAL")
+    if activation.is_active():
+        ok = st == "ACTIVE_ALLOWED" and det.get("RUNTIME_STATUS") == "ACTIVE"
+        return ok, "ACTIVE_V1 normal invocation allowed (post-activation)", "CONTRACT_STATIC"
     ok = st == "BLOCKED_CANDIDATE_NOT_ACTIVE" and det.get("TASK_DISPATCH_COUNT") == 0
     return ok, "NOT_ACTIVE normal invocation zero dispatch", "CONTRACT_STATIC"
 

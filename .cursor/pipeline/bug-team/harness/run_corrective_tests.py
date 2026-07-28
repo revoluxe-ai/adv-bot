@@ -32,6 +32,10 @@ def _tmp() -> Path:
 
 def ct01() -> Result:
     status, det = activation.check_invocation_gate(execution_mode="NORMAL")
+    if activation.is_active():
+        # ACTIVE_V1: NORMAL is allowed; V8 family fanout remains shadow-disabled.
+        ok = status == "ACTIVE_ALLOWED" and det.get("RUNTIME_STATUS") == "ACTIVE"
+        return ok, "ACTIVE_V1 normal invocation allowed; activation intact", "CONTRACT_STATIC"
     ok = status == "BLOCKED_CANDIDATE_NOT_ACTIVE" and det.get("TASK_DISPATCH_COUNT") == 0
     return ok, "normal invocation blocked while NOT_ACTIVE", "CONTRACT_STATIC"
 

@@ -1,7 +1,7 @@
 {
   "CT-01": {
     "PASS": true,
-    "MSG": "normal invocation blocked while NOT_ACTIVE",
+    "MSG": "ACTIVE_V1 normal invocation allowed; activation intact",
     "LABEL": "CONTRACT_STATIC"
   },
   "CT-02": {
