@@ -19,6 +19,7 @@ Implement tasks from an OpenSpec change.
 - `openspec/config.yaml` → `rules.tasks` — task-generation obligations
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + test materialization for owning tasks
+- `/opsx-pyright-strict-coverage` — post-apply soft recommend when production `.py` changed
 - `/opsx-verify` — independent adequacy and archive verdict
 
 **Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -57,7 +58,7 @@ Implement tasks from an OpenSpec change.
 
    **Handle states:**
    - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx:continue`
-   - If `state: "all_done"`: congratulate, suggest `/opsx-verify <change-name>` (not archive readiness)
+   - If `state: "all_done"`: congratulate, then follow **Post-apply next-step recommend** below (not archive readiness)
    - Otherwise: proceed to implementation
 
 4. **Read context files**
@@ -133,8 +134,27 @@ Implement tasks from an OpenSpec change.
    Display:
    - Tasks completed this session
    - Overall progress: "N/M tasks complete"
-   - If all done: suggest `/opsx-verify <change-name>` as the next step (do not claim archive readiness)
+   - If all done: follow **Post-apply next-step recommend** (do not claim archive readiness)
    - If paused: explain why and wait for guidance
+
+### Post-apply next-step recommend
+
+После completion / `all_done` выбери **один** pasteable primary `NEXT_ACTION`
+по правилам ниже (soft recommend; не hard gate archive):
+
+1. Если в этой сессии или в diff change есть **in-policy production Python**
+   (`app/**/*.py` или top-level production `*.py` в корне, не `tests/**`):
+   - Primary: `/opsx-pyright-strict-coverage base=<BASE>`
+   - Если `BASE` неизвестен — спроси один раз: «На какую base branch/ref
+     сверять pyright-strict coverage?» Не выдумывай base.
+   - After coverage `PASS`: recommend `/opsx-static-check`, затем
+     `/opsx-verify <change-name>`.
+2. Иначе (нет in-policy production `.py`):
+   - Primary: `/opsx-verify <change-name>`.
+3. Bug-episode path: `/opsx-test … verify` остаётся обязательным GREEN writer
+   где применимо; coverage recommend — дополнительно, когда трогали production `.py`.
+
+Не объявляй archive readiness из apply.
 
 **Output During Implementation**
 
@@ -164,7 +184,15 @@ Working on task 4/7: <task description>
 - [x] Task 2
 ...
 
-Implementation tasks complete. Next: `/opsx-verify <change-name>`.
+Implementation tasks complete.
+
+If production Python changed (`app/**/*.py` or top-level production scripts):
+  Next: `/opsx-pyright-strict-coverage base=<BASE>`
+  Then: `/opsx-static-check` (after coverage PASS)
+  Then: `/opsx-verify <change-name>`
+Else:
+  Next: `/opsx-verify <change-name>`
+
 Do not claim archive readiness from apply alone.
 ```
 
@@ -309,7 +337,7 @@ Never rewrite prior JSONL lines.
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience
-- Do not declare final adequacy or archive readiness; next step after completion is `/opsx-verify <change-name>`
+- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` when production `.py` changed, else `/opsx-verify <change-name>`)
 
 **Fluid Workflow Integration**
 
