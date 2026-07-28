@@ -28,6 +28,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     AB_HOLD_MIN_VIEWS,
     AbHoldSetupAction,
     classify_ab_hold_setup_keyword,
+    eligible_keyword_texts_for_confirm,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate import (
     allows_ab_hold_enable_for_stats_state,
@@ -43,6 +44,7 @@ __all__ = [
     "build_ab_hold_enable_blocked_by_stats_message",
     "can_apply_card_ab_hold_mode_via_excel",
     "classify_ab_hold_setup_keyword",
+    "eligible_keyword_texts_for_confirm",
     "filter_ab_hold_pipeline_candidates",
     "filter_bidder_eligible_by_ab_hold",
     "filter_structural_act_candidates",
