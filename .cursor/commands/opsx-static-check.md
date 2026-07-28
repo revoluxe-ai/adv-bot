@@ -110,9 +110,12 @@ If unit is FAIL/BLOCKED/ERROR → mark `pytest-full: SKIPPED` and continue to sy
 
 ### 4. Fan-in + synthesize
 
-Follow `.cursor/static-check/contracts/synthesis.md`.
+Follow `.cursor/static-check/contracts/synthesis.md` (SoT: STATIC/TESTS
+buckets, intersection dedupe, actionable group fields, ≤ half-chat PROBLEMS
+budget, TRUNCATED/OMITTED_GROUPS).
 Update checkboxes from packets.
 Do not edit repo files while synthesizing.
+Do not paste worker RAW_TAIL or full FINDINGS into the Final report.
 
 ### 5. Final report
 
@@ -123,14 +126,35 @@ PREFLIGHT: off|on|skipped|failed
 CHECKS:
 - <id>: PASS|FAIL|SKIPPED|BLOCKED|ERROR (command: ...)
 SUMMARY:
-- passed/failed checks, findings total, problem groups, truncated, omitted_groups
+- passed/failed/skipped checks
+- static_findings / test_findings / findings_total
+- problem_groups / truncated / omitted_groups
 PROBLEMS:
-### P1. ...
+### STATIC
+#### P1. <short title>
+- path: <path>
+- count: <n>
+- top: <≤2 codes>
+- fix_target: <one line — file/symbol>
+- fix_cmd: /opsx-fix-types
+- seen_in: [...]
+### TESTS
+#### P2. <short title>
+- node: <pytest node id>
+- count: <n>
+- top: <≤2 assert summaries>
+- fix_target: <one line — test/fixture>
+- fix_cmd: /opsx-test-triage
+- seen_in: [...]
+TRUNCATED: yes|no
+OMITTED_GROUPS: <n>
 NEXT ACTION:
 <one step for the human; never "I will patch run.sh now">
 ```
 
 Error UX: Problem / Cause / Action (never bare FAILED).
+Budgets, dedupe, `fix_cmd` mapping, and single NEXT_ACTION rank: only in
+`contracts/synthesis.md` — do not weaken them here.
 
 ## Human checklist
 
