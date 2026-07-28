@@ -3,7 +3,11 @@
 ```text
 REGISTRY_ID: opsx-bug-team-workers
 IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
-RUNTIME_STATUS: NOT_ACTIVE
+RUNTIME_STATUS: ACTIVE
+OWNER_ACTIVATION: ISSUED
+PIPELINE_GENERATION: ACTIVE_V1_WITH_INVARIANT_FANOUT_V10
+BUG_FAMILY_FANOUT_ENABLED: true
+BUG_FAMILY_FANOUT_STATUS: ACTIVE
 ORCHESTRATOR_MODEL: registry_driven_cursor_task_pipeline
 WORKER_MODEL: cursor_task_enum_worker
 MODEL_SELECTION_POLICY: auto
@@ -50,6 +54,28 @@ WORKER_SPECS_DIR: .cursor/pipeline/bug-team/workers/
 | BOUNDED_HUNTER | generalPurpose | `/opsx-bug-hunt` / project hunt bounds | candidate findings only |
 | FAN_IN_ASSEMBLER | generalPurpose | materialize `mode=fanin_assemble` | **only** `results/FANIN.md` |
 | CLOSURE_OPERATOR | generalPurpose | Owner-facing closure packet | process artifacts; no auto-close |
+| INVARIANT_CAPTURE_WORKER | generalPurpose | post-root-GREEN invariant capture | `family/INVARIANT.md` + proof |
+| RELATION_CLASSIFIER | generalPurpose | hunt candidate relation classify | findings + `family/` |
+| INTEGRATION_OPERATOR | generalPurpose | branch patch integration | `family/INTEGRATION.json` |
+| FAMILY_FAN_IN_ASSEMBLER | generalPurpose | family fan-in assemble | `results/FAMILY-FANIN.json\|.md` |
+| FAMILY_LEARNING_WORKER | generalPurpose | family learning packet | `family/LEARNING_PACKET.json` |
+
+## Invariant-family fanout roles (ACTIVE)
+
+```text
+ACTIVATION_STATUS: ACTIVE
+BUG_FAMILY_FANOUT_ENABLED: true
+BUG_FAMILY_FANOUT_STATUS: ACTIVE
+PIPELINE_GENERATION: ACTIVE_V1_WITH_INVARIANT_FANOUT_V10
+SAME_INVARIANT_HUNT_FINDINGS: AUTOMATIC_FANOUT
+MANUAL_SIBLING_RELAUNCH_REQUIRED: NO
+EXECUTION_IDENTITY_GATE: ACTIVE
+POLICY: .cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json
+```
+
+These roles run on the ACTIVE_V1 path after root GREEN when
+`BUG_FAMILY_FANOUT_ENABLED=true`. Family workers remain gated by V10
+execution-identity validation before orchestration advance.
 
 ## Anti-universal-worker rule
 
