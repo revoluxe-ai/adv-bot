@@ -330,3 +330,23 @@ opsx-bug-team to commant native
 opsx-bug-team - тест развилки от bug-hunt
 
 тесты на команды и team
+
+## Deferred from change card-ab-hold-mode (2026-07-28)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:card-ab-hold-mode] Pre-start safety policy picker (hard|soft|self)
+  source: owner TZ (explore) + openspec/changes/card-ab-hold-mode/proposal.md (Out of scope / risk context)
+  reason: out_of_current_mvp | owner_park
+  notes: До старта эксперимента выбор — жёсткая (abort/reset при сбое статы), мягкая (freeze decide; возможен ограниченный перерасход), сам слежу (+ аварийная кнопка). Сейчас change не раздувать; future change e.g. ab-hold-safety-policy-modes.
+
+- [ ] [deferred-from:card-ab-hold-mode] Anti-drain emergency kill switch
+  source: owner TZ (explore); related OUT_OF_SCOPE_FOLLOW_ON emergency-stop in proposal.md (product anti-drain ≠ financial latch)
+  reason: out_of_current_mvp | owner_park
+  notes: Не просто EXIT из Hold — аварийное гашение трат (ключи/пауза/блок). Отдельная продуктовая идея; не смешивать с Forbidden §18 epoch spend cap / financial latch в текущем Hold.
+
+- [ ] [deferred-from:card-ab-hold-mode] Mid-sync stale UX options (wait|force-apply|EXIT)
+  source: owner TZ (explore)
+  reason: oversized | owner_park
+  notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
