@@ -7,6 +7,19 @@ description: Update a change - revise existing planning artifacts and keep them 
 
 Revise a change's existing planning artifacts and keep them coherent. Never edit code.
 
+**Bound-scope front-door:** If the user wants to cut an oversized change TZ / set an MVP boundary **and** park the deferred remainder into `DOTO/WORKLOG.md`, do **not** invent that dual-write here. Redirect to `/opsx-bound-scope` (plan → `:GO`). There is **no** `/opsx-update:split` — now/later analysis while thinking is `/opsx-explore` (`NOW_LATER`); durable park is `/opsx-bound-scope`. After `/opsx-bound-scope:GO`, this command **consumes** the emitted `UPDATE_HANDOFF` as a specific revision request (confirm-before-write still applies; never recreate deferred units as owed tasks **unless** the owner passes the Deferred re-entry gate below). Coherence-only edits without WORKLOG park stay on `/opsx-update`.
+
+**Deferred park / re-entry boundary (with `/opsx-bound-scope`):**
+
+| Action | Owner command |
+|---|---|
+| Cut current change + append `[deferred-from:<CHANGE_ID>]` to WORKLOG | `/opsx-bound-scope:GO` |
+| Apply KEEP narrowing from `UPDATE_HANDOFF` | `/opsx-update` (this command) |
+| Warn that ideas were parked for later | `/opsx-update` (mandatory check) |
+| Pull a parked idea back into **current** change scope | `/opsx-update` only after explicit owner `REENTER_CONFIRMED` |
+
+`/opsx-update` MUST treat `[deferred-from:<CHANGE_ID>]` (and matching titles/notes for this change) as **out of current owed DoD** until the owner explicitly confirms re-entry. Silent re-inflation of a bounded change is forbidden.
+
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_update --strict`. Stop on non-zero exit and report the guard output.
@@ -45,9 +58,53 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
    The files to edit are `artifactPaths.<id>.existingOutputPaths` - the concrete files that exist on disk, already glob-expanded for glob artifacts (e.g. `specs/**/*.md`). Do NOT write to `resolvedOutputPath`: for a glob artifact it is still the glob pattern, not a real file.
 
+2b. **Deferred park check (mandatory when WORKLOG exists)**
+
+   Read `DOTO/WORKLOG.md` if present (path from `openspec/policies/EXPLORE_POLICY.md` → `explore.worklog.path`; default `DOTO/WORKLOG.md`). Missing WORKLOG is not a blocker: record `DEFERRED_PARKS: none_found (WORKLOG missing)` and continue.
+
+   Collect open parks for **this** change:
+
+   - lines / blocks tagged `[deferred-from:<CHANGE_ID>]` where `<CHANGE_ID>` matches the selected change;
+   - ignore entries already marked `[re-entered:<CHANGE_ID>]` or clearly struck as done.
+
+   Always emit (even on pure coherence / UPDATE_HANDOFF KEEP-narrowing):
+
+   ```text
+   DEFERRED_PARKS_FOR_CHANGE:
+   - <title or one-line> — source/notes summary
+   (or: none_found)
+   ```
+
+   If parks exist, include a short warning:
+
+   ```text
+   DEFERRED_WARNING:
+   These ideas were parked out of the current change (via /opsx-bound-scope).
+   They are NOT owed DoD unless you explicitly re-enter them.
+   ```
+
+   Compare the **requested revision** (user ask, pasted handoff, or coherence edit that would add scope) against `DEFERRED_PARKS_FOR_CHANGE`:
+
+   - Overlap / would re-add a parked unit into proposal/design/tasks/specs → **stop before write** and emit:
+
+   ```text
+   DEFERRED_REENTRY_REQUIRED:
+   UNIT: <parked title>
+   WHY_MATCHED: <short>
+   QUESTION: Confirm you want to pull this idea out of WORKLOG back into the current change scope?
+   Reply: REENTER_CONFIRMED <unit> | KEEP_DEFERRED <unit>
+   ```
+
+   - Without `REENTER_CONFIRMED` for that unit: MUST NOT write the re-entry into artifacts.
+   - `KEEP_DEFERRED` / silence: leave artifacts without that unit; keep WORKLOG park as-is.
+   - On `REENTER_CONFIRMED`: may add the unit to the change (still confirm-before-write per artifact), then **annotate** the matching WORKLOG park append-only / in-place mark as `[re-entered:<CHANGE_ID>]` (narrow WORKLOG write only — do not rewrite unrelated inbox lines; do not delete park history). Prefer adding a one-line note under the park rather than deleting it.
+   - Consuming `UPDATE_HANDOFF` that only **removes/narrows** to KEEP MUST NOT treat deferred parks as re-entry; still print `DEFERRED_PARKS_FOR_CHANGE` as situational awareness.
+
 3. **Understand the request**
-   - If the user asked for a specific revision ("the design now uses X"), that is the starting edit.
-   - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication.
+   - If the user pasted or referenced an `/opsx-bound-scope` `UPDATE_HANDOFF`, treat that as the authoritative KEEP revision request for this invocation (apply KEEP / remove-or-narrow deferred units; do not re-park WORKLOG — bound-scope already did). Do not re-add DEFER units from that handoff.
+   - If the user asked for a specific revision ("the design now uses X"), that is the starting edit — run it through the Deferred re-entry gate in 2b when it overlaps parks.
+   - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication. Coherence MUST NOT silently restore parked scope; if coherence “wants” a deferred unit back, use `DEFERRED_REENTRY_REQUIRED`.
+   - If the request is clearly "bound scope + write WORKLOG" without a completed bound-scope GO, stop and point to `/opsx-bound-scope`.
 
 4. **Perform Architecture Decision Lookup**
 
@@ -83,8 +140,10 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 **Output**
 
 After each invocation, show:
+- `DEFERRED_PARKS_FOR_CHANGE` / any `DEFERRED_REENTRY_REQUIRED` outcomes
 - Which artifacts were revised (and which proposed revisions were rejected)
 - Anything deferred to `/opsx:continue` (not-yet-created artifacts or files)
+- WORKLOG annotations made on confirmed re-entry (if any)
 - Where the change stands and the recommended next command
 
 
@@ -425,5 +484,6 @@ align with the latest applicable event.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.
 - Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx:continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
 - Confirm every edit with the user before writing.
+- Deferred parks: always surface `DEFERRED_PARKS_FOR_CHANGE` when WORKLOG exists; never silently restore `[deferred-from:<CHANGE_ID>]` into owed DoD; re-entry requires `REENTER_CONFIRMED`; the only allowed WORKLOG write from this command is annotating confirmed re-entry (`[re-entered:<CHANGE_ID>]`). Parking new deferrals remains `/opsx-bound-scope:GO` only.
 - If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx:new` (the "Update vs. Start Fresh" heuristic).
 - Bug-episode: never write OpenSpec / TASK_DELTA without durable Route B receipt (`CLASSIFICATION` + `CHOSEN_ROUTE=ROUTE_B` + `EXPECTED_NEXT_COMMAND=/opsx-update` or `CURRENT_ROUTE_STATE=AWAITING_SPEC_UPDATE`); never store `/opsx-update` as `EXPECTED_EXECUTION_ROUTE` / `ACTUAL_EXECUTION_ROUTE`; never write legacy `TASK_DELTA_STATUS` / `CURRENT_ROUTE` in new artifacts.

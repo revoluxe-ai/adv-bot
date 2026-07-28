@@ -54,6 +54,7 @@ Reduce front-door uncertainty for process questions:
   `/opsx-admin-command-promote-process-lesson`
 - Commit process surfaces → `/opsx-admin-command-commit`
 - Product idea / OpenSpec feature thinking → `/opsx-explore`
+- Oversized change TZ / cut scope + park remainder to WORKLOG → `/opsx-bound-scope`
 - Product bug → `/opsx-fix-bug` / bug-hunt path
 
 ## Authority boundary (mandatory)
