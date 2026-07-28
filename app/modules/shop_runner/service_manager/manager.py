@@ -1657,6 +1657,13 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 15, 15)
     async def update_common_bid_in_search_adv(self) -> None:
+        """Обычный updater общей ставки Search: Forbidden при structural A/B Hold.
+
+        Пишет common-bid в WB только для кампаний вне structural freeze
+        (Allowed ``OFF``; Forbidden ``PENDING_SETUP`` / ``ACTIVE`` — OP-008 /
+        card-ab-hold-write-path-ownership §3/§17). Bidder/cluster Hold path
+        не затрагивается: здесь только ordinary Search common-bid mutator.
+        """
         if not settings.AUTO_SETTING_ACTIVE:
             return None
 
@@ -1683,6 +1690,14 @@ class CoroutinesManager:
                 adv.bidder_active and
                 adv.updater_common_bid_in_search_adv_active_status and
                 adv.search_adv_active_status is True]
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
+        )
+
+        # Spec card-ab-hold-write-path-ownership OP-008 / §3 / §17:
+        # ordinary Search common-bid Forbidden in PENDING_SETUP/ACTIVE
+        # (Allowed OFF only; bidder/cluster is the Search bid holder under hold).
+        complex_advs = filter_structural_act_candidates(complex_advs)
         complex_advs, _stale = await self._split_advs_by_stats_freshness(
             complex_advs, operation_name="update_common_bid_in_search_adv"
         )
