@@ -63,7 +63,7 @@ contract and the activated companion command texts.
 
 ---
 
-## Target episode sequence (not live until companions)
+## Live OPSX bug episode sequence
 
 ```text
 BUG SIGNAL
