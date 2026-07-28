@@ -72,9 +72,10 @@ async def process_ab_setup(
     ``CardAbHoldSetupLock:{adv_id}``. Без зафиксированного allowed-set snapshot
     ACTIVE не выставляется; минус приводится к «всё вне allowed-set» (enforcement).
 
-    §18.4 / §18.5: если ``card_ab_hold_phase`` non-NULL (epoch-managed), legacy
-    auto-ACTIVE и ENTER TP-write Forbidden — setup-тик no-op (epoch path owns
-    ACTIVE via PENDING intent → WB sync). ``phase IS NULL`` = legacy MVP-1.
+    §18.4 / §18.4.2 / §18.5: если ``card_ab_hold_phase`` non-NULL (epoch-managed),
+    legacy auto-ACTIVE и ENTER TP-write Forbidden — но Classification FAIL→OFF
+    MAY остаться на setup-тике через ``apply_ab_hold_setup_mutations(...,
+    epoch_managed=True)``. ``phase IS NULL`` = legacy MVP-1 (OFF + TP + ACTIVE).
 
     Decision §19 / tasks §27: в начале тика owned one-shot Search common-bid
     reset-to-min (идемпотентно; не ordinary updater).
@@ -89,20 +90,62 @@ async def process_ab_setup(
         return
 
     # decision §19 / tasks §27: owned ENTER Search common-bid → WB min (once).
-    # До epoch early-return — иначе epoch-managed кампании никогда не сбросят.
+    # До epoch branch — иначе epoch-managed кампании никогда не сбросят.
     _ = await ensure_search_common_bid_reset_on_enter(
         complex_adv,
         wb_manager_hub=wb_manager_hub,
         wb_shop_data_manager=wb_shop_data_manager,
     )
 
-    if is_epoch_managed_ab_hold(complex_adv.adv_setting):
-        # tasks §18.4: epoch-managed MUST NOT reach ACTIVE via legacy process_ab_setup.
+    epoch_managed = is_epoch_managed_ab_hold(complex_adv.adv_setting)
+    if epoch_managed:
+        # PBH-006 / tasks §18.4.2: FAIL→OFF Allowed; ACTIVE/TP still gated.
+        # Не full allowed-set freeze (epoch confirm owns snapshot) — только classify/OFF.
         logger.info(
-            "[adv_id=%s] ab_setup skip auto-ACTIVE: epoch-managed phase=%s",
+            "[adv_id=%s] ab_setup epoch-managed: FAIL->OFF only (no auto-ACTIVE/TP) "
+            "phase=%s",
             complex_adv.adv_id,
             getattr(complex_adv.adv_setting, "card_ab_hold_phase", None),
         )
+        signal_cache = CardAbHoldSignalRedisCache(complex_adv.adv_setting)
+        lock_mgr = RedisLockManager(signal_cache.client)
+        lock_key = setup_lock_redis_key(int(complex_adv.adv_id))
+        token = f"{complex_adv.shop_id}:{uuid4()}"
+        acquired = await lock_mgr.acquire(lock_key, token, SETUP_LOCK_TTL_SEC)
+        if not acquired:
+            logger.warning(
+                "[adv_id=%s] ab_setup epoch-managed: lock not acquired",
+                complex_adv.adv_id,
+            )
+            return
+        try:
+            keywords = await complex_adv.get_keywords()
+            plan_max = float(
+                getattr(complex_adv.adv_setting, "max_price_for_order", None) or 0
+            )
+            if plan_max <= 0:
+                logger.warning(
+                    "[adv_id=%s] ab_setup epoch-managed: max_price_for_order missing, "
+                    "skip FAIL->OFF",
+                    complex_adv.adv_id,
+                )
+                return
+            pass_n, fail_n = await apply_ab_hold_setup_mutations(
+                adv_id=int(complex_adv.adv_id),
+                adv_setting_id=int(complex_adv.adv_setting.id),
+                keywords=keywords,
+                max_pay_for_order=plan_max,
+                epoch_managed=True,
+            )
+            logger.info(
+                "[adv_id=%s] ab_setup epoch-managed done pass=%s fail=%s "
+                "(PENDING; no ACTIVE/TP)",
+                complex_adv.adv_id,
+                pass_n,
+                fail_n,
+            )
+        finally:
+            await lock_mgr.release(lock_key, token)
         return
 
     signal_cache = CardAbHoldSignalRedisCache(complex_adv.adv_setting)
