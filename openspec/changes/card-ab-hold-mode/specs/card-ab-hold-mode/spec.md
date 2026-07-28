@@ -39,7 +39,7 @@ The system MUST provide a dedicated A/B Hold screen with instruction text, a con
 - **AND** if Enable is shown, pressing it does not demote mode or re-signal ENTER
 
 ### Requirement: HOLD freezes target places and keeps bidder running
-While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming, keyword enable/rollout growth, or ordinary minus-phrase recalculation. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF. "Keeping the bidder running" means the bidder path MUST remain eligible during hold and the freeze MUST NOT be implemented by stopping the bidder or the whole campaign; it does NOT forbid the orthogonal campaign activity-control watchdog (ordinary auto-budget / schedule start-pause) from starting or pausing the campaign for reversible operational reasons (daily budget/spend limit, cabinet balance, time schedule, rec_system mode), because those actions do not change the frozen allowed-set, target places, whitelist, keyword enable, or minus set.
+While A/B Hold is active after setup, the system MUST NOT update keyword target places automatically, MUST keep the bidder running so bids follow the fixed target places, and MUST NOT perform structural whitelist expansion/trimming, keyword enable/rollout growth, or ordinary minus-phrase recalculation. The system MUST NOT run the continuous ordinary Search common-bid updater (`update_common_bid_in_search_adv`) for that campaign while mode is `PENDING_SETUP` or `ACTIVE`; Search common bid is reset to WB minimum on ENTER by the owned path (see ENTER resets Search common bid requirement) and then left frozen. Overspend protection relative to plan max CPO MAY still turn expensive keywords OFF. "Keeping the bidder running" means the bidder / cluster-bids path MUST remain eligible during hold and the freeze MUST NOT be implemented by stopping the bidder or the whole campaign; it does NOT forbid the orthogonal campaign activity-control watchdog (ordinary auto-budget / schedule start-pause) from starting or pausing the campaign for reversible operational reasons (daily budget/spend limit, cabinet balance, time schedule, rec_system mode), because those actions do not change the frozen allowed-set, target places, whitelist, keyword enable, minus set, or the frozen Search common bid.
 
 #### Scenario: Target places stay fixed while bidder continues
 - **GIVEN** a campaign is in active A/B Hold after successful setup
@@ -64,9 +64,38 @@ While A/B Hold is active after setup, the system MUST NOT update keyword target 
 - **AND** an orthogonal, reversible operational condition applies (daily budget/spend limit, cabinet balance, time schedule, or rec_system mode)
 - **WHEN** the ordinary campaign activity-control watchdog runs during hold
 - **THEN** it MAY start or pause the campaign for that operational reason
-- **AND** this is not a structural-freeze violation, because it does not mutate the frozen allowed-set, target places, whitelist, keyword enable, or minus set
+- **AND** this is not a structural-freeze violation, because it does not mutate the frozen allowed-set, target places, whitelist, keyword enable, minus set, or frozen Search common bid
 - **AND** the campaign returns to the same frozen state when the operational condition clears
 - **AND** this activity-control path MUST NOT be extended to mutate any frozen entity
+
+### Requirement: ENTER resets Search common bid to WB minimum then freezes it
+Search common bid (the campaign Search auction common CPM written via Wildberries `SetCommonBids` / `update_search_adv_common_cpm`) is a working campaign mechanism: it affects cold / not-yet-visible keywords (including before the views threshold) and catalog bid behavior. It is NOT the keyword/cluster bidder path. When the user successfully enables A/B Hold (ENTER: mode transitions from `OFF` to `PENDING_SETUP` with Redis ENTER / setup start), an A/B Hold owned write-path MUST perform a one-shot reset of Search common bid for all campaign nmids to the Wildberries minimum (`search_adv_min_bids` or equivalent minimum SoT). After that reset, while mode is `PENDING_SETUP` or `ACTIVE`, the continuous ordinary Search common-bid updater (`CoroutinesManager.update_common_bid_in_search_adv` / `UpdateCommotBidInSearchAdvsManager`) MUST NOT change Search common bid for that campaign. The keyword/cluster bidder (`update_cluster_bids`) MUST remain allowed in `ACTIVE` to hold bids toward confirmed target places. A second owned common-bid reset MUST NOT run mid-hold; Enable while already `PENDING_SETUP` or `ACTIVE` remains a no-op (idempotent Enable requirement). Re-reset is allowed only after EXIT to `OFF` and a new ENTER. The continuous ordinary updater MUST NOT be the owner of the ENTER reset.
+
+#### Scenario: ENTER resets Search common bid to minimum
+- **GIVEN** a campaign mode is `OFF`
+- **AND** its Search common bid is above the Wildberries minimum for at least one nmid
+- **WHEN** the user successfully enables A/B Hold (ENTER → `PENDING_SETUP`)
+- **THEN** an A/B Hold owned path sets Search common bid for the campaign nmids to the Wildberries minimum
+- **AND** the continuous ordinary Search common-bid updater is not the owner of that write
+
+#### Scenario: Ordinary Search common-bid updater skips held campaigns
+- **GIVEN** a campaign mode is `PENDING_SETUP` or `ACTIVE`
+- **WHEN** the ordinary Search common-bid updater tick runs
+- **THEN** that updater does not change Search common bid for that campaign
+
+#### Scenario: Bidder continues cluster bids in ACTIVE after common-bid freeze
+- **GIVEN** a campaign is `ACTIVE` under A/B Hold
+- **AND** Search common bid was reset to minimum on ENTER
+- **WHEN** the keyword/cluster bidder tick runs
+- **THEN** the bidder MAY update cluster/keyword bids toward confirmed target places
+- **AND** Search common bid remains at the frozen minimum from the ENTER reset
+
+#### Scenario: Mid-hold Enable does not re-reset Search common bid
+- **GIVEN** a campaign mode is already `PENDING_SETUP` or `ACTIVE`
+- **AND** Search common bid was already reset on ENTER
+- **WHEN** the user presses Enable again
+- **THEN** mode is unchanged
+- **AND** Search common bid is not rewritten by a second owned reset
 
 ### Requirement: ENTER setup freezes the allowed phrase set via PG snapshot before ACTIVE
 The frozen unit of A/B Hold is the campaign's allowed (relevant) phrase set — the relevant phrases plus the resulting GOOD/whitelisted keyword profile — NOT the minus-phrase list. The minus list is only the derived enforcement mechanism that keeps non-allowed phrases out. When A/B Hold enter setup runs, the system MUST capture the allowed phrase set and persist it as a durable PostgreSQL snapshot on the campaign (new migration field), MUST bring Wildberries to that state with one setup sync/mutation (excluding, within the WB minus cap, phrases outside the allowed set — not an ordinary recalculation loop), and MUST NOT mark setup complete or transition the mode to ACTIVE until that allowed-set snapshot write succeeds together with the rest of setup. Redis MUST NOT be the source of truth for the allowed-set snapshot.
@@ -137,12 +166,13 @@ The system MUST NOT tell the user that A/B Hold is enabled and that A/B tests ma
 - **THEN** the UI does not state that the mode is fully enabled for starting A/B tests
 
 ### Requirement: Ordinary structural auto-update is suspended during A/B Hold preparation and hold
-While a campaign is preparing or holding for A/B Hold, the system MUST NOT run ordinary structural campaign auto-update that changes whitelist membership, target places, keyword enable/rollout, or ordinary minus-phrase recalculation outside the A/B Hold setup and hold protection paths (including allowed-set enforcement that excludes non-allowed phrases). A/B Hold applies only to campaigns on the V3 auto-updater; the V2-era campaign strategy objective auto-switch (MIN_CPO ↔ MAX_CONV, the `change_adv_strategy` path) is NOT part of this structural freeze and MUST NOT get a separate A/B Hold freeze gate — it is instead governed by the A/B-Hold-requires-V3 requirement below, and the held V3 profile MUST NOT be driven by that campaign-level strategy objective.
+While a campaign is preparing or holding for A/B Hold, the system MUST NOT run ordinary structural campaign auto-update that changes whitelist membership, target places, keyword enable/rollout, ordinary minus-phrase recalculation, or continuous ordinary Search common-bid mutation outside the A/B Hold setup and hold protection paths (including allowed-set enforcement that excludes non-allowed phrases, and the owned ENTER Search common-bid reset-to-min). The keyword/cluster bidder path is not an ordinary structural auto-update under this requirement and remains governed by the HOLD freezes target places / bidder and ENTER resets Search common bid requirements. A/B Hold applies only to campaigns on the V3 auto-updater; the V2-era campaign strategy objective auto-switch (MIN_CPO ↔ MAX_CONV, the `change_adv_strategy` path) is NOT part of this structural freeze and MUST NOT get a separate A/B Hold freeze gate — it is instead governed by the A/B-Hold-requires-V3 requirement below, and the held V3 profile MUST NOT be driven by that campaign-level strategy objective.
 
 #### Scenario: Ordinary auto-update skips structural work during hold
 - **GIVEN** a campaign is preparing or holding for A/B Hold
 - **WHEN** ordinary structural campaign auto-update would run
 - **THEN** that ordinary structural path does not change the campaign's held profile
+- **AND** the continuous ordinary Search common-bid updater does not change Search common bid for that campaign
 
 ### Requirement: Enter interrupts unsafe concurrent structural apply
 When the user enables A/B Hold, the system MUST coordinate across bot and runner processes so an in-flight ordinary structural update can stop before applying structural changes, with a safe continuation signal that setup may proceed.
@@ -154,7 +184,7 @@ When the user enables A/B Hold, the system MUST coordinate across bot and runner
 - **AND** the system reports that the stop is safe and enter setup may continue
 
 ### Requirement: EXIT restores ordinary target-place and minus updates without profile restore
-When A/B Hold is disabled, EXIT MUST set mode to `OFF`, MUST clear the PostgreSQL allowed-set snapshot for the campaign, MUST clear coordination Redis state used for ENTER/EXIT/setup polling, MUST allow automatic target-place updates and ordinary structural auto-update again, MUST allow ordinary minus-phrase auto-update and allowed-set recalculation again, and MUST leave the held keyword profile as-is without restoring a prior keyword-settings snapshot. The `card_ab_hold_degraded` flag may remain in `OFF` as non-operative residue; automatic cleanup of that residue is deferred and is not required for EXIT completion in MVP.
+When A/B Hold is disabled, EXIT MUST set mode to `OFF`, MUST clear the PostgreSQL allowed-set snapshot for the campaign, MUST clear coordination Redis state used for ENTER/EXIT/setup polling, MUST allow automatic target-place updates and ordinary structural auto-update again, MUST allow ordinary minus-phrase auto-update and allowed-set recalculation again, MUST allow the continuous ordinary Search common-bid updater again, and MUST leave the held keyword profile as-is without restoring a prior keyword-settings snapshot. The `card_ab_hold_degraded` flag may remain in `OFF` as non-operative residue; automatic cleanup of that residue is deferred and is not required for EXIT completion in MVP.
 
 #### Scenario: User disables A/B Hold
 - **GIVEN** a campaign is in active A/B Hold
@@ -162,6 +192,7 @@ When A/B Hold is disabled, EXIT MUST set mode to `OFF`, MUST clear the PostgreSQ
 - **THEN** the campaign mode becomes `OFF`
 - **AND** automatic target-place updates are allowed again
 - **AND** ordinary structural auto-update may run again
+- **AND** the continuous ordinary Search common-bid updater may run again
 - **AND** ordinary minus-phrase auto-update and allowed-set recalculation may run again
 - **AND** the PostgreSQL allowed-set snapshot is cleared
 - **AND** A/B Hold coordination Redis state is cleared

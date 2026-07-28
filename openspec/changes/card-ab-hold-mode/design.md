@@ -30,7 +30,7 @@
 Architecture Decisions Found:
 
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: **Accepted**. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper/UI. Применяется без изменений.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: **Proposed**. §1–§14 — применённый MVP-1 фундамент (ownership setup/hold write-path, structural freeze, allowed-set snapshot + enforcement, Excel-removal, idempotent Enable, V3-only, shared-defaults guard, PENDING liveness). **Обновлено этим change**: §15 (WARM_UP/epoch/generation — ссылка на новый decision ниже), §16 (confirmed epoch-parameters SoT — ссылка на новый decision ниже), §17 (stale/missing stats freeze для keyword inclusion/exclusion **и** Search/Auto bid-мутаторов, не только enable-гейта §2a), §18 (daily-budget/activity-control — ортогональный reuse существующего controller, без новой финансовой safety-модели).
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: **Proposed**. §1–§14 — применённый MVP-1 фундамент (ownership setup/hold write-path, structural freeze, allowed-set snapshot + enforcement, Excel-removal, idempotent Enable, V3-only, shared-defaults guard, PENDING liveness). **Обновлено этим change**: §15 (WARM_UP/epoch/generation — ссылка на новый decision ниже), §16 (confirmed epoch-parameters SoT — ссылка на новый decision ниже), §17 (stale/missing stats freeze для keyword inclusion/exclusion **и** Search/Auto bid-мутаторов, не только enable-гейта §2a), §18 (daily-budget/activity-control — ортогональный reuse существующего controller, без новой финансовой safety-модели). **Дополнительно обновлено (`/opsx-update` Search common-bid):** §3 (ordinary continuous Search common-bid Forbidden under Hold; bidder остаётся Allowed) + **§19** (Search common bid = рабочая механика холодных ключей/каталога; one-shot reset-to-min на ENTER; затем freeze; owned path ≠ ordinary updater ≠ bidder).
 - `openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md` — Status: **Proposed (новый в этом change)**. WARM_UP как durable pre-epoch стадия (default/min 24ч); epoch/generation модель; durable PENDING intent строго до WB-мутации; partial sync → non-ACTIVE recoverable; retry того же generation/параметров без пересчёта и без новой эпохи; дрейф позиции не переоткрывает подтверждение.
 - `openspec/changes/card-ab-hold-mode/decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md` — Status: **Proposed (новый в этом change)**. Confirmed keyword set / confirmed target places / confirmed Auto participation / confirmed Auto bid — durable SoT, отдельный от факт-состояния WB; факт-позиция и target place — раздельные семантические поля; immutable TP в пределах эпохи; Auto bid мутаторы заморожены в активном hold; owner — A/B Hold confirmation write-path, не display-слой и не ordinary auto-updaters.
 
@@ -40,7 +40,7 @@ Architecture Decision Missing: нет для этого обновления —
 
 **Owner layer:**
 
-- A/B Hold epoch/setup write-path (shop-runner, тот же owner, что существующие `process_ab_setup` / `process_ab_hold` entrypoints): владеет WARM_UP-таймером, epoch/generation-нумерацией, durable PENDING intent → WB sync → активный hold порядком, retry-логикой (тот же generation, без пересчёта).
+- A/B Hold epoch/setup write-path (shop-runner, тот же owner, что существующие `process_ab_setup` / `process_ab_hold` entrypoints): владеет WARM_UP-таймером, epoch/generation-нумерацией, durable PENDING intent → WB sync → активный hold порядком, retry-логикой (тот же generation, без пересчёта); **также** one-shot Search common-bid reset-to-min на ENTER (`OFF`→`PENDING_SETUP`, decision §19) — не ordinary `update_common_bid_in_search_adv` и не bidder.
 - A/B Hold confirmation write-path (Telegram confirm-хендлеры → durable PG запись): владеет confirmed keyword set / confirmed target places / confirmed Auto participation / confirmed Auto bid; читает факт-позицию из существующего read-model, не хранит её как подтверждённый параметр.
 - PG durable поля: режим кампании (OFF/PENDING/ACTIVE-класс, уже существует), allowed-set snapshot (уже существует), + **planned Alembic fields** (см. `tasks.md` §19.5 / §22.5): `card_ab_hold_phase`, `card_ab_hold_warmup_started_at`, `card_ab_hold_warmup_duration_hours`, `card_ab_hold_generation`, `card_ab_hold_wb_sync_idempotency_key`, `card_ab_hold_pending_intent_json`, `card_ab_hold_sync_status`, `card_ab_hold_confirmed_keywords_json`, `card_ab_hold_confirmed_target_places_json`, `card_ab_hold_confirmed_auto_participation`, `card_ab_hold_confirmed_auto_bid`. Owner и порядок фиксируются здесь; имена колонок — planning SoT для apply (не код). **Legacy rows:** NULL/0 defaults on new columns MUST NOT activate epoch lifecycle (§18.5 / Migration Plan).
 - **Legacy gate (pre-apply REQUIRED):** `process_ab_setup` → auto-ACTIVE и `setup_apply` TP-write на ENTER PASS — Forbidden относительно owner-флоу; MUST быть phase-gated до apply §19+ (`tasks.md` §18.4).
@@ -48,7 +48,7 @@ Architecture Decision Missing: нет для этого обновления —
 - Существующий daily-budget/activity-control controller (`ensure_campaigns_active` / auto-budget watchdog) — не меняется этим change; A/B Hold только честно описывает его поведение (stop threshold, overshoot без гарантированной границы, суточный сброс) как ортогональный путь.
 - Mode policy overlays — дефолт «выкл» (без изменений, Accepted decision).
 
-**Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (существует), ACT structural guards (существуют), hold guard executors (существуют), allowed-set enforcement (существует), bidder/cluster bids (существуют, теперь явно как holder confirmed target places), Telegram confirm-хендлеры как triggers epoch/generation write-path (не как SoT).
+**Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (существует), ACT structural guards (существуют), hold guard executors (существуют), allowed-set enforcement (существует), bidder/cluster bids (существуют, теперь явно как holder confirmed target places), Telegram confirm-хендлеры как triggers epoch/generation write-path (не как SoT), owned ENTER Search common-bid reset-to-min (`common_bid_enter_reset`, applied §27 / decision §19).
 
 **Forbidden layers:**
 
@@ -58,8 +58,9 @@ Architecture Decision Missing: нет для этого обновления —
 - Продвижение generation, пересчёт TP/Auto bid на retry WB-синхронизации.
 - Остановка кампании исключительно по причине stale/missing статистики (freeze мутаций — да; остановка кампании — нет, это отдельное более сильное действие).
 - Введение нового финансового safety-механизма (абсолютный бюджет, velocity cap, emergency-stop подсистема, global refill suppression) в A/B Hold write-path.
+- Continuous ordinary Search common-bid mutate (`update_common_bid_in_search_adv`) во время `PENDING_SETUP` / `ACTIVE`; leave elevated common bid frozen as-is on ENTER without owned reset-to-min; выполнить ENTER reset через ordinary updater или bidder (§19).
 
-**Rationale:** соответствует обновлённому proposed `card-ab-hold-write-path-ownership` (§15–§18) и двум новым proposed decisions (`ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`), а также accepted `mode-defaults-policy-ownership`. Ownership placement для WARM_UP/epoch/confirm-слоя не пересекается с уже применённым MVP-1 allowed-set/freshness/Excel/V3/shared-defaults ownership — это дополняющий слой, а не замена.
+**Rationale:** соответствует обновлённому proposed `card-ab-hold-write-path-ownership` (§15–§19) и двум новым proposed decisions (`ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`), а также accepted `mode-defaults-policy-ownership`. Ownership placement для WARM_UP/epoch/confirm-слоя и Search common-bid ENTER reset не пересекается с ordinary common-bid updater и bidder — дополняющие слои, не замена.
 
 ## Decisions
 
@@ -135,6 +136,16 @@ Architecture Decision Missing: нет для этого обновления —
 
 **Альтернатива:** включить для всех paid-пользователей сразу после реализации — отклонена владельцем.
 
+### 10. Search common bid: reset-to-min on ENTER, then freeze (см. write-path §19)
+
+**Выбор:** при ENTER (`OFF` → `PENDING_SETUP`) A/B Hold owned path **один раз** сбрасывает Search common bid (общая ставка аукциона / `SetCommonBids`) на WB minimum по nm кампании; пока `PENDING_SETUP`/`ACTIVE`, continuous ordinary `update_common_bid_in_search_adv` Forbidden; bidder/cluster bids в ACTIVE продолжает держать ставки к confirmed ЦП. Повторный reset — только после EXIT → новый ENTER.
+
+**Почему:** common bid — рабочая механика (холодные ключи до порога показов + каталог), не мёртвый legacy и не bidder. Freeze-as-is оставлял бы завышенную общую ставку; ordinary up/reset цикл под Hold загрязняет тест. Owner product: min + freeze.
+
+**Альтернатива A:** только freeze ordinary updater без reset — отклонена (elevated common bid остаётся).  
+**Альтернатива B:** reset при переходе в ACTIVE / после TP confirm — отклонена владельцем (тайминг = ENTER → PENDING_SETUP).  
+**Альтернатива C:** поручить reset ordinary `update_common_bid_in_search_adv` — отклонена (continuous Forbidden under Hold; нужен owned one-shot).
+
 ### Устранённые противоречия (сверка с owner-approved списком)
 
 - Тихая авто-классификация ENTER / авто-TP без явных подтверждений keyword+TP+Auto — устранено decisions §3, §4 выше и `ab-hold-confirmed-epoch-parameters-sot`.
@@ -145,6 +156,7 @@ Architecture Decision Missing: нет для этого обновления —
 - ACTIVE без durable PENDING intent + успешной WB sync — устранено decision §5.
 - Retry, пересчитывающий TP/Auto bid или продвигающий generation — устранено decision §5.
 - Framing, будто `REQ-AB-HOLD-BUDGET-SAFETY-001` или параллельная финансовая safety-модель — текущий scope — явно исключено (Context, decision §7, Non-Goals).
+- Search common bid «забыт» / freeze-as-is без reset-to-min на ENTER — устранено decision §10 выше и write-path §19.
 
 ## Risks / Trade-offs
 
@@ -153,13 +165,14 @@ Architecture Decision Missing: нет для этого обновления —
 - [Risk] Partial sync оставляет кампанию в подвешенном не-активном состоянии дольше, чем ожидает пользователь. → Mitigation: retry переиспользует тот же generation/параметры автоматически на следующем тике (детали планирования retry — предмет будущего `/opsx:apply`); EXIT остаётся доступным в любой момент (существующий MVP-1 инвариант).
 - [Risk] Freeze Search/Auto bid-мутаций при stale-стате маскирует реальную проблему получения статистики. → Mitigation: существующий freshness-класс и honest-degradation паттерн (уже применён для allowed-set §8/§12–§13 write-path decision) переиспользуются, а не изобретаются заново.
 - [Risk] Пользователь трактует daily-budget stop-threshold как гарантированный потолок расходов теста. → Mitigation: явное честное описание overshoot-факторов в плане (этот design) и, в дальнейшем, в Telegram-копирайте (DEFERRED, но обязано наследовать эту честность).
+- [Risk] One-shot ENTER common-bid reset fails (WB/min unavailable) and campaign enters PENDING with elevated common bid. → Mitigation: visible degrade / retry on setup tick; MUST NOT silently claim reset done; continuous ordinary updater remains Forbidden under Hold (decision §19).
 - [Risk] Широкая раскатка до валидации нового флоу повторяет паттерн «слишком рано ready» из MVP-1. → Mitigation: OD-05-гейт и двухэтапная раскатка (ручной тест → лимитированная бета) как единственный путь к broad enable.
 
 ## Migration Plan
 
 1. Этот `/opsx-update` обновляет только планирующие артефакты (`proposal.md`, `design.md`, `specs/card-ab-hold-mode/spec.md`, `tasks.md`, три decision-файла); код/тесты/миграции не создаются и не изменяются. **OP-006 pre-apply planning fixes (2026-07-23):** §18.4 legacy gate; §4.1 TP wording; Alembic field names в §19.5/§22.5; AutoResetBidService в §21.3/§21.4; OD-05 остаётся единственным open owner decision. **OP-008 pre-apply planning fixes (2026-07-23):** PG idempotency/uniqueness contract (§22.5); legacy in-flight policy (§18.5); writer inventory; UX S3 keyboard; explicit test tasks.
 2. `/opsx:apply` для новых задач (`tasks.md` §18.4 и §19+) заблокирован до явной авторизации владельцем.
-3. При авторизации: реализация в порядке зависимостей — **§18.4 gate legacy auto-ACTIVE/auto-TP** → durable WARM_UP-таймер/эпоха/generation-поля → confirm-write-path (keyword/TP/Auto) → durable PENDING intent → WB sync/retry → freeze Search/Auto bid при stale-стате (вкл. `AutoResetBidService`) → честный daily-budget disclosure в UI-копирайте (по UX-контракту) → ручной тест владельца → лимитированная бета.
+3. При авторизации: реализация в порядке зависимостей — **§18.4 gate legacy auto-ACTIVE/auto-TP** → durable WARM_UP-таймер/эпоха/generation-поля → confirm-write-path (keyword/TP/Auto) → durable PENDING intent → WB sync/retry → freeze Search/Auto bid при stale-стате (вкл. `AutoResetBidService`) → **§27 ENTER Search common-bid reset-to-min + ordinary continuous freeze** → честный daily-budget disclosure в UI-копирайте (по UX-контракту) → ручной тест владельца → лимитированная бета.
 4. Широкое включение для всех paid-пользователей — только после OD-05.
 5. Rollback: как в применённом MVP-1 (EXIT → OFF, allowed-set snapshot clear, Redis TTL cleanup) плюс — durable WARM_UP-таймер/PENDING intent без завершённой синхронизации не создают побочных WB-эффектов и очищаются при EXIT/rollback. **Rollback migration MUST NOT** drop or null-out legacy `card_ab_hold_mode`, `allowed_phrases_snapshot`, or `card_ab_hold_degraded` in a way that destroys in-flight legacy hold state.
 
