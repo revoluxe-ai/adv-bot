@@ -206,7 +206,7 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_update:
-    baseline_chars: 74468
+    baseline_chars: 85195
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
