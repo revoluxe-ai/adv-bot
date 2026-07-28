@@ -326,3 +326,5 @@ Disposition:
 Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
 
 opsx-bug-team to commant native
+
+opsx-bug-team - тест развилки от bug-hunt
