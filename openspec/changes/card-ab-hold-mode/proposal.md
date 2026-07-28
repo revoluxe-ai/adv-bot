@@ -58,6 +58,7 @@
 ### Out of scope
 
 - Полный UX-контракт и Telegram storyboard для нового флоу подтверждений — создан этим `/opsx-continue`: `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` (экраны/состояния/клавиатуры/callback/переходы/Back-Cancel/pagination/stale-callback contract) и `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md` (сценарии по экранам); планирующие документы, не реализация — `/opsx:apply` для `tasks.md` §19–25 остаётся заблокирован до owner-авторизации.
+- Pre-start safety policy picker (hard|soft|self) и anti-drain emergency kill switch — **не** текущий DoD; parked in `DOTO/WORKLOG.md` `[deferred-from:card-ab-hold-mode]` (future change, e.g. `ab-hold-safety-policy-modes`). Mid-sync stale UX (wait|force-apply|EXIT) — тоже parked, не owed.
 - Monitoring/alerting и evidence-driven emergency stop — **OUT_OF_SCOPE_FOLLOW_ON**, не артефакт этого обновления.
 - Абсолютный тестовый бюджет, epoch spend cap, velocity cap, generic financial latch, новая emergency-stop подсистема, global refill/restart suppression, отдельная финансовая safety-ownership decision — не вводятся; `REQ-AB-HOLD-BUDGET-SAFETY-001` и любая параллельная финансовая safety-модель — не текущий scope.
 - Встроенный A/B инструмент Wildberries и интерпретация его метрик.
