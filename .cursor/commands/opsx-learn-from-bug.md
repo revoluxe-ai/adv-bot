@@ -106,8 +106,11 @@ Prefer durable case/finding over chat paraphrase.
 Schema: `.cursor/pipeline/contracts/bug-episode/LESSON_GATE.md`.
 
 ```text
-RUNTIME_ENFORCEMENT: NOT_ACTIVE
-IMPLEMENTATION_STATUS: CANDIDATE_IMPLEMENTED
+IMPLEMENTATION_STATUS: LIVE_ACTIVATED
+VALIDATION_STATUS: INDEPENDENT_TEST_PASS
+RUNTIME_ENFORCEMENT: ACTIVE
+LIVE_COMMAND_BEHAVIOR_CHANGED: YES
+GO_ACTIVATE: ISSUED
 ```
 
 Finding-local / `local_case_note_only` **without** FANIN remains allowed and
