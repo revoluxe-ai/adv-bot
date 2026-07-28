@@ -570,7 +570,7 @@ durable case map exists (`case_map_present: true`). When
 `durable_case_map_missing`, `NEXT_COMMAND` MUST be
 `/opsx-materialize-bug-queue mode=hunt-result case=<ROOT_CASE_ID> source=<same hunt source>`
 instead — never a claimable claim-next-bug handoff. After a successful claim,
-`/opsx-claim-next-bug` already emits `/opsx-fix-bug` with `case=` / `intake=` /
+`/opsx-claim-next-bug` emits `/opsx-classify-bug` with `case=` / `finding=` / (then Route A uses `/opsx-fix-bug` with `case=` / `intake=` /
 `finding=` / `claim_token=`. Never hand a child chat bare `/opsx-fix-bug`.
 
 ## Separate root candidate packet
@@ -862,3 +862,58 @@ Next action:
 * Do not run learning.
 * Do not promote a lesson into policy.
 * Physical chat creation belongs to an external browser/coordinator layer.
+
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+

@@ -204,7 +204,7 @@ OWNER_CHAT: <chat_label>
 CLAIMED_AT: <UTC ISO-8601>
 LAST_ACTIVITY_AT: <UTC ISO-8601>
 CLAIM_TOKEN: CLAIM/<CASE_ID>/<FINDING_ID>/<CLAIMED_AT>
-NEXT_ACTION: read_only_adjudication
+NEXT_ACTION: classify_before_impl_route
 ```
 
 Claim token rules:
@@ -372,10 +372,10 @@ PACKET_PATH:
 OWNER_CHAT:
 STATUS: claimed
 MODE: READ_ONLY
-NEXT_ACTION: read_only_adjudication
+NEXT_ACTION: classify_before_impl_route
 
 NEXT_COMMAND:
-/opsx-fix-bug
+/opsx-classify-bug
 
 NEXT_COMMAND_ARGS:
 case=<CASE_ID>
@@ -385,7 +385,7 @@ claim_token=<CLAIM_TOKEN>
 
 USER_MESSAGE:
 Finding <FINDING_ID> принят и закреплён за этим чатом.
-Готов продолжать работу по packet.
+Следующий обязательный шаг: /opsx-classify-bug (до implementation route).
 
 PACKET_SUMMARY:
 - TITLE:
@@ -414,7 +414,7 @@ COMMAND_RECEIPT:
   CLAIM_TOKEN:
   RESULT: claimed
   OUTPUT_PATH:
-  NEXT_ACTION: read_only_adjudication
+  NEXT_ACTION: /opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
 
 SOURCE_RESOLUTION:
 - mode: canonical_id
@@ -466,7 +466,9 @@ Allowed after claim:
 
 * read the packet;
 * summarize the finding to the user in Russian;
-* prepare `/opsx-fix-bug` without `GO` as the next read-only step;
+* append one ROUTE-TRACE event for `claim` and update LEDGER `## ROUTE_STATE`;
+* prepare `/opsx-classify-bug` as the next mandatory step (before any
+  implementation route);
 * wait for the user or chat policy to continue.
 
 Forbidden after claim in this same command:
@@ -561,18 +563,34 @@ hunt child handoffs) MUST align with this order. Consumer safety remains in
 
 (If `OWNER_CHAT` unset → `repair=release_corrupt_claim`, then claim-next.)
 
-2. **`/opsx-fix-bug` with token** only when durable `CLAIM_TOKEN` is already
-   known (this command’s claim packet / same-chat prior `COMMAND_RECEIPT`):
+2. **`/opsx-classify-bug` (mandatory before implementation route)** when the
+    finding is claimed (or known-root / non-queue) and
+    `ROUTE_STATE.CURRENT_CLASSIFICATION` is absent:
+
+```text
+/opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
+```
+
+Include `claim_token=` in context when known; classify does not require it
+for ownership, but downstream executors do.
+
+3. **After classify Route A** — `/opsx-fix-bug` with token only when durable
+   `CLAIM_TOKEN` is already known:
 
 ```text
 /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 ```
 
-3. **Summary-only** when IDs / case map are unknown:
+   After classify Route B → `/opsx-update …` (not fix-bug/apply yet).
+   Route C/D → terminal; do not emit fix-bug.
+
+4. **Summary-only** when IDs / case map are unknown:
 
 ```text
 /opsx-fix-bug <finding summary>
 ```
+
+   Prefer materialize+claim+classify when a case map will exist.
 
 ### Forbidden producer anti-patterns
 
@@ -581,6 +599,8 @@ hunt child handoffs) MUST align with this order. Consumer safety remains in
   `CHAT_REQUIRED=true` there is **no** token yet.
 * Inventing / guessing `CLAIM_TOKEN`.
 * Emitting `/opsx-fix-bug GO …` from a routing / classify / hunt handoff.
+* Skipping `/opsx-classify-bug` after a successful claim (classify-first).
+* Emitting `/opsx-apply` before `/opsx-update` TASK_DELTA=CHANGED.
 * Skipping `/opsx-claim-next-bug` for an unclaimed chat-required finding.
 * Routing `STATUS=claimed` + empty/absent durable `CLAIM_TOKEN` to
   `/opsx-claim-next-bug` (durable-empty ≠ chat-local-missing; use 1c).
@@ -657,6 +677,60 @@ CHAT_REQUIRED: true
 RED-pending findings do **not** bypass claim-first. INDEX may mention
 `red_pending` / `production_go_ready` as recovery stages after claim, but
 ownership model is unchanged.
+
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
 
 ## Hard rules
 

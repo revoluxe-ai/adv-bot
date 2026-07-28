@@ -37,19 +37,32 @@ Remaining text is the raw finding summary, if any.
 
 ## Hard Safety Rules
 
-You MUST NOT modify files.
-
-You MUST NOT create files.
-
 You MUST NOT update OpenSpec artifacts.
 
-You MUST NOT edit code.
+You MUST NOT edit production / application code (`app/**`, etc.).
 
 You MUST NOT stage, commit, push, merge, rebase, deploy, restart services, run migrations, modify secrets, or change infrastructure.
 
 If the user includes `GO`, ignore it for this command. `GO` has no effect here.
 
-This command only classifies and routes.
+This command classifies and routes. It is **not** an implementation executor.
+
+### Allowed process writes (bug episode only)
+
+When `case=<CASE_ID>` resolves to a durable case map, you **must** append
+route durability (schema:
+`.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`):
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl   # append one event
+.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md                   # ## ROUTE_STATE only
+```
+
+Forbidden process writes: inventing findings, changing claim ownership,
+editing OpenSpec, editing tests, rewriting prior ROUTE-TRACE lines.
+
+If `case=` is absent / unresolvable, stay fully read-only and still emit
+the classification output (no durable trace).
 
 ## Source resolution (mandatory)
 
@@ -142,6 +155,31 @@ RESULT: blocked_needs_exact_source
 ```
 
 and ask for the exact finding path or correct `case`/`finding`. Do not hang in broad exploration or on optional git preflight.
+
+## Canonical position (mandatory)
+
+Authority: `.cursor/pipeline/ORCHESTRATION_MVP.md` §0 / Routes A–D.
+
+```text
+BUG SIGNAL → materialize → claim → /opsx-classify-bug → Route A|B|C|D
+```
+
+This command is **required** before choosing an implementation route
+(`/opsx-fix-bug`, `/opsx-update`, `/opsx-apply`) or terminal close for a
+durable finding. Downstream `/opsx-fix-bug` / bug-episode `/opsx-apply`
+must stop with `blocked_needs_classify_first` when `ROUTE_STATE` lacks
+`CURRENT_CLASSIFICATION`.
+
+### Route map (durable tokens)
+
+| Classify label | CURRENT_CLASSIFICATION | Route | Next |
+|---|---|---|---|
+| `implementation_bug` | `IMPLEMENTATION_BUG` | A | `/opsx-fix-bug` WITHOUT GO |
+| `implementation_bug_with_spec_gap` | `SPEC_GAP` | B | `/opsx-update` |
+| `spec_bug` | `SPEC_BUG` | B | `/opsx-update` |
+| `false_positive` | `FALSE_POSITIVE` | C | `CLOSED_NO_IMPLEMENTATION` |
+| `out_of_scope` | `OUT_OF_SCOPE` | D | `ROUTE_TO_OTHER_PROCESS` |
+
 ## Classification Question
 
 Answer this exact question:
@@ -178,7 +216,7 @@ finding — that conflicts with fix-bug's claim-first gate
 (`blocked_needs_claim_first`).
 
 Classify MUST NOT include `GO`. Production edits require a later
-`/opsx-fix-bug GO` only after verdict `fix_now`.
+`/opsx-fix-bug GO` only after verdict `fix_now` **and** RED gate.
 
 OpenSpec artifact update:
 
@@ -199,15 +237,22 @@ Use when the expected behavior is implied by a product invariant or accepted dec
 Required next action:
 
 ```text
-1. /opsx-update <change-id> <minimal spec clarification>
-2. then claim-first if needed:
-   /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
-   — or, only when CLAIM_TOKEN is already known:
-   /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
-   (or /opsx-fix-bug <finding summary> without GO if IDs unknown)
+/opsx-update <change-id> <minimal spec clarification>
 ```
 
-Classify MUST NOT include `GO` on step 2.
+After update, `/opsx-update` emits `TASK_DELTA` and routes to `/opsx-apply`
+or `/opsx-fix-bug` WITHOUT GO. Do **not** skip to apply from classify.
+Do **not** treat update as production GO.
+
+If claim is still required first:
+
+```text
+1. /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
+2. /opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
+3. /opsx-update <change-id> …
+```
+
+Classify MUST NOT include `GO`.
 
 OpenSpec artifact update:
 
@@ -231,11 +276,13 @@ Required next action:
 /opsx-update <change-id> <required behavior change>
 ```
 
-or, if the change is large or architectural:
+or, if the change is large or architectural (no existing change):
 
 ```text
-/opsx-propose <new change>
+/opsx-new <summary>
 ```
+
+(Prefer `/opsx-new` + continue/ff over obsolescent `/opsx-propose`.)
 
 OpenSpec artifact update:
 
@@ -243,7 +290,8 @@ OpenSpec artifact update:
 required before implementation
 ```
 
-Implementation must stop until the spec is corrected.
+Implementation must stop until the spec is corrected. Then TASK_DELTA
+selects `/opsx-apply` or `/opsx-fix-bug`.
 
 ### 4. `out_of_scope`
 
@@ -252,7 +300,7 @@ Use when the finding is real, but outside the current OpenSpec change or accepte
 Required next action:
 
 ```text
-create a separate lightweight bugfix or new OpenSpec change
+ROUTE_TO_OTHER_PROCESS
 ```
 
 OpenSpec artifact update:
@@ -270,7 +318,7 @@ Use when the finding is not runtime reachable, the invariant is already satisfie
 Required next action:
 
 ```text
-stop; do not edit
+CLOSED_NO_IMPLEMENTATION
 ```
 
 OpenSpec artifact update:
@@ -423,43 +471,112 @@ why_existing_spec_is_sufficient:
 
 ### Step 7 — Decide next command
 
-Choose exactly one. For implementation routes, prefer in this order
-(Authority: `/opsx-claim-next-bug` § Producer pasteable-Next contract
-(claim-first)):
+Choose exactly one primary next, in this order
+(Authority: ORCHESTRATION_MVP Routes A–D + `/opsx-claim-next-bug`
+§ Producer pasteable-Next contract (claim-first)):
 
 1. `/opsx-claim-next-bug` when case map exists and finding is unclaimed /
    claimable (`STATUS=available`, `CHAT_REQUIRED=true`) or claimed without a
    usable `CLAIM_TOKEN` in this chat;
-2. `/opsx-fix-bug … claim_token=` only when durable `CLAIM_TOKEN` is already
-   known;
-3. `/opsx-fix-bug <summary>` when IDs / case map are unknown.
+2. Else by classification route:
+   - Route A `IMPLEMENTATION_BUG` → `/opsx-fix-bug … claim_token=` (WITHOUT GO)
+     when durable token known; else summary-only `/opsx-fix-bug <summary>`;
+   - Route B `SPEC_BUG` | `SPEC_GAP` → `/opsx-update <change-id> <summary>`;
+   - Route C `FALSE_POSITIVE` → `CLOSED_NO_IMPLEMENTATION`;
+   - Route D `OUT_OF_SCOPE` → `ROUTE_TO_OTHER_PROCESS`.
 
 ```text
 /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
 /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 /opsx-fix-bug <summary>
 /opsx-update <change-id> <summary>
-/opsx-propose <summary>
-stop: false positive
+/opsx-new <summary>
+CLOSED_NO_IMPLEMENTATION
+ROUTE_TO_OTHER_PROCESS
 stop: need more repo evidence
 ```
 
 Do NOT choose more than one primary next command.
 Do NOT emit `/opsx-fix-bug GO …` from classify. `GO` belongs only to a later
-fix-bug run after verdict `fix_now`.
+fix-bug/apply run after RED gate.
+Do NOT emit `/opsx-apply` from classify — apply is only after `/opsx-update`
+TASK_DELTA=CHANGED.
 Do NOT invent `claim_token` or paste fix-bug+token as primary for an
 unclaimed `available`+`CHAT_REQUIRED=true` finding.
 
-If `implementation_bug_with_spec_gap`, the next command may include two ordered substeps:
+### Step 8 — Persist route trace + ROUTE_STATE
+
+When `case=` is resolved, append ROUTE-TRACE events (`classify-bug` and
+`classification_route_selection`) with SCHEMA_VERSION 2 fields including
+`EVENT_ID` / `EVENT_SEQUENCE` / `ACTOR_*` / `FROM_STATE` / `TO_STATE`.
+
+Route layers (do not collapse):
 
 ```text
-1. /opsx-update <change-id> <minimal spec clarification>
-2. /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"
-   — or, only when CLAIM_TOKEN is already known:
-   /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
-   (or /opsx-fix-bug <summary> without GO if IDs unknown)
+CHOSEN_ROUTE:                 high-level ROUTE_A | ROUTE_B | ROUTE_C | ROUTE_D
+EXPECTED_NEXT_COMMAND:        immediate process handoff
+EXPECTED_EXECUTION_ROUTE:     eventual production executor (or terminal /
+                              PENDING_UNTIL_TASK_DELTA)
 ```
 
+`/opsx-update` is **never** an implementation execution route.
+
+On route selection set:
+
+```text
+Route A (IMPLEMENTATION_BUG):
+  CHOSEN_ROUTE: ROUTE_A
+  EXPECTED_NEXT_COMMAND: /opsx-fix-bug
+  EXPECTED_EXECUTION_ROUTE: /opsx-fix-bug
+  ACTUAL_EXECUTION_ROUTE: PENDING
+  ROUTE_RECONCILIATION: PENDING
+  CURRENT_ROUTE_STATE: AWAITING_FIX_BUG
+
+Route B (SPEC_BUG | SPEC_GAP):
+  CHOSEN_ROUTE: ROUTE_B
+  EXPECTED_NEXT_COMMAND: /opsx-update
+  EXPECTED_EXECUTION_ROUTE: PENDING_UNTIL_TASK_DELTA
+  ACTUAL_EXECUTION_ROUTE: PENDING
+  ROUTE_RECONCILIATION: PENDING
+  CURRENT_ROUTE_STATE: AWAITING_SPEC_UPDATE
+
+Route C (FALSE_POSITIVE):
+  CHOSEN_ROUTE: ROUTE_C
+  EXPECTED_NEXT_COMMAND: CLOSED_NO_IMPLEMENTATION
+  EXPECTED_EXECUTION_ROUTE: CLOSED_NO_IMPLEMENTATION
+  ACTUAL_EXECUTION_ROUTE: NOT_APPLICABLE
+  ROUTE_RECONCILIATION: NOT_APPLICABLE
+  CURRENT_ROUTE_STATE: CLOSED_NO_IMPLEMENTATION
+
+Route D (OUT_OF_SCOPE):
+  CHOSEN_ROUTE: ROUTE_D
+  EXPECTED_NEXT_COMMAND: ROUTE_TO_OTHER_PROCESS
+  EXPECTED_EXECUTION_ROUTE: ROUTE_TO_OTHER_PROCESS
+  ACTUAL_EXECUTION_ROUTE: NOT_APPLICABLE
+  ROUTE_RECONCILIATION: NOT_APPLICABLE
+  CURRENT_ROUTE_STATE: ROUTE_TO_OTHER_PROCESS
+```
+
+Also set process-command reconciliation seeds where applicable:
+
+```text
+ACTUAL_NEXT_COMMAND: PENDING | NOT_APPLICABLE
+NEXT_COMMAND_RECONCILIATION: PENDING | NOT_APPLICABLE
+```
+
+Route D **requires**:
+
+```text
+ROUTE_TARGET_PROCESS_ID
+ROUTE_TARGET_REASON
+```
+
+Missing target → `BLOCKED_MISSING_ROUTE_TARGET` (do not emit clean Route D).
+
+Do **not** omit `CHOSEN_ROUTE` for Route B and then expect `/opsx-update` to
+infer it from `SPEC_BUG`/`SPEC_GAP` alone.
+
+Update LEDGER `## ROUTE_STATE` snapshot fields per ROUTE_TRACE.md / ORCHESTRATION §0.4.
 ## Required Output Format
 
 Return exactly this structure:
@@ -511,8 +628,19 @@ Runtime evidence:
 Диагноз:
 <why this classification is correct>
 
+ROUTE_STATE:
+- CURRENT_CLASSIFICATION:
+- CHOSEN_ROUTE: ROUTE_A | ROUTE_B | ROUTE_C | ROUTE_D
+- EXPECTED_NEXT_COMMAND:
+- EXPECTED_EXECUTION_ROUTE:
+- ACTUAL_EXECUTION_ROUTE:
+- ROUTE_RECONCILIATION:
+- CURRENT_ROUTE_STATE:
+- ROUTE_TRACE_PATH:
+- route_trace_appended: yes/no
+
 Next command:
-<one command or stop condition>
+<one command or stop condition; must match EXPECTED_NEXT_COMMAND>
 
 If OpenSpec update is required:
 - artifact:
@@ -598,14 +726,14 @@ The final answer MUST make the routing decision obvious in the first three lines
 
 The user must be able to copy the next command without rereading the whole analysis.
 
-`Next command` for implementation routes MUST be pasteable and MUST NOT include
-`GO`. Claim-first when the finding is unclaimed / claimable
+`Next command` MUST be pasteable and MUST NOT include `GO` or premature
+`/opsx-apply`. Claim-first when the finding is unclaimed / claimable
 (`STATUS=available`, `CHAT_REQUIRED=true`) or claimed without a usable token:
-emit `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`. Prefer
-`/opsx-fix-bug` with durable `case=` / `intake=` / `finding=` /
-`claim_token=` only when that token is already known — never invent it.
-Authority: `/opsx-claim-next-bug` § Producer pasteable-Next contract
-(claim-first).
+emit `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`. After claim,
+this command is the mandatory router. Prefer `/opsx-fix-bug` (Route A) or
+`/opsx-update` (Route B) per classification — never invent `claim_token`.
+Authority: ORCHESTRATION_MVP Routes A–D + `/opsx-claim-next-bug`
+§ Producer pasteable-Next contract (claim-first).
 
 
 ## Static Analysis Gate
@@ -621,3 +749,63 @@ command:
 caused_by_current_diff: yes/no/unknown
 runtime_bug_revealed: yes/no/unknown
 openspec_contract_issue: yes/no/unknown
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** a classification route, also set:
+
+```text
+CHOSEN_ROUTE                 # ROUTE_A | ROUTE_B | ROUTE_C | ROUTE_D
+EXPECTED_NEXT_COMMAND        # immediate process handoff
+ACTUAL_NEXT_COMMAND          # PENDING until next command starts
+NEXT_COMMAND_RECONCILIATION  # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+EXPECTED_EXECUTION_ROUTE     # eventual executor; Route B = PENDING_UNTIL_TASK_DELTA
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION         # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+CURRENT_ROUTE_STATE
+```
+
+Never write `EXPECTED_EXECUTION_ROUTE=/opsx-update`.
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+

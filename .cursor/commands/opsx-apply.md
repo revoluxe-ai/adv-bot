@@ -188,6 +188,108 @@ Do not claim archive readiness from apply alone.
 What would you like to do?
 ```
 
+
+
+## Bug-episode RED + Owner GO gate
+
+Authority: `.cursor/pipeline/ORCHESTRATION_MVP.md` §1.
+
+When `/opsx-apply` is the bug-episode implementation executor
+(`ROUTE_STATE.EXPECTED_EXECUTION_ROUTE=/opsx-apply` or request includes
+`case=`/`finding=` after `TASK_DELTA: CHANGED`):
+
+Production implementation is allowed only if:
+
+```text
+BUG_CONFIRMED
+AND FIX_NOW
+AND (
+  RED_CONFIRMED
+  OR RED_NOT_APPLICABLE_APPROVED
+)
+AND OWNER_PRODUCTION_GO
+```
+
+Hard stops:
+
+* missing classify → `blocked_needs_classify_first` → `/opsx-classify-bug …`
+* missing/failed TASK_DELTA YES route → do not apply; return to update/fix-bug
+* missing RED → `blocked_needs_red_before_go` → `/opsx-test case= finding=`
+* missing Owner GO → do not edit production; wait for Owner
+
+`/opsx-update` is never a substitute for Owner GO.
+`TASK_DELTA: CHANGED` is never automatic production permission.
+
+On bug-episode apply start set:
+
+```text
+ACTUAL_EXECUTION_ROUTE: /opsx-apply
+ROUTE_RECONCILIATION: MATCH | MISMATCH
+```
+
+MISMATCH -> BLOCKED_ROUTE_MISMATCH (no production edits).
+Also require TASK_DELTA: CHANGED and EXPECTED_EXECUTION_ROUTE=/opsx-apply.
+
+
+Append ROUTE-TRACE event for `apply`. Update `## ROUTE_STATE`.
+
+Normal OpenSpec apply **without** bug-episode case context keeps the
+existing change-lifecycle apply behavior (no RED gate).
+
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+
 **Guardrails**
 - Keep going through tasks until done or blocked
 - Always read context files before starting (from the apply instructions output)
