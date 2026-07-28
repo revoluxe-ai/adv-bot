@@ -26,6 +26,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     normalize_card_ab_hold_phase,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
+    CardAbHoldCommonBidEnterResetRedisCache,
     CardAbHoldLastAbortRedisCache,
     CardAbHoldSetupBlockRedisCache,
     CardAbHoldSignalKind,
@@ -544,6 +545,8 @@ async def disable_card_ab_hold(
         await session.commit()
         cache = CardAbHoldSignalRedisCache(adv)
         await cache.clear()
+        # decision §19: EXIT снимает done-маркер ENTER common-bid reset.
+        await CardAbHoldCommonBidEnterResetRedisCache(adv).clear()
         # decision §14c: EXIT — путь восстановления из зависшего PENDING; снимаем и
         # причину блока setup, чтобы стало ясно — ordinary automation снова активна.
         await CardAbHoldSetupBlockRedisCache(adv).clear()
