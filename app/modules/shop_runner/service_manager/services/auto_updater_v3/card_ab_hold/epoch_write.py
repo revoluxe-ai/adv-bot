@@ -100,12 +100,14 @@ async def confirm_keyword_set_and_start_warmup(
     *,
     duration_hours: int = DEFAULT_WARMUP_HOURS,
 ) -> None:
-    """Подтвердить набор ключей и запустить WARM_UP (§19).
+    """Подтвердить набор ключей и войти в WARM_UP duration-configuration (§19 / WARMS2).
 
-    Если уже ``WARM_UP`` и набор ключей изменился — таймер перезапускается полностью.
+    S1 (первый confirm) и S1b (edit во время running WARM_UP): durable keyword-set
+    + phase ``WARM_UP``, ``warmup_started_at`` MUST оставаться/становиться NULL.
+    Таймер стартует только в ``set_warmup_duration`` после duration confirm (S2→S3).
+    Decision: ``ab-hold-epoch-lifecycle-and-generation-ownership`` §1/§4.
     """
     clamped = clamp_warmup_duration_hours(duration_hours)
-    now = datetime.datetime.now(datetime.timezone.utc)
     normalized_keywords = list(keywords)
     async with sm(read_only=False) as session:
         stmt = _select_adv_for_update(adv_setting_id)
@@ -117,45 +119,62 @@ async def confirm_keyword_set_and_start_warmup(
         prev_phase = normalize_card_ab_hold_phase(
             getattr(adv, "card_ab_hold_phase", None)
         )
-        restart_timer = prev_phase == CardAbHoldPhase.WARM_UP and list(
-            prev_keywords
-        ) != normalized_keywords
+        cleared_running_timer = (
+            prev_phase == CardAbHoldPhase.WARM_UP
+            and getattr(adv, "card_ab_hold_warmup_started_at", None) is not None
+            and list(prev_keywords) != normalized_keywords
+        )
         stmt_up = (
             update(AdvSetting)
             .where(AdvSetting.id == adv_setting_id)
             .values(
                 card_ab_hold_confirmed_keywords_json=normalized_keywords,
                 card_ab_hold_phase=CardAbHoldPhase.WARM_UP.value,
-                card_ab_hold_warmup_started_at=now,
+                # S1/S1b: timer unset → S2 duration config; start is S2 confirm only.
+                card_ab_hold_warmup_started_at=None,
                 card_ab_hold_warmup_duration_hours=clamped,
             )
         )
         _ = await session.execute(stmt_up)
         await session.commit()
-    if restart_timer:
+    if cleared_running_timer:
         logger.info(
-            "[adv_setting_id=%s] WARM_UP timer restarted after keyword-set change",
+            "[adv_setting_id=%s] WARM_UP timer cleared after keyword-set change; "
+            "awaiting duration confirm (S2)",
             adv_setting_id,
         )
 
 
 async def set_warmup_duration(adv_setting_id: int, hours: int) -> int:
-    """Установить длительность WARM_UP (reject < 24, §19).
+    """Подтвердить длительность WARM_UP и стартовать таймер (§19 / WARMS2 S2→S3).
+
+    Persist'ит clamped hours и выставляет ``warmup_started_at=now`` (единственный
+    write-moment старта/рестарта таймера после keyword confirm / S1b clear).
+    Decision: ``ab-hold-epoch-lifecycle-and-generation-ownership`` §1.
 
     Returns:
         Применённая (clamped) длительность в часах.
     """
     clamped = clamp_warmup_duration_hours(hours)
+    now = datetime.datetime.now(datetime.timezone.utc)
     async with sm(read_only=False) as session:
         stmt = _select_adv_for_update(adv_setting_id)
         _ = (await session.execute(stmt)).scalar_one()
         stmt_up = (
             update(AdvSetting)
             .where(AdvSetting.id == adv_setting_id)
-            .values(card_ab_hold_warmup_duration_hours=clamped)
+            .values(
+                card_ab_hold_warmup_duration_hours=clamped,
+                card_ab_hold_warmup_started_at=now,
+            )
         )
         _ = await session.execute(stmt_up)
         await session.commit()
+    logger.info(
+        "[adv_setting_id=%s] WARM_UP timer started duration_hours=%s",
+        adv_setting_id,
+        clamped,
+    )
     return clamped
 
 
