@@ -266,3 +266,11 @@
 
 - [x] 26.1 Lazy-import ``AdvSettingMenu`` в ``back_from_card_ab_hold`` (``_load_adv_setting_menu``); убрать top-level import, ломавший ``keyboard`` → ``telegram.callbacks`` → ``handlers``.
 - [x] 26.2 Regression: import ``get_adv_setting_keyboard`` и ``change_auto_bid`` без circular ImportError; Back по-прежнему вызывает меню; focused ``card_ab_hold`` suite + ``test_auto_bid_freeze`` green.
+## 27. Search common bid: ENTER reset-to-min then freeze (decision §19 / spec)
+
+- [x] 27.1 Tests-first: on successful ENTER (`OFF` → `PENDING_SETUP`), owned A/B Hold path sets Search common bid for campaign nmids to WB minimum (`search_adv_min_bids` / equivalent); continuous ordinary `update_common_bid_in_search_adv` is NOT the owner of that write.
+- [x] 27.2 Tests-first: while mode is `PENDING_SETUP` or `ACTIVE`, ordinary `CoroutinesManager.update_common_bid_in_search_adv` does not change Search common bid (structural freeze; preserve/extend PBH-004 regression suite).
+- [x] 27.3 Tests-first: Enable while already `PENDING_SETUP`/`ACTIVE` does not perform a second owned common-bid reset; paired positive: after EXIT → `OFF` → new ENTER, owned reset runs again.
+- [x] 27.4 Tests-first: in `ACTIVE`, bidder/`update_cluster_bids` remains eligible toward confirmed target places while Search common bid stays at the ENTER minimum.
+- [x] 27.5 Implement owned ENTER Search common-bid reset-to-min on A/B Hold setup/ENTER write-path (reuse WB `SetCommonBids` / min-bid SoT); MUST NOT route through continuous ordinary common-bid updater; visible degrade if min/WB unavailable (no silent skip of contract).
+- [x] 27.6 RU-docstrings со ссылкой на spec requirement «ENTER resets Search common bid to WB minimum then freezes it» и decision §19; focused pytest + `poetry run pyright-strict`.
