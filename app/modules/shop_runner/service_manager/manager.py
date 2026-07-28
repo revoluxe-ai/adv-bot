@@ -573,6 +573,16 @@ class CoroutinesManager:
             if ab_mode == CardAbHoldMode.PENDING_SETUP:
                 phase = getattr(adv.adv_setting, "card_ab_hold_phase", None)
                 if should_run_ab_epoch(ab_mode, phase):
+                    # PBH-006 / §18.4.2: Classification FAIL→OFF still via setup
+                    # (epoch_managed=True); epoch tick owns WARM_UP/sync/ACTIVE.
+                    handlers.append(
+                        functools.partial(
+                            process_ab_setup,
+                            adv,
+                            wb_shop_data_manager=self._wb_shop_data_manager,
+                            wb_manager_hub=self._wb_manager_hub,
+                        )
+                    )
                     handlers.append(
                         functools.partial(
                             process_ab_epoch,

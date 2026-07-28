@@ -1,4 +1,7 @@
-"""Legacy setup phase-gate: epoch-managed MUST NOT auto-ACTIVE / ENTER TP (§18.4)."""
+"""Legacy setup phase-gate: epoch-managed MUST NOT auto-ACTIVE / ENTER TP (§18.4.2).
+
+FAIL→OFF on Classification MAY still run via ``apply(..., epoch_managed=True)``.
+"""
 
 from __future__ import annotations
 
@@ -31,30 +34,60 @@ def _make_keyword(*, ks_id: int, views: int = 200, pfo: float = 50.0, pos: float
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_process_ab_setup_skips_when_epoch_managed_phase_set() -> None:
-    """§18.4: non-NULL phase → early return, без setup mutations."""
+async def test_process_ab_setup_epoch_managed_applies_fail_off_not_active() -> None:
+    """§18.4.2: non-NULL phase → apply(epoch_managed=True); no ACTIVE/TP.
+
+    Classification FAIL→OFF MAY remain on setup tick; auto-ACTIVE and ENTER TP
+    stay gated (PBH-006).
+    """
     adv_setting = SimpleNamespace(
         id=1,
         card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
         card_ab_hold_phase=CardAbHoldPhase.WARM_UP.value,
         max_price_for_order=100.0,
     )
+    keywords = [_make_keyword(ks_id=1, views=50, pfo=150.0)]
     complex_adv = SimpleNamespace(
         adv_id=100,
         shop_id=1,
         card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
         adv_setting=adv_setting,
+        get_keywords=AsyncMock(return_value=keywords),
     )
-    with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.pipelines.apply_ab_hold_setup_mutations",
-        new_callable=AsyncMock,
-    ) as mock_apply:
+    lock_mgr = MagicMock()
+    lock_mgr.acquire = AsyncMock(return_value=True)
+    lock_mgr.release = AsyncMock(return_value=None)
+    _PIPELINES = (
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+        "card_ab_hold.pipelines"
+    )
+    with (
+        patch(
+            f"{_PIPELINES}.ensure_search_common_bid_reset_on_enter",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            f"{_PIPELINES}.CardAbHoldSignalRedisCache",
+            MagicMock(return_value=SimpleNamespace(client=MagicMock())),
+        ),
+        patch(f"{_PIPELINES}.RedisLockManager", MagicMock(return_value=lock_mgr)),
+        patch(
+            f"{_PIPELINES}.apply_ab_hold_setup_mutations",
+            new_callable=AsyncMock,
+            return_value=(0, 1),
+        ) as mock_apply,
+    ):
         await process_ab_setup(
             complex_adv,
             wb_shop_data_manager=MagicMock(),
             wb_manager_hub=MagicMock(),
         )
-    mock_apply.assert_not_called()
+    mock_apply.assert_awaited()
+    assert mock_apply.await_args.kwargs.get("epoch_managed") is True
+    assert (
+        complex_adv.adv_setting.card_ab_hold_mode
+        == CardAbHoldMode.PENDING_SETUP.value
+    )
 
 
 @pytest.mark.unit
