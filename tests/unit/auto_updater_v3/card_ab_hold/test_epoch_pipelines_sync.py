@@ -416,3 +416,81 @@ async def test_next_tick_after_activate_boom_is_activate_only_no_wb_reentry() ->
     mock_wb2.assert_not_called()
     mock_activate2.assert_awaited_once_with(99)
     assert adv.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_epoch_cap_exceeded_persists_degraded_before_active() -> None:
+    """PBH-001: при cap_exceeded epoch sync MUST durable-persist degraded до/на ACTIVE.
+
+    Invariant (decision §8 / tasks 8.12–8.13): allowed-set enforcement с
+    ``cap_exceeded`` не может завершать COMPLETE→ACTIVE с чистым
+    ``card_ab_hold_degraded=false``. Legacy ``process_ab_hold`` персистит флаг;
+    epoch ``sync_intent_to_wb`` не должен ограничиваться WARN-only.
+    """
+    adv = _sync_adv(intent=_INTENT)
+    adv.adv_setting.card_ab_hold_degraded = False
+
+    enforce_result = {
+        "targets": 1,
+        "written": 1,
+        "cap_exceeded": [(5000, 10)],
+    }
+    mock_minus_mgr = MagicMock()
+    mock_minus_mgr.enforce_frozen_allowed_set = AsyncMock(
+        return_value=enforce_result
+    )
+    mock_container = MagicMock()
+    mock_container.minus_phrase_manager.return_value = mock_minus_mgr
+
+    wb_hub = MagicMock()
+    wb_hub.wb_modifier.update_auto_adv_cpm = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.MinusPhraseManagerContainer",
+            return_value=mock_container,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.mark_wb_sync_status",
+            new_callable=AsyncMock,
+        ) as mock_mark,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_activate,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.setup_apply.persist_ab_hold_degraded_flag",
+            new_callable=AsyncMock,
+        ) as mock_persist,
+    ):
+        await process_ab_epoch(
+            adv,
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=wb_hub,
+            stats_fresh=True,
+        )
+
+    mock_mark.assert_awaited_once_with(99, CardAbHoldSyncStatus.COMPLETE)
+    mock_activate.assert_awaited_once_with(99)
+    assert adv.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
+    # Durable honest degradation SoT (decision §8): not WARN-only.
+    if mock_persist.await_count > 0:
+        mock_persist.assert_any_await(adv_setting_id=99, degraded=True)
+    assert bool(getattr(adv.adv_setting, "card_ab_hold_degraded", False)) or (
+        mock_persist.await_count > 0
+    ), (
+        "cap_exceeded on epoch WB sync activated ACTIVE without durable "
+        "card_ab_hold_degraded=true (persist_ab_hold_degraded_flag not called "
+        "and in-memory flag remained false)"
+    )
