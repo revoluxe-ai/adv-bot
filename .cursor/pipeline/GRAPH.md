@@ -9,15 +9,12 @@
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
 - inventory_count: 27
 - fingerprint_strength: names_only
-- source_commit: 79a88786c0352bf96456bbe6d68047d1686380b7
+- fingerprint_algorithm: md5
+- fingerprint_input_mode: names_only_newline_joined
+- source_commit: d7bfbdc7bdd107d6f35a0913f21864d8b0eb5afd
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-28T04:30Z: index Candidate /opsx-bug-team
-  (IMPLEMENTED_NOT_VALIDATED / NOT_ACTIVE; registry-driven Cursor Task
-  workers; free-form intake). Inventory 27;
-  fingerprint c4c8dba1b837ed6e01445d82dccae905. Prior 04:20Z preflight
-  stamp on 26-node fingerprint. GRAPH remains navigation snapshot only.
-  Bodies still partially NOT_OPENED_BUDGET.
+  UPDATE GO 2026-07-28T04:44:44Z Corrective V2: inventory 27; fingerprint c4c8dba1b837ed6e01445d82dccae905 independently reproduced; Candidate /opsx-bug-team NOT_ACTIVE.
 
 ## States
 
