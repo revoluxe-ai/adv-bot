@@ -1,5 +1,5 @@
 ---
-description: "Candidate: registry-driven Cursor Task team for full bug lifecycle (free-form intake → classify → routes → RED/GO/GREEN → fan-in). NOT_ACTIVE until Owner activation."
+description: "Active registry-driven Cursor Task team for full bug lifecycle (free-form intake → classify → routes → RED/fix/GREEN → invariant-family fanout → fan-in). Owner-activated CONTROLLED_LIVE_UNCOMMITTED."
 argument-hint: "[free-form bug description] | signal=\"...\" | case=<CASE_ID>"
 ---
 
@@ -7,24 +7,36 @@ argument-hint: "[free-form bug description] | signal=\"...\" | case=<CASE_ID>"
 
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
-RUNTIME_STATUS: NOT_ACTIVE
-OWNER_ACTIVATION: NOT_ISSUED
+RUNTIME_STATUS: ACTIVE
+OWNER_ACTIVATION: ISSUED
+ACTIVATION_MODE: CONTROLLED_LIVE_UNCOMMITTED
+PIPELINE_GENERATION: ACTIVE_V1_WITH_INVARIANT_FANOUT_V10
+BUG_FAMILY_FANOUT_ENABLED: true
+BUG_FAMILY_FANOUT_STATUS: ACTIVE
+DEFAULT_FULL_BUG_ENTRY: /opsx-bug-team
+SAME_INVARIANT_HUNT_FINDINGS: AUTOMATIC_FANOUT
+MANUAL_SIBLING_RELAUNCH_REQUIRED: NO
+FINAL_CONTROL: OWNER_REVIEWS_UNCOMMITTED_GIT_DIFF
 SUBAGENT_EXECUTION_REQUIRED: YES
 SINGLE_CHAT_ROLE_SIMULATION_ALLOWED: NO
 SUBAGENT_RUNTIME_MODEL: CURSOR_TASK_WORKERS
 MODEL_SELECTION_POLICY: auto
+COMMIT_AUTHORITY: OWNER_ONLY
+GIT_COMMIT: FORBIDDEN
+GIT_PUSH: FORBIDDEN
+DEPLOY: FORBIDDEN
 ```
 
 Передайте описание бага в свободной форме.
 Команда сама материализует сигнал, проверит дубликаты,
 создаст case и выберет безопасный маршрут.
 
-**Activation blocker:** пока `RUNTIME_STATUS: NOT_ACTIVE` — команда
-документирует Candidate-контракт и может запускать **controlled harness**
-только. Не исполнять на реальном продуктовом баге и не выставлять
-`ACTIVE` / `READY_FOR_PRODUCTION`.
+**Current status:** Owner-activated (`RUNTIME_STATUS: ACTIVE`) in
+`CONTROLLED_LIVE_UNCOMMITTED`. Root-bug ACTIVE_V1 path remains the default
+entry; invariant-family fanout V8–V10 is enabled after root GREEN.
+Command-native v2 remains planned separately.
 
-## Hard NOT_ACTIVE runtime gate (BF-007 — mandatory first step)
+## Hard activation runtime gate (BF-007 — mandatory first step)
 
 Before **any** materialization or Task dispatch, read:
 
@@ -53,8 +65,57 @@ no Owner GO
 no activation mutation
 ```
 
-Proof mode does **not** activate Candidate. Only a future Owner activation
-step may set `RUNTIME_STATUS: ACTIVE`.
+Current activation receipt:
+
+```text
+.cursor/pipeline/bug-team/INVARIANT_FAMILY_FANOUT_ACTIVATION_RECEIPT.json
+```
+
+## Invariant-family fanout V8–V10 (ACTIVE)
+
+```text
+V8_IMPLEMENTATION: ACTIVE
+V9_CORRECTIVE: APPLIED (invariant proof / fan-in JSON / learning / parallelism)
+V10_CORRECTIVE: APPLIED (authoritative execution identity validation)
+BUG_FAMILY_FANOUT_ENABLED: true
+BUG_FAMILY_FANOUT_STATUS: ACTIVE
+POLICY: .cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json
+RUNTIME: runtime/family_policy.py + runtime/bug_family.py + runtime/family_fanout.py
+         + runtime/invariant_proof.py + runtime/parallelism.py + runtime/execution_identity.py
+CONTROLLED_TEST_MODE: CONTROLLED_TEST_FAMILY_FANOUT
+V8_TESTS: harness/run_corrective_v8_tests.py
+V9_TESTS: harness/run_corrective_v9_tests.py
+V10_TESTS: harness/run_corrective_v10_tests.py
+CURRENT_ACTIVE_RUNTIME: ACTIVE_V1_WITH_INVARIANT_FANOUT_V10
+EXECUTION_IDENTITY_GATE: ACTIVE
+```
+
+After root GREEN, the pipeline captures a testable invariant, materializes
+hunt candidates, classifies relation, fans out same-invariant branches with
+isolated patches, integrates, runs family-wide GREEN, family fan-in, learning,
+then family closure. Same-invariant hunt findings fan out automatically —
+no manual sibling relaunch. Resume:
+`case=<CASE_ID> mode=resume-family-fanout`.
+
+Relation outcomes:
+
+```text
+SAME_INVARIANT_FINDING → branch fanout (blocks family closure until terminal)
+NEW_ROOT_CAUSE         → linked case (does not block parent family closure)
+FALSE_POSITIVE         → durable rejection
+OUT_OF_SCOPE           → durable handoff
+INCONCLUSIVE           → family OPEN_BLOCKED
+```
+
+V9: invariant↔root-GREEN proof validation; canonical `FAMILY-FANIN.json`;
+complete learning packet; parallelism eligibility/dispatch/observation split;
+policy-derived `BLOCKS_FAMILY_CLOSURE`; Cursor agent ID identity records.
+
+V10: `validate_execution_identity` reconciles canonical
+`team/executions/<WEX>.identity.json` against DISPATCH.jsonl, input/output
+packets, checkpoint, attempt/generation, and real `CURSOR_AGENT_ID`. Terminal
+orchestration advance requires `EXECUTION_IDENTITY_VALIDATION: PASS` /
+`IDENTITY_STATUS: VALIDATED`. Identity JSON alone is not authority.
 
 ## Corrective V7 runtime modules (uncommitted worktree control)
 
@@ -293,21 +354,27 @@ app/** forbidden without Owner production GO via EXECUTOR worker
 
 ```bash
 python .cursor/pipeline/bug-team/harness/run_controlled_tests.py
-python .cursor/pipeline/bug-team/harness/run_corrective_tests.py
-python .cursor/pipeline/bug-team/harness/run_corrective_v3_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v10_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v9_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v8_tests.py
 python .cursor/pipeline/bug-team/harness/run_corrective_v7_tests.py
 python .cursor/pipeline/bug-team/harness/run_corrective_v6_tests.py
 python .cursor/pipeline/bug-team/harness/run_corrective_v5_tests.py
 python .cursor/pipeline/bug-team/harness/run_corrective_v4_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v3_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_tests.py
 ```
 
 Builder runs ≠ Independent Tester PASS.
 
-## When NOT_ACTIVE
+## When NOT_ACTIVE (historical / fail-closed)
 
-If invoked while `RUNTIME_STATUS: NOT_ACTIVE`:
+If `ACTIVATION.json` were reverted to `RUNTIME_STATUS: NOT_ACTIVE`:
 
 1. Refuse live product bug execution.
 2. Report Candidate status + pasteable next:
    `Independent Candidate Team Review`
 3. Optionally point to harness path for controlled verification only.
+
+Current workspace state is `RUNTIME_STATUS: ACTIVE` with
+`BUG_FAMILY_FANOUT_ENABLED: true`.

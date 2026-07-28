@@ -14,7 +14,11 @@
 - source_commit: d7bfbdc7bdd107d6f35a0913f21864d8b0eb5afd
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-28T04:44:44Z Corrective V2: inventory 27; fingerprint c4c8dba1b837ed6e01445d82dccae905 independently reproduced; Candidate /opsx-bug-team NOT_ACTIVE.
+  UPDATE GO 2026-07-28T22:30:00Z: Owner activated invariant-family fanout
+  V8–V10 on /opsx-bug-team (ACTIVE_V1_WITH_INVARIANT_FANOUT_V10;
+  BUG_FAMILY_FANOUT_ENABLED=true). Controlling verdict
+  INDEPENDENT_EXECUTION_IDENTITY_TARGETED_RERUN_PASS. Command-native v2
+  remains planned separately.
 
 ## States
 
@@ -67,6 +71,18 @@
 - all_branches_terminal: every started branch has EPISODE_TERMINAL
 - FANIN_READY: `results/FANIN.md` assemble complete (materialize
   `mode=fanin_assemble` only; no `/opsx-fan-in-*`)
+- family_invariant_captured: post-root-GREEN INVARIANT_CAPTURE_WORKER done
+- family_hunt_active: bounded hunter under family fanout policy
+- family_relation_classified: RELATION_CLASSIFIER assigned
+  SAME_INVARIANT_FINDING | NEW_ROOT_CAUSE | FALSE_POSITIVE | OUT_OF_SCOPE |
+  INCONCLUSIVE
+- family_branch_fanout_active: SAME_INVARIANT branch RED/FIX/GREEN waves
+- family_integrating: INTEGRATION_OPERATOR applying branch patches
+- family_green_pending: family-wide GREEN after integration
+- FAMILY_FANIN_READY: `results/FAMILY-FANIN.json|.md` assembled
+- family_learning: FAMILY_LEARNING_WORKER packet complete
+- family_closed: family closure + HUMAN_SUMMARY; uncommitted owner review
+- family_open_blocked: INCONCLUSIVE or blocking branch unresolved
 - command_defect_signal: off-graph — Bugbot/review on process contracts
   (`.cursor/commands/**`, rules/skills/static-check, mirrors); not a not-admin edge
 - process_lesson_candidate: off-graph — after process FIXED / process Bugbot;
@@ -194,20 +210,24 @@
 - known_flaws: F1 addressed in contract (forbids GO on handoff)
 
 ### /opsx-bug-team
-- purpose: Candidate registry-driven Cursor Task team for full bug lifecycle
-  (free-form intake → materialize/claim/classify → Route A|B|C|D → RED/GO/GREEN
-  → bounded hunt → FANIN → Owner closure)
-- input_state: bug_signal_raw | intake_recorded | finding_queued | (resume) any team checkpoint
-- output_state: WAITING_OWNER gates | FANIN_READY | CLOSED_* | BLOCKED_* (Candidate)
-- artifacts_read: registry + checkpoint + case map
-- artifacts_written: team/DISPATCH.jsonl + CHECKPOINT + worker packets; fan-in only FANIN.md
-- decision_owner: orchestrator (Task dispatch only) + Owner gates
-- next_typical: Independent Candidate Team Review (while NOT_ACTIVE) | Owner GO gates
+- purpose: Active registry-driven Cursor Task team for full bug lifecycle
+  (free-form intake → materialize/claim/classify → Route A|B|C|D → RED/FIX/GREEN
+  → invariant capture → bounded hunt → relation classify → same-invariant fanout
+  → integration → family GREEN → family fan-in → learning → closure)
+- input_state: bug_signal_raw | intake_recorded | finding_queued | (resume) any team checkpoint | resume-family-fanout
+- output_state: GREEN_CONFIRMED | FAMILY_FANIN_READY | family_closed | family_open_blocked | BLOCKED_* | UNCOMMITTED_AWAITING_OWNER_REVIEW
+- artifacts_read: registry + checkpoint + case map + ACTIVATION.json + family policy
+- artifacts_written: team/DISPATCH.jsonl + CHECKPOINT + worker packets; FANIN.md;
+  family/*; FAMILY-FANIN; LEARNING; HUMAN_SUMMARY
+- decision_owner: orchestrator (Task dispatch) + local uncommitted authority;
+  final commit = OWNER_ONLY
+- next_typical: /opsx-bug-team (continue/resume) | owner review uncommitted diff
 - known_flaws: |
-  CANDIDATE ONLY — IMPLEMENTATION_STATUS=IMPLEMENTED_NOT_VALIDATED;
-  RUNTIME_STATUS=NOT_ACTIVE; OWNER_ACTIVATION=NOT_ISSUED;
-  must dispatch real Cursor Task workers (no single-chat role simulation);
-  does not replace live slash commands until Owner activation
+  RUNTIME_STATUS=ACTIVE; PIPELINE_GENERATION=ACTIVE_V1_WITH_INVARIANT_FANOUT_V10;
+  BUG_FAMILY_FANOUT_ENABLED=true; SAME_INVARIANT automatic fanout (no manual
+  sibling relaunch); EXECUTION_IDENTITY_GATE=ACTIVE; commit/push/deploy forbidden;
+  platform may serialize eligible parallel tasks (honest, not failure);
+  command-native v2 PLANNED_SEPARATELY
 
 ### /opsx-verify
 - purpose: read-only audit before archive
@@ -441,6 +461,22 @@ branches_active --/opsx-claim-next-bug--> finding_claimed
 all_branches_terminal --/opsx-materialize-bug-queue mode=fanin_assemble--> FANIN_READY|lesson_candidate_only
 FANIN_READY --/opsx-learn-from-bug--> learning_candidate|class_closed
 # without FANIN_READY: lesson stays LESSON_CANDIDATE_ONLY (CLASS_LEVEL_GO_WRITE forbidden)
+
+# /opsx-bug-team invariant-family fanout V8–V10 (ACTIVE; automatic after root GREEN)
+GREEN_CONFIRMED --/opsx-bug-team INVARIANT_CAPTURE--> family_invariant_captured
+family_invariant_captured --/opsx-bug-team BOUNDED_HUNTER--> family_hunt_active
+family_hunt_active --/opsx-bug-team RELATION_CLASSIFIER--> family_relation_classified
+family_relation_classified --SAME_INVARIANT_FINDING--> family_branch_fanout_active
+family_relation_classified --NEW_ROOT_CAUSE--> finding_queued  # linked case
+family_relation_classified --FALSE_POSITIVE--> fixed_or_closed  # durable rejection
+family_relation_classified --OUT_OF_SCOPE--> ROUTE_TO_OTHER_PROCESS  # durable handoff
+family_relation_classified --INCONCLUSIVE--> family_open_blocked
+family_branch_fanout_active --branch RED/FIX/GREEN--> family_integrating
+family_integrating --/opsx-bug-team INTEGRATION_OPERATOR--> family_green_pending
+family_green_pending --FAMILY_WIDE_GREEN--> FAMILY_FANIN_READY
+FAMILY_FANIN_READY --/opsx-bug-team FAMILY_LEARNING_WORKER--> family_learning
+family_learning --/opsx-bug-team CLOSURE--> family_closed
+# resume: /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
 implementing|impl_done --/opsx-static-check--> static_check_done
@@ -465,19 +501,30 @@ If Bugbot still finds product/logic: fix path → `/opsx-learn-from-bug`
 `target=.cursor/commands/opsx-project-bug-hunt.md` checklist → re-hunt.
 Do **not** use `/opsx-bug-hunt` as the first pre-PR sweep (needs root+invariant).
 
-### Product bug-episode orchestration (live after GO_ACTIVATE)
+### Product bug-episode orchestration (ACTIVE_V1_WITH_INVARIANT_FANOUT_V10)
 
 Typical advisory path (not forced; command contracts win):
 
 ```text
-materialize → claim → /opsx-classify-bug → Route A|B|C|D
-  A: IMPLEMENTATION_BUG → fix-bug WITHOUT GO → /opsx-test RED → Owner GO → fix GO → verify GREEN
-  B: SPEC_* → /opsx-update → TASK_DELTA → apply|fix-bug → same RED/GO/GREEN
-  C: FALSE_POSITIVE → CLOSED_NO_IMPLEMENTATION
-  D: OUT_OF_SCOPE → ROUTE_TO_OTHER_PROCESS
-  → optional /opsx-invariant → hunt_active → branches_active
-  → all_branches_terminal → materialize mode=fanin_assemble → FANIN_READY
-  → /opsx-learn-from-bug (class) | lesson_candidate_only
+/opsx-bug-team (DEFAULT_FULL_BUG_ENTRY)
+  materialize → claim → CLASSIFIER → Route A|B|C|D
+  A: IMPLEMENTATION_BUG → RED → local authority → EXECUTOR → GREEN
+  B: SPEC_* → SPEC_UPDATE → TASK_DELTA → RED → local authority → EXECUTOR → GREEN
+  C: FALSE_POSITIVE → close recommendation (no implementation)
+  D: OUT_OF_SCOPE → durable ROUTE_TARGET_PROCESS_ID handoff
+
+ROOT GREEN
+  → INVARIANT CAPTURE
+  → BOUNDED HUNT
+  → RELATION CLASSIFICATION
+      SAME_INVARIANT_FINDING → BRANCH FANOUT → RED/FIX/GREEN per branch
+        → INTEGRATION → FAMILY GREEN → FAMILY FAN-IN → LEARNING → CLOSURE
+      NEW_ROOT_CAUSE → linked case (parent family not blocked by linked case alone)
+      FALSE_POSITIVE → durable rejection
+      OUT_OF_SCOPE → durable handoff
+      INCONCLUSIVE → family OPEN_BLOCKED
+  → HUMAN_SUMMARY
+  → OWNER_REVIEWS_UNCOMMITTED_GIT_DIFF
 ```
 
 Hard reminders for NAVIGATE:
@@ -486,9 +533,12 @@ Hard reminders for NAVIGATE:
 - claim-first unchanged for `available`+`CHAT_REQUIRED=true`
 - `/opsx-update` ≠ production GO; TASK_DELTA CHANGED ≠ auto apply permission
 - append-only `results/ROUTE-TRACE.jsonl` + LEDGER `## ROUTE_STATE`
-- `LEARNING_READY` (fanout) ≠ `FANIN_READY`
-- no `/opsx-fan-in-*`; FANIN writer = materialize `mode=fanin_assemble` only
+- `LEARNING_READY` (fanout) ≠ `FANIN_READY` / `FAMILY_FANIN_READY`
+- root FANIN writer = materialize `mode=fanin_assemble` / `FAN_IN_ASSEMBLER`
+- family FANIN writer = `FAMILY_FAN_IN_ASSEMBLER` only
+- SAME_INVARIANT automatic fanout — MANUAL_SIBLING_RELAUNCH_REQUIRED=NO
 - GRAPH is navigation snapshot — not policy SoT
+- git commit / push / deploy remain FORBIDDEN under this command
 
 ### Three learning branches (do not mix)
 
