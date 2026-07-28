@@ -25,15 +25,21 @@ class AutoResetBidService:
     async def ensure_auto_bids_minimum(self, advs: list[ComplexAdv]) -> None:
         """Сброс CPM авто-РК до минимума WB для активных bidder-кампаний.
 
-        При A/B Hold ``ACTIVE`` кампания исключается из кандидатов (spec §21
-        Auto bid freeze): ordinary AutoReset MUST NOT менять ставку авто-РК.
+        При A/B Hold freeze (``ACTIVE`` или post-confirm ``PENDING_SETUP`` —
+        ``PENDING_INTENT`` / ``WB_SYNC`` / ``READY_ACTIVE``) кампания исключается
+        из кандидатов (spec §21 / FINDING-PBH-003): ordinary AutoReset MUST NOT
+        менять confirmed Auto bid до activate. ``OFF`` и pre-confirm
+        ``PENDING_SETUP`` остаются eligible.
         """
         candidates = [
             adv
             for adv in advs
             if adv.bot_active
             and adv.bidder_for_auto
-            and not should_freeze_auto_bid_mutations(adv.card_ab_hold_mode)
+            and not should_freeze_auto_bid_mutations(
+                adv.card_ab_hold_mode,
+                getattr(adv, "card_ab_hold_phase", None),
+            )
         ]
 
         try:

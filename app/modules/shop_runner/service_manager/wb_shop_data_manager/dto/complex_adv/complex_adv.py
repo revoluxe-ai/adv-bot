@@ -380,6 +380,19 @@ class ComplexAdv:
         return str(raw)
 
     @property
+    def card_ab_hold_phase(self) -> str | None:
+        """Durable A/B Hold epoch phase; ``None`` = legacy MVP-1 (phase IS NULL).
+
+        Используется Auto bid freeze (FINDING-PBH-003): post-confirm phases
+        ``pending_intent`` / ``wb_sync`` / ``ready_active`` при ``pending_setup``.
+        """
+        raw = getattr(self._adv_setting, "card_ab_hold_phase", None)
+        if raw is None:
+            return None
+        text = str(raw).strip()
+        return text or None
+
+    @property
     def keyword_calibration_max_step(self) -> int:
         return int(self._adv_setting.keyword_calibration_max_step)
 
