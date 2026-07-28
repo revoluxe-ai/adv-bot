@@ -98,7 +98,9 @@ current step actually is `ACTIVE` (H1) — see §H1 below and contract §13.
   it never moves the phase.
 - `◀ Стр. / Стр. ▶` (`page_prev`/`page_next`) never touches Back/Cancel state and never
   discards toggles made on other pages (contract §9).
-- `Подтвердить набор` (`keyword_set_confirm`) commits the draft and starts WARM_UP.
+- `Подтвердить набор` (`keyword_set_confirm`) commits the draft and enters WARM_UP
+  duration configuration (**S2**); it does **not** set `warmup_started_at` / start the timer
+  (contract §4/§6).
 - `← Назад` preserves every toggle across every page and reopens exactly here later
   (contract §7).
 - `Отмена` opens a distinct confirmation sub-dialog:
@@ -172,8 +174,9 @@ for this attempt → abort to `OFF`, nothing to clear).
 ```
 
 - `Изменить набор ключей` (`keyword_edit_open`) opens **S1b**, not S1: the header of S1b
-  explicitly states that confirming an edit here ends the current timer and starts a
-  new one from 0 (decision `ab-hold-epoch-lifecycle-and-generation-ownership` §4).
+  explicitly states that confirming an edit here ends the current timer and returns to
+  duration configuration (**S2**); the new timer starts only after `warmup_duration_confirm`
+  (contract §4/§6; decision `ab-hold-epoch-lifecycle-and-generation-ownership` §4).
   Cancelling out of S1b (contract §8, case "prior durable value exists") leaves the
   original confirmed keyword set and the running timer **untouched**.
 - No Cancel button here — S3 has no draft; `Выключить A/B тест` (EXIT) is the only

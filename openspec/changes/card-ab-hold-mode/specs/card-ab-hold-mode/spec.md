@@ -403,33 +403,44 @@ The shared campaign-defaults application path — the "Применить деф
 - **AND** the A/B Hold mode remains `OFF`
 
 ### Requirement: Explicit keyword-set confirmation starts a durable WARM_UP stage
-Confirming A/B Hold participation MUST require the user to explicitly confirm the campaign's keyword set before any target place is proposed or fixed. That confirmation MUST start a durable pre-epoch WARM_UP stage. Manually changing the confirmed keyword set while WARM_UP is running MUST end the running WARM_UP timer and MUST start a new WARM_UP timer for the changed set; the elapsed time of the previous timer MUST NOT carry over.
+Confirming A/B Hold participation MUST require the user to explicitly confirm the campaign's keyword set before any target place is proposed or fixed. That confirmation MUST enter a durable pre-epoch WARM_UP stage in **duration-configuration** state (Telegram S2): the confirmed keyword set becomes durable and `warmup_started_at` MUST remain unset so the user can configure (and MAY increase) duration before the timer runs. The WARM_UP **timer** MUST start only when the user confirms the duration (Telegram S2 → S3). Manually changing the confirmed keyword set while WARM_UP is running MUST end the running WARM_UP timer, return the campaign to duration-configuration, and MUST start a new WARM_UP timer only after a subsequent duration confirmation; the elapsed time of the previous timer MUST NOT carry over.
 
-#### Scenario: Keyword-set confirmation starts WARM_UP
+#### Scenario: Keyword-set confirmation enters WARM_UP duration configuration
 - **GIVEN** a campaign has paid bot management active and passes the existing enable gates (freshness, V3-only, plan max CPO, launch-volume soft-gate)
 - **WHEN** the user explicitly confirms the campaign's keyword set for A/B Hold
-- **THEN** the campaign enters the WARM_UP stage
+- **THEN** the campaign enters the WARM_UP stage in duration-configuration state
+- **AND** `warmup_started_at` remains unset (timer has not started)
 - **AND** no target place is proposed or fixed yet
 
-#### Scenario: Manual keyword-set change during WARM_UP restarts the timer
+#### Scenario: Duration confirmation starts the WARM_UP timer
+- **GIVEN** a campaign is in WARM_UP duration-configuration after keyword-set confirmation
+- **WHEN** the user confirms the WARM_UP duration (default 24 hours or a longer user-chosen value)
+- **THEN** the confirmed duration is persisted
+- **AND** `warmup_started_at` is set
+- **AND** the WARM_UP timer runs at that duration
+
+#### Scenario: Manual keyword-set change during WARM_UP restarts the timer via duration confirmation
 - **GIVEN** a campaign is in the WARM_UP stage with a running warm-up timer
 - **WHEN** the user manually changes the confirmed keyword set
 - **THEN** the running warm-up timer ends without completing
-- **AND** a new warm-up timer starts for the changed keyword set
+- **AND** the campaign returns to WARM_UP duration-configuration with `warmup_started_at` unset
+- **AND** a new warm-up timer starts only after the user confirms duration again
 - **AND** elapsed time from the previous timer is not carried over
 
 ### Requirement: WARM_UP duration defaults to 24 hours and MUST NOT be reduced below 24 hours
-The WARM_UP stage MUST have a default duration of 24 hours and a minimum duration of 24 hours. The user MAY increase the WARM_UP duration for a campaign. The system MUST NOT allow the user to configure a WARM_UP duration shorter than 24 hours, and the system MUST NOT itself shorten an in-progress WARM_UP below 24 hours from its start.
+The WARM_UP stage MUST have a default duration of 24 hours and a minimum duration of 24 hours. Duration configuration MUST be reachable on the happy path after keyword-set confirmation and before the timer starts. The user MAY increase the WARM_UP duration for a campaign. The system MUST NOT allow the user to configure a WARM_UP duration shorter than 24 hours, and the system MUST NOT itself shorten an in-progress WARM_UP below 24 hours from its start.
 
 #### Scenario: Default WARM_UP duration is 24 hours
-- **GIVEN** the user starts WARM_UP without changing the duration
-- **WHEN** the WARM_UP stage begins
+- **GIVEN** the user confirms keyword set and reaches WARM_UP duration configuration without changing the duration
+- **WHEN** the user confirms the duration
 - **THEN** the WARM_UP duration is 24 hours
+- **AND** the timer starts at that duration
 
 #### Scenario: User increases WARM_UP duration
-- **GIVEN** the user starts WARM_UP
-- **WHEN** the user sets a WARM_UP duration longer than 24 hours
+- **GIVEN** the user is in WARM_UP duration configuration after keyword-set confirmation
+- **WHEN** the user sets a WARM_UP duration longer than 24 hours and confirms it
 - **THEN** the WARM_UP stage uses the longer, user-chosen duration
+- **AND** the timer starts at that longer duration
 
 #### Scenario: User cannot reduce WARM_UP below 24 hours
 - **GIVEN** the user is configuring the WARM_UP duration
