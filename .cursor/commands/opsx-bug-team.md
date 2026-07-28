@@ -24,6 +24,93 @@ MODEL_SELECTION_POLICY: auto
 только. Не исполнять на реальном продуктовом баге и не выставлять
 `ACTIVE` / `READY_FOR_PRODUCTION`.
 
+## Hard NOT_ACTIVE runtime gate (BF-007 — mandatory first step)
+
+Before **any** materialization or Task dispatch, read:
+
+```text
+.cursor/pipeline/bug-team/ACTIVATION.json
+```
+
+via `runtime/activation.py` (`check_invocation_gate`).
+
+```text
+NORMAL / real-intake-shaped invocation + RUNTIME_STATUS != ACTIVE
+→ STATUS: BLOCKED_CANDIDATE_NOT_ACTIVE
+→ TASK_DISPATCH_COUNT: 0
+→ do not call Task tool
+→ do not create real .tmp/opsx-bug-cases cases
+```
+
+Allowed exception only:
+
+```text
+EXECUTION_MODE: REVIEW_PROOF_ONLY
+proof root under .tmp/opsx-bug-team-harness/
+product writes forbidden
+synthetic CASE_ID/FINDING_ID
+no Owner GO
+no activation mutation
+```
+
+Proof mode does **not** activate Candidate. Only a future Owner activation
+step may set `RUNTIME_STATUS: ACTIVE`.
+
+## Corrective V7 runtime modules (uncommitted worktree control)
+
+```text
+CONTROL_MODEL:  USER_REVIEWS_UNCOMMITTED_WORKTREE
+CONTROL:        runtime/control_model.py
+DEFAULT_MODE:   CONTROLLED_LIVE_UNCOMMITTED
+OWNER_GATED:    preserved for EXECUTION_MODE=OWNER_GATED
+V7_TESTS:       harness/run_corrective_v7_tests.py
+```
+
+## Corrective V6 runtime modules (ICT SR copy-replay)
+
+```text
+RETRY_AUTH:     runtime/retry_auth.py  (immutable receipt + append-only registry)
+IDEMPOTENCY:    unchanged from V5
+V6_TESTS:       harness/run_corrective_v6_tests.py
+```
+
+## Corrective V5 runtime modules (ICT rerun blockers)
+
+```text
+IDEMPOTENCY:    prepare fingerprint + exact input/deps/contract/boundary match
+TOCTOU:         validate_dispatch_intent_before_task before Task dispatch
+RETRY_AUTH:     durable one-time retry authorization bound to real previous WEX
+V5_TESTS:       harness/run_corrective_v5_tests.py
+```
+
+## Corrective V4 runtime modules (ICT blockers)
+
+```text
+OWNER_HOST:     runtime/owner_decision_host.py  (RED raw+canonical at reserve)
+LIVE_HOP:       runtime/live_task_hop.py        (sole success authority + ACTIVE lock)
+ORCHESTRATOR:   finalize_after_task → BLOCKED_LEGACY_FINALIZE_DISABLED
+PACKETS:        validate_packet LIVE_TRANSITION_AUTHORITY: NONE
+AUTHORITY_INV:  runtime/LIVE_SUCCESS_AUTHORITY.md
+V4_TESTS:       harness/run_corrective_v4_tests.py
+```
+
+## Corrective V3 runtime modules
+
+```text
+ACTIVATION:     .cursor/pipeline/bug-team/ACTIVATION.json
+PACKETS:        runtime/packets.py          (validate_packet_for_transition)
+FS_BOUNDARY:    runtime/fs_boundary.py      (snapshot diff, not self-report)
+OWNER_HOST:     runtime/owner_decision_host.py  (host-only GO registration)
+OWNER_GO:       runtime/owner_go.py         (create_* FORBIDDEN for workers)
+LIVE_HOP:       runtime/live_task_hop.py    (authoritative prepare→Task→finalize)
+WORKER_CONTRACTS: runtime/worker_contracts.py
+ROUTE_TRACE:    runtime/route_trace.py      (append-only v2)
+TIMEOUT:        runtime/timeout.py          (honest platform limits)
+ORCHESTRATOR:   runtime/orchestrator.py     (delegates to live_task_hop; Task is host)
+DISPATCH_SOT:   dispatch/TASK_DISPATCH.md
+SIMULATED:      harness/task_dispatch.py    (LIVE_RUNTIME_AUTHORITY: NONE)
+```
+
 ## User input
 
 ```text
@@ -70,7 +157,7 @@ Host Cursor chat may:
 6. accept output packets;
 7. validate packet schema + write boundary;
 8. update orchestration state / DISPATCH.jsonl / CHECKPOINT;
-9. stop on Owner gates;
+9. apply control-model gates (local uncommitted authority or legacy Owner GO);
 10. start next wave only after prior gate PASS.
 
 Host chat must **NOT**:
@@ -101,12 +188,15 @@ Rules:
 ```text
 WAVE_1: MATERIALIZER → DUPLICATE_CHECK / CLAIM_WORKER
 WAVE_2: CLASSIFIER
-WAVE_3A Route A: RED → Owner production gate → EXECUTOR → GREEN
-WAVE_3B Route B: SPEC_UPDATE → TASK_DELTA → RED → Owner GO → EXECUTOR → GREEN
+WAVE_3A Route A: RED → local authority → EXECUTOR → GREEN
+WAVE_3B Route B: SPEC_UPDATE → TASK_DELTA → RED → local authority → EXECUTOR → GREEN
 WAVE_3C Route C: close recommendation (no implementation)
 WAVE_3D Route D: durable ROUTE_TARGET_PROCESS_ID handoff
-WAVE_4: TASK_COMPLETION → BOUNDED_HUNTER → FAN_IN → Owner closure → CLOSURE_OPERATOR
+WAVE_4: TASK_COMPLETION → BOUNDED_HUNTER → FAN_IN → auto CLOSURE_OPERATOR
+         (+ HUMAN_SUMMARY.md; user reviews uncommitted worktree)
 ```
+
+Legacy `OWNER_GATED`: intermediate Owner production GO + Owner closure GO still apply.
 
 Next wave forbidden until prior worker output passes schema, status, and
 authority validation.
@@ -114,8 +204,22 @@ authority validation.
 ## Owner gates
 
 ```text
-RED_CONFIRMED → STOP → OWNER_PRODUCTION_GO_DECISION
-FAN_IN_READY_FOR_OWNER_CLOSURE → STOP → OWNER_FINAL_CLOSURE_DECISION
+CONTROL_MODEL:
+  USER_REVIEWS_UNCOMMITTED_WORKTREE
+
+DEFAULT after activation:
+  RED_CONFIRMED → local authority → IMPLEMENTATION_EXECUTOR
+  (no WAITING_OWNER / Owner production GO)
+
+  FANIN READY_FOR_CLOSURE → auto CLOSURE_OPERATOR
+  (no WAITING_OWNER_FINAL_CLOSURE)
+
+Legacy EXECUTION_MODE=OWNER_GATED:
+  RED_CONFIRMED → STOP → OWNER_PRODUCTION_GO_DECISION
+  FAN_IN_READY_FOR_OWNER_CLOSURE → STOP → OWNER_FINAL_CLOSURE_DECISION
+
+Always forbidden:
+  git commit / git push / deploy / external production mutations
 ```
 
 ## Classification (CLASSIFIER worker only)
@@ -145,10 +249,38 @@ EXPECTED_EXECUTION_ROUTE / ACTUAL_EXECUTION_ROUTE / ROUTE_RECONCILIATION
 .tmp/opsx-bug-cases/<CASE_ID>/results/FANIN.md
 ```
 
+`CLOSURE_OPERATOR` may write:
+
+```text
+results/OWNER-CLOSURE-<FINDING_ID>.md
+results/HUMAN_SUMMARY.md
+CASE.md / LEDGER.md / findings / INDEX.md
+ROUTE-TRACE.jsonl closure events
+```
+
+Final user control:
+
+```text
+WORKTREE_STATUS: UNCOMMITTED_CHANGES_AWAITING_USER_REVIEW
+COMMIT_CREATED: NO
+USER_ACTION_REQUIRED: REVIEW_DIFF_AND_DECIDE_COMMIT
+```
+
+Chat must end with section `ПРОСТОЕ ОБЪЯСНЕНИЕ` (plain language).
+
 ## Timeout
 
-Per-subagent timeout/heartbeat (see `TIMEOUT_POLICY.md`). On TIMEOUT:
-checkpoint, terminate process tree, no dependent wave, no forged output.
+Per-subagent timeout/heartbeat (see `TIMEOUT_POLICY.md` and
+`dispatch/TASK_DISPATCH.md`).
+
+```text
+CURSOR_TASK_CANCELLATION: PARTIAL_INTERRUPT_ON_RESUME
+PROCESS_TREE_TERMINATION: BLOCKED_PLATFORM_TERMINATION_LIMITATION
+SAFE_TIMEOUT_ENFORCEMENT: logical state isolation; dependent-wave stop;
+  stale/late-output rejection; finite retry
+```
+
+On TIMEOUT: checkpoint ACTIVE isolation, no dependent wave, no forged output.
 
 ## Commit / product boundary
 
@@ -161,6 +293,12 @@ app/** forbidden without Owner production GO via EXECUTOR worker
 
 ```bash
 python .cursor/pipeline/bug-team/harness/run_controlled_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v3_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v7_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v6_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v5_tests.py
+python .cursor/pipeline/bug-team/harness/run_corrective_v4_tests.py
 ```
 
 Builder runs ≠ Independent Tester PASS.
