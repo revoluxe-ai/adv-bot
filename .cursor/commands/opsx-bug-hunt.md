@@ -816,7 +816,7 @@ adjudicate from a chat-only packet without case-map rows.
 ```
 
 Never emit bare `/opsx-fix-bug` (without `case=` / `finding=` / `claim_token=`).
-After a successful claim, `/opsx-claim-next-bug` supplies `/opsx-fix-bug` with
+After a successful claim, `/opsx-claim-next-bug` supplies `/opsx-classify-bug` first; after classify Route A, `/opsx-fix-bug` with
 durable ARGS including `claim_token=` — the hunt handoff must not skip that step.
 
 Do not include `GO` in a generated child handoff.
@@ -876,3 +876,58 @@ It does not mean:
 * Do not commit, push, deploy, restart, migrate, or touch secrets.
 * Treat an empty or degenerate captured collection that still reaches a success, terminal, transition, or write boundary as a candidate finding rather than a safe no-op.
 * Require a behavioral regression test on every sibling path that can independently violate the same invariant.
+
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+

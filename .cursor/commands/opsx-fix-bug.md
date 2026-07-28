@@ -163,6 +163,8 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
   - `blocked_needs_claim_first` → **только**
     `/opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"`
     (не предлагай retry `/opsx-fix-bug` с `claim_token=`);
+  - `blocked_needs_classify_first` → **только**
+    `/opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>`;
   - `blocked_finding_status_not_actionable` → **`none`**
     (не `/opsx-claim-next-bug` — статус/класс ineligible; опционально
     указать path case INDEX/ledger);
@@ -209,6 +211,60 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
   (`blocked`, `backlog`, `absorbed_*`, `closed_*`, `promoted_*`,
   `duplicate_root_observation`, …) и к классу п.2 —
   claim-next их не возьмёт; для них — `blocked_finding_status_not_actionable`.
+
+
+
+## Route reconciliation gate
+
+Authority: ORCHESTRATION_MVP section 0.5-0.7 + ROUTE_TRACE.md.
+
+Before adjudication that assumes an implementation route, and always before
+production GO:
+
+1. Read EXPECTED_EXECUTION_ROUTE / ACTUAL_EXECUTION_ROUTE /
+   ROUTE_RECONCILIATION from LEDGER ## ROUTE_STATE (or last ROUTE-TRACE).
+2. On this command start as executor, set
+   ACTUAL_EXECUTION_ROUTE=/opsx-fix-bug and compute MATCH or MISMATCH.
+3. If MISMATCH -> hard stop blocked_route_mismatch
+   (BLOCKED_ROUTE_MISMATCH); no production GO; pasteable next: Owner
+   route decision / evidence correction -- not silent continue.
+4. If EXPECTED is /opsx-apply -> do not execute fix-bug as production
+   executor; route to apply (or Owner correction).
+5. Append ROUTE-TRACE with full v2 identity fields + reconciliation.
+6. Episode close forbidden while RECONCILIATION is PENDING or MISMATCH.
+
+## Classify-first gate (mandatory)
+
+Authority: `.cursor/pipeline/ORCHESTRATION_MVP.md` §0.1.
+
+After Claim ownership gate passes (or when claim is not required), and before
+forensics / `mode=update` / production `GO` that selects an implementation
+route:
+
+1. Read `LEDGER.md` → `## ROUTE_STATE` → `CURRENT_CLASSIFICATION`.
+2. If absent/empty for this finding/case → hard stop
+   `blocked_needs_classify_first`.
+3. Pasteable next **only**:
+
+```text
+/opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
+```
+
+4. If `CURRENT_CLASSIFICATION` is `SPEC_BUG` | `SPEC_GAP` and
+   `TASK_DELTA` not yet recorded → do not adjudicate as pure implementation;
+   pasteable next `/opsx-update <change-id> …` (or continue update) unless
+   Owner already completed update and TASK_DELTA says `/opsx-fix-bug`.
+5. If `FALSE_POSITIVE` | `OUT_OF_SCOPE` → do not open production path;
+   align with classification terminal.
+
+Exceptions (classify not required):
+
+* Claim ownership blockers already returned (claim-first / status / token);
+* Duplicate-root / non-actionable status refusal;
+* Type-check routing to `/opsx-fix-types`.
+
+Append one ROUTE-TRACE event for each `/opsx-fix-bug` hop (adjudication
+and/or GO apply). Update `## ROUTE_STATE` `LAST_COMMAND` / `NEXT_ACTION`.
 
 ## Разрешение на запись
 
@@ -1200,6 +1256,10 @@ Follow-up:
   `STATUS: available` (и не класс п.2 DUP-/duplicate_root) — stop с
   `blocked_needs_claim_first` до forensics;
   pasteable next только `/opsx-claim-next-bug …` (не invent `CLAIM_TOKEN`);
+- если claim gate pass (или claim не требуется), но в LEDGER
+  `## ROUTE_STATE` отсутствует `CURRENT_CLASSIFICATION` — stop с
+  `blocked_needs_classify_first` до forensics / `GO`;
+  pasteable next только `/opsx-classify-bug case=… finding=…`;
 - если передан / resumed `finding=` со `STATUS` ∈
   {`backlog`, `blocked`, `absorbed_*`, `closed_false_positive`,
   `closed_fixed`, `promoted_to_root_case`, `duplicate_ancestor`,
@@ -1369,3 +1429,57 @@ INTAKE-002
    → blocked_missing_claim_token; next /opsx-claim-next-bug … (echo via
      owner_already_has_open_claim) или retry fix-bug с token из claim packet
 ```
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+

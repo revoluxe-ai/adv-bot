@@ -526,3 +526,59 @@ MUST treat capture/write as separate from optimization/promotion into broader po
   `/opsx-admin-command-promote-process-lesson`);
 - emitting `DESIGN_BRIEF_READY` for new admin commands (use promote →
   `/opsx-admin-command-design-command`).
+
+
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+

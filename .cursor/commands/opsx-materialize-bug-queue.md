@@ -54,6 +54,61 @@ Technical tokens may remain in English when they are command names, enum values,
 $ARGUMENTS
 ```
 
+
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+
 ## Modes
 
 Exactly one mode is required:
@@ -482,7 +537,7 @@ SOURCE_REFERENCE: invocation payload
 OBSERVED_SYMPTOM: first non-empty line / short summary of RAW_REPORT
 KNOWN_CONTEXT: empty
 STATUS: intake_recorded
-NEXT_ACTION: /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID>
+NEXT_ACTION: /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"  # or /opsx-classify-bug when claim not required
 ```
 
 If `case=<CASE_ID>` points to an existing case:
@@ -1122,6 +1177,36 @@ ACTIVE_BRANCH_COUNT:
 One row per started branch (FINDING_ID, PARENT, DEPTH, EPISODE_TERMINAL,
 evidence paths, OWNER_PRODUCTION_GO, …).
 
+## ROUTE_STATE
+
+Current snapshot only (append-only history is ROUTE-TRACE.jsonl).
+MUST align with the latest applicable JSONL event:
+
+```text
+CURRENT_CLASSIFICATION:
+EXPECTED_EXECUTION_ROUTE:
+ACTUAL_EXECUTION_ROUTE:
+ROUTE_RECONCILIATION:
+
+CURRENT_ROUTE_STATE:
+LAST_ROUTE_EVENT_ID:
+LAST_ROUTE_EVENT_SEQUENCE:
+LAST_ROUTE_EVENT_AT:
+
+CURRENT_ACTOR_ROLE:
+CURRENT_ACTOR_AGENT_ID:
+CURRENT_ACTOR_CHAT_ID:
+
+OWNER_GATE_STATUS:
+TASK_DELTA:
+TERMINAL_STATUS:
+
+ROUTE_TRACE_PATH: .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+NEXT_ACTION:
+```
+
+Schema: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md` (SCHEMA_VERSION 2).
+
 ```
 
 Keep intake and finding sections in stable registration order.
@@ -1143,7 +1228,7 @@ OBSERVED_SYMPTOM:
 KNOWN_CONTEXT:
 STATUS: intake_recorded
 LAST_ACTIVITY_AT:
-NEXT_ACTION: /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID>
+NEXT_ACTION: /opsx-claim-next-bug case=<CASE_ID> chat_label="<label>"  # or /opsx-classify-bug when claim not required
 DISPOSITION:
 CANONICAL_INTAKE_ID:
 RELATED_FINDING_ID:
@@ -1182,7 +1267,10 @@ NEXT_ACTION:
 NEXT_COMMAND (when STATUS=available and CHAT_REQUIRED=true, pre-claim):
 /opsx-claim-next-bug case=<CASE_ID> chat_label="<owner-label>"
 
-NEXT_COMMAND (only after claim, or for same-chat resume with matched claim_token):
+NEXT_COMMAND (only after claim, before implementation route):
+/opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
+
+NEXT_COMMAND (only after classify Route A, or TASK_DELTA NO → fix-bug):
 /opsx-fix-bug case=<CASE_ID> intake=<SOURCE_INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 
 MODE:
@@ -1197,7 +1285,7 @@ FORBIDDEN:
 - do not emit bare /opsx-fix-bug without case=/finding=/claim_token=
 ```
 
-When `CHAT_REQUIRED=true` and the finding is still `available` (unclaimed), `NEXT_COMMAND` MUST be `/opsx-claim-next-bug case=<CASE_ID> chat_label="…"` — never bare `/opsx-fix-bug`. After claim, `/opsx-claim-next-bug` supplies `/opsx-fix-bug` with durable ARGS including `claim_token=`.
+When `CHAT_REQUIRED=true` and the finding is still `available` (unclaimed), `NEXT_COMMAND` MUST be `/opsx-claim-next-bug case=<CASE_ID> chat_label="…"` — never bare `/opsx-fix-bug`. After claim, `/opsx-claim-next-bug` supplies `/opsx-classify-bug` (mandatory); classify then routes to fix-bug/update. Durable `claim_token=` is still required for later `/opsx-fix-bug`.
 
 `PACKET_PURPOSE` must be one of:
 
@@ -1266,8 +1354,13 @@ Recovery `NEXT_ACTION` may use orchestration stages when companions apply
 (still not ACTIVE until GO_ACTIVATE):
 
 ```text
+finding_claimed          → /opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
+classified_impl          → /opsx-fix-bug … WITHOUT GO (+ claim_token)
+classified_spec          → /opsx-update <change-id> …
+task_delta_changed       → /opsx-apply <change-id>   # still needs RED+Owner GO
+task_delta_unchanged     → /opsx-fix-bug … WITHOUT GO
 red_pending              → /opsx-test case=<CASE_ID> finding=<FINDING_ID>
-production_go_ready      → /opsx-fix-bug … claim_token=…   # Owner GO only after RED
+production_go_ready      → /opsx-fix-bug … GO  or  /opsx-apply   # Owner GO only after RED
 FANIN_READY              → /opsx-learn-from-bug … FANIN_PATH=…
 LESSON_CANDIDATE_ONLY    → Owner FINAL / keep candidate-only
 ```

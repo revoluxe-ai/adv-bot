@@ -54,6 +54,60 @@ User input:
 $ARGUMENTS
 ```
 
+
+## Route-trace event requirements (SCHEMA_VERSION 2)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`.
+
+On every significant hop that touches a durable case map, append **one**
+JSONL event to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Mandatory identity/order fields on every event:
+
+```text
+SCHEMA_VERSION
+EVENT_ID
+EVENT_SEQUENCE
+CASE_ID
+FINDING_ID
+EVENT_TYPE
+COMMAND
+ACTOR_ROLE
+ACTOR_AGENT_ID
+ACTOR_CHAT_ID
+FROM_STATE
+TO_STATE
+STARTED_AT
+COMPLETED_AT
+DURATION_MS
+TERMINAL_STATUS
+PREVIOUS_EVENT_ID
+```
+
+Actor identity:
+
+```text
+ACTOR_AGENT_ID: CURRENT_CHAT_AGENT  # if no separate agent id
+ACTOR_CHAT_ID:  durable stable chat label (required; not free-text role alone)
+```
+
+When this command **selects** or **executes** an implementation route, also set:
+
+```text
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION   # PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+RECONCILIATION_REASON
+```
+
+Mismatch → `BLOCKED_ROUTE_MISMATCH` (no production GO; no silent episode close).
+Refresh LEDGER `## ROUTE_STATE` to match the latest event (snapshot only).
+Never rewrite prior JSONL lines.
+
 ## Hard rules
 
 - Do not modify production code.
@@ -281,6 +335,10 @@ Schema: `.cursor/pipeline/contracts/bug-episode/RED_EVIDENCE.md`.
 5. Update finding/LEDGER evidence fields via materialize `mode=update`
    (`RED_EVIDENCE_PATH`, `TEST_ID`, `TEST_CONTENT_SHA256`).
 
+6. Append one ROUTE-TRACE event for `test RED` (or `test GREEN` in verify
+   mode). Update LEDGER `## ROUTE_STATE` (`LAST_COMMAND`, `OWNER_GATE_STATUS`
+   when RED_CONFIRMED → Owner may issue GO, `NEXT_ACTION`).
+
 ### Exact RED statuses
 
 Return exactly one:
@@ -308,11 +366,19 @@ Rules:
 
 ### Pasteable next after RED_CONFIRMED
 
+Default (Route A / TASK_DELTA NO):
+
 ```text
 /opsx-fix-bug case=<CASE_ID> intake=<INTAKE_ID> finding=<FINDING_ID> claim_token=<CLAIM_TOKEN>
 ```
 
-Owner may append `GO` only when
+If `ROUTE_STATE` / TASK_DELTA says `EXPECTED_EXECUTION_ROUTE=/opsx-apply`:
+
+```text
+/opsx-apply <change-id>
+```
+
+Owner may append production `GO` only when
 `BUG_CONFIRMED ∧ FIX_NOW ∧ (RED_CONFIRMED ∨ RED_NOT_APPLICABLE_APPROVED)`.
 
 ## Verify mode (GREEN writer)
@@ -346,6 +412,7 @@ GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW
 
    Schema: `.cursor/pipeline/contracts/bug-episode/GREEN_EVIDENCE.md`.
 6. Update finding/LEDGER `GREEN_EVIDENCE_PATH` via materialize `mode=update`.
+7. Append ROUTE-TRACE event for `test GREEN`; update `## ROUTE_STATE`.
 
 Silent test weakening is forbidden.
 
