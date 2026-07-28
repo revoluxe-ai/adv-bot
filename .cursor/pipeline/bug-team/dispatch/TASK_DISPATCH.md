@@ -1,0 +1,158 @@
+# Task dispatch protocol (Candidate)
+
+```text
+SCHEMA: opsx-bug-team/TASK_DISPATCH
+IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
+RUNTIME_STATUS: NOT_ACTIVE
+SUBAGENT_EXECUTION_REQUIRED: YES
+SINGLE_CHAT_ROLE_SIMULATION_ALLOWED: NO
+SUBAGENT_RUNTIME_MODEL: CURSOR_TASK_WORKERS
+```
+
+## Paths
+
+```text
+ORCHESTRATOR_ENTRYPOINT: .cursor/commands/opsx-bug-team.md
+WORKER_REGISTRY_PATH:    .cursor/pipeline/bug-team/REGISTRY.md
+TASK_DISPATCH_PATH:      .cursor/pipeline/bug-team/dispatch/TASK_DISPATCH.md
+DISPATCH_IMPL_PATH:      .cursor/pipeline/bug-team/harness/task_dispatch.py
+WORKER_SPECS_DIR:        .cursor/pipeline/bug-team/workers/
+```
+
+## Hard rule
+
+The host Cursor chat (`ORCHESTRATOR`) **must** launch each worker via the
+Cursor **Task** tool (registry-driven Task workers).
+
+Forbidden:
+
+```text
+orchestrator self-classifies as CLASSIFIER
+orchestrator authors RED as RED_TEST_WORKER
+orchestrator edits production as IMPLEMENTATION_EXECUTOR
+orchestrator confirms GREEN as GREEN_VERIFIER
+orchestrator assembles FANIN as FAN_IN_ASSEMBLER
+one long prompt that role-plays all workers in-sequence
+```
+
+## Cursor Task call shape (mandatory)
+
+For every worker hop the orchestrator issues **exactly one** Task invocation:
+
+```text
+Tool: Task
+arguments:
+  description: "opsx-bug-team/<WORKER_ID>"   # short UI title
+  subagent_type: <TASK_SUBAGENT_TYPE from REGISTRY>
+  # model: OMIT — inherit / auto only
+  run_in_background: false | true   # true only for long workers with heartbeat
+  prompt: |
+    WORKER_ID: <WORKER_ID>
+    WORKER_EXECUTION_ID: <WEX/...>
+    PARENT_ORCHESTRATION_ID: <ORCH/...>
+    CASE_ID: <CASE_ID>
+    FINDING_ID: <FINDING_ID or null>
+    INPUT_PACKET_PATH: <absolute or repo-relative .in.md>
+    OUTPUT_PACKET_PATH: <absolute or repo-relative .out.md>
+    WRITE_BOUNDARY_PATH: .cursor/pipeline/bug-team/WRITE_BOUNDARY.md
+    WORKER_SPEC_PATH: .cursor/pipeline/bug-team/workers/<WORKER_ID>.md
+    TIMEOUT_SECONDS: <n>
+    ATTEMPT: <n>
+    MAX_ATTEMPTS: <n>
+    CHECKPOINT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/CHECKPOINT.md
+    HEARTBEAT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/heartbeats/<WEX>.json
+    MODEL_SELECTION_POLICY: auto
+    FORBIDDEN: do not perform other workers' duties
+    REQUIRED: write OUTPUT_PACKET only within WRITE_BOUNDARY;
+              update HEARTBEAT_PATH periodically;
+              exit with terminal STATUS in output packet
+```
+
+`model` must never be set. Prefer registry `TASK_SUBAGENT_TYPE`.
+
+## Dispatch record (durable)
+
+After each Task launch / completion, orchestrator appends one line to:
+
+```text
+.tmp/opsx-bug-cases/<CASE_ID>/team/DISPATCH.jsonl
+```
+
+Required fields:
+
+```text
+SCHEMA_VERSION: 1
+WORKER_EXECUTION_ID
+PARENT_ORCHESTRATION_ID
+WORKER_ID
+TASK_SUBAGENT_TYPE
+CURSOR_TASK_TOOL: Task
+STARTED_AT
+LAST_HEARTBEAT_AT
+TIMEOUT_SECONDS
+ATTEMPT
+MAX_ATTEMPTS
+PROCESS_ID_OR_TASK_ID      # Task tool agent id when returned
+CHECKPOINT_PATH
+INPUT_PACKET_PATH
+OUTPUT_ARTIFACT_PATH
+STATUS: PENDING|RUNNING|WAITING_OWNER|PASS|FAIL|BLOCKED|TIMEOUT|CANCELLED
+TERMINAL_STATUS
+SCHEMA_VALID: true|false
+WRITE_BOUNDARY_OK: true|false
+```
+
+## Orchestrator-only duties
+
+```text
+parse invocation / raw intake envelope (not normalize — MATERIALIZER does)
+read registry + checkpoint
+build execution plan
+write immutable .in.md packets
+call Task tool
+validate .out.md schema + write boundary
+update CHECKPOINT + ROUTE-TRACE
+stop on Owner gates
+start next wave only after prior gate PASS
+```
+
+## Independence matrix (must not share execution identity)
+
+```text
+RED_TEST_WORKER           ≠ IMPLEMENTATION_EXECUTOR
+IMPLEMENTATION_EXECUTOR   ≠ GREEN_VERIFIER
+SPEC_UPDATE_WORKER         ≠ any reviewer role
+BOUNDED_HUNTER            ≠ IMPLEMENTATION_EXECUTOR
+FAN_IN_ASSEMBLER          ≠ CLOSURE_OPERATOR
+```
+
+Each inequality ⇒ distinct `WORKER_EXECUTION_ID` and distinct Cursor Task run.
+
+## Timeout isolation
+
+Timeout is **per Task subagent**, not one global command timer only.
+
+On TIMEOUT:
+
+1. Mark that `WORKER_EXECUTION_ID` as TIMEOUT in DISPATCH.jsonl.
+2. Terminate that process tree (do not await forever).
+3. Keep partial output if any.
+4. Do not dispatch dependent workers.
+5. Persist resumable CHECKPOINT.
+6. Orchestrator must **not** fabricate the missing output packet.
+
+## Fan-out
+
+Allowed only for independent read-only probes (separate WEX each).
+Forbidden: parallel competing production executors.
+
+## Activation blocker
+
+Independent Review PASS / runtime activation **forbidden** if:
+
+- workers are only roles inside one prompt;
+- no factual Task dispatch path / DISPATCH.jsonl;
+- RED and GREEN share one execution identity;
+- timeout is only command-global;
+- no worker-level checkpoints;
+- orchestrator silently replaces a failed worker.
