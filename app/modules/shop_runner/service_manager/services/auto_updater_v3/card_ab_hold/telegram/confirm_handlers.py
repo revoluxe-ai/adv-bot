@@ -42,6 +42,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     normalize_card_ab_hold_mode,
     normalize_card_ab_hold_phase,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_decision import (
+    AB_HOLD_S1_SOURCE_KEYWORDS_ATTR,
+    eligible_keyword_texts_for_confirm,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
     CardAbHoldSetupBlockRedisCache,
     CardAbHoldSignalRedisCache,
@@ -152,18 +156,74 @@ def _draft_auto_bid(draft: dict[str, Any], adv: AdvSetting) -> float:
     return _default_auto_bid(adv)
 
 
-def _keyword_candidates(adv: AdvSetting) -> list[str]:
-    """Кандидаты для S1: snapshot или подтверждённый набор."""
+def _keyword_candidates(
+    adv: AdvSetting,
+    *,
+    calculated_keywords: list[Any] | None = None,
+) -> list[str]:
+    """Кандидаты для S1: snapshot → confirmed → live eligible read-model.
+
+    После epoch-managed Enable snapshot/confirmed пусты (``process_ab_setup``
+    no-op). Тогда берём PASS-ключи из CalculatedKeyword / injected source
+    (PFO ≤ max CPO, ≥100 показов) — для явного user select, без auto-confirm
+    (decision ``ab-hold-confirmed-epoch-parameters-sot`` §1).
+
+    Args:
+        adv: кампания / AdvSetting-like.
+        calculated_keywords: опциональный eligibility source; иначе transient
+            ``AB_HOLD_S1_SOURCE_KEYWORDS_ATTR`` (выставляет async resolve).
+
+    Returns:
+        Список текстов кандидатов (может быть пустым, если eligibility нет).
+    """
     snapshot_raw = cast(
         list[str],
         getattr(adv, "card_ab_hold_allowed_phrases_snapshot", None) or [],
     )
     if snapshot_raw:
         return snapshot_raw
-    return cast(
+    confirmed = cast(
         list[str],
         getattr(adv, "card_ab_hold_confirmed_keywords_json", None) or [],
     )
+    if confirmed:
+        return confirmed
+    source = calculated_keywords
+    if source is None:
+        raw_source = getattr(adv, AB_HOLD_S1_SOURCE_KEYWORDS_ATTR, None)
+        if raw_source is not None:
+            source = list(raw_source)
+    if not source:
+        return []
+    max_pfo = float(getattr(adv, "max_price_for_order", None) or 0)
+    return eligible_keyword_texts_for_confirm(
+        source,
+        max_pay_for_order=max_pfo,
+    )
+
+
+async def _resolve_keyword_candidates(adv: AdvSetting) -> list[str]:
+    """S1 candidates с live eligibility load при пустых snapshot/confirmed.
+
+    Загружает CalculatedKeyword через тот же UI read-model, что keyboard
+    (``get_keywords_for_keyboard``), кэширует source на ``adv`` и возвращает
+    PASS-тексты. Не пишет PG snapshot и не auto-confirm.
+    """
+    existing = _keyword_candidates(adv)
+    if existing:
+        return existing
+    from app.client_bot.utils import get_keywords_for_keyboard
+
+    try:
+        keywords = await get_keywords_for_keyboard(adv)
+    except Exception:
+        logger.exception(
+            "[adv_setting_id=%s] S1 eligible keyword load failed",
+            getattr(adv, "id", None),
+        )
+        return []
+    setattr(adv, AB_HOLD_S1_SOURCE_KEYWORDS_ATTR, list(keywords))
+    return _keyword_candidates(adv)
 
 
 def _tp_rows_from_adv(
@@ -335,7 +395,7 @@ async def _render_for_adv(
         return
 
     if phase == CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM:
-        keywords = _keyword_candidates(adv)
+        keywords = await _resolve_keyword_candidates(adv)
         page = int(draft.get("page") or 0)
         _, norm_page, total_pages = paginate(keywords, page)
         text = build_s1_text(
@@ -521,7 +581,7 @@ async def on_keyword_toggle(
     ):
         await _render_for_adv(query, adv, state)
         return
-    keywords = _keyword_candidates(adv)
+    keywords = await _resolve_keyword_candidates(adv)
     if callback_data.keyword_idx < 0 or callback_data.keyword_idx >= len(keywords):
         await query.answer()
         await _render_for_adv(query, adv, state)
@@ -575,7 +635,7 @@ async def on_keyword_set_confirm(
         await _render_for_adv(query, adv, state)
         return
     draft = await load_draft(state, int(adv.id))
-    keywords = _keyword_candidates(adv)
+    keywords = await _resolve_keyword_candidates(adv)
     selected = selected_keywords(keywords, draft)
     if not selected:
         await query.answer("Выберите хотя бы один ключ", show_alert=True)
