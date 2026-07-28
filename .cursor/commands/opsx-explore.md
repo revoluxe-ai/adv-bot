@@ -23,13 +23,15 @@ Apply `rules.explore` from config and the `explore` policy from `EXPLORE_POLICY.
 
 If `explore.worklog.enabled=true` and `explore.worklog.read_if_exists=true`, check `explore.worklog.path`. When the file exists, read it before the final output. When it does not exist and `explore.worklog.missing_is_not_blocker=true`, explicitly write: `WORKLOG not found, continuing without it.`
 
-Treat WORKLOG as raw notes, not source of truth. Do not modify `DOTO/WORKLOG.md`. Extract useful context beyond TODOs:
+Treat WORKLOG as raw notes, not source of truth. Do not modify `DOTO/WORKLOG.md`. (`/opsx-bound-scope:GO` is the allowed OPSX append producer for deferred-from-change entries; explore remains read-only.) Extract useful context beyond TODOs:
 - Worklog-derived candidate tasks
 - Worklog-derived known bugs / drift
 - Worklog-derived affected file hints
 - Worklog-derived validation hints
 - Worklog-derived open questions
 - Worklog-derived prior agent findings
+- Worklog-derived deferred-from-change parks (`[deferred-from:<CHANGE_ID>]`) — still raw notes, not current change DoD
+- Worklog-derived re-entered marks (`[re-entered:<CHANGE_ID>]`) — historical; DoD ownership is the change artifacts after confirmed `/opsx-update` re-entry
 
 Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked against repository evidence where possible. If WORKLOG names a file, module, class, function, command, error, or test, inspect the repository/OpenSpec artifacts before presenting it as confirmed. Do not blindly turn every WORKLOG line into a task.
 
@@ -42,7 +44,7 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 6. Inspect repository files and OpenSpec artifacts relevant to the requested task.
 7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
 8. Do not modify production code.
-9. Do not modify WORKLOG.
+9. Do not modify WORKLOG (deferred parks are written only by `/opsx-bound-scope:GO`).
 
 **Required final output format:**
 
@@ -67,8 +69,44 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 ## Recommended Workflow
 Один из вариантов: short handoff / core OpenSpec / expanded OpenSpec.
 
+## Now / Later (optional)
+Include when implementation-sized ideas crystallize **and** any of:
+- the user asked for now/later, MVP boundary, or «что сейчас / что потом»;
+- explore surfaces **2+** distinct implementation threads for one change or one proposal;
+- an active change already looks oversized relative to a shippable slice;
+- the user gave an explicit split hint (e.g. «split: core enter/exit now; excel later»).
+
+Omit when the thread is pure research with no near-term implementation ask.
+
+This section is **recommendation only** (explore remains read-only for WORKLOG and must not park).
+
+Format:
+
+```text
+NOW_LATER:
+CHANGE_ID: <id or none_yet>
+SPLIT_HINT: <user hint or explore-inferred>
+DO_NOW (candidate KEEP):
+- <idea> — why now
+DO_LATER (candidate DEFER → WORKLOG):
+- <idea> — why later
+NEXT_IF_ACCEPT:
+- existing change → /opsx-bound-scope change=<CHANGE_ID>
+- no change yet → /opsx-propose (or /opsx-new) for DO_NOW only,
+  then /opsx-bound-scope if the draft still bloated
+DO_NOT:
+- treat this table as already parked in WORKLOG
+- run /opsx-update:split (does not exist; splitter is /opsx-bound-scope)
+```
+
+Owner may refine the table in chat, then run `/opsx-bound-scope` so plan printouts
+match the agreed split. Explore MUST NOT append WORKLOG or edit change artifacts
+for the park; that is bound-scope → update.
+
 ## Next Action
-Что делать дальше.
+Что делать дальше. If `NOW_LATER` was emitted and the owner wants
+to commit the boundary, prefer pointing to `/opsx-bound-scope` (not a silent
+full-scope `/opsx-propose` of everything).
 
 **Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
@@ -195,6 +233,15 @@ If the user mentions a change or you detect one is relevant:
 
 4. **The user decides** - Offer and move on. Don't pressure. Don't auto-capture.
 
+5. **Optional now/later when ideas are ready to implement**
+   - If multiple threads or an oversized change appear, offer `NOW_LATER`
+     (see required final output).
+   - Prefer an explicit ask when ambiguous: «Разделить на сейчас / потом?»
+   - If the user supplies a split hint (`split: …`, «сейчас X, потом Y»), use it as
+     `SPLIT_HINT` and fill DO_NOW / DO_LATER against that hint — still recommendation only.
+   - Hand off parking to `/opsx-bound-scope`; hand off KEEP artifact edits to
+     `/opsx-update` after bound-scope `:GO`. Do not invent `/opsx-update:split`.
+
 ---
 
 ## What You Don't Have To Do
@@ -205,6 +252,7 @@ If the user mentions a change or you detect one is relevant:
 - Reach a conclusion
 - Stay on topic if a tangent is valuable
 - Be brief (this is thinking time)
+- Always emit Now / Later (only when triggers above apply)
 
 ---
 
@@ -213,6 +261,7 @@ If the user mentions a change or you detect one is relevant:
 There's no required ending. Discovery might:
 
 - **Flow into a proposal**: "Ready to start? I can create a change proposal."
+- **Flow into a bound scope**: "Too much for one change — run `/opsx-bound-scope` with this DO_NOW / DO_LATER?"
 - **Result in artifact updates**: "Updated design.md with these decisions"
 - **Just provide clarity**: User has what they need, moves on
 - **Continue later**: "We can pick this up anytime"
@@ -228,6 +277,9 @@ When things crystallize, you might offer a summary - but it's optional. Sometime
 - **Don't rush** - Discovery is thinking time, not task time
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
+- **Don't park to WORKLOG** - Deferred parks are `/opsx-bound-scope:GO` only; explore may only *suggest* DO_LATER
+- **Don't duplicate the splitter** - No `/opsx-update:split`; scope cut + park is `/opsx-bound-scope`
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
 - **Do question assumptions** - Including the user's and your own
+- **Do offer now/later explicitly** when implementation ideas multiply — better a clear question than a silent full-scope propose
