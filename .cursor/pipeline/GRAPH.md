@@ -7,19 +7,16 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 26
+- inventory_count: 27
 - fingerprint_strength: names_only
+- source_commit: 79a88786c0352bf96456bbe6d68047d1686380b7
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-28T01:43Z corrective ROUTE_TRACE v2 +
-  blocked_route_mismatch / blocked_missing_route_target. Prior
-  UPDATE GO 2026-07-28T01:26Z (Owner GO UPDATE LIVE ORCHESTRATION ROUTING):
-  classify-first mandatory (materialize→claim→classify→Route A|B|C|D);
-  spec route via /opsx-update + TASK_DELTA → apply|fix-bug; ROUTE-TRACE.jsonl
-  + LEDGER ## ROUTE_STATE; RED+Owner GO for both fix-bug and bug-episode apply.
-  Prior 2026-07-27T23:44Z RED→GO→GREEN→FANIN→lesson kept. GRAPH remains
-  snapshot only; command gates / Owner / durable case state win.
-  Inventory 26 names_only fingerprint 36715089212461e01e2291eebdfa7777.
+  UPDATE GO 2026-07-28T04:30Z: index Candidate /opsx-bug-team
+  (IMPLEMENTED_NOT_VALIDATED / NOT_ACTIVE; registry-driven Cursor Task
+  workers; free-form intake). Inventory 27;
+  fingerprint c4c8dba1b837ed6e01445d82dccae905. Prior 04:20Z preflight
+  stamp on 26-node fingerprint. GRAPH remains navigation snapshot only.
   Bodies still partially NOT_OPENED_BUDGET.
 
 ## States
@@ -198,6 +195,22 @@
 - decision_owner: classifier
 - next_typical: /opsx-fix-bug WITHOUT GO | /opsx-update | stop FP | ROUTE_TO_OTHER_PROCESS
 - known_flaws: F1 addressed in contract (forbids GO on handoff)
+
+### /opsx-bug-team
+- purpose: Candidate registry-driven Cursor Task team for full bug lifecycle
+  (free-form intake → materialize/claim/classify → Route A|B|C|D → RED/GO/GREEN
+  → bounded hunt → FANIN → Owner closure)
+- input_state: bug_signal_raw | intake_recorded | finding_queued | (resume) any team checkpoint
+- output_state: WAITING_OWNER gates | FANIN_READY | CLOSED_* | BLOCKED_* (Candidate)
+- artifacts_read: registry + checkpoint + case map
+- artifacts_written: team/DISPATCH.jsonl + CHECKPOINT + worker packets; fan-in only FANIN.md
+- decision_owner: orchestrator (Task dispatch only) + Owner gates
+- next_typical: Independent Candidate Team Review (while NOT_ACTIVE) | Owner GO gates
+- known_flaws: |
+  CANDIDATE ONLY — IMPLEMENTATION_STATUS=IMPLEMENTED_NOT_VALIDATED;
+  RUNTIME_STATUS=NOT_ACTIVE; OWNER_ACTIVATION=NOT_ISSUED;
+  must dispatch real Cursor Task workers (no single-chat role simulation);
+  does not replace live slash commands until Owner activation
 
 ### /opsx-verify
 - purpose: read-only audit before archive
