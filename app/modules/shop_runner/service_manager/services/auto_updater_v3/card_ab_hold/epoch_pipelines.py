@@ -40,9 +40,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
     setup_apply as ab_hold_setup_apply,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stale_stats_freeze import (
-    should_freeze_keyword_and_bid_mutations,
-)
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
@@ -118,9 +115,15 @@ async def process_ab_epoch(
         complex_adv: кампания с ``adv_setting`` epoch-полями.
         wb_shop_data_manager: контекст shop-runner (reserved для parity с setup/hold).
         wb_manager_hub: WB write-path для sync intent.
-        stats_fresh: False при stale/missing stats — keyword/WB мутации §23 skip
-            (не блокирует activate-only после complete).
+        stats_fresh: retained for call-site compatibility; decide-class freeze
+            lives in ``stale_stats_freeze`` / hold pipelines. After durable
+            PENDING intent, apply snapshot / WB sync MUST NOT be gated on
+            freshness (PBH-005 / decision §17 carve-out). Also does not block
+            activate-only after complete.
     """
+    # PBH-005: apply snapshot path is not decide-class; do not stale-gate here.
+    _ = stats_fresh
+
     if not is_epoch_managed_ab_hold(complex_adv.adv_setting):
         return
 
@@ -153,7 +156,7 @@ async def process_ab_epoch(
     sync_status = normalize_card_ab_hold_sync_status(
         getattr(adv_setting, "card_ab_hold_sync_status", None)
     )
-    # Residual complete: activate-only before needs_sync / §23 freeze / WB body.
+    # Residual complete: activate-only before needs_sync / WB body.
     if sync_status == CardAbHoldSyncStatus.COMPLETE:
         intent_raw = getattr(adv_setting, "card_ab_hold_pending_intent_json", None)
         generation: int | None = None
@@ -187,17 +190,6 @@ async def process_ab_epoch(
         return
 
     intent = cast(dict[str, Any], intent_raw)
-
-    if should_freeze_keyword_and_bid_mutations(
-        mode=mode,
-        phase=getattr(adv_setting, "card_ab_hold_phase", None),
-        stats_fresh=stats_fresh,
-    ):
-        logger.info(
-            "[adv_id=%s] ab_epoch: stale stats freeze — skip WB sync (§23)",
-            complex_adv.adv_id,
-        )
-        return
 
     generation = int(intent.get("generation", 0) or 0)
     try:
