@@ -65,36 +65,340 @@ contract and the activated companion command texts.
 
 ## Live OPSX bug episode sequence
 
+### Canonical pre-implementation routing (mandatory)
+
 ```text
 BUG SIGNAL
-  → /opsx-fix-bug WITHOUT GO
-  → BUG_CONFIRMED + verdict fix_now
-  → /opsx-test (author + run RED; no production GO)
-  → RED_CONFIRMED | fail-states | BUG_NOT_TESTABLE → Owner exception
-  → OWNER_PRODUCTION_GO_ALLOWED_IF:
+  → /opsx-materialize-bug-queue (durable intake / findings)
+  → /opsx-claim-next-bug          # when claimable queue
+  → /opsx-classify-bug            # mandatory before implementation route
+  → Route A | B | C | D
+```
 
-       BUG_CONFIRMED
-       AND FIX_NOW
-       AND (
-         RED_CONFIRMED
-         OR RED_NOT_APPLICABLE_APPROVED
-       )
+`/opsx-classify-bug` is **required** before choosing `/opsx-fix-bug`,
+`/opsx-update`, `/opsx-apply`, or terminal close. Skipping classify when a
+durable finding is claimed/available for adjudication is a hard process
+blocker (`blocked_needs_classify_first`).
 
-     # RED_NOT_APPLICABLE_APPROVED alone does NOT allow GO
-     # without BUG_CONFIRMED and FIX_NOW.
-  → /opsx-fix-bug GO  (production only; test freeze by default)
-  → same TEST_ID re-run → GREEN_CONFIRMED
-  → optional bounded invariant hunt / fan-out children
-  → per-branch RED → Owner GO → fix → GREEN → terminal
-  → ALL started branches terminal
-  → assemble FANIN.md (read-only rollup; no slash required)
-  → FANIN_READY
-  → /opsx-learn-from-bug with FANIN_PATH=…  (class-level)
-  → Owner FINAL class verdict
+### Route A — implementation bug
+
+```text
+CLASSIFICATION: IMPLEMENTATION_BUG
+  (classify label: implementation_bug)
+
+→ /opsx-fix-bug WITHOUT GO
+→ BUG_CONFIRMED + verdict fix_now
+→ /opsx-test (author + run RED; no production GO)
+→ RED_CONFIRMED | fail-states | BUG_NOT_TESTABLE → Owner exception
+→ OWNER_PRODUCTION_GO (exact token GO) only if §1.2 holds
+→ /opsx-fix-bug GO  (production only; test freeze by default)
+→ /opsx-test verify → GREEN_CONFIRMED
+```
+
+### Route B — specification defect or gap
+
+```text
+CLASSIFICATION: SPEC_BUG | SPEC_GAP
+  (classify labels: spec_bug | implementation_bug_with_spec_gap)
+
+CHOSEN_ROUTE: ROUTE_B
+EXPECTED_NEXT_COMMAND: /opsx-update
+EXPECTED_EXECUTION_ROUTE: PENDING_UNTIL_TASK_DELTA
+ACTUAL_EXECUTION_ROUTE: PENDING
+ROUTE_RECONCILIATION: PENDING
+CURRENT_ROUTE_STATE: AWAITING_SPEC_UPDATE
+
+→ /opsx-update <change-id>   # immediate process step; NOT production GO
+→ specification corrected
+→ TASK_DELTA_CHECK (§0.2)
+```
+
+Route B layers (do not collapse):
+
+```text
+CLASSIFICATION ROUTE:           ROUTE_B
+IMMEDIATE PROCESS STEP:         /opsx-update
+IMPLEMENTATION EXECUTION ROUTE: PENDING_UNTIL_TASK_DELTA
+  (chosen only after TASK_DELTA)
+```
+
+`/opsx-update` MUST NEVER be stored as `EXPECTED_EXECUTION_ROUTE` or
+`ACTUAL_EXECUTION_ROUTE`.
+
+After `/opsx-update`:
+
+```text
+TASK_DELTA: CHANGED
+  → EXPECTED_EXECUTION_ROUTE: /opsx-apply
+  → EXPECTED_NEXT_COMMAND: /opsx-apply
+  → CURRENT_ROUTE_STATE: AWAITING_APPLY_RED
+
+TASK_DELTA: UNCHANGED
+  → EXPECTED_EXECUTION_ROUTE: /opsx-fix-bug
+  → EXPECTED_NEXT_COMMAND: /opsx-fix-bug
+  → CURRENT_ROUTE_STATE: AWAITING_FIX_BUG_RED
+
+ACTUAL_EXECUTION_ROUTE: PENDING
+ROUTE_RECONCILIATION: PENDING
+```
+
+(Legacy readers may map YES→CHANGED, NO→UNCHANGED; new writes use only
+CHANGED|UNCHANGED.)
+
+Then both executors follow the same RED → Owner GO → GREEN path as Route A
+(§1). `/opsx-update` does **not** replace the implementation executor.
+New/changed tasks do **not** auto-authorize `/opsx-apply` production edits.
+Executor start must set `ACTUAL_EXECUTION_ROUTE` and reconcile (§0.5).
+
+### Route C — false positive
+
+```text
+CLASSIFICATION: FALSE_POSITIVE
+  (classify label: false_positive)
+
+→ REJECTED / CLOSED_NO_IMPLEMENTATION
+EXPECTED_EXECUTION_ROUTE: CLOSED_NO_IMPLEMENTATION
+ACTUAL_EXECUTION_ROUTE: NOT_APPLICABLE
+ROUTE_RECONCILIATION: NOT_APPLICABLE
+```
+
+### Route D — out of scope
+
+```text
+CLASSIFICATION: OUT_OF_SCOPE
+  (classify label: out_of_scope)
+
+→ ROUTE_TO_OTHER_PROCESS
+EXPECTED_EXECUTION_ROUTE: ROUTE_TO_OTHER_PROCESS
+ROUTE_TARGET_PROCESS_ID: <required>
+ROUTE_TARGET_REASON: <required>
+ACTUAL_EXECUTION_ROUTE: NOT_APPLICABLE
+ROUTE_RECONCILIATION: NOT_APPLICABLE
+```
+
+Missing `ROUTE_TARGET_PROCESS_ID` → `BLOCKED_MISSING_ROUTE_TARGET`.
+Not opportunistic fix inside current episode.
+
+### Post-fix episode expansion (unchanged shape)
+
+```text
+→ optional bounded invariant hunt / fan-out children
+→ per-branch: classify (if new finding) → route → RED → Owner GO → GREEN → terminal
+→ ALL started branches terminal
+→ assemble FANIN.md (materialize mode=fanin_assemble; no /opsx-fan-in-*)
+→ FANIN_READY
+→ /opsx-learn-from-bug with FANIN_PATH=…  (class-level)
+→ Owner FINAL class verdict
 ```
 
 Finding-scoped notes without class promotion may skip FANIN; they must not
 claim a confirmed class lesson or class-rule GO write.
+
+Every significant hop appends to durable `ROUTE-TRACE.jsonl` (§0.3).
+
+---
+
+## 0. Classify-first, task delta, route trace
+
+### 0.1 Classify-first gate
+
+Before `/opsx-fix-bug` adjudication that selects an implementation route,
+or before `/opsx-apply` / `/opsx-update` on a claimed finding in a bug
+episode, durable route state MUST record a classification:
+
+```text
+CURRENT_CLASSIFICATION ∈
+  IMPLEMENTATION_BUG | SPEC_BUG | SPEC_GAP | FALSE_POSITIVE | OUT_OF_SCOPE
+```
+
+Produced by `/opsx-classify-bug` and mirrored in `LEDGER.md` →
+`## ROUTE_STATE`.
+
+For Route B (`SPEC_BUG` | `SPEC_GAP`) the classify receipt MUST also record:
+
+```text
+CHOSEN_ROUTE: ROUTE_B
+EXPECTED_NEXT_COMMAND: /opsx-update
+EXPECTED_EXECUTION_ROUTE: PENDING_UNTIL_TASK_DELTA
+CURRENT_ROUTE_STATE: AWAITING_SPEC_UPDATE
+```
+
+`/opsx-update` gates on those handoff fields (not on
+`EXPECTED_EXECUTION_ROUTE=/opsx-update`). Missing `CHOSEN_ROUTE` with only
+`SPEC_BUG`/`SPEC_GAP` is incomplete — do not silently infer Route B.
+
+If classification is missing → blocker `blocked_needs_classify_first`;
+pasteable next:
+
+```text
+/opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
+```
+
+### 0.2 TASK_DELTA after `/opsx-update`
+
+Schema: `.cursor/pipeline/contracts/bug-episode/TASK_DELTA.md`.
+
+Canonical durable decision:
+
+```text
+TASK_DELTA: CHANGED | UNCHANGED
+EXPECTED_EXECUTION_ROUTE: /opsx-apply | /opsx-fix-bug
+EXPECTED_NEXT_COMMAND: /opsx-apply | /opsx-fix-bug
+TASK_DELTA_EVIDENCE_PATH
+```
+
+Rule:
+
+```text
+CHANGED   → EXPECTED_EXECUTION_ROUTE=/opsx-apply
+            EXPECTED_NEXT_COMMAND=/opsx-apply
+            CURRENT_ROUTE_STATE=AWAITING_APPLY_RED
+UNCHANGED → EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug
+            EXPECTED_NEXT_COMMAND=/opsx-fix-bug
+            CURRENT_ROUTE_STATE=AWAITING_FIX_BUG_RED
+```
+
+Seed reconciliation:
+
+```text
+ACTUAL_EXECUTION_ROUTE: PENDING
+ROUTE_RECONCILIATION: PENDING
+ACTUAL_NEXT_COMMAND: PENDING
+NEXT_COMMAND_RECONCILIATION: PENDING
+```
+
+Before TASK_DELTA (post-classify Route B only):
+
+```text
+EXPECTED_EXECUTION_ROUTE: PENDING_UNTIL_TASK_DELTA
+EXPECTED_NEXT_COMMAND: /opsx-update
+CURRENT_ROUTE_STATE: AWAITING_SPEC_UPDATE
+```
+
+### 0.3 Durable team route trace
+
+Schema: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md` (`SCHEMA_VERSION: 2`).
+
+```text
+RUNTIME:
+  .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+```
+
+Append-only. Monotonic `EVENT_SEQUENCE` per CASE_ID; unique `EVENT_ID`;
+`PREVIOUS_EVENT_ID` except first event.
+
+Every producer event MUST record at least:
+
+```text
+EVENT_ID EVENT_SEQUENCE CASE_ID FINDING_ID EVENT_TYPE COMMAND
+ACTOR_ROLE ACTOR_AGENT_ID ACTOR_CHAT_ID
+FROM_STATE TO_STATE STARTED_AT TERMINAL_STATUS
+```
+
+Route-selecting / executing hops also record:
+
+```text
+CHOSEN_ROUTE
+EXPECTED_NEXT_COMMAND
+ACTUAL_NEXT_COMMAND
+NEXT_COMMAND_RECONCILIATION
+EXPECTED_EXECUTION_ROUTE
+ACTUAL_EXECUTION_ROUTE
+ROUTE_RECONCILIATION
+```
+
+Analytics MUST distinguish:
+
+```text
+CHOSEN_ROUTE            = high-level Route A|B|C|D
+EXPECTED_NEXT_COMMAND   = immediate process handoff
+EXPECTED_EXECUTION_ROUTE= eventual production executor
+```
+
+### 0.4 Human-readable `## ROUTE_STATE` (LEDGER)
+
+In `.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md` maintain **current** snapshot
+aligned with the latest applicable JSONL event:
+
+```text
+## ROUTE_STATE
+
+CURRENT_CLASSIFICATION:
+CHOSEN_ROUTE:
+EXPECTED_NEXT_COMMAND:
+ACTUAL_NEXT_COMMAND:
+NEXT_COMMAND_RECONCILIATION:
+EXPECTED_EXECUTION_ROUTE:
+ACTUAL_EXECUTION_ROUTE:
+ROUTE_RECONCILIATION:
+
+CURRENT_ROUTE_STATE:
+LAST_ROUTE_EVENT_ID:
+LAST_ROUTE_EVENT_SEQUENCE:
+LAST_ROUTE_EVENT_AT:
+
+CURRENT_ACTOR_ROLE:
+CURRENT_ACTOR_AGENT_ID:
+CURRENT_ACTOR_CHAT_ID:
+
+OWNER_GATE_STATUS:
+TASK_DELTA:
+TERMINAL_STATUS:
+
+ROUTE_TRACE_PATH: .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+NEXT_ACTION:
+```
+
+`LEDGER.md` does not replace append-only `ROUTE-TRACE.jsonl`.
+
+### 0.5 Route reconciliation + mismatch hard gate
+
+```text
+ROUTE_RECONCILIATION: PENDING | MATCH | MISMATCH | NOT_APPLICABLE
+```
+
+On route selection: `ACTUAL=PENDING`, `RECONCILIATION=PENDING`.
+On executor start: set `ACTUAL`, then `MATCH` or `MISMATCH`.
+
+If mismatch:
+
+```text
+STATUS: BLOCKED_ROUTE_MISMATCH
+EPISODE_CLOSE_ALLOWED: NO
+PRODUCTION_GO_ALLOWED: NO
+```
+
+Owner route decision or corrected evidence required; no silent close.
+
+### 0.6 Owner waiting time
+
+```text
+gate open  → OWNER_GATE_STATUS=WAITING + OWNER_GATE_OPENED_AT
+Owner GO   → APPROVED + OWNER_GO_ISSUED_AT + OWNER_WAIT_DURATION_MS
+rejection  → REJECTED
+```
+
+Executors must not forge these timestamps.
+
+### 0.7 Episode closure gate (route)
+
+Episode close requires:
+
+```text
+EXPECTED_EXECUTION_ROUTE recorded
+ACTUAL_EXECUTION_ROUTE recorded or NOT_APPLICABLE
+ROUTE_RECONCILIATION ∈ { MATCH, NOT_APPLICABLE }
+```
+
+Forbidden close when:
+
+```text
+PENDING
+MISMATCH
+missing reconciliation
+```
+
+Routes C/D use `ACTUAL=NOT_APPLICABLE` and `RECONCILIATION=NOT_APPLICABLE`.
 
 ---
 
@@ -104,6 +408,16 @@ claim a confirmed class lesson or class-rule GO write.
 
 Owner **production** GO must not open production repair until a durable RED
 proof exists for that finding, or an explicit Owner exception is recorded.
+
+Applies to **both** implementation executors on a bug episode:
+
+- `/opsx-fix-bug` GO
+- `/opsx-apply` (when `EXPECTED_EXECUTION_ROUTE=/opsx-apply` / bug-episode case)
+
+`/opsx-update` is **never** equivalent to production GO.
+
+Also forbidden when `ROUTE_RECONCILIATION=MISMATCH` or
+`BLOCKED_ROUTE_MISMATCH` / `BLOCKED_MISSING_ROUTE_TARGET`.
 
 ### 1.2 Preconditions for production GO
 
@@ -116,22 +430,31 @@ AND (
   RED_CONFIRMED
   OR RED_NOT_APPLICABLE_APPROVED
 )
+AND OWNER_PRODUCTION_GO
+AND ROUTE_RECONCILIATION ∈ { MATCH, NOT_APPLICABLE }
+AND ACTUAL_EXECUTION_ROUTE matches EXPECTED when both are set
 ```
 
 `RED_NOT_APPLICABLE_APPROVED` alone does **not** authorize production GO
 without `BUG_CONFIRMED` and `FIX_NOW`.
 
+Presence of new OpenSpec tasks after `/opsx-update` does **not** authorize
+`/opsx-apply` production edits without the same gate.
+
 ### 1.3 Role split (policy)
 
 | Role | Command / actor | May write |
 |------|-----------------|-----------|
+| Classifier | `/opsx-classify-bug` | route trace + `ROUTE_STATE` only (no OpenSpec/code) |
+| Spec reviser | `/opsx-update` | OpenSpec planning artifacts; TASK_DELTA evidence; route trace |
 | Bug Analyst | `/opsx-fix-bug` WITHOUT GO | `.tmp/opsx-bug-cases/**` only |
 | Regression Author | `/opsx-test` | `tests/**` (+ fixtures); RED evidence in case map |
 | Owner | human | production GO; `RED_NOT_APPLICABLE_APPROVED`; FINAL class verdict |
 | Coordinator | human / operator (not a new agent type) | routes episode; invokes read-only fan-in assembly |
 | FAN_IN_ASSEMBLER | procedure / Coordinator role | builds `FANIN.md` only; **no** Owner authority |
-| Executor | `/opsx-fix-bug` GO | production after Owner GO; prefer test freeze |
-| Independent Tester | separate chat when practical | GREEN confirm; no-weaken check |
+| Executor (fix) | `/opsx-fix-bug` GO | production after Owner GO; prefer test freeze |
+| Executor (apply) | `/opsx-apply` after TASK_DELTA CHANGED | production after same RED+Owner GO gate |
+| Independent Tester | `/opsx-test verify` (sole GREEN writer) | GREEN evidence; no-weaken check |
 
 ```text
 COORDINATOR:
@@ -596,11 +919,15 @@ Companion updates must keep the names distinct in command text and handoffs.
 
 ### 9.1 Production GO
 
-- Exact Owner token `GO` (per live `/opsx-fix-bug` semantics when companions
-  align) opens **production** repair only under §1.
+- Exact Owner token `GO` opens **production** repair only under §1 for
+  `/opsx-fix-bug` **and** for bug-episode `/opsx-apply` after
+  `TASK_DELTA: CHANGED`.
 - Executor commands must not invent Owner approval.
+- `/opsx-update` is never production GO.
+- New/changed tasks after update are not automatic apply authorization.
 - Test authoring for RED does **not** require a separate Owner production GO
-  (uses `/opsx-test` path once companions align).
+  (uses `/opsx-test` path).
+- Classify-first (§0.1) is required before selecting an implementation route.
 
 ### 9.2 Final class verdict
 
@@ -664,7 +991,16 @@ DO_NOT_DO_YET:
 
 - [x] Marked `LIVE_PROCESS_CONTRACT` / `RUNTIME_ENFORCEMENT: ACTIVE` /
       `LIVE_COMMAND_BEHAVIOR_CHANGED: YES` / `GO_ACTIVATE: ISSUED`
-- [x] RED-before-GO defined (`OWNER_PRODUCTION_GO_ALLOWED_IF` grouping)
+- [x] Classify-first mandatory before implementation route (§0.1)
+- [x] Routes A–D (implementation / spec / FP / out-of-scope) defined
+- [x] TASK_DELTA CHANGED|UNCHANGED → apply vs fix-bug (§0.2)
+- [x] ROUTE-TRACE v2 + LEDGER `## ROUTE_STATE` (§0.3–0.4)
+- [x] Route reconciliation + MISMATCH hard gate (§0.5)
+- [x] Owner waiting fields (§0.6)
+- [x] Episode closure requires MATCH|NOT_APPLICABLE (§0.7)
+- [x] Route D requires ROUTE_TARGET_PROCESS_ID
+- [x] RED-before-GO for both `/opsx-fix-bug` and bug-episode `/opsx-apply`
+- [x] `/opsx-update` ≠ production GO; task delta ≠ auto apply permission
 - [x] RED/GREEN + anti-weaken defined
 - [x] Hunt bounds 3/3/3 + `PASS_3=MANDATORY_STOP` defined
 - [x] BRANCH_REGISTRY + `FAN_IN_ELIGIBLE_TERMINAL?` defined

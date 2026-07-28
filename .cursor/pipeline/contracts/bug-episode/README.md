@@ -28,6 +28,17 @@ must not invent a second schema root.
 | `FANIN.md` | FANIN.md assemble input/output contract |
 | `LESSON_GATE.md` | Class-level lesson gate preconditions |
 | `TERMINAL_STATUS_MAP.md` | Episode terminal ↔ durable LEDGER status |
+| `ROUTE_TRACE.md` | Append-only `ROUTE-TRACE.jsonl` event schema |
+| `TASK_DELTA.md` | Post-`/opsx-update` task-delta → apply vs fix-bug |
+
+## Classify-first routing (policy in ORCHESTRATION_MVP)
+
+```text
+BUG SIGNAL → materialize → claim → /opsx-classify-bug → Route A|B|C|D
+```
+
+Runtime current snapshot: `LEDGER.md` → `## ROUTE_STATE`.
+Append-only history: `results/ROUTE-TRACE.jsonl`.
 
 ## BRANCH_REGISTRY shape (single runtime instance)
 
@@ -57,4 +68,6 @@ NEW_SLASH: /opsx-fan-in-* FORBIDDEN
 ```text
 LEARNING_READY  ≠  FANIN_READY
 claim STATUS    ≠  EPISODE_TERMINAL   (parallel fields)
+/opsx-update    ≠  OWNER_PRODUCTION_GO
+TASK_DELTA CHANGED  ≠  automatic /opsx-apply production permission
 ```
