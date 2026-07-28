@@ -7,69 +7,42 @@ RUNTIME_STATUS: NOT_ACTIVE
 SUBAGENT_EXECUTION_REQUIRED: YES
 TASK_SUBAGENT_TYPE: generalPurpose
 MODEL_SELECTION_POLICY: auto
-MAPS_TO: Owner-facing closure
 ```
 
 ## INPUT_PACKET_SCHEMA
 
 ```text
-WORKER_IO + FANIN + OWNER_FINAL_CLOSURE_DECISION
+Default CONTROLLED_LIVE_UNCOMMITTED:
+  WORKER_IO + FANIN (READY_FOR_CLOSURE, BLOCKING_FINDINGS=NONE)
+  → automatic dispatch (no Owner closure stop)
+
+Legacy OWNER_GATED:
+  WORKER_IO + FANIN + OWNER_FINAL_CLOSURE_DECISION
 ```
 
-Common header: `packets/WORKER_IO.md`.
-
-## OUTPUT_PACKET_SCHEMA
-
-```text
-closure packet; case terminal recommendation
-```
-
-## WRITE_BOUNDARY
+## OUTPUT / WRITE_BOUNDARY
 
 ```text
 ALLOWED:
-  process closure artifacts only after Owner gate
+  results/OWNER-CLOSURE-<FINDING_ID>.md
+  results/HUMAN_SUMMARY.md
+  CASE.md terminal update
+  LEDGER.md terminal update
+  finding terminal update
+  ROUTE-TRACE.jsonl closure events
+  INDEX.md corresponding case update
 FORBIDDEN:
-  auto-close without Owner; act as FAN_IN_ASSEMBLER
+  results/FANIN.md (Fan-In only)
+  git commit / push / deploy claims
 ```
 
-## TIMEOUT_SECONDS
+## TERMINAL
 
 ```text
-300
+CASE_STATUS: CLOSED
+WORKTREE_STATUS: UNCOMMITTED_CHANGES_AWAITING_USER_REVIEW
+COMMIT_CREATED: NO
+USER_ACTION_REQUIRED: REVIEW_DIFF_AND_DECIDE_COMMIT
 ```
 
-## HEARTBEAT_POLICY
-
-```text
-update HEARTBEAT_PATH every <=30s
-Required fields: STARTED_AT, LAST_HEARTBEAT_AT, PROGRESS_MARKER,
-PROCESS_ID_OR_TASK_ID, ATTEMPT, CHECKPOINT_PATH, OUTPUT_ARTIFACT_PATH
-```
-
-## RETRY_POLICY
-
-```text
-MAX_ATTEMPTS: 1
-MAX_ATTEMPTS=1
-```
-
-## DEPENDENCIES
-
-```text
-['FAN_IN_ASSEMBLER']
-```
-
-Next wave forbidden until this worker output passes schema + status +
-authority validation.
-
-## TERMINAL_STATES
-
-```text
-PASS|FAIL|BLOCKED|TIMEOUT|WAITING_OWNER|CANCELLED
-```
-
-## Dispatch
-
-Must be launched via Cursor Task tool per
-`dispatch/TASK_DISPATCH.md`. Must not be role-simulated by orchestrator.
+Must produce plain-language `HUMAN_SUMMARY.md`.

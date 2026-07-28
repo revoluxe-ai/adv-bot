@@ -61,8 +61,29 @@ Forbidden: production / tests / OpenSpec.
 
 ## IMPLEMENTATION_EXECUTOR
 
-Allowed production writes **only** after Owner production GO + RED gate.
-Forbidden without GO.
+```text
+CONTROLLED_LIVE_UNCOMMITTED (default after activation):
+  local worktree writes after LOCAL_IMPLEMENTATION_AUTHORIZED (valid RED)
+  Owner production GO NOT required
+
+OWNER_GATED (legacy):
+  production / worktree writes only after Owner production GO + RED gate
+```
+
+Forbidden always: git commit / push / deploy / external mutations / GREEN self-confirm.
+
+## CLOSURE_OPERATOR
+
+Allowed:
+
+```text
+results/OWNER-CLOSURE-<FINDING_ID>.md
+results/HUMAN_SUMMARY.md
+CASE.md / LEDGER.md / findings/** / INDEX.md
+ROUTE-TRACE.jsonl closure events
+```
+
+Forbidden: rewriting FANIN.md; claiming COMMITTED / DEPLOYED / PUSHED.
 
 ## Candidate package write boundary (Builder)
 

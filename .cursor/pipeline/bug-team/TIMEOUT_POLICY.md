@@ -5,6 +5,23 @@ IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
 RUNTIME_STATUS: NOT_ACTIVE
 ```
 
+## Platform discovery (honest — BF-006)
+
+```text
+CURSOR_TASK_CANCELLATION: PARTIAL_INTERRUPT_ON_RESUME
+PROCESS_TREE_TERMINATION: BLOCKED_PLATFORM_TERMINATION_LIMITATION
+SAFE_TIMEOUT_STOP: IMPLEMENTED
+LATE_OUTPUT_REJECTION: IMPLEMENTED
+```
+
+Evidence: Cursor Task tool supports `interrupt=true` when resuming a
+**running** async agent. No general process-tree kill API is proven for
+the OPSX orchestrator. Python harness subprocess kill is **not** Cursor
+Task cancellation.
+
+Runtime module: `runtime/timeout.py`
+Status dump: `runtime/TIMEOUT_PLATFORM_STATUS.json`
+
 ## Per-worker required fields
 
 ```text
@@ -12,10 +29,11 @@ STARTED_AT
 LAST_HEARTBEAT_AT
 TIMEOUT_SECONDS
 PROGRESS_MARKER
-PROCESS_ID
+PROCESS_ID_OR_TASK_ID
 ATTEMPT
 MAX_ATTEMPTS
 CHECKPOINT_PATH
+PACKET_GENERATION
 ```
 
 ## Default limits (Candidate)
@@ -34,31 +52,16 @@ CHECKPOINT_PATH
 | FAN_IN_ASSEMBLER | 600 | 2 |
 | CLOSURE_OPERATOR | 300 | 1 |
 
-No infinite automatic retries. Exhaustion → `MAX_RETRY_EXHAUSTED` terminal.
+Exhaustion → `BLOCKED_MAX_RETRY_EXHAUSTED`. No infinite retries.
 
-## States
+## Safe timeout stop
 
-```text
-PENDING
-RUNNING
-WAITING_OWNER
-PASS
-FAIL
-BLOCKED
-TIMEOUT
-CANCELLED
-```
+1. Detect heartbeat timeout.
+2. Mark worker TIMEOUT; persist TIMEOUT event.
+3. Do not dispatch dependent workers.
+4. Persist resumable checkpoint.
+5. Retain partial artifacts.
+6. Reject late output via generation/attempt validation.
+7. Resume requires a new execution attempt.
 
-## Timeout procedure
-
-1. Save checkpoint.
-2. Append TIMEOUT event to `ROUTE-TRACE.jsonl`.
-3. Terminate process tree (cancel sibling/child Task workers for this case).
-4. Do not start next wave.
-5. Return resumable state.
-6. Do not hide partial artifacts.
-
-## Hang detection
-
-Orchestrator polls `LAST_HEARTBEAT_AT`. If
-`now - LAST_HEARTBEAT_AT > TIMEOUT_SECONDS` while STATUS=RUNNING → TIMEOUT.
+Do **not** claim `PROCESS_TREE_TERMINATION_IMPLEMENTED: YES`.

@@ -1,0 +1,9 @@
+{
+  "CURSOR_TASK_CANCELLATION": "PARTIAL_INTERRUPT_ON_RESUME",
+  "PROCESS_TREE_TERMINATION": "BLOCKED_PLATFORM_TERMINATION_LIMITATION",
+  "SAFE_TIMEOUT_STOP": true,
+  "LATE_OUTPUT_REJECTION": true,
+  "MAX_ATTEMPTS_DEFAULT": 2,
+  "DISCOVERY_NOTE": "Task tool interrupt=true on resume of running async agent; no proven general process-tree termination API for OPSX orchestrator.",
+  "UPDATED_AT": 1785213846.7304478
+}

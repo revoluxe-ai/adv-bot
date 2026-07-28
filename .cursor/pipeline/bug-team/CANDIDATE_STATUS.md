@@ -8,19 +8,12 @@ OWNER_ACTIVATION: NOT_ISSUED
 RUNTIME_ENFORCEMENT: NOT_ACTIVE
 READY_FOR_PRODUCTION: FORBIDDEN
 GO_ACTIVATE: NOT_ISSUED
+CONTROL_MODEL: USER_REVIEWS_UNCOMMITTED_WORKTREE
+CORRECTIVE_V2: APPLIED
+CORRECTIVE_V3..V6: APPLIED
+CORRECTIVE_V7: APPLIED (IMPLEMENTED_NOT_VALIDATED)
+ACTIVATION_ARTIFACT: .cursor/pipeline/bug-team/ACTIVATION.json
 ```
-
-## Authority
-
-This package is a **Candidate** only.
-
-- Independent Reviewer has not passed.
-- Independent Tester has not issued PASS.
-- Owner has not issued activation.
-- Live OPSX bug-episode policy remains
-  `.cursor/pipeline/ORCHESTRATION_MVP.md` (LIVE_ACTIVATED).
-- This candidate must **not** be treated as a replacement for live
-  slash commands until Owner activation.
 
 ## Forbidden status tokens
 
@@ -35,4 +28,9 @@ GO_ACTIVATE: ISSUED
 VALIDATION_STATUS: INDEPENDENT_TEST_PASS
 ```
 
-Builder-local controlled-test runs are **not** Independent Tester PASS.
+Builder-local controlled-test runs and REVIEW_PROOF_ONLY live Task proofs
+are **not** Independent Tester PASS and do **not** activate runtime.
+
+Future activation (Owner only) must use `CONTROLLED_LIVE_UNCOMMITTED`
+per `ACTIVATION.json` → `FUTURE_ACTIVATION_CONTRACT`.
+

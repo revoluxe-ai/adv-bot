@@ -13,7 +13,11 @@ MAPS_TO: /opsx-fix-bug GO | /opsx-apply
 ## INPUT_PACKET_SCHEMA
 
 ```text
-WORKER_IO + RED_CONFIRMED + OWNER_PRODUCTION_GO receipt
+Default CONTROLLED_LIVE_UNCOMMITTED:
+  WORKER_IO + RED_CONFIRMED + local execution authority
+
+Legacy OWNER_GATED:
+  WORKER_IO + RED_CONFIRMED + OWNER_PRODUCTION_GO receipt
 ```
 
 Common header: `packets/WORKER_IO.md`.
@@ -21,16 +25,18 @@ Common header: `packets/WORKER_IO.md`.
 ## OUTPUT_PACKET_SCHEMA
 
 ```text
-FIX evidence; production paths; ACTUAL_EXECUTION_ROUTE
+FIX evidence; local worktree paths; ACTUAL_EXECUTION_ROUTE
 ```
 
 ## WRITE_BOUNDARY
 
 ```text
-ALLOWED:
-  production only after Owner GO; no test mutate by default
-FORBIDDEN:
-  GO bypass; GREEN self-confirm; shared identity with RED/GREEN
+ALLOWED (CONTROLLED_LIVE_UNCOMMITTED):
+  local repository worktree writes within worker allowlist after valid RED
+  (app/, tests/, openspec/changes/, results/FIX-*, …)
+FORBIDDEN always:
+  git commit / push / deploy / external production mutations
+  GREEN self-confirm; shared identity with RED/GREEN
 ```
 
 ## TIMEOUT_SECONDS
@@ -38,38 +44,3 @@ FORBIDDEN:
 ```text
 2400
 ```
-
-## HEARTBEAT_POLICY
-
-```text
-update HEARTBEAT_PATH every <=60s
-Required fields: STARTED_AT, LAST_HEARTBEAT_AT, PROGRESS_MARKER,
-PROCESS_ID_OR_TASK_ID, ATTEMPT, CHECKPOINT_PATH, OUTPUT_ARTIFACT_PATH
-```
-
-## RETRY_POLICY
-
-```text
-MAX_ATTEMPTS: 2
-ATTEMPT<=MAX_ATTEMPTS
-```
-
-## DEPENDENCIES
-
-```text
-['RED_TEST_WORKER']
-```
-
-Next wave forbidden until this worker output passes schema + status +
-authority validation.
-
-## TERMINAL_STATES
-
-```text
-PASS|FAIL|BLOCKED|TIMEOUT|CANCELLED
-```
-
-## Dispatch
-
-Must be launched via Cursor Task tool per
-`dispatch/TASK_DISPATCH.md`. Must not be role-simulated by orchestrator.
