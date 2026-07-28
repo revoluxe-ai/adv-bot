@@ -29,19 +29,45 @@ _HANDLER = "app.client_bot.user_interface.handlers.change_auto_bid"
     [
         (CardAbHoldMode.OFF, False),
         ("off", False),
-        (CardAbHoldMode.PENDING_SETUP, False),
-        ("pending_setup", False),
+        # One-arg PENDING_SETUP: conservative freeze (callers must pass phase
+        # to keep pre-confirm AutoReset eligible — FINDING-PBH-003).
+        (CardAbHoldMode.PENDING_SETUP, True),
+        ("pending_setup", True),
         (CardAbHoldMode.ACTIVE, True),
         ("active", True),
         (None, False),
     ],
 )
-def test_should_freeze_auto_bid_mutations_active_only(
+def test_should_freeze_auto_bid_mutations_mode_only(
     mode: CardAbHoldMode | str | None,
     expected: bool,
 ) -> None:
-    """Ordinary Auto bid freeze только при ACTIVE (не PENDING_SETUP)."""
+    """One-arg freeze: ACTIVE and PENDING_SETUP (phase omitted); not OFF."""
     assert should_freeze_auto_bid_mutations(mode) is expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("mode", "phase", "expected"),
+    [
+        (CardAbHoldMode.PENDING_SETUP, "awaiting_auto_bid_confirm", False),
+        (CardAbHoldMode.PENDING_SETUP, "awaiting_keyword_confirm", False),
+        (CardAbHoldMode.PENDING_SETUP, "warm_up", False),
+        (CardAbHoldMode.PENDING_SETUP, None, False),
+        (CardAbHoldMode.PENDING_SETUP, "pending_intent", True),
+        (CardAbHoldMode.PENDING_SETUP, "wb_sync", True),
+        (CardAbHoldMode.PENDING_SETUP, "ready_active", True),
+        (CardAbHoldMode.ACTIVE, "ready_active", True),
+        (CardAbHoldMode.OFF, "pending_intent", False),
+    ],
+)
+def test_should_freeze_auto_bid_mutations_phase_aware(
+    mode: CardAbHoldMode,
+    phase: str | None,
+    expected: bool,
+) -> None:
+    """Phase-aware freeze: post-confirm PENDING_SETUP only; pre-confirm allowed."""
+    assert should_freeze_auto_bid_mutations(mode, phase) is expected
 
 
 @pytest.mark.unit
