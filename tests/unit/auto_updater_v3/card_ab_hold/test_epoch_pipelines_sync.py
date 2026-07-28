@@ -19,6 +19,21 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 
 
+@pytest.fixture(autouse=True)
+def _stub_enter_common_bid_reset() -> None:
+    """Изолировать §22 sync-тесты от §19 ENTER common-bid Redis/WB path.
+
+    ``process_ab_epoch`` always calls ``ensure_search_common_bid_reset_on_enter``;
+    stubs without AdvSetting.adv_id / Redis would otherwise fail before sync body.
+    """
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+        "card_ab_hold.epoch_pipelines.ensure_search_common_bid_reset_on_enter",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 def _sync_adv(
     *,
     intent: dict | None,
@@ -29,6 +44,7 @@ def _sync_adv(
     """Собрать ComplexAdv-подобный stub с production enum values."""
     adv_setting = SimpleNamespace(
         id=99,
+        adv_id=5000,
         card_ab_hold_phase=phase or CardAbHoldPhase.PENDING_INTENT.value,
         card_ab_hold_sync_status=sync_status,
         card_ab_hold_pending_intent_json=intent,
@@ -155,22 +171,44 @@ async def test_sync_success_activates_campaign() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_stale_stats_skips_wb_sync() -> None:
-    """§23: stale → no sync attempt, stays PENDING."""
+async def test_stale_stats_does_not_block_pending_intent_wb_sync() -> None:
+    """PBH-005 / §17 carve-out: stale MUST NOT skip apply snapshot of PENDING intent.
+
+    Decide-class freeze remains elsewhere; after durable intent, PG apply + WB sync
+    proceed even when ``stats_fresh=False``.
+    """
     adv = _sync_adv(intent=_INTENT)
-    with patch(
-        "app.modules.shop_runner.service_manager.services.auto_updater_v3."
-        "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
-        new_callable=AsyncMock,
-    ) as mock_wb:
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.apply_confirmed_intent_to_pg",
+            new_callable=AsyncMock,
+        ) as mock_pg,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.sync_intent_to_wb",
+            new_callable=AsyncMock,
+        ) as mock_wb,
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.mark_wb_sync_status",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_pipelines.activate_after_successful_sync",
+            new_callable=AsyncMock,
+            return_value=True,
+        ),
+    ):
         await process_ab_epoch(
             adv,
             wb_shop_data_manager=MagicMock(),
             wb_manager_hub=MagicMock(),
             stats_fresh=False,
         )
-    mock_wb.assert_not_called()
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
+    mock_pg.assert_awaited_once()
+    mock_wb.assert_awaited_once()
 
 
 @pytest.mark.unit
