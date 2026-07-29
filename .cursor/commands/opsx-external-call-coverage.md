@@ -178,6 +178,10 @@ Rename/copy: проверяй **новый** путь (destination).
   (session/client создаётся только внутри target callable и не передаётся через
   аргументы/provenance seam) классифицируй как `UNTESTABLE_SEAM` с
   `NOTE=NO_INJECTABLE_SEAM`; не закрывай gap через unit session-mock.
+* Предпочтительный seam для PG/CH: parent orchestration открывает session/client
+  и передаёт в child callable, где выполняется store-работа. Если changed
+  boundary оставляет child-only создание session/client без handoff — помечай
+  `UNTESTABLE_SEAM` с `NOTE=NO_PARENT_SESSION_HANDOFF`.
 
 ### PG session mode check (mandatory for KIND=PG)
 
@@ -474,3 +478,4 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 - [ ] PG surfaces имеют INTENT; bare `sm()` → WEAK `PG_IMPLICIT_SESSION_MODE`
 - [ ] wrong polarity (WRITE/RAW→True, PURE_READ→False) → WEAK `PG_WRONG_SESSION_MODE`
 - [ ] PG/CH FAIL → close-external-gap, не «просто /opsx-test»
+- [ ] changed PG/CH boundary без parent→child session/client handoff → `UNTESTABLE_SEAM` (`NO_PARENT_SESSION_HANDOFF`)
