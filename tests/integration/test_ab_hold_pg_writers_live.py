@@ -44,6 +44,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_handlers import (
     _abort_epoch_to_off,
+    _load_adv,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
     disable_card_ab_hold,
@@ -101,6 +102,22 @@ async def test_live_pg_start_epoch_on_enable_persists_mode_phase(
     row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
     assert row[0] == CardAbHoldMode.PENDING_SETUP.value
     assert row[1] == CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM.value
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_confirm_handlers_load_adv_uses_read_replica_mode(
+    live_db_url: str,
+) -> None:
+    """``_load_adv`` читает AdvSetting через production ``sm(read_only=True)`` seam."""
+    adv_setting_id = insert_adv_row(
+        live_db_url, adv_setting_id=1001, adv_id=9901, mode="off", phase=None
+    )
+    with patched_async_session_maker(live_db_url):
+        adv = await _load_adv(adv_setting_id)
+
+    assert adv is not None
+    assert int(adv.id) == adv_setting_id
 
 
 @pytest.mark.destructive_local

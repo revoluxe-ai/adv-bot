@@ -321,7 +321,7 @@ async def open_card_ab_hold_menu(
     query: CallbackQuery, callback_data: CardAbHoldMenu
 ) -> None:
     """Открыть инструкцию A/B Hold (spec card-ab-hold-mode paid-only UI)."""
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
         )
@@ -358,7 +358,7 @@ async def _handle_ab_hold_enable(
     §12 — только V3. Immediate setup job out of MVP: UI показывает PENDING и poll
     LastAbort/ACTIVE.
     """
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         )
@@ -475,7 +475,7 @@ async def _handle_ab_hold_enable(
         adv_id=adv_id,
         shop_id=shop_id,
     )
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         )
@@ -534,7 +534,7 @@ async def cancel_card_ab_hold_enable(
     query: CallbackQuery, callback_data: CardAbHoldCancel
 ) -> None:
     """§2c «Отмена» soft-warning объёма: mode остаётся OFF, ENTER не пишется."""
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         adv = await session.scalar(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
         )
@@ -566,7 +566,7 @@ async def disable_card_ab_hold(
     Spec §8 / §22.5: без keyword restore; epoch phase/timer/intent/confirmed
     сбрасываются в той же PG-транзакции, что и mode→OFF.
     """
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # noload: EXIT пишет только AdvSetting epoch/mode; join WBCabinet не нужен
         # (и ломает disposable live-PG stub без полного графа cabinet).
         adv = await session.scalar(

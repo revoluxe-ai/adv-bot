@@ -642,7 +642,7 @@ async def _render_for_adv(
 
 
 async def _load_adv(adv_setting_original_id: int) -> AdvSetting | None:
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         return await session.scalar(
             select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         )
