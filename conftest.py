@@ -113,6 +113,7 @@ os.environ["STATS_FRESHNESS_GUARD_ENABLED"] = "true"
 
 # Now it's safe to import modules that use settings
 import asyncio
+import re
 from clickhouse_connect import get_async_client
 from clickhouse_connect.driver.exceptions import DatabaseError
 from fakeredis import FakeRedis
@@ -159,6 +160,14 @@ COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.
 # Глобальное хранилище для cleanup контейнеров
 _DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
 
+# Настройки orchestration destructive integration setup.
+SETUP_DB_STARTUP_MAX_RETRIES = 120
+SETUP_DB_STARTUP_SLEEP_SEC = 2
+SETUP_DB_INIT_MAX_RETRIES = 10
+SETUP_DB_INIT_BACKOFF_MAX_SEC = 10
+SETUP_DB_SETTLE_SLEEP_SEC = 10
+DOCKER_DIAGNOSTIC_MAX_LEN = 600
+
 
 def _create_test_async_engine(**kwargs: object):
     """Движок к тестовому Postgres в Docker; validation-before-connect.
@@ -197,6 +206,211 @@ def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
         return 124, "", f"timeout while running: {' '.join(args)}"
 
 
+def _truncate_diagnostic(raw_text: str, max_len: int = DOCKER_DIAGNOSTIC_MAX_LEN) -> str:
+    """Ограничить длину диагностики для безопасного вывода."""
+    if len(raw_text) <= max_len:
+        return raw_text
+    omitted = len(raw_text) - max_len
+    return f"{raw_text[:max_len]}... <truncated {omitted} chars>"
+
+
+def _scrub_sensitive_text(raw_text: str) -> str:
+    """Fail-closed маскирование секретов в диагностическом тексте."""
+    if not raw_text:
+        return ""
+    text = raw_text
+    text = re.sub(
+        r"(?i)(--(?:password|token|api-key))(?:\s+|=)(?:'[^']*'|\"[^\"]*\"|[^\s,;]+)",
+        lambda match: f"{match.group(1)}=<redacted>",
+        text,
+    )
+    text = re.sub(
+        r"(?i)([A-Za-z][A-Za-z0-9+.\-]*://)([^/\s:@]+):([^@\s]+)@",
+        r"\1<redacted>:<redacted>@",
+        text,
+    )
+    text = re.sub(
+        r"(?i)\b(PASSWORD|PASS|TOKEN|SECRET|API_KEY|DATABASE_URL|DSN)\b\s*([=:])\s*(?:'[^']*'|\"[^\"]*\"|[^\s,;]+)?",
+        lambda match: f"{match.group(1)}{match.group(2)}<redacted>",
+        text,
+    )
+    text = re.sub(
+        r"(?i)\b[A-Za-z0-9._-]+(?:TOKEN|PASSWORD|SECRET|API_KEY|DATABASE_URL|DSN|PASS)[A-Za-z0-9._-]+\b",
+        "<redacted>",
+        text,
+    )
+    text = re.sub(
+        r"(?i)Authorization\s*:\s*(Bearer|Basic)\s*(?:'[^']*'|\"[^\"]*\"|[^\s,;]+)",
+        r"Authorization: \1 <redacted>",
+        text,
+    )
+    return _truncate_diagnostic(text)
+
+
+def _safe_command_repr(command: tuple[str, ...] | list[str]) -> str:
+    """Построить безопасное allowlist-представление CLI команды."""
+    sensitive_flags = {"--password", "--token", "--api-key"}
+    rendered: list[str] = []
+    redact_next = False
+    for raw_arg in command:
+        arg = str(raw_arg)
+        lower = arg.lower()
+
+        if redact_next:
+            rendered.append("<redacted>")
+            redact_next = False
+            continue
+
+        if lower in sensitive_flags:
+            rendered.append(lower)
+            redact_next = True
+            continue
+
+        if lower.startswith("--password="):
+            rendered.append("--password=<redacted>")
+            continue
+        if lower.startswith("--token="):
+            rendered.append("--token=<redacted>")
+            continue
+        if lower.startswith("--api-key="):
+            rendered.append("--api-key=<redacted>")
+            continue
+
+        scrubbed = _scrub_sensitive_text(arg)
+        if re.search(r"^[A-Za-z0-9._:/{}@,\-=+]+$", scrubbed):
+            rendered.append(scrubbed)
+        else:
+            rendered.append("<redacted>")
+
+    return _truncate_diagnostic(" ".join(rendered))
+
+
+def _docker_stage_error(
+    *,
+    stage: str,
+    command: tuple[str, ...] | list[str],
+    exit_code: int,
+    stderr: str,
+    owner_action: str,
+) -> RuntimeError:
+    """Собрать RuntimeError для fail-closed Docker lifecycle."""
+    safe_command = _safe_command_repr(command)
+    safe_stderr = _scrub_sensitive_text((stderr or "").strip()) or "<empty>"
+    safe_action = _scrub_sensitive_text(owner_action)
+    return RuntimeError(
+        f"[DOCKER_STAGE={stage}] exit_code={exit_code}; command={safe_command}; "
+        f"stderr={safe_stderr}; owner_action={safe_action}"
+    )
+
+
+def _format_docker_warning(*, context: str, exit_code: int, stderr: str) -> str:
+    """Собрать безопасный warning для Docker cleanup без raw stderr."""
+    safe_context = _scrub_sensitive_text(context) or "<empty>"
+    safe_stderr = _scrub_sensitive_text((stderr or "").strip()) or "<empty>"
+    return _truncate_diagnostic(
+        f"[WARNING] {safe_context}; rc={exit_code}; stderr={safe_stderr}"
+    )
+
+
+def _format_retry_diagnostic(
+    *,
+    operation: str,
+    error: Exception,
+    attempt: int,
+    max_attempts: int,
+    backoff_sec: int | float,
+) -> str:
+    """Собрать безопасный retry-log без raw exception текста."""
+    safe_operation = _scrub_sensitive_text(operation) or "<empty>"
+    safe_error_type = type(error).__name__
+    safe_error = _scrub_sensitive_text(str(error)) or "<empty>"
+    return _truncate_diagnostic(
+        f"[WAIT] {safe_operation} failed ({safe_error_type}): {safe_error}. "
+        f"Retry {attempt}/{max_attempts} in {backoff_sec}s..."
+    )
+
+
+def _is_non_retryable_init_error(exc: Exception) -> bool:
+    """Классифицировать детерминированные init-ошибки, которые нельзя ретраить."""
+    if isinstance(exc, (NotImplementedError, KeyboardInterrupt)):
+        return True
+
+    non_retryable_error_types: tuple[type[BaseException], ...] = (pytest.fail.Exception,)
+    try:
+        from tests.support.destructive_pg_dsn import DestructiveTestDatabaseError as _DST
+        non_retryable_error_types = (_DST, pytest.fail.Exception)
+    except Exception:
+        pass
+
+    if isinstance(exc, non_retryable_error_types):
+        return True
+
+    # Явно детерминированные infrastructure/configuration сигнатуры.
+    if isinstance(exc, RuntimeError):
+        msg = str(exc)
+        deterministic_markers = (
+            "DOCKER_STAGE=",
+            "Docker Compose не найден",
+            "command not found:",
+            "network_guard internal error",
+        )
+        if any(marker in msg for marker in deterministic_markers):
+            return True
+    return False
+
+
+def _raise_docker_stage_error(
+    *,
+    stage: str,
+    command: tuple[str, ...] | list[str],
+    exit_code: int,
+    stderr: str,
+    owner_action: str,
+) -> None:
+    """Сформировать fail-closed ошибку Docker-этапа с actionable текстом."""
+    raise _docker_stage_error(
+        stage=stage,
+        command=command,
+        exit_code=exit_code,
+        stderr=stderr,
+        owner_action=owner_action,
+    )
+
+
+def _docker_compose_preflight_or_raise() -> list[str]:
+    """Проверить Docker CLI/daemon/compose до ``compose up``."""
+    rc, _out, err = _sync_run("docker", "--version", timeout=5)
+    if rc != 0:
+        _raise_docker_stage_error(
+            stage="detect",
+            command=("docker", "--version"),
+            exit_code=rc,
+            stderr=err,
+            owner_action="Установите Docker CLI и убедитесь, что `docker` доступен в PATH.",
+        )
+
+    rc, _out, err = _sync_run("docker", "info", "--format", "{{.ServerVersion}}", timeout=8)
+    if rc != 0:
+        _raise_docker_stage_error(
+            stage="daemon",
+            command=("docker", "info", "--format", "{{.ServerVersion}}"),
+            exit_code=rc,
+            stderr=err,
+            owner_action="Запустите Docker daemon (Docker Desktop/Engine) и повторите прогон.",
+        )
+
+    rc, _out, err = _sync_run("docker", "compose", "version", timeout=8)
+    if rc != 0:
+        _raise_docker_stage_error(
+            stage="compose",
+            command=("docker", "compose", "version"),
+            exit_code=rc,
+            stderr=err,
+            owner_action="Убедитесь, что Docker Compose plugin установлен и команда работает.",
+        )
+    return ["docker", "compose"]
+
+
 def _detect_compose_cmd() -> list[str]:
     """Определяет доступную форму запуска compose: ['docker', 'compose'] или ['docker-compose']."""
     # Предпочитаем новый docker compose
@@ -231,14 +445,8 @@ atexit.register(_emergency_cleanup)
 
 @pytest.fixture(scope="session")
 def docker_compose_cmd() -> list[str]:
-    """Определяет команду для запуска Docker Compose и падает ошибкой, если недоступна."""
-    cmd = _detect_compose_cmd()
-    if not cmd:
-        raise RuntimeError(
-            "Docker Compose не найден в системе. Установите Docker Desktop/Engine "
-            "и убедитесь, что доступны команды `docker compose` или `docker-compose`, "
-            "затем перезапустите pytest."
-        )
+    """Определяет команду Docker Compose после fail-closed preflight."""
+    cmd = _docker_compose_preflight_or_raise()
     _DOCKER_CLEANUP_STATE["compose_cmd"] = cmd
     return cmd
 
@@ -274,7 +482,13 @@ def _destructive_db_session_teardown(docker_compose_cmd):
         timeout=20,
     )
     if rc != 0:
-        print(f"[WARNING] 'compose down' failed rc={rc}: {err.strip()}")
+        print(
+            _format_docker_warning(
+                context="compose down failed",
+                exit_code=rc,
+                stderr=err,
+            )
+        )
     if cid:
         _sync_run("docker", "rm", "-f", cid, timeout=10)
         _DOCKER_CLEANUP_STATE["container_id"] = None
@@ -283,200 +497,326 @@ def _destructive_db_session_teardown(docker_compose_cmd):
 
 
 @pytest.fixture
-def setup_test_database(request, docker_compose_cmd, _destructive_db_session_teardown):
+def setup_test_database(request):
     """Поднять disposable test PG/CH (один раз за session) после marker check.
 
     Требует ``@pytest.mark.destructive_local`` на тесте. Opt-in env недостаточен.
     """
     _require_destructive_local(request)
+    from tests.support.destructive_pg_dsn import (
+        DestructiveTestDatabaseError,
+        validate_destructive_test_database_url,
+    )
 
-    global _TEST_DB_READY, _TEST_DB_INITIALIZED
-    if _TEST_DB_INITIALIZED:
-        yield
-        return
+    # Fail-closed preflight BEFORE any docker compose interaction.
+    validate_destructive_test_database_url(TEST_DB_URL, environ=dict(os.environ))
 
+    docker_compose_cmd = _docker_compose_preflight_or_raise()
+
+    global _TEST_DB_READY
+    _TEST_DB_READY = False
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = docker_compose_cmd
+    compose_attempted = False
+    compose_started = False
+    container_id = ""
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
-
-    # --- Запуск Docker Compose ---
-    # Если test_db уже healthy — только ``up -d`` (без force-recreate: меньше WinError 64 на Windows).
-    compose_up_args = ["up", "-d"]
-    rc, cid_out, _ = _sync_run(
-        *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
-    )
-    if cid_out.strip():
-        rc_inspect, status_out, _ = _sync_run(
-            "docker",
-            "inspect",
-            "--format",
-            "{{.State.Health.Status}}",
-            cid_out.strip(),
-            timeout=10,
+    try:
+        # --- Запуск Docker Compose ---
+        # Если test_db уже healthy — только ``up -d`` (без force-recreate).
+        compose_up_args = ["up", "-d"]
+        _rc_ps, cid_out, _ = _sync_run(
+            *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
         )
-        if rc_inspect == 0 and status_out.strip() == "healthy":
-            print("[OK] Reusing running test_db container (skip --force-recreate).")
-        else:
-            compose_up_args = ["up", "-d", "--build", "--force-recreate"]
-    else:
-        compose_up_args = ["up", "-d", "--build", "--force-recreate"]
-
-    rc, out, err = _sync_run(
-        *docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args, timeout=180
-    )
-    if rc != 0:
-        raise RuntimeError(f"Failed to start Docker Compose services. rc={rc} stderr={err}")
-
-    # --- Ожидание запуска контейнера ---
-    container_id: str = ""
-    # На Windows/Docker Desktop первый старт (pull + initdb) может занимать заметно больше минуты.
-    # Делаем запас, плюс выводим текущий статус для диагностики.
-    max_retries = 120
-    for i in range(max_retries):
-        rc, cid_out, _ = _sync_run(*docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10)
-        container_id = cid_out.strip()
-        if container_id:
-            _DOCKER_CLEANUP_STATE["container_id"] = container_id  # Сохраняем для emergency cleanup
-            rc, status_out, _ = _sync_run(
+        if cid_out.strip():
+            rc_inspect, status_out, _ = _sync_run(
                 "docker",
                 "inspect",
                 "--format",
-                "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
-                container_id,
+                "{{.State.Health.Status}}",
+                cid_out.strip(),
                 timeout=10,
             )
-            status = status_out.strip() if rc == 0 else "unknown"
-
-            if status.endswith(" healthy"):
-                print("[OK] Test database is healthy.")
-                break
-
-            # Fallback: если healthcheck по какой-то причине не работает/не успевает,
-            # но TCP/SQL подключение уже возможно — продолжаем (это надёжнее, чем ждать "healthy").
-            async def _probe() -> bool:
-                engine = _create_test_async_engine()
-                try:
-                    async with engine.connect() as conn:
-                        await conn.execute(text("SELECT 1;"))
-                    return True
-                finally:
-                    await engine.dispose()
-
-            try:
-                if asyncio.run(_probe()):
-                    print("[OK] Test database is reachable (probe SELECT 1).")
-                    break
-            except Exception:
-                pass
-
-            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: {status})")
+            if rc_inspect == 0 and status_out.strip() == "healthy":
+                print("[OK] Reusing running test_db container (skip --force-recreate).")
+            else:
+                compose_up_args = ["up", "-d", "--build", "--force-recreate"]
         else:
-            print(f"[WAIT] Waiting for test database... Attempt {i + 1}/{max_retries} (status: no container yet)")
-        time.sleep(2)
-    else:
-        # Если так и не дождались health=healthy — покажем статус и логи для диагностики
-        _sync_run("docker", "ps", "-a", timeout=10)
-        if container_id:
-            _sync_run("docker", "logs", container_id, timeout=10)
-        raise RuntimeError("Test database did not become healthy in time.")
+            compose_up_args = ["up", "-d", "--build", "--force-recreate"]
 
-    print("[DB] Resetting PostgreSQL schema for tests...")
-
-    # --- Ensure pg_hba.conf allows host connections (Windows/Docker Desktop often shows as 172.* gateway) ---
-    # Иногда init-скрипты в /docker-entrypoint-initdb.d не применяются (например, если volume не пересоздался),
-    # и тогда asyncpg получает: "no pg_hba.conf entry ... no encryption".
-    # Патчим pg_hba.conf прямо в контейнере и делаем reload конфигурации.
-    if container_id:
-        hba_patch_cmd = (
-            'set -e; '
-            'HBA="$PGDATA/pg_hba.conf"; '
-            'MARKER="# added by pytest conftest (allow host connections for tests)"; '
-            'if ! grep -q "$MARKER" "$HBA"; then '
-            '  printf "\\n%s\\n" "$MARKER" >> "$HBA"; '
-            '  printf "host    all             all             0.0.0.0/0               trust\\n" >> "$HBA"; '
-            '  printf "host    all             all             ::/0                    trust\\n" >> "$HBA"; '
-            '  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select pg_reload_conf();" >/dev/null; '
-            'fi'
+        compose_attempted = True
+        rc, _out, err = _sync_run(
+            *docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args, timeout=180
         )
-        _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
+        if rc != 0:
+            _raise_docker_stage_error(
+                stage="up",
+                command=(*docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args),
+                exit_code=rc,
+                stderr=err,
+                owner_action=(
+                    "Проверьте `docker compose -f tests/docker-compose.test.yml logs` "
+                    "и исправьте конфигурацию контейнеров."
+                ),
+            )
+        compose_started = True
 
-    # Задержка после health=healthy: на Windows соединение с хоста стабилизируется не сразу.
-    time.sleep(10)
-
-    async def init_schema_and_seed() -> None:
-        """Пересоздаёт public-схему и сидирует wbcabinet id=1 для integration-тестов."""
-        engine = _create_test_async_engine()
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
-                await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
-                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-                from app.modules.common_slaves.wildberries.models.models import (
-                    AdvSetting,
-                    KeywordSetting,
-                    WBUserCabinet,
-                    WBCard,
-                    WBCategory,
-                    WBToken,
-                    WBBalancePayment,
-                    WBBonusPayment,
-                    WBAutoBudgetTopUp,
-                    AdvKeyword,
+        # --- Ожидание запуска контейнера ---
+        last_health_command: tuple[str, ...] = (
+            *docker_compose_cmd,
+            "-f",
+            COMPOSE_FILE,
+            "ps",
+            "-q",
+            "test_db",
+        )
+        last_health_exit_code = 0
+        last_health_stderr = ""
+        for i in range(SETUP_DB_STARTUP_MAX_RETRIES):
+            _rc_ps, cid_out, err_ps = _sync_run(
+                *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
+            )
+            last_health_command = (
+                *docker_compose_cmd,
+                "-f",
+                COMPOSE_FILE,
+                "ps",
+                "-q",
+                "test_db",
+            )
+            last_health_exit_code = _rc_ps
+            last_health_stderr = err_ps
+            container_id = cid_out.strip()
+            if container_id:
+                _DOCKER_CLEANUP_STATE["container_id"] = container_id
+                rc, status_out, err_inspect = _sync_run(
+                    "docker",
+                    "inspect",
+                    "--format",
+                    "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
+                    container_id,
+                    timeout=10,
                 )
-                from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (
-                    BalanceReminder,
+                last_health_command = (
+                    "docker",
+                    "inspect",
+                    "--format",
+                    "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
+                    container_id,
                 )
-                from app.modules.billing.event_manager.models import BillingEvent
-                from app.utils.db.models import User, Invite
+                last_health_exit_code = rc
+                last_health_stderr = err_inspect
+                status = status_out.strip() if rc == 0 else "unknown"
 
-                await conn.run_sync(Base.metadata.create_all)
+                if status.endswith(" healthy"):
+                    print("[OK] Test database is healthy.")
+                    break
 
-                initial_wb_cabinet_data = {
-                    "id": 1,
-                    "shop_id": "test_shop_id",
-                    "active": True,
-                    "expiration_time": datetime.now() + timedelta(days=7),
-                    "balance": 0.0,
-                    "bonus": 0.0,
-                    "demo": True,
-                    "expiration_alarm_days_pass": None,
-                }
-                insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                    index_elements=["id"],
-                    set_={k: v for k, v in initial_wb_cabinet_data.items() if k != "id"},
+                print(
+                    f"[WAIT] Waiting for test database... Attempt {i + 1}/"
+                    f"{SETUP_DB_STARTUP_MAX_RETRIES} (status: {status})"
                 )
-                await conn.execute(on_conflict_stmt)
-                await conn.execute(
-                    text(
-                        "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
-                        "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+            else:
+                print(
+                    f"[WAIT] Waiting for test database... Attempt {i + 1}/"
+                    f"{SETUP_DB_STARTUP_MAX_RETRIES} (status: no container yet)"
+                )
+            time.sleep(SETUP_DB_STARTUP_SLEEP_SEC)
+        else:
+            _raise_docker_stage_error(
+                stage="health",
+                command=last_health_command,
+                exit_code=last_health_exit_code,
+                stderr=(
+                    f"{last_health_stderr} | timed out waiting for healthy status "
+                    f"after {SETUP_DB_STARTUP_MAX_RETRIES} attempts"
+                ),
+                owner_action=(
+                    "Проверьте healthcheck/логи контейнера test_db и увеличьте "
+                    "ресурсы Docker при необходимости."
+                ),
+            )
+
+        print("[DB] Resetting PostgreSQL schema for tests...")
+
+        # --- Ensure pg_hba.conf allows host connections ---
+        if container_id:
+            hba_patch_cmd = (
+                'set -e; '
+                'HBA="$PGDATA/pg_hba.conf"; '
+                'MARKER="# added by pytest conftest (allow host connections for tests)"; '
+                'if ! grep -q "$MARKER" "$HBA"; then '
+                '  printf "\\n%s\\n" "$MARKER" >> "$HBA"; '
+                '  printf "host    all             all             0.0.0.0/0               trust\\n" >> "$HBA"; '
+                '  printf "host    all             all             ::/0                    trust\\n" >> "$HBA"; '
+                '  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select pg_reload_conf();" >/dev/null; '
+                'fi'
+            )
+            _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
+
+        # После health=healthy на Windows host-коннект может стабилизироваться не сразу.
+        time.sleep(SETUP_DB_SETTLE_SLEEP_SEC)
+
+        async def init_schema_and_seed() -> None:
+            """Пересоздать public-схему и сидировать wbcabinet id=1."""
+            engine = _create_test_async_engine()
+            try:
+                async with engine.begin() as conn:
+                    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
+                    await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
+                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
+                    from app.modules.common_slaves.wildberries.models.models import (
+                        AdvKeyword,
+                        AdvSetting,
+                        WBAutoBudgetTopUp,
+                        WBBalancePayment,
+                        WBBonusPayment,
+                        WBCard,
+                        WBCategory,
+                        WBToken,
+                        WBUserCabinet,
+                        KeywordSetting,
+                    )
+                    from app.modules.billing.event_manager.models import BillingEvent
+                    from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (
+                        BalanceReminder,
+                    )
+                    from app.utils.db.models import Invite, User
+
+                    await conn.run_sync(Base.metadata.create_all)
+
+                    initial_wb_cabinet_data = {
+                        "id": 1,
+                        "shop_id": "test_shop_id",
+                        "active": True,
+                        "expiration_time": datetime.now() + timedelta(days=7),
+                        "balance": 0.0,
+                        "bonus": 0.0,
+                        "demo": True,
+                        "expiration_alarm_days_pass": None,
+                    }
+                    insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
+                    on_conflict_stmt = insert_stmt.on_conflict_do_update(
+                        index_elements=["id"],
+                        set_={
+                            k: v
+                            for k, v in initial_wb_cabinet_data.items()
+                            if k != "id"
+                        },
+                    )
+                    await conn.execute(on_conflict_stmt)
+                    await conn.execute(
+                        text(
+                            "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
+                            "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
+                        )
+                    )
+            finally:
+                await engine.dispose()
+
+        for attempt in range(1, SETUP_DB_INIT_MAX_RETRIES + 1):
+            init_coro = init_schema_and_seed()
+            try:
+                asyncio.run(init_coro)
+                break
+            except KeyboardInterrupt:
+                init_coro.close()
+                # Deterministic owner interruption: never retry.
+                raise
+            except (DestructiveTestDatabaseError, pytest.fail.Exception):
+                # Deterministic safety/owner interruption: never retry.
+                raise
+            except Exception as exc:  # noqa: BLE001
+                if _is_non_retryable_init_error(exc):
+                    raise
+                if attempt >= SETUP_DB_INIT_MAX_RETRIES:
+                    raise
+                backoff_sec = min(2 * attempt, SETUP_DB_INIT_BACKOFF_MAX_SEC)
+                print(
+                    _format_retry_diagnostic(
+                        operation="Test DB init",
+                        error=exc,
+                        attempt=attempt,
+                        max_attempts=SETUP_DB_INIT_MAX_RETRIES,
+                        backoff_sec=backoff_sec,
                     )
                 )
-        finally:
-            await engine.dispose()
+                time.sleep(backoff_sec)
 
-    # Docker Desktop / Windows: сразу после health=healthy бывает WinError 64 (connection reset).
-    # asyncio.run() на каждую попытку — отдельный loop, не ломает pytest-asyncio.
-    max_init_retries = 10
-    for attempt in range(1, max_init_retries + 1):
+        print("[OK] Test database setup complete.")
+        _TEST_DB_READY = True
+        yield
+    finally:
+        primary_exception = sys.exc_info()[1]
+        if isinstance(primary_exception, GeneratorExit):
+            # Generator close() is normal fixture finalization path, not a primary test/setup error.
+            primary_exception = None
+        cleanup_error: RuntimeError | None = None
         try:
-            asyncio.run(init_schema_and_seed())
-            break
-        except Exception as exc:  # noqa: BLE001
-            if attempt >= max_init_retries:
-                raise
-            backoff_sec = min(2 * attempt, 10)
-            print(
-                f"[WAIT] Test DB init failed ({type(exc).__name__}): {exc}. "
-                f"Retry {attempt}/{max_init_retries} in {backoff_sec}s..."
-            )
-            time.sleep(backoff_sec)
-
-    print("[OK] Test database setup complete.")
-
-    _TEST_DB_READY = True
-    _TEST_DB_INITIALIZED = True
-    yield
-    # Session teardown: _destructive_db_session_teardown
+            if compose_attempted:
+                print(f"\n[CLEANUP] Compose down: {COMPOSE_FILE}")
+                try:
+                    rc, _out, err = _sync_run(
+                        *docker_compose_cmd,
+                        "-f",
+                        COMPOSE_FILE,
+                        "down",
+                        "-v",
+                        "--remove-orphans",
+                        "--timeout",
+                        "1",
+                        timeout=20,
+                    )
+                    if rc != 0:
+                        cleanup_error = _docker_stage_error(
+                            stage="cleanup",
+                            command=(
+                                *docker_compose_cmd,
+                                "-f",
+                                COMPOSE_FILE,
+                                "down",
+                                "-v",
+                                "--remove-orphans",
+                                "--timeout",
+                                "1",
+                            ),
+                            exit_code=rc,
+                            stderr=err,
+                            owner_action=(
+                                "Проверьте права Docker/состояние daemon и повторите "
+                                "cleanup вручную: `docker compose -f tests/docker-compose.test.yml "
+                                "down -v --remove-orphans`."
+                            ),
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    cleanup_error = _docker_stage_error(
+                        stage="cleanup",
+                        command=(
+                            *docker_compose_cmd,
+                            "-f",
+                            COMPOSE_FILE,
+                            "down",
+                            "-v",
+                            "--remove-orphans",
+                            "--timeout",
+                            "1",
+                        ),
+                        exit_code=(
+                            124 if isinstance(exc, subprocess.TimeoutExpired) else -1
+                        ),
+                        stderr=str(exc),
+                        owner_action=(
+                            "Проверьте доступность Docker daemon и повторите cleanup "
+                            "вручную."
+                        ),
+                    )
+        finally:
+            _TEST_DB_READY = False
+            _DOCKER_CLEANUP_STATE["container_id"] = None
+            _DOCKER_CLEANUP_STATE["compose_cmd"] = None
+        if cleanup_error is not None:
+            if primary_exception is None:
+                raise cleanup_error
+            print(f"[WARNING] Cleanup failure ignored due to primary exception: {cleanup_error}")
 
 
 @pytest.fixture(scope="function", name="async_engine")
@@ -980,7 +1320,13 @@ async def clickhouse_client(request, setup_test_database):
             if attempt == max_attempts:
                 raise
             print(
-                f"[WAIT] ClickHouse not ready (attempt {attempt}/{max_attempts}): {exc}"
+                _format_retry_diagnostic(
+                    operation="ClickHouse not ready",
+                    error=exc,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    backoff_sec=1,
+                )
             )
             await asyncio.sleep(1)
 
