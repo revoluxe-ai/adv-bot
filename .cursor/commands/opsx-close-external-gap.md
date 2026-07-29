@@ -60,6 +60,7 @@ $ARGUMENTS
 | Token / body | Effect |
 |--------------|--------|
 | pasted `EXTERNAL_CALL_COVERAGE_REPORT` / `GAPS:` / `SURFACES:` | primary input |
+| pasted `REFACTOR_AND_TEST_PACKET` | packetized primary input (preferred for mixed FAIL pipeline) |
 | `kind=pg` \| `kind=ch` | optional filter; default = все PG+CH FAIL gaps из packet |
 | `symbols=a,b` | optional subset of SYMBOL names |
 | `base=` | **запрещён** → `STATUS=BLOCKED`; скажи: base только у coverage |
@@ -75,17 +76,23 @@ $ARGUMENTS
 
 /opsx-close-external-gap kind=ch symbols=load_keyword_v3_profile_data
 <paste report>
+
+/opsx-close-external-gap
+<paste REFACTOR_AND_TEST_PACKET>
 ```
+
+Если прислан `TEST_ONLY_PACKET` (без REFACTOR_AND_TEST items) →
+`STATUS=BLOCKED_REDIRECT_TEST_ONLY_PACKET` и отправь в `/opsx-test`.
 
 ## Required input
 
-Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH →
-`STATUS=BLOCKED_NEEDS_PACKET`.
+Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH и нет
+`REFACTOR_AND_TEST_PACKET` с PG|CH items → `STATUS=BLOCKED_NEEDS_PACKET`.
 
 Спроси один раз:
 
 ```text
-Вставь EXTERNAL_CALL_COVERAGE_REPORT (или GAPS) из
+Вставь EXTERNAL_CALL_COVERAGE_REPORT / GAPS или REFACTOR_AND_TEST_PACKET из
 /opsx-external-call-coverage. base= здесь не нужен.
 ```
 
@@ -152,8 +159,8 @@ Forbidden unless owner явно расширяет scope:
 
 ## Steps
 
-1. Разобрать packet; извлечь `BASE`, `HEAD`, FAIL gaps; filter `kind` /
-   `symbols`.
+1. Разобрать packet; извлечь `BASE`, `HEAD`, FAIL gaps (или items из
+   `REFACTOR_AND_TEST_PACKET`); применить filter `kind` / `symbols`.
 2. Если `base=` в args → `BLOCKED` (не путать с BASE внутри packet).
 3. Если нет PG/CH FAIL gaps → `BLOCKED_NEEDS_PACKET` или
    `BLOCKED_REDIRECT_TEST_ONLY`.
@@ -171,13 +178,14 @@ Forbidden unless owner явно расширяет scope:
 | `PARTIAL` | часть gaps закрыта; остальные перечислены |
 | `BLOCKED_NEEDS_PACKET` | нет входа из coverage |
 | `BLOCKED_REDIRECT_TEST_ONLY` | gaps не PG/CH refactor path → `/opsx-test` |
+| `BLOCKED_REDIRECT_TEST_ONLY_PACKET` | передан только `TEST_ONLY_PACKET` → `/opsx-test` |
 | `BLOCKED_NEEDS_SEAM_SCOPE` | seam шире минимального; нужен apply/change |
 | `BLOCKED` | неизвестный token / `base=` в args / preflight |
 
 ## Final report (required)
 
 ```text
-STATUS: CLOSED | PARTIAL | BLOCKED | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_NEEDS_SEAM_SCOPE
+STATUS: CLOSED | PARTIAL | BLOCKED | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_REDIRECT_TEST_ONLY_PACKET | BLOCKED_NEEDS_SEAM_SCOPE
 
 PACKET_BASE: <from report>
 PACKET_HEAD: <from report>
@@ -217,6 +225,7 @@ DO_NOT_DO_YET:
 * `PARTIAL` → продолжить эту команду с remaining GAPS **или**
   re-audit focus для видимости.
 * `BLOCKED_REDIRECT_TEST_ONLY` → `/opsx-test` затем coverage rerun.
+* `BLOCKED_REDIRECT_TEST_ONLY_PACKET` → `/opsx-test` с этим packet, затем coverage rerun.
 * `BLOCKED_NEEDS_PACKET` → попросить paste report.
 * `BLOCKED_NEEDS_SEAM_SCOPE` → `/opsx-apply` (или явный task) с описанием
   нужного seam.
