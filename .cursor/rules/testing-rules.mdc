@@ -17,6 +17,8 @@ Authority split (не дублировать полный policy в commands):
 - `/opsx-pyright-strict-coverage` — diff allowlist coverage для pyright-strict
 - `/opsx-external-call-coverage` — executable diff gate: external surfaces
   (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests; kind taxonomy внутри одной команды
+- `/opsx-close-external-gap` — REFACTOR_AND_TEST closure for PG/CH from
+  coverage packet (no `base=`); TEST_ONLY остаётся `/opsx-test`
 - `/opsx-verify` — независимая adequacy-проверка и archive verdict `GO` / `NO_GO`
 
 Устаревший файл `.cursor/rules/TESTING_RULES.mdc` — только migration pointer; не использовать как policy.
@@ -116,6 +118,22 @@ Blocking gate перед завершением implementation-задачи: н�
 
 Full E2E не требуется автоматически.
 
+### Kind defaults for external stores
+
+| Kind | Durable read/write adapter | Достаточно / недостаточно |
+|------|----------------------------|---------------------------|
+| **PG** | `integration` на живом `async_session` (или test DB via production `sm` seam) | Unit + `AsyncMock` session — **не** proof |
+| **CH** | `integration` на живом `clickhouse_client` | Mocked CH client alone — **не** proof |
+| Redis | fakeredis / boundary_adapter OK | |
+| WB / HTTP | orchestration_seam; mock **after** causal boundary OK | |
+
+Частая специфика PG/CH: чтобы написать норм integration, сначала нужен
+минимальный production seam (inject session/client). Это **не** `/opsx-test`
+alone:
+
+- TEST_ONLY → `/opsx-test`
+- REFACTOR_AND_TEST → `/opsx-close-external-gap` (вход = coverage packet, **без** `base=`)
+
 Для lifecycle / retry / state-machine / scheduler invariants проверяй residual и repeated invocation (next-tick, retry after durable status, partial completion), когда это применимо к protected behavior.
 
 ## `TEST_COVERAGE_PACKET` (change-specific)
@@ -135,12 +153,16 @@ Full E2E не требуется автоматически.
   (HTTP / WB_WRITE / PG / CH / REDIS / OTHER) внутри **одной** команды.
 - Этот rule остаётся design/execution policy; executable PASS/FAIL gate —
   команда, не этот файл.
-- Не требуй `-m integration` для каждого surface: используй Minimum test level.
-- Не создавай отдельные kind-команды (`/opsx-ch-coverage` и т.п.).
+- Не требуй `-m integration` для каждого surface: используй Minimum test level
+  + kind defaults (PG/CH → integration).
+- Не создавай отдельные kind-команды (`/opsx-ch-coverage` и т.п.); для
+  REFACTOR_AND_TEST → `/opsx-close-external-gap`.
 - `EXTERNAL_CALL_COVERAGE_REPORT` — additive для `/opsx-verify`; absence ≠
   auto archive `NO_GO`.
-- Gaps: `/opsx-test` (testable) или `/opsx-apply` (UNTESTABLE_SEAM) — не
-  чинить production внутри coverage-команды.
+- Gaps: TEST_ONLY → `/opsx-test`; PG/CH / UNTESTABLE →
+  `/opsx-close-external-gap` (packet in, no `base=`); не чинить production
+  внутри coverage-команды.
+- Session-mock unit для PG/CH не закрывает external-call gap.
 
 ## CallbackQuery answer (Dispatcher pre-answer middleware)
 

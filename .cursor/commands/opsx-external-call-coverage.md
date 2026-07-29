@@ -144,7 +144,7 @@ Rename/copy: проверяй **новый** путь (destination).
 ## Minimum test level (per testing-rules)
 
 Для каждого surface назначь `MINIMUM_LEVEL` по
-`.cursor/rules/testing-rules.mdc` § Minimum test level:
+`.cursor/rules/testing-rules.mdc` § Minimum test level + kind defaults ниже:
 
 * `unit_component`
 * `orchestration_seam`
@@ -152,14 +152,28 @@ Rename/copy: проверяй **новый** путь (destination).
 * `boundary_adapter`
 * `integration`
 
+### Kind defaults (mandatory)
+
+| KIND | Default MINIMUM_LEVEL for durable I/O adapters | Notes |
+|------|-----------------------------------------------|-------|
+| `PG` | `integration` | живой `async_session` / real sm; session `AsyncMock` alone → **not** COVERED |
+| `CH` | `integration` | живой `clickhouse_client`; mocked CH client alone → **not** COVERED |
+| `REDIS` | `boundary_adapter` or `integration` (fakeredis OK) | fakeredis roundtrip acceptable |
+| `WB_WRITE` | `orchestration_seam` | mock WB **after** causal/write-gate boundary OK |
+| `HTTP` | `orchestration_seam` / `boundary_adapter` | client fake after seam OK |
+| `OTHER` | per boundary | Telegram/fs/ARQ — case-by-case |
+
 Правила:
 
-* Не требуй full E2E / `-m integration` автоматически.
-* Write-gate / WB destructive → evidence должен доказывать filtering до
-  write boundary (не только `assert_not_called()`).
+* Не требуй full E2E автоматически.
+* Write-gate / WB destructive → evidence filtering до write boundary
+  (не только `assert_not_called()`).
 * Mock внешней destructive dependency допустим **после** causal boundary,
-  если orchestration path реален.
+  если orchestration path реален — **кроме** заявленного proof самого
+  PG/CH adapter (тогда нужен live store).
 * Pure DTO/mapping без I/O → обычно не surface (`NO_EXTERNAL_SURFACE`).
+* Unit session-mock для PG/CH writer = `WEAK_EVIDENCE` (или
+  `UNTESTABLE_SEAM`, если без DI нельзя подставить test session).
 
 ## Test mapping
 
@@ -169,6 +183,8 @@ Rename/copy: проверяй **новый** путь (destination).
 2. Adjacent feature suite if shared symbol signature changed.
 3. Inspect whether test actually exercises the production seam (not only
    a similarly named test).
+4. Для PG/CH: предпочитай `tests/integration/**` + re-read persisted
+   rows/query results.
 
 Dispositions (per surface):
 
@@ -176,11 +192,30 @@ Dispositions (per surface):
 |-------------|---------|
 | `COVERED` | есть test evidence ≥ `MINIMUM_LEVEL` с real causal path |
 | `MISSING_TEST` | surface testable; адекватного test нет |
-| `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak |
-| `UNTESTABLE_SEAM` | нельзя написать адекватный test без production seam/DI change |
+| `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak / **PG\|CH только session-mock** |
+| `UNTESTABLE_SEAM` | нельзя написать адекватный (esp. live PG/CH) test без production seam/DI |
 | `OUT_OF_POLICY` | не in-policy |
 | `NO_EXTERNAL_SURFACE` | in-policy file/hunk без внешней границы |
 | `DEFERRED_OWNER` | нужна owner decision (спорный KIND/level) |
+
+## KIND_CLOSURE (pasteable handoff)
+
+В Final report после `GAPS:` добавь блок маршрутизации:
+
+```text
+KIND_CLOSURE:
+- KIND: REDIS|WB_WRITE|HTTP|OTHER
+  MODE: TEST_ONLY
+  NEXT: /opsx-test
+  THEN: /opsx-external-call-coverage base=<BASE> focus=<kind>
+- KIND: PG|CH
+  MODE: REFACTOR_AND_TEST
+  NEXT: /opsx-close-external-gap
+  PACKET: paste this EXTERNAL_CALL_COVERAGE_REPORT (no base= on close)
+  THEN: /opsx-external-call-coverage base=<BASE> focus=pg|ch
+```
+
+Не смешивай TEST_ONLY и REFACTOR_AND_TEST в одном «просто допиши тест».
 
 ## Steps
 
@@ -190,10 +225,10 @@ Dispositions (per surface):
 4. Если `change=` — optional read change artifacts / existing
    `TEST_COVERAGE_PACKET` / prior report (не реконструируй из chat).
 5. Inventory in-policy changed paths; detect surfaces; assign KIND +
-   MINIMUM_LEVEL.
-6. Map tests; assign DISPOSITION.
+   MINIMUM_LEVEL (kind defaults выше).
+6. Map tests; assign DISPOSITION (PG/CH mock → WEAK / UNTESTABLE).
 7. Apply `focus=` filter for summary FAIL set.
-8. Печать Final report (обязательный completion gate).
+8. Печать Final report + `KIND_CLOSURE` (обязательный completion gate).
 9. Не писать файлы.
 
 ## Status
@@ -263,6 +298,12 @@ SURFACES:
 GAPS:
 - <SYMBOL> (<KIND>): <DISPOSITION> → <pasteable next>
 
+KIND_CLOSURE:
+- KIND: …
+  MODE: TEST_ONLY | REFACTOR_AND_TEST
+  NEXT: …
+  THEN: …
+
 WHAT_HAPPENED:
 WHY:
 CURRENT_STATE: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
@@ -274,11 +315,12 @@ DO_NOT_DO_YET:
 ### NEXT_ACTION rules
 
 * `BLOCKED` (no base) → pasteable ask for `base=`.
-* `FAIL` + `MISSING_TEST` / `WEAK_EVIDENCE` (testable) →
-  `/opsx-test` (targeted) затем
-  `/opsx-external-call-coverage base=<BASE>`.
-* `FAIL` + `UNTESTABLE_SEAM` → owner GO на минимальный seam via
-  `/opsx-apply` (или явный seam task), затем `/opsx-test`, затем rerun.
+* `FAIL` + TEST_ONLY kinds (REDIS / testable WB_WRITE / HTTP) →
+  `/opsx-test` затем
+  `/opsx-external-call-coverage base=<BASE> focus=<kind|all>`.
+* `FAIL` + PG/CH / `UNTESTABLE_SEAM` / PG|CH `WEAK_EVIDENCE` (mock-only) →
+  `/opsx-close-external-gap` + paste this report (**без** `base=` на close)
+  затем coverage `focus=pg|ch`.
 * `FAIL` + `DEFERRED_OWNER` → один уточняющий вопрос владельцу.
 * `PASS` + `focus=all` → `/opsx-static-check`, затем
   `/opsx-verify <change-name>` если есть активный change.
@@ -289,9 +331,10 @@ DO_NOT_DO_YET:
 
 * Не archive.
 * Не считать `/opsx-static-check` PASS доказательством external-call coverage.
-* Не считать unit green / похожее имя test доказанным coverage.
+* Не считать unit green / session-mock PG|CH доказанным coverage.
 * Не писать production/tests из этой команды.
-* Не запускать kind-specific «замену» полного gate.
+* Не запускать kind-specific audit front-doors вместо `focus=`.
+* Не слать `base=` в `/opsx-close-external-gap`.
 
 ## Optional handoff artifact (additive)
 
@@ -320,8 +363,8 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 | `/opsx-apply` (recommend chain) | `/opsx-pyright-strict-coverage` then this |
 | `/opsx-pyright-strict-coverage` PASS | this with `base=` |
 | this PASS (`focus=all`) | `/opsx-static-check` → `/opsx-verify` |
-| this FAIL testable | `/opsx-test` → rerun |
-| this FAIL untestable | `/opsx-apply` (seam) → `/opsx-test` → rerun |
+| this FAIL TEST_ONLY | `/opsx-test` → rerun |
+| this FAIL PG/CH / UNTESTABLE | `/opsx-close-external-gap` (paste report) → focus re-audit |
 | this report present | `/opsx-verify` additive consume |
 
 ## Regression checks (self)
@@ -333,5 +376,7 @@ EXTERNAL_CALL_COVERAGE_REPORT:
       `/opsx-ch-coverage` и аналоги
 - [ ] Не заявлен verify/archive verdict
 - [ ] `focus≠all` PASS не закрывает pre-verify chain
-- [ ] Final report напечатан
-- [ ] MINIMUM_LEVEL следует testing-rules (не «всегда integration»)
+- [ ] Final report + KIND_CLOSURE напечатаны
+- [ ] MINIMUM_LEVEL следует testing-rules; PG/CH default integration
+- [ ] session-mock PG/CH не объявлен COVERED
+- [ ] PG/CH FAIL → close-external-gap, не «просто /opsx-test»

@@ -114,6 +114,16 @@ Never rewrite prior JSONL lines.
 - Do not modify OpenSpec artifacts unless the user explicitly asks.
 - Do not commit, push, merge, rebase, deploy, restart services, touch secrets, run migrations, or change Kubernetes/CI.
 - If the requested test cannot be written without changing production code, stop and explain the smallest required production seam/change. Do not implement it.
+- If the request is a **PG/CH external-call gap** from
+  `/opsx-external-call-coverage` that needs seam + live integration
+  (REFACTOR_AND_TEST), do **not** pretend session-mock unit closes it.
+  Redirect:
+
+```text
+NEXT_ACTION: /opsx-close-external-gap
+```
+
+  (paste the coverage report; no `base=` on close).
 - Prefer minimal targeted tests over broad rewrites.
 - Do not create fake passing tests that only assert trivial behavior.
 - In bug-regression / verify modes: also allow durable writes under
