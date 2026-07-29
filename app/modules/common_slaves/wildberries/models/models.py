@@ -965,8 +965,12 @@ class AdvSetting(BaseTable):
 
     @worst_promo_position.setter
     def worst_promo_position(self, value: bool | None) -> None:
-        """DEPRECATED: см. getter; семантика setter не меняется."""
-        self._worst_promo_position = value
+        """DEPRECATED: см. getter; семантика setter не меняется.
+
+        Instance shadow через ``object.__setattr__``: атрибут — ``ClassVar``
+        (SA2 non-mapped / zlpr), прямой ``self._… =`` запрещён Pyright.
+        """
+        object.__setattr__(self, "_worst_promo_position", value)
 
     auto_budget_topups: Mapped[list["WBAutoBudgetTopUp"]] = relationship(
         "WBAutoBudgetTopUp",
