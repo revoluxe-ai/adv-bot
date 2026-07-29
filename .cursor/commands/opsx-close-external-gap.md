@@ -98,6 +98,24 @@ $ARGUMENTS
 
 Не выдумывай gaps из git diff.
 
+## LOC_LINK (mandatory for report items)
+
+Authority: `.cursor/rules/opsx-clickable-loc-link-contract.mdc`.
+
+Если item ссылается на конкретный code/test location, печатай:
+
+`LOC_LINK: <repo-relative-path>:<line>`
+
+Где применимо:
+
+* входные `REFACTOR_AND_TEST_PACKET` items (consume/preserve в отчёте);
+* `SEAMS_WRITTEN`;
+* `INTEGRATION_TESTS`;
+* `CLOSE_RESULTS`.
+
+`PATH` без `LOC_LINK` допустим только когда строка объективно не определяется;
+в этом случае используй fallback-строку сигнатуры и пометь это в `NOTE`.
+
 ## Closure mode (derived)
 
 Для каждого выбранного gap выставь ровно один:
@@ -168,6 +186,7 @@ Forbidden unless owner явно расширяет scope:
 
 1. Разобрать packet; извлечь `BASE`, `HEAD`, FAIL gaps (или items из
    `REFACTOR_AND_TEST_PACKET`); применить filter `kind` / `symbols`.
+   Для items с location перенести/сформировать `LOC_LINK`.
 2. Если `base=` в args → `BLOCKED` (не путать с BASE внутри packet).
 3. Если нет PG/CH FAIL gaps → `BLOCKED_NEEDS_PACKET` или
    `BLOCKED_REDIRECT_TEST_ONLY`.
@@ -202,13 +221,15 @@ CLOSED: <n>
 REMAINING: <n>
 
 SEAMS_WRITTEN:
-- <path>::<symbol> — <one-line seam>
+- <path>::<symbol> @ <LOC_LINK> — <one-line seam>
 
 INTEGRATION_TESTS:
-- <path>::<node> — <PASS|FAIL>
+- <path>::<node> @ <LOC_LINK> — <PASS|FAIL>
 
 CLOSE_RESULTS:
 - SYMBOL: <name>
+  PATH: <path>
+  LOC_LINK: <path>:<line>
   KIND: PG|CH
   MODE: REFACTOR_AND_TEST|TEST_ONLY_REDIRECT
   DISPOSITION_BEFORE: …
@@ -265,3 +286,4 @@ DO_NOT_DO_YET:
 - [ ] PG CLOSED: explicit `read_only=` matches WRITE|PURE_READ|READ_AFTER_WRITE (no bare)
 - [ ] NEXT_ACTION re-audit использует PACKET_BASE, не выдуманный base
 - [ ] Final report напечатан
+- [ ] У каждого relevant result/seam/test item есть `LOC_LINK` (`<path>:<line>`)

@@ -143,6 +143,8 @@ Rename/copy: проверяй **новый** путь (destination).
 
 ## LOC_LINK (line-aware, mandatory)
 
+Authority: `.cursor/rules/opsx-clickable-loc-link-contract.mdc`.
+
 Для каждого найденного surface и каждого gap/packet item печатай
 `LOC_LINK` в кликабельном для Cursor формате:
 
