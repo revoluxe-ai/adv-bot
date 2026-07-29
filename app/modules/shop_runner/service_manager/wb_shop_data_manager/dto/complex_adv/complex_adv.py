@@ -259,14 +259,12 @@ class ComplexAdv:
 
     @property
     def auto_update_white_list(self) -> bool:
-        if self._adv_setting.auto_update_white_list is None:
-            return True
         return self._adv_setting.auto_update_white_list
 
 
     @property
     def bidder_active(self) -> bool:
-        return self._adv_setting.bidder_active
+        return bool(self._adv_setting.bidder_active)
 
     @property
     def bidder_coroutine_type(self) -> BidderCoroutineType:
@@ -289,7 +287,10 @@ class ComplexAdv:
 
     @property
     def hard_min_ctr(self) -> int | None:
-        return self._adv_setting.hard_min_ctr
+        raw = self._adv_setting.hard_min_ctr
+        if raw is None:
+            return None
+        return int(raw)
 
     @property
     def original_adv_setting_id(self) -> int:
@@ -398,7 +399,7 @@ class ComplexAdv:
 
     @property
     def shop_id(self) -> str:
-        return self._shop_id
+        return self._shop_id or ""
 
     @property
     def search_adv(self) -> AdvSetting | None:
@@ -506,7 +507,8 @@ class ComplexAdv:
 
     @property
     def target_place(self) -> int:
-        return self._adv_setting.max_place
+        place = self._adv_setting.max_place
+        return 0 if place is None else int(place)
 
     @property
     def exponent_predict_ctr(self) -> float:
@@ -559,11 +561,12 @@ class ComplexAdv:
 
     @property
     def is_bidder_for_search_adv_active(self) -> bool:
-        return self._adv_setting.bidder_active
+        return bool(self._adv_setting.bidder_active)
 
     @property
     def max_user_cpm(self) -> int:
-        return self._adv_setting.max_cpm
+        cpm = self._adv_setting.max_cpm
+        return 0 if cpm is None else int(cpm)
 
     @property
     def fact_pay_for_order(self) -> float | None:
