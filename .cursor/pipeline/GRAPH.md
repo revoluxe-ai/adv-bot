@@ -25,6 +25,7 @@
 - change_scaffolded: change dir exists; first artifact pending (`/opsx-new`)
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
+- scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
 - impl_done: tasks complete; soft-recommend pyright then external-call coverage when production `.py`, then verify
 - verify_pass: archive-eligible after `/opsx-verify`
@@ -112,6 +113,16 @@
 - decision_owner: operator
 - next_typical: /opsx-new | /opsx-ff
 - known_flaws: NOT_OPENED_BUDGET detail
+
+### /opsx-bound-scope
+- purpose: trim oversized change scope into now-vs-later with WORKLOG parking and `/opsx-update` handoff
+- input_state: planning_revise | change_idea
+- output_state: planning_revise | scope_bounded
+- artifacts_read: change proposal/design/tasks/specs (+ targeted ADL when needed)
+- artifacts_written: plan-only none; with `:GO` append `DOTO/WORKLOG.md` + emit `UPDATE_HANDOFF`
+- decision_owner: operator (GO required for WORKLOG writes)
+- next_typical: /opsx-update (after accepted keep/defer split, usually post `/opsx-explore` TЗ discussion)
+- known_flaws: none recorded
 
 ### /opsx-new
 - purpose: scaffold a new OpenSpec change; stop before creating artifacts
@@ -450,6 +461,9 @@ impl_done --/opsx-verify--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
 planning_revise --/opsx-update|/opsx-explore--> apply_ready|change_idea
+planning_revise --/opsx-bound-scope [after TЗ discussion in /opsx-explore]--> planning_revise|scope_bounded
+planning_revise --/opsx-bound-scope:GO [accepted split]--> scope_bounded
+scope_bounded --/opsx-update--> apply_ready|planning_revise
 product_dirty --/opsx-commit--> pr_ready
 pr_ready --/opsx-split-for-pr--> pr_ready
 pr_ready --/opsx-create-pr--> pr_ready

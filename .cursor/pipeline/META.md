@@ -1,6 +1,6 @@
 # pipeline graph meta
 
-updated_at_utc: 2026-07-29T05:36:55Z
+updated_at_utc: 2026-07-29T15:26:39Z
 scope: ALL_NON_ADMIN_OPSX
 source_fingerprint: 6b60f06b851ee1655b67a6887111b997
 fingerprint_strength: names_only
@@ -16,3 +16,6 @@ notes: |
   UPDATE GO 2026-07-29T05:36:55Z: Added /opsx-close-external-gap
   (REFACTOR_AND_TEST for PG/CH from coverage packet; no base=).
   Inventory 31 nodes; fingerprint independently reproduced.
+  UPDATE GO 2026-07-29T15:26:39Z: Added /opsx-bound-scope command-node and
+  post-/opsx-explore advisory transitions for scope bounding + update handoff.
+  /opsx-propose remains excluded from recommendations by owner directive.
