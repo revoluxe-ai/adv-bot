@@ -32,6 +32,8 @@ orchestrator authors RED as RED_TEST_WORKER
 orchestrator edits production as IMPLEMENTATION_EXECUTOR
 orchestrator confirms GREEN as GREEN_VERIFIER
 orchestrator assembles FANIN as FAN_IN_ASSEMBLER
+orchestrator writes LEARNING_DECISION as FAMILY_LEARNING_WORKER
+orchestrator closes case as CLOSURE_OPERATOR without learning
 one long prompt that role-plays all workers in-sequence
 ```
 
@@ -123,7 +125,12 @@ RED_TEST_WORKER           ≠ IMPLEMENTATION_EXECUTOR
 IMPLEMENTATION_EXECUTOR   ≠ GREEN_VERIFIER
 SPEC_UPDATE_WORKER         ≠ any reviewer role
 BOUNDED_HUNTER            ≠ IMPLEMENTATION_EXECUTOR
+FAN_IN_ASSEMBLER          ≠ FAMILY_LEARNING_WORKER
+FAMILY_LEARNING_WORKER    ≠ CLOSURE_OPERATOR
 FAN_IN_ASSEMBLER          ≠ CLOSURE_OPERATOR
+
+Live WAVE_4 terminal edges:
+  FAN_IN_ASSEMBLER → FAMILY_LEARNING_WORKER → CLOSURE_OPERATOR
 ```
 
 Each inequality ⇒ distinct `WORKER_EXECUTION_ID` and distinct Cursor Task run.

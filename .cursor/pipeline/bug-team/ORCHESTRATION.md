@@ -69,7 +69,8 @@ WAVE_4:
   TASK_COMPLETION_WORKER (Task)
   → BOUNDED_HUNTER (Task)
   → FAN_IN_ASSEMBLER (Task)   # writes ONLY results/FANIN.md
-  → auto CLOSURE_OPERATOR when READY_FOR_CLOSURE (no Owner closure stop)
+  → FAMILY_LEARNING_WORKER (Task)  # LEARNING_DECISION.json (+ conditional packet)
+  → auto CLOSURE_OPERATOR when READY_FOR_CLOSURE + learning COMPLETE
   → HUMAN_SUMMARY.md + terminal CLOSED + AWAITING_USER_REVIEW
 ```
 
@@ -88,6 +89,7 @@ BUG SIGNAL (free-form | context | signal= | case= resume)
 → TASK_COMPLETION_WORKER
 → BOUNDED_HUNTER
 → FAN_IN_ASSEMBLER
+→ FAMILY_LEARNING_WORKER
 → CLOSURE_OPERATOR (auto) + HUMAN_SUMMARY
 → USER reviews uncommitted worktree (no auto-commit)
 ```
@@ -181,7 +183,9 @@ Mismatch → `BLOCKED_ROUTE_MISMATCH`; no production GO; no episode close.
 
 ```text
 RED_CONFIRMED → validate local execution authority → IMPLEMENTATION_EXECUTOR
-FANIN READY_FOR_CLOSURE + BLOCKING_FINDINGS=NONE → auto CLOSURE_OPERATOR
+FANIN READY_FOR_CLOSURE + BLOCKING_FINDINGS=NONE
+  → FAMILY_LEARNING_WORKER
+  → auto CLOSURE_OPERATOR (requires validated LEARNING_DECISION)
 ```
 
 Local worktree writes allowed after valid RED. No intermediate Owner GO / closure stop.
@@ -196,7 +200,9 @@ FAN_IN_READY_FOR_OWNER_CLOSURE → STOP → OWNER_FINAL_CLOSURE_DECISION
 
 Bypass attempts → rejected (`OWNER_GATE_BYPASS_REJECTED`).
 
-Fan-In Assembler must not close the case (CLOSURE_OPERATOR only).
+Fan-In Assembler must not close the case (FAMILY_LEARNING_WORKER then CLOSURE_OPERATOR only).
+Learning worker must not close the case (CLOSURE_OPERATOR only).
+Closure must not skip LEARNING_DECISION.
 
 ## Claim authority
 

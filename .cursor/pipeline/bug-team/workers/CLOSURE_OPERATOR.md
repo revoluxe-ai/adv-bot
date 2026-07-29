@@ -13,12 +13,33 @@ MODEL_SELECTION_POLICY: auto
 
 ```text
 Default CONTROLLED_LIVE_UNCOMMITTED:
-  WORKER_IO + FANIN (READY_FOR_CLOSURE, BLOCKING_FINDINGS=NONE)
+  WORKER_IO
+  + FANIN (READY_FOR_CLOSURE, BLOCKING_FINDINGS=NONE)
+  + validated LEARNING_DECISION.json
+    (LEARNING_STAGE_INVOKED=true, LEARNING_STATUS=COMPLETE,
+     LEARNING_VERDICT in closure-allowed set,
+     PROMOTION_DECISION in {NONE|DEFERRED|RESOLVED_NO_PROMOTE|QUEUED})
   → automatic dispatch (no Owner closure stop)
 
 Legacy OWNER_GATED:
   WORKER_IO + FANIN + OWNER_FINAL_CLOSURE_DECISION
 ```
+
+## Learning gate (mandatory)
+
+Reject closure unless learning decision validates. Required rejection statuses:
+
+```text
+BLOCKED_LEARNING_DECISION_MISSING
+BLOCKED_LEARNING_DECISION_INVALID
+BLOCKED_LEARNING_INCOMPLETE
+BLOCKED_OWNER_LEARNING_DECISION_REQUIRED
+```
+
+Closure must not require actual promotion. Candidate verdicts may close only
+with `PROMOTION_DECISION` ∈ {`DEFERRED`, `RESOLVED_NO_PROMOTE`, `QUEUED`}.
+
+Live predecessor: `FAMILY_LEARNING_WORKER` (not direct fan-in).
 
 ## OUTPUT / WRITE_BOUNDARY
 
@@ -33,7 +54,9 @@ ALLOWED:
   INDEX.md corresponding case update
 FORBIDDEN:
   results/FANIN.md (Fan-In only)
+  creating LEARNING_DECISION (learning worker only)
   git commit / push / deploy claims
+  activating global rules / superclass
 ```
 
 ## TERMINAL
