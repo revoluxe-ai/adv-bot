@@ -29,9 +29,7 @@ from tests.factories.complex_adv import (
     create_complex_adv_seed,
 )
 
-pytestmark = pytest.mark.integration
-
-
+pytestmark = pytest.mark.destructive_local
 async def _create_second_complex_adv_seed(
     session: AsyncSession, wb_cabinet_id: int
 ) -> ComplexAdvSeed:

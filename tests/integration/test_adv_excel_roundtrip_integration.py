@@ -30,8 +30,7 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 from tests.factories.adv_factory import AdvSettingFactory
 
-pytestmark = pytest.mark.integration
-
+pytestmark = pytest.mark.destructive_local
 _PATCH_IMPORT_SM = (
     "app.client_bot.user_interface.services.adv_excel_roundtrip.import_apply._sm"
 )

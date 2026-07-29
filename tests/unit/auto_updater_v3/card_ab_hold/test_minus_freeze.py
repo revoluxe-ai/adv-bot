@@ -44,6 +44,15 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
 )
 
+_PIPELINES = (
+    "app.modules.shop_runner.service_manager.services."
+    "auto_updater_v3.card_ab_hold.pipelines"
+)
+_SETUP_APPLY = (
+    "app.modules.shop_runner.service_manager.services."
+    "auto_updater_v3.card_ab_hold.setup_apply"
+)
+
 
 def _complex_adv(*, nmid: int = 101, auto_adv_id: int = 9) -> SimpleNamespace:
     """РК с одной auto-целью (meta unknown → не shelf-only, search=None)."""
@@ -248,20 +257,79 @@ def test_manager_wires_minus_structural_filter() -> None:
 
 
 @pytest.mark.unit
-def test_setup_pipeline_orders_capture_enforce_before_active() -> None:
-    """8.1/8.5 wiring: process_ab_setup capture→enforce→mutations со snapshot."""
-    import inspect
+@pytest.mark.asyncio
+async def test_setup_pipeline_orders_capture_enforce_before_active() -> None:
+    """8.1/8.5: legacy ENTER path вызывает enforce до apply (не string-index).
 
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
-        pipelines,
-    )
+    Epoch-managed ветка вызывает ``apply_ab_hold_setup_mutations`` раньше в
+    исходнике — поэтому порядок проверяем по call-order на legacy path
+    (phase IS NULL), а не через ``src.index``.
+    """
+    call_order: list[str] = []
+    keywords = [
+        SimpleNamespace(status=KeywordStatus.GOOD, text="good1"),
+        SimpleNamespace(status=KeywordStatus.BAD, text="bad1"),
+    ]
+    complex_adv = _setup_complex_adv()
+    complex_adv.get_keywords = AsyncMock(return_value=keywords)
 
-    src = inspect.getsource(pipelines.process_ab_setup)
-    assert "capture_allowed_phrase_set" in src
-    assert "enforce_frozen_allowed_set" in src
-    assert "allowed_phrases_snapshot" in src
-    assert src.index("capture_allowed_phrase_set") < src.index("enforce_frozen_allowed_set")
-    assert src.index("enforce_frozen_allowed_set") < src.index("apply_ab_hold_setup_mutations")
+    lock_mgr = MagicMock()
+    lock_mgr.acquire = AsyncMock(return_value=True)
+    lock_mgr.release = AsyncMock(return_value=None)
+
+    async def _enforce(*_a: object, **_k: object) -> dict[str, object]:
+        call_order.append("enforce")
+        return {"targets": 1, "written": 0, "cap_exceeded": []}
+
+    async def _apply(*_a: object, **_k: object) -> tuple[int, int]:
+        call_order.append("apply")
+        return (1, 0)
+
+    mgr = MagicMock()
+    mgr.enforce_frozen_allowed_set = AsyncMock(side_effect=_enforce)
+    container = MagicMock()
+    container.minus_phrase_manager.return_value = mgr
+
+    with (
+        patch(
+            f"{_PIPELINES}.CardAbHoldSignalRedisCache",
+            MagicMock(return_value=SimpleNamespace(client=MagicMock())),
+        ),
+        patch(
+            f"{_PIPELINES}.CardAbHoldSetupBlockRedisCache",
+            MagicMock(
+                return_value=MagicMock(set_block=AsyncMock(), clear=AsyncMock())
+            ),
+        ),
+        patch(f"{_PIPELINES}.RedisLockManager", MagicMock(return_value=lock_mgr)),
+        patch(
+            f"{_PIPELINES}.MinusPhraseManagerContainer",
+            MagicMock(return_value=container),
+        ),
+        patch(
+            f"{_PIPELINES}.apply_ab_hold_setup_mutations",
+            AsyncMock(side_effect=_apply),
+        ),
+        patch(
+            f"{_PIPELINES}.ensure_search_common_bid_reset_on_enter",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            f"{_PIPELINES}.capture_allowed_phrase_set",
+            side_effect=lambda kws: (
+                call_order.append("capture")
+                or [kw.text for kw in kws if kw.status != KeywordStatus.BAD]
+            ),
+        ),
+    ):
+        await process_ab_setup(
+            complex_adv,  # type: ignore[arg-type]
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+        )
+
+    assert call_order == ["capture", "enforce", "apply"]
+    assert complex_adv.adv_setting.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
 
 
 @pytest.mark.unit
@@ -321,15 +389,6 @@ def test_status_label_reflects_degradation() -> None:
 
 
 # --- Write-boundary: honest degradation persisted to PG from hold tick ---
-
-_PIPELINES = (
-    "app.modules.shop_runner.service_manager.services."
-    "auto_updater_v3.card_ab_hold.pipelines"
-)
-_SETUP_APPLY = (
-    "app.modules.shop_runner.service_manager.services."
-    "auto_updater_v3.card_ab_hold.setup_apply"
-)
 
 
 class _RecordingSession:

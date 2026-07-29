@@ -1,4 +1,7 @@
-"""Read-only integration test for rec system bid debug entrypoint."""
+"""Read-only integration test for rec system bid debug entrypoint.
+
+Требует ``destructive_local`` + CH opt-in. Не использует production ``default_db``.
+"""
 
 from __future__ import annotations
 
@@ -15,10 +18,13 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_m
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_repository import (
     AutoShelfBidRepository,
 )
-from app.utils.click_house.client import get_clickhouse_client
+from tests.support.destructive_clickhouse import ALLOWED_CH_DATABASE
+
+pytestmark = pytest.mark.destructive_local
 
 
 def _parse_dt(name: str) -> datetime:
+    """Прочитать ISO datetime из env или skip."""
     value = os.environ.get(name)
     if not value:
         pytest.skip(f"{name} is not set")
@@ -30,22 +36,21 @@ def _debug_integration_enabled() -> bool:
     return os.environ.get("REC_BID_DEBUG_INTEGRATION_ENABLED", "").lower() == "true"
 
 
-async def _ensure_debug_table_exists() -> None:
-    """Убедиться, что debug-таблица доступна в тестовом ClickHouse.
+async def _ensure_debug_table_exists(clickhouse_client) -> None:
+    """Убедиться, что debug-таблица доступна в test ClickHouse DB.
 
     Тест не создаёт schema сам и остаётся read-only: если таблицы нет,
     debug-прогон пропускается вместо падения на UNKNOWN_TABLE.
     """
     try:
-        async with get_clickhouse_client() as client:
-            result = await client.query(
-                """
-                SELECT count()
-                FROM system.tables
-                WHERE database = 'default_db'
-                  AND name = 'auto_shelf_bid_intervals'
-                """
-            )
+        result = await clickhouse_client.query(
+            f"""
+            SELECT count()
+            FROM system.tables
+            WHERE database = '{ALLOWED_CH_DATABASE}'
+              AND name = 'auto_shelf_bid_intervals'
+            """
+        )
     except DatabaseError as exc:
         pytest.skip(f"ClickHouse debug integration is unavailable: {exc}")
 
@@ -54,9 +59,10 @@ async def _ensure_debug_table_exists() -> None:
         pytest.skip("auto_shelf_bid_intervals table is not available")
 
 
-@pytest.mark.integration
 @pytest.mark.asyncio
-async def test_debug_fetch_and_rank_rec_system_bids_for_nmid() -> None:
+async def test_debug_fetch_and_rank_rec_system_bids_for_nmid(
+    clickhouse_client,
+) -> None:
     """Run the debug ranking flow only when explicitly enabled."""
     if not _debug_integration_enabled():
         pytest.skip("REC_BID_DEBUG_INTEGRATION_ENABLED is not set to true")
@@ -73,7 +79,7 @@ async def test_debug_fetch_and_rank_rec_system_bids_for_nmid() -> None:
     repository = AutoShelfBidRepository(wb_manager_hub=None)  # type: ignore[arg-type]
     service = AutoShelfBidRecommendationReadService(repository)
 
-    await _ensure_debug_table_exists()
+    await _ensure_debug_table_exists(clickhouse_client)
 
     diagnostics = await service.fetch_bid_hour_observation_diagnostics(
         nmid=nmid,

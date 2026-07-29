@@ -31,7 +31,6 @@ from tests.factories.clickhouse_factory import (
     build_clusters_adv_stats_rows,
 )
 
-
 @pytest.fixture
 def client_session_mock():
     session = AsyncMock()
@@ -171,9 +170,10 @@ async def test_adv_settings_auto_update(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
-    await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")
-    await clickhouse_client.command("TRUNCATE TABLE default_db.adv_events_ticks")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.clusters_adv_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.adv_events_ticks")
     setup_redis_cache()
     nmid = 987_654_321
     base_date = date.today()
@@ -215,7 +215,7 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
 
     rows = build_clusters_adv_stats_rows(records)
     await clickhouse_client.insert(
-        "default_db.clusters_adv_stats",
+        "test_adv_bot_clickhouse.clusters_adv_stats",
         rows,
         column_names=CLUSTERS_ADV_STATS_COLUMNS,
     )

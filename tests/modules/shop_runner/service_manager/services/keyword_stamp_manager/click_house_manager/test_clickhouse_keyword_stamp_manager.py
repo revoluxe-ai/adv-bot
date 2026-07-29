@@ -14,14 +14,12 @@ from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.clic
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from tests.factories import KeywordStatFromJamFactory
 
-pytestmark = pytest.mark.integration
-
-
+pytestmark = pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: AsyncClient) -> None:
-    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS default_db")
+    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS test_adv_bot_clickhouse")
 
-    table_name = "default_db.keyword_position_from_api"
+    table_name = "test_adv_bot_clickhouse.keyword_position_from_api"
     _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table_name}")
     create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name}
@@ -81,10 +79,10 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
 
 @pytest.mark.asyncio
 async def test_get_last_positions_returns_total_orders(clickhouse_client: AsyncClient) -> None:
-    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS default_db")
+    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS test_adv_bot_clickhouse")
 
-    stamp_table = "default_db.keyword_stamp"
-    positions_table = "default_db.keyword_position_from_api"
+    stamp_table = "test_adv_bot_clickhouse.keyword_stamp"
+    positions_table = "test_adv_bot_clickhouse.keyword_position_from_api"
 
     for table in (stamp_table, positions_table):
         _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table}")

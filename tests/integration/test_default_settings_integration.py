@@ -25,7 +25,7 @@ from app.utils.db.models import User
 from tests.factories.adv_factory import AdvSettingFactory, WBCabinetFactory, WBUserCabinetFactory
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 class MockSessionMaker:

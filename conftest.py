@@ -2,9 +2,31 @@
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
-from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+# --- Fail-closed test network + secret scrub (до app imports) -----------------
+# Proxy env не должен позволять обход localhost-only guard.
+for _proxy_key in (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+):
+    os.environ.pop(_proxy_key, None)
 
-# Устанавливаем переменные окружения для тестовой БД ДО любых импортов.
+# Force safe placeholder credentials (не production tokens).
+os.environ["BOT_TOKEN"] = "test_token_123"
+os.environ["TELEGRAM_BOT_TOKEN"] = "test_token_123"
+os.environ["WEBHOOK_SECRET"] = "test_secret"
+os.environ["YOOKASSA_TOKEN"] = "test_yookassa"
+os.environ["WB_TEST_MODE"] = "1"
+os.environ["WB_TEST_TOKEN"] = "test_wb_token"
+os.environ.pop("UNISENDER_GO_API_KEY", None)
+os.environ.pop("UNISENDER_GO_INTEGRATION_TEST_RECIPIENT", None)
+os.environ.pop("TEST_TELEGRAM_BOT_TOKEN", None)
+os.environ.pop("TEST_TELEGRAM_CHAT_ID", None)
+
+# Устанавливаем переменные окружения для тестовой БД ДО любых app-импортов.
 # 127.0.0.1: на Windows Docker Desktop localhost (::1) часто даёт WinError 64.
 _TEST_PG_HOST = "127.0.0.1"
 os.environ["POSTGRES_MASTER_HOST"] = _TEST_PG_HOST
@@ -26,12 +48,10 @@ os.environ["CLICK_HOUSE_PASSWORD"] = "password"  # Password from docker-compose.
 os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
 os.environ.setdefault("CH_MAX_THREAD", "10")
 os.environ.setdefault("BIDDER_STEP_RUB", "1")
-os.environ.setdefault("REDIS_MASTER_HOST", "localhost")
-os.environ.setdefault("REDIS_REPLICA_HOST", "localhost")
-os.environ.setdefault("REDIS_PORT", "6379")
-os.environ.setdefault("BOT_TOKEN", "test_token_123")
-os.environ.setdefault("WEBHOOK_SECRET", "test_secret")
-os.environ.setdefault("YOOKASSA_TOKEN", "test_yookassa")
+os.environ["REDIS_MASTER_HOST"] = "localhost"
+os.environ["REDIS_REPLICA_HOST"] = "localhost"
+os.environ["REDIS_HOST"] = "localhost"
+os.environ["REDIS_PORT"] = "6379"
 os.environ.setdefault("MIN_SUM", "0")
 os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
 os.environ.setdefault("PG_POOL_SIZE", "5")
@@ -45,6 +65,48 @@ os.environ["TEST_DB_POSTGRES_URL"] = TEST_DB_POSTGRES_URL
 import dotenv
 # Загружаем .env, но НЕ перезаписываем уже установленные переменные окружения для тестов
 dotenv.load_dotenv(override=False)
+
+# Повторно форсим test endpoints после dotenv (на случай, если ключи отсутствовали
+# до load и попали из .env).
+os.environ["POSTGRES_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["POSTGRES_REPLICA_HOST"] = _TEST_PG_HOST
+os.environ["POSTGRES_PORT"] = "5433"
+os.environ["POSTGRES_DBNAME"] = "test_adv_bot_db"
+os.environ["CLICKHOUSE_PORT"] = "8124"
+os.environ["CLICK_HOUSE_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_MASTER_HOST"] = "localhost"
+os.environ["REDIS_REPLICA_HOST"] = "localhost"
+os.environ["REDIS_HOST"] = "localhost"
+os.environ["BOT_TOKEN"] = "test_token_123"
+os.environ["TELEGRAM_BOT_TOKEN"] = "test_token_123"
+os.environ["YOOKASSA_TOKEN"] = "test_yookassa"
+# После load_dotenv(override=False) отсутствующие ключи могли вернуться из .env —
+# повторный scrub + пустые placeholders, чтобы live send-тесты skip'ались.
+os.environ.pop("UNISENDER_GO_API_KEY", None)
+os.environ.pop("UNISENDER_GO_INTEGRATION_TEST_RECIPIENT", None)
+os.environ.pop("TEST_TELEGRAM_BOT_TOKEN", None)
+os.environ.pop("TEST_TELEGRAM_CHAT_ID", None)
+os.environ["UNISENDER_GO_API_KEY"] = ""
+os.environ["UNISENDER_GO_INTEGRATION_TEST_RECIPIENT"] = ""
+for _proxy_key in (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "PROXY",
+):
+    os.environ.pop(_proxy_key, None)
+
+# Network guard: запрет исходящих TCP вне loopback (до создания clients).
+from tests.support.network_guard import install_network_guard
+from tests.support.subprocess_guard import install_subprocess_guard
+
+install_network_guard()
+install_subprocess_guard()
+
+from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 # В тестах guard включён по умолчанию; отдельные кейсы отключают через monkeypatch.
 os.environ["STATS_FRESHNESS_GUARD_ENABLED"] = "true"
@@ -99,11 +161,18 @@ _DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
 
 
 def _create_test_async_engine(**kwargs: object):
-    """Движок к тестовому Postgres в Docker; ``ssl=False`` для asyncpg на Windows."""
+    """Движок к тестовому Postgres в Docker; validation-before-connect.
+
+    Требует ``ALLOW_DESTRUCTIVE_TEST_DB=1`` и запрещает DEV_TUNNELS_*.
+    ``ssl=False`` для asyncpg на Windows.
+    """
+    from tests.support.destructive_pg_dsn import create_validated_async_engine_from_url
+
     connect_args = dict(kwargs.pop("connect_args", {}))  # type: ignore[arg-type]
     connect_args.setdefault("ssl", False)
-    return create_async_engine(
+    return create_validated_async_engine_from_url(
         TEST_DB_URL,
+        create_async_engine_fn=create_async_engine,
         poolclass=NullPool,
         connect_args=connect_args,
         **kwargs,  # type: ignore[arg-type]
@@ -175,11 +244,57 @@ def docker_compose_cmd() -> list[str]:
 
 
 _TEST_DB_READY = False
+_TEST_DB_INITIALIZED = False
+
+
+def _require_destructive_local(request: pytest.FixtureRequest) -> None:
+    """Fail-closed: destructive fixtures требуют marker до Docker/engine/DDL."""
+    from tests.support.destructive_markers import require_destructive_local_marker
+
+    require_destructive_local_marker(request)
 
 
 @pytest.fixture(scope="session")
-def setup_test_database(docker_compose_cmd):
-    """Синхронная фикстура для настройки тестовой базы данных с помощью Docker Compose и Alembic."""
+def _destructive_db_session_teardown(docker_compose_cmd):
+    """Session lifecycle: teardown compose только в конце (без setup)."""
+    yield
+    print(f"\n[CLEANUP] Stopping Docker Compose: {COMPOSE_FILE}")
+    cid = _DOCKER_CLEANUP_STATE.get("container_id")
+    if cid:
+        _sync_run("docker", "stop", "-t", "2", cid, timeout=10)
+    rc, _, err = _sync_run(
+        *docker_compose_cmd,
+        "-f",
+        COMPOSE_FILE,
+        "down",
+        "-v",
+        "--remove-orphans",
+        "--timeout",
+        "1",
+        timeout=20,
+    )
+    if rc != 0:
+        print(f"[WARNING] 'compose down' failed rc={rc}: {err.strip()}")
+    if cid:
+        _sync_run("docker", "rm", "-f", cid, timeout=10)
+        _DOCKER_CLEANUP_STATE["container_id"] = None
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
+    print("[OK] Cleanup complete.")
+
+
+@pytest.fixture
+def setup_test_database(request, docker_compose_cmd, _destructive_db_session_teardown):
+    """Поднять disposable test PG/CH (один раз за session) после marker check.
+
+    Требует ``@pytest.mark.destructive_local`` на тесте. Opt-in env недостаточен.
+    """
+    _require_destructive_local(request)
+
+    global _TEST_DB_READY, _TEST_DB_INITIALIZED
+    if _TEST_DB_INITIALIZED:
+        yield
+        return
+
     print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
 
     # --- Запуск Docker Compose ---
@@ -358,46 +473,16 @@ def setup_test_database(docker_compose_cmd):
 
     print("[OK] Test database setup complete.")
 
-    global _TEST_DB_READY
     _TEST_DB_READY = True
+    _TEST_DB_INITIALIZED = True
     yield
-
-    # --- TEARDOWN ---
-    print(f"\n[CLEANUP] Stopping Docker Compose: {COMPOSE_FILE}")
-
-    # Сначала пытаемся остановить контейнер gracefully
-    if container_id:
-        _sync_run("docker", "stop", "-t", "2", container_id, timeout=10)
-
-    # Затем compose down с очень коротким таймаутом
-    rc, _, err = _sync_run(
-        *docker_compose_cmd,
-        "-f",
-        COMPOSE_FILE,
-        "down",
-        "-v",
-        "--remove-orphans",
-        "--timeout",
-        "1",
-        timeout=20,
-    )
-    if rc != 0:
-        print(f"[WARNING] 'compose down' failed rc={rc}: {err.strip()}")
-
-    # Финальная зачистка
-    if container_id:
-        _sync_run("docker", "rm", "-f", container_id, timeout=10)
-        _DOCKER_CLEANUP_STATE["container_id"] = None
-    # Если нормальный teardown прошёл — emergency cleanup больше не нужен
-    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
-
-    print("[OK] Cleanup complete.")
-
+    # Session teardown: _destructive_db_session_teardown
 
 
 @pytest.fixture(scope="function", name="async_engine")
-async def _async_engine(setup_test_database):
-    """Создаёт async движок для каждого теста."""
+async def _async_engine(request, setup_test_database):
+    """Создаёт async движок для каждого destructive_local теста."""
+    _require_destructive_local(request)
     engine = _create_test_async_engine(echo=False)
     try:
         yield engine
@@ -406,8 +491,9 @@ async def _async_engine(setup_test_database):
 
 
 @pytest.fixture(name="async_session")
-async def _async_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
-    """Создаёт async сессию с откатом после теста."""
+async def _async_session(request, async_engine) -> AsyncGenerator[AsyncSession, None]:
+    """Создаёт async сессию с откатом после теста (destructive_local only)."""
+    _require_destructive_local(request)
     async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
     async with async_session_maker() as session:
         trans = await session.begin()
@@ -489,23 +575,49 @@ def pytest_configure(config) -> None:
     config.addinivalue_line("markers", "fast: быстрый набор тестов для быстрого прогона")
     config.addinivalue_line("markers", "unit: маркирует unit-тесты")
     config.addinivalue_line("markers", "integration: маркирует интеграционные тесты")
+    config.addinivalue_line(
+        "markers",
+        "destructive_local: destructive local PG/CH fixtures "
+        "(opt-in ALLOW_DESTRUCTIVE_TEST_*; not selected by -m integration alone)",
+    )
 
 
 def pytest_collection_modifyitems(config, items: list[pytest.Item]) -> None:
     """
     Каждый тест получает ровно один тип: unit или integration.
     - tests/unit/ -> unit; tests/integration/ -> integration.
-    - tests/unit/ дополнительно получают marker fast.
+    - tests/unit/ получают marker fast **только если нет explicit integration
+      и нет destructive_local**.
+    - ``destructive_local`` никогда не получает ``fast`` и не получает auto
+      ``integration`` (только явный marker ``destructive_local``).
     - Остальные без маркера типа -> unit по умолчанию.
     """
+
+    def _has_mark(item: pytest.Item, name: str) -> bool:
+        if name in item.keywords:
+            return True
+        return item.get_closest_marker(name) is not None
+
     for item in items:
         path = str(item.fspath).replace("\\", "/")
         is_unit_path = "/tests/unit/" in path or path.endswith("/tests/unit")
-        if is_unit_path and item.get_closest_marker("fast") is None:
+        has_unit = _has_mark(item, "unit")
+        has_integration = _has_mark(item, "integration")
+        has_destructive = _has_mark(item, "destructive_local")
+
+        # destructive_local / integration never get auto-fast.
+        if (
+            is_unit_path
+            and not has_integration
+            and not has_destructive
+            and not _has_mark(item, "fast")
+        ):
             item.add_marker(pytest.mark.fast)
 
-        has_unit = item.get_closest_marker("unit") is not None
-        has_integration = item.get_closest_marker("integration") is not None
+        if has_destructive:
+            # Never auto-add integration/unit/fast. Selection: -m destructive_local
+            continue
+
         if has_unit or has_integration:
             continue
         if "/integration/" in path or "integration" in item.fspath.basename or "/tests_entry_points/" in path:
@@ -516,6 +628,21 @@ def pytest_collection_modifyitems(config, items: list[pytest.Item]) -> None:
             item.add_marker(pytest.mark.integration)
         else:
             item.add_marker(pytest.mark.unit)
+
+    # Fail-closed collection: plain -m integration / -m fast must not select
+    # destructive_local even if a test also carries @pytest.mark.integration.
+    markexpr = (getattr(config.option, "markexpr", None) or "").strip()
+    markexpr_compact = markexpr.replace(" ", "")
+    if markexpr and "destructive_local" not in markexpr_compact:
+        if (
+            markexpr_compact == "integration"
+            or markexpr_compact == "fast"
+            or markexpr_compact.startswith("integrationand")
+            or markexpr_compact.startswith("fastand")
+            or markexpr_compact.endswith("andintegration")
+            or markexpr_compact.endswith("andfast")
+        ):
+            items[:] = [i for i in items if not _has_mark(i, "destructive_local")]
 @pytest.fixture
 def tokens_mock() -> list[MagicMock]:
     token_mock = MagicMock(spec=WBToken)
@@ -624,7 +751,9 @@ async def di_container() -> AsyncGenerator["AppContainer", None]:
 
 
 @pytest.fixture(scope="function")
-async def postgres_session(async_engine):
+async def postgres_session(request, async_engine):
+    """Async PG session для destructive_local tests."""
+    _require_destructive_local(request)
     async_session_maker = async_sessionmaker(async_engine, expire_on_commit=False)
     async with async_session_maker() as session:
         yield session
@@ -658,8 +787,9 @@ from tests.factories.complex_adv import create_complex_adv_seed
 # TODO Сделать дашборд по эффективности работы платных клиентов и самому писать им - это будет про-активная поддержка. С сортировкой по эффективности
 
 @pytest.fixture(scope='function')
-async def complex_adv(postgres_session: AsyncSession) -> AsyncGenerator[ComplexAdv, None]:
-    """Создает полностью связанную структуру ComplexAdv (реальные ORM-объекты)."""
+async def complex_adv(request, postgres_session: AsyncSession) -> AsyncGenerator[ComplexAdv, None]:
+    """Создает ComplexAdv на реальном PG. Требует ``destructive_local``."""
+    _require_destructive_local(request)
 
     await postgres_session.begin()
     seed = await create_complex_adv_seed(postgres_session)
@@ -719,11 +849,50 @@ async def sm_generator(postgres_session):
 
 
 @pytest.fixture(autouse=True)
-async def clean_db(request: pytest.FixtureRequest):
-    """Очищает ключевые таблицы до и после каждого теста (не трогая event loop).
+def _enforce_test_network_and_subprocess_guards():
+    """Invariant: после каждого теста guards должны быть установлены.
 
-    Unit-тесты не запрашивают БД — для них фикстура сразу no-op (без задержек).
-    Для integration без поднятой Docker-БД — тоже no-op.
+    Если тест снял guard и не восстановил — немедленная переустановка + fail.
+    """
+    from tests.support.network_guard import (
+        install_network_guard,
+        is_network_guard_installed,
+    )
+    from tests.support.subprocess_guard import (
+        install_subprocess_guard,
+        is_subprocess_guard_installed,
+    )
+
+    if not is_network_guard_installed():
+        install_network_guard()
+    if not is_subprocess_guard_installed():
+        install_subprocess_guard()
+    yield
+    leaked = False
+    msgs: list[str] = []
+    if not is_network_guard_installed():
+        install_network_guard()
+        leaked = True
+        msgs.append("network guard was uninstalled without restore")
+    if not is_subprocess_guard_installed():
+        install_subprocess_guard()
+        leaked = True
+        msgs.append("subprocess guard was uninstalled without restore")
+    if leaked:
+        pytest.fail(
+            "Test guard lifecycle violation: "
+            + "; ".join(msgs)
+            + " — guards reinstalled",
+            pytrace=False,
+        )
+
+
+@pytest.fixture(autouse=True)
+async def clean_db(request: pytest.FixtureRequest):
+    """Очищает ключевые таблицы до и после destructive_local теста.
+
+    Unit / без поднятой БД — no-op. Если БД готова и будет TRUNCATE —
+    требуется ``destructive_local`` (fail до engine).
     """
     if request.node.get_closest_marker("unit") is not None:
         yield
@@ -731,6 +900,8 @@ async def clean_db(request: pytest.FixtureRequest):
     if not _TEST_DB_READY:
         yield
         return
+
+    _require_destructive_local(request)
 
     truncate_sql = text(
         # Чистим данные, которые часто создаются тестами.
@@ -771,23 +942,33 @@ def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRed
 
 
 @pytest.fixture(scope="function")
-async def clickhouse_client(setup_test_database):
+async def clickhouse_client(request, setup_test_database):
     """
-    Создаёт async-клиент ClickHouse.
-    Зависит от setup_test_database (который запускает docker-compose).
+    Создаёт async-клиент ClickHouse (GuardedClickHouseClient).
+
+    Fail-closed: marker ``destructive_local`` + endpoint validator + SQL gate.
+    Database: ``test_adv_bot_clickhouse`` (не prod ``default_db``).
     """
+    _require_destructive_local(request)
+    from tests.support.destructive_clickhouse import (
+        ALLOWED_CH_DATABASE,
+        create_validated_async_clickhouse_client,
+    )
+
     host = os.environ.get("CLICK_HOUSE_HOST", _TEST_PG_HOST)
     port = int(os.environ.get("CLICKHOUSE_PORT", "8124"))
     user = os.environ.get("CLICK_HOUSE_USER", "CLICK_HOUSE_USER")
     password = os.environ.get("CLICK_HOUSE_PASSWORD", "password")
+    database = ALLOWED_CH_DATABASE
 
-    client = await get_async_client(
-            host=host,
-            port=port,
-            username=user,
-            password=password,
-            database="default_db",
-        )
+    client = await create_validated_async_clickhouse_client(
+        host=host,
+        port=port,
+        database=database,
+        username=user,
+        password=password,
+        get_async_client_fn=get_async_client,
+    )
 
     max_attempts = 10
     for attempt in range(1, max_attempts + 1):
@@ -811,7 +992,7 @@ async def clickhouse_client(setup_test_database):
 
     # Создаём таблицы ClickHouse, если их нет
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.full_adv_wb_stat (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.full_adv_wb_stat (
             adv_id Int32,
             date Date,
             views Int32,
@@ -827,7 +1008,7 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.advkeyword_new (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.advkeyword_new (
             adv_id Int32,
             text String,
             date Date,
@@ -841,7 +1022,7 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.clusters_adv_stats (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.clusters_adv_stats (
             adv_id UInt32,
             nmid UInt64,
             wb_category LowCardinality(String),
@@ -864,7 +1045,7 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.adv_events_ticks (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.adv_events_ticks (
             norm_query LowCardinality(String),
             ts DateTime,
             d_views UInt32,
@@ -877,7 +1058,7 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.wb_common_stat (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.wb_common_stat (
             nmid UInt64,
             date Date,
             open_card UInt32,
@@ -895,7 +1076,7 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.plan_fact_stats (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.plan_fact_stats (
             adv_id Int32,
             shop_id String,
             date Date,
@@ -915,7 +1096,7 @@ async def clickhouse_client(setup_test_database):
     """)
 
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.fact_stat_states (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.fact_stat_states (
             bucket_start DateTime,
             shop_id String,
             complex_adv_id Int64,
@@ -942,7 +1123,7 @@ async def clickhouse_client(setup_test_database):
 
     # Создаём таблицу advkeyword (источник для Materialized Views)
     await client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.advkeyword (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.advkeyword (
             adv_id UInt64,
             date Date,
             text String,
@@ -958,10 +1139,10 @@ async def clickhouse_client(setup_test_database):
 
     # Создаём Materialized View: advkeyword_daily_mv
     await client.command("""
-        DROP VIEW IF EXISTS default_db.advkeyword_daily_mv
+        DROP VIEW IF EXISTS test_adv_bot_clickhouse.advkeyword_daily_mv
     """)
     await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.advkeyword_daily_mv
+        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.advkeyword_daily_mv
         (
             `adv_id` UInt64,
             `date` Date,
@@ -982,17 +1163,17 @@ async def clickhouse_client(setup_test_database):
             argMaxState(clicks, version) AS clicks,
             argMaxState(views, version) AS views,
             argMaxState(spend, version) AS spend
-        FROM default_db.advkeyword
+        FROM test_adv_bot_clickhouse.advkeyword
         GROUP BY adv_id, date, text
     """)
 
     # Создаём Materialized View: cumulative_views
     # ВАЖНО: SummingMergeTree автоматически суммирует числовые колонки, поэтому НЕ используем sum() в SELECT
     await client.command("""
-        DROP VIEW IF EXISTS default_db.cumulative_views
+        DROP VIEW IF EXISTS test_adv_bot_clickhouse.cumulative_views
     """)
     await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.cumulative_views
+        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.cumulative_views
         (
             `adv_id` UInt64,
             `text` String,
@@ -1012,16 +1193,16 @@ async def clickhouse_client(setup_test_database):
             views AS total_views,
             clicks AS total_clicks,
             spend AS total_spend
-        FROM default_db.advkeyword
+        FROM test_adv_bot_clickhouse.advkeyword
     """)
 
     # Создаём Materialized View: mv_clusters_daily
     # Агрегирует данные из clusters_adv_stats по дням с использованием AggregatingMergeTree
     await client.command("""
-        DROP VIEW IF EXISTS default_db.mv_clusters_daily
+        DROP VIEW IF EXISTS test_adv_bot_clickhouse.mv_clusters_daily
     """)
     await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_daily
+        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.mv_clusters_daily
         (
             `nmid` UInt64,
             `text` LowCardinality(String),
@@ -1048,16 +1229,16 @@ async def clickhouse_client(setup_test_database):
                argMaxState(cpm, timestamp) AS cpm_state,
                argMaxState(cpc, timestamp) AS cpc_state,
                maxState(timestamp) AS ts_state
-        FROM default_db.clusters_adv_stats
+        FROM test_adv_bot_clickhouse.clusters_adv_stats
         GROUP BY nmid, text, date
     """)
 
     # Создаём Materialized View: mv_clusters_daily_agg
     await client.command("""
-        DROP VIEW IF EXISTS default_db.mv_clusters_daily_agg
+        DROP VIEW IF EXISTS test_adv_bot_clickhouse.mv_clusters_daily_agg
     """)
     await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_daily_agg
+        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.mv_clusters_daily_agg
         (
             `adv_id` UInt32,
             `nmid` UInt64,
@@ -1085,17 +1266,17 @@ async def clickhouse_client(setup_test_database):
             argMaxState(orders, timestamp) AS orders_state,
             argMaxState(cpm, timestamp) AS cpm_state,
             maxState(timestamp) AS ts_state
-        FROM default_db.clusters_adv_stats
+        FROM test_adv_bot_clickhouse.clusters_adv_stats
         GROUP BY adv_id, nmid, norm_query, date
     """)
 
     # Создаём Materialized View: mv_clusters_last_state
     # Хранит последнее состояние для каждого nmid + text
     await client.command("""
-        DROP VIEW IF EXISTS default_db.mv_clusters_last_state
+        DROP VIEW IF EXISTS test_adv_bot_clickhouse.mv_clusters_last_state
     """)
     await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS default_db.mv_clusters_last_state
+        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.mv_clusters_last_state
         (
             `nmid` UInt64,
             `text` LowCardinality(String),
@@ -1114,7 +1295,7 @@ async def clickhouse_client(setup_test_database):
                argMaxState(cpc, timestamp) AS last_cpc_state,
                argMaxState(cpm, timestamp) AS last_cpm_state,
                maxState(timestamp) AS last_ts_state
-        FROM default_db.clusters_adv_stats
+        FROM test_adv_bot_clickhouse.clusters_adv_stats
         GROUP BY nmid, norm_query
     """)
 
