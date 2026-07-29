@@ -6,6 +6,10 @@ Spec requirements:
 - stale callback → fail-closed redraw (§10)
 
 WB-мутации не выполняются в handlers — sync owned by shop-runner.
+
+Callback ACK: ``ImmediateCallbackAnswerUpdateMiddleware`` уже отвечает на
+CallbackQuery; handlers не вызывают ``query.answer()`` — user-visible
+пояснения через ``_notify_callback_user`` (message.answer / bot.send_message).
 """
 
 from __future__ import annotations
@@ -202,6 +206,38 @@ async def _maybe_answer(message: Any, text: str, **kwargs: Any) -> None:
         await result
 
 
+async def _notify_callback_user(query: CallbackQuery, text: str | None) -> None:
+    """Краткое пояснение в чат после ACK middleware (не CallbackQuery.answer).
+
+    ``ImmediateCallbackAnswerUpdateMiddleware`` уже ответил на CallbackQuery.
+    Handlers не вызывают ``query.answer()``; user-visible toast/alert →
+    ``message.answer`` или ``bot.send_message`` (см. docks/CALLBACK_ANSWER_POLICY.md).
+
+    Args:
+        query: CallbackQuery текущего хендлера.
+        text: текст уведомления; пустой/None — no-op.
+    """
+    if not text:
+        return
+    msg = query.message
+    answer = getattr(msg, "answer", None) if msg is not None else None
+    if callable(answer):
+        result = answer(text)
+        if inspect.isawaitable(result):
+            await result
+        return
+    bot = getattr(query, "bot", None)
+    send = getattr(bot, "send_message", None) if bot is not None else None
+    if not callable(send):
+        return
+    chat_id = getattr(getattr(query, "from_user", None), "id", None)
+    if chat_id is None:
+        return
+    result = send(chat_id, text)
+    if inspect.isawaitable(result):
+        await result
+
+
 def _default_auto_bid(adv: AdvSetting) -> float:
     cpm = getattr(adv, "cpm", None)
     if cpm is not None and float(cpm) > 0:
@@ -372,7 +408,7 @@ async def _answer_stale(
         received,
         phase.value if phase else None,
     )
-    await query.answer(STALE_TOAST)
+    await _notify_callback_user(query, STALE_TOAST)
 
 
 async def _edit_confirm_screen(
@@ -635,7 +671,7 @@ async def on_keyword_toggle(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="keyword_toggle"
@@ -644,12 +680,10 @@ async def on_keyword_toggle(
         return
     keywords = await _resolve_keyword_candidates(adv)
     if callback_data.keyword_idx < 0 or callback_data.keyword_idx >= len(keywords):
-        await query.answer()
         await _render_for_adv(query, adv, state)
         return
     kw = keywords[callback_data.keyword_idx]
     await toggle_keyword_inclusion(state, int(adv.id), kw)
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -663,7 +697,7 @@ async def on_page_nav(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="page_nav"
@@ -674,7 +708,6 @@ async def on_page_nav(
         1 if callback_data.direction == "n" else -1
     )
     await set_page(state, int(adv.id), new_page, bump=True)
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -688,7 +721,7 @@ async def on_keyword_set_confirm(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="keyword_set_confirm"
@@ -699,7 +732,7 @@ async def on_keyword_set_confirm(
     keywords = await _resolve_keyword_candidates(adv)
     selected = selected_keywords(keywords, draft)
     if not selected:
-        await query.answer("Выберите хотя бы один ключ", show_alert=True)
+        await _notify_callback_user(query, "Выберите хотя бы один ключ")
         return
     duration = int(draft.get("duration_hours") or DEFAULT_WARMUP_HOURS)
     await confirm_keyword_set_and_start_warmup(
@@ -709,7 +742,7 @@ async def on_keyword_set_confirm(
     draft["keyword_included"] = {}
     await save_draft(state, int(adv.id), draft)
     await bump_revision(state, int(adv.id))
-    await query.answer("Набор ключей подтверждён")
+    await _notify_callback_user(query, "Набор ключей подтверждён")
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -723,7 +756,7 @@ async def on_warmup_preset(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="warmup_duration_preset"
@@ -734,7 +767,6 @@ async def on_warmup_preset(
     draft["duration_hours"] = int(callback_data.hours)
     draft["revision"] = int(draft.get("revision") or 1) + 1
     await save_draft(state, int(adv.id), draft)
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -748,7 +780,7 @@ async def on_warmup_duration_confirm(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="warmup_duration_confirm"
@@ -759,7 +791,7 @@ async def on_warmup_duration_confirm(
     hours = int(draft.get("duration_hours") or DEFAULT_WARMUP_HOURS)
     await set_warmup_duration(int(adv.id), hours)
     await bump_revision(state, int(adv.id))
-    await query.answer("Длительность прогрева подтверждена")
+    await _notify_callback_user(query, "Длительность прогрева подтверждена")
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -773,14 +805,13 @@ async def on_warmup_refresh(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="warmup_status_refresh"
     ):
         await _render_for_adv(query, adv, state)
         return
-    await query.answer()
     await _render_for_adv(query, adv, state)
 
 
@@ -792,7 +823,7 @@ async def on_keyword_edit_open(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     phase = normalize_card_ab_hold_phase(getattr(adv, "card_ab_hold_phase", None))
     if phase != CardAbHoldPhase.WARM_UP:
@@ -818,7 +849,6 @@ async def on_keyword_edit_open(
     draft["page"] = 0
     draft["revision"] = int(draft.get("revision") or 1) + 1
     await save_draft(state, int(adv.id), draft)
-    await query.answer()
     await _render_for_adv(query, adv, state)
 
 
@@ -830,7 +860,7 @@ async def on_tp_confirm_all(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="tp_confirm_all"
@@ -845,7 +875,7 @@ async def on_tp_confirm_all(
     await confirm_target_places(int(adv.id), tp_map)
     await set_w3_confirmed_visible(state, int(adv.id), True)
     await bump_revision(state, int(adv.id))
-    await query.answer("Целевые позиции зафиксированы")
+    await _notify_callback_user(query, "Целевые позиции зафиксированы")
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -860,7 +890,7 @@ async def on_continue_to_auto(
     """W3-confirmed → A1/A2: скрыть read-only экран и показать следующий шаг (§7)."""
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="continue_to_auto"
@@ -868,7 +898,6 @@ async def on_continue_to_auto(
         await _render_for_adv(query, adv, state)
         return
     await set_w3_confirmed_visible(state, int(adv.id), False)
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -882,7 +911,7 @@ async def on_auto_participation_confirm(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="auto_participation_confirm"
@@ -893,9 +922,9 @@ async def on_auto_participation_confirm(
     await confirm_auto_participation(int(adv.id), participates)
     if not participates:
         await confirm_auto_bid(int(adv.id), 0.0)
-        await query.answer("Участие Auto: нет. Создание intent…")
+        await _notify_callback_user(query, "Участие Auto: нет. Создание intent…")
     else:
-        await query.answer("Участие Auto подтверждено")
+        await _notify_callback_user(query, "Участие Auto подтверждено")
     await bump_revision(state, int(adv.id))
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
@@ -910,7 +939,7 @@ async def on_auto_bid_confirm(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="auto_bid_confirm"
@@ -921,7 +950,7 @@ async def on_auto_bid_confirm(
     bid = _draft_auto_bid(draft, adv)
     await confirm_auto_bid(int(adv.id), bid)
     await bump_revision(state, int(adv.id))
-    await query.answer("Ставка Auto подтверждена")
+    await _notify_callback_user(query, "Ставка Auto подтверждена")
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -942,7 +971,7 @@ async def on_auto_bid_edit(
     """
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="auto_bid_edit"
@@ -955,7 +984,6 @@ async def on_auto_bid_edit(
     await save_draft(state, int(adv.id), draft)
     await state.update_data({_CAH_AWAITING_AUTO_BID_ADV_KEY: int(adv.id)})
     await state.set_state(_CAH_AWAITING_AUTO_BID_STATE)
-    await query.answer()
     prompt = (
         f"{_AUTO_BID_ENTRY_PROMPT} Текущая: {current_bid:g}."
     )
@@ -1029,14 +1057,13 @@ async def on_sync_refresh(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="sync_status_refresh"
     ):
         await _render_for_adv(query, adv, state)
         return
-    await query.answer()
     await _render_for_adv(query, adv, state)
 
 
@@ -1048,7 +1075,7 @@ async def on_back(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="back"
@@ -1063,7 +1090,6 @@ async def on_back(
             CardAbHoldPhase.AWAITING_AUTO_BID_CONFIRM,
         ):
             await set_w3_confirmed_visible(state, int(adv.id), True)
-            await query.answer()
             adv = await _load_adv(callback_data.adv_setting_original_id)
             if adv is not None:
                 await _render_for_adv(query, adv, state)
@@ -1078,7 +1104,6 @@ async def on_back(
     }
     if step in draft_steps_with_draft:
         await mark_summary_visible(state, int(adv.id), return_step=step)
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -1092,7 +1117,7 @@ async def on_cancel_open(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="cancel_open"
@@ -1104,7 +1129,6 @@ async def on_cancel_open(
     draft["page"] = callback_data.page
     await save_draft(state, int(adv.id), draft)
     await open_cancel_dialog(state, int(adv.id))
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -1118,7 +1142,7 @@ async def on_cancel_no(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="cancel_confirm_no"
@@ -1126,7 +1150,6 @@ async def on_cancel_no(
         await _render_for_adv(query, adv, state)
         return
     await close_cancel_dialog(state, int(adv.id))
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -1140,7 +1163,7 @@ async def on_cancel_yes(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="cancel_confirm_yes"
@@ -1150,11 +1173,11 @@ async def on_cancel_yes(
     step = callback_data.step
     if step == ConfirmStep.S1B.value:
         await discard_edit_draft_only(state, int(adv.id))
-        await query.answer("Изменения отменены")
+        await _notify_callback_user(query, "Изменения отменены")
     else:
         await reset_draft(state, int(adv.id))
         await _abort_epoch_to_off(adv)
-        await query.answer("A/B тест отменён")
+        await _notify_callback_user(query, "A/B тест отменён")
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -1168,7 +1191,7 @@ async def on_open_current_step(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="open_current_step"
@@ -1176,7 +1199,6 @@ async def on_open_current_step(
         await _render_for_adv(query, adv, state)
         return
     await clear_summary(state, int(adv.id))
-    await query.answer()
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
@@ -1190,7 +1212,7 @@ async def on_confirm_disable(
 ) -> None:
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await query.answer("Доступно только при включённом боте", show_alert=True)
+        await _notify_callback_user(query, "Доступно только при включённом боте")
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="disable"
@@ -1199,7 +1221,7 @@ async def on_confirm_disable(
         return
     await reset_draft(state, int(adv.id))
     await _abort_epoch_to_off(adv)
-    await query.answer("A/B Hold выключен")
+    await _notify_callback_user(query, "A/B Hold выключен")
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is not None:
         await _render_for_adv(query, adv, state)
