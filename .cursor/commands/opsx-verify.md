@@ -61,6 +61,9 @@ Verify блокирует archive только при доказанном test-
 verify должен независимо проверить, что перечисленные `GAPS` с
 `MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` закрыты актуальными
 tests (или owner-deferral явно задокументирован вне archive path).
+Включая PG session-mode WEAK: `PG_IMPLICIT_SESSION_MODE` (bare `sm()`) и
+`PG_WRONG_SESSION_MODE` — SoT `.cursor/rules/testing-rules.mdc` § PG session
+mode (явный `read_only=` обязателен).
 
 `EXTERNAL_CALL_COVERAGE_REPORT` — additive evidence contract (sibling к
 `TEST_COVERAGE_PACKET`, но diff/base-owned, не invariant-owned).
@@ -769,7 +772,7 @@ or:
 * Do not change legacy verify eligibility when the packet or external-call report is absent.
 * Do not issue `NO_GO` from packet status alone.
 * Do not invent a full external-call inventory during verify when the report is absent; soft-recommend `/opsx-external-call-coverage` instead.
-* When the report is present, do not ignore still-open `MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` gaps.
+* When the report is present, do not ignore still-open `MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` gaps (включая `PG_IMPLICIT_SESSION_MODE` / `PG_WRONG_SESSION_MODE`).
 * Do not infer coverage from test names, task checkboxes, or green suite status.
 * Do not accept synthetic production fields, impossible states, or wrong-owner identity as realistic test setup.
 * Do not accept a test that fully mocks the causal boundary it claims to verify.

@@ -179,16 +179,18 @@ Rename/copy: проверяй **новый** путь (destination).
 
 Authority: `.cursor/rules/testing-rules.mdc` § PG session mode.
 Для каждого PG surface назначь `INTENT` и сверь call site
-(`sm` / `get_async_session_maker` / provenance injected session):
+(`sm` / `get_async_session_maker` / provenance injected session).
+**Каждый** call MUST иметь явный `read_only=`; bare `sm()` запрещён.
 
 | INTENT | Required | Disposition impact |
 |--------|----------|--------------------|
-| `WRITE` | `read_only=False` или bare `sm()` (default False) | `read_only=True` → `WEAK_EVIDENCE` NOTE=`PG_WRONG_SESSION_MODE` (FAIL set) |
-| `PURE_READ` | prefer `read_only=True` | bare/`False` → SURFACES NOTE=`PG_SESSION_HYGIENE` (**не** авто-FAIL) |
-| `READ_AFTER_WRITE` | master (`False` / bare) | `read_only=True` → `WEAK_EVIDENCE` NOTE=`PG_WRONG_SESSION_MODE` |
+| `WRITE` | `sm(read_only=False)` | bare → `WEAK_EVIDENCE` NOTE=`PG_IMPLICIT_SESSION_MODE`; `True` → `WEAK_EVIDENCE` NOTE=`PG_WRONG_SESSION_MODE` |
+| `PURE_READ` | `sm(read_only=True)` | bare → `WEAK_EVIDENCE` NOTE=`PG_IMPLICIT_SESSION_MODE`; `False` → `WEAK_EVIDENCE` NOTE=`PG_WRONG_SESSION_MODE` |
+| `READ_AFTER_WRITE` | `sm(read_only=False)` | bare → `WEAK_EVIDENCE` NOTE=`PG_IMPLICIT_SESSION_MODE`; `True` → `WEAK_EVIDENCE` NOTE=`PG_WRONG_SESSION_MODE` |
 
 SoT политики — testing-rules + этот gate; **не** дублировать полный policy в
 `/opsx-project-bug-hunt` (hunt — optional thin checklist later, не SoT).
+`PG_SESSION_HYGIENE` (non-FAIL note) **снят** — bare всегда FAIL-set WEAK.
 
 ## Test mapping
 
@@ -207,7 +209,7 @@ Dispositions (per surface):
 |-------------|---------|
 | `COVERED` | есть test evidence ≥ `MINIMUM_LEVEL` с real causal path |
 | `MISSING_TEST` | surface testable; адекватного test нет |
-| `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak / **PG\|CH только session-mock** / **PG_WRONG_SESSION_MODE** |
+| `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak / **PG\|CH только session-mock** / **PG_WRONG_SESSION_MODE** / **PG_IMPLICIT_SESSION_MODE** |
 | `UNTESTABLE_SEAM` | нельзя написать адекватный (esp. live PG/CH) test без production seam/DI |
 | `OUT_OF_POLICY` | не in-policy |
 | `NO_EXTERNAL_SURFACE` | in-policy file/hunk без внешней границы |
@@ -242,7 +244,7 @@ KIND_CLOSURE:
 5. Inventory in-policy changed paths; detect surfaces; assign KIND +
    MINIMUM_LEVEL (kind defaults выше). Для PG — также INTENT + session mode.
 6. Map tests; assign DISPOSITION (PG/CH mock → WEAK / UNTESTABLE;
-   PG_WRONG_SESSION_MODE → WEAK).
+   `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE` → WEAK).
 7. Apply `focus=` filter for summary FAIL set.
 8. Печать Final report + `KIND_CLOSURE` (обязательный completion gate).
 9. Не писать файлы.
@@ -310,7 +312,7 @@ SURFACES:
   INTENT: <WRITE|PURE_READ|READ_AFTER_WRITE|n/a>   # required when KIND=PG
   MATCHED_TESTS: <list|none>
   DISPOSITION: <disposition>
-  NOTE: <short>   # e.g. PG_WRONG_SESSION_MODE | PG_SESSION_HYGIENE | …
+  NOTE: <short>   # e.g. PG_WRONG_SESSION_MODE | PG_IMPLICIT_SESSION_MODE | …
 
 GAPS:
 - <SYMBOL> (<KIND>): <DISPOSITION> → <pasteable next>
@@ -336,7 +338,7 @@ DO_NOT_DO_YET:
   `/opsx-test` затем
   `/opsx-external-call-coverage base=<BASE> focus=<kind|all>`.
 * `FAIL` + PG/CH / `UNTESTABLE_SEAM` / PG|CH `WEAK_EVIDENCE` (mock-only
-  или `PG_WRONG_SESSION_MODE`) →
+  / `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE`) →
   `/opsx-close-external-gap` + paste this report (**без** `base=` на close)
   затем coverage `focus=pg|ch`.
 * `FAIL` + `DEFERRED_OWNER` → один уточняющий вопрос владельцу.
@@ -351,10 +353,13 @@ DO_NOT_DO_YET:
 * Не считать `/opsx-static-check` PASS доказательством external-call coverage.
 * Не считать unit green / session-mock PG|CH доказанным coverage.
 * Не считать COVERED PG WRITE / READ_AFTER_WRITE на `read_only=True`.
+* Не считать COVERED bare `sm()` (`PG_IMPLICIT_SESSION_MODE`).
+* Не считать COVERED PURE_READ на `read_only=False`.
 * Не писать production/tests из этой команды.
 * Не делать `/opsx-project-bug-hunt` SoT для session-mode policy.
 * Не запускать kind-specific audit front-doors вместо `focus=`.
 * Не слать `base=` в `/opsx-close-external-gap`.
+* Не использовать `PG_SESSION_HYGIENE` как non-FAIL для bare.
 
 ## Optional handoff artifact (additive)
 
@@ -399,5 +404,6 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 - [ ] Final report + KIND_CLOSURE напечатаны
 - [ ] MINIMUM_LEVEL следует testing-rules; PG/CH default integration
 - [ ] session-mock PG/CH не объявлен COVERED
-- [ ] PG surfaces имеют INTENT; WRITE/READ_AFTER_WRITE на `read_only=True` → WEAK
+- [ ] PG surfaces имеют INTENT; bare `sm()` → WEAK `PG_IMPLICIT_SESSION_MODE`
+- [ ] wrong polarity (WRITE/RAW→True, PURE_READ→False) → WEAK `PG_WRONG_SESSION_MODE`
 - [ ] PG/CH FAIL → close-external-gap, не «просто /opsx-test»

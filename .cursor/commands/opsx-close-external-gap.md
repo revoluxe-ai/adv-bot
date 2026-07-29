@@ -113,17 +113,19 @@ COVERED после close **только** если:
 * assert читает **persisted** state из PG/CH (re-select / query), не только
   mock call args;
 * для **PG**: session mode совпадает с intent символа
-  (testing-rules § PG session mode):
-  WRITE → `sm(read_only=False)` (или bare `sm()`); PURE_READ →
-  `sm(read_only=True)`; READ_AFTER_WRITE → master. Seam, который оставляет
-  WRITE на `read_only=True`, **не** CLOSED.
+  (testing-rules § PG session mode) — **только явный** `read_only=`:
+  WRITE / READ_AFTER_WRITE → `sm(read_only=False)`;
+  PURE_READ → `sm(read_only=True)`.
+  Seam, который оставляет bare `sm()` или wrong polarity, **не** CLOSED.
+  При production edit на WRITE/READ path: bare → переписать в required call.
 
 **Не** считать закрытием:
 
 * unit + `AsyncMock` session;
 * orchestration, где writer всегда patched;
 * green по имени без re-read из store;
-* PG WRITE path / test на `read_only=True` (write-on-replica).
+* PG WRITE / READ_AFTER_WRITE на `read_only=True` (write-on-replica);
+* bare `sm()` на любом PG INTENT (`PG_IMPLICIT_SESSION_MODE`).
 
 Policy: `.cursor/rules/testing-rules.mdc` § Minimum test level / external-call /
 PG session mode.
@@ -134,6 +136,7 @@ Allowed:
 
 * минимальный production seam в `app/**` для inject session/CH client /
   DI (без бизнес-переписывания вне gap);
+* на том же seam pass: bare `sm()` → явный `sm(read_only=…)` по INTENT;
 * `tests/integration/**` (+ fixtures/helpers под integration);
 * docstring на изменённых публичных символах (project documentation rule).
 
@@ -222,7 +225,8 @@ DO_NOT_DO_YET:
 
 * Не archive / verify GO.
 * Не считать unit session-mock закрытием PG/CH.
-* Не считать CLOSED PG WRITE seam/test на `read_only=True`.
+* Не считать CLOSED PG WRITE/RAW на `read_only=True`.
+* Не считать CLOSED bare `sm()` (нужен явный `read_only=`).
 * Не invent gaps без packet.
 * Не передавать `base=` этой команде.
 * Не дробить на `/opsx-pg-coverage` / `/opsx-ch-coverage`.
@@ -242,6 +246,6 @@ DO_NOT_DO_YET:
 - [ ] без packet → BLOCKED_NEEDS_PACKET
 - [ ] REDIS-only gaps → BLOCKED_REDIRECT_TEST_ONLY
 - [ ] CLOSED требует integration + live fixture + re-read store
-- [ ] PG CLOSED: session mode matches WRITE|PURE_READ|READ_AFTER_WRITE
+- [ ] PG CLOSED: explicit `read_only=` matches WRITE|PURE_READ|READ_AFTER_WRITE (no bare)
 - [ ] NEXT_ACTION re-audit использует PACKET_BASE, не выдуманный base
 - [ ] Final report напечатан
