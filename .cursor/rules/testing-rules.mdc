@@ -122,10 +122,23 @@ Full E2E не требуется автоматически.
 
 | Kind | Durable read/write adapter | Достаточно / недостаточно |
 |------|----------------------------|---------------------------|
-| **PG** | `integration` на живом `async_session` (или test DB via production `sm` seam) | Unit + `AsyncMock` session — **не** proof |
+| **PG** | `integration` на живом `async_session` (или test DB via production `sm` seam) **и** корректный session mode (ниже) | Unit + `AsyncMock` session — **не** proof; WRITE на `read_only=True` — **не** proof |
 | **CH** | `integration` на живом `clickhouse_client` | Mocked CH client alone — **не** proof |
 | Redis | fakeredis / boundary_adapter OK | |
 | WB / HTTP | orchestration_seam; mock **after** causal boundary OK | |
+
+#### PG session mode (`get_async_session_maker` / `sm`)
+
+`sm(read_only=…)` выбирает host: `True` → replica, `False`/default → master.
+Live session **недостаточен**, если mode не совпадает с intent:
+
+| Intent | Required call | Notes |
+|--------|---------------|-------|
+| **WRITE** (mutate / `commit` / `with_for_update` / durable UPDATE/INSERT/DELETE) | `sm(read_only=False)` | Явный `False` предпочтителен; bare `sm()` OK (default=`False`) |
+| **PURE_READ** (нет mutate/commit в том же session scope) | `sm(read_only=True)` | Hygiene: replica; bare/`False` на pure-read — note, не авто-FAIL |
+| **READ_AFTER_WRITE** / consistency-sensitive read | master (`False` или bare `sm()`) | Replica lag → не `read_only=True` |
+
+Запрещено / не proof: WRITE path с `sm(read_only=True)`; COVERED только из‑за live fixture без проверки mode.
 
 Частая специфика PG/CH: чтобы написать норм integration, сначала нужен
 минимальный production seam (inject session/client). Это **не** `/opsx-test`
@@ -163,6 +176,8 @@ alone:
   `/opsx-close-external-gap` (packet in, no `base=`); не чинить production
   внутри coverage-команды.
 - Session-mock unit для PG/CH не закрывает external-call gap.
+- PG session mode (WRITE / PURE_READ / READ_AFTER_WRITE) — см. § Kind defaults;
+  executable check в `/opsx-external-call-coverage`, не в hunt как SoT.
 
 ## CallbackQuery answer (Dispatcher pre-answer middleware)
 
