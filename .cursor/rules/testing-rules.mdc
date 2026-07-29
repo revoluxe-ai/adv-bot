@@ -125,6 +125,31 @@ Full E2E не требуется автоматически.
 - Не меняй invariant ради удобства теста.
 - Final adequacy и archive readiness объявляет только `/opsx-verify`.
 
+## CallbackQuery answer (Dispatcher pre-answer middleware)
+
+Когда на client_bot Dispatcher стоит `ImmediateCallbackAnswerUpdateMiddleware`
+(или эквивалентный outer pre-answer до handler):
+
+1. Не считай доказательством корректной ACK-политики assert вида
+   `query.answer.awaited` / `callback.answer.assert_awaited` в хендлерах под
+   этим middleware — такой assert часто **кодирует баг** (второй answer после
+   middleware ACK).
+2. Предпочтительный regression shape для этого класса: AST/source-инвариант,
+   что module хендлера **не** вызывает `CallbackQuery.answer` /
+   `query.answer` / `callback.answer` (разрешены `query.message.answer` /
+   `bot.send_message` и аналогичные chat sends).
+3. Пользовательские toast/alert после ACK — через `message.answer` /
+   `bot.send_message`, не через повторный `callback.answer`.
+4. Не ослабляй такой AST-инвариант ради зелёных соседних тестов; соседние
+   тесты обновляй под chat-notify канал.
+
+Product ACK policy живёт в `app/client_bot/callback_helpers.py` и
+`docks/CALLBACK_ANSWER_POLICY.md`; этот раздел — только **test-design**
+для предотвращения повторного double-answer класса.
+
+Class lesson evidence:
+`BUGCASE-CAH-DOUBLE-ANSWER-20260729T013308Z` (ROOT-001 + HC-001).
+
 ## Устаревшее (запрещено переносить)
 
 Не требовать и не восстанавливать:
