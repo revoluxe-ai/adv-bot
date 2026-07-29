@@ -111,15 +111,22 @@ COVERED после close **только** если:
 * вызывает production writer/reader (не fully mocked `sm` / CH client как
   единственный path);
 * assert читает **persisted** state из PG/CH (re-select / query), не только
-  mock call args.
+  mock call args;
+* для **PG**: session mode совпадает с intent символа
+  (testing-rules § PG session mode):
+  WRITE → `sm(read_only=False)` (или bare `sm()`); PURE_READ →
+  `sm(read_only=True)`; READ_AFTER_WRITE → master. Seam, который оставляет
+  WRITE на `read_only=True`, **не** CLOSED.
 
 **Не** считать закрытием:
 
 * unit + `AsyncMock` session;
 * orchestration, где writer всегда patched;
-* green по имени без re-read из store.
+* green по имени без re-read из store;
+* PG WRITE path / test на `read_only=True` (write-on-replica).
 
-Policy: `.cursor/rules/testing-rules.mdc` § Minimum test level / external-call.
+Policy: `.cursor/rules/testing-rules.mdc` § Minimum test level / external-call /
+PG session mode.
 
 ## Write boundary
 
@@ -215,6 +222,7 @@ DO_NOT_DO_YET:
 
 * Не archive / verify GO.
 * Не считать unit session-mock закрытием PG/CH.
+* Не считать CLOSED PG WRITE seam/test на `read_only=True`.
 * Не invent gaps без packet.
 * Не передавать `base=` этой команде.
 * Не дробить на `/opsx-pg-coverage` / `/opsx-ch-coverage`.
@@ -234,5 +242,6 @@ DO_NOT_DO_YET:
 - [ ] без packet → BLOCKED_NEEDS_PACKET
 - [ ] REDIS-only gaps → BLOCKED_REDIRECT_TEST_ONLY
 - [ ] CLOSED требует integration + live fixture + re-read store
+- [ ] PG CLOSED: session mode matches WRITE|PURE_READ|READ_AFTER_WRITE
 - [ ] NEXT_ACTION re-audit использует PACKET_BASE, не выдуманный base
 - [ ] Final report напечатан
