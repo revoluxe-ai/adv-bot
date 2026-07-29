@@ -141,6 +141,23 @@ Rename/copy: проверяй **новый** путь (destination).
 При сомнении между KIND — выбери наиболее specific (`WB_WRITE` >
 `HTTP`; конкретный store > `OTHER`) и запиши `KIND_NOTE`.
 
+## LOC_LINK (line-aware, mandatory)
+
+Для каждого найденного surface и каждого gap/packet item печатай
+`LOC_LINK` в кликабельном для Cursor формате:
+
+`<repo-relative-path>:<line>`
+
+Правила:
+
+1. `LOC_LINK` обязателен в `SURFACES`, `GAPS`, `ROUTE_PACKETS` items и
+   `PASTE_AND_GO_BLOCKS` items.
+2. `PATH` оставляй как путь к файлу (без строки), а `LOC_LINK` — тот же
+   путь + номер строки.
+3. Строку бери из boundary call / changed hunk; если точка boundary не
+   однозначна — fallback на строку сигнатуры `def/class` целевого symbol.
+4. Не печатай только `PATH` без `LOC_LINK`.
+
 ## Minimum test level (per testing-rules)
 
 Для каждого surface назначь `MINIMUM_LEVEL` по
@@ -295,6 +312,7 @@ ROUTE_PACKETS:
     - SYMBOL: <name>
       KIND: <kind>
       PATH: <path>
+      LOC_LINK: <path>:<line>
       DISPOSITION: <MISSING_TEST|WEAK_EVIDENCE>
       NEXT: /opsx-test
 - REFACTOR_AND_TEST_PACKET:
@@ -306,6 +324,7 @@ ROUTE_PACKETS:
     - SYMBOL: <name>
       KIND: <PG|CH>
       PATH: <path>
+      LOC_LINK: <path>:<line>
       DISPOSITION: <WEAK_EVIDENCE|UNTESTABLE_SEAM|MISSING_TEST>
       NEXT: /opsx-close-external-gap
 ```
@@ -315,6 +334,7 @@ ROUTE_PACKETS:
 * При отсутствии mixed FAIL `ROUTE_PACKETS` можно опустить.
 * Для `REFACTOR_AND_TEST_PACKET` не требуй и не передавай `base=` в close-команду.
 * Для `TEST_ONLY_PACKET` не включай PG/CH REFACTOR_AND_TEST items.
+* Каждый item в packet MUST содержать `LOC_LINK`.
 
 ## MIXED_FAIL_PIPELINE (mandatory when both packet types exist)
 
@@ -353,6 +373,7 @@ REFACTOR_AND_TEST_PACKET:
   - SYMBOL: <name>
     KIND: <PG|CH>
     PATH: <path>
+    LOC_LINK: <path>:<line>
     DISPOSITION: <WEAK_EVIDENCE|UNTESTABLE_SEAM|MISSING_TEST>
     NEXT: /opsx-close-external-gap
 ```
@@ -371,6 +392,7 @@ TEST_ONLY_PACKET:
   - SYMBOL: <name>
     KIND: <kind>
     PATH: <path>
+    LOC_LINK: <path>:<line>
     DISPOSITION: <MISSING_TEST|WEAK_EVIDENCE>
     NEXT: /opsx-test
 ```
@@ -440,8 +462,8 @@ COPY_PASTE_RUNBOOK:
 4. Если `change=` — optional read change artifacts / existing
    `TEST_COVERAGE_PACKET` / prior report (не реконструируй из chat).
 5. Inventory in-policy changed paths; detect surfaces; assign KIND +
-   MINIMUM_LEVEL (kind defaults выше). Для PG — также INTENT + session mode
-   + `HANDLER_INLINE_SM_CHECK`.
+   MINIMUM_LEVEL (kind defaults выше) + `LOC_LINK`. Для PG — также INTENT +
+   session mode + `HANDLER_INLINE_SM_CHECK`.
 6. Map tests; assign DISPOSITION (PG/CH mock → WEAK / UNTESTABLE;
    `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE` → WEAK;
    no injectable / no parent handoff → `UNTESTABLE_SEAM`, не stop на WEAK).
@@ -508,6 +530,7 @@ SURFACES:
 - KIND: <kind>
   SYMBOL: <qualname>
   PATH: <path>
+  LOC_LINK: <path>:<line>
   BOUNDARY: <short>
   MINIMUM_LEVEL: <level>
   INTENT: <WRITE|PURE_READ|READ_AFTER_WRITE|n/a>   # required when KIND=PG
@@ -516,7 +539,7 @@ SURFACES:
   NOTE: <short>   # e.g. PG_WRONG_SESSION_MODE | PG_IMPLICIT_SESSION_MODE | …
 
 GAPS:
-- <SYMBOL> (<KIND>): <DISPOSITION> → <pasteable next>
+- <SYMBOL> (<KIND>) @ <LOC_LINK>: <DISPOSITION> → <pasteable next>
 
 KIND_CLOSURE:
 - KIND: …
@@ -583,6 +606,7 @@ COPY_PASTE_RUNBOOK:
 * Не слать `base=` в `/opsx-close-external-gap`.
 * Не использовать `PG_SESSION_HYGIENE` как non-FAIL для bare.
 * Не печатать runbook с нерезолвнутыми `<BASE>`/`<HEAD>`, если refs уже известны.
+* Не печатать `PATH` без `LOC_LINK` для surface/gap/packet items.
 
 ## Optional handoff artifact (additive)
 
@@ -636,3 +660,4 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 - [ ] handler/inline `sm(...)` без child session arg → `UNTESTABLE_SEAM`
       (`NO_INJECTABLE_SEAM` / `NO_PARENT_SESSION_HANDOFF`), не только WEAK
 - [ ] changed PG/CH boundary без parent→child session/client handoff → `UNTESTABLE_SEAM` (`NO_PARENT_SESSION_HANDOFF`)
+- [ ] У каждого surface/gap/packet item есть `LOC_LINK` в формате `<path>:<line>`
