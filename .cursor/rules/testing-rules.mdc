@@ -148,6 +148,12 @@ fixture без проверки mode. Executable tokens:
 минимальный production seam (inject session/client). Это **не** `/opsx-test`
 alone:
 
+- Для **new/changed** PG/CH boundary-кода проектный default: предусматривать
+  injectable seam (session/client/provenance session) в callable, который
+  проверяется тестами. Паттерн «session/client создаётся только внутри функции»
+  считать external-call gap класса `REFACTOR_AND_TEST` (обычно
+  `UNTESTABLE_SEAM` с `NOTE=NO_INJECTABLE_SEAM`), а не закрывать unit-mock
+  доказательством.
 - TEST_ONLY → `/opsx-test`
 - REFACTOR_AND_TEST → `/opsx-close-external-gap` (вход = coverage packet, **без** `base=`)
 
