@@ -7,18 +7,16 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 27
+- inventory_count: 30
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: d7bfbdc7bdd107d6f35a0913f21864d8b0eb5afd
+- source_commit: 835e7ea19897ad5ca5d535fe987be6aa86f78502
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-28T22:30:00Z: Owner activated invariant-family fanout
-  V8–V10 on /opsx-bug-team (ACTIVE_V1_WITH_INVARIANT_FANOUT_V10;
-  BUG_FAMILY_FANOUT_ENABLED=true). Controlling verdict
-  INDEPENDENT_EXECUTION_IDENTITY_TARGETED_RERUN_PASS. Command-native v2
-  remains planned separately.
+  UPDATE GO 2026-07-29T05:18:39Z: inventory 30; fingerprint
+  4c572a4fbfabce2cea414878b844f11e; added /opsx-external-call-coverage
+  after pyright-strict-coverage in post-apply soft chain.
 
 ## States
 
@@ -28,7 +26,7 @@
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
 - implementing: `/opsx-apply` in progress
-- impl_done: tasks complete; soft-recommend coverage when production `.py`, then verify
+- impl_done: tasks complete; soft-recommend pyright then external-call coverage when production `.py`, then verify
 - verify_pass: archive-eligible after `/opsx-verify`
 - verify_fail: back to apply/update
 - archived: `/opsx-archive` done
@@ -94,6 +92,9 @@
 - coverage_pass: `/opsx-pyright-strict-coverage` — in-policy diff ⊆ strict include
 - coverage_gaps: missing include and/or HIT_EXCLUDE; needs GO or manual include
 - blocked_needs_base: coverage command missing/invalid `base=`
+- external_call_pass: `/opsx-external-call-coverage` — external surfaces adequately tested
+- external_call_gaps: MISSING_TEST / WEAK_EVIDENCE / UNTESTABLE_SEAM / DEFERRED_OWNER
+- focus_pass_incomplete_gate: external-call PASS with focus≠all (full gate not closed)
 - static_check_done: `/opsx-static-check` synthesized
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
@@ -157,7 +158,7 @@
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
 - artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
-- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
+- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
 - known_flaws: none recorded (ADL budget-exhaust→NO_GO closed 2026-07-27); task delta ≠ auto GO
 
 ### /opsx-pyright-strict-coverage
@@ -167,8 +168,18 @@
 - artifacts_read: git diff base...head; pyrightconfig_strict.json
 - artifacts_written: none without GO; with GO only additive include[] entries
 - decision_owner: coverage auditor; include expansion only with owner GO
-- next_typical: /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
+- next_typical: /opsx-external-call-coverage | /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
 - known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy
+
+### /opsx-external-call-coverage
+- purpose: audit base..head production external-call surfaces (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests per testing-rules
+- input_state: coverage_pass | impl_done | implementing | product_dirty | external_call_gaps
+- output_state: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
+- artifacts_read: git diff base...head; app/**; tests/**; testing-rules.mdc; optional EXTERNAL_CALL_COVERAGE_REPORT / change artifacts
+- artifacts_written: none (v1 read-only; chat report / optional pasted EXTERNAL_CALL_COVERAGE_REPORT)
+- decision_owner: coverage auditor for dispositions; archive remains /opsx-verify; seams → /opsx-apply; tests → /opsx-test
+- next_typical: /opsx-static-check | /opsx-test | /opsx-apply (UNTESTABLE_SEAM) | /opsx-verify | rerun with focus=all
+- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep front-doors)
 
 ### /opsx-materialize-bug-queue
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist
@@ -413,8 +424,14 @@ change_idea --/opsx-ff--> apply_ready
 artifacts_in_progress --/opsx-continue--> apply_ready
 apply_ready --/opsx-apply--> implementing|impl_done
 impl_done --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
+coverage_pass --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
+external_call_pass --/opsx-static-check--> static_check_done
 coverage_pass --/opsx-static-check--> static_check_done
 coverage_gaps --/opsx-pyright-strict-coverage GO|/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
+external_call_gaps --/opsx-test|/opsx-apply--> tests_authored|implementing
+external_call_gaps --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
+focus_pass_incomplete_gate --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
+impl_done --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 impl_done --/opsx-verify--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
@@ -495,7 +512,7 @@ family_learning --/opsx-bug-team CLOSURE--> family_closed
 # resume: /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
-implementing|impl_done|coverage_pass --/opsx-static-check--> static_check_done
+implementing|impl_done|coverage_pass|external_call_pass --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
 # command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
@@ -513,10 +530,22 @@ lifecycle authority.
 
 After `/opsx-apply` when production Python changed (`app/**/*.py` or
 top-level production scripts): recommend
-`/opsx-pyright-strict-coverage base=<BASE>` before `/opsx-static-check`
-and `/opsx-verify`. `PASS` pyright-strict alone does **not** prove changed
-files are in `pyrightconfig_strict.json` include. Soft recommend — does not
-block archive by itself.
+`/opsx-pyright-strict-coverage base=<BASE>` before
+`/opsx-external-call-coverage`, `/opsx-static-check`, and `/opsx-verify`.
+`PASS` pyright-strict alone does **not** prove changed files are in
+`pyrightconfig_strict.json` include. Soft recommend — does not block
+archive by itself.
+
+### Post-apply external-call coverage
+
+After pyright-coverage `PASS` (or when allowlist already known good) and
+production `.py` changed: recommend
+`/opsx-external-call-coverage base=<BASE>` before `/opsx-static-check` and
+`/opsx-verify`. One command covers HTTP/WB/PG/CH/Redis/OTHER via kind
+taxonomy (`focus=` optional for debug only). Soft recommend — absence of
+report does not auto-`NO_GO` verify; open gaps in a present
+`EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not** replace
+`TEST_COVERAGE_PACKET`.
 
 ### Pre-Bugbot primary hunt
 
@@ -684,8 +713,10 @@ command-contract classes (F6).
 - Pre-PR product/runtime: `/opsx-project-bug-hunt` receipt before `/opsx-create-pr`
   (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
 - After apply with production `.py`: soft recommend
-  `/opsx-pyright-strict-coverage base=<BASE>` before `/opsx-static-check` /
-  `/opsx-verify` (allowlist coverage ≠ checker PASS)
+  `/opsx-pyright-strict-coverage base=<BASE>` then
+  `/opsx-external-call-coverage base=<BASE>` before `/opsx-static-check` /
+  `/opsx-verify` (allowlist coverage ≠ checker PASS; external-call PASS ≠
+  archive GO; kinds stay inside one command)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`

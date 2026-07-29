@@ -14,6 +14,9 @@ Authority split (не дублировать полный policy в commands):
 - `openspec/config.yaml` → `rules.tasks` — обязательства при генерации tasks
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + materialization обязательных tests
+- `/opsx-pyright-strict-coverage` — diff allowlist coverage для pyright-strict
+- `/opsx-external-call-coverage` — executable diff gate: external surfaces
+  (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests; kind taxonomy внутри одной команды
 - `/opsx-verify` — независимая adequacy-проверка и archive verdict `GO` / `NO_GO`
 
 Устаревший файл `.cursor/rules/TESTING_RULES.mdc` — только migration pointer; не использовать как policy.
@@ -124,6 +127,20 @@ Full E2E не требуется автоматически.
 - Не выдумывай mandatory scenarios без evidence из spec / decision / task / invariant / materialized packet.
 - Не меняй invariant ради удобства теста.
 - Final adequacy и archive readiness объявляет только `/opsx-verify`.
+
+## `/opsx-external-call-coverage` (diff-scoped executable gate)
+
+- Команда: `.cursor/commands/opsx-external-call-coverage.md`.
+- Вход: `base=` (обязателен); inventory `base...HEAD` external surfaces
+  (HTTP / WB_WRITE / PG / CH / REDIS / OTHER) внутри **одной** команды.
+- Этот rule остаётся design/execution policy; executable PASS/FAIL gate —
+  команда, не этот файл.
+- Не требуй `-m integration` для каждого surface: используй Minimum test level.
+- Не создавай отдельные kind-команды (`/opsx-ch-coverage` и т.п.).
+- `EXTERNAL_CALL_COVERAGE_REPORT` — additive для `/opsx-verify`; absence ≠
+  auto archive `NO_GO`.
+- Gaps: `/opsx-test` (testable) или `/opsx-apply` (UNTESTABLE_SEAM) — не
+  чинить production внутри coverage-команды.
 
 ## CallbackQuery answer (Dispatcher pre-answer middleware)
 

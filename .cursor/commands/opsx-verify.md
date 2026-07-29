@@ -54,6 +54,32 @@ not_applicable
 
 Verify блокирует archive только при доказанном test-coverage mismatch, слабом тестовом evidence либо отсутствии обязательного behavioral scenario, которое следует из specification, invariant или materialized `TEST_COVERAGE_PACKET`.
 
+## Additive external-call coverage assurance
+
+Если в change artifacts, context files или явно переданном output присутствует
+блок `EXTERNAL_CALL_COVERAGE_REPORT` (из `/opsx-external-call-coverage`),
+verify должен независимо проверить, что перечисленные `GAPS` с
+`MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` закрыты актуальными
+tests (или owner-deferral явно задокументирован вне archive path).
+
+`EXTERNAL_CALL_COVERAGE_REPORT` — additive evidence contract (sibling к
+`TEST_COVERAGE_PACKET`, но diff/base-owned, не invariant-owned).
+
+Он не меняет:
+
+* legacy eligibility verify при absence report;
+* основной verdict contract / archive routing markers;
+* право verify не становиться general bug hunter / полным re-scan diff.
+
+Отсутствие `EXTERNAL_CALL_COVERAGE_REPORT` не даёт автоматический `NO_GO`.
+Наличие report со всё ещё открытыми FAIL-gaps → учитывай как test-coverage
+/ weak-evidence blocker (как packet mismatch), со ссылкой на surface.
+
+Verify не должен заново изобретать полный external-call inventory, если
+report отсутствует; soft recommend владельцу:
+`/opsx-external-call-coverage base=<BASE>` когда production `.py` в change
+и report не передан.
+
 Verify не должен превращаться в общий bug hunter.
 
 Он проверяет, доказано ли тестами уже сформулированное требование или invariant.
@@ -229,6 +255,33 @@ Compatibility mode: legacy
 и продолжай обычный verify.
 
 Отсутствие packet не отменяет существующую обязанность verify сопоставить implementation и tests со specification.
+
+#### EXTERNAL_CALL_COVERAGE_REPORT discovery
+
+Если среди прочитанных artifacts или context files найден блок
+`EXTERNAL_CALL_COVERAGE_REPORT`, извлеки:
+
+* `STATUS`;
+* `BASE` / `HEAD` / `FOCUS`;
+* `EXTERNAL_SURFACES`;
+* `GAPS` (KIND / SYMBOL / DISPOSITION);
+* `EVIDENCE_SUMMARY` если есть.
+
+Не реконструируй полный diff-inventory заново, если report отсутствует.
+
+Если report отсутствует, зафиксируй:
+
+```text
+External-call coverage report: absent
+Compatibility mode: legacy
+Soft recommend: /opsx-external-call-coverage base=<BASE> (when production .py changed)
+```
+
+и продолжай обычный verify (absence ≠ auto `NO_GO`).
+
+Если report присутствует со STATUS=FAIL или незакрытыми GAPS — проверь,
+закрыты ли они сейчас; открытые FAIL-gaps → archive `NO_GO` с точными
+surface references.
 
 ### 5. Architecture Decision Lookup
 
@@ -712,8 +765,11 @@ or:
 * Use exact file/function references for placement findings.
 * Keep one overall verdict. No mixed top-level success plus archive `NO_GO`.
 * Treat `TEST_COVERAGE_PACKET` as additive evidence only.
-* Do not change legacy verify eligibility when the packet is absent.
+* Treat `EXTERNAL_CALL_COVERAGE_REPORT` as additive evidence only (diff/base-owned; not a substitute for packet).
+* Do not change legacy verify eligibility when the packet or external-call report is absent.
 * Do not issue `NO_GO` from packet status alone.
+* Do not invent a full external-call inventory during verify when the report is absent; soft-recommend `/opsx-external-call-coverage` instead.
+* When the report is present, do not ignore still-open `MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` gaps.
 * Do not infer coverage from test names, task checkboxes, or green suite status.
 * Do not accept synthetic production fields, impossible states, or wrong-owner identity as realistic test setup.
 * Do not accept a test that fully mocks the causal boundary it claims to verify.
@@ -722,8 +778,10 @@ or:
 * Do not require every failure mode mechanically; require only invariant-relevant cases.
 * Preserve one overall verdict and the existing final marker.
 * Do not turn verify into a general repository review or random bug hunt.
-* Do not modify `TEST_COVERAGE_PACKET` during verify.
+* Do not modify `TEST_COVERAGE_PACKET` or `EXTERNAL_CALL_COVERAGE_REPORT` during verify.
 * Do not silently promote a provisional scenario to a mandatory blocker without specification or invariant evidence.
 * Do not treat an `unknown` scenario as automatically `not_covered`.
 * Do not treat absence of packet as proof that coverage is sufficient.
 * Do not treat presence of packet as proof that its scenarios are implemented.
+* Do not treat absence of `EXTERNAL_CALL_COVERAGE_REPORT` as proof that external surfaces are covered.
+* Do not treat presence of the report as proof that its gaps are closed.

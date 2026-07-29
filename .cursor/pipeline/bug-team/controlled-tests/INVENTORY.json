@@ -1,8 +1,8 @@
 {
   "FINGERPRINT_ALGORITHM": "md5",
   "FINGERPRINT_INPUT_MODE": "names_only_newline_joined",
-  "INVENTORY_COUNT": 29,
-  "GRAPH_NODE_COUNT": 29,
+  "INVENTORY_COUNT": 30,
+  "GRAPH_NODE_COUNT": 30,
   "NAMES": [
     "opsx-apply.md",
     "opsx-archive.md",
@@ -15,6 +15,7 @@
     "opsx-continue.md",
     "opsx-create-pr.md",
     "opsx-explore.md",
+    "opsx-external-call-coverage.md",
     "opsx-fanout-bug-hunt.md",
     "opsx-ff.md",
     "opsx-fix-bug.md",
@@ -34,8 +35,8 @@
     "opsx-update.md",
     "opsx-verify.md"
   ],
-  "FINGERPRINT": "0e2d79fbe644ebd0e5848106350aaac8",
+  "FINGERPRINT": "4c572a4fbfabce2cea414878b844f11e",
   "REPRODUCTION_COMMAND": "python -c \"from pathlib import Path; import hashlib; ex={...}; names=sorted(p.name for p in Path('.cursor/commands').glob('opsx-*.md') if p.name not in ex); print(len(names), hashlib.md5(chr(10).join(names).encode()).hexdigest())\"",
   "INVENTORY_PATH": ".cursor\\pipeline\\bug-team\\controlled-tests\\INVENTORY.json",
-  "INVENTORY_CONTENT_SHA256": "b70719937f8abfd87240359c31b64a7371da8db2f874ec01ed5baee077471473"
+  "INVENTORY_CONTENT_SHA256": "02f6c582026be14c9868249d1c05d8f59e5cb10b666176dd4fbd18d1714d01cd"
 }

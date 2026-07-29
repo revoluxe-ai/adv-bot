@@ -20,6 +20,7 @@ Implement tasks from an OpenSpec change.
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + test materialization for owning tasks
 - `/opsx-pyright-strict-coverage` — post-apply soft recommend when production `.py` changed
+- `/opsx-external-call-coverage` — after pyright-coverage PASS; soft recommend for external surfaces in diff
 - `/opsx-verify` — independent adequacy and archive verdict
 
 **Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -146,13 +147,15 @@ Implement tasks from an OpenSpec change.
    (`app/**/*.py` или top-level production `*.py` в корне, не `tests/**`):
    - Primary: `/opsx-pyright-strict-coverage base=<BASE>`
    - Если `BASE` неизвестен — спроси один раз: «На какую base branch/ref
-     сверять pyright-strict coverage?» Не выдумывай base.
-   - After coverage `PASS`: recommend `/opsx-static-check`, затем
-     `/opsx-verify <change-name>`.
+     сверять pyright-strict / external-call coverage?» Не выдумывай base.
+   - After pyright-coverage `PASS`: recommend
+     `/opsx-external-call-coverage base=<BASE>`, затем после его `PASS`
+     (`focus=all`) — `/opsx-static-check`, затем `/opsx-verify <change-name>`.
 2. Иначе (нет in-policy production `.py`):
    - Primary: `/opsx-verify <change-name>`.
 3. Bug-episode path: `/opsx-test … verify` остаётся обязательным GREEN writer
-   где применимо; coverage recommend — дополнительно, когда трогали production `.py`.
+   где применимо; coverage recommends — дополнительно, когда трогали
+   production `.py`.
 
 Не объявляй archive readiness из apply.
 
@@ -188,7 +191,8 @@ Implementation tasks complete.
 
 If production Python changed (`app/**/*.py` or top-level production scripts):
   Next: `/opsx-pyright-strict-coverage base=<BASE>`
-  Then: `/opsx-static-check` (after coverage PASS)
+  Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
+  Then: `/opsx-static-check` (after external-call PASS, focus=all)
   Then: `/opsx-verify <change-name>`
 Else:
   Next: `/opsx-verify <change-name>`
@@ -337,7 +341,7 @@ Never rewrite prior JSONL lines.
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience
-- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` when production `.py` changed, else `/opsx-verify <change-name>`)
+- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage` when production `.py` changed, else `/opsx-verify <change-name>`)
 
 **Fluid Workflow Integration**
 
