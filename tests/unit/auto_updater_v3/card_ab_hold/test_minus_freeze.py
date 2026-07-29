@@ -472,6 +472,7 @@ def _setup_complex_adv() -> SimpleNamespace:
     """
     adv_setting = SimpleNamespace(
         id=555,
+        adv_id=9,  # AdvSettingRedisCache key (ENTER common-bid reset)
         nmids=[101],
         max_price_for_order=100,
         card_ab_hold_mode="pending_setup",
@@ -530,6 +531,11 @@ async def _run_setup_with_keywords(
             MagicMock(return_value=container),
         ),
         patch(f"{_PIPELINES}.apply_ab_hold_setup_mutations", apply_mock),
+        # Isolate setup body from §19 ENTER common-bid Redis/WB (not under test).
+        patch(
+            f"{_PIPELINES}.ensure_search_common_bid_reset_on_enter",
+            new_callable=AsyncMock,
+        ),
     ):
         await process_ab_setup(
             complex_adv,  # type: ignore[arg-type]
