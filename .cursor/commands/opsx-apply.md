@@ -13,6 +13,8 @@ Implement tasks from an OpenSpec change.
 
 **Canonical testing rule:** Before implementation, read `.cursor/rules/testing-rules.mdc` as the only general test-design/execution policy. Do not treat `.cursor/rules/TESTING_RULES.mdc` as policy (migration pointer only). Do not copy large test-policy blocks into this command; follow the authority split below.
 
+**PG session mode:** New/changed production `sm(...)` / `get_async_session_maker(...)` MUST use explicit `read_only=` per intent (WRITE/RAW → `False`, PURE_READ → `True`). Bare `sm()` forbidden — see testing-rules § PG session mode; coverage will WEAK `PG_IMPLICIT_SESSION_MODE`.
+
 **Authority split for tests:**
 
 - `.cursor/rules/testing-rules.mdc` — general test-design and execution

@@ -124,6 +124,9 @@ NEXT_ACTION: /opsx-close-external-gap
 ```
 
   (paste the coverage report; no `base=` on close).
+- PG `sm(...)`: только явный `read_only=` (testing-rules § PG session mode).
+  Bare `sm()` / wrong polarity — не TEST_ONLY; → `/opsx-close-external-gap`
+  (или apply), не unit session-mock.
 - Prefer minimal targeted tests over broad rewrites.
 - Do not create fake passing tests that only assert trivial behavior.
 - In bug-regression / verify modes: also allow durable writes under
