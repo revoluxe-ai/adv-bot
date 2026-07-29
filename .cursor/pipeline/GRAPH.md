@@ -7,16 +7,16 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 30
+- inventory_count: 31
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: 835e7ea19897ad5ca5d535fe987be6aa86f78502
+- source_commit: c445c45ab28d3cf6dc3d06f381b2155f927db0fa
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-29T05:18:39Z: inventory 30; fingerprint
-  4c572a4fbfabce2cea414878b844f11e; added /opsx-external-call-coverage
-  after pyright-strict-coverage in post-apply soft chain.
+  UPDATE GO 2026-07-29T05:36:55Z: inventory 31; fingerprint
+  6b60f06b851ee1655b67a6887111b997; added /opsx-close-external-gap
+  for PG/CH REFACTOR_AND_TEST (packet-in, no base=).
 
 ## States
 
@@ -95,6 +95,8 @@
 - external_call_pass: `/opsx-external-call-coverage` — external surfaces adequately tested
 - external_call_gaps: MISSING_TEST / WEAK_EVIDENCE / UNTESTABLE_SEAM / DEFERRED_OWNER
 - focus_pass_incomplete_gate: external-call PASS with focus≠all (full gate not closed)
+- external_gap_closing: `/opsx-close-external-gap` REFACTOR_AND_TEST (PG/CH) in progress
+- external_gap_closed: close STATUS=CLOSED; await focused re-audit
 - static_check_done: `/opsx-static-check` synthesized
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
@@ -173,13 +175,23 @@
 
 ### /opsx-external-call-coverage
 - purpose: audit base..head production external-call surfaces (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests per testing-rules
-- input_state: coverage_pass | impl_done | implementing | product_dirty | external_call_gaps
+- input_state: coverage_pass | impl_done | implementing | product_dirty | external_call_gaps | external_gap_closed
 - output_state: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
 - artifacts_read: git diff base...head; app/**; tests/**; testing-rules.mdc; optional EXTERNAL_CALL_COVERAGE_REPORT / change artifacts
 - artifacts_written: none (v1 read-only; chat report / optional pasted EXTERNAL_CALL_COVERAGE_REPORT)
-- decision_owner: coverage auditor for dispositions; archive remains /opsx-verify; seams → /opsx-apply; tests → /opsx-test
-- next_typical: /opsx-static-check | /opsx-test | /opsx-apply (UNTESTABLE_SEAM) | /opsx-verify | rerun with focus=all
-- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep front-doors)
+- decision_owner: coverage auditor for dispositions; archive remains /opsx-verify
+- next_typical: /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
+- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration
+
+### /opsx-close-external-gap
+- purpose: REFACTOR_AND_TEST closure for PG/CH gaps from coverage packet (minimal seam + live integration); no base=
+- input_state: external_call_gaps
+- output_state: external_gap_closed | external_gap_closing | external_call_gaps | tests_authored | implementing
+- artifacts_read: pasted EXTERNAL_CALL_COVERAGE_REPORT / GAPS; testing-rules; gap PATH symbols
+- artifacts_written: minimal app/** seam + tests/integration/** when REFACTOR_AND_TEST
+- decision_owner: closure writer; TEST_ONLY redirects to /opsx-test; oversized seam → /opsx-apply
+- next_typical: /opsx-external-call-coverage base=<PACKET_BASE> focus=pg|ch | /opsx-test | /opsx-apply
+- known_flaws: must not accept base=; session-mock unit ≠ CLOSED for PG/CH
 
 ### /opsx-materialize-bug-queue
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist
@@ -428,7 +440,9 @@ coverage_pass --/opsx-external-call-coverage--> external_call_pass|external_call
 external_call_pass --/opsx-static-check--> static_check_done
 coverage_pass --/opsx-static-check--> static_check_done
 coverage_gaps --/opsx-pyright-strict-coverage GO|/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
-external_call_gaps --/opsx-test|/opsx-apply--> tests_authored|implementing
+external_call_gaps --/opsx-test--> tests_authored
+external_call_gaps --/opsx-close-external-gap--> external_gap_closed|external_gap_closing|external_call_gaps
+external_gap_closed --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 external_call_gaps --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
 focus_pass_incomplete_gate --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
 impl_done --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
@@ -546,6 +560,12 @@ taxonomy (`focus=` optional for debug only). Soft recommend — absence of
 report does not auto-`NO_GO` verify; open gaps in a present
 `EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not** replace
 `TEST_COVERAGE_PACKET`.
+
+Closure split after FAIL:
+
+* TEST_ONLY (Redis/WB/…) → `/opsx-test` → focused re-audit
+* REFACTOR_AND_TEST (PG/CH) → `/opsx-close-external-gap` with pasted
+  report (**no** `base=` on close) → focused re-audit
 
 ### Pre-Bugbot primary hunt
 
@@ -716,7 +736,8 @@ command-contract classes (F6).
   `/opsx-pyright-strict-coverage base=<BASE>` then
   `/opsx-external-call-coverage base=<BASE>` before `/opsx-static-check` /
   `/opsx-verify` (allowlist coverage ≠ checker PASS; external-call PASS ≠
-  archive GO; kinds stay inside one command)
+  archive GO; kinds stay inside one audit; PG/CH FAIL →
+  `/opsx-close-external-gap` packet-in, not per-dep audit commands)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
