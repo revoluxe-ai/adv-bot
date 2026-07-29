@@ -23,6 +23,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select
+from sqlalchemy.orm import noload
 
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_lifecycle import (
@@ -650,8 +651,11 @@ async def _load_adv(adv_setting_original_id: int) -> AdvSetting | None:
 async def _abort_epoch_to_off(adv: AdvSetting) -> None:
     """Abort epoch attempt → OFF (§8, nothing durable to clear on fresh S1)."""
     async with sm(read_only=False) as session:
+        # noload: abort пишет только AdvSetting; full WBCabinet join не нужен.
         row = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == adv.id)
+            select(AdvSetting)
+            .options(noload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == adv.id)
         )
         if row is None:
             return
