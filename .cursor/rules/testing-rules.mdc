@@ -154,6 +154,11 @@ alone:
   считать external-call gap класса `REFACTOR_AND_TEST` (обычно
   `UNTESTABLE_SEAM` с `NOTE=NO_INJECTABLE_SEAM`), а не закрывать unit-mock
   доказательством.
+- Preferred seam pattern для PG/CH: lifecycle session/client держать в parent
+  orchestration callable и передавать dependency в child callable, где
+  выполняется store-работа. Child-only создание session/client без handoff
+  для changed boundary считать gap класса `REFACTOR_AND_TEST`
+  (`NOTE=NO_PARENT_SESSION_HANDOFF`) до рефактора.
 - TEST_ONLY → `/opsx-test`
 - REFACTOR_AND_TEST → `/opsx-close-external-gap` (вход = coverage packet, **без** `base=`)
 

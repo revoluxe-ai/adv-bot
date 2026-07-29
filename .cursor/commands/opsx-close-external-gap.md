@@ -125,6 +125,11 @@ COVERED после close **только** если:
   PURE_READ → `sm(read_only=True)`.
   Seam, который оставляет bare `sm()` или wrong polarity, **не** CLOSED.
   При production edit на WRITE/READ path: bare → переписать в required call.
+* для **PG/CH** preferred testability seam: parent callable открывает
+  session/client и передаёт в child callable, где выполняется store-операция.
+  Child-only создание session/client без handoff для changed boundary считать
+  `REFACTOR_AND_TEST` gap (`NOTE=NO_PARENT_SESSION_HANDOFF`) и не закрывать
+  только integration-assert'ом вокруг внешнего orchestration.
 
 **Не** считать закрытием:
 
@@ -143,6 +148,8 @@ Allowed:
 
 * минимальный production seam в `app/**` для inject session/CH client /
   DI (без бизнес-переписывания вне gap);
+* при `NO_PARENT_SESSION_HANDOFF`: поднять открытие session/client в parent и
+  передать dependency в child callable, где находится PG/CH работа;
 * на том же seam pass: bare `sm()` → явный `sm(read_only=…)` по INTENT;
 * `tests/integration/**` (+ fixtures/helpers под integration);
 * docstring на изменённых публичных символах (project documentation rule).

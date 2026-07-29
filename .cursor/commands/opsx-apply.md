@@ -14,6 +14,7 @@ Implement tasks from an OpenSpec change.
 **Canonical testing rule:** Before implementation, read `.cursor/rules/testing-rules.mdc` as the only general test-design/execution policy. Do not treat `.cursor/rules/TESTING_RULES.mdc` as policy (migration pointer only). Do not copy large test-policy blocks into this command; follow the authority split below.
 
 **PG session mode:** New/changed production `sm(...)` / `get_async_session_maker(...)` MUST use explicit `read_only=` per intent (WRITE/RAW → `False`, PURE_READ → `True`). Bare `sm()` forbidden — see testing-rules § PG session mode; coverage will WEAK `PG_IMPLICIT_SESSION_MODE`.
+For PG/CH testability seams, default to parent→child handoff: open session/client in the parent orchestration callable and pass it to the child callable that performs store work; avoid hidden session/client creation only inside deep child callables.
 
 **Authority split for tests:**
 
@@ -336,6 +337,7 @@ Never rewrite prior JSONL lines.
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
+- For new/changed PG/CH boundaries, prefer parent-opened session/client passed into child callables that execute DB/CH logic; treat hidden child-only session/client creation as a refactor gap unless explicitly justified by design constraints
 - After implementing tasks, treat any new production/exported symbol whose only callers are tests as dead surface: wire it into a runtime-reachable path or remove it before completion. Passing tests do not prove wiring.
 - Update task checkbox immediately after completing each task; never mark `[x]` when mandatory tests for that task fail
 - When a completed task closes a decision-delta, sync every status mirror in the same pass: the tasks.md checkbox, the decision.md review-checklist annotation, and the design.md checklist/status mirror if present. Do not leave a shipped delta marked "proposed / not yet applied".
