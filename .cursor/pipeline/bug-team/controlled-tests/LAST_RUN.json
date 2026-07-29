@@ -108,7 +108,7 @@
     "MSG": "partial WAVE_2 stop"
   },
   "X_PREMATURE_ACTIVE": {
-    "PASS": true,
+    "PASS": false,
     "MSG": "premature ACTIVE transition forbidden in candidate status"
   },
   "X_PASS_ALREADY": {
