@@ -116,7 +116,7 @@ async def test_card_ab_hold_back_reloads_adv_setting_menu_not_closed_dead_end() 
             CardAbHoldBack(adv_setting_original_id=adv.id),
         )
 
-    query.answer.assert_awaited()
+    query.answer.assert_not_awaited()
     resolve_cabinet.assert_awaited_once()
     mock_menu_cls.assert_called_once_with(
         query.bot, msg.chat.id, wb_uc, adv

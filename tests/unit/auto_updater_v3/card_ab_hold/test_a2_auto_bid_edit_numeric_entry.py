@@ -97,19 +97,38 @@ def _callback(*, adv_id: int = 42, revision: int = 1) -> CahAutoBidEdit:
     )
 
 
-def _answer_texts(query: MagicMock) -> list[str]:
+def _user_notice_texts(query: MagicMock) -> list[str]:
+    """Тексты user-visible notice (message.answer / bot.send_message), не CallbackQuery.answer."""
     texts: list[str] = []
-    for call in query.answer.await_args_list:
-        if call.args:
-            texts.append(str(call.args[0]))
-        elif "text" in call.kwargs:
-            texts.append(str(call.kwargs["text"]))
+    for mock in (
+        getattr(query.message, "answer", None),
+        getattr(query, "bot", None) and getattr(query.bot, "send_message", None),
+        getattr(getattr(query.message, "bot", None), "send_message", None),
+        getattr(query, "answer", None),  # legacy / forbidden path — still scan for TODO stub
+    ):
+        if mock is None or not hasattr(mock, "await_args_list"):
+            continue
+        for call in mock.await_args_list:
+            if call.args:
+                # bot.send_message(chat_id, text) — text is args[1]
+                if mock is getattr(getattr(query, "bot", None), "send_message", None) or mock is getattr(
+                    getattr(query.message, "bot", None), "send_message", None
+                ):
+                    if len(call.args) >= 2:
+                        texts.append(str(call.args[1]))
+                    elif "text" in call.kwargs:
+                        texts.append(str(call.kwargs["text"]))
+                else:
+                    texts.append(str(call.args[0]))
+            elif "text" in call.kwargs:
+                texts.append(str(call.kwargs["text"]))
     return texts
 
 
 def _todo_stub_alert_present(query: MagicMock) -> bool:
     return any(
-        any(marker in text for marker in _TODO_STUB_MARKERS) for text in _answer_texts(query)
+        any(marker in text for marker in _TODO_STUB_MARKERS)
+        for text in _user_notice_texts(query)
     )
 
 
@@ -211,9 +230,10 @@ async def test_on_auto_bid_edit_does_not_todo_alert() -> None:
     ):
         await confirm_handlers.on_auto_bid_edit(query, callback, state)
 
+    query.answer.assert_not_awaited()
     assert not _todo_stub_alert_present(query), (
         "FINDING-PBH-002: on_auto_bid_edit answered TODO stub alert "
-        f"{_answer_texts(query)!r}; UX requires numeric-entry sub-flow, not TODO"
+        f"{_user_notice_texts(query)!r}; UX requires numeric-entry sub-flow, not TODO"
     )
 
 
@@ -242,9 +262,10 @@ async def test_on_auto_bid_edit_opens_numeric_entry_subflow() -> None:
     ):
         await confirm_handlers.on_auto_bid_edit(query, callback, state)
 
+    query.answer.assert_not_awaited()
     assert not _todo_stub_alert_present(query), (
         "FINDING-PBH-002: TODO stub alert is not numeric-entry "
-        f"(answers={_answer_texts(query)!r})"
+        f"(answers={_user_notice_texts(query)!r})"
     )
     draft = await load_draft(state, int(adv.id))
     opened = await _numeric_entry_opened(state, draft, query)
@@ -282,9 +303,10 @@ async def test_auto_bid_edit_flow_can_update_draft_auto_bid() -> None:
     ):
         await confirm_handlers.on_auto_bid_edit(query, callback, state)
 
+    query.answer.assert_not_awaited()
     assert not _todo_stub_alert_present(query), (
         "FINDING-PBH-002: TODO stub leaves draft auto_bid immutable "
-        f"(answers={_answer_texts(query)!r})"
+        f"(answers={_user_notice_texts(query)!r})"
     )
 
     draft_mid = await load_draft(state, int(adv.id))

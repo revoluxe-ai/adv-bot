@@ -79,6 +79,7 @@ def _adv_after_tp_confirm(adv: SimpleNamespace) -> SimpleNamespace:
 def _make_query() -> MagicMock:
     msg = MagicMock(spec=Message)
     msg.edit_text = AsyncMock()
+    msg.answer = AsyncMock()
     query = MagicMock()
     query.message = msg
     query.answer = AsyncMock()

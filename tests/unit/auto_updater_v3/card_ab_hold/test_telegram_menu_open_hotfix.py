@@ -119,7 +119,7 @@ async def test_menu_open_sends_new_message_for_text_and_media_callbacks(
     msg.answer.assert_awaited_once()
     msg.edit_text.assert_not_awaited()
     msg.edit_caption.assert_not_awaited()
-    query.answer.assert_awaited_once_with()
+    query.answer.assert_not_awaited()
     session.commit.assert_not_awaited()
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
 
@@ -166,6 +166,9 @@ async def test_menu_open_unsupported_message_type_alerts_and_keeps_state() -> No
     adv = _make_adv()
     session, session_cm = _make_session(adv)
     query = _make_query(object())
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     before_mode = adv.card_ab_hold_mode
 
     with (
@@ -178,10 +181,10 @@ async def test_menu_open_unsupported_message_type_alerts_and_keeps_state() -> No
             query, CardAbHoldMenu(adv_setting_original_id=adv.id)
         )
 
-    query.answer.assert_awaited_once()
-    alert_text = query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    query.bot.send_message.assert_awaited_once()
+    alert_text = query.bot.send_message.await_args.args[1]
     assert "неподдерживаемый тип" in alert_text.lower()
-    assert query.answer.await_args.kwargs.get("show_alert") is True
     assert adv.card_ab_hold_mode == before_mode
     session.commit.assert_not_awaited()
 
