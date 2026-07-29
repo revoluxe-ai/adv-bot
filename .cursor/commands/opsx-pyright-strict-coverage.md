@@ -14,8 +14,9 @@ argument-hint: "base=<branch|ref> [head=<ref>] [GO]"
 ## What this is
 
 * Coverage audit: branch diff ⊆ strict-include (minus exclude).
-* Рекомендуемый шаг **после** `/opsx-apply`, **до** `/opsx-static-check` и
-  `/opsx-verify`, когда в сессии/diff есть production `.py`.
+* Рекомендуемый шаг **после** `/opsx-apply`, **до**
+  `/opsx-external-call-coverage`, `/opsx-static-check` и `/opsx-verify`,
+  когда в сессии/diff есть production `.py`.
 * Опционально `GO`: только **additive** записи в `include[]`.
 
 ## What this is NOT
@@ -24,6 +25,7 @@ argument-hint: "base=<branch|ref> [head=<ref>] [GO]"
 * NOT разбор/фикс typing diagnostics (→ `/opsx-fix-types`).
 * NOT archive / adequacy verdict (→ `/opsx-verify`).
 * NOT ослабление `typeCheckingMode`, удаление `exclude`, suppressions.
+* NOT external-call / integration coverage (→ `/opsx-external-call-coverage`).
 * NOT `/opsx-project-bug-hunt` и не product-bug triage.
 
 ## User input
@@ -195,10 +197,13 @@ DO_NOT_DO_YET:
   (отдельное решение; **эта** команда с GO exclude не трогает) или
   вынести код из excluded path.
 * `PASS` →  
-  `/opsx-static-check`  
-  затем `/opsx-verify <change-name>` если есть активный change.
-* После успешного `GO` write → обязательно `/opsx-static-check` (новый include
-  может вскрыть diagnostics → `/opsx-fix-types`).
+  `/opsx-external-call-coverage base=<BASE>`  
+  затем `/opsx-static-check` → `/opsx-verify <change-name>` если есть
+  активный change.
+* После успешного `GO` write → сначала rerun allowlist audit; при PASS →
+  `/opsx-external-call-coverage base=<BASE>`; `/opsx-static-check` после
+  external-call PASS (новый include может вскрыть diagnostics →
+  `/opsx-fix-types`).
 
 ### DO_NOT_DO_YET
 
@@ -212,7 +217,7 @@ DO_NOT_DO_YET:
 | From | To |
 |------|-----|
 | `/opsx-apply` (recommend) | this command with `base=` |
-| this PASS | `/opsx-static-check` → `/opsx-verify` |
+| this PASS | `/opsx-external-call-coverage` → `/opsx-static-check` → `/opsx-verify` |
 | this FAIL + diagnostics later | `/opsx-fix-types` after static-check |
 
 ## Regression checks (self)
