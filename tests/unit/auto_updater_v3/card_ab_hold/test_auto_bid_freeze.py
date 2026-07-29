@@ -169,3 +169,72 @@ async def test_set_auto_bid_blocked_on_ab_hold_active() -> None:
         42, AB_HOLD_MANUAL_AUTO_BID_BLOCKED_MSG
     )
     state.clear.assert_awaited_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_auto_bid_calls_wb_write_on_off_mode() -> None:
+    """set_auto_bid в OFF режиме доходит до WB write boundary."""
+    adv = _adv_setting(mode="off")
+    lookup_session = _session_with_adv(adv)
+
+    commit_adv = SimpleNamespace(cpm=900)
+    commit_session = AsyncMock()
+    commit_session.get = AsyncMock(return_value=commit_adv)
+    commit_session.commit = AsyncMock()
+
+    menu_session = AsyncMock()
+    menu_session.execute = AsyncMock(
+        return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
+    )
+
+    def _ctx(session: AsyncMock) -> MagicMock:
+        ctx = MagicMock()
+        ctx.__aenter__ = AsyncMock(return_value=session)
+        ctx.__aexit__ = AsyncMock(return_value=None)
+        return ctx
+
+    mock_sm = MagicMock(side_effect=[_ctx(lookup_session), _ctx(commit_session), _ctx(menu_session)])
+
+    update_auto_adv_cpm = AsyncMock()
+    hub = SimpleNamespace(wb_modifier=SimpleNamespace(update_auto_adv_cpm=update_auto_adv_cpm))
+    factory = MagicMock()
+    factory.get_wb_manager_hub.return_value = hub
+    factory_container = SimpleNamespace(wb_manager_hub_factory=MagicMock(return_value=factory))
+    container = SimpleNamespace(
+        module_resources=SimpleNamespace(
+            wb_manager_hub_factory_container=factory_container
+        )
+    )
+    container_ctx = MagicMock()
+    container_ctx.__aenter__ = AsyncMock(return_value=container)
+    container_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    message = SimpleNamespace(
+        chat=SimpleNamespace(id=42),
+        text="500",
+        from_user=SimpleNamespace(id=7),
+        bot=AsyncMock(),
+    )
+    state = AsyncMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "effective_min": 150,
+            "adv_original_id": 1,
+            "auto_adv_id": 501,
+            "nmids": [10, 11],
+        }
+    )
+
+    with patch(f"{_HANDLER}.sm", mock_sm), patch(
+        f"{_HANDLER}.DIManager.create", AsyncMock(return_value=container_ctx)
+    ):
+        await set_auto_bid(message, state)
+
+    update_auto_adv_cpm.assert_awaited_once_with(501, {10: 500, 11: 500})
+    commit_session.get.assert_awaited_once()
+    commit_session.commit.assert_awaited_once()
+    state.clear.assert_awaited_once()
+    message.bot.send_message.assert_awaited_once_with(
+        42, "Ставка в автокампании обновлена: 500 руб."
+    )
