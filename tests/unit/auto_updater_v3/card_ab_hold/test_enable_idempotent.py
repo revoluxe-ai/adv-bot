@@ -102,7 +102,12 @@ async def test_enable_active_does_not_demote_or_signal_enter() -> None:
 
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message = None
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     callback = CardAbHoldEnable(adv_setting_original_id=7)
 
     set_signal = AsyncMock()
@@ -128,8 +133,8 @@ async def test_enable_active_does_not_demote_or_signal_enter() -> None:
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
     eval_stats.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "включён" in query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    assert "включён" in query.message.answer.await_args.args[0]
 
 
 @pytest.mark.unit
@@ -151,7 +156,12 @@ async def test_enable_pending_does_not_rewrite_enter_signal() -> None:
 
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message = None
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     callback = CardAbHoldEnable(adv_setting_original_id=8)
 
     set_signal = AsyncMock()
@@ -168,7 +178,8 @@ async def test_enable_pending_does_not_rewrite_enter_signal() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    assert "подготовка" in query.answer.await_args.args[0].lower()
+    query.answer.assert_not_awaited()
+    assert "подготовка" in query.message.answer.await_args.args[0].lower()
 
 
 @pytest.mark.unit

@@ -67,8 +67,30 @@ def _make_session(adv: SimpleNamespace) -> tuple[MagicMock, MagicMock]:
 def _make_query() -> MagicMock:
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message = None
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     return query
+
+
+def _user_notice_text(query: MagicMock) -> str:
+    """Текст user-visible notice (message.answer / bot.send_message)."""
+    if query.message is not None and getattr(query.message, "answer", None):
+        if query.message.answer.await_count > 0:
+            args = query.message.answer.await_args.args
+            if args:
+                return str(args[0])
+    send = getattr(getattr(query, "bot", None), "send_message", None)
+    if send is not None and send.await_count > 0:
+        args = send.await_args.args
+        if len(args) >= 2:
+            return str(args[1])
+        if "text" in send.await_args.kwargs:
+            return str(send.await_args.kwargs["text"])
+    return ""
 
 
 def _make_enable_success_mocks(
@@ -131,8 +153,8 @@ async def test_enable_low_views_warns_and_stays_off() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "Мало показов" in query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    assert "Мало показов" in _user_notice_text(query)
 
 
 @pytest.mark.unit
@@ -271,8 +293,8 @@ async def test_enable_ch_error_shows_distinct_reason_and_stays_off() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    query.answer.assert_awaited()
-    alert = query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    alert = _user_notice_text(query)
     assert "недоступна" in alert
     assert "Мало показов" not in alert
 
@@ -301,8 +323,8 @@ async def test_cancel_keeps_off_and_no_enter() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "отмен" in query.answer.await_args.args[0].lower()
+    query.answer.assert_not_awaited()
+    assert "отмен" in _user_notice_text(query).lower()
 
 
 @pytest.mark.unit

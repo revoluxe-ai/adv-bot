@@ -119,8 +119,30 @@ def _make_session(adv: SimpleNamespace) -> tuple[MagicMock, MagicMock]:
 def _make_query() -> MagicMock:
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message = None
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     return query
+
+
+def _user_notice_text(query: MagicMock) -> str:
+    """Текст user-visible notice (message.answer / bot.send_message)."""
+    if query.message is not None and getattr(query.message, "answer", None):
+        if query.message.answer.await_count > 0:
+            args = query.message.answer.await_args.args
+            if args:
+                return str(args[0])
+    send = getattr(getattr(query, "bot", None), "send_message", None)
+    if send is not None and send.await_count > 0:
+        args = send.await_args.args
+        if len(args) >= 2:
+            return str(args[1])
+        if "text" in send.await_args.kwargs:
+            return str(send.await_args.kwargs["text"])
+    return ""
 
 
 def _make_enable_success_mocks(
@@ -184,8 +206,8 @@ async def test_enable_blocked_when_max_cpo_missing_or_non_positive(
     # max-CPO gate — до freshness и объёмного soft-gate (decision §14a).
     stats_eval.assert_not_awaited()
     volume_eval.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "max CPO" in query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    assert "max CPO" in _user_notice_text(query)
 
 
 @pytest.mark.unit

@@ -14,7 +14,6 @@ PASS-ключи. После фикса — non-empty candidates на той же
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -60,9 +59,10 @@ def _make_fsm() -> FSMContext:
 
 
 def _make_query() -> MagicMock:
-    """CallbackQuery со Message.edit_text / answer."""
+    """CallbackQuery со Message.edit_text / message.answer (не CallbackQuery.answer)."""
     msg = MagicMock(spec=Message)
     msg.edit_text = AsyncMock()
+    msg.answer = AsyncMock()
     query = MagicMock()
     query.message = msg
     query.answer = AsyncMock()
@@ -291,17 +291,17 @@ async def test_epoch_s1_confirm_not_dead_end_when_eligible_exist_after_enable() 
     ):
         await confirm_handlers.on_keyword_set_confirm(query, callback, state)
 
-    answer_args = query.answer.await_args
+    query.answer.assert_not_awaited()
+    answer_args = query.message.answer.await_args
     assert answer_args is not None
     answer_text = answer_args.args[0] if answer_args.args else ""
-    kwargs: dict[str, Any] = answer_args.kwargs or {}
 
     assert answer_text != _EMPTY_CANDIDATES_TOAST, (
         "FINDING-PBH-001: on_keyword_set_confirm dead-ends with «%s» after "
         "epoch enable even though eligibility source has %r — S1 candidates "
         "were empty." % (_EMPTY_CANDIDATES_TOAST, expected)
     )
-    assert kwargs.get("show_alert") is not True or answer_text != _EMPTY_CANDIDATES_TOAST
+    assert "подтвержд" in answer_text.lower()
     mock_confirm.assert_awaited()
     confirmed_keywords = mock_confirm.await_args.args[1]
     assert set(expected).issubset(set(confirmed_keywords))
