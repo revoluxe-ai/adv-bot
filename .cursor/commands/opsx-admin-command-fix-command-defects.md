@@ -56,7 +56,9 @@ When `GO` is absent:
   (review output, file list, or short description). Do not invent defects.
 - Output a `STATUS: FIX_PLAN_READY` packet (or `BLOCKED_NEEDS_EVIDENCE` if
   evidence is insufficient).
-- End with exact next owner action, e.g. `Reply: GO` to apply the packet.
+- End with exact next owner action. If the user asked for copy-paste / exact
+  commands / «go», also print `OWNER_RUN_COMMAND` (see Output).
+- Default end line remains usable as `Reply: GO` to apply the packet.
 
 ### APPLY (requires `GO`)
 
@@ -164,7 +166,27 @@ READ_IO:
 NEXT_ACTION:
 - Reply: GO
   (or provide missing evidence if blocked)
+
+OWNER_RUN_COMMAND:
 ```
+
+```text
+/opsx-admin-command-fix-command-defects GO
+```
+
+```text
+APPLY_INPUT_PACKET:
+- STATUS: FIX_PLAN_READY
+- (repeat DEFECTS_TO_FIX / FILES / PROPOSED_BEHAVIOR above — ready to paste)
+```
+
+When the owner asks for «точные команды» / copy-paste / go:
+
+1. Always print the fenced `OWNER_RUN_COMMAND` block above (literal command,
+   no placeholders).
+2. Optionally print `APPLY_INPUT_PACKET` so APPLY does not require hunting the
+   prior chat plan.
+3. Do not replace the run command with only prose «Reply: GO» — keep both.
 
 ### APPLY
 
@@ -191,6 +213,12 @@ NEXT_ACTION:
 - else: none
 - optional after FIXED (transferable process class?): /opsx-admin-command-promote-process-lesson
   (separate from product /opsx-learn-from-bug)
+
+OWNER_RUN_COMMAND:   # when process files changed
+```
+
+```text
+/opsx-admin-command-commit
 ```
 
 After a successful `FIXED` APPLY, if the defect class looks transferable
@@ -208,4 +236,5 @@ Before returning:
 - every APPLY edit maps to a packet defect + listed file;
 - no bulk preload of the command set;
 - decision lookup changes stay context-first / bounded fallback;
-- I/O stayed within execution-preflight Read budgets.
+- I/O stayed within execution-preflight Read budgets;
+- when owner asked for copy-paste/exact commands: `OWNER_RUN_COMMAND` printed.
