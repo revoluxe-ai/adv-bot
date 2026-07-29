@@ -7,6 +7,7 @@ import logging
 import re
 import typing
 from enum import Enum
+from typing import ClassVar
 
 import jwt
 from jwt import DecodeError
@@ -423,8 +424,12 @@ class AdvSetting(BaseTable):
     class ActiveStatuses(Enum):
         DONE = "done"
 
-    # Instance/runtime flag; class default avoids untyped declarative Base.__init__ override.
-    _worst_promo_position: bool | None = None
+    # DEPRECATED: populate-path отключён (set_worst_promo_position удалён / вызов
+    # закомментирован). Non-mapped runtime flag (ClassVar — не колонка SA2; zlpr).
+    # Must be bare ClassVar (not typing.ClassVar) under from __future__ import annotations.
+    # Instance override via worst_promo_position setter remains supported.
+    # Не удалять и не менять семантику без отдельного cleanup-scope.
+    _worst_promo_position: ClassVar[bool | None] = None
 
     def __repr__(self):
         return (
@@ -946,6 +951,12 @@ class AdvSetting(BaseTable):
 
     @property
     def worst_promo_position(self) -> bool | None:
+        """DEPRECATED: флаг worst promo position; наполнения больше нет.
+
+        Populate-path (`data_manager.set_worst_promo_position`) удалён; вызов в
+        client_bot закомментирован. Getter/setter оставлены без смены поведения
+        для residual UI-read. Не использовать в новом коде.
+        """
         try:
             return self._worst_promo_position
         except Exception as e:
@@ -954,6 +965,7 @@ class AdvSetting(BaseTable):
 
     @worst_promo_position.setter
     def worst_promo_position(self, value: bool | None) -> None:
+        """DEPRECATED: см. getter; семантика setter не меняется."""
         self._worst_promo_position = value
 
     auto_budget_topups: Mapped[list["WBAutoBudgetTopUp"]] = relationship(
