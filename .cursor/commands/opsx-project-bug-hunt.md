@@ -102,6 +102,22 @@ Hard I/O rules:
 6. `deep` widens **within** touched modules + same write-boundary families —
    never into unrelated business domains.
 
+## LOC_LINK contract (mandatory)
+
+Authority: `.cursor/rules/opsx-clickable-loc-link-contract.mdc`.
+
+For every finding that references concrete code location, include:
+
+`LOC_LINK: <repo-relative-path>:<line>`
+
+Rules:
+
+* Use plain `path:line` (Cursor-clickable), not `file://` as the only format.
+* Keep `EVIDENCE` for paths/symbols, but location-specific finding fields must
+  include `LOC_LINK`.
+* If exact line is unavailable, fallback to symbol definition line with short
+  fallback note in finding text.
+
 ## Project grounding (mandatory load order)
 
 Load only what the diff/focus requires; skip irrelevant layers.
@@ -232,6 +248,7 @@ PROJECT_BUG_HUNT_RECEIPT:
 FINDINGS:
 ### FINDING_ID: PBH-001
 - TITLE:
+- LOC_LINK:
 - LITERAL_CLAIM:
 - PRODUCTION_CLASSIFICATION:
 - RUNTIME_PATH:
@@ -355,6 +372,7 @@ human finds a miss. Keep items concrete and falsifiable.
   sibling hunts here.
 * Checklist updates are learning writes — not silent mid-hunt edits unless
   `/opsx-learn-from-bug GO` (or explicit owner edit) authorized them.
+* Do not emit finding blocks with code-location but without `LOC_LINK`.
 
 ## Anti-patterns
 

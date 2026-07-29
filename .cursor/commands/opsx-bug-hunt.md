@@ -165,6 +165,22 @@ Blocker:
 
 List the missing fields.
 
+## LOC_LINK contract (mandatory)
+
+Authority: `.cursor/rules/opsx-clickable-loc-link-contract.mdc`.
+
+For every report item that references a concrete code location, include:
+
+`LOC_LINK: <repo-relative-path>:<line>`
+
+Rules:
+
+* Use plain `path:line` (Cursor-clickable), not `file://` as the only format.
+* If exact boundary line is unknown, fallback to symbol definition line
+  (`def` / `class`) and note fallback in that item.
+* `File:`/`Function:`/`Evidence:` without `LOC_LINK` is insufficient for
+  claimable/new findings.
+
 ## Root anchoring rules
 
 Treat the root finding as an existing case, not as a candidate new finding.
@@ -701,6 +717,7 @@ KNOWN_ROOT_RESULT:
 - ROOT_FINDING_ID:
 - STATUS:
 - SNAPSHOT:
+- LOC_LINK:
 - MATCHED_EFFECT:
 - MATCHED_CAUSAL_PATH:
 - MATCHED_WRITE_BOUNDARY:
@@ -709,13 +726,14 @@ KNOWN_ROOT_RESULT:
 
 DUPLICATE_ROOT_OBSERVATIONS:
 - (optional; DUP-* only; never CHILD-*; never claimable)
-- DUP-001: ...
+- DUP-001: ... (LOC_LINK: <path>:<line>)
 
 NEW_FINDINGS:
 
 1. [classification] [relationship_to_root] short title
    FINDING_ID:
    File:
+   LOC_LINK:
    Function:
    Boundary:
    Evidence:
@@ -782,6 +800,7 @@ CHILD_CASE_PACKET:
 - ROOT_FINDING_ID:
 - FINDING_ID:
 - PARENT_FINDING_ID:
+- LOC_LINK:
 - TITLE:
 - RELATION_TO_ROOT:
 - PRODUCTION_CLASSIFICATION:
@@ -876,6 +895,7 @@ It does not mean:
 * Do not commit, push, deploy, restart, migrate, or touch secrets.
 * Treat an empty or degenerate captured collection that still reaches a success, terminal, transition, or write boundary as a candidate finding rather than a safe no-op.
 * Require a behavioral regression test on every sibling path that can independently violate the same invariant.
+* Do not emit claimable finding packets with code location but missing `LOC_LINK`.
 
 
 ## Route-trace event requirements (SCHEMA_VERSION 2)
