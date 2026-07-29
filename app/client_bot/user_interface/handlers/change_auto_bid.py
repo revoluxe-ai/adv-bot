@@ -50,6 +50,42 @@ async def _get_wb_user_cabinet_for_adv_and_telegram(
     return result.scalar_one_or_none()
 
 
+async def _load_adv_setting_with_cabinet(
+    session: AsyncSession, adv_original_id: int
+) -> AdvSetting | None:
+    """Загрузить AdvSetting вместе с кабинетом для сценариев изменения ставки."""
+    stmt = (
+        select(AdvSetting)
+        .options(joinedload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_original_id)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def _load_adv_setting_for_menu(
+    session: AsyncSession, adv_original_id: int
+) -> AdvSetting | None:
+    """Загрузить AdvSetting для возврата в меню кампании."""
+    stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def _persist_adv_cpm(
+    session: AsyncSession,
+    adv_original_id: int,
+    new_cpm: int,
+) -> bool:
+    """Сохранить новое значение cpm в PG и вернуть факт обновления строки."""
+    adv = await session.get(AdvSetting, adv_original_id)
+    if adv is None:
+        return False
+    adv.cpm = new_cpm
+    await session.commit()
+    return True
+
+
 @router.callback_query(
     callbacks.ChangeAutoBid.filter(F.action == "open"),
 )
@@ -58,6 +94,7 @@ async def open_change_auto_bid(
     callback_data: callbacks.ChangeAutoBid,
     state: FSMContext,
 ):
+    """Открыть сценарий изменения авто-ставки и сохранить порог в FSM."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
     bot = callback.bot
@@ -66,14 +103,8 @@ async def open_change_auto_bid(
     chat_id = callback.message.chat.id
     adv_original_id = callback_data.adv_original_id
 
-    async with sm() as session:
-        stmt = (
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_original_id)
-        )
-        result = await session.execute(stmt)
-        adv_setting = result.scalar_one_or_none()
+    async with sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting_with_cabinet(session, adv_original_id)
 
     if not adv_setting:
         await bot.send_message(chat_id, "Рекламная кампания не найдена.")
@@ -159,6 +190,7 @@ async def open_change_auto_bid(
 
 @router.message(StateFilter(states.ChangeAutoBid.waiting_for_new_bid))
 async def set_auto_bid(message: types.Message, state: FSMContext):
+    """Проверить ввод, записать ставку в WB/PG и вернуть пользователя в меню РК."""
     bot = message.bot
     if bot is None:
         raise ValueError("Нет bot")
@@ -204,13 +236,8 @@ async def set_auto_bid(message: types.Message, state: FSMContext):
         )
         return
 
-    async with sm() as session:
-        result = await session.execute(
-            select(AdvSetting).options(joinedload(AdvSetting.wb_cabinet)).where(
-                AdvSetting.id == adv_original_id
-            )
-        )
-        adv_setting = result.scalar_one_or_none()
+    async with sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting_with_cabinet(session, adv_original_id)
 
     if not adv_setting:
         await bot.send_message(chat_id, "Рекламная кампания не найдена.")
@@ -250,10 +277,11 @@ async def set_auto_bid(message: types.Message, state: FSMContext):
         return
 
     async with sm(read_only=False) as session:
-        adv = await session.get(AdvSetting, adv_original_id)
-        if adv:
-            adv.cpm = new_cpm
-            await session.commit()
+        persisted = await _persist_adv_cpm(session, adv_original_id, new_cpm)
+    if not persisted:
+        await bot.send_message(chat_id, "Рекламная кампания не найдена.")
+        await state.clear()
+        return
 
     await state.clear()
     await bot.send_message(
@@ -261,11 +289,8 @@ async def set_auto_bid(message: types.Message, state: FSMContext):
         f"Ставка в автокампании обновлена: {new_cpm} руб.",
     )
 
-    async with sm() as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv_for_menu = result.scalar_one_or_none()
+    async with sm(read_only=True) as session:
+        adv_for_menu = await _load_adv_setting_for_menu(session, adv_original_id)
         if not adv_for_menu:
             return
         wb_user_cabinet = await _get_wb_user_cabinet_for_adv_and_telegram(
