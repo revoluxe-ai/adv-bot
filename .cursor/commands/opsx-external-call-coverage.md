@@ -200,6 +200,43 @@ SoT политики — testing-rules + этот gate; **не** дублиро�
 `/opsx-project-bug-hunt` (hunt — optional thin checklist later, не SoT).
 `PG_SESSION_HYGIENE` (non-FAIL note) **снят** — bare всегда FAIL-set WEAK.
 
+### HANDLER_INLINE_SM_CHECK (mandatory for KIND=PG changed callables)
+
+Human-native seam check. **Не останавливайся** на одном `PG_IMPLICIT_SESSION_MODE`,
+если session создаётся внутри target callable без handoff.
+
+Для каждого changed PG callable (handler / orchestration / writer) ответь:
+
+1. Есть `async with sm(...)` / `get_async_session_maker(...)` **внутри**
+   target callable?
+2. Session передаётся в child callable аргументом / provenance seam? (`yes`/`no`)
+3. Если шаг 1 = yes и шаг 2 = **no** → `DISPOSITION=UNTESTABLE_SEAM` с
+   `NOTE=NO_INJECTABLE_SEAM` и/или `NOTE=NO_PARENT_SESSION_HANDOFF`.
+4. Если при этом ещё и bare `sm()` → добавь `NOTE=PG_IMPLICIT_SESSION_MODE`,
+   но **primary disposition остаётся** `UNTESTABLE_SEAM` (не downgrade до
+   только `WEAK_EVIDENCE`).
+
+Example FAIL (must catch):
+
+```python
+async def open_change_auto_bid(...):
+    async with sm() as session:  # session created inside handler
+        ...  # no helper(session, ...) child receiving the session
+```
+
+→ `UNTESTABLE_SEAM` (`NO_INJECTABLE_SEAM` / `NO_PARENT_SESSION_HANDOFF`),
+optionally also `PG_IMPLICIT_SESSION_MODE`.
+
+Preferred pattern (not a FAIL for handoff):
+
+```python
+async def open_change_auto_bid(...):
+    async with sm(read_only=True) as session:
+        adv = await load_adv_for_change_auto_bid(session, adv_id)
+```
+
+где store-работа живёт в child, принимающем `session`.
+
 ## Test mapping
 
 Для каждого surface найди candidate tests:
@@ -282,7 +319,8 @@ ROUTE_PACKETS:
 ## MIXED_FAIL_PIPELINE (mandatory when both packet types exist)
 
 Если одновременно сформированы `TEST_ONLY_PACKET` и `REFACTOR_AND_TEST_PACKET`,
-добавь в `NEXT_ACTION` стандартный pipeline:
+добавь в `NEXT_ACTION` стандартный pipeline **и** секцию
+`PASTE_AND_GO_BLOCKS` (см. ниже).
 
 ```text
 MIXED_FAIL_PIPELINE:
@@ -290,8 +328,108 @@ MIXED_FAIL_PIPELINE:
    <paste REFACTOR_AND_TEST_PACKET>
 2) /opsx-test
    <paste TEST_ONLY_PACKET>
-3) /opsx-external-call-coverage base=<BASE> focus=pg|ch
-4) /opsx-external-call-coverage base=<BASE>
+3) /opsx-external-call-coverage base=<RESOLVED_BASE> focus=pg|ch
+4) /opsx-external-call-coverage base=<RESOLVED_BASE>
+```
+
+### PASTE_AND_GO_BLOCKS (mandatory for mixed FAIL)
+
+Печатай **ровно 4** отдельных fenced `text` блока. Внутри блока —
+только команды/пакет (первая строка = команда). Без пояснений внутри блока.
+Подставь уже резолвнутый `BASE` (запрещены плейсхолдеры `<BASE>` /
+`<HEAD>` когда refs уже известны).
+
+Блок 1 — close PG/CH:
+
+```text
+/opsx-close-external-gap
+
+REFACTOR_AND_TEST_PACKET:
+- SOURCE: EXTERNAL_CALL_COVERAGE_REPORT
+- BASE: <resolved>
+- HEAD: <resolved>
+- KINDS: [PG|CH]
+- ITEMS:
+  - SYMBOL: <name>
+    KIND: <PG|CH>
+    PATH: <path>
+    DISPOSITION: <WEAK_EVIDENCE|UNTESTABLE_SEAM|MISSING_TEST>
+    NEXT: /opsx-close-external-gap
+```
+
+Блок 2 — TEST_ONLY:
+
+```text
+/opsx-test
+
+TEST_ONLY_PACKET:
+- SOURCE: EXTERNAL_CALL_COVERAGE_REPORT
+- BASE: <resolved>
+- HEAD: <resolved>
+- KINDS: [REDIS|WB_WRITE|HTTP|OTHER]
+- ITEMS:
+  - SYMBOL: <name>
+    KIND: <kind>
+    PATH: <path>
+    DISPOSITION: <MISSING_TEST|WEAK_EVIDENCE>
+    NEXT: /opsx-test
+```
+
+Блок 3 — focus re-audit:
+
+```text
+/opsx-external-call-coverage base=<resolved> focus=pg
+```
+
+Блок 4 — full gate:
+
+```text
+/opsx-external-call-coverage base=<resolved>
+```
+
+## COPY_PASTE_RUNBOOK (mandatory in every Final report)
+
+После `DO_NOT_DO_YET` всегда печатай секцию `COPY_PASTE_RUNBOOK` с
+готовыми к вставке fenced-блоками. Правила:
+
+1. Если `BASE`/`HEAD` уже резолвнуты — **запрещены** плейсхолдеры
+   `<BASE>` / `<HEAD>` / `<ref>` внутри runbook-блоков; только literal refs.
+2. Каждый блок начинается с команды первой строкой.
+3. Без «описательного» NEXT_ACTION вместо runbook: краткий `NEXT_ACTION`
+   + полный `COPY_PASTE_RUNBOOK`.
+
+Минимальные варианты по STATUS:
+
+* `BLOCKED` (no base):
+
+```text
+COPY_PASTE_RUNBOOK:
+```
+
+```text
+/opsx-external-call-coverage base=stage
+```
+
+* `FAIL` + только TEST_ONLY: блок `/opsx-test` + пакет, затем
+  `/opsx-external-call-coverage base=<resolved>`.
+* `FAIL` + только REFACTOR_AND_TEST (PG/CH / UNTESTABLE): блок
+  `/opsx-close-external-gap` + пакет (без `base=`), затем
+  `/opsx-external-call-coverage base=<resolved> focus=pg`.
+* `FAIL` + mixed → используй `PASTE_AND_GO_BLOCKS` (4 блока) как runbook.
+* `PASS` + `focus=all`:
+
+```text
+/opsx-static-check
+```
+
+```text
+/opsx-verify <change-name-if-any>
+```
+
+* `PASS` + `focus≠all`:
+
+```text
+/opsx-external-call-coverage base=<resolved>
 ```
 
 ## Steps
@@ -302,11 +440,14 @@ MIXED_FAIL_PIPELINE:
 4. Если `change=` — optional read change artifacts / existing
    `TEST_COVERAGE_PACKET` / prior report (не реконструируй из chat).
 5. Inventory in-policy changed paths; detect surfaces; assign KIND +
-   MINIMUM_LEVEL (kind defaults выше). Для PG — также INTENT + session mode.
+   MINIMUM_LEVEL (kind defaults выше). Для PG — также INTENT + session mode
+   + `HANDLER_INLINE_SM_CHECK`.
 6. Map tests; assign DISPOSITION (PG/CH mock → WEAK / UNTESTABLE;
-   `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE` → WEAK).
+   `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE` → WEAK;
+   no injectable / no parent handoff → `UNTESTABLE_SEAM`, не stop на WEAK).
 7. Apply `focus=` filter for summary FAIL set.
-8. Печать Final report + `KIND_CLOSURE` (обязательный completion gate).
+8. Печать Final report + `KIND_CLOSURE` + `COPY_PASTE_RUNBOOK`
+   (и `PASTE_AND_GO_BLOCKS` при mixed FAIL).
 9. Не писать файлы.
 
 ## Status
@@ -390,33 +531,41 @@ ROUTE_PACKETS:
 MIXED_FAIL_PIPELINE:
 - <steps|not_applicable>
 
+PASTE_AND_GO_BLOCKS:
+- <4 fenced blocks|not_applicable>
+
 WHAT_HAPPENED:
 WHY:
 CURRENT_STATE: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
 OWNER_DECISION_REQUIRED: false | true (<what>)
 NEXT_ACTION:
 DO_NOT_DO_YET:
+
+COPY_PASTE_RUNBOOK:
+- <literal fenced command blocks; no unresolved <BASE>/<HEAD> when refs known>
 ```
 
 ### NEXT_ACTION rules
 
-* `BLOCKED` (no base) → pasteable ask for `base=`.
+* Всегда дополняй `COPY_PASTE_RUNBOOK` (и при mixed — `PASTE_AND_GO_BLOCKS`).
+* `BLOCKED` (no base) → pasteable ask + runbook блок
+  `/opsx-external-call-coverage base=stage` (или другой known base).
 * `FAIL` + TEST_ONLY kinds (REDIS / testable WB_WRITE / HTTP) →
   `/opsx-test` затем
-  `/opsx-external-call-coverage base=<BASE> focus=<kind|all>`.
+  `/opsx-external-call-coverage base=<RESOLVED_BASE> focus=<kind|all>`
+  (literal BASE в runbook).
 * `FAIL` + PG/CH / `UNTESTABLE_SEAM` / PG|CH `WEAK_EVIDENCE` (mock-only
-  / `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE`) →
+  / `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE` /
+  `NO_INJECTABLE_SEAM` / `NO_PARENT_SESSION_HANDOFF`) →
   `/opsx-close-external-gap` + paste this report (**без** `base=` на close)
-  затем coverage `focus=pg|ch`.
+  затем coverage `focus=pg|ch` с literal BASE.
 * `FAIL` + mixed (есть и TEST_ONLY, и REFACTOR_AND_TEST) →
-  сначала `/opsx-close-external-gap` с `REFACTOR_AND_TEST_PACKET`,
-  затем `/opsx-test` с `TEST_ONLY_PACKET`,
-  затем coverage rerun `focus=pg|ch` и `focus=all`.
+  печатай `PASTE_AND_GO_BLOCKS` (4 блока); не оставляй только описание.
 * `FAIL` + `DEFERRED_OWNER` → один уточняющий вопрос владельцу.
 * `PASS` + `focus=all` → `/opsx-static-check`, затем
   `/opsx-verify <change-name>` если есть активный change.
 * `PASS` + `focus≠all` →
-  `/opsx-external-call-coverage base=<BASE>` (full `focus=all`).
+  `/opsx-external-call-coverage base=<RESOLVED_BASE>` (full `focus=all`).
 
 ### DO_NOT_DO_YET
 
@@ -426,11 +575,14 @@ DO_NOT_DO_YET:
 * Не считать COVERED PG WRITE / READ_AFTER_WRITE на `read_only=True`.
 * Не считать COVERED bare `sm()` (`PG_IMPLICIT_SESSION_MODE`).
 * Не считать COVERED PURE_READ на `read_only=False`.
+* Не downgrade `UNTESTABLE_SEAM` (`NO_INJECTABLE_SEAM` /
+  `NO_PARENT_SESSION_HANDOFF`) до одного только `WEAK_EVIDENCE`.
 * Не писать production/tests из этой команды.
 * Не делать `/opsx-project-bug-hunt` SoT для session-mode policy.
 * Не запускать kind-specific audit front-doors вместо `focus=`.
 * Не слать `base=` в `/opsx-close-external-gap`.
 * Не использовать `PG_SESSION_HYGIENE` как non-FAIL для bare.
+* Не печатать runbook с нерезолвнутыми `<BASE>`/`<HEAD>`, если refs уже известны.
 
 ## Optional handoff artifact (additive)
 
@@ -472,10 +624,15 @@ EXTERNAL_CALL_COVERAGE_REPORT:
       `/opsx-ch-coverage` и аналоги
 - [ ] Не заявлен verify/archive verdict
 - [ ] `focus≠all` PASS не закрывает pre-verify chain
-- [ ] Final report + KIND_CLOSURE напечатаны
+- [ ] Final report + KIND_CLOSURE + COPY_PASTE_RUNBOOK напечатаны
+- [ ] Mixed FAIL → PASTE_AND_GO_BLOCKS (4 literal блока)
+- [ ] Runbook без нерезолвнутых `<BASE>`/`<HEAD>` когда refs known
 - [ ] MINIMUM_LEVEL следует testing-rules; PG/CH default integration
 - [ ] session-mock PG/CH не объявлен COVERED
 - [ ] PG surfaces имеют INTENT; bare `sm()` → WEAK `PG_IMPLICIT_SESSION_MODE`
 - [ ] wrong polarity (WRITE/RAW→True, PURE_READ→False) → WEAK `PG_WRONG_SESSION_MODE`
 - [ ] PG/CH FAIL → close-external-gap, не «просто /opsx-test»
+- [ ] HANDLER_INLINE_SM_CHECK выполнен для KIND=PG
+- [ ] handler/inline `sm(...)` без child session arg → `UNTESTABLE_SEAM`
+      (`NO_INJECTABLE_SEAM` / `NO_PARENT_SESSION_HANDOFF`), не только WEAK
 - [ ] changed PG/CH boundary без parent→child session/client handoff → `UNTESTABLE_SEAM` (`NO_PARENT_SESSION_HANDOFF`)
