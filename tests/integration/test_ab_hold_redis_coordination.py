@@ -1,10 +1,10 @@
-"""Integration (Redis): CardAbHold Signal / LastAbort / SetupBlock roundtrip.
+"""Integration (Redis): CardAbHold Signal / LastAbort / SetupBlock / EnterReset.
 
 Закрывает разрыв: unit-тесты проверяли только Pydantic DTO / ключи, а
 production caches пишут через ``RedisClient`` + TTL. Здесь — fakeredis
 (тот же ``RedisClient``, что в проде); DI обходится через patch ``client``.
 
-Spec ``card-ab-hold-mode`` / decision write-path ownership §4–5 / §14b.
+Spec ``card-ab-hold-mode`` / decision write-path ownership §4–5 / §14b / §19.
 Класс: integration (Redis path). Live cluster Redis вне scope.
 """
 
@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
     SETUP_LOCK_TTL_SEC,
+    CardAbHoldCommonBidEnterResetRedisCache,
     CardAbHoldLastAbortRedisCache,
     CardAbHoldLastAbortSnapshot,
     CardAbHoldSetupBlockRedisCache,
@@ -124,6 +125,53 @@ async def test_setup_block_roundtrip_and_clear_over_fakeredis(
         await cache.clear()
         assert await cache.get_block() is None
         assert await fake_redis.exists("CardAbHoldSetupBlock:9003") == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_common_bid_enter_reset_done_marker_roundtrip_over_fakeredis(
+    fake_redis: FakeRedis,
+) -> None:
+    """§19: ENTER mark_done → is_done; EXIT clear снимает one-shot маркер.
+
+    Unit mocks кэш целиком; здесь production get/set/delete через RedisClient.
+    """
+    wrapper = RedisClient(redis_client=fake_redis)
+    cache = CardAbHoldCommonBidEnterResetRedisCache(_adv(adv_id=9005))
+    key = "CardAbHoldCommonBidEnterReset:9005"
+
+    with patch.object(
+        type(cache), "client", new_callable=PropertyMock
+    ) as client_prop:
+        client_prop.return_value = wrapper
+        assert await cache.is_done() is False
+
+        await cache.mark_done()
+        assert await cache.is_done() is True
+        assert await fake_redis.get(key) == "done"
+        ttl = await fake_redis.ttl(key)
+        assert ttl > 0
+
+        await cache.clear()
+        assert await cache.is_done() is False
+        assert await fake_redis.exists(key) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_common_bid_enter_reset_rejects_non_done_payload(
+    fake_redis: FakeRedis,
+) -> None:
+    """Чужой payload под тем же ключом не считается done-маркером."""
+    wrapper = RedisClient(redis_client=fake_redis)
+    cache = CardAbHoldCommonBidEnterResetRedisCache(_adv(adv_id=9006))
+    await fake_redis.set("CardAbHoldCommonBidEnterReset:9006", "other")
+
+    with patch.object(
+        type(cache), "client", new_callable=PropertyMock
+    ) as client_prop:
+        client_prop.return_value = wrapper
+        assert await cache.is_done() is False
 
 
 @pytest.mark.integration
