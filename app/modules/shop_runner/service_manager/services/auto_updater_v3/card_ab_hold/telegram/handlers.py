@@ -13,7 +13,7 @@ import logging
 from aiogram import Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, noload
 
 from app.client_bot.user_interface.helpers.wb_user_cabinet import (
     get_wb_user_cabinet_for_adv_and_telegram,
@@ -567,8 +567,12 @@ async def disable_card_ab_hold(
     сбрасываются в той же PG-транзакции, что и mode→OFF.
     """
     async with sm() as session:
+        # noload: EXIT пишет только AdvSetting epoch/mode; join WBCabinet не нужен
+        # (и ломает disposable live-PG stub без полного графа cabinet).
         adv = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
+            select(AdvSetting)
+            .options(noload(AdvSetting.wb_cabinet))
+            .where(AdvSetting.id == callback_data.adv_setting_original_id)
         )
         if adv is None or not is_card_ab_hold_ui_visible(adv):
             await _notify_callback_user(query, "Доступно только при включённом боте")
