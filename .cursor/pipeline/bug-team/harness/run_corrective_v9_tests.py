@@ -639,10 +639,10 @@ def registry01() -> Result:
         "INTEGRATION_OPERATOR",
         "FAMILY_FAN_IN_ASSEMBLER",
         "FAMILY_LEARNING_WORKER",
-        "SHADOW_V8",
+        "LEARNING_DECISION",
     ]
     ok = all(n in text for n in needed)
-    return ok, "V8 shadow roles registered", "CONTRACT_STATIC"
+    return ok, "family roles + LEARNING_DECISION registered", "CONTRACT_STATIC"
 
 
 def identity01() -> Result:

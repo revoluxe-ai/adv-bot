@@ -21,12 +21,35 @@ from runtime import (  # noqa: E402
     activation,
     control_model,
     fs_boundary,
+    learning_decision,
     live_task_hop,
     owner_decision_host,
 )
 
 Result = Tuple[bool, str, str]
 HARNESS = Path(".tmp/opsx-bug-team-harness/corrective-v7-unit")
+
+
+def _write_episode_learning(
+    case: Path,
+    *,
+    case_id: str = "C-V7",
+    verdict: str = "NO_REUSABLE_LESSON",
+    fanin_rel: str = "results/FANIN.md",
+) -> Dict[str, Any]:
+    """Mandatory LEARNING_DECISION before episode closure (V11 corrective)."""
+    fanin = case / fanin_rel
+    decision = learning_decision.build_learning_decision(
+        case_id=case_id,
+        learning_verdict=verdict,
+        learning_status="COMPLETE",
+        promotion_decision="NONE",
+        source_fanin_path=fanin_rel,
+        source_fanin_hash=learning_decision.file_sha(fanin) if fanin.exists() else None,
+        decision_rationale="V7 harness learning hop",
+    )
+    learning_decision.write_learning_decision(case, decision)
+    return decision
 
 
 def _case(name: str) -> Path:
@@ -67,6 +90,7 @@ def _sim_route_flow(case: Path, *, route: str, task_delta: str = "UNCHANGED") ->
     mode = control_model.MODE_CONTROLLED_LIVE_UNCOMMITTED
     steps: List[str] = ["INTAKE", "MATERIALIZE", "CLAIM", "CLASSIFY", f"ROUTE_{route}"]
     if route == "C":
+        _write_episode_learning(case)
         closure = control_model.apply_closure_artifacts(
             case,
             finding_id="F-C",
@@ -137,10 +161,21 @@ def _sim_route_flow(case: Path, *, route: str, task_delta: str = "UNCHANGED") ->
         encoding="utf-8",
     )
     readiness, blocking = control_model.parse_fanin_readiness(fanin)
+    pre = control_model.decide_auto_closure(
+        execution_mode=mode,
+        closure_readiness=readiness,
+        blocking_findings=blocking,
+        case_root=case,
+    )
+    assert pre.get("EXPECTED_NEXT_COMMAND") == "FAMILY_LEARNING_WORKER"
+    assert pre.get("AUTO_CLOSURE") is False
+    steps.append("FAMILY_LEARNING")
+    _write_episode_learning(case)
     decision = control_model.decide_auto_closure(
         execution_mode=mode,
         closure_readiness=readiness,
         blocking_findings=blocking,
+        case_root=case,
     )
     assert decision["AUTO_CLOSURE"] is True
     assert decision.get("WAITING_OWNER_FINAL_CLOSURE") is False
@@ -271,18 +306,34 @@ def gate02() -> Result:
         encoding="utf-8",
     )
     readiness, blocking = control_model.parse_fanin_readiness(fanin)
+    pre = control_model.decide_auto_closure(
+        execution_mode=control_model.MODE_CONTROLLED_LIVE_UNCOMMITTED,
+        closure_readiness=readiness,
+        blocking_findings=blocking,
+        case_root=case,
+    )
+    ok = (
+        pre.get("AUTO_CLOSURE") is False
+        and pre.get("EXPECTED_NEXT_COMMAND") == "FAMILY_LEARNING_WORKER"
+    )
+    _write_episode_learning(case)
     d = control_model.decide_auto_closure(
         execution_mode=control_model.MODE_CONTROLLED_LIVE_UNCOMMITTED,
         closure_readiness=readiness,
         blocking_findings=blocking,
+        case_root=case,
     )
-    ok = d["AUTO_CLOSURE"] is True and d.get("WAITING_OWNER") is False
+    ok = ok and d["AUTO_CLOSURE"] is True and d.get("WAITING_OWNER") is False
     if ok:
         control_model.apply_closure_artifacts(
             case, finding_id="F-G2", human_summary_kwargs=_human_kwargs()
         )
         ok = (case / "results" / "HUMAN_SUMMARY.md").exists()
-    return ok, "FANIN ready -> no WAITING_OWNER_FINAL_CLOSURE; closure runs", "RUNTIME_UNIT"
+    return (
+        ok,
+        "FANIN ready -> learning -> no WAITING_OWNER_FINAL_CLOSURE; closure runs",
+        "RUNTIME_UNIT",
+    )
 
 
 def gate03() -> Result:
@@ -417,6 +468,7 @@ def user05() -> Result:
 
 def human01() -> Result:
     case = _case("human01")
+    _write_episode_learning(case)
     control_model.apply_closure_artifacts(
         case, finding_id="F-H", human_summary_kwargs=_human_kwargs()
     )
