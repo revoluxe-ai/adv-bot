@@ -225,6 +225,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page,
         )
+        # DEPRECATED: set_worst_promo_position удалён; populate-path не восстанавливать
+        # без отдельного product scope. AdvSetting.worst_promo_position — legacy residual.
         # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
 
         for adv in self._adv_settings:

@@ -259,6 +259,7 @@ def get_advs_keyboard_with_paginator(
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = adv.check_last_24_hours  # type: ignore[attr-defined]
         check_text = "✅" if check_last_24_hours else "❓"
+        # DEPRECATED residual read: AdvSetting.worst_promo_position (populate-path off).
         button_text = (
             f"{'(' + str(adv.worst_promo_position) + ')' if adv.worst_promo_position else ''}{check_text} {adv.name} (Бот включен)"
             if adv.bot_active
