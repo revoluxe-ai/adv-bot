@@ -180,6 +180,14 @@ async def test_views_resolve_failure_defers_plan_fact_snapshot() -> None:
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.persist_v3_tick_report",
             new=AsyncMock(),
         ),
+        # Isolate views-gate body from CardAbHold ENTER interrupt Redis (DI Provide /
+        # closed loop). Same target as tests/unit/auto_updater_v3/conftest.py
+        # for test_orchestrator*; this nodeid is outside that autouse filter.
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "orchestrator.abort_ordinary_v3_if_enter_signaled",
+            new=AsyncMock(return_value=False),
+        ),
     ):
         step_cls.return_value.get_state = AsyncMock(return_value=None)
         step_cls.return_value.set_state = AsyncMock()
