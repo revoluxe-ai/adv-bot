@@ -1,7 +1,13 @@
-"""Telegram handlers экрана A/B Hold (spec ``card-ab-hold-mode``)."""
+"""Telegram handlers экрана A/B Hold (spec ``card-ab-hold-mode``).
+
+Callback ACK: ``ImmediateCallbackAnswerUpdateMiddleware`` уже отвечает на
+CallbackQuery; handlers не вызывают ``query.answer()`` — user-visible
+пояснения через ``_notify_callback_user`` (message.answer / bot.send_message).
+"""
 
 from __future__ import annotations
 
+import inspect
 import logging
 
 from aiogram import Router
@@ -82,6 +88,39 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 logger = logging.getLogger(__name__)
 
 card_ab_hold_router = Router(name="card_ab_hold")
+
+
+async def _notify_callback_user(query: CallbackQuery, text: str | None) -> None:
+    """Краткое пояснение в чат после ACK middleware (не CallbackQuery.answer).
+
+    ``ImmediateCallbackAnswerUpdateMiddleware`` уже ответил на CallbackQuery.
+    Handlers не вызывают ``query.answer()``; user-visible toast/alert →
+    ``message.answer`` или ``bot.send_message`` (см. docks/CALLBACK_ANSWER_POLICY.md).
+
+    Args:
+        query: CallbackQuery текущего хендлера.
+        text: текст уведомления; пустой/None — no-op.
+    """
+    if not text:
+        return
+    msg = query.message
+    answer = getattr(msg, "answer", None) if msg is not None else None
+    if callable(answer):
+        result = answer(text)
+        if inspect.isawaitable(result):
+            await result
+        return
+    bot = getattr(query, "bot", None)
+    send = getattr(bot, "send_message", None) if bot is not None else None
+    if not callable(send):
+        return
+    chat_id = getattr(getattr(query, "from_user", None), "id", None)
+    if chat_id is None:
+        return
+    result = send(chat_id, text)
+    if inspect.isawaitable(result):
+        await result
+
 
 _INSTRUCTION = (
     "Режим A/B тестирования карточки\n\n"
@@ -183,8 +222,8 @@ async def _edit_screen(
 
     Args:
         phase: durable ``card_ab_hold_phase`` для S0 confirm-bridge (UX §5).
-        alert_if_unavailable: если False — не вызывать ``query.answer`` при skip
-            (caller уже ответил toast/alert; иначе второй answer перетирает UX).
+        alert_if_unavailable: если False — не слать user-notice при skip
+            (caller уже уведомил; иначе второй toast дублирует UX).
     """
     msg = query.message
     if msg is None:
@@ -192,9 +231,9 @@ async def _edit_screen(
             "CardAbHold screen render skipped: callback message is unavailable"
         )
         if alert_if_unavailable:
-            await query.answer(
+            await _notify_callback_user(
+                query,
                 "Не удалось открыть экран A/B Hold: сообщение недоступно.",
-                show_alert=True,
             )
         return False
     if not isinstance(msg, Message):
@@ -203,9 +242,9 @@ async def _edit_screen(
             type(msg).__name__,
         )
         if alert_if_unavailable:
-            await query.answer(
+            await _notify_callback_user(
+                query,
                 "Не удалось открыть экран A/B Hold: неподдерживаемый тип сообщения.",
-                show_alert=True,
             )
         return False
 
@@ -287,20 +326,17 @@ async def open_card_ab_hold_menu(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
         )
         if adv is None or not is_card_ab_hold_ui_visible(adv):
-            await query.answer("Доступно только при включённом боте", show_alert=True)
+            await _notify_callback_user(query, "Доступно только при включённом боте")
             return
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         status = await _screen_status_text(adv, mode)
-        rendered = await _edit_screen(
+        await _edit_screen(
             query,
             f"{_INSTRUCTION}\n{status}",
             adv.id,
             mode,
             phase=getattr(adv, "card_ab_hold_phase", None),
         )
-        if not rendered:
-            return
-        await query.answer()
 
 
 async def _handle_ab_hold_enable(
@@ -327,11 +363,11 @@ async def _handle_ab_hold_enable(
             select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         )
         if adv is None or not can_enable_card_ab_hold(adv):
-            await query.answer("Доступно только при включённом боте", show_alert=True)
+            await _notify_callback_user(query, "Доступно только при включённом боте")
             return
         if is_card_ab_hold_enable_noop(adv):
             mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
-            await query.answer(card_ab_hold_enable_noop_answer(adv), show_alert=True)
+            await _notify_callback_user(query, card_ab_hold_enable_noop_answer(adv))
             await _edit_screen(
                 query,
                 f"{_INSTRUCTION}\nСтатус: {mode.value}",
@@ -348,7 +384,7 @@ async def _handle_ab_hold_enable(
             return
         if not can_enable_card_ab_hold_on_version(adv):
             reason = card_ab_hold_requires_v3_message()
-            await query.answer(reason, show_alert=True)
+            await _notify_callback_user(query, reason)
             await _edit_screen(
                 query,
                 f"{_INSTRUCTION}\n{reason}",
@@ -364,7 +400,7 @@ async def _handle_ab_hold_enable(
             return
         if not has_positive_plan_max_cpo(adv):
             reason = card_ab_hold_requires_max_cpo_message()
-            await query.answer(reason, show_alert=True)
+            await _notify_callback_user(query, reason)
             await _edit_screen(
                 query,
                 f"{_INSTRUCTION}\n{reason}",
@@ -382,9 +418,8 @@ async def _handle_ab_hold_enable(
         stats_ok, stats_reason = await evaluate_ab_hold_enable_stats(adv)
         if not stats_ok:
             blocked = build_ab_hold_enable_blocked_by_stats_message(stats_reason)
-            await query.answer(
-                build_ab_hold_enable_blocked_alert(stats_reason),
-                show_alert=True,
+            await _notify_callback_user(
+                query, build_ab_hold_enable_blocked_alert(stats_reason)
             )
             await _edit_screen(
                 query,
@@ -397,8 +432,8 @@ async def _handle_ab_hold_enable(
         if not skip_view_volume_gate:
             volume_eval = await evaluate_ab_hold_launch_view_volume(adv)
             if volume_eval.is_unavailable:
-                await query.answer(
-                    build_ab_hold_views_unavailable_alert(), show_alert=True
+                await _notify_callback_user(
+                    query, build_ab_hold_views_unavailable_alert()
                 )
                 await _edit_screen(
                     query,
@@ -414,8 +449,8 @@ async def _handle_ab_hold_enable(
                 return
             if not volume_eval.is_sufficient:
                 total_views = volume_eval.total_views
-                await query.answer(
-                    build_ab_hold_low_views_alert(total_views), show_alert=True
+                await _notify_callback_user(
+                    query, build_ab_hold_low_views_alert(total_views)
                 )
                 await _edit_low_views_warning(
                     query,
@@ -445,7 +480,7 @@ async def _handle_ab_hold_enable(
             select(AdvSetting).where(AdvSetting.id == adv_setting_id)
         )
         if adv is None:
-            await query.answer("Кампания не найдена", show_alert=True)
+            await _notify_callback_user(query, "Кампания не найдена")
             return
         await CardAbHoldSignalRedisCache(adv).set_signal(
             CardAbHoldSignalSnapshot(signal=CardAbHoldSignalKind.ENTER)
@@ -458,7 +493,7 @@ async def _handle_ab_hold_enable(
             degraded=bool(getattr(adv, "card_ab_hold_degraded", False)),
         )
         logger.info("[adv_id=%s] CardAbHold ENTER → PENDING_SETUP", adv.adv_id)
-        await query.answer("Подготовка A/B Hold…")
+        await _notify_callback_user(query, "Подготовка A/B Hold…")
         await _edit_screen(
             query,
             f"{_INSTRUCTION}\n{status}",
@@ -504,7 +539,7 @@ async def cancel_card_ab_hold_enable(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
         )
         if adv is None or not is_card_ab_hold_ui_visible(adv):
-            await query.answer("Доступно только при включённом боте", show_alert=True)
+            await _notify_callback_user(query, "Доступно только при включённом боте")
             return
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         logger.info(
@@ -512,7 +547,7 @@ async def cancel_card_ab_hold_enable(
             adv.adv_id,
             mode.value,
         )
-        await query.answer("Включение отменено")
+        await _notify_callback_user(query, "Включение отменено")
         await _edit_screen(
             query,
             f"{_INSTRUCTION}\nСтатус: {mode.value}",
@@ -536,7 +571,7 @@ async def disable_card_ab_hold(
             select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
         )
         if adv is None or not is_card_ab_hold_ui_visible(adv):
-            await query.answer("Доступно только при включённом боте", show_alert=True)
+            await _notify_callback_user(query, "Доступно только при включённом боте")
             return
         adv.card_ab_hold_mode = CardAbHoldMode.OFF.value
         adv.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
@@ -553,7 +588,7 @@ async def disable_card_ab_hold(
         logger.info(
             "[adv_id=%s] CardAbHold EXIT → OFF (allowed-set snapshot cleared)", adv.adv_id
         )
-        await query.answer("Режим A/B выключен")
+        await _notify_callback_user(query, "Режим A/B выключен")
         await _edit_screen(
             query,
             f"{_INSTRUCTION}\nСтатус: off",
@@ -589,7 +624,6 @@ async def back_from_card_ab_hold(
     UX §7 / ROOT-001: S0/status Back → campaign menu. Старые A/B-сообщения
     не удаляем и не редактируем в dead-end «Экран закрыт…».
     """
-    await query.answer()
     msg = query.message
     if not isinstance(msg, Message):
         return
