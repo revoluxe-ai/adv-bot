@@ -17,12 +17,28 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 
 
+@pytest.fixture(autouse=True)
+def _stub_enter_common_bid_reset() -> None:
+    """Изолировать warmup-тесты от §19 ENTER common-bid Redis/WB path.
+
+    ``process_ab_epoch`` always calls ``ensure_search_common_bid_reset_on_enter``;
+    without a stub, AdvSettingRedisCache hits DI Redis ``Provide`` before WARM_UP body.
+    """
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+        "card_ab_hold.epoch_pipelines.ensure_search_common_bid_reset_on_enter",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 def _epoch_adv(*, phase: str, started_hours_ago: int = 25) -> SimpleNamespace:
     started = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
         hours=started_hours_ago
     )
     adv_setting = SimpleNamespace(
         id=42,
+        adv_id=9001,  # AdvSettingRedisCache key (ENTER common-bid reset)
         card_ab_hold_phase=phase,
         card_ab_hold_warmup_started_at=started,
         card_ab_hold_warmup_duration_hours=24,
