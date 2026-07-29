@@ -10,12 +10,14 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.click
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.dto.plan_fact_stat_dto import PlanFactStatDTO
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
+pytestmark = pytest.mark.destructive_local
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_insert_and_select_single_record(clickhouse_client):
     """Тест вставки одной записи и чтения из ClickHouse"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -49,7 +51,7 @@ async def test_insert_and_select_single_record(clickhouse_client):
             plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
             fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
             version
-        FROM default_db.plan_fact_stats
+        FROM test_adv_bot_clickhouse.plan_fact_stats
         WHERE adv_id = 12345
         ORDER BY timestamp
         """
@@ -78,7 +80,7 @@ async def test_insert_and_select_single_record(clickhouse_client):
 @pytest.mark.asyncio
 async def test_batch_insert_multiple_records(clickhouse_client):
     """Тест батч-вставки нескольких записей"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -134,7 +136,7 @@ async def test_batch_insert_multiple_records(clickhouse_client):
     async with anti_ch_crash_semaphore:
         # Проверяем количество записей
         count_result = await clickhouse_client.query(
-            "SELECT COUNT(*) FROM default_db.plan_fact_stats WHERE date = '2025-12-25'"
+            "SELECT COUNT(*) FROM test_adv_bot_clickhouse.plan_fact_stats WHERE date = '2025-12-25'"
         )
     assert count_result.result_rows[0][0] == 3
     async with anti_ch_crash_semaphore:
@@ -142,7 +144,7 @@ async def test_batch_insert_multiple_records(clickhouse_client):
         result = await clickhouse_client.query(
             """
             SELECT adv_id, shop_id, plan_orders, fact_predict_orders, fact_method
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE date = '2025-12-25'
             ORDER BY adv_id
             """
@@ -158,7 +160,7 @@ async def test_batch_insert_multiple_records(clickhouse_client):
 @pytest.mark.asyncio
 async def test_insert_with_null_plan_values(clickhouse_client):
     """Тест вставки записей с NULL значениями для плана"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -188,7 +190,7 @@ async def test_insert_with_null_plan_values(clickhouse_client):
             """
             SELECT plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
                    fact_predict_orders, fact_original_orders, fact_pay_for_order
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = 44444
             """
         )
@@ -207,7 +209,7 @@ async def test_insert_with_null_plan_values(clickhouse_client):
 @pytest.mark.asyncio
 async def test_insert_with_null_fact_values(clickhouse_client):
     """Тест вставки записей с NULL значениями для факта"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -237,7 +239,7 @@ async def test_insert_with_null_fact_values(clickhouse_client):
             """
             SELECT plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
                    fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = 55555
             """
         )
@@ -257,7 +259,7 @@ async def test_insert_with_null_fact_values(clickhouse_client):
 @pytest.mark.asyncio
 async def test_insert_with_null_plan_and_fact_values(clickhouse_client):
     """Тест вставки записей с NULL значениями для плана и факта"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -287,7 +289,7 @@ async def test_insert_with_null_plan_and_fact_values(clickhouse_client):
             """
             SELECT adv_id, shop_id, date, timestamp,
                    plan_orders, fact_predict_orders, version
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = 66666
             """
         )
@@ -306,7 +308,7 @@ async def test_insert_with_null_plan_and_fact_values(clickhouse_client):
 @pytest.mark.asyncio
 async def test_data_types_correctness(clickhouse_client):
     """Тест корректности типов данных (Int32, Float64, String, Date, DateTime)"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -344,7 +346,7 @@ async def test_data_types_correctness(clickhouse_client):
                 toTypeName(fact_predict_orders) as fact_predict_orders_type,
                 toTypeName(fact_method) as fact_method_type,
                 toTypeName(version) as version_type
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = 77777
             LIMIT 1
             """
@@ -368,7 +370,7 @@ async def test_data_types_correctness(clickhouse_client):
 @pytest.mark.asyncio
 async def test_partitioning_by_month(clickhouse_client):
     """Тест партиционирования по месяцу"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -411,7 +413,7 @@ async def test_partitioning_by_month(clickhouse_client):
             """
             SELECT partition, count() as cnt
             FROM system.parts
-            WHERE database = 'default_db'
+            WHERE database = 'test_adv_bot_clickhouse'
               AND table = 'plan_fact_stats'
               AND active = 1
             GROUP BY partition
@@ -428,7 +430,7 @@ async def test_partitioning_by_month(clickhouse_client):
 @pytest.mark.asyncio
 async def test_ordering_by_adv_id_date_timestamp(clickhouse_client):
     """Тест сортировки по (adv_id, date, timestamp)"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     manager = ClickHousePlanFactManager()
 
@@ -472,7 +474,7 @@ async def test_ordering_by_adv_id_date_timestamp(clickhouse_client):
         result = await clickhouse_client.query(
             """
             SELECT adv_id, date, timestamp, version
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = 99999
             ORDER BY adv_id, date, timestamp
             """

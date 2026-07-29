@@ -3,8 +3,7 @@ from clickhouse_connect.driver.asyncclient import AsyncClient
 
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
-pytestmark = pytest.mark.integration
-
+pytestmark = pytest.mark.destructive_local
 # Пример теста для проверки тестовой сессии ClickHouse
 
 

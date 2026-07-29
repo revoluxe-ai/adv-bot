@@ -10,12 +10,14 @@ from app.modules.shop_runner.service_manager.services.common_sale_stat_updater.c
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
+pytestmark = pytest.mark.destructive_local
+
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_client):
     # Arrange: очистим таблицу, чтобы тест был детерминированным
-    await clickhouse_client.command("TRUNCATE TABLE default_db.wb_common_stat")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.wb_common_stat")
 
     manager = ClickHouseCommonStatManager()
     day = datetime.date(2025, 12, 21)
@@ -50,7 +52,7 @@ async def test_clickhouse_common_stat_manager_insert_and_select(clickhouse_clien
         result = await clickhouse_client.query(
             """
             SELECT nmid, date, open_card, add_to_cart, orders, orders_sum, buy_outs, buyouts_sum_rub
-            FROM default_db.wb_common_stat
+            FROM test_adv_bot_clickhouse.wb_common_stat
             WHERE nmid IN (123, 456) AND date = '2025-12-21'
             ORDER BY nmid
             """

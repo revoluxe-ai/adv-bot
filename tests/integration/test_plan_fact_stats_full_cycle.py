@@ -31,6 +31,8 @@ from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.pre_comple
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 
+pytestmark = pytest.mark.destructive_local
+
 
 def _make_minimal_common_advs_stat_data(adv_setting: object) -> CommonAdvsStatData:
     """Минимальный CommonAdvsStatData для тестов с моками (без обращения к CH/Postgres)."""
@@ -166,7 +168,7 @@ async def test_full_cycle_plan_fact_stats(
     clickhouse_client, complex_adv, access_mock, fake_redis
 ):
     """Тест полного цикла: получение кампаний → получение плана/факта → запись в ClickHouse"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
@@ -202,7 +204,7 @@ async def test_full_cycle_plan_fact_stats(
                 plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
                 fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
                 version
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = {complex_adv.adv_id}
             ORDER BY timestamp DESC
             LIMIT 1
@@ -237,7 +239,7 @@ async def test_full_cycle_plan_fact_stats(
     fmt_res = await clickhouse_client.query(
         """
         SELECT formatDateTime(max(timestamp), %(plan_fact_ts_format)s, 'Europe/Moscow')
-        FROM default_db.plan_fact_stats
+        FROM test_adv_bot_clickhouse.plan_fact_stats
         WHERE adv_id = %(adv_id)s
         """,
         parameters={
@@ -255,7 +257,7 @@ async def test_full_cycle_with_real_complex_adv(
     clickhouse_client, complex_adv, access_mock, fake_redis
 ):
     """Тест с реальными ComplexAdv из фикстуры"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
@@ -286,7 +288,7 @@ async def test_full_cycle_with_real_complex_adv(
         result = await clickhouse_client.query(
             f"""
             SELECT adv_id, shop_id, plan_orders, fact_predict_orders, fact_method
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = {complex_adv.adv_id}
             LIMIT 1
             """
@@ -307,7 +309,7 @@ async def test_full_cycle_error_handling_for_some_advs(
     clickhouse_client, complex_adv, access_mock, fake_redis
 ):
     """Тест обработки ошибок получения данных для отдельных кампаний"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
@@ -353,7 +355,7 @@ async def test_full_cycle_multiple_advs_simultaneously(
     clickhouse_client, complex_adv, access_mock, fake_redis
 ):
     """Тест записи данных для нескольких кампаний одновременно"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
@@ -413,7 +415,7 @@ async def test_full_cycle_multiple_advs_simultaneously(
         result = await clickhouse_client.query(
             f"""
             SELECT adv_id, plan_orders, fact_predict_orders, fact_method
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id IN ({complex_adv.adv_id}, 11111, 22222)
             ORDER BY adv_id
             """
@@ -444,7 +446,7 @@ async def test_full_cycle_data_correctness_in_clickhouse(
     clickhouse_client, complex_adv, access_mock, fake_redis
 ):
     """Тест корректности данных в ClickHouse после записи"""
-    await clickhouse_client.command("TRUNCATE TABLE default_db.plan_fact_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.plan_fact_stats")
 
     wb_api = WBApi(access_mock, AsyncMock())
     redis_client_wrapper = RedisClient(redis_client=fake_redis)
@@ -478,7 +480,7 @@ async def test_full_cycle_data_correctness_in_clickhouse(
                 plan_orders, plan_target_pay_for_order, plan_max_pay_for_order,
                 fact_predict_orders, fact_original_orders, fact_pay_for_order, fact_method,
                 version
-            FROM default_db.plan_fact_stats
+            FROM test_adv_bot_clickhouse.plan_fact_stats
             WHERE adv_id = {complex_adv.adv_id}
             LIMIT 1
             """

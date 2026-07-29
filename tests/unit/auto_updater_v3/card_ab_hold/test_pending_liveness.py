@@ -554,6 +554,7 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
     query = _make_query()
     signal_clear = AsyncMock()
     block_clear = AsyncMock()
+    enter_reset_clear = AsyncMock()
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
@@ -567,6 +568,11 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
             "CardAbHoldSetupBlockRedisCache",
             return_value=MagicMock(clear=block_clear),
         ),
+        patch.object(
+            handlers,
+            "CardAbHoldCommonBidEnterResetRedisCache",
+            return_value=MagicMock(clear=enter_reset_clear),
+        ),
     ):
         await handlers.disable_card_ab_hold(
             query, CardAbHoldDisable(adv_setting_original_id=42)
@@ -578,6 +584,7 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
     session.commit.assert_awaited()
     signal_clear.assert_awaited_once()
     block_clear.assert_awaited_once()
+    enter_reset_clear.assert_awaited_once()
 
 
 @pytest.mark.unit

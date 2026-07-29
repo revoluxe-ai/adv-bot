@@ -9,7 +9,7 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from tests.factories.adv_factory import WBCabinetFactory
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 @pytest.fixture

@@ -1,13 +1,11 @@
-"""Alembic upgrade/downgrade для epoch migration (§19.5 / §22.5).
+"""Статические проверки Alembic epoch migration (§19.5 / §22.5).
 
-Live disposable PG в CI обычно недоступен — статические проверки migration source
-+ optional live test при ``TEST_DATABASE_URL``.
+Live upgrade/downgrade: ``tests/integration/card_ab_hold/test_migration_epoch_live_pg.py``.
 """
 
 from __future__ import annotations
 
 import ast
-import os
 from pathlib import Path
 
 import pytest
@@ -82,27 +80,3 @@ def test_migration_unique_idempotency_constraint_named() -> None:
     text = _MIGRATION.read_text(encoding="utf-8")
     assert "uq_advsetting_card_ab_hold_wb_sync_idempotency_key" in text
     assert "create_unique_constraint" in text
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(
-    not os.getenv("TEST_DATABASE_URL"),
-    reason="TEST_DATABASE_URL not set — live alembic upgrade/downgrade skipped",
-)
-def test_live_alembic_upgrade_downgrade_epoch_revision() -> None:
-    """Live disposable PG: upgrade/downgrade ``d0e1f2a3b4c5`` via Operations.
-
-    Обходит ``alembic_/env.py`` (который берёт URL из settings/.env) и
-    применяет migration functions напрямую к ``TEST_DATABASE_URL``.
-    """
-    from tests.unit.auto_updater_v3.card_ab_hold._live_pg_bootstrap import (
-        assert_epoch_columns_present,
-        create_pre_epoch_advsetting_schema,
-        run_epoch_migration_upgrade_downgrade,
-    )
-
-    db_url = os.environ["TEST_DATABASE_URL"]
-    create_pre_epoch_advsetting_schema(db_url)
-    run_epoch_migration_upgrade_downgrade(db_url)
-    present = assert_epoch_columns_present(db_url)
-    assert len(present) == len(_EPOCH_COLUMNS)

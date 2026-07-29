@@ -22,7 +22,7 @@ services:
   test_clickhouse:
     image: clickhouse/clickhouse-server:latest
     environment:
-      CLICKHOUSE_DB: default_db
+      CLICKHOUSE_DB: test_adv_bot_clickhouse
       CLICKHOUSE_USER: CLICK_HOUSE_USER
       CLICKHOUSE_PASSWORD: password
       TZ: Europe/Moscow

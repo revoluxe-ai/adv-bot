@@ -21,7 +21,7 @@ from app.settings.settings_master import Settings
 from app.utils.db.models import Invite, InviteStatus, User
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 async def _create_user_with_cabinet(

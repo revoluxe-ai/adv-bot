@@ -13,9 +13,7 @@ from app.modules.adv_creator.backend.exc import (
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-pytestmark = pytest.mark.integration
-
-
+pytestmark = pytest.mark.destructive_local
 @pytest.fixture
 def bot_mock():
     bot_mock = MagicMock(spec=Bot)

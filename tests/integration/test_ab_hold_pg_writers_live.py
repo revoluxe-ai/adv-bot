@@ -1,12 +1,13 @@
 """Live PG re-read coverage for A/B Hold writers (external-call PG gaps).
 
-Requires ``TEST_DATABASE_URL``. Proves durable writes via production ``sm`` seam
-(patched to disposable DB) + SQL re-select — not session AsyncMock.
+Requires validated ``TEST_DATABASE_URL`` + ``ALLOW_DESTRUCTIVE_TEST_DB=1``.
+Proves durable writes via production ``sm`` seam (patched to disposable DB)
++ SQL re-select — not session AsyncMock. Не marker ``fast``.
 """
 
 from __future__ import annotations
 
-import os
+from collections.abc import Iterator
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -47,7 +48,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
     disable_card_ab_hold,
 )
-from tests.unit.auto_updater_v3.card_ab_hold._live_pg_bootstrap import (
+from tests.integration.card_ab_hold._live_pg_bootstrap import (
+    disposable_ab_hold_schema,
     ensure_post_epoch_schema_for_orm,
     fetch_adv_epoch_row,
     fetch_keyword_row,
@@ -55,8 +57,8 @@ from tests.unit.auto_updater_v3.card_ab_hold._live_pg_bootstrap import (
     insert_keyword_row,
     patched_async_session_maker,
 )
+from tests.support.destructive_pg_dsn import require_validated_live_pg_dsn_or_skip
 
-_HAS_LIVE_PG = bool(os.getenv("TEST_DATABASE_URL"))
 _HANDLERS = (
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
     "card_ab_hold.telegram.handlers"
@@ -68,18 +70,16 @@ _CONFIRM = (
 
 
 @pytest.fixture(scope="module")
-def live_db_url() -> str:
-    """Один disposable schema на модуль (требует TEST_DATABASE_URL)."""
-    if not _HAS_LIVE_PG:
-        pytest.skip("TEST_DATABASE_URL not set")
-    db_url = os.environ["TEST_DATABASE_URL"]
-    ensure_post_epoch_schema_for_orm(db_url)
-    return db_url
+def live_db_url() -> Iterator[str]:
+    """Disposable schema на модуль; невалидный DSN → fail-closed error."""
+    db_url = require_validated_live_pg_dsn_or_skip()
+    with disposable_ab_hold_schema(db_url):
+        ensure_post_epoch_schema_for_orm(db_url)
+        yield db_url
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_start_epoch_on_enable_persists_mode_phase(
     live_db_url: str,
 ) -> None:
@@ -103,9 +103,8 @@ async def test_live_pg_start_epoch_on_enable_persists_mode_phase(
     assert row[1] == CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM.value
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_warmup_keyword_and_duration_writers(live_db_url: str) -> None:
     """``confirm_keyword_set`` + ``set_warmup_duration`` durable WARM_UP timer."""
     adv_setting_id = insert_adv_row(
@@ -129,9 +128,8 @@ async def test_live_pg_warmup_keyword_and_duration_writers(live_db_url: str) -> 
     assert list(row[5]) == ["alpha", "beta"]
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_epoch_confirm_sync_activate_and_clear(
     live_db_url: str,
 ) -> None:
@@ -177,9 +175,8 @@ async def test_live_pg_epoch_confirm_sync_activate_and_clear(
     assert row[11] is None
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_apply_confirmed_intent_writes_tp_and_snapshot(
     live_db_url: str,
 ) -> None:
@@ -217,9 +214,8 @@ async def test_live_pg_apply_confirmed_intent_writes_tp_and_snapshot(
     assert list(row[12]) == ["alpha"]
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_setup_mutations_epoch_managed_fail_off_skips_active(
     live_db_url: str,
 ) -> None:
@@ -284,9 +280,8 @@ async def test_live_pg_setup_mutations_epoch_managed_fail_off_skips_active(
     assert row[0] == CardAbHoldMode.PENDING_SETUP.value
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_disable_card_ab_hold_clears_mode_and_epoch(
     live_db_url: str,
 ) -> None:
@@ -329,9 +324,8 @@ async def test_live_pg_disable_card_ab_hold_clears_mode_and_epoch(
     assert list(row[12]) == []
 
 
-@pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _HAS_LIVE_PG, reason="TEST_DATABASE_URL not set")
 async def test_live_pg_abort_epoch_to_off_clears_mode_and_epoch(
     live_db_url: str,
 ) -> None:
