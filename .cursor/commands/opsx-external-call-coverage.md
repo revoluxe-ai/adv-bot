@@ -174,6 +174,10 @@ Rename/copy: проверяй **новый** путь (destination).
 * Pure DTO/mapping без I/O → обычно не surface (`NO_EXTERNAL_SURFACE`).
 * Unit session-mock для PG/CH writer = `WEAK_EVIDENCE` (или
   `UNTESTABLE_SEAM`, если без DI нельзя подставить test session).
+* Для **new/changed** PG/CH boundary-кода отсутствие injectable seam
+  (session/client создаётся только внутри target callable и не передаётся через
+  аргументы/provenance seam) классифицируй как `UNTESTABLE_SEAM` с
+  `NOTE=NO_INJECTABLE_SEAM`; не закрывай gap через unit session-mock.
 
 ### PG session mode check (mandatory for KIND=PG)
 
@@ -210,7 +214,7 @@ Dispositions (per surface):
 | `COVERED` | есть test evidence ≥ `MINIMUM_LEVEL` с real causal path |
 | `MISSING_TEST` | surface testable; адекватного test нет |
 | `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak / **PG\|CH только session-mock** / **PG_WRONG_SESSION_MODE** / **PG_IMPLICIT_SESSION_MODE** |
-| `UNTESTABLE_SEAM` | нельзя написать адекватный (esp. live PG/CH) test без production seam/DI |
+| `UNTESTABLE_SEAM` | нельзя написать адекватный (esp. live PG/CH) test без production seam/DI; для new/changed PG/CH include `NOTE=NO_INJECTABLE_SEAM` когда session/client создаётся только внутри callable |
 | `OUT_OF_POLICY` | не in-policy |
 | `NO_EXTERNAL_SURFACE` | in-policy file/hunk без внешней границы |
 | `DEFERRED_OWNER` | нужна owner decision (спорный KIND/level) |
