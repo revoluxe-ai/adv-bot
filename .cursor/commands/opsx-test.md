@@ -54,6 +54,33 @@ User input:
 $ARGUMENTS
 ```
 
+## Packetized TEST_ONLY input
+
+Команда поддерживает пакетный вход из
+`/opsx-external-call-coverage` (`ROUTE_PACKETS`):
+
+```text
+TEST_ONLY_PACKET:
+- SOURCE: EXTERNAL_CALL_COVERAGE_REPORT
+- BASE: <BASE>
+- HEAD: <HEAD>
+- KINDS: [REDIS|WB_WRITE|HTTP|OTHER]
+- ITEMS:
+  - SYMBOL:
+    KIND:
+    PATH:
+    DISPOSITION:
+    NEXT: /opsx-test
+```
+
+Правила:
+
+- Если передан `TEST_ONLY_PACKET`, обрабатывай его как первичный input.
+- Если вместе с ним переданы PG/CH `REFACTOR_AND_TEST` items →
+  не закрывай их здесь; верни redirect на `/opsx-close-external-gap`.
+- Если packet пустой (`ITEMS` нет) → `NEXT_ACTION: /opsx-external-call-coverage base=<BASE>`
+  для повторной проверки.
+
 
 ## Route-trace event requirements (SCHEMA_VERSION 2)
 
@@ -124,6 +151,8 @@ NEXT_ACTION: /opsx-close-external-gap
 ```
 
   (paste the coverage report; no `base=` on close).
+- If input is `TEST_ONLY_PACKET`, process all `ITEMS` batch-wise and report
+  per-item closure; do not require manual split from mixed coverage report.
 - PG `sm(...)`: только явный `read_only=` (testing-rules § PG session mode).
   Bare `sm()` / wrong polarity — не TEST_ONLY; → `/opsx-close-external-gap`
   (или apply), не unit session-mock.
@@ -441,6 +470,7 @@ Result:
 - targeted command:
 - broader command, if needed:
 - remaining risks:
+- packet_source: none | TEST_ONLY_PACKET
 ```
 
 Return (bug-regression / verify):

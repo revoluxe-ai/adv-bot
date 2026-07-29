@@ -84,8 +84,8 @@ $ARGUMENTS
 
 ### No write GO in v1
 
-В v1 **нет** `GO` режима для автофиксов. Gaps → `/opsx-test` или
-`/opsx-apply` (seams), затем rerun этого audit.
+В v1 **нет** `GO` режима для автофиксов. Gaps → `/opsx-test` (TEST_ONLY) или
+`/opsx-close-external-gap` (REFACTOR_AND_TEST), затем rerun этого audit.
 
 ## Policy scope (in / out)
 
@@ -238,6 +238,58 @@ KIND_CLOSURE:
 
 Не смешивай TEST_ONLY и REFACTOR_AND_TEST в одном «просто допиши тест».
 
+## ROUTE_PACKETS (mandatory for mixed FAIL)
+
+Если в `GAPS` одновременно есть TEST_ONLY и REFACTOR_AND_TEST, добавь
+после `KIND_CLOSURE` блоки пакетной маршрутизации:
+
+```text
+ROUTE_PACKETS:
+- TEST_ONLY_PACKET:
+  - SOURCE: EXTERNAL_CALL_COVERAGE_REPORT
+  - BASE: <BASE>
+  - HEAD: <HEAD>
+  - KINDS: [REDIS|WB_WRITE|HTTP|OTHER]
+  - ITEMS:
+    - SYMBOL: <name>
+      KIND: <kind>
+      PATH: <path>
+      DISPOSITION: <MISSING_TEST|WEAK_EVIDENCE>
+      NEXT: /opsx-test
+- REFACTOR_AND_TEST_PACKET:
+  - SOURCE: EXTERNAL_CALL_COVERAGE_REPORT
+  - BASE: <BASE>
+  - HEAD: <HEAD>
+  - KINDS: [PG|CH]
+  - ITEMS:
+    - SYMBOL: <name>
+      KIND: <PG|CH>
+      PATH: <path>
+      DISPOSITION: <WEAK_EVIDENCE|UNTESTABLE_SEAM|MISSING_TEST>
+      NEXT: /opsx-close-external-gap
+```
+
+Правила:
+
+* При отсутствии mixed FAIL `ROUTE_PACKETS` можно опустить.
+* Для `REFACTOR_AND_TEST_PACKET` не требуй и не передавай `base=` в close-команду.
+* Для `TEST_ONLY_PACKET` не включай PG/CH REFACTOR_AND_TEST items.
+
+## MIXED_FAIL_PIPELINE (mandatory when both packet types exist)
+
+Если одновременно сформированы `TEST_ONLY_PACKET` и `REFACTOR_AND_TEST_PACKET`,
+добавь в `NEXT_ACTION` стандартный pipeline:
+
+```text
+MIXED_FAIL_PIPELINE:
+1) /opsx-close-external-gap
+   <paste REFACTOR_AND_TEST_PACKET>
+2) /opsx-test
+   <paste TEST_ONLY_PACKET>
+3) /opsx-external-call-coverage base=<BASE> focus=pg|ch
+4) /opsx-external-call-coverage base=<BASE>
+```
+
 ## Steps
 
 1. Разобрать `base` / `head` / `focus` / `change`.
@@ -327,6 +379,13 @@ KIND_CLOSURE:
   NEXT: …
   THEN: …
 
+ROUTE_PACKETS:
+- TEST_ONLY_PACKET: <present|absent>
+- REFACTOR_AND_TEST_PACKET: <present|absent>
+
+MIXED_FAIL_PIPELINE:
+- <steps|not_applicable>
+
 WHAT_HAPPENED:
 WHY:
 CURRENT_STATE: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
@@ -345,6 +404,10 @@ DO_NOT_DO_YET:
   / `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE`) →
   `/opsx-close-external-gap` + paste this report (**без** `base=` на close)
   затем coverage `focus=pg|ch`.
+* `FAIL` + mixed (есть и TEST_ONLY, и REFACTOR_AND_TEST) →
+  сначала `/opsx-close-external-gap` с `REFACTOR_AND_TEST_PACKET`,
+  затем `/opsx-test` с `TEST_ONLY_PACKET`,
+  затем coverage rerun `focus=pg|ch` и `focus=all`.
 * `FAIL` + `DEFERRED_OWNER` → один уточняющий вопрос владельцу.
 * `PASS` + `focus=all` → `/opsx-static-check`, затем
   `/opsx-verify <change-name>` если есть активный change.
