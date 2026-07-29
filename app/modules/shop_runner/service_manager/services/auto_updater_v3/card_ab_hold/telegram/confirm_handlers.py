@@ -10,6 +10,7 @@ WB-мутации не выполняются в handlers — sync owned by shop
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any, cast
 
@@ -183,6 +184,22 @@ def _parse_auto_bid_text(text: str | None) -> float | None:
     if value <= 0:
         return None
     return value
+
+
+async def _maybe_answer(message: Any, text: str, **kwargs: Any) -> None:
+    """Безопасно вызвать ``message.answer`` (Message или unit SimpleNamespace).
+
+    Args:
+        message: aiogram Message или mock с callable ``answer``.
+        text: текст ответа.
+        **kwargs: доп. аргументы ``answer`` (например ``reply_markup``).
+    """
+    answer = getattr(message, "answer", None)
+    if not callable(answer):
+        return
+    result = answer(text, **kwargs)
+    if inspect.isawaitable(result):
+        await result
 
 
 def _default_auto_bid(adv: AdvSetting) -> float:
@@ -936,13 +953,13 @@ async def on_auto_bid_edit(
     current_bid = _draft_auto_bid(draft, adv)
     draft["awaiting_auto_bid_input"] = True
     await save_draft(state, int(adv.id), draft)
-    await state.update_data(**{_CAH_AWAITING_AUTO_BID_ADV_KEY: int(adv.id)})
+    await state.update_data({_CAH_AWAITING_AUTO_BID_ADV_KEY: int(adv.id)})
     await state.set_state(_CAH_AWAITING_AUTO_BID_STATE)
     await query.answer()
     prompt = (
         f"{_AUTO_BID_ENTRY_PROMPT} Текущая: {current_bid:g}."
     )
-    if query.message is not None:
+    if isinstance(query.message, Message):
         await query.message.answer(prompt)
     elif query.bot is not None:
         # Fallback: rare path without callback message object.
@@ -973,17 +990,16 @@ async def on_auto_bid_numeric_message(
     if adv_id is None:
         adv_id = _resolve_auto_bid_entry_adv_id(data.get(_CAH_AWAITING_AUTO_BID_ADV_KEY))
     if adv_id is None:
-        answer = getattr(message, "answer", None)
-        if callable(answer):
-            await answer("Сессия ввода ставки устарела. Нажмите «Изменить значение» снова.")
+        await _maybe_answer(
+            message,
+            "Сессия ввода ставки устарела. Нажмите «Изменить значение» снова.",
+        )
         await state.set_state(None)
         return
 
     bid = _parse_auto_bid_text(getattr(message, "text", None))
-    answer = getattr(message, "answer", None)
     if bid is None:
-        if callable(answer):
-            await answer(_AUTO_BID_ENTRY_PROMPT)
+        await _maybe_answer(message, _AUTO_BID_ENTRY_PROMPT)
         return
 
     draft = await load_draft(state, adv_id)
@@ -992,18 +1008,18 @@ async def on_auto_bid_numeric_message(
     draft["revision"] = int(draft.get("revision") or 1) + 1
     await save_draft(state, adv_id, draft)
     await state.set_state(None)
-    await state.update_data(**{_CAH_AWAITING_AUTO_BID_ADV_KEY: None})
-    if not callable(answer):
-        return
+    await state.update_data({_CAH_AWAITING_AUTO_BID_ADV_KEY: None})
     revision = int(draft["revision"])
     text = build_a2_text(auto_bid=bid)
     kb = build_a2_keyboard(adv_id=adv_id, revision=revision, auto_bid=bid)
     try:
-        await answer(text, reply_markup=kb)
+        await _maybe_answer(message, text, reply_markup=kb)
     except TypeError:
         # Unit SimpleNamespace / mocks without reply_markup support.
-        await answer(f"Ставка Auto в черновике: {bid:g}. Подтвердите на экране A2.")
-
+        await _maybe_answer(
+            message,
+            f"Ставка Auto в черновике: {bid:g}. Подтвердите на экране A2.",
+        )
 
 @card_ab_hold_confirm_router.callback_query(CahSyncStatusRefresh.filter())
 async def on_sync_refresh(
