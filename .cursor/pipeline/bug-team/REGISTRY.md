@@ -53,12 +53,12 @@ WORKER_SPECS_DIR: .cursor/pipeline/bug-team/workers/
 | TASK_COMPLETION_WORKER | generalPurpose | evidence-mapped OpenSpec `[x]` | tasks.md checkboxes only with evidence |
 | BOUNDED_HUNTER | generalPurpose | `/opsx-bug-hunt` / project hunt bounds | candidate findings only |
 | FAN_IN_ASSEMBLER | generalPurpose | materialize `mode=fanin_assemble` | **only** `results/FANIN.md` |
-| CLOSURE_OPERATOR | generalPurpose | Owner-facing closure packet | process artifacts; no auto-close |
+| FAMILY_LEARNING_WORKER | generalPurpose | mandatory LEARNING_DECISION (+ conditional packet) | `family/LEARNING_DECISION.json` or `results/LEARNING_DECISION.json`; optional `family/LEARNING_PACKET.json` |
+| CLOSURE_OPERATOR | generalPurpose | Owner-facing closure packet | process artifacts; requires validated LEARNING_DECISION |
 | INVARIANT_CAPTURE_WORKER | generalPurpose | post-root-GREEN invariant capture | `family/INVARIANT.md` + proof |
 | RELATION_CLASSIFIER | generalPurpose | hunt candidate relation classify | findings + `family/` |
 | INTEGRATION_OPERATOR | generalPurpose | branch patch integration | `family/INTEGRATION.json` |
 | FAMILY_FAN_IN_ASSEMBLER | generalPurpose | family fan-in assemble | `results/FAMILY-FANIN.json\|.md` |
-| FAMILY_LEARNING_WORKER | generalPurpose | family learning packet | `family/LEARNING_PACKET.json` |
 
 ## Invariant-family fanout roles (ACTIVE)
 

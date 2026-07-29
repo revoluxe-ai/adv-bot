@@ -150,8 +150,10 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
         "team/heartbeats/",
     ],
     "FAMILY_LEARNING_WORKER": [
+        "family/LEARNING_DECISION.json",
         "family/LEARNING_PACKET.json",
         "family/FAMILY.json",
+        "results/LEARNING_DECISION.json",
         "results/LEARNING_REPORT.md",
         "team/packets/",
         "team/heartbeats/",

@@ -20,7 +20,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import bug_family, control_model, execution_identity, family_policy
+from . import bug_family, control_model, execution_identity, family_policy, learning_decision
 
 # Family fanout workers that must present VALIDATED execution identity before accept.
 FAMILY_WORKERS_REQUIRING_VALIDATED_IDENTITY = (
@@ -1077,12 +1077,44 @@ def run_learning(case_root: Path, *, force: bool = False) -> Dict[str, Any]:
         "UPDATED_AT": _now(),
     }
     validate_learning_packet(packet, case_root if not force else None)
-    (bug_family.family_dir(case_root) / "LEARNING_PACKET.json").write_text(
+    packet_path = bug_family.family_dir(case_root) / "LEARNING_PACKET.json"
+    packet_path.write_text(
         json.dumps(packet, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    # Mandatory compact decision (full packet remains for candidate/class lessons).
+    fanin_rel = "results/FAMILY-FANIN.json" if fanin_json.exists() else "results/FAMILY-FANIN.md"
+    fanin_src = case_root / fanin_rel
+    decision = learning_decision.build_learning_decision(
+        case_id=str(family["CASE_ID"]),
+        bug_family_id=str(family["BUG_FAMILY_ID"]),
+        invariant_id=str(family.get("INVARIANT_ID") or ""),
+        learning_verdict="CLASS_LESSON_CANDIDATE",
+        learning_status="COMPLETE",
+        policy_already_exists=False,
+        policy_refs=[],
+        enforcement_gap=None,
+        promotion_decision="DEFERRED",
+        recommendations={
+            "STATIC_CHECK_CANDIDATE": False,
+            "PROJECT_WIDE_HUNT_REQUEST": False,
+            "TESTING_RULES_CANDIDATE": False,
+        },
+        source_fanin_path=fanin_rel,
+        source_fanin_hash=_file_sha(fanin_src) if fanin_src.exists() else None,
+        source_artifact_paths=dict(packet["SOURCE_ARTIFACT_PATHS"]),
+        source_artifact_hashes=dict(packet["SOURCE_ARTIFACT_HASHES"]),
+        decision_rationale=(
+            "Family fan-in complete; class-lesson candidate recorded; "
+            "promotion deferred (no auto rule/superclass activation)."
+        ),
+        full_packet_path="family/LEARNING_PACKET.json",
+    )
+    learning_decision.write_learning_decision(case_root, decision)
+    learning_decision.validate_learning_decision(decision, case_root=case_root)
     report = case_root / "results" / "LEARNING_REPORT.md"
     report.write_text(
-        f"# LEARNING_REPORT\n\nLEARNING_STATUS: COMPLETE\nFAMILY: {family['BUG_FAMILY_ID']}\n",
+        f"# LEARNING_REPORT\n\nLEARNING_STATUS: COMPLETE\nFAMILY: {family['BUG_FAMILY_ID']}\n"
+        f"LEARNING_VERDICT: {decision['LEARNING_VERDICT']}\n",
         encoding="utf-8",
     )
     bug_family.update_family_status(case_root, learning_status="COMPLETE", family_status="LEARNING")
@@ -1239,11 +1271,13 @@ def close_family(case_root: Path) -> Dict[str, Any]:
     fanin = Path(case_root) / "results" / "FAMILY-FANIN.md"
     if not fanin.exists() or "READY_FOR_FAMILY_CLOSURE" not in fanin.read_text(encoding="utf-8"):
         raise FamilyFanoutError("BLOCKED_FAMILY_CLOSURE_FANIN")
-    learning = json.loads(
-        (bug_family.family_dir(case_root) / "LEARNING_PACKET.json").read_text(encoding="utf-8")
-    )
-    if learning.get("LEARNING_STATUS") != "COMPLETE":
-        raise FamilyFanoutError("BLOCKED_FAMILY_CLOSURE_LEARNING")
+    try:
+        learning_decision.evaluate_closure_learning_gate(case_root)
+    except learning_decision.LearningDecisionError as exc:
+        # Preserve historical alias when decision missing/incomplete for family path.
+        if exc.code == "BLOCKED_LEARNING_DECISION_MISSING":
+            raise FamilyFanoutError("BLOCKED_LEARNING_DECISION_MISSING") from exc
+        raise FamilyFanoutError(exc.code, exc.detail, exc.payload) from exc
     if not (Path(case_root) / "results" / "HUMAN_SUMMARY.md").exists():
         raise FamilyFanoutError("BLOCKED_FAMILY_CLOSURE_HUMAN_SUMMARY")
 

@@ -3,7 +3,8 @@
 
 Default live mode after activation: CONTROLLED_LIVE_UNCOMMITTED.
 - No intermediate Owner production GO for local worktree writes after valid RED.
-- No intermediate Owner closure GO when fan-in is READY_FOR_CLOSURE.
+- After fan-in READY_FOR_CLOSURE: FAMILY_LEARNING_WORKER then CLOSURE_OPERATOR
+  (validated LEARNING_DECISION required; no Owner closure GO by default).
 - Git commit/push/deploy/external mutations remain forbidden.
 - Legacy OWNER_GATED mode preserves previous Owner GO behavior.
 
@@ -18,6 +19,8 @@ import re
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+from . import learning_decision
 
 CONTROL_MODEL = "USER_REVIEWS_UNCOMMITTED_WORKTREE"
 MODE_CONTROLLED_LIVE_UNCOMMITTED = "CONTROLLED_LIVE_UNCOMMITTED"
@@ -184,8 +187,14 @@ def decide_auto_closure(
     execution_mode: str,
     closure_readiness: str,
     blocking_findings: Optional[List[str]] = None,
+    case_root: Optional[Path] = None,
+    learning_decision_obj: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Fan-in → automatic CLOSURE_OPERATOR when uncommitted control model."""
+    """Fan-in → learning → automatic CLOSURE_OPERATOR when uncommitted control model.
+
+    After READY_FOR_CLOSURE, FAMILY_LEARNING_WORKER must complete a validated
+    LEARNING_DECISION before CLOSURE_OPERATOR may dispatch.
+    """
     blocking = [b for b in (blocking_findings or []) if b]
     if uses_owner_closure_gate(execution_mode):
         return {
@@ -193,6 +202,8 @@ def decide_auto_closure(
             "AUTO_CLOSURE": False,
             "WAITING_OWNER": True,
             "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+            "LEARNING_DISPATCH_ALLOWED": False,
+            "EXPECTED_NEXT_COMMAND": "OWNER_FINAL_CLOSURE_DECISION",
         }
     if blocking:
         return {
@@ -201,6 +212,8 @@ def decide_auto_closure(
             "CASE_STATUS": "OPEN_BLOCKED",
             "BLOCKING_FINDINGS": blocking,
             "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+            "LEARNING_DISPATCH_ALLOWED": False,
+            "EXPECTED_NEXT_COMMAND": None,
         }
     if closure_readiness not in ("READY_FOR_CLOSURE", "READY_FOR_FAMILY_CLOSURE"):
         return {
@@ -208,14 +221,88 @@ def decide_auto_closure(
             "AUTO_CLOSURE": False,
             "CLOSURE_READINESS": closure_readiness,
             "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+            "LEARNING_DISPATCH_ALLOWED": False,
+            "EXPECTED_NEXT_COMMAND": None,
         }
+
+    # Mandatory learning hop before closure.
+    decision = learning_decision_obj
+    if decision is None and case_root is not None:
+        decision = learning_decision.load_learning_decision(case_root)
+
+    if decision is None:
+        return {
+            "STATUS": "LEARNING_REQUIRED",
+            "AUTO_CLOSURE": False,
+            "WAITING_OWNER": False,
+            "WAITING_OWNER_FINAL_CLOSURE": False,
+            "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+            "LEARNING_DISPATCH_ALLOWED": True,
+            "EXPECTED_NEXT_COMMAND": "FAMILY_LEARNING_WORKER",
+            "REASON": "BLOCKED_LEARNING_DECISION_MISSING",
+        }
+
+    try:
+        if case_root is not None:
+            learning_decision.evaluate_closure_learning_gate(case_root, decision=decision)
+        else:
+            learning_decision.validate_learning_decision(decision)
+            if decision.get("LEARNING_STATUS") != "COMPLETE":
+                raise learning_decision.LearningDecisionError(
+                    "BLOCKED_LEARNING_INCOMPLETE",
+                    f"status={decision.get('LEARNING_STATUS')}",
+                )
+            if decision.get("LEARNING_VERDICT") in learning_decision.CLOSURE_BLOCKING_VERDICTS:
+                code = (
+                    "BLOCKED_OWNER_LEARNING_DECISION_REQUIRED"
+                    if decision.get("LEARNING_VERDICT") == "OWNER_DECISION_REQUIRED"
+                    else "BLOCKED_LEARNING_INCOMPLETE"
+                )
+                raise learning_decision.LearningDecisionError(code)
+            if decision.get("LEARNING_VERDICT") not in learning_decision.CLOSURE_ALLOWED_VERDICTS:
+                raise learning_decision.LearningDecisionError(
+                    "BLOCKED_LEARNING_DECISION_INVALID",
+                    f"verdict={decision.get('LEARNING_VERDICT')}",
+                )
+    except learning_decision.LearningDecisionError as exc:
+        if exc.code == "BLOCKED_OWNER_LEARNING_DECISION_REQUIRED":
+            return {
+                "STATUS": "BLOCKED_OWNER_LEARNING_DECISION_REQUIRED",
+                "AUTO_CLOSURE": False,
+                "WAITING_OWNER": True,
+                "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+                "LEARNING_DISPATCH_ALLOWED": False,
+                "EXPECTED_NEXT_COMMAND": "OWNER_LEARNING_DECISION",
+                "REASON": exc.detail,
+            }
+        if exc.code == "BLOCKED_LEARNING_DECISION_MISSING":
+            return {
+                "STATUS": "LEARNING_REQUIRED",
+                "AUTO_CLOSURE": False,
+                "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+                "LEARNING_DISPATCH_ALLOWED": True,
+                "EXPECTED_NEXT_COMMAND": "FAMILY_LEARNING_WORKER",
+                "REASON": exc.code,
+            }
+        return {
+            "STATUS": exc.code,
+            "AUTO_CLOSURE": False,
+            "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+            "LEARNING_DISPATCH_ALLOWED": True,
+            "EXPECTED_NEXT_COMMAND": "FAMILY_LEARNING_WORKER",
+            "REASON": exc.detail,
+        }
+
     return {
         "STATUS": "AUTO_CLOSURE_AUTHORIZED",
         "AUTO_CLOSURE": True,
         "WAITING_OWNER": False,
         "WAITING_OWNER_FINAL_CLOSURE": False,
         "CLOSURE_OPERATOR_DISPATCH_ALLOWED": True,
+        "LEARNING_DISPATCH_ALLOWED": False,
+        "EXPECTED_NEXT_COMMAND": "CLOSURE_OPERATOR",
         "CASE_STATUS": "CLOSING",
+        "LEARNING_DECISION_VALIDATED": True,
     }
 
 
@@ -365,9 +452,25 @@ def apply_closure_artifacts(
     finding_id: str,
     human_summary_kwargs: Dict[str, Any],
     terminal_status: str = "CLOSED_FIXED_VERIFIED",
+    skip_learning_gate: bool = False,
 ) -> Dict[str, Any]:
-    """CLOSURE_OPERATOR write set for uncommitted control model."""
+    """CLOSURE_OPERATOR write set for uncommitted control model.
+
+    Requires validated LEARNING_DECISION unless skip_learning_gate (tests only).
+    """
     case_root = Path(case_root)
+    if not skip_learning_gate:
+        try:
+            learning_decision.evaluate_closure_learning_gate(case_root)
+        except learning_decision.LearningDecisionError as exc:
+            return {
+                "STATUS": exc.code,
+                "CASE_STATUS": "OPEN_BLOCKED",
+                "AUTO_CLOSURE": False,
+                "CLOSURE_OPERATOR_DISPATCH_ALLOWED": False,
+                "REASON": exc.detail,
+                **exc.payload,
+            }
     results = case_root / "results"
     results.mkdir(parents=True, exist_ok=True)
 

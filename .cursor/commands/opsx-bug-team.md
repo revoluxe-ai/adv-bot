@@ -253,7 +253,7 @@ WAVE_3A Route A: RED → local authority → EXECUTOR → GREEN
 WAVE_3B Route B: SPEC_UPDATE → TASK_DELTA → RED → local authority → EXECUTOR → GREEN
 WAVE_3C Route C: close recommendation (no implementation)
 WAVE_3D Route D: durable ROUTE_TARGET_PROCESS_ID handoff
-WAVE_4: TASK_COMPLETION → BOUNDED_HUNTER → FAN_IN → auto CLOSURE_OPERATOR
+WAVE_4: TASK_COMPLETION → BOUNDED_HUNTER → FAN_IN → FAMILY_LEARNING_WORKER → auto CLOSURE_OPERATOR
          (+ HUMAN_SUMMARY.md; user reviews uncommitted worktree)
 ```
 
@@ -272,8 +272,8 @@ DEFAULT after activation:
   RED_CONFIRMED → local authority → IMPLEMENTATION_EXECUTOR
   (no WAITING_OWNER / Owner production GO)
 
-  FANIN READY_FOR_CLOSURE → auto CLOSURE_OPERATOR
-  (no WAITING_OWNER_FINAL_CLOSURE)
+  FANIN READY_FOR_CLOSURE → FAMILY_LEARNING_WORKER → auto CLOSURE_OPERATOR
+  (no WAITING_OWNER_FINAL_CLOSURE; learning decision mandatory)
 
 Legacy EXECUTION_MODE=OWNER_GATED:
   RED_CONFIRMED → STOP → OWNER_PRODUCTION_GO_DECISION
@@ -308,6 +308,14 @@ EXPECTED_EXECUTION_ROUTE / ACTUAL_EXECUTION_ROUTE / ROUTE_RECONCILIATION
 
 ```text
 .tmp/opsx-bug-cases/<CASE_ID>/results/FANIN.md
+```
+
+`FAMILY_LEARNING_WORKER` may write:
+
+```text
+family/LEARNING_DECISION.json   # or results/LEARNING_DECISION.json (episode-only)
+family/LEARNING_PACKET.json     # only when FULL_PACKET_REQUIRED
+results/LEARNING_REPORT.md
 ```
 
 `CLOSURE_OPERATOR` may write:
