@@ -3,10 +3,13 @@
 From repo root:
 
 ```bash
-bash .cursor/static-check/bin/run.sh -- poetry run pytest .
+bash .cursor/static-check/bin/run.sh -- poetry run pytest
 ```
 
-Packet COMMAND: `poetry run pytest .`
+Packet COMMAND: `poetry run pytest`
+
+Do **not** pass path `.` — it overrides `pytest.ini` `testpaths = tests` and may
+collect `.tmp/**` / volume trees.
 
 **Orchestrator gate:** start only if `pytest-unit` packet `STATUS=PASS`.
 If unit is FAIL/BLOCKED/ERROR → do **not** run this check (`SKIPPED`).
