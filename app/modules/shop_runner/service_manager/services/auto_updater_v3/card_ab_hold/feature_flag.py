@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Iterable
 
 
 def _parse_truthy(raw: str | None) -> bool:
@@ -165,8 +164,3 @@ def can_enter_epoch_managed_ab_hold(
     if shop_id is not None and int(shop_id) in card_ab_hold_epoch_allowlist_shop_ids():
         return True
     return False
-
-
-def assert_allowlist_ids(ids: Iterable[int]) -> frozenset[int]:
-    """Тестовый хелпер: нормализовать набор id без чтения env."""
-    return frozenset(int(x) for x in ids)

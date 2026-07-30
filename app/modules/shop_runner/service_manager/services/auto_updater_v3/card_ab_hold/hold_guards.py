@@ -128,6 +128,40 @@ def select_ab_hold_pfo_recovery_on_keyword_ids(
     return on_ids
 
 
+async def apply_ab_hold_overspend_offs_in_session(
+    session: AsyncSession,
+    *,
+    keyword_ids: list[int],
+) -> int:
+    """Persist FORCE_OFF в переданной PG session (hold-guard overspend).
+
+    Parent orchestration открывает WRITE session maker и передаёт session
+    сюда — injectable seam для live PG integration evidence.
+
+    Args:
+        session: injectable async session (WRITE / commit).
+        keyword_ids: keyword_setting ids to FORCE_OFF.
+
+    Returns:
+        Число обновлённых id (0 если список пуст).
+    """
+    if not keyword_ids:
+        return 0
+    off_hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+    stmt = (
+        update(KeywordSetting)
+        .where(KeywordSetting.id.in_(keyword_ids))
+        .values(
+            hard_status=off_hs,
+            strategy_mode=KeywordStrategyMode.OFF,
+            target_place=None,
+        )
+    )
+    _ = await session.execute(stmt)
+    await session.commit()
+    return len(keyword_ids)
+
+
 async def apply_ab_hold_overspend_offs(
     *,
     adv_id: int,
@@ -135,30 +169,25 @@ async def apply_ab_hold_overspend_offs(
 ) -> int:
     """Persist FORCE_OFF для hold-guard (strategy_mode OFF + hard_status).
 
+    Parent WRITE seam: ``sm(read_only=False)`` →
+    ``apply_ab_hold_overspend_offs_in_session``.
+
     Returns:
         Число обновлённых id.
     """
     if not keyword_ids:
         return 0
-    off_hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
     async with sm(read_only=False) as session:
-        stmt = (
-            update(KeywordSetting)
-            .where(KeywordSetting.id.in_(keyword_ids))
-            .values(
-                hard_status=off_hs,
-                strategy_mode=KeywordStrategyMode.OFF,
-                target_place=None,
-            )
+        updated = await apply_ab_hold_overspend_offs_in_session(
+            session,
+            keyword_ids=keyword_ids,
         )
-        _ = await session.execute(stmt)
-        await session.commit()
     logger.info(
         "[adv_id=%s] ab_hold overspend OFF count=%s",
         adv_id,
-        len(keyword_ids),
+        updated,
     )
-    return len(keyword_ids)
+    return updated
 
 
 def _normalize_confirmed_target_places(
