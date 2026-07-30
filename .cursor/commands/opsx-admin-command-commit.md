@@ -49,6 +49,7 @@ Only these paths may be staged/committed by this command:
 .cursor/agents/**
 .cursor/static-check/**
 .cursor/pipeline/**
+.cursor/antipattern-gate/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -65,6 +66,8 @@ Materialized operator pipeline graph under `.cursor/pipeline/` (from
 Static-check infra under `.cursor/static-check/` is in scope in full:
 contracts, check packs, registry, base prompts/rules, **and** agent runner
 scripts (e.g. `bin/run.sh`).
+Antipattern-gate companions under `.cursor/antipattern-gate/` (catalog,
+`PRACTICE_LEDGER.jsonl`, README) are in scope with `/opsx-antipattern-gate`.
 All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
@@ -152,7 +155,9 @@ Preferred grouping:
 5. agents skills/guides (.agents/**, .cursor/agents/**) — by intent
 6. static-check infra (.cursor/static-check/**) — separate unless companion
    to the same disclosed packet
-7. unrelated process edits — separate commits by concern
+7. antipattern-gate companions (.cursor/antipattern-gate/**) — with the
+   `/opsx-antipattern-gate` command packet when they change together
+8. unrelated process edits — separate commits by concern
 ```
 
 Do **not**:
