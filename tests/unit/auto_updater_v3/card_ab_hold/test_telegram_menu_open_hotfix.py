@@ -224,5 +224,7 @@ def test_enable_disable_handlers_and_business_gates_wiring_unchanged() -> None:
     assert "can_enable_card_ab_hold_on_version" in handle_src
     assert "has_positive_plan_max_cpo" in handle_src
 
-    assert "card_ab_hold_mode = CardAbHoldMode.OFF.value" in disable_src
+    assert "disable_card_ab_hold_in_session" in disable_src
+    in_session_src = inspect.getsource(handlers.disable_card_ab_hold_in_session)
+    assert "card_ab_hold_mode = CardAbHoldMode.OFF.value" in in_session_src
 

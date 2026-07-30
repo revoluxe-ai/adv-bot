@@ -563,17 +563,19 @@ def insert_ready_for_intent_row(
     return adv_setting_id
 
 
-@contextmanager
-def patched_async_session_maker(
+@asynccontextmanager
+async def patched_async_session_maker(
     db_url: str,
     *,
     targets: Sequence[str] | None = None,
-) -> Iterator[None]:
+) -> AsyncIterator[None]:
     """Подменить ``sm`` card_ab_hold writers на disposable async engine.
 
     Args:
         db_url: disposable Postgres URL.
         targets: module paths to patch; default — все A/B Hold PG writers.
+
+    Lifecycle: always ``await engine.dispose()`` on exit (async cleanup only).
     """
     from unittest.mock import patch
 
@@ -593,5 +595,7 @@ def patched_async_session_maker(
     with ExitStack() as stack:
         for target in patch_targets:
             stack.enter_context(patch(target, sm_factory))
-        yield
-    engine.sync_engine.dispose()
+        try:
+            yield
+        finally:
+            await engine.dispose()
