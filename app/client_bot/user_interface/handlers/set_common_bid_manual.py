@@ -7,7 +7,7 @@ only. При ``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``)
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 from aiogram import Bot, Router, types
 from aiogram.filters import StateFilter
@@ -21,6 +21,7 @@ from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu import AdvSettingMenu
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
+from app.core.di.wb_manager_hub import WBManagerHub, WBManagerHubFactory
 from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
     SetCommonBidsCommandItem,
@@ -145,15 +146,16 @@ async def set_common_bid_manual_start(
 
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
-            factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+            factory = cast(
+                WBManagerHubFactory,
+                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory(),  # pyright: ignore
             )
-            hub = factory.get_wb_manager_hub(shop_id)
+            hub: WBManagerHub = factory.get_wb_manager_hub(shop_id)
             min_bids = await hub.wb_manager.get_min_bids_cache_only(
                 [complex_adv],
                 context="set_common_bid_manual",
             )
-    except Exception as e:
+    except Exception:
         logger.exception("get_min_bids failed for adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(
             chat_id,
@@ -293,10 +295,11 @@ async def set_common_bid_manual_apply(
 
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
-            factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+            factory = cast(
+                WBManagerHubFactory,
+                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory(),  # pyright: ignore
             )
-            hub = factory.get_wb_manager_hub(shop_id)
+            hub: WBManagerHub = factory.get_wb_manager_hub(shop_id)
             redis_client = hub.redis_client_wrapper
 
             await hub.wb_modifier.update_search_adv_common_cpm(command)
@@ -304,11 +307,10 @@ async def set_common_bid_manual_apply(
             redis_bid_value = RedisCommonBidValueManager(redis_client)
             redis_bid_ts = RedisCommonBidTimestampManager(redis_client)
             bid_values = {nmid: bid_value for nmid in nmids}
-            search_adv_id = adv_setting.search_adv_id
-            if search_adv_id is not None:
-                await redis_bid_value.set_bids(search_adv_id, bid_values)
-                await redis_bid_ts.set(search_adv_id)
-    except Exception as e:
+            # search_adv_id уже проверен выше (`not adv_setting.search_adv_id` → return)
+            await redis_bid_value.set_bids(search_adv_id, bid_values)
+            await redis_bid_ts.set(search_adv_id)
+    except Exception:
         logger.exception(
             "update_search_adv_common_cpm failed for adv_setting_id=%s",
             adv_setting_original_id,
