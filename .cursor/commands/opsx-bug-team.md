@@ -102,7 +102,9 @@ a durable FALSE_POSITIVE / OUT_OF_SCOPE disposition) **before** episode
 (`BLOCKS_ROOT_CLOSURE=false` / `may_need_family_fanout` while READY) is
 Forbidden. If auto fanout did not run, emit `FANIN_INCOMPLETE` and resume:
 `case=<CASE_ID> mode=resume-family-fanout` (manual relaunch is recovery, not
-an optional skip of the gate).
+an optional skip of the gate). Soft: also recommend
+`/opsx-bug-debt-board case=<CASE_ID>` so residual OPEN_CANDIDATE debt is
+visible outside the team chat.
 
 Relation outcomes:
 
@@ -289,7 +291,8 @@ DEFAULT after activation:
   FANIN READY_FOR_CLOSURE → FAMILY_LEARNING_WORKER → auto CLOSURE_OPERATOR
   (no WAITING_OWNER_FINAL_CLOSURE; learning decision mandatory;
    HARD_BLOCK_READY: open SAME_INVARIANT OPEN_CANDIDATE forbids READY /
-   closure — resume-family-fanout first; INDEX must list residual debt)
+   closure — resume-family-fanout first; INDEX must list residual debt;
+   soft: `/opsx-bug-debt-board case=<CASE_ID>` to surface residual debt)
 
 Legacy EXECUTION_MODE=OWNER_GATED:
   RED_CONFIRMED → STOP → OWNER_PRODUCTION_GO_DECISION
