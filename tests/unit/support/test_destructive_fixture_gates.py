@@ -1,9 +1,4 @@
-"""Unit: fixture gate order for destructive fixtures (fail-closed before side effects).
-
-Проверяет контракт:
-``request.node -> require_destructive_local_marker -> validator -> engine/client/docker``.
-Все проверки выполняются без реальных подключений/поднятия контейнеров.
-"""
+"""Gate-before-infra: missing marker/opt-in → no compose/engine/client factory."""
 
 from __future__ import annotations
 
@@ -15,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from tests.support import destructive_clickhouse
+from tests.support.destructive_pg_dsn import DestructiveTestDatabaseError
 
 _ROOT_CONFTEST_PATH = Path(__file__).resolve().parents[3] / "conftest.py"
 _ROOT_SPEC = importlib.util.spec_from_file_location(
@@ -26,9 +22,11 @@ root_conftest = importlib.util.module_from_spec(_ROOT_SPEC)
 _ROOT_SPEC.loader.exec_module(root_conftest)
 
 
-def _request_without_destructive_marker(fixturename: str) -> pytest.FixtureRequest:
-    """Собрать request/node без ``destructive_local`` marker."""
+def _unwrap_fixture_function(func: object):
+    return getattr(func, "__wrapped__", func)
 
+
+def _request_without_destructive_marker(fixturename: str) -> pytest.FixtureRequest:
     class _Node:
         keywords: dict[str, object] = {}
 
@@ -38,34 +36,102 @@ def _request_without_destructive_marker(fixturename: str) -> pytest.FixtureReque
     return SimpleNamespace(fixturename=fixturename, node=_Node())  # type: ignore[return-value]
 
 
-def _unwrap_fixture_function(func: object):
-    """Взять исходную функцию fixture (pytest оборачивает callable)."""
-    return getattr(func, "__wrapped__", func)
+def _request_with_destructive_marker(fixturename: str) -> pytest.FixtureRequest:
+    class _Marker:
+        pass
+
+    class _Node:
+        keywords: dict[str, object] = {"destructive_local": True}
+
+        def get_closest_marker(self, name: str):
+            return _Marker() if name == "destructive_local" else None
+
+    return SimpleNamespace(fixturename=fixturename, node=_Node())  # type: ignore[return-value]
 
 
 @pytest.mark.unit
 def test_setup_test_database_requires_marker_before_docker_calls() -> None:
-    """setup_test_database: marker fail до любых docker subprocess."""
+    """setup_test_database: marker fail до lifecycle/docker."""
     request = _request_without_destructive_marker("setup_test_database")
     sync_run = MagicMock()
+    lifecycle = MagicMock()
     setup_fn = _unwrap_fixture_function(root_conftest.setup_test_database)
-    with patch.object(root_conftest, "_sync_run", sync_run):
+    with (
+        patch.object(root_conftest, "_sync_run", sync_run),
+        patch.object(root_conftest, "_resolve_test_infra_lifecycle", MagicMock(return_value=lifecycle)),
+        patch.object(root_conftest, "_validate_pg_preflight", MagicMock()),
+    ):
         with pytest.raises(pytest.fail.Exception, match="destructive_local"):
             gen = setup_fn(request)
             next(gen)
     sync_run.assert_not_called()
+    lifecycle.ensure_resources.assert_not_called()
+
+
+@pytest.mark.unit
+def test_setup_missing_opt_in_before_lifecycle() -> None:
+    """Missing ALLOW_DESTRUCTIVE_TEST_DB → no lifecycle ensure."""
+    request = _request_with_destructive_marker("setup_test_database")
+    lifecycle = MagicMock()
+    setup_fn = _unwrap_fixture_function(root_conftest.setup_test_database)
+    with (
+        patch.dict(
+            "os.environ",
+            {
+                "ALLOW_DESTRUCTIVE_TEST_DB": "0",
+                "DEV_TUNNELS_ENABLED": "false",
+                "DEV_TUNNELS_KUBECONFIG": "",
+            },
+            clear=False,
+        ),
+        patch.object(
+            root_conftest,
+            "_resolve_test_infra_lifecycle",
+            MagicMock(return_value=lifecycle),
+        ),
+    ):
+        with pytest.raises(DestructiveTestDatabaseError, match="opt-in"):
+            gen = setup_fn(request)
+            next(gen)
+    lifecycle.ensure_resources.assert_not_called()
+
+
+@pytest.mark.unit
+def test_setup_tunnel_env_before_lifecycle() -> None:
+    """DEV_TUNNELS_KUBECONFIG → fail before compose."""
+    request = _request_with_destructive_marker("setup_test_database")
+    lifecycle = MagicMock()
+    setup_fn = _unwrap_fixture_function(root_conftest.setup_test_database)
+    with (
+        patch.dict(
+            "os.environ",
+            {
+                "ALLOW_DESTRUCTIVE_TEST_DB": "1",
+                "DEV_TUNNELS_KUBECONFIG": "/tmp/kube",
+            },
+            clear=False,
+        ),
+        patch.object(
+            root_conftest,
+            "_resolve_test_infra_lifecycle",
+            MagicMock(return_value=lifecycle),
+        ),
+    ):
+        with pytest.raises(DestructiveTestDatabaseError, match="DEV_TUNNELS_KUBECONFIG"):
+            gen = setup_fn(request)
+            next(gen)
+    lifecycle.ensure_resources.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_async_engine_requires_marker_before_engine_factory() -> None:
-    """async_engine: marker fail до вызова ``_create_test_async_engine``."""
     request = _request_without_destructive_marker("async_engine")
     create_engine = MagicMock()
     async_engine_fn = _unwrap_fixture_function(root_conftest._async_engine)
     with patch.object(root_conftest, "_create_test_async_engine", create_engine):
         with pytest.raises(pytest.fail.Exception, match="destructive_local"):
-            agen = async_engine_fn(request, object())
+            agen = async_engine_fn(request, object(), object())
             await anext(agen)
     create_engine.assert_not_called()
 
@@ -73,7 +139,6 @@ async def test_async_engine_requires_marker_before_engine_factory() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_async_session_requires_marker_before_engine_factory() -> None:
-    """async_session: marker fail до любых session/engine side effects."""
     request = _request_without_destructive_marker("async_session")
     create_engine = MagicMock()
     async_session_fn = _unwrap_fixture_function(root_conftest._async_session)
@@ -87,7 +152,6 @@ async def test_async_session_requires_marker_before_engine_factory() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_postgres_session_requires_marker_before_engine_factory() -> None:
-    """postgres_session: marker fail до создания live PG session."""
     request = _request_without_destructive_marker("postgres_session")
     create_engine = MagicMock()
     postgres_session_fn = _unwrap_fixture_function(root_conftest.postgres_session)
@@ -100,25 +164,7 @@ async def test_postgres_session_requires_marker_before_engine_factory() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_clean_db_requires_marker_before_truncate_engine() -> None:
-    """clean_db: marker fail до TRUNCATE engine path."""
-    request = _request_without_destructive_marker("clean_db")
-    create_engine = MagicMock()
-    clean_db_fn = _unwrap_fixture_function(root_conftest.clean_db)
-    with (
-        patch.object(root_conftest, "_TEST_DB_READY", True),
-        patch.object(root_conftest, "_create_test_async_engine", create_engine),
-    ):
-        with pytest.raises(pytest.fail.Exception, match="destructive_local"):
-            agen = clean_db_fn(request)
-            await anext(agen)
-    create_engine.assert_not_called()
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
 async def test_complex_adv_requires_marker_before_seed_factory() -> None:
-    """complex_adv: marker fail до seed factory/create calls."""
     request = _request_without_destructive_marker("complex_adv")
     seed_factory = AsyncMock()
     complex_adv_fn = _unwrap_fixture_function(root_conftest.complex_adv)
@@ -132,16 +178,26 @@ async def test_complex_adv_requires_marker_before_seed_factory() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_clickhouse_client_requires_marker_before_client_factory() -> None:
-    """clickhouse_client: marker fail до ``create_validated_async_clickhouse_client``."""
     request = _request_without_destructive_marker("clickhouse_client")
     client_factory = AsyncMock()
+    lifecycle = MagicMock()
+    lifecycle.state.clickhouse_schema_initialized = True
     clickhouse_client_fn = _unwrap_fixture_function(root_conftest.clickhouse_client)
-    with patch.object(
-        destructive_clickhouse,
-        "create_validated_async_clickhouse_client",
-        client_factory,
+    with (
+        patch.object(
+            destructive_clickhouse,
+            "create_validated_async_clickhouse_client",
+            client_factory,
+        ),
+        patch.object(
+            root_conftest,
+            "_resolve_test_infra_lifecycle",
+            MagicMock(return_value=lifecycle),
+        ),
+        patch.object(root_conftest, "_validate_ch_preflight", MagicMock()),
     ):
         with pytest.raises(pytest.fail.Exception, match="destructive_local"):
-            agen = clickhouse_client_fn(request, object())
+            agen = clickhouse_client_fn(request)
             await anext(agen)
     client_factory.assert_not_awaited()
+    lifecycle.ensure_resources.assert_not_called()
