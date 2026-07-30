@@ -19,6 +19,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_pipelines import (
     apply_confirmed_intent_to_pg,
+    apply_confirmed_intent_to_pg_in_session,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
     activate_after_successful_sync,
@@ -31,6 +32,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     mark_wb_sync_status,
     set_warmup_duration,
     start_epoch_on_enable,
+    start_epoch_on_enable_in_session,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
@@ -45,9 +47,16 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_handlers import (
     _abort_epoch_to_off,
     _load_adv,
+    _load_adv_in_session,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
     disable_card_ab_hold,
+    load_adv_setting_for_ab_hold_menu,
+    load_adv_setting_for_back,
+    sm as handlers_sm,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_handlers import (
+    sm as confirm_sm,
 )
 from tests.integration.card_ab_hold._live_pg_bootstrap import (
     disposable_ab_hold_schema,
@@ -88,15 +97,13 @@ async def test_live_pg_start_epoch_on_enable_persists_mode_phase(
     adv_setting_id = insert_adv_row(
         live_db_url, adv_setting_id=101, adv_id=9101, mode="off", phase=None
     )
-    with (
-        patched_async_session_maker(live_db_url),
-        patch(
+    async with patched_async_session_maker(live_db_url):
+        with patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3."
             "card_ab_hold.epoch_write.can_enter_epoch_managed_ab_hold",
             return_value=True,
-        ),
-    ):
-        managed = await start_epoch_on_enable(adv_setting_id, adv_id=9101)
+        ):
+            managed = await start_epoch_on_enable(adv_setting_id, adv_id=9101)
 
     assert managed is True
     row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
@@ -113,7 +120,7 @@ async def test_live_pg_confirm_handlers_load_adv_uses_read_replica_mode(
     adv_setting_id = insert_adv_row(
         live_db_url, adv_setting_id=1001, adv_id=9901, mode="off", phase=None
     )
-    with patched_async_session_maker(live_db_url):
+    async with patched_async_session_maker(live_db_url):
         adv = await _load_adv(adv_setting_id)
 
     assert adv is not None
@@ -131,7 +138,7 @@ async def test_live_pg_warmup_keyword_and_duration_writers(live_db_url: str) -> 
         mode=CardAbHoldMode.PENDING_SETUP.value,
         phase=CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM.value,
     )
-    with patched_async_session_maker(live_db_url):
+    async with patched_async_session_maker(live_db_url):
         await confirm_keyword_set_and_start_warmup(
             adv_setting_id, ["alpha", "beta"], duration_hours=24
         )
@@ -162,7 +169,7 @@ async def test_live_pg_epoch_confirm_sync_activate_and_clear(
             "card_ab_hold_warmup_duration_hours": 24,
         },
     )
-    with patched_async_session_maker(live_db_url):
+    async with patched_async_session_maker(live_db_url):
         assert await advance_warmup_to_tp_confirm(adv_setting_id) is True
         await confirm_target_places(adv_setting_id, {"alpha": 5})
         await confirm_auto_participation(adv_setting_id, True)
@@ -219,7 +226,7 @@ async def test_live_pg_apply_confirmed_intent_writes_tp_and_snapshot(
         "auto_bid": 50.0,
         "generation": 1,
     }
-    with patched_async_session_maker(live_db_url):
+    async with patched_async_session_maker(live_db_url):
         await apply_confirmed_intent_to_pg(
             adv_setting_id=adv_setting_id, intent=intent
         )
@@ -276,7 +283,7 @@ async def test_live_pg_setup_mutations_epoch_managed_fail_off_skips_active(
         pay_for_order=40.0,
         position=8.0,
     )
-    with patched_async_session_maker(live_db_url):
+    async with patched_async_session_maker(live_db_url):
         pass_count, fail_count = await apply_ab_hold_setup_mutations(
             adv_id=9105,
             adv_setting_id=adv_setting_id,
@@ -302,7 +309,7 @@ async def test_live_pg_setup_mutations_epoch_managed_fail_off_skips_active(
 async def test_live_pg_disable_card_ab_hold_clears_mode_and_epoch(
     live_db_url: str,
 ) -> None:
-    """``disable_card_ab_hold`` bare ``sm()`` WRITE → OFF + epoch clears (re-read)."""
+    """``disable_card_ab_hold`` WRITE ``sm(read_only=False)`` → OFF + epoch clears."""
     adv_setting_id = insert_adv_row(
         live_db_url,
         adv_setting_id=106,
@@ -322,15 +329,15 @@ async def test_live_pg_disable_card_ab_hold_clears_mode_and_epoch(
     callback = CardAbHoldDisable(adv_setting_original_id=adv_setting_id)
     redis_clear = AsyncMock()
     fake_cache = MagicMock(return_value=SimpleNamespace(clear=redis_clear))
-    with (
-        patched_async_session_maker(live_db_url),
-        patch(f"{_HANDLERS}._notify_callback_user", new_callable=AsyncMock),
-        patch(f"{_HANDLERS}._edit_screen", new_callable=AsyncMock),
-        patch(f"{_HANDLERS}.CardAbHoldSignalRedisCache", fake_cache),
-        patch(f"{_HANDLERS}.CardAbHoldCommonBidEnterResetRedisCache", fake_cache),
-        patch(f"{_HANDLERS}.CardAbHoldSetupBlockRedisCache", fake_cache),
-    ):
-        await disable_card_ab_hold(query, callback)
+    async with patched_async_session_maker(live_db_url):
+        with (
+            patch(f"{_HANDLERS}._notify_callback_user", new_callable=AsyncMock),
+            patch(f"{_HANDLERS}._edit_screen", new_callable=AsyncMock),
+            patch(f"{_HANDLERS}.CardAbHoldSignalRedisCache", fake_cache),
+            patch(f"{_HANDLERS}.CardAbHoldCommonBidEnterResetRedisCache", fake_cache),
+            patch(f"{_HANDLERS}.CardAbHoldSetupBlockRedisCache", fake_cache),
+        ):
+            await disable_card_ab_hold(query, callback)
 
     row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
     assert row[0] == CardAbHoldMode.OFF.value
@@ -363,12 +370,12 @@ async def test_live_pg_abort_epoch_to_off_clears_mode_and_epoch(
     adv = SimpleNamespace(id=adv_setting_id, adv_id=9107)
     redis_clear = AsyncMock()
     fake_cache = MagicMock(return_value=SimpleNamespace(clear=redis_clear))
-    with (
-        patched_async_session_maker(live_db_url),
-        patch(f"{_CONFIRM}.CardAbHoldSignalRedisCache", fake_cache),
-        patch(f"{_CONFIRM}.CardAbHoldSetupBlockRedisCache", fake_cache),
-    ):
-        await _abort_epoch_to_off(adv)  # type: ignore[arg-type]
+    async with patched_async_session_maker(live_db_url):
+        with (
+            patch(f"{_CONFIRM}.CardAbHoldSignalRedisCache", fake_cache),
+            patch(f"{_CONFIRM}.CardAbHoldSetupBlockRedisCache", fake_cache),
+        ):
+            await _abort_epoch_to_off(adv)  # type: ignore[arg-type]
 
     row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
     assert row[0] == CardAbHoldMode.OFF.value
@@ -376,3 +383,79 @@ async def test_live_pg_abort_epoch_to_off_clears_mode_and_epoch(
     assert int(row[4]) == 0
     assert row[5] is None
     assert list(row[12]) == []
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_in_session_children_persist_via_injected_session(
+    live_db_url: str,
+) -> None:
+    """Child ``*_in_session`` helpers принимают live session и пишут durable state."""
+    adv_setting_id = insert_adv_row(
+        live_db_url, adv_setting_id=108, adv_id=9108, mode="off", phase=None
+    )
+    insert_keyword_row(
+        live_db_url,
+        keyword_id=2108,
+        adv_setting_id=adv_setting_id,
+        text_value="gamma",
+        target_place=None,
+    )
+    async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
+            sm as epoch_sm,
+        )
+
+        async with epoch_sm(read_only=False) as session:
+            await start_epoch_on_enable_in_session(
+                session, adv_setting_id, epoch_managed=True
+            )
+        async with epoch_sm(read_only=False) as session:
+            await apply_confirmed_intent_to_pg_in_session(
+                session,
+                adv_setting_id=adv_setting_id,
+                intent={
+                    "keywords": ["gamma"],
+                    "target_places": {"gamma": 4},
+                    "generation": 1,
+                },
+            )
+        async with confirm_sm(read_only=True) as session:
+            loaded = await _load_adv_in_session(session, adv_setting_id)
+        async with handlers_sm(read_only=True) as session:
+            menu_adv = await load_adv_setting_for_ab_hold_menu(session, adv_setting_id)
+            back_adv = await load_adv_setting_for_back(session, adv_setting_id)
+
+    assert loaded is not None
+    assert int(loaded.id) == adv_setting_id
+    assert menu_adv is not None
+    assert back_adv is not None
+    row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
+    assert row[0] == CardAbHoldMode.PENDING_SETUP.value
+    assert row[1] == CardAbHoldPhase.WB_SYNC.value
+    assert list(row[12]) == ["gamma"]
+    kw = fetch_keyword_row(live_db_url, 2108)
+    assert kw[2] == 4
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_back_load_adv_setting_for_menu_path(
+    live_db_url: str,
+) -> None:
+    """``load_adv_setting_for_back`` PURE_READ re-select AdvSetting (+ cabinet join)."""
+    adv_setting_id = insert_adv_row(
+        live_db_url,
+        adv_setting_id=109,
+        adv_id=9109,
+        mode=CardAbHoldMode.ACTIVE.value,
+        phase=CardAbHoldPhase.READY_ACTIVE.value,
+        bot_active=True,
+    )
+    async with patched_async_session_maker(live_db_url):
+        async with handlers_sm(read_only=True) as session:
+            adv = await load_adv_setting_for_back(session, adv_setting_id)
+
+    assert adv is not None
+    assert int(adv.id) == adv_setting_id
+    assert int(adv.adv_id) == 9109

@@ -356,8 +356,10 @@ def test_disable_clears_allowed_snapshot() -> None:
     )
 
     src = inspect.getsource(handlers.disable_card_ab_hold)
-    assert "empty_allowed_snapshot" in src
-    assert "card_ab_hold_allowed_phrases_snapshot" in src
+    assert "disable_card_ab_hold_in_session" in src
+    child_src = inspect.getsource(handlers.disable_card_ab_hold_in_session)
+    assert "empty_allowed_snapshot" in child_src
+    assert "card_ab_hold_allowed_phrases_snapshot" in child_src
 
 
 @pytest.mark.unit

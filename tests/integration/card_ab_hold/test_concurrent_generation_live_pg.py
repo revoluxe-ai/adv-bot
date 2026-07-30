@@ -38,7 +38,7 @@ async def test_live_pg_concurrent_generation_only_one_wins() -> None:
             db_url, adv_setting_id=42, adv_id=9001
         )
 
-        with patched_async_session_maker(db_url):
+        async with patched_async_session_maker(db_url):
             results = await asyncio.gather(
                 create_pending_intent_for_generation(adv_setting_id, adv_id=9001),
                 create_pending_intent_for_generation(adv_setting_id, adv_id=9001),
@@ -74,7 +74,7 @@ async def test_live_pg_duplicate_intent_retry_idempotent() -> None:
             db_url, adv_setting_id=43, adv_id=8002
         )
 
-        with patched_async_session_maker(db_url):
+        async with patched_async_session_maker(db_url):
             first = await create_pending_intent_for_generation(
                 adv_setting_id, adv_id=8002
             )
