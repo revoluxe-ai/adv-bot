@@ -6,11 +6,12 @@ freeze ≠ stop campaign.
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.shop_runner.service_manager.manager import CoroutinesManager
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     CardAbHoldPhase,
@@ -27,16 +28,33 @@ def _active_adv(
     phase: str = CardAbHoldPhase.READY_ACTIVE.value,
     intent: dict[str, object] | None = None,
 ) -> SimpleNamespace:
+    """ACTIVE Hold campaign stub for coexistence predicates."""
     return SimpleNamespace(
         adv_id=adv_id,
+        bot_active=True,
+        auto_budget_watchdog_enabled=False,
+        use_common_budget=False,
         card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
         adv_setting=SimpleNamespace(
+            id=adv_id,
             card_ab_hold_phase=phase,
             card_ab_hold_pending_intent_json=intent or {"generation": 1},
             card_ab_hold_confirmed_target_places_json={"kw": 10},
             card_ab_hold_confirmed_keywords_json=["kw"],
         ),
     )
+
+
+def _manager_stub() -> CoroutinesManager:
+    """Minimal CoroutinesManager instance for binding real methods."""
+    mgr = object.__new__(CoroutinesManager)
+    mgr._wb_manager_hub = MagicMock()
+    mgr._tasks_manager = MagicMock()
+    mgr._plan_fact_reader = MagicMock()
+    mgr._auto_shelf_bid_control_view_provider = MagicMock()
+    mgr._redis_campaign_activity_reason_manager = MagicMock()
+    mgr._ensure_budget_for_campaign_start_retry = AsyncMock()
+    return mgr
 
 
 @pytest.mark.unit
@@ -66,7 +84,6 @@ def test_freeze_helpers_do_not_clear_epoch_intent_on_simulated_budget_pause() ->
     before_intent = adv.adv_setting.card_ab_hold_pending_intent_json
     before_tp = adv.adv_setting.card_ab_hold_confirmed_target_places_json
 
-    # stale ACTIVE исключается из keyword/bid handlers, но объект не трогается
     filtered = filter_ab_hold_stale_mutation_candidates([adv], fresh_ids=set())
     assert filtered == []
     assert adv.adv_setting.card_ab_hold_pending_intent_json == before_intent
@@ -76,8 +93,6 @@ def test_freeze_helpers_do_not_clear_epoch_intent_on_simulated_budget_pause() ->
 @pytest.mark.unit
 def test_active_stale_freezes_mutations_but_not_stop() -> None:
     """B: ACTIVE + stale → freeze=True; freeze predicate ≠ stop-path."""
-    from app.modules.shop_runner.service_manager.manager import CoroutinesManager
-
     assert (
         should_freeze_keyword_and_bid_mutations(
             mode=CardAbHoldMode.ACTIVE,
@@ -92,17 +107,86 @@ def test_active_stale_freezes_mutations_but_not_stop() -> None:
 
 
 @pytest.mark.unit
-def test_ensure_campaigns_active_not_gated_by_stale_mutation_filter() -> None:
-    """B: ``ensure_campaigns_active`` получает полный advs pool без stale filter."""
-    from app.modules.shop_runner.service_manager.manager import CoroutinesManager
+@pytest.mark.asyncio
+async def test_ensure_campaigns_active_receives_full_advs_pool() -> None:
+    """B: ``_run_auto_adv_active_control`` передаёт полный pool в ensure (без stale filter)."""
+    pool = [_active_adv(301), _active_adv(302)]
+    ensure = AsyncMock()
+    mgr = _manager_stub()
+    service = MagicMock()
+    service.ensure_campaigns_active = ensure
 
-    watchdog_src = inspect.getsource(CoroutinesManager.auto_budget_watchdog)
-    assert "_run_auto_adv_active_control(advs)" in watchdog_src
-    assert "filter_ab_hold_stale_mutation_candidates" not in watchdog_src
+    with patch(
+        "app.modules.shop_runner.service_manager.manager.AutoAdvActiveControlService",
+        return_value=service,
+    ) as svc_cls:
+        await CoroutinesManager._run_auto_adv_active_control(mgr, pool)  # type: ignore[arg-type]
 
-    active_control_src = inspect.getsource(CoroutinesManager._run_auto_adv_active_control)
-    assert "ensure_campaigns_active" in active_control_src
-    assert "filter_ab_hold_stale_mutation_candidates" not in active_control_src
+    svc_cls.assert_called_once()
+    ensure.assert_awaited_once_with(pool)
 
-    reset_src = inspect.getsource(CoroutinesManager.auto_reset_bid_for_auto_adv)
-    assert "filter_ab_hold_stale_mutation_candidates" in reset_src
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_auto_budget_watchdog_passes_unfiltered_advs_to_active_control() -> None:
+    """B: watchdog finally вызывает active control с исходным advs list (не stale-filter)."""
+    pool = [_active_adv(401), _active_adv(402)]
+    mgr = _manager_stub()
+    mgr.shop_id = "shop"
+    mgr._wb_shop_data_manager = MagicMock()
+    mgr._wb_shop_data_manager.get_complex_advs = AsyncMock(return_value=pool)
+    mgr._auto_budget_service = MagicMock()
+    control = AsyncMock()
+    stale_filter = MagicMock()
+
+    # while_coroutine_decorator wraps into an infinite loop — call __wrapped__ once.
+    raw = CoroutinesManager.auto_budget_watchdog
+    fn = getattr(raw, "__wrapped__", None)
+    assert fn is not None, "auto_budget_watchdog must expose __wrapped__ one-shot body"
+
+    with (
+        patch.object(mgr, "_run_auto_adv_active_control", control),
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.stale_stats_freeze.filter_ab_hold_stale_mutation_candidates",
+            stale_filter,
+        ),
+    ):
+        await fn(mgr)
+
+    control.assert_awaited_once_with(pool)
+    stale_filter.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_auto_reset_bid_applies_stale_mutation_filter() -> None:
+    """Contrast: keyword/bid reset path DOES gate through stale-mutation filter."""
+    pool = [_active_adv(501), _active_adv(502)]
+    mgr = _manager_stub()
+    mgr._wb_shop_data_manager = MagicMock()
+    mgr._wb_shop_data_manager.get_complex_advs = AsyncMock(return_value=pool)
+    mgr._split_advs_by_stats_freshness = AsyncMock(return_value=([pool[0]], [pool[1]]))
+    ensure_bids = AsyncMock()
+    filter_mock = MagicMock(return_value=[pool[0]])
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.stale_stats_freeze.filter_ab_hold_stale_mutation_candidates",
+            filter_mock,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.manager.AutoResetBidService",
+            return_value=MagicMock(ensure_auto_bids_minimum=ensure_bids),
+        ),
+    ):
+        raw = CoroutinesManager.auto_reset_bid_for_auto_adv
+        fn = getattr(raw, "__wrapped__", None)
+        assert fn is not None
+        await fn(mgr)
+
+    filter_mock.assert_called_once()
+    assert filter_mock.call_args.args[0] == pool
+    assert filter_mock.call_args.args[1] == {501}
+    ensure_bids.assert_awaited_once_with([pool[0]])

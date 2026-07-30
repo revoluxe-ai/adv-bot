@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import pytest
 
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    CardAbHoldMode,
+    is_ab_hold_structural_freeze,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_decision import (
     AB_HOLD_MIN_VIEWS,
     AbHoldSetupAction,
@@ -60,13 +64,30 @@ def test_ab_hold_setup_fail_when_pay_for_order_missing() -> None:
 
 
 @pytest.mark.unit
-def test_ab_hold_structural_freeze_modes() -> None:
-    """Spec card-ab-hold-mode: freeze только PENDING_SETUP и ACTIVE."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
-        CardAbHoldMode,
-        is_ab_hold_structural_freeze,
-    )
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        (CardAbHoldMode.OFF, False),
+        (CardAbHoldMode.PENDING_SETUP, True),
+        (CardAbHoldMode.ACTIVE, True),
+        ("off", False),
+        ("pending_setup", True),
+        ("active", True),
+        (" PENDING_SETUP ", True),
+        ("Active", True),
+        (None, False),
+        ("", False),
+        ("unknown_mode", False),
+    ],
+)
+def test_ab_hold_structural_freeze_modes(
+    mode: CardAbHoldMode | str | None,
+    expected: bool,
+) -> None:
+    """Spec card-ab-hold-mode: freeze только PENDING_SETUP и ACTIVE.
 
-    assert is_ab_hold_structural_freeze(CardAbHoldMode.OFF) is False
-    assert is_ab_hold_structural_freeze(CardAbHoldMode.PENDING_SETUP) is True
-    assert is_ab_hold_structural_freeze(CardAbHoldMode.ACTIVE) is True
+    Защищает ``is_ab_hold_structural_freeze``: enum, PG/UI-строки (normalize),
+    None/пустые/неизвестные → OFF → no freeze. Без этого ordinary structural
+    ACT (БС/ЦП/enable) могли бы пропускаться или блокироваться ошибочно.
+    """
+    assert is_ab_hold_structural_freeze(mode) is expected

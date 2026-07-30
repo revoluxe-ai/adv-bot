@@ -40,6 +40,8 @@ _CARD_AB_HOLD_SM_TARGETS: tuple[str, ...] = (
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
     "card_ab_hold.epoch_pipelines.sm",
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+    "card_ab_hold.hold_guards.sm",
+    "app.modules.shop_runner.service_manager.services.auto_updater_v3."
     "card_ab_hold.telegram.handlers.sm",
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
     "card_ab_hold.telegram.confirm_handlers.sm",

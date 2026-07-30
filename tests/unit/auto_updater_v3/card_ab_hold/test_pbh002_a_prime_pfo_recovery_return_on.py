@@ -1,4 +1,4 @@
-"""PBH-002 RED: Owner A_PRIME — PFO recovery within confirmed set MUST restore ON.
+"""PBH-002: Owner A_PRIME — PFO recovery within confirmed set MUST restore ON.
 
 Owner policy (gates/OWNER_A_B_C_DECISION.json, choice A_PRIME):
 - confirmed-set membership frozen after keyword confirm;
@@ -6,17 +6,13 @@ Owner policy (gates/OWNER_A_B_C_DECISION.json, choice A_PRIME):
 - AUTO_ON when PFO recovers within confirmed set Allowed;
 - views permanent OFF latch during WARM_UP lean-disallowed (separate).
 
-Current production latch (bug under RED):
-- ``setup_apply`` writes FAIL->OFF only; PASS never restores strategy_mode;
-- ``hold_guards`` / ``process_ab_hold`` only OFF (no return-ON on recovery).
-
-This module encodes the desired A_PRIME contract so pytest FAILS on current
-code (RED_CONFIRMED). No production fix here.
+Behavioral coverage:
+- setup PASS after PFO latch writes return-ON (session.execute);
+- ACTIVE hold tick awaits ``apply_ab_hold_pfo_recovery_ons`` with recovered ids.
 """
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -24,10 +20,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
-    hold_guards,
-    setup_apply,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
 )
@@ -49,17 +41,6 @@ _SETUP_APPLY = (
 _PIPELINES = (
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
     "card_ab_hold.pipelines"
-)
-
-# Tokens that would indicate a return-ON / PFO-recovery seam (desired A_PRIME).
-_RECOVERY_ON_TOKENS = (
-    "recovery_on",
-    "return_on",
-    "pfo_recovery",
-    "restore_on",
-    "auto_on",
-    "PASS_ON",
-    "on_ids",
 )
 
 
@@ -111,12 +92,6 @@ def _has_return_on_write(execute_calls: list[Any]) -> bool:
         if _stmt_sets_non_off_strategy(call.args[0]):
             return True
     return False
-
-
-def _source_has_recovery_on(module_or_fn: Any) -> bool:
-    """Source mentions a return-ON / PFO-recovery seam."""
-    src = inspect.getsource(module_or_fn).lower()
-    return any(tok.lower() in src for tok in _RECOVERY_ON_TOKENS)
 
 
 @pytest.mark.unit
@@ -171,40 +146,17 @@ async def test_pbh002_a_prime_setup_pass_restores_on_after_pfo_recovery() -> Non
     assert _has_return_on_write(mock_session.execute.call_args_list), (
         "Owner A_PRIME: AUTO_ON_WHEN_PFO_RECOVERS_WITHIN_CONFIRMED_SET — "
         "apply_ab_hold_setup_mutations(epoch_managed=True) MUST restore "
-        "strategy_mode away from OFF for PASS keywords previously latched OFF; "
-        "current code only writes FAIL->OFF (no return-ON on PASS)"
-    )
-
-
-@pytest.mark.unit
-def test_pbh002_setup_apply_source_missing_return_on_seam() -> None:
-    """setup_apply source MUST contain a return-ON / recovery seam (A_PRIME)."""
-    assert _source_has_recovery_on(setup_apply) or _source_has_recovery_on(
-        setup_apply.apply_ab_hold_setup_mutations
-    ), (
-        "Owner A_PRIME: setup_apply MUST implement return-ON when PFO recovers "
-        "within confirmed set; module currently documents/implements FAIL->OFF "
-        "only (PASS skips TP under epoch_managed, never restores ON)"
-    )
-
-
-@pytest.mark.unit
-def test_pbh002_hold_guards_source_missing_return_on_seam() -> None:
-    """hold_guards source MUST contain a return-ON / recovery seam (A_PRIME)."""
-    assert _source_has_recovery_on(hold_guards), (
-        "Owner A_PRIME: hold_guards MUST implement return-ON when PFO recovers; "
-        "current module only select_ab_hold_overspend_off_keyword_ids / "
-        "apply_ab_hold_overspend_offs (OFF-only latch)"
+        "strategy_mode away from OFF for PASS keywords previously latched OFF"
     )
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
-    """A_PRIME ACTIVE hold: campaign PFO recovery MUST restore latched OFF->ON.
+    """A_PRIME ACTIVE hold: campaign PFO recovery MUST await return-ON writer.
 
-    Current ``process_ab_hold`` early-returns when not deep-overspend and never
-    issues return-ON — permanent latch after prior overspend OFF.
+    Patches both hold PG-write seams so unit stays mock-only; asserts
+    ``apply_ab_hold_pfo_recovery_ons`` was awaited with recovered keyword ids.
     """
     adv_setting = SimpleNamespace(
         id=20,
@@ -214,7 +166,7 @@ async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
         card_ab_hold_allowed_phrases_snapshot=["confirmed-kw"],
         card_ab_hold_degraded=False,
     )
-    recovered = _recovered_pass_keyword()
+    recovered = _recovered_pass_keyword(ks_id=101)
     complex_adv = SimpleNamespace(
         adv_id=10,
         shop_id=1,
@@ -233,6 +185,7 @@ async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
     container.minus_phrase_manager.return_value = mgr
 
     off_mock = AsyncMock(return_value=0)
+    recovery_on_mock = AsyncMock(return_value=1)
 
     with (
         patch(
@@ -240,6 +193,7 @@ async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
             MagicMock(return_value=container),
         ),
         patch(f"{_PIPELINES}.apply_ab_hold_overspend_offs", off_mock),
+        patch(f"{_PIPELINES}.apply_ab_hold_pfo_recovery_ons", recovery_on_mock),
     ):
         await process_ab_hold(
             complex_adv,  # type: ignore[arg-type]
@@ -249,8 +203,7 @@ async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
         )
 
     off_mock.assert_not_awaited()
-    assert _source_has_recovery_on(process_ab_hold), (
-        "Owner A_PRIME: when ACTIVE hold PFO recovers (no deep overspend), "
-        "process_ab_hold MUST restore ON for confirmed-set keywords previously "
-        "latched OFF; current code returns without return-ON"
+    recovery_on_mock.assert_awaited_once_with(
+        adv_id=10,
+        keyword_ids=[101],
     )

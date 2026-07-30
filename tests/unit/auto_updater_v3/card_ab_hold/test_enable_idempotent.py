@@ -10,7 +10,6 @@ Allowed: OFF Enable → путь ENTER (wiring: predicate false + handler order)
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -61,26 +60,6 @@ def test_enable_noop_answers_distinguish_active_and_pending() -> None:
 def test_advsetting_orm_has_no_shop_id_column() -> None:
     """Reality gate: ``shop_id`` живёт на WBCabinet, не на AdvSetting."""
     assert "shop_id" not in sa_inspect(AdvSetting).columns
-
-
-@pytest.mark.unit
-def test_enable_handler_checks_noop_before_enter_writes() -> None:
-    """11.2 wiring: no-op gate до start_epoch_on_enable / Redis ENTER."""
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    assert "is_card_ab_hold_enable_noop" in src
-    assert src.index("is_card_ab_hold_enable_noop") < src.index("start_epoch_on_enable")
-    assert src.index("start_epoch_on_enable") < src.index("set_signal")
-    assert "card_ab_hold_phase =" not in src
-
-
-@pytest.mark.unit
-def test_enable_handler_wires_shop_id_via_wb_cabinet_not_adv_getattr() -> None:
-    """ROOT-001 wiring: cabinet.shop_id + coerce; запрет ``getattr(adv, \"shop_id\")``."""
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    assert "wb_cabinet" in src
-    assert "coerce_shop_id_for_epoch_allowlist" in src
-    assert 'getattr(adv, "shop_id"' not in src
-    assert "getattr(adv, 'shop_id'" not in src
 
 
 @pytest.mark.unit

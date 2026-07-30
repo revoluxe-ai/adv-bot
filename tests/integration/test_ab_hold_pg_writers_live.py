@@ -38,6 +38,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldMode,
     CardAbHoldPhase,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.hold_guards import (
+    apply_ab_hold_pfo_recovery_ons,
+    apply_ab_hold_pfo_recovery_ons_in_session,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_apply import (
     apply_ab_hold_setup_mutations,
     persist_ab_hold_degraded_flag,
@@ -53,8 +57,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
     disable_card_ab_hold,
+    load_adv_setting_after_enable,
     load_adv_setting_for_ab_hold_menu,
     load_adv_setting_for_back,
+    load_adv_setting_for_enable_gates,
 )
 from tests.integration.card_ab_hold._live_pg_bootstrap import (
     disposable_ab_hold_schema,
@@ -474,6 +480,84 @@ async def test_live_pg_back_load_adv_setting_for_menu_path(
 
 @pytest.mark.destructive_local
 @pytest.mark.asyncio
+async def test_live_pg_load_adv_setting_for_enable_gates_pure_read(
+    live_db_url: str,
+) -> None:
+    """``load_adv_setting_for_enable_gates`` PURE_READ injected session + SQL re-read.
+
+    Parent enable path opens ``sm(read_only=True)`` and hands session to this child;
+    evidence is ORM load matching durable ``advsetting`` row (not session AsyncMock).
+    """
+    adv_setting_id = insert_adv_row(
+        live_db_url,
+        adv_setting_id=112,
+        adv_id=9112,
+        mode=CardAbHoldMode.OFF.value,
+        phase=None,
+        bot_active=True,
+    )
+    async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
+            sm as handlers_sm,
+        )
+
+        async with handlers_sm(read_only=True) as session:
+            adv = await load_adv_setting_for_enable_gates(session, adv_setting_id)
+
+    assert adv is not None
+    assert int(adv.id) == adv_setting_id
+    assert int(adv.adv_id) == 9112
+    row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
+    assert row[0] == CardAbHoldMode.OFF.value
+    assert getattr(adv, "card_ab_hold_mode", None) == row[0]
+    assert row[1] is None
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_load_adv_setting_after_enable_read_after_write(
+    live_db_url: str,
+) -> None:
+    """``load_adv_setting_after_enable`` READ_AFTER_WRITE after durable enable write.
+
+    Mirrors production: ``start_epoch_on_enable`` then child load under
+    ``sm(read_only=False)``; SQL re-read proves PENDING_SETUP / AWAITING_KEYWORD.
+    """
+    adv_setting_id = insert_adv_row(
+        live_db_url,
+        adv_setting_id=113,
+        adv_id=9113,
+        mode=CardAbHoldMode.OFF.value,
+        phase=None,
+        bot_active=True,
+    )
+    async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
+            sm as handlers_sm,
+        )
+
+        with patch(
+            "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+            "card_ab_hold.epoch_write.can_enter_epoch_managed_ab_hold",
+            return_value=True,
+        ):
+            managed = await start_epoch_on_enable(adv_setting_id, adv_id=9113)
+        assert managed is True
+
+        async with handlers_sm(read_only=False) as session:
+            adv = await load_adv_setting_after_enable(session, adv_setting_id)
+
+    assert adv is not None
+    assert int(adv.id) == adv_setting_id
+    row = fetch_adv_epoch_row(live_db_url, adv_setting_id)
+    assert row[0] == CardAbHoldMode.PENDING_SETUP.value
+    assert row[1] == CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM.value
+    assert getattr(adv, "card_ab_hold_mode", None) == row[0]
+    assert getattr(adv, "card_ab_hold_phase", None) == row[1]
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
 async def test_live_pg_persist_ab_hold_degraded_flag_write_and_clear(
     live_db_url: str,
 ) -> None:
@@ -512,3 +596,76 @@ async def test_live_pg_persist_ab_hold_degraded_flag_write_and_clear(
             adv_setting_id=adv_setting_id, degraded=False
         )
     assert fetch_adv_degraded_flag(live_db_url, adv_setting_id) is False
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_apply_ab_hold_pfo_recovery_ons_persists_return_on(
+    live_db_url: str,
+) -> None:
+    """``apply_ab_hold_pfo_recovery_ons`` WRITE seam + SQL re-read (A_PRIME).
+
+    Parent ``sm(read_only=False)`` → ``apply_ab_hold_pfo_recovery_ons_in_session``;
+    keyword was latched OFF → durable MIN_CPA + white-list hard_status.
+    """
+    from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
+        hard_status_for_strategy_mode,
+    )
+
+    adv_setting_id = insert_adv_row(
+        live_db_url,
+        adv_setting_id=111,
+        adv_id=9111,
+        mode=CardAbHoldMode.ACTIVE.value,
+        phase=CardAbHoldPhase.READY_ACTIVE.value,
+        bot_active=True,
+    )
+    keyword_id = insert_keyword_row(
+        live_db_url,
+        keyword_id=2111,
+        adv_setting_id=adv_setting_id,
+        text_value="pfo-recovered",
+        hard_status=hard_status_for_strategy_mode(KeywordStrategyMode.OFF),
+        strategy_mode=KeywordStrategyMode.OFF.name,
+        target_place=None,
+    )
+    before = fetch_keyword_row(live_db_url, keyword_id)
+    assert before[0] == hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+    assert before[1] == KeywordStrategyMode.OFF.name
+
+    async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.hold_guards import (
+            sm as hold_guards_sm,
+        )
+
+        updated = await apply_ab_hold_pfo_recovery_ons(
+            adv_id=9111, keyword_ids=[keyword_id]
+        )
+        assert updated == 1
+        after_parent = fetch_keyword_row(live_db_url, keyword_id)
+        assert after_parent[0] == hard_status_for_strategy_mode(
+            KeywordStrategyMode.MIN_CPA
+        )
+        assert after_parent[1] == KeywordStrategyMode.MIN_CPA.name
+
+        # Reset latch, then prove injectable child seam with live session.
+        insert_keyword_row(
+            live_db_url,
+            keyword_id=keyword_id,
+            adv_setting_id=adv_setting_id,
+            text_value="pfo-recovered",
+            hard_status=hard_status_for_strategy_mode(KeywordStrategyMode.OFF),
+            strategy_mode=KeywordStrategyMode.OFF.name,
+            target_place=None,
+        )
+        async with hold_guards_sm(read_only=False) as session:
+            child_updated = await apply_ab_hold_pfo_recovery_ons_in_session(
+                session, keyword_ids=[keyword_id]
+            )
+        assert child_updated == 1
+
+    after_child = fetch_keyword_row(live_db_url, keyword_id)
+    assert after_child[0] == hard_status_for_strategy_mode(KeywordStrategyMode.MIN_CPA)
+    assert after_child[1] == KeywordStrategyMode.MIN_CPA.name
+    assert after_child[2] is None

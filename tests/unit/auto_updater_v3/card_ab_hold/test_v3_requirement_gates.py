@@ -9,8 +9,8 @@
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -81,54 +81,156 @@ def test_switch_to_v3_never_blocked(mode: CardAbHoldMode) -> None:
 
 
 @pytest.mark.unit
-def test_enable_handler_runs_v3_gate_before_pending_and_enter_write() -> None:
-    """14.1/14.3 wiring: V3-gate стоит до записи PENDING_SETUP и Redis ENTER.
-
-    Гарантирует «на не-V3 mode остаётся OFF, ENTER не пишется»: ранний return
-    gate'а расположен строго раньше PG-write и `set_signal(ENTER)`.
-    """
+@pytest.mark.asyncio
+async def test_enable_handler_runs_v3_gate_before_pending_and_enter_write() -> None:
+    """14.1/14.3: non-V3 Enable → mode OFF, start_epoch/set_signal не вызываются."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
         handlers,
     )
-
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    gate_at = src.find("can_enable_card_ab_hold_on_version")
-    pending_write_at = src.find("start_epoch_on_enable")
-    enter_write_at = src.find("set_signal")
-    assert gate_at != -1
-    assert pending_write_at != -1 and gate_at < pending_write_at
-    assert enter_write_at != -1 and gate_at < enter_write_at
-
-
-@pytest.mark.unit
-def test_version_toggle_runs_downgrade_block_before_automatic_version_write() -> None:
-    """14.2/14.4 wiring: downgrade-block стоит до PG-write `automatic_version`.
-
-    Гарантирует «downgrade на V2 при активном A/B Hold не меняет automatic_version»:
-    ранний return блока расположен строго раньше `update(...).values` записи.
-    """
-    from app.modules.shop_runner.service_manager.auto_updater_version_toggle.telegram import (
-        handlers,
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
+        CardAbHoldEnable,
     )
 
-    src = inspect.getsource(handlers.toggle_auto_updater_version)
-    block_at = src.find("is_switch_to_version_blocked_by_ab_hold")
-    write_at = src.find('"automatic_version": new_version')
-    assert block_at != -1
-    assert write_at != -1 and block_at < write_at
+    adv = SimpleNamespace(
+        id=7,
+        adv_id=77,
+        bot_active=True,
+        automatic_version=2,
+        max_price_for_order=100.0,
+        card_ab_hold_mode=CardAbHoldMode.OFF.value,
+        card_ab_hold_degraded=False,
+    )
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=adv)
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+    query = MagicMock()
+    query.answer = AsyncMock()
+    query.message = MagicMock(answer=AsyncMock())
+    query.bot = MagicMock(send_message=AsyncMock())
+    query.from_user = SimpleNamespace(id=1)
+    start_epoch = AsyncMock()
+    set_signal = AsyncMock()
+    eval_stats = AsyncMock()
+
+    with (
+        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
+        patch.object(
+            handlers,
+            "CardAbHoldSignalRedisCache",
+            return_value=MagicMock(set_signal=set_signal),
+        ),
+        patch.object(handlers, "evaluate_ab_hold_enable_stats", eval_stats),
+        patch.object(handlers, "_edit_screen", new_callable=AsyncMock),
+    ):
+        await handlers.enable_card_ab_hold(
+            query, CardAbHoldEnable(adv_setting_original_id=7)
+        )
+
+    assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
+    start_epoch.assert_not_awaited()
+    set_signal.assert_not_awaited()
+    eval_stats.assert_not_awaited()
 
 
 @pytest.mark.unit
-def test_change_adv_strategy_stays_v2_scope_no_ab_hold_freeze_gate() -> None:
-    """14.5 regression: change_adv_strategy — V2-scope, A/B Hold НЕ добавляет freeze-гард.
+@pytest.mark.asyncio
+async def test_version_toggle_blocks_v2_downgrade_before_automatic_version_write() -> None:
+    """14.2/14.4: ACTIVE Hold + toggle V2 → session.execute(update) не вызывается."""
+    from app.modules.shop_runner.service_manager.auto_updater_version_toggle.telegram import (
+        handlers as version_handlers,
+    )
+    from app.modules.shop_runner.service_manager.auto_updater_version_toggle.telegram.callbacks import (
+        AutoUpdaterVersionToggle,
+    )
 
-    Осознанно противоположно 6 structural ACT-корутинам: strategy (MIN_CPO/MAX_CONV)
-    вынесен из scope freeze A/B Hold (spec «A/B Hold requires V3…» + decision §12).
-    Полная гарантия «strategy не влияет на V3 held-профиль» зависит от отдельной
-    развязки V3 keyword ``strategy_mode`` ← ``AdvSetting.strategy`` (вне этого change).
-    """
+    adv = SimpleNamespace(
+        id=11,
+        automatic_version=3,
+        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+    )
+    session = MagicMock()
+    result = MagicMock()
+    result.scalar_one_or_none = MagicMock(return_value=adv)
+    session.execute = AsyncMock(return_value=result)
+    session.commit = AsyncMock()
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    query = MagicMock()
+    query.message = MagicMock()
+    query.message.chat = SimpleNamespace(id=100)
+    query.from_user = SimpleNamespace(id=1)
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+
+    with patch.object(version_handlers, "sm", return_value=session_cm):
+        await version_handlers.toggle_auto_updater_version(
+            query,
+            AutoUpdaterVersionToggle(adv_setting_original_id=11, new_version=2),
+            bot,
+            state,
+        )
+
+    # Only the SELECT for adv_before — no UPDATE of automatic_version.
+    assert session.execute.await_count == 1
+    session.commit.assert_not_awaited()
+    bot.send_message.assert_awaited()
+    assert "A/B Hold" in bot.send_message.await_args.args[1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_change_adv_strategy_keeps_active_hold_campaigns() -> None:
+    """14.5: change_adv_strategy не фильтрует structural freeze — ACTIVE остаётся в pool."""
     from app.modules.shop_runner.service_manager.manager import CoroutinesManager
 
-    src = inspect.getsource(CoroutinesManager.change_adv_strategy)
-    assert "filter_structural_act_candidates" not in src
-    assert "card_ab_hold_mode" not in src
+    active = SimpleNamespace(
+        adv_id=1,
+        bot_active=True,
+        is_part_auto_setting_active=True,
+        auto_update_strategy=True,
+        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+    )
+    off = SimpleNamespace(
+        adv_id=2,
+        bot_active=True,
+        is_part_auto_setting_active=True,
+        auto_update_strategy=True,
+        card_ab_hold_mode=CardAbHoldMode.OFF.value,
+    )
+    mgr = object.__new__(CoroutinesManager)
+    mgr._wb_shop_data_manager = MagicMock()
+    mgr._wb_shop_data_manager.get_complex_advs = AsyncMock(return_value=[active, off])
+    mgr._max_workers_for = MagicMock(return_value=1)
+    mgr._tasks_manager = MagicMock()
+    mgr.shop_id = "shop"
+    resolved: list[int] = []
+
+    async def _resolve(complex_adv: SimpleNamespace):
+        resolved.append(int(complex_adv.adv_id))
+        return complex_adv, None
+
+    mgr._resolve_strategy_selection = _resolve  # type: ignore[method-assign]
+
+    async def _run_tasks(handlers, max_workers=None, tasks_manager=None):
+        _ = max_workers, tasks_manager
+        out = []
+        for h in handlers:
+            out.append(await h())
+        return out
+
+    with patch(
+        "app.modules.shop_runner.service_manager.manager.run_tasks",
+        new=_run_tasks,
+    ):
+        raw = CoroutinesManager.change_adv_strategy
+        fn = getattr(raw, "__wrapped__", None)
+        assert fn is not None
+        await fn(mgr)
+
+    assert resolved == [1, 2]
