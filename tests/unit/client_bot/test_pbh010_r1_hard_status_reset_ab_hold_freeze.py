@@ -11,7 +11,6 @@ PBH-011 add_* membership and PBH-009 hold_guards TP.
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -31,16 +30,12 @@ _ADD = "app.client_bot.user_interface.handlers.add_white_phrases"
 
 
 @pytest.mark.unit
-def test_pbh010_r1_reset_writers_wire_ab_hold_structural_freeze() -> None:
-    """Source of R1 reset writers MUST contain freeze gate (peer root does)."""
-    white_src = inspect.getsource(reset_white_list)
-    nrf_src = inspect.getsource(reset_non_relevant_phrases)
-    updater_src = inspect.getsource(keyword_updater.update_keywords)
-    filter_src = inspect.getsource(keyword_updater._non_frozen_adv_setting_filter)
-    assert "is_ab_hold_structural_freeze" in white_src
-    assert "is_ab_hold_structural_freeze" in nrf_src
-    assert "PENDING_SETUP" in filter_src and "ACTIVE" in filter_src
-    assert "_non_frozen_adv_setting_filter" in updater_src
+def test_pbh010_r1_update_keywords_filter_excludes_structural_freeze_modes() -> None:
+    """``_non_frozen_adv_setting_filter`` must exclude PENDING_SETUP/ACTIVE."""
+    clause = keyword_updater._non_frozen_adv_setting_filter()
+    compiled = str(clause.compile(compile_kwargs={"literal_binds": True}))
+    assert CardAbHoldMode.PENDING_SETUP.value in compiled
+    assert CardAbHoldMode.ACTIVE.value in compiled
 
 
 @pytest.mark.unit
@@ -140,12 +135,3 @@ async def test_pbh010_r1_reset_non_relevant_phrases_blocked_on_ab_hold(
         for c in bot.send_message.call_args_list
     )
 
-
-@pytest.mark.unit
-def test_pbh010_r1_update_keywords_excludes_structural_freeze_modes() -> None:
-    """Shop update_keywords subquery filter must exclude PENDING_SETUP/ACTIVE."""
-    filter_src = inspect.getsource(keyword_updater._non_frozen_adv_setting_filter)
-    updater_src = inspect.getsource(keyword_updater.update_keywords)
-    assert "PENDING_SETUP" in filter_src
-    assert "ACTIVE" in filter_src
-    assert "_non_frozen_adv_setting_filter" in updater_src

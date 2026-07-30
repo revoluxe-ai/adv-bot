@@ -18,7 +18,6 @@ Asserts observable membership-write silence under PENDING_SETUP / ACTIVE
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -30,11 +29,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 
 MODULE = "app.client_bot.user_interface.handlers.add_white_phrases"
-
-_HOLD_GATE_TOKENS = (
-    "is_ab_hold_structural_freeze",
-    "is_ab_hold_auto_bid_manual_blocked",
-)
 
 
 def _make_message(*, text: str = "phrase one\nphrase two") -> MagicMock:
@@ -73,31 +67,6 @@ def _patch_sm(session: AsyncMock):
     mock_sm.return_value.__aenter__ = AsyncMock(return_value=session)
     mock_sm.return_value.__aexit__ = AsyncMock(return_value=None)
     return patch(f"{MODULE}.sm", mock_sm)
-
-
-@pytest.mark.unit
-def test_add_phrase_handlers_wire_ab_hold_structural_freeze() -> None:
-    """Source of add_* phrase waiting handlers MUST contain a Hold freeze gate.
-
-    Observable wiring (peer pattern from FINDING-PBH-004-R1): ordinary
-    membership mutators under Hold require ``is_ab_hold_structural_freeze``
-    (or equivalent manual block) before ``data_manager.add_*_phrases``.
-    """
-    src = inspect.getsource(add_white_phrases)
-    waiting_fns = (
-        inspect.getsource(add_white_phrases.waiting_for_white_phrases),
-        inspect.getsource(add_white_phrases.waiting_for_fixed_phrases),
-        inspect.getsource(add_white_phrases.waiting_for_relevant_phrases),
-    )
-    assert any(token in src for token in _HOLD_GATE_TOKENS), (
-        "FINDING-PBH-011: add_white_phrases.py has no A/B Hold freeze gate token "
-        f"before data_manager.add_*_phrases; expected one of {_HOLD_GATE_TOKENS}."
-    )
-    for fn_src in waiting_fns:
-        assert any(token in fn_src for token in _HOLD_GATE_TOKENS), (
-            "FINDING-PBH-011: waiting_for_* phrase handler missing Hold freeze "
-            f"gate; expected one of {_HOLD_GATE_TOKENS}."
-        )
 
 
 @pytest.mark.unit
