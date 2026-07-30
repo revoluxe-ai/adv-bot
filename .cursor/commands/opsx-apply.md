@@ -145,7 +145,27 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
 ### Post-apply next-step recommend
 
 После completion / `all_done` выбери **один** pasteable primary `NEXT_ACTION`
-по правилам ниже (soft recommend; не hard gate archive):
+по правилам ниже (soft recommend; не hard gate archive).
+Authority for bug close/handback:
+`.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+
+**Bug-episode first** (when `case=`/`finding=` present or ROUTE_STATE ties
+this change to a durable case):
+
+1. **Never** write `closed_fixed` / close CASE from apply.
+2. Read durable `CLOSE_FINDING_INTENT` / `POST_GREEN_OWNER` /
+   `HANDBACK_COMMAND` from LEDGER (do not invent from chat).
+3. **PRIMARY** `NEXT_ACTION`:
+   `/opsx-test case=<CASE_ID> finding=<FINDING_ID> verify`
+4. **SECONDARY** (always emit pasteable, no silent return):
+   `HANDBACK_COMMAND` or
+   `/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`
+5. **ALSO_OK**: continue OpenSpec soft chain below (solo walk / coverage);
+   Owner may ignore handback — not a violation.
+6. Coverage recommends (pyright → ecc → …) remain **additional** after
+   GREEN path is stated, when production `.py` changed.
+
+**OpenSpec-only** (no bug case context):
 
 1. Если в этой сессии или в diff change есть **in-policy production Python**
    (`app/**/*.py` или top-level production `*.py` в корне, не `tests/**`):
@@ -169,11 +189,9 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
      (docs/typing-only / нерелевантный tests-only → skip).
 2. Иначе (нет in-policy production `.py`):
    - Primary: `/opsx-verify <change-name>`.
-3. Bug-episode path: `/opsx-test … verify` остаётся обязательным GREEN writer
-   где применимо; coverage recommends — дополнительно, когда трогали
-   production `.py`.
 
 Не объявляй archive readiness из apply.
+Не объявляй bug-card closed из apply.
 
 **Output During Implementation**
 

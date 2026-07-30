@@ -904,11 +904,57 @@ intake=<INTAKE_ID>
 finding=<FINDING_ID>
 ```
 
+### Close finding after GREEN (`close=fixed`)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+
+```text
+mode=update
+case=<CASE_ID>
+finding=<FINDING_ID>
+close=fixed
+```
+
+Allowed only when:
+
+* GREEN evidence exists (`GREEN_EVIDENCE_PATH` / `results/GREEN-<FINDING_ID>.md`);
+* route reconciliation permits episode close (ORCHESTRATION §0.7);
+* caller is post-`/opsx-test verify` or explicit Owner solo close — **not**
+  `/opsx-apply` / `/opsx-update` / `/opsx-verify`.
+
+Writes:
+
+* finding `STATUS: closed_fixed`
+* `EPISODE_TERMINAL: FIXED`
+* `COMPLETED_AT` (UTC ISO-8601)
+* LEDGER counts / finding row
+* CASE/INDEX terminal or next-action refresh (if no other open working
+  findings → case may move to closed/fixed stage; else keep case open and
+  set NEXT to remaining work / handback)
+
+Optional:
+
+```text
+leave_open_reason=<token from CLOSE_POLICY>
+```
+
+When `leave_open_reason=` is set instead of `close=fixed`, do **not**
+set `closed_fixed`; record reason on finding/ROUTE_STATE only.
+
+Also may patch close-intent fields when explicitly named:
+
+```text
+CLOSE_FINDING_INTENT=
+POST_GREEN_OWNER=
+HANDBACK_COMMAND=
+```
+
 Rules:
 
 * patch only named fields from `$ARGUMENTS` or an explicit field block;
 * do not rewrite the whole ledger from chat memory;
-* do not invent status transitions;
+* do not invent status transitions **except** the documented `close=fixed`
+  / leave_open_reason ops above;
 * do not clear `OWNER_CHAT` / `CLAIM_TOKEN` unless explicitly requested
   **or** an explicit `repair=` corrupt-claim op below applies;
 * do not auto-steal claims;

@@ -289,6 +289,25 @@ Always forbidden:
   git commit / git push / deploy / external production mutations
 ```
 
+### Owner-block UX (A/B/C / policy / INSUFFICIENT_EVIDENCE)
+
+When the team **stops** for Owner adjudication (`OWNER_A_B_C_UNRESOLVED`,
+policy choice, or equivalent), the host output MUST include — no silent
+auto-continue into the next wave without these lines:
+
+```text
+OWNER_DECISION_REQUIRED: A | B | C | <exact choices>
+OPTIONAL_IF_UNSURE:
+/opsx-explore case=<CASE_ID> finding=<FINDING_ID>
+THEN_RETURN (pasteable — never silent):
+/opsx-bug-team case=<CASE_ID> mode=continue
+```
+
+Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+Explore clarifies; it does **not** replace A/B/C. After Owner answers in
+explore (or here), resume only via the pasteable `THEN_RETURN` (or explicit
+Owner `GO continue team` in this chat).
+
 ## Classification (CLASSIFIER worker only)
 
 Exactly one of:

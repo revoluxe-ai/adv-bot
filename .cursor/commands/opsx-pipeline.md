@@ -282,6 +282,7 @@ RECOMMENDATION_STRENGTH: advisory
 KNOWN_FLAWS:
 OWNER_DECISION_REQUIRED:
 NEXT_ACTION:
+ALSO_OK:
 DO_NOT_DO_YET:
 ```
 
@@ -306,8 +307,17 @@ BLOCKED_AMBIGUOUS_POSITION
 - `OWNER_DECISION_REQUIRED` — `none` or exact decision
 - `NEXT_ACTION` — one pasteable **recommended** command or `none`
   (operator may ignore)
+- `ALSO_OK` — optional one-line advisory alternate pasteable (solo walk,
+  explore, handback, etc.). Does **not** replace `NEXT_ACTION`. Never
+  frame ignoring `NEXT_ACTION` for an `ALSO_OK` path as a violation.
 - `DO_NOT_DO_YET` — actions that would bypass **command** gates or skip
   UPDATE GO; never “do not leave the graph”
+
+When at a bug-episode fork (see GRAPH soft `BUG_EPISODE_FORK` /
+`CLOSE_POLICY.md`): set `NEXT_ACTION` to the **PRIMARY** path for the
+current node (often team handback after GREEN/invariant/Owner-block exit,
+or apply/fix-bug while mid solo walk); put the other path in `ALSO_OK`
+with `case=` IDs. Never recommend a silent return to bug-team.
 
 ## Failure / recovery
 
@@ -341,6 +351,7 @@ Before returning:
 - [ ] NAVIGATE/UPDATE did not write files
 - [ ] UPDATE GO wrote only `.cursor/pipeline/**`
 - [ ] Exactly one `NEXT_ACTION`, marked advisory on NAVIGATE
+- [ ] `ALSO_OK` used for bug-episode forks (team vs solo) when relevant
 - [ ] Shared materialization used (no alternate durable map)
 - [ ] Graph not claimed as lifecycle authority or forced path
 - [ ] Off-graph deviation allowed without framing as failure

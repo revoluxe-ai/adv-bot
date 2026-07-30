@@ -455,6 +455,25 @@ GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW
    Schema: `.cursor/pipeline/contracts/bug-episode/GREEN_EVIDENCE.md`.
 6. Update finding/LEDGER `GREEN_EVIDENCE_PATH` via materialize `mode=update`.
 7. Append ROUTE-TRACE event for `test GREEN`; update `## ROUTE_STATE`.
+8. **Post-GREEN next** (authority:
+   `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`):
+   - Read `POST_GREEN_OWNER`, `CLOSE_FINDING_INTENT`, `HANDBACK_COMMAND`
+     from LEDGER (defaults: `bug-team` + `ask_after_green`).
+   - **Never** silent-return to bug-team; always pasteable.
+   - If `POST_GREEN_OWNER=bug-team` (default):
+     **PRIMARY** `NEXT_ACTION` =
+     `HANDBACK_COMMAND` or
+     `/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`
+     **ALSO_OK**: solo close pasteables below; OpenSpec coverage/verify.
+   - If `POST_GREEN_OWNER=solo` + `auto_after_green`:
+     call materialize `mode=update … close=fixed` (same turn allowed for
+     evidence+close field write via materialize contract).
+   - If `POST_GREEN_OWNER=solo` + `ask_after_green`:
+     emit pasteable pair:
+     `/opsx-materialize-bug-queue mode=update case=… finding=… close=fixed`
+     vs leave open with `LEAVE_OPEN_REASON=…`
+   - If `never`: leave open; still show handback as ALSO_OK when team case.
+   - Do **not** close error class / lesson from verify mode.
 
 Silent test weakening is forbidden.
 

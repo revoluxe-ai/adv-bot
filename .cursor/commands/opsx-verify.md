@@ -114,6 +114,29 @@ report отсутствует; soft recommend владельцу:
 `/opsx-performance-review scope=base base=<BASE>` когда production hot-path
 (DB/query/queue/concurrency/pool/retry) в change и report не передан.
 
+## Additive linked bug-card audit (soft)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+
+When the change is tied to a durable bug case (`case=` in request, design,
+ROUTE_STATE, or tasks mention `BUGCASE-…`):
+
+1. Read `.tmp/opsx-bug-cases/INDEX.md` and the case LEDGER/finding rows
+   (bounded; do not invent IDs).
+2. Soft-report `OPEN_LINKED_FINDINGS`, `CLOSE_FINDING_INTENT`,
+   `POST_GREEN_OWNER`, whether GREEN exists, and pasteable handback if
+   cards still open.
+3. **Do not** write `closed_fixed` from verify.
+4. **Default:** open cards are a **warn / soft recommend**, not automatic
+   archive `NO_GO` (hard `archive_requires_bug_cards_settled` is out of
+   scope for this increment).
+5. Pasteable ALSO_OK examples:
+   `/opsx-test case=… finding=… verify` or
+   `/opsx-bug-team case=… mode=resume-family-fanout` or
+   `/opsx-materialize-bug-queue mode=update … close=fixed` (solo only).
+
+Absence of a linked case → skip this section.
+
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
 **OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:
@@ -764,6 +787,10 @@ Archive ready: yes / no
 Blockers:
 - ...
 
+## Linked bug cards (soft)
+- none | OPEN_LINKED_FINDINGS: …
+- ALSO_OK handback/close pasteables if any:
+
 ## Следующая команда
 /opsx-archive <change-name>
 ```
@@ -780,6 +807,8 @@ Other allowed next commands for blockers:
 ```text
 /opsx-update <change-name>
 manual fix
+/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
+/opsx-test case=<CASE_ID> finding=<FINDING_ID> verify
 ```
 
 Не создавай новый top-level output section для test coverage.
@@ -825,6 +854,7 @@ or:
 * Treat `TEST_COVERAGE_PACKET` as additive evidence only.
 * Treat `EXTERNAL_CALL_COVERAGE_REPORT` as additive evidence only (diff/base-owned; not a substitute for packet).
 * Treat `PERFORMANCE_REVIEW_REPORT` as additive evidence only (diff/base-owned; not a substitute for external-call or packet).
+* Soft-audit linked bug cards when case-tied; do not close cards from verify; open cards ≠ default archive NO_GO.
 * Do not change legacy verify eligibility when the packet, external-call report, or performance report is absent.
 * Do not issue `NO_GO` from packet status alone.
 * Do not invent a full external-call inventory during verify when the report is absent; soft-recommend `/opsx-external-call-coverage` instead.

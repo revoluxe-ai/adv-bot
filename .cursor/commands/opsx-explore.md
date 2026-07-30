@@ -108,6 +108,28 @@ for the park; that is bound-scope → update.
 to commit the boundary, prefer pointing to `/opsx-bound-scope` (not a silent
 full-scope `/opsx-propose` of everything).
 
+### Bug-episode / bug-team handback (when case= or finding= in scope)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+
+When exploration clarifies an Owner A/B/C (or A′/B′/C′) for an open bug
+case:
+
+1. State the recommended choice clearly.
+2. **Do not** silently “return to bug-team” or auto-dispatch team hops.
+3. Emit **pasteable** lines with durable IDs:
+
+```text
+NEXT_ACTION (Owner answers in team chat OR pastes):
+/opsx-bug-team case=<CASE_ID> mode=continue
+
+ALSO_OK (if still unsure):
+/opsx-explore case=<CASE_ID> finding=<FINDING_ID>
+```
+
+4. Prefer INDEX / LEDGER `CASE_ID` over chat memory. If IDs unknown → ask
+   once or point to `.tmp/opsx-bug-cases/INDEX.md`.
+
 **Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
