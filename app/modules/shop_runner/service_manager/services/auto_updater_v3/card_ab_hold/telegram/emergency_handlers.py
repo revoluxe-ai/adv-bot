@@ -8,7 +8,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Literal
+
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
@@ -35,6 +39,48 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     is_card_ab_hold_ui_visible,
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
+
+EmergencyEducateAckKind = Literal["ok", "ui_hidden", "emergency_not_visible"]
+
+
+@dataclass(frozen=True, slots=True)
+class EmergencyEducateAckOutcome:
+    """Итог PG-seam ACK образования Emergency (caller commits).
+
+    ``kind``:
+    - ``ok`` — educated выставлен на ``adv`` в сессии;
+    - ``ui_hidden`` — нет AdvSetting / paid UI скрыт;
+    - ``emergency_not_visible`` — Hold mode OFF (Emergency недоступен).
+    """
+
+    kind: EmergencyEducateAckKind
+    adv: AdvSetting | None = None
+
+
+async def acknowledge_emergency_education_in_session(
+    session: AsyncSession,
+    *,
+    adv_setting_original_id: int,
+) -> EmergencyEducateAckOutcome:
+    """Загрузить AdvSetting и ACK образования Emergency в переданной WRITE session.
+
+    Parent (``emergency_educate_ack``) открывает ``sm(read_only=False)`` и
+    передаёт session сюда; commit — на вызывающем после успешного ``ok``.
+
+    Args:
+        session: открытая AsyncSession (WRITE / caller commits).
+        adv_setting_original_id: PK ``AdvSetting.id``.
+
+    Returns:
+        ``EmergencyEducateAckOutcome`` с kind и опционально мутированным ``adv``.
+    """
+    adv = await session.get(AdvSetting, adv_setting_original_id)
+    if adv is None or not is_card_ab_hold_ui_visible(adv):
+        return EmergencyEducateAckOutcome(kind="ui_hidden")
+    if not is_ab_hold_emergency_visible(adv.card_ab_hold_mode):
+        return EmergencyEducateAckOutcome(kind="emergency_not_visible")
+    mark_emergency_educated_in_memory(adv)
+    return EmergencyEducateAckOutcome(kind="ok", adv=adv)
 
 
 def _emergency_education_text() -> str:
@@ -100,18 +146,22 @@ async def emergency_educate_ack(
 ) -> None:
     """Confirm/ACK образования Emergency на Hold screen (spec launch education)."""
     async with sm(read_only=False) as session:
-        adv = await session.get(AdvSetting, callback_data.adv_setting_original_id)
-        if adv is None or not is_card_ab_hold_ui_visible(adv):
+        outcome = await acknowledge_emergency_education_in_session(
+            session,
+            adv_setting_original_id=callback_data.adv_setting_original_id,
+        )
+        if outcome.kind == "ui_hidden":
             await hold_handlers._notify_callback_user(
                 query, "Доступно только при включённом боте"
             )
             return
-        if not is_ab_hold_emergency_visible(adv.card_ab_hold_mode):
+        if outcome.kind == "emergency_not_visible":
             await hold_handlers._notify_callback_user(
                 query, "Emergency доступен только в режиме A/B Hold"
             )
             return
-        mark_emergency_educated_in_memory(adv)
+        adv = outcome.adv
+        assert adv is not None
         await session.commit()
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         status = await hold_handlers._screen_status_text(adv, mode)
