@@ -848,6 +848,26 @@ class AdvSetting(BaseTable):
         default=None,
         comment="A/B Hold confirmed Auto bid (epoch SoT)",
     )
+    card_ab_hold_emergency_latch: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+        comment=(
+            "A/B Hold Emergency kill-switch latch (ab-hold-emergency-kill-switch): "
+            "True → no budget top-up / no activity restart; pause+block applied"
+        ),
+    )
+    card_ab_hold_emergency_educated: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+        comment=(
+            "A/B Hold Emergency launch education ACK "
+            "(ab-hold-emergency-kill-switch Confirm/ACK)"
+        ),
+    )
 
     bidder_mode: Mapped[BidderMode | None] = mapped_column(
         SAEnum(BidderMode),
