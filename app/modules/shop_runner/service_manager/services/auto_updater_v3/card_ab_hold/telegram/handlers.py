@@ -44,9 +44,17 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldBack,
     CardAbHoldCancel,
     CardAbHoldDisable,
+    CardAbHoldEmergencyAsk,
+    CardAbHoldEmergencyEducate,
     CardAbHoldEnable,
     CardAbHoldLaunchAnyway,
     CardAbHoldMenu,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+    SUPPORT_LINK,
+    is_ab_hold_emergency_latch_active,
+    is_ab_hold_emergency_visible,
+    is_emergency_educated,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_callbacks import (
     CahOpenCurrentStep,
@@ -156,6 +164,8 @@ def _screen_keyboard(
     mode: CardAbHoldMode | str | None,
     *,
     phase: CardAbHoldPhase | str | None = None,
+    emergency_educated: bool = False,
+    emergency_latch: bool = False,
 ) -> InlineKeyboardMarkup:
     """Клавиатура экрана A/B Hold (decision §11 / UX §5).
 
@@ -165,6 +175,9 @@ def _screen_keyboard(
     При ``mode≠OFF`` и non-NULL epoch ``phase`` добавляется
     «Открыть текущий шаг» (``CahOpenCurrentStep``) — мост в confirm-flow
     (ROOT-001 / UX §5). Legacy MVP-1 (``phase`` NULL) Open не получает.
+
+    Emergency (``ab-hold-emergency-kill-switch``): только mode≠OFF;
+    сначала education ACK, затем кнопка Emergency; при latch — support URL.
     """
     rows: list[list[InlineKeyboardButton]] = []
     if should_offer_card_ab_hold_enable_control(mode):
@@ -193,6 +206,38 @@ def _screen_keyboard(
                 )
             ]
         )
+    if is_ab_hold_emergency_visible(mode):
+        if emergency_latch:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text="Связаться с поддержкой",
+                        url=SUPPORT_LINK,
+                    )
+                ]
+            )
+        elif not emergency_educated:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text="⚠️ Важно: Emergency — прочитать",
+                        callback_data=CardAbHoldEmergencyEducate(
+                            adv_setting_original_id=adv_id
+                        ).pack(),
+                    )
+                ]
+            )
+        else:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text="🚨 Emergency — остановить траты",
+                        callback_data=CardAbHoldEmergencyAsk(
+                            adv_setting_original_id=adv_id
+                        ).pack(),
+                    )
+                ]
+            )
     rows.append(
         [
             InlineKeyboardButton(
@@ -224,6 +269,8 @@ async def _edit_screen(
     *,
     phase: CardAbHoldPhase | str | None = None,
     alert_if_unavailable: bool = True,
+    emergency_educated: bool = False,
+    emergency_latch: bool = False,
 ) -> bool:
     """Отправить экран A/B Hold отдельным сообщением.
 
@@ -235,6 +282,8 @@ async def _edit_screen(
         phase: durable ``card_ab_hold_phase`` для S0 confirm-bridge (UX §5).
         alert_if_unavailable: если False — не слать user-notice при skip
             (caller уже уведомил; иначе второй toast дублирует UX).
+        emergency_educated: ACK образования Emergency.
+        emergency_latch: активен ли kill-switch latch.
     """
     msg = query.message
     if msg is None:
@@ -260,7 +309,14 @@ async def _edit_screen(
         return False
 
     await msg.answer(
-        text, reply_markup=_screen_keyboard(adv_id, mode, phase=phase)
+        text,
+        reply_markup=_screen_keyboard(
+            adv_id,
+            mode,
+            phase=phase,
+            emergency_educated=emergency_educated,
+            emergency_latch=emergency_latch,
+        ),
     )
     return True
 
@@ -347,6 +403,12 @@ async def open_card_ab_hold_menu(
             adv.id,
             mode,
             phase=getattr(adv, "card_ab_hold_phase", None),
+            emergency_educated=is_emergency_educated(
+                getattr(adv, "card_ab_hold_emergency_educated", False)
+            ),
+            emergency_latch=is_ab_hold_emergency_latch_active(
+                getattr(adv, "card_ab_hold_emergency_latch", False)
+            ),
         )
 
 
@@ -584,6 +646,12 @@ async def _handle_ab_hold_enable(
             adv.id,
             normalize_card_ab_hold_mode(adv.card_ab_hold_mode),
             phase=getattr(adv, "card_ab_hold_phase", None),
+            emergency_educated=is_emergency_educated(
+                getattr(adv, "card_ab_hold_emergency_educated", False)
+            ),
+            emergency_latch=is_ab_hold_emergency_latch_active(
+                getattr(adv, "card_ab_hold_emergency_latch", False)
+            ),
             alert_if_unavailable=False,
         )
 
