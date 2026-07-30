@@ -41,6 +41,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
     setup_apply as ab_hold_setup_apply,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.keyword_tp_bulk import (
+    bulk_update_keyword_target_places,
+)
 from app.modules.shop_runner.service_manager.services.minus_phrase_manager import (
     MinusPhraseManagerContainer,
 )
@@ -250,6 +253,7 @@ async def apply_confirmed_intent_to_pg_in_session(
     text_to_id: dict[str, int] = {
         str(kw.text).lower(): int(kw.id) for kw in keyword_rows
     }
+    tp_updates: list[tuple[int, int]] = []
     for keyword_text, place in target_places.items():
         ks_id = text_to_id.get(str(keyword_text).lower())
         if ks_id is None:
@@ -260,12 +264,8 @@ async def apply_confirmed_intent_to_pg_in_session(
                 keyword_text,
             )
             continue
-        stmt_tp = (
-            update(KeywordSetting)
-            .where(KeywordSetting.id == ks_id)
-            .values(target_place=int(place))
-        )
-        _ = await session.execute(stmt_tp)
+        tp_updates.append((ks_id, int(place)))
+    await bulk_update_keyword_target_places(session, tp_updates)
 
     stmt_adv = (
         update(AdvSetting)

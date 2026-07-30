@@ -550,9 +550,7 @@ class CoroutinesManager:
         from .services.auto_updater_v3.card_ab_hold.pipelines import (
             process_ab_hold,
             process_ab_setup,
-        )
-        from .services.auto_updater_v3.card_ab_hold.epoch_pipelines import (
-            process_ab_epoch,
+            process_ab_setup_then_epoch,
         )
         # TODO: Убрал фильтрацию в качестве быстрого фикса, т.к. новая модель v3 отключала все ключи, и потом не включала, потому что стата кластеров не свежая, а она не свежая, потому что ключи все OFF
         handlers: list[Callable[[], Awaitable[Any]]] = []
@@ -575,17 +573,10 @@ class CoroutinesManager:
                 if should_run_ab_epoch(ab_mode, phase):
                     # PBH-006 / §18.4.2: Classification FAIL→OFF still via setup
                     # (epoch_managed=True); epoch tick owns WARM_UP/sync/ACTIVE.
+                    # PERF-003: one serial handler (setup→epoch), not two parallel.
                     handlers.append(
                         functools.partial(
-                            process_ab_setup,
-                            adv,
-                            wb_shop_data_manager=self._wb_shop_data_manager,
-                            wb_manager_hub=self._wb_manager_hub,
-                        )
-                    )
-                    handlers.append(
-                        functools.partial(
-                            process_ab_epoch,
+                            process_ab_setup_then_epoch,
                             adv,
                             wb_shop_data_manager=self._wb_shop_data_manager,
                             wb_manager_hub=self._wb_manager_hub,

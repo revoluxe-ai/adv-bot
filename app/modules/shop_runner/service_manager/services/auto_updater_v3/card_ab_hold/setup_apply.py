@@ -25,6 +25,9 @@ from app.modules.common_slaves.wildberries.models.models import AdvSetting
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
     hard_status_for_strategy_mode,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.keyword_tp_bulk import (
+    bulk_update_keyword_target_places,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
 )
@@ -89,13 +92,7 @@ async def apply_ab_hold_setup_mutations_in_session(
         )
         _ = await session.execute(stmt_off)
     if not epoch_managed:
-        for ks_id, place in pass_updates:
-            stmt_tp = (
-                update(KeywordSetting)
-                .where(KeywordSetting.id == ks_id)
-                .values(target_place=place)
-            )
-            _ = await session.execute(stmt_tp)
+        await bulk_update_keyword_target_places(session, list(pass_updates))
         stmt_mode = (
             update(AdvSetting)
             .where(AdvSetting.id == adv_setting_id)
