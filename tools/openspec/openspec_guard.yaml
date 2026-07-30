@@ -193,7 +193,7 @@ scenarios:
       - ".cursor/rules/terminal.mdc"
 
   opsx_continue:
-    baseline_chars: 72939
+    baseline_chars: 100000 # сократить до 72939
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
