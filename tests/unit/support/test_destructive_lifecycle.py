@@ -370,3 +370,59 @@ def test_partial_startup_tracks_started_services() -> None:
     lc.ensure_resources(TestResourceNeeds(needs_pg=True))
     assert COMPOSE_SERVICE_PG in lc.state.started_services
     assert lc.state.health_check_counts.get(COMPOSE_SERVICE_PG) == 1
+
+
+@pytest.mark.unit
+def test_run_awaitable_from_sync_without_running_loop() -> None:
+    """Без running loop bridge использует asyncio.run и возвращает результат."""
+    from tests.support.destructive_lifecycle import run_awaitable_from_sync
+
+    async def _work() -> str:
+        return "ok"
+
+    assert run_awaitable_from_sync(_work()) == "ok"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_awaitable_from_sync_inside_running_loop() -> None:
+    """Regression: schema bootstrap из async fixture не должен звать голый asyncio.run.
+
+    Симулирует ``clickhouse_client`` → ``ensure_resources`` → init_*_schema:
+    уже есть running loop; прямой ``asyncio.run`` падает, bridge — нет.
+    """
+    import asyncio
+
+    from tests.support.destructive_lifecycle import run_awaitable_from_sync
+
+    async def _work() -> int:
+        await asyncio.sleep(0)
+        return 42
+
+    doomed = _work()
+    with pytest.raises(RuntimeError, match="running event loop"):
+        asyncio.run(doomed)
+    doomed.close()
+
+    assert run_awaitable_from_sync(_work()) == 42
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_ensure_resources_ch_init_ok_under_running_loop() -> None:
+    """ensure_resources(CH) с init, использующим bridge, не падает под async loop."""
+    from tests.support.destructive_lifecycle import run_awaitable_from_sync
+
+    calls: list[str] = []
+
+    def _init_ch() -> None:
+        async def _ddl() -> None:
+            calls.append("ddl")
+
+        run_awaitable_from_sync(_ddl())
+
+    lc = _lifecycle(init_ch=_init_ch)
+    lc.ensure_resources(TestResourceNeeds(needs_clickhouse=True))
+    assert calls == ["ddl"]
+    assert lc.state.clickhouse_schema_initialized is True
+    assert lc.state.clickhouse_schema_init_count == 1
