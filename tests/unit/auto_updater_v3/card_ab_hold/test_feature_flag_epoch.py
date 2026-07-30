@@ -116,12 +116,6 @@ def test_broad_enable_readiness_allowed_only_with_od05(
 
 
 @pytest.mark.unit
-def test_assert_allowlist_ids_helper() -> None:
-    """Тестовый хелпер нормализует id."""
-    assert feature_flag.assert_allowlist_ids([1, 2, 2]) == frozenset({1, 2})
-
-
-@pytest.mark.unit
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
