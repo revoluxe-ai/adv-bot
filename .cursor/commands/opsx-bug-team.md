@@ -241,7 +241,13 @@ Rules:
 - `subagent_type` from registry (`generalPurpose` unless specialized);
 - **omit** `model` (auto / inherit only);
 - unique `WORKER_EXECUTION_ID` per hop;
-- append `.tmp/opsx-bug-cases/<CASE_ID>/team/DISPATCH.jsonl`;
+- append `.tmp/opsx-bug-cases/<CASE_ID>/team/DISPATCH.jsonl` per
+  `TASK_DISPATCH.md` **Append recipe** (prefer `live_task_hop`; ad-hoc
+  Shell/Python MUST follow
+  `.cursor/commands/opsx-execution-preflight.md` →
+  **Windows Shell JSON / JSONL write safety** —
+  `encoding="utf-8"` + `ensure_ascii=True`; no `ensure_ascii=False` stdin
+  recipes; no unsafe console print of the line);
 - never invent missing worker output.
 
 ## Waves
