@@ -41,3 +41,10 @@ Working directory: <abs REPO_ROOT>
 - After background launch, ending the turn is only to receive completion notifications — not to stop the command
 - On each worker notification: record packet; if wave still open → keep waiting; if wave complete → continue immediately (next wave or synthesis)
 - Never leave the user with only “waiting for packets” as the last answer
+- **System/Task completion notification is not a user-facing Final report.**
+  When the last check of the run finishes (or Wave B is SKIPPED after Wave A),
+  the orchestrator’s next user-visible message MUST include the full Final
+  report (`STATUS` + `CHECKS` + `NEXT ACTION`) from `opsx-static-check.md` §5.
+  Stopping after a red subagent packet alone = **contract violation**.
+- Do not paste worker `RAW_TAIL` into the user Final report; synthesize per
+  `contracts/synthesis.md`.

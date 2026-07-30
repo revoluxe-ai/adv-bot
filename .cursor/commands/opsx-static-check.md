@@ -50,7 +50,15 @@ Read-only quality gate. Не заменяет `/opsx-verify`, `/opsx-fix-types`,
 - Не объявлять archive `GO`/`NO_GO`.
 - Не создавать durable artifacts по умолчанию.
 - При BLOCKED/FAIL: только отчёт + NEXT ACTION для **человека** / другой команды. **Этот** run ничего не патчит.
-- **Completion gate:** run считается незавершённым, пока не напечатан блок Final report (`STATUS` + `CHECKS` + `NEXT ACTION`). Сообщение «жду packets» / progress — **не** финальный ответ.
+- **Completion gate:** run считается незавершённым, пока **оркестратор** не
+  напечатал блок Final report (`STATUS` + `CHECKS` + `NEXT ACTION`) в **своём**
+  ответе пользователю. Не финальный ответ:
+  - «жду packets» / progress / `WORKER READY` alone;
+  - system notification о завершении Task/subagent;
+  - сырой worker packet / `RAW_TAIL` субагента (в т.ч. в Agent Team UI).
+  Notification «pytest-full FAIL» **≠** Final report. После закрытия последней
+  wave оркестратор **в том же ходе** (сразу после записи последнего packet)
+  обязан сделать fan-in → synthesis → Final report — нельзя «просто остановиться».
 
 Shared contracts: `.cursor/commands/opsx-source-resolution.md`, `.cursor/commands/opsx-execution-preflight.md` (общий opsx preflight ≠ optional PREFLIGHT этой команды).
 
@@ -117,7 +125,18 @@ Update checkboxes from packets.
 Do not edit repo files while synthesizing.
 Do not paste worker RAW_TAIL or full FINDINGS into the Final report.
 
+When the **last open check** of the run completes (Wave B packet, or Wave A
+when Wave B is SKIPPED / MODE=FAST): **immediately** synthesize and go to
+§5 — do not end the turn with only `WORKER READY`.
+
+Mass `severity` / setup ERROR with the same root cause → one PROBLEMS group
+with `count`, not a dump of every node id (see synthesis.md).
+
 ### 5. Final report
+
+**Mandatory artifact of every completed `/opsx-static-check` run** (PASS, FAIL,
+or BLOCKED). Print the full template below even when Team/UI already showed a
+red subagent.
 
 ```text
 STATUS: PASS | FAIL | BLOCKED
@@ -162,4 +181,5 @@ Budgets, dedupe, `fix_cmd` mapping, and single NEXT_ACTION rank: only in
 - No self-repair of command/infra during this run?
 - Fan-out via Task `shell` (registry `task_type`) — no custom agent names?
 - Registry-driven waves?
+- Final report printed by orchestrator (not only worker notification)?
 - One NEXT_ACTION?
