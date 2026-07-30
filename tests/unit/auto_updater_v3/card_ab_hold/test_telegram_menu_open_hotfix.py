@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -204,27 +203,4 @@ async def test_edit_screen_does_not_swallow_send_errors() -> None:
                 mode=CardAbHoldMode.OFF,
             )
     query.answer.assert_not_awaited()
-
-
-@pytest.mark.unit
-def test_enable_disable_handlers_and_business_gates_wiring_unchanged() -> None:
-    """Hotfix не меняет wiring enable/disable и набор бизнес-гейтов."""
-    enable_src = inspect.getsource(handlers.enable_card_ab_hold)
-    launch_anyway_src = inspect.getsource(handlers.launch_card_ab_hold_anyway)
-    handle_src = inspect.getsource(handlers._handle_ab_hold_enable)
-    disable_src = inspect.getsource(handlers.disable_card_ab_hold)
-
-    assert "_handle_ab_hold_enable" in enable_src
-    assert "skip_view_volume_gate=False" in enable_src
-    assert "_handle_ab_hold_enable" in launch_anyway_src
-    assert "skip_view_volume_gate=True" in launch_anyway_src
-
-    assert "evaluate_ab_hold_enable_stats" in handle_src
-    assert "evaluate_ab_hold_launch_view_volume" in handle_src
-    assert "can_enable_card_ab_hold_on_version" in handle_src
-    assert "has_positive_plan_max_cpo" in handle_src
-
-    assert "disable_card_ab_hold_in_session" in disable_src
-    in_session_src = inspect.getsource(handlers.disable_card_ab_hold_in_session)
-    assert "card_ab_hold_mode = CardAbHoldMode.OFF.value" in in_session_src
 

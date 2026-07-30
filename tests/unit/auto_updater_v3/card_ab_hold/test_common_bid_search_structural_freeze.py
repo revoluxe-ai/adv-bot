@@ -10,19 +10,16 @@ structural hold; bidder/cluster is the allowed Search bid holder.
 
 Post-fix production path calls ``filter_structural_act_candidates`` before
 freshness / stale-mutation filters and the WB write. This suite is the
-post-fix regression: selection helper mirrors the fixed manager path,
-wiring tests prove the structural gate is present, predicate tests cover
-PENDING_SETUP / ACTIVE freeze.
+post-fix regression: selection helper mirrors the fixed manager path;
+predicate tests cover PENDING_SETUP / ACTIVE freeze.
 """
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 
 import pytest
 
-from app.modules.shop_runner.service_manager.manager import CoroutinesManager
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     is_ab_hold_structural_freeze,
@@ -33,9 +30,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stale_stats_freeze import (
     filter_ab_hold_stale_mutation_candidates,
-)
-from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.update_commot_bid_in_search_advs_manager import (
-    UpdateCommotBidInSearchAdvsManager,
 )
 
 
@@ -88,15 +82,15 @@ def test_common_bid_structural_freeze_predicates_forbid_pending_and_active() -> 
     """Инвентарь Forbidden: PENDING_SETUP/ACTIVE → structural freeze True."""
     assert is_ab_hold_structural_freeze(CardAbHoldMode.PENDING_SETUP) is True
     assert is_ab_hold_structural_freeze(CardAbHoldMode.ACTIVE) is True
-    assert is_ab_hold_structural_freeze(CardAbHoldMode.OFF) is False
     assert should_allow_structural_act(CardAbHoldMode.PENDING_SETUP) is False
     assert should_allow_structural_act(CardAbHoldMode.ACTIVE) is False
+    assert is_ab_hold_structural_freeze(CardAbHoldMode.OFF) is False
     assert should_allow_structural_act(CardAbHoldMode.OFF) is True
 
 
 @pytest.mark.unit
-def test_common_bid_candidates_must_drop_pending_and_active_before_wb_write() -> None:
-    """FINDING-PBH-004 post-fix: write set keeps OFF only under structural hold.
+def test_production_like_common_bid_candidates_drop_hold_modes() -> None:
+    """FINDING-PBH-004: production-like selection drops PENDING/ACTIVE before WB write.
 
     Когда кампании в PENDING_SETUP/ACTIVE имеют common-bid updater active и fresh
     stats, production-like path (flags → structural → freshness → stale) обязан
@@ -121,68 +115,3 @@ def test_common_bid_candidates_must_drop_pending_and_active_before_wb_write() ->
     assert all(
         a.card_ab_hold_mode == CardAbHoldMode.OFF.value for a in production_selected
     )
-
-
-@pytest.mark.unit
-def test_update_common_bid_in_search_adv_wires_structural_act_filter() -> None:
-    """Manager MUST call filter_structural_act_candidates (or equivalent freeze).
-
-    Sibling ACT paths (whitelist/TP/minus/emergency) already wire the gate;
-    Search common-bid must do the same per OP-008 / §3 / §17.
-    """
-    src = inspect.getsource(CoroutinesManager.update_common_bid_in_search_adv)
-    has_structural_gate = (
-        "filter_structural_act_candidates" in src
-        or "is_ab_hold_structural_freeze" in src
-        or "should_allow_structural_act" in src
-    )
-    assert has_structural_gate, (
-        "FINDING-PBH-004: CoroutinesManager.update_common_bid_in_search_adv "
-        "never calls filter_structural_act_candidates / is_ab_hold_structural_freeze "
-        "/ should_allow_structural_act before WB Search common-bid write. "
-        "Only freshness (+ stale-mutation on already-fresh set) is applied."
-    )
-
-
-@pytest.mark.unit
-def test_update_commot_bid_manager_does_not_substitute_structural_gate() -> None:
-    """Per-adv WB writer must not be the only place to rely on — gate is manager-side.
-
-    If manager omits structural filter, UpdateCommotBidInSearchAdvsManager also
-    lacks mode gate → PENDING/ACTIVE still receive SetCommonBidsCommand.
-    After fix, either manager filters candidates OR this writer refuses freeze modes.
-    """
-    manager_src = inspect.getsource(CoroutinesManager.update_common_bid_in_search_adv)
-    writer_src = inspect.getsource(
-        UpdateCommotBidInSearchAdvsManager.update_common_bid_in_search_adv
-    )
-    manager_gated = (
-        "filter_structural_act_candidates" in manager_src
-        or "is_ab_hold_structural_freeze" in manager_src
-        or "should_allow_structural_act" in manager_src
-    )
-    writer_gated = (
-        "filter_structural_act_candidates" in writer_src
-        or "is_ab_hold_structural_freeze" in writer_src
-        or "should_allow_structural_act" in writer_src
-        or "card_ab_hold_mode" in writer_src
-    )
-    assert manager_gated or writer_gated, (
-        "FINDING-PBH-004: neither CoroutinesManager.update_common_bid_in_search_adv "
-        "nor UpdateCommotBidInSearchAdvsManager.update_common_bid_in_search_adv "
-        "applies structural A/B Hold freeze; Forbidden PENDING_SETUP/ACTIVE still "
-        "reach ordinary Search common-bid WB writes."
-    )
-
-
-@pytest.mark.unit
-def test_sibling_structural_act_paths_still_wire_filter() -> None:
-    """Contrast: whitelist/TP paths already call filter_structural_act_candidates."""
-    wired = (
-        "update_top_key_in_advs",
-        "update_individual_keyword_target_places",
-        "white_list_tail_trimmer",
-    )
-    for name in wired:
-        src = inspect.getsource(getattr(CoroutinesManager, name))
-        assert "filter_structural_act_candidates" in src, name

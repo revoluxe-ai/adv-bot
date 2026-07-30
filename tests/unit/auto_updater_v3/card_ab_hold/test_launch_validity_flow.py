@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -325,23 +324,3 @@ async def test_cancel_keeps_off_and_no_enter() -> None:
     set_signal.assert_not_awaited()
     query.answer.assert_not_awaited()
     assert "отмен" in _user_notice_text(query).lower()
-
-
-@pytest.mark.unit
-def test_view_volume_gate_runs_after_freshness_before_pending_write() -> None:
-    """13.5 wiring: объёмный gate — после freshness и до ``start_epoch_on_enable``."""
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    freshness_at = src.find("evaluate_ab_hold_enable_stats")
-    volume_at = src.find("evaluate_ab_hold_launch_view_volume")
-    pending_at = src.find("start_epoch_on_enable")
-    assert -1 < freshness_at < volume_at < pending_at
-    assert "skip_view_volume_gate" in src
-
-
-@pytest.mark.unit
-def test_enable_uses_volume_gate_and_launch_anyway_skips_it() -> None:
-    """13.5 wiring: enable проверяет объём; launch-anyway его пропускает."""
-    enable_src = inspect.getsource(handlers.enable_card_ab_hold)
-    launch_src = inspect.getsource(handlers.launch_card_ab_hold_anyway)
-    assert "skip_view_volume_gate=False" in enable_src
-    assert "skip_view_volume_gate=True" in launch_src

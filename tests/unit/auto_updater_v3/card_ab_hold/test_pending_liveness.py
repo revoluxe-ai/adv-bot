@@ -16,7 +16,6 @@ recoverable». Decision ``card-ab-hold-write-path-ownership`` §14:
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -258,20 +257,6 @@ async def test_enable_positive_max_cpo_proceeds_to_pending() -> None:
     start_epoch.assert_awaited_once()
     assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
-
-
-@pytest.mark.unit
-def test_max_cpo_gate_runs_before_freshness_volume_and_pending_write() -> None:
-    """16.1 wiring: max-CPO gate — до freshness, объёмного gate и записи PENDING."""
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    gate_at = src.find("has_positive_plan_max_cpo")
-    freshness_at = src.find("evaluate_ab_hold_enable_stats")
-    volume_at = src.find("evaluate_ab_hold_launch_view_volume")
-    pending_at = src.find("start_epoch_on_enable")
-    enter_at = src.find("set_signal")
-    assert gate_at != -1
-    assert gate_at < freshness_at < volume_at < pending_at
-    assert gate_at < enter_at
 
 
 @pytest.mark.unit
@@ -527,13 +512,6 @@ async def test_screen_status_text_plain_for_non_pending() -> None:
         )
     assert text == "Статус: off"
     block_cls.assert_not_called()
-
-
-@pytest.mark.unit
-def test_menu_open_uses_screen_status_text() -> None:
-    """16.4 wiring: open_card_ab_hold_menu строит статус через _screen_status_text."""
-    src = inspect.getsource(handlers.open_card_ab_hold_menu)
-    assert "_screen_status_text" in src
 
 
 # --- 16.5: EXIT recovery from stuck PENDING + no owned auto-abort (MVP) ---

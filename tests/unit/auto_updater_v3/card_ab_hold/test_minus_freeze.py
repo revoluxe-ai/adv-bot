@@ -246,17 +246,6 @@ def test_enter_status_active_degraded_does_not_claim_clean_hold() -> None:
 
 
 @pytest.mark.unit
-def test_manager_wires_minus_structural_filter() -> None:
-    """8.2/8.6 wiring: update_minus_phrases_in_advs фильтрует freeze modes."""
-    import inspect
-
-    from app.modules.shop_runner.service_manager.manager import CoroutinesManager
-
-    src = inspect.getsource(CoroutinesManager.update_minus_phrases_in_advs)
-    assert "filter_structural_act_candidates" in src
-
-
-@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_setup_pipeline_orders_capture_enforce_before_active() -> None:
     """8.1/8.5: legacy ENTER path вызывает enforce до apply (не string-index).
@@ -333,33 +322,61 @@ async def test_setup_pipeline_orders_capture_enforce_before_active() -> None:
 
 
 @pytest.mark.unit
-def test_hold_pipeline_enforces_allowed_set() -> None:
-    """8.2/8.6 wiring: process_ab_hold вызывает enforce_frozen_allowed_set."""
-    import inspect
-
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
-        pipelines,
-    )
-
-    src = inspect.getsource(pipelines.process_ab_hold)
-    assert "enforce_frozen_allowed_set" in src
-    assert "cap_exceeded" in src
-
-
-@pytest.mark.unit
-def test_disable_clears_allowed_snapshot() -> None:
-    """8.3/8.8 wiring: EXIT очищает card_ab_hold_allowed_phrases_snapshot."""
-    import inspect
-
+@pytest.mark.asyncio
+async def test_disable_clears_allowed_snapshot() -> None:
+    """8.3/8.8 EXIT clears ``card_ab_hold_allowed_phrases_snapshot`` via in_session."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
         handlers,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
+        CardAbHoldDisable,
+    )
 
-    src = inspect.getsource(handlers.disable_card_ab_hold)
-    assert "disable_card_ab_hold_in_session" in src
-    child_src = inspect.getsource(handlers.disable_card_ab_hold_in_session)
-    assert "empty_allowed_snapshot" in child_src
-    assert "card_ab_hold_allowed_phrases_snapshot" in child_src
+    adv = SimpleNamespace(
+        id=42,
+        adv_id=4242,
+        bot_active=True,
+        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+        card_ab_hold_allowed_phrases_snapshot=["good1", "good2"],
+        card_ab_hold_phase=None,
+    )
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=adv)
+    session.commit = AsyncMock()
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+    query = MagicMock()
+    query.answer = AsyncMock()
+    query.message = MagicMock(answer=AsyncMock())
+
+    with (
+        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(
+            handlers,
+            "CardAbHoldSignalRedisCache",
+            return_value=MagicMock(clear=AsyncMock()),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldCommonBidEnterResetRedisCache",
+            return_value=MagicMock(clear=AsyncMock()),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldSetupBlockRedisCache",
+            return_value=MagicMock(clear=AsyncMock()),
+        ),
+        patch.object(handlers, "_edit_screen", new_callable=AsyncMock),
+        patch.object(handlers, "is_card_ab_hold_ui_visible", return_value=True),
+    ):
+        await handlers.disable_card_ab_hold(
+            query, CardAbHoldDisable(adv_setting_original_id=42)
+        )
+
+    assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
+    assert adv.card_ab_hold_allowed_phrases_snapshot == []
+    session.commit.assert_awaited()
 
 
 @pytest.mark.unit

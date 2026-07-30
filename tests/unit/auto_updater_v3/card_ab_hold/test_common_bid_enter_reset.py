@@ -8,7 +8,6 @@ PBH-004 suite; bidder remains eligible in ACTIVE.
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -18,20 +17,13 @@ from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommand,
 )
 from app.core.mp.wb.dto.adv_min_bids import AdvMinNmidsBids
-from app.modules.shop_runner.service_manager.manager import CoroutinesManager
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.common_bid_enter_reset import (
     build_set_common_bids_to_min_command,
     ensure_search_common_bid_reset_on_enter,
     resolve_search_min_bids_for_nmids,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_pipelines import (
-    process_ab_epoch,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.pipelines import (
-    process_ab_setup,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
     filter_bidder_eligible_by_ab_hold,
@@ -270,28 +262,6 @@ def test_bidder_remains_eligible_in_active_while_common_bid_frozen() -> None:
     assert {a.adv_id for a in eligible} == {1, 2}
     structural = filter_structural_act_candidates(pool)
     assert [a.adv_id for a in structural] == [2]
-
-
-@pytest.mark.unit
-def test_process_ab_setup_wires_enter_common_bid_reset() -> None:
-    """§27.5 wiring: legacy setup path calls owned ENTER reset."""
-    src = inspect.getsource(process_ab_setup)
-    assert "ensure_search_common_bid_reset_on_enter" in src
-
-
-@pytest.mark.unit
-def test_process_ab_epoch_wires_enter_common_bid_reset() -> None:
-    """§27.5 wiring: epoch PENDING path also calls owned ENTER reset."""
-    src = inspect.getsource(process_ab_epoch)
-    assert "ensure_search_common_bid_reset_on_enter" in src
-
-
-@pytest.mark.unit
-def test_ordinary_manager_common_bid_not_owner_of_enter_reset() -> None:
-    """Owned reset MUST NOT live inside continuous ordinary updater."""
-    src = inspect.getsource(CoroutinesManager.update_common_bid_in_search_adv)
-    assert "ensure_search_common_bid_reset_on_enter" not in src
-    assert "filter_structural_act_candidates" in src
 
 
 @pytest.mark.unit

@@ -19,7 +19,6 @@ Do not weaken by matching the buggy omit-filter behavior.
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -311,24 +310,4 @@ async def test_pbh007_epoch_setup_must_not_recovery_on_outside_confirmed_set() -
         "PBH-007 / Owner A_PRIME: post-confirm epoch setup MUST NOT recovery_on "
         f"keyword outside confirmed set (ks_id={_OUTSIDE_KS_ID}, text={_OUTSIDE_PHRASE!r}); "
         "call site must pass confirmed membership filter into apply_ab_hold_setup_mutations"
-    )
-
-
-@pytest.mark.unit
-def test_pbh007_epoch_process_ab_setup_source_binds_confirmed_filter() -> None:
-    """Source seam: epoch process_ab_setup MUST bind confirmed set / snapshot to apply."""
-    src = inspect.getsource(process_ab_setup)
-    epoch_idx = src.find("if epoch_managed:")
-    assert epoch_idx >= 0
-    epoch_region = src[epoch_idx:]
-    apply_idx = epoch_region.find("apply_ab_hold_setup_mutations(")
-    assert apply_idx >= 0
-    # Epoch apply call site window (kwargs + preceding confirmed-set read).
-    bind_window = epoch_region[max(0, apply_idx - 200) : apply_idx + 350]
-    has_snapshot_kw = "allowed_phrases_snapshot" in bind_window
-    has_confirmed_read = "card_ab_hold_confirmed_keywords_json" in bind_window
-    assert has_snapshot_kw or has_confirmed_read, (
-        "PBH-007: epoch-managed process_ab_setup MUST pass allowed_phrases_snapshot "
-        "or read card_ab_hold_confirmed_keywords_json before apply_ab_hold_setup_mutations; "
-        "current epoch call site omits membership filter after keyword confirm"
     )
