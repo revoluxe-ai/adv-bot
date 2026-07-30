@@ -210,10 +210,15 @@ async def get_keyword_statistic_clickhouse(
     pass_days: int | None = 7,
 ) -> tuple[int, int, float]:
     """
-    Возвращает суммарную статистику по ключевому слову text из агрегатов `mv_clusters_daily_agg`:
+    Возвращает суммарную статистику по ключевому слову text из агрегатов
+    ``default_db.mv_clusters_daily_agg``:
     - total_clicks
     - total_views
     - total_spend
+
+    Имя БД MUST быть в тексте SQL (рабочий контур ``default_db``); session
+    ``client.database`` не заменяет квалификацию. Spec:
+    ``clickhouse-query-database-qualification``.
     """
 
     if not adv_ids:
@@ -227,6 +232,8 @@ async def get_keyword_statistic_clickhouse(
 
     adv_ids_str = ", ".join(map(str, adv_ids))
 
+    # Qualified MV: working-contour addressing requires ``default_db.`` in SQL
+    # text (spec: clickhouse-query-database-qualification).
     query = f"""
         WITH keyword_stats AS (
             SELECT
