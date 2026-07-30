@@ -391,3 +391,6 @@ No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only par
 Внедрить практики, риски
 
 Сделать мета-команды по ремонту-доработке обучению команд, которые обслуживают другие команды
+
+
+сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
