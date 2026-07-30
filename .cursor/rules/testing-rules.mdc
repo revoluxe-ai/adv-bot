@@ -105,6 +105,13 @@ Blocking gate перед завершением implementation-задачи: н�
 - Внешнюю destructive dependency (WB write, billing, destructive side effect) можно mock-ать **после** causal boundary, если orchestration path и input shape сохранены.
 - Нельзя заранее передавать в test результат, который должна вычислить проверяемая production boundary, и выдавать это за proof границы.
 - Нельзя stub-ать pipeline так, что real guard никогда не достигается.
+- Если production SQL или database/table qualification для PG/CH store call
+  изменились: тесты MUST упражнять этот SQL path (минимум — capturing fake
+  client/session на rewritten callable до live; для COVERED — живой
+  `clickhouse_client` / PG session). Patch всей rewritten function
+  (`SQL_REWRITE_MOCKED_AWAY`) не доказывает rewrite. См.
+  `/opsx-close-external-gap` (SQL rewrite proof) и
+  `/opsx-external-call-coverage` (`NOTE=SQL_REWRITE_MOCKED_AWAY`).
 
 ## Minimum test level
 
@@ -123,7 +130,7 @@ Full E2E не требуется автоматически.
 | Kind | Durable read/write adapter | Достаточно / недостаточно |
 |------|----------------------------|---------------------------|
 | **PG** | `integration` на живом `async_session` (или test DB via production `sm` seam) **и** корректный session mode (ниже) | Unit + `AsyncMock` session — **не** proof; bare `sm()` / wrong polarity — **не** proof |
-| **CH** | `integration` на живом `clickhouse_client` | Mocked CH client alone — **не** proof |
+| **CH** | `integration` на живом `clickhouse_client` | Mocked CH client alone — **не** proof; patch rewritten SQL producer — **не** proof (`SQL_REWRITE_MOCKED_AWAY`) |
 | Redis | fakeredis / boundary_adapter OK | |
 | WB / HTTP | orchestration_seam; mock **after** causal boundary OK | |
 
