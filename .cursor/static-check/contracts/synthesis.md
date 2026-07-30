@@ -14,8 +14,10 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
    two P# entries):
    - same path + symbol, or
    - same path + primary diagnostic code family, or
-   - same pytest node id
-   → one problem group with `seen_in: [check_ids…]`.
+   - same pytest node id, or
+   - same environment root cause (e.g. identical
+     `DEV_TUNNELS_ENABLED` / connection-refused message across many nodes)
+   → one problem group with `seen_in: [check_ids…]` and merged `count`.
 4. **Group shape** (each P# must include all fields):
    - short title
    - `path` or test `node`
@@ -46,3 +48,6 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
    - else pytest → `/opsx-test-triage`
    - PASS → continue (optional `/opsx-verify` hint only; never archive GO)
    Per-group `fix_cmd` does **not** replace this single NEXT_ACTION.
+9. **Delivery:** Final report is mandatory after fan-in even when Agent Team /
+   UI already displayed a failed subagent. Orchestrator prints it; do not
+   treat Task completion notifications as the report.
