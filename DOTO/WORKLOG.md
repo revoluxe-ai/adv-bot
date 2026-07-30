@@ -1,4 +1,5 @@
 INBOX
+ Выпилить LEGACY app/dev_local/k8s_tunnels (+ re-export app/dev_local, scripts/dev-tunnels.ps1, DEV_TUNNEL_* в env.sample); канон локали = публичный IP/NodePort из .env. Unit-тесты на модуль уже сняты.
  Переключить всех на корзины - они опять появились
  CH: иногда 500 на тяжёлых запросах
  отписать WB на форум о проблеме с корзинами

@@ -81,6 +81,9 @@ def test_setup_missing_opt_in_before_lifecycle() -> None:
                 "ALLOW_DESTRUCTIVE_TEST_DB": "0",
                 "DEV_TUNNELS_ENABLED": "false",
                 "DEV_TUNNELS_KUBECONFIG": "",
+                # Isolates from ambient / leaked suite pollution (TUNNEL_PRESENT_ENV_KEYS).
+                "DEV_TUNNEL_PG_LOCAL_PORT": "",
+                "DEV_TUNNEL_CH_HTTP_PORT": "",
             },
             clear=False,
         ),
