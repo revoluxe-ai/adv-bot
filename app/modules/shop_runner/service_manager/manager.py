@@ -590,6 +590,7 @@ class CoroutinesManager:
                             adv,
                             wb_shop_data_manager=self._wb_shop_data_manager,
                             wb_manager_hub=self._wb_manager_hub,
+                            stats_fresh=stats_fresh,
                         )
                     )
                 continue

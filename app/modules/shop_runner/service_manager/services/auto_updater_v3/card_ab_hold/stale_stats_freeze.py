@@ -2,8 +2,9 @@
 
 Decision ``card-ab-hold-write-path-ownership`` §17: во время WARM_UP, PENDING или
 ACTIVE при stale/missing статистике **decide-class** решения о включении/исключении
-ключей и мутации Search/Auto ставок MUST замереть; это MUST NOT быть самостоятельной
-причиной stop кампании (orthogonal к ``ensure_campaigns_active`` / daily budget).
+ключей (включая ENTER/setup FAIL→OFF / PBH-001) и мутации Search/Auto ставок MUST
+замереть; это MUST NOT быть самостоятельной причиной stop кампании (orthogonal к
+``ensure_campaigns_active`` / daily budget).
 
 **PBH-005 carve-out:** apply snapshot уже записанного durable PENDING intent
 (``apply_confirmed_intent_to_pg`` / ``sync_intent_to_wb`` в ``process_ab_epoch``)
@@ -11,8 +12,8 @@ ACTIVE при stale/missing статистике **decide-class** решения
 
 Дополнение к ``filter_structural_act_candidates`` (structural freeze по mode):
 stale-freeze — отдельный слой для hold-tick / AutoReset / ordinary common bid /
-hold enforcement, когда freshness-класс stale, но кампания остаётся в eligible
-pool (§2a PENDING liveness).
+hold enforcement / epoch-managed setup FAIL→OFF, когда freshness-класс stale, но
+кампания остаётся в eligible pool (§2a PENDING liveness).
 """
 
 from __future__ import annotations

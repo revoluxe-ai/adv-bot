@@ -64,6 +64,7 @@ async def process_ab_setup(
     *,
     wb_shop_data_manager: "WBShopDataManager",
     wb_manager_hub: "WBManagerHub",
+    stats_fresh: bool = True,
 ) -> None:
     """ENTER setup-tick: capture allowed-set → snapshot → enforce → OFF/ЦП → ACTIVE.
 
@@ -75,7 +76,12 @@ async def process_ab_setup(
     §18.4 / §18.4.2 / §18.5: если ``card_ab_hold_phase`` non-NULL (epoch-managed),
     legacy auto-ACTIVE и ENTER TP-write Forbidden — но Classification FAIL→OFF
     MAY остаться на setup-тике через ``apply_ab_hold_setup_mutations(...,
-    epoch_managed=True)``. ``phase IS NULL`` = legacy MVP-1 (OFF + TP + ACTIVE).
+    epoch_managed=True)`` **только при fresh stats**. ``phase IS NULL`` = legacy
+    MVP-1 (OFF + TP + ACTIVE).
+
+    Decision §17 / PBH-001: stale/missing stats MUST freeze decide-class
+    FAIL→OFF (reuse ``should_freeze_keyword_and_bid_mutations``); freeze ≠
+    abort epoch. PBH-005 apply/sync живёт в ``process_ab_epoch``, не здесь.
 
     Decision §19 / tasks §27: в начале тика owned one-shot Search common-bid
     reset-to-min (идемпотентно; не ordinary updater).
@@ -99,13 +105,27 @@ async def process_ab_setup(
 
     epoch_managed = is_epoch_managed_ab_hold(complex_adv.adv_setting)
     if epoch_managed:
+        phase = getattr(complex_adv.adv_setting, "card_ab_hold_phase", None)
+        # PBH-001 / decision §17: Classification FAIL→OFF is decide-class —
+        # freeze on stale; do not call apply_ab_hold_setup_mutations.
+        if should_freeze_keyword_and_bid_mutations(
+            mode=mode,
+            phase=phase,
+            stats_fresh=stats_fresh,
+        ):
+            logger.info(
+                "[adv_id=%s] ab_setup epoch-managed: stale stats freeze — "
+                "skip FAIL->OFF (§17 / PBH-001)",
+                complex_adv.adv_id,
+            )
+            return
         # PBH-006 / tasks §18.4.2: FAIL→OFF Allowed; ACTIVE/TP still gated.
         # Не full allowed-set freeze (epoch confirm owns snapshot) — только classify/OFF.
         logger.info(
             "[adv_id=%s] ab_setup epoch-managed: FAIL->OFF only (no auto-ACTIVE/TP) "
             "phase=%s",
             complex_adv.adv_id,
-            getattr(complex_adv.adv_setting, "card_ab_hold_phase", None),
+            phase,
         )
         signal_cache = CardAbHoldSignalRedisCache(complex_adv.adv_setting)
         lock_mgr = RedisLockManager(signal_cache.client)
@@ -363,7 +383,8 @@ async def process_ab_setup_then_epoch(
         complex_adv: кампания shop-runner.
         wb_shop_data_manager: контекст shop-runner.
         wb_manager_hub: WB write-path.
-        stats_fresh: прокидывается в ``process_ab_epoch``.
+        stats_fresh: прокидывается в ``process_ab_setup`` (decide freeze) и
+            ``process_ab_epoch`` (PBH-005: apply/sync не блокируется stale alone).
     """
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_pipelines import (
         process_ab_epoch,
@@ -373,6 +394,7 @@ async def process_ab_setup_then_epoch(
         complex_adv,
         wb_shop_data_manager=wb_shop_data_manager,
         wb_manager_hub=wb_manager_hub,
+        stats_fresh=stats_fresh,
     )
     await process_ab_epoch(
         complex_adv,
