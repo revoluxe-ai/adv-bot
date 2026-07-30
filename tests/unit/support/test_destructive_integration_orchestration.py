@@ -305,6 +305,60 @@ def test_sanitizer_truncates_stderr_length() -> None:
 
 
 @pytest.mark.unit
+def test_scrub_sensitive_text_accepts_none_and_magicmock() -> None:
+    """Non-str stderr (suite MagicMock leak) → empty, без TypeError в re.sub."""
+    from unittest.mock import MagicMock
+
+    assert root_conftest._scrub_sensitive_text(None) == ""
+    assert root_conftest._scrub_sensitive_text(MagicMock()) == ""
+    assert root_conftest._coerce_diagnostic_text(MagicMock()) == ""
+    assert root_conftest._coerce_diagnostic_text(b"plain") == "plain"
+
+
+@pytest.mark.unit
+def test_docker_stage_error_with_magicmock_stderr_does_not_typeerror() -> None:
+    """Teardown path: MagicMock stderr → RuntimeError diagnostics, not TypeError."""
+    from unittest.mock import MagicMock
+
+    exc = root_conftest._docker_stage_error(
+        stage="cleanup",
+        command=("docker", "compose", "down"),
+        exit_code=1,
+        stderr=MagicMock(),
+        owner_action="retry cleanup",
+    )
+    message = str(exc)
+    assert "DOCKER_STAGE=cleanup" in message
+    assert "exit_code=1" in message
+    assert "stderr=<empty>" in message
+
+
+@pytest.mark.unit
+def test_compose_down_coerces_magicmock_stderr_before_raise() -> None:
+    """_compose_down передаёт str в raise_docker_stage даже при MagicMock err."""
+    from unittest.mock import MagicMock
+
+    from tests.support.destructive_lifecycle import coerce_compose_stream
+    from tests.unit.support.test_destructive_lifecycle import _lifecycle
+
+    captured: dict[str, object] = {}
+
+    def _raise_stage(**kwargs: object) -> None:
+        captured.update(kwargs)
+        raise RuntimeError("stage")
+
+    def _sync_run(*_a: object, **_k: object) -> tuple[int, str, object]:
+        return 1, "", MagicMock(name="fake_stderr")
+
+    lc = _lifecycle(sync_run=_sync_run, raise_stage=_raise_stage)
+    lc._compose_cmd = ["docker", "compose"]
+    err = lc._compose_down()
+    assert isinstance(err, RuntimeError)
+    assert captured.get("stderr") == ""
+    assert coerce_compose_stream(MagicMock()) == ""
+
+
+@pytest.mark.unit
 def test_safe_error_text_contains_stage_exitcode_owner_action() -> None:
     exc = root_conftest._docker_stage_error(
         stage="cleanup",
