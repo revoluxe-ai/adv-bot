@@ -48,7 +48,7 @@ FORBIDDEN_PG_DATABASES: frozenset[str] = frozenset(
     }
 )
 
-# Env проекта для kubectl port-forward / dev tunnels (см. app/dev_local/k8s_tunnels.py).
+# Env denylist: legacy tunnel flags must stay false/unset for destructive tests.
 TUNNEL_TRUTHY_ENV_KEYS: tuple[str, ...] = ("DEV_TUNNELS_ENABLED",)
 TUNNEL_PRESENT_ENV_KEYS: tuple[str, ...] = (
     "DEV_TUNNELS_KUBECONFIG",
