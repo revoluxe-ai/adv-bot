@@ -7,17 +7,18 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 33
+- inventory_count: 35
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: f04a0bccf2643336eea5a3e4f0660ea344e8637e
+- source_commit: 7fbce8b13701c946da00f05997f59ab1ca844c60
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-30T04:38:13Z: inventory 33; fingerprint
-  d8acc1c0ce8e215eb1ef01c39f667f07; added /opsx-performance-review
-  and /opsx-performance-fix; soft chain
-  external-call → performance (trigger) → static-check; F10 closed.
+  UPDATE GO 2026-07-30T12:17:37Z: inventory 35; fingerprint
+  78bbacb3fcee9523e0bdf73df1a18a5d; added /opsx-antipattern-gate
+  and /opsx-bug-debt-board; soft chain pyright → ecc → optional
+  performance → antipattern → static-check; F11 closed; F12 open.
+  Prior: performance-review (2026-07-30T04:38:13Z); F10 closed.
 
 ## States
 
@@ -28,7 +29,7 @@
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
 - scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
-- impl_done: tasks complete; soft-recommend pyright then external-call then conditional performance-review when production `.py`, then static-check / verify
+- impl_done: tasks complete; soft-recommend pyright then external-call then conditional performance-review when production `.py`, then antipattern-gate, then static-check / verify
 - verify_pass: archive-eligible after `/opsx-verify`
 - verify_fail: back to apply/update
 - archived: `/opsx-archive` done
@@ -105,6 +106,12 @@
 - performance_fixing: `/opsx-performance-fix` applying packet (no independent PASS)
 - performance_reaudit_pending: READY_FOR_PERFORMANCE_REAUDIT → independent review
 - performance_measure_authorized: READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN (owner unlocks one run inside fix)
+- antipattern_pass: `/opsx-antipattern-gate` STATUS=PASS
+- antipattern_suspects: PASS_WITH_SUSPECTS (Owner may continue to static)
+- antipattern_fail: FAIL (FIX_EXIT / re-scan; static soft-blocked until Owner continues)
+- antipattern_blocked: missing/invalid `base=` / unknown token / ledger write without GO
+- debt_clear: `/opsx-bug-debt-board` STATUS=CLEAR (spare-slot; not a hard gate; ≠ card-close)
+- debt_found: DEBT_FOUND (pasteable FIX_EXIT; verify/archive are NOT residual close)
 - static_check_done: `/opsx-static-check` synthesized
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
@@ -178,8 +185,8 @@
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
 - artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
-- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
-- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return
+- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; apply soft handoff may omit antipattern (F12 / NOT_OPENED_BUDGET)
 
 ### /opsx-pyright-strict-coverage
 - purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude)
@@ -188,8 +195,8 @@
 - artifacts_read: git diff base...head; pyrightconfig_strict.json
 - artifacts_written: none without GO; with GO only additive include[] entries
 - decision_owner: coverage auditor; include expansion only with owner GO
-- next_typical: /opsx-external-call-coverage | /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
-- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy
+- next_typical: /opsx-external-call-coverage | /opsx-antipattern-gate | /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; contract NEXT may lag antipattern insert (F12)
 
 ### /opsx-external-call-coverage
 - purpose: audit base..head production external-call surfaces (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests per testing-rules
@@ -198,8 +205,8 @@
 - artifacts_read: git diff base...head; app/**; tests/**; testing-rules.mdc; optional EXTERNAL_CALL_COVERAGE_REPORT / change artifacts
 - artifacts_written: none (v1 read-only; chat report / optional pasted EXTERNAL_CALL_COVERAGE_REPORT)
 - decision_owner: coverage auditor for dispositions; archive remains /opsx-verify
-- next_typical: /opsx-performance-review (when trigger applies) | /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
-- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration
+- next_typical: /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
+- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration; NEXT rules beyond opened budget may lag antipattern (F12)
 
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
@@ -208,8 +215,8 @@
 - artifacts_read: scoped git/app Python; optional PERFORMANCE_FIX_RESULT / MEASUREMENT_RESULT
 - artifacts_written: none (chat report / packets only)
 - decision_owner: independent performance reviewer (not fixer self-report)
-- next_typical: /opsx-static-check (PASS|PASS_WITH_RISK|empty/no surfaces) | /opsx-performance-fix + FIX_PACKET (FAIL) | re-run after measurement
-- known_flaws: soft conditional gate (not every-diff hard archive gate); default scope=staged can empty_scope-PASS while working dirty; no /opsx-performance-run
+- next_typical: /opsx-antipattern-gate (PASS|PASS_WITH_RISK|empty/no surfaces) | /opsx-static-check [operator skip / demoted primary] | /opsx-performance-fix + FIX_PACKET (FAIL) | re-run after measurement
+- known_flaws: soft conditional gate (not every-diff hard archive gate); default scope=staged can empty_scope-PASS while working dirty; no /opsx-performance-run; contract NEXT still→static without antipattern (F12)
 
 ### /opsx-performance-fix
 - purpose: apply PERFORMANCE_FIX_PACKET; optional one-shot measurement only under review-issued READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN; never issues independent PASS
@@ -220,6 +227,26 @@
 - decision_owner: fixer (bounded); independent verdict remains /opsx-performance-review
 - next_typical: /opsx-performance-review + PERFORMANCE_FIX_RESULT | measure under auth then review
 - known_flaws: fixer self-report ≠ PASS; no invented /opsx-performance-run; do not strip Queue/Semaphore/Lock/Redis NX/caps without proof
+
+### /opsx-antipattern-gate
+- purpose: diff-scoped antipattern over-report (`base...head`); optional practice ledger via `accept|reject` + GO
+- input_state: external_call_pass | performance_pass | impl_done | product_dirty | antipattern_fail | antipattern_suspects
+- output_state: antipattern_pass | antipattern_suspects | antipattern_fail | antipattern_blocked
+- artifacts_read: git diff base...head; catalog; PRACTICE_LEDGER.jsonl; optional change context
+- artifacts_written: none on SCAN; with accept/reject+GO append-only `.cursor/antipattern-gate/PRACTICE_LEDGER.jsonl`
+- decision_owner: antipattern auditor; ledger write only with Owner GO
+- next_typical: /opsx-static-check (PASS|PASS_WITH_SUSPECTS) | FIX_EXIT / re-scan (FAIL) | /opsx-verify
+- known_flaws: soft gate (not hard archive); over-report intentional; MATCHES_ACCEPTED_PRACTICE ≠ testing-rules proof
+
+### /opsx-bug-debt-board
+- purpose: READ_ONLY cross-case bug debt inventory (INDEX + cases); pasteable recovery exits
+- input_state: anytime (esp. post-GREEN | FANIN | chat-loss | pre-verify spare slot | family_closed)
+- output_state: debt_clear | debt_found | blocked (missing INDEX/cases / bad case=)
+- artifacts_read: `.tmp/opsx-bug-cases/INDEX.md` + case LEDGER/FANIN/findings/HC-*
+- artifacts_written: none (READ_ONLY; never INDEX/LEDGER/close writer)
+- decision_owner: operator picks which debt row; FANIN/close remain other commands
+- next_typical: first HARD_BLOCK / OPEN_CANDIDATE FIX_EXIT | /opsx-bug-team resume | /opsx-claim-next-bug | materialize update | continue planned hop if CLEAR
+- known_flaws: soft only; CLEAR ≠ card-close; verify/archive are NOT residual close while debt open
 
 ### /opsx-close-external-gap
 - purpose: REFACTOR_AND_TEST closure for PG/CH gaps from coverage packet (minimal seam + live integration); no base=
@@ -426,7 +453,7 @@
 
 ### /opsx-static-check
 - purpose: orchestrated FAST/FULL static checks (read-only)
-- input_state: implementing | impl_done | performance_pass | external_call_pass | static_check_done
+- input_state: implementing | impl_done | antipattern_pass | antipattern_suspects | performance_pass | external_call_pass | static_check_done
 - output_state: static_check_done
 - artifacts_read: registry + check outputs
 - artifacts_written: none (read-only)
@@ -478,11 +505,18 @@ apply_ready --/opsx-apply--> implementing|impl_done
 impl_done --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 coverage_pass --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 external_call_pass --/opsx-performance-review [trigger REQUIRED|RECOMMENDED]--> performance_pass|performance_fail|performance_measure_authorized|performance_review_pending
-external_call_pass --/opsx-static-check [trigger NOT_APPLICABLE / operator skip]--> static_check_done
-performance_pass --/opsx-static-check--> static_check_done
+external_call_pass --/opsx-antipattern-gate [perf skipped / NOT_APPLICABLE]--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
+external_call_pass --/opsx-static-check [operator skip only; demoted]--> static_check_done
+performance_pass --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
+# demoted primary (was typical; keep as operator skip only):
+# performance_pass --/opsx-static-check--> static_check_done
+performance_pass --/opsx-static-check [operator skip / demoted primary]--> static_check_done
+antipattern_pass|antipattern_suspects --/opsx-static-check--> static_check_done
+antipattern_fail --FIX_EXIT|/opsx-antipattern-gate re-scan--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
 performance_fail --/opsx-performance-fix--> performance_reaudit_pending|performance_fixing
 performance_reaudit_pending --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
 performance_measure_authorized --/opsx-performance-fix AUTHORIZE_ONE_PERFORMANCE_RUN--> performance_reaudit_pending
+* --/opsx-bug-debt-board [ALSO_OK anytime]--> debt_clear|debt_found
 coverage_pass --/opsx-static-check--> static_check_done
 coverage_gaps --/opsx-pyright-strict-coverage GO|/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 external_call_gaps --/opsx-test--> tests_authored
@@ -492,6 +526,7 @@ external_call_gaps --/opsx-external-call-coverage--> external_call_pass|external
 focus_pass_incomplete_gate --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
 impl_done --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 impl_done --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
+impl_done --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
 impl_done --/opsx-verify--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
@@ -578,7 +613,7 @@ family_learning --/opsx-bug-team CLOSURE--> family_closed
 # resume: /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
-implementing|impl_done|coverage_pass|external_call_pass|performance_pass --/opsx-static-check--> static_check_done
+implementing|impl_done|coverage_pass|external_call_pass|performance_pass|antipattern_pass|antipattern_suspects --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
 # command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
@@ -597,7 +632,8 @@ lifecycle authority.
 After `/opsx-apply` when production Python changed (`app/**/*.py` or
 top-level production scripts): recommend
 `/opsx-pyright-strict-coverage base=<BASE>` before
-`/opsx-external-call-coverage`, `/opsx-static-check`, and `/opsx-verify`.
+`/opsx-external-call-coverage`, optional `/opsx-performance-review`,
+`/opsx-antipattern-gate`, `/opsx-static-check`, and `/opsx-verify`.
 `PASS` pyright-strict alone does **not** prove changed files are in
 `pyrightconfig_strict.json` include. Soft recommend — does not block
 archive by itself.
@@ -607,10 +643,10 @@ archive by itself.
 After pyright-coverage `PASS` (or when allowlist already known good) and
 production `.py` changed: recommend
 `/opsx-external-call-coverage base=<BASE>` before conditional
-`/opsx-performance-review`, `/opsx-static-check`, and `/opsx-verify`. One
-command covers HTTP/WB/PG/CH/Redis/OTHER via kind taxonomy (`focus=`
-optional for debug only). Soft recommend — absence of report does not
-auto-`NO_GO` verify; open gaps in a present
+`/opsx-performance-review`, `/opsx-antipattern-gate`, `/opsx-static-check`,
+and `/opsx-verify`. One command covers HTTP/WB/PG/CH/Redis/OTHER via kind
+taxonomy (`focus=` optional for debug only). Soft recommend — absence of
+report does not auto-`NO_GO` verify; open gaps in a present
 `EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not** replace
 `TEST_COVERAGE_PACKET`.
 
@@ -626,11 +662,31 @@ After external-call `PASS`, when performance trigger applies (DB/query/
 repository; Queue/TasksManager/`run_tasks`/`gather`/`create_task`;
 Semaphore/Lock/Redis NX; pool/cap/rate-limit/retry/backpressure): soft
 recommend `/opsx-performance-review scope=base base=<BASE>` before
-`/opsx-static-check`. Not every-diff mandatory. `FAIL` →
-`/opsx-performance-fix` + FIX_PACKET → independent re-audit via review
-(fixer self-report is never PASS). Measurement only under
-`READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
+`/opsx-antipattern-gate` then `/opsx-static-check`. Not every-diff
+mandatory. `FAIL` → `/opsx-performance-fix` + FIX_PACKET → independent
+re-audit via review (fixer self-report is never PASS). Measurement only
+under `READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
 `/opsx-performance-run`. Operator may skip soft gate (deviation allowed).
+Direct `performance_pass → static-check` is demoted (operator skip only).
+
+### Post-apply antipattern gate
+
+After external-call `PASS` and optional performance
+`PASS|PASS_WITH_RISK|NOT_APPLICABLE` (or when perf skipped): soft recommend
+`/opsx-antipattern-gate base=<BASE>` before `/opsx-static-check` /
+`/opsx-verify`. Over-report by design. `PASS|PASS_WITH_SUSPECTS` →
+static-check (Owner may continue with suspects). `FAIL` → FIX_EXIT /
+re-scan; soft-block static until Owner continues. Soft recommend — not a
+hard archive gate. Optional practice ledger: `accept=` / `reject=` + GO.
+
+### Bug debt board (ALSO_OK anytime)
+
+Anytime (esp. post-GREEN / FANIN / chat-loss / pre-verify spare slot):
+`/opsx-bug-debt-board` surfaces open findings, OPEN_CANDIDATE /
+HARD_BLOCK_READY residuals, CLOSED-with-residual, stale claims with
+pasteable FIX_EXIT. `CLEAR` ≠ card-close. `/opsx-verify` / `/opsx-archive`
+are **not** residual close while debt open. Soft only — not FANIN/INDEX
+writer.
 
 ### Pre-Bugbot primary hunt
 
@@ -817,6 +873,26 @@ command-contract classes (F6).
     applies; FAIL → /opsx-performance-fix + packet → re-audit
   do_not_pretend_fixed: false (closed by this materialization)
 
+- id: F11 GRAPH_MISSING_ANTIPATTERN_AND_BUG_DEBT
+  where: .cursor/pipeline/GRAPH.md (pre 2026-07-30T12:17:37Z UPDATE)
+  symptom: |
+    NAVIGATE could not recommend /opsx-antipattern-gate or
+    /opsx-bug-debt-board; soft chain jumped performance_pass→static_check
+  operator_workaround: |
+    /opsx-antipattern-gate base=<BASE>; spare /opsx-bug-debt-board
+  do_not_pretend_fixed: false (closed by this materialization)
+
+- id: F12 SOFT_CHAIN_CONTRACT_LAG
+  where: opsx-pyright-strict-coverage.md / opsx-performance-review.md vs
+    opsx-antipattern-gate.md soft position
+  symptom: |
+    pyright + performance-review contracts still NEXT → static without
+    antipattern; antipattern contract + owner soft-chain disagree
+  operator_workaround: |
+    follow GRAPH soft chain (antipattern before static); later
+    /opsx-admin-command-fix-command-defects on lagging contracts
+  do_not_pretend_fixed: true
+
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
@@ -840,11 +916,15 @@ command-contract classes (F6).
   `/opsx-pyright-strict-coverage base=<BASE>` then
   `/opsx-external-call-coverage base=<BASE>` then conditional
   `/opsx-performance-review scope=base base=<BASE>` (when trigger applies)
-  before `/opsx-static-check` / `/opsx-verify` (allowlist coverage ≠
-  checker PASS; external-call PASS ≠ archive GO; performance PASS ≠
-  archive GO; kinds stay inside one audit; PG/CH FAIL →
-  `/opsx-close-external-gap` packet-in, not per-dep audit commands;
-  performance FAIL → `/opsx-performance-fix` then independent re-audit)
+  then `/opsx-antipattern-gate base=<BASE>` before `/opsx-static-check` /
+  `/opsx-verify` (allowlist coverage ≠ checker PASS; external-call PASS ≠
+  archive GO; performance PASS ≠ archive GO; antipattern PASS ≠ archive GO;
+  kinds stay inside one audit; PG/CH FAIL → `/opsx-close-external-gap`
+  packet-in, not per-dep audit commands; performance FAIL →
+  `/opsx-performance-fix` then independent re-audit; antipattern FAIL →
+  FIX_EXIT / re-scan)
+- Bug debt: `/opsx-bug-debt-board` ALSO_OK anytime; `CLEAR` ≠ card-close;
+  verify/archive are **not** residual close while debt open
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
