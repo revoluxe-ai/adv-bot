@@ -14,6 +14,11 @@ architecture decisions belong here.
   - Status: Accepted
   - Scope: ownership and placement of mode-specific defaults for paid, free,
     and common policy overlays.
+- [clickhouse-sql-database-qualification](clickhouse-sql-database-qualification/decision.md)
+  - Status: Accepted
+  - Scope: domain invariant — working-contour ClickHouse SQL MUST qualify
+    database as `default_db.<object>` in query text; SQL-contract proof
+    required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
 
 ## Change Requirements
 
