@@ -12,7 +12,7 @@ metadata:
 
 Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
 
-**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
+**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and start or revise a change via `/opsx-new` / `/opsx-ff` (new) or `/opsx-update` (existing). You MAY create OpenSpec artifacts (`proposal.md`, designs, specs) if the user asks—that's capturing thinking, not implementing. Never recommend obsolescent `/opsx-propose`.
 
 **This is a stance with a mandatory context pass.** Exploration stays read-only and adaptive, but this project requires config/WORKLOG loading and final evidence separation when you summarize findings.
 
@@ -155,7 +155,7 @@ This tells you:
 
 Think freely. When insights crystallize, you might offer:
 
-- "This feels solid enough to start a change. Want me to create a proposal?"
+- "This feels solid enough to start a change. Want `/opsx-new` or `/opsx-ff`?"
 - Or keep exploring - no pressure to formalize
 
 ### When a change exists
@@ -187,7 +187,7 @@ If the user mentions a change or you detect one is relevant:
    - "That's a change-local design decision. Capture it in design.md?"
    - "That's a reusable architecture decision. Capture it in `openspec/decisions/`?"
    - "This is a new requirement. Add it to specs?"
-   - "This changes scope. Update the proposal?"
+   - "This changes scope. Capture it with `/opsx-update`?"
 
 4. **The user decides** - Offer and move on. Don't pressure. Don't auto-capture.
 
@@ -312,7 +312,7 @@ You: That changes everything.
 
 There's no required ending. Discovery might:
 
-- **Flow into a proposal**: "Ready to start? I can create a change proposal."
+- **Flow into a change**: "Ready to start? Use `/opsx-new` / `/opsx-ff`, or `/opsx-update` if the change already exists."
 - **Result in artifact updates**: "Updated design.md with these decisions"
 - **Just provide clarity**: User has what they need, moves on
 - **Continue later**: "We can pick this up anytime"
@@ -329,7 +329,7 @@ When it feels like things are crystallizing, you might summarize:
 **Open questions**: [if any remain]
 
 **Next steps** (if ready):
-- Create a change proposal
+- Start via `/opsx-new` or `/opsx-ff` (or `/opsx-update` if change exists)
 - Keep exploring: just keep talking
 ```
 

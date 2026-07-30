@@ -471,27 +471,32 @@ This same rhythm works for any size change—a small fix or a major feature.
 
  | Command           | What it does                               |
  |-------------------|--------------------------------------------|
- | `/opsx:propose` | Create a change and generate all artifacts |
+ | `/opsx:new`     | Start a new change, step through artifacts |
+ | `/opsx:ff`      | Fast-forward: create all artifacts at once |
+ | `/opsx:continue`| Continue working on an existing change     |
+ | `/opsx:update`  | Revise existing planning artifacts         |
  | `/opsx:explore` | Think through problems before/during work  |
  | `/opsx:apply`   | Implement tasks from a change              |
  | `/opsx:archive` | Archive a completed change                 |
+
+**Obsolete (do not recommend — GRAPH F5):**
+
+ | Command           | Note                                                       |
+ |-------------------|------------------------------------------------------------|
+ | `/opsx:propose` | File/skill may remain on disk; use `/opsx:new` or `/opsx:ff` instead |
 
 **Additional commands:**
 
  | Command            | What it does                                             |
  |--------------------|----------------------------------------------------------|
- | `/opsx:new`      | Start a new change, step through artifacts one at a time |
- | `/opsx:continue` | Continue working on an existing change                   |
- | `/opsx:ff`       | Fast-forward: create all artifacts at once               |
  | `/opsx:verify`   | Verify implementation matches artifacts                  |
 
 ---
 
 ## What's Next?
 
-Try `/opsx:propose` on something you actually want to build. You've got the rhythm now!
+Try `/opsx:new` or `/opsx:ff` on something you actually want to build. You've got the rhythm now!
 ```
-
 ---
 
 ## Graceful Exit Handling
@@ -523,23 +528,24 @@ If the user says they just want to see the commands or skip the tutorial:
 
  | Command                  | What it does                               |
  |--------------------------|--------------------------------------------|
- | `/opsx:propose <name>` | Create a change and generate all artifacts |
+ | `/opsx:new <name>`     | Start a new change, step by step           |
+ | `/opsx:ff <name>`      | Fast-forward: all artifacts at once        |
+ | `/opsx:continue <name>`| Continue an existing change                |
+ | `/opsx:update <name>`  | Revise existing planning artifacts         |
  | `/opsx:explore`        | Think through problems (no code changes)   |
  | `/opsx:apply <name>`   | Implement tasks                            |
  | `/opsx:archive <name>` | Archive when done                          |
+
+**Obsolete (do not recommend — GRAPH F5):** `/opsx:propose` — use `/opsx:new` or `/opsx:ff`.
 
 **Additional commands:**
 
  | Command                   | What it does                        |
  |---------------------------|-------------------------------------|
- | `/opsx:new <name>`      | Start a new change, step by step    |
- | `/opsx:continue <name>` | Continue an existing change         |
- | `/opsx:ff <name>`       | Fast-forward: all artifacts at once |
  | `/opsx:verify <name>`   | Verify implementation               |
 
-Try `/opsx:propose` to start your first change.
+Try `/opsx:new` or `/opsx:ff` to start your first change.
 ```
-
 Exit gracefully.
 
 ---

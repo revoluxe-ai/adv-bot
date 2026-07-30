@@ -2,7 +2,26 @@
 name: /opsx-propose
 id: opsx-propose
 category: Workflow
-description: Propose a new change - create it and generate all artifacts in one step
+description: "OBSOLETE (GRAPH F5) — do not recommend; redirect to /opsx-new|/opsx-ff|/opsx-update"
+---
+
+# OBSOLETE — do not recommend (GRAPH F5)
+
+`/opsx-propose` is **obsolescent**. The command file may remain on disk, but
+agents and humans MUST NOT use it as the start path.
+
+**Redirect (mandatory on invoke):**
+
+| Situation | Use instead |
+|---|---|
+| New change (step-by-step) | `/opsx-new` then `/opsx-continue` |
+| New change (all artifacts at once) | `/opsx-ff` |
+| Existing change — revise planning | `/opsx-update` |
+
+On invoke: state the obsolescence, print the redirect table, and **stop** —
+do **not** run `openspec new change`, do **not** write proposal/design/tasks
+via this command. Body below is historical only.
+
 ---
 
 Propose a new change - create the change and generate all artifacts in one step.
