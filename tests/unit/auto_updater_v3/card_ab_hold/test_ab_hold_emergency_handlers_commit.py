@@ -26,6 +26,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldEmergencyConfirm,
     CardAbHoldEmergencyEducate,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.emergency_handlers import (
+    EmergencyEducateAckOutcome,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -57,12 +60,17 @@ def _hold_adv(*, adv_id: int = 55) -> SimpleNamespace:
 async def test_emergency_educate_ack_awaits_session_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Educate ACK мутирует educated — обязан await session.commit()."""
+    """Educate ACK ok → await session.commit() до UX (caller-commit contract)."""
     adv = _hold_adv(adv_id=77)
     session, session_cm = _writable_session(adv)
     monkeypatch.setattr(emergency_handlers, "sm", MagicMock(return_value=session_cm))
+    seam = AsyncMock(
+        return_value=EmergencyEducateAckOutcome(kind="ok", adv=adv)
+    )
     monkeypatch.setattr(
-        emergency_handlers, "is_card_ab_hold_ui_visible", lambda _adv: True
+        emergency_handlers,
+        "acknowledge_emergency_education_in_session",
+        seam,
     )
     monkeypatch.setattr(
         handlers, "_screen_status_text", AsyncMock(return_value="Статус: active")
@@ -74,7 +82,10 @@ async def test_emergency_educate_ack_awaits_session_commit(
     cb = CardAbHoldEmergencyEducate(adv_setting_original_id=77)
     await emergency_handlers.emergency_educate_ack(query, cb)
 
-    assert adv.card_ab_hold_emergency_educated is True
+    seam.assert_awaited_once()
+    assert seam.await_args is not None
+    assert seam.await_args.args[0] is session
+    assert seam.await_args.kwargs["adv_setting_original_id"] == 77
     session.commit.assert_awaited()
 
 

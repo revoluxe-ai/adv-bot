@@ -42,6 +42,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldEmergencyConfirm,
     CardAbHoldEmergencyEducate,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.emergency_handlers import (
+    EmergencyEducateAckOutcome,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
     _screen_keyboard,
 )
@@ -253,6 +256,19 @@ async def test_ensure_budget_passes_latch_gate_when_off() -> None:
     mgr._acquire_lock.assert_awaited_once()
 
 
+def _patch_writable_sm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncMock:
+    """Writable ``sm(read_only=False)`` session для Telegram Emergency handlers."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+    monkeypatch.setattr(emergency_handlers, "sm", MagicMock(return_value=session_cm))
+    return session
+
+
 @pytest.mark.asyncio
 async def test_emergency_abort_does_not_mutate(monkeypatch: pytest.MonkeyPatch) -> None:
     """Spec: Cancel confirm does nothing — apply MUST NOT вызываться."""
@@ -270,6 +286,101 @@ async def test_emergency_abort_does_not_mutate(monkeypatch: pytest.MonkeyPatch) 
     ack = notify.await_args.args[1]
     assert "отменён" in ack.lower()
     assert len(ack) <= _TG_CALLBACK_ANSWER_MAX
+
+
+@pytest.mark.asyncio
+async def test_emergency_educate_ack_happy_path_notifies_and_edits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Educate ACK ok → commit, success notify, screen с emergency_educated=True."""
+    adv = SimpleNamespace(
+        id=77,
+        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+        card_ab_hold_phase=None,
+        card_ab_hold_emergency_latch=False,
+        bot_active=True,
+    )
+    session = _patch_writable_sm(monkeypatch)
+    monkeypatch.setattr(
+        emergency_handlers,
+        "acknowledge_emergency_education_in_session",
+        AsyncMock(return_value=EmergencyEducateAckOutcome(kind="ok", adv=adv)),
+    )
+    notify = AsyncMock()
+    edit = AsyncMock()
+    monkeypatch.setattr(
+        handlers, "_screen_status_text", AsyncMock(return_value="Статус: active")
+    )
+    monkeypatch.setattr(handlers, "_notify_callback_user", notify)
+    monkeypatch.setattr(handlers, "_edit_screen", edit)
+
+    query = MagicMock()
+    cb = CardAbHoldEmergencyEducate(adv_setting_original_id=77)
+    await emergency_handlers.emergency_educate_ack(query, cb)
+
+    session.commit.assert_awaited()
+    notify.assert_awaited_once()
+    ack = notify.await_args.args[1]
+    assert "Emergency доступен" in ack
+    assert len(ack) <= _TG_CALLBACK_ANSWER_MAX
+    edit.assert_awaited_once()
+    assert edit.await_args.kwargs["emergency_educated"] is True
+    assert edit.await_args.kwargs["emergency_latch"] is False
+    assert edit.await_args.args[2] == 77
+
+
+@pytest.mark.asyncio
+async def test_emergency_educate_ack_ui_hidden_skips_commit_and_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ui_hidden → paid-bot deny, без commit и без edit_screen."""
+    session = _patch_writable_sm(monkeypatch)
+    monkeypatch.setattr(
+        emergency_handlers,
+        "acknowledge_emergency_education_in_session",
+        AsyncMock(return_value=EmergencyEducateAckOutcome(kind="ui_hidden")),
+    )
+    notify = AsyncMock()
+    edit = AsyncMock()
+    monkeypatch.setattr(handlers, "_notify_callback_user", notify)
+    monkeypatch.setattr(handlers, "_edit_screen", edit)
+
+    query = MagicMock()
+    cb = CardAbHoldEmergencyEducate(adv_setting_original_id=77)
+    await emergency_handlers.emergency_educate_ack(query, cb)
+
+    session.commit.assert_not_awaited()
+    edit.assert_not_awaited()
+    notify.assert_awaited_once()
+    assert "включённом боте" in notify.await_args.args[1]
+
+
+@pytest.mark.asyncio
+async def test_emergency_educate_ack_not_visible_skips_commit_and_edit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """emergency_not_visible → mode deny, без commit и без edit_screen."""
+    session = _patch_writable_sm(monkeypatch)
+    monkeypatch.setattr(
+        emergency_handlers,
+        "acknowledge_emergency_education_in_session",
+        AsyncMock(
+            return_value=EmergencyEducateAckOutcome(kind="emergency_not_visible")
+        ),
+    )
+    notify = AsyncMock()
+    edit = AsyncMock()
+    monkeypatch.setattr(handlers, "_notify_callback_user", notify)
+    monkeypatch.setattr(handlers, "_edit_screen", edit)
+
+    query = MagicMock()
+    cb = CardAbHoldEmergencyEducate(adv_setting_original_id=77)
+    await emergency_handlers.emergency_educate_ack(query, cb)
+
+    session.commit.assert_not_awaited()
+    edit.assert_not_awaited()
+    notify.assert_awaited_once()
+    assert "режиме A/B Hold" in notify.await_args.args[1]
 
 
 @pytest.mark.asyncio

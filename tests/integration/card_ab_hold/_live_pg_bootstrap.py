@@ -45,6 +45,8 @@ _CARD_AB_HOLD_SM_TARGETS: tuple[str, ...] = (
     "card_ab_hold.telegram.handlers.sm",
     "app.modules.shop_runner.service_manager.services.auto_updater_v3."
     "card_ab_hold.telegram.confirm_handlers.sm",
+    "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+    "card_ab_hold.telegram.emergency_handlers.sm",
 )
 
 # Активная schema для текущего bootstrap-контекста (search_path).
@@ -315,6 +317,34 @@ def ensure_post_epoch_schema_for_orm(db_url: str) -> None:
     ensure_keywordsetting_stub(db_url)
 
 
+def ensure_emergency_latch_columns(db_url: str) -> None:
+    """Применить ``f2a3b4c5d6e7`` (emergency latch + educated) на disposable schema.
+
+    Вызывать после ``ensure_post_epoch_schema_for_orm`` (parent revision
+    ``d0e1f2a3b4c5``). Не трогает production ``public``.
+    """
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    from alembic_.versions.f2a3b4c5d6e7_add_card_ab_hold_emergency_latch import (
+        upgrade as emergency_upgrade,
+    )
+
+    engine = create_validated_sync_engine(db_url)
+    with engine.begin() as conn:
+        ctx = MigrationContext.configure(conn)
+        with Operations.context(ctx):
+            emergency_upgrade()
+        conn.execute(text("UPDATE alembic_version SET version_num = 'f2a3b4c5d6e7'"))
+    engine.dispose()
+
+
+def ensure_post_epoch_with_emergency_schema_for_orm(db_url: str) -> None:
+    """Post-epoch + Emergency latch/educated columns для ORM writers."""
+    ensure_post_epoch_schema_for_orm(db_url)
+    ensure_emergency_latch_columns(db_url)
+
+
 def insert_adv_row(
     db_url: str,
     *,
@@ -484,6 +514,23 @@ def fetch_adv_degraded_flag(db_url: str, adv_setting_id: int) -> bool:
             text(
                 """
                 SELECT card_ab_hold_degraded
+                FROM advsetting WHERE id = :id
+                """
+            ),
+            {"id": adv_setting_id},
+        ).scalar_one()
+    engine.dispose()
+    return bool(value)
+
+
+def fetch_emergency_educated_flag(db_url: str, adv_setting_id: int) -> bool:
+    """Re-read durable ``card_ab_hold_emergency_educated`` after educate ACK."""
+    engine = create_validated_sync_engine(db_url)
+    with engine.connect() as conn:
+        value = conn.execute(
+            text(
+                """
+                SELECT card_ab_hold_emergency_educated
                 FROM advsetting WHERE id = :id
                 """
             ),

@@ -573,3 +573,133 @@ def test_live_pg_bootstrap_wbcabinet_stub_covers_orm_joined_columns() -> None:
     ):
         assert col in ddl, f"missing ORM column in wbcabinet stub: {col}"
     assert "live_pg_stub_shop" in ddl
+
+
+@pytest.mark.unit
+def test_live_pg_bootstrap_patches_emergency_handlers_sm() -> None:
+    """Disposable schema patch MUST cover emergency_handlers.sm (educate WRITE)."""
+    from tests.integration.card_ab_hold import _live_pg_bootstrap as boot
+
+    assert any(
+        target.endswith("emergency_handlers.sm")
+        for target in boot._CARD_AB_HOLD_SM_TARGETS
+    )
+
+
+@pytest.mark.unit
+def test_live_pg_bootstrap_fetch_emergency_educated_flag_reselects_column() -> None:
+    """Shared re-read helper executes SELECT of ``card_ab_hold_emergency_educated``."""
+    from sqlalchemy.sql.elements import TextClause
+
+    from tests.integration.card_ab_hold import _live_pg_bootstrap as boot
+
+    executed: list[Any] = []
+    conn = MagicMock()
+
+    def _execute(stmt: Any, params: Any = None) -> MagicMock:
+        executed.append((stmt, params))
+        result = MagicMock()
+        result.scalar_one = MagicMock(return_value=True)
+        return result
+
+    conn.execute = MagicMock(side_effect=_execute)
+    engine = MagicMock()
+    engine.connect.return_value.__enter__ = MagicMock(return_value=conn)
+    engine.connect.return_value.__exit__ = MagicMock(return_value=None)
+    engine.dispose = MagicMock()
+
+    with patch.object(boot, "create_validated_sync_engine", return_value=engine):
+        assert (
+            boot.fetch_emergency_educated_flag(
+                "postgresql://u:p@localhost/testdb", 77
+            )
+            is True
+        )
+
+    assert executed, "fetch_emergency_educated_flag MUST execute a SELECT"
+    stmt, params = executed[0]
+    assert isinstance(stmt, TextClause)
+    sql = str(stmt)
+    assert "card_ab_hold_emergency_educated" in sql
+    assert "advsetting" in sql.lower()
+    assert params == {"id": 77}
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_emergency_educate_ack_hands_off_write_session_to_in_session_child() -> None:
+    """``emergency_educate_ack`` → ``acknowledge_emergency_education_in_session``."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
+        emergency_handlers,
+        handlers,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
+        CardAbHoldEmergencyEducate,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.emergency_handlers import (
+        EmergencyEducateAckOutcome,
+    )
+
+    fake_session = MagicMock(name="emergency_educate_session")
+    fake_session.commit = AsyncMock()
+    adv = SimpleNamespace(
+        id=77,
+        card_ab_hold_mode="active",
+        card_ab_hold_phase=None,
+        card_ab_hold_emergency_latch=False,
+    )
+    child = AsyncMock(
+        return_value=EmergencyEducateAckOutcome(kind="ok", adv=adv)
+    )
+    sm_mock = MagicMock(return_value=_session_cm(fake_session))
+    with (
+        patch.object(emergency_handlers, "sm", sm_mock),
+        patch.object(
+            emergency_handlers, "acknowledge_emergency_education_in_session", child
+        ),
+        patch.object(
+            handlers, "_screen_status_text", AsyncMock(return_value="Статус: active")
+        ),
+        patch.object(handlers, "_notify_callback_user", AsyncMock()),
+        patch.object(handlers, "_edit_screen", AsyncMock()),
+    ):
+        query = MagicMock()
+        cb = CardAbHoldEmergencyEducate(adv_setting_original_id=77)
+        await emergency_handlers.emergency_educate_ack(query, cb)
+
+    _assert_child_got_session(
+        child, fake_session, read_only=False, sm_mock=sm_mock
+    )
+    fake_session.commit.assert_awaited()
+    assert child.await_args is not None
+    assert child.await_args.kwargs["adv_setting_original_id"] == 77
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_acknowledge_emergency_education_in_session_marks_educated() -> None:
+    """Child seam: UI visible + Hold mode → mark educated on AdvSetting."""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+        CardAbHoldMode,
+    )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
+        emergency_handlers,
+    )
+
+    adv = SimpleNamespace(
+        id=77,
+        bot_active=True,
+        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+        card_ab_hold_emergency_educated=False,
+    )
+    session = AsyncMock()
+    session.get = AsyncMock(return_value=adv)
+
+    outcome = await emergency_handlers.acknowledge_emergency_education_in_session(
+        session, adv_setting_original_id=77
+    )
+
+    assert outcome.kind == "ok"
+    assert outcome.adv is adv
+    assert adv.card_ab_hold_emergency_educated is True
+    session.get.assert_awaited_once()
