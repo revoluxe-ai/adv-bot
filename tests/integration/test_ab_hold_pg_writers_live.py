@@ -40,6 +40,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_apply import (
     apply_ab_hold_setup_mutations,
+    persist_ab_hold_degraded_flag,
+    persist_ab_hold_degraded_flag_in_session,
+    sm as setup_apply_sm,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
     CardAbHoldDisable,
@@ -61,6 +64,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from tests.integration.card_ab_hold._live_pg_bootstrap import (
     disposable_ab_hold_schema,
     ensure_post_epoch_schema_for_orm,
+    fetch_adv_degraded_flag,
     fetch_adv_epoch_row,
     fetch_keyword_row,
     insert_adv_row,
@@ -459,3 +463,41 @@ async def test_live_pg_back_load_adv_setting_for_menu_path(
     assert adv is not None
     assert int(adv.id) == adv_setting_id
     assert int(adv.adv_id) == 9109
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_persist_ab_hold_degraded_flag_write_and_clear(
+    live_db_url: str,
+) -> None:
+    """``persist_ab_hold_degraded_flag`` WRITE ``sm(read_only=False)`` + SQL re-read.
+
+    Parent → ``persist_ab_hold_degraded_flag_in_session``; self-heal False clears
+    the durable flag after True.
+    """
+    adv_setting_id = insert_adv_row(
+        live_db_url,
+        adv_setting_id=110,
+        adv_id=9110,
+        mode=CardAbHoldMode.ACTIVE.value,
+        phase=CardAbHoldPhase.READY_ACTIVE.value,
+        bot_active=True,
+    )
+    assert fetch_adv_degraded_flag(live_db_url, adv_setting_id) is False
+
+    async with patched_async_session_maker(live_db_url):
+        await persist_ab_hold_degraded_flag(
+            adv_setting_id=adv_setting_id, degraded=True
+        )
+        assert fetch_adv_degraded_flag(live_db_url, adv_setting_id) is True
+
+        async with setup_apply_sm(read_only=False) as session:
+            await persist_ab_hold_degraded_flag_in_session(
+                session, adv_setting_id=adv_setting_id, degraded=False
+            )
+        assert fetch_adv_degraded_flag(live_db_url, adv_setting_id) is False
+
+        await persist_ab_hold_degraded_flag(
+            adv_setting_id=adv_setting_id, degraded=False
+        )
+    assert fetch_adv_degraded_flag(live_db_url, adv_setting_id) is False

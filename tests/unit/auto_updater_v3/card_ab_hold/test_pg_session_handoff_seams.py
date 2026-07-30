@@ -70,6 +70,13 @@ def test_setup_apply_and_intent_parents_hand_off_session() -> None:
         setup_apply.apply_ab_hold_setup_mutations_in_session
     ).parameters
 
+    degraded_src = inspect.getsource(setup_apply.persist_ab_hold_degraded_flag)
+    assert "sm(read_only=False)" in degraded_src
+    assert "persist_ab_hold_degraded_flag_in_session" in degraded_src
+    assert "session" in inspect.signature(
+        setup_apply.persist_ab_hold_degraded_flag_in_session
+    ).parameters
+
     intent_src = inspect.getsource(epoch_pipelines.apply_confirmed_intent_to_pg)
     assert "sm(read_only=False)" in intent_src
     assert "apply_confirmed_intent_to_pg_in_session" in intent_src
@@ -142,3 +149,13 @@ def test_live_pg_bootstrap_awaits_async_engine_dispose() -> None:
     assert "await engine.dispose()" in src
     assert "sync_engine.dispose" not in src
     assert "@asynccontextmanager" in inspect.getsource(boot)
+
+
+@pytest.mark.unit
+def test_live_pg_bootstrap_fetch_adv_degraded_flag_reselects_column() -> None:
+    """Shared re-read helper для ``persist_ab_hold_degraded_flag`` live evidence."""
+    from tests.integration.card_ab_hold import _live_pg_bootstrap as boot
+
+    src = inspect.getsource(boot.fetch_adv_degraded_flag)
+    assert "card_ab_hold_degraded" in src
+    assert "advsetting" in src

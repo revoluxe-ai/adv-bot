@@ -458,6 +458,23 @@ def fetch_adv_epoch_row(db_url: str, adv_setting_id: int) -> Any:
     return row
 
 
+def fetch_adv_degraded_flag(db_url: str, adv_setting_id: int) -> bool:
+    """Re-read durable ``card_ab_hold_degraded`` for live PG writer evidence."""
+    engine = create_validated_sync_engine(db_url)
+    with engine.connect() as conn:
+        value = conn.execute(
+            text(
+                """
+                SELECT card_ab_hold_degraded
+                FROM advsetting WHERE id = :id
+                """
+            ),
+            {"id": adv_setting_id},
+        ).scalar_one()
+    engine.dispose()
+    return bool(value)
+
+
 def fetch_keyword_row(db_url: str, keyword_id: int) -> Any:
     """Re-read keywordsetting hard_status / strategy_mode / target_place."""
     engine = create_validated_sync_engine(db_url)
