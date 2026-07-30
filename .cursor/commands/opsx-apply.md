@@ -181,14 +181,22 @@ this change to a durable case):
        `create_task`; Semaphore/Lock/Redis NX; pool/cap/rate-limit/
        retry/backpressure; или неоднозначный hot async path) →
        `/opsx-performance-review scope=base base=<BASE>`;
-     - иначе → `/opsx-static-check`;
+     - иначе → `/opsx-antipattern-gate base=<BASE>`;
      - после performance `PASS` | `PASS_WITH_RISK` (или
-       `NOT_APPLICABLE` / empty surfaces) → `/opsx-static-check`,
+       `NOT_APPLICABLE` / empty surfaces) →
+       `/opsx-antipattern-gate base=<BASE>`;
+     - после antipattern-gate `PASS` | `PASS_WITH_SUSPECTS`
+       (Owner may continue with suspects) → `/opsx-static-check`,
        затем `/opsx-verify <change-name>`.
    - Performance review **не** обязателен для каждого diff
      (docs/typing-only / нерелевантный tests-only → skip).
+   - Antipattern-gate — soft over-report; не archive gate. `FAIL` →
+     fix pasteable exit или `accept=`/`reject=` practice ledger, затем
+     re-run `/opsx-antipattern-gate base=<BASE>`.
 2. Иначе (нет in-policy production `.py`):
    - Primary: `/opsx-verify <change-name>`.
+   - Если в diff есть `tests/**` / process surfaces — soft recommend
+     `/opsx-antipattern-gate base=<BASE> focus=tests|process` before verify.
 
 Не объявляй archive readiness из apply.
 Не объявляй bug-card closed из apply.
@@ -228,11 +236,14 @@ If production Python changed (`app/**/*.py` or top-level production scripts):
   Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
   Then: `/opsx-performance-review scope=base base=<BASE>` when trigger applies
         (else skip)
-  Then: `/opsx-static-check` (after external-call PASS, and after performance
-        PASS|PASS_WITH_RISK when review ran)
+  Then: `/opsx-antipattern-gate base=<BASE>` (after external-call PASS, and
+        after performance PASS|PASS_WITH_RISK when review ran)
+  Then: `/opsx-static-check` (after antipattern-gate PASS|PASS_WITH_SUSPECTS)
   Then: `/opsx-verify <change-name>`
 Else:
   Next: `/opsx-verify <change-name>`
+  Soft: `/opsx-antipattern-gate base=<BASE> focus=tests|process` when those
+        paths changed
 
 Do not claim archive readiness from apply alone.
 ```
