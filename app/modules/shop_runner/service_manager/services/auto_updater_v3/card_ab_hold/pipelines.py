@@ -344,3 +344,39 @@ async def process_ab_hold(
         adv_id=int(complex_adv.adv_id),
         keyword_ids=off_ids,
     )
+
+
+async def process_ab_setup_then_epoch(
+    complex_adv: "ComplexAdv",
+    *,
+    wb_shop_data_manager: "WBShopDataManager",
+    wb_manager_hub: "WBManagerHub",
+    stats_fresh: bool = True,
+) -> None:
+    """Один handler: setup, затем epoch для той же кампании (serial same-adv).
+
+    Снижает давление на ``run_tasks`` (1 слот вместо 2) и гарантирует порядок
+    FAIL→OFF setup перед epoch tick. ``CardAbHoldSetupLock`` остаётся внутри
+    ``process_ab_setup``; epoch выполняется после его release.
+
+    Args:
+        complex_adv: кампания shop-runner.
+        wb_shop_data_manager: контекст shop-runner.
+        wb_manager_hub: WB write-path.
+        stats_fresh: прокидывается в ``process_ab_epoch``.
+    """
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_pipelines import (
+        process_ab_epoch,
+    )
+
+    await process_ab_setup(
+        complex_adv,
+        wb_shop_data_manager=wb_shop_data_manager,
+        wb_manager_hub=wb_manager_hub,
+    )
+    await process_ab_epoch(
+        complex_adv,
+        wb_shop_data_manager=wb_shop_data_manager,
+        wb_manager_hub=wb_manager_hub,
+        stats_fresh=stats_fresh,
+    )
