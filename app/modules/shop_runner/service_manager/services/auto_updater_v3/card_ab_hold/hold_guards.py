@@ -10,9 +10,10 @@ Owner A_PRIME / PBH-002: symmetric ``pfo_recovery`` / ``return_on`` /
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -160,37 +161,121 @@ async def apply_ab_hold_overspend_offs(
     return len(keyword_ids)
 
 
+def _normalize_confirmed_target_places(
+    confirmed_target_places: Mapping[int | str, int] | None,
+    keyword_ids: list[int],
+) -> dict[int, int]:
+    """Собрать id→TP из SoT-карты для recovery_on (PBH-009).
+
+    Ключи карты — ``KeywordSetting.id`` (int или str). Ids вне
+    ``keyword_ids`` игнорируются; отсутствующий TP для id означает, что
+    колонка ``target_place`` в этом UPDATE не пишется.
+
+    Args:
+        confirmed_target_places: epoch confirmed JSON SoT (id→TP) или None.
+        keyword_ids: ids, для которых выполняется return_on.
+
+    Returns:
+        Подмножество id→int(target_place) только для восстанавливаемых ids.
+    """
+    if not confirmed_target_places:
+        return {}
+    out: dict[int, int] = {}
+    for raw_id in keyword_ids:
+        ks_id = int(raw_id)
+        place = confirmed_target_places.get(ks_id)
+        if place is None:
+            place = confirmed_target_places.get(str(ks_id))
+        if place is None:
+            continue
+        out[ks_id] = int(place)
+    return out
+
+
+async def apply_ab_hold_pfo_recovery_ons_in_session(
+    session: AsyncSession,
+    *,
+    keyword_ids: list[int],
+    confirmed_target_places: Mapping[int | str, int] | None = None,
+) -> int:
+    """Persist return_on / recovery_on в переданной PG session (A_PRIME auto_on).
+
+    Parent orchestration открывает WRITE session maker и передаёт session
+    сюда — injectable seam для live PG integration evidence.
+
+    PBH-009: после overspend OFF (``target_place=None``) recovery MUST
+    восстановить confirmed ``target_place`` из epoch SoT-карты, иначе bidder
+    уходит в ``snap_to_min``.
+
+    Args:
+        session: injectable async session (WRITE / commit).
+        keyword_ids: keyword_setting ids to restore_on (MIN_CPA).
+        confirmed_target_places: id→confirmed TP из
+            ``card_ab_hold_confirmed_target_places_json`` (после резолва
+            text→id на call site). ``None``/пусто — TP не трогаем.
+
+    Returns:
+        Число обновлённых id (0 если список пуст).
+    """
+    if not keyword_ids:
+        return 0
+    on_hs = hard_status_for_strategy_mode(_AB_HOLD_RECOVERY_ON_MODE)
+    id_to_place = _normalize_confirmed_target_places(
+        confirmed_target_places, keyword_ids
+    )
+    # Group by restored TP (None = leave column untouched) for O(distinct places)
+    # round-trips; literals keep Update._values inspectable (unit contract).
+    by_place: dict[int | None, list[int]] = {}
+    for ks_id in keyword_ids:
+        place = id_to_place.get(int(ks_id))
+        by_place.setdefault(place, []).append(int(ks_id))
+    for place, ids in by_place.items():
+        values: dict[str, object] = {
+            "hard_status": on_hs,
+            "strategy_mode": _AB_HOLD_RECOVERY_ON_MODE,
+        }
+        if place is not None:
+            values["target_place"] = place
+        stmt_return_on = (
+            update(KeywordSetting)
+            .where(KeywordSetting.id.in_(ids))
+            .values(**values)
+        )
+        _ = await session.execute(stmt_return_on)
+    await session.commit()
+    return len(keyword_ids)
+
+
 async def apply_ab_hold_pfo_recovery_ons(
     *,
     adv_id: int,
     keyword_ids: list[int],
+    confirmed_target_places: Mapping[int | str, int] | None = None,
 ) -> int:
     """Persist return_on / recovery_on after PFO recovers (A_PRIME auto_on).
+
+    Parent WRITE seam: ``sm(read_only=False)`` →
+    ``apply_ab_hold_pfo_recovery_ons_in_session``.
 
     Args:
         adv_id: campaign id (logging).
         keyword_ids: keyword_setting ids to restore_on (MIN_CPA).
+        confirmed_target_places: id→confirmed TP SoT (PBH-009); optional.
 
     Returns:
         Число обновлённых id.
     """
     if not keyword_ids:
         return 0
-    on_hs = hard_status_for_strategy_mode(_AB_HOLD_RECOVERY_ON_MODE)
     async with sm(read_only=False) as session:
-        stmt_return_on = (
-            update(KeywordSetting)
-            .where(KeywordSetting.id.in_(keyword_ids))
-            .values(
-                hard_status=on_hs,
-                strategy_mode=_AB_HOLD_RECOVERY_ON_MODE,
-            )
+        updated = await apply_ab_hold_pfo_recovery_ons_in_session(
+            session,
+            keyword_ids=keyword_ids,
+            confirmed_target_places=confirmed_target_places,
         )
-        _ = await session.execute(stmt_return_on)
-        await session.commit()
     logger.info(
         "[adv_id=%s] ab_hold pfo_recovery return_on count=%s",
         adv_id,
-        len(keyword_ids),
+        updated,
     )
-    return len(keyword_ids)
+    return updated
