@@ -370,9 +370,12 @@ def _validate_ch_preflight() -> None:
 
 
 def _run_pg_schema_bootstrap() -> None:
-    """Session-once PG DROP/CREATE + create_all + baseline seed."""
-    import asyncio
+    """Session-once PG DROP/CREATE + create_all + baseline seed.
 
+    Вызывается из sync ``ensure_resources``; может идти из-под async fixture —
+    поэтому не ``asyncio.run`` напрямую (см. ``run_awaitable_from_sync``).
+    """
+    from tests.support.destructive_lifecycle import run_awaitable_from_sync
     from tests.support.destructive_pg_reset import init_postgres_schema_and_seed
 
     async def _run() -> None:
@@ -382,18 +385,21 @@ def _run_pg_schema_bootstrap() -> None:
         finally:
             await engine.dispose()
 
-    asyncio.run(_run())
+    run_awaitable_from_sync(_run())
 
 
 def _run_ch_schema_bootstrap() -> None:
-    """Session-once ClickHouse DDL через temporary validated client."""
-    import asyncio
+    """Session-once ClickHouse DDL через temporary validated client.
 
+    См. ``_run_pg_schema_bootstrap``: bridge обязателен при вызове из
+    async ``clickhouse_client`` → ``ensure_resources``.
+    """
     from tests.support.destructive_ch_reset import apply_clickhouse_session_ddl
     from tests.support.destructive_clickhouse import (
         ALLOWED_CH_DATABASE,
         create_validated_async_clickhouse_client,
     )
+    from tests.support.destructive_lifecycle import run_awaitable_from_sync
 
     async def _run() -> None:
         client = await create_validated_async_clickhouse_client(
@@ -410,8 +416,7 @@ def _run_ch_schema_bootstrap() -> None:
         finally:
             client.close()
 
-    asyncio.run(_run())
-
+    run_awaitable_from_sync(_run())
 
 def _build_test_infra_lifecycle():
     """Собрать session-owned lifecycle с runners из conftest."""

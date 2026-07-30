@@ -6,7 +6,9 @@
 * validation/marker/opt-in/tunnels — до любых Docker/engine/client side effects;
 * selective services: PG-only / CH-only / mixed;
 * deterministic policy errors — NON_RETRYABLE (без sleep/retry);
-* data reset — function-scoped, отдельно от schema bootstrap.
+* data reset — function-scoped, отдельно от schema bootstrap;
+* sync schema runners вызываемые из async fixtures — через
+  ``run_awaitable_from_sync`` (не nested ``asyncio.run``).
 
 Не выполняет real Docker/PG/CH сам по себе без injected runners —
 удобно для mock-only unit coverage.
@@ -14,12 +16,43 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import os
 import time
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypeVar
+
+_T = TypeVar("_T")
+
+
+def run_awaitable_from_sync(awaitable: Awaitable[_T]) -> _T:
+    """Выполнить awaitable из sync-кода, даже если уже есть running event loop.
+
+    Session schema bootstrap (``init_pg_schema`` / ``init_ch_schema``) вызывается
+    из sync ``TestInfraLifecycle.ensure_resources``, а тот — из async fixtures
+    (``clickhouse_client``, …). Прямой ``asyncio.run`` в running loop →
+    ``RuntimeError``. При отсутствии loop — обычный ``asyncio.run``; при
+    наличии — отдельный thread + новый loop (без ``nest_asyncio``).
+
+    Args:
+        awaitable: корутина / awaitable для однократного запуска.
+
+    Returns:
+        Результат awaitable.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(awaitable)
+
+    def _in_thread() -> _T:
+        return asyncio.run(awaitable)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_in_thread).result()
 
 # --- Fixture / resource registries -------------------------------------------------
 
