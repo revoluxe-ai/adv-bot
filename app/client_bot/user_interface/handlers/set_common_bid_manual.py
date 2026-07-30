@@ -1,4 +1,9 @@
-"""Ручная установка общей ставки в поисковой (аукционной) кампании."""
+"""Ручная установка общей ставки в поисковой (аукционной) кампании.
+
+Ordinary Telegram SetCommonBids / ``update_search_adv_common_cpm`` — Allowed OFF
+only. При ``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``)
+ручное изменение общей ставки блокируется так же, как TP в keyword_settings.
+"""
 
 import asyncio
 import logging
@@ -21,6 +26,9 @@ from app.core.mp.wb.api.adapter.promotion_client.common_bids.command import (
     SetCommonBidsCommandItem,
 )
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from app.modules.shop_runner.service_manager.services.update_commot_bid_in_search_advs_manager.redis_common_bid_timestamp_manager import (
     RedisCommonBidTimestampManager,
 )
@@ -38,6 +46,11 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 MAX_BID_RUB = 3000
+
+AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG = (
+    "Кампания в режиме A/B Hold — изменение общей ставки запрещено. "
+    "Чтобы изменить ставку, выключите A/B Hold на экране режима."
+)
 
 
 async def _reload_adv_setting_menu(
@@ -97,6 +110,10 @@ async def set_common_bid_manual_start(
 
     if not adv_setting:
         await bot.send_message(chat_id, "Кампания не найдена.")
+        return
+
+    if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+        await bot.send_message(chat_id, AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG)
         return
 
     if not adv_setting.search_adv_id:
@@ -232,6 +249,11 @@ async def set_common_bid_manual_apply(
     if not adv_setting or not adv_setting.search_adv_id:
         await state.set_state(None)
         await message.answer("Кампания не найдена или нет поисковой РК.")
+        return
+
+    if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+        await state.set_state(None)
+        await message.answer(AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG)
         return
 
     search_adv_id = adv_setting.search_adv_id

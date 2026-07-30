@@ -718,6 +718,12 @@ async def change_keyword_hard_status(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
+    """Меняет hard_status ключа; под A/B Hold structural freeze — отказ.
+
+    При ``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``)
+    hard_status / ``sync_keyword_setting_mode_for_v3`` / commit не выполняются
+    (peer: ``keyword_target_place_value``).
+    """
     # TODO Показать ключи в в не индекса - не работает
     # TODO: Не работает кнопка Скрыть не релевантные фразы
     # TODO: Тестировать дальше - не работает!!!!
@@ -734,6 +740,14 @@ async def change_keyword_hard_status(
             keyword_setting: KeywordSetting | None = keyword_setting.scalar() # noqa
             assert keyword_setting
             adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
+            if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+                await bot.send_message(
+                    callback.message.chat.id,
+                    "Кампания в режиме A/B Hold — статус ключа "
+                    "заморожен. Чтобы изменить статус, выключите A/B Hold "
+                    "на экране режима.",
+                )
+                return
             if new_hard_status >= 0:
                 keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
                 _ = sync_keyword_setting_mode_for_v3(
