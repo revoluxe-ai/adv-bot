@@ -27,7 +27,7 @@ smell). Default — **over-report**: лучше лишний `SUSPECT`, чем �
 * NOT archive `GO` / `NO_GO` (→ `/opsx-verify`).
 * NOT запуск pyright/mypy/pytest (→ `/opsx-static-check`).
 * NOT external-call coverage (→ `/opsx-external-call-coverage`).
-* NOT bug residual / OPEN_CANDIDATE board (→ future debt-board / INDEX).
+* NOT bug residual / OPEN_CANDIDATE board (→ `/opsx-bug-debt-board` / INDEX).
 * NOT auto-edit of `.cursor/rules/testing-rules.mdc` (promote separately).
 * NOT product bug hunt (→ `/opsx-project-bug-hunt` / `/opsx-fix-bug`).
 

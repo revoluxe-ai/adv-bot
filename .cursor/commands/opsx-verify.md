@@ -134,8 +134,14 @@ ROUTE_STATE, or tasks mention `BUGCASE-…`):
    `/opsx-test case=… finding=… verify` or
    `/opsx-bug-team case=… mode=resume-family-fanout` or
    `/opsx-materialize-bug-queue mode=update … close=fixed` (solo only).
+6. Soft recommend cross-case debt inventory (does not change GO/NO_GO alone):
+   `/opsx-bug-debt-board case=<CASE_ID>` when a linked case is known, else
+   `/opsx-bug-debt-board` when `.tmp/opsx-bug-cases/INDEX.md` exists.
+   Surface CLOSED_WITH_RESIDUAL / OPEN_CANDIDATE / HARD_BLOCK_READY debt
+   in the soft linked-cards section if the board would show rows.
 
-Absence of a linked case → skip this section.
+Absence of a linked case → skip this section (still soft-recommend
+`/opsx-bug-debt-board` when INDEX exists and change is bug-adjacent).
 
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
@@ -790,6 +796,7 @@ Blockers:
 ## Linked bug cards (soft)
 - none | OPEN_LINKED_FINDINGS: …
 - ALSO_OK handback/close pasteables if any:
+- Soft debt board: /opsx-bug-debt-board [case=<CASE_ID>] (if INDEX/case present)
 
 ## Следующая команда
 /opsx-archive <change-name>
@@ -809,6 +816,7 @@ Other allowed next commands for blockers:
 manual fix
 /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 /opsx-test case=<CASE_ID> finding=<FINDING_ID> verify
+/opsx-bug-debt-board case=<CASE_ID>
 ```
 
 Не создавай новый top-level output section для test coverage.

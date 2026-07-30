@@ -188,7 +188,7 @@ Rules:
 * `LEDGER.md` is the operational source of truth for finding status and claim eligibility.
 * `findings/<FINDING_ID>.md` holds either a working packet or a closed false-positive record.
 * `handoffs/COMMON_HANDOFF.md` is the short shared handoff for new chats.
-* `INDEX.md` is the cross-case recovery board and status board for forgotten, claimed, blocked, backlog, open findings, and open hunt candidates (`OPEN_CANDIDATES`, including SAME_INVARIANT residuals that HARD_BLOCK READY).
+* `INDEX.md` is the cross-case recovery board and status board for forgotten, claimed, blocked, backlog, open findings, and open hunt candidates (`OPEN_CANDIDATES`, including SAME_INVARIANT residuals that HARD_BLOCK READY). Operator front-door to **read** that debt without rewriting INDEX: `/opsx-bug-debt-board`.
 
 ## INTAKE object
 
