@@ -22,8 +22,10 @@ audit command.
 * Grounded in **this** project's architecture decisions, write-path rules,
   shop-runner / Redis / ClickHouse / WB / Telegram contracts, and the learning
   checklist below.
-* Producer of structured findings that enter the durable case map via
-  `/opsx-materialize-bug-queue mode=intake` (same consumer path as Bugbot).
+* Producer of structured findings that enter the durable case map. Primary
+  entry when bug-team is ACTIVE: `/opsx-bug-team` (free-form / RAW_REPORT;
+  team materializes). Else: `/opsx-materialize-bug-queue mode=intake` or
+  `/opsx-fix-bug` WITHOUT GO (first-run intake) — same consumer case map.
 
 ## What this is NOT
 
@@ -71,7 +73,8 @@ READ_ONLY discovery:
 * do not create branches or worktrees;
 * output structured findings + pasteable next actions;
 * may write nothing to disk except what the human later pastes into
-  materialize (prefer chat-structured intake packets).
+  `/opsx-bug-team` or alternate intake (prefer chat-structured finding
+  packets).
 
 ### `GO`
 
@@ -144,8 +147,9 @@ not invent ADLs.
 | Primary project discovery pre-PR | **`/opsx-project-bug-hunt`** (this) |
 | Same-invariant siblings after known root | `/opsx-bug-hunt` |
 | Fan-out of root-aware hunt | `/opsx-fanout-bug-hunt` |
-| Raw durable record | `/opsx-materialize-bug-queue` |
-| Claim / fix | `/opsx-claim-next-bug` → `/opsx-fix-bug` |
+| Orchestrated full bug entry (when ACTIVE) | **`/opsx-bug-team`** (`DEFAULT_FULL_BUG_ENTRY`) |
+| Raw durable record (alternate / team-off) | `/opsx-materialize-bug-queue` or `/opsx-fix-bug` WITHOUT GO intake |
+| Claim / fix (manual queue path) | `/opsx-claim-next-bug` → `/opsx-fix-bug` |
 | Residual external review | **Bugbot** (safety net) |
 | Miss reached Bugbot (product/logic) | `/opsx-learn-from-bug` → update **this** checklist |
 | Process-contract Bugbot (F6) | `/opsx-admin-command-fix-command-defects` |
@@ -260,10 +264,21 @@ FINDINGS:
 - SEPARATE_ADJUDICATION_REQUIRED: true|false
 - SUGGESTED_INTAKE_TITLE:
 
-MATERIALIZE_HANDOFF:
-- for each SEPARATE_ADJUDICATION_REQUIRED=true finding, pasteable:
+BUG_TEAM_HANDOFF (PRIMARY when ACTIVE):
+- Read `.cursor/pipeline/bug-team/ACTIVATION.json` (exact path).
+- If `RUNTIME_STATUS == ACTIVE`, for each SEPARATE_ADJUDICATION_REQUIRED=true
+  finding, pasteable primary:
+  /opsx-bug-team
+  (RAW_REPORT / structured finding block as free-form raw envelope;
+  team materializes — no prerequisite materialize or fix-bug)
+
+ALTERNATE_INTAKE_HANDOFF (when team not ACTIVE, or owner escape hatch):
+- for each SEPARATE_ADJUDICATION_REQUIRED=true finding, pasteable either:
   /opsx-materialize-bug-queue mode=intake
-  (with RAW_REPORT = structured finding block above)
+  or
+  /opsx-fix-bug
+  WITHOUT GO (first-run / intake mode only; with RAW_REPORT)
+  Never `/opsx-fix-bug GO` from this hunt.
 
 ROOT_AWARE_FOLLOWUP:
 - if a finding needs same-invariant sibling expansion after first fix:
@@ -281,11 +296,19 @@ DO_NOT_DO_YET:
 
 ### Handoff rules
 
-* Primary next for new discoveries:
-  `/opsx-materialize-bug-queue mode=intake` (never bare `/opsx-fix-bug`).
-* After durable intake + `CHAT_REQUIRED`:
+* Ranked next for new discoveries (`SEPARATE_ADJUDICATION_REQUIRED`):
+  1. **PRIMARY** — if `.cursor/pipeline/bug-team/ACTIVATION.json` has
+     `RUNTIME_STATUS == ACTIVE` → `/opsx-bug-team` with structured finding
+     as raw envelope (team owns materialize/claim/route). Missing file or
+     non-ACTIVE → treat as not ACTIVE.
+  2. **ALTERNATE** (team not ACTIVE, or explicit owner escape hatch) —
+     `/opsx-materialize-bug-queue mode=intake` **or** `/opsx-fix-bug`
+     WITHOUT GO (first-run / intake only).
+  3. **Forbidden from this hunt** — `/opsx-fix-bug GO` (production GO only
+     after durable claim/classify/RED on the fix-bug path).
+* After durable intake on the **manual** queue path + `CHAT_REQUIRED`:
   `/opsx-claim-next-bug case=… chat_label=…`
-* Do **not** skip claim-first for chat-required findings.
+* Do **not** skip claim-first for chat-required findings on the manual path.
 * Do **not** emit `/opsx-fanout-bug-hunt` unless a prior root-aware
   `/opsx-bug-hunt` result exists (fanout is not for this command's output).
 
@@ -365,9 +388,12 @@ human finds a miss. Keep items concrete and falsifiable.
 
 * Diff- or focus-anchored — no aimless whole-repo tourism.
 * No production classification without reachability reasoning.
-* No bare `/opsx-fix-bug` handoff.
+* No `/opsx-fix-bug GO` handoff from this hunt. Intake WITHOUT GO is allowed
+  only as **alternate** when bug-team is not ACTIVE (or owner escape hatch).
+* When `ACTIVATION.json` `RUNTIME_STATUS == ACTIVE`, primary next is
+  `/opsx-bug-team` — do not demote team to residual after materialize advice.
 * No process-contract hunting in this command (F6).
-* Do not claim Bugbot is obsolete; claim **this** is primary.
+* Do not claim Bugbot is obsolete; claim **this** is primary discovery.
 * Do not weaken `/opsx-bug-hunt` root+invariant requirements by routing
   sibling hunts here.
 * Checklist updates are learning writes — not silent mid-hunt edits unless
@@ -380,4 +406,5 @@ human finds a miss. Keep items concrete and falsifiable.
 * Turning `deep` into a repository-wide style pass.
 * Fixing dead code to impress Bugbot.
 * Using this command as `/opsx-explore` or pipeline navigator.
-* Creating a parallel case-map layout outside materialize.
+* Creating a parallel case-map layout outside materialize / bug-team.
+* Recommending materialize-first while bug-team `RUNTIME_STATUS` is ACTIVE.
