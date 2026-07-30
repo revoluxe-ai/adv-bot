@@ -79,9 +79,9 @@ class Settings:
     def run_local(self) -> bool:
         """Флаг локального режима (legacy env RUN_LOCAL).
 
-        Port-forward PG/CH из приложения отключён; подключение — по IP из .env
-        (см. k8s/network/local-dev-external-access.md). Туннели вручную: DEV_TUNNELS_ENABLED=true
-        и app.dev_local.k8s_tunnels или scripts/dev-tunnels.ps1.
+        Локальная разработка: канон — публичный IP + NodePort из .env
+        (см. k8s/network/local-dev-external-access.md). In-app kubectl port-forward
+        удалён; DEV_TUNNELS_ENABLED остаётся только denylist для destructive tests.
         """
         value = os.environ.get("RUN_LOCAL")
         if value is None:

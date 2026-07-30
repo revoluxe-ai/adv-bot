@@ -55,9 +55,7 @@
     "app/client_bot/user_interface/views/keyword_v3_profile_ui.py",
     "app/modules/common_slaves/wildberries/models/models.py",
     "app/modules/shop_runner/service_manager/services/auto_reset_bid_service.py",
-    "app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py",
-    "app/dev_local/__init__.py",
-    "app/dev_local/k8s_tunnels.py"
+    "app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",
