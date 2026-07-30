@@ -1,8 +1,12 @@
 """Bootstrap disposable PG schema for A/B Hold live verification (§19.5 / §22.7.3).
 
-Минимальный stub ``advsetting`` / ``keywordsetting`` (без полного FK-графа) для
-Alembic epoch upgrade/downgrade и ORM writers против disposable
+Минимальный stub ``advsetting`` / ``keywordsetting`` / ``wbcabinet`` (без полного
+FK-графа) для Alembic epoch upgrade/downgrade и ORM writers против disposable
 ``TEST_DATABASE_URL``.
+
+``wbcabinet`` stub MUST включать mapped-колонки ORM ``WBCabinet`` (как минимум
+``shop_id``): ``AdvSetting.wb_cabinet`` — ``lazy="joined"``, иначе SELECT
+AdvSetting падает с ``UndefinedColumn``.
 
 Fail-closed: каждый ``create_engine`` / ``create_async_engine`` идёт только после
 ``validate_destructive_test_database_url``. DDL выполняется в уникальной schema
@@ -120,8 +124,19 @@ DROP TABLE IF EXISTS advsetting CASCADE;
 DROP TABLE IF EXISTS wbcabinet CASCADE;
 DROP TABLE IF EXISTS alembic_version CASCADE;
 
+-- Stub wbcabinet: колонки под ORM WBCabinet (AdvSetting.wb_cabinet lazy=joined).
+-- Без shop_id/прочих mapped columns ORM SELECT AdvSetting → UndefinedColumn.
 CREATE TABLE wbcabinet (
-    id SERIAL PRIMARY KEY
+    id SERIAL PRIMARY KEY,
+    shop_id VARCHAR NOT NULL UNIQUE,
+    active BOOLEAN DEFAULT true,
+    expiration_time TIMESTAMP NOT NULL DEFAULT (now() + interval '7 days'),
+    expiration_alarm_days_pass INTEGER,
+    demo BOOLEAN DEFAULT true,
+    balance FLOAT NOT NULL DEFAULT 0,
+    bonus FLOAT NOT NULL DEFAULT 0,
+    default_max_cpm INTEGER NOT NULL DEFAULT 400,
+    balance_went_negative_at TIMESTAMPTZ
 );
 
 -- Stub: VARCHAR вместо PG ENUM, без FK — достаточно для epoch migration + ORM SELECT.
@@ -205,7 +220,8 @@ CREATE TABLE advsetting (
     auto_common_budget BOOLEAN
 );
 
-INSERT INTO wbcabinet (id) VALUES (1);
+INSERT INTO wbcabinet (id, shop_id, active, demo, balance, bonus, default_max_cpm)
+VALUES (1, 'live_pg_stub_shop', true, true, 0, 0, 400);
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL PRIMARY KEY
 );

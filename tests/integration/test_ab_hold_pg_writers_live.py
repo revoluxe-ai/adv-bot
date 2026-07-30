@@ -42,7 +42,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     apply_ab_hold_setup_mutations,
     persist_ab_hold_degraded_flag,
     persist_ab_hold_degraded_flag_in_session,
-    sm as setup_apply_sm,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
     CardAbHoldDisable,
@@ -56,10 +55,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     disable_card_ab_hold,
     load_adv_setting_for_ab_hold_menu,
     load_adv_setting_for_back,
-    sm as handlers_sm,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_handlers import (
-    sm as confirm_sm,
 )
 from tests.integration.card_ab_hold._live_pg_bootstrap import (
     disposable_ab_hold_schema,
@@ -406,8 +401,16 @@ async def test_live_pg_in_session_children_persist_via_injected_session(
         target_place=None,
     )
     async with patched_async_session_maker(live_db_url):
+        # Import sm *inside* the patch: module-level ``from … import sm`` would
+        # keep the production session maker and miss disposable search_path.
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
             sm as epoch_sm,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_handlers import (
+            sm as confirm_sm,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
+            sm as handlers_sm,
         )
 
         async with epoch_sm(read_only=False) as session:
@@ -457,6 +460,10 @@ async def test_live_pg_back_load_adv_setting_for_menu_path(
         bot_active=True,
     )
     async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.handlers import (
+            sm as handlers_sm,
+        )
+
         async with handlers_sm(read_only=True) as session:
             adv = await load_adv_setting_for_back(session, adv_setting_id)
 
@@ -486,6 +493,10 @@ async def test_live_pg_persist_ab_hold_degraded_flag_write_and_clear(
     assert fetch_adv_degraded_flag(live_db_url, adv_setting_id) is False
 
     async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.setup_apply import (
+            sm as setup_apply_sm,
+        )
+
         await persist_ab_hold_degraded_flag(
             adv_setting_id=adv_setting_id, degraded=True
         )

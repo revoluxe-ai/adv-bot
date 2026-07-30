@@ -159,3 +159,26 @@ def test_live_pg_bootstrap_fetch_adv_degraded_flag_reselects_column() -> None:
     src = inspect.getsource(boot.fetch_adv_degraded_flag)
     assert "card_ab_hold_degraded" in src
     assert "advsetting" in src
+
+
+@pytest.mark.unit
+def test_live_pg_bootstrap_wbcabinet_stub_covers_orm_joined_columns() -> None:
+    """Stub ``wbcabinet`` MUST include WBCabinet mapped cols (lazy=joined AdvSetting).
+
+    Regression: id-only stub → UndefinedColumn shop_id on ``_load_adv`` / menu-back.
+    """
+    from tests.integration.card_ab_hold import _live_pg_bootstrap as boot
+
+    ddl = boot._PRE_EPOCH_DDL
+    assert "CREATE TABLE wbcabinet" in ddl
+    for col in (
+        "shop_id",
+        "active",
+        "expiration_time",
+        "balance",
+        "bonus",
+        "default_max_cpm",
+        "balance_went_negative_at",
+    ):
+        assert col in ddl, f"missing ORM column in wbcabinet stub: {col}"
+    assert "live_pg_stub_shop" in ddl
