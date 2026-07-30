@@ -913,10 +913,17 @@ class CoroutinesManager:
         try:
             if not advs:
                 return None
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+                should_suppress_budget_and_activity_restart,
+            )
+
             candidates: list[ComplexAdv] = [
                 adv
                 for adv in advs
                 if adv.auto_budget_watchdog_enabled
+                and not should_suppress_budget_and_activity_restart(
+                    getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+                )
                 and (
                     (
                         adv.use_common_budget

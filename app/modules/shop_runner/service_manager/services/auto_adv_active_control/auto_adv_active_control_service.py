@@ -198,13 +198,30 @@ class AutoAdvActiveControlService:
         из БД; при выходе за расписание/даты РК ставится на паузу. Ограничения
         по времени нигде больше не применяются — только в этом сервисе.
         """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+            should_suppress_budget_and_activity_restart,
+        )
+
+        # Emergency latch: ordinary schedule/budget restart Forbidden; вместо
+        # этого принудительная пауза обеих ног (spec kill switch).
+        latch_advs = [
+            adv
+            for adv in advs
+            if adv.bot_active
+            and should_suppress_budget_and_activity_restart(
+                getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+            )
+        ]
         complex_advs = [
             adv
             for adv in advs
             if adv.bot_active
             and adv.auto_budget_watchdog_enabled  # управление активностью РК: бюджет, пополнение, расписание
+            and not should_suppress_budget_and_activity_restart(
+                getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+            )
         ]
-        if not complex_advs:
+        if not complex_advs and not latch_advs:
             return None
 
         handlers: list[Callable[[], Awaitable[None]]] = []
@@ -213,7 +230,10 @@ class AutoAdvActiveControlService:
         start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
         end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
 
-        unique_adv_ids = list({adv.adv_setting.id for adv in complex_advs})
+        unique_adv_ids = list(
+            {adv.adv_setting.id for adv in complex_advs}
+            | {adv.adv_setting.id for adv in latch_advs}
+        )
         # Настройки времени применяются только для этих РК (с включённым контролем)
         time_settings_by_adv: dict[int, TimeSettingsDbState | None]
         async with get_session_maker(read_only=True) as session:
@@ -222,6 +242,10 @@ class AutoAdvActiveControlService:
             )
 
         wb_wallet_cache = WbWalletOkCache()
+        for adv in latch_advs:
+            handlers.append(
+                lambda complex_adv=adv: self._emergency_latch_force_pause(complex_adv)
+            )
         for adv in complex_advs:
             db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
@@ -263,6 +287,27 @@ class AutoAdvActiveControlService:
     @staticmethod
     def _max_workers_for(handler_count: int, cap: int) -> int:
         return max(1, min(handler_count, cap))
+
+    async def _emergency_latch_force_pause(self, adv: ComplexAdv) -> None:
+        """Принудительная пауза Search+Auto при активном Emergency latch.
+
+        Spec ``ab-hold-emergency-kill-switch``: latch ACTIVE → РК на паузе,
+        ordinary restart Forbidden. Docstring: write-path decision carve-out.
+        """
+        try:
+            if adv.adv_id:
+                await self._wb_modifier.pause_auto_campaign(adv)
+            if adv.search_adv_id:
+                await self._wb_modifier.pause_auction_campaign(adv)
+            logger.warning(
+                "[adv_setting_id=%s] Emergency latch force-pause done",
+                adv.adv_setting.id,
+            )
+        except Exception:
+            logger.exception(
+                "[adv_setting_id=%s] Emergency latch force-pause failed",
+                adv.adv_setting.id,
+            )
 
     @staticmethod
     async def _get_spend_for_adv(
