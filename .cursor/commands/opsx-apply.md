@@ -24,6 +24,7 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
 - `/opsx-apply` — implementation + test materialization for owning tasks
 - `/opsx-pyright-strict-coverage` — post-apply soft recommend when production `.py` changed
 - `/opsx-external-call-coverage` — after pyright-coverage PASS; soft recommend for external surfaces in diff
+- `/opsx-performance-review` — after external-call PASS when performance trigger applies (DB/query/queue/concurrency/pool/retry); soft recommend, not every-diff hard gate
 - `/opsx-verify` — independent adequacy and archive verdict
 
 **Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
@@ -153,7 +154,19 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
      сверять pyright-strict / external-call coverage?» Не выдумывай base.
    - After pyright-coverage `PASS`: recommend
      `/opsx-external-call-coverage base=<BASE>`, затем после его `PASS`
-     (`focus=all`) — `/opsx-static-check`, затем `/opsx-verify <change-name>`.
+     (`focus=all`):
+     - если diff попадает под performance trigger
+       (`PERFORMANCE_REVIEW_REQUIRED` / `RECOMMENDED` —
+       DB/query/repository; Queue/TasksManager/`run_tasks`/`gather`/
+       `create_task`; Semaphore/Lock/Redis NX; pool/cap/rate-limit/
+       retry/backpressure; или неоднозначный hot async path) →
+       `/opsx-performance-review scope=base base=<BASE>`;
+     - иначе → `/opsx-static-check`;
+     - после performance `PASS` | `PASS_WITH_RISK` (или
+       `NOT_APPLICABLE` / empty surfaces) → `/opsx-static-check`,
+       затем `/opsx-verify <change-name>`.
+   - Performance review **не** обязателен для каждого diff
+     (docs/typing-only / нерелевантный tests-only → skip).
 2. Иначе (нет in-policy production `.py`):
    - Primary: `/opsx-verify <change-name>`.
 3. Bug-episode path: `/opsx-test … verify` остаётся обязательным GREEN writer
@@ -195,7 +208,10 @@ Implementation tasks complete.
 If production Python changed (`app/**/*.py` or top-level production scripts):
   Next: `/opsx-pyright-strict-coverage base=<BASE>`
   Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
-  Then: `/opsx-static-check` (after external-call PASS, focus=all)
+  Then: `/opsx-performance-review scope=base base=<BASE>` when trigger applies
+        (else skip)
+  Then: `/opsx-static-check` (after external-call PASS, and after performance
+        PASS|PASS_WITH_RISK when review ran)
   Then: `/opsx-verify <change-name>`
 Else:
   Next: `/opsx-verify <change-name>`
@@ -345,7 +361,7 @@ Never rewrite prior JSONL lines.
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience
-- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage` when production `.py` changed, else `/opsx-verify <change-name>`)
+- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage`, then conditional `/opsx-performance-review`, then `/opsx-static-check` when production `.py` changed, else `/opsx-verify <change-name>`)
 
 **Fluid Workflow Integration**
 

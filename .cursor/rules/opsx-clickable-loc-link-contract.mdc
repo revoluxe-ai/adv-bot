@@ -5,6 +5,8 @@ globs:
   - .cursor/commands/opsx-close-external-gap.md
   - .cursor/commands/opsx-bug-hunt.md
   - .cursor/commands/opsx-project-bug-hunt.md
+  - .cursor/commands/opsx-performance-review.md
+  - .cursor/commands/opsx-performance-fix.md
 alwaysApply: false
 ---
 
