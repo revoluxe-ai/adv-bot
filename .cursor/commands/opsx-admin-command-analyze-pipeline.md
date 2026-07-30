@@ -254,7 +254,9 @@ Check:
 openspec/decisions/...
 
 Next:
-run /opsx-propose
+run /opsx-update   # existing change
+# or /opsx-new | /opsx-ff when no change exists
+# never /opsx-propose (obsolescent; GRAPH F5)
 ```
 
 ------------------------------------------------------------------------

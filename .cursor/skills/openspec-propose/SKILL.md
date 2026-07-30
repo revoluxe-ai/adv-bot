@@ -1,6 +1,6 @@
 ---
 name: openspec-propose
-description: Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.
+description: "OBSOLETE (GRAPH F5) — do not use; redirect to /opsx-new|/opsx-ff|/opsx-update. Kept on disk only."
 allowed-tools: Bash(openspec:*)
 license: MIT
 compatibility: Requires openspec CLI.
@@ -8,6 +8,24 @@ metadata:
   author: openspec
   version: "1.0"
   generatedBy: "1.6.0"
+---
+
+# OBSOLETE — do not recommend (GRAPH F5)
+
+This skill is **obsolescent**. Do **not** create changes through it.
+
+**Redirect (mandatory on invoke):**
+
+| Situation | Use instead |
+|---|---|
+| New change (step-by-step) | `/opsx-new` then `/opsx-continue` |
+| New change (all artifacts at once) | `/opsx-ff` |
+| Existing change — revise planning | `/opsx-update` |
+
+On invoke: state the obsolescence, print the redirect table, and **stop** —
+do **not** run `openspec new change` or write artifacts via this skill.
+Body below is historical only.
+
 ---
 
 Propose a new change - create the change and generate all artifacts in one step.

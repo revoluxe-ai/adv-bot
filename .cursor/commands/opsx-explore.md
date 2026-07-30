@@ -7,7 +7,7 @@ description: "Enter explore mode - think through ideas, investigate problems, cl
 
 Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
 
-**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
+**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and start or revise a change via `/opsx-new` / `/opsx-ff` (new) or `/opsx-update` (existing). You MAY create OpenSpec artifacts (`proposal.md`, designs, specs) if the user asks—that's capturing thinking, not implementing. Never recommend obsolescent `/opsx-propose`.
 
 **This is a stance with a mandatory context pass.** Exploration stays read-only and adaptive, but this project requires config/WORKLOG loading and final evidence separation when you summarize findings.
 
@@ -92,11 +92,12 @@ DO_LATER (candidate DEFER → WORKLOG):
 - <idea> — why later
 NEXT_IF_ACCEPT:
 - existing change → /opsx-bound-scope change=<CHANGE_ID>
-- no change yet → /opsx-propose (or /opsx-new) for DO_NOW only,
+- no change yet → /opsx-new or /opsx-ff for DO_NOW only,
   then /opsx-bound-scope if the draft still bloated
 DO_NOT:
 - treat this table as already parked in WORKLOG
 - run /opsx-update:split (does not exist; splitter is /opsx-bound-scope)
+- recommend /opsx-propose (obsolescent; GRAPH F5)
 ```
 
 Owner may refine the table in chat, then run `/opsx-bound-scope` so plan printouts
@@ -106,7 +107,7 @@ for the park; that is bound-scope → update.
 ## Next Action
 Что делать дальше. If `NOW_LATER` was emitted and the owner wants
 to commit the boundary, prefer pointing to `/opsx-bound-scope` (not a silent
-full-scope `/opsx-propose` of everything).
+full-scope `/opsx-new` / `/opsx-ff` of everything).
 
 ### Bug-episode / bug-team handback (when case= or finding= in scope)
 
@@ -219,7 +220,7 @@ If the user mentioned a specific change name, read its artifacts for context.
 
 Think freely. When insights crystallize, you might offer:
 
-- "This feels solid enough to start a change. Want me to create a proposal?"
+- "This feels solid enough to start a change. Want `/opsx-new` or `/opsx-ff`?"
 - Or keep exploring - no pressure to formalize
 
 ### When a change exists
@@ -251,7 +252,7 @@ If the user mentions a change or you detect one is relevant:
    - "That's a change-local design decision. Capture it in design.md?"
    - "That's a reusable architecture decision. Capture it in `openspec/decisions/`?"
    - "This is a new requirement. Add it to specs?"
-   - "This changes scope. Update the proposal?"
+   - "This changes scope. Capture it with `/opsx-update`?"
 
 4. **The user decides** - Offer and move on. Don't pressure. Don't auto-capture.
 
@@ -282,7 +283,7 @@ If the user mentions a change or you detect one is relevant:
 
 There's no required ending. Discovery might:
 
-- **Flow into a proposal**: "Ready to start? I can create a change proposal."
+- **Flow into a change**: "Ready to start? Use `/opsx-new` / `/opsx-ff`, or `/opsx-update` if the change already exists."
 - **Flow into a bound scope**: "Too much for one change — run `/opsx-bound-scope` with this DO_NOW / DO_LATER?"
 - **Result in artifact updates**: "Updated design.md with these decisions"
 - **Just provide clarity**: User has what they need, moves on
@@ -304,4 +305,4 @@ When things crystallize, you might offer a summary - but it's optional. Sometime
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
 - **Do question assumptions** - Including the user's and your own
-- **Do offer now/later explicitly** when implementation ideas multiply — better a clear question than a silent full-scope propose
+- **Do offer now/later explicitly** when implementation ideas multiply — better a clear question than a silent full-scope `/opsx-new` / `/opsx-ff`
