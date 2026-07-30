@@ -169,7 +169,10 @@ Independent COVERED (via re-audit) requires:
 * green по имени без re-read из store;
 * PG WRITE / READ_AFTER_WRITE на `read_only=True` (write-on-replica);
 * bare `sm()` на любом PG INTENT (`PG_IMPLICIT_SESSION_MODE`);
-* own green unit/mock-only tests (`READY_FOR_READ_ONLY_REAUDIT` only).
+* own green unit/mock-only tests (`READY_FOR_READ_ONLY_REAUDIT` only);
+* handoff/unit test, который **patches away** production callable, чей
+  PG/CH SQL / table / database qualification был изменён в этом close
+  (`SQL_REWRITE_MOCKED_AWAY` — не proof rewrite).
 
 Policy: `.cursor/rules/testing-rules.mdc` § Minimum test level / external-call /
 PG session mode.
@@ -232,6 +235,28 @@ test infra **не требуется**.
 * отражено в итоговом отчёте (`SEAMS_AUTHORED` / `SCOPE_EXPANSION` /
   `HELPER_STRATEGY`);
 * покрыто подходящими mock-only/unit тестами **до** live запуска.
+
+### PG/CH SQL rewrite proof (mandatory when applicable)
+
+Если production edit в рамках gap **меняет** PG/CH SQL-текст, qualification
+таблицы/БД или store targeting boundary (пример: снятие/добавление
+`default_db.`, переход на unqualified + `client.database`):
+
+1. **До** live MUST author pre-live unit, который вызывает **rewritten**
+   callable с capturing fake client/session и assert'ит issued
+   SQL/command против DB-targeting contract (нет запрещённого
+   `default_db.` под guarded path / ожидаемый unqualified или expected
+   qualified test DB — по выбранной seam policy).
+2. Тест, который `patch`/`AsyncMock` **саму** rewritten callable/function,
+   **не** считается покрытием этого rewrite (только handoff/math OK).
+3. В `TESTS_AUTHORED` каждый релевантный node MUST иметь tag:
+   `SQL_CONTRACT_UNIT` | `HANDOFF_MOCK_ONLY` | `DESTRUCTIVE_AUTHORED_NOT_RUN`
+   (можно комбинировать с `authored` / `mock_unit_pass` / `not_run_live`).
+4. Если prod SQL был rewritten и есть только `HANDOFF_MOCK_ONLY` →
+   `CLOSE_RESULTS.RESULT=REMAINING` **или** `AUTHORED` с
+   `NOTE=SQL_REWRITE_UNPROVEN`; `OWNER_DECISION_REQUIRED=true` с hint
+   дописать `SQL_CONTRACT_UNIT` до «implementation complete for store
+   path». Не представлять handoff-only как store-path complete.
 
 ## HELPER_DISCOVERY (reuse-first, non-blocking)
 
@@ -564,6 +589,7 @@ SEAMS_AUTHORED:
 
 TESTS_AUTHORED:
 - <path>::<node> @ <LOC_LINK> — authored | mock_unit_pass | not_run_live
+  TAG: SQL_CONTRACT_UNIT | HANDOFF_MOCK_ONLY | DESTRUCTIVE_AUTHORED_NOT_RUN | n/a
 
 LIVE_RUN: not_attempted | authorized_pass | authorized_fail | blocked_no_auth
 
@@ -576,6 +602,7 @@ CLOSE_RESULTS:
   DISPOSITION_BEFORE: …
   RESULT: AUTHORED|REMAINING|REDIRECTED|BLOCKED
   NOTE: implementation self-report only; not independent PASS/CLOSED
+        (| SQL_REWRITE_UNPROVEN when SQL rewritten + only HANDOFF_MOCK_ONLY)
 
 WHAT_HAPPENED:
 WHY:
@@ -610,6 +637,8 @@ DO_NOT_DO_YET:
 * Не считать unit session-mock закрытием PG/CH.
 * Не считать evidence PG WRITE/RAW на `read_only=True`.
 * Не считать evidence bare `sm()` (нужен явный `read_only=`).
+* Не считать sole pre-live proof для PG/CH SQL rewrite тест, который
+  mocks/patches rewritten store callable (`SQL_REWRITE_MOCKED_AWAY`).
 * Не invent gaps без packet.
 * Не передавать `base=` этой команде.
 * Не дробить на `/opsx-pg-coverage` / `/opsx-ch-coverage`.
@@ -650,6 +679,8 @@ DO_NOT_DO_YET:
 | 14 | Injectable seam already exists | prefer tests-only; no needless re-refactor |
 | 15 | Untracked content / run-block / HEAD mismatch | `DATA_GAP` / `AUDITED_STATE_CHANGED` |
 | 16 | Live token reuse | reject; need new re-audit + token |
+| 17 | Prod CH/PG SQL/db qualification rewritten; only handoff mock patches away rewritten callable | forbidden as sole pre-live proof; need `SQL_CONTRACT_UNIT` or `RESULT=REMAINING` / `NOTE=SQL_REWRITE_UNPROVEN` |
+| 18 | Prod SQL rewritten + capturing fake client asserts SQL contract | `TESTS_AUTHORED` tag `SQL_CONTRACT_UNIT`; store path may be AUTHORED (still not independent PASS) |
 
 ## Regression checks (self)
 
@@ -666,4 +697,5 @@ DO_NOT_DO_YET:
 - [ ] only live gate uses `AUTHORIZE_ONE_LIVE_RUN` + B2 audited-state
 - [ ] causal SCOPE_EXPANSION is informational, not permission ask
 - [ ] simulation matrix scenarios considered (static/dry-run)
+- [ ] PG/CH SQL rewrite → `SQL_CONTRACT_UNIT` or REMAINING/`SQL_REWRITE_UNPROVEN`; no sole handoff mock of rewritten callable
 - [ ] no stage/commit/push/commit-command invoke
