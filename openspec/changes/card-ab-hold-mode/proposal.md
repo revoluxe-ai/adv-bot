@@ -48,7 +48,8 @@
 - После WARM_UP: раздельное отображение факт-позиции и предложенной целевой позиции (`ab_hold_target_place_from_keyword`); явное подтверждение целевых позиций; durable immutable TP в пределах эпохи; retry/дрейф не переоткрывают подтверждение.
 - Отдельные явные подтверждения участия Auto и ставки Auto; заморозка ordinary auto-update мутаторов ставки Auto в активном hold.
 - Durable PENDING intent до WB-мутации; одна WB-синхронизация подтверждённых параметров; переход в активный hold только после подтверждённо успешной синхронизации; partial sync — восстановимое не-активное состояние с сохранённым набором параметров; retry без пересчёта TP/Auto bid и без новой эпохи.
-- Freeze keyword inclusion/exclusion и Search/Auto bid-мутаций при stale/missing статистике на протяжении WARM_UP/ожидания подтверждения/активного hold; без остановки кампании только по этой причине.
+- Freeze keyword inclusion/exclusion и Search/Auto bid-мутаций при stale/missing статистике на протяжении WARM_UP/ожидания подтверждения/активного hold; без остановки кампании только по этой причине; **включая ENTER/setup FAIL→OFF** (decide-class; PBH-001); apply snapshot после durable PENDING intent — carve-out PBH-005.
+- Soft-policy RU disclaimer (Enable и/или статус теста): временные сбои статы не должны ломать ровный тест через decide на «неизвестных» данных; пользователь следит за ходом; формулировка freeze-decide, не «ослабим защиту».
 - **Search common bid:** ENTER one-shot reset-to-min (owned setup/ENTER path) + continuous ordinary common-bid freeze under Hold; bidder unchanged (decision §19 / tasks §27).
 - Честное описание daily-budget/activity-control reuse (stop threshold, overshoot без гарантированной границы, суточный сброс) в плане; без новых бюджетных/emergency-stop механизмов.
 - Telegram UX на уровне плана: пагинация 10, «Назад» сохраняет черновик, «Отмена» — отдельное действие.
