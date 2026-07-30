@@ -106,8 +106,6 @@ from tests.support.subprocess_guard import install_subprocess_guard
 install_network_guard()
 install_subprocess_guard()
 
-from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-
 # В тестах guard включён по умолчанию; отдельные кейсы отключают через monkeypatch.
 os.environ["STATS_FRESHNESS_GUARD_ENABLED"] = "true"
 
@@ -139,16 +137,11 @@ import importlib
 import subprocess
 import time
 import atexit
-from datetime import datetime, timedelta
 
 import pytest
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import text
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.pool import NullPool
-
-from app.utils.db.base import BaseTable as Base
 
 from typing import AsyncGenerator
 # Переменные окружения для тестовой БД
@@ -157,8 +150,10 @@ TEST_DB_URL = (
 )
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "tests", "docker-compose.test.yml")
 
-# Глобальное хранилище для cleanup контейнеров
+# Глобальное хранилище для emergency cleanup (crash path).
 _DOCKER_CLEANUP_STATE = {"compose_cmd": None, "container_id": None}
+# Session lifecycle handle (заполняется fixture ``_test_infra_lifecycle``).
+_TEST_INFRA_LIFECYCLE = None
 
 # Настройки orchestration destructive integration setup.
 SETUP_DB_STARTUP_MAX_RETRIES = 120
@@ -167,6 +162,9 @@ SETUP_DB_INIT_MAX_RETRIES = 10
 SETUP_DB_INIT_BACKOFF_MAX_SEC = 10
 SETUP_DB_SETTLE_SLEEP_SEC = 10
 DOCKER_DIAGNOSTIC_MAX_LEN = 600
+
+# Compat: _TEST_DB_READY отражает session PG readiness (не per-test).
+_TEST_DB_READY = False
 
 
 def _create_test_async_engine(**kwargs: object):
@@ -332,31 +330,115 @@ def _format_retry_diagnostic(
 
 def _is_non_retryable_init_error(exc: Exception) -> bool:
     """Классифицировать детерминированные init-ошибки, которые нельзя ретраить."""
-    if isinstance(exc, (NotImplementedError, KeyboardInterrupt)):
-        return True
+    from tests.support.destructive_lifecycle import RetryClass, classify_lifecycle_error
 
-    non_retryable_error_types: tuple[type[BaseException], ...] = (pytest.fail.Exception,)
-    try:
-        from tests.support.destructive_pg_dsn import DestructiveTestDatabaseError as _DST
-        non_retryable_error_types = (_DST, pytest.fail.Exception)
-    except Exception:
-        pass
+    return classify_lifecycle_error(exc) is RetryClass.NON_RETRYABLE
 
-    if isinstance(exc, non_retryable_error_types):
-        return True
 
-    # Явно детерминированные infrastructure/configuration сигнатуры.
-    if isinstance(exc, RuntimeError):
-        msg = str(exc)
-        deterministic_markers = (
-            "DOCKER_STAGE=",
-            "Docker Compose не найден",
-            "command not found:",
-            "network_guard internal error",
+def _resolve_test_infra_lifecycle(request: pytest.FixtureRequest):
+    """Получить session lifecycle ПОСЛЕ marker/validation gate.
+
+    Unit tests могут inject'ить ``request._test_infra_lifecycle``.
+    """
+    injected = getattr(request, "_test_infra_lifecycle", None)
+    if injected is not None:
+        return injected
+    return request.getfixturevalue("_test_infra_lifecycle")
+
+
+def _validate_pg_preflight() -> None:
+    """Fail-closed PG DSN/opt-in/tunnels до Docker/engine."""
+    from tests.support.destructive_pg_dsn import validate_destructive_test_database_url
+
+    validate_destructive_test_database_url(TEST_DB_URL, environ=dict(os.environ))
+
+
+def _validate_ch_preflight() -> None:
+    """Fail-closed CH endpoint/opt-in/tunnels до Docker/client."""
+    from tests.support.destructive_clickhouse import (
+        ALLOWED_CH_DATABASE,
+        validate_destructive_clickhouse_endpoint,
+    )
+
+    validate_destructive_clickhouse_endpoint(
+        host=os.environ.get("CLICK_HOUSE_HOST", _TEST_PG_HOST),
+        port=os.environ.get("CLICKHOUSE_PORT", "8124"),
+        database=ALLOWED_CH_DATABASE,
+        username=os.environ.get("CLICK_HOUSE_USER"),
+        environ=dict(os.environ),
+    )
+
+
+def _run_pg_schema_bootstrap() -> None:
+    """Session-once PG DROP/CREATE + create_all + baseline seed."""
+    import asyncio
+
+    from tests.support.destructive_pg_reset import init_postgres_schema_and_seed
+
+    async def _run() -> None:
+        engine = _create_test_async_engine()
+        try:
+            await init_postgres_schema_and_seed(engine)
+        finally:
+            await engine.dispose()
+
+    asyncio.run(_run())
+
+
+def _run_ch_schema_bootstrap() -> None:
+    """Session-once ClickHouse DDL через temporary validated client."""
+    import asyncio
+
+    from tests.support.destructive_ch_reset import apply_clickhouse_session_ddl
+    from tests.support.destructive_clickhouse import (
+        ALLOWED_CH_DATABASE,
+        create_validated_async_clickhouse_client,
+    )
+
+    async def _run() -> None:
+        client = await create_validated_async_clickhouse_client(
+            host=os.environ.get("CLICK_HOUSE_HOST", _TEST_PG_HOST),
+            port=int(os.environ.get("CLICKHOUSE_PORT", "8124")),
+            database=ALLOWED_CH_DATABASE,
+            username=os.environ.get("CLICK_HOUSE_USER", "CLICK_HOUSE_USER"),
+            password=os.environ.get("CLICK_HOUSE_PASSWORD", "password"),
+            get_async_client_fn=get_async_client,
         )
-        if any(marker in msg for marker in deterministic_markers):
-            return True
-    return False
+        try:
+            await client.command("SELECT 1")
+            await apply_clickhouse_session_ddl(client)
+        finally:
+            client.close()
+
+    asyncio.run(_run())
+
+
+def _build_test_infra_lifecycle():
+    """Собрать session-owned lifecycle с runners из conftest."""
+    from tests.support.destructive_lifecycle import (
+        TestInfraLifecycle,
+        TestInfraSessionState,
+        is_reuse_mode_enabled,
+    )
+
+    state = TestInfraSessionState(reuse_mode=is_reuse_mode_enabled())
+    return TestInfraLifecycle(
+        state=state,
+        compose_file=COMPOSE_FILE,
+        sync_run=_sync_run,
+        docker_preflight=_docker_compose_preflight_or_raise,
+        validate_pg=_validate_pg_preflight,
+        validate_ch=_validate_ch_preflight,
+        init_pg_schema=_run_pg_schema_bootstrap,
+        init_ch_schema=_run_ch_schema_bootstrap,
+        raise_docker_stage=_raise_docker_stage_error,
+        sleep_fn=time.sleep,
+        startup_max_retries=SETUP_DB_STARTUP_MAX_RETRIES,
+        startup_sleep_sec=SETUP_DB_STARTUP_SLEEP_SEC,
+        settle_sleep_sec=SETUP_DB_SETTLE_SLEEP_SEC,
+        init_max_retries=SETUP_DB_INIT_MAX_RETRIES,
+        format_retry_diagnostic=_format_retry_diagnostic,
+    )
 
 
 def _raise_docker_stage_error(
@@ -444,15 +526,30 @@ atexit.register(_emergency_cleanup)
 
 
 @pytest.fixture(scope="session")
-def docker_compose_cmd() -> list[str]:
-    """Определяет команду Docker Compose после fail-closed preflight."""
-    cmd = _docker_compose_preflight_or_raise()
-    _DOCKER_CLEANUP_STATE["compose_cmd"] = cmd
-    return cmd
+def _test_infra_lifecycle():
+    """Session owner: Compose/schema bootstrap once; teardown once.
 
-
-_TEST_DB_READY = False
-_TEST_DB_INITIALIZED = False
+    Сам по себе НЕ стартует Docker — только создаёт lifecycle object.
+    Side effects происходят через ``ensure_resources`` после gate.
+    """
+    global _TEST_INFRA_LIFECYCLE, _TEST_DB_READY
+    lifecycle = _build_test_infra_lifecycle()
+    _TEST_INFRA_LIFECYCLE = lifecycle
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
+    primary_exc: BaseException | None = None
+    try:
+        yield lifecycle
+    except BaseException as exc:  # noqa: BLE001 — preserve for teardown
+        primary_exc = exc
+        raise
+    finally:
+        try:
+            lifecycle.teardown(primary_exception=primary_exc)
+        finally:
+            _TEST_INFRA_LIFECYCLE = None
+            _TEST_DB_READY = False
+            _DOCKER_CLEANUP_STATE["container_id"] = None
+            _DOCKER_CLEANUP_STATE["compose_cmd"] = None
 
 
 def _require_destructive_local(request: pytest.FixtureRequest) -> None:
@@ -462,366 +559,41 @@ def _require_destructive_local(request: pytest.FixtureRequest) -> None:
     require_destructive_local_marker(request)
 
 
-@pytest.fixture(scope="session")
-def _destructive_db_session_teardown(docker_compose_cmd):
-    """Session lifecycle: teardown compose только в конце (без setup)."""
-    yield
-    print(f"\n[CLEANUP] Stopping Docker Compose: {COMPOSE_FILE}")
-    cid = _DOCKER_CLEANUP_STATE.get("container_id")
-    if cid:
-        _sync_run("docker", "stop", "-t", "2", cid, timeout=10)
-    rc, _, err = _sync_run(
-        *docker_compose_cmd,
-        "-f",
-        COMPOSE_FILE,
-        "down",
-        "-v",
-        "--remove-orphans",
-        "--timeout",
-        "1",
-        timeout=20,
-    )
-    if rc != 0:
-        print(
-            _format_docker_warning(
-                context="compose down failed",
-                exit_code=rc,
-                stderr=err,
-            )
-        )
-    if cid:
-        _sync_run("docker", "rm", "-f", cid, timeout=10)
-        _DOCKER_CLEANUP_STATE["container_id"] = None
-    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
-    print("[OK] Cleanup complete.")
-
-
 @pytest.fixture
 def setup_test_database(request):
-    """Поднять disposable test PG/CH (один раз за session) после marker check.
+    """Ensure PG compose+schema (session-once) после marker/DSN gate.
 
-    Требует ``@pytest.mark.destructive_local`` на тесте. Opt-in env недостаточен.
+    Function-scoped entrypoint: gate → validate → dynamic lifecycle acquisition.
+    Compose down выполняется только в session teardown, не здесь.
     """
+    global _TEST_DB_READY
     _require_destructive_local(request)
-    from tests.support.destructive_pg_dsn import (
-        DestructiveTestDatabaseError,
-        validate_destructive_test_database_url,
-    )
+    from tests.support.destructive_lifecycle import TestResourceNeeds
 
     # Fail-closed preflight BEFORE any docker compose interaction.
-    validate_destructive_test_database_url(TEST_DB_URL, environ=dict(os.environ))
+    _validate_pg_preflight()
 
-    docker_compose_cmd = _docker_compose_preflight_or_raise()
-
-    global _TEST_DB_READY
-    _TEST_DB_READY = False
-    _DOCKER_CLEANUP_STATE["compose_cmd"] = docker_compose_cmd
-    compose_attempted = False
-    compose_started = False
-    container_id = ""
-    print(f"\n[SETUP] Starting Docker Compose: {COMPOSE_FILE}")
+    lifecycle = _resolve_test_infra_lifecycle(request)
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = getattr(lifecycle, "_compose_cmd", None)
     try:
-        # --- Запуск Docker Compose ---
-        # Если test_db уже healthy — только ``up -d`` (без force-recreate).
-        compose_up_args = ["up", "-d"]
-        _rc_ps, cid_out, _ = _sync_run(
-            *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
-        )
-        if cid_out.strip():
-            rc_inspect, status_out, _ = _sync_run(
-                "docker",
-                "inspect",
-                "--format",
-                "{{.State.Health.Status}}",
-                cid_out.strip(),
-                timeout=10,
-            )
-            if rc_inspect == 0 and status_out.strip() == "healthy":
-                print("[OK] Reusing running test_db container (skip --force-recreate).")
-            else:
-                compose_up_args = ["up", "-d", "--build", "--force-recreate"]
-        else:
-            compose_up_args = ["up", "-d", "--build", "--force-recreate"]
-
-        compose_attempted = True
-        rc, _out, err = _sync_run(
-            *docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args, timeout=180
-        )
-        if rc != 0:
-            _raise_docker_stage_error(
-                stage="up",
-                command=(*docker_compose_cmd, "-f", COMPOSE_FILE, *compose_up_args),
-                exit_code=rc,
-                stderr=err,
-                owner_action=(
-                    "Проверьте `docker compose -f tests/docker-compose.test.yml logs` "
-                    "и исправьте конфигурацию контейнеров."
-                ),
-            )
-        compose_started = True
-
-        # --- Ожидание запуска контейнера ---
-        last_health_command: tuple[str, ...] = (
-            *docker_compose_cmd,
-            "-f",
-            COMPOSE_FILE,
-            "ps",
-            "-q",
-            "test_db",
-        )
-        last_health_exit_code = 0
-        last_health_stderr = ""
-        for i in range(SETUP_DB_STARTUP_MAX_RETRIES):
-            _rc_ps, cid_out, err_ps = _sync_run(
-                *docker_compose_cmd, "-f", COMPOSE_FILE, "ps", "-q", "test_db", timeout=10
-            )
-            last_health_command = (
-                *docker_compose_cmd,
-                "-f",
-                COMPOSE_FILE,
-                "ps",
-                "-q",
-                "test_db",
-            )
-            last_health_exit_code = _rc_ps
-            last_health_stderr = err_ps
-            container_id = cid_out.strip()
-            if container_id:
-                _DOCKER_CLEANUP_STATE["container_id"] = container_id
-                rc, status_out, err_inspect = _sync_run(
-                    "docker",
-                    "inspect",
-                    "--format",
-                    "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
-                    container_id,
-                    timeout=10,
-                )
-                last_health_command = (
-                    "docker",
-                    "inspect",
-                    "--format",
-                    "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}nohealth{{end}}",
-                    container_id,
-                )
-                last_health_exit_code = rc
-                last_health_stderr = err_inspect
-                status = status_out.strip() if rc == 0 else "unknown"
-
-                if status.endswith(" healthy"):
-                    print("[OK] Test database is healthy.")
-                    break
-
-                print(
-                    f"[WAIT] Waiting for test database... Attempt {i + 1}/"
-                    f"{SETUP_DB_STARTUP_MAX_RETRIES} (status: {status})"
-                )
-            else:
-                print(
-                    f"[WAIT] Waiting for test database... Attempt {i + 1}/"
-                    f"{SETUP_DB_STARTUP_MAX_RETRIES} (status: no container yet)"
-                )
-            time.sleep(SETUP_DB_STARTUP_SLEEP_SEC)
-        else:
-            _raise_docker_stage_error(
-                stage="health",
-                command=last_health_command,
-                exit_code=last_health_exit_code,
-                stderr=(
-                    f"{last_health_stderr} | timed out waiting for healthy status "
-                    f"after {SETUP_DB_STARTUP_MAX_RETRIES} attempts"
-                ),
-                owner_action=(
-                    "Проверьте healthcheck/логи контейнера test_db и увеличьте "
-                    "ресурсы Docker при необходимости."
-                ),
-            )
-
-        print("[DB] Resetting PostgreSQL schema for tests...")
-
-        # --- Ensure pg_hba.conf allows host connections ---
-        if container_id:
-            hba_patch_cmd = (
-                'set -e; '
-                'HBA="$PGDATA/pg_hba.conf"; '
-                'MARKER="# added by pytest conftest (allow host connections for tests)"; '
-                'if ! grep -q "$MARKER" "$HBA"; then '
-                '  printf "\\n%s\\n" "$MARKER" >> "$HBA"; '
-                '  printf "host    all             all             0.0.0.0/0               trust\\n" >> "$HBA"; '
-                '  printf "host    all             all             ::/0                    trust\\n" >> "$HBA"; '
-                '  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select pg_reload_conf();" >/dev/null; '
-                'fi'
-            )
-            _sync_run("docker", "exec", container_id, "sh", "-lc", hba_patch_cmd, timeout=20)
-
-        # После health=healthy на Windows host-коннект может стабилизироваться не сразу.
-        time.sleep(SETUP_DB_SETTLE_SLEEP_SEC)
-
-        async def init_schema_and_seed() -> None:
-            """Пересоздать public-схему и сидировать wbcabinet id=1."""
-            engine = _create_test_async_engine()
-            try:
-                async with engine.begin() as conn:
-                    await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
-                    await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
-                    await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
-                    from app.modules.common_slaves.wildberries.models.models import (
-                        AdvKeyword,
-                        AdvSetting,
-                        WBAutoBudgetTopUp,
-                        WBBalancePayment,
-                        WBBonusPayment,
-                        WBCard,
-                        WBCategory,
-                        WBToken,
-                        WBUserCabinet,
-                        KeywordSetting,
-                    )
-                    from app.modules.billing.event_manager.models import BillingEvent
-                    from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (
-                        BalanceReminder,
-                    )
-                    from app.utils.db.models import Invite, User
-
-                    await conn.run_sync(Base.metadata.create_all)
-
-                    initial_wb_cabinet_data = {
-                        "id": 1,
-                        "shop_id": "test_shop_id",
-                        "active": True,
-                        "expiration_time": datetime.now() + timedelta(days=7),
-                        "balance": 0.0,
-                        "bonus": 0.0,
-                        "demo": True,
-                        "expiration_alarm_days_pass": None,
-                    }
-                    insert_stmt = insert(WBCabinet).values(initial_wb_cabinet_data)
-                    on_conflict_stmt = insert_stmt.on_conflict_do_update(
-                        index_elements=["id"],
-                        set_={
-                            k: v
-                            for k, v in initial_wb_cabinet_data.items()
-                            if k != "id"
-                        },
-                    )
-                    await conn.execute(on_conflict_stmt)
-                    await conn.execute(
-                        text(
-                            "SELECT setval(pg_get_serial_sequence('wbcabinet', 'id'), "
-                            "(SELECT COALESCE(MAX(id), 1) FROM wbcabinet));"
-                        )
-                    )
-            finally:
-                await engine.dispose()
-
-        for attempt in range(1, SETUP_DB_INIT_MAX_RETRIES + 1):
-            init_coro = init_schema_and_seed()
-            try:
-                asyncio.run(init_coro)
-                break
-            except KeyboardInterrupt:
-                init_coro.close()
-                # Deterministic owner interruption: never retry.
-                raise
-            except (DestructiveTestDatabaseError, pytest.fail.Exception):
-                # Deterministic safety/owner interruption: never retry.
-                raise
-            except Exception as exc:  # noqa: BLE001
-                if _is_non_retryable_init_error(exc):
-                    raise
-                if attempt >= SETUP_DB_INIT_MAX_RETRIES:
-                    raise
-                backoff_sec = min(2 * attempt, SETUP_DB_INIT_BACKOFF_MAX_SEC)
-                print(
-                    _format_retry_diagnostic(
-                        operation="Test DB init",
-                        error=exc,
-                        attempt=attempt,
-                        max_attempts=SETUP_DB_INIT_MAX_RETRIES,
-                        backoff_sec=backoff_sec,
-                    )
-                )
-                time.sleep(backoff_sec)
-
-        print("[OK] Test database setup complete.")
-        _TEST_DB_READY = True
+        lifecycle.ensure_resources(TestResourceNeeds(needs_pg=True))
+        _TEST_DB_READY = bool(lifecycle.state.pg_ready)
+        _DOCKER_CLEANUP_STATE["compose_cmd"] = lifecycle._compose_cmd
+        print("[OK] Test database setup complete (session-scoped schema).")
         yield
-    finally:
-        primary_exception = sys.exc_info()[1]
-        if isinstance(primary_exception, GeneratorExit):
-            # Generator close() is normal fixture finalization path, not a primary test/setup error.
-            primary_exception = None
-        cleanup_error: RuntimeError | None = None
-        try:
-            if compose_attempted:
-                print(f"\n[CLEANUP] Compose down: {COMPOSE_FILE}")
-                try:
-                    rc, _out, err = _sync_run(
-                        *docker_compose_cmd,
-                        "-f",
-                        COMPOSE_FILE,
-                        "down",
-                        "-v",
-                        "--remove-orphans",
-                        "--timeout",
-                        "1",
-                        timeout=20,
-                    )
-                    if rc != 0:
-                        cleanup_error = _docker_stage_error(
-                            stage="cleanup",
-                            command=(
-                                *docker_compose_cmd,
-                                "-f",
-                                COMPOSE_FILE,
-                                "down",
-                                "-v",
-                                "--remove-orphans",
-                                "--timeout",
-                                "1",
-                            ),
-                            exit_code=rc,
-                            stderr=err,
-                            owner_action=(
-                                "Проверьте права Docker/состояние daemon и повторите "
-                                "cleanup вручную: `docker compose -f tests/docker-compose.test.yml "
-                                "down -v --remove-orphans`."
-                            ),
-                        )
-                except Exception as exc:  # noqa: BLE001
-                    cleanup_error = _docker_stage_error(
-                        stage="cleanup",
-                        command=(
-                            *docker_compose_cmd,
-                            "-f",
-                            COMPOSE_FILE,
-                            "down",
-                            "-v",
-                            "--remove-orphans",
-                            "--timeout",
-                            "1",
-                        ),
-                        exit_code=(
-                            124 if isinstance(exc, subprocess.TimeoutExpired) else -1
-                        ),
-                        stderr=str(exc),
-                        owner_action=(
-                            "Проверьте доступность Docker daemon и повторите cleanup "
-                            "вручную."
-                        ),
-                    )
-        finally:
-            _TEST_DB_READY = False
-            _DOCKER_CLEANUP_STATE["container_id"] = None
-            _DOCKER_CLEANUP_STATE["compose_cmd"] = None
-        if cleanup_error is not None:
-            if primary_exception is None:
-                raise cleanup_error
-            print(f"[WARNING] Cleanup failure ignored due to primary exception: {cleanup_error}")
+    except BaseException as exc:  # noqa: BLE001
+        # Partial failure: session teardown still owns cleanup.
+        lifecycle.state.primary_failure = exc
+        raise
 
 
 @pytest.fixture(scope="function", name="async_engine")
-async def _async_engine(request, setup_test_database):
-    """Создаёт async движок для каждого destructive_local теста."""
+async def _async_engine(request, setup_test_database, reset_postgres_test_data):
+    """Function-scoped AsyncEngine (pytest-asyncio 0.21 loop safety).
+
+    Compose/schema — session-once через ``setup_test_database``.
+    Data reset — function-scoped через ``reset_postgres_test_data``.
+    """
     _require_destructive_local(request)
     engine = _create_test_async_engine(echo=False)
     try:
@@ -843,6 +615,27 @@ async def _async_session(request, async_engine) -> AsyncGenerator[AsyncSession, 
             if trans.is_active:
                 await trans.rollback()
             await session.close()
+
+
+@pytest.fixture
+async def reset_postgres_test_data(request, setup_test_database):
+    """Function-scoped PG data reset (до test body, один раз).
+
+    Не autouse: активируется только через PG fixture dependency chain.
+    """
+    _require_destructive_local(request)
+    from tests.support.destructive_pg_reset import (
+        reset_postgres_test_data as _reset_pg,
+    )
+
+    lifecycle = _resolve_test_infra_lifecycle(request)
+    engine = _create_test_async_engine()
+    try:
+        await _reset_pg(engine, restore_baseline=True)
+        lifecycle.record_pg_data_reset()
+    finally:
+        await engine.dispose()
+    yield
 
 
 
@@ -983,6 +776,23 @@ def pytest_collection_modifyitems(config, items: list[pytest.Item]) -> None:
             or markexpr_compact.endswith("andfast")
         ):
             items[:] = [i for i in items if not _has_mark(i, "destructive_local")]
+
+    # Collection-time resource discovery + live-fixture marker invariant.
+    from tests.support.destructive_lifecycle import (
+        discover_session_resource_needs,
+        item_uses_live_fixtures,
+    )
+
+    config._test_infra_needs = discover_session_resource_needs(items)  # type: ignore[attr-defined]
+    missing_marker: list[str] = []
+    for item in items:
+        if item_uses_live_fixtures(item) and not _has_mark(item, "destructive_local"):
+            missing_marker.append(item.nodeid)
+    if missing_marker:
+        raise pytest.UsageError(
+            "Live PG/CH fixtures require @pytest.mark.destructive_local. "
+            "Offenders:\n- " + "\n- ".join(missing_marker)
+        )
 @pytest.fixture
 def tokens_mock() -> list[MagicMock]:
     token_mock = MagicMock(spec=WBToken)
@@ -1227,41 +1037,6 @@ def _enforce_test_network_and_subprocess_guards():
         )
 
 
-@pytest.fixture(autouse=True)
-async def clean_db(request: pytest.FixtureRequest):
-    """Очищает ключевые таблицы до и после destructive_local теста.
-
-    Unit / без поднятой БД — no-op. Если БД готова и будет TRUNCATE —
-    требуется ``destructive_local`` (fail до engine).
-    """
-    if request.node.get_closest_marker("unit") is not None:
-        yield
-        return
-    if not _TEST_DB_READY:
-        yield
-        return
-
-    _require_destructive_local(request)
-
-    truncate_sql = text(
-        # Чистим данные, которые часто создаются тестами.
-        # Включаем wbcabinet, чтобы тесты могли стабильно создавать кабинет с id=1
-        # (иначе возможны UniqueViolation на pkey при сидировании).
-        'TRUNCATE "user", wbcabinet, wbusercabinet, wbbalancepayment, wbbonuspayment, '
-        "payment, keywordsetting, advsetting, balancereminder, billing_event RESTART IDENTITY CASCADE"
-    )
-
-    async def _truncate() -> None:
-        engine = _create_test_async_engine()
-        async with engine.begin() as conn:
-            await conn.execute(truncate_sql)
-        await engine.dispose()
-
-    await _truncate()
-    yield
-    await _truncate()
-
-
 @pytest.fixture(scope='function')
 def main_di_container() -> "AppContainer":
     from app.core.di.app_container import AppContainer
@@ -1282,18 +1057,26 @@ def di_containner_for_adv_auto_updater_v2(main_di_container, fake_redis: FakeRed
 
 
 @pytest.fixture(scope="function")
-async def clickhouse_client(request, setup_test_database):
-    """
-    Создаёт async-клиент ClickHouse (GuardedClickHouseClient).
+async def clickhouse_client(request):
+    """Function-scoped GuardedClickHouseClient; schema DDL — session-once.
 
-    Fail-closed: marker ``destructive_local`` + endpoint validator + SQL gate.
-    Database: ``test_adv_bot_clickhouse`` (не prod ``default_db``).
+    Gate → CH validation → lifecycle.ensure(CH) → client → data reset → yield.
+    Compose down — только session teardown. Не зависит от PG setup.
     """
     _require_destructive_local(request)
+    from tests.support.destructive_ch_reset import (
+        apply_clickhouse_session_ddl,
+        reset_clickhouse_test_data,
+    )
     from tests.support.destructive_clickhouse import (
         ALLOWED_CH_DATABASE,
         create_validated_async_clickhouse_client,
     )
+    from tests.support.destructive_lifecycle import TestResourceNeeds
+
+    _validate_ch_preflight()
+    lifecycle = _resolve_test_infra_lifecycle(request)
+    lifecycle.ensure_resources(TestResourceNeeds(needs_clickhouse=True))
 
     host = os.environ.get("CLICK_HOUSE_HOST", _TEST_PG_HOST)
     port = int(os.environ.get("CLICKHOUSE_PORT", "8124"))
@@ -1318,6 +1101,7 @@ async def clickhouse_client(request, setup_test_database):
             break
         except DatabaseError as exc:
             if attempt == max_attempts:
+                client.close()
                 raise
             print(
                 _format_retry_diagnostic(
@@ -1330,328 +1114,19 @@ async def clickhouse_client(request, setup_test_database):
             )
             await asyncio.sleep(1)
 
+    if not lifecycle.state.clickhouse_schema_initialized:
+        await apply_clickhouse_session_ddl(client)
+        lifecycle.state.clickhouse_schema_initialized = True
+        lifecycle.state.clickhouse_schema_init_count += 1
 
-    print("[OK] ClickHouse async client created")
+    await reset_clickhouse_test_data(client)
+    lifecycle.record_ch_data_reset()
 
-    # Добавим небольшую задержку, чтобы ClickHouse полностью инициализировался
-    await asyncio.sleep(5)
-
-    # Создаём таблицы ClickHouse, если их нет
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.full_adv_wb_stat (
-            adv_id Int32,
-            date Date,
-            views Int32,
-            clicks Int32,
-            spend Float64,
-            added_to_cart Int32,
-            orders Int32,
-            sum_price_orders Float64,
-            version Float64
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(date)
-        ORDER BY (adv_id, date, version)
-    """)
-
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.advkeyword_new (
-            adv_id Int32,
-            text String,
-            date Date,
-            clicks_state AggregateFunction(argMax, Int32, Float64),
-            views_state AggregateFunction(argMax, Int32, Float64),
-            spend_state AggregateFunction(argMax, Float64, Float64),
-            version Float64
-        ) ENGINE = AggregatingMergeTree()
-        PARTITION BY toYYYYMM(date)
-        ORDER BY (adv_id, text, date)
-    """)
-
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.clusters_adv_stats (
-            adv_id UInt32,
-            nmid UInt64,
-            wb_category LowCardinality(String),
-            norm_query LowCardinality(String),
-            views UInt32,
-            clicks UInt32,
-            ctr Float64,
-            cpm Float64,
-            add_to_cart UInt32,
-            orders UInt32,
-            cpc Float64,
-            avr_pos Float64,
-            date Date,
-            spend Nullable(Float64) DEFAULT NULL,
-            timestamp DateTime default now()
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(date)
-        ORDER BY (wb_category, nmid, norm_query, date, timestamp)
-        SETTINGS index_granularity = 8192
-    """)
-
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.adv_events_ticks (
-            norm_query LowCardinality(String),
-            ts DateTime,
-            d_views UInt32,
-            d_clicks UInt32,
-            nmid UInt64
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(ts)
-        ORDER BY (norm_query, nmid, ts)
-        SETTINGS index_granularity = 8192
-    """)
-
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.wb_common_stat (
-            nmid UInt64,
-            date Date,
-            open_card UInt32,
-            add_to_cart UInt32,
-            orders UInt32,
-            orders_sum Float64,
-            buy_outs UInt32,
-            buyouts_sum_rub Float64 DEFAULT 0,
-            version Float64,
-            INDEX idx_wb_common_stat_date date TYPE minmax GRANULARITY 1
-        )
-        ENGINE = ReplacingMergeTree(version)
-        ORDER BY (nmid, date)
-        SETTINGS index_granularity = 8192
-    """)
-
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.plan_fact_stats (
-            adv_id Int32,
-            shop_id String,
-            date Date,
-            timestamp DateTime,
-            plan_orders Nullable(Int32),
-            plan_target_pay_for_order Nullable(Int32),
-            plan_max_pay_for_order Nullable(Int32),
-            fact_predict_orders Nullable(Float64),
-            fact_original_orders Nullable(Float64),
-            fact_pay_for_order Nullable(Float64),
-            fact_method Nullable(String),
-            version Float64
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(date)
-        ORDER BY (adv_id, date, timestamp)
-        SETTINGS index_granularity = 8192
-    """)
-
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.fact_stat_states (
-            bucket_start DateTime,
-            shop_id String,
-            complex_adv_id Int64,
-            views_adv_sum Int64,
-            clicks_adv_sum Int64,
-            carts_adv_sum Int64,
-            orders_adv_sum Int64,
-            spend_adv_sum_rub Int64,
-            orders_sum_adv_rub Int64,
-            open_card_sum Int64,
-            carts_card_sum Int64,
-            orders_card_sum Int64,
-            orders_sum_card_rub Int64,
-            buy_outs_sum Int64,
-            src_ts DateTime,
-            version Int64,
-            event_date Date DEFAULT toDate(0),
-            event_id Int64 DEFAULT 0
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(event_date)
-        ORDER BY (complex_adv_id, event_date, event_id, src_ts)
-        SETTINGS index_granularity = 8192
-    """)
-
-    # Создаём таблицу advkeyword (источник для Materialized Views)
-    await client.command("""
-        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.advkeyword (
-            adv_id UInt64,
-            date Date,
-            text String,
-            views UInt32,
-            clicks UInt32,
-            spend Float64,
-            version UInt64
-        ) ENGINE = MergeTree()
-        PARTITION BY toYYYYMM(date)
-        ORDER BY (adv_id, date, text, version)
-        SETTINGS index_granularity = 8192
-    """)
-
-    # Создаём Materialized View: advkeyword_daily_mv
-    await client.command("""
-        DROP VIEW IF EXISTS test_adv_bot_clickhouse.advkeyword_daily_mv
-    """)
-    await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.advkeyword_daily_mv
-        (
-            `adv_id` UInt64,
-            `date` Date,
-            `text` String,
-            `clicks` AggregateFunction(argMax, UInt32, UInt64),
-            `views` AggregateFunction(argMax, UInt32, UInt64),
-            `spend` AggregateFunction(argMax, Float64, UInt64)
-        )
-        ENGINE = AggregatingMergeTree
-        PARTITION BY toYYYYMM(date)
-        ORDER BY (adv_id, date, text)
-        SETTINGS index_granularity = 8192
-        AS
-        SELECT
-            adv_id,
-            date,
-            text,
-            argMaxState(clicks, version) AS clicks,
-            argMaxState(views, version) AS views,
-            argMaxState(spend, version) AS spend
-        FROM test_adv_bot_clickhouse.advkeyword
-        GROUP BY adv_id, date, text
-    """)
-
-    # Создаём Materialized View: cumulative_views
-    # ВАЖНО: SummingMergeTree автоматически суммирует числовые колонки, поэтому НЕ используем sum() в SELECT
-    await client.command("""
-        DROP VIEW IF EXISTS test_adv_bot_clickhouse.cumulative_views
-    """)
-    await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.cumulative_views
-        (
-            `adv_id` UInt64,
-            `text` String,
-            `date` Date,
-            `total_views` UInt64,
-            `total_clicks` UInt64,
-            `total_spend` Float64
-        )
-        ENGINE = SummingMergeTree
-        ORDER BY (adv_id, text, date)
-        SETTINGS index_granularity = 8192
-        AS
-        SELECT
-            adv_id,
-            text,
-            date,
-            views AS total_views,
-            clicks AS total_clicks,
-            spend AS total_spend
-        FROM test_adv_bot_clickhouse.advkeyword
-    """)
-
-    # Создаём Materialized View: mv_clusters_daily
-    # Агрегирует данные из clusters_adv_stats по дням с использованием AggregatingMergeTree
-    await client.command("""
-        DROP VIEW IF EXISTS test_adv_bot_clickhouse.mv_clusters_daily
-    """)
-    await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.mv_clusters_daily
-        (
-            `nmid` UInt64,
-            `text` LowCardinality(String),
-            `date` Date,
-            `views_state` AggregateFunction(argMax, UInt32, DateTime),
-            `clicks_state` AggregateFunction(argMax, UInt32, DateTime),
-            `add_to_cart_state` AggregateFunction(argMax, UInt32, DateTime),
-            `orders_state` AggregateFunction(argMax, UInt32, DateTime),
-            `cpm_state` AggregateFunction(argMax, Float64, DateTime),
-            `cpc_state` AggregateFunction(argMax, Float64, DateTime),
-            `ts_state` AggregateFunction(max, DateTime)
-        )
-        ENGINE = AggregatingMergeTree
-        ORDER BY (nmid, text, date)
-        SETTINGS index_granularity = 8192
-        AS
-        SELECT nmid,
-               norm_query AS text,
-               date,
-               argMaxState(views, timestamp) AS views_state,
-               argMaxState(clicks, timestamp) AS clicks_state,
-               argMaxState(add_to_cart, timestamp) AS add_to_cart_state,
-               argMaxState(orders, timestamp) AS orders_state,
-               argMaxState(cpm, timestamp) AS cpm_state,
-               argMaxState(cpc, timestamp) AS cpc_state,
-               maxState(timestamp) AS ts_state
-        FROM test_adv_bot_clickhouse.clusters_adv_stats
-        GROUP BY nmid, text, date
-    """)
-
-    # Создаём Materialized View: mv_clusters_daily_agg
-    await client.command("""
-        DROP VIEW IF EXISTS test_adv_bot_clickhouse.mv_clusters_daily_agg
-    """)
-    await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.mv_clusters_daily_agg
-        (
-            `adv_id` UInt32,
-            `nmid` UInt64,
-            `norm_query` LowCardinality(String),
-            `date` Date,
-            `views_state` AggregateFunction(argMax, UInt32, DateTime),
-            `clicks_state` AggregateFunction(argMax, UInt32, DateTime),
-            `carts_state` AggregateFunction(argMax, UInt32, DateTime),
-            `orders_state` AggregateFunction(argMax, UInt32, DateTime),
-            `cpm_state` AggregateFunction(argMax, Float64, DateTime),
-            `ts_state` AggregateFunction(max, DateTime)
-        )
-        ENGINE = AggregatingMergeTree()
-        ORDER BY (adv_id, nmid, norm_query, date)
-        SETTINGS index_granularity = 8192
-        AS
-        SELECT
-            adv_id,
-            nmid,
-            norm_query,
-            date,
-            argMaxState(views, timestamp) AS views_state,
-            argMaxState(clicks, timestamp) AS clicks_state,
-            argMaxState(add_to_cart, timestamp) AS carts_state,
-            argMaxState(orders, timestamp) AS orders_state,
-            argMaxState(cpm, timestamp) AS cpm_state,
-            maxState(timestamp) AS ts_state
-        FROM test_adv_bot_clickhouse.clusters_adv_stats
-        GROUP BY adv_id, nmid, norm_query, date
-    """)
-
-    # Создаём Materialized View: mv_clusters_last_state
-    # Хранит последнее состояние для каждого nmid + text
-    await client.command("""
-        DROP VIEW IF EXISTS test_adv_bot_clickhouse.mv_clusters_last_state
-    """)
-    await client.command("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS test_adv_bot_clickhouse.mv_clusters_last_state
-        (
-            `nmid` UInt64,
-            `text` LowCardinality(String),
-            `last_avg_pos_state` AggregateFunction(argMax, Float64, DateTime),
-            `last_cpc_state` AggregateFunction(argMax, Float64, DateTime),
-            `last_cpm_state` AggregateFunction(argMax, Float64, DateTime),
-            `last_ts_state` AggregateFunction(max, DateTime)
-        )
-        ENGINE = AggregatingMergeTree
-        ORDER BY (nmid, text)
-        SETTINGS index_granularity = 8192
-        AS
-        SELECT nmid,
-               norm_query AS text,
-               argMaxState(avr_pos, timestamp) AS last_avg_pos_state,
-               argMaxState(cpc, timestamp) AS last_cpc_state,
-               argMaxState(cpm, timestamp) AS last_cpm_state,
-               maxState(timestamp) AS last_ts_state
-        FROM test_adv_bot_clickhouse.clusters_adv_stats
-        GROUP BY nmid, norm_query
-    """)
-
-    print("[OK] ClickHouse tables created/checked")
-
-    yield client
-
-
-    client.close()
-    print("[OK] ClickHouse client closed")
+    try:
+        yield client
+    finally:
+        client.close()
+        print("[OK] ClickHouse client closed")
 
 
 @pytest.fixture(scope='function')
