@@ -87,6 +87,33 @@ Verify не должен превращаться в общий bug hunter.
 
 Он проверяет, доказано ли тестами уже сформулированное требование или invariant.
 
+## Additive performance review assurance
+
+Если в change artifacts, context files или явно переданном output присутствует
+блок `PERFORMANCE_REVIEW_REPORT` (из `/opsx-performance-review`), verify
+должен независимо проверить, что открытые blocking findings
+(`STATUS=FAIL` / незакрытый `DATA_GAP` с обязательным measurement) закрыты
+актуальным независимым review `PASS` | `PASS_WITH_RISK` (или owner-deferral
+явно вне archive path).
+
+`PERFORMANCE_REVIEW_REPORT` — additive evidence contract (sibling к
+`EXTERNAL_CALL_COVERAGE_REPORT`; diff/base-owned performance gate).
+
+Он не меняет:
+
+* legacy eligibility verify при absence report;
+* основной verdict contract / archive routing markers;
+* право verify не становиться general performance hunter / полным re-scan.
+
+Отсутствие `PERFORMANCE_REVIEW_REPORT` не даёт автоматический `NO_GO`.
+Наличие report со всё ещё открытыми FAIL / blocking DATA_GAP → archive
+`NO_GO` со ссылкой на finding.
+
+Verify не должен заново изобретать полный performance inventory, если
+report отсутствует; soft recommend владельцу:
+`/opsx-performance-review scope=base base=<BASE>` когда production hot-path
+(DB/query/queue/concurrency/pool/retry) в change и report не передан.
+
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
 **OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:
@@ -285,6 +312,34 @@ Soft recommend: /opsx-external-call-coverage base=<BASE> (when production .py ch
 Если report присутствует со STATUS=FAIL или незакрытыми GAPS — проверь,
 закрыты ли они сейчас; открытые FAIL-gaps → archive `NO_GO` с точными
 surface references.
+
+#### PERFORMANCE_REVIEW_REPORT discovery
+
+Если среди прочитанных artifacts или context files найден блок
+`PERFORMANCE_REVIEW_REPORT`, извлеки:
+
+* `STATUS`;
+* `BASE` / `HEAD` / `FOCUS`;
+* `FINDINGS_OPEN`;
+* `EVIDENCE_SUMMARY`;
+* `SERIALIZATION_CONTRACTS_NOTED` если есть.
+
+Не реконструируй полный performance inventory заново, если report отсутствует.
+
+Если report отсутствует, зафиксируй:
+
+```text
+Performance review report: absent
+Compatibility mode: legacy
+Soft recommend: /opsx-performance-review scope=base base=<BASE>
+  (when DB/query/queue/concurrency/pool/retry hot-path changed)
+```
+
+и продолжай обычный verify (absence ≠ auto `NO_GO`).
+
+Если report присутствует со STATUS=FAIL или blocking DATA_GAP /
+незакрытыми FINDINGS_OPEN — проверь актуальность; открытые blockers →
+archive `NO_GO` с точными finding references.
 
 ### 5. Architecture Decision Lookup
 
@@ -769,10 +824,13 @@ or:
 * Keep one overall verdict. No mixed top-level success plus archive `NO_GO`.
 * Treat `TEST_COVERAGE_PACKET` as additive evidence only.
 * Treat `EXTERNAL_CALL_COVERAGE_REPORT` as additive evidence only (diff/base-owned; not a substitute for packet).
-* Do not change legacy verify eligibility when the packet or external-call report is absent.
+* Treat `PERFORMANCE_REVIEW_REPORT` as additive evidence only (diff/base-owned; not a substitute for external-call or packet).
+* Do not change legacy verify eligibility when the packet, external-call report, or performance report is absent.
 * Do not issue `NO_GO` from packet status alone.
 * Do not invent a full external-call inventory during verify when the report is absent; soft-recommend `/opsx-external-call-coverage` instead.
-* When the report is present, do not ignore still-open `MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` gaps (включая `PG_IMPLICIT_SESSION_MODE` / `PG_WRONG_SESSION_MODE`).
+* Do not invent a full performance inventory during verify when `PERFORMANCE_REVIEW_REPORT` is absent; soft-recommend `/opsx-performance-review` when hot-path applies.
+* When the external-call report is present, do not ignore still-open `MISSING_TEST` / `WEAK_EVIDENCE` / `UNTESTABLE_SEAM` gaps (включая `PG_IMPLICIT_SESSION_MODE` / `PG_WRONG_SESSION_MODE`).
+* When `PERFORMANCE_REVIEW_REPORT` is present, do not ignore still-open FAIL / blocking DATA_GAP findings; fixer self-report is not independent PASS.
 * Do not infer coverage from test names, task checkboxes, or green suite status.
 * Do not accept synthetic production fields, impossible states, or wrong-owner identity as realistic test setup.
 * Do not accept a test that fully mocks the causal boundary it claims to verify.
@@ -781,10 +839,12 @@ or:
 * Do not require every failure mode mechanically; require only invariant-relevant cases.
 * Preserve one overall verdict and the existing final marker.
 * Do not turn verify into a general repository review or random bug hunt.
-* Do not modify `TEST_COVERAGE_PACKET` or `EXTERNAL_CALL_COVERAGE_REPORT` during verify.
+* Do not modify `TEST_COVERAGE_PACKET`, `EXTERNAL_CALL_COVERAGE_REPORT`, or `PERFORMANCE_REVIEW_REPORT` during verify.
 * Do not silently promote a provisional scenario to a mandatory blocker without specification or invariant evidence.
 * Do not treat an `unknown` scenario as automatically `not_covered`.
 * Do not treat absence of packet as proof that coverage is sufficient.
 * Do not treat presence of packet as proof that its scenarios are implemented.
 * Do not treat absence of `EXTERNAL_CALL_COVERAGE_REPORT` as proof that external surfaces are covered.
 * Do not treat presence of the report as proof that its gaps are closed.
+* Do not treat absence of `PERFORMANCE_REVIEW_REPORT` as proof that performance is adequate.
+* Do not treat presence of the performance report as proof that its findings are closed.

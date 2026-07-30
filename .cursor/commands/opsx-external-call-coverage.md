@@ -443,6 +443,14 @@ COPY_PASTE_RUNBOOK:
 * `PASS` + `focus=all`:
 
 ```text
+/opsx-performance-review scope=base base=<resolved>
+```
+
+(when performance trigger applies — DB/query/repository, Queue/TasksManager/
+`run_tasks`/`gather`/`create_task`, Semaphore/Lock/Redis NX, pool/cap/
+rate-limit/retry/backpressure, or recommended hot async; otherwise skip)
+
+```text
 /opsx-static-check
 ```
 
@@ -587,8 +595,11 @@ COPY_PASTE_RUNBOOK:
 * `FAIL` + mixed (есть и TEST_ONLY, и REFACTOR_AND_TEST) →
   печатай `PASTE_AND_GO_BLOCKS` (4 блока); не оставляй только описание.
 * `FAIL` + `DEFERRED_OWNER` → один уточняющий вопрос владельцу.
-* `PASS` + `focus=all` → `/opsx-static-check`, затем
-  `/opsx-verify <change-name>` если есть активный change.
+* `PASS` + `focus=all` → if performance trigger applies →
+  `/opsx-performance-review scope=base base=<RESOLVED_BASE>`; else
+  `/opsx-static-check`; after performance `PASS`|`PASS_WITH_RISK` (or skip)
+  → `/opsx-static-check`, затем `/opsx-verify <change-name>` если есть
+  активный change. Performance review не обязателен для каждого diff.
 * `PASS` + `focus≠all` →
   `/opsx-external-call-coverage base=<RESOLVED_BASE>` (full `focus=all`).
 
@@ -596,6 +607,9 @@ COPY_PASTE_RUNBOOK:
 
 * Не archive.
 * Не считать `/opsx-static-check` PASS доказательством external-call coverage.
+* Не отправлять performance N+1 / queue / concurrency findings в
+  `/opsx-close-external-gap` — для них `/opsx-performance-review` /
+  `/opsx-performance-fix`.
 * Не считать unit green / session-mock PG|CH доказанным coverage.
 * Не считать COVERED PG WRITE / READ_AFTER_WRITE на `read_only=True`.
 * Не считать COVERED bare `sm()` (`PG_IMPLICIT_SESSION_MODE`).
@@ -636,7 +650,7 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 |------|-----|
 | `/opsx-apply` (recommend chain) | `/opsx-pyright-strict-coverage` then this |
 | `/opsx-pyright-strict-coverage` PASS | this with `base=` |
-| this PASS (`focus=all`) | `/opsx-static-check` → `/opsx-verify` |
+| this PASS (`focus=all`) | conditional `/opsx-performance-review` → `/opsx-static-check` → `/opsx-verify` |
 | this FAIL TEST_ONLY | `/opsx-test` → rerun |
 | this FAIL PG/CH / UNTESTABLE | `/opsx-close-external-gap` (paste report) → focus re-audit |
 | this report present | `/opsx-verify` additive consume |
