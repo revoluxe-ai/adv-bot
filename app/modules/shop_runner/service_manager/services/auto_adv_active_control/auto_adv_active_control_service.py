@@ -151,8 +151,10 @@ class WbWalletOkCache:
     loading ensure at most one WB wallet fetch per cabinet per run.
     """
 
-    ok_by_cabinet: dict[int, bool] = field(default_factory=dict)
-    _locks_by_cabinet: dict[int, asyncio.Lock] = field(default_factory=dict)
+    ok_by_cabinet: dict[int, bool] = field(default_factory=dict[int, bool])
+    _locks_by_cabinet: dict[int, asyncio.Lock] = field(
+        default_factory=dict[int, asyncio.Lock]
+    )
     _locks_meta: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     async def lock_for(self, wb_cabinet_id: int) -> asyncio.Lock:
@@ -451,8 +453,10 @@ class AutoAdvActiveControlService:
             return None
         try:
             if inspect.iscoroutinefunction(build_view):
-                return await build_view(int(adv.adv_setting.id))
-            return build_view(int(adv.adv_setting.id))
+                result = await build_view(int(adv.adv_setting.id))
+            else:
+                result = build_view(int(adv.adv_setting.id))
+            return cast(AutoShelfBidControlViewDTO | None, result)
         except Exception:
             logger.warning(
                 "Auto watchdog: build_view failed adv_id=%s shop_id=%s",
