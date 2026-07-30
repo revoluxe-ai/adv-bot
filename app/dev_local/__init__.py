@@ -1,4 +1,8 @@
-"""Локальная разработка: опциональный kubectl port-forward (DEV_TUNNELS_ENABLED=true)."""
+"""LEGACY re-export: kubectl port-forward (очередь на выпиливание с k8s_tunnels).
+
+Канон локали — IP/NodePort из ``.env``, не этот пакет. См. module docstring
+``app.dev_local.k8s_tunnels`` и ``DOTO/WORKLOG.md``.
+"""
 
 from app.dev_local.k8s_tunnels import (
     start_dev_tunnels_monitor,

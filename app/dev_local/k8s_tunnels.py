@@ -1,7 +1,13 @@
-"""kubectl port-forward к Postgres и ClickHouse (опционально, не из settings).
+"""LEGACY — kubectl port-forward к Postgres/ClickHouse (очередь на выпиливание).
 
-Включение: ``DEV_TUNNELS_ENABLED=true`` перед вызовом ``start_dev_tunnels_monitor``.
-Автозапуск при импорте ``settings`` отключён — локально используйте IP из .env.
+**Статус:** deprecated / pending removal. Канонический локальный путь — публичный
+IP / NodePort из ``.env`` (см. ``k8s/network/local-dev-external-access.md``,
+``env.sample``). Не добавлять новые callers и unit-тесты на этот модуль.
+
+Трекинг: ``DOTO/WORKLOG.md`` — «Выпилить app/dev_local/k8s_tunnels (+ scripts/dev-tunnels.ps1)».
+
+Включение (пока модуль жив): ``DEV_TUNNELS_ENABLED=true`` перед
+``start_dev_tunnels_monitor``. Автозапуск при импорте ``settings`` отключён.
 
 Несколько точек входа (несколько Python-процессов) могут работать параллельно:
 
