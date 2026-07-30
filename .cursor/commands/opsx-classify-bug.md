@@ -58,6 +58,13 @@ route durability (schema:
 .tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md                   # ## ROUTE_STATE only
 ```
 
+JSONL append via Shell/Python MUST follow
+`.cursor/commands/opsx-execution-preflight.md` →
+**Windows Shell JSON / JSONL write safety** and ROUTE_TRACE **Write rules**
+(`encoding="utf-8"` + `ensure_ascii=True` for agent recipes; no
+`ensure_ascii=False` stdin; no unsafe console print; ASCII `->` in
+machine string fields). Prefer a `route_trace` helper when available.
+
 Forbidden process writes: inventing findings, changing claim ownership,
 editing OpenSpec, editing tests, rewriting prior ROUTE-TRACE lines.
 
@@ -760,6 +767,9 @@ JSONL event to:
 ```text
 .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
+
+Append encoding: follow ROUTE_TRACE **Write rules** and
+`opsx-execution-preflight.md` **Windows Shell JSON / JSONL write safety**.
 
 Mandatory identity/order fields on every event:
 

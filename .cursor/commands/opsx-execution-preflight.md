@@ -170,3 +170,39 @@ EXECUTION_PREFLIGHT:
 * No mass parallel file Reads; Grep/section-first; parallel Read max 2.
 * Do not invent a second status taxonomy when the command already has blockers.
 * Keep companion source-resolution rules for artifact rediscovery.
+
+## Windows Shell JSON / JSONL write safety (mandatory)
+
+Applies whenever an agent appends or writes JSON/JSONL via Shell/Python
+(including `DISPATCH.jsonl`, `ROUTE-TRACE.jsonl`, team packets, and similar
+durable case artifacts) instead of an authoritative runtime helper.
+
+On Windows the default locale/console encoding is often `cp1251` /
+`charmap`. `json.dumps(..., ensure_ascii=False)` plus a non-UTF-8 stream
+fails with `UnicodeEncodeError` on characters such as `→` (`U+2192`) when
+those appear in payload fields copied from command prose.
+
+### Required recipe (ad-hoc Shell / stdin Python)
+
+1. Always open/write with explicit UTF-8:
+   `Path.open(..., encoding="utf-8")` or `Path.write_text(..., encoding="utf-8")`.
+2. For agent-authored recipes: `json.dumps(obj, ensure_ascii=True)`
+   (ASCII-safe even if a debug `print` or a missing encoding slips in).
+3. Do **not** `print()` the JSON/JSONL line to the console unless stdout is
+   UTF-8 (`PYTHONIOENCODING=utf-8` or `sys.stdout.reconfigure(encoding="utf-8")`).
+   Prefer no print of the payload line.
+4. In machine-written string fields prefer ASCII `->` over Unicode `→`.
+5. When a bug-team / route-trace runtime helper exists (e.g.
+   `live_task_hop`, `route_trace.append`), prefer it over ad-hoc stdin append.
+
+### Forbidden (ad-hoc recipes)
+
+```text
+open(path, "a") without encoding="utf-8"
+json.dumps(..., ensure_ascii=False) in agent Shell/stdin recipes
+print(json.dumps(..., ensure_ascii=False)) to a cp1251 console
+relying on Windows default locale for JSONL bytes
+```
+
+Cite this section from DISPATCH / ROUTE_TRACE SoTs and from commands that
+require durable JSONL append. Do not invent a second incompatible recipe.

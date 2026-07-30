@@ -104,6 +104,26 @@ SCHEMA_VALID: true|false
 WRITE_BOUNDARY_OK: true|false
 ```
 
+### Append recipe (mandatory)
+
+Prefer authoritative `runtime/live_task_hop.py` (or other sealed dispatch
+helpers) over ad-hoc stdin Python.
+
+If the orchestrator must append via Shell/Python, follow
+`.cursor/commands/opsx-execution-preflight.md` →
+**Windows Shell JSON / JSONL write safety**:
+
+```text
+encoding="utf-8" on every open/write
+ensure_ascii=True for agent-authored recipes
+no print of the JSONL line to a cp1251 console
+ASCII "->" (not "→") in machine-written string fields
+```
+
+Do not use `json.dumps(..., ensure_ascii=False)` in agent Shell/stdin
+recipes for `DISPATCH.jsonl` — that pattern fails on Windows `cp1251`
+when payload text contains `→` or other non-ASCII.
+
 ## Orchestrator-only duties
 
 ```text

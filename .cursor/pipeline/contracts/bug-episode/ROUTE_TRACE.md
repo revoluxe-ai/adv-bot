@@ -402,4 +402,12 @@ null
 3. Set `PREVIOUS_EVENT_ID` from the prior event’s `EVENT_ID`.
 4. Do not log secrets or raw claim tokens (presence only).
 5. After append, refresh LEDGER `## ROUTE_STATE` to match this event (snapshot only).
+6. Ad-hoc Shell/Python append MUST follow
+   `.cursor/commands/opsx-execution-preflight.md` →
+   **Windows Shell JSON / JSONL write safety**
+   (`encoding="utf-8"` + `ensure_ascii=True` for agent recipes; no unsafe
+   console print of the line; ASCII `->` in machine string fields).
+7. Prefer an authoritative `route_trace` runtime helper when available;
+   do not invent a second write recipe that uses `ensure_ascii=False` on
+   Windows agent Shell/stdin scripts.
 ```
