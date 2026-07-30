@@ -51,7 +51,7 @@ def test_setup_test_database_requires_marker_before_docker_calls() -> None:
     setup_fn = _unwrap_fixture_function(root_conftest.setup_test_database)
     with patch.object(root_conftest, "_sync_run", sync_run):
         with pytest.raises(pytest.fail.Exception, match="destructive_local"):
-            gen = setup_fn(request, ["docker", "compose"], object())
+            gen = setup_fn(request)
             next(gen)
     sync_run.assert_not_called()
 
