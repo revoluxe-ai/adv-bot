@@ -400,6 +400,11 @@ missing reconciliation
 
 Routes C/D use `ACTUAL=NOT_APPLICABLE` and `RECONCILIATION=NOT_APPLICABLE`.
 
+Human-native close/handback/solo-walk/Owner-block explore policy:
+`.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`
+(finding vs case vs class; `POST_GREEN_OWNER`; pasteable handback;
+never close from apply/update/verify).
+
 ---
 
 ## 1. RED-before-GO

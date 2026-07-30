@@ -870,7 +870,14 @@ AUTO_MATERIALIZE: false
 - **не** редактируй tests;
 - предпочитай shared guard/candidate filter вместо локального дублирования;
 - optional: re-run same `TEST_ID` as check only;
-- GREEN confirmation → `/opsx-test … verify` (this command is not GREEN writer).
+- GREEN confirmation → `/opsx-test … verify` (this command is not GREEN writer);
+- **Never** write `closed_fixed` from fix-bug;
+- After production GO completes, receipt **PRIMARY** `NEXT_ACTION` =
+  `/opsx-test case=<CASE_ID> finding=<FINDING_ID> verify`;
+- **SECONDARY** pasteable handback (CLOSE_POLICY; no silent return):
+  `HANDBACK_COMMAND` from LEDGER or
+  `/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`;
+- **ALSO_OK**: solo walk / OpenSpec coverage — not a violation.
 
 ### Case B: unreachable reported path, invariant protected elsewhere
 
@@ -1021,6 +1028,8 @@ COMMAND_RECEIPT:
   RESULT:
   OUTPUT_PATH:
   NEXT_ACTION:
+  ALSO_OK:
+  HANDBACK_COMMAND:
   PERSISTENCE_DECISION:
   CANONICAL_INTAKE_ID:
   RELATED_FINDING_ID:
@@ -1090,11 +1099,13 @@ COMMAND_RECEIPT:
 8. не патчь dead code без явного обоснования;
 9. не трогай forbidden files/actions;
 10. optional: re-run same `TEST_ID` as check only; GREEN →
-    `/opsx-test case=… finding=… verify`;
+    `/opsx-test case=… finding=… verify` as PRIMARY next (not close);
+    emit pasteable bug-team handback as SECONDARY/ALSO_OK per CLOSE_POLICY;
 11. отчитайся по changed files, optional pytest check, durable ids;
 12. заверши `COMMAND_RECEIPT` с `CASE_ID` / `INTAKE_ID` / `FINDING_ID` /
     `CLAIM_TOKEN` (echo matched token после успешного claim gate; иначе
-    пусто) / `PERSISTENCE_DECISION` / `RED_EVIDENCE_PATH`.
+    пусто) / `PERSISTENCE_DECISION` / `RED_EVIDENCE_PATH` /
+    `HANDBACK_COMMAND` / `ALSO_OK` when case-tied.
 
 Если баг требует более широкого изменения поведения, чем покрывает текущий report, остановись и предложи OpenSpec change вместо silent scope expansion.
 

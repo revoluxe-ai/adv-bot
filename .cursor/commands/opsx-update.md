@@ -375,6 +375,22 @@ If TASK_DELTA: UNCHANGED:
    automatic production permission — apply still needs RED + Owner GO.
 6. Never write `EXPECTED_EXECUTION_ROUTE=/opsx-update` or
    `ACTUAL_EXECUTION_ROUTE=/opsx-update`.
+7. **Close / handback intent** (authority:
+   `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`):
+   - Optional arg `close_finding=auto_after_green|ask_after_green|never`
+     and/or `post_green_owner=bug-team|solo`.
+   - Defaults when omitted: `ask_after_green` + `POST_GREEN_OWNER=bug-team`.
+   - Persist on LEDGER `## ROUTE_STATE` + TASK-DELTA evidence:
+     `CLOSE_FINDING_INTENT`, `POST_GREEN_OWNER`, `HANDBACK_COMMAND`
+     (`/opsx-bug-team case=<CASE_ID> mode=continue` pre-GREEN;
+     `mode=resume-family-fanout` when family path after root GREEN).
+   - **Never** write `closed_fixed` / close the finding from update.
+8. Bug-episode output MUST include soft recommends (not silent return):
+   - **PRIMARY** `NEXT_ACTION`: after CHANGED → `/opsx-apply … case= finding=`
+     (still needs RED+GO); after UNCHANGED → `/opsx-fix-bug …` (not apply).
+   - **SECONDARY**: pasteable `HANDBACK_COMMAND` when Owner wants team
+     to resume later.
+   - **ALSO_OK**: solo walk through apply/fix-bug (advisory; not a violation).
 
 ### Required bug-episode output (complete TASK_DELTA)
 
@@ -411,7 +427,11 @@ CURRENT_ROUTE_STATE: AWAITING_APPLY_RED | AWAITING_FIX_BUG_RED
 ACTUAL_EXECUTION_ROUTE: PENDING
 ROUTE_RECONCILIATION: PENDING
 ROUTE_TRACE_PATH:
+CLOSE_FINDING_INTENT:
+POST_GREEN_OWNER:
+HANDBACK_COMMAND:
 NEXT_ACTION:
+ALSO_OK:
 ```
 
 Also keep the normal OpenSpec update summary (artifacts revised / rejected /

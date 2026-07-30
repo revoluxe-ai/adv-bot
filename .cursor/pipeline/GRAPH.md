@@ -113,13 +113,13 @@
 
 ### /opsx-explore
 - purpose: think through ideas before scaffolding a change
-- input_state: change_idea
-- output_state: change_idea | planning_revise
-- artifacts_read: none required
+- input_state: change_idea | OWNER_BLOCK (bug-team A/B/C)
+- output_state: change_idea | planning_revise | OWNER_DECISION_READY
+- artifacts_read: none required; optional case/finding when bug-tied
 - artifacts_written: none
 - decision_owner: operator
-- next_typical: /opsx-new | /opsx-ff
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: /opsx-new | /opsx-ff | /opsx-bug-team mode=continue (pasteable handback after A/B/C)
+- known_flaws: when clarifying Owner A/B/C must emit pasteable team return — NO_SILENT_RETURN
 
 ### /opsx-bound-scope
 - purpose: trim oversized change scope into now-vs-later with WORKLOG parking and `/opsx-update` handoff
@@ -168,8 +168,8 @@
 - artifacts_read: change planning artifacts; optional case ROUTE_STATE
 - artifacts_written: revised planning artifacts; TASK-DELTA-*.md; ROUTE-TRACE.jsonl; ROUTE_STATE
 - decision_owner: operator
-- next_typical: /opsx-apply (TASK_DELTA CHANGED) | /opsx-fix-bug WITHOUT GO (TASK_DELTA UNCHANGED) | /opsx-continue
-- known_flaws: NOT_OPENED_BUDGET detail; update ≠ production GO
+- next_typical: /opsx-apply (TASK_DELTA CHANGED) | /opsx-fix-bug GO path (TASK_DELTA UNCHANGED) | /opsx-bug-team handback (SECONDARY) | /opsx-continue
+- known_flaws: NOT_OPENED_BUDGET detail; update ≠ production GO; never closed_fixed from update; persist CLOSE_FINDING_INTENT on ROUTE_STATE
 
 ### /opsx-apply
 - purpose: implement tasks from an OpenSpec change; bug-episode path requires RED+Owner GO
@@ -178,8 +178,8 @@
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
 - artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
-- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
-- known_flaws: none recorded (ADL budget-exhaust→NO_GO closed 2026-07-27); task delta ≠ auto GO
+- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return
 
 ### /opsx-pyright-strict-coverage
 - purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude)
@@ -262,7 +262,7 @@
 - artifacts_read: intakes/findings; ROUTE_STATE/classification; RED evidence; code forensics
 - artifacts_written: .tmp/opsx-bug-cases/** without GO; production only with GO+fix_now+RED gate; tests forbidden under GO; ROUTE-TRACE
 - decision_owner: adjudicator + claim gate + classify-first + Owner GO + RED-before-GO
-- next_typical: /opsx-classify-bug (if missing) | /opsx-test case= finding= | /opsx-fix-bug GO (after RED) | /opsx-claim-next-bug | /opsx-invariant | /opsx-learn-from-bug | none
+- next_typical: /opsx-classify-bug (if missing) | /opsx-test case= finding= | /opsx-fix-bug GO (after RED) | /opsx-claim-next-bug | /opsx-invariant | /opsx-bug-team handback (post-GO SECONDARY) | /opsx-learn-from-bug | none
 - known_flaws: |
   F6: does not own process-contract defects → `/opsx-admin-command-fix-command-defects`;
   F7: durable STATUS ready_for_fix/adjudicating/implementing/verification blocks
@@ -271,7 +271,8 @@
   skip-claim OK for known-root CHAT_REQUIRED=false; DUP-/duplicate_root →
   blocked_finding_status_not_actionable; production GO blocked without
   RED_CONFIRMED | RED_NOT_APPLICABLE_APPROVED (`blocked_needs_red_before_go`);
-  not GREEN writer; no NON_WEAKEN_DELTA self-approve
+  not GREEN writer; no NON_WEAKEN_DELTA self-approve; never closed_fixed from fix-bug;
+  post-GO PRIMARY = test verify + pasteable team handback
 
 ### /opsx-classify-bug
 - purpose: classify finding vs OpenSpec; mandatory router before implementation route
@@ -295,13 +296,14 @@
   family/*; FAMILY-FANIN; LEARNING; HUMAN_SUMMARY
 - decision_owner: orchestrator (Task dispatch) + local uncommitted authority;
   final commit = OWNER_ONLY
-- next_typical: /opsx-bug-team (continue/resume) | owner review uncommitted diff
+- next_typical: /opsx-bug-team (continue/resume) | /opsx-explore case= finding= (OPTIONAL_IF_UNSURE on Owner-block) | owner review uncommitted diff
 - known_flaws: |
   RUNTIME_STATUS=ACTIVE; PIPELINE_GENERATION=ACTIVE_V1_WITH_INVARIANT_FANOUT_V10;
   BUG_FAMILY_FANOUT_ENABLED=true; SAME_INVARIANT automatic fanout (no manual
   sibling relaunch); EXECUTION_IDENTITY_GATE=ACTIVE; commit/push/deploy forbidden;
   platform may serialize eligible parallel tasks (honest, not failure);
-  command-native v2 PLANNED_SEPARATELY
+  command-native v2 PLANNED_SEPARATELY;
+  Owner-block must show A/B/C + optional explore + pasteable THEN_RETURN
 
 ### /opsx-verify
 - purpose: read-only audit before archive
@@ -335,13 +337,13 @@
 
 ### /opsx-invariant
 - purpose: named behavioral invariant + hunt/fix handoff packets
-- input_state: adjudicating | invariant_defined
+- input_state: adjudicating | invariant_defined | GREEN_CONFIRMED
 - output_state: invariant_defined
 - artifacts_read: case/finding / code
 - artifacts_written: invariant packets (per contract)
 - decision_owner: invariant author
-- next_typical: /opsx-bug-hunt | /opsx-fix-bug WITHOUT GO
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: /opsx-bug-team handback (PRIMARY when case=) | /opsx-bug-hunt | /opsx-fix-bug WITHOUT GO (ALSO_OK solo)
+- known_flaws: invariant is a fork — prefer team handback over human hunt/close menu; NO_SILENT_RETURN
 
 ### /opsx-project-bug-hunt
 - purpose: primary project-tuned discovery on base..head (WB Sky Bugbot analogue); feeds intake
@@ -409,8 +411,8 @@
 - artifacts_read: request / finding packet / RED evidence
 - artifacts_written: tests/** ; results/RED-*.md ; results/GREEN-*.md (verify only)
 - decision_owner: tester / regression author
-- next_typical: /opsx-fix-bug (after RED_CONFIRMED, Owner may GO) | /opsx-fix-types | none
-- known_flaws: NOT_OPENED_BUDGET detail; GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW on hash mismatch
+- next_typical: /opsx-fix-bug (after RED_CONFIRMED, Owner may GO) | /opsx-bug-team handback (after GREEN, default) | /opsx-materialize-bug-queue close=fixed (solo) | /opsx-fix-types | none
+- known_flaws: NOT_OPENED_BUDGET detail; GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW on hash mismatch; post-GREEN default team handback not OpenSpec verify
 
 ### /opsx-test-triage
 - purpose: triage failing/noisy tests
@@ -535,7 +537,10 @@ RED_CONFIRMED|RED_NOT_APPLICABLE_APPROVED --(Owner)--> production_go_ready
 production_go_ready --/opsx-fix-bug GO [iff fix_now + RED gate]--> fix_implementing
 production_go_ready --/opsx-apply [bug-episode TASK_DELTA CHANGED + same gate]--> fix_implementing
 fix_implementing --/opsx-test verify--> GREEN_CONFIRMED
-GREEN_CONFIRMED --> fixed_or_closed
+GREEN_CONFIRMED --/opsx-bug-team resume-family-fanout [default POST_GREEN_OWNER=bug-team]--> family_invariant_captured|family_closed|…
+GREEN_CONFIRMED --solo close=fixed [POST_GREEN_OWNER=solo only]--> fixed_or_closed
+# do not treat apply all_done as fixed_or_closed; apply never writes closed_fixed
+# phantom edge removed: GREEN_CONFIRMED --> fixed_or_closed (no command)
 # durable STATUS for GO path: available+CHAT_REQUIRED=false OR claimed+token
 # — NOT durable ready_for_fix / adjudicating / implementing / verification (F7)
 # classify-first: fix-bug without CURRENT_CLASSIFICATION → blocked_needs_classify_first
@@ -661,6 +666,32 @@ ROOT GREEN
   → OWNER_REVIEWS_UNCOMMITTED_GIT_DIFF
 ```
 
+### BUG_EPISODE_FORK (soft — human-native)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+
+NAVIGATE / command soft recommends use **PRIMARY** + **ALSO_OK** (still one
+pipeline `NEXT_ACTION`; alternatives named explicitly):
+
+```text
+PATH_TEAM (default after GREEN / after invariant / after Owner-block exit):
+  /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout|continue
+  — pasteable only; NO_SILENT_RETURN
+
+PATH_SOLO_WALK (Owner wants to see code / walk chain):
+  update → apply | fix-bug GO → /opsx-test verify
+  → then team handback OR solo close=fixed / leave_open
+  — advisory; not a violation; not framed as bypass
+
+TASK_DELTA: CHANGED   → apply path
+TASK_DELTA: UNCHANGED → fix-bug GO (apply not required)
+
+OWNER_BLOCK (team stopped for A/B/C):
+  OWNER_DECISION_REQUIRED: A|B|C
+  OPTIONAL_IF_UNSURE: /opsx-explore case= finding=
+  THEN_RETURN pasteable: /opsx-bug-team case= mode=…
+```
+
 Hard reminders for NAVIGATE:
 
 - classify-first before implementation route (`blocked_needs_classify_first`)
@@ -673,6 +704,8 @@ Hard reminders for NAVIGATE:
 - SAME_INVARIANT automatic fanout — MANUAL_SIBLING_RELAUNCH_REQUIRED=NO
 - GRAPH is navigation snapshot — not policy SoT
 - git commit / push / deploy remain FORBIDDEN under this command
+- apply/update never write `closed_fixed`; GREEN → team handback default
+- silent/surprise return to bug-team is a UX defect (KNOWN_FLAW)
 
 ### Three learning branches (do not mix)
 

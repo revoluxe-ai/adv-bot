@@ -30,6 +30,7 @@ must not invent a second schema root.
 | `TERMINAL_STATUS_MAP.md` | Episode terminal ↔ durable LEDGER status |
 | `ROUTE_TRACE.md` | Append-only `ROUTE-TRACE.jsonl` event schema |
 | `TASK_DELTA.md` | Post-`/opsx-update` task-delta → apply vs fix-bug |
+| `CLOSE_POLICY.md` | Finding/case/class close; handback; solo walk; Owner-block explore |
 
 ## Classify-first routing (policy in ORCHESTRATION_MVP)
 

@@ -77,6 +77,11 @@ TASK_DELTA_EVIDENCE_PATH:
   .tmp/opsx-bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
 
 DECISION_REASON:
+
+# Optional close / handback (see CLOSE_POLICY.md); persist on ROUTE_STATE too
+CLOSE_FINDING_INTENT: auto_after_green | ask_after_green | never
+POST_GREEN_OWNER: bug-team | solo
+HANDBACK_COMMAND: /opsx-bug-team case=<CASE_ID> mode=<resume-family-fanout|continue>
 ```
 
 Optional list mirrors (informational):

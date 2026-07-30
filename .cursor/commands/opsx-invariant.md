@@ -1269,6 +1269,24 @@ Recommended next step:
 
 ````
 
+# Bug-team handback (when case= present)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
+
+Invariant is a **fork**, not a human menu to run hunt/close alone by default.
+When `case=<CASE_ID>` is known (or ROOT packet ties to a durable case), the
+**Recommended next step** MUST lead with pasteable team handback (no silent
+return):
+
+```text
+/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
+```
+
+ALSO_OK (solo walk / advisory, not a violation): `/opsx-bug-hunt …` only if
+Owner explicitly wants solo hunt; `/opsx-fix-bug …` without GO if still
+adjudicating. Prefer team handback over asking the human to choose among
+hunt / close / learn.
+
 Если конкретного bug report нет, верни:
 
 ```text
