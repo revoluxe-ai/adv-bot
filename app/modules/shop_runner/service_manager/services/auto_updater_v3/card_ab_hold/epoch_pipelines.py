@@ -11,6 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
@@ -164,7 +165,7 @@ async def process_ab_epoch(
             # getattr → object; cast mirrors pending/WB_SYNC path (intent: dict[str, Any]).
             intent_complete = cast(dict[str, Any], intent_raw)
             generation = int(intent_complete.get("generation", 0) or 0)
-        await _apply_activation_to_complex_adv(
+        _ = await _apply_activation_to_complex_adv(
             complex_adv,
             generation=generation,
         )
@@ -218,10 +219,64 @@ async def process_ab_epoch(
         return
 
     # Durable complete: activation errors must not reopen WB via PARTIAL.
-    await _apply_activation_to_complex_adv(
+    _ = await _apply_activation_to_complex_adv(
         complex_adv,
         generation=generation,
     )
+
+
+async def apply_confirmed_intent_to_pg_in_session(
+    session: AsyncSession,
+    *,
+    adv_setting_id: int,
+    intent: dict[str, Any],
+) -> None:
+    """Записать confirmed TP + allowed snapshot в переданной PG session (§22).
+
+    Args:
+        session: injectable async session (WRITE).
+        adv_setting_id: ``AdvSetting.id``.
+        intent: durable pending intent (``target_places``, ``keywords``).
+    """
+    target_places: dict[str, int] = dict(intent.get("target_places") or {})
+    keywords_list: list[str] = list(intent.get("keywords") or [])
+    allowed_snapshot = normalize_allowed_snapshot(keywords_list)
+
+    stmt = select(KeywordSetting).where(
+        KeywordSetting.adv_setting_id == adv_setting_id
+    )
+    result = await session.execute(stmt)
+    keyword_rows = result.scalars().all()
+    text_to_id: dict[str, int] = {
+        str(kw.text).lower(): int(kw.id) for kw in keyword_rows
+    }
+    for keyword_text, place in target_places.items():
+        ks_id = text_to_id.get(str(keyword_text).lower())
+        if ks_id is None:
+            logger.warning(
+                "[adv_setting_id=%s] apply_confirmed_intent: keyword %r "
+                "not found in PG — skip TP",
+                adv_setting_id,
+                keyword_text,
+            )
+            continue
+        stmt_tp = (
+            update(KeywordSetting)
+            .where(KeywordSetting.id == ks_id)
+            .values(target_place=int(place))
+        )
+        _ = await session.execute(stmt_tp)
+
+    stmt_adv = (
+        update(AdvSetting)
+        .where(AdvSetting.id == adv_setting_id)
+        .values(
+            card_ab_hold_allowed_phrases_snapshot=allowed_snapshot,
+            card_ab_hold_phase=CardAbHoldPhase.WB_SYNC.value,
+        )
+    )
+    _ = await session.execute(stmt_adv)
+    await session.commit()
 
 
 async def apply_confirmed_intent_to_pg(
@@ -236,50 +291,18 @@ async def apply_confirmed_intent_to_pg(
     """
     target_places: dict[str, int] = dict(intent.get("target_places") or {})
     keywords_list: list[str] = list(intent.get("keywords") or [])
-    allowed_snapshot = normalize_allowed_snapshot(keywords_list)
-
     async with sm(read_only=False) as session:
-        stmt = select(KeywordSetting).where(
-            KeywordSetting.adv_setting_id == adv_setting_id
+        await apply_confirmed_intent_to_pg_in_session(
+            session,
+            adv_setting_id=adv_setting_id,
+            intent=intent,
         )
-        result = await session.execute(stmt)
-        keyword_rows = result.scalars().all()
-        text_to_id: dict[str, int] = {
-            str(kw.text).lower(): int(kw.id) for kw in keyword_rows
-        }
-        for keyword_text, place in target_places.items():
-            ks_id = text_to_id.get(str(keyword_text).lower())
-            if ks_id is None:
-                logger.warning(
-                    "[adv_setting_id=%s] apply_confirmed_intent: keyword %r "
-                    "not found in PG — skip TP",
-                    adv_setting_id,
-                    keyword_text,
-                )
-                continue
-            stmt_tp = (
-                update(KeywordSetting)
-                .where(KeywordSetting.id == ks_id)
-                .values(target_place=int(place))
-            )
-            _ = await session.execute(stmt_tp)
-
-        stmt_adv = (
-            update(AdvSetting)
-            .where(AdvSetting.id == adv_setting_id)
-            .values(
-                card_ab_hold_allowed_phrases_snapshot=allowed_snapshot,
-                card_ab_hold_phase=CardAbHoldPhase.WB_SYNC.value,
-            )
-        )
-        _ = await session.execute(stmt_adv)
-        await session.commit()
 
     logger.info(
         "[adv_setting_id=%s] apply_confirmed_intent_to_pg: tp=%s allowed=%s",
         adv_setting_id,
         len(target_places),
-        len(allowed_snapshot),
+        len(normalize_allowed_snapshot(keywords_list)),
     )
 
 
