@@ -1,3 +1,16 @@
+"""Telegram-хендлеры ручного добавления white/fixed/relevant фраз.
+
+Ordinary ``data_manager.add_*_phrases`` — Allowed OFF only. При
+``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``) membership
+mutation блокируется до вызова data_manager (peer: keyword_settings /
+set_common_bid_manual). Owned keyword-set change path — WARM_UP
+``keyword_edit_open`` only.
+
+``reset_white_list`` / ``reset_non_relevant_phrases`` — ordinary hard_status
+writers той же freeze-gate class (FINDING-PBH-010-R1): под structural freeze
+hard_status / ``sync_keyword_setting_mode_for_v3`` / commit Forbidden.
+"""
+
 from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
@@ -13,6 +26,9 @@ from app.modules.common_slaves.wildberries.models import (
     KeywordSetting,
     WBUserCabinet,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     is_v3_campaign,
     sync_keyword_setting_mode_for_v3,
@@ -21,6 +37,16 @@ from app.modules.wb_adv_updater import data_manager
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
+
+AB_HOLD_ADD_PHRASES_BLOCKED_MSG = (
+    "Кампания в режиме A/B Hold — добавление фраз запрещено. "
+    "Чтобы изменить состав фраз, выключите A/B Hold на экране режима."
+)
+
+AB_HOLD_HARD_STATUS_RESET_BLOCKED_MSG = (
+    "Кампания в режиме A/B Hold — статус ключей заморожен. "
+    "Чтобы сбросить список, выключите A/B Hold на экране режима."
+)
 
 
 @router.callback_query(callbacks.AddWhitePhrases.filter())
@@ -41,11 +67,17 @@ async def add_white_phrases(
 
 @router.message(StateFilter(states.AddWhitePhrases.waiting_for_white_phrases))
 async def waiting_for_white_phrases(message, bot: Bot, state: FSMContext):
+    """Добавляет white-фразы; под A/B Hold structural freeze — отказ без write."""
     text = message.text
     keywords = text.split("\n")
     keywords = [keyword.strip().lower() for keyword in keywords]
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
+    async with sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+    if adv is not None and is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+        await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
+        return
     await data_manager.add_white_phrases(keywords, adv_setting_id)
     await messages.WhitePhrasesAdded(bot, message.from_user.id)(adv_setting_id)
 
@@ -65,11 +97,17 @@ async def add_fixed_phrases(
 
 @router.message(StateFilter(states.AddFixedPhrases.waiting_for_fixed_phrases))
 async def waiting_for_fixed_phrases(message, bot: Bot, state: FSMContext):
+    """Добавляет fixed-фразы; под A/B Hold structural freeze — отказ без write."""
     text = message.text
     keywords = text.split("\n")
     keywords = [k.strip().lower() for k in keywords]
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
+    async with sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+    if adv is not None and is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+        await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
+        return
     await data_manager.add_fixed_phrases(keywords, adv_setting_id)
     await messages.FixedPhrasesAdded(bot, message.from_user.id)(adv_setting_id)
 
@@ -89,11 +127,17 @@ async def add_relevant_phrases(
 
 @router.message(StateFilter(states.AddRelevantPhrases.waiting_for_relevant_phrases))
 async def waiting_for_relevant_phrases(message, bot: Bot, state: FSMContext):
+    """Добавляет relevant-фразы; под A/B Hold structural freeze — отказ без write."""
     text = message.text
     keywords = text.split("\n")
     keywords = [keyword.strip().lower() for keyword in keywords]
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
+    async with sm(read_only=True) as session:
+        adv = await session.get(AdvSetting, adv_setting_id)
+    if adv is not None and is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+        await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
+        return
     await messages.LongTimeOperation(bot, message.from_user.id)()
     await data_manager.add_relevant_phrases(keywords, adv_setting_id)
     await messages.RelevantPhrasesAdded(bot, message.from_user.id, adv_setting_id)()
@@ -106,11 +150,18 @@ async def reset_white_list(
     state: FSMContext,
     callback_data: callbacks.ResetWhiteList,
 ):
+    """Сбрасывает WHITE_LIST→AUTO; под A/B Hold structural freeze — отказ без write."""
     await bot.send_message(callback.from_user.id, "Сброс белого списка...")
     adv_setting_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
         adv = await session.get(AdvSetting, adv_setting_id)
         assert adv is not None
+        if is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+            await bot.send_message(
+                callback.from_user.id,
+                AB_HOLD_HARD_STATUS_RESET_BLOCKED_MSG,
+            )
+            return
         stmt = select(KeywordSetting).where(
             KeywordSetting.adv_setting_id == adv_setting_id,
             KeywordSetting.hard_status == 2,
@@ -148,6 +199,7 @@ async def reset_non_relevant_phrases(
     state: FSMContext,
     callback_data: callbacks.ResetNonRelevantPhrases,
 ) -> None:
+    """Сбрасывает BLACK_LIST→AUTO; под A/B Hold structural freeze — отказ без write."""
     assert callback.from_user
     await bot.send_message(
         callback.from_user.id, "Сброс нерелевантных фраз (чёрный список)..."
@@ -156,6 +208,12 @@ async def reset_non_relevant_phrases(
     async with sm(read_only=False) as session:
         adv = await session.get(AdvSetting, adv_setting_id)
         assert adv is not None
+        if is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+            await bot.send_message(
+                callback.from_user.id,
+                AB_HOLD_HARD_STATUS_RESET_BLOCKED_MSG,
+            )
+            return
         stmt = update(KeywordSetting).where(
             KeywordSetting.adv_setting_id == adv_setting_id,
             KeywordSetting.hard_status == 0,
