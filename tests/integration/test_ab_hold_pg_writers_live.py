@@ -39,6 +39,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldPhase,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.hold_guards import (
+    apply_ab_hold_overspend_offs,
+    apply_ab_hold_overspend_offs_in_session,
     apply_ab_hold_pfo_recovery_ons,
     apply_ab_hold_pfo_recovery_ons_in_session,
 )
@@ -668,4 +670,74 @@ async def test_live_pg_apply_ab_hold_pfo_recovery_ons_persists_return_on(
     after_child = fetch_keyword_row(live_db_url, keyword_id)
     assert after_child[0] == hard_status_for_strategy_mode(KeywordStrategyMode.MIN_CPA)
     assert after_child[1] == KeywordStrategyMode.MIN_CPA.name
+    assert after_child[2] is None
+
+
+@pytest.mark.destructive_local
+@pytest.mark.asyncio
+async def test_live_pg_apply_ab_hold_overspend_offs_clears_target_place(
+    live_db_url: str,
+) -> None:
+    """``apply_ab_hold_overspend_offs`` WRITE seam + SQL re-read (FORCE_OFF).
+
+    Parent ``sm(read_only=False)`` → ``apply_ab_hold_overspend_offs_in_session``;
+    durable OFF hard_status / strategy_mode + ``target_place=None``.
+    """
+    from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.applier import (
+        hard_status_for_strategy_mode,
+    )
+
+    adv_setting_id = insert_adv_row(
+        live_db_url,
+        adv_setting_id=112,
+        adv_id=9112,
+        mode=CardAbHoldMode.ACTIVE.value,
+        phase=CardAbHoldPhase.READY_ACTIVE.value,
+        bot_active=True,
+    )
+    keyword_id = insert_keyword_row(
+        live_db_url,
+        keyword_id=2112,
+        adv_setting_id=adv_setting_id,
+        text_value="overspend-off",
+        hard_status=hard_status_for_strategy_mode(KeywordStrategyMode.MIN_CPA),
+        strategy_mode=KeywordStrategyMode.MIN_CPA.name,
+        target_place=7,
+    )
+    before = fetch_keyword_row(live_db_url, keyword_id)
+    assert before[2] == 7
+
+    async with patched_async_session_maker(live_db_url):
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.hold_guards import (
+            sm as hold_guards_sm,
+        )
+
+        updated = await apply_ab_hold_overspend_offs(
+            adv_id=9112, keyword_ids=[keyword_id]
+        )
+        assert updated == 1
+        after_parent = fetch_keyword_row(live_db_url, keyword_id)
+        assert after_parent[0] == hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+        assert after_parent[1] == KeywordStrategyMode.OFF.name
+        assert after_parent[2] is None
+
+        insert_keyword_row(
+            live_db_url,
+            keyword_id=keyword_id,
+            adv_setting_id=adv_setting_id,
+            text_value="overspend-off",
+            hard_status=hard_status_for_strategy_mode(KeywordStrategyMode.MIN_CPA),
+            strategy_mode=KeywordStrategyMode.MIN_CPA.name,
+            target_place=5,
+        )
+        async with hold_guards_sm(read_only=False) as session:
+            child_updated = await apply_ab_hold_overspend_offs_in_session(
+                session, keyword_ids=[keyword_id]
+            )
+        assert child_updated == 1
+
+    after_child = fetch_keyword_row(live_db_url, keyword_id)
+    assert after_child[0] == hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+    assert after_child[1] == KeywordStrategyMode.OFF.name
     assert after_child[2] is None

@@ -540,6 +540,30 @@ def fetch_emergency_educated_flag(db_url: str, adv_setting_id: int) -> bool:
     return bool(value)
 
 
+def fetch_emergency_latch_row(db_url: str, adv_setting_id: int) -> Any:
+    """Re-read Emergency latch + pause-intent columns после kill-switch.
+
+    Returns:
+        ``(latch, auto_adv_target_status, auction_adv_target_status, mode)``.
+    """
+    engine = create_validated_sync_engine(db_url)
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT card_ab_hold_emergency_latch,
+                       auto_adv_target_status,
+                       auction_adv_target_status,
+                       card_ab_hold_mode
+                FROM advsetting WHERE id = :id
+                """
+            ),
+            {"id": adv_setting_id},
+        ).one()
+    engine.dispose()
+    return row
+
+
 def fetch_keyword_row(db_url: str, keyword_id: int) -> Any:
     """Re-read keywordsetting hard_status / strategy_mode / target_place."""
     engine = create_validated_sync_engine(db_url)

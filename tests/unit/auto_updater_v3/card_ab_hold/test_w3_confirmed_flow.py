@@ -134,6 +134,26 @@ async def test_load_factual_positions_uses_keyboard_read_model() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.asyncio
+async def test_load_factual_positions_uses_injected_keywords_loader() -> None:
+    """Injectable ``keywords_loader`` bypasses default keyboard/CH path."""
+    adv = SimpleNamespace(id=7)
+    kw = SimpleNamespace(text="gamma", cluster_stat=SimpleNamespace(position=3.5))
+    loader = AsyncMock(return_value=[kw])
+
+    with patch(
+        "app.client_bot.utils.get_keywords_for_keyboard",
+        new=AsyncMock(side_effect=AssertionError("default loader must not run")),
+    ):
+        positions = await confirm_handlers._load_factual_positions(
+            adv, keywords_loader=loader
+        )
+
+    loader.assert_awaited_once_with(adv)
+    assert positions == {"gamma": 3.5}
+
+
+@pytest.mark.unit
 def test_tp_rows_use_passed_live_positions_not_adv_attr() -> None:
     """Fact/proposed берутся из positions-аргумента; фантомный attr на adv игнорируется."""
     adv = SimpleNamespace(

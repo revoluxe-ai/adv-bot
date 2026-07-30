@@ -241,6 +241,28 @@ async def test_hold_guards_pfo_recovery_parent_hands_off_session() -> None:
     )
 
 
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_hold_guards_overspend_offs_parent_hands_off_session() -> None:
+    """``apply_ab_hold_overspend_offs`` → ``*_in_session`` + sm(read_only=False)."""
+    fake_session = MagicMock(name="overspend_session")
+    child = AsyncMock(return_value=3)
+    sm_mock = MagicMock(return_value=_session_cm(fake_session))
+    with (
+        patch.object(hold_guards, "sm", sm_mock),
+        patch.object(
+            hold_guards, "apply_ab_hold_overspend_offs_in_session", child
+        ),
+    ):
+        updated = await hold_guards.apply_ab_hold_overspend_offs(
+            adv_id=10, keyword_ids=[1, 2, 3]
+        )
+    assert updated == 3
+    _assert_child_got_session(
+        child, fake_session, read_only=False, sm_mock=sm_mock
+    )
+
+
 def _query_stub() -> MagicMock:
     """Minimal CallbackQuery stub for Telegram parent handoff tests."""
     from aiogram.types import Message
