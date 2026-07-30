@@ -116,7 +116,6 @@ $lines = @(
     "DEV_TUNNELS_ENABLED=false",
     "",
     "# Postgres: worker ExternalIP + NodePort (NOT LB 217.25.92.218 with port 31024)",
-    "# Alternative: port-forward 127.0.0.1:15432",
     "POSTGRES_MASTER_HOST=$pgHost",
     "POSTGRES_REPLICA_HOST=$pgHost",
     "POSTGRES_PORT=$pgPort",
