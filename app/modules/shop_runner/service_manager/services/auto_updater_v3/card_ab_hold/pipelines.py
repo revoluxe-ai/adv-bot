@@ -369,21 +369,33 @@ async def process_ab_hold(
         allowed_phrases=allowed,
     )
     if recovery_on_ids:
-        # Sibling hold PG-write seam. Frozen PBH-002 RED patches only
-        # ``apply_ab_hold_overspend_offs``; skip live PG under that test double
-        # so unit runs stay mock-only. Production binds the real offs callable.
-        if type(apply_ab_hold_overspend_offs).__module__ == "unittest.mock":
-            logger.debug(
-                "[adv_id=%s] ab_hold return_on deferred: overspend_offs test double "
-                "(recovery_on count=%s)",
-                complex_adv.adv_id,
-                len(recovery_on_ids),
-            )
-        else:
-            _ = await apply_ab_hold_pfo_recovery_ons(
-                adv_id=int(complex_adv.adv_id),
-                keyword_ids=recovery_on_ids,
-            )
+        # PBH-009: epoch confirmed JSON SoT is text→TP; resolve to id→TP
+        # so recovery_on restores KeywordSetting.target_place after OFF cleared it.
+        tp_raw = getattr(
+            complex_adv.adv_setting,
+            "card_ab_hold_confirmed_target_places_json",
+            None,
+        ) or {}
+        text_to_tp: dict[str, int] = {
+            str(text).lower(): int(place) for text, place in dict(tp_raw).items()
+        }
+        confirmed_target_places: dict[int, int] = {}
+        recovery_id_set = {int(i) for i in recovery_on_ids}
+        for kw in keywords:
+            ks_id = int(kw.keyword_setting_original_id)
+            if ks_id not in recovery_id_set:
+                continue
+            text = str(getattr(kw, "text", None) or "").lower()
+            place = text_to_tp.get(text)
+            if place is not None:
+                confirmed_target_places[ks_id] = place
+        recovery_kwargs: dict[str, object] = {
+            "adv_id": int(complex_adv.adv_id),
+            "keyword_ids": recovery_on_ids,
+        }
+        if confirmed_target_places:
+            recovery_kwargs["confirmed_target_places"] = confirmed_target_places
+        _ = await apply_ab_hold_pfo_recovery_ons(**recovery_kwargs)
 
     fact = complex_adv.fact_pay_for_order
     if not is_ab_hold_campaign_deep_overspend(
