@@ -28,6 +28,21 @@ from typing import Any, ClassVar, TypeVar
 _T = TypeVar("_T")
 
 
+def coerce_compose_stream(raw: object) -> str:
+    """Нормализовать stdout/stderr compose/sync_run до str.
+
+    Утечки ``MagicMock`` из unit-suite не должны доходить до ``re.sub`` в
+    conftest scrub при teardown.
+    """
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, (bytes, bytearray)):
+        return bytes(raw).decode("utf-8", errors="replace")
+    return ""
+
+
 def run_awaitable_from_sync(awaitable: Awaitable[_T]) -> _T:
     """Выполнить awaitable из sync-кода, даже если уже есть running event loop.
 
@@ -630,7 +645,7 @@ class TestInfraLifecycle:
                             "1",
                         ),
                         exit_code=rc,
-                        stderr=err,
+                        stderr=coerce_compose_stream(err),
                         owner_action=(
                             "Проверьте права Docker/состояние daemon и повторите "
                             "cleanup вручную."

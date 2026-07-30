@@ -204,19 +204,35 @@ def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
         return 124, "", f"timeout while running: {' '.join(args)}"
 
 
+def _coerce_diagnostic_text(raw: object) -> str:
+    """Нормализовать stderr/stdout до str для scrub.
+
+    Non-str (``None``, ``MagicMock`` от утечки mock'ов в suite) → ``""``,
+    чтобы teardown lifecycle не падал ``TypeError`` в ``re.sub``.
+    """
+    if raw is None:
+        return ""
+    if isinstance(raw, str):
+        return raw
+    if isinstance(raw, (bytes, bytearray)):
+        return bytes(raw).decode("utf-8", errors="replace")
+    return ""
+
+
 def _truncate_diagnostic(raw_text: str, max_len: int = DOCKER_DIAGNOSTIC_MAX_LEN) -> str:
     """Ограничить длину диагностики для безопасного вывода."""
-    if len(raw_text) <= max_len:
-        return raw_text
-    omitted = len(raw_text) - max_len
-    return f"{raw_text[:max_len]}... <truncated {omitted} chars>"
+    text = _coerce_diagnostic_text(raw_text)
+    if len(text) <= max_len:
+        return text
+    omitted = len(text) - max_len
+    return f"{text[:max_len]}... <truncated {omitted} chars>"
 
 
-def _scrub_sensitive_text(raw_text: str) -> str:
+def _scrub_sensitive_text(raw_text: object) -> str:
     """Fail-closed маскирование секретов в диагностическом тексте."""
-    if not raw_text:
+    text = _coerce_diagnostic_text(raw_text)
+    if not text:
         return ""
-    text = raw_text
     text = re.sub(
         r"(?i)(--(?:password|token|api-key))(?:\s+|=)(?:'[^']*'|\"[^\"]*\"|[^\s,;]+)",
         lambda match: f"{match.group(1)}=<redacted>",
@@ -288,23 +304,27 @@ def _docker_stage_error(
     stage: str,
     command: tuple[str, ...] | list[str],
     exit_code: int,
-    stderr: str,
-    owner_action: str,
+    stderr: object,
+    owner_action: object,
 ) -> RuntimeError:
     """Собрать RuntimeError для fail-closed Docker lifecycle."""
     safe_command = _safe_command_repr(command)
-    safe_stderr = _scrub_sensitive_text((stderr or "").strip()) or "<empty>"
-    safe_action = _scrub_sensitive_text(owner_action)
+    safe_stderr = (
+        _scrub_sensitive_text(_coerce_diagnostic_text(stderr).strip()) or "<empty>"
+    )
+    safe_action = _scrub_sensitive_text(owner_action) or "<empty>"
     return RuntimeError(
         f"[DOCKER_STAGE={stage}] exit_code={exit_code}; command={safe_command}; "
         f"stderr={safe_stderr}; owner_action={safe_action}"
     )
 
 
-def _format_docker_warning(*, context: str, exit_code: int, stderr: str) -> str:
+def _format_docker_warning(*, context: object, exit_code: int, stderr: object) -> str:
     """Собрать безопасный warning для Docker cleanup без raw stderr."""
     safe_context = _scrub_sensitive_text(context) or "<empty>"
-    safe_stderr = _scrub_sensitive_text((stderr or "").strip()) or "<empty>"
+    safe_stderr = (
+        _scrub_sensitive_text(_coerce_diagnostic_text(stderr).strip()) or "<empty>"
+    )
     return _truncate_diagnostic(
         f"[WARNING] {safe_context}; rc={exit_code}; stderr={safe_stderr}"
     )
@@ -451,8 +471,8 @@ def _raise_docker_stage_error(
     stage: str,
     command: tuple[str, ...] | list[str],
     exit_code: int,
-    stderr: str,
-    owner_action: str,
+    stderr: object,
+    owner_action: object,
 ) -> None:
     """Сформировать fail-closed ошибку Docker-этапа с actionable текстом."""
     raise _docker_stage_error(
