@@ -818,9 +818,20 @@ FANIN_READY
   ∧ all started branches terminal
   ∧ checks 3–6 PASS
   ∧ checks 1–2 PASS or N/A with Owner-noted exceptions recorded
+  ∧ NO_OPEN_SAME_INVARIANT_CANDIDATES (HARD_BLOCK_READY)
 ```
 
 Otherwise `FANIN_INCOMPLETE` (do not claim lesson gate pass).
+
+**HARD_BLOCK_READY (episode):** any hunt/residual candidate with
+`RELATION_TO_ROOT_CANDIDATE=SAME_INVARIANT_FINDING` and
+`STATUS ∈ {open_candidate, OPEN_CANDIDATE}` that lacks a durable
+`FALSE_POSITIVE` / `OUT_OF_SCOPE` disposition **MUST** force
+`FANIN_INCOMPLETE`, populate `BLOCKING_FINDINGS`, and **MUST NOT** allow
+`CLOSURE_READINESS=READY_FOR_CLOSURE` or `BLOCKS_ROOT_CLOSURE=false`.
+Pasteable next: `/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`
+(or materialize sibling then fanout). See
+`.cursor/pipeline/contracts/bug-episode/FANIN.md`.
 
 ---
 

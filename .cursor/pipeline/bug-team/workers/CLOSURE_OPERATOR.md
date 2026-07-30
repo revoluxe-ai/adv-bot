@@ -25,6 +25,24 @@ Legacy OWNER_GATED:
   WORKER_IO + FANIN + OWNER_FINAL_CLOSURE_DECISION
 ```
 
+## HARD_BLOCK_READY gate (mandatory)
+
+Reject closure when FANIN / case map still has an open SAME_INVARIANT hunt
+candidate (`STATUS ∈ {open_candidate, OPEN_CANDIDATE}`, not durably
+`FALSE_POSITIVE` / `OUT_OF_SCOPE`). Required rejection status:
+
+```text
+BLOCKED_OPEN_SAME_INVARIANT_CANDIDATE
+```
+
+`BLOCKS_ROOT_CLOSURE=false` on such a residual MUST NOT authorize closure.
+Pasteable recovery: `/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`.
+Authority: `.cursor/pipeline/contracts/bug-episode/FANIN.md` HARD_BLOCK_READY.
+
+When closing (or when residuals were cleared this hop), INDEX recovery row
+MUST list any remaining OPEN_CANDIDATE debt or clear BLOCKERS accordingly
+(see `/opsx-materialize-bug-queue` INDEX rules).
+
 ## Learning gate (mandatory)
 
 Reject closure unless learning decision validates. Required rejection statuses:

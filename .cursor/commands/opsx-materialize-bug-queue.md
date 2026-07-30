@@ -188,7 +188,7 @@ Rules:
 * `LEDGER.md` is the operational source of truth for finding status and claim eligibility.
 * `findings/<FINDING_ID>.md` holds either a working packet or a closed false-positive record.
 * `handoffs/COMMON_HANDOFF.md` is the short shared handoff for new chats.
-* `INDEX.md` is the cross-case recovery board and status board for forgotten, claimed, blocked, backlog, and open findings.
+* `INDEX.md` is the cross-case recovery board and status board for forgotten, claimed, blocked, backlog, open findings, and open hunt candidates (`OPEN_CANDIDATES`, including SAME_INVARIANT residuals that HARD_BLOCK READY).
 
 ## INTAKE object
 
@@ -1382,6 +1382,7 @@ CURRENT_STAGE
 LAST_COMMAND
 LAST_ACTIVITY_AT
 OPEN_FINDINGS
+OPEN_CANDIDATES
 READY_FOR_FIX
 BLOCKERS
 NEXT_ACTION
@@ -1394,7 +1395,19 @@ Rules for the recovery row:
 * `CURRENT_STAGE` mirrors case stage (`intake_recorded`, `adjudicated`, `hunt_materialized`, etc.);
 * `LAST_COMMAND` is the last OPSX command that wrote the case map;
 * `NEXT_ACTION` MUST be an exact pasteable command (not prose);
-* after chat loss, opening `INDEX.md` MUST be enough to continue.
+* after chat loss, opening `INDEX.md` MUST be enough to continue;
+* `OPEN_CANDIDATES` MUST list every hunt/residual candidate with
+  `STATUS ∈ {open_candidate, OPEN_CANDIDATE}` (include `HUNT_CANDIDATE_ID`
+  and proposed `FINDING_ID` when known);
+* SAME_INVARIANT open candidates are HARD_BLOCK_READY debt: put them in
+  `BLOCKERS`, set `NEXT_ACTION` to
+  `/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`
+  (or materialize sibling then fanout), and **MUST NOT** imply case is
+  closable / READY_FOR_CLOSURE while they remain open;
+* after hunt or FANIN that surfaces such residuals, INDEX recovery MUST be
+  refreshed in the same operator session (FAN_IN_ASSEMBLER does not write
+  INDEX — orchestrator / `mode=update` / closure hop that already owns INDEX
+  refresh MUST fulfill this obligation).
 
 Recovery `NEXT_ACTION` may use orchestration stages when companions apply
 (still not ACTIVE until GO_ACTIVATE):
@@ -1407,6 +1420,7 @@ task_delta_changed       → /opsx-apply <change-id>   # still needs RED+Owner G
 task_delta_unchanged     → /opsx-fix-bug … WITHOUT GO
 red_pending              → /opsx-test case=<CASE_ID> finding=<FINDING_ID>
 production_go_ready      → /opsx-fix-bug … GO  or  /opsx-apply   # Owner GO only after RED
+FANIN_INCOMPLETE_SAME_INVARIANT_OPEN → /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 FANIN_READY              → /opsx-learn-from-bug … FANIN_PATH=…
 LESSON_CANDIDATE_ONLY    → Owner FINAL / keep candidate-only
 ```
@@ -1418,6 +1432,7 @@ FORGOTTEN_OR_STALE_CLAIMS
 CLAIMED_NOT_COMPLETED
 AVAILABLE_READY_TO_CLAIM
 READY_FOR_FIX
+OPEN_SAME_INVARIANT_CANDIDATES
 BLOCKED
 BACKLOG
 CLOSED_FALSE_POSITIVES
