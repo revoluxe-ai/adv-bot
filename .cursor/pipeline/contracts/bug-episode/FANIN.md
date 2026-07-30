@@ -65,9 +65,47 @@ FANIN_READY
   ∧ all started branches terminal
   ∧ checks 3–6 PASS
   ∧ checks 1–2 PASS or N/A with Owner-noted exceptions
+  ∧ NO_OPEN_SAME_INVARIANT_CANDIDATES (HARD_BLOCK_READY)
 ```
 
 Otherwise `FANIN_INCOMPLETE`.
+
+### HARD_BLOCK_READY — open SAME_INVARIANT candidates
+
+Hunt / residual candidates with:
+
+```text
+RELATION_TO_ROOT_CANDIDATE = SAME_INVARIANT_FINDING
+STATUS ∈ {open_candidate, OPEN_CANDIDATE}
+```
+
+that are **not** durably disposed as `FALSE_POSITIVE` or `OUT_OF_SCOPE`
+**MUST** block episode readiness.
+
+When any such candidate exists:
+
+```text
+STATUS: FANIN_INCOMPLETE
+BLOCKING_FINDINGS: include each HUNT_CANDIDATE_ID / PROPOSED_FINDING_ID
+CLOSURE_READINESS: MUST NOT be READY_FOR_CLOSURE
+BLOCKING_FINDINGS=NONE: FORBIDDEN
+BLOCKS_ROOT_CLOSURE=false for SAME_INVARIANT open candidates: FORBIDDEN
+```
+
+Required pasteable next (in FANIN / INDEX recovery):
+
+```text
+/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
+```
+
+(or materialize sibling finding, then fanout). Listing the residual only under
+`REMAINING_EXCEPTIONS` / `may_need_family_fanout` while claiming
+`FANIN_READY` / `READY_FOR_CLOSURE` is Forbidden.
+
+Allowed path to `FANIN_READY` after such a candidate appears:
+
+1. materialize + terminate the SAME_INVARIANT branch, **or**
+2. durable `FALSE_POSITIVE` / `OUT_OF_SCOPE` disposition record.
 
 ```text
 LEARNING_READY ≠ FANIN_READY

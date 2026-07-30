@@ -22,7 +22,15 @@ Common header: `packets/WORKER_IO.md`.
 
 ```text
 FANIN.md fields; STATUS FANIN_READY|FANIN_INCOMPLETE
+HARD_BLOCK_READY: open SAME_INVARIANT candidates → FANIN_INCOMPLETE
+  + BLOCKING_FINDINGS (never READY_FOR_CLOSURE / BLOCKS_ROOT_CLOSURE=false)
 ```
+
+Authority: `.cursor/pipeline/contracts/bug-episode/FANIN.md` (HARD_BLOCK_READY).
+Assembler MUST scan hunt residuals / `findings/HC-*` / FANIN input for
+`RELATION_TO_ROOT_CANDIDATE=SAME_INVARIANT_FINDING` with open_candidate status.
+If any remain undisposed → emit `FANIN_INCOMPLETE` and pasteable
+`/opsx-bug-team case=<CASE_ID> mode=resume-family-fanout`.
 
 ## WRITE_BOUNDARY
 
@@ -32,6 +40,9 @@ ALLOWED:
 FORBIDDEN:
   LEDGER; ROUTE-TRACE; CASE; findings; INDEX; production; tests; OpenSpec; .cursor; checkpoint
 ```
+
+INDEX obligation for open SAME_INVARIANT residuals is owned by
+`/opsx-materialize-bug-queue` / orchestrator INDEX refresh — not this worker.
 
 ACTIVE_V1 root fan-in. When V8 family fanout is Owner-enabled, prefer
 `FAMILY_FAN_IN_ASSEMBLER` / `results/FAMILY-FANIN.md` per

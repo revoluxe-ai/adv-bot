@@ -93,14 +93,22 @@ EXECUTION_IDENTITY_GATE: ACTIVE
 After root GREEN, the pipeline captures a testable invariant, materializes
 hunt candidates, classifies relation, fans out same-invariant branches with
 isolated patches, integrates, runs family-wide GREEN, family fan-in, learning,
-then family closure. Same-invariant hunt findings fan out automatically —
-no manual sibling relaunch. Resume:
-`case=<CASE_ID> mode=resume-family-fanout`.
+then family closure. Same-invariant hunt findings **MUST** fan out (or receive
+a durable FALSE_POSITIVE / OUT_OF_SCOPE disposition) **before** episode
+`FANIN_READY` / `READY_FOR_CLOSURE` — HARD_BLOCK_READY (see
+`.cursor/pipeline/contracts/bug-episode/FANIN.md` and
+`policy/BUG_FAMILY_FANOUT_POLICY.json` BLOCKING_RULES). Listing an
+`OPEN_CANDIDATE` SAME_INVARIANT residual as non-blocking
+(`BLOCKS_ROOT_CLOSURE=false` / `may_need_family_fanout` while READY) is
+Forbidden. If auto fanout did not run, emit `FANIN_INCOMPLETE` and resume:
+`case=<CASE_ID> mode=resume-family-fanout` (manual relaunch is recovery, not
+an optional skip of the gate).
 
 Relation outcomes:
 
 ```text
-SAME_INVARIANT_FINDING → branch fanout (blocks family closure until terminal)
+SAME_INVARIANT_FINDING → branch fanout (blocks family closure until terminal;
+                         also blocks episode FANIN_READY while OPEN_CANDIDATE)
 NEW_ROOT_CAUSE         → linked case (does not block parent family closure)
 FALSE_POSITIVE         → durable rejection
 OUT_OF_SCOPE           → durable handoff
@@ -279,7 +287,9 @@ DEFAULT after activation:
   (no WAITING_OWNER / Owner production GO)
 
   FANIN READY_FOR_CLOSURE → FAMILY_LEARNING_WORKER → auto CLOSURE_OPERATOR
-  (no WAITING_OWNER_FINAL_CLOSURE; learning decision mandatory)
+  (no WAITING_OWNER_FINAL_CLOSURE; learning decision mandatory;
+   HARD_BLOCK_READY: open SAME_INVARIANT OPEN_CANDIDATE forbids READY /
+   closure — resume-family-fanout first; INDEX must list residual debt)
 
 Legacy EXECUTION_MODE=OWNER_GATED:
   RED_CONFIRMED → STOP → OWNER_PRODUCTION_GO_DECISION
