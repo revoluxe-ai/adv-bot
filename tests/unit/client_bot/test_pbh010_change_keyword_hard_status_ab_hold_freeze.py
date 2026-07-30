@@ -12,7 +12,6 @@ reopen PBH-004. Asserts observable refuse under PENDING_SETUP / ACTIVE
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -20,7 +19,6 @@ import pytest
 
 from app.client_bot.user_interface.handlers.keyword_settings import (
     change_keyword_hard_status,
-    keyword_target_place_value,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
@@ -73,21 +71,6 @@ def _callback(*, keyword_id: int = 42, new_hard_status: int = 2) -> MagicMock:
         keyword_setting_original_id=keyword_id,
     )
     return callback, callback_data
-
-
-@pytest.mark.unit
-def test_pbh010_change_keyword_hard_status_wires_ab_hold_structural_freeze() -> None:
-    """Source of change_keyword_hard_status MUST contain freeze gate (peer TP does)."""
-    hard_src = inspect.getsource(change_keyword_hard_status)
-    tp_src = inspect.getsource(keyword_target_place_value)
-    assert "is_ab_hold_structural_freeze" in tp_src, (
-        "peer TP path unexpectedly lost is_ab_hold_structural_freeze"
-    )
-    assert "is_ab_hold_structural_freeze" in hard_src, (
-        "FINDING-PBH-010: change_keyword_hard_status missing "
-        "is_ab_hold_structural_freeze before hard_status / "
-        "sync_keyword_setting_mode_for_v3 commit"
-    )
 
 
 @pytest.mark.unit
