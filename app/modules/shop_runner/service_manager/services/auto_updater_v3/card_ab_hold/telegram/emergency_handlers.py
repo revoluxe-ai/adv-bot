@@ -112,6 +112,7 @@ async def emergency_educate_ack(
             )
             return
         mark_emergency_educated_in_memory(adv)
+        await session.commit()
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         status = await hold_handlers._screen_status_text(adv, mode)
         edu = _emergency_education_text()
@@ -176,6 +177,7 @@ async def emergency_confirm_execute(
         result = await apply_ab_hold_emergency_in_session(
             session, adv_setting_id=adv.id
         )
+        await session.commit()
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         text = format_emergency_user_result_text(result)
         await hold_handlers._notify_callback_user(query, text)
