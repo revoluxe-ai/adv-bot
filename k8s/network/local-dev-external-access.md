@@ -123,6 +123,8 @@ docker run -d --name adv-bot-redis -p 6379:6379 redis:7-alpine
 Test-NetConnection 127.0.0.1 -Port 6379
 ```
 
-## Альтернатива: port-forward
+## Port-forward (не канон)
 
-`DEV_TUNNELS_ENABLED=true` + `scripts/dev-tunnels.ps1` → `127.0.0.1:15432` / `:18123`.
+In-app / `scripts/dev-tunnels.ps1` удалены. Канон — публичный IP + NodePort из `.env`.
+Ручной `kubectl port-forward` — только с явным Owner GO; `DEV_TUNNELS_ENABLED`
+должен оставаться `false`/`unset` для destructive tests.
