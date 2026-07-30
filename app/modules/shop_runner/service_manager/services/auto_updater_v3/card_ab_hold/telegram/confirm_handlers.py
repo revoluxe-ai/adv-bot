@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, cast
 
 from aiogram import Router
@@ -193,10 +194,10 @@ def _parse_auto_bid_text(text: str | None) -> float | None:
 
 
 async def _maybe_answer(message: Any, text: str, **kwargs: Any) -> None:
-    """Безопасно вызвать ``message.answer`` (Message или unit SimpleNamespace).
+    """Вызвать ``message.answer``, если у объекта есть callable ``answer``.
 
     Args:
-        message: aiogram Message или mock с callable ``answer``.
+        message: aiogram Message (или duck-typed объект с ``answer``).
         text: текст ответа.
         **kwargs: доп. аргументы ``answer`` (например ``reply_markup``).
     """
@@ -355,17 +356,41 @@ def _tp_rows_from_adv(
     return rows
 
 
-async def _load_factual_positions(adv: AdvSetting) -> dict[str, float]:
+KeywordsForKeyboardLoader = Callable[[AdvSetting], Awaitable[list[Any]]]
+"""Injectable loader for ``_load_factual_positions`` (default: keyboard CH/PG path)."""
+
+
+async def _load_factual_positions(
+    adv: AdvSetting,
+    *,
+    keywords_loader: KeywordsForKeyboardLoader | None = None,
+) -> dict[str, float]:
     """Текущие наблюдаемые позиции ключей (Telegram UI read-model).
 
     Источник — тот же путь, что keyword-клавиатура бота
     (``fetch_keywords_from_database`` / CH+PG), не Redis-only snapshot и не
     колонка AdvSetting. Сырая ``cluster_stat.position`` (без floor-to-1),
     чтобы proposed TP мог отфильтровать non-positive.
+
+    Injectable ``keywords_loader`` (default ``get_keywords_for_keyboard``)
+    делает CH/PG boundary тестируемой без module-level patch: parent/tests
+    передают loader, production path остаётся без изменений при ``None``.
+
+    Args:
+        adv: кампания, для которой читаются позиции.
+        keywords_loader: optional override keyboard/CH read-model loader.
+
+    Returns:
+        Mapping ``keyword_text → raw cluster position``.
     """
     from app.client_bot.utils import get_keywords_for_keyboard
 
-    keywords = await get_keywords_for_keyboard(adv)
+    loader = (
+        keywords_loader
+        if keywords_loader is not None
+        else get_keywords_for_keyboard
+    )
+    keywords = await loader(adv)
     out: dict[str, float] = {}
     for kw in keywords:
         out[str(kw.text)] = float(kw.cluster_stat.position)
@@ -1074,14 +1099,7 @@ async def on_auto_bid_numeric_message(
     revision = int(draft["revision"])
     text = build_a2_text(auto_bid=bid)
     kb = build_a2_keyboard(adv_id=adv_id, revision=revision, auto_bid=bid)
-    try:
-        await _maybe_answer(message, text, reply_markup=kb)
-    except TypeError:
-        # Unit SimpleNamespace / mocks without reply_markup support.
-        await _maybe_answer(
-            message,
-            f"Ставка Auto в черновике: {bid:g}. Подтвердите на экране A2.",
-        )
+    await _maybe_answer(message, text, reply_markup=kb)
 
 @card_ab_hold_confirm_router.callback_query(CahSyncStatusRefresh.filter())
 async def on_sync_refresh(

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, cast
 from uuid import uuid4
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.hold_guards import (
@@ -371,13 +371,18 @@ async def process_ab_hold(
     if recovery_on_ids:
         # PBH-009: epoch confirmed JSON SoT is text→TP; resolve to id→TP
         # so recovery_on restores KeywordSetting.target_place after OFF cleared it.
-        tp_raw = getattr(
-            complex_adv.adv_setting,
-            "card_ab_hold_confirmed_target_places_json",
-            None,
-        ) or {}
+        tp_raw = cast(
+            dict[str, object],
+            getattr(
+                complex_adv.adv_setting,
+                "card_ab_hold_confirmed_target_places_json",
+                None,
+            )
+            or {},
+        )
         text_to_tp: dict[str, int] = {
-            str(text).lower(): int(place) for text, place in dict(tp_raw).items()
+            str(text).lower(): int(cast(int | str | float, place))
+            for text, place in tp_raw.items()
         }
         confirmed_target_places: dict[int, int] = {}
         recovery_id_set = {int(i) for i in recovery_on_ids}
@@ -389,13 +394,14 @@ async def process_ab_hold(
             place = text_to_tp.get(text)
             if place is not None:
                 confirmed_target_places[ks_id] = place
-        recovery_kwargs: dict[str, object] = {
-            "adv_id": int(complex_adv.adv_id),
-            "keyword_ids": recovery_on_ids,
-        }
-        if confirmed_target_places:
-            recovery_kwargs["confirmed_target_places"] = confirmed_target_places
-        _ = await apply_ab_hold_pfo_recovery_ons(**recovery_kwargs)
+        _ = await apply_ab_hold_pfo_recovery_ons(
+            adv_id=int(complex_adv.adv_id),
+            keyword_ids=recovery_on_ids,
+            confirmed_target_places=cast(
+                Mapping[int | str, int] | None,
+                confirmed_target_places if confirmed_target_places else None,
+            ),
+        )
 
     fact = complex_adv.fact_pay_for_order
     if not is_ab_hold_campaign_deep_overspend(
