@@ -7,16 +7,17 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 31
+- inventory_count: 33
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: c445c45ab28d3cf6dc3d06f381b2155f927db0fa
+- source_commit: f04a0bccf2643336eea5a3e4f0660ea344e8637e
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-29T05:36:55Z: inventory 31; fingerprint
-  6b60f06b851ee1655b67a6887111b997; added /opsx-close-external-gap
-  for PG/CH REFACTOR_AND_TEST (packet-in, no base=).
+  UPDATE GO 2026-07-30T04:38:13Z: inventory 33; fingerprint
+  d8acc1c0ce8e215eb1ef01c39f667f07; added /opsx-performance-review
+  and /opsx-performance-fix; soft chain
+  external-call → performance (trigger) → static-check; F10 closed.
 
 ## States
 
@@ -27,7 +28,7 @@
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
 - scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
-- impl_done: tasks complete; soft-recommend pyright then external-call coverage when production `.py`, then verify
+- impl_done: tasks complete; soft-recommend pyright then external-call then conditional performance-review when production `.py`, then static-check / verify
 - verify_pass: archive-eligible after `/opsx-verify`
 - verify_fail: back to apply/update
 - archived: `/opsx-archive` done
@@ -98,6 +99,12 @@
 - focus_pass_incomplete_gate: external-call PASS with focus≠all (full gate not closed)
 - external_gap_closing: `/opsx-close-external-gap` REFACTOR_AND_TEST (PG/CH) in progress
 - external_gap_closed: close STATUS=CLOSED; await focused re-audit
+- performance_review_pending: soft gate after external_call_pass when performance trigger applies
+- performance_pass: PASS | PASS_WITH_RISK | NOT_APPLICABLE | empty_scope / no surfaces
+- performance_fail: FAIL (+ PERFORMANCE_FIX_PACKET) | DATA_GAP on fix/measurement path
+- performance_fixing: `/opsx-performance-fix` applying packet (no independent PASS)
+- performance_reaudit_pending: READY_FOR_PERFORMANCE_REAUDIT → independent review
+- performance_measure_authorized: READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN (owner unlocks one run inside fix)
 - static_check_done: `/opsx-static-check` synthesized
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
@@ -171,7 +178,7 @@
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
 - artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
-- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
+- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode) | /opsx-project-bug-hunt
 - known_flaws: none recorded (ADL budget-exhaust→NO_GO closed 2026-07-27); task delta ≠ auto GO
 
 ### /opsx-pyright-strict-coverage
@@ -191,8 +198,28 @@
 - artifacts_read: git diff base...head; app/**; tests/**; testing-rules.mdc; optional EXTERNAL_CALL_COVERAGE_REPORT / change artifacts
 - artifacts_written: none (v1 read-only; chat report / optional pasted EXTERNAL_CALL_COVERAGE_REPORT)
 - decision_owner: coverage auditor for dispositions; archive remains /opsx-verify
-- next_typical: /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
+- next_typical: /opsx-performance-review (when trigger applies) | /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
 - known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration
+
+### /opsx-performance-review
+- purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
+- input_state: external_call_pass | impl_done | performance_reaudit_pending | performance_review_pending | product_dirty
+- output_state: performance_pass | performance_fail | performance_measure_authorized | performance_review_pending
+- artifacts_read: scoped git/app Python; optional PERFORMANCE_FIX_RESULT / MEASUREMENT_RESULT
+- artifacts_written: none (chat report / packets only)
+- decision_owner: independent performance reviewer (not fixer self-report)
+- next_typical: /opsx-static-check (PASS|PASS_WITH_RISK|empty/no surfaces) | /opsx-performance-fix + FIX_PACKET (FAIL) | re-run after measurement
+- known_flaws: soft conditional gate (not every-diff hard archive gate); default scope=staged can empty_scope-PASS while working dirty; no /opsx-performance-run
+
+### /opsx-performance-fix
+- purpose: apply PERFORMANCE_FIX_PACKET; optional one-shot measurement only under review-issued READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN; never issues independent PASS
+- input_state: performance_fail | performance_fixing | performance_measure_authorized
+- output_state: performance_reaudit_pending | performance_fixing | performance_fail
+- artifacts_read: pasted FIX_PACKET / AUTHORIZATION; causal paths
+- artifacts_written: scoped app/** + tests per packet; measurement artifacts only under auth
+- decision_owner: fixer (bounded); independent verdict remains /opsx-performance-review
+- next_typical: /opsx-performance-review + PERFORMANCE_FIX_RESULT | measure under auth then review
+- known_flaws: fixer self-report ≠ PASS; no invented /opsx-performance-run; do not strip Queue/Semaphore/Lock/Redis NX/caps without proof
 
 ### /opsx-close-external-gap
 - purpose: REFACTOR_AND_TEST closure for PG/CH gaps from coverage packet (minimal seam + live integration); no base=
@@ -397,7 +424,7 @@
 
 ### /opsx-static-check
 - purpose: orchestrated FAST/FULL static checks (read-only)
-- input_state: implementing | impl_done | static_check_done
+- input_state: implementing | impl_done | performance_pass | external_call_pass | static_check_done
 - output_state: static_check_done
 - artifacts_read: registry + check outputs
 - artifacts_written: none (read-only)
@@ -448,7 +475,12 @@ artifacts_in_progress --/opsx-continue--> apply_ready
 apply_ready --/opsx-apply--> implementing|impl_done
 impl_done --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 coverage_pass --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
-external_call_pass --/opsx-static-check--> static_check_done
+external_call_pass --/opsx-performance-review [trigger REQUIRED|RECOMMENDED]--> performance_pass|performance_fail|performance_measure_authorized|performance_review_pending
+external_call_pass --/opsx-static-check [trigger NOT_APPLICABLE / operator skip]--> static_check_done
+performance_pass --/opsx-static-check--> static_check_done
+performance_fail --/opsx-performance-fix--> performance_reaudit_pending|performance_fixing
+performance_reaudit_pending --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
+performance_measure_authorized --/opsx-performance-fix AUTHORIZE_ONE_PERFORMANCE_RUN--> performance_reaudit_pending
 coverage_pass --/opsx-static-check--> static_check_done
 coverage_gaps --/opsx-pyright-strict-coverage GO|/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 external_call_gaps --/opsx-test--> tests_authored
@@ -457,6 +489,7 @@ external_gap_closed --/opsx-external-call-coverage--> external_call_pass|externa
 external_call_gaps --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
 focus_pass_incomplete_gate --/opsx-external-call-coverage--> external_call_pass|external_call_gaps
 impl_done --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
+impl_done --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
 impl_done --/opsx-verify--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
@@ -540,7 +573,7 @@ family_learning --/opsx-bug-team CLOSURE--> family_closed
 # resume: /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
-implementing|impl_done|coverage_pass|external_call_pass --/opsx-static-check--> static_check_done
+implementing|impl_done|coverage_pass|external_call_pass|performance_pass --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
 # command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
@@ -568,10 +601,11 @@ archive by itself.
 
 After pyright-coverage `PASS` (or when allowlist already known good) and
 production `.py` changed: recommend
-`/opsx-external-call-coverage base=<BASE>` before `/opsx-static-check` and
-`/opsx-verify`. One command covers HTTP/WB/PG/CH/Redis/OTHER via kind
-taxonomy (`focus=` optional for debug only). Soft recommend — absence of
-report does not auto-`NO_GO` verify; open gaps in a present
+`/opsx-external-call-coverage base=<BASE>` before conditional
+`/opsx-performance-review`, `/opsx-static-check`, and `/opsx-verify`. One
+command covers HTTP/WB/PG/CH/Redis/OTHER via kind taxonomy (`focus=`
+optional for debug only). Soft recommend — absence of report does not
+auto-`NO_GO` verify; open gaps in a present
 `EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not** replace
 `TEST_COVERAGE_PACKET`.
 
@@ -580,6 +614,18 @@ Closure split after FAIL:
 * TEST_ONLY (Redis/WB/…) → `/opsx-test` → focused re-audit
 * REFACTOR_AND_TEST (PG/CH) → `/opsx-close-external-gap` with pasted
   report (**no** `base=` on close) → focused re-audit
+
+### Post-apply performance review (conditional)
+
+After external-call `PASS`, when performance trigger applies (DB/query/
+repository; Queue/TasksManager/`run_tasks`/`gather`/`create_task`;
+Semaphore/Lock/Redis NX; pool/cap/rate-limit/retry/backpressure): soft
+recommend `/opsx-performance-review scope=base base=<BASE>` before
+`/opsx-static-check`. Not every-diff mandatory. `FAIL` →
+`/opsx-performance-fix` + FIX_PACKET → independent re-audit via review
+(fixer self-report is never PASS). Measurement only under
+`READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
+`/opsx-performance-run`. Operator may skip soft gate (deviation allowed).
 
 ### Pre-Bugbot primary hunt
 
@@ -727,6 +773,17 @@ command-contract classes (F6).
   operator_workaround: /opsx-project-bug-hunt directly; then UPDATE GO
   do_not_pretend_fixed: false (closed by this materialization)
 
+- id: F10 GRAPH_MISSING_PERFORMANCE
+  where: .cursor/pipeline/GRAPH.md (pre 2026-07-30T04:38:13Z UPDATE)
+  symptom: |
+    NAVIGATE skipped /opsx-performance-review and /opsx-performance-fix;
+    quality chain jumped external_call_pass→static-check only despite
+    /opsx-apply soft handoff
+  operator_workaround: |
+    /opsx-performance-review scope=base base=<BASE> directly when trigger
+    applies; FAIL → /opsx-performance-fix + packet → re-audit
+  do_not_pretend_fixed: false (closed by this materialization)
+
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
@@ -748,10 +805,13 @@ command-contract classes (F6).
   (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
 - After apply with production `.py`: soft recommend
   `/opsx-pyright-strict-coverage base=<BASE>` then
-  `/opsx-external-call-coverage base=<BASE>` before `/opsx-static-check` /
-  `/opsx-verify` (allowlist coverage ≠ checker PASS; external-call PASS ≠
+  `/opsx-external-call-coverage base=<BASE>` then conditional
+  `/opsx-performance-review scope=base base=<BASE>` (when trigger applies)
+  before `/opsx-static-check` / `/opsx-verify` (allowlist coverage ≠
+  checker PASS; external-call PASS ≠ archive GO; performance PASS ≠
   archive GO; kinds stay inside one audit; PG/CH FAIL →
-  `/opsx-close-external-gap` packet-in, not per-dep audit commands)
+  `/opsx-close-external-gap` packet-in, not per-dep audit commands;
+  performance FAIL → `/opsx-performance-fix` then independent re-audit)
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
 - Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
