@@ -176,7 +176,7 @@ Authority: `.cursor/rules/opsx-clickable-loc-link-contract.mdc`.
 | KIND | Default MINIMUM_LEVEL for durable I/O adapters | Notes |
 |------|-----------------------------------------------|-------|
 | `PG` | `integration` | живой `async_session` / real sm; session `AsyncMock` alone → **not** COVERED; также проверить **session mode** (ниже) |
-| `CH` | `integration` | живой `clickhouse_client`; mocked CH client alone → **not** COVERED |
+| `CH` | `integration` | живой `clickhouse_client`; mocked CH client alone → **not** COVERED; SQL rewrite mocked away → `WEAK` `SQL_REWRITE_MOCKED_AWAY` |
 | `REDIS` | `boundary_adapter` or `integration` (fakeredis OK) | fakeredis roundtrip acceptable |
 | `WB_WRITE` | `orchestration_seam` | mock WB **after** causal/write-gate boundary OK |
 | `HTTP` | `orchestration_seam` / `boundary_adapter` | client fake after seam OK |
@@ -201,6 +201,13 @@ Authority: `.cursor/rules/opsx-clickable-loc-link-contract.mdc`.
   и передаёт в child callable, где выполняется store-работа. Если changed
   boundary оставляет child-only создание session/client без handoff — помечай
   `UNTESTABLE_SEAM` с `NOTE=NO_PARENT_SESSION_HANDOFF`.
+* Для KIND=`CH`|`PG` surfaces, чей changed hunk включает SQL/query text или
+  db/table qualification: если единственные tests `patch`/`AsyncMock` **producer
+  callable**, так что новый SQL никогда не выполняется →
+  `DISPOSITION=WEAK_EVIDENCE` с `NOTE=SQL_REWRITE_MOCKED_AWAY` (FAIL-set).
+  Handoff-only green **недостаточен** для `COVERED` на этом surface.
+  (Capturing fake client, вызывающий rewritten callable, — минимум для
+  снятия этого NOTE; live fixture всё ещё нужен для `COVERED`.)
 
 ### PG session mode check (mandatory for KIND=PG)
 
@@ -273,7 +280,7 @@ Dispositions (per surface):
 |-------------|---------|
 | `COVERED` | есть test evidence ≥ `MINIMUM_LEVEL` с real causal path |
 | `MISSING_TEST` | surface testable; адекватного test нет |
-| `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak / **PG\|CH только session-mock** / **PG_WRONG_SESSION_MODE** / **PG_IMPLICIT_SESSION_MODE** |
+| `WEAK_EVIDENCE` | test есть, но name/green без seam proof / write-gate weak / **PG\|CH только session-mock** / **PG_WRONG_SESSION_MODE** / **PG_IMPLICIT_SESSION_MODE** / **SQL_REWRITE_MOCKED_AWAY** (changed SQL/qualification, producer fully mocked) |
 | `UNTESTABLE_SEAM` | нельзя написать адекватный (esp. live PG/CH) test без production seam/DI; для new/changed PG/CH include `NOTE=NO_INJECTABLE_SEAM` когда session/client создаётся только внутри callable |
 | `OUT_OF_POLICY` | не in-policy |
 | `NO_EXTERNAL_SURFACE` | in-policy file/hunk без внешней границы |
@@ -611,6 +618,8 @@ COPY_PASTE_RUNBOOK:
   `/opsx-close-external-gap` — для них `/opsx-performance-review` /
   `/opsx-performance-fix`.
 * Не считать unit green / session-mock PG|CH доказанным coverage.
+* Не считать COVERED handoff-only tests, что patch away producer с
+  changed PG/CH SQL/qualification (`SQL_REWRITE_MOCKED_AWAY` → WEAK).
 * Не считать COVERED PG WRITE / READ_AFTER_WRITE на `read_only=True`.
 * Не считать COVERED bare `sm()` (`PG_IMPLICIT_SESSION_MODE`).
 * Не считать COVERED PURE_READ на `read_only=False`.
@@ -669,6 +678,7 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 - [ ] Runbook без нерезолвнутых `<BASE>`/`<HEAD>` когда refs known
 - [ ] MINIMUM_LEVEL следует testing-rules; PG/CH default integration
 - [ ] session-mock PG/CH не объявлен COVERED
+- [ ] changed CH/PG SQL/qualification + producer fully mocked → WEAK `SQL_REWRITE_MOCKED_AWAY` (не COVERED)
 - [ ] PG surfaces имеют INTENT; bare `sm()` → WEAK `PG_IMPLICIT_SESSION_MODE`
 - [ ] wrong polarity (WRITE/RAW→True, PURE_READ→False) → WEAK `PG_WRONG_SESSION_MODE`
 - [ ] PG/CH FAIL → close-external-gap, не «просто /opsx-test»
