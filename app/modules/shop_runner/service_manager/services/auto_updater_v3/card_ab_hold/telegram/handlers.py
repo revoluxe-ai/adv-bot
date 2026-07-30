@@ -13,6 +13,7 @@ import logging
 from aiogram import Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, noload
 
 from app.client_bot.user_interface.helpers.wb_user_cabinet import (
@@ -322,8 +323,8 @@ async def open_card_ab_hold_menu(
 ) -> None:
     """Открыть инструкцию A/B Hold (spec card-ab-hold-mode paid-only UI)."""
     async with sm(read_only=True) as session:
-        adv = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
+        adv = await load_adv_setting_for_ab_hold_menu(
+            session, callback_data.adv_setting_original_id
         )
         if adv is None or not is_card_ab_hold_ui_visible(adv):
             await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -337,6 +338,81 @@ async def open_card_ab_hold_menu(
             mode,
             phase=getattr(adv, "card_ab_hold_phase", None),
         )
+
+
+async def load_adv_setting_for_ab_hold_menu(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить AdvSetting для S0/menu handlers (PURE_READ session).
+
+    Args:
+        session: injectable async session.
+        adv_setting_original_id: ``AdvSetting.id``.
+
+    Returns:
+        AdvSetting или None.
+    """
+    return await session.scalar(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    )
+
+
+async def load_adv_setting_for_enable_gates(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить AdvSetting для enable gates (PURE_READ session)."""
+    return await session.scalar(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    )
+
+
+async def load_adv_setting_after_enable(
+    session: AsyncSession,
+    adv_setting_id: int,
+) -> AdvSetting | None:
+    """Re-read AdvSetting после ``start_epoch_on_enable`` (READ_AFTER_WRITE)."""
+    return await session.scalar(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_id)
+    )
+
+
+async def disable_card_ab_hold_in_session(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """EXIT: mode OFF + clear snapshot/epoch fields в переданной WRITE session.
+
+    Returns:
+        Обновлённый AdvSetting или None, если не найден / UI скрыт.
+    """
+    adv = await session.scalar(
+        select(AdvSetting)
+        .options(noload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_setting_original_id)
+    )
+    if adv is None or not is_card_ab_hold_ui_visible(adv):
+        return None
+    adv.card_ab_hold_mode = CardAbHoldMode.OFF.value
+    adv.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
+    for field, value in clear_epoch_fields_values().items():
+        setattr(adv, field, value)
+    await session.commit()
+    return adv
+
+
+async def load_adv_setting_for_back(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить AdvSetting + wb_cabinet для Back → AdvSettingMenu."""
+    adv_stmt = (
+        select(AdvSetting)
+        .options(joinedload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_setting_original_id)
+    )
+    return (await session.execute(adv_stmt)).scalar_one_or_none()
 
 
 async def _handle_ab_hold_enable(
@@ -359,8 +435,8 @@ async def _handle_ab_hold_enable(
     LastAbort/ACTIVE.
     """
     async with sm(read_only=True) as session:
-        adv = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+        adv = await load_adv_setting_for_enable_gates(
+            session, adv_setting_original_id
         )
         if adv is None or not can_enable_card_ab_hold(adv):
             await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -476,9 +552,7 @@ async def _handle_ab_hold_enable(
         shop_id=shop_id,
     )
     async with sm(read_only=False) as session:
-        adv = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-        )
+        adv = await load_adv_setting_after_enable(session, adv_setting_id)
         if adv is None:
             await _notify_callback_user(query, "Кампания не найдена")
             return
@@ -535,8 +609,8 @@ async def cancel_card_ab_hold_enable(
 ) -> None:
     """§2c «Отмена» soft-warning объёма: mode остаётся OFF, ENTER не пишется."""
     async with sm(read_only=True) as session:
-        adv = await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == callback_data.adv_setting_original_id)
+        adv = await load_adv_setting_for_ab_hold_menu(
+            session, callback_data.adv_setting_original_id
         )
         if adv is None or not is_card_ab_hold_ui_visible(adv):
             await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -567,21 +641,12 @@ async def disable_card_ab_hold(
     сбрасываются в той же PG-транзакции, что и mode→OFF.
     """
     async with sm(read_only=False) as session:
-        # noload: EXIT пишет только AdvSetting epoch/mode; join WBCabinet не нужен
-        # (и ломает disposable live-PG stub без полного графа cabinet).
-        adv = await session.scalar(
-            select(AdvSetting)
-            .options(noload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == callback_data.adv_setting_original_id)
+        adv = await disable_card_ab_hold_in_session(
+            session, callback_data.adv_setting_original_id
         )
-        if adv is None or not is_card_ab_hold_ui_visible(adv):
+        if adv is None:
             await _notify_callback_user(query, "Доступно только при включённом боте")
             return
-        adv.card_ab_hold_mode = CardAbHoldMode.OFF.value
-        adv.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
-        for field, value in clear_epoch_fields_values().items():
-            setattr(adv, field, value)
-        await session.commit()
         cache = CardAbHoldSignalRedisCache(adv)
         await cache.clear()
         # decision §19: EXIT снимает done-маркер ENTER common-bid reset.
@@ -638,12 +703,7 @@ async def back_from_card_ab_hold(
     telegram_user_id = query.from_user.id
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=True) as session:
-        adv_stmt = (
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_setting_original_id)
-        )
-        adv = (await session.execute(adv_stmt)).scalar_one_or_none()
+        adv = await load_adv_setting_for_back(session, adv_setting_original_id)
         if adv is None:
             await bot.send_message(chat_id, "Кампания не найдена.")
             return

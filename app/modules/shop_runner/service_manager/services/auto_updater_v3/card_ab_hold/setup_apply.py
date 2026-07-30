@@ -17,6 +17,7 @@ import logging
 import math
 
 from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
@@ -52,6 +53,60 @@ def ab_hold_target_place_from_keyword(keyword: CalculatedKeyword) -> int | None:
     if pos <= 0:
         return None
     return clamp_not_full_target_place(int(math.floor(pos + 0.5)))
+
+
+async def apply_ab_hold_setup_mutations_in_session(
+    session: AsyncSession,
+    *,
+    adv_setting_id: int,
+    fail_ids: list[int],
+    pass_updates: list[tuple[int, int]],
+    snapshot: list[str],
+    degraded: bool,
+    epoch_managed: bool,
+) -> None:
+    """Persist ENTER FAIL/OFF (+ legacy ACTIVE/TP) в переданной PG session.
+
+    Args:
+        session: injectable async session (WRITE).
+        adv_setting_id: ``AdvSetting.id``.
+        fail_ids: keyword_setting ids для OFF.
+        pass_updates: ``(keyword_setting_id, target_place)`` для legacy PASS.
+        snapshot: allowed-phrases snapshot (legacy ACTIVE path).
+        degraded: honest degradation flag (legacy ACTIVE path).
+        epoch_managed: True — не писать TP/ACTIVE.
+    """
+    off_hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
+    if fail_ids:
+        stmt_off = (
+            update(KeywordSetting)
+            .where(KeywordSetting.id.in_(fail_ids))
+            .values(
+                hard_status=off_hs,
+                strategy_mode=KeywordStrategyMode.OFF,
+                target_place=None,
+            )
+        )
+        _ = await session.execute(stmt_off)
+    if not epoch_managed:
+        for ks_id, place in pass_updates:
+            stmt_tp = (
+                update(KeywordSetting)
+                .where(KeywordSetting.id == ks_id)
+                .values(target_place=place)
+            )
+            _ = await session.execute(stmt_tp)
+        stmt_mode = (
+            update(AdvSetting)
+            .where(AdvSetting.id == adv_setting_id)
+            .values(
+                card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+                card_ab_hold_allowed_phrases_snapshot=snapshot,
+                card_ab_hold_degraded=degraded,
+            )
+        )
+        _ = await session.execute(stmt_mode)
+    await session.commit()
 
 
 async def apply_ab_hold_setup_mutations(
@@ -103,38 +158,16 @@ async def apply_ab_hold_setup_mutations(
     snapshot: list[str] = (
         list(allowed_phrases_snapshot) if allowed_phrases_snapshot is not None else []
     )
-    off_hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
     async with sm(read_only=False) as session:
-        if fail_ids:
-            stmt_off = (
-                update(KeywordSetting)
-                .where(KeywordSetting.id.in_(fail_ids))
-                .values(
-                    hard_status=off_hs,
-                    strategy_mode=KeywordStrategyMode.OFF,
-                    target_place=None,
-                )
-            )
-            _ = await session.execute(stmt_off)
-        if not epoch_managed:
-            for ks_id, place in pass_updates:
-                stmt_tp = (
-                    update(KeywordSetting)
-                    .where(KeywordSetting.id == ks_id)
-                    .values(target_place=place)
-                )
-                _ = await session.execute(stmt_tp)
-            stmt_mode = (
-                update(AdvSetting)
-                .where(AdvSetting.id == adv_setting_id)
-                .values(
-                    card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
-                    card_ab_hold_allowed_phrases_snapshot=snapshot,
-                    card_ab_hold_degraded=degraded,
-                )
-            )
-            _ = await session.execute(stmt_mode)
-        await session.commit()
+        await apply_ab_hold_setup_mutations_in_session(
+            session,
+            adv_setting_id=adv_setting_id,
+            fail_ids=fail_ids,
+            pass_updates=pass_updates,
+            snapshot=snapshot,
+            degraded=degraded,
+            epoch_managed=epoch_managed,
+        )
 
     logger.info(
         "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s "
@@ -148,6 +181,22 @@ async def apply_ab_hold_setup_mutations(
         "PENDING (epoch gate)" if epoch_managed else "ACTIVE",
     )
     return pass_count, len(fail_ids)
+
+
+async def persist_ab_hold_degraded_flag_in_session(
+    session: AsyncSession,
+    *,
+    adv_setting_id: int,
+    degraded: bool,
+) -> None:
+    """Персистить ``card_ab_hold_degraded`` в переданной PG session."""
+    stmt = (
+        update(AdvSetting)
+        .where(AdvSetting.id == adv_setting_id)
+        .values(card_ab_hold_degraded=degraded)
+    )
+    _ = await session.execute(stmt)
+    await session.commit()
 
 
 async def persist_ab_hold_degraded_flag(
@@ -168,13 +217,9 @@ async def persist_ab_hold_degraded_flag(
             open-match); False — поверхность равна замороженному allowed-set.
     """
     async with sm(read_only=False) as session:
-        stmt = (
-            update(AdvSetting)
-            .where(AdvSetting.id == adv_setting_id)
-            .values(card_ab_hold_degraded=degraded)
+        await persist_ab_hold_degraded_flag_in_session(
+            session, adv_setting_id=adv_setting_id, degraded=degraded
         )
-        _ = await session.execute(stmt)
-        await session.commit()
     logger.info(
         "[adv_setting_id=%s] ab_hold degraded flag persisted degraded=%s",
         adv_setting_id,

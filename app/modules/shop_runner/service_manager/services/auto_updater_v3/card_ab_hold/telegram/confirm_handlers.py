@@ -23,6 +23,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
 
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
@@ -641,27 +642,56 @@ async def _render_for_adv(
     await _edit_confirm_screen(query, text, kb)
 
 
+async def _load_adv_in_session(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить AdvSetting в переданной PURE_READ session.
+
+    Args:
+        session: injectable async session.
+        adv_setting_original_id: ``AdvSetting.id``.
+
+    Returns:
+        AdvSetting или None.
+    """
+    return await session.scalar(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    )
+
+
 async def _load_adv(adv_setting_original_id: int) -> AdvSetting | None:
+    """Загрузить AdvSetting через production ``sm(read_only=True)`` seam."""
     async with sm(read_only=True) as session:
-        return await session.scalar(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
-        )
+        return await _load_adv_in_session(session, adv_setting_original_id)
+
+
+async def _abort_epoch_mode_off_in_session(
+    session: AsyncSession,
+    adv_setting_id: int,
+) -> AdvSetting | None:
+    """Mode → OFF + clear allowed snapshot в переданной WRITE session.
+
+    Returns:
+        Обновлённый AdvSetting или None.
+    """
+    row = await session.scalar(
+        select(AdvSetting)
+        .options(noload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_setting_id)
+    )
+    if row is None:
+        return None
+    row.card_ab_hold_mode = CardAbHoldMode.OFF.value
+    row.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
+    await session.commit()
+    return row
 
 
 async def _abort_epoch_to_off(adv: AdvSetting) -> None:
     """Abort epoch attempt → OFF (§8, nothing durable to clear on fresh S1)."""
     async with sm(read_only=False) as session:
-        # noload: abort пишет только AdvSetting; full WBCabinet join не нужен.
-        row = await session.scalar(
-            select(AdvSetting)
-            .options(noload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv.id)
-        )
-        if row is None:
-            return
-        row.card_ab_hold_mode = CardAbHoldMode.OFF.value
-        row.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
-        await session.commit()
+        _ = await _abort_epoch_mode_off_in_session(session, int(adv.id))
     await clear_epoch_on_exit(int(adv.id))
     await CardAbHoldSignalRedisCache(adv).clear()
     await CardAbHoldSetupBlockRedisCache(adv).clear()
