@@ -6,6 +6,8 @@ Spec ``card-ab-hold-mode`` / tasks §18.4:
 - Epoch-managed (``epoch_managed=True``): FAIL → OFF Allowed; PASS MUST NOT write
   target_place; MUST NOT set mode ACTIVE (TP only after confirm; ACTIVE only after
   PENDING intent → WB sync).
+- Owner A_PRIME / PBH-002: PASS after prior PFO latch → ``recovery_on`` /
+  ``return_on`` (strategy_mode restore to MIN_CPA); membership unchanged.
 
 Использует тот же SQLAlchemy update-паттерн, что ``WhiteListTrimmer`` —
 без full NORMAL preamble (decision write-path ownership).
@@ -45,6 +47,20 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 logger = logging.getLogger(__name__)
 
+# Owner A_PRIME: operable ladder floor when auto_on / restore_on after PFO latch.
+_AB_HOLD_RECOVERY_ON_MODE = KeywordStrategyMode.MIN_CPA
+
+
+def _keyword_strategy_is_off(keyword: CalculatedKeyword) -> bool:
+    """True, если текущий ``strategy_mode`` — OFF (PFO safety latch)."""
+    mode = getattr(keyword, "strategy_mode", None)
+    if mode is None:
+        return False
+    try:
+        return int(mode) == int(KeywordStrategyMode.OFF)
+    except (TypeError, ValueError):
+        return mode is KeywordStrategyMode.OFF
+
 
 def ab_hold_target_place_from_keyword(keyword: CalculatedKeyword) -> int | None:
     """Предложенная ЦП из фактической позиции ключа (чистое предложение).
@@ -67,8 +83,9 @@ async def apply_ab_hold_setup_mutations_in_session(
     snapshot: list[str],
     degraded: bool,
     epoch_managed: bool,
+    recovery_on_ids: list[int] | None = None,
 ) -> None:
-    """Persist ENTER FAIL/OFF (+ legacy ACTIVE/TP) в переданной PG session.
+    """Persist ENTER FAIL/OFF (+ return_on / legacy ACTIVE/TP) в PG session.
 
     Args:
         session: injectable async session (WRITE).
@@ -78,6 +95,7 @@ async def apply_ab_hold_setup_mutations_in_session(
         snapshot: allowed-phrases snapshot (legacy ACTIVE path).
         degraded: honest degradation flag (legacy ACTIVE path).
         epoch_managed: True — не писать TP/ACTIVE.
+        recovery_on_ids: PASS ids previously latched OFF → restore_on (A_PRIME).
     """
     off_hs = hard_status_for_strategy_mode(KeywordStrategyMode.OFF)
     if fail_ids:
@@ -91,6 +109,19 @@ async def apply_ab_hold_setup_mutations_in_session(
             )
         )
         _ = await session.execute(stmt_off)
+    on_ids = list(recovery_on_ids or [])
+    if on_ids:
+        # pfo_recovery / return_on: strategy only — no TP (epoch) / membership.
+        on_hs = hard_status_for_strategy_mode(_AB_HOLD_RECOVERY_ON_MODE)
+        stmt_return_on = (
+            update(KeywordSetting)
+            .where(KeywordSetting.id.in_(on_ids))
+            .values(
+                hard_status=on_hs,
+                strategy_mode=_AB_HOLD_RECOVERY_ON_MODE,
+            )
+        )
+        _ = await session.execute(stmt_return_on)
     if not epoch_managed:
         await bulk_update_keyword_target_places(session, list(pass_updates))
         stmt_mode = (
@@ -122,6 +153,8 @@ async def apply_ab_hold_setup_mutations(
         allowed_phrases_snapshot: PG snapshot разрешённого (allowed/relevant) набора
             фраз (decision §8, primary invariant). MUST быть зафиксирован до ACTIVE
             на legacy-пути; минус — производный enforcement, не хранится здесь.
+            Если задан — ``recovery_on`` / auto_on только внутри snapshot
+            (Owner A_PRIME: within confirmed set).
         degraded: честная деградация hold (decision §8) — enforcement allowed-set
             превысил WB minus cap на ENTER. Персистится вместе с mode → ACTIVE
             на legacy-пути.
@@ -132,8 +165,12 @@ async def apply_ab_hold_setup_mutations(
         (pass_count, fail_count)
     """
     fail_ids: list[int] = []
+    recovery_on_ids: list[int] = []
     pass_updates: list[tuple[int, int]] = []
     pass_count = 0
+    snapshot_filter: set[str] | None = (
+        set(allowed_phrases_snapshot) if allowed_phrases_snapshot is not None else None
+    )
     for kw in keywords:
         action = classify_ab_hold_setup_keyword(
             pay_for_order=kw.pay_for_order,
@@ -145,6 +182,11 @@ async def apply_ab_hold_setup_mutations(
             fail_ids.append(ks_id)
             continue
         pass_count += 1
+        # A_PRIME pfo_recovery: PASS + prior OFF latch → return_on (not membership).
+        if _keyword_strategy_is_off(kw):
+            text = str(getattr(kw, "text", None) or "")
+            if snapshot_filter is None or text in snapshot_filter:
+                recovery_on_ids.append(ks_id)
         if epoch_managed:
             # §18.4.2: TP only after explicit tp_confirm — never on ENTER PASS.
             continue
@@ -164,14 +206,16 @@ async def apply_ab_hold_setup_mutations(
             snapshot=snapshot,
             degraded=degraded,
             epoch_managed=epoch_managed,
+            recovery_on_ids=recovery_on_ids,
         )
 
     logger.info(
-        "[adv_id=%s] ab_setup applied pass=%s fail=%s allowed_phrases=%s "
-        "degraded=%s epoch_managed=%s → %s",
+        "[adv_id=%s] ab_setup applied pass=%s fail=%s recovery_on=%s "
+        "allowed_phrases=%s degraded=%s epoch_managed=%s → %s",
         adv_id,
         pass_count,
         len(fail_ids),
+        len(recovery_on_ids),
         len(snapshot),
         degraded,
         epoch_managed,

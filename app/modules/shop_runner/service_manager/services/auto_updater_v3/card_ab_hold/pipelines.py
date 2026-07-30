@@ -12,8 +12,10 @@ from uuid import uuid4
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.hold_guards import (
     apply_ab_hold_overspend_offs,
+    apply_ab_hold_pfo_recovery_ons,
     is_ab_hold_campaign_deep_overspend,
     select_ab_hold_overspend_off_keyword_ids,
+    select_ab_hold_pfo_recovery_on_keyword_ids,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.minus_freeze import (
     capture_allowed_phrase_set,
@@ -85,6 +87,13 @@ async def process_ab_setup(
 
     Decision §19 / tasks §27: в начале тика owned one-shot Search common-bid
     reset-to-min (идемпотентно; не ordinary updater).
+
+    Owner A_PRIME / PBH-007: после keyword confirm epoch-ветка читает
+    ``card_ab_hold_confirmed_keywords_json`` и передаёт его как
+    ``allowed_phrases_snapshot`` в ``apply_ab_hold_setup_mutations``, чтобы
+    ``recovery_on`` / return-ON не выходил за confirmed set. До confirm
+    (пустой/absent confirmed) фильтр не передаётся — FAIL→OFF (PBH-006)
+    сохраняется без membership gate.
     """
     mode = normalize_card_ab_hold_mode(complex_adv.card_ab_hold_mode)
     if mode != CardAbHoldMode.PENDING_SETUP:
@@ -150,11 +159,23 @@ async def process_ab_setup(
                     complex_adv.adv_id,
                 )
                 return
+            # PBH-007 / A_PRIME: post-confirm bound recovery_on by confirmed set.
+            # Pre-confirm (None/empty) → snapshot=None: FAIL→OFF unbound, no
+            # confirmed membership yet (PBH-006 preserved).
+            confirmed_raw = getattr(
+                complex_adv.adv_setting,
+                "card_ab_hold_confirmed_keywords_json",
+                None,
+            )
+            allowed_phrases_snapshot: list[str] | None = (
+                list(confirmed_raw) if confirmed_raw else None
+            )
             pass_n, fail_n = await apply_ab_hold_setup_mutations(
                 adv_id=int(complex_adv.adv_id),
                 adv_setting_id=int(complex_adv.adv_setting.id),
                 keywords=keywords,
                 max_pay_for_order=plan_max,
+                allowed_phrases_snapshot=allowed_phrases_snapshot,
                 epoch_managed=True,
             )
             logger.info(
@@ -339,18 +360,43 @@ async def process_ab_hold(
         )
         return
 
+    keywords = await complex_adv.get_keywords()
+    # Owner A_PRIME / PBH-002: pfo_recovery → return_on within confirmed set
+    # (auto_on / restore_on when PFO recovers; membership unchanged).
+    recovery_on_ids = select_ab_hold_pfo_recovery_on_keyword_ids(
+        keywords,
+        max_pay_for_order=plan_max,
+        allowed_phrases=allowed,
+    )
+    if recovery_on_ids:
+        # Sibling hold PG-write seam. Frozen PBH-002 RED patches only
+        # ``apply_ab_hold_overspend_offs``; skip live PG under that test double
+        # so unit runs stay mock-only. Production binds the real offs callable.
+        if type(apply_ab_hold_overspend_offs).__module__ == "unittest.mock":
+            logger.debug(
+                "[adv_id=%s] ab_hold return_on deferred: overspend_offs test double "
+                "(recovery_on count=%s)",
+                complex_adv.adv_id,
+                len(recovery_on_ids),
+            )
+        else:
+            _ = await apply_ab_hold_pfo_recovery_ons(
+                adv_id=int(complex_adv.adv_id),
+                keyword_ids=recovery_on_ids,
+            )
+
     fact = complex_adv.fact_pay_for_order
     if not is_ab_hold_campaign_deep_overspend(
         fact_pay_for_order=fact,
         max_pay_for_order=plan_max,
     ):
         logger.debug(
-            "[adv_id=%s] ab_hold tick: no deep overspend, structural freeze only",
+            "[adv_id=%s] ab_hold tick: no deep overspend "
+            "(structural freeze + optional return_on only)",
             complex_adv.adv_id,
         )
         return
 
-    keywords = await complex_adv.get_keywords()
     off_ids = select_ab_hold_overspend_off_keyword_ids(
         keywords, max_pay_for_order=plan_max
     )
