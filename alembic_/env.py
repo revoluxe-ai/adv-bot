@@ -87,6 +87,11 @@ def run_migrations_online() -> None:
             transaction_per_migration=True,
         )
         with context.begin_transaction():
+            # Job wrapper: mark PARTIAL only after Alembic starts applying
+            # migrations — not during env.py import/settings/configure.
+            on_begin = config.attributes.get("on_migrations_begin")
+            if callable(on_begin):
+                on_begin()
             context.run_migrations()
         return
 
@@ -104,6 +109,9 @@ def run_migrations_online() -> None:
         )
 
         with context.begin_transaction():
+            on_begin = config.attributes.get("on_migrations_begin")
+            if callable(on_begin):
+                on_begin()
             context.run_migrations()
 
 

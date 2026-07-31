@@ -272,7 +272,14 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
         connection.commit()  # mandatory before Alembic
 
         alembic_cfg.attributes["connection"] = connection
-        upgrade_started = True
+
+        # True only when Alembic actually enters run_migrations (see env.py).
+        # Import/settings/configure failures before that stay PRECONDITION_FAILED.
+        def _on_migrations_begin() -> None:
+            nonlocal upgrade_started
+            upgrade_started = True
+
+        alembic_cfg.attributes["on_migrations_begin"] = _on_migrations_begin
         command.upgrade(alembic_cfg, target)
 
         after = _db_heads(connection)

@@ -138,9 +138,104 @@ def test_db_heads_permission_denied_not_base() -> None:
     err = ProgrammingError(
         "SELECT version_num FROM alembic_version",
         {},
-        Exception('permission denied for table alembic_version'),
+        Exception("permission denied for table alembic_version"),
     )
     err.orig = SimpleNamespace(pgcode="42501")
     conn.execute.side_effect = err
     with pytest.raises(ProgrammingError):
         _db_heads(conn)
+
+
+def test_upgrade_import_failure_is_precondition_not_partial(
+    env_ok: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Failures before run_migrations must not be PARTIAL_OR_UNKNOWN."""
+    engine = MagicMock()
+    conn = MagicMock()
+    engine.connect.return_value = conn
+
+    def execute(stmt, params=None):  # noqa: ANN001
+        sql = str(stmt)
+        if "pg_is_in_recovery" in sql:
+            return MagicMock(
+                mappings=lambda: MagicMock(
+                    one=lambda: {
+                        "db": "db",
+                        "usr": "u",
+                        "pid": 1,
+                        "recovering": False,
+                    }
+                )
+            )
+        if "pg_try_advisory_lock" in sql:
+            return MagicMock(scalar_one=lambda: True)
+        if "alembic_version" in sql:
+            return MagicMock(fetchall=lambda: [("d0e1f2a3b4c5",)])
+        if "pg_advisory_unlock" in sql:
+            return MagicMock()
+        return MagicMock()
+
+    conn.execute.side_effect = execute
+
+    def boom(_cfg, _target):  # noqa: ANN001
+        raise RuntimeError("env import failed before migrations")
+
+    with patch("app.db.migrate.ScriptDirectory") as sd:
+        sd.from_config.return_value.get_heads.return_value = ["f2a3b4c5d6e7"]
+        sd.from_config.return_value.walk_revisions.return_value = [
+            SimpleNamespace(revision="f2a3b4c5d6e7"),
+            SimpleNamespace(revision="d0e1f2a3b4c5"),
+        ]
+        with patch("app.db.migrate.command.upgrade", side_effect=boom):
+            result = run_migration(engine=engine)
+    assert result.outcome == MigrationOutcome.PRECONDITION_FAILED
+    assert "env import failed" in result.detail
+
+
+def test_upgrade_after_migrations_begin_is_partial(
+    env_ok: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Once on_migrations_begin fires, failures are PARTIAL_OR_UNKNOWN."""
+    engine = MagicMock()
+    conn = MagicMock()
+    engine.connect.return_value = conn
+
+    def execute(stmt, params=None):  # noqa: ANN001
+        sql = str(stmt)
+        if "pg_is_in_recovery" in sql:
+            return MagicMock(
+                mappings=lambda: MagicMock(
+                    one=lambda: {
+                        "db": "db",
+                        "usr": "u",
+                        "pid": 1,
+                        "recovering": False,
+                    }
+                )
+            )
+        if "pg_try_advisory_lock" in sql:
+            return MagicMock(scalar_one=lambda: True)
+        if "alembic_version" in sql:
+            return MagicMock(fetchall=lambda: [("d0e1f2a3b4c5",)])
+        if "pg_advisory_unlock" in sql:
+            return MagicMock()
+        return MagicMock()
+
+    conn.execute.side_effect = execute
+
+    def boom(cfg, _target):  # noqa: ANN001
+        cb = cfg.attributes.get("on_migrations_begin")
+        assert callable(cb)
+        cb()
+        raise RuntimeError("DDL failed mid-upgrade")
+
+    with patch("app.db.migrate.ScriptDirectory") as sd:
+        sd.from_config.return_value.get_heads.return_value = ["f2a3b4c5d6e7"]
+        sd.from_config.return_value.walk_revisions.return_value = [
+            SimpleNamespace(revision="f2a3b4c5d6e7"),
+            SimpleNamespace(revision="d0e1f2a3b4c5"),
+        ]
+        with patch("app.db.migrate.command.upgrade", side_effect=boom):
+            result = run_migration(engine=engine)
+    assert result.outcome == MigrationOutcome.PARTIAL_OR_UNKNOWN
+    assert "DDL failed" in result.detail
