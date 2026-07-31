@@ -222,6 +222,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
     receipt_state = os.environ.get("MIGRATION_RECEIPT_STATE", "").strip().upper()
     connection: Connection | None = None
     upgrade_started = False
+    migrations_finished = False
     try:
         connection = engine.connect()
         _run_identity_checks(connection)
@@ -281,33 +282,89 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
 
         alembic_cfg.attributes["on_migrations_begin"] = _on_migrations_begin
         command.upgrade(alembic_cfg, target)
+        # Alembic returned — revision DDL finished (or no-op upgrade path).
+        migrations_finished = True
 
         after = _db_heads(connection)
-        _maybe_reset_role(connection)
         if after != target_set:
-            _release_lock(connection)
-            connection.commit()
+            try:
+                _maybe_reset_role(connection)
+                _release_lock(connection)
+                connection.commit()
+            except Exception:  # noqa: BLE001
+                pass
             return MigrationResult(
                 MigrationOutcome.PARTIAL_OR_UNKNOWN,
                 f"after upgrade heads {sorted(after)} != target {target}",
                 tuple(sorted(after)),
                 target,
             )
-        _release_lock(connection)
-        connection.commit()
+
+        # Schema is at target: cleanup errors must not become PARTIAL_OR_UNKNOWN.
+        cleanup_note = ""
+        try:
+            _maybe_reset_role(connection)
+            _release_lock(connection)
+            connection.commit()
+        except Exception as cleanup_exc:  # noqa: BLE001
+            cleanup_note = (
+                f"; cleanup warning: {type(cleanup_exc).__name__}: {cleanup_exc}"
+            )
+            try:
+                connection.invalidate()
+            except Exception:  # noqa: BLE001
+                pass
         return MigrationResult(
             MigrationOutcome.SUCCESS,
-            "upgrade completed",
+            f"upgrade completed{cleanup_note}",
             tuple(sorted(after)),
             target,
         )
     except Exception as exc:  # noqa: BLE001 — map to outcome codes
+        if migrations_finished:
+            # Upgrade returned OK; failure was in verify/cleanup. Confirm heads.
+            heads: tuple[str, ...] = tuple()
+            if connection is not None:
+                try:
+                    connection.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+                try:
+                    heads = tuple(sorted(_db_heads(connection)))
+                except Exception:  # noqa: BLE001
+                    heads = tuple()
+                try:
+                    _maybe_reset_role(connection)
+                    _release_lock(connection)
+                    connection.commit()
+                except Exception:  # noqa: BLE001
+                    try:
+                        connection.invalidate()
+                    except Exception:  # noqa: BLE001
+                        pass
+            if heads and frozenset(heads) == frozenset({target}):
+                return MigrationResult(
+                    MigrationOutcome.SUCCESS,
+                    (
+                        "upgrade completed; post-upgrade error ignored: "
+                        f"{type(exc).__name__}: {exc}"
+                    ),
+                    heads,
+                    target,
+                )
+            return MigrationResult(
+                MigrationOutcome.PARTIAL_OR_UNKNOWN,
+                f"post-upgrade verify failed: {type(exc).__name__}: {exc}",
+                heads,
+                target,
+            )
+
         outcome = (
             MigrationOutcome.PARTIAL_OR_UNKNOWN
             if upgrade_started
             else MigrationOutcome.PRECONDITION_FAILED
         )
-        heads: tuple[str, ...] = tuple()
+        heads = tuple()
         if connection is not None:
             try:
                 connection.rollback()
@@ -326,6 +383,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
                 except Exception:  # noqa: BLE001
                     pass
         return MigrationResult(outcome, f"{type(exc).__name__}: {exc}", heads, target)
+
     finally:
         if connection is not None:
             try:
