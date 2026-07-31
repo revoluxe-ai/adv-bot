@@ -97,7 +97,7 @@ def _script_heads(script: ScriptDirectory) -> frozenset[str]:
 
 
 def _db_heads(connection: Connection) -> frozenset[str]:
-    """Текущие heads БД; отсутствующая alembic_version ≡ BASE."""
+    """Текущие heads БД; отсутствующая alembic_version ≡ BASE (только 42P01)."""
     try:
         rows = connection.execute(
             text("SELECT version_num FROM alembic_version")
@@ -105,8 +105,8 @@ def _db_heads(connection: Connection) -> frozenset[str]:
     except ProgrammingError as exc:
         orig = getattr(exc, "orig", None)
         pgcode = getattr(orig, "pgcode", None)
-        msg = str(exc).lower()
-        if pgcode == "42P01" or "alembic_version" in msg:
+        # Strict: only undefined_table. Permission denied / other codes must raise.
+        if pgcode == "42P01":
             try:
                 connection.rollback()
             except Exception:  # noqa: BLE001

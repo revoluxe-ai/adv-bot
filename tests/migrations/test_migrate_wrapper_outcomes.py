@@ -127,3 +127,20 @@ def test_db_heads_missing_table_is_base() -> None:
     conn.execute.side_effect = err
     assert _db_heads(conn) == frozenset({"BASE"})
     conn.rollback.assert_called()
+
+
+def test_db_heads_permission_denied_not_base() -> None:
+    from sqlalchemy.exc import ProgrammingError
+
+    from app.db.migrate import _db_heads
+
+    conn = MagicMock()
+    err = ProgrammingError(
+        "SELECT version_num FROM alembic_version",
+        {},
+        Exception('permission denied for table alembic_version'),
+    )
+    err.orig = SimpleNamespace(pgcode="42501")
+    conn.execute.side_effect = err
+    with pytest.raises(ProgrammingError):
+        _db_heads(conn)
