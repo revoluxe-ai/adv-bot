@@ -5,11 +5,15 @@
 # Запуск: только после verify_baseline_and_acquire_release; не initContainer.
 # envFrom: те же ConfigMap/Secret, что у app Deployments — alembic_/env.py
 # импортирует models/settings (EXECUTION_CLOSURE). DATABASE_URL перекрывает DSN.
+#
+# Placeholders (must be unique tokens, not bare env names):
+#   __JOB_NAME_SUFFIX__, __RELEASE_ID__, __IMAGE_REF__,
+#   __EXPECTED_TARGET_REVISION__, __EXPECTED_CURRENT_REVISION_SETS_JSON__
 # ============================================================================
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: app-db-migrate-RELEASE_ID
+  name: app-db-migrate-__JOB_NAME_SUFFIX__
   namespace: prod-adv-bot
   labels:
     app.kubernetes.io/name: app-db-migrate
@@ -27,9 +31,10 @@ spec:
         - name: harbor-skyline360-login-secret
       containers:
         - name: migrate
-          image: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot@sha256:RELEASE_PLATFORM_MANIFEST_DIGEST
+          # Prefer /app/.venv/bin/python — image PATH may be overridden at runtime.
+          image: __IMAGE_REF__
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.db.migrate"]
+          command: ["/app/.venv/bin/python", "-m", "app.db.migrate"]
           envFrom:
             - configMapRef:
                 name: prod-wb-gram
@@ -37,12 +42,12 @@ spec:
                 name: common-secrets
           env:
             - name: RELEASE_ID
-              value: "RELEASE_ID"
+              value: "__RELEASE_ID__"
             - name: EXPECTED_TARGET_REVISION
-              value: "EXPECTED_TARGET_REVISION"
+              value: "__EXPECTED_TARGET_REVISION__"
             - name: EXPECTED_CURRENT_REVISION_SETS
               # Single-quoted YAML so substituted JSON [["rev"]] keeps literal double-quotes.
-              value: 'EXPECTED_CURRENT_REVISION_SETS_JSON'
+              value: '__EXPECTED_CURRENT_REVISION_SETS_JSON__'
             - name: SET_ROLE_APP_OWNER
               value: "1"
             # Must win over POSTGRES_* from ConfigMap for migrator DSN (primary, not pooler).
