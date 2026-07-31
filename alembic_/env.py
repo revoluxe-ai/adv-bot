@@ -24,8 +24,8 @@ dotenv.load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
+# Job wrapper may pass DATABASE_URL; otherwise legacy POSTGRES_* settings.
 row = get_alchemy_row_for_migration()
-
 config.set_main_option("sqlalchemy.url", row)
 
 # Interpret the config file for Python logging.
@@ -75,10 +75,21 @@ def run_migrations_online() -> None:
     """
     Run migrations in 'online' mode.
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
+    If Config.attributes['connection'] is set (Job wrapper), reuse that
+    Connection and do not create a second Engine. Otherwise create NullPool
+    Engine from sqlalchemy.url.
     """
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            transaction_per_migration=True,
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -86,7 +97,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            transaction_per_migration=True,
+        )
 
         with context.begin_transaction():
             context.run_migrations()
