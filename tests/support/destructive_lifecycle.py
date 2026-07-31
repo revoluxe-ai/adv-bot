@@ -43,6 +43,27 @@ def coerce_compose_stream(raw: object) -> str:
     return ""
 
 
+def coerce_compose_exit_code(raw: object) -> int | None:
+    """Нормализовать returncode compose/sync_run до int.
+
+    ``None`` означает pollution (``MagicMock`` / non-int): нельзя трактовать
+    как ненулевой exit и поднимать ``DOCKER_STAGE=cleanup`` на случайном
+    последнем тесте сессии.
+
+    Args:
+        raw: значение returncode из ``sync_run``.
+
+    Returns:
+        int exit code, либо ``None`` если значение не int (mock leak).
+    """
+    if isinstance(raw, bool):
+        # bool — subclass int; для exit code не используем.
+        return None
+    if isinstance(raw, int):
+        return raw
+    return None
+
+
 def run_awaitable_from_sync(awaitable: Awaitable[_T]) -> _T:
     """Выполнить awaitable из sync-кода, даже если уже есть running event loop.
 
@@ -618,7 +639,7 @@ class TestInfraLifecycle:
         """Compose down; возвращает cleanup error вместо raise при primary failure."""
         cmd = self._compose_cmd or ["docker", "compose"]
         try:
-            rc, _out, err = self.sync_run(
+            rc_raw, _out, err = self.sync_run(
                 *cmd,
                 "-f",
                 self.compose_file,
@@ -630,6 +651,16 @@ class TestInfraLifecycle:
                 timeout=20,
             )
             self.state.compose_down_count += 1
+            rc = coerce_compose_exit_code(rc_raw)
+            if rc is None:
+                # MagicMock/non-int returncode (subprocess.run pollution) —
+                # не поднимать DOCKER_STAGE=cleanup на victim-тесте сессии.
+                print(
+                    "[WARNING] compose down returncode is non-int "
+                    f"(type={type(rc_raw).__name__!r}); treating as mock "
+                    "pollution, skip fail-closed cleanup raise."
+                )
+                return None
             if rc != 0:
                 try:
                     self.raise_docker_stage(

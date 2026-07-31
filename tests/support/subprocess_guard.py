@@ -124,6 +124,87 @@ _original_os_popen: Callable[..., Any] | None = None
 _original_asyncio_exec: Callable[..., Any] | None = None
 _original_asyncio_shell: Callable[..., Any] | None = None
 
+# Snapshot at import (before unit tests may replace ``_original_*`` with MagicMock).
+# Used to recover after polluting guard unit tests that overwrite originals.
+_BOOTSTRAP_SUBPROCESS_RUN: Callable[..., Any] = subprocess.run
+_BOOTSTRAP_SUBPROCESS_POPEN: Callable[..., Any] = subprocess.Popen
+_BOOTSTRAP_SUBPROCESS_CALL: Callable[..., Any] = subprocess.call
+_BOOTSTRAP_SUBPROCESS_CHECK_CALL: Callable[..., Any] = subprocess.check_call
+_BOOTSTRAP_SUBPROCESS_CHECK_OUTPUT: Callable[..., Any] = subprocess.check_output
+_BOOTSTRAP_OS_SYSTEM: Callable[..., Any] = os.system
+_BOOTSTRAP_OS_POPEN: Callable[..., Any] = os.popen
+_BOOTSTRAP_ASYNCIO_EXEC: Callable[..., Any] = asyncio.create_subprocess_exec
+_BOOTSTRAP_ASYNCIO_SHELL: Callable[..., Any] = asyncio.create_subprocess_shell
+
+
+def _is_mock_like(obj: object) -> bool:
+    """True если callable похож на unittest.mock (утечка из unit-suite)."""
+    mod = getattr(type(obj), "__module__", "") or ""
+    name = type(obj).__name__
+    return mod.startswith("unittest.mock") or name in {
+        "MagicMock",
+        "Mock",
+        "AsyncMock",
+        "NonCallableMagicMock",
+    }
+
+
+def _resolve_install_original(
+    current: object, bootstrap: Callable[..., Any]
+) -> Callable[..., Any]:
+    """Выбрать original для install: current, если не mock, иначе bootstrap."""
+    if _is_mock_like(current):
+        return bootstrap
+    return current  # type: ignore[return-value]
+
+
+def restore_bootstrap_process_apis() -> None:
+    """Принудительно вернуть process APIs к bootstrap (post-pollution recovery).
+
+    Вызывать после unit-тестов guard, которые подменяли ``_original_*`` на
+    ``MagicMock``: иначе ``uninstall`` записывает MagicMock в ``subprocess.run``
+    и session docker cleanup падает с ``exit_code=<MagicMock ... returncode>``.
+    """
+    global _original_subprocess_run
+    global _original_subprocess_popen
+    global _original_subprocess_call
+    global _original_subprocess_check_call
+    global _original_subprocess_check_output
+    global _original_os_system
+    global _original_os_popen
+    global _original_asyncio_exec
+    global _original_asyncio_shell
+
+    subprocess.run = _BOOTSTRAP_SUBPROCESS_RUN  # type: ignore[assignment]
+    subprocess.Popen = _BOOTSTRAP_SUBPROCESS_POPEN  # type: ignore[misc, assignment]
+    subprocess.call = _BOOTSTRAP_SUBPROCESS_CALL  # type: ignore[assignment]
+    subprocess.check_call = _BOOTSTRAP_SUBPROCESS_CHECK_CALL  # type: ignore[assignment]
+    subprocess.check_output = _BOOTSTRAP_SUBPROCESS_CHECK_OUTPUT  # type: ignore[assignment]
+    os.system = _BOOTSTRAP_OS_SYSTEM  # type: ignore[assignment]
+    os.popen = _BOOTSTRAP_OS_POPEN  # type: ignore[assignment]
+    asyncio.create_subprocess_exec = _BOOTSTRAP_ASYNCIO_EXEC  # type: ignore[assignment]
+    asyncio.create_subprocess_shell = _BOOTSTRAP_ASYNCIO_SHELL  # type: ignore[assignment]
+    if _guard_installed:
+        _original_subprocess_run = _BOOTSTRAP_SUBPROCESS_RUN
+        _original_subprocess_popen = _BOOTSTRAP_SUBPROCESS_POPEN
+        _original_subprocess_call = _BOOTSTRAP_SUBPROCESS_CALL
+        _original_subprocess_check_call = _BOOTSTRAP_SUBPROCESS_CHECK_CALL
+        _original_subprocess_check_output = _BOOTSTRAP_SUBPROCESS_CHECK_OUTPUT
+        _original_os_system = _BOOTSTRAP_OS_SYSTEM
+        _original_os_popen = _BOOTSTRAP_OS_POPEN
+        _original_asyncio_exec = _BOOTSTRAP_ASYNCIO_EXEC
+        _original_asyncio_shell = _BOOTSTRAP_ASYNCIO_SHELL
+    else:
+        _original_subprocess_run = None
+        _original_subprocess_popen = None
+        _original_subprocess_call = None
+        _original_subprocess_check_call = None
+        _original_subprocess_check_output = None
+        _original_os_system = None
+        _original_os_popen = None
+        _original_asyncio_exec = None
+        _original_asyncio_shell = None
+
 
 class SubprocessGuardError(RuntimeError):
     """Запуск subprocess заблокирован test subprocess guard."""
@@ -261,15 +342,29 @@ def install_subprocess_guard() -> None:
     if _guard_installed:
         return
 
-    _original_subprocess_run = subprocess.run
-    _original_subprocess_popen = subprocess.Popen
-    _original_subprocess_call = subprocess.call
-    _original_subprocess_check_call = subprocess.check_call
-    _original_subprocess_check_output = subprocess.check_output
-    _original_os_system = os.system
-    _original_os_popen = os.popen
-    _original_asyncio_exec = asyncio.create_subprocess_exec
-    _original_asyncio_shell = asyncio.create_subprocess_shell
+    _original_subprocess_run = _resolve_install_original(
+        subprocess.run, _BOOTSTRAP_SUBPROCESS_RUN
+    )
+    _original_subprocess_popen = _resolve_install_original(
+        subprocess.Popen, _BOOTSTRAP_SUBPROCESS_POPEN
+    )
+    _original_subprocess_call = _resolve_install_original(
+        subprocess.call, _BOOTSTRAP_SUBPROCESS_CALL
+    )
+    _original_subprocess_check_call = _resolve_install_original(
+        subprocess.check_call, _BOOTSTRAP_SUBPROCESS_CHECK_CALL
+    )
+    _original_subprocess_check_output = _resolve_install_original(
+        subprocess.check_output, _BOOTSTRAP_SUBPROCESS_CHECK_OUTPUT
+    )
+    _original_os_system = _resolve_install_original(os.system, _BOOTSTRAP_OS_SYSTEM)
+    _original_os_popen = _resolve_install_original(os.popen, _BOOTSTRAP_OS_POPEN)
+    _original_asyncio_exec = _resolve_install_original(
+        asyncio.create_subprocess_exec, _BOOTSTRAP_ASYNCIO_EXEC
+    )
+    _original_asyncio_shell = _resolve_install_original(
+        asyncio.create_subprocess_shell, _BOOTSTRAP_ASYNCIO_SHELL
+    )
 
     def guarded_run(*p_args, **kwargs):  # type: ignore[no-untyped-def]
         argv = p_args[0] if p_args else kwargs.get("args")
@@ -362,24 +457,42 @@ def uninstall_subprocess_guard(*, _allow_for_guard_unit_tests: bool = False) -> 
 
     if not _guard_installed:
         return
-    if _original_subprocess_run is not None:
-        subprocess.run = _original_subprocess_run  # type: ignore[assignment]
-    if _original_subprocess_popen is not None:
-        subprocess.Popen = _original_subprocess_popen  # type: ignore[misc, assignment]
-    if _original_subprocess_call is not None:
-        subprocess.call = _original_subprocess_call  # type: ignore[assignment]
-    if _original_subprocess_check_call is not None:
-        subprocess.check_call = _original_subprocess_check_call  # type: ignore[assignment]
-    if _original_subprocess_check_output is not None:
-        subprocess.check_output = _original_subprocess_check_output  # type: ignore[assignment]
-    if _original_os_system is not None:
-        os.system = _original_os_system  # type: ignore[assignment]
-    if _original_os_popen is not None:
-        os.popen = _original_os_popen  # type: ignore[assignment]
-    if _original_asyncio_exec is not None:
-        asyncio.create_subprocess_exec = _original_asyncio_exec  # type: ignore[assignment]
-    if _original_asyncio_shell is not None:
-        asyncio.create_subprocess_shell = _original_asyncio_shell  # type: ignore[assignment]
+
+    # Если unit-тест подменил ``_original_*`` на MagicMock — не записывать
+    # mock обратно в process APIs (иначе session docker cleanup ломается).
+    def _restore(api_attr: str, original: object, bootstrap: Callable[..., Any]) -> None:
+        target_mod = subprocess if api_attr.startswith("subprocess.") else (
+            os if api_attr.startswith("os.") else asyncio
+        )
+        name = api_attr.split(".", 1)[1]
+        value = bootstrap if original is None or _is_mock_like(original) else original
+        setattr(target_mod, name, value)
+
+    _restore("subprocess.run", _original_subprocess_run, _BOOTSTRAP_SUBPROCESS_RUN)
+    _restore("subprocess.Popen", _original_subprocess_popen, _BOOTSTRAP_SUBPROCESS_POPEN)
+    _restore("subprocess.call", _original_subprocess_call, _BOOTSTRAP_SUBPROCESS_CALL)
+    _restore(
+        "subprocess.check_call",
+        _original_subprocess_check_call,
+        _BOOTSTRAP_SUBPROCESS_CHECK_CALL,
+    )
+    _restore(
+        "subprocess.check_output",
+        _original_subprocess_check_output,
+        _BOOTSTRAP_SUBPROCESS_CHECK_OUTPUT,
+    )
+    _restore("os.system", _original_os_system, _BOOTSTRAP_OS_SYSTEM)
+    _restore("os.popen", _original_os_popen, _BOOTSTRAP_OS_POPEN)
+    _restore(
+        "asyncio.create_subprocess_exec",
+        _original_asyncio_exec,
+        _BOOTSTRAP_ASYNCIO_EXEC,
+    )
+    _restore(
+        "asyncio.create_subprocess_shell",
+        _original_asyncio_shell,
+        _BOOTSTRAP_ASYNCIO_SHELL,
+    )
     _original_subprocess_run = None
     _original_subprocess_popen = None
     _original_subprocess_call = None
