@@ -232,14 +232,16 @@ def verify_release_platform_digest(
 
     index_pin = index_digest.strip()
     if index_pin:
+        index_pin_norm = normalize_digest(index_pin)
         idx_digest, idx_doc = fetch_oci_document(
             registry_host=registry_host,
             repository=repository,
-            reference=normalize_digest(index_pin),
+            reference=index_pin_norm,
             username=username,
             password=password,
             http_get=http_get,
         )
+        _assert_registry_digest_matches_pin(str(idx_digest), index_pin_norm)
         media = str(idx_doc.get("mediaType") or "")
         if not _is_index_media_type(media) and "manifests" not in idx_doc:
             raise ProvenanceError(
@@ -268,9 +270,7 @@ def verify_release_platform_digest(
             mode=mode_norm,
             platform=plat,
             platform_manifest_digest=pinned,
-            index_digest=normalize_digest(idx_digest)
-            if DIGEST_RE.match(str(idx_digest).lower())
-            else normalize_digest(index_pin),
+            index_digest=index_pin_norm,
             registry_checked=True,
             detail=(
                 "registry index→platform digest match; "
