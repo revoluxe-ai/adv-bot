@@ -158,7 +158,12 @@ def test_relevant_phrase_menu_true_state_has_relevant_workflow_only() -> None:
 
 @pytest.mark.asyncio
 async def test_open_menu_does_not_toggle_setting(monkeypatch: pytest.MonkeyPatch) -> None:
-    adv = SimpleNamespace(id=1, adv_id=10, auto_add_only_relevant_phrase=False)
+    adv = SimpleNamespace(
+        id=1,
+        adv_id=10,
+        auto_add_only_relevant_phrase=False,
+        card_ab_hold_mode=None,
+    )
     fake_factory = _FakeSessionFactory(adv)
     monkeypatch.setattr(
         "app.client_bot.user_interface.handlers.auto_add_only_relevant_phrase_toggle.sm",
@@ -193,7 +198,12 @@ async def test_open_menu_does_not_toggle_setting(monkeypatch: pytest.MonkeyPatch
 
 @pytest.mark.asyncio
 async def test_toggle_rerenders_menu_after_write(monkeypatch: pytest.MonkeyPatch) -> None:
-    adv = SimpleNamespace(id=1, adv_id=10, auto_add_only_relevant_phrase=False)
+    adv = SimpleNamespace(
+        id=1,
+        adv_id=10,
+        auto_add_only_relevant_phrase=False,
+        card_ab_hold_mode=None,
+    )
     fake_factory = _FakeSessionFactory(adv)
     fake_factory.session.value = adv
     monkeypatch.setattr(
