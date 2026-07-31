@@ -239,3 +239,54 @@ def test_upgrade_after_migrations_begin_is_partial(
             result = run_migration(engine=engine)
     assert result.outcome == MigrationOutcome.PARTIAL_OR_UNKNOWN
     assert "DDL failed" in result.detail
+
+
+def test_post_upgrade_cleanup_error_still_success(env_ok: None) -> None:
+    """Cleanup failure after successful upgrade must not be PARTIAL_OR_UNKNOWN."""
+    engine = MagicMock()
+    conn = MagicMock()
+    engine.connect.return_value = conn
+    calls = {"n": 0}
+
+    def execute(stmt, params=None):  # noqa: ANN001
+        sql = str(stmt)
+        if "pg_is_in_recovery" in sql:
+            return MagicMock(
+                mappings=lambda: MagicMock(
+                    one=lambda: {
+                        "db": "db",
+                        "usr": "u",
+                        "pid": 1,
+                        "recovering": False,
+                    }
+                )
+            )
+        if "pg_try_advisory_lock" in sql:
+            return MagicMock(scalar_one=lambda: True)
+        if "alembic_version" in sql:
+            # Before upgrade: parent; after upgrade: head
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return MagicMock(fetchall=lambda: [("d0e1f2a3b4c5",)])
+            return MagicMock(fetchall=lambda: [("f2a3b4c5d6e7",)])
+        if "pg_advisory_unlock" in sql:
+            raise RuntimeError("unlock failed after upgrade")
+        return MagicMock()
+
+    conn.execute.side_effect = execute
+
+    def ok_upgrade(cfg, _target):  # noqa: ANN001
+        cb = cfg.attributes.get("on_migrations_begin")
+        if callable(cb):
+            cb()
+
+    with patch("app.db.migrate.ScriptDirectory") as sd:
+        sd.from_config.return_value.get_heads.return_value = ["f2a3b4c5d6e7"]
+        sd.from_config.return_value.walk_revisions.return_value = [
+            SimpleNamespace(revision="f2a3b4c5d6e7"),
+            SimpleNamespace(revision="d0e1f2a3b4c5"),
+        ]
+        with patch("app.db.migrate.command.upgrade", side_effect=ok_upgrade):
+            result = run_migration(engine=engine)
+    assert result.outcome == MigrationOutcome.SUCCESS
+    assert "cleanup warning" in result.detail
