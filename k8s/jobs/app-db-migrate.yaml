@@ -3,6 +3,8 @@
 # ============================================================================
 # Назначение: one-shot RELEASE migrate Job после CONTROL lease.
 # Запуск: только после verify_baseline_and_acquire_release; не initContainer.
+# envFrom: те же ConfigMap/Secret, что у app Deployments — alembic_/env.py
+# импортирует models/settings (EXECUTION_CLOSURE). DATABASE_URL перекрывает DSN.
 # ============================================================================
 apiVersion: batch/v1
 kind: Job
@@ -28,6 +30,11 @@ spec:
           image: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot@sha256:RELEASE_PLATFORM_MANIFEST_DIGEST
           imagePullPolicy: IfNotPresent
           command: ["python", "-m", "app.db.migrate"]
+          envFrom:
+            - configMapRef:
+                name: prod-wb-gram
+            - secretRef:
+                name: common-secrets
           env:
             - name: RELEASE_ID
               value: "RELEASE_ID"
@@ -38,6 +45,7 @@ spec:
               value: 'EXPECTED_CURRENT_REVISION_SETS_JSON'
             - name: SET_ROLE_APP_OWNER
               value: "1"
+            # Must win over POSTGRES_* from ConfigMap for migrator DSN (primary, not pooler).
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

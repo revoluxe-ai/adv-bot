@@ -52,10 +52,10 @@ Runtime Deployments **не** монтируют этот secret — operational 
 Откат image на совместимую версию; схему не downgrade; forward-fix.  
 PITR только при порче данных.
 
-## Файлы
+## Jobs
 
-- Wrapper: `app/db/migrate.py`
-- Manifest: `app/db/manifest.py`
-- Control SQL: `k8s/migrations/sql/001_migration_control.sql`
-- Jobs: `k8s/jobs/app-db-migrate.yaml`, `k8s/jobs/app-db-control.yaml`
+- `k8s/jobs/app-db-migrate.yaml` — RELEASE migrate; `envFrom` ConfigMap `prod-wb-gram`
+  + Secret `common-secrets` (settings import via `alembic_/env.py`), plus
+  `DATABASE_URL` from `app-db-migrator`.
+- `k8s/jobs/app-db-control.yaml` — CONTROL verify+acquire (не exec RELEASE).
 - Helper: `scripts/Invoke-ProdDbMigrateThenRollout.ps1`
