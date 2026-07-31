@@ -318,8 +318,15 @@ CREATE OR REPLACE FUNCTION migration_control.complete_release(
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = migration_control, pg_temp
 AS $$
+DECLARE v_exec migration_control.release_execution%ROWTYPE;
 BEGIN
-    PERFORM migration_control._require_token(p_release_id, p_fencing_token);
+    v_exec := migration_control._require_token(p_release_id, p_fencing_token);
+    IF v_exec.migration_state NOT IN ('SUCCEEDED', 'NOOP') THEN
+        RAISE EXCEPTION 'PRECONDITION_FAILED: migration_state=% (need SUCCEEDED|NOOP)', v_exec.migration_state;
+    END IF;
+    IF v_exec.deployment_state <> 'DEPLOYING' THEN
+        RAISE EXCEPTION 'PRECONDITION_FAILED: deployment_state=% (need DEPLOYING)', v_exec.deployment_state;
+    END IF;
     UPDATE migration_control.release_execution
     SET deployment_state = 'COMPLETED',
         deployment_completed_at = now(),
