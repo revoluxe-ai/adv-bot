@@ -8,6 +8,10 @@ FK-графа) для Alembic epoch upgrade/downgrade и ORM writers проти�
 ``shop_id``): ``AdvSetting.wb_cabinet`` — ``lazy="joined"``, иначе SELECT
 AdvSetting падает с ``UndefinedColumn``.
 
+ORM-complete post-epoch bootstrap ALSO applies emergency latch/educated
+(``f2a3b4c5d6e7``): mapped on ``AdvSetting``, иначе ``SELECT … FOR UPDATE`` →
+``UndefinedColumn`` на ``card_ab_hold_emergency_latch``.
+
 Fail-closed: каждый ``create_engine`` / ``create_async_engine`` идёт только после
 ``validate_destructive_test_database_url``. DDL выполняется в уникальной schema
 на run (``ab_hold_<uuid>``) — cleanup ``DROP SCHEMA … CASCADE``, без DROP
@@ -311,17 +315,23 @@ def ensure_keywordsetting_stub(db_url: str) -> None:
 
 
 def ensure_post_epoch_schema_for_orm(db_url: str) -> None:
-    """Гарантировать post-epoch ``advsetting`` + ``keywordsetting`` для live ORM."""
+    """Гарантировать ORM-complete disposable ``advsetting`` + ``keywordsetting``.
+
+    Включает epoch ``d0e1f2a3b4c5`` и emergency ``f2a3b4c5d6e7``: ORM
+    ``AdvSetting`` мапит ``card_ab_hold_emergency_latch`` /
+    ``card_ab_hold_emergency_educated``, иначе SELECT → ``UndefinedColumn``.
+    """
     create_pre_epoch_advsetting_schema(db_url)
     run_epoch_migration_upgrade_downgrade(db_url)
+    ensure_emergency_latch_columns(db_url)
     ensure_keywordsetting_stub(db_url)
 
 
 def ensure_emergency_latch_columns(db_url: str) -> None:
     """Применить ``f2a3b4c5d6e7`` (emergency latch + educated) на disposable schema.
 
-    Вызывать после ``ensure_post_epoch_schema_for_orm`` (parent revision
-    ``d0e1f2a3b4c5``). Не трогает production ``public``.
+    Вызывать после epoch upgrade (parent revision ``d0e1f2a3b4c5``).
+    Не трогает production ``public``.
     """
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
@@ -340,9 +350,8 @@ def ensure_emergency_latch_columns(db_url: str) -> None:
 
 
 def ensure_post_epoch_with_emergency_schema_for_orm(db_url: str) -> None:
-    """Post-epoch + Emergency latch/educated columns для ORM writers."""
+    """Alias: ``ensure_post_epoch_schema_for_orm`` уже ORM-complete (emergency)."""
     ensure_post_epoch_schema_for_orm(db_url)
-    ensure_emergency_latch_columns(db_url)
 
 
 def insert_adv_row(

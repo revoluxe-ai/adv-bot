@@ -206,4 +206,5 @@ async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
     recovery_on_mock.assert_awaited_once_with(
         adv_id=10,
         keyword_ids=[101],
+        confirmed_target_places=None,
     )

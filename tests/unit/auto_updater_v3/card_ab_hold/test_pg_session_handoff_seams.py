@@ -598,6 +598,24 @@ def test_live_pg_bootstrap_wbcabinet_stub_covers_orm_joined_columns() -> None:
 
 
 @pytest.mark.unit
+def test_live_pg_bootstrap_post_epoch_schema_applies_emergency_for_orm() -> None:
+    """ORM live bootstrap MUST apply emergency latch cols (mapped on AdvSetting).
+
+    Regression: epoch-only disposable schema → UndefinedColumn
+    ``card_ab_hold_emergency_latch`` on ``SELECT … FOR UPDATE``.
+    """
+    import inspect
+
+    from tests.integration.card_ab_hold import _live_pg_bootstrap as boot
+
+    src = inspect.getsource(boot.ensure_post_epoch_schema_for_orm)
+    assert "ensure_emergency_latch_columns" in src
+    alias_src = inspect.getsource(boot.ensure_post_epoch_with_emergency_schema_for_orm)
+    assert "ensure_post_epoch_schema_for_orm" in alias_src
+    assert "ensure_emergency_latch_columns" not in alias_src
+
+
+@pytest.mark.unit
 def test_live_pg_bootstrap_patches_emergency_handlers_sm() -> None:
     """Disposable schema patch MUST cover emergency_handlers.sm (educate WRITE)."""
     from tests.integration.card_ab_hold import _live_pg_bootstrap as boot
