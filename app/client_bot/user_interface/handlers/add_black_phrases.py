@@ -1,8 +1,23 @@
+"""Telegram-хендлеры шаблонов чёрного списка (NRF) фраз.
+
+Ordinary ``RelevantPhraseManager.update_black_phrases`` — Forbidden under
+A/B Hold ``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``).
+Gate стоит до membership write в ``waiting_for_black_phrases`` и
+``reset_black_phrases`` (peer: ``add_white_phrases`` / PBH-011).
+Keyword-set / NRF-template change path — WARM_UP ``keyword_edit_open`` only.
+
+PG seams: parent открывает ``sm(read_only=True)`` и передаёт session в
+``load_adv_setting_in_session`` (PURE_READ для freeze-check / export).
+"""
+
+from __future__ import annotations
+
 from aiogram import Bot, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
 from app.client_bot.telegram_message_split import split_telegram_plain_text
@@ -12,16 +27,47 @@ from app.client_bot.user_interface.views import callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
 from app.modules.relevant_phrase_manager.not_relevante_template import NotRelevantTemplate
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
+    is_ab_hold_structural_freeze,
+)
 from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
 
+AB_HOLD_ADD_PHRASES_BLOCKED_MSG = (
+    "Кампания в режиме A/B Hold — добавление фраз запрещено. "
+    "Чтобы изменить состав фраз, выключите A/B Hold на экране режима."
+)
+
+AB_HOLD_RESET_PHRASES_BLOCKED_MSG = (
+    "Кампания в режиме A/B Hold — статус ключей заморожен. "
+    "Чтобы сбросить список, выключите A/B Hold на экране режима."
+)
+
+
+async def load_adv_setting_in_session(
+    session: AsyncSession,
+    adv_setting_id: int,
+) -> AdvSetting | None:
+    """PURE_READ: загрузить AdvSetting по PK для freeze-gate / preview / export.
+
+    Args:
+        session: injectable async session (caller: ``sm(read_only=True)``).
+        adv_setting_id: PK ``AdvSetting.id``.
+
+    Returns:
+        AdvSetting или ``None``, если кампания не найдена.
+    """
+    return await session.get(AdvSetting, adv_setting_id)
+
 
 def _black_phrases_from_message(text: str) -> list[str]:
+    """Разбивает текст сообщения на непустые строки фраз."""
     return [line.strip() for line in text.split("\n") if line.strip()]
 
 
 def _exit_test_keyboard(adv_setting_id: int) -> InlineKeyboardBuilder:
+    """Клавиатура выхода из режима теста шаблонов чёрного списка."""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
@@ -41,6 +87,7 @@ async def add_white_phrases(
     callback_data: callbacks.AddBlackPhrasesTemplates,
     state: FSMContext,
 ) -> None:
+    """Открывает FSM ожидания строк шаблонов чёрного списка."""
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases)
@@ -54,6 +101,7 @@ async def add_white_phrases(
 async def waiting_for_black_phrases(
     message: Message, bot: Bot, state: FSMContext
 ) -> None:
+    """Сохраняет шаблоны чёрного списка; под A/B Hold structural freeze — отказ без write."""
     text = message.text
     if not text:
         return None
@@ -61,8 +109,11 @@ async def waiting_for_black_phrases(
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
     async with sm(read_only=True) as session:
-        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
+        adv = await load_adv_setting_in_session(session, adv_setting_id)
     if adv is None:
+        return None
+    if is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+        await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
         return None
 
     rel_manager = RelevantPhraseManager(adv)
@@ -80,6 +131,7 @@ async def test_black_phrases_start(
     callback_data: callbacks.TestBlackPhrasesTemplates,
     state: FSMContext,
 ) -> None:
+    """Запускает FSM проверки фраз по текущим сохранённым шаблонам (read-only)."""
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases_test)
@@ -103,6 +155,7 @@ async def exit_black_phrases_test(
     callback_data: callbacks.ExitBlackPhrasesTest,
     state: FSMContext,
 ) -> None:
+    """Возвращает из теста шаблонов в экран ожидания строк чёрного списка."""
     adv_setting_id = callback_data.adv_setting_id
     await state.update_data(last_adv_setting_id=adv_setting_id)
     await state.set_state(states.AddBlackPhrasesTemplates.waiting_for_black_phrases)
@@ -114,13 +167,14 @@ async def exit_black_phrases_test(
 async def waiting_for_black_phrases_test(
     message: Message, bot: Bot, state: FSMContext
 ) -> None:
+    """Проверяет фразы по шаблонам без записи membership (read-only preview)."""
     text = message.text
     if not text:
         return None
     data = await state.get_data()
     adv_setting_id = data["last_adv_setting_id"]
     async with sm(read_only=True) as session:
-        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
+        adv = await load_adv_setting_in_session(session, adv_setting_id)
     if adv is None:
         return None
 
@@ -159,11 +213,19 @@ async def waiting_for_black_phrases_test(
 async def reset_black_phrases(
     callback: CallbackQuery, bot: Bot, callback_data: callbacks.ResetBlackPhrases
 ) -> None:
+    """Сбрасывает шаблоны чёрного списка; под A/B Hold structural freeze — отказ без write."""
     adv_setting_original_id = callback_data.adv_setting_id
     async with sm(read_only=True) as session:
-        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_original_id)
+        adv = await load_adv_setting_in_session(session, adv_setting_original_id)
         if not adv:
             raise
+    if is_ab_hold_structural_freeze(adv.card_ab_hold_mode):
+        assert callback.from_user
+        await bot.send_message(
+            callback.from_user.id,
+            AB_HOLD_RESET_PHRASES_BLOCKED_MSG,
+        )
+        return
     manager = RelevantPhraseManager(adv)
     await manager.update_black_phrases([])
     await messages.WaitingForBlackPhrases(bot, callback.from_user.id)(
@@ -177,11 +239,12 @@ async def export_black_phrases(
     bot: Bot,
     callback_data: callbacks.ExportBlackPhrases,
 ) -> None:
+    """Выгружает текущие шаблоны чёрного списка в txt (read-only)."""
     adv_setting_id = callback_data.adv_setting_id
     async with sm(read_only=True) as session:
-        adv: AdvSetting | None = await session.get(AdvSetting, adv_setting_id)
+        adv = await load_adv_setting_in_session(session, adv_setting_id)
     if adv is None:
-        if callback.message is not None:
+        if isinstance(callback.message, Message):
             await callback.message.answer("Кампания не найдена.")
         return
 

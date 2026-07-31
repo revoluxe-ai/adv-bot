@@ -18,12 +18,25 @@ Do not weaken assertions.
 
 First classify the failure and produce a copy-pasteable NEXT PROMPT.
 
+## Type-check routing
+
+If the failure packet is `pyright` / `pyright-strict` / `mypy` diagnostics (not a pytest assertion failure) — do **not** classify it with the pytest taxonomy below.
+
+Return immediately:
+
+```text
+NEXT_ACTION: /opsx-fix-types
+```
+
+Owner command: `.cursor/commands/opsx-fix-types.md`.
+
 ## Policy source
 
 Before triage, inspect and follow:
 
 - `openspec/policies/test-triage.md`
 
+Read that exact path directly (`.cursor/commands/opsx-source-resolution.md`). If failing test paths are provided, open those exact paths first; do not inventory all tests to rediscover them.
 If this policy file exists, treat it as the source of truth for test failure classification rules.
 
 If the command and policy conflict:
@@ -112,3 +125,17 @@ Stop conditions:
 [END NEXT PROMPT]
 
 11. Команда проверки:
+
+
+## Orchestration RED status mapping (light)
+
+When triage feeds a bug-episode RED path, map classes:
+
+| Triage class | Typical RED / next |
+|---|---|
+| CODE_BUG | continue RED authoring toward `RED_CONFIRMED` |
+| BAD_TEST / wrong assertion | `RED_WRONG_REASON` or rewrite test via `/opsx-test` |
+| FLAKY_OR_ENV / setup | `TEST_SETUP_DEFECT` / `BLOCKED` |
+| TEST_OBSOLETE | do not force production GO |
+
+Do **not** emit production GO from triage.

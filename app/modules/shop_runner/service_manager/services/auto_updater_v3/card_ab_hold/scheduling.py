@@ -11,6 +11,7 @@ from typing import Protocol, Sequence, TypeVar
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     is_ab_hold_structural_freeze,
+    is_epoch_managed_ab_hold,
     normalize_card_ab_hold_mode,
 )
 
@@ -33,6 +34,19 @@ def should_run_ab_setup(mode: CardAbHoldMode | str | None) -> bool:
 def should_run_ab_hold(mode: CardAbHoldMode | str | None) -> bool:
     """ACTIVE → только hold entrypoint."""
     return normalize_card_ab_hold_mode(mode) == CardAbHoldMode.ACTIVE
+
+
+def should_run_ab_epoch(
+    mode: CardAbHoldMode | str | None,
+    phase: str | None,
+) -> bool:
+    """``PENDING_SETUP`` + non-NULL phase → epoch tick (§19–§22), не legacy setup.
+
+    Legacy MVP-1 (``phase IS NULL``) MUST продолжать ``process_ab_setup``.
+    """
+    if normalize_card_ab_hold_mode(mode) != CardAbHoldMode.PENDING_SETUP:
+        return False
+    return is_epoch_managed_ab_hold(phase=phase)
 
 
 def should_schedule_ordinary_updater(mode: CardAbHoldMode | str | None) -> bool:

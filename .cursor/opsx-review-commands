@@ -1,0 +1,291 @@
+# /opsx-review-commands
+
+Independent READ_ONLY reviewer for OpenSpec/OPSX Cursor command
+contracts.
+
+## Purpose
+
+Review Cursor commands and workflow contracts, not production code.
+
+Detect: - command contradictions; - lifecycle gate defects; - decision
+lookup conflicts; - handoff failures; - state identity loss; - semantic
+contract drift.
+
+## Modes
+
+SINGLE_COMMAND_REVIEW COMMAND_SET_REVIEW FULL_OPSX_AUDIT
+REGRESSION_REVIEW
+
+`HANDOFF_AUDIT` / `GATE_AUDIT` are **deferred** (not modes yet). Gate coverage
+is enforced inside `FULL_OPSX_AUDIT` via checklist + two-pass + FP policy below.
+
+## Read-only boundary
+
+Never: - edit files; - create patches; - fix findings; - commit; -
+push; - change tasks.
+
+## Tool I/O contract (mandatory — hang prevention)
+
+Follow `.cursor/commands/opsx-execution-preflight.md` **Read / tool I/O budgets**
+and `.cursor/commands/opsx-source-resolution.md`.
+
+Hard rules for this reviewer:
+
+1. Prefer `Grep` / filename inventory over full-file `Read`.
+2. Parallel `Read`: max **2**. Never open the full `.cursor/commands/opsx-*.md`
+   set in one turn.
+3. Large files: `Read` with `limit`/`offset` (≤ 120 lines first pass) or Grep
+   hit ± context. Full-file only when REQUIRED_FOR a confirmed defect claim.
+4. Do **not** launch a subagent that “extracts contracts from ALL opsx-*.md”
+   via parallel full Reads. If COMMAND_SET / FULL audit needs breadth:
+   - inventory filenames once;
+   - Grep for high-risk tokens across the set;
+   - sequentially Read only hit files / sections.
+5. Never preload `opsx-admin-command-analyze-pipeline.md`, `opsx-learn-from-bug.md`,
+   `opsx-admin-command-design-command.md`, or other large siblings “for orientation”
+   unless they are in scope or Grep-hit for the active question.
+6. Read timeout / stall → stop stacking Reads; continue with evidence on hand
+   or return `BLOCKED` / `EVIDENCE_GAP` for the missing required path.
+
+### Mode budgets (files fully/section-read)
+
+| Mode | Max section-Reads | Notes |
+|---|---|---|
+| SINGLE_COMMAND_REVIEW | 3 | target + ≤2 direct cited deps |
+| COMMAND_SET_REVIEW | 5 | after Grep filter |
+| FULL_OPSX_AUDIT | 8 | two-pass; checklist pairs first; not all files |
+| REGRESSION_REVIEW | 5 | changed files + cited consumers |
+
+These caps count substantive `Read` opens, not Grep or `Test-Path`.
+Reserved gate-pair Reads still count toward the mode cap (not an exemption).
+
+## HIGH_RISK_HANDOFF_CHECKLIST (budget-first)
+
+For `FULL_OPSX_AUDIT` (and when COMMAND_SET / REGRESSION Grep hits these
+tokens), the checklist **consumes section-Read budget before** opportunistic
+non-gate Grep hits.
+
+Keep the list short (≤ **4** producer–consumer pairs; ≤ **8** section-Reads).
+
+| Priority | Gate tokens | Default producer side | Default consumer side |
+|---|---|---|---|
+| 1 | `claim_token` / `CLAIM_TOKEN` / `blocked_missing_claim_token` / `blocked_claimed_without_durable_token` | `opsx-materialize-bug-queue.md`, `opsx-claim-next-bug.md` | `opsx-fix-bug.md` |
+| 2 | `CHAT_REQUIRED` / pre-claim `NEXT_COMMAND` | `opsx-materialize-bug-queue.md`, `opsx-fanout-bug-hunt.md` | `opsx-claim-next-bug.md`, `opsx-fix-bug.md` |
+| 3 | `GO` / `NO_GO` / owner approval gate | producer of GO invitation | consumer that may act on GO |
+| 4 | ownership / ADL / disposition handoff tokens | emitter of durable status | consumer that routes on that status |
+
+Rules:
+
+1. Allocate Reads to checklist pairs **first** whenever inventory/Grep shows
+   any checklist token (or when running FULL).
+2. Always open **both** sides of a selected pair before judging alignment.
+3. Prefer the default paths in the table; substitute only when Grep shows a
+   different emitter/consumer for the same token.
+4. Remaining budget (if any) goes to ranked non-checklist Grep hits.
+5. Do **not** open all inventory members. Unopened → `NOT_OPENED_BUDGET`.
+
+## FULL_OPSX_AUDIT two-pass procedure
+
+Mandatory for `MODE=FULL_OPSX_AUDIT`:
+
+### Pass 1 — breadth (no deep contract invention)
+
+1. Inventory `.cursor/commands/opsx-*.md` (+ `.cursor/opsx-review-commands` if
+   in scope) once (filename list only).
+2. Grep across the set for checklist tokens and other high-risk contract
+   tokens (status/disposition/handoff/GO/ownership).
+3. Rank hits: checklist pairs first, then other producer–consumer suspects.
+4. Do **not** confirm or reject gate defects from Grep snippets alone.
+
+### Pass 2 — depth (bounded section-Reads)
+
+1. Spend the mode budget (max **8**) on Pass-1 ranked items.
+2. Checklist pairs first; both sides section-Read (≤ 120 lines or Grep ±
+   context per open).
+3. Then opportunistic high-risk hits with remaining budget.
+4. Parallel `Read` still max **2**.
+5. Record every opened path in `READ_IO.files_section_read` and every
+   checklist pair outcome in `GATE_PAIRS_OPENED`.
+
+## Gate FALSE_POSITIVES policy (mandatory)
+
+Gate-class tokens (at minimum: `claim_token` / `CLAIM_TOKEN`,
+`blocked_missing_claim_token` / `blocked_claimed_without_durable_token`,
+`CHAT_REQUIRED`, `GO` / `NO_GO`, ownership/claim gates, ADL / disposition
+handoff tokens that affect routing):
+
+- **Forbidden:** place a finding in `FALSE_POSITIVES_REJECTED` when only one
+  side (or neither side) of the producer–consumer pair was section-Read.
+- **Allowed FP reject:** only after **both** sides were section-Read under
+  the mode budget and the texts are compatible under the relevant matrix
+  (e.g. `STATUS` × `CHAT_REQUIRED` × durable-proof-presence for
+  claim_token optionality; empty durable proof ≠ weaken ownership).
+- If Grep suggests a gate defect but the pair cannot be fully opened:
+  emit `RISKS` and/or `EVIDENCE_GAP` / `NOT_OPENED_BUDGET` — never a clean FP
+  reject that implies the gate was verified.
+
+Known miss class (must not recur): Grep sees “claim_token optional” on one
+file while `available`+`CHAT_REQUIRED` handoff requires claim-first; rejecting
+as FP without opening `opsx-fix-bug.md` and `opsx-claim-next-bug.md` /
+materialize handoff sections is a process defect of this reviewer.
+
+Known miss class (must not recur) — prohibition ↔ gate / empty durable
+proof: consumer «Запреты» / acceptance require token ownership for
+`STATUS: claimed`, but the operational gate / blockers table only fire
+when durable `CLAIM_TOKEN` is non-empty (`claimed` + empty/absent →
+optional / fall-through). That mismatch is a **confirmed defect**, not
+FP. On FULL / REGRESSION when claim pair #1 is in scope, compare
+Запреты ↔ blockers ↔ gate steps (not only the claim-first cell). Empty
+durable proof must not weaken ownership.
+
+Exact-cell claim-first (must not recur / not FP when both sides opened):
+
+1. **Cell match:** Consumer claim-first trigger MUST equal the producer /
+   claim eligibility cell: `STATUS=available` ∧ `CHAT_REQUIRED=true`.
+   Over-broad triggers (`STATUS≠claimed`, or any non-available non-claimed
+   set such as `blocked` / `backlog` / `absorbed_*`) are a **confirmed
+   defect** (claim-next will refuse → loop), not alignment.
+2. **Separate pre-claim blocker:** Pre-claim refusal MUST use a distinct
+   blocker (canonical: `blocked_needs_claim_first`), not reuse
+   `blocked_missing_claim_token` / token-mismatch family (those apply only
+   after a durable claim exists).
+3. **Pasteable + no invent:** For the pre-claim cell, pasteable next MUST be
+   `/opsx-claim-next-bug` only — never “retry `/opsx-fix-bug` with
+   `claim_token=`” (token does not exist yet). Consumer MUST NOT invent or
+   write `CLAIM_TOKEN`.
+
+Known miss class (must not recur) — REVIEW_MISS_ACCEPTANCE_ANCHOR_DRIFT:
+same-`CASE_ID` acceptance / checklist text across `opsx-claim-next-bug.md`
+↔ `opsx-materialize-bug-queue.md` ↔ `opsx-fanout-bug-hunt.md` MUST agree
+on claimable `STATUS` × `CHAT_REQUIRED` (eligibility cell). Adjacent /
+`backlog` (and other non-available statuses) ≠ claimable. Drift between
+those acceptance anchors is a **confirmed defect**, not FP — but only
+after **both** sides of the compared pair were section-Read. Grep-only
+or one-side reject → `RISKS` / `EVIDENCE_GAP` / `NOT_OPENED_BUDGET`, never
+clean FP.
+
+Known miss class (must not recur) — REVIEW_MISS_PROSE_REFUSAL_WITHOUT_BLOCKER_CELL:
+«отдельный отказ» / «Запреты» / acceptance prose that refuses a gate cell
+**without** a matching blockers-table cell (+ acceptance outcome for that
+cell) is a **confirmed defect**, not FP. Especially: `CHAT_REQUIRED=true`
+fall-through on `backlog` | `blocked` | `absorbed_*` (prose says refuse,
+blockers omit the cell → claim-next / fix-bug loop). On FULL / REGRESSION
+when claim pair #2 is in scope, compare Запреты ↔ blockers ↔ acceptance
+outcomes for those statuses — not only the `available`+`CHAT_REQUIRED`
+claim-first cell.
+
+Known miss class (must not recur) — REVIEW_MISS_STATUS_REFUSAL_SET_INCOMPLETE:
+complements (does **not** replace)
+`REVIEW_MISS_PROSE_REFUSAL_WITHOUT_BLOCKER_CELL`. Cell presence for
+`backlog`|`blocked`|`absorbed_*` is not enough if fix-bug п.3 / blockers
+refusal set omits other claim-next **ineligible** or materialize-written
+terminal statuses (`closed_false_positive`, `closed_fixed`,
+`promoted_to_root_case`, `duplicate_ancestor`, and listed intermediate
+post-claim statuses when present). On FULL / REGRESSION when claim pair
+#2 / status-refusal is in scope: section-Read **both** fix-bug п.3
+(+ blockers / п.5 exclusion) **and** claim-next ineligible (plus
+materialize STATUS writers when Grep hits promoted/duplicate/closed).
+Missing overlap that leaves `finding=` fall-through (undefined when
+`CHAT_REQUIRED=true`) or п.5 optional-token (when `CHAT_REQUIRED=false`)
+is a **confirmed defect**, not FP. Both sides section-Read required for
+FP reject; else `RISKS` / `EVIDENCE_GAP` / `NOT_OPENED_BUDGET`.
+
+Exact-cell ownership-proof (must not recur / not FP when both sides
+opened; applies after a durable claim exists — separate from claim-first):
+
+1. **Cell match:** `STATUS=claimed` ⇒ durable `CLAIM_TOKEN` is required
+   (non-empty). Empty / absent durable token ⇒ hard-stop blocker
+   (canonical: `blocked_claimed_without_durable_token`); never optional
+   ownership / fall-through.
+2. **Prohibition ↔ gate:** If «Запреты» / acceptance forbid bypassing
+   token for claimed, gate steps + blockers MUST enforce that for empty
+   durable token too — not only when `CLAIM_TOKEN` is already non-empty.
+3. **Not alignment:** «я тот же чат» / «токен потерян» / «достаточно
+   case+finding» without durable proof (or without usable prior-receipt
+   `CLAIM_TOKEN` when durable is non-empty) is not ownership alignment.
+
+## Semantic contract review
+
+Check producer and consumer compatibility.
+
+Detect: - enum mismatch; - status token mismatch; - disposition
+mismatch; - output/input schema drift; - gate matrix mismatch
+(STATUS × CHAT_REQUIRED × claim_token × durable-proof-presence).
+
+For claim / chat-required handoffs, matrix compatibility means **exact
+cell** agreement (eligibility ↔ consumer hard-stop), not “any unclaimed
+status.” See Exact-cell claim-first and Exact-cell ownership-proof under
+Gate FALSE_POSITIVES. Empty durable proof ≠ weaken ownership gate.
+
+Example:
+
+Producer: local_note_only
+
+Consumer: local_case_note_only
+
+Report only if exact values influence routing, gates, lifecycle or
+decisions.
+
+## Contract extraction
+
+Extract: - inputs; - outputs; - GO/NO_GO; - artifacts; - state
+identifiers; - machine tokens emitted; - machine tokens accepted; -
+producer-consumer mappings; - handoff contracts.
+
+Extract only for files actually opened under the mode budget. For
+unopened inventory members, report `NOT_OPENED_BUDGET` — do not invent
+contracts.
+
+## Decision lookup
+
+Use context-first lookup.
+
+Budgets: - SINGLE_COMMAND_REVIEW: 3 - COMMAND_SET_REVIEW: 5 -
+FULL_OPSX_AUDIT: 8 - REGRESSION_REVIEW: 5
+
+Never recursively load all decisions.
+
+## Output
+
+Return: STATUS MODE REVIEW_SCOPE REPOSITORY_SNAPSHOT VERDICT
+CONFIRMED_DEFECTS RISKS FALSE_POSITIVES_REJECTED DECISION_LOOKUPS
+COVERAGE GATE_PAIRS_OPENED GATE_FP_POLICY_APPLIED NEXT_ACTION
+
+Include:
+
+```text
+READ_IO:
+- inventory_count:
+- greps_used:
+- files_section_read:
+- checklist_pairs_opened:
+- opportunistic_reads:
+- parallel_max_used:
+- deferred_not_opened:
+
+GATE_PAIRS_OPENED:
+- token:
+- producer_path:
+- consumer_path:
+- both_sides_section_read: true | false
+- disposition: confirmed | risk | evidence_gap | fp_rejected_after_both_sides
+
+GATE_FP_POLICY_APPLIED: true | false
+```
+
+Every confirmed defect requires: - file:line; - evidence; - execution
+condition; - operational impact; - confidence.
+
+## Self review
+
+Before returning:
+
+- remain read-only;
+- prove defects with evidence;
+- separate risks from defects;
+- keep scope bounded;
+- stay inside Read I/O budgets;
+- checklist pairs preferred before opportunistic Reads on FULL;
+- no gate-token entry in `FALSE_POSITIVES_REJECTED` unless both sides
+  section-Read;
+- do not require opening every inventory file.

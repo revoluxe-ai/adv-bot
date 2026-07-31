@@ -46,7 +46,7 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 4. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Read existing proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - If the artifacts touch ownership, layering, write paths, or domain invariants with no relevant decision, output `Architecture Decision Missing`.

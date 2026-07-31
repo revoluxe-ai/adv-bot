@@ -14,14 +14,23 @@ architecture decisions belong here.
   - Status: Accepted
   - Scope: ownership and placement of mode-specific defaults for paid, free,
     and common policy overlays.
+- [clickhouse-sql-database-qualification](clickhouse-sql-database-qualification/decision.md)
+  - Status: Accepted
+  - Scope: domain invariant — working-contour ClickHouse SQL MUST qualify
+    database as `default_db.<object>` in query text; SQL-contract proof
+    required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
 
 ## Change Requirements
 
 - Every change that touches ownership, layering, write paths, or domain
-  invariants must search `openspec/decisions/**/*.md`.
+  invariants must resolve decisions **context-first** (exact/
+  `artifactPaths` / index), then bounded fallback under
+  `openspec/decisions/` — not a full recursive dump of every decision file.
 - Relevant decisions must be cited by path from proposal/design artifacts and
   implementation/verification summaries.
-- If a relevant decision is missing, create a proposed decision artifact before
-  declaring the change implementation-ready.
+- If a relevant decision is missing after context-first + bounded fallback,
+  create a proposed decision artifact before declaring the change
+  implementation-ready (or record `Architecture Decision Missing` /
+  `EVIDENCE_GAP`).
 - Passing tests are not enough when implementation placement conflicts with an
   accepted architecture decision.

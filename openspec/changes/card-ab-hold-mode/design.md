@@ -1,309 +1,312 @@
 ## Context
 
-Клиентам нужен paid self-service режим для «чистого» A/B-теста карточки: зафиксировать целевые позиции по текущей фактической позиции, отключить обновление ЦП, оставить биддер работающим, не полагаясь на полный `bot_active=False` и не на хрупкую комбинацию legacy-флагов.
+Клиентам нужен paid self-service режим для «чистого» A/B-теста карточки: явно выбрать и подтвердить набор ключей и целевые позиции, прогреть кампанию перед фиксацией, отключить обновление ЦП, оставить биддер работающим, отдельно управлять участием и ставкой Auto — не полагаясь на полный `bot_active=False` и не на хрупкую комбинацию legacy-флагов.
 
-Сегодня ordinary V3 (`adv_settings_auto_update` → `process_adv_v3`) и параллельные ACT-корутины (whitelist top-key, individual target place, emergency, и т.д.) могут менять ключи/БС/ЦП в любой тик. Bot и shop-runner крутятся в разных подах — нужен Redis cooperative interrupt, чтобы ENTER не смешался с уже идущим normal apply.
+Ранее применённая MVP-1 реализация (`card-ab-hold-write-path-ownership` §1–§14, tasks §1–§18) уже закрыла: paid-only Telegram enable/disable, freshness/V3-only/max-CPO/soft-volume гейты на enable, allowed-set PG snapshot + hold enforcement минус-профиля, Excel write-path removal, idempotent Enable, hide-Enable keyboard, shared-defaults guard, PENDING_SETUP liveness. Эта реализация остаётся действующим фундаментом.
 
-Стек: Python 3.11, SQLAlchemy + PostgreSQL, Redis (паттерн `AdvSettingRedisCache` / `RedisCacheBase`, lock через `RedisLockManager`), Telegram paid UI. Режим — paid automation core: enable/disable только через Telegram при `bot_active is True`. Excel roundtrip **не** является write-path режима в MVP (future).
+**Owner-approved обновление (этот `/opsx-update`; semantic SoT = owner-approved product requirements + CONTROL decisions, НЕ `REQ-AB-HOLD-BUDGET-SAFETY-001`):** MVP-1 фиксировала целевую позицию синхронно с автоматической PASS/FAIL классификацией на ENTER — без отдельного прогрева и без явных подтверждений пользователя (keyword/TP/Auto). Владелец продукта требует другой флоу поверх существующего фундамента: keyword confirm → durable WARM_UP (не короче 24ч) → раздельное отображение факт-позиции/предложенной целевой позиции → явный TP confirm → явный Auto participation confirm → явный Auto bid confirm → durable PENDING intent → WB sync → активный hold. Этот design обновляет план (не код — `/opsx:apply` в рамках этого обновления заблокирован до авторизации владельцем); реализация должна происходить строго по цитируемым ниже decisions.
+
+Стек: Python 3.11, SQLAlchemy + PostgreSQL, Redis (`AdvSettingRedisCache` / `RedisCacheBase`, `RedisLockManager`), Telegram paid UI, существующий daily-budget/activity-control controller (`ensure_campaigns_active` / auto-budget watchdog).
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Durable режим кампании: OFF / PENDING_SETUP / ACTIVE в PG.
-- ENTER: setup по `pay_for_order ≤ max CPO` и `views ≥ 100` (окно как в карточке ключа); FAIL → OFF; PASS → ЦП := текущая фактическая; БС фиксируется по итогу setup.
-- ENTER allowed-set: зафиксировать разрешённый набор фраз → PG allowed-set snapshot (новая Alembic migration) → одна setup sync привести WB к allowed-set → только затем setup MAY → ACTIVE.
-- HOLD: обновление ЦП выкл; биддер ON; structural ACT freeze (WL/TP/enable/emergency + ordinary allowed-set recalc); hold enforcement исключает новые/не-разрешённые фразы к замороженному allowed-set (минус как enforcement, WB cap → иначе видимая деградация); только guard перерасхода vs max CPO.
-- UI readiness: «режим включён / можно запускать A/B» только после ACTIVE (полный setup, в т.ч. allowed-set snapshot); не на PENDING; без гонки.
-- EXIT: снова обновление ЦП + ordinary апдейтеры + ordinary minus auto-update + allowed-set recalc; clear PG allowed-set snapshot + clear coordination Redis state; без restore keyword-profile / Excel snapshot; `card_ab_hold_degraded` в OFF может оставаться non-operative residue (deferred cleanup).
-- Cross-pod Redis: signal ENTER/EXIT, last-abort ack, setup lock NX.
-- Paid-only Telegram UI (скрыть при `bot_active is False`) + reject enable.
-- Enable gate на stats freshness/health (тот же класс, что `advs_filtred`); UI: причина + ограничение + `const.SUPPORT_LINK`.
-- A/B Hold — только V3 auto-updater: enable при `automatic_version != 3` blocked (mode остаётся OFF + причина); пока PENDING/ACTIVE — запрет переключения на V2 (сначала EXIT → OFF). V2 `change_adv_strategy` (MIN_CPO/MAX_CONV) — вне A/B Hold freeze; held V3-профиль не управляется этим полем.
-- После PENDING/ACTIVE: setup/hold scheduling не зависит от попадания в `advs_filtred`.
-- **Excel: колонка/apply `card_ab_hold_mode` убраны из MVP** (ignore leftover payload; future option).
-- Instruction: набор рекламных фраз зафиксирован (новые исключаются); ручные правки в WB MAY быть возвращены; изменить набор → отключить A/B Hold; без обещания полной заморозки вне scope типа РК / WB cap.
-- Tests-first gates: structural freeze, allowed-set snapshot/enforcement (вкл. WB cap visible degradation), UI not-ready on PENDING, paid visibility, interrupt до apply, freshness enable + post-enter schedule + Excel ignore.
+- Обновить план (proposal/design/spec/decisions/tasks) так, чтобы явно кодировать: durable WARM_UP (default/min 24ч, увеличение разрешено, уменьшение запрещено, без авто-add/авто-return, safety-исключение допускается, TP не фиксируется); раздельное отображение факт-позиции и предложенной целевой позиции (`ab_hold_target_place_from_keyword(position)`) как двух семантических полей; явные раздельные подтверждения TP / Auto participation / Auto bid; durable immutable TP в пределах эпохи (ENTER/retry не пересчитывают; дрейф не переоткрывает подтверждение); durable PENDING intent строго до WB-мутации; partial sync → восстановимое не-активное состояние; retry того же generation без пересчёта и без новой эпохи; freeze keyword inclusion/exclusion и Search/Auto bid-мутаций при stale/missing статистике на всём жизненном цикле (без остановки кампании только по этой причине); честное описание daily-budget/activity-control reuse (stop threshold, overshoot без гарантированной границы, суточный сброс); Telegram UX на уровне плана (пагинация 10, «Назад» сохраняет черновик, «Отмена» — отдельное действие); раскатку через ручной тест владельца → лимитированную opt-in бету → OD-05 как единственный гейт широкого включения.
+- Устранить перечисленные владельцем противоречия (см. Decisions → «Устранённые противоречия»).
+- Сохранить согласованность с уже применённым MVP-1 фундаментом (не откатывать §1–§14/tasks §1–§18).
 
 **Non-Goals:**
 
-- Встроенный A/B WB, price management, hard-block полок, Safe mode.
-- Free path / enable при `bot_active is False`.
-- Переписывание ordinary V3 preamble вне отдельного hold/setup path.
-- Обязательный Excel backup / restore keyword-settings при EXIT (allowed-set snapshot — отдельный freeze-механизм, не Excel backup).
-- **Excel enable/disable/edit A/B Hold** — future / out of MVP (идея сохранена; текущий контракт — только Telegram).
+- Полный UX-контракт и Telegram storyboard нового confirm-флоу — не этот design; создан отдельным последующим `/opsx-continue` в `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` и `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md` (планирующие UX-документы; не разблокируют `/opsx:apply` §19–25).
+- Monitoring/alerting и evidence-driven emergency stop — OUT_OF_SCOPE_FOLLOW_ON, не артефакт этого обновления.
+- Абсолютный тестовый бюджет, epoch spend cap, velocity cap, generic financial latch, новая emergency-stop подсистема, global refill/restart suppression, отдельная финансовая safety-ownership decision.
+- Изменение самого daily-budget/activity-control controller — только честное описание его существующего поведения.
+- `/opsx:apply` в рамках этого обновления — реализация заблокирована до авторизации владельцем.
+- Owned авто-abort зависшего PENDING — остаётся SHOULD/future (не меняется этим обновлением).
 
 ## Architecture Decision References
 
 Architecture Decisions Found:
 
-- `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: Accepted. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper / UI.
-- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: Proposed. Ownership setup/hold write-path, exclusion из ordinary V3, structural freeze (вкл. минус-фразы), PG vs Redis, paid-only Telegram enable, bidder MUST оставаться работающим; stats freshness asymmetry; **§2c** launch validity soft-gate (campaign-level proxy Σ via `get_keywords_views_by_days` + calendar-day MV cover last-24h wall-clock → warn + raise-max-CPO + launch-anyway/cancel; CH-error → distinct soft reason; keyword-filtered / true rolling 24h = out of MVP); **§8** allowed-set PG snapshot + hold enforcement (минус — derived; WB cap visible degradation) + UI readiness только после ACTIVE; **§9** Excel write-path out of MVP; **§10** Telegram Enable idempotent while PENDING/ACTIVE; **§11** keyboard MAY hide Enable while PENDING/ACTIVE (Disable/Back remain); **§13** shared campaign-defaults application («Применить дефолты» / `apply_defaults_to_adv_setting`) — не disable-path: MUST NOT disable/mutate A/B Hold на held-кампании (mode preserved; disable только owned Telegram EXIT).
+- `openspec/decisions/mode-defaults-policy-ownership/decision.md` — Status: **Accepted**. Дефолт «A/B Hold выкл» при paid/free overlays принадлежит declarative mode policy overlays, не transition-helper/UI. Применяется без изменений.
+- `openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md` — Status: **Proposed**. §1–§14 — применённый MVP-1 фундамент (ownership setup/hold write-path, structural freeze, allowed-set snapshot + enforcement, Excel-removal, idempotent Enable, V3-only, shared-defaults guard, PENDING liveness). **Обновлено этим change**: §15 (WARM_UP/epoch/generation — ссылка на новый decision ниже), §16 (confirmed epoch-parameters SoT — ссылка на новый decision ниже), §17 (stale/missing stats freeze для keyword inclusion/exclusion **и** Search/Auto bid-мутаторов, не только enable-гейта §2a; **PBH-005 carve-out:** after durable PENDING intent, apply snapshot PG/WB MUST NOT be stale-blocked; MVP default = soft), §18 (daily-budget/activity-control — ортогональный reuse существующего controller, без новой финансовой safety-модели). **Дополнительно обновлено (`/opsx-update` Search common-bid):** §3 (ordinary continuous Search common-bid Forbidden under Hold; bidder остаётся Allowed) + **§19** (Search common bid = рабочая механика холодных ключей/каталога; one-shot reset-to-min на ENTER; затем freeze; owned path ≠ ordinary updater ≠ bidder).
+- `openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md` — Status: **Proposed (новый в этом change)**. WARM_UP как durable pre-epoch стадия (default/min 24ч); epoch/generation модель; durable PENDING intent строго до WB-мутации; partial sync → non-ACTIVE recoverable; retry того же generation/параметров без пересчёта и без новой эпохи; дрейф позиции не переоткрывает подтверждение.
+- `openspec/changes/card-ab-hold-mode/decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md` — Status: **Proposed (новый в этом change)**. Confirmed keyword set / confirmed target places / confirmed Auto participation / confirmed Auto bid — durable SoT, отдельный от факт-состояния WB; факт-позиция и target place — раздельные семантические поля; immutable TP в пределах эпохи; Auto bid мутаторы заморожены в активном hold; owner — A/B Hold confirmation write-path, не display-слой и не ordinary auto-updaters.
 
-Architecture Decision Missing: нет (для этого change placement закрыт proposed decision выше; при archive — promo в `openspec/decisions/`).
+Architecture Decision Missing: нет для этого обновления — placement закрыт тремя proposed decisions выше (одна обновлена, две новые); при archive reusable часть промотится в `openspec/decisions/`.
 
 ## Ownership & Placement
 
 **Owner layer:**
 
-- Shop-runner A/B Hold automation path: `process_ab_setup` / `process_ab_hold` (отдельные entrypoints рядом с V3, не «ветка глубоко внутри NORMAL preamble» как единственный контроль).
-- PG durable mode на `AdvSetting` (или эквивалентное поле кампании): source of truth OFF / PENDING_SETUP / ACTIVE.
-- PG durable allowed-set snapshot на кампании (новое поле, **новая migration**): SoT зафиксированного разрешённого набора фраз; Redis не SoT snapshot.
-- Allowed-set freeze path: capture allowed-set → snapshot → setup sync привести WB к allowed-set; во время PENDING/ACTIVE — без ordinary recalculation allowed-set; hold-protection исключает не-разрешённые фразы (минус как enforcement) в пределах WB cap, иначе видимая деградация (owner: A/B Hold path + gate на `MinusPhraseManager` / manager coroutine).
-- Redis coordination layer: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock` по project patterns.
-- Paid UI / handlers: **единственный** enable/disable write-path MVP; экран инструкции (вкл. текст про минус-freeze) + вкл/выкл; gate `bot_active` **и** stats freshness на enable; alert с reason + `SUPPORT_LINK`; **ready-to-test только после ACTIVE**. Manual «Обновить минус-слова» при PENDING/ACTIVE: manager skip → Telegram non-success (blocked / отключите A/B Hold), не «Минус-слова обновлены».
-- Telegram manual target-place write boundary: handler manual input загружает `AdvSetting` и проверяет structural-freeze guard до PG write/commit; при `PENDING_SETUP`/`ACTIVE` запись `KeywordSetting.target_place` не выполняется, FSM очищается, пользователю отправляется explanatory message; при `OFF` существующий write path manual target_place остаётся неизменным.
-- Mode policy overlays: default «выкл».
-- Excel schema: **remove** `card_ab_hold_mode` EDIT column; import ignore/no-op если поле всё же пришло; `can_apply_card_ab_hold_mode_via_excel` → always deny non-absent / remove enable path.
+- A/B Hold epoch/setup write-path (shop-runner, тот же owner, что существующие `process_ab_setup` / `process_ab_hold` entrypoints): владеет WARM_UP-таймером, epoch/generation-нумерацией, durable PENDING intent → WB sync → активный hold порядком, retry-логикой (тот же generation, без пересчёта); **также** one-shot Search common-bid reset-to-min на ENTER (`OFF`→`PENDING_SETUP`, decision §19) — не ordinary `update_common_bid_in_search_adv` и не bidder.
+- A/B Hold confirmation write-path (Telegram confirm-хендлеры → durable PG запись): владеет confirmed keyword set / confirmed target places / confirmed Auto participation / confirmed Auto bid; читает факт-позицию из существующего read-model, не хранит её как подтверждённый параметр.
+- PG durable поля: режим кампании (OFF/PENDING/ACTIVE-класс, уже существует), allowed-set snapshot (уже существует), + **planned Alembic fields** (см. `tasks.md` §19.5 / §22.5): `card_ab_hold_phase`, `card_ab_hold_warmup_started_at`, `card_ab_hold_warmup_duration_hours`, `card_ab_hold_generation`, `card_ab_hold_wb_sync_idempotency_key`, `card_ab_hold_pending_intent_json`, `card_ab_hold_sync_status`, `card_ab_hold_confirmed_keywords_json`, `card_ab_hold_confirmed_target_places_json`, `card_ab_hold_confirmed_auto_participation`, `card_ab_hold_confirmed_auto_bid`. Owner и порядок фиксируются здесь; имена колонок — planning SoT для apply (не код). **Legacy rows:** NULL/0 defaults on new columns MUST NOT activate epoch lifecycle (§18.5 / Migration Plan).
+- **Legacy gate (pre-apply REQUIRED):** `process_ab_setup` → auto-ACTIVE и `setup_apply` TP-write на ENTER PASS — Forbidden относительно owner-флоу; MUST быть phase-gated до apply §19+ (`tasks.md` §18.4).
+- Redis coordination layer (уже существует: `CardAbHoldSignal` / `CardAbHoldLastAbort` / `CardAbHoldSetupLock`) — координация cross-pod, не SoT для confirmed-параметров или generation.
+- Существующий daily-budget/activity-control controller (`ensure_campaigns_active` / auto-budget watchdog) — не меняется этим change; A/B Hold только честно описывает его поведение (stop threshold, overshoot без гарантированной границы, суточный сброс) как ортогональный путь.
+- Mode policy overlays — дефолт «выкл» (без изменений, Accepted decision).
 
-**Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (или единый dispatcher), ACT structural guards на whitelist/target-place/emergency/minus ordinary recalc, hold guard executors (overspend / PFO > max), allowed-set enforcement (minus non-allowed), bidder/cluster bids, Apply path только для setup/hold allowed mutations.
+**Allowed layers:** scheduling exclusion в `adv_settings_auto_update` (существует), ACT structural guards (существуют), hold guard executors (существуют), allowed-set enforcement (существует), bidder/cluster bids (существуют, теперь явно как holder confirmed target places), Telegram confirm-хендлеры как triggers epoch/generation write-path (не как SoT), owned ENTER Search common-bid reset-to-min (`common_bid_enter_reset`, applied §27 / decision §19).
 
 **Forbidden layers:**
 
-- Ordinary V3 NORMAL preamble как sole controller hold без exclusion scheduling.
-- Прямое присваивание mode default в transition-helper/handler.
-- Остановка биддера / `bot_active=False` как реализация hold.
-- Structural ACT (БС / ЦП update / enable / ordinary minus recalculation) во время PENDING_SETUP / ACTIVE.
-- UI «можно запускать A/B» на PENDING_SETUP или до успешного allowed-set snapshot.
-- Redis как единственный source of truth режима или allowed-set snapshot без PG.
-- Excel export/import/apply `card_ab_hold_mode` (вкл. direct ACTIVE / PENDING / OFF).
-- Любой non-setup переход в ACTIVE (§8 / §9).
-- Отключение / сброс A/B Hold held-кампании через shared defaults / «Применить дефолты» в обход owned Telegram EXIT (decision §13).
+- Фиксация целевой позиции в момент автоматической классификации ключа (ENTER-тик) без прошедшего durable WARM_UP и без явного TP confirm.
+- Хранение/пересчёт confirmed target place или confirmed Auto bid в display/formatting-слое, в ordinary auto-updater или в Telegram-хендлере напрямую (мимо epoch write-path).
+- WB-мутация confirmed-параметров эпохи до записи durable PENDING intent в PG.
+- Продвижение generation, пересчёт TP/Auto bid на retry WB-синхронизации.
+- Остановка кампании исключительно по причине stale/missing статистики (freeze мутаций — да; остановка кампании — нет, это отдельное более сильное действие).
+- Введение нового финансового safety-механизма (абсолютный бюджет, velocity cap, emergency-stop подсистема, global refill suppression) в A/B Hold write-path.
+- Continuous ordinary Search common-bid mutate (`update_common_bid_in_search_adv`) во время `PENDING_SETUP` / `ACTIVE`; leave elevated common bid frozen as-is on ENTER without owned reset-to-min; выполнить ENTER reset через ordinary updater или bidder (§19).
 
-**Rationale:** соответствует proposed `card-ab-hold-write-path-ownership` (§3 + §8 + §9) и accepted `mode-defaults-policy-ownership`.
+**Rationale:** соответствует обновлённому proposed `card-ab-hold-write-path-ownership` (§15–§19) и двум новым proposed decisions (`ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`), а также accepted `mode-defaults-policy-ownership`. Ownership placement для WARM_UP/epoch/confirm-слоя и Search common-bid ENTER reset не пересекается с ordinary common-bid updater и bidder — дополняющие слои, не замена.
 
 ## Decisions
 
-### 1. Durable PG enum + Redis interrupt (не start/end tick flags)
+### 1. WARM_UP как отдельная durable pre-epoch стадия (см. `ab-hold-epoch-lifecycle-and-generation-ownership`)
 
-**Выбор:** PG `card_ab_hold_mode` ∈ {OFF, PENDING_SETUP, ACTIVE}; Redis signal/last-abort/setup-lock для multi-pod.
+**Выбор:** явное подтверждение набора ключей запускает WARM_UP; длительность — durable параметр эпохи, default = 24 часа, минимум = 24 часа; пользователь MAY увеличить, MUST NOT уменьшить ниже 24 часов. Во время WARM_UP: без авто-добавления новых ключей, без авто-возврата исключённых, safety-исключение Allowed, целевая позиция не фиксируется. Существующие пороги «≥100 показов/ключ» и «≥1000 показов кампании» (soft-gate объёма) сохраняют текущую семантику как условия eligibility/enable, а не длительность WARM_UP.
 
-**Почему:** bot и shop-runner в разных подах; mid-tick normal нужно прервать до apply. Start/end флаги тика не abort’ят in-flight и stuck при краше.
+**Почему:** без durable прогрева перед фиксацией целевой позиции тест начинается на «холодном» или ещё не устоявшемся профиле; фиксация синхронно с классификацией (MVP-1) не даёт пользователю время убедиться в стабильности набора ключей и не даёт возможности осознанно подтвердить именно то, что будет заморожено.
 
-**Альтернатива:** только `if` в orchestrator по PG — отклонена (гонка mid-tick). Только Redis без PG — отклонена (нет durable режима).
+**Альтернатива:** оставить фиксацию TP синхронно с ENTER-классификацией (MVP-1 как есть) — отклонена владельцем: silent auto-ENTER без warm-up и без confirm — explicit contradiction to remove. Сделать WARM_UP настраиваемым без минимума — отклонена (риск слишком короткого/нулевого прогрева).
 
-### 2. Scheduling exclusion + отдельные entrypoints
+### 2. Ручное изменение набора ключей во время WARM_UP сбрасывает таймер
 
-**Выбор:** при PENDING_SETUP → только setup; при ACTIVE → только hold; ordinary V3 structural не schedule’ится. Setup/hold ставятся из **полного** eligible списка `advs` (как ordinary V3), а не только из `advs_filtred`. Freshness-фильтр ordinary V2 / cluster-bids остаётся своим контрактом.
+**Выбор:** любое ручное изменение состава подтверждённого набора ключей во время WARM_UP завершает текущий таймер и запускает новый отсчёт (снова ≥ выбранной длительности, не короче 24 часов); остаток прежнего таймера не переносится.
 
-**Почему:** Bugbot/продукт — PENDING не должен вечно висеть из‑за stale после ENTER; после переключения сбои статы «уже не так критичны» для продолжения setup/hold. Вход в тест при больной стате запрещён отдельно (см. §2a / UI).
+**Почему:** прогрев измеряет стабильность именно того набора, который в итоге будет заморожен; изменение набора обесценивает уже прошедшее время прогрева для нового состава.
 
-**Альтернатива:** один `process_adv_v3` с огромной внутренней веткой — отклонена decision’ом (forbidden «sole if»). Setup только из `advs_filtred` — отклонена (stuck PENDING).
+**Альтернатива:** переносить остаток таймера на новый набор — отклонена (не гарантирует полноценный прогрев нового состава).
 
-### 2a. Stats freshness gate на enable (не на post-enter)
+### 3. Факт-позиция и предложенная/подтверждённая целевая позиция — раздельные семантические поля (см. `ab-hold-confirmed-epoch-parameters-sot`)
 
-**Выбор:** enable (**Telegram UI only** → PENDING) MUST NOT, если РК не проходит freshness/health класс `_split_advs_by_stats_freshness` (не попала бы в fresh automation set). UI при блокировке MUST сразу показать: (1) причину, (2) что включение теста ограничено, (3) рекомендацию обратиться в поддержку/к админу со ссылкой `app.client_bot.const.SUPPORT_LINK`. В репозитории нет `const.ADMIN`; whitelist админов — `const.ADMINS`; публичная ссылка для пользователя — `SUPPORT_LINK` (как в других handler’ах: «обратитесь в поддержку → {SUPPORT_LINK}»). Excel не enable-path в MVP.
+**Выбор:** после WARM_UP экран/сообщение показывает по каждому ключу факт (текущая наблюдаемая позиция, read-model) и отдельно предложенную целевую позицию через `ab_hold_target_place_from_keyword(position)`; пользователь явно подтверждает целевую позицию; подтверждённое значение становится durable и immutable в пределах эпохи. ENTER/setup/retry не пересчитывают подтверждённое значение; обычный дрейф факт-позиции после подтверждения не переоткрывает подтверждение.
 
-**Почему:** ENTER/setup на «мёртвой» стате даёт массовый FAIL→OFF и грязный старт теста; после входа блокировать hold/setup freshness’ом хуже, чем слабее overspend на stale.
+**Почему:** слияние факт-позиции и целевой позиции в одно поле мешает пользователю осознанно оценить предложение и делает подтверждение неотличимым от простого чтения текущего состояния; фиксация без возможности пересмотра после подтверждения нужна, чтобы тест оставался «чистым» на протяжении эпохи.
 
-### 2c. Launch validity soft-gate (низкий объём показов — campaign-level proxy)
+**Альтернатива:** пересчитывать target place при каждом отображении статуса (текущая факт-позиция) — отклонена (эквивалент «TP fixed без confirm», прямое противоречие).
 
-**Выбор:** новый шаг enable-потока (**Telegram UI only**), decision §2c: **попытка запуска → оценка → при проблеме → информация + рекомендация + выбор**. После прохождения freshness (§2a), но до записи `PENDING_SETUP` + Redis ENTER, handler агрегирует суммарные показы keyword-clusters кампании как **campaign-level proxy**: `get_keywords_views_by_days(adv_ids, start, end)` в `app/modules/shop_runner/wb_stat_manager/clickhouse_manager/full_wb_adv_stat.py` (MV `default_db.mv_clusters_daily_agg`) по `adv_id` (+ парный `search_adv_id`). Это **не** фильтр по setup non-BAD / would-carry-test ключам (`fetch_keywords_from_database`) — такой keyword-filtered aggregate = future / out of MVP. Зерно окна — **календарные дни MV**, покрывающие last-24h wall-clock (inclusive `date BETWEEN` по суткам агрегата); true rolling 24h hour-buckets поверх daily MV — невозможно без нового источника и **out of MVP**. Порог — константа `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000` (имя историческое; семантика = порог Σ за calendar-day cover). Если измеренная `Σ < порога`: mode остаётся `OFF`, сообщение с (1) причиной (мало показов для надёжного A/B), (2) рекомендацией поднять план max CPO и повторить, (3) inline-выбором «Всё равно запустить» / «Отмена». «Всё равно запустить» → `PENDING_SETUP` + Redis ENTER; «Отмена» → `OFF`, ENTER не пишется. При `Σ ≥ порога` предупреждение не показывается, enable идёт обычным путём (§7). Если CH unavailable / query error — **отдельный soft reason** (объём временно недоступен), mode `OFF`, без ENTER; **не** трактовать ошибку как 0 показов и **не** показывать low-impressions warning. Это **soft-gate** (пользователь MAY продолжить на свой риск при measured low volume), в отличие от freshness hard-block (§2a) и пустого allowed-set (не-ready, §8).
+### 4. Отдельные явные подтверждения Auto participation и Auto bid
 
-**Почему:** крайне низкий суммарный объём показов кампании — практичный proxy слабого теста без нового CH-контракта и без дублирования setup-классификации на enable; soft-warn + выбор лучше hard-block. Daily MV grain честнее, чем обещать true rolling 24h. CH-error как distinct reason избегает ложного «мало показов» при сбое инфраструктуры.
+**Выбор:** участие Auto в тесте и ставка Auto подтверждаются двумя отдельными явными действиями пользователя, независимыми друг от друга и от Search-подтверждений (keyword set, TP). После активного hold ordinary auto-update мутаторы ставки Auto не изменяют подтверждённое значение.
 
-**Альтернатива:** hard-block enable при низком объёме — отклонена (пользователь MAY запустить на свой риск). Молчаливый enable без предупреждения — отклонена. Keyword-filtered Σ только по setup-кандидатам — отложена (новый CH filter / UI keyword set на enable). True rolling 24h — отклонена при текущем daily MV. Трактовать CH error как 0 views — отклонена (ложный low-impressions soft-warn).
+**Почему:** Auto и Search — разные рекламные механизмы с разными рисками (широкий матчинг Auto); слияние подтверждений в одно действие скрывает от пользователя, что он в действительности разрешает автоматике по ставке.
 
-### 2d. ENTER hard-gate: plan max CPO must be positive (decision §14a)
+**Альтернатива:** подразумевать участие/ставку Auto из Search-подтверждения — отклонена владельцем (silent auto-TP/Auto без явного confirm — explicit contradiction to remove).
 
-**Выбор:** enable (**Telegram UI only** → PENDING) MUST быть заблокирован, если план `max_price_for_order` отсутствует или ≤ 0. Mode остаётся `OFF`; UI показывает причину (нужен положительный план max CPO) + рекомендацию задать и повторить. Проверяется вместе с §2a freshness и §12 V3-only, **до** §2c soft-gate (нет смысла предупреждать про объём, если max CPO = 0).
+### 5. Durable PENDING intent строго до WB-мутации; partial sync — восстановимое не-активное состояние; retry без пересчёта и без новой эпохи (см. `ab-hold-epoch-lifecycle-and-generation-ownership`)
 
-**Почему:** `process_ab_setup` использует `max_price_for_order` для классификации ключей; при отсутствии / ≤ 0 setup-тик детерминированно делает early return каждый тик и никогда не доходит до ACTIVE, а кампания при этом исключена из ordinary automation — вечный semi-frozen PENDING. Дешевле и честнее отсечь это на enable (аналогично freshness hard-block §2a), чем оставлять пользователя в PENDING без причины.
+**Выбор:** после всех подтверждений write-path фиксирует durable намерение (все confirmed-параметры + generation) в PostgreSQL перед первой попыткой WB-мутации этой generation. Если синхронизация WB завершилась частично, кампания остаётся не-активной с сохранённым тем же durable намерением; повторная попытка переиспользует тот же generation/параметры без пересчёта TP/Auto bid и без создания новой эпохи. Активный hold достигается только после подтверждённо полной успешной синхронизации.
 
-**Альтернатива:** оставить проверку max CPO только на setup-тике (early return, stay PENDING) — отклонена (молчаливый вечный PENDING). Мягкое предупреждение вместо hard-block — отклонена (без положительного max CPO тест в принципе не соберётся).
+**Почему:** без durable-before-WB порядка потеря процесса/сети между подтверждением и WB-записью оставляет систему без источника правды о том, что пользователь на самом деле разрешил; пересчёт на retry обесценивает уже сделанные подтверждения и повторяет прежний класс проблем (ACTIVE без честного snapshot).
 
-### 3. ENTER criterion
+**Альтернатива:** пересчитывать TP/Auto bid на каждый retry по свежей стате — отклонена владельцем (retry, который пересчитывает TP/Auto bid или продвигает generation — explicit contradiction to remove).
 
-**Выбор:** PASS iff `pay_for_order is not None` и `pay_for_order ≤ plan.max_pay_for_order` и `views ≥ 100` (тот же источник показов, что карточка ключа / CalculatedKeyword за недельное окно). FAIL → OFF. PASS → set target_place = current WB position; зафиксировать БС-состав по итогу setup.
+### 6. Stale/missing статистика замирает Search/Auto bid-мутации и keyword inclusion/exclusion, но не останавливает кампанию (см. обновлённый §17 write-path decision)
 
-**Почему:** max (не resolve) — рабочий потолок после прогрева; 100 показов снижает ложный PASS на шуме. Equality на max = PASS (`≤`).
+**Выбор:** пока кампания в WARM_UP, ожидании подтверждения или активном hold, при stale/missing статистике по ключу/кампании замирают **decide-class** пути: (a) включение/исключение ключей (в т.ч. WARM_UP safety-исключение, hold-enforcement, **и ENTER/setup FAIL→OFF**), (b) мутации ставки Search и мутации ставки/участия Auto. Freeze не пересчитывает уже подтверждённые (durable, immutable) параметры эпохи. **Apply snapshot ≠ decide:** после записи durable PENDING intent применение confirmed-параметров в PG и синхронизация в WB (`apply_confirmed_intent_to_pg` / `sync_intent_to_wb`) **MUST NOT** блокироваться только из‑за stale/missing stats (PBH-005 carve-out). На том же тике decide-class пути MAY оставаться заморожены. MVP default safety stance = **soft** (freeze decide; не abort/reset эпохи только из‑за stale; EXIT — явное действие пользователя). Stale/missing статистика сама по себе не является причиной остановки кампании. **UX:** при Enable и/или в статусе теста — краткий soft-policy disclaimer: временные сбои статы обычно безобидны; ради ровного теста бот не меняет состав ключей/ставки наугад; пользователь сам контролирует ход (формулировка freeze-decide, не «ослабим защиту»).
 
-**Альтернатива:** filter по resolve — отклонена (слишком жёстко при выполненном плане). Keep-as-is на FAIL — отклонена пользователем.
+**Почему:** решения на «неизвестных» данных хуже временной заморозки; но уже согласованный PENDING intent — исполнение снимка, а не новое решение по стате. Блокировать sync stale-гейтом смешивает decide и apply и оставляет кампанию в «подготовке» при периодическом stale. Disclaimer снимает ложное ожидание, что soft = «бот сам всё разрулит при любой дыре в стате».
 
-### 4. HOLD invariants
+**Альтернатива:** останавливать кампанию при stale-стате как safety-мера — отклонена владельцем. Pre-start picker hard|soft|self, anti-drain и mid-sync UX (wait|force|EXIT) — **не** owed design work этого change; см. `DOTO/WORKLOG.md` `[deferred-from:card-ab-hold-mode]` (parked via `/opsx-bound-scope`).
 
-**Выбор:** ЦП не обновляются; биддер продолжает работать к зафиксированным ЦП; нет WL add/remove/trim/enable/calibration UP; нет ordinary minus recalculation (allowed-set заморожен); hold-protection исключает новые/не-разрешённые фразы и восстанавливает снятые разрешённые к замороженному allowed-set (минус как enforcement, в пределах WB minus cap; иначе видимая деградация); только guard перерасхода vs max CPO (reuse overspend/PFO-off семантику).
+### 7. Daily-budget / activity-control — честный reuse существующего controller, не новая финансовая safety-модель (см. обновлённый §18 write-path decision)
 
-**Почему:** позиции и разрешённый набор фраз стабильны для теста; трафик не обрывается отключением биддера; новые фразы и ручные правки в WB/боте не должны «загрязнять» A/B.
+**Выбор:** A/B Hold переиспользует существующий daily-budget/activity-control controller как есть. Это стоп-порог (stop threshold), а не жёсткий лимит: перерасход возможен из-за задержки статы, каданса воркера, in-flight трат, конкурентных write-путей и top-up без обрезки до остатка бюджета; нет гарантированной числовой верхней границы overshoot; суточный сброс и возобновление трат на следующий день — ожидаемое поведение, честно раскрываемое пользователю (уровень плана; конкретный текст — Telegram storyboard, DEFERRED). Абсолютный тестовый бюджет / epoch spend cap / velocity cap / financial latch / новая emergency-stop подсистема / global refill suppression не вводятся.
 
-### 4a. Allowed-phrase-set freeze + hold enforcement
+**Почему:** владелец явно запретил параллельную финансовую safety-модель и `REQ-AB-HOLD-BUDGET-SAFETY-001` как текущий scope; честное раскрытие существующего поведения контроллера снижает риск того, что пользователь примет daily-budget за гарантированный потолок теста.
 
-**Выбор:** primary invariant — замораживается **разрешённый (relevant) набор фраз** (relevant-фразы + получившийся GOOD/whitelist профиль ключей), а не список минус-фраз; минус — производный enforcement. Переиспользуется существующая модель `auto_add_only_relevant_phrase` / `relevant_phrases` / `NOT_RELEVANT_PHRASE` (не-разрешённая фраза → BAD → минус). На ENTER до ACTIVE — жёсткий порядок: (1) зафиксировать allowed-set и записать durable PG allowed-set snapshot (новое поле, новая migration); (2) одной setup sync/mutation привести WB к allowed-set (исключить всё вне набора в пределах WB minus cap); (3) остальной setup (ключи/ЦП/БС); (4) ACTIVE. Во время PENDING/ACTIVE ordinary `update_minus_phrases` recalc (изменение allowed-set по свежей стате) MUST NOT — allowed-set заморожен; **отдельно** hold-protection исключает любые новые/не-разрешённые фразы и восстанавливает снятые разрешённые, удерживая поверхность трат = allowed-set. EXIT → clear allowed-set snapshot; ordinary minus + recalc снова разрешены.
+**Альтернатива:** ввести отдельный epoch spend cap специально для A/B Hold — отклонена владельцем (explicit out-of-scope item).
 
-**Почему:** новые фразы появляются постоянно (стата пересчитывает GOOD/BAD); заморозка одного минус-листа не мешает новым фразам откручиваться и загрязнять тест. Замораживать надо источник (allowed-set), а минус применять как enforcement. PG snapshot переживает рестарт; Redis не SoT набора.
+### 8. Telegram UX на уровне плана: пагинация 10, «Назад» сохраняет черновик, «Отмена» — отдельное действие
 
-**WB minus cap (видимая деградация):** enforcement ограничен лимитом WB (~1000 фраз/nmid). Если для удержания allowed-set нужно исключить больше, чем допускает cap (или тип РК — open-match без доказанной controllability), система деградирует **видимо** (лог + честный статус, что hold не гарантирован), не заявляя чистый hold молча.
+**Выбор:** список ключей на экранах подтверждения пагинируется по 10 элементов на страницу; кнопка «Назад» сохраняет текущий черновик подтверждения (не отбрасывает прогресс); «Отмена» — отдельное явное действие, отличное от «Назад», приводящее к отказу от текущей попытки без сохранения черновика. Существующий MVP-1 экран `card_ab_hold` — не референс для нового флоу.
 
-**Альтернатива:** snapshot минус-листа + restore-on-drift (изначальный дизайн) — отклонена: замораживает производный негатив, новые фразы протекают и тест грязный. Хранить allowed-set только в Redis — отклонена (нет durable SoT).
+**Почему:** это планировочные, стабильные ограничения UX (размер страницы, различие «Назад»/«Отмена»), достаточные для дальнейшего дизайна конкретных экранов; полный сторибоард — отдельная задача с собственным review.
 
-### 4b. UI readiness after ACTIVE only
+**Альтернатива:** сразу проектировать полный сторибоард в этом обновлении — отклонена владельцем; выполнено отдельным последующим `/opsx-continue` (см. `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md`, `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md`).
 
-**Выбор:** UI MUST показывать PENDING/«подготовка» пока setup идёт; сообщение «режим включён / можно запускать A/B» — только после PG mode == ACTIVE (полный setup, в т.ч. allowed-set snapshot). Setup lock / interrupt исключают ready при abort.
+### 9. Раскатка: ручной тест владельца → лимитированная opt-in бета → OD-05 → широкое включение
 
-**Почему:** иначе пользователь стартует тест на незафиксированном минус-профиле (гонка с PENDING).
+**Выбор:** после реализации (отдельный будущий `/opsx:apply`, заблокированный в этом обновлении) первый этап — ручной тест владельцем на собственных/тестовых кампаниях; второй этап — ограниченная opt-in бета с структурированным сбором фидбэка; широкое включение для всех paid-пользователей возможно только после явного принятия владельцем решения **OD-05**. OD-05 — единственное открытое owner-решение этого обновления.
 
-### 4c. PENDING_SETUP liveness: actionable status + EXIT recovery (decision §14b/§14c)
+**Почему:** WARM_UP/confirm/epoch-слой меняет ключевой пользовательский флоу поверх уже работающего MVP-1; владелец явно запросил постепенную, управляемую раскатку с одной точкой принятия решения (OD-05), а не немедленное широкое включение.
 
-**Выбор:** пока PENDING_SETUP, если setup не может прогрессировать по детерминированной причине, детектируемой только на setup-тике (пустой allowed-set / нет non-BAD ключей; либо max CPO пропал после enable), UI-статус MUST называть конкретную причину и действие (поднять max CPO / нет подходящих ключей / отключить A/B Hold), а не только generic «Подготовка…». Транзиентные причины (lock contention, единичный stale-тик, warmup кэша ключей) MAY оставлять generic preparing. EXIT доступен всегда при PENDING_SETUP → OFF (возврат в ordinary automation). Канал причины — reuse `CardAbHoldLastAbort`-подобного Redis-признака (writer = shop-runner, reader = UI poll), **без новой миграции**. Owned авто-abort зависшего PENDING → OFF — **SHOULD / future** (нужен durable `pending_since` + watchdog), вне MVP.
+**Альтернатива:** включить для всех paid-пользователей сразу после реализации — отклонена владельцем.
 
-**Почему:** PENDING_SETUP исключает кампанию из ordinary automation (§2/§3); молчаливый вечный PENDING = semi-frozen limbo без сигнала пользователю. MVP-минимум: видимая причина + всегда доступный EXIT — без новой миграции. Часть детерминированных причин (max CPO) отсекается ещё раньше на enable (§2d); 4c покрывает то, что можно узнать только на setup-тике.
+### 10. Search common bid: reset-to-min on ENTER, then freeze (см. write-path §19)
 
-**Альтернатива:** авто-abort-to-OFF с новым timestamp+watchdog как MUST — отклонена в MVP (лишняя миграция; EXIT + reason достаточно). Ничего не менять (generic «Подготовка…») — отклонена (finding: молчаливый вечный PENDING).
+**Выбор:** при ENTER (`OFF` → `PENDING_SETUP`) A/B Hold owned path **один раз** сбрасывает Search common bid (общая ставка аукциона / `SetCommonBids`) на WB minimum по nm кампании; пока `PENDING_SETUP`/`ACTIVE`, continuous ordinary `update_common_bid_in_search_adv` Forbidden; bidder/cluster bids в ACTIVE продолжает держать ставки к confirmed ЦП. Повторный reset — только после EXIT → новый ENTER.
 
-### 5. EXIT
+**Почему:** common bid — рабочая механика (холодные ключи до порога показов + каталог), не мёртвый legacy и не bidder. Freeze-as-is оставлял бы завышенную общую ставку; ordinary up/reset цикл под Hold загрязняет тест. Owner product: min + freeze.
 
-**Выбор:** EXIT ставит PG mode → OFF, очищает PG allowed-set snapshot и coordination Redis state (ENTER/EXIT/setup polling), после чего снова разрешены обновление ЦП, ordinary structural апдейтеры и ordinary minus auto-update; без restore keyword-profile / Excel snapshot. `card_ab_hold_degraded` в OFF может оставаться как неоперативный residue; отдельная auto-cleanup этого residue отложена (deferred cleanup).
+**Альтернатива A:** только freeze ordinary updater без reset — отклонена (elevated common bid остаётся).  
+**Альтернатива B:** reset при переходе в ACTIVE / после TP confirm — отклонена владельцем (тайминг = ENTER → PENDING_SETUP).  
+**Альтернатива C:** поручить reset ordinary `update_common_bid_in_search_adv` — отклонена (continuous Forbidden under Hold; нужен owned one-shot).
 
-**Почему:** простой контракт для пользователя; minus freeze снят явно.
+### Устранённые противоречия (сверка с owner-approved списком)
 
-### 6. Redis classes (project patterns)
-
-| Prefix | Role | Writer | TTL |
-|--------|------|--------|-----|
-| `CardAbHoldSignal` | ENTER/EXIT/CANCEL JSON snapshot | bot | ~15 мин |
-| `CardAbHoldLastAbort` | `{safe, can_continue, reason, at}` | shop-runner | ~1 ч |
-| `CardAbHoldSetupLock` | NX lock via `RedisLockManager` | shop-runner | ~5 мин |
-
-Классы: `AdvSettingRedisCache` + `RedisCacheBase`, ключ `{prefix}:{adv_id}`; Pydantic/JSON как у `LastV3UpdaterAction`.
-
-Check-points interrupt: после load и **обязательно до apply**; early return без WB structural apply.
-
-### 7. Paid UI write-path
-
-**Выбор:** кнопка «Включить» → явный экран с инструкцией (confirmation через отдельный экран + действие; текст MUST включать фиксацию набора фраз [новые исключаются] / restore из WB / «чтобы изменить набор — отключите A/B Hold», scoped/best-effort без обещания полной заморозки вне типа РК / WB cap); при клике: gate `bot_active`, **gate stats freshness**, при fail — alert (причина + ограничение + `SUPPORT_LINK`) без PENDING; если mode уже `PENDING_SETUP` или `ACTIVE` — **no-op** (не demote, не Redis ENTER, не re-ENTER force sync; decision §10); при ok и mode `OFF` — PG PENDING_SETUP, Redis ENTER, poll last-abort / **ACTIVE**; UI «можно запускать A/B» только после ACTIVE; «Выключить» → EXIT signal + PG OFF + clear allowed-set snapshot (единственный MVP путь обратно в `OFF` перед новым ENTER). Клавиатура экрана: **Disable + Back всегда**; **Enable MUST при `OFF`**; при `PENDING_SETUP` / `ACTIVE` UI **MAY скрыть** Enable (decision §11) — сахар против случайного нажатия; handler no-op (§10) остаётся обязательным при stale callback.
-
-**Affected records:** KeywordsSetting (status/БС/ЦП) на ENTER; AdvSetting mode field; AdvSetting allowed-set snapshot field; bidder продолжает писать ставки в HOLD; WB minus set на setup sync / hold enforcement.
-
-**Recovery:** EXIT всегда доступен paid-пользователю; TTL Redis; при зависшем PENDING_SETUP — повторный setup под lock или EXIT (setup не режется freshness filter после enter); UI не показывает ready, пока не ACTIVE. Детерминированные блокеры setup: `max_price_for_order ≤ 0` отсекается hard-gate на enable (§2d/§14a); прочие (пустой allowed-set / нет non-BAD ключей) surфейсятся actionable-причиной в статусе (§4c/§14b) с всегда доступным EXIT; owned авто-abort зависшего PENDING → OFF — SHOULD/future (§14c).
-
-### 8. Defaults
-
-Default OFF через mode overlays (`mode-defaults-policy-ownership`); free overlay удерживает OFF / не включает режим.
-
-### 9. Excel out of MVP (decision §9)
-
-**Выбор:** убрать `card_ab_hold_mode` из Excel schema export/import/apply целиком. Leftover payload → ignore. Future change может вернуть колонку с корректным path только → PENDING (не ACTIVE) + interrupt/setup; сейчас — out.
-
-**Почему:** prod bug — Excel `active` обходил ENTER allowed-set snapshot; `process_ab_setup` не бежит на ACTIVE; enforcement/ready врут. Полное удаление из Excel проще и безопаснее coercion.
-
-**Альтернатива:** coerce Excel enable → `pending_setup` only — отклонена пользователем (убераем Excel совсем на сейчас).
-
-## Affected components (ориентир)
-
-- PG migration #1 (уже): поле режима на кампании + default OFF.
-- PG migration #2 (**новая**): durable allowed-set snapshot на кампании + clear на EXIT.
-- Shop-runner: dispatcher `adv_settings_auto_update`; setup/hold pipelines (вкл. allowed-set capture+snapshot+sync); interrupt checks; ACT guards (top-key WL, individual TP, WL trim non-v3, stats emergency structural, ordinary allowed-set recalc); allowed-set enforcement on drift (minus non-allowed, WB cap → visible degradation).
-- Redis caches + lock.
-- ClickHouse read (реюз `full_wb_adv_stat.get_keywords_views_by_days` / `mv_clusters_daily_agg`): campaign-level Σ keyword views за календарные дни MV (cover last-24h wall-clock) для launch-validity soft-gate (§2c); CH-error → distinct soft reason (не 0 views).
-- Telegram: отдельное сообщение/экран A/B + keyboard; hide when `bot_active is False`; instruction minus-freeze copy; ready only after ACTIVE; **low-volume warning + confirm-callback «Всё равно запустить» / «Отмена»** (§2c) + **CH-error soft reason** (§2c); **max-CPO hard-gate reason на enable** (§2d) + **actionable PENDING-status причина при детерминированном блоке setup** (§4c, reader Redis `CardAbHoldSetupBlock`-канала — LastAbort-подобный признак, writer = shop-runner setup).
-- Excel roundtrip: **remove** column + ignore apply for `card_ab_hold_mode`.
-- Unit/gate tests (`ab_hold_gates` по духу `bot_active_gates`).
-
-## Side effects
-
-- ENTER может массово OFF ключи с `views < 100` или PFO > max.
-- HOLD снижает «подстройку» экономики (нет calibraton/enable) — ожидаемо для теста.
-- Bidder продолжает траты по зафиксированным позициям.
-- Новые/не-разрешённые фразы во время hold исключаются; ручные правки в WB/боте перезаписываются к замороженному allowed-set.
-- При превышении WB minus cap / open-match РК hold — best-effort с видимой деградацией (лог + честный статус), не гарантированная чистая поверхность.
-- Пользователи больше не смогут включать/выключать A/B Hold через Excel (только Telegram).
-
-## Access guards
-
-| Path | Gate |
-|------|------|
-| UI / enable | `bot_active is True` **и** stats freshness/health pass **и** `automatic_version == 3` |
-| UI enable on non-V3 | no-op (mode stays `OFF`) + reason «A/B Hold требует V3» |
-| Auto-updater version → V2 | blocked while mode ∈ {PENDING_SETUP, ACTIVE} (EXIT → OFF first) |
-| V2 `change_adv_strategy` (MIN_CPO/MAX_CONV) | вне A/B Hold freeze; held V3-профиль не зависит от campaign strategy objective |
-| UI enable blocked by stats | show reason + restriction + `const.SUPPORT_LINK` |
-| UI enable when plan max CPO ≤ 0 / missing | hard block: mode stays `OFF` + reason «нужен положительный план max CPO» (§2d/§14a) |
-| UI enable low measured campaign views (Σ calendar-day MV cover last-24h wall-clock < `AB_HOLD_MIN_TOTAL_VIEWS_24H`) | soft warn: reason + raise-max-CPO recommendation + choice launch-anyway/cancel; mode stays `OFF` until confirm (§2c) |
-| UI enable when CH volume query unavailable / errors | soft reason (volume stats temporarily unavailable); mode stays `OFF`; no ENTER; MUST NOT present as measured low impressions (§2c) |
-| UI ready-to-test copy | mode == ACTIVE after full setup (incl. allowed-set snapshot) |
-| PENDING_SETUP status on deterministic setup block | actionable reason + action (raise max CPO / no eligible keywords / EXIT), not generic «Подготовка…»; EXIT always available (§4c/§14b/§14c) |
-| Excel apply `card_ab_hold_mode` | **MUST NOT** (ignore / no column) |
-| Shared defaults / «Применить дефолты» on held campaign | **MUST NOT** disable/mutate (mode preserved; disable только owned Telegram EXIT §13) |
-| Ordinary V3 schedule | mode == OFF |
-| A/B setup / hold schedule | mode PENDING/ACTIVE; **не** требовать `advs_filtred` |
-| Structural ACT (WL/TP/enable/emergency keys) | mode not in PENDING_SETUP, ACTIVE |
-| Ordinary minus recalculation / allowed-set recalc | mode not in PENDING_SETUP, ACTIVE |
-| Allowed-set enforcement (minus non-allowed) | PENDING_SETUP / ACTIVE when drift detected; within WB minus cap else visible degradation |
-| Bidder / cluster bids | allowed if paid bot+bidder flags as today |
-| Hold guards | ACTIVE only |
-| Non-setup ACTIVE write | Forbidden |
-
-## Validation plan
-
-- Unit: ENTER pass/fail matrix (PFO, views, None).
-- Unit: interrupt → no apply when signal ENTER.
-- Gate: ACTIVE → top-key / individual TP / trim not called; cluster bids still eligible.
-- Gate: PENDING/ACTIVE → ordinary allowed-set recalc not applied; new non-allowed phrase → excluded; removed allowed phrase → restored.
-- Gate: enforcement exceeding WB minus cap / open-match → visible degradation (log + honest status), not silent clean hold.
-- Gate: setup failure on allowed-set capture/snapshot → no ACTIVE; UI not ready.
-- Gate: UI ready-to-test only after ACTIVE; PENDING never shows ready-to-test.
-- Gate: EXIT → ordinary minus + allowed-set recalc eligible again; allowed-set snapshot cleared/archived.
-- Gate: `bot_active=False` → UI hidden / enable no-op.
-- Gate: enable blocked when stats freshness fails; UI contains reason + restriction + `SUPPORT_LINK`.
-- Integration (real/test CH): campaign-level keyword views aggregate over `mv_clusters_daily_agg` calendar days covering last-24h wall-clock; boundary around `AB_HOLD_MIN_TOTAL_VIEWS_24H = 1000`.
-- Gate (§2c): enable with measured Σ < threshold → mode stays `OFF`, message has reason + raise-max-CPO recommendation + launch-anyway/cancel choice; launch-anyway → PENDING_SETUP + ENTER; cancel → OFF, no ENTER; Σ ≥ threshold → enable without warning (paired).
-- Gate (§2c CH-error): CH unavailable / query error → distinct soft reason (not low-impressions copy), mode `OFF`, no ENTER; MUST NOT coerce error to 0 views.
-- Gate (§2d): enable with `max_price_for_order ≤ 0` / missing → mode stays `OFF` + reason (нужен положительный план max CPO); paired positive `> 0` → gate passes (enable proceeds to §2c/normal path).
-- Gate (§4c): PENDING_SETUP with deterministic block (empty allowed-set / missing max CPO) → status surfaces specific reason + action; transient reason → generic preparing acceptable; EXIT while PENDING → OFF + ordinary automation eligible.
-- Telegram payload-limit: worst-case low-views warning text + confirm-callback `callback_data` within Bot API byte limits.
-- Gate: PENDING/ACTIVE + not in fresh set → setup/hold всё ещё eligible; ordinary V2 по-прежнему может требовать fresh.
-- Gate: Excel import `active` / `pending_setup` / `off` → mode unchanged; schema has no column.
-- Gate: Enable while ACTIVE/PENDING → mode unchanged, no Redis ENTER rewrite; OFF → PENDING.
-- Gate: keyboard while ACTIVE/PENDING → Disable+Back present; Enable MAY be absent; while OFF → Enable present.
-- EXIT → ordinary V3 снова в schedule.
-- Не мокать decision function под тестом; write-gate доказывает фильтрацию до write boundary.
-
-## Performance
-
-- Redis get на check-point: дешёвый; TTL ограничивает leaks.
-- Setup один раз на ENTER (lock NX); hold тик легче NORMAL preamble (узкий executor set).
-- Minus snapshot: один PG write на ENTER; restore только при drift.
-- Массовые РК: mode filter в scheduler — O(advs), без N+1 Redis на всех OFF.
+- Тихая авто-классификация ENTER / авто-TP без явных подтверждений keyword+TP+Auto — устранено decisions §3, §4 выше и `ab-hold-confirmed-epoch-parameters-sot`.
+- TP, зафиксированная на ENTER без WARM_UP и без раздельного отображения факт-позиции vs предложенного TP — устранено decisions §1, §3.
+- HOLD без durable WARM_UP — устранено decision §1 (WARM_UP предшествует любому TP confirm, который предшествует hold).
+- Абсолютный тестовый бюджет / velocity cap / emergency-stop / financial-safety-ownership из прежнего PLAN_ONLY — устранено decision §7 (явно out of scope).
+- Daily budget как hard cap / epoch cap / гарантированная граница overshoot — устранено decision §7 (честное stop-threshold описание).
+- ACTIVE без durable PENDING intent + успешной WB sync — устранено decision §5.
+- Retry, пересчитывающий TP/Auto bid или продвигающий generation — устранено decision §5.
+- Framing, будто `REQ-AB-HOLD-BUDGET-SAFETY-001` или параллельная финансовая safety-модель — текущий scope — явно исключено (Context, decision §7, Non-Goals).
+- Search common bid «забыт» / freeze-as-is без reset-to-min на ENTER — устранено decision §10 выше и write-path §19.
 
 ## Risks / Trade-offs
 
-- [Risk] Ключи с малой статистикой уйдут в OFF на ENTER. → Mitigation: справка про прогрев; порог 100 views; max CPO не зажимать перед входом; **не пускать enable при проблемной стате РК**.
-- [Risk] In-flight normal уже в apply при клике. → Mitigation: signal + check before apply; UI «Подготовка…»; короткий poll timeout.
-- [Risk] Пропущенный ACT без guard (вкл. minus). → Mitigation: gate-suite + decision Forbidden; review `update_minus_phrases_in_advs`.
-- [Risk] UI сообщает ready на PENDING. → Mitigation: poll только ACTIVE; decision §8 Forbidden; paired UI test.
-- [Risk] Excel → ACTIVE без snapshot (prod). → Mitigation: decision §9 — remove Excel column/apply entirely; regression tests import ignore.
-- [Risk] Пользователь путает с Safe mode. → Mitigation: отдельный UI/название A/B Hold; out of scope Safe mode.
-- [Risk] Setup/hold на stale после enter слабее охраняют overspend. → Acceptable trade-off vs stuck PENDING; enable уже отрезал «холодный» вход.
-- [Risk] Enforcement перезапишет осознанную ручную правку. → Acceptable: инструкция + «чтобы менять набор — отключите Hold».
-- [Risk] Allowed-set требует > WB minus cap исключений / open-match РК → hold не гарантирован. → Mitigation: видимая деградация (лог + честный статус), scoped wording; не обещать полную заморозку.
-- [Risk] Нет Excel bulk enable. → Acceptable MVP; Telegram-only; Excel return = future change.
-- [Risk] Случайный Enable mid-hold. → Mitigation: §10 handler no-op + §11 MAY hide Enable на PENDING/ACTIVE.
-- [Risk] Детерминированный блок setup (`max_price_for_order ≤ 0` / пустой allowed-set) → молчаливый вечный PENDING (semi-frozen, вне ordinary automation). → Mitigation: §2d enable hard-gate по max CPO + §4c actionable non-ready статус + всегда доступный EXIT; owned авто-abort = SHOULD/future.
+- [Risk] Пользователь подтверждает TP слишком быстро после короткого WARM_UP и не замечает нестабильность позиции. → Mitigation: минимум 24 часа не обходится; отображение факт-позиции отдельно от предложенной цели даёт пользователю сигнал перед подтверждением.
+- [Risk] Ручной сброс WARM_UP-таймера при частых изменениях набора ключей затягивает вход в тест. → Acceptable trade-off: владелец явно требует полноценный прогрев именно финального набора.
+- [Risk] Partial sync оставляет кампанию в подвешенном не-активном состоянии дольше, чем ожидает пользователь. → Mitigation: retry переиспользует тот же generation/параметры автоматически на следующем тике (детали планирования retry — предмет будущего `/opsx:apply`); EXIT остаётся доступным в любой момент (существующий MVP-1 инвариант).
+- [Risk] Freeze Search/Auto bid-мутаций при stale-стате маскирует реальную проблему получения статистики. → Mitigation: существующий freshness-класс и honest-degradation паттерн (уже применён для allowed-set §8/§12–§13 write-path decision) переиспользуются, а не изобретаются заново.
+- [Risk] Пользователь трактует daily-budget stop-threshold как гарантированный потолок расходов теста. → Mitigation: явное честное описание overshoot-факторов в плане (этот design) и, в дальнейшем, в Telegram-копирайте (DEFERRED, но обязано наследовать эту честность).
+- [Risk] One-shot ENTER common-bid reset fails (WB/min unavailable) and campaign enters PENDING with elevated common bid. → Mitigation: visible degrade / retry on setup tick; MUST NOT silently claim reset done; continuous ordinary updater remains Forbidden under Hold (decision §19).
+- [Risk] Широкая раскатка до валидации нового флоу повторяет паттерн «слишком рано ready» из MVP-1. → Mitigation: OD-05-гейт и двухэтапная раскатка (ручной тест → лимитированная бета) как единственный путь к broad enable.
 
 ## Migration Plan
 
-1. Deploy migration режима (field default OFF) — уже в change.
-2. Deploy **новая** migration allowed-set snapshot field — no freeze behavior until runner/UI wired.
-3. Deploy runner (allowed-set snapshot + hold enforcement + gate ordinary recalc) + Redis + UI (instruction + ready after ACTIVE).
-4. Rollout paid UI entry; **remove** Excel `card_ab_hold_mode` column/apply if still present.
-5. Rollback: mode OFF + disable UI; clear snapshots; Redis TTL cleanup; ordinary V3 / minus без exclusion.
+1. Этот `/opsx-update` обновляет только планирующие артефакты (`proposal.md`, `design.md`, `specs/card-ab-hold-mode/spec.md`, `tasks.md`, три decision-файла); код/тесты/миграции не создаются и не изменяются. **OP-006 pre-apply planning fixes (2026-07-23):** §18.4 legacy gate; §4.1 TP wording; Alembic field names в §19.5/§22.5; AutoResetBidService в §21.3/§21.4; OD-05 остаётся единственным open owner decision. **OP-008 pre-apply planning fixes (2026-07-23):** PG idempotency/uniqueness contract (§22.5); legacy in-flight policy (§18.5); writer inventory; UX S3 keyboard; explicit test tasks.
+2. `/opsx:apply` для новых задач (`tasks.md` §18.4 и §19+) заблокирован до явной авторизации владельцем.
+3. При авторизации: реализация в порядке зависимостей — **§18.4 gate legacy auto-ACTIVE/auto-TP** → durable WARM_UP-таймер/эпоха/generation-поля → confirm-write-path (keyword/TP/Auto) → durable PENDING intent → WB sync/retry → freeze Search/Auto bid при stale-стате (вкл. `AutoResetBidService`) → **§27 ENTER Search common-bid reset-to-min + ordinary continuous freeze** → честный daily-budget disclosure в UI-копирайте (по UX-контракту) → ручной тест владельца → лимитированная бета.
+4. Широкое включение для всех paid-пользователей — только после OD-05.
+5. Rollback: как в применённом MVP-1 (EXIT → OFF, allowed-set snapshot clear, Redis TTL cleanup) плюс — durable WARM_UP-таймер/PENDING intent без завершённой синхронизации не создают побочных WB-эффектов и очищаются при EXIT/rollback. **Rollback migration MUST NOT** drop or null-out legacy `card_ab_hold_mode`, `allowed_phrases_snapshot`, or `card_ab_hold_degraded` in a way that destroys in-flight legacy hold state.
+
+### Legacy / in-flight migration policy (OP-008)
+
+Applies to campaigns already in MVP-1 hold at migration time and to any row where new epoch columns arrive via Alembic with NULL/0 defaults.
+
+| Rule | Contract |
+|---|---|
+| No auto-conversion | Existing MVP-1 campaigns (`card_ab_hold_mode` ∈ {`PENDING_SETUP`, `ACTIVE`} with `card_ab_hold_phase` NULL) **MUST NOT** auto-convert to epoch-managed generation on migration or process restart. |
+| NULL phase = legacy | `card_ab_hold_phase` NULL means **legacy-MVP-1 semantics** until EXIT or controlled re-enter under fail-closed feature flag (§25). |
+| New flow entry | New epoch flow (WARM_UP → confirms → PENDING intent → WB sync → ACTIVE) only via fail-closed feature flag + explicit owner entry — not via migration defaults. |
+| ACTIVE legacy continues | Already `ACTIVE` legacy campaigns continue legacy hold behavior (`process_ab_hold`, allowed-set enforcement, legacy setup path where still gated) until explicit EXIT; prefer EXIT-only transition to new flow for MVP (no silent in-place epoch upgrade). |
+| Process restart | Process restart / shop-runner redeploy **MUST NOT** change flow version for a row; durable PG fields are SoT. |
+| Migration defaults inert | New columns (`card_ab_hold_phase`, `card_ab_hold_generation`, `card_ab_hold_pending_intent_json`, `card_ab_hold_sync_status`, `card_ab_hold_wb_sync_idempotency_key`, confirmed-* columns, warmup timer fields) with NULL / 0 / `none` defaults **MUST NOT** activate the new lifecycle on existing rows. |
+| No automatic backfill | Automatic backfill of confirmed parameters (keyword set, TP map, Auto participation/bid) from live WB/PG state **FORBIDDEN** for legacy rows — would fake user confirms. |
+| Rollback safety | Downgrade migration MUST preserve legacy mode, allowed-set snapshot, and degraded flag; MUST NOT destroy in-flight legacy hold. |
 
 ## Open Questions
 
-1. ~~Точный source field views~~ — **Resolved in apply:** `CalculatedKeyword.views` ← `cluster_stat.views` (тот же источник карточки ключа / calculated keywords cache).
-2. ~~Immediate setup job~~ — **Resolved MVP:** immediate setup job **не** запускается из bot; UI ставит `PENDING_SETUP`, пишет Redis ENTER, poll `LastAbort`/PG mode; setup на тике shop-runner. UX показывает PENDING; **ready-to-test только после ACTIVE** (уточнено update минус-freeze).
-3. ~~Hold guard executors~~ — **Resolved MVP:** hold использует deep-overspend + PFO>max OFF (`hold_guards.py`), без resolve clamp / без полного `ResetOverMaxCpo` ladder trim. Полный V3 executor pair — optional follow-up, не blocker archive.
-4. ~~Setup vs stale `advs_filtred`~~ — **Resolved (update):** enable блокируется freshness/health статы + UI reason/`SUPPORT_LINK`; после PENDING/ACTIVE setup/hold schedule из полного `advs`, не только `advs_filtred`.
-5. ~~Minus freeze storage~~ — **Resolved (update):** durable PG **allowed-set** snapshot на кампании (новая migration); capture allowed-set→snapshot до ACTIVE; hold enforcement (исключение не-разрешённых фраз, в пределах WB cap; иначе видимая деградация); clear/archive on EXIT. Заморозка allowed-set — primary invariant, минус — derived enforcement.
-6. ~~Excel A/B Hold column~~ — **Resolved (update):** убрать из Excel schema/apply в MVP (decision §9); enable/disable только Telegram; future option отдельно.
-7. Launch validity soft-gate (decision §2c) — **Resolved (applied tasks §13 + §17):** campaign-level proxy + calendar-day MV cover + CH-error distinct reason; wiring в `_handle_ab_hold_enable`.
-8. PENDING_SETUP liveness (decision §14) — **Resolved (update, applied tasks §16):** enable hard-gate `max_price_for_order > 0` (§2d/§14a); actionable non-ready причина для детерминированных блоков setup vs generic preparing (§4c/§14b); MVP recovery = actionable reason + always-available EXIT (§14c); owned авто-abort-to-OFF (durable `pending_since` timestamp + watchdog) = SHOULD/future (без новой миграции в MVP).
+1. ~~Точные названия новых durable PG-полей~~ — **RESOLVED (OP-006 planning):** planned names зафиксированы в `tasks.md` §19.5 / §22.5 и Ownership & Placement выше; Alembic SQL создаётся только при `/opsx:apply`.
+2. Ретрай-каденс и лимит попыток WB-синхронизации при partial sync (сколько раз/как часто повторять до эскалации actionable-статуса пользователю) — implementation-деталь будущего `/opsx:apply`; текущий design фиксирует только инвариант «тот же generation, без пересчёта».
+3. Точный UX-контракт и тексты Telegram-сообщений (в т.ч. текст про честный overshoot) — создан отдельным последующим `/opsx-continue`: `openspec/changes/card-ab-hold-mode/ux/telegram-ux-contract.md` (контракт) и `openspec/changes/card-ab-hold-mode/ux/telegram-storyboard.md` (иллюстративные тексты, не binding — implementation MAY скорректировать формулировки при `/opsx:apply`, сохраняя инварианты).
+4. Критерий/процедура принятия OD-05 (кто, когда, по каким метрикам бета-теста) — owner decision, вне scope этого design; фиксируется только то, что OD-05 — единственный гейт широкого включения.
+
+## Practice Applicability Map (pilot v0.1)
+
+```yaml
+change_id: card-ab-hold-mode
+
+practice_baseline:
+  branch: operator/TASK-WB-AB-TESTING-COMPLETE-IMPLEMENTATION-001
+  head_sha: bc2223605f53fb28539e761f13b6fa144fc9bea4
+  date: 2026-07-26
+
+baseline_note: >
+  Dated pilot evidence based on draft Practices v0.1.
+  This is not project-wide policy and does not affect archive readiness.
+
+applicable_practices:
+  - practice_id: call-chains
+    applicability_reason: >
+      Change owns multiple entrypoints and strategies (Telegram enable/confirm,
+      shop-runner epoch/setup/hold, ordinary V3 interrupt) that reach PG, Redis,
+      and WB write resources; canonical chains and owner bypass must stay
+      traceable.
+    selected_rule_ids:
+      - CALL-001
+      - CALL-002
+    evidence_locators:
+      - openspec/changes/card-ab-hold-mode/decisions/card-ab-hold-write-path-ownership/decision.md
+      - openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md
+      - app/modules/shop_runner/service_manager/manager.py::adv_settings_auto_update
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/pipelines.py::process_ab_setup
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/pipelines.py::process_ab_hold
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_pipelines.py::process_ab_epoch
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py::enable_card_ab_hold
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/orchestrator.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_legacy_setup_epoch_gate.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_write_gates_boundary.py
+    enforcement:
+      - textual
+      - ai_review
+    result: not_verified
+    deviations: []
+
+  - practice_id: testing
+    applicability_reason: >
+      Change adds state-changing write gates, freezes, and failure/replay-sensitive
+      epoch paths; write-gate and honesty-of-assurance evidence must be locatable
+      without treating local tests as full CI or production proof.
+    selected_rule_ids:
+      - TEST-002
+      - TEST-004
+    evidence_locators:
+      - openspec/changes/card-ab-hold-mode/tasks.md
+      - tests/unit/auto_updater_v3/card_ab_hold/test_write_gates_boundary.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_pipelines_sync.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_concurrent_generation.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_auto_bid_freeze.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_stale_stats_freeze.py
+      - .cursor/rules/testing-rules.mdc
+      - openspec/policies/VERIFY_POLICY.md
+    enforcement:
+      - textual
+      - ai_review
+    result: not_verified
+    deviations: []
+
+  - practice_id: data-integrity
+    applicability_reason: >
+      Epoch lifecycle persists durable PG intent before WB sync, uses generation
+      and idempotency keys, and requires activate-only completion semantics across
+      PG/Redis/WB stores.
+    selected_rule_ids:
+      - DATA-001
+      - DATA-003
+      - DATA-004
+    evidence_locators:
+      - openspec/changes/card-ab-hold-mode/decisions/ab-hold-epoch-lifecycle-and-generation-ownership/decision.md
+      - openspec/changes/card-ab-hold-mode/decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py::create_pending_intent_for_generation
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py::activate_after_successful_sync
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_pipelines.py::process_ab_epoch
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_pipelines.py::sync_intent_to_wb
+      - app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/redis_coordination.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_pipelines_sync.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_concurrent_generation.py
+      - tests/unit/auto_updater_v3/card_ab_hold/test_epoch_lifecycle_pure.py
+    enforcement:
+      - textual
+      - ai_review
+    result: not_verified
+    deviations: []
+
+practice_candidates: []
+
+not_migrate:
+  - OD-05
+  - ROOT-001 and BUGCASE verdicts
+  - absence of CI or pre-commit
+  - monitoring scope
+  - active task completion state
+  - .tmp paths
+  - raw extraction or Navigator dumps
+  - proposed-but-not-accepted decisions as practices
+```
 
 ## Review Checklist
 
 - [x] existing decisions searched
 - [x] relevant decisions cited
-- [x] new decision proposed if missing (`card-ab-hold-write-path-ownership`; дополнен §2c launch-validity soft-gate + §8 minus + §9 Excel out + §10 Enable idempotent + §11 hide Enable keyboard + §12 V3-only/V2-block + §13 shared-defaults not-a-disable-path + §14 PENDING liveness)
-- [x] implementation layer matches decision *(§8 REDEFINED applied; §9 Excel remove, §10 Enable idempotent, §11 hide Enable, §12 V3-only + V2 downgrade block (tasks §14), §13 shared-defaults not-a-disable-path guard (tasks §15), §2c launch-validity — **applied** (tasks §13 + §17)); §14 PENDING liveness — applied via `/opsx:apply` (tasks §16))*
-- [x] §2c launch-validity soft-gate — **applied** (metric SoT reconciled + CH-error distinct reason; tasks §13 + §17)
-- [x] §14 PENDING_SETUP liveness — **applied** (owner: bot enable write-path + A/B Hold setup/status; max-CPO enable hard-gate `has_positive_plan_max_cpo` §2d/§14a + actionable PENDING status via `CardAbHoldSetupBlock` Redis channel §4c/§14b + EXIT recovery §14c; owned auto-abort = SHOULD/future; tasks §16)
+- [x] new decision proposed if missing (`ab-hold-epoch-lifecycle-and-generation-ownership`, `ab-hold-confirmed-epoch-parameters-sot`; обновлён `card-ab-hold-write-path-ownership` §15–§18)
+- [ ] implementation layer matches decision *(не применяется в этом PLAN_ONLY обновлении — `/opsx:apply` заблокирован до owner-авторизации; применённая MVP-1 часть §1–§14 remains verified as before)*

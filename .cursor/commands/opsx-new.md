@@ -11,6 +11,8 @@ Start a new change using the experimental artifact-driven approach.
 
 **Input**: The argument after `/opsx:new` is the change name (kebab-case), OR a description of what the user wants to build.
 
+**Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` when exact paths/IDs appear later in the workflow; this command creates a new change and should not inventory unrelated trees first.
+
 **Steps**
 
 1. **If no input provided, ask what they want to build**

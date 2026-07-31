@@ -13,6 +13,8 @@ Fast-forward through artifact creation - generate everything needed to start imp
 
 **Input**: The argument after `/opsx:ff` is the change name (kebab-case), OR a description of what the user wants to build.
 
+**Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` for any supplied exact change/decision paths; do not rediscover known artifacts via full-tree inventory.
+
 **Steps**
 
 1. **If no input provided, ask what they want to build**

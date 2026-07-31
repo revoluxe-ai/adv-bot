@@ -23,7 +23,7 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 class _MockSessionMaker:

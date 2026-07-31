@@ -1,0 +1,44 @@
+# Static-check registry — source of truth for /opsx-static-check
+# Add a check: create checks/<id>/*, then a row here.
+# Launch: Task tool with task_type (Cursor Task enum). Never use custom agent names.
+
+version: 1
+
+modes:
+  FAST:
+    waves:
+      - id: A
+        parallel: true
+        checks: [pyright-strict, mypy, pytest-unit]
+  FULL:
+    waves:
+      - id: A
+        parallel: true
+        checks: [pyright-strict, mypy, pytest-unit]
+      - id: B
+        parallel: false
+        after: [pytest-unit]
+        require_status: PASS
+        checks: [pytest-full]
+        note: "Start pytest-full only if pytest-unit STATUS=PASS. Never parallel with unit."
+
+checks:
+  pyright-strict:
+    task_type: shell
+    pack: .cursor/static-check/checks/pyright-strict
+  mypy:
+    task_type: shell
+    pack: .cursor/static-check/checks/mypy
+  pytest-unit:
+    task_type: shell
+    pack: .cursor/static-check/checks/pytest-unit
+  pytest-full:
+    task_type: shell
+    pack: .cursor/static-check/checks/pytest-full
+
+shared_load:
+  - .cursor/static-check/base/worker-rules.md
+  - .cursor/static-check/base/shell.md
+  - .cursor/static-check/base/worker-prompt.md
+  - .cursor/static-check/contracts/worker-packet.md
+# preflight.md is optional: only when /opsx-static-check ... PREFLIGHT

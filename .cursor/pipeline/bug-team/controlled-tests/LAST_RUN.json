@@ -1,0 +1,130 @@
+{
+  "T1": {
+    "PASS": true,
+    "MSG": "Route A stops at Owner production gate after RED"
+  },
+  "T2": {
+    "PASS": true,
+    "MSG": "Route B CHANGED stops at RED Owner gate"
+  },
+  "T3": {
+    "PASS": true,
+    "MSG": "Route B UNCHANGED stops at RED Owner gate"
+  },
+  "T4": {
+    "PASS": true,
+    "MSG": "Route C early close without implementation"
+  },
+  "T5": {
+    "PASS": true,
+    "MSG": "Route D durable handoff target"
+  },
+  "T6": {
+    "PASS": true,
+    "MSG": "INSUFFICIENT_EVIDENCE blocked stop"
+  },
+  "T7": {
+    "PASS": true,
+    "MSG": "production Owner-gate bypass rejected"
+  },
+  "T8": {
+    "PASS": true,
+    "MSG": "closure Owner-gate bypass rejected"
+  },
+  "T9": {
+    "PASS": true,
+    "MSG": "duplicate claim rejected"
+  },
+  "T10": {
+    "PASS": true,
+    "MSG": "worker timeout + process-tree termination + checkpoint"
+  },
+  "T11": {
+    "PASS": true,
+    "MSG": "resume after TIMEOUT without repeating completed hops"
+  },
+  "T12": {
+    "PASS": true,
+    "MSG": "FAN_IN write-boundary violation rejected"
+  },
+  "T13": {
+    "PASS": true,
+    "MSG": "one-line free-form Russian intake materialized"
+  },
+  "T14": {
+    "PASS": true,
+    "MSG": "multiline unstructured intake preserved"
+  },
+  "T15": {
+    "PASS": true,
+    "MSG": "command without argument uses current context"
+  },
+  "T16": {
+    "PASS": true,
+    "MSG": "incomplete intake -> INSUFFICIENT_EVIDENCE"
+  },
+  "T17": {
+    "PASS": true,
+    "MSG": "duplicate root rejected"
+  },
+  "T18": {
+    "PASS": true,
+    "MSG": "case= + free-form -> BLOCKED_AMBIGUOUS_INVOCATION"
+  },
+  "T19": {
+    "PASS": true,
+    "MSG": "dispatches MATERIALIZER Task worker; orchestrator does not materialize"
+  },
+  "T20": {
+    "PASS": true,
+    "MSG": "Route A distinct RED/Executor/GREEN executions"
+  },
+  "T21": {
+    "PASS": true,
+    "MSG": "Route B distinct Spec/RED/Executor/GREEN"
+  },
+  "T22": {
+    "PASS": true,
+    "MSG": "GREEN cannot reuse Executor execution identity"
+  },
+  "T23": {
+    "PASS": true,
+    "MSG": "timed-out worker prevents dependent wave dispatch"
+  },
+  "T24": {
+    "PASS": true,
+    "MSG": "malformed output packet rejected"
+  },
+  "T25": {
+    "PASS": true,
+    "MSG": "production write-boundary violation terminates execution"
+  },
+  "T26": {
+    "PASS": true,
+    "MSG": "Fan-In writes only FANIN.md"
+  },
+  "X_PARTIAL_W2": {
+    "PASS": true,
+    "MSG": "partial WAVE_2 stop"
+  },
+  "X_PREMATURE_ACTIVE": {
+    "PASS": false,
+    "MSG": "premature ACTIVE transition forbidden in candidate status"
+  },
+  "X_PASS_ALREADY": {
+    "PASS": true,
+    "MSG": "PASS_ALREADY without forced RED"
+  },
+  "X_HASH_MISMATCH": {
+    "PASS": true,
+    "MSG": "frozen test hash mismatch"
+  },
+  "X_ROUTE_MISMATCH": {
+    "PASS": true,
+    "MSG": "route reconciliation mismatch detected"
+  },
+  "X_MAX_RETRY": {
+    "PASS": true,
+    "MSG": "max retry bounded"
+  }
+}

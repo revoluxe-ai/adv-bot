@@ -324,3 +324,92 @@ Disposition:
 * consider reuse of `mv_clusters_daily_agg.ts_state` only after proving semantic equivalence.
 
 Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
+
+opsx-bug-team to commant native
+
+opsx-bug-team - тест развилки от bug-hunt
+
+тесты на команды и team
+
+## Deferred from change card-ab-hold-mode (2026-07-28)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:card-ab-hold-mode] Pre-start safety policy picker (hard|soft|self)
+  source: owner TZ (explore) + openspec/changes/card-ab-hold-mode/proposal.md (Out of scope / risk context)
+  reason: out_of_current_mvp | owner_park
+  notes: До старта эксперимента выбор — жёсткая (abort/reset при сбое статы), мягкая (freeze decide; возможен ограниченный перерасход), сам слежу (+ аварийная кнопка). Сейчас change не раздувать; future change e.g. ab-hold-safety-policy-modes.
+
+- [ ] [deferred-from:card-ab-hold-mode] Anti-drain emergency kill switch
+  source: owner TZ (explore); related OUT_OF_SCOPE_FOLLOW_ON emergency-stop in proposal.md (product anti-drain ≠ financial latch)
+  reason: out_of_current_mvp | owner_park
+  notes: Не просто EXIT из Hold — аварийное гашение трат (ключи/пауза/блок). Отдельная продуктовая идея; не смешивать с Forbidden §18 epoch spend cap / financial latch в текущем Hold.
+
+- [ ] [deferred-from:card-ab-hold-mode] Mid-sync stale UX options (wait|force-apply|EXIT)
+  source: owner TZ (explore)
+  reason: oversized | owner_park
+  notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
+
+## Bound confirmed card-ab-hold-mode (2026-07-30)
+
+Via `/opsx-bound-scope:GO` — no new deferred checklist rows (picker / anti-drain /
+mid-sync already parked 2026-07-28; skip_reappend).
+
+KEEP_MVP_BOUNDARY (owed now, handoff → `/opsx-update`):
+- Soft-only: freeze decide-class on stale, including epoch-managed setup FAIL→OFF
+  (close PBH-001 / ROOT-001 hole under §17); do not abort/reset epoch on stale alone;
+  PBH-005 apply-snapshot carve-out unchanged.
+- Soft-policy RU disclaimer at Enable and/or hold status (user monitors test;
+  wording must not say «ослабим защиту» if behavior is freeze-decide).
+- Pre-start hard|soft|self picker, anti-drain, mid-sync UX — remain out of DoD
+  until REENTER_CONFIRMED.
+
+## Deferred from change openspec-guard-size-recovery (2026-07-30)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of any current OpenSpec change
+until `/opsx-new` (or equivalent) + `/opsx-update` + `REENTER_CONFIRMED`.
+No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only park).
+
+- [ ] [deferred-from:openspec-guard-size-recovery] Guard size recovery / openspec compress tooling
+  source: /opsx-admin-command-design-command (OPTION_A recommended; OPTION_B optional) + explore 2026-07-30
+  reason: out_of_current_mvp | owner_park | needs_test_design
+  notes: Сложная команда; нужен способ тестировать. Сейчас НЕ implement.
+    OPTION_A: playbook при guard FAIL + ranked offenders в /opsx-update(+siblings) + guard --report-offenders.
+    OPTION_B: /opsx-admin-openspec-size-reduce (GO-gated), FORBIDDEN default write openspec/changes/**.
+    ≠ /opsx-bound-scope (scope drift ≠ char shrink).
+    Временно: baseline opsx_update bumped to 89948 (2026-07-30) — не вечный substitute for reduce.
+
+- [ ] [deferred-from:openspec-guard-size-recovery] Test strategy for guard reduce / recovery
+  source: owner (explore/design follow-up)
+  reason: oversized | owner_park
+  notes: Придумать harness: synthetic oversized fixture → FAIL → plan → GO reduce → GREEN;
+    запрет semantic loss на process contracts; не трогать product change specs.
+
+Анализ материализации решения багов для обучения системы супер-классам ошибок
+Внедрить практики, риски
+
+Сделать мета-команды по ремонту-доработке обучению команд, которые обслуживают другие команды
+
+
+сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
+
+## Deferred from change fix-bug-with-remove-ch-db-name-from-queries (2026-07-31)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] CH database from env → client.database
+  source: explore NOW_LATER + owner split (2026-07-31); openspec/changes/fix-bug-with-remove-ch-db-name-from-queries/proposal.md (Scope out)
+  reason: out_of_current_mvp | owner_park
+  notes: Host/user/password уже из env; database в client hardcoded. Полный env wiring — отдельно от фикса «DB в тексте CH query».
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] Mass CH SQL qualification / unqualify strategy
+  source: explore + owner park (2026-07-31)
+  reason: oversized | owner_park
+  notes: Не трогать все CH readers в этом change. После фикса текущего класса багов — отдельная волна + возможно ADL.
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] Reusable ADL: CH DB qualification policy
+  source: explore Architecture Decision Missing (2026-07-31)
+  reason: out_of_current_mvp
+  notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.

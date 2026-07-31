@@ -70,13 +70,15 @@ async def export_shop_adv_excel(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-    if callback.message is None or callback.from_user is None:
+    if callback.message is None:
         return
+    # CallbackQuery.from_user в aiogram типизирован как User (не Optional).
+    from_user = callback.from_user
     chat_id = callback.message.chat.id
     wb_uc_id = callback_data.wb_user_cabinet_original_id
     try:
         await verify_user_owns_wb_user_cabinet(
-            telegram_user_id=callback.from_user.id,
+            telegram_user_id=from_user.id,
             wb_user_cabinet_id=wb_uc_id,
         )
     except PermissionError:
@@ -106,7 +108,7 @@ async def export_shop_adv_excel(
     except Exception:
         logger.exception(
             "adv excel export failed telegram_user_id=%s wb_user_cabinet_id=%s",
-            callback.from_user.id,
+            from_user.id,
             wb_uc_id,
         )
         await bot.send_message(
@@ -122,13 +124,14 @@ async def import_shop_adv_excel_start(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-    if callback.message is None or callback.from_user is None:
+    if callback.message is None:
         return
+    from_user = callback.from_user
     chat_id = callback.message.chat.id
     wb_uc_id = callback_data.wb_user_cabinet_original_id
     try:
         await verify_user_owns_wb_user_cabinet(
-            telegram_user_id=callback.from_user.id,
+            telegram_user_id=from_user.id,
             wb_user_cabinet_id=wb_uc_id,
         )
     except PermissionError:

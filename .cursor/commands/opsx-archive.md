@@ -9,7 +9,7 @@ Archive a completed change in the experimental workflow.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
-**Architecture Decision Lookup:** Before archiving, search `openspec/decisions/**/*.md` and read proposed decisions from `artifactPaths.decisions.existingOutputPaths`. Use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving the change into `changes/archive` when they are reusable architecture source of truth. If there is nothing reusable to promote, explicitly output `Reusable architecture promotions: none`. Do not archive when `design.md` contains a permanent architecture decision that has not been moved to `openspec/decisions/` or a proposed decision artifact.
+**Architecture Decision Lookup:** Before archiving, resolve proposed decision paths from `artifactPaths.decisions.existingOutputPaths` first, then read only needed accepted decisions. Prefer exact paths over a full `openspec/decisions/**` walk. Follow `.cursor/commands/opsx-source-resolution.md`. Use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving the change into `changes/archive` when they are reusable architecture source of truth. If there is nothing reusable to promote, explicitly output `Reusable architecture promotions: none`. Do not archive when `design.md` contains a permanent architecture decision that has not been moved to `openspec/decisions/` or a proposed decision artifact.
 
 **Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -70,12 +70,14 @@ Archive a completed change in the experimental workflow.
 
 5. **Perform Architecture Decision Archive Gate**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve proposed decision paths from `artifactPaths.decisions.existingOutputPaths` first.
+   - Read only needed accepted decisions (index → exact paths; bounded fallback ≤ 3 targeted lookups if gaps remain unless `EVIDENCE_GAP` is recorded). Never dump `openspec/decisions/**`.
+   - If the ≤ 3 fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without archiving. Budget exhaustion is not proof that no decision exists; do **not** emit `Architecture Decision Missing`.
    - Read proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
    - Get `openspec instructions decisions --change "<name>" --json` when proposed decisions exist or archive analysis requires a proposed decision, and apply `rules.decisions`.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving `changeRoot` when they should become reusable source of truth; report promoted paths.
-   - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions that are not captured in `openspec/decisions/` or a proposed decision artifact, return `NO_GO` and do not archive.
+   - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes they are not captured in `openspec/decisions/` or a proposed decision artifact, output `Architecture Decision Missing`, return `NO_GO`, and do not archive.
    - If no proposed decision needs promotion, output `Reusable architecture promotions: none` and proceed.
 
 6. **Perform the archive**

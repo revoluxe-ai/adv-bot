@@ -1,0 +1,147 @@
+{
+  "V4-GATE-01": {
+    "PASS": true,
+    "MSG": "valid raw+canonical → RESERVED",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-02": {
+    "PASS": true,
+    "MSG": "correct raw / wrong canonical rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-03": {
+    "PASS": true,
+    "MSG": "wrong raw / correct canonical rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-04": {
+    "PASS": true,
+    "MSG": "wrong frozen test hash rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-05": {
+    "PASS": true,
+    "MSG": "wrong RED_PACKET_ID rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-06": {
+    "PASS": true,
+    "MSG": "mismatched receipt → MISMATCH not GO_REQUIRED",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-07": {
+    "PASS": true,
+    "MSG": "rejected receipt remains unreserved",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-GATE-08": {
+    "PASS": true,
+    "MSG": "mismatch creates no dispatch intent",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-01": {
+    "PASS": true,
+    "MSG": "legacy finalize disabled; checkpoint unchanged",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-02": {
+    "PASS": true,
+    "MSG": "legacy cannot append success route event",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-03": {
+    "PASS": true,
+    "MSG": "legacy cannot consume Owner receipt",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-04": {
+    "PASS": true,
+    "MSG": "legacy cannot enable dependent worker",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-05": {
+    "PASS": true,
+    "MSG": "weak validate_packet PASS does not advance state",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-06": {
+    "PASS": true,
+    "MSG": "finalize_live_hop advances exactly once",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-07": {
+    "PASS": true,
+    "MSG": "duplicate live finalize rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-AUTH-08": {
+    "PASS": true,
+    "MSG": "exactly one live success authority (static)",
+    "LABEL": "CONTRACT_STATIC"
+  },
+  "V4-LOCK-01": {
+    "PASS": true,
+    "MSG": "different worker while ACTIVE RUNNING blocked",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-02": {
+    "PASS": true,
+    "MSG": "same worker new WEX while RUNNING blocked",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-03": {
+    "PASS": true,
+    "MSG": "exact idempotent replay returns existing intent",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-04": {
+    "PASS": true,
+    "MSG": "matching checkpoint_generation does not permit supersede",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-05": {
+    "PASS": true,
+    "MSG": "blocked prepare does not reserve Owner receipt",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-06": {
+    "PASS": true,
+    "MSG": "blocked prepare does not append dispatch-success event",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-07": {
+    "PASS": true,
+    "MSG": "explicit TIMEOUT + authorized retry allows new attempt",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-08": {
+    "PASS": true,
+    "MSG": "FAIL + unauthorized prepare blocked until retry auth",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-09": {
+    "PASS": true,
+    "MSG": "superseded WEX late output rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V4-LOCK-10": {
+    "PASS": true,
+    "MSG": "dependent worker cannot begin while parent RUNNING",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "ICT-REG-001": {
+    "PASS": true,
+    "MSG": "ICT-REG-001 raw ok / canonical wrong rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "ICT-REG-002": {
+    "PASS": true,
+    "MSG": "ICT-REG-002 legacy finalize no state advancement",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "ICT-REG-003": {
+    "PASS": true,
+    "MSG": "ICT-REG-003 different-worker prepare blocked while RUNNING",
+    "LABEL": "RUNTIME_UNIT"
+  }
+}

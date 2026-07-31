@@ -37,3 +37,27 @@ class CardAbHoldCancel(CallbackData, prefix="card_ab_hold_cancel"):
     """§2c: «Отмена» soft-warning низкого объёма → остаётся OFF."""
 
     adv_setting_original_id: int
+
+
+class CardAbHoldEmergencyEducate(CallbackData, prefix="cah_em_edu"):
+    """ACK образования Emergency на launch/Hold screen."""
+
+    adv_setting_original_id: int
+
+
+class CardAbHoldEmergencyAsk(CallbackData, prefix="cah_em_ask"):
+    """Запрос confirm Emergency (ещё не исполняет)."""
+
+    adv_setting_original_id: int
+
+
+class CardAbHoldEmergencyConfirm(CallbackData, prefix="cah_em_ok"):
+    """Подтверждение Emergency → executor."""
+
+    adv_setting_original_id: int
+
+
+class CardAbHoldEmergencyAbort(CallbackData, prefix="cah_em_no"):
+    """Отмена confirm Emergency."""
+
+    adv_setting_original_id: int

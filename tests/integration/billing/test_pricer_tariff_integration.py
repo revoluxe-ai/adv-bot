@@ -1,24 +1,37 @@
-import pytest
+"""Integration: Pricer tariff AUTO/OLD modes against live test PG.
 
+``wb_cabinet`` consumes baseline ``wbcabinet`` id=1 from
+``reset_postgres_test_data(restore_baseline=True)`` — do not INSERT id=1 again.
+"""
+
+from __future__ import annotations
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.pricer.pricer import Pricer, TariffMode
 from app.modules.billing.pricer.tariffs import tariffs, tariffs_for_auto_setting
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from tests.factories.adv_factory import WBCabinetFactory
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 @pytest.fixture
 async def wb_cabinet(async_session: AsyncSession) -> WBCabinet:
-    """Создаёт WBCabinet с id=1 для использования в тестах через factory."""
-    wb_cabinet = WBCabinetFactory.build(id=1, shop_id="test_shop_id", active=True, balance=0.0, bonus=0.0, demo=True)
-    async_session.add(wb_cabinet)
-    await async_session.flush()
-    return wb_cabinet
+    """Baseline WBCabinet id=1 после destructive PG reset (без повторного INSERT).
+
+    ``async_engine`` → ``reset_postgres_test_data(restore_baseline=True)`` уже
+    сеет ``wbcabinet`` id=1 / ``shop_id=test_shop_id``. Повторный insert даёт
+    ``UniqueViolationError`` на ``wbcabinet_pkey``.
+    """
+    row = await async_session.get(WBCabinet, 1)
+    assert row is not None, (
+        "expected baseline wbcabinet id=1 from reset_postgres_test_data"
+    )
+    assert row.shop_id == "test_shop_id"
+    return row
 
 
 def _make_search_adv(*, adv_id: int, wb_cabinet_id: int) -> AdvSetting:

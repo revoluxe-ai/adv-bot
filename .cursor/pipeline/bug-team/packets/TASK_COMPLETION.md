@@ -1,0 +1,19 @@
+# Task completion evidence packet
+
+```text
+SCHEMA: opsx-bug-team/TASK_COMPLETION
+IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
+RUNTIME_STATUS: NOT_ACTIVE
+```
+
+Required per OpenSpec task:
+
+```text
+TASK_ID
+CURRENT_TASK_TEXT
+IMPLEMENTATION_EVIDENCE
+TEST_EVIDENCE
+COMPLETION_DECISION: COMPLETE|INCOMPLETE|BLOCKED
+```
+
+Neighboring green tests alone are insufficient for `COMPLETE`.

@@ -550,6 +550,7 @@ class CoroutinesManager:
         from .services.auto_updater_v3.card_ab_hold.pipelines import (
             process_ab_hold,
             process_ab_setup,
+            process_ab_setup_then_epoch,
         )
         # TODO: Убрал фильтрацию в качестве быстрого фикса, т.к. новая модель v3 отключала все ключи, и потом не включала, потому что стата кластеров не свежая, а она не свежая, потому что ключи все OFF
         handlers: list[Callable[[], Awaitable[Any]]] = []
@@ -557,18 +558,41 @@ class CoroutinesManager:
         # advs_filtred) — иначе PENDING зависает при stale после ENTER.
         from .services.auto_updater_v3.card_ab_hold.scheduling import (
             filter_ab_hold_pipeline_candidates,
+            should_run_ab_epoch,
         )
 
+        fresh_advs, _stale_advs = await self._split_advs_by_stats_freshness(
+            advs, operation_name="adv_settings_auto_update_ab_hold"
+        )
+        fresh_ids = {int(adv.adv_id) for adv in fresh_advs}
+
         for adv, ab_mode in filter_ab_hold_pipeline_candidates(advs):
+            stats_fresh = int(adv.adv_id) in fresh_ids
             if ab_mode == CardAbHoldMode.PENDING_SETUP:
-                handlers.append(
-                    functools.partial(
-                        process_ab_setup,
-                        adv,
-                        wb_shop_data_manager=self._wb_shop_data_manager,
-                        wb_manager_hub=self._wb_manager_hub,
+                phase = getattr(adv.adv_setting, "card_ab_hold_phase", None)
+                if should_run_ab_epoch(ab_mode, phase):
+                    # PBH-006 / §18.4.2: Classification FAIL→OFF still via setup
+                    # (epoch_managed=True); epoch tick owns WARM_UP/sync/ACTIVE.
+                    # PERF-003: one serial handler (setup→epoch), not two parallel.
+                    handlers.append(
+                        functools.partial(
+                            process_ab_setup_then_epoch,
+                            adv,
+                            wb_shop_data_manager=self._wb_shop_data_manager,
+                            wb_manager_hub=self._wb_manager_hub,
+                            stats_fresh=stats_fresh,
+                        )
                     )
-                )
+                else:
+                    handlers.append(
+                        functools.partial(
+                            process_ab_setup,
+                            adv,
+                            wb_shop_data_manager=self._wb_shop_data_manager,
+                            wb_manager_hub=self._wb_manager_hub,
+                            stats_fresh=stats_fresh,
+                        )
+                    )
                 continue
             if ab_mode == CardAbHoldMode.ACTIVE:
                 handlers.append(
@@ -577,6 +601,7 @@ class CoroutinesManager:
                         adv,
                         wb_shop_data_manager=self._wb_shop_data_manager,
                         wb_manager_hub=self._wb_manager_hub,
+                        stats_fresh=stats_fresh,
                     )
                 )
                 continue
@@ -888,10 +913,17 @@ class CoroutinesManager:
         try:
             if not advs:
                 return None
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+                should_suppress_budget_and_activity_restart,
+            )
+
             candidates: list[ComplexAdv] = [
                 adv
                 for adv in advs
                 if adv.auto_budget_watchdog_enabled
+                and not should_suppress_budget_and_activity_restart(
+                    getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+                )
                 and (
                     (
                         adv.use_common_budget
@@ -1613,6 +1645,16 @@ class CoroutinesManager:
         )
         advs = [adv for adv in advs if adv.bot_active]
 
+        fresh_advs, _stale = await self._split_advs_by_stats_freshness(
+            advs, operation_name="auto_reset_bid_for_auto_adv"
+        )
+        fresh_ids = {int(adv.adv_id) for adv in fresh_advs}
+        from .services.auto_updater_v3.card_ab_hold.stale_stats_freeze import (
+            filter_ab_hold_stale_mutation_candidates,
+        )
+
+        advs = filter_ab_hold_stale_mutation_candidates(advs, fresh_ids)
+
         wb_manager_hub = self._wb_manager_hub
         service = AutoResetBidService(
             wb_manager_hub=wb_manager_hub,
@@ -1624,6 +1666,13 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 15, 15)
     async def update_common_bid_in_search_adv(self) -> None:
+        """Обычный updater общей ставки Search: Forbidden при structural A/B Hold.
+
+        Пишет common-bid в WB только для кампаний вне structural freeze
+        (Allowed ``OFF``; Forbidden ``PENDING_SETUP`` / ``ACTIVE`` — OP-008 /
+        card-ab-hold-write-path-ownership §3/§17). Bidder/cluster Hold path
+        не затрагивается: здесь только ordinary Search common-bid mutator.
+        """
         if not settings.AUTO_SETTING_ACTIVE:
             return None
 
@@ -1650,8 +1699,24 @@ class CoroutinesManager:
                 adv.bidder_active and
                 adv.updater_common_bid_in_search_adv_active_status and
                 adv.search_adv_active_status is True]
-        complex_advs, _ = await self._split_advs_by_stats_freshness(
+        from .services.auto_updater_v3.card_ab_hold.scheduling import (
+            filter_structural_act_candidates,
+        )
+
+        # Spec card-ab-hold-write-path-ownership OP-008 / §3 / §17:
+        # ordinary Search common-bid Forbidden in PENDING_SETUP/ACTIVE
+        # (Allowed OFF only; bidder/cluster is the Search bid holder under hold).
+        complex_advs = filter_structural_act_candidates(complex_advs)
+        complex_advs, _stale = await self._split_advs_by_stats_freshness(
             complex_advs, operation_name="update_common_bid_in_search_adv"
+        )
+        fresh_ids = {int(adv.adv_id) for adv in complex_advs}
+        from .services.auto_updater_v3.card_ab_hold.stale_stats_freeze import (
+            filter_ab_hold_stale_mutation_candidates,
+        )
+
+        complex_advs = filter_ab_hold_stale_mutation_candidates(
+            complex_advs, fresh_ids
         )
         search_adv_bids = await resolver.get_merged_bids(complex_advs)
         advs: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(

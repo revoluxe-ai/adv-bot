@@ -5,6 +5,9 @@ import typing
 from collections.abc import Awaitable, Callable
 
 from app.core.di.wb_manager_hub.wb_manager_hub import WBManagerHub
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.auto_bid_freeze import (
+    should_freeze_auto_bid_mutations,
+)
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
@@ -20,9 +23,24 @@ class AutoResetBidService:
         self._tasks_manager = tasks_manager
 
     async def ensure_auto_bids_minimum(self, advs: list[ComplexAdv]) -> None:
-        candidates = [adv for adv in advs if adv.bot_active
-                      and adv.bidder_for_auto
-                      ]
+        """Сброс CPM авто-РК до минимума WB для активных bidder-кампаний.
+
+        При A/B Hold freeze (``ACTIVE`` или post-confirm ``PENDING_SETUP`` —
+        ``PENDING_INTENT`` / ``WB_SYNC`` / ``READY_ACTIVE``) кампания исключается
+        из кандидатов (spec §21 / FINDING-PBH-003): ordinary AutoReset MUST NOT
+        менять confirmed Auto bid до activate. ``OFF`` и pre-confirm
+        ``PENDING_SETUP`` остаются eligible.
+        """
+        candidates = [
+            adv
+            for adv in advs
+            if adv.bot_active
+            and adv.bidder_for_auto
+            and not should_freeze_auto_bid_mutations(
+                adv.card_ab_hold_mode,
+                getattr(adv, "card_ab_hold_phase", None),
+            )
+        ]
 
         try:
             min_bids = await self._wb_manager.get_min_bids_cache_only(

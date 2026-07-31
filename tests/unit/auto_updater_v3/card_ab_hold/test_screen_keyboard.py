@@ -6,12 +6,13 @@ OFF → Enable+Disable+Back; PENDING/ACTIVE → Disable+Back, Enable absent.
 
 from __future__ import annotations
 
-import inspect
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
+    CardAbHoldPhase,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
     handlers,
@@ -79,9 +80,32 @@ def test_screen_keyboard_pending_or_active_hides_enable(
 
 
 @pytest.mark.unit
-def test_edit_screen_passes_mode_into_keyboard() -> None:
-    """12.2 wiring: `_edit_screen` прокидывает mode в `_screen_keyboard`."""
-    src = inspect.getsource(handlers._edit_screen)
-    assert "mode" in src
-    assert "_screen_keyboard" in src
-    assert "reply_markup=_screen_keyboard(adv_id, mode)" in src
+@pytest.mark.asyncio
+async def test_edit_screen_passes_mode_into_keyboard() -> None:
+    """12.2 wiring: ``_edit_screen`` прокидывает mode (+phase) в ``_screen_keyboard``."""
+    query = MagicMock()
+    query.message = MagicMock()
+    query.message.answer = AsyncMock()
+    keyboard = MagicMock(name="markup")
+    with (
+        patch.object(handlers, "Message", type(query.message)),
+        patch.object(handlers, "_screen_keyboard", return_value=keyboard) as kb,
+    ):
+        ok = await handlers._edit_screen(
+            query,
+            text="payload",
+            adv_id=42,
+            mode=CardAbHoldMode.ACTIVE,
+            phase=CardAbHoldPhase.READY_ACTIVE,
+        )
+    assert ok is True
+    kb.assert_called_once_with(
+        42,
+        CardAbHoldMode.ACTIVE,
+        phase=CardAbHoldPhase.READY_ACTIVE,
+        emergency_educated=False,
+        emergency_latch=False,
+    )
+    query.message.answer.assert_awaited_once_with(
+        "payload", reply_markup=keyboard
+    )
