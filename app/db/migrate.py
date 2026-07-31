@@ -19,6 +19,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
 
 MIGRATION_LOCK_ID = 731_984_123
@@ -96,7 +97,22 @@ def _script_heads(script: ScriptDirectory) -> frozenset[str]:
 
 
 def _db_heads(connection: Connection) -> frozenset[str]:
-    rows = connection.execute(text("SELECT version_num FROM alembic_version")).fetchall()
+    """Текущие heads БД; отсутствующая alembic_version ≡ BASE."""
+    try:
+        rows = connection.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).fetchall()
+    except ProgrammingError as exc:
+        orig = getattr(exc, "orig", None)
+        pgcode = getattr(orig, "pgcode", None)
+        msg = str(exc).lower()
+        if pgcode == "42P01" or "alembic_version" in msg:
+            try:
+                connection.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            return frozenset({"BASE"})
+        raise
     if not rows:
         return frozenset({"BASE"})
     return frozenset(str(r[0]) for r in rows)

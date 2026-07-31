@@ -47,10 +47,11 @@ Write-Host "ReleaseId=$ReleaseId ImageDigest=$ImageDigest"
 Write-Host "NOTE: Ensure provenance bound manifest hash was verified by CONTROL Job first."
 
 # Build [["rev1"],["rev2"],...] — each revision is its own allowed current set.
+# YAML template uses single-quoted value so JSON double-quotes stay literal.
 $allCurrent = @($ExpectedCurrentRevision) + @($AdditionalAllowedCurrentRevisions)
 $parts = foreach ($rev in $allCurrent) {
     if ([string]::IsNullOrWhiteSpace($rev)) { continue }
-    $escaped = $rev.Trim().Replace('\', '\\').Replace('"', '\"')
+    $escaped = $rev.Trim().Replace('\', '\\').Replace('"', '\"').Replace("'", "''")
     "[`"$escaped`"]"
 }
 if (-not $parts -or @($parts).Count -lt 1) {
@@ -59,12 +60,16 @@ if (-not $parts -or @($parts).Count -lt 1) {
 $expectedCurrentRevisionSetsJson = "[" + (@($parts) -join ",") + "]"
 
 $tmp = New-TemporaryFile
-(Get-Content -Raw -LiteralPath $JobTemplate) `
+$rendered = (Get-Content -Raw -LiteralPath $JobTemplate) `
     -replace "RELEASE_ID", $ReleaseId `
     -replace "RELEASE_PLATFORM_MANIFEST_DIGEST", $ImageDigest `
     -replace "EXPECTED_TARGET_REVISION", $ExpectedTargetRevision `
-    -replace "EXPECTED_CURRENT_REVISION_SETS_JSON", $expectedCurrentRevisionSetsJson `
-    | Set-Content -Path $tmp -Encoding utf8
+    -replace "EXPECTED_CURRENT_REVISION_SETS_JSON", $expectedCurrentRevisionSetsJson
+
+if ($rendered -notmatch "(?m)^\s+value:\s+'\[\[") {
+    throw "Rendered Job YAML missing single-quoted EXPECTED_CURRENT_REVISION_SETS JSON (YAML would break on double quotes)."
+}
+Set-Content -Path $tmp -Encoding utf8 -Value $rendered
 
 if ($WhatIf) {
     Write-Host "WhatIf: would apply Job from $tmp"

@@ -110,3 +110,20 @@ def test_main_emits_json_on_missing_env(
     payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert payload["outcome"] == "PRECONDITION_FAILED"
     assert "DATABASE_URL" in payload["detail"]
+
+
+def test_db_heads_missing_table_is_base() -> None:
+    from sqlalchemy.exc import ProgrammingError
+
+    from app.db.migrate import _db_heads
+
+    conn = MagicMock()
+    err = ProgrammingError(
+        "SELECT version_num FROM alembic_version",
+        {},
+        Exception("relation \"alembic_version\" does not exist"),
+    )
+    err.orig = SimpleNamespace(pgcode="42P01")
+    conn.execute.side_effect = err
+    assert _db_heads(conn) == frozenset({"BASE"})
+    conn.rollback.assert_called()

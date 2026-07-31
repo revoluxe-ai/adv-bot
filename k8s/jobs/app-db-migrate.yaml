@@ -34,7 +34,8 @@ spec:
             - name: EXPECTED_TARGET_REVISION
               value: "EXPECTED_TARGET_REVISION"
             - name: EXPECTED_CURRENT_REVISION_SETS
-              value: "EXPECTED_CURRENT_REVISION_SETS_JSON"
+              # Single-quoted YAML so substituted JSON [["rev"]] keeps literal double-quotes.
+              value: 'EXPECTED_CURRENT_REVISION_SETS_JSON'
             - name: SET_ROLE_APP_OWNER
               value: "1"
             - name: DATABASE_URL
