@@ -261,7 +261,13 @@ Pre-commit checks are gated by `CHECK_MODE`. Scope = files **staged for the curr
 | Preview (`GO` absent) | List `CHECK_MODE` + per-group matrix; **do not run** checks |
 | Execute (`GO` present) | After staging each group and inspecting staged diff, **run** the matrix for that group before `git commit` |
 
-Any FAIL / BLOCKED / non-zero exit → do **not** commit that group; report commands + result; leave working tree as-is; stop that group (do not auto-fix production). Independent later groups may continue only if their staging is still safe.
+Any FAIL / BLOCKED / non-zero exit / FAIL_CLOSED → **COMMIT STOP** for the entire `/opsx-commit` run:
+- do **not** commit the current group;
+- do **not** start or continue any later groups;
+- leave working tree as-is (including already-created earlier commits in this run, if any);
+- report the failing step + commands + result;
+- do not auto-fix production.
+One failed check ends the commit operation.
 
 ### Infer related tests
 
@@ -287,7 +293,7 @@ If the staged set has **no** production or test Python (`.py`):
 
 If staged production `.py` changed and no related tests can be inferred:
 
-- under both `FULL_CHECK` and `FAST_CHECK` → do **not** commit;
+- under both `FULL_CHECK` and `FAST_CHECK` → **COMMIT STOP** (do not commit; do not continue later groups);
 - report `Verification: FAIL_CLOSED - no related tests inferred for production Python`;
 - legacy “commit allowed if no focused test inferred” does **not** apply.
 
@@ -313,7 +319,7 @@ When production/test Python is present:
    - c) `/opsx-performance-review` when that command’s existing trigger applies; else record `NOT_APPLICABLE`
    - d) `/opsx-antipattern-gate` SCAN semantics
 
-If `base=` cannot be resolved → BLOCKED for AI steps; do not commit the group.
+If `base=` cannot be resolved → BLOCKED for AI steps → **COMMIT STOP** (do not commit; do not continue later groups).
 
 ### High-risk zones (report visibility)
 
@@ -430,12 +436,13 @@ For each commit:
 2. Inspect staged diff.
 3. Run the `CHECK_MODE` matrix for that group's staged paths (see Verification rules).
 4. On all required steps PASS (or allowed SKIP / NOT_APPLICABLE) → commit with detailed message.
-5. On any FAIL / BLOCKED → do not commit that group; report; stop that group.
-6. Continue to next group only when safe.
+5. On any FAIL / BLOCKED / FAIL_CLOSED → **COMMIT STOP**: do not commit this group; do not process later groups; report and end the run.
+6. Continue to the next group only after the current group's full check matrix passed.
 
-If a verification command fails:
-- stop that group immediately;
+If a verification command fails (or any check step is FAIL / BLOCKED / FAIL_CLOSED):
+- **COMMIT STOP** immediately for the whole run;
 - do not commit the failing group;
+- do not continue with remaining groups;
 - leave working tree as-is;
 - report what failed.
 
