@@ -31,11 +31,14 @@ from tests.integration.helpers.v3_target_place_assertions import (
 from tests.integration.helpers.v3_target_place_samples import (
     ensure_v3_keyword_samples,
 )
+import app.modules.bids_for_positions_manager.clickhouse_manager.clickhouse_manager as bids_ch_module
+import app.modules.predict_keywords_target_place.clickhouse_manager.clickhouse_manager as predict_ch_module
 from tests.integration.test_predict_keywords_target_place_integration import (
     TEST_NMID,
     _ensure_predict_tables,
     _make_adv_mock,
 )
+from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST
 
 def _synthetic_ladder_profile(keyword: str, ts: datetime) -> list[BidPosition]:
@@ -258,8 +261,16 @@ async def test_v3_strategy_order_for_db_keyword_texts(v3_db_keyword_samples) -> 
 @pytest.mark.destructive_local
 async def test_v3_get_keyword_bid_profiles_ch_integration_ordered(
     clickhouse_client,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """E2E CH: bid_profiles → target_place по режимам, лестница MAX<=OPT<=MIN."""
+    patch_get_clickhouse_client(monkeypatch, [bids_ch_module], clickhouse_client)
+    patch_get_clickhouse_client(
+        monkeypatch,
+        [predict_ch_module],
+        clickhouse_client,
+        attr="get_client",
+    )
     await _ensure_predict_tables(clickhouse_client)
     ts = datetime.now()
     norm_query = "kw_ch_ladder"
