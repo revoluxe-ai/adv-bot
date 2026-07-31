@@ -195,8 +195,12 @@ CREATE OR REPLACE FUNCTION migration_control.mark_migration_succeeded(
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = migration_control, pg_temp
 AS $$
+DECLARE v_exec migration_control.release_execution%ROWTYPE;
 BEGIN
-    PERFORM migration_control._require_token(p_release_id, p_fencing_token);
+    v_exec := migration_control._require_token(p_release_id, p_fencing_token);
+    IF v_exec.migration_state <> 'RUNNING' THEN
+        RAISE EXCEPTION 'PRECONDITION_FAILED: migration_state=% (need RUNNING)', v_exec.migration_state;
+    END IF;
     UPDATE migration_control.release_execution
     SET migration_state = 'SUCCEEDED', migration_completed_at = now(), updated_at = now()
     WHERE release_id = p_release_id;
@@ -209,8 +213,12 @@ CREATE OR REPLACE FUNCTION migration_control.mark_migration_noop(
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = migration_control, pg_temp
 AS $$
+DECLARE v_exec migration_control.release_execution%ROWTYPE;
 BEGIN
-    PERFORM migration_control._require_token(p_release_id, p_fencing_token);
+    v_exec := migration_control._require_token(p_release_id, p_fencing_token);
+    IF v_exec.migration_state <> 'RUNNING' THEN
+        RAISE EXCEPTION 'PRECONDITION_FAILED: migration_state=% (need RUNNING)', v_exec.migration_state;
+    END IF;
     UPDATE migration_control.release_execution
     SET migration_state = 'NOOP', migration_completed_at = now(), updated_at = now()
     WHERE release_id = p_release_id;

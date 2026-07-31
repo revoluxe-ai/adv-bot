@@ -13,7 +13,6 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 from alembic import command
 from alembic.config import Config
@@ -103,6 +102,37 @@ def _db_heads(connection: Connection) -> frozenset[str]:
     return frozenset(str(r[0]) for r in rows)
 
 
+def _validate_target_is_unique_head(
+    script: ScriptDirectory, target: str
+) -> MigrationResult | None:
+    """Target обязан быть единственным script head (не любой ancestor)."""
+    script_heads = _script_heads(script)
+    if len(script_heads) != 1:
+        return MigrationResult(
+            MigrationOutcome.PRECONDITION_FAILED,
+            f"script directory must have exactly one head, got {sorted(script_heads)}",
+            tuple(),
+            target,
+        )
+    head = next(iter(script_heads))
+    if target != head:
+        known = {rev.revision for rev in script.walk_revisions()}
+        if target not in known:
+            detail = f"target {target} not in script directory"
+        else:
+            detail = (
+                f"target {target} is not the unique script head {head}; "
+                "refusing incomplete-schema upgrade"
+            )
+        return MigrationResult(
+            MigrationOutcome.PRECONDITION_FAILED,
+            detail,
+            tuple(),
+            target,
+        )
+    return None
+
+
 def _run_identity_checks(connection: Connection) -> None:
     row = connection.execute(
         text(
@@ -166,28 +196,12 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
     script = ScriptDirectory.from_config(alembic_cfg)
     target = _resolve_target(script)
     allowed_current = _parse_expected_current_sets()
-    script_heads = _script_heads(script)
-    if target not in script_heads and os.environ.get("ALLOW_UPGRADE_HEAD", "").strip() != "1":
-        # target may be single head id
-        if len(script_heads) != 1 or target not in script_heads:
-            # still allow exact target revision that is the unique head
-            heads = list(script_heads)
-            if not (len(heads) == 1 and heads[0] == target):
-                if target not in {rev.revision for rev in script.walk_revisions()}:
-                    return MigrationResult(
-                        MigrationOutcome.PRECONDITION_FAILED,
-                        f"target {target} not in script directory",
-                        tuple(),
-                        target,
-                    )
 
-    if len(script_heads) != 1:
-        return MigrationResult(
-            MigrationOutcome.PRECONDITION_FAILED,
-            f"script directory must have exactly one head, got {sorted(script_heads)}",
-            tuple(),
-            target,
-        )
+    bad_target = _validate_target_is_unique_head(script, target)
+    if bad_target is not None:
+        if own_engine:
+            engine.dispose()
+        return bad_target
 
     receipt_state = os.environ.get("MIGRATION_RECEIPT_STATE", "").strip().upper()
     connection: Connection | None = None
@@ -300,8 +314,16 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
 
 
 def main() -> int:
-    """CLI entrypoint: 0 только для успешных исходов."""
-    result = run_migration()
+    """CLI entrypoint: 0 только для успешных исходов; всегда JSON outcome."""
+    try:
+        result = run_migration()
+    except (RuntimeError, json.JSONDecodeError, ValueError, TypeError) as exc:
+        result = MigrationResult(
+            MigrationOutcome.PRECONDITION_FAILED,
+            f"{type(exc).__name__}: {exc}",
+            tuple(),
+            os.environ.get("EXPECTED_TARGET_REVISION", "").strip(),
+        )
     _emit(result)
     if result.outcome in {
         MigrationOutcome.SUCCESS,

@@ -104,12 +104,11 @@ def ancestor_closure(revision_ids: Iterable[str]) -> set[str]:
         seen.add(rid)
         rev = script.get_revision(rid)
         down = rev.down_revision
-        if down is None:
-            continue
-        if isinstance(down, (list, tuple, set)):
-            stack.extend(str(x) for x in down)
-        else:
-            stack.append(str(down))
+        if down is not None:
+            if isinstance(down, (list, tuple, set)):
+                stack.extend(str(x) for x in down)
+            else:
+                stack.append(str(down))
         depends = rev.depends_on
         if depends:
             if isinstance(depends, (list, tuple, set)):
