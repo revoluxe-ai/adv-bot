@@ -1,24 +1,30 @@
+"""Integration: full_wb_adv_stat against Guarded test CH (rewrite default_db).
+
+Act uses production SQL with ``default_db.*``; tests redirect
+``get_clickhouse_client`` and rewrite qualifiers to
+``test_adv_bot_clickhouse.*`` before the destructive guard sees them.
+"""
+
 import datetime as dt
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
+import app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat as full_wb_adv_stat_module
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+
 from clickhouse_connect import get_async_client  # Import for type hinting
+from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 
 pytestmark = pytest.mark.destructive_local
 
 
-def _create_mock_clickhouse_context(clickhouse_client):
-    """Создаёт мок контекстного менеджера для get_clickhouse_client."""
-    mock_context = AsyncMock()
-    mock_context.__aenter__.return_value = clickhouse_client
-    mock_context.__aexit__.return_value = None
-    return mock_context
-
-
 @pytest.mark.integration
-async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
+async def test_get_keywords_views_by_days(
+    clickhouse_client: get_async_client,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Seed test CH → Act via rewritten client → assert keyword/auto views text."""
     adv_id = 123
     start_date = dt.datetime(2025, 11, 26)
     end_date = dt.datetime(2025, 11, 28)
@@ -27,6 +33,10 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
     await clickhouse_client.command(f"TRUNCATE TABLE test_adv_bot_clickhouse.full_adv_wb_stat")
     await clickhouse_client.command(f"TRUNCATE TABLE test_adv_bot_clickhouse.clusters_adv_stats")
     await clickhouse_client.command(f"TRUNCATE TABLE test_adv_bot_clickhouse.mv_clusters_daily_agg")
+
+    patch_get_clickhouse_client(
+        monkeypatch, [full_wb_adv_stat_module], clickhouse_client
+    )
 
 
     # Тестовые данные для mv_clusters_daily_agg через clusters_adv_stats
@@ -182,21 +192,13 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
         ]
     )
 
-    # Создаём мок контекстного менеджера для get_clickhouse_client
-    mock_context = _create_mock_clickhouse_context(clickhouse_client)
+    result_keywords_views = await full_wb_adv_stat.get_keywords_views_by_days(
+        [adv_id], start_date, end_date
+    )
+    result_auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
+        [adv_id], start_date, end_date
+    )
 
-    # Вызываем тестируемую функцию с мокированным клиентом
-    with patch(
-        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
-        return_value=mock_context,
-    ):
-        result_keywords_views = await full_wb_adv_stat.get_keywords_views_by_days(
-            [adv_id], start_date, end_date
-        )
-        result_auto_adv_stats = await full_wb_adv_stat.get_daily_stats_by_last_days(
-            [adv_id], start_date, end_date
-        )
-    
     auto_views_by_day = {stat.date: stat.views for stat in result_auto_adv_stats}
 
     # Ожидаемые показы по ключевым словам
@@ -286,20 +288,18 @@ async def test_get_keywords_views_by_days(clickhouse_client: get_async_client):
     # Тестирование с пустыми данными
     await clickhouse_client.command(f"TRUNCATE TABLE test_adv_bot_clickhouse.clusters_adv_stats")
     await clickhouse_client.command(f"TRUNCATE TABLE test_adv_bot_clickhouse.mv_clusters_daily_agg")
-    with patch(
-        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
-        return_value=mock_context,
-    ):
-        empty_result_views = await full_wb_adv_stat.get_keywords_views_by_days(
-            [adv_id], start_date, end_date
-        )
+    empty_result_views = await full_wb_adv_stat.get_keywords_views_by_days(
+        [adv_id], start_date, end_date
+    )
     assert empty_result_views == {dt.date(2025, 11, 26): 0, dt.date(2025, 11, 27): 0, dt.date(2025, 11, 28): 0}
 
 
 @pytest.mark.integration
 async def test_get_spend_by_last_days_with_argmax(
     clickhouse_client: get_async_client,
+    monkeypatch: pytest.MonkeyPatch,
 ):
+    """Argmax spend by version: Act via rewritten client hits test CH rows only."""
     adv_id = 321
     other_adv_id = 999
     start_date = dt.datetime(2025, 11, 26)
@@ -329,14 +329,11 @@ async def test_get_spend_by_last_days_with_argmax(
         ],
     )
 
-    mock_context = _create_mock_clickhouse_context(clickhouse_client)
-
-    with patch(
-        "app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat.get_clickhouse_client",
-        return_value=mock_context,
-    ):
-        value = await full_wb_adv_stat.get_spend_by_last_days(
-            [adv_id], start_date, end_date
-        )
+    patch_get_clickhouse_client(
+        monkeypatch, [full_wb_adv_stat_module], clickhouse_client
+    )
+    value = await full_wb_adv_stat.get_spend_by_last_days(
+        [adv_id], start_date, end_date
+    )
 
     assert value == pytest.approx(75.0 + 55.0)
