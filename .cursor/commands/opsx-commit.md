@@ -1,6 +1,6 @@
 ---
 description: "Atomic local commits for product/code/OpenSpec/docs. AI/process surfaces redirect to /opsx-admin-command-commit."
-argument-hint: "GO [optional OpenSpec change-id / context]"
+argument-hint: "[FULL_CHECK|FAST_CHECK] GO [optional change-id / base=<ref> / context]"
 ---
 
 # /opsx-commit
@@ -11,7 +11,7 @@ If `GO` is absent:
 - do not modify files;
 - do not stage files;
 - do not commit;
-- output only the proposed commit plan.
+- output only the proposed commit plan (include `CHECK_MODE` + per-group check matrix; do **not** run the matrix).
 
 Never push, merge, rebase, force-push, deploy, restart services, run migrations against production, or touch secrets.
 
@@ -20,6 +20,26 @@ Never push, merge, rebase, force-push, deploy, restart services, run migrations 
 ```text
 $ARGUMENTS
 ```
+
+## Check mode (mandatory)
+
+Parse exact case-sensitive tokens in `$ARGUMENTS`:
+
+| Token | Meaning |
+|---|---|
+| `FULL_CHECK` | Full pre-commit matrix (also the **default** when neither token is present) |
+| `FAST_CHECK` | Fast pre-commit matrix (overrides default) |
+
+Rules:
+
+1. If **both** `FULL_CHECK` and `FAST_CHECK` are present → `STATUS: BLOCKED_AMBIGUOUS_CHECK_MODE`; do not stage or commit.
+2. If neither is present → `CHECK_MODE=FULL_CHECK`.
+3. `CHECK_MODE` is **not** commit authorization. `GO` is still required to stage/commit.
+4. Check tokens do not authorize process-surface commits (still `/opsx-admin-command-commit`).
+
+Optional `base=<ref>` in `$ARGUMENTS` is used by `FULL_CHECK` AI soft-chain steps. If absent, resolve merge-base against upstream tracking branch, else `stage`, else `main` / `master`; document the chosen ref. If base cannot be resolved on `FULL_CHECK` when AI steps apply → do not commit that group (`BLOCKED` for AI steps).
+
+`FAST_CHECK` is **not** equivalent to `/opsx-static-check FAST` (this FAST omits mypy by design).
 
 ## Purpose
 
@@ -232,21 +252,73 @@ git restore --staged <file>
 
 ## Verification rules
 
-For each commit group, infer focused verification commands.
+Pre-commit checks are gated by `CHECK_MODE`. Scope = files **staged for the current commit group** (not the whole dirty tree).
 
-Examples:
+### When checks run
+
+| Path | Behavior |
+|---|---|
+| Preview (`GO` absent) | List `CHECK_MODE` + per-group matrix; **do not run** checks |
+| Execute (`GO` present) | After staging each group and inspecting staged diff, **run** the matrix for that group before `git commit` |
+
+Any FAIL / BLOCKED / non-zero exit → do **not** commit that group; report commands + result; leave working tree as-is; stop that group (do not auto-fix production). Independent later groups may continue only if their staging is still safe.
+
+### Infer related tests
+
+From staged production / test paths, infer related tests under `tests/` (same module/package, adjacent `test_*` files, explicit paired paths). Prefer Poetry:
 
 ```bash
-pytest path/to/test_file.py -q
-pytest tests/path -q
+poetry run pytest -m unit <related_unit_paths> -q
+poetry run pytest -m integration <related_integration_paths> -q
 ```
 
-If no focused test is obvious:
-- commit is allowed;
-- include `Verification: not run - no focused test inferred`;
-- mark it in the final report.
+Use `bash .cursor/static-check/bin/run.sh -- pyright-strict` and
+`bash .cursor/static-check/bin/run.sh -- mypy .` (or the registry-equivalent human cmds) for typing tools so the venv runner matches `/opsx-static-check`.
 
-If risky zones changed, strongly prefer tests before commit:
+### Non-Python / docs / OpenSpec-only groups
+
+If the staged set has **no** production or test Python (`.py`):
+
+- skip pyright / mypy / pytest with an explicit Verification note;
+- `FAST_CHECK` → `Verification: not_applicable_no_python` is allowed;
+- `FULL_CHECK` → still run applicable AI soft-chain steps on the staged diff (at least antipattern SCAN when base resolves); skip steps that cannot apply.
+
+### Production Python present — FAIL_CLOSED on missing tests
+
+If staged production `.py` changed and no related tests can be inferred:
+
+- under both `FULL_CHECK` and `FAST_CHECK` → do **not** commit;
+- report `Verification: FAIL_CLOSED - no related tests inferred for production Python`;
+- legacy “commit allowed if no focused test inferred” does **not** apply.
+
+### FAST_CHECK matrix
+
+When production/test Python is present:
+
+1. `pyright-strict` (path-scoped when the tool allows; else project `pyright-strict`)
+2. Related **unit** tests only (`pytest -m unit …`)
+
+Do **not** run: mypy, integration tests, AI soft-chain.
+
+### FULL_CHECK matrix (default)
+
+When production/test Python is present:
+
+1. Related **unit** tests, then related **integration** tests (path-focused; honor existing markers; do not invent live/destructive runs beyond project norms)
+2. `pyright-strict`
+3. `mypy`
+4. AI soft-chain audits — run **inline** as READ_ONLY procedures (do not require a separate owner chat hop), scoped to the staged/product diff vs resolved `base=`:
+   - a) `/opsx-pyright-strict-coverage` semantics (changed production Python ⊆ strict include)
+   - b) `/opsx-external-call-coverage` semantics
+   - c) `/opsx-performance-review` when that command’s existing trigger applies; else record `NOT_APPLICABLE`
+   - d) `/opsx-antipattern-gate` SCAN semantics
+
+If `base=` cannot be resolved → BLOCKED for AI steps; do not commit the group.
+
+### High-risk zones (report visibility)
+
+When these zones change, they must be visible in the final report (checks still follow `CHECK_MODE`):
+
 - campaign state;
 - paid/free boundary;
 - bid/cost/reallocation logic;
@@ -254,7 +326,9 @@ If risky zones changed, strongly prefer tests before commit:
 - async/concurrency;
 - bot callbacks/messages.
 
-These are high-risk WB Sky zones and must be visible in the final report.
+### Commit message Verification
+
+Must list `CHECK_MODE`, commands run, and PASS/FAIL/SKIP/NOT_APPLICABLE per step. Do not claim equivalence to `/opsx-static-check` MODE labels.
 
 ## Commit message format
 
@@ -340,11 +414,12 @@ If `GO` is absent, output only:
 
 ```text
 Commit plan:
+- CHECK_MODE: FULL_CHECK | FAST_CHECK
+- base_ref: <resolved or pending>
 - proposed commits
 - files per commit
-- commands that would be run
+- check matrix per commit (commands that WOULD run; not executed)
 - suspicious files
-- tests to run
 - process-surface files left for /opsx-admin-command-commit
 ```
 
@@ -353,12 +428,13 @@ If `GO` is present, execute the commit plan.
 For each commit:
 1. Stage files for that group.
 2. Inspect staged diff.
-3. Run focused verification if inferred.
-4. Commit with detailed message.
-5. Continue to next group.
+3. Run the `CHECK_MODE` matrix for that group's staged paths (see Verification rules).
+4. On all required steps PASS (or allowed SKIP / NOT_APPLICABLE) → commit with detailed message.
+5. On any FAIL / BLOCKED → do not commit that group; report; stop that group.
+6. Continue to next group only when safe.
 
 If a verification command fails:
-- stop immediately;
+- stop that group immediately;
 - do not commit the failing group;
 - leave working tree as-is;
 - report what failed.
@@ -384,14 +460,18 @@ Skipped:
 OUT_OF_SCOPE_REDIRECT:
 - process-surface files left for /opsx-admin-command-commit:
 
+CHECK_MODE:
+- FULL_CHECK | FAST_CHECK
+
 Verification:
 - passed:
 - failed:
-- not run:
+- blocked:
+- skipped / not_applicable:
 
 Next:
 - if process surfaces remain dirty: /opsx-admin-command-commit
-- recommended final verify command
+- optional later: /opsx-pipeline UPDATE (refresh /opsx-commit graph node for check modes)
 - recommended PR command, but do not push
 ```
 
