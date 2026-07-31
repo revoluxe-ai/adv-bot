@@ -10,8 +10,8 @@
   (not kubectl set image alone) to avoid TOCTOU.
 
   EXPECTED_CURRENT_REVISION_SETS is rendered as JSON list-of-lists for
-  python -m app.db.migrate (never substitute the bare token EXPECTED_CURRENT
-  inside the env var name EXPECTED_CURRENT_REVISION_SETS).
+  python -m app.db.migrate. Template placeholders use __TOKEN__ form so
+  value substitution cannot rewrite YAML env key names.
 #>
 [CmdletBinding()]
 param(
@@ -19,7 +19,7 @@ param(
     [string] $ReleaseId,
 
     [Parameter(Mandatory = $true)]
-    [string] $ImageDigest,
+    [string] $ImageRef,
 
     [Parameter(Mandatory = $true)]
     [string] $ExpectedTargetRevision,
@@ -45,11 +45,10 @@ if (-not (Test-Path -LiteralPath $JobTemplate)) {
     throw "Job template not found: $JobTemplate"
 }
 
-Write-Host "ReleaseId=$ReleaseId ImageDigest=$ImageDigest"
+Write-Host "ReleaseId=$ReleaseId ImageRef=$ImageRef"
 Write-Host "NOTE: Ensure provenance bound manifest hash was verified by CONTROL Job first."
 
 # Build [["rev1"],["rev2"],...] — each revision is its own allowed current set.
-# YAML template uses single-quoted value so JSON double-quotes stay literal.
 $allCurrent = @($ExpectedCurrentRevision) + @($AdditionalAllowedCurrentRevisions)
 $parts = foreach ($rev in $allCurrent) {
     if ([string]::IsNullOrWhiteSpace($rev)) { continue }
@@ -61,15 +60,25 @@ if (-not $parts -or @($parts).Count -lt 1) {
 }
 $expectedCurrentRevisionSetsJson = "[" + (@($parts) -join ",") + "]"
 
+# Job name suffix: DNS-1123-ish (lowercase alnum and '-')
+$jobSuffix = ($ReleaseId.ToLower() -replace '[^a-z0-9-]', '-').Trim('-')
+if ([string]::IsNullOrWhiteSpace($jobSuffix)) {
+    throw "ReleaseId produced empty job name suffix"
+}
+
 $tmp = New-TemporaryFile
 $rendered = (Get-Content -Raw -LiteralPath $JobTemplate) `
-    -replace "RELEASE_ID", $ReleaseId `
-    -replace "RELEASE_PLATFORM_MANIFEST_DIGEST", $ImageDigest `
-    -replace "EXPECTED_TARGET_REVISION", $ExpectedTargetRevision `
-    -replace "EXPECTED_CURRENT_REVISION_SETS_JSON", $expectedCurrentRevisionSetsJson
+    -replace "__JOB_NAME_SUFFIX__", $jobSuffix `
+    -replace "__RELEASE_ID__", $ReleaseId `
+    -replace "__IMAGE_REF__", $ImageRef `
+    -replace "__EXPECTED_TARGET_REVISION__", $ExpectedTargetRevision `
+    -replace "__EXPECTED_CURRENT_REVISION_SETS_JSON__", $expectedCurrentRevisionSetsJson
 
+if ($rendered -match "__[A-Z0-9_]+__") {
+    throw "Unresolved template placeholders remain in rendered Job YAML."
+}
 if ($rendered -notmatch "(?m)^\s+value:\s+'\[\[") {
-    throw "Rendered Job YAML missing single-quoted EXPECTED_CURRENT_REVISION_SETS JSON (YAML would break on double quotes)."
+    throw "Rendered Job YAML missing single-quoted EXPECTED_CURRENT_REVISION_SETS JSON."
 }
 
 # PowerShell 5.x Set-Content -Encoding utf8 writes BOM; kubectl rejects BOM YAML.
@@ -79,17 +88,16 @@ $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 if ($WhatIf) {
     Write-Host "WhatIf: would apply Job from $($tmp.FullName)"
     Write-Host "EXPECTED_CURRENT_REVISION_SETS=$expectedCurrentRevisionSetsJson"
-    Get-Content -LiteralPath $tmp.FullName | Select-Object -First 50
+    Get-Content -LiteralPath $tmp.FullName | Select-Object -First 55
     exit 0
 }
 
-$jobName = "app-db-migrate-$ReleaseId"
+$jobName = "app-db-migrate-$jobSuffix"
 kubectl apply --dry-run=client -f $tmp.FullName
 if ($LASTEXITCODE -ne 0) { throw "kubectl apply --dry-run failed" }
 kubectl apply -f $tmp.FullName
 if ($LASTEXITCODE -ne 0) { throw "kubectl apply failed" }
 
-# Complete OR Failed — do not wait full timeout when Job already Failed.
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $finished = $false
 while ($sw.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
@@ -122,7 +130,7 @@ Migrate Job completed. Next: Deployment CAS per frozen manifest, e.g.:
 
 kubectl patch deployment/<name> -n $Namespace --type=json -p "[
   {`"op`":`"test`",`"path`":`"/spec/template/spec/containers/0/image`",`"value`":`"harbor...@sha256:CURRENT`"},
-  {`"op`":`"replace`",`"path`":`"/spec/template/spec/containers/0/image`",`"value`":`"harbor...@sha256:$ImageDigest`"}
+  {`"op`":`"replace`",`"path`":`"/spec/template/spec/containers/0/image`",`"value`":`"$ImageRef`"}
 ]"
 
 Do not kubectl set image without test op.
