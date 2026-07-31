@@ -8,6 +8,10 @@
 
   Deployment updates MUST use JSON Patch test+replace on container image
   (not kubectl set image alone) to avoid TOCTOU.
+
+  EXPECTED_CURRENT_REVISION_SETS is rendered as JSON list-of-lists for
+  python -m app.db.migrate (never substitute the bare token EXPECTED_CURRENT
+  inside the env var name EXPECTED_CURRENT_REVISION_SETS).
 #>
 [CmdletBinding()]
 param(
@@ -23,6 +27,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string] $ExpectedCurrentRevision,
 
+    [Parameter(Mandatory = $false)]
+    [string[]] $AdditionalAllowedCurrentRevisions = @(),
+
     [string] $Namespace = "prod-adv-bot",
 
     [string] $JobTemplate = ".\k8s\jobs\app-db-migrate.yaml",
@@ -32,20 +39,37 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if (-not (Test-Path -LiteralPath $JobTemplate)) {
+    throw "Job template not found: $JobTemplate"
+}
+
 Write-Host "ReleaseId=$ReleaseId ImageDigest=$ImageDigest"
 Write-Host "NOTE: Ensure provenance bound manifest hash was verified by CONTROL Job first."
 
+# Build [["rev1"],["rev2"],...] — each revision is its own allowed current set.
+$allCurrent = @($ExpectedCurrentRevision) + @($AdditionalAllowedCurrentRevisions)
+$parts = foreach ($rev in $allCurrent) {
+    if ([string]::IsNullOrWhiteSpace($rev)) { continue }
+    $escaped = $rev.Trim().Replace('\', '\\').Replace('"', '\"')
+    "[`"$escaped`"]"
+}
+if (-not $parts -or @($parts).Count -lt 1) {
+    throw "ExpectedCurrentRevision must be non-empty"
+}
+$expectedCurrentRevisionSetsJson = "[" + (@($parts) -join ",") + "]"
+
 $tmp = New-TemporaryFile
-(Get-Content -Raw $JobTemplate) `
+(Get-Content -Raw -LiteralPath $JobTemplate) `
     -replace "RELEASE_ID", $ReleaseId `
     -replace "RELEASE_PLATFORM_MANIFEST_DIGEST", $ImageDigest `
     -replace "EXPECTED_TARGET_REVISION", $ExpectedTargetRevision `
-    -replace "EXPECTED_CURRENT", $ExpectedCurrentRevision `
+    -replace "EXPECTED_CURRENT_REVISION_SETS_JSON", $expectedCurrentRevisionSetsJson `
     | Set-Content -Path $tmp -Encoding utf8
 
 if ($WhatIf) {
     Write-Host "WhatIf: would apply Job from $tmp"
-    Get-Content $tmp | Select-Object -First 40
+    Write-Host "EXPECTED_CURRENT_REVISION_SETS=$expectedCurrentRevisionSetsJson"
+    Get-Content $tmp | Select-Object -First 50
     exit 0
 }
 

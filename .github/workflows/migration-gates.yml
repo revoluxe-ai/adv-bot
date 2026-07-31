@@ -8,6 +8,10 @@ on:
       - "app/db/**"
       - "tests/migrations/**"
       - ".github/workflows/migration-gates.yml"
+      - ".github/ci/migration-ephemeral.env"
+      - "k8s/jobs/**"
+      - "k8s/migrations/**"
+      - "scripts/Invoke-ProdDbMigrateThenRollout.ps1"
 
 jobs:
   migration-static:
@@ -67,6 +71,10 @@ jobs:
           POSTGRES_MASTER_HOST: localhost
           POSTGRES_REPLICA_HOST: localhost
         run: |
+          set -a
+          # shellcheck disable=SC1091
+          source .github/ci/migration-ephemeral.env
+          set +a
           poetry run alembic upgrade head
           poetry run alembic check
           poetry run alembic heads
