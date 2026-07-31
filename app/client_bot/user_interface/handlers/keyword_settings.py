@@ -1066,6 +1066,13 @@ async def change_keyword_target_place(
 async def keyword_target_place_value(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
+    """Сохраняет целевую позицию ключа; missing AdvSetting / A/B Hold — отказ.
+
+    При ``KeywordSetting.adv_setting is None`` — ``Кампания не найдена.`` без
+    записи ``target_place`` / commit (FINDING-PBH-016; peer: add_white_phrases
+    missing-campaign stop). При ``is_ab_hold_structural_freeze`` — Hold freeze
+    без записи. Parent WRITE seam: ``_sm(read_only=False)``.
+    """
     data = await state.get_data()
     keyword_setting_original_id = data.get("keyword_setting_for_target_place")
     if not keyword_setting_original_id:
@@ -1105,9 +1112,12 @@ async def keyword_target_place_value(
             await state.set_state()
             return
         adv_setting = keyword_setting.adv_setting
-        if adv_setting is not None and is_ab_hold_structural_freeze(
-            adv_setting.card_ab_hold_mode
-        ):
+        if adv_setting is None:
+            await bot.send_message(message.chat.id, "Кампания не найдена.")
+            await state.update_data(keyword_setting_for_target_place=None)
+            await state.set_state()
+            return
+        if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
             await bot.send_message(
                 message.chat.id,
                 "Кампания в режиме A/B Hold — целевая позиция ключа "
