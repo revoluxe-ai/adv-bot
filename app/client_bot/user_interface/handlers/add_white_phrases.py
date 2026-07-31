@@ -3,8 +3,10 @@
 Ordinary ``data_manager.add_*_phrases`` — Allowed OFF only. При
 ``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``) membership
 mutation блокируется до вызова data_manager (peer: keyword_settings /
-set_common_bid_manual). Owned keyword-set change path — WARM_UP
-``keyword_edit_open`` only.
+set_common_bid_manual). Missing AdvSetting (``load_adv_card_ab_hold_mode_in_session``
+→ ``None``) — stop с ``Кампания не найдена.`` без membership write (peer:
+``add_black_phrases`` / FINDING-PBH-015). Owned keyword-set change path —
+WARM_UP ``keyword_edit_open`` only.
 
 ``reset_white_list`` / ``reset_non_relevant_phrases`` — ordinary hard_status
 writers той же freeze-gate class (FINDING-PBH-010-R1): под structural freeze
@@ -212,7 +214,7 @@ async def add_white_phrases(
 async def waiting_for_white_phrases(
     message: Message, bot: Bot, state: FSMContext
 ) -> None:
-    """Добавляет white-фразы; под A/B Hold structural freeze — отказ без write."""
+    """Добавляет white-фразы; missing campaign / Hold freeze — отказ без write."""
     text = message.text
     if not text:
         return
@@ -222,7 +224,10 @@ async def waiting_for_white_phrases(
     adv_setting_id = data["last_adv_setting_id"]
     async with sm(read_only=True) as session:
         mode = await load_adv_card_ab_hold_mode_in_session(session, adv_setting_id)
-    if mode is not None and is_ab_hold_structural_freeze(mode):
+    if mode is None:
+        await message.answer("Кампания не найдена.")
+        return
+    if is_ab_hold_structural_freeze(mode):
         await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
         return
     await data_manager.add_white_phrases(keywords, adv_setting_id)
@@ -249,7 +254,7 @@ async def add_fixed_phrases(
 async def waiting_for_fixed_phrases(
     message: Message, bot: Bot, state: FSMContext
 ) -> None:
-    """Добавляет fixed-фразы; под A/B Hold structural freeze — отказ без write."""
+    """Добавляет fixed-фразы; missing campaign / Hold freeze — отказ без write."""
     text = message.text
     if not text:
         return
@@ -259,7 +264,10 @@ async def waiting_for_fixed_phrases(
     adv_setting_id = data["last_adv_setting_id"]
     async with sm(read_only=True) as session:
         mode = await load_adv_card_ab_hold_mode_in_session(session, adv_setting_id)
-    if mode is not None and is_ab_hold_structural_freeze(mode):
+    if mode is None:
+        await message.answer("Кампания не найдена.")
+        return
+    if is_ab_hold_structural_freeze(mode):
         await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
         return
     await data_manager.add_fixed_phrases(keywords, adv_setting_id)
@@ -286,7 +294,7 @@ async def add_relevant_phrases(
 async def waiting_for_relevant_phrases(
     message: Message, bot: Bot, state: FSMContext
 ) -> None:
-    """Добавляет relevant-фразы; под A/B Hold structural freeze — отказ без write."""
+    """Добавляет relevant-фразы; missing campaign / Hold freeze — отказ без write."""
     text = message.text
     if not text:
         return
@@ -296,7 +304,10 @@ async def waiting_for_relevant_phrases(
     adv_setting_id = data["last_adv_setting_id"]
     async with sm(read_only=True) as session:
         mode = await load_adv_card_ab_hold_mode_in_session(session, adv_setting_id)
-    if mode is not None and is_ab_hold_structural_freeze(mode):
+    if mode is None:
+        await message.answer("Кампания не найдена.")
+        return
+    if is_ab_hold_structural_freeze(mode):
         await message.answer(AB_HOLD_ADD_PHRASES_BLOCKED_MSG)
         return
     user = message.from_user
