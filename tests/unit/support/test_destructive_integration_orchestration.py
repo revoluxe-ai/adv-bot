@@ -359,6 +359,40 @@ def test_compose_down_coerces_magicmock_stderr_before_raise() -> None:
 
 
 @pytest.mark.unit
+def test_compose_down_skips_raise_on_magicmock_returncode() -> None:
+    """MagicMock returncode (subprocess.run leak) → warning, не DOCKER_STAGE ERROR.
+
+    Victim-паттерн pytest-full: session teardown compose down видит
+    ``exit_code=<MagicMock name='mock().returncode'>`` и ERROR на последнем
+    тесте (graphic_positions DTO) хотя DTO Docker не использует.
+    """
+    from unittest.mock import MagicMock
+
+    from tests.support.destructive_lifecycle import coerce_compose_exit_code
+    from tests.unit.support.test_destructive_lifecycle import _lifecycle
+
+    raise_calls: list[dict[str, object]] = []
+
+    def _raise_stage(**kwargs: object) -> None:
+        raise_calls.append(kwargs)
+        raise RuntimeError("stage")
+
+    polluted_rc = MagicMock(name="mock().returncode")
+
+    def _sync_run(*_a: object, **_k: object) -> tuple[object, str, str]:
+        return polluted_rc, "", ""
+
+    lc = _lifecycle(sync_run=_sync_run, raise_stage=_raise_stage)
+    lc._compose_cmd = ["docker", "compose"]
+    err = lc._compose_down()
+    assert err is None
+    assert raise_calls == []
+    assert coerce_compose_exit_code(polluted_rc) is None
+    assert coerce_compose_exit_code(0) == 0
+    assert coerce_compose_exit_code(2) == 2
+
+
+@pytest.mark.unit
 def test_safe_error_text_contains_stage_exitcode_owner_action() -> None:
     exc = root_conftest._docker_stage_error(
         stage="cleanup",
