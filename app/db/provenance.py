@@ -101,6 +101,26 @@ def _is_index_media_type(media_type: str) -> bool:
     return "index" in mt or "manifest.list" in mt
 
 
+def _assert_registry_digest_matches_pin(registry_digest: str, pinned: str) -> None:
+    """
+    Если registry вернул Docker-Content-Digest — он обязан совпасть с pin.
+
+    Отсутствие валидного digest в ответе допускается (некоторые registry
+    не отдают заголовок); невалидный/чужой digest — ошибка provenance.
+    """
+    raw = (registry_digest or "").strip()
+    if not raw:
+        return
+    if not DIGEST_RE.match(raw.lower()):
+        raise ProvenanceError(
+            f"registry Docker-Content-Digest is not a valid sha256: {registry_digest!r}"
+        )
+    if normalize_digest(raw) != pinned:
+        raise ProvenanceError(
+            f"registry Docker-Content-Digest mismatch: {raw} != {pinned}"
+        )
+
+
 HttpGet = Callable[[str, dict[str, str]], tuple[dict[str, str], bytes]]
 
 
@@ -242,12 +262,7 @@ def verify_release_platform_digest(
             password=password,
             http_get=http_get,
         )
-        if normalize_digest(plat_digest) != pinned and plat_digest != pinned:
-            # Some registries echo the request digest; tolerate equal pin.
-            if not DIGEST_RE.match(str(plat_digest).lower()):
-                raise ProvenanceError(
-                    f"platform manifest digest mismatch from registry: {plat_digest}"
-                )
+        _assert_registry_digest_matches_pin(str(plat_digest), pinned)
         _ = plat_doc  # existence of JSON body is the proof
         return ProvenanceResult(
             mode=mode_norm,
@@ -272,11 +287,7 @@ def verify_release_platform_digest(
         password=password,
         http_get=http_get,
     )
-    if DIGEST_RE.match(str(plat_digest).lower()):
-        if normalize_digest(str(plat_digest)) != pinned:
-            raise ProvenanceError(
-                f"registry Docker-Content-Digest mismatch: {plat_digest} != {pinned}"
-            )
+    _assert_registry_digest_matches_pin(str(plat_digest), pinned)
     return ProvenanceResult(
         mode=mode_norm,
         platform=plat,

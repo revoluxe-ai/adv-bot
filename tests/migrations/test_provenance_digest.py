@@ -53,6 +53,51 @@ def test_digest_pin_mode_equality() -> None:
     assert result.registry_checked is False
 
 
+def test_registry_manifest_index_path_rejects_platform_digest_mismatch() -> None:
+    """Index→platform pin OK, but registry Content-Digest for platform differs → fail."""
+    index_dig = "sha256:" + ("1" * 64)
+    plat_pin = "sha256:" + ("2" * 64)
+    wrong_plat = "sha256:" + ("3" * 64)
+    index_doc = {
+        "mediaType": "application/vnd.oci.image.index.v1+json",
+        "manifests": [
+            {
+                "digest": plat_pin,
+                "platform": {"os": "linux", "architecture": "amd64"},
+            }
+        ],
+    }
+    plat_doc = {
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "layers": [],
+    }
+
+    def fake_get(url: str, headers: dict[str, str]) -> tuple[dict[str, str], bytes]:
+        if index_dig in url:
+            return (
+                {"docker-content-digest": index_dig},
+                json.dumps(index_doc).encode(),
+            )
+        if plat_pin in url:
+            return (
+                {"docker-content-digest": wrong_plat},
+                json.dumps(plat_doc).encode(),
+            )
+        raise AssertionError(f"unexpected url {url}")
+
+    with pytest.raises(ProvenanceError, match="Docker-Content-Digest mismatch"):
+        verify_release_platform_digest(
+            platform_manifest_digest=plat_pin,
+            index_digest=index_dig,
+            mode="registry_manifest",
+            registry_host="harbor.example",
+            repository="proj/adv-bot",
+            username="u",
+            password="p",
+            http_get=fake_get,
+        )
+
+
 def test_registry_manifest_resolves_index(monkeypatch: pytest.MonkeyPatch) -> None:
     index_dig = "sha256:" + ("e" * 64)
     plat_dig = "sha256:" + ("f" * 64)
