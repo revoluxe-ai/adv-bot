@@ -34,6 +34,8 @@ param(
 
     [string] $JobTemplate = ".\k8s\jobs\app-db-migrate.yaml",
 
+    [int] $TimeoutSeconds = 1800,
+
     [switch] $WhatIf
 )
 
@@ -69,20 +71,50 @@ $rendered = (Get-Content -Raw -LiteralPath $JobTemplate) `
 if ($rendered -notmatch "(?m)^\s+value:\s+'\[\[") {
     throw "Rendered Job YAML missing single-quoted EXPECTED_CURRENT_REVISION_SETS JSON (YAML would break on double quotes)."
 }
-Set-Content -Path $tmp -Encoding utf8 -Value $rendered
+
+# PowerShell 5.x Set-Content -Encoding utf8 writes BOM; kubectl rejects BOM YAML.
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($tmp.FullName, $rendered, $utf8NoBom)
 
 if ($WhatIf) {
-    Write-Host "WhatIf: would apply Job from $tmp"
+    Write-Host "WhatIf: would apply Job from $($tmp.FullName)"
     Write-Host "EXPECTED_CURRENT_REVISION_SETS=$expectedCurrentRevisionSetsJson"
-    Get-Content $tmp | Select-Object -First 50
+    Get-Content -LiteralPath $tmp.FullName | Select-Object -First 50
     exit 0
 }
 
-kubectl apply --dry-run=client -f $tmp
-kubectl apply -f $tmp
-kubectl wait --for=condition=complete "job/app-db-migrate-$ReleaseId" -n $Namespace --timeout=1800s
-if ($LASTEXITCODE -ne 0) {
-    throw "Migrate Job failed; do not rollout. Inspect logs; PARTIAL_OR_UNKNOWN forbids blind retry."
+$jobName = "app-db-migrate-$ReleaseId"
+kubectl apply --dry-run=client -f $tmp.FullName
+if ($LASTEXITCODE -ne 0) { throw "kubectl apply --dry-run failed" }
+kubectl apply -f $tmp.FullName
+if ($LASTEXITCODE -ne 0) { throw "kubectl apply failed" }
+
+# Complete OR Failed — do not wait full timeout when Job already Failed.
+$sw = [System.Diagnostics.Stopwatch]::StartNew()
+$finished = $false
+while ($sw.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
+    $raw = kubectl get "job/$jobName" -n $Namespace -o json 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        Start-Sleep -Seconds 3
+        continue
+    }
+    $job = $raw | ConvertFrom-Json
+    $conditions = @($job.status.conditions)
+    $isComplete = $conditions | Where-Object { $_.type -eq "Complete" -and $_.status -eq "True" }
+    $isFailed = $conditions | Where-Object { $_.type -eq "Failed" -and $_.status -eq "True" }
+    if ($isComplete) {
+        $finished = $true
+        break
+    }
+    if ($isFailed) {
+        Write-Host "Migrate Job Failed; dumping logs:"
+        kubectl logs -n $Namespace -l "job-name=$jobName" --tail=120
+        throw "Migrate Job failed; do not rollout. Inspect logs; PARTIAL_OR_UNKNOWN forbids blind retry."
+    }
+    Start-Sleep -Seconds 5
+}
+if (-not $finished) {
+    throw "Timed out waiting for job/$jobName (neither Complete nor Failed within ${TimeoutSeconds}s)."
 }
 
 Write-Host @"

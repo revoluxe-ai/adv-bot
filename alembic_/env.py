@@ -102,10 +102,11 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Standalone alembic upgrade: one transaction for the whole run
+        # (default). transaction_per_migration is Job-wrapper only.
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            transaction_per_migration=True,
         )
 
         with context.begin_transaction():
