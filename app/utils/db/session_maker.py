@@ -7,6 +7,7 @@ PgBouncer, чтобы prepared statements не конфликтовали при
 
 import asyncio
 import logging
+import os
 import ssl
 import traceback
 from collections.abc import AsyncGenerator
@@ -97,6 +98,10 @@ def get_alchemy_row(read_only: bool) -> str:
 
 
 def get_alchemy_row_for_migration() -> str:
+    """DSN для Alembic: приоритет DATABASE_URL, иначе POSTGRES_* settings."""
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if database_url:
+        return database_url
     port = settings.postgres_port
     postgres_dbname = settings.postgres_dbname
     postgres_password = settings.postgres_password

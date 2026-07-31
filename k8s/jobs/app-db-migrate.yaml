@@ -1,0 +1,60 @@
+# ============================================================================
+# app-db-migrate.yaml
+# ============================================================================
+# Назначение: one-shot RELEASE migrate Job после CONTROL lease.
+# Запуск: только после verify_baseline_and_acquire_release; не initContainer.
+# envFrom: те же ConfigMap/Secret, что у app Deployments — alembic_/env.py
+# импортирует models/settings (EXECUTION_CLOSURE). DATABASE_URL перекрывает DSN.
+# ============================================================================
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: app-db-migrate-RELEASE_ID
+  namespace: prod-adv-bot
+  labels:
+    app.kubernetes.io/name: app-db-migrate
+    app.kubernetes.io/part-of: safe-prod-pg-migrations
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app-db-migrate
+    spec:
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: harbor-skyline360-login-secret
+      containers:
+        - name: migrate
+          image: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot@sha256:RELEASE_PLATFORM_MANIFEST_DIGEST
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.db.migrate"]
+          envFrom:
+            - configMapRef:
+                name: prod-wb-gram
+            - secretRef:
+                name: common-secrets
+          env:
+            - name: RELEASE_ID
+              value: "RELEASE_ID"
+            - name: EXPECTED_TARGET_REVISION
+              value: "EXPECTED_TARGET_REVISION"
+            - name: EXPECTED_CURRENT_REVISION_SETS
+              # Single-quoted YAML so substituted JSON [["rev"]] keeps literal double-quotes.
+              value: 'EXPECTED_CURRENT_REVISION_SETS_JSON'
+            - name: SET_ROLE_APP_OWNER
+              value: "1"
+            # Must win over POSTGRES_* from ConfigMap for migrator DSN (primary, not pooler).
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-db-migrator
+                  key: database_url
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
