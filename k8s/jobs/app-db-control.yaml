@@ -2,13 +2,21 @@
 # app-db-control.yaml
 # ============================================================================
 # Назначение: CONTROL Job — provenance-bound verify+acquire (не exec RELEASE).
-# MVP: registry-layer extract / attestation verify; пишет termination-log JSON.
-# Image: отдельный CONTROL/extractor, НЕ RELEASE_IMAGE.
+# Provenance: OCI digest pin / registry manifest fetch (app.db.provenance).
+# Image: CONTROL runner (MVP may reuse adv-bot image digest as *runner* only;
+#        RELEASE must not be executed as provenance extractor).
+#
+# Placeholders:
+#   __JOB_NAME_SUFFIX__, __CONTROL_IMAGE_REF__, __RELEASE_ID__,
+#   __RELEASE_PLATFORM_MANIFEST_DIGEST__, __EXPECTED_PLATFORM_MANIFEST_DIGEST__,
+#   __EXPECTED_TARGET_REVISION__, __EXPECTED_SOURCE_HISTORY_HASH__,
+#   __WORKFLOW_RUN_ID__, __DATABASE_IDENTITY__, __PROVENANCE_MODE__,
+#   __CONTROL_DRY_RUN__
 # ============================================================================
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: app-db-control-RELEASE_ID
+  name: app-db-control-__JOB_NAME_SUFFIX__
   namespace: prod-adv-bot
   labels:
     app.kubernetes.io/name: app-db-control
@@ -26,18 +34,30 @@ spec:
         - name: harbor-skyline360-login-secret
       containers:
         - name: control
-          image: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot-control:CONTROL_TAG
+          image: __CONTROL_IMAGE_REF__
           imagePullPolicy: IfNotPresent
-          command: ["python", "-m", "app.db.control_acquire"]
+          command: ["/app/.venv/bin/python", "-m", "app.db.control_acquire"]
           env:
             - name: RELEASE_ID
-              value: "RELEASE_ID"
+              value: "__RELEASE_ID__"
             - name: RELEASE_PLATFORM_MANIFEST_DIGEST
-              value: "RELEASE_PLATFORM_MANIFEST_DIGEST"
+              value: "__RELEASE_PLATFORM_MANIFEST_DIGEST__"
+            - name: EXPECTED_PLATFORM_MANIFEST_DIGEST
+              value: "__EXPECTED_PLATFORM_MANIFEST_DIGEST__"
             - name: TARGET_PLATFORM
               value: "linux/amd64"
+            - name: PROVENANCE_MODE
+              value: "__PROVENANCE_MODE__"
             - name: EXPECTED_TARGET_REVISION
-              value: "EXPECTED_TARGET_REVISION"
+              value: "__EXPECTED_TARGET_REVISION__"
+            - name: EXPECTED_SOURCE_HISTORY_HASH
+              value: "__EXPECTED_SOURCE_HISTORY_HASH__"
+            - name: WORKFLOW_RUN_ID
+              value: "__WORKFLOW_RUN_ID__"
+            - name: DATABASE_IDENTITY
+              value: "__DATABASE_IDENTITY__"
+            - name: CONTROL_DRY_RUN
+              value: "__CONTROL_DRY_RUN__"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

@@ -23,6 +23,19 @@ ENV_PY = ALEMBIC_DIR / "env.py"
 ALEMBIC_INI = REPO_ROOT / "alembic.ini"
 
 
+def _revision_dependencies(rev: object) -> object:
+    """
+    Зависимости ревизии для ancestor closure.
+
+    Alembic ``Script`` exposes ``dependencies`` (not ``depends_on``).
+    Module-level ``depends_on`` is used as fallback for tests/fakes.
+    """
+    deps = getattr(rev, "dependencies", None)
+    if deps is not None:
+        return deps
+    return getattr(rev, "depends_on", None)
+
+
 def _file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     digest.update(path.read_bytes())
@@ -68,7 +81,7 @@ def build_execution_manifest(
             {
                 "revision": rev.revision,
                 "down_revision": rev.down_revision,
-                "depends_on": rev.depends_on,
+                "depends_on": _revision_dependencies(rev),
                 "branch_labels": list(rev.branch_labels or []),
                 "file_sha256": _file_sha256(Path(rev.path)),
             }
@@ -109,7 +122,7 @@ def ancestor_closure(revision_ids: Iterable[str]) -> set[str]:
                 stack.extend(str(x) for x in down)
             else:
                 stack.append(str(down))
-        depends = rev.depends_on
+        depends = _revision_dependencies(rev)
         if depends:
             if isinstance(depends, (list, tuple, set)):
                 stack.extend(str(x) for x in depends)
@@ -130,7 +143,7 @@ def source_history_hash(revision_ids: Iterable[str]) -> str:
             {
                 "revision": rid,
                 "down_revision": rev.down_revision,
-                "depends_on": rev.depends_on,
+                "depends_on": _revision_dependencies(rev),
                 "file_sha256": _file_sha256(Path(rev.path)),
             }
         )
