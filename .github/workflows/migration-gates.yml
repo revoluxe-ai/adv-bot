@@ -1,0 +1,66 @@
+name: Migration gates
+
+on:
+  pull_request:
+    paths:
+      - "alembic_/**"
+      - "alembic.ini"
+      - "app/db/**"
+      - "tests/migrations/**"
+      - ".github/workflows/migration-gates.yml"
+
+jobs:
+  migration-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.8.3
+          virtualenvs-create: true
+      - name: Install deps
+        run: poetry install --no-interaction --no-ansi
+      - name: Alembic single head
+        run: |
+          poetry run alembic heads
+          test "$(poetry run alembic heads | wc -l)" -eq 1
+      - name: Pytest migrations unit
+        run: poetry run pytest tests/migrations -q
+
+  migration-ephemeral-pg:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: replay
+          POSTGRES_USER: replay
+          POSTGRES_DB: replay_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snok/install-poetry@v1
+        with:
+          version: 1.8.3
+          virtualenvs-create: true
+      - name: Install deps
+        run: poetry install --no-interaction --no-ansi
+      - name: Upgrade empty DB to head + alembic check
+        env:
+          DATABASE_URL: postgresql://replay:replay@localhost:5432/replay_db
+          POSTGRES_PORT: "5432"
+          POSTGRES_DBNAME: replay_db
+          POSTGRES_USER: replay
+          POSTGRES_PASSWORD: replay
+          POSTGRES_MASTER_HOST: localhost
+          POSTGRES_REPLICA_HOST: localhost
+        run: |
+          poetry run alembic upgrade head
+          poetry run alembic check
+          poetry run alembic heads
