@@ -22,8 +22,24 @@
 ## Provenance
 
 - Предпочтительно: signed attestation на OCI digest.
-- MVP: CONTROL image читает OCI layers из Harbor по digest **без** запуска RELEASE.
-- Multi-arch: различать `RELEASE_INDEX_DIGEST` и `RELEASE_PLATFORM_MANIFEST_DIGEST` (`linux/amd64`).
+- MVP (`app.db.provenance` + `python -m app.db.control_acquire`):
+  - `PROVENANCE_MODE=digest_pin` — равенство pin digest (без registry fetch);
+  - `PROVENANCE_MODE=registry_manifest` — GET OCI index/manifest из Harbor
+    по digest, resolve `linux/amd64`, **без** `docker run` / exec RELEASE.
+- Multi-arch: различать `RELEASE_INDEX_DIGEST` и `RELEASE_PLATFORM_MANIFEST_DIGEST`.
+- `EXPECTED_SOURCE_HISTORY_HASH` должен совпасть с RECONCILED APPLICATION
+  baseline (`migration_control.baseline_registry`). Interim prod pin:
+  `interim-forensics-20260731T093353Z` (не invent; Owner обновляет baseline).
+
+## Automation gate
+
+```
+PROD_AUTOMATION_ENABLEMENT_ALLOWED=NO
+```
+
+Пока NO: protected deploy workflow / CAS rollout **не** включать.
+CONTROL+Migrate Jobs — staff/dry-run path. Flip to YES только после
+реального CONTROL provenance в CI gate + GRANT EXECUTE + secret wiring.
 
 ## APPLICATION_SECURITY_CUTOVER
 
@@ -54,8 +70,12 @@ PITR только при порче данных.
 
 ## Jobs
 
+Порядок: **CONTROL → Migrate → Deployment CAS** (не наоборот).
+
+- `k8s/jobs/app-db-control.yaml` — CONTROL verify+acquire; Secret `app-db-control`.
+  `CONTROL_DRY_RUN=1` — provenance + baseline SELECT, без lease.
 - `k8s/jobs/app-db-migrate.yaml` — RELEASE migrate; `envFrom` ConfigMap `prod-wb-gram`
   + Secret `common-secrets` (settings import via `alembic_/env.py`), plus
   `DATABASE_URL` from `app-db-migrator`.
-- `k8s/jobs/app-db-control.yaml` — CONTROL verify+acquire (не exec RELEASE).
-- Helper: `scripts/Invoke-ProdDbMigrateThenRollout.ps1`
+- Helper: `scripts/Invoke-ProdDbMigrateThenRollout.ps1` (migrate+CAS note only;
+  CONTROL must already have succeeded).
