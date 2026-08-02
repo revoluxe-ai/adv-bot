@@ -327,6 +327,7 @@ Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates 
 
 
 
+
 Зашифровать свой комп
 Навести порядок ChatGPT
 Навести порядок в CODEX
@@ -340,3 +341,7 @@ Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates 
 
 opsx-bug-team to commant native
 
+
+opsx-bug-team to commant native
+
+opsx-bug-team - тест развилки от bug-hunt
