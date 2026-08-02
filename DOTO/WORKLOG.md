@@ -383,6 +383,27 @@ KEEP_MVP_BOUNDARY (owed now, handoff → `/opsx-update`):
   until REENTER_CONFIRMED.
 
 
+## Deferred from change openspec-guard-size-recovery (2026-07-30)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of any current OpenSpec change
+until `/opsx-new` (or equivalent) + `/opsx-update` + `REENTER_CONFIRMED`.
+No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only park).
+
+- [ ] [deferred-from:openspec-guard-size-recovery] Guard size recovery / openspec compress tooling
+  source: /opsx-admin-command-design-command (OPTION_A recommended; OPTION_B optional) + explore 2026-07-30
+  reason: out_of_current_mvp | owner_park | needs_test_design
+  notes: Сложная команда; нужен способ тестировать. Сейчас НЕ implement.
+    OPTION_A: playbook при guard FAIL + ranked offenders в /opsx-update(+siblings) + guard --report-offenders.
+    OPTION_B: /opsx-admin-openspec-size-reduce (GO-gated), FORBIDDEN default write openspec/changes/**.
+    ≠ /opsx-bound-scope (scope drift ≠ char shrink).
+    Временно: baseline opsx_update bumped to 89948 (2026-07-30) — не вечный substitute for reduce.
+
+- [ ] [deferred-from:openspec-guard-size-recovery] Test strategy for guard reduce / recovery
+  source: owner (explore/design follow-up)
+  reason: oversized | owner_park
+  notes: Придумать harness: synthetic oversized fixture → FAIL → plan → GO reduce → GREEN;
+    запрет semantic loss на process contracts; не трогать product change specs.
+
 Анализ материализации решения багов для обучения системы супер-классам ошибок
 Внедрить практики, риски
 
