@@ -5,25 +5,29 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
 
 ## Steps
 
-1. **Normalize** findings from all packets (path, symbol/node, code, message,
-   severity, check_id).
+1. **Normalize** findings from all packets (path, line, symbol/node, code,
+   message, severity, check_id). Use FINDINGS.`line` when present; do not drop
+   line numbers when synthesizing PROBLEMS.
 2. **Bucket** every finding into exactly one of:
    - `STATIC` — pyright-strict, mypy
    - `TESTS` — pytest-unit, pytest-full
 3. **Deduplicate intersections** before grouping (never emit the same issue as
    two P# entries):
-   - same path + symbol, or
-   - same path + primary diagnostic code family, or
+   - same path + line + symbol, or
+   - same path + line + primary diagnostic code family, or
+   - same path + primary diagnostic code family when both lines are `n/a`, or
    - same pytest node id, or
    - same environment root cause (e.g. identical
      `DEV_TUNNELS_ENABLED` / connection-refused message across many nodes)
    → one problem group with `seen_in: [check_ids…]` and merged `count`.
 4. **Group shape** (each P# must include all fields):
    - short title
-   - `path` or test `node`
+   - `path` or test `node` — for STATIC: print `path: <filepath:line>` when
+     `line` is an int; else `path: <filepath>`. Prefer a representative line
+     from the group (lowest line if merged). TESTS keep pytest `node`.
    - `count` (merged finding count)
    - `top` — ≤2 codes or assert summaries
-   - `fix_target` — one line (file/symbol or test to repair; not an opsx command)
+   - `fix_target` — one line (file:line/symbol or test to repair; not an opsx command)
    - `fix_cmd` — recommended repair command for this group:
      - STATIC bucket → `/opsx-fix-types`
      - TESTS bucket → `/opsx-test-triage`

@@ -151,10 +151,10 @@ SUMMARY:
 PROBLEMS:
 ### STATIC
 #### P1. <short title>
-- path: <path>
+- path: <filepath:line>   # or <filepath> if line unknown
 - count: <n>
 - top: <≤2 codes>
-- fix_target: <one line — file/symbol>
+- fix_target: <one line — file:line/symbol>
 - fix_cmd: /opsx-fix-types
 - seen_in: [...]
 ### TESTS
