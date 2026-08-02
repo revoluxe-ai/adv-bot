@@ -31,6 +31,29 @@ This command may mutate git **only** to create local commits. Nothing else.
 - `git reset --hard`, `git clean -fd`, destructive checkout that discards work or advances a rebase todo
 - deploy, restart services, production migrations, secrets access
 
+## Content-edit ban (mandatory — GO does not heal)
+
+This command may change the **git index / local commit history** only.
+It must **not** rewrite working-tree **content** to make verification pass.
+
+**Forbidden on the GO path (and preview):**
+- `Write` / `StrReplace` / patch / format of `app/**`, `tests/**`, `alembic_/**`,
+  `openspec/**`, `pyrightconfig*.json`, `pyproject.toml`, or any other product /
+  config / test file to satisfy pyright, mypy, pytest, coverage, or soft-chain
+- “heal-to-green”: editing production or configs after a red check, then
+  re-running the matrix in the same `/opsx-commit` turn
+- applying `/opsx-pyright-strict-coverage` **GO** (include writes),
+  `/opsx-fix-types`, `/opsx-test`, or any other writer command as a side effect
+- inventing product semantics while clearing conflict markers
+
+**Allowed content operations:** none for product/config. Staging (`git add`)
+may include paths that are **already** dirty or **already** conflict-resolved
+in the working tree before this command started. If a path is still unmerged
+and resolution would require choosing or inventing product semantics →
+**COMMIT STOP**; leave resolution to the owner (or a separate fix command).
+
+`GO` authorizes commit creation only. It does **not** authorize heal-to-green.
+
 After the authorized commit(s) finish, **stop**. Do not “finish the rebase”, “keep going”, or drive any in-progress sequencer.
 
 ## User input
@@ -304,8 +327,15 @@ Any FAIL / BLOCKED / non-zero exit / FAIL_CLOSED → **COMMIT STOP** for the ent
 - do **not** start or continue any later groups;
 - leave working tree as-is (including already-created earlier commits in this run, if any);
 - report the failing step + commands + result;
-- do not auto-fix production.
-One failed check ends the commit operation.
+- do **not** auto-fix production, tests, migrations, or configs
+  (see **Content-edit ban**);
+- do **not** edit `pyrightconfig*.json` / includes to clear coverage FAIL;
+- print one pasteable `NEXT_ACTION` to the owning heal command, for example:
+  - typing / pyright errors → `/opsx-fix-types`
+  - `MISSING_FROM_INCLUDE` / coverage FAIL → `/opsx-pyright-strict-coverage`
+  - test FAIL → `/opsx-test-triage`
+  - then the owner re-runs `/opsx-commit … GO` after the heal command finishes
+One failed check ends the commit operation. No heal-to-green inside this command.
 
 ### Infer related tests
 
@@ -351,11 +381,18 @@ When production/test Python is present:
 1. Related **unit** tests, then related **integration** tests (path-focused; honor existing markers; do not invent live/destructive runs beyond project norms)
 2. `pyright-strict`
 3. `mypy`
-4. AI soft-chain audits — run **inline** as READ_ONLY procedures (do not require a separate owner chat hop), scoped to the staged/product diff vs resolved `base=`:
-   - a) `/opsx-pyright-strict-coverage` semantics (changed production Python ⊆ strict include)
-   - b) `/opsx-external-call-coverage` semantics
+4. AI soft-chain audits — run **inline** as **report-only / READ_ONLY**
+   procedures (do not require a separate owner chat hop), scoped to the
+   staged/product diff vs resolved `base=`:
+   - a) `/opsx-pyright-strict-coverage` **SCAN** semantics only
+     (changed production Python ⊆ strict include) — **never** write `include[]`
+   - b) `/opsx-external-call-coverage` semantics (report only)
    - c) `/opsx-performance-review` when that command’s existing trigger applies; else record `NOT_APPLICABLE`
-   - d) `/opsx-antipattern-gate` SCAN semantics
+   - d) `/opsx-antipattern-gate` SCAN semantics (report only)
+
+Soft-chain FAIL / `MISSING_FROM_INCLUDE` / `HIT_EXCLUDE` → **COMMIT STOP**
+(same rules as other check FAIL). Do **not** apply coverage `GO` or edit
+`pyrightconfig*.json` from this command.
 
 If `base=` cannot be resolved → BLOCKED for AI steps → **COMMIT STOP** (do not commit; do not continue later groups).
 
@@ -561,3 +598,8 @@ alembic downgrade
 ```
 
 Never “keep going” on a rebase after `git commit`. Sequencer control belongs to the owner.
+
+Never heal-to-green: no `Write` / `StrReplace` on product, tests, migrations,
+or `pyrightconfig*.json` to clear a red check; no applying writer commands
+(`/opsx-fix-types`, `/opsx-pyright-strict-coverage GO`, etc.) from this command.
+On FAIL → **COMMIT STOP** + pasteable `NEXT_ACTION` only (see Content-edit ban).
