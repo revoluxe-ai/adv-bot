@@ -127,10 +127,10 @@ class ShopDataUpdater:
 
         adv_ids: list[int] = []
         async with sm(read_only=True) as session:
-            adv_settings = await self.get_adv_setting_by_wb_cabinet_active_filter(
-                session,
-                wb_cabinet_id=self.wb_cabinet.id,
-            )
+           adv_settings = await self.get_adv_setting_by_wb_cabinet(session,
+                                                                                      wb_cabinet_id=self.wb_cabinet.id,
+                                                                                      )
+
         for adv_setting in adv_settings:
             adv_ids.append(adv_setting.adv_id)
             search_id = adv_setting.search_adv_id
@@ -211,12 +211,13 @@ class ShopDataUpdater:
         logger.debug("Обновление карточек в базе завершено")
 
     @staticmethod
-    async def get_adv_setting_by_wb_cabinet_active_filter(
+    async def get_adv_setting_by_wb_cabinet(
         session: AsyncSession,
         *,
         wb_cabinet_id: int,
     ) -> Sequence[models.AdvSetting]:
         """Вернуть AdvSetting кабинета, у которых задан search_adv_id (колонка БД)."""
+
         stmt = (
             select(models.AdvSetting)
             .options(
@@ -227,11 +228,7 @@ class ShopDataUpdater:
                 )
             )
             .where(
-                models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                models.AdvSetting._search_adv_id.is_not(None),  # pyright: ignore[reportPrivateUsage]
-            )
-        )
-
+                models.AdvSetting.wb_cabinet_id == wb_cabinet_id,))
         result = await session.execute(stmt)
         adv_settings = result.unique().scalars().all()
         return adv_settings

@@ -1,4 +1,9 @@
-"""Live-PG тесты фильтра AdvSetting по wb_cabinet / bot_active в ShopDataUpdater.
+"""Live-PG тесты выборки AdvSetting по wb_cabinet_id в ShopDataUpdater.
+
+Accepted API после rebase: ``ShopDataUpdater.get_adv_setting_by_wb_cabinet``
+фильтрует только по ``wb_cabinet_id`` (без ``bot_active`` и без обязательного
+``_search_adv_id``). Caller ``update_advs_data`` сам опционально добавляет
+``search_adv_id`` при сборке списка adv_ids.
 
 Требуют ``destructive_local``: используют fixture ``async_session``.
 """
@@ -19,52 +24,44 @@ pytestmark = [
 ]
 
 
-async def test_get_adv_setting_by_wb_cabinet_active_filter(
+async def test_get_adv_setting_by_wb_cabinet_returns_all_cabinet_settings(
     async_session: AsyncSession,
 ):
-    """bot_active=True попадает в выборку get_adv_setting_by_wb_cabinet_active_filter."""
+    """Возвращает AdvSetting кабинета независимо от bot_active и _search_adv_id."""
     wb_cabinet = WBCabinetFactory.build()
+    other_cabinet = WBCabinetFactory.build()
 
-    adv_setting = AdvSettingFactory.build(
+    with_search = AdvSettingFactory.build(
         wb_cabinet=wb_cabinet,
-        bot_active=True,
-    )
-    try:
-        async_session.add(adv_setting)
-        await async_session.flush()
-        adv_settings: Sequence[AdvSetting] = (
-            await ShopDataUpdater.get_adv_setting_by_wb_cabinet_active_filter(
-                async_session,
-                wb_cabinet_id=wb_cabinet.id,
-            )
-        )
-        assert adv_settings
-
-    finally:
-        await async_session.rollback()
-
-
-async def test_get_adv_setting_by_wb_cabinet_active_filter_not_bot_active(
-    async_session: AsyncSession,
-):
-    """bot_active=False исключается при only_bot_active=True."""
-    wb_cabinet = WBCabinetFactory.build()
-
-    adv_setting = AdvSettingFactory.build(
-        wb_cabinet=wb_cabinet,
+        wb_cabinet_id=wb_cabinet.id,
         bot_active=False,
+        _search_adv_id=2,
+    )
+    without_search = AdvSettingFactory.build(
+        wb_cabinet=wb_cabinet,
+        wb_cabinet_id=wb_cabinet.id,
+        bot_active=True,
+        _search_adv_id=None,
+    )
+    other_setting = AdvSettingFactory.build(
+        wb_cabinet=other_cabinet,
+        wb_cabinet_id=other_cabinet.id,
+        bot_active=True,
+        _search_adv_id=3,
     )
     try:
-        async_session.add(adv_setting)
+        async_session.add_all([wb_cabinet, other_cabinet, with_search, without_search, other_setting])
         await async_session.flush()
+
         adv_settings: Sequence[AdvSetting] = (
-            await ShopDataUpdater.get_adv_setting_by_wb_cabinet_active_filter(
+            await ShopDataUpdater.get_adv_setting_by_wb_cabinet(
                 async_session,
                 wb_cabinet_id=wb_cabinet.id,
-                only_bot_active=True,
             )
         )
-        assert not adv_settings
-
+        result_ids = {adv.id for adv in adv_settings}
+        assert with_search.id in result_ids
+        assert without_search.id in result_ids
+        assert other_setting.id not in result_ids
     finally:
         await async_session.rollback()
