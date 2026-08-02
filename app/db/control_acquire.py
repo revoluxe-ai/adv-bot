@@ -25,7 +25,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -62,9 +62,10 @@ def _source_revision_set() -> list[str]:
     if not raw:
         # Default: singleton set of expected target (Expand-compatible acquire).
         return [_require("EXPECTED_TARGET_REVISION")]
-    data = json.loads(raw)
-    if not isinstance(data, list) or not data:
+    data_obj = json.loads(raw)
+    if not isinstance(data_obj, list) or not data_obj:
         raise ValueError("SOURCE_REVISION_SET must be a non-empty JSON array")
+    data = cast(list[object], data_obj)
     return [str(x) for x in data]
 
 
@@ -164,11 +165,12 @@ def _acquire(
                 "source_history_hash": source_history_hash,
             },
         ).mappings().one()
-        result = row["result"]
-        if isinstance(result, str):
-            result = json.loads(result)
-        if not isinstance(result, dict):
-            raise RuntimeError(f"unexpected acquire result type: {type(result)}")
+        result_obj = row["result"]
+        if isinstance(result_obj, str):
+            result_obj = json.loads(result_obj)
+        if not isinstance(result_obj, dict):
+            raise RuntimeError(f"unexpected acquire result type: {type(result_obj)}")
+        result = cast(dict[str, Any], result_obj)
         return result
 
 

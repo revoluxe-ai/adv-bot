@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from app.client_bot.admin_access import is_bot_admin
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -28,7 +28,7 @@ class UiModeService:
         """Return stored UI mode with admin-aware defaults."""
         stored_mode = await self.redis_client.get(get_ui_mode_redis_key(user_telegram_id))
         if stored_mode in {"free", "paid"}:
-            return stored_mode
+            return cast(UiMode, stored_mode)
         return "paid" if is_bot_admin(user_telegram_id) else "free"
 
     async def set_user_ui_mode(self, user_telegram_id: int, mode: UiMode) -> None:

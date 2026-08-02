@@ -12,6 +12,7 @@ import json
 import sys
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any, cast
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -52,7 +53,7 @@ def build_execution_manifest(
     python_version: str = "",
     alembic_version: str = "",
     sqlalchemy_version: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Строит versioned MIGRATION_EXECUTION_MANIFEST."""
     files: list[dict[str, str]] = []
     for path in sorted(VERSIONS_DIR.glob("*.py")):
@@ -75,7 +76,7 @@ def build_execution_manifest(
 
     cfg = Config(str(ALEMBIC_INI))
     script = ScriptDirectory.from_config(cfg)
-    revisions: list[dict] = []
+    revisions: list[dict[str, Any]] = []
     for rev in script.walk_revisions():
         revisions.append(
             {
@@ -86,8 +87,8 @@ def build_execution_manifest(
                 "file_sha256": _file_sha256(Path(rev.path)),
             }
         )
-    revisions.sort(key=lambda r: r["revision"])
-    return {
+    revisions.sort(key=lambda r: str(r["revision"]))
+    manifest: dict[str, Any] = {
         "manifest_format_version": 1,
         "release_image_digest": release_image_digest,
         "python_version": python_version,
@@ -97,6 +98,7 @@ def build_execution_manifest(
         "revisions": revisions,
         "target_bundle_hash": _hash_obj({"files": files, "revisions": revisions}),
     }
+    return manifest
 
 
 def _hash_obj(obj: object) -> str:
@@ -119,13 +121,13 @@ def ancestor_closure(revision_ids: Iterable[str]) -> set[str]:
         down = rev.down_revision
         if down is not None:
             if isinstance(down, (list, tuple, set)):
-                stack.extend(str(x) for x in down)
+                stack.extend(str(x) for x in cast(Iterable[object], down))
             else:
                 stack.append(str(down))
         depends = _revision_dependencies(rev)
         if depends:
             if isinstance(depends, (list, tuple, set)):
-                stack.extend(str(x) for x in depends)
+                stack.extend(str(x) for x in cast(Iterable[object], depends))
             else:
                 stack.append(str(depends))
     return seen
@@ -136,7 +138,7 @@ def source_history_hash(revision_ids: Iterable[str]) -> str:
     closure = sorted(ancestor_closure(revision_ids))
     cfg = Config(str(ALEMBIC_INI))
     script = ScriptDirectory.from_config(cfg)
-    items = []
+    items: list[dict[str, Any]] = []
     for rid in closure:
         rev = script.get_revision(rid)
         items.append(
@@ -147,7 +149,8 @@ def source_history_hash(revision_ids: Iterable[str]) -> str:
                 "file_sha256": _file_sha256(Path(rev.path)),
             }
         )
-    return _hash_obj({"manifest_format_version": 1, "closure": items})
+    payload: dict[str, Any] = {"manifest_format_version": 1, "closure": items}
+    return _hash_obj(payload)
 
 
 def main() -> int:

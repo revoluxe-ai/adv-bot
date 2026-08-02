@@ -13,6 +13,7 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
+from typing import cast
 
 from alembic import command
 from alembic.config import Config
@@ -69,14 +70,16 @@ def _parse_expected_current_sets() -> list[frozenset[str]]:
     raw = os.environ.get("EXPECTED_CURRENT_REVISION_SETS", "").strip()
     if not raw:
         raise RuntimeError("EXPECTED_CURRENT_REVISION_SETS JSON is required")
-    data = json.loads(raw)
-    if not isinstance(data, list) or not data:
+    data_obj = json.loads(raw)
+    if not isinstance(data_obj, list) or not data_obj:
         raise RuntimeError("EXPECTED_CURRENT_REVISION_SETS must be a non-empty list of sets")
+    data = cast(list[object], data_obj)
     sets: list[frozenset[str]] = []
     for item in data:
         if not isinstance(item, list) or not item:
             raise RuntimeError("each current revision set must be a non-empty list")
-        sets.append(frozenset(str(x) for x in item))
+        values = cast(list[object], item)
+        sets.append(frozenset(str(x) for x in values))
     return sets
 
 

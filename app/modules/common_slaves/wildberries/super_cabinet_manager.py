@@ -1,3 +1,5 @@
+"""Доступ к WB-кабинету: выбор валидных personal-токенов и deactivate при их отсутствии."""
+
 import logging
 import typing
 from dataclasses import dataclass
@@ -82,7 +84,7 @@ async def get_access_for_wb_cabinet(
         result_for_wb_tokens = await session.execute(stmt_for_wb_tokens)
         wb_tokens: typing.Sequence[WBToken] = result_for_wb_tokens.scalars().all()
 
-        valited_tokens = []
+        valited_tokens: list[WBToken] = []
         for token in wb_tokens:
             token.api_key = token.api_key.replace("\r", "").replace("\n", "").strip()
             if not token.check_valid():
@@ -105,14 +107,15 @@ async def get_access_for_wb_cabinet(
             )
             return access
 
-    if shop_id_for_deactivate is not None:
-        await deactivate_cabinet_atomic_with_user_trackers(
-            shop_id_for_deactivate,
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
-        raise ApiForbiddenError(
-            f"Нет валидных токенов для кабинета с shop_id {shop_id_for_deactivate}"
-        )
+    # После ветки без return shop_id_for_deactivate всегда задан (str).
+    deactivate_shop_id = shop_id_for_deactivate or shop_id
+    await deactivate_cabinet_atomic_with_user_trackers(
+        deactivate_shop_id,
+        notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+    )
+    raise ApiForbiddenError(
+        f"Нет валидных токенов для кабинета с shop_id {deactivate_shop_id}"
+    )
 
 
 async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:

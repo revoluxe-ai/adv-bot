@@ -26,7 +26,7 @@ async def toggle_ui_mode(
     redis_client: RedisClient | None = Provide["redis_client_wrapper"],
 ) -> None:
     """Toggle the admin-selected UI mode and rerender the shop menu."""
-    if callback_query.message is None or callback_query.from_user is None:
+    if callback_query.message is None:
         return
     user_telegram_id = callback_query.from_user.id
     chat_id = callback_query.message.chat.id
