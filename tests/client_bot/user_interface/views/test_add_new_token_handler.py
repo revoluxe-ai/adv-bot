@@ -136,9 +136,10 @@ class TestProcessAddNewToken:
             mock_validator = MagicMock()
             mock_result = MagicMock()
             mock_result.is_valid_jwt = True
+            mock_result.is_personal = True
             mock_result.is_read_only = False
             mock_result.is_expired = False
-            mock_result.can_be_used = True
+            mock_result.can_be_used_for_free = True
             mock_result.shop_id = shop_id
             mock_validator.validate = AsyncMock(return_value=mock_result)
             mock_validator_class.return_value = mock_validator
@@ -148,17 +149,20 @@ class TestProcessAddNewToken:
             ) as mock_sm:
                 mock_session = MagicMock()
 
+                # Handler uses Result.scalar_one_or_none() (not scalar()).
                 # First query - user found
                 mock_user_result = MagicMock()
-                mock_user_result.scalar.return_value = 1
+                mock_user_result.scalar_one_or_none.return_value = 1
 
                 mock_wb_user_cabinet = MagicMock(spec=WBUserCabinet)
                 mock_wb_user_cabinet.id = 1
                 mock_wb_user_cabinet.wb_cabinet = MagicMock(spec=WBCabinet)
                 mock_wb_user_cabinet.wb_cabinet.shop_id = shop_id
-                # Second query - cabinet found
+                # Second query - cabinet found (shop_id must match validation_result)
                 mock_cabinet_result = MagicMock()
-                mock_cabinet_result.scalar.return_value = mock_wb_user_cabinet
+                mock_cabinet_result.scalar_one_or_none.return_value = (
+                    mock_wb_user_cabinet
+                )
 
                 # Third query - existing token found for same user
                 mock_existing_token = MagicMock(spec=WBToken)
@@ -167,7 +171,7 @@ class TestProcessAddNewToken:
                 mock_existing_token.get_shop_id_from_token = MagicMock()
                 mock_existing_token.get_shop_id_from_token.return_value = shop_id
                 mock_token_result = MagicMock()
-                mock_token_result.scalar.return_value = mock_existing_token
+                mock_token_result.scalar_one_or_none.return_value = mock_existing_token
 
                 mock_session.execute = AsyncMock(
                     side_effect=[
