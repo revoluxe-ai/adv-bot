@@ -80,7 +80,13 @@
     "app/modules/sales_plan_settings/telegram/keyboards.py",
     "app/modules/shop_menu/message.py",
     "app/modules/token_permissions/dto.py",
-    "app/modules/token_permissions/validator.py"
+    "app/modules/token_permissions/validator.py",
+    "app/client_bot/global_router.py",
+    "app/client_bot/middlewars/__init__.py",
+    "app/client_bot/middlewars/phone_required.py",
+    "app/client_bot/user_interface/handlers/phone_collection.py",
+    "app/client_bot/user_interface/views/phone_request.py",
+    "app/utils/db/models.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",
