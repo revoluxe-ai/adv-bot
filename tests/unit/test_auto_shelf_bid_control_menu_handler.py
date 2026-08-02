@@ -30,8 +30,15 @@ BOT_ACTIVE_PAYWALL_MESSAGE = (
 
 @dataclass
 class FakeMessage:
+    """Двойник Telegram Message для unit-тестов callback/FSM хендлеров.
+
+    В callback-тестах обязательно патчить ``handler.Message`` на этот класс:
+    production ``_callback_message`` проверяет ``isinstance(..., Message)``.
+    """
+
     text: str
     answers: list[str] = field(default_factory=list)
+    edit_text: AsyncMock = field(default_factory=AsyncMock)
 
     async def answer(self, text: str, **_: object) -> None:
         self.answers.append(text)
@@ -99,6 +106,7 @@ def _view() -> AutoShelfBidControlViewDTO:
 async def test_send_main_screen_applies_refresh_before_build_view(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     calls: list[str] = []
     service = type("FakeService", (), {})()
     service.apply_main_bid_refresh_if_needed = AsyncMock(
@@ -141,6 +149,7 @@ async def test_send_main_screen_applies_refresh_before_build_view(
 async def test_menu_write_action_shows_paywall_when_bot_inactive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     callback_message = FakeMessage(text="main")
     callback = SimpleNamespace(
         message=callback_message,
@@ -227,6 +236,7 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Без покрытий — текст в чат; callback.answer не трогаем (есть middleware)."""
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     chat_message = FakeMessage(text="main")
     callback = AsyncMock()
     callback.message = chat_message
@@ -286,6 +296,7 @@ def test_auto_shelf_bid_control_action_normalization_accepts_compact_and_legacy_
 async def test_send_strategy_screen_uses_strategy_renderer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     service = type("FakeService", (), {})()
     service.build_view = AsyncMock(return_value=_view())
     callback_message = FakeMessage(text="settings")
@@ -315,8 +326,8 @@ async def test_send_strategy_screen_uses_strategy_renderer(
 async def test_strategy_switch_updates_strategy_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    callback_message = AsyncMock()
-    callback_message.text = "strategy"
+    monkeypatch.setattr(handler, "Message", FakeMessage)
+    callback_message = FakeMessage(text="strategy")
     callback = SimpleNamespace(
         message=callback_message,
         from_user=SimpleNamespace(id=1),
