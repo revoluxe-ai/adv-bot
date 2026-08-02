@@ -18,13 +18,15 @@ router = Router()
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_auto_cpm"))
 async def get_min_position(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
     """Enable bidder immediately or request only the missing CPM settings."""
+    if callback.message is None:
+        raise RuntimeError("callback.message is None")
     adv_original_id = callback_data.adv_original_id
-    await state.update_data(last_adv_original_id=adv_original_id)
+    _ = await state.update_data(last_adv_original_id=adv_original_id)
     async with sm(read_only=False) as session:
         result = await session.execute(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
@@ -47,8 +49,6 @@ async def get_min_position(
                 adv_original_id
             )
             return
-        if not callback.message:
-            raise RuntimeError("callback.message is None")
 
         await state.set_state(states.CPMSetting.waiting_for_max_cpm)
         await ui_messages.AutoCPMSettingGetMaxCPM(bot, chat_id)()
@@ -57,19 +57,21 @@ async def get_min_position(
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "off_auto_cpm"))
 async def off_auto_cpm(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
     """Disable bidder automation for the selected campaign."""
-    adv_original_id: int = callback_data.adv_original_id  # type: ignore
+    if callback.message is None:
+        raise RuntimeError("callback.message is None")
+    adv_original_id = callback_data.adv_original_id
     async with sm(read_only=False) as session:
         adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)  # pyright: ignore
+            select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv = adv.scalar()
         adv.bidder_active = False  # type: ignore[attr-defined]
         await session.commit()
         import app.client_bot.user_interface.views.messages as ui_messages
 
-        await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)  # pyright: ignore
+        await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)

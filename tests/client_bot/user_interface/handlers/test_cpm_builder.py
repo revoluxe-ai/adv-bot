@@ -15,7 +15,10 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSett
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater.modules.bidder.tg_bot_handlers import on_off_controller
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.asyncio,
+]
 
 
 class _MockSessionMaker:
@@ -121,6 +124,7 @@ def _button_texts(markup: object) -> list[str]:
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_set_auto_cpm_enables_immediately_when_settings_exist(
     async_session: AsyncSession,
 ) -> None:
@@ -150,6 +154,7 @@ async def test_set_auto_cpm_enables_immediately_when_settings_exist(
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_set_auto_cpm_requests_target_place_only_when_max_place_missing(
     async_session: AsyncSession,
 ) -> None:
@@ -200,6 +205,7 @@ async def test_set_auto_cpm_requests_target_place_only_when_max_place_missing(
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_set_auto_cpm_requests_max_cpm_only_when_it_is_missing(
     async_session: AsyncSession,
 ) -> None:
@@ -244,6 +250,7 @@ async def test_set_auto_cpm_requests_max_cpm_only_when_it_is_missing(
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_set_auto_cpm_requests_both_values_when_both_missing(
     async_session: AsyncSession,
 ) -> None:
@@ -299,6 +306,7 @@ async def test_set_auto_cpm_requests_both_values_when_both_missing(
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_change_target_position_updates_campaign_and_keywords_only(
     async_session: AsyncSession,
 ) -> None:
@@ -328,6 +336,7 @@ async def test_change_target_position_updates_campaign_and_keywords_only(
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_change_manual_max_cpm_does_not_touch_bot_active(
     async_session: AsyncSession,
 ) -> None:
