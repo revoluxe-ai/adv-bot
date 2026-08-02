@@ -368,6 +368,21 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
 
 
+## Bound confirmed card-ab-hold-mode (2026-07-30)
+
+Via `/opsx-bound-scope:GO` — no new deferred checklist rows (picker / anti-drain /
+mid-sync already parked 2026-07-28; skip_reappend).
+
+KEEP_MVP_BOUNDARY (owed now, handoff → `/opsx-update`):
+- Soft-only: freeze decide-class on stale, including epoch-managed setup FAIL→OFF
+  (close PBH-001 / ROOT-001 hole under §17); do not abort/reset epoch on stale alone;
+  PBH-005 apply-snapshot carve-out unchanged.
+- Soft-policy RU disclaimer at Enable and/or hold status (user monitors test;
+  wording must not say «ослабим защиту» if behavior is freeze-decide).
+- Pre-start hard|soft|self picker, anti-drain, mid-sync UX — remain out of DoD
+  until REENTER_CONFIRMED.
+
+
 Анализ материализации решения багов для обучения системы супер-классам ошибок
 Внедрить практики, риски
 
