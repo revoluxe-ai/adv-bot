@@ -100,6 +100,9 @@ if typing.TYPE_CHECKING:
         GetAdvV1BalanceResponse200,
     )
     from app.core.mp.wb.api.domain_managers.promotion import PromotionManager
+    from app.core.mp.wb.api.adapter.promotion_client.normquery_bids.command import (
+        SetNormqueryBidsCommandItem,
+    )
     from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
         UpdateBidsCommand,
     )
@@ -163,6 +166,14 @@ class WBModifier:
         ]
 
         await self._promotion_manager.set_cluster_bids(converted_bids)
+        return None
+
+    async def set_normquery_bids(
+        self,
+        bids: list["SetNormqueryBidsCommandItem"],
+    ) -> None:
+        """Set bids for specific search normquery clusters via existing promotion flow."""
+        await self._promotion_manager.set_cluster_bids(bids)
         return None
 
     async def update_auto_adv_cpm(
