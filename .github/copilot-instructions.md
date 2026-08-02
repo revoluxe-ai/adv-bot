@@ -51,7 +51,7 @@ poetry run pre-commit run --all-files
 poetry run pytest
 
 # Run specific test markers
-poetry run pytest -m unit
+poetry run pytest -m unit -n 8 --dist=worksteal
 poetry run pytest -m integration
 poetry run pytest -m asyncio
 
@@ -128,7 +128,7 @@ poetry run alembic downgrade -1
 
 ### Test Structure
 
-- Every test has exactly one type: **unit** or **integration**. Use `poetry run pytest -m unit` or `poetry run pytest -m integration` to run by type.
+- Every test has exactly one type: **unit** or **integration**. Full unit suite: `poetry run pytest -m unit -n 8 --dist=worksteal`; integration: `poetry run pytest -m integration`. Targeted path suites omit `-n`.
 - Type is set by path (`tests/unit/` → unit, `tests/integration/` → integration) or by explicit `@pytest.mark.unit` / `@pytest.mark.integration`; tests without either default to unit (see `conftest.py`).
 - Unit tests: isolated, mocks only (no real PostgreSQL/Redis/ClickHouse). Integration tests: use test DB/Redis/ClickHouse or multi-component flow.
 - Async tests are detected via `asyncio_mode = auto`. Slow tests use `@pytest.mark.slow`; combine with type if needed (e.g. `-m "integration and not slow"`).

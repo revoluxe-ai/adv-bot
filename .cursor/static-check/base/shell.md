@@ -5,7 +5,7 @@
 ```text
 pyright-strict
 mypy .
-poetry run pytest -m unit
+poetry run pytest -m unit -n 8 --dist=worksteal
 poetry run pytest
 ```
 
@@ -14,7 +14,7 @@ poetry run pytest
 ```bash
 bash .cursor/static-check/bin/run.sh -- pyright-strict
 bash .cursor/static-check/bin/run.sh -- mypy .
-bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit
+bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit -n 8 --dist=worksteal
 bash .cursor/static-check/bin/run.sh -- poetry run pytest
 ```
 
@@ -22,7 +22,7 @@ From repo root. Works in **Git Bash and WSL**.
 
 Runner resolves **absolute** `.venv/Scripts/*.exe` (or `.venv/bin/*`) and does **not** source `~/.bashrc` (avoids npm pyright/node).
 
-Packet `COMMAND`: human form (`pyright-strict`, `mypy .`, `poetry run pytest`, …).
+Packet `COMMAND`: human form (`pyright-strict`, `mypy .`, `poetry run pytest -m unit -n 8 --dist=worksteal`, `poetry run pytest`, …).
 
 Do **not** invoke `poetry run pytest .` — path `.` overrides `testpaths` and may
 collect `.tmp/**`.

@@ -39,12 +39,14 @@ Authority split (не дублировать полный policy в commands):
 6. `ruff` и `black` не являются обязательными gates, если задача явно не просит lint/format
 7. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
 8. На Windows PowerShell не используй bash-синтаксис: `||`, `&&`, `grep`, `sed`, `awk`, `true` как no-op
+9. Полный unit-набор (`-m unit` без path): `poetry run pytest -m unit -n 8 --dist=worksteal` (pytest-xdist). Targeted/path/`-k`/`--lf` — без `-n` по умолчанию (overhead воркеров).
+10. Collection node ids для xdist должны быть детерминированы (не генерировать parametrize id от `datetime.now()` / `time.time()` при collect).
 
 ## Targeted и adjacent coverage
 
-1. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза.
+1. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза (без xdist).
 2. Если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
-3. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через поиск call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.
+3. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через поиск call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>` (узкий path — без `-n`), а не только новый/targeted тест. Полный `-m unit` без path — с `-n 8 --dist=worksteal`.
 
 ## Failure matrix (fallback / retry / error-handling / state transitions)
 

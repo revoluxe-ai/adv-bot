@@ -339,11 +339,19 @@ One failed check ends the commit operation. No heal-to-green inside this command
 
 ### Infer related tests
 
-From staged production / test paths, infer related tests under `tests/` (same module/package, adjacent `test_*` files, explicit paired paths). Prefer Poetry:
+From staged production / test paths, infer related tests under `tests/` (same module/package, adjacent `test_*` files, explicit paired paths). Prefer Poetry.
+
+Path-focused related suites (default for commit gates — **no** xdist):
 
 ```bash
 poetry run pytest -m unit <related_unit_paths> -q
 poetry run pytest -m integration <related_integration_paths> -q
+```
+
+Only if a commit group explicitly needs the **full** unit marker suite (no path filter):
+
+```bash
+poetry run pytest -m unit -n 8 --dist=worksteal -q
 ```
 
 Use `bash .cursor/static-check/bin/run.sh -- pyright-strict` and
@@ -370,7 +378,7 @@ If staged production `.py` changed and no related tests can be inferred:
 When production/test Python is present:
 
 1. `pyright-strict` (path-scoped when the tool allows; else project `pyright-strict`)
-2. Related **unit** tests only (`pytest -m unit …`)
+2. Related **unit** tests only (`poetry run pytest -m unit <related_unit_paths> …` — path-focused, no `-n`)
 
 Do **not** run: mypy, integration tests, AI soft-chain.
 

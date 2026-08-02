@@ -1,15 +1,16 @@
 # pytest-unit — instructions
 
-From repo root:
+From repo root (full unit suite — pytest-xdist):
 
 ```bash
-bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit
+bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit -n 8 --dist=worksteal
 ```
 
-Packet COMMAND: `poetry run pytest -m unit`
+Packet COMMAND: `poetry run pytest -m unit -n 8 --dist=worksteal`
 
 If unavailable → STATUS=BLOCKED.
 Do not run pyright, mypy, or `pytest .`.
+Do not drop `-n` / `--dist` for this check (full suite).
 
 ## Parsing
 

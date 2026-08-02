@@ -41,7 +41,7 @@ Working team layout for this repo (keep it lean):
 
 ## Shell / env gate
 
-Canonical human cmds: `pyright-strict`, `mypy .`, `poetry run pytest -m unit`, `poetry run pytest .`.
+Canonical human cmds: `pyright-strict`, `mypy .`, `poetry run pytest -m unit -n 8 --dist=worksteal`, `poetry run pytest`.
 Workers **must** invoke via `bash .cursor/static-check/bin/run.sh -- ...` (see `base/shell.md`).
 Launch workers via Task `subagent_type` = registry `task_type` (`shell` primary).
 Optional `PREFLIGHT` token only; default off. Check runs must not edit infra to self-heal.
