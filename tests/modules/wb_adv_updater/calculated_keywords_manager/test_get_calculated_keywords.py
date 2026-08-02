@@ -50,6 +50,21 @@ from tests.factories.keyword_pipeline import (
 # ============================================================================
 
 
+@pytest.fixture(autouse=True)
+def _stub_plan_fact_reader_io(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Отключить Redis/CH I/O PlanFactReader в unit-сьюте этого модуля.
+
+    ``__get_calculated_keywords`` всегда вызывает ``PlanFactReader().get_latest_plan_fact``;
+    без стаба каждый тест ждёт timeout Redis/CH (~4s) и только потом падает в except.
+    Тесты с явным ``monkeypatch.setattr(... get_latest_plan_fact ...)`` переопределяют стаб.
+    """
+    monkeypatch.setattr(
+        ckm_module.PlanFactReader,
+        "get_latest_plan_fact",
+        AsyncMock(return_value=None),
+    )
+
+
 @pytest.fixture
 def complex_adv_mock():
     """Мок для ComplexAdv (для тестов с белым списком)."""
