@@ -19,6 +19,11 @@ architecture decisions belong here.
   - Scope: domain invariant — working-contour ClickHouse SQL MUST qualify
     database as `default_db.<object>` in query text; SQL-contract proof
     required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
+- [neo4j-not-in-runtime-config-di](neo4j-not-in-runtime-config-di/decision.md)
+  - Status: Accepted
+  - Scope: Neo4j MUST NOT be a mandatory part of runtime app config /
+    application DI; reintroduction requires an explicit change with real
+    driver/DI wiring (test `NEO4J_*` stubs are not the architecture).
 
 ## Change Requirements
 

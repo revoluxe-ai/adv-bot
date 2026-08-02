@@ -79,12 +79,11 @@ class TestTokenPermissionsValidator:
         assert result.error_message is None
         assert len(result.missing_required) == 0
 
-        # Check that API probes were successful for all except Statistics
+        # claims_plus_api probes all required rights, including Статистика
         assert result.permissions["Контент"].api_probe_success is True
         assert result.permissions["Аналитика"].api_probe_success is True
         assert result.permissions["Продвижение"].api_probe_success is True
-        # Statistics should not have API probe
-        assert result.permissions["Статистика"].api_probe_success is None
+        assert result.permissions["Статистика"].api_probe_success is True
 
     @pytest.mark.asyncio
     async def test_valid_token_claims_plus_api_mode_failure(self):
@@ -199,7 +198,11 @@ class TestTokenPermissionsValidator:
 
     @pytest.mark.asyncio
     async def test_read_only_token(self):
-        """Test validation with read-only token."""
+        """Read-only token remains usable for analytics registration path.
+
+        ``can_be_used`` no longer hard-fails on read-only (start UX warns after add).
+        ``error_message`` still surfaces the read-only notice for callers that check it.
+        """
         validator = TokenPermissionsValidator()
 
         # Mock WBToken to return read_only = True
@@ -218,7 +221,7 @@ class TestTokenPermissionsValidator:
 
         assert result.is_valid_jwt
         assert result.is_read_only
-        assert not result.can_be_used
+        assert result.can_be_used
         assert result.error_message == "Токен только для чтения"
 
     @pytest.mark.asyncio
@@ -421,14 +424,15 @@ class TestTokenPermissionsValidator:
         with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session) as mock_session_class:
             result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
 
-        # Verify session was created only once despite 3 API probes
+        # Verify session was created only once despite 4 API probes
         assert mock_session_class.call_count == 1
         # Verify session was closed exactly once
         assert mock_session.close.call_count == 1
-        # Verify all three probes succeeded
+        # Verify all required probes succeeded (including Статистика)
         assert result.permissions["Контент"].api_probe_success is True
         assert result.permissions["Аналитика"].api_probe_success is True
         assert result.permissions["Продвижение"].api_probe_success is True
+        assert result.permissions["Статистика"].api_probe_success is True
 
     def test_permission_status_is_available_with_api_probe(self):
         """Test PermissionStatus.is_available with API probe result."""

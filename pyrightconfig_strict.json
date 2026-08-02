@@ -64,8 +64,9 @@
     "app/modules/common_slaves/wildberries/models/models.py",
     "app/modules/shop_runner/service_manager/services/auto_reset_bid_service.py",
     "app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py",
-    "app/modules/common_slaves/wildberries/shops_data_updater.py"
-
+    "app/modules/common_slaves/wildberries/shops_data_updater.py",
+    "app/modules/shop_runner/service_manager/wb_shop_data_manager/single_run_decorator.py",
+    "app/modules/shop_runner/service_manager/wb_shop_data_manager/wb_shop_data_manager.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

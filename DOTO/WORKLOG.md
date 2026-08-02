@@ -413,3 +413,32 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   source: explore Architecture Decision Missing (2026-07-31)
   reason: out_of_current_mvp
   notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.
+
+## Deferred from change drop-unused-neo4j-config (2026-08-01)
+
+Raw notes from `/opsx-bound-scope:GO`. Not current change DoD. Return via `/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Зачистка docs/docker/monitoring Neo4j
+  source: openspec/changes/drop-unused-neo4j-config/proposal.md (Out of scope); design Non-Goals
+  reason: out_of_current_mvp
+  notes: FACT_SHEET, k8s/monitoring/NEO4J_*, dockers/neo4j — не блокируют AppConfig
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Удалить commented ML/graph Neo4j-код и entry scripts
+  source: proposal Out of scope; design Non-Goals
+  reason: oversized | out_of_current_mvp
+  notes: graph_vector_updater / hard_ml / run_update_cards_data_in_neo4j — уже не runtime
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Починить или удалить image_master2._neo4j методы
+  source: design Non-Goals
+  reason: out_of_current_mvp
+  notes: __init__ не создаёт _neo4j; не hot path shop-runner
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Cluster teardown live Neo4j (если ещё в cluster)
+  source: proposal Out of scope; explore Unconfirmed
+  reason: owner_park | infra
+  notes: отдельный infra GO; не часть appconfig change
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Прочие unit-кластеры после Neo4j (TG_TOKENS, shelf, calculated_keywords)
+  source: proposal Out of scope
+  reason: out_of_current_mvp
+  notes: отдельные triage; не смешивать с drop Neo4j config

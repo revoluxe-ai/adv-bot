@@ -5,6 +5,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 
 """DTO wrapper over AdvSetting for shop-runner control flows."""
 
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -61,14 +62,17 @@ class GetKeywordsProvider(Protocol):
 
     Реализация — ``fetch_calculated_keywords_from_redis``; при miss —
     ``ShopRunnerKeywordsCacheMissError``. Пересчёт из БД — ``fetch_keywords_from_database``.
+
+    Возврат ``Awaitable`` (не ``async def``/Coroutine): совместим с
+    обёртками вроде ``@single_run``, чей тип — ``Awaitable[list[...]]``.
     """
 
-    async def __call__(
+    def __call__(
         self,
         complex_adv: ComplexAdv,
         *,
         cache_only: bool = True,
-    ) -> list[CalculatedKeyword]: ...
+    ) -> Awaitable[list[CalculatedKeyword]]: ...
 
 
 @dataclass(frozen=True, slots=True)

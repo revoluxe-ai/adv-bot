@@ -110,7 +110,7 @@ async def test_change_adv_strategy_updates_only_started_and_enabled_campaigns() 
         "app.modules.shop_runner.service_manager.manager.CoroutinesManager._split_advs_by_stats_freshness",
         _mock_split_fresh,
     ):
-        await manager.change_adv_strategy.__wrapped__(manager)
+        await manager.change_adv_strategy.__wrapped__(manager, only_bot_active=True)
 
     manager._apply_strategy_updates.assert_awaited_once_with(
         [(1, 101, Strategy.MIN_CPO, Strategy.MAX_CONV, "test_change")]

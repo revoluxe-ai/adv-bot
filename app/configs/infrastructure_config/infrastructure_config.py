@@ -1,10 +1,15 @@
+"""Инфраструктурные настройки приложения (активные runtime-зависимости).
+
+Neo4j убран из обязательного surface — см. decision
+``neo4j-not-in-runtime-config-di`` / change ``drop-unused-neo4j-config``.
+"""
+
 __all__ = ["InfrastructureConfig"]
 
 from functools import partial
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-from .neo4j_config import Neo4jConfig
 from .redis_config import RedisConfig
 from .wb_config import WBConfig
 
@@ -12,7 +17,6 @@ from .wb_config import WBConfig
 class InfrastructureConfig(BaseSettings):
     """Конфигурация инфраструктуры - централизованное место для всех внешних сервисов"""
 
-    neo4j: Neo4jConfig = Field(default_factory=partial(Neo4jConfig))
     redis: RedisConfig = Field(default_factory=partial(RedisConfig))
     wb: WBConfig = Field(default_factory=lambda: WBConfig())
 

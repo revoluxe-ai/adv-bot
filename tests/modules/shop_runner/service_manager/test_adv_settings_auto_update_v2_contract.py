@@ -118,7 +118,7 @@ async def test_adv_settings_auto_update_returns_early_when_auto_setting_disabled
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
     manager._redis_stats_freshness_cache.mget_entries.assert_not_called()
@@ -152,7 +152,7 @@ async def test_adv_settings_auto_update_skips_when_no_complex_advs(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -191,7 +191,7 @@ async def test_adv_settings_auto_update_filters_bot_inactive(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -232,7 +232,7 @@ async def test_adv_settings_auto_update_filters_when_part_auto_setting_inactive(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -272,7 +272,7 @@ async def test_adv_settings_auto_update_filters_when_search_adv_not_started(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -314,7 +314,7 @@ async def test_adv_settings_auto_update_stats_freshness_hit_miss_fail_open(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
     assert run_tasks_mock.call_args.kwargs["return_exceptions"] is False
@@ -356,7 +356,7 @@ async def test_adv_settings_auto_update_stats_freshness_invalid_payload_fail_ope
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
 
@@ -403,7 +403,7 @@ async def test_adv_settings_auto_update_stats_freshness_stale_over_6h_skips_adv(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -450,7 +450,7 @@ async def test_adv_settings_auto_update_stats_freshness_stale_skips_adv(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -511,7 +511,7 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
     kwargs = run_tasks_mock.call_args.kwargs
@@ -573,7 +573,7 @@ async def test_adv_settings_auto_update_migrates_v1_to_v2_before_dispatch(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     assert adv.auto_updater_version == 2
     session.execute.assert_awaited_once()

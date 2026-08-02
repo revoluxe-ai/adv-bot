@@ -330,12 +330,30 @@ class TestSchedulerGlobalFunctions:
 
     @pytest.mark.asyncio
     async def test_get_token_monitoring_scheduler_singleton(self):
-        """Test that get_token_monitoring_scheduler returns singleton."""
-        scheduler1 = get_token_monitoring_scheduler()
-        scheduler2 = get_token_monitoring_scheduler()
+        """Singleton factory returns one TokenMonitoringScheduler without TG env.
 
-        assert scheduler1 is scheduler2
-        assert isinstance(scheduler1, TokenMonitoringScheduler)
+        Bare construction pulls NotificationManager → get_notification_sender →
+        settings.TG_TOKENS_FOR_SENDING. Patch the sender seam so the test does
+        not require developer TG_TOKENS_FOR_SENDING while still exercising the
+        real get_token_monitoring_scheduler singleton path.
+        """
+        import app.modules.token_monitoring.scheduler as scheduler_mod
+        from app.client_bot.notification_sender import reset_notification_sender
+
+        scheduler_mod._scheduler_instance = None
+        try:
+            with patch(
+                "app.modules.token_monitoring.services.notification_manager.get_notification_sender",
+                return_value=MagicMock(name="notification_sender"),
+            ):
+                scheduler1 = get_token_monitoring_scheduler()
+                scheduler2 = get_token_monitoring_scheduler()
+
+            assert scheduler1 is scheduler2
+            assert isinstance(scheduler1, TokenMonitoringScheduler)
+        finally:
+            scheduler_mod._scheduler_instance = None
+            reset_notification_sender()
 
     @pytest.mark.asyncio
     async def test_start_token_monitoring_scheduler(self):

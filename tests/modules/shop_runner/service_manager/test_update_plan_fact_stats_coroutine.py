@@ -65,7 +65,7 @@ async def test_update_plan_fact_stats_success_with_full_data(
         ),
     ):
         # Используем __wrapped__ для обхода декоратора
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
 
     # Проверяем, что process_and_save был вызван с правильными аргументами
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
@@ -101,7 +101,7 @@ async def test_update_plan_fact_stats_empty_advs_list(access_mock, fake_redis):
             return_value=mock_plan_fact_manager,
         ),
     ):
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
 
     # Проверяем, что process_and_save не был вызван (early return в корутине)
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_not_called()
@@ -133,7 +133,7 @@ async def test_update_plan_fact_stats_calls_process_and_save(access_mock, fake_r
             return_value=mock_plan_fact_manager,
         ),
     ):
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
 
     # Проверяем, что process_and_save был вызван с правильными аргументами
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
@@ -175,7 +175,7 @@ async def test_update_plan_fact_stats_multiple_advs(access_mock, fake_redis):
             return_value=mock_plan_fact_manager,
         ),
     ):
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
 
     # Проверяем, что process_and_save был вызван с правильными аргументами
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()
@@ -216,7 +216,7 @@ async def test_update_plan_fact_stats_uses_wrapped(access_mock, fake_redis):
         ),
     ):
         # Используем __wrapped__ для обхода декоратора while_coroutine_decorator
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
 
     # Проверяем, что метод был вызван
     mock_plan_fact_manager.process_and_save_pre_complex_advs.assert_called_once()

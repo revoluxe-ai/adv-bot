@@ -77,13 +77,21 @@ class WBShopDataManager:
     @single_run()
     async def __get_calculated_keywords(
         self,
-        complex_adv: ComplexAdv
+        complex_adv: ComplexAdv,
+        *,
+        cache_only: bool = True,
     ) -> list[CalculatedKeyword]:
         """Только Redis ``calculated_keywords:{adv_id}`` (прогрев — snapshot updater).
+
+        Args:
+            complex_adv: комплекс, для которого читаются keywords.
+            cache_only: keyword-only параметр ``GetKeywordsProvider``;
+                отклонение ``False`` — в ``ComplexAdv.get_keywords``.
 
         Raises:
             ShopRunnerKeywordsCacheMissError: hash отсутствует.
         """
+        _ = cache_only  # Protocol GetKeywordsProvider; guard — ComplexAdv.get_keywords
         from app.modules.shop_runner.required_data_miss import (
             fetch_calculated_keywords_from_redis,
         )

@@ -222,7 +222,7 @@ async def test_full_cycle_plan_fact_stats(
             )
         )
         # Используем __wrapped__ для обхода декоратора
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем, что данные записались в ClickHouse
         result = await clickhouse_client.query(
@@ -315,7 +315,7 @@ async def test_full_cycle_with_real_complex_adv(
                 return_value=fact,
             )
         )
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем, что данные записались с правильным adv_id из complex_adv
         result = await clickhouse_client.query(
@@ -384,7 +384,7 @@ async def test_full_cycle_error_handling_for_some_advs(
             )
         )
         with pytest.raises(Exception, match="Fact data error"):
-            await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+            await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
 
 
 @pytest.mark.integration
@@ -452,7 +452,7 @@ async def test_full_cycle_multiple_advs_simultaneously(
                 new=AsyncMock(side_effect=facts),
             )
         )
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем, что все три кампании записались
         result = await clickhouse_client.query(
@@ -518,7 +518,7 @@ async def test_full_cycle_data_correctness_in_clickhouse(
                 return_value=fact,
             )
         )
-        await manager.update_plan_fact_stats.__wrapped__(manager)  # noqa
+        await manager.update_plan_fact_stats.__wrapped__(manager, only_bot_active=False)  # noqa
     async with anti_ch_crash_semaphore:
         # Проверяем все поля на корректность
         result = await clickhouse_client.query(

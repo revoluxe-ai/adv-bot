@@ -167,7 +167,7 @@ async def test_adv_settings_auto_update(
         # decorator while_coroutine_decorator запускает корутину в бесконечном цикле,
         # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
         # чтобы выполнить её один раз и не зависнуть.
-        await manager.adv_settings_auto_update.__wrapped__(manager) # noqa
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)  # noqa
 
 
 @pytest.mark.integration

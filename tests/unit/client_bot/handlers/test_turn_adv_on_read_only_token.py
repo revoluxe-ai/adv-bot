@@ -122,24 +122,24 @@ async def test_turn_adv_on_blocks_read_only_token_activation() -> None:
     )
 
     with (
-        patch("app.client_bot.user_interface.handlers.adv_setting.sm", _MockSessionMaker(session)),
+        patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm", _MockSessionMaker(session)),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.TokenInfoService",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.TokenInfoService",
             MagicMock(return_value=token_service),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
             AsyncMock(return_value=(1000, 0)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.pricer.get_price_for_day_for_shop",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
             AsyncMock(return_value=100),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.pricer.get_tariff_for_day",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
             MagicMock(return_value=100),
         ),
-        patch("app.client_bot.user_interface.handlers.adv_setting.ShopMenu", shop_menu_ctor),
+        patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu", shop_menu_ctor),
     ):
         await turn_adv_on(callback, state, callback_data, bot)
 
@@ -168,25 +168,25 @@ async def test_turn_adv_on_keeps_paid_enable_path_for_normal_token() -> None:
     adv_menu_ctor = MagicMock(return_value=adv_menu_call)
 
     with (
-        patch("app.client_bot.user_interface.handlers.adv_setting.sm", _MockSessionMaker(session)),
+        patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm", _MockSessionMaker(session)),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.TokenInfoService",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.TokenInfoService",
             MagicMock(return_value=token_service),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
             AsyncMock(return_value=(1000, 0)),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.pricer.get_price_for_day_for_shop",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
             AsyncMock(return_value=100),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.pricer.get_tariff_for_day",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
             MagicMock(return_value=100),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
             adv_menu_ctor,
         ),
     ):

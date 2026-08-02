@@ -93,7 +93,7 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
             plan_fact_reader=plan_fact_reader,
             wb_manager_hub=fake_wb_manager_hub,
         )
-        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
+        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager, only_bot_active=True)
 
     auto_budget_service_instance.ensure_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_budget.call_args[0]
@@ -172,7 +172,7 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
             plan_fact_reader=plan_fact_reader,
             wb_manager_hub=fake_wb_manager_hub,
         )
-        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
+        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager, only_bot_active=True)
 
     auto_budget_service_instance.ensure_common_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_common_budget.call_args[0]
@@ -247,7 +247,7 @@ async def test_auto_budget_watchdog_runs_active_control_without_budget_handlers(
             plan_fact_reader=plan_fact_reader,
             wb_manager_hub=fake_wb_manager_hub,
         )
-        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager)
+        await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager, only_bot_active=True)
 
     auto_budget_service_instance.ensure_budget.assert_not_called()
     auto_budget_service_instance.ensure_common_budget.assert_not_called()
