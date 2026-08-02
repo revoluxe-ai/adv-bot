@@ -366,3 +366,6 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   reason: oversized | owner_park
   notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
 
+
+Анализ материализации решения багов для обучения системы супер-классам ошибок
+Внедрить практики, риски
