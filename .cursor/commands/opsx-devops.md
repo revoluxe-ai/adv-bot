@@ -123,8 +123,10 @@ Rules:
    `OPS_STATE.md` + `LAST.json` in the same turn (no secrets/DSN/passwords).
 5. Durable memory that must survive sessions = committed OPS_STATE / LAST.json /
    runbook / devops.mdc — never chat history, never `.tmp` alone.
-6. After process-file updates: `NEXT_ACTION` → `/opsx-admin-command-commit`
-   (not `/opsx-commit`).
+6. Commit ownership after updates:
+   - `.cursor/devops/**` (OPS_STATE / LAST.json) + `.cursor/commands/opsx-devops.md`
+     + `.cursor/rules/devops.mdc` → `/opsx-admin-command-commit` (not `/opsx-commit`);
+   - `DEVOPS_DB_MIGRATIONS.md` (ordinary project docs) → `/opsx-commit`.
 
 ## Modes
 

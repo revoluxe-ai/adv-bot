@@ -50,6 +50,7 @@ Only these paths may be staged/committed by this command:
 .cursor/static-check/**
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
+.cursor/devops/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -68,6 +69,8 @@ contracts, check packs, registry, base prompts/rules, **and** agent runner
 scripts (e.g. `bin/run.sh`).
 Antipattern-gate companions under `.cursor/antipattern-gate/` (catalog,
 `PRACTICE_LEDGER.jsonl`, README) are in scope with `/opsx-antipattern-gate`.
+Durable DevOps ops memory under `.cursor/devops/**` (`OPS_STATE.md`,
+`LAST.json`, …) is in scope with `/opsx-devops` (never secrets/DSN values).
 All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
