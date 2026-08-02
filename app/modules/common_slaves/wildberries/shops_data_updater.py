@@ -217,7 +217,6 @@ class ShopDataUpdater:
         wb_cabinet_id: int,
     ) -> Sequence[models.AdvSetting]:
         """Вернуть AdvSetting кабинета, у которых задан search_adv_id (колонка БД)."""
-
         stmt = (
             select(models.AdvSetting)
             .options(
@@ -226,6 +225,9 @@ class ShopDataUpdater:
                     models.AdvSetting.adv_id,
                     models.AdvSetting._search_adv_id,  # pyright: ignore[reportPrivateUsage]
                 )
+            ).where(
+                models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
+
             )
             .where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,))
