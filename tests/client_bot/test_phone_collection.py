@@ -277,7 +277,7 @@ async def test_save_user_phone_replays_pending_callback() -> None:
     ) as mock_sleep:
         await save_user_phone(message, bot, state, dispatcher)
 
-    mock_sleep.assert_awaited_once_with(0.7)
+    mock_sleep.assert_awaited_once_with(0.3)
     dispatcher.feed_update.assert_awaited_once()
     _, replay_kwargs = dispatcher.feed_update.call_args
     replay_update = replay_kwargs["update"] if "update" in replay_kwargs else dispatcher.feed_update.call_args.args[1]
