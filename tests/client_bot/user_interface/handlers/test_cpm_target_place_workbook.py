@@ -25,7 +25,10 @@ from app.client_bot.user_interface.services.cpm_target_place_workbook import (
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.asyncio,
+]
 
 
 class _MockSessionMaker:
@@ -139,6 +142,7 @@ async def _fetch_keyword_places(session: AsyncSession, adv_id: int) -> dict[str,
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_export_workbook_uses_current_campaign_keywords_and_skips_non_relevant(
     async_session: AsyncSession,
 ) -> None:
@@ -168,6 +172,7 @@ async def test_export_workbook_uses_current_campaign_keywords_and_skips_non_rele
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_import_workbook_updates_only_valid_rows_and_keeps_adv_flags(
     async_session: AsyncSession,
 ) -> None:
