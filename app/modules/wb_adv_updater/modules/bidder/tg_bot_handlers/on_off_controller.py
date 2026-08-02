@@ -36,6 +36,7 @@ async def get_min_position(
         has_max_cpm = adv.max_cpm is not None and adv.max_cpm > 0
 
         import app.client_bot.user_interface.views.messages as ui_messages
+
         chat_id = callback.message.chat.id
         if has_max_place and has_max_cpm:
             adv.bidder_active = True
@@ -49,7 +50,6 @@ async def get_min_position(
                 adv_original_id
             )
             return
-
         await state.set_state(states.CPMSetting.waiting_for_max_cpm)
         await ui_messages.AutoCPMSettingGetMaxCPM(bot, chat_id)()
 
