@@ -156,11 +156,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._v3_last_action_str: str | None = None
         self._ui_access: UiAccessMode = UiAccessMode.FREE
-        self._ui_access_resolver: UiAccessResolver | None = None
-        if isinstance(redis_client, RedisClient):
-            self._ui_access_resolver = UiAccessResolver(
-                UiModeService(redis_client=redis_client)
-            )
+        self._ui_access_resolver = UiAccessResolver(
+            UiModeService(redis_client=redis_client)
+        )
 
 
     @staticmethod
@@ -378,8 +376,6 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
     async def _resolve_ui_access(self) -> UiAccessMode:
         """Resolve effective freemium access for campaign menu rendering."""
-        if self._ui_access_resolver is None:
-            return UiAccessMode.PAID if self.adv.bot_active else UiAccessMode.FREE
         return await self._ui_access_resolver.resolve_adv_ui_access(
             int(self.chat_id), self.adv
         )
