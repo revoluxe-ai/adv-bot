@@ -328,7 +328,7 @@ async def process_cabinet_api(
         await state.set_state(states.CabinetRegistration.api)
         return None
 
-    if not validation_result.can_be_used:
+    if not validation_result.can_be_used_for_free:
         missing_str = ", ".join(sorted(validation_result.missing_required))
         logger.info(
             "Token missing required permissions for user %s: %s",
@@ -609,7 +609,7 @@ async def process_add_new_token(
         await state.set_state(states.AddNewToken.token)
         return None
 
-    if not validation_result.can_be_used:
+    if not validation_result.can_be_used_for_free:
         missing_str = ", ".join(sorted(validation_result.missing_required))
         logger.info(
             "Token missing required permissions for user %s: %s",

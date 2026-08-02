@@ -443,7 +443,7 @@ class CoroutinesManager:
         )
 
     @while_coroutine_decorator(60 * 5, 5)
-    async def update_common_sale_stat(self, only_bot_active: bool) -> None:
+    async def update_common_sale_stat(self, only_bot_active: bool = False) -> None:
         # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N РК)
         advs = await self._wb_shop_data_manager.get_complex_advs(
             only_bot_active=only_bot_active,
@@ -479,11 +479,11 @@ class CoroutinesManager:
         for stat in stats:
             await data_manager.set_last_full_stat_update(stat.advertId, date_time)
 
-    async def update_full_adv_stat(self, only_bot_active: bool) -> None:
+    async def update_full_adv_stat(self, only_bot_active: bool = False) -> None:
         return await self._update_full_adv_stat(only_bot_active)
 
     @while_coroutine_decorator(5 * 60, 1)
-    async def _update_full_adv_stat(self,  only_bot_active: bool) -> None:
+    async def _update_full_adv_stat(self,  only_bot_active: bool = False) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
             only_bot_active=only_bot_active,
@@ -532,7 +532,7 @@ class CoroutinesManager:
         logger.debug("Обновление карточек завершено")
 
     @while_coroutine_decorator(5 * 60)
-    async def adv_settings_auto_update(self, only_bot_active: bool) -> None:
+    async def adv_settings_auto_update(self, only_bot_active: bool = False) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
@@ -660,7 +660,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60, 1)
-    async def update_top_key_in_advs(self, only_bot_active: bool) -> None:
+    async def update_top_key_in_advs(self, only_bot_active: bool = False) -> None:
         from .old_modules.setting_auto_updater.modules.first_key_updater import (
             FirstKeyUpdaterError,
             FirstKeyUpdater,
@@ -869,7 +869,6 @@ class CoroutinesManager:
             filter_structural_act_candidates,
         )
         from .services.minus_phrase_manager import MinusPhraseManagerContainer
-
         wb_manager_hub = self._wb_manager_hub
         container = MinusPhraseManagerContainer(_wb_api_manager_hub=wb_manager_hub)
         minus_phrase_manager = container.minus_phrase_manager()
@@ -909,7 +908,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60, 60)
-    async def auto_budget_watchdog(self, only_bot_active: bool) -> None:
+    async def auto_budget_watchdog(self, only_bot_active: bool = False) -> None:
         """Сначала автопополнение бюджетов (если есть кандидаты), затем запуск/пауза РК.
 
         Раньше `auto_adv_active_control` крутился отдельной задачей с тем же интервалом,
@@ -1094,7 +1093,7 @@ class CoroutinesManager:
             )
 
     @while_coroutine_decorator(5 * 60, 60)
-    async def update_clusters_adv_stats_today(self, only_bot_active: bool) -> None:
+    async def update_clusters_adv_stats_today(self, only_bot_active: bool = False) -> None:
         """Обновление статистики кластеров за сегодня."""
 
         diag_enabled = _cluster_stats_diagnostic_enabled()
@@ -1184,7 +1183,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
-    async def update_clusters_adv_stats_history(self, only_bot_active: bool) -> None:
+    async def update_clusters_adv_stats_history(self, only_bot_active: bool = False) -> None:
         """Обновление статистики кластеров за прошлые дни."""
         wb_manager_hub = self._wb_manager_hub
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
@@ -1196,7 +1195,7 @@ class CoroutinesManager:
         await updater.update_past_days_stats(complex_advs, for_last_days=365)
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def update_cluster_bids(self, only_bot_active: bool) -> None:
+    async def update_cluster_bids(self, only_bot_active: bool = False) -> None:
         if not settings.AUTO_SETTING_ACTIVE:
             return None
         from .services.update_cluster_bids_manager.di import ClusterBidsManagerContainer
@@ -1259,7 +1258,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def cache_current_cluster_bids(self, only_bot_active: bool) -> None:
+    async def cache_current_cluster_bids(self, only_bot_active: bool = False) -> None:
         # TODO: Очень долго работает, надо оптимизировать
         """Fetch current normquery bids from WB API and warm Redis for cluster bid reads."""
         if not settings.AUTO_SETTING_ACTIVE:
@@ -1302,7 +1301,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 60, 60)
-    async def preload_min_bids_cache_miss(self, only_bot_active: bool) -> None:
+    async def preload_min_bids_cache_miss(self, only_bot_active: bool = False) -> None:
         """Приоритетная догрузка cache miss по min bids; на время запроса блокирует old-ветку через Event.
 
         До завершения догрузки ``read_min_bids_cache_only`` может писать WARNING
@@ -1366,7 +1365,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 60 * 12, 60)
-    async def preload_min_bids_cache_old(self, only_bot_active: bool) -> None:
+    async def preload_min_bids_cache_old(self, only_bot_active: bool = False) -> None:
         """Фоновое обновление уже закэшированных min bids; ждёт Event, пока идёт miss-догрузка."""
         if not settings.AUTO_SETTING_ACTIVE:
             return None
@@ -1407,7 +1406,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def handle_stats_stale_emergency(self, only_bot_active: bool) -> None:
+    async def handle_stats_stale_emergency(self, only_bot_active: bool = False) -> None:
         """Emergency mode: stale stats over 6 hours => keep one top key and min bid."""
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
@@ -1586,8 +1585,8 @@ class CoroutinesManager:
 
 
     @while_coroutine_decorator(5 * 60, 60)
-    async def update_plan_fact_stats(self, only_bot_active: bool) -> None:
-        """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут."""
+    async def update_plan_fact_stats(self, only_bot_active: bool = False) -> None:
+        """Циклическая корутина для записи данных план-факта в ClickHouse каждые 5 минут"""
         # TODO: Перенести запись данных в CH в единый пайплайн под updater.py для единнобразия
         from .services.plan_fact_controller.plan_fact_manager import PlanFactManager
         pre_advs: list[PreComplexAdv] = (
@@ -1651,7 +1650,7 @@ class CoroutinesManager:
 
 
     @while_coroutine_decorator(60 * 60 * 4, 60)
-    async def auto_reset_bid_for_auto_adv(self, only_bot_active: bool) -> None:
+    async def auto_reset_bid_for_auto_adv(self, only_bot_active: bool = False) -> None:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
             only_bot_active=only_bot_active,
@@ -1761,7 +1760,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def increment_fact_data_stats(self, only_bot_active: bool) -> None:
+    async def increment_fact_data_stats(self, only_bot_active: bool = False) -> None:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
             only_bot_active=only_bot_active,
@@ -1796,7 +1795,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def auto_shelf_bid_increment_stats(self, only_bot_active: bool) -> None:
+    async def auto_shelf_bid_increment_stats(self, only_bot_active: bool = False) -> None:
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
             only_bot_active=only_bot_active,
@@ -1829,7 +1828,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def auto_shelf_bid_control(self, only_bot_active: bool) -> None:
+    async def auto_shelf_bid_control(self, only_bot_active: bool = False) -> None:
         """Цикл управления общей ставкой полок для single-nmid Auto-РК."""
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
@@ -1867,7 +1866,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60, 60)
-    async def white_list_tail_trimmer(self, only_bot_active: bool) -> None:
+    async def white_list_tail_trimmer(self, only_bot_active: bool = False) -> None:
         """Срез хвоста БС для v2. V3 (``automatic_version == 3``): M1/trim в ``process_adv_v3``."""
         complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
@@ -1919,7 +1918,7 @@ class CoroutinesManager:
 
 
     @while_coroutine_decorator(5 * 60, 60)
-    async def update_individual_keyword_target_places(self, only_bot_active: bool) -> None:
+    async def update_individual_keyword_target_places(self, only_bot_active: bool = False) -> None:
         from .services.keywords_target_place_updater import KeywordTargetPlaceUpdater
         from app.modules.predict_keywords_target_place import (build_predict_keywords_target_place,
                                                                PredictKeywordsTargetPlace)
@@ -1977,7 +1976,7 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60, 1)
-    async def change_adv_strategy(self, only_bot_active: bool) -> None:
+    async def change_adv_strategy(self, only_bot_active: bool = False) -> None:
         """Периодически выставляет ``AdvSetting.strategy`` (MIN_CPO / MAX_CONV).
 
         ``load_extras=True`` — обогащение ``traffic_clicks_dto`` для сравнения орг/пол.
