@@ -55,6 +55,7 @@ class User(BaseTable):
         BIGINT, nullable=True, unique=True
     )
     username: Mapped[str] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
     # Web registration (phase 1: nullable; phase 2 may tighten to NOT NULL/UNIQUE)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -96,8 +97,6 @@ class User(BaseTable):
 class UserBalancePayment(BaseTable):
     """Запись о пополнении/списании личного баланса пользователя."""
 
-    __tablename__ = "userbalancepayment"
-
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id"), nullable=False
     )
@@ -120,8 +119,6 @@ class UserBalancePayment(BaseTable):
 
 class UserBonusPayment(BaseTable):
     """Запись о начислении/списании бонусов пользователя."""
-
-    __tablename__ = "userbonuspayment"
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id"), nullable=False
