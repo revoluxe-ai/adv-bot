@@ -1,3 +1,10 @@
+"""Хендлеры start / shop menu: регистрация, выбор магазина, mass-ops.
+
+``_get_wb_user_cabinet_for_shop_menu`` eager-load'ит ``user`` вместе с
+``wb_cabinet``, чтобы restore главной клавиатуры после mass-ops не
+упирался в lazy-load вне DB-сессии.
+"""
+
 import asyncio
 import logging
 from collections.abc import Sequence
@@ -16,6 +23,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.client_bot import const
 from app.client_bot.admin_access import is_bot_admin, use_minimal_presentation_ui
+from app.client_bot.ui_access import UiAccessMode
 from app.client_bot.utils import create_user
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
@@ -927,10 +935,25 @@ async def shop_menu_process(
 async def _get_wb_user_cabinet_for_shop_menu(
     wb_user_cabinet_original_id: int,
 ) -> WBUserCabinet | None:
+    """Загрузить WBUserCabinet для сборки shop-menu keyboard.
+
+    Вместе с ``wb_cabinet`` eager-load'ит ``user``, чтобы
+    ``build_shop_main_keyboard`` / ``close_shop_mass_adv_ops_menu``
+    не делали lazy-load ``user`` вне живой DB-сессии.
+
+    Args:
+        wb_user_cabinet_original_id: PK ``WBUserCabinet``.
+
+    Returns:
+        Кабинет с загруженными ``wb_cabinet`` и ``user``, либо ``None``.
+    """
     async with sm(read_only=True) as session:
         stmt = (
             select(WBUserCabinet)
-            .options(joinedload(WBUserCabinet.wb_cabinet))
+            .options(
+                joinedload(WBUserCabinet.wb_cabinet),
+                joinedload(WBUserCabinet.user),
+            )
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
         result = await session.execute(stmt)
@@ -965,6 +988,12 @@ async def close_shop_mass_adv_ops_menu(
     callback: types.CallbackQuery,
     callback_data: callbacks.ShopMassAdvOpsBack,
 ) -> None:
+    """Вернуть главную клавиатуру магазина после меню массовых операций.
+
+    Подменю массовых операций доступно только в PAID UI, поэтому restore
+    использует ``UiAccessMode.PAID``, чтобы кнопка «Массовые операции с РК»
+    снова появилась на главной клавиатуре.
+    """
     if callback.message is None:
         return
     message = cast(types.Message, callback.message)
@@ -979,6 +1008,7 @@ async def close_shop_mass_adv_ops_menu(
         reply_markup=build_shop_main_keyboard(
             wb_user_cabinet,
             wb_user_cabinet.wb_cabinet,
+            ui_access=UiAccessMode.PAID,
         )
     )
 

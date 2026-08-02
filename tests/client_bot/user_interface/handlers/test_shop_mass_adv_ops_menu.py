@@ -47,7 +47,13 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
         wb_user_cabinet_original_id=wb_user_cabinet_id
     )
     wb_cabinet = SimpleNamespace(id=7, active=True)
-    wb_user_cabinet = SimpleNamespace(id=wb_user_cabinet_id, wb_cabinet=wb_cabinet)
+    # non-admin user: admin UI-mode toggle must not appear; .user must be present
+    # so close → build_shop_main_keyboard matches production eager-loaded shape.
+    wb_user_cabinet = SimpleNamespace(
+        id=wb_user_cabinet_id,
+        wb_cabinet=wb_cabinet,
+        user=SimpleNamespace(user_telegram_id=1_000_001),
+    )
 
     with patch(
         "app.client_bot.user_interface.handlers.start.start._get_wb_user_cabinet_for_shop_menu",

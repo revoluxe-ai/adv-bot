@@ -3,6 +3,7 @@
 import datetime
 from unittest.mock import MagicMock
 
+from app.client_bot.ui_access import UiAccessMode
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.keyboards import (
     get_payment_keyboard,
@@ -129,7 +130,7 @@ def test_shop_menu_keyboard_connect_existing_advs_button() -> None:
 
 
 def test_shop_menu_keyboard_mass_ops_button_and_hidden_bulk_buttons() -> None:
-    """ShopMenu main keyboard has mass ops entry and hides moved bulk buttons."""
+    """PAID ShopMenu shows mass-ops entry; moved bulk buttons stay off main keyboard."""
     from app.modules.shop_menu.message import ShopMenu
 
     bot = MagicMock()
@@ -153,6 +154,8 @@ def test_shop_menu_keyboard_mass_ops_button_and_hidden_bulk_buttons() -> None:
     menu._wb_user_cabinet = wb_user_cabinet
     menu._wb_cabinet = wb_cabinet
     menu._user_telegram_id = 123
+    # Mass-ops is a paid control; default ShopMenu._ui_access is FREE.
+    menu._ui_access = UiAccessMode.PAID
 
     kb = menu.keyboard
     all_texts = [btn.text for row in kb.inline_keyboard for btn in row]

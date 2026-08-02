@@ -74,7 +74,16 @@ class TestShopMenuTariffDisplay:
     def test_shop_menu_keyboard_uses_active_fallback_when_attribute_absent(self):
         menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
         m = cast(Any, menu)
-        m._wb_user_cabinet = type("WBUC", (), {"name": "Shop Fallback", "id": 11})()
+        # non-admin .user: keyboard path must not AttributeError; admin toggle absent
+        m._wb_user_cabinet = type(
+            "WBUC",
+            (),
+            {
+                "name": "Shop Fallback",
+                "id": 11,
+                "user": type("User", (), {"user_telegram_id": 1_000_001})(),
+            },
+        )()
         # intentionally no `active` attribute
         m._wb_cabinet = type(
             "WBC",

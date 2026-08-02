@@ -1,3 +1,10 @@
+"""Меню магазина: текст, главная и mass-ops клавиатуры Telegram UI.
+
+Содержит ``ShopMenu`` и builders клавиатур. ``build_shop_main_keyboard``
+безопасно обрабатывает отсутствие ``WBUserCabinet.user`` (admin toggle
+не показывается без валидного admin telegram id).
+"""
+
 import logging
 from datetime import datetime, timedelta
 from typing import Mapping
@@ -27,7 +34,6 @@ from app.client_bot.user_interface.views.callbacks import (
     ToggleCabinetActive,
     ExportShopAdvExcel,
     ImportShopAdvExcel,
-    ToggleCabinetActive,
     UiModeToggle,
 )
 from app.client_bot.user_interface.views.callbacks import (
@@ -80,6 +86,20 @@ def build_shop_main_keyboard(
     wb_cabinet: WBCabinet,
     ui_access: UiAccessMode = UiAccessMode.FREE,
 ) -> InlineKeyboardMarkup:
+    """Собрать главную inline-клавиатуру магазина.
+
+    Админский toggle режима UI добавляется только при валидном
+    telegram id админа. Отсутствие ``wb_user_cabinet.user`` (или ``None``)
+    не должно приводить к ``AttributeError`` — toggle просто не показывается.
+
+    Args:
+        wb_user_cabinet: Кабинет пользователя WB (может быть без загруженного ``user``).
+        wb_cabinet: Кабинет магазина.
+        ui_access: Режим доступа UI (FREE/PAID), влияет на платные кнопки.
+
+    Returns:
+        InlineKeyboardMarkup главной клавиатуры магазина.
+    """
     wb_cabinet_original_id = wb_cabinet.id
     builder = InlineKeyboardBuilder()
 
@@ -149,7 +169,10 @@ def build_shop_main_keyboard(
             )
         )
 
-    if _is_admin_user(getattr(wb_user_cabinet.user, "user_telegram_id", None)):
+    # Безопасный resolve: user может отсутствовать / быть None
+    # (например, loader без joinedload или detached ORM вне сессии).
+    user = getattr(wb_user_cabinet, "user", None)
+    if _is_admin_user(getattr(user, "user_telegram_id", None)):
         _ = builder.row(
             InlineKeyboardButton(
                 text=f"Режим интерфейса: {ui_access.name}",
