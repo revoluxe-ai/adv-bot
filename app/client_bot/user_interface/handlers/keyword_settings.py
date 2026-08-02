@@ -53,6 +53,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 from app.client_bot.user_interface.utils import (
     format_target_place_display,
+    get_auto_target_place_manual_change_locked_text,
     get_effective_keyword_target_place,
 )
 from ..helpers.wb_user_cabinet import get_wb_user_cabinet_id_or_none
@@ -1031,6 +1032,14 @@ async def change_keyword_target_place(
                 "Не удалось найти настройки ключевого слова.",
             )
         return
+    if keyword_setting.adv_setting and keyword_setting.adv_setting.auto_update_target_place:
+        await state.set_state(state=None)
+        if callback_query.message:
+            await bot.send_message(
+                callback_query.message.chat.id,
+                get_auto_target_place_manual_change_locked_text(),
+            )
+        return
 
     value, source = get_effective_keyword_target_place(
         keyword_setting,
@@ -1111,11 +1120,20 @@ async def keyword_target_place_value(
             )
             await state.set_state()
             return
+
         adv_setting = keyword_setting.adv_setting
         if adv_setting is None:
             await bot.send_message(message.chat.id, "Кампания не найдена.")
             await state.update_data(keyword_setting_for_target_place=None)
             await state.set_state()
+            return
+        if adv_setting.auto_update_target_place:
+            await state.update_data(keyword_setting_for_target_place=None)
+            await state.set_state(state=None)
+            await bot.send_message(
+                message.chat.id,
+                get_auto_target_place_manual_change_locked_text(),
+            )
             return
         if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
             await bot.send_message(

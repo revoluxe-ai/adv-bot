@@ -6,6 +6,9 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.future import select
 
 from app.client_bot.user_interface import states
+from app.client_bot.user_interface.utils import (
+    get_auto_target_place_manual_change_locked_text,
+)
 from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker
@@ -42,6 +45,14 @@ async def get_min_position(
             adv.bidder_active = True
             await session.commit()
             await ui_messages.CPMSetting(bot, chat_id)(adv_original_id)
+            return
+
+        if adv.auto_update_target_place and not has_max_place:
+            await state.set_state(state=None)
+            await bot.send_message(
+                chat_id,
+                get_auto_target_place_manual_change_locked_text(),
+            )
             return
 
         if not has_max_place:

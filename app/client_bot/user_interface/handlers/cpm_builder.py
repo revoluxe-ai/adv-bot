@@ -15,6 +15,9 @@ from app.client_bot.user_interface.services.cpm_target_place_workbook import (
     apply_target_place_workbook,
     build_target_place_workbook,
 )
+from app.client_bot.user_interface.utils import (
+    get_auto_target_place_manual_change_locked_text,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -55,6 +58,16 @@ def _format_target_place_import_summary(summary: TargetPlaceImportSummary) -> st
     return "\n".join(lines)
 
 
+async def _load_adv_setting(
+    session: AsyncSession, adv_original_id: int
+) -> AdvSetting | None:
+    """Load campaign settings by id using the current session maker."""
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    )
+    return result.scalar_one_or_none()
+
+
 @router.callback_query(
     callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page")  # noqa
 )
@@ -93,6 +106,10 @@ async def get_max_cpm(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv = result.scalar_one()
+        if adv.auto_update_target_place:
+            await state.set_state(state=None)
+            await message.answer(get_auto_target_place_manual_change_locked_text())
+            return
         adv.max_place = min_position
         has_max_cpm = adv.max_cpm is not None and adv.max_cpm > 0
         if has_max_cpm:
@@ -148,7 +165,7 @@ async def set_max_cpm(
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_manual_cpm"))  # noqa
 async def set_manual_cpm(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
@@ -194,12 +211,25 @@ async def set_manual_cpm_message(
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_max_position"))  # noqa
 async def set_max_position(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
     """Request a new shared target place for the selected campaign."""
     adv_original_id = callback_data.adv_original_id
+    async with sm(read_only=True) as session:
+        adv = await _load_adv_setting(session, adv_original_id)
+
+    if adv is None:
+        raise RuntimeError('Не найдена кампания для настройки')
+
+    if adv.auto_update_target_place:
+        await state.set_state(state=None)
+        await bot.send_message(
+            callback.message.chat.id,
+            get_auto_target_place_manual_change_locked_text(),
+        )
+        return
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_max_position)
     await messages.AutoCPMSettingGetMinPosition(bot, callback.message.chat.id)(
@@ -231,6 +261,10 @@ async def set_max_position_message(
             select(AdvSetting).where(AdvSetting.id == adv_original_id)
         )
         adv = result.scalar_one()
+        if adv.auto_update_target_place:
+            await state.set_state(state=None)
+            await message.answer(get_auto_target_place_manual_change_locked_text())
+            return
         adv.max_place = max_position
         await _set_all_keywords_target_place(session, adv_original_id, max_position)
         await session.commit()
@@ -243,12 +277,24 @@ async def set_max_position_message(
 )
 async def download_target_places_template(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
     """Export xlsx template with editable target places for campaign keywords."""
     adv_original_id = callback_data.adv_original_id
+    async with sm(read_only=True) as session:
+        adv = await _load_adv_setting(session, adv_original_id)
+    if adv is None:
+        raise RuntimeError('Не найдена кампания для настройки')
+
+    if adv.auto_update_target_place:
+        await state.set_state(state=None)
+        await bot.send_message(
+            callback.message.chat.id,
+            get_auto_target_place_manual_change_locked_text(),
+        )
+        return
     payload = await build_target_place_workbook(adv_original_id)
     await state.update_data(last_adv_original_id=adv_original_id)
     await bot.send_document(
@@ -265,12 +311,24 @@ async def download_target_places_template(
 )
 async def upload_target_places_template_start(
     callback: types.CallbackQuery,
-    callback_data: callbacks.ChoiceAdvPaginator,
+    callback_data: callbacks.CPMSettingMenu,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
     """Switch FSM to workbook upload mode for campaign target places."""
     adv_original_id = callback_data.adv_original_id
+    async with sm(read_only=True) as session:
+        adv = await _load_adv_setting(session, adv_original_id)
+    if adv is None:
+        raise RuntimeError('Не найдена кампания для настройки')
+
+    if adv.auto_update_target_place:
+        await state.set_state(state=None)
+        await bot.send_message(
+            callback.message.chat.id,
+            get_auto_target_place_manual_change_locked_text(),
+        )
+        return
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_target_place_workbook)
     await bot.send_message(
@@ -301,6 +359,16 @@ async def upload_target_places_template_file(
         await message.answer(
             "Сессия истекла. Откройте управление ставкой и снова нажмите загрузку файла."
         )
+        return
+    async with sm(read_only=True) as session:
+        adv = await _load_adv_setting(session, int(adv_original_id))
+    if adv is None:
+        await state.set_state(state=None)
+        raise RuntimeError('Не найдена кампания для настройки')
+
+    if adv.auto_update_target_place:
+        await state.set_state(state=None)
+        await message.answer(get_auto_target_place_manual_change_locked_text())
         return
 
     await message.answer("Файл получен, начинаю обработку целевых позиций…")
