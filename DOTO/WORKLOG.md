@@ -324,3 +324,15 @@ Disposition:
 * consider reuse of `mv_clusters_daily_agg.ts_state` only after proving semantic equivalence.
 
 Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
+
+
+Зашифровать свой комп
+Навести порядок ChatGPT
+Навести порядок в CODEX
+
+Сделать проект для создания который пишет python тесты на деградацию промтов.
+
+
+Разобраться с MAx - там есть клиенты, а я их игнорю!
+
+Идея: епе бнмра
