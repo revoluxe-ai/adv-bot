@@ -67,7 +67,7 @@ def test_free_keyboard_keeps_manual_buttons_and_hides_autopilot_controls() -> No
     assert "⏰ Ограничения показов по времени" in texts
     assert "Управление ставкой" in texts
     assert "Изменить ставку в Авто" in texts
-    assert "Установить общую ставку (аукцион)" in texts
+    assert "Поставить общую ставку для Поисковой РК" in texts
     assert "Обновить минус-слова" in texts
     assert "Загрузить статистику из WB" in texts
     assert "Выгрузить ключи в csv-файл" in texts
@@ -109,6 +109,23 @@ def test_paid_keyboard_shows_autopilot_controls_and_top_auto_button() -> None:
     assert "Версия АвтоАпдейтера (сейчас V3)" in texts
     assert "V3 cal. шаг: 4" in texts
     assert "V3 агр.: 2" in texts
+
+
+@pytest.mark.unit
+def test_search_common_bid_button_hidden_without_search_campaign() -> None:
+    adv = _build_adv(bot_active=False)
+    adv.search_adv_id = None
+
+    markup = get_adv_setting_keyboard(
+        wb_user_cabinet=SimpleNamespace(id=55),
+        adv_setting=adv,
+        in_favorites=False,
+        ui_access=UiAccessMode.FREE,
+    )
+
+    texts = _button_texts(markup)
+
+    assert "Поставить общую ставку для Поисковой РК" not in texts
 
 
 @pytest.mark.asyncio

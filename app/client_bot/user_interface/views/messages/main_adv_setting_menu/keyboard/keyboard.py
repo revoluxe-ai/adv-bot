@@ -494,7 +494,7 @@ def get_adv_setting_keyboard(
         ).pack()
         _ = builder.row(
             InlineKeyboardButton(
-                text="Установить общую ставку (аукцион)",
+                text="Поставить общую ставку для Поисковой РК",
                 callback_data=set_common_bid_callback,
             )
         )
