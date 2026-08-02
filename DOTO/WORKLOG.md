@@ -410,3 +410,24 @@ No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only par
 
 сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
 
+сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
+
+## Deferred from change fix-bug-with-remove-ch-db-name-from-queries (2026-07-31)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] CH database from env → client.database
+  source: explore NOW_LATER + owner split (2026-07-31); openspec/changes/fix-bug-with-remove-ch-db-name-from-queries/proposal.md (Scope out)
+  reason: out_of_current_mvp | owner_park
+  notes: Host/user/password уже из env; database в client hardcoded. Полный env wiring — отдельно от фикса «DB в тексте CH query».
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] Mass CH SQL qualification / unqualify strategy
+  source: explore + owner park (2026-07-31)
+  reason: oversized | owner_park
+  notes: Не трогать все CH readers в этом change. После фикса текущего класса багов — отдельная волна + возможно ADL.
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] Reusable ADL: CH DB qualification policy
+  source: explore Architecture Decision Missing (2026-07-31)
+  reason: out_of_current_mvp
+  notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.
