@@ -9,7 +9,6 @@ from typing import Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
-
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -40,7 +39,7 @@ async def consumer() -> None:
         logger.info("Consumer waiting for task")
         if _coroutine_parallel_run_queue.empty() and active_tasks:
             logger.info("Consumer waiting for task")
-            await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
+            _, _ = await asyncio.wait(active_tasks, return_when=asyncio.FIRST_COMPLETED)
             # Удалять задачи из списка active_tasks здесь не нужно, так как мы используем колбэки для их удаления
         else:
             coroutine = await _coroutine_parallel_run_queue.get()
@@ -101,7 +100,7 @@ class ShopDataUpdater:
             if not_existing_adv_ids:
                 await self.__quick_update_advs_in_db(not_existing_adv_ids)
             func = self.__quick_update_advs_in_db(existind_advs_ids)
-            await _coroutine_parallel_run_queue.put(func)
+            await _coroutine_parallel_run_queue.put(func) # pyright: ignore
 
     async def __quick_update_advs_in_db(self, adv_ids: set[int]) -> None:
         """Обновить указанные РК и карточки в БД."""
@@ -113,13 +112,13 @@ class ShopDataUpdater:
             nmids = adv.nmids
             if nmids:
                 for nmid in nmids:
-                    nmids_collection.add(nmid)
+                    nmids_collection.add(nmid) # pyright: ignore
         cards = await wb_api.get_all_cards()
+
         # core CardFromWB и common_slaves CardFromWB — разные классы; cast на границе DB helper.
         await wb_db_manager.update_cards_in_db(
             typing.cast(list[CardFromWB], cards), self.wb_cabinet
         )
-
     async def update_advs_data(self) -> list[AuctionAdv]:
         """Загрузить РК кабинета из WB, сохранить в БД и обновить recommendations-bid кэш."""
         # adv_ids берём из БД по кампаниям с bot_active; обновляем и авто-, и поисковые РК
