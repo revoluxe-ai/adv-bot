@@ -13,7 +13,25 @@ If `GO` is absent:
 - do not commit;
 - output only the proposed commit plan (include `CHECK_MODE` + per-group check matrix; do **not** run the matrix).
 
-Never push, merge, rebase, force-push, deploy, restart services, run migrations against production, or touch secrets.
+## Commit-only git allowlist (mandatory)
+
+This command may mutate git **only** to create local commits. Nothing else.
+
+**Allowed mutating git:**
+- `git add` / path staging for the current commit group
+- `git commit` (authorized only with exact token `GO`)
+- `git restore --staged <file>` only to unstage unsafe / out-of-scope / unrelated staged paths before stopping a group
+
+**Allowed read-only git:** preflight `branch` / `status` / `diff` / `log` (and merge-base resolution for `FULL_CHECK` `base=<ref>` when required).
+
+**Forbidden (non-exhaustive — if it advances history, remotes, or a sequencer, it is forbidden):**
+- any `git rebase` form, including `--continue`, `--skip`, `--abort`, `--edit-todo`, `--autosquash`
+- any `git merge` / `git cherry-pick` progression (`--continue`, `--skip`, `--abort`)
+- `git push` / force-push / remote updates
+- `git reset --hard`, `git clean -fd`, destructive checkout that discards work or advances a rebase todo
+- deploy, restart services, production migrations, secrets access
+
+After the authorized commit(s) finish, **stop**. Do not “finish the rebase”, “keep going”, or drive any in-progress sequencer.
 
 ## User input
 
@@ -144,6 +162,26 @@ GO_ON_PROTECTED_BRANCH
 ```
 
 Even with `GO_ON_PROTECTED_BRANCH`, never push.
+
+### Sequencer / rebase in progress (mandatory)
+
+Detect an in-progress git sequencer from `git status` and/or presence of
+`.git/rebase-merge`, `.git/rebase-apply`, `MERGE_HEAD`, `CHERRY_PICK_HEAD`,
+`REVERT_HEAD`.
+
+If a sequencer is in progress:
+- planning and (with `GO`) creating the authorized local commit(s) remain allowed;
+- after those commits (or after plan-only output), **hard stop** this command;
+- never run rebase/merge/cherry-pick `--continue|--skip|--abort` or otherwise
+  advance the sequencer;
+- include in the report:
+
+```text
+REBASE_OR_SEQUENCER_IN_PROGRESS_LEFT_TO_OWNER: yes
+DO_NOT_DO_YET: git rebase/--continue/--skip/--abort; merge/cherry-pick progression; push; force-push
+```
+
+Owner continues, skips, or aborts the sequencer **outside** this command.
 
 ## Detect OpenSpec change
 
@@ -451,6 +489,11 @@ If a group requires manual `git add -p`:
 - continue with safe groups;
 - report skipped files.
 
+When a sequencer/rebase is in progress: after the last authorized commit group
+for this run (or immediately after plan-only), end the run. Do not continue the
+sequencer. Do not interpret remaining dirty tree or rebase stops as work for
+this command beyond the commit allowlist.
+
 ## Final report
 
 After execution, output:
@@ -476,21 +519,38 @@ Verification:
 - blocked:
 - skipped / not_applicable:
 
+REBASE_OR_SEQUENCER_IN_PROGRESS_LEFT_TO_OWNER:
+- yes | no
+
 Next:
 - if process surfaces remain dirty: /opsx-admin-command-commit
+- if sequencer still in progress: owner continues/skips/aborts outside this command
 - optional later: /opsx-pipeline UPDATE (refresh /opsx-commit graph node for check modes)
 - recommended PR command, but do not push
+
+DO_NOT_DO_YET:
+- git rebase (any form, including --continue/--skip/--abort/--edit-todo)
+- merge/cherry-pick progression; push; force-push
 ```
 
 ## Absolute prohibitions
 
-Never run:
+Never run (including during an in-progress rebase/merge/cherry-pick):
 
 ```bash
 git push
 git push --force
 git rebase
+git rebase --continue
+git rebase --skip
+git rebase --abort
+git rebase --edit-todo
 git merge
+git merge --continue
+git merge --abort
+git cherry-pick --continue
+git cherry-pick --skip
+git cherry-pick --abort
 git reset --hard
 git clean -fd
 git checkout .
@@ -499,3 +559,5 @@ kubectl
 alembic upgrade
 alembic downgrade
 ```
+
+Never “keep going” on a rebase after `git commit`. Sequencer control belongs to the owner.
