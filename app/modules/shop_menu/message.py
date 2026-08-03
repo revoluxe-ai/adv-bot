@@ -659,12 +659,27 @@ class ShopMenu(TextWithKeyboard):
             f"{parsed.percent_part}{exp_part}"
         )
     @staticmethod
-    async def _get_wb_user_cabinet_with_user_and_wb_cabinet(session: AsyncSession,
-                                                            wb_user_cabinet_original_id: int,
-                                                            ) -> WBUserCabinet:
-        # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
+    async def _get_wb_user_cabinet_with_user_and_wb_cabinet(
+        session: AsyncSession,
+        wb_user_cabinet_original_id: int,
+    ) -> WBUserCabinet:
+        """Загрузить WBUserCabinet с user и wb_cabinet (eager load).
+
+        Делает INNER JOIN по relationship-путям и selectinload связанных
+        сущностей для меню магазина. В SQLAlchemy 2.0 каждый relationship
+        joinится отдельным ``.join(...)`` без второго позиционного onclause.
+
+        Args:
+            session: Async SQLAlchemy-сессия.
+            wb_user_cabinet_original_id: PK ``WBUserCabinet``.
+
+        Returns:
+            ``WBUserCabinet`` с предзагруженными связями.
+        """
         stmt = (
             select(WBUserCabinet)
+            # SA 2.0: каждый relationship — отдельный .join(); второй
+            # позиционный аргумент — onclause, не вторая связь.
             .join(WBUserCabinet.wb_cabinet)
             .join(WBUserCabinet.user)
             .options(
