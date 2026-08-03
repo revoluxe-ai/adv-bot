@@ -129,7 +129,12 @@ async def send_need_subscribe_message(bot: Bot, event: Message | CallbackQuery) 
 
 
 class ChannelSubscriptionMiddleware(BaseMiddleware):
-    """Block access for users unsubscribed from the support channel."""
+    """Block access for users unsubscribed from the support channel.
+
+    Admission of ``data["bot"]`` is structural (``get_chat_member`` /
+    ``send_message``), then narrowed with ``cast(Bot, …)`` for typing — not
+    ``isinstance(Bot)`` alone.
+    """
 
     async def __call__(
         self,
@@ -137,21 +142,61 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        """Проверяет подписку и при необходимости блокирует handler.
+
+        Args:
+            handler: Downstream handler.
+            event: Message или CallbackQuery.
+            data: Aiogram data; ожидает ключ ``bot`` с методами membership/send.
+
+        Returns:
+            Результат handler либо ``None`` при блоке NeedSubscribe.
+        """
         event = cast(Message | CallbackQuery, event)
         telegram_id = event.from_user.id if event.from_user else None
+        logger.debug(
+            "ChannelSubscriptionMiddleware: enter type=%s user=%s callback=%r text=%r",
+            type(event).__name__,
+            telegram_id,
+            getattr(event, "data", None),
+            getattr(event, "text", None),
+        )
         if telegram_id is None:
+            logger.debug("ChannelSubscriptionMiddleware: no telegram_id, pass through")
             return await handler(event, data)
 
         if is_bot_admin(telegram_id) or _is_whitelisted_event(event):
+            logger.debug(
+                "ChannelSubscriptionMiddleware: bypass user=%s admin=%s whitelisted=%s",
+                telegram_id,
+                is_bot_admin(telegram_id),
+                _is_whitelisted_event(event),
+            )
             return await handler(event, data)
 
-        bot = data.get("bot")
-        if not hasattr(bot, "get_chat_member") or not hasattr(bot, "send_message"):
+        # Structural admission: duck-typed bots (and unit MagicMock) must still
+        # run subscription checks when Telegram methods are present. isinstance(Bot)
+        # alone rejects non-Bot providers and skips Redis/Telegram write path.
+        bot_raw = data.get("bot")
+        if bot_raw is None or not (
+            hasattr(bot_raw, "get_chat_member") and hasattr(bot_raw, "send_message")
+        ):
+            logger.debug(
+                "ChannelSubscriptionMiddleware: bot missing methods, pass through user=%s",
+                telegram_id,
+            )
             return await handler(event, data)
+        bot = cast(Bot, bot_raw)
 
         is_subscribed = await is_user_subscribed_to_support_channel(bot, telegram_id)
+        logger.debug(
+            "ChannelSubscriptionMiddleware: subscription result user=%s subscribed=%s",
+            telegram_id,
+            is_subscribed,
+        )
         if is_subscribed is None or is_subscribed is True:
             return await handler(event, data)
 
+        logger.debug("ChannelSubscriptionMiddleware: blocking user=%s", telegram_id)
         await send_need_subscribe_message(bot, event)
         return None
