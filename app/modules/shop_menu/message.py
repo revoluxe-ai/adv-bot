@@ -34,6 +34,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ShopMassAdvOpsMenu,
     ExportShopAdvExcel,
     ImportShopAdvExcel,
+    ToggleCabinetActive,
     UiModeToggle,
 )
 from app.client_bot.user_interface.views.callbacks import (
@@ -62,7 +63,6 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.suffixes import get_day_suffix
-from tests.integration.billing.test_pricer_tariff_integration import wb_cabinet
 
 logger = logging.getLogger(__name__)
 
