@@ -86,7 +86,19 @@
     "app/client_bot/middlewars/phone_required.py",
     "app/client_bot/user_interface/handlers/phone_collection.py",
     "app/client_bot/user_interface/views/phone_request.py",
-    "app/utils/db/models.py"
+    "app/utils/db/models.py",
+    "app/client_bot/middlewars/channel_subscription.py",
+    "app/client_bot/user_interface/handlers/cpm_builder.py",
+    "app/client_bot/user_interface/handlers/user_subscribe_on_channel.py",
+    "app/client_bot/user_interface/services/cpm_target_place_workbook.py",
+    "app/client_bot/user_interface/states.py",
+    "app/client_bot/user_interface/utils/__init__.py",
+    "app/client_bot/user_interface/utils/target_place_messages.py",
+    "app/client_bot/user_interface/views/get_main_text.py",
+    "app/client_bot/user_interface/views/messages/strategy_display.py",
+    "app/modules/common_slaves/wildberries/models/enums",
+    "app/modules/shop_runner/service_manager/services/v3_status_mode_sync.py",
+    "app/utils/db/session_maker.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",
