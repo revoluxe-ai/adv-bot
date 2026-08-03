@@ -326,16 +326,58 @@ Any FAIL / BLOCKED / non-zero exit / FAIL_CLOSED → **COMMIT STOP** for the ent
 - do **not** commit the current group;
 - do **not** start or continue any later groups;
 - leave working tree as-is (including already-created earlier commits in this run, if any);
-- report the failing step + commands + result;
 - do **not** auto-fix production, tests, migrations, or configs
   (see **Content-edit ban**);
 - do **not** edit `pyrightconfig*.json` / includes to clear coverage FAIL;
-- print one pasteable `NEXT_ACTION` to the owning heal command, for example:
-  - typing / pyright errors → `/opsx-fix-types`
-  - `MISSING_FROM_INCLUDE` / coverage FAIL → `/opsx-pyright-strict-coverage`
-  - test FAIL → `/opsx-test-triage`
-  - then the owner re-runs `/opsx-commit … GO` after the heal command finishes
+- emit the **human-native exit** block below (mandatory; not prose-only).
+
 One failed check ends the commit operation. No heal-to-green inside this command.
+
+### Human-native exit (COMMIT STOP / PARTIAL — mandatory)
+
+On every **COMMIT STOP**, and on **PARTIAL** end when blockers remain, print this
+block **as the owner-facing entrance** (bookkeeping `Done`/`Skipped` may appear
+above it, but must not replace it):
+
+```text
+STATUS: COMMIT_STOP | PARTIAL
+WHAT_HAPPENED: <1–2 lines what this run did / stopped on>
+WHY: <blocker class: typing | MISSING_FROM_INCLUDE | HIT_EXCLUDE | test_fail | FAIL_CLOSED | blocked_preflight | …>
+FAILED_STEP: <exact command + short result>
+CHECK_MODE: FAST_CHECK | FULL_CHECK
+
+OWNER_RUN_COMMAND:
+```
+
+Then **one** fenced literal command (fill known args; no empty placeholders when
+paths/nodeids are known):
+
+| WHY / class | Primary `OWNER_RUN_COMMAND` |
+|---|---|
+| typing / pyright errors | `/opsx-fix-types` |
+| `MISSING_FROM_INCLUDE` / `HIT_EXCLUDE` | `/opsx-pyright-strict-coverage` (list OUT paths in body above fence) |
+| unit/test FAIL | `/opsx-test-triage` (include failing path / nodeid when known) |
+| `FAIL_CLOSED` (no related tests) | `/opsx-test-triage` + list uncovered production paths |
+| heal already done; finish commits | `/opsx-commit FAST_CHECK GO` or `/opsx-commit FULL_CHECK GO` (match this run’s mode) |
+| process surfaces only | `/opsx-admin-command-commit` |
+
+Then:
+
+```text
+NEXT_ACTION: <same literal as OWNER_RUN_COMMAND>
+ALSO_OK: <optional secondary commands; never replace primary>
+DO_NOT_DO_YET: heal-to-green inside /opsx-commit; rebase --continue/--skip/--abort; push; force-push
+```
+
+When multiple leftover classes exist, pick **one primary** by priority:
+
+1. FAIL that stopped the run
+2. `MISSING_FROM_INCLUDE` / `HIT_EXCLUDE` leftovers
+3. test / triage leftovers
+4. `/opsx-commit … GO` for remaining in-include groups
+
+Put all other heal/finish commands under `ALSO_OK` only. Do not bury the primary
+entrance in a bullet list without a fenced `OWNER_RUN_COMMAND`.
 
 ### Infer related tests
 
@@ -557,7 +599,7 @@ For each commit:
 2. Inspect staged diff.
 3. Run the `CHECK_MODE` matrix for that group's staged paths (see Verification rules).
 4. On all required steps PASS (or allowed SKIP / NOT_APPLICABLE) → commit with detailed message.
-5. On any FAIL / BLOCKED / FAIL_CLOSED → **COMMIT STOP**: do not commit this group; do not process later groups; report and end the run.
+5. On any FAIL / BLOCKED / FAIL_CLOSED → **COMMIT STOP**: do not commit this group; do not process later groups; emit **human-native exit** and end the run.
 6. Continue to the next group only after the current group's full check matrix passed.
 
 If a verification command fails (or any check step is FAIL / BLOCKED / FAIL_CLOSED):
@@ -565,7 +607,7 @@ If a verification command fails (or any check step is FAIL / BLOCKED / FAIL_CLOS
 - do not commit the failing group;
 - do not continue with remaining groups;
 - leave working tree as-is;
-- report what failed.
+- emit **human-native exit** (`STATUS: COMMIT_STOP` + fenced `OWNER_RUN_COMMAND`).
 
 If a group requires manual `git add -p`:
 - skip that group;
@@ -579,9 +621,12 @@ this command beyond the commit allowlist.
 
 ## Final report
 
-After execution, output:
+After execution, output bookkeeping **plus** the human-native exit when status is
+`COMMIT_STOP` or `PARTIAL` with remaining blockers.
 
 ```text
+STATUS: COMMITTED | PARTIAL | COMMIT_STOP | BLOCKED
+
 Done:
 - commits created:
 
@@ -604,17 +649,34 @@ Verification:
 
 REBASE_OR_SEQUENCER_IN_PROGRESS_LEFT_TO_OWNER:
 - yes | no
+```
 
-Next:
-- if process surfaces remain dirty: /opsx-admin-command-commit
-- if sequencer still in progress: owner continues/skips/aborts outside this command
-- optional later: /opsx-pipeline UPDATE (refresh /opsx-commit graph node for check modes)
-- recommended PR command, but do not push
+When `STATUS` is `COMMIT_STOP` or `PARTIAL` (blockers remain), **also** emit the
+mandatory human-native exit (see **Human-native exit** above):
 
+```text
+WHAT_HAPPENED:
+WHY:
+FAILED_STEP:
+OWNER_RUN_COMMAND:
+```
+
+```text
+<one fenced primary heal/finish command>
+```
+
+```text
+NEXT_ACTION: <same as OWNER_RUN_COMMAND>
+ALSO_OK:
 DO_NOT_DO_YET:
+- heal-to-green inside /opsx-commit
 - git rebase (any form, including --continue/--skip/--abort/--edit-todo)
 - merge/cherry-pick progression; push; force-push
 ```
+
+When `STATUS` is `COMMITTED` with a clean in-scope tree, a short success note is
+enough; still list sequencer handoff under `DO_NOT_DO_YET` / ALSO_OK if rebase
+is in progress (owner continues outside this command).
 
 ## Absolute prohibitions
 
@@ -648,4 +710,5 @@ Never “keep going” on a rebase after `git commit`. Sequencer control belongs
 Never heal-to-green: no `Write` / `StrReplace` on product, tests, migrations,
 or `pyrightconfig*.json` to clear a red check; no applying writer commands
 (`/opsx-fix-types`, `/opsx-pyright-strict-coverage GO`, etc.) from this command.
-On FAIL → **COMMIT STOP** + pasteable `NEXT_ACTION` only (see Content-edit ban).
+On FAIL → **COMMIT STOP** + mandatory human-native exit (`OWNER_RUN_COMMAND` /
+`NEXT_ACTION` fenced; see Content-edit ban and **Human-native exit**).
