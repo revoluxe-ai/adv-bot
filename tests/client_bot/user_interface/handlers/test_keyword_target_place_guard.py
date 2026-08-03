@@ -47,6 +47,15 @@ class _FakeState:
         self.state_calls.append(state)
 
 
+def _message_stub(*, text: str, chat_id: int = 42, user_id: int = 1001) -> SimpleNamespace:
+    """Telegram Message-shaped stub: chat + from_user required by happy-path handler."""
+    return SimpleNamespace(
+        chat=SimpleNamespace(id=chat_id),
+        text=text,
+        from_user=SimpleNamespace(id=user_id),
+    )
+
+
 async def _create_keyword(
     session: AsyncSession, *, auto_update_target_place: bool
 ) -> tuple[int, int]:
@@ -121,7 +130,7 @@ async def test_keyword_target_place_submit_is_blocked_when_auto_update_enabled(
     )
     state = _FakeState({"keyword_setting_for_target_place": keyword_id})
     bot = AsyncMock()
-    message = SimpleNamespace(chat=SimpleNamespace(id=42), text="9")
+    message = _message_stub(text="9")
     mock_sm = _MockSessionMaker(async_session)
 
     with patch(
@@ -149,7 +158,7 @@ async def test_keyword_target_place_submit_updates_value_when_auto_update_disabl
         {"keyword_setting_for_target_place": keyword_id, "last_keyword_setting_page": 1}
     )
     bot = AsyncMock()
-    message = SimpleNamespace(chat=SimpleNamespace(id=42), text="9")
+    message = _message_stub(text="9", user_id=1001)
     mock_sm = _MockSessionMaker(async_session)
     updated_message = AsyncMock()
     keyword_screen = AsyncMock()
@@ -170,5 +179,7 @@ async def test_keyword_target_place_submit_updates_value_when_auto_update_disabl
     updated = await _get_keyword(async_session, keyword_id)
     assert updated.target_place == 9
     updated_message.assert_awaited_once()
-    keyword_screen_cls.assert_called_once_with(bot, 42, keyword_id, 1)
+    keyword_screen_cls.assert_called_once_with(
+        bot, 42, keyword_id, 1, telegram_user_id=1001
+    )
     keyword_screen.assert_awaited_once()
