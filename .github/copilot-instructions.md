@@ -79,6 +79,7 @@ python create_adv.py
 - **Line Length**: 88 characters (Black/Ruff standard)
 - **Python Version**: 3.11
 - **Type Hints**: Use type hints for all function signatures and public APIs
+- **Unused call results**: If a function/method returns a value and the caller intentionally ignores it, assign `_ = ...` (never leave a bare call). Prefer using the return when it matters. Enforced by pyright `reportUnusedCallResult`. See `.cursor/rules/python-unused-call-result.mdc`.
 - **Async/Await**: Prefer async/await for I/O operations (database, API calls, etc.)
 
 ### Import Organization

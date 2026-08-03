@@ -137,6 +137,9 @@ Process notes под `.tmp/` не обязательны; по умолчани�
    - pre-existing out-of-scope debt;
    - unresolved diagnostics.
 8. Для каждой группы предложи минимальный production typing fix.
+   - Для `reportUnusedCallResult` / «Result of call expression is of type … and is not used»:
+     предпочтительный fix — `_ = <call>` (осознанный discard), если return реально не нужен;
+     иначе присвоить и использовать значение. См. `.cursor/rules/python-unused-call-result.mdc`.
 9. Реши `GO_ELIGIBLE` и `VERDICT`.
 10. Ничего не меняй в коде.
 
@@ -346,11 +349,12 @@ OPTIONAL_BACKLOG:
 3. повторяющиеся/искажённые terminal lines → `duplicate_diagnostic`, unique count < raw count;
 4. missing file path → `missing_source_path`, часто `blocked` или group out of apply;
 5. unnecessary cast → минимальный fix = remove cast;
-6. `list[Unknown]` в Pydantic models → уточнение annotation / `default_factory` typing;
-7. ошибка исчезла после GO → `remaining_in_scope=0`, `NEXT_ACTION: none`;
-8. out-of-scope debt остался, текущий scope зелёный → `terminal_for_current_scope=true`, backlog ≠ NEXT_ACTION;
-9. после typing fix найден behavioral defect → `NEXT_ACTION: /opsx-fix-bug` без GO;
-10. пользователь вставил Mypy output без `tool=` → tool выводится из output, повторный ввод не требуется.
+6. unused call result (`reportUnusedCallResult`) → минимальный fix = `_ = <call>` (или use return);
+7. `list[Unknown]` в Pydantic models → уточнение annotation / `default_factory` typing;
+8. ошибка исчезла после GO → `remaining_in_scope=0`, `NEXT_ACTION: none`;
+9. out-of-scope debt остался, текущий scope зелёный → `terminal_for_current_scope=true`, backlog ≠ NEXT_ACTION;
+10. после typing fix найден behavioral defect → `NEXT_ACTION: /opsx-fix-bug` без GO;
+11. пользователь вставил Mypy output без `tool=` → tool выводится из output, повторный ввод не требуется.
 
 ## Guardrails
 

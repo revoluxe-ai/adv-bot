@@ -1,0 +1,44 @@
+---
+description: Неиспользуемый результат вызова — только через `_ = ...`
+globs: ["**/*.py", "app/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
+alwaysApply: true
+---
+# Неиспользуемый результат вызова (`_ =`)
+
+## Контекст применения
+
+Python-код проекта (`app/`, `tests/`, scripts). Механический gate:
+pyright `reportUnusedCallResult` (см. `pyrightconfig.json`).
+
+## Основной принцип
+
+Если функция или метод **возвращает значение**, а вызывающий код его
+**намеренно не использует**, результат нужно явно отбросить:
+
+```python
+_ = await some_side_effect()
+_ = message.answer("ok")
+```
+
+Не оставлять «голый» вызов с отбрасываемым return value:
+
+```python
+# плохо — reportUnusedCallResult
+await some_side_effect()
+message.answer("ok")
+```
+
+Если значение нужно — присваивать осмысленному имени и использовать его.
+`_ =` только для осознанного discard side-effect / fire-and-forget API.
+
+## Связь с gate
+
+- `pyrightconfig.json`: `"reportUnusedCallResult": "error"`.
+- При type-fix предпочитать `_ = <call>` для этого diagnostic
+  (см. `/opsx-fix-types`).
+
+## Ограничения
+
+- Не подменять `_ =` игнором ошибок (`try/except` / `# type: ignore`) без причины.
+- Не путать с неиспользуемыми локальными переменными (`F841`) — это отдельное правило.
+- Не менять смысл API: если return критичен для корректности, его нужно читать, а не глушить через `_`.
