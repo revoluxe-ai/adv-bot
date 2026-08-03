@@ -357,6 +357,40 @@ poetry run pytest -m unit -n 8 --dist=worksteal -q
 Use `bash .cursor/static-check/bin/run.sh -- pyright-strict` and
 `bash .cursor/static-check/bin/run.sh -- mypy .` (or the registry-equivalent human cmds) for typing tools so the venv runner matches `/opsx-static-check`.
 
+### pyright-strict SoT (include[] — mandatory)
+
+Commit-gate `pyright-strict` MUST match owner terminal / `/opsx-static-check`:
+
+```bash
+bash .cursor/static-check/bin/run.sh -- pyright-strict
+```
+
+**Default: no path arguments.** Bare project run uses
+`pyrightconfig_strict.json` `include[]` only (same as owner alias).
+
+**Forbidden:** passing staged (or any) paths that are **outside** strict
+`include[]` into `run.sh -- pyright-strict …`. Explicit path args make
+pyright typecheck files the project SoT intentionally skips, which causes
+false `COMMIT STOP` vs owner `pyright-strict` → 0 errors.
+
+**Optional path-scope (rare):** only
+`intersection(staged_production_py, strict_include)`. Never pass
+`MISSING_FROM_INCLUDE` / out-of-include paths to pyright.
+
+**Out-of-include staged production `.py`:** coverage disposition, **not** a
+path-scoped type FAIL:
+
+- report `MISSING_FROM_INCLUDE` (or `HIT_EXCLUDE`);
+- **COMMIT STOP** with `NEXT_ACTION: /opsx-pyright-strict-coverage`
+  (owner may later `GO` to extend `include[]`);
+- do **not** invent type errors by forcing pyright on those paths;
+- do **not** edit `pyrightconfig*.json` from this command.
+
+Under `FAST_CHECK`, run a **lightweight include-intersection** check on staged
+production Python (same dispositions as coverage SCAN) before or beside bare
+`pyright-strict`. Under `FULL_CHECK`, the soft-chain coverage SCAN remains
+authoritative for the same rule.
+
 ### Non-Python / docs / OpenSpec-only groups
 
 If the staged set has **no** production or test Python (`.py`):
@@ -377,17 +411,21 @@ If staged production `.py` changed and no related tests can be inferred:
 
 When production/test Python is present:
 
-1. `pyright-strict` (path-scoped when the tool allows; else project `pyright-strict`)
-2. Related **unit** tests only (`poetry run pytest -m unit <related_unit_paths> …` — path-focused, no `-n`)
+1. Lightweight strict-include intersection on staged production `.py`
+   (`MISSING_FROM_INCLUDE` / `HIT_EXCLUDE` → **COMMIT STOP** →
+   `/opsx-pyright-strict-coverage`; never path-scoped pyright on those paths)
+2. Bare project `pyright-strict` (no path args; see **pyright-strict SoT**)
+3. Related **unit** tests only (`poetry run pytest -m unit <related_unit_paths> …` — path-focused, no `-n`)
 
-Do **not** run: mypy, integration tests, AI soft-chain.
+Do **not** run: mypy, integration tests, AI soft-chain (except the lightweight
+include check above).
 
 ### FULL_CHECK matrix (default)
 
 When production/test Python is present:
 
 1. Related **unit** tests, then related **integration** tests (path-focused; honor existing markers; do not invent live/destructive runs beyond project norms)
-2. `pyright-strict`
+2. Bare project `pyright-strict` (no path args; see **pyright-strict SoT**)
 3. `mypy`
 4. AI soft-chain audits — run **inline** as **report-only / READ_ONLY**
    procedures (do not require a separate owner chat hop), scoped to the
