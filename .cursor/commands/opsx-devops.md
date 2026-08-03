@@ -230,7 +230,7 @@ Allowed only when named in the active plan:
      OPS_STATE already at target revision / prior SUCCESS_NOOP for same head);
    - Deployment CAS: JSON Patch `test`+`replace` on container image for listed
      entrypoints (never bare `set image`);
-   - RO log/rollout verify; update OPS_STATE.
+   - RO log/rollout verify; update OPS_STATE.md + LAST.json.
 6. `OTHER_ALLOWLISTED` — only if plan lists exact commands and Owner GO restates
    them; still subject to hard forbids.
 
@@ -337,5 +337,5 @@ Not a bug-episode or archive hard gate.
 - [ ] CSI / port-forward / secret dump / bare set image / laptop alembic rejected
 - [ ] Product bug → REDIRECT_PRODUCT
 - [ ] PowerShell path / filter rules preserved
-- [ ] Successful SAFE_PROD_RELEASE GO updated OPS_STATE
+- [ ] Successful SAFE_PROD_RELEASE GO updated OPS_STATE.md + LAST.json
 - [ ] Human block includes NEXT_ACTION and DO_NOT_DO_YET
