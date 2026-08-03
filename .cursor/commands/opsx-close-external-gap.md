@@ -601,8 +601,14 @@ CLOSE_RESULTS:
   MODE: REFACTOR_AND_TEST|TEST_ONLY_REDIRECT
   DISPOSITION_BEFORE: …
   RESULT: AUTHORED|REMAINING|REDIRECTED|BLOCKED
+  EXPECTED_REAUDIT: COVERED | WEAK_HANDOFF_ONLY | REMAINING | UNKNOWN
   NOTE: implementation self-report only; not independent PASS/CLOSED
         (| SQL_REWRITE_UNPROVEN when SQL rewritten + only HANDOFF_MOCK_ONLY)
+
+EXPECTED_REAUDIT_SUMMARY:
+- COVERED: <n>
+- WEAK_HANDOFF_ONLY: <n>   # re-audit FAIL expected; progress from UNTESTABLE
+- REMAINING: <n>
 
 WHAT_HAPPENED:
 WHY:
@@ -618,8 +624,17 @@ DO_NOT_DO_YET:
 
 * `READY_FOR_READ_ONLY_REAUDIT` →  
   `/opsx-external-call-coverage base=<PACKET_BASE> focus=<kind>`  
-  затем при focused PASS / independent live-ready verdict → owner may
+  **Expected interim:** items with `EXPECTED_REAUDIT=WEAK_HANDOFF_ONLY`
+  usually remain `WEAK_EVIDENCE` FAIL on re-audit — that is **progress**
+  from `UNTESTABLE_SEAM`, not “close did nothing”. Next work for those
+  symbols is integration / live evidence (or close TEST_ONLY_REDIRECT /
+  integration authorship), **not** reinventing `*_in_session`.
+  WHAT_HAPPENED MUST list AUTHORED counts vs how many are expected
+  still-FAIL-as-WEAK.
+  Только после focused PASS / independent live-ready verdict → owner may
   authorize one live run; then coverage `focus=all` as needed.
+  Do **not** imply focused PASS is the immediate next milestone after
+  handoff-only close.
 * `BLOCKED_REDIRECT_TEST_ONLY` → `/opsx-test` затем coverage rerun.
 * `BLOCKED_REDIRECT_TEST_ONLY_PACKET` → `/opsx-test` с этим packet, затем coverage rerun.
 * `BLOCKED_NEEDS_PACKET` → попросить paste report.
@@ -649,6 +664,11 @@ DO_NOT_DO_YET:
 * Не treat `GO` / `AUTHORIZE_COMMAND_FIX` as live auth.
 * Не делать opportunistic refactor вне causal scope.
 * Do not stage, commit, push, or invoke commit commands.
+* Не трактовать post-handoff re-audit `WEAK_EVIDENCE` FAIL как
+  «close ничего не сделал» / нулевой прогресс.
+* Не подразумевать focused PASS сразу после handoff-only
+  `READY_FOR_READ_ONLY_REAUDIT` без `EXPECTED_REAUDIT=COVERED`.
+* Не опускать `EXPECTED_REAUDIT` на AUTHORED CLOSE_RESULTS items.
 
 ## Handoff
 
@@ -691,6 +711,8 @@ DO_NOT_DO_YET:
 - [ ] PG evidence: explicit `read_only=` matches WRITE|PURE_READ|READ_AFTER_WRITE (no bare)
 - [ ] NEXT_ACTION re-audit использует PACKET_BASE, не выдуманный base
 - [ ] Final report напечатан as self-report (no independent PASS/CLOSED)
+- [ ] AUTHORED CLOSE_RESULTS include `EXPECTED_REAUDIT`; summary printed
+- [ ] READY_FOR_READ_ONLY_REAUDIT warns WEAK-after-handoff is expected interim
 - [ ] У каждого relevant result/seam/test item есть `LOC_LINK` (`<path>:<line>`)
 - [ ] HELPER_DISCOVERY / HELPER_STRATEGY printed; new helper not auto-BLOCKED
 - [ ] no design/protected approval tokens required for normal close

@@ -485,9 +485,13 @@ rate-limit/retry/backpressure, or recommended hot async; otherwise skip)
    `PG_WRONG_SESSION_MODE` / `PG_IMPLICIT_SESSION_MODE` → WEAK;
    no injectable / no parent handoff → `UNTESTABLE_SEAM`, не stop на WEAK).
 7. Apply `focus=` filter for summary FAIL set.
-8. Печать Final report + `KIND_CLOSURE` + `COPY_PASTE_RUNBOOK`
+8. Если в chat / pasted packet есть prior `GAPS` / `REFACTOR_AND_TEST_PACKET`
+   / `CLOSE_RESULTS` / `EXTERNAL_CALL_COVERAGE_REPORT` — построй
+   `PROGRESS_VS_PRIOR_PACKET` и `CONVERGENCE` (см. ниже). Если prior нет —
+   печатай `PROGRESS_VS_PRIOR_PACKET: not_applicable (no prior packet)`.
+9. Печать Final report + `KIND_CLOSURE` + `COPY_PASTE_RUNBOOK`
    (и `PASTE_AND_GO_BLOCKS` при mixed FAIL).
-9. Не писать файлы.
+10. Не писать файлы.
 
 ## Status
 
@@ -513,6 +517,35 @@ rate-limit/retry/backpressure, or recommended hot async; otherwise skip)
   archive gate; verify может additive-сверить report, если он передан.
 * Не рефакторь production «чтобы тестировалось» внутри этой команды.
 * Не дроби front-door на kind-команды.
+
+## Progress vs prior packet (mandatory when prior exists)
+
+После close↔coverage циклов STATUS часто снова `FAIL`, даже когда работа
+сходится. Без явного progress owner воспринимает это как бесконечный круг.
+
+Когда в chat или pasted input есть prior packet / prior GAPS /
+`CLOSE_RESULTS` / prior report:
+
+1. Сравни prior symbols с текущим FAIL-set.
+2. Печатай блок `PROGRESS_VS_PRIOR_PACKET` (шаблон в Final report).
+3. `UNTESTABLE_SEAM` → `WEAK_EVIDENCE` (handoff/mock-only) = **progress**,
+   не regression.
+4. Назначь `CONVERGENCE: improving | stalled | regressed`:
+   - `improving` — есть RESOLVED_TO_COVERED и/или
+     PROGRESSED_UNTESTABLE_TO_WEAK, и NEW_GAPS не доминируют без смысла;
+   - `stalled` — STILL_SAME_DISPOSITION ≈ prior без прогресса;
+   - `regressed` — есть REGRESSED (COVERED→FAIL или WEAK→UNTESTABLE).
+5. В `WHAT_HAPPENED` / `WHY` при `FAIL` + progress>0 явно пиши
+   `converging loop, not stuck` + краткие counts.
+6. Раздели `GAPS` (или аннотируй каждую строку) минимум на:
+   - `NEED_SEAM` — `UNTESTABLE_SEAM` / `NO_INJECTABLE_SEAM` /
+     `NO_PARENT_SESSION_HANDOFF`;
+   - `NEED_INTEGRATION_EVIDENCE` — `WEAK_EVIDENCE` handoff/session-mock
+     при уже существующем seam (не reinvent seam);
+   - `OTHER_WEAK` — session-mode / `SQL_REWRITE_MOCKED_AWAY` / прочее.
+
+Если prior packet отсутствует — не выдумывай history; пиши
+`PROGRESS_VS_PRIOR_PACKET: not_applicable (no prior packet)`.
 
 ## Final report (required)
 
@@ -556,7 +589,26 @@ SURFACES:
   NOTE: <short>   # e.g. PG_WRONG_SESSION_MODE | PG_IMPLICIT_SESSION_MODE | …
 
 GAPS:
-- <SYMBOL> (<KIND>) @ <LOC_LINK>: <DISPOSITION> → <pasteable next>
+- NEED_SEAM:
+  - <SYMBOL> (<KIND>) @ <LOC_LINK>: <DISPOSITION> → <pasteable next>
+- NEED_INTEGRATION_EVIDENCE:
+  - <SYMBOL> (<KIND>) @ <LOC_LINK>: <DISPOSITION> → <pasteable next>
+- OTHER_WEAK:
+  - <SYMBOL> (<KIND>) @ <LOC_LINK>: <DISPOSITION> → <pasteable next>
+  # (flat GAPS list OK only if each line is annotated with one of the
+  # three labels above)
+
+PROGRESS_VS_PRIOR_PACKET:
+- not_applicable (no prior packet)
+  # OR when prior exists:
+- PRIOR_ITEMS: <n>
+- RESOLVED_TO_COVERED: <symbols|none>
+- PROGRESSED_UNTESTABLE_TO_WEAK: <symbols|none>  # progress, not regression
+- STILL_SAME_DISPOSITION: <symbols|none>
+- REGRESSED: <symbols|none>
+- NEW_GAPS_NOT_IN_PRIOR: <symbols|none>
+
+CONVERGENCE: improving | stalled | regressed | not_applicable
 
 KIND_CLOSURE:
 - KIND: …
@@ -577,6 +629,7 @@ PASTE_AND_GO_BLOCKS:
 WHAT_HAPPENED:
 WHY:
 CURRENT_STATE: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
+CONVERGENCE: improving | stalled | regressed | not_applicable
 OWNER_DECISION_REQUIRED: false | true (<what>)
 NEXT_ACTION:
 DO_NOT_DO_YET:
@@ -599,6 +652,11 @@ COPY_PASTE_RUNBOOK:
   `NO_INJECTABLE_SEAM` / `NO_PARENT_SESSION_HANDOFF`) →
   `/opsx-close-external-gap` + paste this report (**без** `base=` на close)
   затем coverage `focus=pg|ch` с literal BASE.
+  При `NEED_INTEGRATION_EVIDENCE` (WEAK после handoff) — в pasteable
+  packet / WHAT_HAPPENED явно: seam уже есть; цель close/test =
+  integration evidence, не reinvent `*_in_session`.
+* `FAIL` + progress (`CONVERGENCE=improving`) — всё равно FAIL до COVERED,
+  но WHAT_HAPPENED MUST сказать `converging loop, not stuck`.
 * `FAIL` + mixed (есть и TEST_ONLY, и REFACTOR_AND_TEST) →
   печатай `PASTE_AND_GO_BLOCKS` (4 блока); не оставляй только описание.
 * `FAIL` + `DEFERRED_OWNER` → один уточняющий вопрос владельцу.
@@ -632,6 +690,12 @@ COPY_PASTE_RUNBOOK:
 * Не использовать `PG_SESSION_HYGIENE` как non-FAIL для bare.
 * Не печатать runbook с нерезолвнутыми `<BASE>`/`<HEAD>`, если refs уже известны.
 * Не печатать `PATH` без `LOC_LINK` для surface/gap/packet items.
+* Не трактовать `FAIL` после close без `PROGRESS_VS_PRIOR_PACKET` как
+  «команды зациклились» — при prior packet progress обязателен.
+* Не считать `UNTESTABLE`→`WEAK` (handoff) regression или «close ничего
+  не сделал».
+* Не смешивать `NEED_SEAM` и `NEED_INTEGRATION_EVIDENCE` в один
+  undifferentiated GAPS dump без labels.
 
 ## Optional handoff artifact (additive)
 
@@ -674,6 +738,11 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 - [ ] Не заявлен verify/archive verdict
 - [ ] `focus≠all` PASS не закрывает pre-verify chain
 - [ ] Final report + KIND_CLOSURE + COPY_PASTE_RUNBOOK напечатаны
+- [ ] Prior packet present → `PROGRESS_VS_PRIOR_PACKET` + `CONVERGENCE`
+      printed; absent → `not_applicable`
+- [ ] FAIL GAPS labeled `NEED_SEAM` / `NEED_INTEGRATION_EVIDENCE` /
+      `OTHER_WEAK` (or annotated lines)
+- [ ] `UNTESTABLE`→`WEAK` counted as progress, not regression
 - [ ] Mixed FAIL → PASTE_AND_GO_BLOCKS (4 literal блока)
 - [ ] Runbook без нерезолвнутых `<BASE>`/`<HEAD>` когда refs known
 - [ ] MINIMUM_LEVEL следует testing-rules; PG/CH default integration
