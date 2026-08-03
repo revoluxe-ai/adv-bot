@@ -48,7 +48,8 @@ kubectl paths per `.cursor/rules/terminal.mdc`).
 * Pod / log / event / resource / alert diagnosis in cluster.
 * Review `k8s/**` or monitoring manifests before a change.
 * Planned safe apply / rollout restart / bounded scale after `PLAN_WRITE` + `GO`.
-* Safe prod release: CONTROL → Migrate Job → Deployment CAS
+* Safe prod release: CONTROL → Migrate Job → Deployment CAS →
+  `complete_release` (when lease acquired) → OPS_STATE refresh
   (`intent=safe_prod_release` | `migrate_rollout` | `image_cas`).
 
 ## When not to use
@@ -86,9 +87,9 @@ Recognized `intent=` values (non-exhaustive):
 | intent | WRITE_CLASS (typical) |
 |--------|------------------------|
 | `restart` / scale / apply paths | `ROLLOUT` / `SCALE` / `MANIFEST_APPLY` |
-| `safe_prod_release` | `SAFE_PROD_RELEASE` (CONTROL→Migrate→CAS) |
+| `safe_prod_release` | `SAFE_PROD_RELEASE` (CONTROL→Migrate→CAS→complete_release→OPS_STATE) |
 | `migrate_rollout` | `SAFE_PROD_RELEASE` (same order; emphasize migrate) |
-| `image_cas` | `SAFE_PROD_RELEASE` (CAS only when OPS_STATE says schema already at target) |
+| `image_cas` | `SAFE_PROD_RELEASE` (CAS [+ complete_release if lease held] when schema already at target) |
 
 Examples:
 
@@ -163,7 +164,8 @@ Without enough scope (`intent` / `paths` / `resource`) → `STATUS=BLOCKED` with
 the exact missing fields.
 
 For `SAFE_PROD_RELEASE` intents: plan **ordered** steps only
-(CONTROL → Migrate → CAS). Out-of-order plans → `STATUS=BLOCKED`.
+(CONTROL → Migrate → CAS → `complete_release` when lease acquired →
+OPS_STATE). Out-of-order plans → `STATUS=BLOCKED`.
 
 ### GO — allowlisted write
 
@@ -230,6 +232,10 @@ Allowed only when named in the active plan:
      OPS_STATE already at target revision / prior SUCCESS_NOOP for same head);
    - Deployment CAS: JSON Patch `test`+`replace` on container image for listed
      entrypoints (never bare `set image`);
+   - `complete_release` (SECURITY DEFINER / control SQL) to free singleton lease
+     when CONTROL acquired a lease (`CONTROL_DRY_RUN≠1`); **skip** when
+     `CONTROL_DRY_RUN=1` or no lease was taken (dry-run / image_cas-only with
+     no active lease per OPS_STATE);
    - RO log/rollout verify; update OPS_STATE.md + LAST.json.
 6. `OTHER_ALLOWLISTED` — only if plan lists exact commands and Owner GO restates
    them; still subject to hard forbids.
@@ -249,8 +255,9 @@ plan-stated path) before destructive-ish applies when practical.
 4. Plan does not include any `FORBIDDEN_HIT`.
 5. Commands use PowerShell-safe kubectl invocation (no `grep`/`&&`/Unix-only paths).
 6. For `SAFE_PROD_RELEASE`: OPS_STATE + `DEVOPS_DB_MIGRATIONS.md` were read this
-   turn; step order is CONTROL → Migrate → CAS (omitting only steps justified
-   by OPS_STATE).
+   turn; step order is CONTROL → Migrate → CAS → `complete_release` (if lease
+   acquired) → OPS_STATE (omitting only steps justified by OPS_STATE /
+   `CONTROL_DRY_RUN`).
 
 If any check fails → `STATUS=BLOCKED`; show the exact pasteable GO command.
 
@@ -337,5 +344,7 @@ Not a bug-episode or archive hard gate.
 - [ ] CSI / port-forward / secret dump / bare set image / laptop alembic rejected
 - [ ] Product bug → REDIRECT_PRODUCT
 - [ ] PowerShell path / filter rules preserved
+- [ ] Successful SAFE_PROD_RELEASE GO: `complete_release` when lease acquired;
+      skipped only for CONTROL_DRY_RUN=1 / no lease
 - [ ] Successful SAFE_PROD_RELEASE GO updated OPS_STATE.md + LAST.json
 - [ ] Human block includes NEXT_ACTION and DO_NOT_DO_YET
