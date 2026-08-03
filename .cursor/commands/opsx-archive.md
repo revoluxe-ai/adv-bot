@@ -176,6 +176,10 @@ DO_NOT_DO_YET: sync / decision promote / archive move
 **Specs:** ✓ Synced to main specs
 
 All artifacts complete. All tasks complete.
+
+### Soft next (optional — not an archive gate)
+If client/CS distribution materials are needed:
+`/opsx-distribute-brief change=<change-name>`
 ```
 
 **Output On Success (No Delta Specs)**
@@ -189,6 +193,10 @@ All artifacts complete. All tasks complete.
 **Specs:** No delta specs
 
 All artifacts complete. All tasks complete.
+
+### Soft next (optional — not an archive gate)
+If client/CS distribution materials are needed:
+`/opsx-distribute-brief change=<change-name>`
 ```
 
 **Output On Success With Warnings**
@@ -207,6 +215,10 @@ All artifacts complete. All tasks complete.
 - Delta spec sync was skipped (user chose to skip)
 
 Review the archive if this was not intentional.
+
+### Soft next (optional — not an archive gate)
+If client/CS distribution materials are needed:
+`/opsx-distribute-brief change=<change-name>`
 ```
 
 **Output On Error (Archive Exists)**
@@ -238,3 +250,4 @@ Target archive directory already exists.
 - Show clear summary of what happened
 - If sync is requested, use the Skill tool to invoke `openspec-sync-specs` (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- Soft-suggest `/opsx-distribute-brief` after success when client/CS materials may be needed; never require it as an archive gate; never write the distribution brief from this command
