@@ -12,6 +12,7 @@ from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
 from app.modules.common_slaves.wildberries.models import KeywordSetting
@@ -74,16 +75,108 @@ def _parse_positive_int(value: Any, *, field_name: str) -> int:
     return parsed
 
 
+async def load_keywords_for_target_place_workbook_in_session(
+    session: AsyncSession, adv_original_id: int
+) -> list[KeywordSetting]:
+    """Load non-blacklist keywords for workbook export (PURE_READ).
+
+    Args:
+        session: injectable async session (caller: ``sm(read_only=True)``).
+        adv_original_id: campaign AdvSetting primary key.
+
+    Returns:
+        KeywordSetting rows ordered by text.
+    """
+    result = await session.execute(
+        select(KeywordSetting)
+        .where(KeywordSetting.adv_setting_id == adv_original_id)
+        .where(KeywordSetting.hard_status != const.BLACK_LIST)
+        .order_by(KeywordSetting.text.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def apply_target_place_rows_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+    rows: list[dict[str, Any]],
+    summary: TargetPlaceImportSummary,
+) -> TargetPlaceImportSummary:
+    """Apply workbook rows to keywords and commit (WRITE).
+
+    Args:
+        session: injectable async session (``sm(read_only=False)``).
+        adv_original_id: campaign AdvSetting primary key.
+        rows: parsed workbook records.
+        summary: mutable import summary accumulator.
+
+    Returns:
+        The same summary instance after mutation/commit.
+    """
+    result = await session.execute(
+        select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_original_id)
+    )
+    keywords = result.scalars().all()
+    keywords_by_id = {keyword.id: keyword for keyword in keywords}
+    keywords_by_text = {keyword.text: keyword for keyword in keywords}
+
+    for row_number, row in enumerate(rows, start=3):
+        raw_target_place = row.get("target_place")
+        if _is_empty(raw_target_place):
+            summary.skipped_empty_rows += 1
+            continue
+        try:
+            target_place = _parse_positive_int(
+                raw_target_place, field_name="target_place"
+            )
+        except ValueError as exc:
+            summary.validation_error_rows += 1
+            summary.errors.append(f"Строка {row_number}: {exc}")
+            continue
+
+        keyword = None
+        raw_keyword_id = row.get("keyword_id")
+        if not _is_empty(raw_keyword_id):
+            try:
+                keyword_id = _parse_positive_int(
+                    raw_keyword_id, field_name="keyword_id"
+                )
+            except ValueError as exc:
+                summary.validation_error_rows += 1
+                summary.errors.append(f"Строка {row_number}: {exc}")
+                continue
+            keyword = keywords_by_id.get(keyword_id)
+
+        if keyword is None:
+            keyword_text = str(row.get("keyword") or "").strip()
+            if not keyword_text:
+                summary.validation_error_rows += 1
+                summary.errors.append(
+                    f"Строка {row_number}: не указан keyword для поиска ключа"
+                )
+                continue
+            keyword = keywords_by_text.get(keyword_text)
+
+        if keyword is None:
+            summary.not_found_rows += 1
+            summary.errors.append(
+                f"Строка {row_number}: ключ не найден в текущей РК"
+            )
+            continue
+
+        keyword.target_place = target_place
+        summary.updated_rows += 1
+
+    await session.commit()
+    return summary
+
+
 async def build_target_place_workbook(adv_original_id: int) -> bytes:
     """Build .xlsx template with current target places for one campaign."""
-    async with _sm() as session:
-        result = await session.execute(
-            select(KeywordSetting)
-            .where(KeywordSetting.adv_setting_id == adv_original_id)
-            .where(KeywordSetting.hard_status != const.BLACK_LIST)
-            .order_by(KeywordSetting.text.asc())
+    async with _sm(read_only=True) as session:
+        keywords = await load_keywords_for_target_place_workbook_in_session(
+            session, adv_original_id
         )
-        keywords = result.scalars().all()
 
     rows = [
         {
@@ -145,60 +238,7 @@ async def apply_target_place_workbook(
     rows = read_target_place_workbook(content)
     summary = TargetPlaceImportSummary(processed_rows=len(rows))
     async with _sm(read_only=False) as session:
-        result = await session.execute(
-            select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_original_id)
+        summary = await apply_target_place_rows_in_session(
+            session, adv_original_id, rows, summary
         )
-        keywords = result.scalars().all()
-        keywords_by_id = {keyword.id: keyword for keyword in keywords}
-        keywords_by_text = {keyword.text: keyword for keyword in keywords}
-
-        for row_number, row in enumerate(rows, start=3):
-            raw_target_place = row.get("target_place")
-            if _is_empty(raw_target_place):
-                summary.skipped_empty_rows += 1
-                continue
-            try:
-                target_place = _parse_positive_int(
-                    raw_target_place, field_name="target_place"
-                )
-            except ValueError as exc:
-                summary.validation_error_rows += 1
-                summary.errors.append(f"Строка {row_number}: {exc}")
-                continue
-
-            keyword = None
-            raw_keyword_id = row.get("keyword_id")
-            if not _is_empty(raw_keyword_id):
-                try:
-                    keyword_id = _parse_positive_int(
-                        raw_keyword_id, field_name="keyword_id"
-                    )
-                except ValueError as exc:
-                    summary.validation_error_rows += 1
-                    summary.errors.append(f"Строка {row_number}: {exc}")
-                    continue
-                keyword = keywords_by_id.get(keyword_id)
-
-            if keyword is None:
-                keyword_text = str(row.get("keyword") or "").strip()
-                if not keyword_text:
-                    summary.validation_error_rows += 1
-                    summary.errors.append(
-                        f"Строка {row_number}: не указан keyword для поиска ключа"
-                    )
-                    continue
-                keyword = keywords_by_text.get(keyword_text)
-
-            if keyword is None:
-                summary.not_found_rows += 1
-                summary.errors.append(
-                    f"Строка {row_number}: ключ не найден в текущей РК"
-                )
-                continue
-
-            keyword.target_place = target_place
-            summary.updated_rows += 1
-
-        await session.commit()
-
     return summary

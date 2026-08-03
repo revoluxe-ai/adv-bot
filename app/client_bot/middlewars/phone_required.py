@@ -10,6 +10,7 @@ from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
 from app.client_bot.user_interface.views.phone_request import (
@@ -22,6 +23,25 @@ from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
 logger = logging.getLogger(__name__)
+
+
+async def load_user_phone_gate_fields_in_session(
+    session: AsyncSession, telegram_id: int
+) -> User | None:
+    """Load passed_gate/phone fields for phone-required middleware (PURE_READ).
+
+    Args:
+        session: injectable async session (caller: ``sm(read_only=True)``).
+        telegram_id: Telegram user id.
+
+    Returns:
+        User row or None when the user is missing.
+    """
+    stmt = select(User).options(load_only(User.passed_gate, User.phone)).where(
+        User.user_telegram_id == telegram_id
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 def _json_scalar(value: Any, default: Any) -> Any:
@@ -89,11 +109,7 @@ class PhoneRequiredMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         async with _sm(read_only=True) as session:
-            stmt = select(User).options(load_only(User.passed_gate, User.phone)).where(
-                User.user_telegram_id == telegram_id
-            )
-            result = await session.execute(stmt)
-            user = result.scalar_one_or_none()
+            user = await load_user_phone_gate_fields_in_session(session, telegram_id)
 
         if user is None:
             logger.debug("PhoneRequiredMiddleware: user not found, pass through user=%s", telegram_id)

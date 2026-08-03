@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, Update
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.user_interface.views.phone_request import (
     get_phone_request_keyboard,
@@ -18,6 +19,29 @@ from app.utils.db.session_maker import get_async_session_maker
 router = Router()
 _sm = get_async_session_maker
 logger = logging.getLogger(__name__)
+
+
+async def save_user_phone_in_session(
+    session: AsyncSession, telegram_id: int, phone_number: str
+) -> User | None:
+    """Persist phone for an existing user (WRITE seam).
+
+    Args:
+        session: injectable async session (``sm(read_only=False)``).
+        telegram_id: Telegram user id.
+        phone_number: normalized phone string to store.
+
+    Returns:
+        Updated User, or None when the user row is missing.
+    """
+    stmt = select(User).where(User.user_telegram_id == telegram_id)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+    if user is None:
+        return None
+    user.phone = phone_number
+    await session.commit()
+    return user
 
 
 @router.message(F.contact)
@@ -47,19 +71,17 @@ async def save_user_phone(
 
     phone_number = message.contact.phone_number.strip()
     async with _sm(read_only=False) as session:
-        stmt = select(User).where(User.user_telegram_id == message.from_user.id)
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-        if user is None:
-            await bot.send_message(
-                message.chat.id,
-                "Пользователь не найден. Нажмите /start и повторите попытку.",
-                reply_markup=ReplyKeyboardRemove(),
-            )
-            return
-        user.phone = phone_number
-        await session.commit()
-        logger.debug("save_user_phone: phone saved user=%s", message.from_user.id)
+        user = await save_user_phone_in_session(
+            session, message.from_user.id, phone_number
+        )
+    if user is None:
+        await bot.send_message(
+            message.chat.id,
+            "Пользователь не найден. Нажмите /start и повторите попытку.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return
+    logger.debug("save_user_phone: phone saved user=%s", message.from_user.id)
 
     pending_callback = (await state.get_data()).get("pending_phone_callback")
     await state.update_data(pending_phone_callback=None)
