@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.fsm.context import FSMContext
@@ -16,6 +17,7 @@ from app.utils.db.session_maker import get_async_session_maker
 
 router = Router()
 _sm = get_async_session_maker
+logger = logging.getLogger(__name__)
 
 
 @router.message(F.contact)
@@ -28,6 +30,12 @@ async def save_user_phone(
     """Save the user's own Telegram contact and remove the reply keyboard."""
     if message.from_user is None or message.contact is None:
         return
+
+    logger.debug(
+        "save_user_phone: received contact user=%s contact_user=%s",
+        message.from_user.id,
+        message.contact.user_id,
+    )
 
     if message.contact.user_id != message.from_user.id:
         await bot.send_message(
@@ -51,9 +59,15 @@ async def save_user_phone(
             return
         user.phone = phone_number
         await session.commit()
+        logger.debug("save_user_phone: phone saved user=%s", message.from_user.id)
 
     pending_callback = (await state.get_data()).get("pending_phone_callback")
     await state.update_data(pending_phone_callback=None)
+    logger.debug(
+        "save_user_phone: pending callback exists user=%s has_pending=%s",
+        message.from_user.id,
+        bool(pending_callback),
+    )
     await bot.send_message(
         message.chat.id,
         "Номер телефона сохранён.",
@@ -65,4 +79,9 @@ async def save_user_phone(
     await asyncio.sleep(0.3)
     callback_query = CallbackQuery.model_validate(json.loads(pending_callback))
     replay_update = Update(update_id=message.message_id, callback_query=callback_query)
+    logger.debug(
+        "save_user_phone: replay callback user=%s data=%r",
+        message.from_user.id,
+        callback_query.data,
+    )
     await dispatcher.feed_update(bot, replay_update)

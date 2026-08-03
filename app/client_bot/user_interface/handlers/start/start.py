@@ -88,6 +88,14 @@ async def callback_start_registration(
     callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     """Открыть start-flow и восстановить главное меню или gate."""
+
+    logger.debug(
+        "callback_start_registration: enter user=%s data=%r message_chat=%s",
+        callback.from_user.id,
+        callback.data,
+        callback.message.chat.id if callback.message is not None else None,
+    )
+
     await state.clear()
     async with sm() as session:
         user_id = callback.from_user.id
@@ -99,9 +107,17 @@ async def callback_start_registration(
             )
             .where(User.user_telegram_id == user_id)
         )
-        user_result = await session.execute(stmt)
-        user: User | None = user_result.unique().scalar_one_or_none()
+
+        result = await session.execute(stmt)
+        user: User | None = result.unique().scalar_one_or_none()
+        logger.debug(
+            "callback_start_registration: user loaded user=%s exists=%s passed_gate=%s",
+            user_id,
+            user is not None,
+            user.passed_gate if user is not None else None,
+        )
         if callback.message is None:
+            logger.debug("callback_start_registration: no callback.message user=%s", user_id)
             return
         chat_id = callback.message.chat.id
         if user is None:
@@ -111,9 +127,18 @@ async def callback_start_registration(
                 username=callback.from_user.username,
                 adv_updater_user_chat_id=chat_id,
             )
+            logger.debug("callback_start_registration: created user=%s chat_id=%s", user_id, chat_id)
 
         minimal = use_minimal_presentation_ui(user_id, user.passed_gate)
+        logger.debug(
+            "callback_start_registration: decision user=%s minimal=%s passed_gate=%s invite_gate=%s",
+            user_id,
+            minimal,
+            user.passed_gate,
+            settings.invite_gate,
+        )
         if minimal:
+            logger.debug("callback_start_registration: sending minimal MainMenu user=%s", user_id)
             await MainMenu(bot, chat_id, full_client_ui=False)()
             return
 
@@ -122,12 +147,14 @@ async def callback_start_registration(
             and not user.passed_gate
             and not is_bot_admin(user_id)
         ):
+            logger.debug("callback_start_registration: sending gate screen user=%s", user_id)
             _= await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
                 reply_markup=get_gate_keyboard(),
             )
             return
+        logger.debug("callback_start_registration: sending full MainMenu user=%s", user_id)
         await MainMenu(bot, chat_id, full_client_ui=True)()
     return
 

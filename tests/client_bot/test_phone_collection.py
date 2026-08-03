@@ -3,6 +3,7 @@
 import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -135,27 +136,16 @@ async def test_phone_required_middleware_blocks_callback_without_phone() -> None
     _, session_cm = make_session_context(user=user)
 
     event = MagicMock(spec=CallbackQuery)
-    event.from_user = MagicMock(id=444, username="u")
+    event.from_user = MagicMock(id=444, username="u", is_bot=False, first_name="User")
+    event.id = "callback-id"
+    event.chat_instance = "chat-instance"
+    event.data = "adv:test"
+    # MagicMock(spec=Message) omits unset attrs; production reads .date / .message_id
+    # like aiogram Message (datetime) / InaccessibleMessage (int always present).
     event.message = MagicMock(spec=Message)
-    event.message.chat = MagicMock(spec=Chat, id=444)
-    event.model_dump.return_value = {
-        "id": "callback-id",
-        "from_user": {
-            "id": 444,
-            "is_bot": False,
-            "first_name": "User",
-        },
-        "chat_instance": "chat-instance",
-        "data": "adv:test",
-        "message": {
-            "message_id": 55,
-            "date": 0,
-            "chat": {
-                "id": 444,
-                "type": "private",
-            },
-        },
-    }
+    event.message.message_id = 55
+    event.message.date = datetime.fromtimestamp(0, tz=timezone.utc)
+    event.message.chat = MagicMock(spec=Chat, id=444, type="private")
     bot = AsyncMock()
     handler = AsyncMock()
     state = MagicMock(spec=FSMContext)
