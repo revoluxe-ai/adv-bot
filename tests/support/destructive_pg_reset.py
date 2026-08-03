@@ -10,6 +10,11 @@ TRUNCATE берёт AccessExclusiveLock на все перечисленные �
 параллельных workers / overlapping sessions это даёт ``DeadlockDetectedError``.
 Поэтому reset: (1) сериализует truncate через ``pg_advisory_xact_lock``,
 (2) ретраит bounded deadlock.
+
+Session bootstrap (``init_postgres_schema_and_seed``) перед ``DROP SCHEMA``
+терминирует чужие client backends на ``test_adv_bot_db`` и ставит
+``lock_timeout`` / ``statement_timeout`` — иначе зомби-pytest / вторая
+сессия может держать локи бесконечно (симптом: pytest «висит» на DROP).
 """
 
 from __future__ import annotations
@@ -52,6 +57,19 @@ PG_RESET_ADVISORY_LOCK_KEY: int = 874_512_903
 PG_RESET_DEADLOCK_MAX_ATTEMPTS: int = 5
 PG_RESET_DEADLOCK_BASE_DELAY_SEC: float = 0.05
 PG_RESET_DEADLOCK_MAX_DELAY_SEC: float = 0.5
+
+# Session schema bootstrap: не ждать чужие локи вечно.
+PG_SCHEMA_INIT_LOCK_TIMEOUT: str = "5s"
+PG_SCHEMA_INIT_STATEMENT_TIMEOUT: str = "60s"
+
+# SQL: убить другие client-сессии текущей БД (не себя, не autovacuum).
+PG_TERMINATE_OTHER_BACKENDS_SQL: str = """
+SELECT pg_terminate_backend(pid)
+FROM pg_stat_activity
+WHERE datname = current_database()
+  AND pid <> pg_backend_pid()
+  AND backend_type = 'client backend'
+"""
 
 
 def is_pg_deadlock_error(exc: BaseException) -> bool:
@@ -179,14 +197,41 @@ async def _restore_baseline_wbcabinet(conn: Any) -> None:
     )
 
 
+async def terminate_other_postgres_backends(conn: Any) -> None:
+    """Завершить чужие client backends на текущей БД.
+
+    Нужен перед ``DROP SCHEMA`` / тяжёлым DDL: иначе зомби-сессии держат
+    AccessExclusiveLock/row locks и pytest выглядит как hang.
+
+    Args:
+        conn: открытое SQLAlchemy async connection (внутри транзакции).
+
+    Side effects:
+        ``pg_terminate_backend`` для других client backends той же database.
+    """
+    await conn.execute(text(PG_TERMINATE_OTHER_BACKENDS_SQL))
+
+
 async def init_postgres_schema_and_seed(engine: Any) -> None:
     """Session-once: DROP/CREATE public schema + metadata.create_all + baseline.
+
+    Перед DROP терминирует чужие client backends и ограничивает lock/statement
+    timeout, чтобы bootstrap не зависал при конкурирующих pytest.
 
     Caller обязан dispose engine снаружи (``await engine.dispose()``).
     """
     from app.utils.db.base import BaseTable as Base
 
     async with engine.begin() as conn:
+        await conn.execute(
+            text(f"SET LOCAL lock_timeout = '{PG_SCHEMA_INIT_LOCK_TIMEOUT}'")
+        )
+        await conn.execute(
+            text(
+                f"SET LOCAL statement_timeout = '{PG_SCHEMA_INIT_STATEMENT_TIMEOUT}'"
+            )
+        )
+        await terminate_other_postgres_backends(conn)
         await conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE;"))
         await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public;"))
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm;"))
