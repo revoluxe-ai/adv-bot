@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import io
+import math
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from openpyxl.styles import Font, PatternFill
@@ -37,14 +38,14 @@ class TargetPlaceImportSummary:
     skipped_empty_rows: int = 0
     not_found_rows: int = 0
     validation_error_rows: int = 0
-    errors: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list[str])
 
 
 def _is_empty(value: Any) -> bool:
     """Return True for blank cell values used by pandas/openpyxl."""
     if value is None:
         return True
-    if isinstance(value, float) and pd.isna(value):
+    if isinstance(value, float) and math.isnan(value):
         return True
     if isinstance(value, str) and not value.strip():
         return True
@@ -58,7 +59,7 @@ def _parse_positive_int(value: Any, *, field_name: str) -> int:
     if isinstance(value, int):
         parsed = value
     elif isinstance(value, float):
-        if pd.isna(value) or not float(value).is_integer():
+        if math.isnan(value) or not float(value).is_integer():
             raise ValueError(f"{field_name} должно быть целым числом больше 0")
         parsed = int(value)
     elif isinstance(value, str):
@@ -98,11 +99,11 @@ async def build_target_place_workbook(adv_original_id: int) -> bytes:
 
 def write_target_place_workbook_rows(rows: list[dict[str, Any]]) -> bytes:
     """Write workbook rows in the target place template format."""
-    df = pd.DataFrame(rows, columns=_HEADERS)
+    df = pd.DataFrame(rows, columns=cast(Any, _HEADERS))
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, sheet_name=_SHEET_NAME, index=False, startrow=1)
-        ws = writer.book[_SHEET_NAME]
+    with pd.ExcelWriter(cast(Any, buf), engine="openpyxl") as writer:
+        cast(Any, df).to_excel(writer, sheet_name=_SHEET_NAME, index=False, startrow=1)
+        ws: Any = writer.book[_SHEET_NAME]
         ws.cell(row=1, column=1, value=_LEGEND_TEXT)
         ws.merge_cells(start_row=1, end_row=1, start_column=1, end_column=len(_HEADERS))
         for col_idx, header in enumerate(_HEADERS, start=1):
@@ -120,7 +121,7 @@ def write_target_place_workbook_rows(rows: list[dict[str, Any]]) -> bytes:
                 allow_blank=True,
             )
             ws.add_data_validation(validation)
-            validation.add(f"{target_col}3:{target_col}{last_row}")
+            cast(Any, validation).add(f"{target_col}3:{target_col}{last_row}")
     buf.seek(0)
     return buf.getvalue()
 
@@ -128,12 +129,13 @@ def write_target_place_workbook_rows(rows: list[dict[str, Any]]) -> bytes:
 def read_target_place_workbook(content: bytes) -> list[dict[str, Any]]:
     """Read workbook created by build_target_place_workbook."""
     bio = io.BytesIO(content)
-    df = pd.read_excel(bio, header=1, engine="openpyxl")
+    df = cast(Any, pd).read_excel(bio, header=1, engine="openpyxl")
     df.columns = [str(column).strip() for column in df.columns]
     missing = [header for header in _HEADERS if header not in df.columns]
     if missing:
         raise ValueError(f"В файле нет обязательных колонок: {', '.join(missing)}")
-    return df.to_dict(orient="records")
+    records = cast(list[dict[Any, Any]], df.to_dict(orient="records"))
+    return [{str(key): value for key, value in record.items()} for record in records]
 
 
 async def apply_target_place_workbook(

@@ -74,6 +74,8 @@ async def to_page_for_cpm_setting(
     bot: aiogram.Bot,
 ) -> None:
     """Open CPM settings page for the selected campaign."""
+    if callback.message is None:
+        return
     adv_original_id = callback_data.adv_original_id
     await messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)
 
@@ -83,7 +85,7 @@ async def get_max_cpm(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     """Persist target place and request max CPM only when it is still missing."""
-    text = message.text
+    text = message.text or ""
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -130,7 +132,7 @@ async def set_max_cpm(
 ) -> None:
     """Persist max CPM and enable bidder, keeping any prior target place value."""
     data = await state.get_data()
-    text = message.text
+    text = message.text or ""
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -167,6 +169,8 @@ async def set_manual_cpm(
     state: FSMContext,
 ) -> None:
     """Request manual max CPM value for the selected campaign."""
+    if callback.message is None:
+        return
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
     await state.set_state(states.CPMSetting.waiting_for_manual_cpm)
@@ -178,7 +182,7 @@ async def set_manual_cpm_message(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     """Save manual max CPM without touching bidder or bot activity flags."""
-    text = message.text
+    text = message.text or ""
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -214,6 +218,8 @@ async def set_max_position(
     state: FSMContext,
 ) -> None:
     """Request a new shared target place for the selected campaign."""
+    if callback.message is None:
+        return
     adv_original_id = callback_data.adv_original_id
     async with sm(read_only=True) as session:
         adv = await _load_adv_setting(session, adv_original_id)
@@ -244,7 +250,7 @@ async def set_max_position_message(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     """Save shared target place and propagate it to all campaign keywords."""
-    text = message.text
+    text = message.text or ""
     if "/start" in text:
         await state.set_state(state=None)
         await start.start_registration(message, bot, state)
@@ -285,6 +291,8 @@ async def download_target_places_template(
     state: FSMContext,
 ) -> None:
     """Export xlsx template with editable target places for campaign keywords."""
+    if callback.message is None:
+        return
     adv_original_id = callback_data.adv_original_id
     async with sm(read_only=True) as session:
         adv = await _load_adv_setting(session, adv_original_id)
@@ -321,6 +329,8 @@ async def upload_target_places_template_start(
     state: FSMContext,
 ) -> None:
     """Switch FSM to workbook upload mode for campaign target places."""
+    if callback.message is None:
+        return
     adv_original_id = callback_data.adv_original_id
     async with sm(read_only=True) as session:
         adv = await _load_adv_setting(session, adv_original_id)
