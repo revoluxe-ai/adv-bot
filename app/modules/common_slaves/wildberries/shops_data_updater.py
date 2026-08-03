@@ -227,7 +227,6 @@ class ShopDataUpdater:
                 )
             ).where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,
-
             )
             .where(
                 models.AdvSetting.wb_cabinet_id == wb_cabinet_id,))
