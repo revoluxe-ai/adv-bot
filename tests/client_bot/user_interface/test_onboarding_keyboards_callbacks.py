@@ -211,3 +211,35 @@ def test_reset_shop_non_relevant_phrases_callback_pack_unpack() -> None:
     unpacked = callbacks.ResetShopNonRelevantPhrases.unpack(packed)
     assert unpacked.wb_user_cabinet_original_id == 321
     assert packed.startswith("reset_shop_non_rel:")
+
+
+def test_shop_menu_keyboard_free_hides_mass_ops_button() -> None:
+    """ShopMenu FREE keyboard does not show the mass operations entry."""
+    from app.modules.shop_menu.message import ShopMenu
+
+    bot = MagicMock()
+    state = MagicMock()
+    state.update_data = MagicMock(return_value=None)
+    cabinet_id = 42
+    menu = ShopMenu(
+        bot=bot,
+        chat_id=123,
+        state=state,
+        wb_user_cabinet_original_id=cabinet_id,
+        redis_client=None,
+    )
+    wb_cabinet = MagicMock()
+    wb_cabinet.id = 1
+    wb_cabinet.white_list_update_active = False
+    wb_cabinet.default_max_cpm = 100
+    wb_user_cabinet = MagicMock()
+    wb_user_cabinet.id = cabinet_id
+    wb_user_cabinet.wb_cabinet = wb_cabinet
+    menu._wb_user_cabinet = wb_user_cabinet
+    menu._wb_cabinet = wb_cabinet
+    menu._user_telegram_id = 123
+    menu._ui_access = UiAccessMode.FREE
+
+    kb = menu.keyboard
+    all_texts = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "РњР°СЃСЃРѕРІС‹Рµ РѕРїРµСЂР°С†РёРё СЃ Р Рљ" not in all_texts

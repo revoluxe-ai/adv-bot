@@ -46,7 +46,12 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
     callback_data = callbacks.ShopMassAdvOpsBack(
         wb_user_cabinet_original_id=wb_user_cabinet_id
     )
-    wb_cabinet = SimpleNamespace(id=7, active=True)
+    wb_cabinet = SimpleNamespace(
+        id=7,
+        active=True,
+        adv_settings=[SimpleNamespace(bot_active=True)],
+    )
+    user = Mock()
 
     # non-admin user: admin UI-mode toggle must not appear; .user must be present
     # so close → build_shop_main_keyboard matches production eager-loaded shape.

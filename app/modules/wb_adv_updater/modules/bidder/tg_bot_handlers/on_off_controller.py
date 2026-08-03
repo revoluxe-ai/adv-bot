@@ -3,6 +3,7 @@
 import aiogram
 from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.client_bot.user_interface import states
@@ -18,7 +19,7 @@ sm = get_async_session_maker
 router = Router()
 
 
-async def _load_adv_setting(session, adv_original_id: int) -> AdvSetting | None:
+async def _load_adv_setting(session: AsyncSession, adv_original_id: int) -> AdvSetting | None:
     """Load CPM campaign settings for bidder toggle flow."""
     return await session.get(AdvSetting, adv_original_id)
 

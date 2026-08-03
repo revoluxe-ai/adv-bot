@@ -86,6 +86,7 @@ def build_shop_main_keyboard(
     wb_cabinet: WBCabinet,
     ui_access: UiAccessMode = UiAccessMode.FREE,
 ) -> InlineKeyboardMarkup:
+
     """Собрать главную inline-клавиатуру магазина.
 
     Админский toggle режима UI добавляется только при валидном
@@ -100,6 +101,7 @@ def build_shop_main_keyboard(
     Returns:
         InlineKeyboardMarkup главной клавиатуры магазина.
     """
+    """Build the shop menu keyboard for the effective free/paid access mode."""
     wb_cabinet_original_id = wb_cabinet.id
     builder = InlineKeyboardBuilder()
 
