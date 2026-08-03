@@ -41,16 +41,34 @@ Working team layout for this repo (keep it lean):
 
 ## Shell / env gate
 
-Canonical human cmds: `pyright-strict`, `mypy .`, `poetry run pytest -m unit -n 8 --dist=worksteal`, `poetry run pytest`.
+Canonical human cmds: `pyright-strict`, `mypy .`, targeted
+`poetry run pytest -m unit|integration <paths>`, full
+`poetry run pytest -m unit -n 8 --dist=worksteal`,
+`poetry run pytest -m integration`, and FULL-only
+`poetry run pytest -m destructive_local` (+ ALLOW_*). Never bare
+`poetry run pytest`.
 Workers **must** invoke via `bash .cursor/static-check/bin/run.sh -- ...` (see `base/shell.md`).
-Launch workers via Task `subagent_type` = registry `task_type` (`shell` primary).
+Launch workers via Task `subagent_type` = registry `task_type` (`shell` short
+checks; `generalPurpose` long suite waves).
+Launch-infra: missing packet / Agent Looping / **silent stall** → interrupt
+open Task if needed → exactly one Task `generalPurpose` retry (same prompt).
+If Task budget exhausted and suite never started → one **orchestrator-direct**
+`run.sh` + synthesize packet; then ERROR. Not a product-test FAIL. Exclude
+live pytest (PG lock) and full `STOP_RUN`.
 Optional `PREFLIGHT` token only; default off. Check runs must not edit infra to self-heal.
-Wave B only if `pytest-unit` STATUS=PASS.
+Pytest cascade: targeted → unit → integration → (FULL) destructive; hard-stop
+on FAIL|BLOCKED|ERROR; no deselect of dirty paths in suite waves.
 
 ## Do not
 
 - Duplicate SoT in `opsx-static-check-workers/` or fat agent bodies
 - Prefer custom project agent names that are not in the Cursor Task enum
+- Prefer Task `shell` for long suite waves (use registry GP)
 - Auto-delegate workers with vague “use proactively” for general coding
-- Run `pytest-full` in parallel with `pytest-unit`
+- Run suite pytest waves in parallel with each other or with targeted
+- Schedule `pytest-destructive` in FAST / launch retired `pytest-full`
+- Retry the same CHECK_ID more than once via Task after launch-infra failure
+  (orchestrator-direct once is allowed after Task budget)
+- Treat Agent Looping / empty packet / silent stall as pytest FAIL without a
+  worker packet
 - End the orchestrator chat after fan-out / partial READY without Final report (WAIT contract in command + `base/worker-prompt.md`)

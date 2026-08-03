@@ -1,8 +1,4 @@
-# pytest-full — context
+# pytest-full — RETIRED
 
-- Includes unit + integration and may need Docker/DB/local services.
-- Honest environment failures beat fake "test-failure" labels.
-- Heavier than unit; expected only in MODE=FULL.
-- Invoke `poetry run pytest` (no path arg) so `testpaths = tests` applies.
-  Do **not** pass `.` — that overrides testpaths and may collect `.tmp/**`
-  harness / docker-volume trees (collection errors, not missing libs).
+Historical pack for bare `poetry run pytest`. Removed from registry.
+See `pytest-targeted`, `pytest-unit`, `pytest-integration`, `pytest-destructive`.

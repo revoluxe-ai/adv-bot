@@ -1,24 +1,15 @@
-# pytest-full — instructions
+# pytest-full — RETIRED
 
-From repo root:
+**Retired.** Do not launch this check.
 
-```bash
-bash .cursor/static-check/bin/run.sh -- poetry run pytest
-```
+Replaced by the pytest cascade in `.cursor/static-check/registry.yaml`:
 
-Packet COMMAND: `poetry run pytest`
+1. `pytest-targeted` — dirty/related paths (working tree)
+2. `pytest-unit` — `-m unit`
+3. `pytest-integration` — `-m integration`
+4. `pytest-destructive` — `-m destructive_local` (FULL only)
 
-Do **not** pass path `.` — it overrides `pytest.ini` `testpaths = tests` and may
-collect `.tmp/**` / volume trees.
+Bare `poetry run pytest` (no marker) is forbidden in `/opsx-static-check`.
 
-**Orchestrator gate:** start only if `pytest-unit` packet `STATUS=PASS`.
-If unit is FAIL/BLOCKED/ERROR → do **not** run this check (`SKIPPED`).
-
-If unavailable → STATUS=BLOCKED.
-Do not run pyright or mypy.
-
-## Parsing
-
-Prefer failed node ids.
-Missing infra → severity `environment` (or `collection-error`).
-Exit 0 → PASS. Non-zero with failures → FAIL.
+If an orchestrator still references `pytest-full` → treat as ERROR/misconfig;
+use the cascade packs instead.

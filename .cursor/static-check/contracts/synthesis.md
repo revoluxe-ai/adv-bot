@@ -10,7 +10,8 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
    line numbers when synthesizing PROBLEMS.
 2. **Bucket** every finding into exactly one of:
    - `STATIC` — pyright-strict, mypy
-   - `TESTS` — pytest-unit, pytest-full
+   - `TESTS` — pytest-targeted, pytest-unit, pytest-integration,
+     pytest-destructive (retired id `pytest-full` must not appear)
 3. **Deduplicate intersections** before grouping (never emit the same issue as
    two P# entries):
    - same path + line + symbol, or

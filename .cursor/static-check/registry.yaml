@@ -1,6 +1,10 @@
 # Static-check registry — source of truth for /opsx-static-check
 # Add a check: create checks/<id>/*, then a row here.
 # Launch: Task tool with task_type (Cursor Task enum). Never use custom agent names.
+#
+# Pytest cascade (hard stop: FAIL|BLOCKED|ERROR → later pytest waves SKIPPED):
+#   targeted → unit → integration → (FULL only) destructive_local
+# FAST never schedules pytest-destructive. Do not run bare `poetry run pytest`.
 
 version: 1
 
@@ -9,18 +13,42 @@ modes:
     waves:
       - id: A
         parallel: true
-        checks: [pyright-strict, mypy, pytest-unit]
+        checks: [pyright-strict, mypy, pytest-targeted]
+      - id: U
+        parallel: false
+        after: [pytest-targeted]
+        require_status: PASS
+        checks: [pytest-unit]
+        note: "Start pytest-unit only if pytest-targeted STATUS=PASS. Never parallel with targeted."
+      - id: I
+        parallel: false
+        after: [pytest-unit]
+        require_status: PASS
+        checks: [pytest-integration]
+        note: "Start pytest-integration only if pytest-unit STATUS=PASS."
   FULL:
     waves:
       - id: A
         parallel: true
-        checks: [pyright-strict, mypy, pytest-unit]
-      - id: B
+        checks: [pyright-strict, mypy, pytest-targeted]
+      - id: U
+        parallel: false
+        after: [pytest-targeted]
+        require_status: PASS
+        checks: [pytest-unit]
+        note: "Start pytest-unit only if pytest-targeted STATUS=PASS. Never parallel with targeted."
+      - id: I
         parallel: false
         after: [pytest-unit]
         require_status: PASS
-        checks: [pytest-full]
-        note: "Start pytest-full only if pytest-unit STATUS=PASS. Never parallel with unit."
+        checks: [pytest-integration]
+        note: "Start pytest-integration only if pytest-unit STATUS=PASS."
+      - id: D
+        parallel: false
+        after: [pytest-integration]
+        require_status: PASS
+        checks: [pytest-destructive]
+        note: "FULL only. Start pytest-destructive only if pytest-integration STATUS=PASS. Requires ALLOW_* + docker-compose.test.yml."
 
 checks:
   pyright-strict:
@@ -29,12 +57,20 @@ checks:
   mypy:
     task_type: shell
     pack: .cursor/static-check/checks/mypy
+  pytest-targeted:
+    task_type: shell
+    pack: .cursor/static-check/checks/pytest-targeted
+  # Long suite waves: generalPurpose primary (shell Task often Agent-Loops /
+  # silent-stalls before pytest starts). Short checks stay on shell.
   pytest-unit:
-    task_type: shell
+    task_type: generalPurpose
     pack: .cursor/static-check/checks/pytest-unit
-  pytest-full:
-    task_type: shell
-    pack: .cursor/static-check/checks/pytest-full
+  pytest-integration:
+    task_type: generalPurpose
+    pack: .cursor/static-check/checks/pytest-integration
+  pytest-destructive:
+    task_type: generalPurpose
+    pack: .cursor/static-check/checks/pytest-destructive
 
 shared_load:
   - .cursor/static-check/base/worker-rules.md

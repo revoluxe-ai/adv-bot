@@ -9,13 +9,26 @@ alwaysApply: false
 
 # opsx-static-check infra invariants
 
-1. Workers launch via Cursor Task enum (`registry.task_type`, primary `shell`). Never try custom `opsx-sc-*` agent names as Task `subagent_type`.
+1. Workers launch via Cursor Task enum (`registry.task_type`: `shell` for
+   short checks; `generalPurpose` for long suite waves). Never try custom
+   `opsx-sc-*` agent names as Task `subagent_type`.
 2. Check details live only in `.cursor/static-check/checks/<id>/`.
 3. Composition of MODE/waves lives only in `.cursor/static-check/registry.yaml`.
 4. Workers/orchestrator are READ_ONLY; no autofix; no archive `GO`/`NO_GO`; **no self-repair** of check infra during a check run.
 5. Do not reintroduce a second SoT (`opsx-static-check-workers/` or fat agent copies).
 6. Canonical human cmds via runner: `bash .cursor/static-check/bin/run.sh -- …`.
 7. Preflight is **optional** (`PREFLIGHT` token only); default off.
-8. Wave B (`pytest-full`) only if `pytest-unit` STATUS=PASS.
+8. Pytest cascade: `pytest-targeted` → `pytest-unit` → `pytest-integration` →
+   (FULL only) `pytest-destructive`. Each later pytest wave only if prior
+   STATUS=PASS. Never bare `poetry run pytest` / retired `pytest-full`. Never
+   deselect dirty paths from suite waves. Never schedule destructive in FAST.
 9. Prompt body comes from `.cursor/static-check/base/worker-prompt.md` + pack LOAD list.
-10. Orchestrator **WAIT contract**: incomplete until Final report; never stop the chat after fan-out / partial WORKER READY; resume on each Task notification until all wave packets are in.
+10. Orchestrator **WAIT contract**: incomplete until Final report; never stop the chat after fan-out / partial WORKER READY; resume on each Task notification **or** silent-stall signal until all wave packets are in.
+11. **Launch-infra retry:** empty/missing worker packet, Agent Looping, Task
+    abort without packet, **or silent stall** → interrupt open Task if needed →
+    exactly one Task `generalPurpose` retry (same prompt). Not a pytest FAIL.
+    Never more than one Task retry per CHECK_ID. Exclude live pytest (PG lock)
+    and full `STOP_RUN`.
+12. **Orchestrator-direct:** after Task launch-infra budget exhausted and the
+    check never started → one orchestrator Shell `run.sh` + synthesize packet.
+    Not a second Task retry. Then ERROR if that also fails.
