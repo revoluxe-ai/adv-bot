@@ -1,4 +1,3 @@
-from app.client_bot import const
 from app.settings import settings
 
 

@@ -1,4 +1,4 @@
-from enum import StrEnum, auto
+from enum import StrEnum
 
 #TODO Надо выпилить, не актуально. Теперь режим задается в ComplexAdv.strategy
 class TargetPositionMode(StrEnum):

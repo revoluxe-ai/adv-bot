@@ -23,9 +23,6 @@ async def check_subscribe(
     state: FSMContext,
 ) -> None:
     """Re-check channel membership and continue the normal start flow."""
-    if callback.from_user is None:
-        return
-
     subscription_status = await is_user_subscribed_to_support_channel(
         bot,
         callback.from_user.id,
