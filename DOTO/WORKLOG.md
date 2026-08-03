@@ -442,3 +442,5 @@ Raw notes from `/opsx-bound-scope:GO`. Not current change DoD. Return via `/opsx
   source: proposal Out of scope
   reason: out_of_current_mvp
   notes: отдельные triage; не смешивать с drop Neo4j config
+
+внедрить нагрузочные тесты
