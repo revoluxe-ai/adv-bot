@@ -5,9 +5,10 @@
 ```text
 pyright-strict
 mypy .
-poetry run pytest -m unit <paths…>          # pytest-targeted (unit bucket)
-poetry run pytest -m integration <paths…>   # pytest-targeted (integration bucket)
+poetry run pytest -m unit <paths…>          # pytest-targeted unit bucket (≤1; prefilter destructive)
+poetry run pytest -m integration <paths…>   # pytest-targeted integration bucket (≤1; skip if empty)
 poetry run pytest -m unit -n 8 --dist=worksteal
+poetry run pytest -m unit -x               # pytest-unit fallback classifier only
 poetry run pytest -m integration
 poetry run pytest -m destructive_local      # FULL only; requires ALLOW_*
 ```
@@ -20,6 +21,7 @@ bash .cursor/static-check/bin/run.sh -- mypy .
 bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit <paths…>
 bash .cursor/static-check/bin/run.sh -- poetry run pytest -m integration <paths…>
 bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit -n 8 --dist=worksteal
+bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit -x
 bash .cursor/static-check/bin/run.sh -- poetry run pytest -m integration
 bash .cursor/static-check/bin/run.sh -- poetry run pytest -m destructive_local
 ```
@@ -50,3 +52,17 @@ Do **not** invoke bare `poetry run pytest` (no marker) — retired with
 - Pytest cascade: targeted PASS → unit → integration → (FULL only) destructive.
   Later pytest waves SKIPPED on FAIL|BLOCKED|ERROR. Never deselect dirty paths
   from suite waves. Never schedule destructive in FAST.
+- **xdist only on full unit:** `-n` / `--dist=worksteal` is allowed solely for
+  `poetry run pytest -m unit -n 8 --dist=worksteal`. Never add xdist to
+  targeted path runs, integration, or destructive.
+- **unit fallback classifier:** `poetry run pytest -m unit -x` is allowed only
+  after pytest-unit xdist INFRA retry is exhausted (see pytest-unit pack).
+- **pytest-targeted:** prefilter `destructive_local` before Shell; ≤1 run per
+  non-empty bucket; empty/exit 5 → PASS+note, never exclude+rerun.
+- **Stale pytest:** before Wave U (and before pytest-unit INFRA retry), clear
+  orphaned pytest/xdist for this REPO_ROOT (see pytest-unit instructions).
+  Concurrent second `-n` suite on the same tree is unsupported.
+  Kill only eligible pre-run orphans outside current run tree; ambiguous
+  ownership => `blocked_hygiene_ambiguous` (do not blind-kill).
+- **pytest-unit owner:** orchestrator Shell (`task_type: orchestrator`), not a
+  nested Task.

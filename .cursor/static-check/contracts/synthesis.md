@@ -3,6 +3,12 @@
 SoT for Final report PROBLEMS after fan-in. Orchestrator must follow this
 exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
 
+Run metadata contract (printed in Final SUMMARY):
+
+- `A_REUSED: yes|no (fingerprint=<id|n/a>)`
+- when resume profile `FROM_WAVE=U` is used, Wave A checks must appear in
+  CHECKS as `SKIPPED (A_REUSED)` and are not treated as failures.
+
 ## Steps
 
 1. **Normalize** findings from all packets (path, line, symbol/node, code,
@@ -31,13 +37,18 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
    - `fix_target` — one line (file:line/symbol or test to repair; not an opsx command)
    - `fix_cmd` — recommended repair command for this group:
      - STATIC bucket → `/opsx-fix-types`
-     - TESTS bucket → `/opsx-test-triage`
+     - TESTS bucket with failed node ids / assertion failures → `/opsx-test-triage`
+    - TESTS / pytest-unit `ERROR infra_suite_hard` (fallback non-xdist also
+      infra-crashed without failed nodes) → owner recover:
+      kill leftover pytest for REPO_ROOT, inspect env/xdist instability,
+      re-run `/opsx-static-check` Wave U (or canonical unit command) —
+      **not** `/opsx-test-triage`
      - env/config group (if any) → short recover step text (not opsx-fix-*)
    - `seen_in`
    Evidence lines inside a group: ≤4.
 5. **Rank** within each bucket (then print STATIC first, then TESTS):
-   environment/config → collection → multi-tool typing → typing →
-   multi-seen pytest → other pytest → other.
+   environment/config → infra_suite (xdist worker-death) → collection →
+   multi-tool typing → typing → multi-seen pytest → other pytest → other.
 6. **Hard body budget** (Final PROBLEMS section only, ~half chat max):
    - ≤12 problem groups total across both buckets
    - ≤80 lines AND ≤3500 characters for the PROBLEMS body
@@ -49,8 +60,11 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
    repeating the same stack/source blob across groups.
 8. **One NEXT_ACTION** (what to run *first* now; still exactly one line):
    - env/config → recover step
+  - else pytest-unit `ERROR infra_suite_hard` / fallback infra crash without
+    failed nodes → kill leftover pytest; recover env; re-run unit/static-check
+    (not test-triage)
    - else typing / multi-tool typing → `/opsx-fix-types`
-   - else pytest → `/opsx-test-triage`
+   - else pytest with failed nodes → `/opsx-test-triage`
    - PASS → continue (optional `/opsx-verify` hint only; never archive GO)
    Per-group `fix_cmd` does **not** replace this single NEXT_ACTION.
 9. **Delivery:** Final report is mandatory after fan-in even when Agent Team /

@@ -27,7 +27,35 @@ collection / pytest node without a file line).
 
 STATUS rules:
 
-- PASS — exit 0, no blocking diagnostics
-- FAIL — tool ran; diagnostics/failures present
+- PASS — exit 0, no blocking diagnostics; also pytest-targeted bucket N/A
+  (empty after prefilter / exit 5 no failed nodes) with NOTES such as
+  `bucket_empty_skipped:<unit|integration>` or
+  `bucket_empty_collection:<unit|integration>` / `not_applicable_no_related_tests`
+- FAIL — tool ran; diagnostics/failures present (not empty-collection exit 5)
 - BLOCKED — cannot run (missing poetry/config/script)
 - ERROR — unexpected crash / invalid execution
+
+Optional NOTES line (when used by a pack): short tokens only; do not replace
+STATUS.
+Recommended tokens:
+- `UNIT_RECOVERY_PATH=none|xdist_retry|fallback_non_xdist` (pytest-unit)
+- `bucket_empty_skipped:<unit|integration>` / `bucket_empty_collection:<unit|integration>`
+- `not_applicable_no_related_tests`
+
+For pytest-unit infra ladders:
+- first xdist worker-death without failed nodes => `STATUS: ERROR` +
+  `ERROR: infra_suite` (before retry/fallback handling),
+- fallback non-xdist infra crash without failed nodes =>
+  `STATUS: ERROR` + `ERROR: infra_suite_hard`.
+
+Orchestrator Final vs this packet:
+
+- Each check still returns the packet shape above (`CHECK_ID` / `STATUS` / …).
+- The **command Final report** (user-visible completion) is separate and must
+  start with `STATUS: PASS|FAIL|BLOCKED|ERROR` plus `CHECKS` (see
+  `opsx-static-check.md` §5).
+- Progress-only orchestrator text («Wave A in flight», «waiting for packets»,
+  «cascade continues», or equivalent without that Final block) is an
+  **incomplete run**. Supervisor / owner envelopes MUST set
+  `REPORTED_STATUS=INCOMPLETE_RUN` (not success-shaped PASS/FAIL) when only
+  progress was emitted.

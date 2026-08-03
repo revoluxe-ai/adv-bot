@@ -1,9 +1,26 @@
-# Worker Task prompt template
+# Worker / orchestrator execution template for /opsx-static-check
 
-Orchestrator builds one Task per check. Use registry `task_type` as Task `subagent_type`
-(must be a real Cursor Task enum value, e.g. `shell`). Do **not** invent custom agent names.
+## Default launch: `SERIAL_ORCHESTRATOR` (no nested Task)
 
-## Required prompt body
+Unless the Owner message contains the **exact** token `PARALLEL_TASKS`:
+
+- Do **not** create Cursor Task workers for any check.
+- The **parent orchestrator** runs every scheduled check via Shell:
+  `bash .cursor/static-check/bin/run.sh -- <canonical command from instructions>`
+- Synthesize each worker packet locally (schema in `contracts/worker-packet.md`).
+- Registry `task_type` / wave `parallel` are ignored under this default.
+- Complete the cascade, then emit the Final report (`STATUS` + `CHECKS` +
+  `NEXT ACTION`). Progress-only lines are never terminal.
+
+## Opt-in: `PARALLEL_TASKS` (legacy Task fan-out)
+
+Only when Owner passes `PARALLEL_TASKS`: orchestrator builds one Task per
+**Task-launched** check. Use registry `task_type` as Task `subagent_type` when
+it is a real Cursor Task enum value (`shell` / `generalPurpose`). For
+`task_type: orchestrator` (pytest-unit): **do not** create a Task — see
+«pytest-unit orchestrator path» below. Do **not** invent custom agent names.
+
+## Required prompt body (Task workers under `PARALLEL_TASKS` only)
 
 ```text
 You are a READ-ONLY static-check worker.
@@ -30,18 +47,38 @@ Rules:
 Working directory: <abs REPO_ROOT>
 ```
 
-## Launch
+## Launch (`PARALLEL_TASKS` only)
 
 - `run_in_background: true` for parallel wave members (launch **all** wave checks in one orchestrator turn)
-- Use registry `task_type` as primary: `shell` for short checks (pyright /
-  mypy / pytest-targeted); `generalPurpose` for long suite waves
-  (`pytest-unit` / `pytest-integration` / `pytest-destructive`). Do **not**
-  prefer shell for suite waves — shell Task often Agent-Loops / silent-stalls
-  before pytest starts.
-- Initial fallback if registry `task_type` unavailable in the live Task enum:
-  `generalPurpose` with the **same** prompt body
+- Use registry `task_type` as primary:
+  - `shell` — short checks (`pyright-strict` / `mypy` / `pytest-targeted`)
+  - `orchestrator` — **pytest-unit only**: do **not** create a Task; the
+    orchestrator runs hygiene + `run.sh` itself via Shell and synthesizes the
+    worker packet (see pytest-unit instructions)
+  - `generalPurpose` — other long suite waves (`pytest-integration` /
+    `pytest-destructive`). Do **not** prefer shell for those — shell Task
+    often Agent-Loops / silent-stalls before pytest starts
+- Initial fallback if registry `task_type` unavailable in the live Task enum
+  (and the check is **not** `orchestrator`): `generalPurpose` with the **same**
+  prompt body
+
+## pytest-unit orchestrator path (mandatory always)
+
+1. Stale-pytest hygiene (≤ ~5s) per `checks/pytest-unit/instructions.md`.
+2. Run once: `bash .cursor/static-check/bin/run.sh -- poetry run pytest -m unit -n 8 --dist=worksteal`.
+3. Parse STATUS: PASS / FAIL (failed nodes) / ERROR `infra_suite` (xdist
+   worker-death / INTERNALERROR / exit 2|3 with **no** failed node ids).
+4. On `infra_suite`: exactly one INFRA recovery = hygiene again + one Shell
+   re-run; emit `WORKER INFRA RETRY: pytest-unit → orchestrator-shell`.
+5. Never fan-out Task for pytest-unit. Launch-infra Task retry does **not**
+   apply to this check (already orchestrator-owned).
 
 ## Launch-infra retry (exactly one Task retry)
+
+Applies only under `PARALLEL_TASKS` to checks launched via Task
+(`shell` / `generalPurpose`). **Not** for `task_type: orchestrator`
+(pytest-unit). **Not** under default `SERIAL_ORCHESTRATOR` (all checks already
+parent Shell).
 
 Treat as **launch-infra failure** (not a pytest FAIL) when ANY of:
 
@@ -68,20 +105,35 @@ and the **same** prompt body (still READ_ONLY; same `run.sh` command).
 - **Not** launch-infra: matching `pytest`/`run.sh` is alive (e.g. PG lock
   hang) → env / concurrent-suite; owner `STOP_RUN` of entire static-check →
   no retry.
+- **Not** launch-infra: pytest finished with `INTERNALERROR` / «no active
+  workers» without failed nodes → that is **INFRA suite** recovery on
+  pytest-unit (orchestrator path above), not a Task retry.
 
 ## Orchestrator-direct fallback (exactly one)
 
-If the one Task launch-infra retry is exhausted **and** the check never
-started (no parseable packet; no matching `pytest`/`run.sh` / command
-output) → orchestrator runs **once** via its own Shell tool:
-`bash .cursor/static-check/bin/run.sh -- <canonical command>`, synthesizes a
-worker packet, continues cascade. Not a second Task retry. If that also fails
-→ `STATUS=ERROR`; later pytest waves SKIPPED per cascade gates.
+Applies under `PARALLEL_TASKS` only. If the one Task launch-infra retry is
+exhausted **and** the check never started (no parseable packet; no matching
+`pytest`/`run.sh` / command output) → orchestrator runs **once** via its own
+Shell tool: `bash .cursor/static-check/bin/run.sh -- <canonical command>`,
+synthesizes a worker packet, continues cascade. Not a second Task retry. If
+that also fails → `STATUS=ERROR`; later pytest waves SKIPPED per cascade gates.
 
-## Orchestrator wait (mandatory)
+Does **not** apply to pytest-unit primary path (already orchestrator Shell);
+pytest-unit uses INFRA recovery instead when the suite itself dies on xdist.
+Under default `SERIAL_ORCHESTRATOR`, every check is already orchestrator Shell
+— this fallback is unused.
 
-- Fan-out without fan-in/Final report = **incomplete run**
-- After background launch, ending the turn is only to receive completion notifications — not to stop the command
+## Orchestrator wait / completion (mandatory)
+
+- Fan-out / progress without fan-in/Final report = **incomplete run**
+  (`INCOMPLETE_RUN` for supervisor / owner envelopes — not PASS/FAIL).
+- **Forbidden as sole/terminal user-visible content:**
+  - “Wave A in flight”
+  - “waiting for packets”
+  - “cascade continues”
+  - any equivalent progress-only wording without Final `STATUS:` + `CHECKS`
+- After background launch (`PARALLEL_TASKS`), ending the turn is only to receive
+  completion notifications — not to stop the command. Resume until Final.
 - On each worker notification **or** silent-stall signal: record packet **or**
   apply Launch-infra Task retry once **or** (after Task budget) orchestrator-direct;
   if wave still open → keep waiting; if wave complete → continue immediately

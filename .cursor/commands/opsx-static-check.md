@@ -1,6 +1,6 @@
 ---
-description: "Единая read-only точка статических проверок: MODE=FULL|FAST; parallel Task workers; сводный отчёт."
-argument-hint: "[FAST|FULL] [PREFLIGHT]"
+description: "Единая read-only точка статических проверок: MODE=FULL|FAST; optional FROM_WAVE=U resume; сводный отчёт."
+argument-hint: "[FAST|FULL] [PREFLIGHT] [FROM_WAVE=U] [A_REUSE_FINGERPRINT=<id>]"
 ---
 
 # /opsx-static-check
@@ -29,6 +29,8 @@ $ARGUMENTS
 | (нет MODE) / `FULL` | `MODE=FULL` |
 | `FAST` | `MODE=FAST` |
 | `PREFLIGHT` | run optional env preflight before fan-out |
+| `FROM_WAVE=U` | resume profile: skip Wave A, start from Wave U (only with A-reuse proof) |
+| `A_REUSE_FINGERPRINT=<id>` | proof token for `FROM_WAVE=U` (must match current working-tree fingerprint) |
 | иное неизвестное | `STATUS=BLOCKED`, не запускать agents |
 
 Примеры:
@@ -37,6 +39,7 @@ $ARGUMENTS
 - `/opsx-static-check FAST` → FAST, без preflight
 - `/opsx-static-check FULL PREFLIGHT` → FULL + preflight
 - `/opsx-static-check PREFLIGHT FAST` → FAST + preflight
+- `/opsx-static-check FULL FROM_WAVE=U A_REUSE_FINGERPRINT=<id>` → resume from Wave U (A reused)
 
 ## Purpose / boundaries
 
@@ -68,6 +71,22 @@ Shared contracts: `.cursor/commands/opsx-source-resolution.md`, `.cursor/command
 
 Read `.cursor/static-check/registry.yaml` and `.cursor/static-check/contracts/synthesis.md`.
 
+If `FROM_WAVE=U` is present:
+
+- require `A_REUSE_FINGERPRINT=<id>`; else `STATUS=BLOCKED`;
+- compute current working-tree fingerprint using the same snapshot method as
+  orchestrator status inventory;
+- allow resume only when fingerprint matches and there is accepted evidence in
+  the current conversation that Wave A (`pyright-strict`, `mypy`,
+  `pytest-targeted`) is `PASS` for that same fingerprint;
+- otherwise `STATUS=BLOCKED` with `NEXT ACTION`: run full `/opsx-static-check`.
+
+Resume profile scope:
+
+- `FROM_WAVE=U` executes only `pytest-unit` → `pytest-integration` →
+  `pytest-destructive` cascade.
+- Wave A checks are marked `SKIPPED (A_REUSED)` in final CHECKS.
+
 Announce:
 
 ```text
@@ -76,6 +95,7 @@ MODE: FULL|FAST
 PREFLIGHT: off|on
 Parallel plan: <waves from registry>
 Checks: [ ] ...
+A_REUSED: yes|no (fingerprint=<id|n/a>)
 ```
 
 ### 2. Optional PREFLIGHT (default OFF)
@@ -91,27 +111,68 @@ Checks: [ ] ...
 - **не** запускать workers
 - **не** править файлы
 
-Если `PREFLIGHT` не задан → сразу fan-out.
+Если `PREFLIGHT` не задан → сразу launch (`SERIAL_ORCHESTRATOR` default).
 
-### 3. Fan-out (from registry waves)
+### 3. Launch (from registry waves)
 
-**Primary launch (mandatory):** Task tool with `subagent_type` = registry
-`task_type` (short checks: `shell`; long suite waves `pytest-unit` /
-`pytest-integration` / `pytest-destructive`: `generalPurpose` — shell Task
-often Agent-Loops / silent-stalls before pytest starts).
+#### Default: `SERIAL_ORCHESTRATOR` (no nested Task)
 
-- Read prompt template from `.cursor/static-check/base/worker-prompt.md`.
+Unless the Owner message contains the **exact** token `PARALLEL_TASKS`:
+
+1. Do **not** call the Cursor Task tool for any static-check worker.
+2. The **parent orchestrator** runs every scheduled check itself via Shell:
+   `bash .cursor/static-check/bin/run.sh -- <canonical command from instructions>`
+   (see `base/shell.md`), in **cascade order** for the mode, applying
+   hard-stop / SKIPPED rules between steps.
+3. Load shared contracts + each pack `instructions.md` / `context.md` in the
+   parent context before that check's Shell.
+4. Emit each worker packet yourself (same schema as Task workers).
+5. Registry `task_type` and wave `parallel` are **ignored** under this default
+   (documented for the optional parallel path only). See `registry.yaml`
+   `default_launch: SERIAL_ORCHESTRATOR`.
+
+FULL cascade order (example): pyright-strict → mypy → pytest-targeted →
+pytest-unit → pytest-integration → pytest-destructive.
+
+**pytest-unit under SERIAL (and always):** mandatory stale-pytest hygiene
+before run; classify xdist worker-death / `INTERNALERROR` / exit ∈ {2,3}
+**without** failed node ids as `ERROR` (`infra_suite`); then hygiene again +
+**one** Shell re-run. Emit
+`WORKER INFRA RETRY: pytest-unit → orchestrator-shell`. Do not route solely
+to `/opsx-test-triage` for worker-death without failed nodes.
+Hygiene must kill only eligible pre-run orphans (outside current run tree); if
+probe ownership is ambiguous, return `blocked_hygiene_ambiguous` (no blind kill).
+If xdist retry is exhausted with another infra death (still no failed nodes),
+run one deterministic non-xdist classifier (`poetry run pytest -m unit -x`)
+inside the same run. Record `UNIT_RECOVERY_PATH=xdist_retry|fallback_non_xdist`.
+Only fallback infra crash may remain `ERROR infra_suite_hard`.
+
+#### Opt-in: `PARALLEL_TASKS` (legacy Task fan-out)
+
+Only when Owner passes exact token `PARALLEL_TASKS` — honor registry
+`task_type`:
+
+| `task_type` | Checks | Launch |
+|-------------|--------|--------|
+| `shell` | pyright-strict, mypy, pytest-targeted | Task `subagent_type: shell` |
+| `orchestrator` | **pytest-unit only** | **No Task.** Orchestrator Shell + hygiene + `run.sh` (same as SERIAL for this check) |
+| `generalPurpose` | pytest-integration, pytest-destructive | Task `subagent_type: generalPurpose` |
+
+- Read prompt template from `.cursor/static-check/base/worker-prompt.md` for Task-launched checks.
 - Fill REPO_ROOT / MODE / CHECK_ID; load packs via that template.
 - Invoke tools only via `bash .cursor/static-check/bin/run.sh -- …` (see `base/shell.md`).
 - Do **not** invent `bash -lc 'source ...; cmd'`.
-- Do **not** attempt custom project agent names (`opsx-sc-*` or any non-Task-enum id) — they are invalid for Task and must not be tried first.
+- Do **not** attempt custom project agent names (`opsx-sc-*` or any non-Task-enum id).
+- Do **not** fan-out a nested Task for `task_type: orchestrator`.
 
-If registry `task_type` is unavailable in the live Task enum → launch with
-`generalPurpose` and the **same** prompt. Never invent undeclared tool wrappers.
+If registry `task_type` is unavailable in the live Task enum **and** the check
+is not `orchestrator` → launch with `generalPurpose` and the **same** prompt.
+Never invent undeclared tool wrappers.
 
-**Launch-infra retry (exactly one Task retry per CHECK_ID):** treat as
-launch-infra failure (not a pytest FAIL) and retry once via Task
-`generalPurpose` with the same prompt (see `base/worker-prompt.md`) when ANY of:
+**Launch-infra retry (exactly one Task retry per CHECK_ID):** for Task-launched
+checks only (not pytest-unit / not SERIAL primary path). Treat as launch-infra
+failure (not a pytest FAIL) and retry once via Task `generalPurpose` with the
+same prompt when ANY of:
 
 - first Task finishes with no parseable worker packet;
 - Agent Looping / repeating-pattern abort, or Task error without packet body;
@@ -125,14 +186,16 @@ launch-infra failure (not a pytest FAIL) and retry once via Task
 Use the retry packet if valid. Never more than one Task retry.
 
 **Orchestrator-direct fallback (exactly one, after Task budget exhausted):**
-if the one Task launch-infra retry is exhausted **and** the suite/check never
-started (no parseable packet; no matching `pytest`/`run.sh` / command
-output) → orchestrator runs **once** via its own Shell tool:
+if the one Task launch-infra retry is exhausted **and** the check never
+started → orchestrator runs **once** via its own Shell tool:
 `bash .cursor/static-check/bin/run.sh -- <canonical command from instructions>`,
 synthesizes a worker packet from exit code + tail, continues cascade.
 Emit `WORKER DIRECT: <check_id> → orchestrator-shell`. This is **not** a
 second Task retry and not a product FAIL path. If orchestrator-direct also
 fails to start/finish → `STATUS=ERROR` for that check.
+
+Does **not** replace pytest-unit primary path (already orchestrator Shell);
+pytest-unit uses INFRA recovery when xdist workers die after a real start.
 
 **Not** launch-infra / not orchestrator-direct (do not retry for these):
 
@@ -143,18 +206,51 @@ fails to start/finish → `STATUS=ERROR` for that check.
 
 Task prompt MUST match `base/worker-prompt.md` (required body).
 
-Progress:
+Progress lines (interim only — never terminal):
 
 ```text
 WORKER READY: <check_id> → <STATUS> (findings=<n>)
+WORKER HYGIENE: pytest-unit → cleared|none|blocked (found=<n> eligible=<n> killed=<n> skipped_current_tree=<n>)
+WORKER INFRA RETRY: pytest-unit → orchestrator-shell
+WORKER INFRA FALLBACK: pytest-unit → non-xdist-classifier
 WORKER RETRY: <check_id> → generalPurpose (launch-infra)
 WORKER DIRECT: <check_id> → orchestrator-shell
 ```
 
+#### Progress vs Final report (mandatory)
+
+**Progress-only** messages are **not** a terminal Final report. Forbidden as
+the sole/terminal user-visible content of a completed command turn:
+
+- "Wave A in flight"
+- "waiting for packets"
+- "cascade continues"
+- any equivalent progress-only wording without a Final `STATUS:` block
+
+A turn that ends without a Final report starting with exactly:
+
+```text
+STATUS: PASS|FAIL|BLOCKED|ERROR
+```
+
+followed by the required `CHECKS` / synthesis fields is an **incomplete run**
+(`INCOMPLETE_RUN` for supervisor / owner envelopes — not PASS/FAIL success).
+
+Under default `SERIAL_ORCHESTRATOR`, complete the cascade in the orchestrator
+turn (Shell steps until every scheduled check has a packet), then emit Final.
+Do not end the turn after launching background work with only a progress
+sentence. Under `PARALLEL_TASKS`, WAIT until packets land, then Final — never
+treat progress as completion.
+
 Pytest cascade (registry waves; hard stop on FAIL|BLOCKED|ERROR):
 
-1. Wave A parallel: `pyright-strict`, `mypy`, `pytest-targeted`
-2. Wave U `pytest-unit` — only if `pytest-targeted` STATUS=PASS
+1. Wave A: `pyright-strict`, `mypy`, `pytest-targeted`
+   (SERIAL: sequential Shell; `PARALLEL_TASKS`: may Task-parallel).
+   `pytest-targeted`: prefilter `destructive_local` before Shell; ≤1 run per
+   non-empty bucket; empty/exit 5 bucket → PASS+note (no exclude+rerun).
+2. Wave U `pytest-unit` — only if `pytest-targeted` STATUS=PASS;
+   orchestrator Shell + hygiene; xdist only here; if xdist infra persists after
+   one retry, run one in-run fallback non-xdist classifier (no manual rerun loop)
 3. Wave I `pytest-integration` — only if `pytest-unit` STATUS=PASS
 4. Wave D `pytest-destructive` — MODE=FULL only; only if
    `pytest-integration` STATUS=PASS (set ALLOW_* per pack). Never in FAST.
@@ -162,7 +258,7 @@ Pytest cascade (registry waves; hard stop on FAIL|BLOCKED|ERROR):
 If a pytest gate fails → mark later pytest checks `SKIPPED` and continue to
 synthesis (typing packets from Wave A still fan-in). Do **not** `--deselect`
 dirty paths from suite waves. Do **not** launch retired `pytest-full` / bare
-`poetry run pytest`.
+`poetry run pytest`. Never put xdist on targeted / integration / destructive.
 
 ### 4. Fan-in + synthesize
 
@@ -187,13 +283,15 @@ or BLOCKED). Print the full template below even when Team/UI already showed a
 red subagent.
 
 ```text
-STATUS: PASS | FAIL | BLOCKED
+STATUS: PASS | FAIL | BLOCKED | ERROR
 MODE: FULL | FAST
 PREFLIGHT: off|on|skipped|failed
 CHECKS:
 - <id>: PASS|FAIL|SKIPPED|BLOCKED|ERROR (command: ...)
 SUMMARY:
 - passed/failed/skipped checks
+- A_REUSED: yes|no (fingerprint=<id|n/a>)
+- UNIT_RECOVERY_PATH: none|xdist_retry|fallback_non_xdist
 - static_findings / test_findings / findings_total
 - problem_groups / truncated / omitted_groups
 PROBLEMS:
@@ -207,11 +305,11 @@ PROBLEMS:
 - seen_in: [...]
 ### TESTS
 #### P2. <short title>
-- node: <pytest node id>
+- node: <pytest node id>   # or infra note if ERROR infra_suite
 - count: <n>
 - top: <≤2 assert summaries>
-- fix_target: <one line — test/fixture>
-- fix_cmd: /opsx-test-triage
+- fix_target: <one line — test/fixture or hygiene>
+- fix_cmd: /opsx-test-triage   # or owner recover env + re-run unit if infra_suite_hard
 - seen_in: [...]
 TRUNCATED: yes|no
 OMITTED_GROUPS: <n>
@@ -227,9 +325,14 @@ Budgets, dedupe, `fix_cmd` mapping, and single NEXT_ACTION rank: only in
 
 - PREFLIGHT off unless explicitly requested?
 - No self-repair of command/infra during this run?
-- Fan-out via registry `task_type` (shell short / GP suite waves) — no custom agent names?
-- Launch-infra: one Task GP retry on empty packet / Agent Looping / silent stall;
-  then orchestrator-direct once if suite never started?
-- Registry-driven waves?
-- Final report printed by orchestrator (not only worker notification)?
+- Default launch `SERIAL_ORCHESTRATOR` (no nested Task) unless exact token
+  `PARALLEL_TASKS`? No custom agent names?
+- pytest-unit: orchestrator Shell + stale-pytest hygiene; INFRA retry once on
+  xdist worker-death without failed nodes; if still infra, one in-run fallback
+  `pytest -m unit -x` before declaring `infra_suite_hard`?
+- `PARALLEL_TASKS` only: Launch-infra one Task GP retry; then orchestrator-direct
+  once if suite never started?
+- Registry-driven waves? xdist only on full unit?
+- Final report printed by orchestrator (not progress-only / not only notification)?
+  Progress strings («Wave A in flight», «waiting for packets») never terminal?
 - One NEXT_ACTION?
