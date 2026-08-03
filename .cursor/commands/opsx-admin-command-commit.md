@@ -18,6 +18,18 @@ If `GO` is absent:
 
 Never push, merge, rebase, force-push, deploy, restart services, run migrations against production, or touch secrets.
 
+If the working tree has **unmerged paths** or merge/rebase is in progress,
+do **not** propose or create ordinary commits. Redirect:
+
+```text
+STATUS: BLOCKED_CONFLICTED_TREE
+NEXT_ACTION: /opsx-admin-command-resolve-conflicts
+DO_NOT_DO_YET: stage; commit; push; create-pr
+```
+
+Product-only conflicts (no process-surface unmerged paths) are out of scope
+here too — report them and do not invent a product merge workflow.
+
 Product/code/OpenSpec product commits belong to `/opsx-commit`, not this command.
 
 ## User input
@@ -119,6 +131,11 @@ git diff --cached --name-status
 ```
 
 Do not run `git fetch` unless remote state becomes REQUIRED_FOR.
+
+After `git status --short`, if any unmerged codes appear (`UU`, `AA`, `DU`,
+`UD`, `AU`, `UA`, `DD`) or merge/rebase is in progress → stop with
+`BLOCKED_CONFLICTED_TREE` and `NEXT_ACTION: /opsx-admin-command-resolve-conflicts`
+(no staging, no commit plan execution).
 
 Block execution if current branch is:
 

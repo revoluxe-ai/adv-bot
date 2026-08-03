@@ -168,7 +168,11 @@ Stop before PR creation if:
 - no commits exist ahead of target/base branch;
 - an open PR already exists for the current branch;
 - PR title/body would be generic or meaningless;
-- `GO` is absent.
+- `GO` is absent;
+- working tree has unmerged paths (`UU` / `AA` / …) or merge|rebase is in
+  progress — especially on process surfaces
+  (`.cursor/commands/**`, rules, skills, mirrors, …):
+  set `NEXT_ACTION: /opsx-admin-command-resolve-conflicts` and do not open a PR.
 
 ## Required read-only checks before PR
 
