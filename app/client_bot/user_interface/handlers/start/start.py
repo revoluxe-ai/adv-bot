@@ -25,7 +25,6 @@ from sqlalchemy.exc import IntegrityError
 from app.client_bot import const
 from app.client_bot.admin_access import is_bot_admin, use_minimal_presentation_ui
 from app.client_bot.ui_access import UiAccessMode
-from app.client_bot.utils import create_user
 from app.client_bot.redis_manager import RedisManager
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers.shop_choice_message import (
@@ -225,7 +224,12 @@ async def _load_adv_settings_for_wb_user_cabinet_in_session(
 async def callback_start_registration(
     callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
 ) -> None:
-    """Открыть start-flow и восстановить главное меню или gate."""
+    """Вернуть в меню существующего User (menu-return); без ``create_user``.
+
+    PURE_READ: ``sm(read_only=True)``. Creation User остаётся на message
+    ``/start`` / write middleware. Missing User → gate при ``invite_gate``,
+    иначе early return без MainMenu.
+    """
 
     logger.debug(
         "callback_start_registration: enter user=%s data=%r message_chat=%s",
@@ -233,7 +237,6 @@ async def callback_start_registration(
         callback.data,
         callback.message.chat.id if callback.message is not None else None,
     )
-
 
     await state.clear()
     async with sm(read_only=True) as session:
@@ -251,13 +254,18 @@ async def callback_start_registration(
             return
         chat_id = callback.message.chat.id
         if user is None:
-            user = await create_user(
-                session,
+            logger.debug(
+                "callback_start_registration: missing user non-write user=%s invite_gate=%s",
                 user_id,
-                username=callback.from_user.username,
-                adv_updater_user_chat_id=chat_id,
+                settings.invite_gate,
             )
-            logger.debug("callback_start_registration: created user=%s chat_id=%s", user_id, chat_id)
+            if settings.invite_gate:
+                _ = await bot.send_message(
+                    chat_id,
+                    get_gate_message_text(),
+                    reply_markup=get_gate_keyboard(),
+                )
+            return
 
         minimal = use_minimal_presentation_ui(user_id, user.passed_gate)
         logger.debug(
@@ -278,7 +286,7 @@ async def callback_start_registration(
             and not is_bot_admin(user_id)
         ):
             logger.debug("callback_start_registration: sending gate screen user=%s", user_id)
-            _= await bot.send_message(
+            _ = await bot.send_message(
                 chat_id,
                 get_gate_message_text(),
                 reply_markup=get_gate_keyboard(),
