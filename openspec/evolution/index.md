@@ -12,7 +12,7 @@ Human display is always `Title (STAR_ID)`.
 
 | Title | STAR_ID | Status | Card | Active increment |
 |-------|---------|--------|------|------------------|
-| Безопасный постоянный сбор WB API-данных | `wb-safe-readonly-collect` | ACTIVE | [wb-safe-readonly-collect.md](wb-safe-readonly-collect.md) | `INC-RO-01` best-effort collect + L0 archive |
+| Безопасный постоянный сбор WB API-данных | `wb-safe-readonly-collect` | ACTIVE | [wb-safe-readonly-collect.md](wb-safe-readonly-collect.md) | next: gap-triggered INC-RO-02 / CANDIDATE path |
 
 ## Lookup rules
 

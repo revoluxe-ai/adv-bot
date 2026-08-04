@@ -5,7 +5,7 @@ STAR_ID: wb-safe-readonly-collect
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-04T04:47:00Z
-UPDATED_AT: 2026-08-04T05:24:57Z
+UPDATED_AT: 2026-08-04T10:25:43Z
 ```
 
 ## North Star
@@ -41,8 +41,8 @@ allowlist семей эндпоинтов) в архив на локаль — �
 ### INC-RO-01 — Best-effort collect + L0 archive via Job
 
 ```text
-STATUS: ACTIVE
-LINKED_CHANGES: wb-readonly-api-preflight
+STATUS: DELIVERED
+LINKED_CHANGES: wb-readonly-api-preflight (archived 2026-08-04)
 ```
 
 Outcome:
@@ -210,6 +210,9 @@ Evidence / completion:
 
 ## History
 
+- 2026-08-04T10:25:43Z — INC-RO-01 DELIVERED; change `wb-readonly-api-preflight`
+  archived; main spec `wb-api-read-only-preflight` synced; decision
+  `scripts-wb-api-ops-stack` promoted Accepted.
 - 2026-08-04T05:24:57Z — INC-RO-01 revised to B+L0 (preflight +
   best-effort collect + Owner-local secret-strip archive); linked
   `wb-readonly-api-preflight`; INC-RO-04 narrowed to map-driven /
