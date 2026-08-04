@@ -2,6 +2,16 @@
 
 <!-- Background and current state -->
 
+## Evolution Context (optional)
+
+<!--
+For a linked change, cite Title (STAR_ID), INCREMENT_ID, Current Increment,
+Contribution to North Star, and Forward Compatibility Constraints from the
+approved EVOLUTION_HANDOFF.
+Explain how the design avoids a dead end without implementing Future
+Increments. Omit for standalone/legacy/not-applicable changes.
+-->
+
 ## Goals / Non-Goals
 
 **Goals:**
