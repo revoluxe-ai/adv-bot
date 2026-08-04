@@ -3,22 +3,30 @@ name: /opsx-scripts
 id: opsx-scripts
 category: Workflow
 description: "Daily scripts/ ops: inventory, readiness ledger, local test, PLAN_RUN/RUN Job via scripts-branch image, battle-tested recording."
-argument-hint: "[INVENTORY|STATUS|TEST_LOCAL|PLAN_RUN|RUN|RECORD_BATTLE] [script=…] [args=…] [ns=…] [GO]"
+argument-hint: "[INVENTORY|STATUS|TEST_LOCAL|PLAN_RUN|RUN|RECORD_BATTLE] [script=<title|path>] [args=…] [ns=…] [GO]"
 ---
 
 # /opsx-scripts
 
 Side-lane **daily** operator command for `scripts/` lifecycle:
 
-* inventory current entrypoints;
+* inventory current entrypoints with human `title` + path hint;
 * track readiness (`runnable` / `tests` / `battle_tested`);
 * local workability checks (reuse project pytest / smoke; do not invent a new framework);
 * plan and (with `GO`) run via **image from branch `scripts` → Kubernetes Job → report**.
 
+Owner must not need to memorize repo paths: every human-facing list and
+status line uses **`Title (scripts/…/file.py)`** — title first, path only as
+a secondary hint in parentheses.
+
+Shared display SoT (cite): `.cursor/commands/opsx-human-label-display.md`.
+This command specializes it for `scripts/` (`title` ledger field + path).
+
 Infra bootstrap / repair → `/opsx-scripts-prepare` (keep that out of daily context).
 
-Follow `.cursor/commands/opsx-source-resolution.md` and
-`.cursor/commands/opsx-execution-preflight.md` (PowerShell kubectl per
+Follow `.cursor/commands/opsx-source-resolution.md`,
+`.cursor/commands/opsx-execution-preflight.md`, and
+`.cursor/commands/opsx-human-label-display.md` (PowerShell kubectl per
 `.cursor/rules/terminal.mdc`).
 
 ## What this is
@@ -75,23 +83,39 @@ $ARGUMENTS
 | `PLAN_RUN` | Build Job plan from template; no cluster mutate |
 | `RUN` | Requires `GO`; apply one Job; collect report |
 | `RECORD_BATTLE` | Requires Owner evidence; set `battle_tested=YES` |
-| `script=<path>` | Target under `scripts/` |
+| `script=<title\|path>` | Target by human `title` (preferred) or repo path |
 | `args=…` | Extra CLI args for the script (PLAN_RUN/RUN) |
 | `ns=<namespace>` | Job namespace; default from template |
 | `image=<ref>` | Override image ref (else latest scripts-branch tag/sha) |
 | `GO` | Authorize allowlisted write / cluster mutate for this mode |
 | unknown conflicting mode | `STATUS=BLOCKED` |
 
+### Script identity and display (mandatory)
+
+Follow `.cursor/commands/opsx-human-label-display.md`. Local rules:
+
+* Ledger field `title` is required for every entrypoint.
+* Resolve `script=` as: exact path match, else case-insensitive exact title
+  match, else unique case-insensitive title substring. If ambiguous or none →
+  `STATUS=BLOCKED` and list candidates as `Title (path)`.
+* Every human-facing inventory / status / report / `NEXT_ACTION` line names a
+  script as **`Title (path)`**. Path alone is not the primary label.
+* Pasteable commands may use `script=<Title>` when the title is unique; still
+  show `Title (path)` once in `WHAT_HAPPENED` / plan body.
+* Job template / kubectl still use the resolved `path` internally.
+
 Examples:
 
 ```text
 /opsx-scripts INVENTORY
-/opsx-scripts STATUS script=scripts/export_non_zero_balance_users.py
-/opsx-scripts TEST_LOCAL script=scripts/test_path.py
-/opsx-scripts PLAN_RUN script=scripts/export_non_zero_balance_users.py
-/opsx-scripts RUN GO script=scripts/export_non_zero_balance_users.py
-/opsx-scripts RECORD_BATTLE GO script=scripts/export_non_zero_balance_users.py evidence=job/ops-script-…
+/opsx-scripts STATUS script=Export non-zero balance users
+/opsx-scripts TEST_LOCAL script=Path smoke
+/opsx-scripts PLAN_RUN script=Export non-zero balance users
+/opsx-scripts RUN GO script=Export non-zero balance users
+/opsx-scripts RECORD_BATTLE GO script=Export non-zero balance users evidence=job/ops-script-…
 ```
+
+(Paths remain valid: `script=scripts/export_non_zero_balance_users.py`.)
 
 ## Ledger contract (`scripts/REGISTRY.md`)
 
@@ -99,7 +123,8 @@ Authoritative readiness fields per entrypoint:
 
 | Field | Values |
 |-------|--------|
-| `path` | repo-relative path |
+| `title` | short human name (required; Owner may edit) |
+| `path` | repo-relative path (hint / machine id) |
 | `runnable` | `UNKNOWN` \| `WORKS` \| `BROKEN` |
 | `tests` | `NONE` \| `PARTIAL` \| `COVERED` |
 | `battle_tested` | `NO` \| `YES` |
@@ -110,8 +135,12 @@ Authoritative readiness fields per entrypoint:
 
 Rules:
 
-* `INVENTORY` adds missing entrypoints as `UNKNOWN` / `NONE` / `NO`; does not
-  delete Owner notes without cause; marks vanished paths in notes.
+* `INVENTORY` adds missing entrypoints as `UNKNOWN` / `NONE` / `NO` and
+  **must assign `title`** when missing (prefer module docstring first line;
+  else humanize filename / parent package; keep stable once set unless Owner
+  renames). Does not delete Owner notes/titles without cause; marks vanished
+  paths in notes.
+* Table column order for humans: `title`, `path`, then readiness fields.
 * `TEST_LOCAL` may set `runnable` + `tests` + `last_local_at` from evidence.
 * `RUN` completion may set `runnable` + `last_cluster_at` + `last_image_ref`
   from Job result; does **not** set `battle_tested=YES`.
@@ -125,11 +154,13 @@ Rules:
 
 Default mode. Scan `scripts/` for entrypoint candidates (top-level runnable
 scripts + clear package entrypoints; skip `__init__` / pure helpers).
-Update `scripts/REGISTRY.md`. No cluster mutate.
+Update `scripts/REGISTRY.md` including `title` backfill. Emit the inventory
+summary as lines of `Title (path)` plus readiness columns. No cluster mutate.
 
 ### STATUS — READ_ONLY
 
-Read registry (+ optional script path). No writes.
+Read registry (+ optional `script=` title or path). Show `Title (path)` as
+the primary label. No writes.
 
 ### TEST_LOCAL — local check (may write registry + tests)
 
@@ -166,8 +197,9 @@ secret dump, namespace delete, uncontrolled force-delete, prod DB migration).
 
 ### RECORD_BATTLE — Owner attestation
 
-Set `battle_tested=YES` only with `GO` + `script=` + `evidence=` (Job name,
-report path, or Owner note). No cluster mutate required.
+Set `battle_tested=YES` only with `GO` + `script=` (title or path) +
+`evidence=` (Job name, report path, or Owner note). Confirm target as
+`Title (path)` before writing. No cluster mutate required.
 
 ## Authority surfaces
 
@@ -203,7 +235,9 @@ Acknowledgement alone is not GO.
 
 ```text
 SCRIPTS_RUN_PLAN:
-SCRIPT:
+SCRIPT_TITLE:
+SCRIPT_PATH:
+SCRIPT_DISPLAY: Title (path)
 IMAGE_REF:
 NS:
 JOB_NAME:
@@ -232,6 +266,9 @@ OWNER_DECISION_REQUIRED: yes | no
 NEXT_ACTION:
 DO_NOT_DO_YET:
 ```
+
+When a script is named in any of the human fields above, use `Title (path)`.
+Pasteable `NEXT_ACTION` may use `script=<Title>` if unique.
 
 Optional durable receipt: `.tmp/opsx-scripts/<UTC_TS>/SCRIPTS_REPORT.md`
 
@@ -265,4 +302,6 @@ FAILURE: no bypass of prepare infra or devops forbids
 - [ ] battle_tested not set from RUN alone
 - [ ] Working scripts not rewritten by default
 - [ ] master/stage deploy workflows not touched
+- [ ] Human lists/status use `Title (path)` (path not sole primary label)
+- [ ] Missing/ambiguous title resolution → BLOCKED with candidate list
 - [ ] NEXT_ACTION + DO_NOT_DO_YET present

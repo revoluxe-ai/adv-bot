@@ -9,8 +9,14 @@ Shared mandatory contract for shell/tool operations that OPSX commands run befor
 This file is **not** a user-facing `/opsx-*` workflow command.
 Any OPSX command that references it MUST follow it for git/status/diff/find/rg/test-discovery and similar preflight operations.
 
-Companion contract: `.cursor/commands/opsx-source-resolution.md` (artifact resolution).
-This contract covers **execution cost / hang risk**, not path rediscovery.
+Companion contracts:
+
+* `.cursor/commands/opsx-source-resolution.md` — artifact resolution
+* `.cursor/commands/opsx-human-label-display.md` — human inventory/list labels
+  (`Title (machine-id)`; cite-only, not a runnable `/opsx-*` command)
+
+This contract covers **execution cost / hang risk**, not path rediscovery and
+not human display naming (see human-label-display for that).
 
 ## Goal
 

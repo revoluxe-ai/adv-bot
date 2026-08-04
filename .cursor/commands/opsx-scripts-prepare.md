@@ -81,7 +81,11 @@ All must be present and coherent for `SCRIPTS_INFRA=READY`:
    `python <script>` (or equivalent) from the built image. Canonical path:
    `k8s/jobs/ops-script-runner.yaml`
 3. **Registry** — durable readiness ledger at `scripts/REGISTRY.md` with
-   schema for `runnable` / `tests` / `battle_tested`.
+   schema for `title` / `path` / `runnable` / `tests` / `battle_tested`.
+   `title` is required (human primary label); `path` is the secondary hint
+   (see `.cursor/commands/opsx-human-label-display.md`).
+   CHECK treats a registry missing the `title` column as
+   `REGISTRY_STATUS=INVALID` (GAP) until repaired.
 4. **Reuse, do not reinvent** — existing Dockerfile, imagePullSecrets /
    envFrom patterns from `k8s/jobs/app-db-migrate.yaml` where applicable;
    do not rewrite working scripts.
@@ -145,7 +149,8 @@ Allowed paths (create/update only when missing or Owner-listed gap):
 
 1. `.github/workflows/deploy_scripts.yml`
 2. `k8s/jobs/ops-script-runner.yaml`
-3. `scripts/REGISTRY.md` (schema + seed rows; reconcile missing entrypoints)
+3. `scripts/REGISTRY.md` (schema including required `title` + `path`, seed
+   rows; reconcile missing entrypoints / backfill missing titles)
 
 Optional companion soft redirects only if already part of an approved packet
 (normally already present): `.cursor/commands/opsx-devops.md`,
