@@ -2,11 +2,11 @@ from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.client_bot import const
 from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -49,7 +49,7 @@ def get_main_menu_keyboard(
     user_telegram_id: int, *, full_client_ui: bool = False
 ) -> InlineKeyboardMarkup:
     """Клавиатура главной: минимальный режим только если presentation_only и не full_client_ui."""
-    keyboard_buttons = []
+    keyboard_buttons: list[list[InlineKeyboardButton]] = []
 
     if settings.presentation_only and not full_client_ui:
         if is_bot_admin(user_telegram_id):
@@ -58,11 +58,11 @@ def get_main_menu_keyboard(
                 callback_data=AdminPanel(action="menu").pack(),
             )
             keyboard_buttons.append([admin_button])
-        presentation_button = InlineKeyboardButton(
-            text="Запросить презентацию",
-            callback_data=callbacks.RequestPresentation(action="request").pack(),
+        invite_button = InlineKeyboardButton(
+            text="Ввести инвайт",
+            callback_data=Gate(action="invite_enter").pack(),
         )
-        keyboard_buttons.append([presentation_button])
+        keyboard_buttons.append([invite_button])
         return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
     if is_bot_admin(user_telegram_id):
@@ -134,7 +134,7 @@ def get_shops_list_keyboard(
     page: int = 1,
 ) -> InlineKeyboardMarkup:
     """Клавиатура страницы «Мои магазины»: Добавить магазин, список, пагинация, Назад."""
-    keyboard_buttons = []
+    keyboard_buttons: list[list[InlineKeyboardButton]] = []
 
     add_shop_button = InlineKeyboardButton(
         text="➕Добавить магазин", callback_data=callbacks.ShopNew().pack()

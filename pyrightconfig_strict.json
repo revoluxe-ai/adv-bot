@@ -72,6 +72,7 @@
     "app/client_bot/ui_mode.py",
     "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
     "app/client_bot/user_interface/handlers/start/start.py",
+    "app/client_bot/user_interface/handlers/shop_choice_message.py",
     "app/client_bot/user_interface/handlers/ui_mode_toggle.py",
     "app/client_bot/user_interface/views/callbacks.py",
     "app/configs/infrastructure_config/infrastructure_config.py",
