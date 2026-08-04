@@ -2,8 +2,8 @@
 name: /opsx-scripts
 id: opsx-scripts
 category: Workflow
-description: "Daily scripts/ ops: inventory, readiness ledger, local test, PLAN_RUN/RUN Job via scripts-branch image, battle-tested recording."
-argument-hint: "[INVENTORY|STATUS|TEST_LOCAL|PLAN_RUN|RUN|RECORD_BATTLE] [script=<title|path>] [args=…] [ns=…] [GO]"
+description: "Daily scripts/ ops: inventory, readiness ledger, local test, PUSH scripts branch for image, PLAN_RUN/RUN Job, battle-tested recording."
+argument-hint: "[INVENTORY|STATUS|TEST_LOCAL|PUSH|PLAN_RUN|RUN|RECORD_BATTLE] [script=<title|path>] [args=…] [ns=…] [GO]"
 ---
 
 # /opsx-scripts
@@ -13,6 +13,7 @@ Side-lane **daily** operator command for `scripts/` lifecycle:
 * inventory current entrypoints with human `title` + path hint;
 * track readiness (`runnable` / `tests` / `battle_tested`);
 * local workability checks (reuse project pytest / smoke; do not invent a new framework);
+* with `PUSH GO`, publish current branch `scripts` to origin (no PR) so GHA can build the image;
 * plan and (with `GO`) run via **image from branch `scripts` → Kubernetes Job → report**.
 
 Owner must not need to memorize repo paths: every human-facing list and
@@ -33,6 +34,8 @@ Follow `.cursor/commands/opsx-source-resolution.md`,
 
 * Front door for script inventory, ledger updates, local checks, and script Jobs.
 * Consumer of `SCRIPTS_INFRA_READY` artifacts from `/opsx-scripts-prepare`.
+* Owner of the intentional **no-PR** `git push` of branch `scripts` for image publish
+  (`PUSH GO` only — not `/opsx-commit`, not prepare).
 * Emitter of `SCRIPTS_REPORT` with explicit human next action.
 
 ## What this is NOT
@@ -42,12 +45,15 @@ Follow `.cursor/commands/opsx-source-resolution.md`,
 * NOT bug-episode RED/GREEN writer → `/opsx-test` / `/opsx-fix-bug`.
 * NOT OpenSpec feature implement / verify / archive.
 * NOT silent rewrite of working scripts.
+* NOT commit owner → `/opsx-commit` (product) or `/opsx-admin-command-commit` (process).
+* NOT force-push, push of non-`scripts` branches, merge, rebase, or reset.
 * NOT CSI / port-forward / secret dump / prod DB migration.
 
 ## When to use
 
 * “What scripts exist and what is their readiness?”
 * “Check this script locally / cover with a smoke test.”
+* “Publish branch scripts so GHA builds `:scripts` image.”
 * “Plan or run script X via image + Job.”
 * “Mark script as battle-tested after real use.”
 
@@ -80,6 +86,7 @@ $ARGUMENTS
 | `INVENTORY` (default if bare) | Reconcile `scripts/**` entrypoints ↔ registry |
 | `STATUS` | Show ledger for `script=` or summary |
 | `TEST_LOCAL` | Local workability / targeted pytest; update ledger |
+| `PUSH` | Requires `GO`; push branch `scripts` to origin for image build |
 | `PLAN_RUN` | Build Job plan from template; no cluster mutate |
 | `RUN` | Requires `GO`; apply one Job; collect report |
 | `RECORD_BATTLE` | Requires Owner evidence; set `battle_tested=YES` |
@@ -87,7 +94,7 @@ $ARGUMENTS
 | `args=…` | Extra CLI args for the script (PLAN_RUN/RUN) |
 | `ns=<namespace>` | Job namespace; default from template |
 | `image=<ref>` | Override image ref (else latest scripts-branch tag/sha) |
-| `GO` | Authorize allowlisted write / cluster mutate for this mode |
+| `GO` | Authorize allowlisted write / cluster mutate / push for this mode |
 | unknown conflicting mode | `STATUS=BLOCKED` |
 
 ### Script identity and display (mandatory)
@@ -110,6 +117,7 @@ Examples:
 /opsx-scripts INVENTORY
 /opsx-scripts STATUS script=Export non-zero balance users
 /opsx-scripts TEST_LOCAL script=Path smoke
+/opsx-scripts PUSH GO
 /opsx-scripts PLAN_RUN script=Export non-zero balance users
 /opsx-scripts RUN GO script=Export non-zero balance users
 /opsx-scripts RECORD_BATTLE GO script=Export non-zero balance users evidence=job/ops-script-…
@@ -180,7 +188,29 @@ substituted placeholders. May `kubectl apply --dry-run=client` when paths
 ready. No live mutate.
 
 Requires infra preconditions. If image for branch `scripts` is unknown,
-state how to obtain it (push to `scripts` / `workflow_dispatch` / pass `image=`).
+state how to obtain it: pasteable `/opsx-scripts PUSH GO`, then wait for GHA
+(`deploy_scripts.yml`), or pass `image=` when a pullable ref already exists.
+
+### PUSH — GO publish branch `scripts` for image build
+
+Intentional **no-PR** publish path for scripts ops (triggers
+`.github/workflows/deploy_scripts.yml` on remote).
+
+1. GO gate for PUSH must pass.
+2. `git branch --show-current` MUST be exactly `scripts` → else `STATUS=BLOCKED`.
+3. Working tree must be clean for tracked files (no uncommitted changes that
+   would be missing from the pushed tip). If dirty → `STATUS=BLOCKED`;
+   `NEXT_ACTION` → `/opsx-commit` (and/or admin-commit for process) — do not push.
+4. Allowed command only:
+   `git push -u origin HEAD` (equivalent: `git push -u origin scripts`).
+5. **Forbidden:** `--force` / `--force-with-lease`, push to other remotes or
+   branch names, `git merge`, `git rebase`, `git reset`, commit from this mode.
+6. On success: report remote tip; remind Harbor/GHCR tags `:scripts` and sha;
+   `STATUS=PUSHED`; `NEXT_ACTION` wait for workflow then
+   `/opsx-scripts PLAN_RUN` or `RUN GO` with `image=`.
+7. On push failure: `STATUS=BLOCKED`; no retry loop; leave remote as-is.
+
+`/opsx-scripts-prepare` and `/opsx-commit` remain no-push.
 
 ### RUN — GO cluster execute
 
@@ -211,10 +241,18 @@ TEST_AUTHORING_HANDOFF: /opsx-test (optional)
 KNOWLEDGE_FORBIDS: .cursor/rules/devops.mdc
 ```
 
-Decision owner: **Owner** for `RUN GO` and `RECORD_BATTLE GO`.
+Decision owner: **Owner** for `PUSH GO`, `RUN GO`, and `RECORD_BATTLE GO`.
 This command must not re-decide verify/archive/product GO.
 
-## GO gate (RUN / RECORD_BATTLE / registry-repair writes that need GO)
+## GO gate (PUSH / RUN / RECORD_BATTLE / registry-repair writes that need GO)
+
+For **PUSH**:
+
+1. Exact token `GO`.
+2. Mode is `PUSH`.
+3. Current branch is exactly `scripts`.
+4. Tracked working tree clean (see PUSH mode).
+5. Push command is only the allowlisted non-force `git push -u origin HEAD`.
 
 For **RUN**:
 
@@ -253,9 +291,9 @@ OWNER_GO_LINE:
 ## Return contract (mandatory)
 
 ```text
-STATUS: INVENTORY_DONE | STATUS_DONE | TEST_DONE | RUN_PLAN_READY | RUN_DONE |
+STATUS: INVENTORY_DONE | STATUS_DONE | TEST_DONE | PUSHED | RUN_PLAN_READY | RUN_DONE |
         LEDGER_UPDATED | BLOCKED | REDIRECT_PREPARE | REDIRECT_DEVOPS | REDIRECT_TEST
-MODE: INVENTORY | STATUS | TEST_LOCAL | PLAN_RUN | RUN | RECORD_BATTLE
+MODE: INVENTORY | STATUS | TEST_LOCAL | PUSH | PLAN_RUN | RUN | RECORD_BATTLE
 SCRIPTS_INFRA: READY | GAP | UNKNOWN
 FORBIDDEN_HIT: NONE | <id>
 
@@ -280,8 +318,11 @@ are operated here; Owner decides commit cadence.
 
 * Local test fail → ledger `runnable=BROKEN` or keep `UNKNOWN` with notes;
   `NEXT_ACTION` fix or stop.
+* Image missing / ImagePullBackOff → `BLOCKED`; suggest `/opsx-scripts PUSH GO`
+  (after clean tip) then re-`RUN GO` with pullable `image=`.
 * Job fail → `BLOCKED`; leave Job for inspect; suggest
   `/opsx-devops INVESTIGATE` if cluster-generic.
+* Push fail or dirty tree → `BLOCKED`; no force; no retry loop.
 * Same mutate error ≥ 3 → stop; escalate Owner.
 
 ## Pipeline position
@@ -289,16 +330,18 @@ are operated here; Owner decides commit cadence.
 ```text
 ENTRY_STATE: SCRIPTS_INFRA_READY + owner intent
 PREVIOUS: /opsx-scripts-prepare | prior /opsx-scripts | consult
-COMMAND_ACTION: inventory | test | plan/run | record battle
-EXIT_STATE: REPORT_READY | LEDGER_UPDATED | BLOCKED | REDIRECT_*
+COMMAND_ACTION: inventory | test | push | plan/run | record battle
+EXIT_STATE: PUSHED | REPORT_READY | LEDGER_UPDATED | BLOCKED | REDIRECT_*
 NEXT: Owner | next /opsx-scripts … | /opsx-devops | stop
-FAILURE: no bypass of prepare infra or devops forbids
+FAILURE: no bypass of prepare infra or devops forbids; no force-push
 ```
 
 ## Self-check before finish
 
 - [ ] Infra gap → REDIRECT_PREPARE (not improvised workflow invent in daily mode)
-- [ ] RUN without GO → BLOCKED
+- [ ] RUN / PUSH without GO → BLOCKED
+- [ ] PUSH only on branch `scripts`; never `--force`
+- [ ] PUSH does not commit
 - [ ] battle_tested not set from RUN alone
 - [ ] Working scripts not rewritten by default
 - [ ] master/stage deploy workflows not touched

@@ -107,8 +107,9 @@ Owner explicitly lists those paths in GO (default: leave them alone).
 Mutate **only** after GO gate passes. Create or repair allowlisted missing
 files. Prefer additive create over rewriting working content.
 
-Do not run Kubernetes Jobs here. Do not push to remote unless Owner separately
-asks (out of scope of this command’s default GO).
+Do not run Kubernetes Jobs here. Do not push to remote from prepare.
+Image-publish push of branch `scripts` belongs to `/opsx-scripts PUSH GO`
+(intentional no-PR path), not this command.
 
 ## Authority surfaces
 

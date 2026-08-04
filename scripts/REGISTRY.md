@@ -46,7 +46,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Test PG connection | scripts/test_pg_conn.py | UNKNOWN | NONE | NO | - | - | - | |
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
-| Users CSV export | scripts/users_csv_exporter/csv_export.py | UNKNOWN | NONE | NO | - | - | - | |
+| Users CSV export | scripts/users_csv_exporter/csv_export.py | UNKNOWN | NONE | NO | - | 2026-08-04T01:54:17Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:scripts | ImagePullBackOff: tag :scripts not found |
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
 ## Support (not Job entrypoints)
