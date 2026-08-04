@@ -2,7 +2,7 @@
 name: /opsx-scripts
 id: opsx-scripts
 category: Workflow
-description: "Daily scripts/ ops: inventory, readiness ledger, local test, PUSH scripts branch for image, PLAN_RUN/RUN Job, battle-tested recording."
+description: "Goal-driven scripts/ ops: inventory, tests, image publish, autonomous RUN-to-result, readiness ledger."
 argument-hint: "[INVENTORY|STATUS|TEST_LOCAL|PUSH|PLAN_RUN|RUN|RECORD_BATTLE] [script=<title|path>] [args=…] [ns=…] [GO]"
 ---
 
@@ -36,6 +36,8 @@ Follow `.cursor/commands/opsx-source-resolution.md`,
 * Consumer of `SCRIPTS_INFRA_READY` artifacts from `/opsx-scripts-prepare`.
 * Owner of the intentional **no-PR** `git push` of branch `scripts` for image publish
   (`PUSH GO` only — not `/opsx-commit`, not prepare).
+* Goal executor: one `RUN GO` owns the safe chain from image readiness through
+  GHA/Job monitoring, logs, known output retrieval, and final report.
 * Emitter of `SCRIPTS_REPORT` with explicit human next action.
 
 ## What this is NOT
@@ -188,8 +190,8 @@ substituted placeholders. May `kubectl apply --dry-run=client` when paths
 ready. No live mutate.
 
 Requires infra preconditions. If image for branch `scripts` is unknown,
-state how to obtain it: pasteable `/opsx-scripts PUSH GO`, then wait for GHA
-(`deploy_scripts.yml`), or pass `image=` when a pullable ref already exists.
+show the full automatic chain that `RUN GO` will perform. `PUSH GO` remains an
+optional low-level operation; it is not a mandatory human step before RUN.
 
 ### PUSH — GO publish branch `scripts` for image build
 
@@ -198,9 +200,10 @@ Intentional **no-PR** publish path for scripts ops (triggers
 
 1. GO gate for PUSH must pass.
 2. `git branch --show-current` MUST be exactly `scripts` → else `STATUS=BLOCKED`.
-3. Working tree must be clean for tracked files (no uncommitted changes that
-   would be missing from the pushed tip). If dirty → `STATUS=BLOCKED`;
-   `NEXT_ACTION` → `/opsx-commit` (and/or admin-commit for process) — do not push.
+3. Execution-critical tracked files must be clean. A dirty
+   `scripts/REGISTRY.md` created by this command does not block image publish;
+   any other tracked dirty path → `STATUS=BLOCKED`, because it may be missing
+   from the pushed image. Never commit or stash automatically.
 4. Allowed command only:
    `git push -u origin HEAD` (equivalent: `git push -u origin scripts`).
 5. **Forbidden:** `--force` / `--force-with-lease`, push to other remotes or
@@ -212,15 +215,45 @@ Intentional **no-PR** publish path for scripts ops (triggers
 
 `/opsx-scripts-prepare` and `/opsx-commit` remain no-push.
 
-### RUN — GO cluster execute
+### RUN — GO autonomous goal execution
 
-1. GO gate must pass.
-2. Restate plan; dry-run when apply; create **one** Job.
-3. Wait/bounded poll for completion; collect logs / exit code / output paths
-   if the script writes known artifacts.
-4. Update ledger (`runnable`, cluster timestamps, image ref).
-5. Stop on first unexpected failure; no mutate retry loop.
-6. Emit `SCRIPTS_REPORT`.
+`RUN GO` authorizes the complete safe path required to return the script
+result. Do not return intermediate “push/wait/run again” instructions when
+the command can continue itself.
+
+1. Validate the RUN GO gate and restate one `SCRIPTS_RUN_PLAN`.
+2. Resolve image readiness:
+   - when the supplied immutable image is already pullable, use it;
+   - otherwise, on branch `scripts`, inspect local/remote tips and the matching
+     `deploy_scripts.yml` run by head SHA;
+   - if the remote lacks the current clean-enough tip, run the same allowlisted
+     non-force `git push -u origin HEAD` authorized by this RUN GO;
+   - never require an additional `PUSH GO`.
+3. Monitor the matching GHA run to terminal state (default timeout **20 min**).
+   Stay in this invocation; use bounded polling / `gh run watch`, not a
+   “wait and invoke me again” response. On success prefer the immutable Harbor
+   `:<pushed-commit-sha>` ref over mutable `:scripts`.
+4. Render the Job, run client dry-run, and create one uniquely named Job.
+5. Monitor Job/pod to terminal state (default timeout **30 min**), collecting
+   concise status, events, logs, and container exit code.
+6. One controlled recovery is allowed only for the expected image-availability
+   race: if this invocation's pod reaches `ErrImagePull` /
+   `ImagePullBackOff` while its matching GHA build is still running, finish
+   waiting for GHA, delete only this invocation's Job, and create it once more
+   with the immutable SHA image. No retry for script/runtime/cluster errors.
+7. Discover declared/obvious output paths (script constants, plan metadata).
+   After Job success, copy known files from the pod with `kubectl cp` into
+   `.tmp/opsx-scripts/<UTC_TS>/outputs/`; report local paths and sizes.
+8. Update ledger only with terminal evidence:
+   - success → `runnable=WORKS`, timestamp, immutable image, concise note;
+   - script/runtime failure → `runnable=BROKEN`;
+   - pre-start image/infra failure → keep `runnable=UNKNOWN`.
+9. Emit one terminal `SCRIPTS_REPORT`; do not ask for another GO between the
+   authorized stages.
+
+The command may stop early only on definitive GHA/Job failure, authentication
+or authorization denial, execution-critical dirty files, hard-forbid hit, or
+bounded timeout. A queued/running workflow is an expected wait, not a blocker.
 
 Hard forbids identical in spirit to `/opsx-devops` (CSI, port-forward,
 secret dump, namespace delete, uncontrolled force-delete, prod DB migration).
@@ -257,11 +290,15 @@ For **PUSH**:
 For **RUN**:
 
 1. Exact token `GO`.
-2. Scoped `SCRIPTS_RUN_PLAN` in this turn **or** enough `script=` + `image=` /
-   resolvable scripts-branch image + namespace.
+2. `script=` resolves uniquely; `image=` is optional. If absent/unpullable,
+   RUN owns safe push + build monitoring under the same GO.
 3. Infra preconditions hold.
 4. No `FORBIDDEN_HIT`.
-5. PowerShell-safe kubectl.
+5. Current branch is `scripts` when image publication is required.
+6. Tracked dirty paths are empty or exactly `scripts/REGISTRY.md`; never
+   auto-commit/stash other changes.
+7. Push, if needed, is only non-force `git push -u origin HEAD`.
+8. PowerShell-safe kubectl.
 
 For **RECORD_BATTLE**:
 
@@ -277,12 +314,20 @@ SCRIPT_TITLE:
 SCRIPT_PATH:
 SCRIPT_DISPLAY: Title (path)
 IMAGE_REF:
+IMAGE_SOURCE: supplied | existing | built_by_run
+PUSH_REQUIRED: yes | no
+PUSHED_SHA:
+GHA_RUN:
 NS:
 JOB_NAME:
 TEMPLATE_PATH: k8s/jobs/ops-script-runner.yaml
 COMMAND:
 ARGS:
+KNOWN_OUTPUTS:
 DRY_RUN_RESULT:
+GHA_TIMEOUT:
+JOB_TIMEOUT:
+MAX_IMAGE_RACE_RETRIES: 1
 ROLLBACK_HINT: delete job/<JOB_NAME> if still present
 FORBIDDEN_CHECK: PASS | FAIL
 OWNER_GO_LINE:
@@ -292,7 +337,8 @@ OWNER_GO_LINE:
 
 ```text
 STATUS: INVENTORY_DONE | STATUS_DONE | TEST_DONE | PUSHED | RUN_PLAN_READY | RUN_DONE |
-        LEDGER_UPDATED | BLOCKED | REDIRECT_PREPARE | REDIRECT_DEVOPS | REDIRECT_TEST
+        RUN_DONE_WITH_OUTPUT_GAP | LEDGER_UPDATED | BLOCKED |
+        REDIRECT_PREPARE | REDIRECT_DEVOPS | REDIRECT_TEST
 MODE: INVENTORY | STATUS | TEST_LOCAL | PUSH | PLAN_RUN | RUN | RECORD_BATTLE
 SCRIPTS_INFRA: READY | GAP | UNKNOWN
 FORBIDDEN_HIT: NONE | <id>
@@ -310,6 +356,21 @@ Pasteable `NEXT_ACTION` may use `script=<Title>` if unique.
 
 Optional durable receipt: `.tmp/opsx-scripts/<UTC_TS>/SCRIPTS_REPORT.md`
 
+RUN report additionally includes:
+
+```text
+PUSHED_SHA:
+GHA_RUN:
+GHA_RESULT:
+JOB:
+JOB_RESULT:
+CONTAINER_EXIT_CODE:
+ATTEMPTS:
+LOG_SUMMARY:
+OUTPUTS:
+LEDGER_RESULT:
+```
+
 When process-surface command files change (rare here): commit via
 `/opsx-admin-command-commit`. Ledger-only updates under `scripts/REGISTRY.md`
 are operated here; Owner decides commit cadence.
@@ -318,11 +379,15 @@ are operated here; Owner decides commit cadence.
 
 * Local test fail → ledger `runnable=BROKEN` or keep `UNKNOWN` with notes;
   `NEXT_ACTION` fix or stop.
-* Image missing / ImagePullBackOff → `BLOCKED`; suggest `/opsx-scripts PUSH GO`
-  (after clean tip) then re-`RUN GO` with pullable `image=`.
+* Image missing before RUN → autonomously push/watch/build under the same GO.
+* ImagePullBackOff during matching build → one controlled immutable-image retry.
+* GHA queued/running → keep monitoring; do not return a human wait step.
+* GHA terminal failure / timeout → `BLOCKED` with run URL and concise failure.
 * Job fail → `BLOCKED`; leave Job for inspect; suggest
   `/opsx-devops INVESTIGATE` if cluster-generic.
-* Push fail or dirty tree → `BLOCKED`; no force; no retry loop.
+* Script succeeds but known output copy fails → `RUN_DONE_WITH_OUTPUT_GAP`;
+  preserve success evidence and state the exact retrieval gap.
+* Push auth failure or execution-critical dirty tree → `BLOCKED`; no force.
 * Same mutate error ≥ 3 → stop; escalate Owner.
 
 ## Pipeline position
@@ -330,8 +395,9 @@ are operated here; Owner decides commit cadence.
 ```text
 ENTRY_STATE: SCRIPTS_INFRA_READY + owner intent
 PREVIOUS: /opsx-scripts-prepare | prior /opsx-scripts | consult
-COMMAND_ACTION: inventory | test | push | plan/run | record battle
-EXIT_STATE: PUSHED | REPORT_READY | LEDGER_UPDATED | BLOCKED | REDIRECT_*
+COMMAND_ACTION: inventory | test | push | autonomous run-to-result | record battle
+EXIT_STATE: PUSHED | RUN_DONE | RUN_DONE_WITH_OUTPUT_GAP | REPORT_READY |
+            LEDGER_UPDATED | BLOCKED | REDIRECT_*
 NEXT: Owner | next /opsx-scripts … | /opsx-devops | stop
 FAILURE: no bypass of prepare infra or devops forbids; no force-push
 ```
@@ -342,6 +408,10 @@ FAILURE: no bypass of prepare infra or devops forbids; no force-push
 - [ ] RUN / PUSH without GO → BLOCKED
 - [ ] PUSH only on branch `scripts`; never `--force`
 - [ ] PUSH does not commit
+- [ ] RUN GO continues through push/build/Job/output without another GO
+- [ ] Matching GHA queued/running is monitored, not returned as a blocker
+- [ ] Only one image-readiness retry; no generic Job retry
+- [ ] Known outputs copied and reported after success
 - [ ] battle_tested not set from RUN alone
 - [ ] Working scripts not rewritten by default
 - [ ] master/stage deploy workflows not touched
