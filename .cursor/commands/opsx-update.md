@@ -20,6 +20,24 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 `/opsx-update` MUST treat `[deferred-from:<CHANGE_ID>]` (and matching titles/notes for this change) as **out of current owed DoD** until the owner explicitly confirms re-entry. Silent re-inflation of a bounded change is forbidden.
 
+**Optional Evolution handoff:** Read
+`openspec/policies/EVOLUTION_POLICY.md`. An `EVOLUTION_HANDOFF` may link or
+re-scope an existing change after Owner confirms the proposed artifact edits.
+Validate its exact `CARD_PATH`; preserve `STAR_ID`/`INCREMENT_ID`; reconcile
+`CONTRIBUTION_TO_NORTH_STAR`; reconcile proposal/design/specs/tasks to
+`CURRENT_INCREMENT`; and keep
+`FUTURE_INCREMENTS` out of owed DoD. Linking is optional, legacy changes need
+no migration, and changing a change's intent still requires a fresh
+`/opsx-new`. If a requested edit overlaps a parked unit, the existing
+`REENTER_CONFIRMED` gate remains authoritative even when that unit appears on
+an Evolution Path.
+
+For linked updates, recompute the planning-side `NORTH_STAR_ALIGNMENT` fields
+that can be known without implementation evidence. A missing/unrelated
+contribution, card/increment mismatch, or Future Scope leak must be corrected
+or reported as `EVOLUTION_SCOPE_DRIFT`; never hide it by unlinking the change.
+Implementation-only evidence remains for `/opsx-apply` and `/opsx-verify`.
+
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_update --strict`. Stop on non-zero exit and report the guard output.
@@ -105,6 +123,10 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
    - If the user asked for a specific revision ("the design now uses X"), that is the starting edit — run it through the Deferred re-entry gate in 2b when it overlaps parks.
    - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication. Coherence MUST NOT silently restore parked scope; if coherence “wants” a deferred unit back, use `DEFERRED_REENTRY_REQUIRED`.
    - If the request is clearly "bound scope + write WORKLOG" without a completed bound-scope GO, stop and point to `/opsx-bound-scope`.
+   - If an `EVOLUTION_HANDOFF` is supplied, treat its `IN_SCOPE` and
+     `OUT_OF_SCOPE` as the requested boundary. Show concrete per-artifact
+     revisions before writing. Do not add Future Increments and do not bypass
+     `REENTER_CONFIRMED` for previously parked units.
 
 4. **Perform Architecture Decision Lookup**
 
@@ -144,6 +166,8 @@ After each invocation, show:
 - Which artifacts were revised (and which proposed revisions were rejected)
 - Anything deferred to `/opsx:continue` (not-yet-created artifacts or files)
 - WORKLOG annotations made on confirmed re-entry (if any)
+- Evolution link / Current Increment / Contribution and any
+  `EVOLUTION_SCOPE_DRIFT` removed
 - Where the change stands and the recommended next command
 
 
@@ -505,5 +529,7 @@ align with the latest applicable event.
 - Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx:continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
 - Confirm every edit with the user before writing.
 - Deferred parks: always surface `DEFERRED_PARKS_FOR_CHANGE` when WORKLOG exists; never silently restore `[deferred-from:<CHANGE_ID>]` into owed DoD; re-entry requires `REENTER_CONFIRMED`; the only allowed WORKLOG write from this command is annotating confirmed re-entry (`[re-entered:<CHANGE_ID>]`). Parking new deferrals remains `/opsx-bound-scope:GO` only.
+- Evolution: never require linking for legacy/standalone changes; never treat a
+  card as implementation GO; never pull Future Increments into owed DoD.
 - If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx:new` (the "Update vs. Start Fresh" heuristic).
 - Bug-episode: never write OpenSpec / TASK_DELTA without durable Route B receipt (`CLASSIFICATION` + `CHOSEN_ROUTE=ROUTE_B` + `EXPECTED_NEXT_COMMAND=/opsx-update` or `CURRENT_ROUTE_STATE=AWAITING_SPEC_UPDATE`); never store `/opsx-update` as `EXPECTED_EXECUTION_ROUTE` / `ACTUAL_EXECUTION_ROUTE`; never write legacy `TASK_DELTA_STATUS` / `CURRENT_ROUTE` in new artifacts.

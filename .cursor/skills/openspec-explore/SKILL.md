@@ -23,6 +23,8 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 **Project config, policy, and WORKLOG:** At the start of exploration, read:
 - `openspec/config.yaml` for shared OpenSpec context and `rules.explore`
 - `openspec/policies/EXPLORE_POLICY.md` for Explore command policy
+- `openspec/policies/EVOLUTION_POLICY.md` for long-lived capability/evolution
+  discussions
 
 Apply `rules.explore` from config and the `explore` policy from `EXPLORE_POLICY.md`.
 
@@ -48,6 +50,9 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
 8. Do not modify production code.
 9. Do not modify WORKLOG.
+10. For capability-sized ideas, read `openspec/evolution/index.md` first and
+    inspect at most three strongest matching cards. Explore may emit an
+    `EVOLUTION_CANDIDATE`, but must not write the registry.
 
 **Required final output format:**
 
@@ -71,6 +76,13 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 
 ## Recommended Workflow
 Один из вариантов: short handoff / core OpenSpec / expanded OpenSpec.
+
+## Evolution Context (optional)
+For long-lived capability work, show overlap candidates as `Title (STAR_ID)`
+and an exploratory `EVOLUTION_CANDIDATE` containing North Star, Evolution Path,
+Current Increment, Contribution to North Star, Forward Compatibility
+Constraints, and Future Non-DoD.
+Persist only via `/opsx-evolution`; this section is not implementation GO.
 
 ## Next Action
 Что делать дальше.

@@ -24,8 +24,16 @@ python openspec/tools/check_config_contract.py
 **Обязательная настройка:** перед выводом результата прочитай:
 - `openspec/config.yaml` для shared OpenSpec context и `rules.verify`
 - `openspec/policies/VERIFY_POLICY.md` для Verify command policy
+- `openspec/policies/EVOLUTION_POLICY.md` для optional linked Current
+  Increment boundary
 
 Примени `rules.verify` из config и `verify` policy из `VERIFY_POLICY.md`.
+Если change linked, Future Increments не являются missing requirements, а
+реализованный `OUT_OF_SCOPE` является `EVOLUTION_SCOPE_DRIFT`. Отсутствие
+Evolution Context не блокирует standalone/legacy verify.
+Выведи `NORTH_STAR_ALIGNMENT` по policy: linked `FAIL` означает archive
+`NO_GO`, `WARN` сам по себе не блокирует, остальные режимы дают
+`NOT_APPLICABLE`.
 
 Если настройки отсутствуют или неполные, явно напиши это в разделе `Итоговый вердикт` и используй strict fallback:
 - язык ответа: русский

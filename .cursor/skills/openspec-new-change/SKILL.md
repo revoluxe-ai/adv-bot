@@ -14,6 +14,12 @@ Start a new change using the experimental artifact-driven approach.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Optional Evolution handoff:** Follow
+`openspec/policies/EVOLUTION_POLICY.md`. When supplied, preserve
+`STAR_ID`/`INCREMENT_ID`, Current Increment, and
+`CONTRIBUTION_TO_NORTH_STAR` for downstream artifact creation. Linking is
+optional; standalone and legacy-unlinked changes remain valid.
+
 **Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.
 
 **Steps**

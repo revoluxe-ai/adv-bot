@@ -15,6 +15,19 @@ Fast-forward through artifact creation - generate everything needed to start imp
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` for any supplied exact change/decision paths; do not rediscover known artifacts via full-tree inventory.
 
+**Optional Evolution handoff:** Read
+`openspec/policies/EVOLUTION_POLICY.md`. When an `EVOLUTION_HANDOFF` is
+supplied, validate its exact `CARD_PATH`, preserve `STAR_ID` and
+`INCREMENT_ID` plus `CONTRIBUTION_TO_NORTH_STAR`, and generate every artifact
+strictly for `CURRENT_INCREMENT`.
+Include an `## Evolution Context` section in the proposal/design when those
+artifacts exist. `FORWARD_COMPATIBILITY_CONSTRAINTS` constrain today's design;
+`FUTURE_INCREMENTS` are context only and MUST NOT become specs, acceptance
+criteria, or tasks. Without a handoff, linking remains optional; classify as
+`STANDALONE`, `CANDIDATE`, or `NOT_APPLICABLE`. For a capability-sized
+`CANDIDATE`, show bounded registry matches as a soft recommendation, never a
+hard blocker.
+
 **Steps**
 
 1. **If no input provided, ask what they want to build**
@@ -62,6 +75,9 @@ Fast-forward through artifact creation - generate everything needed to start imp
       - Read any completed dependency files for context
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
+      - If linked, reconcile every artifact with the approved Current Increment;
+        stop with `EVOLUTION_SCOPE_DRIFT` rather than materializing an
+        `OUT_OF_SCOPE` or Future Increment unit
       - Show brief progress: "✓ Created <artifact-id>"
 
    b. **Continue until all `applyRequires` artifacts are complete**
@@ -83,6 +99,7 @@ Fast-forward through artifact creation - generate everything needed to start imp
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
+- Evolution link, Current Increment, and Contribution to North Star when linked
 - What's ready: "All artifacts created! Ready for implementation."
 - Prompt: "Run `/opsx:apply` to start implementing."
 
@@ -102,3 +119,5 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- Never require North Star linking for standalone/legacy work
+- Never treat Evolution Path or Future Increments as current owed DoD

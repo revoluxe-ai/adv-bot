@@ -15,6 +15,16 @@ Continue working on a change by creating the next artifact.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`. When the change name is known, use `openspec status/instructions --change "<name>"` and canonical change paths; do not inventory unrelated changes; do not gate on unconditional `git status`.
 
+**Optional Evolution handoff:** Read
+`openspec/policies/EVOLUTION_POLICY.md`. Detect Evolution Context in existing
+artifacts or consume a supplied `EVOLUTION_HANDOFF`. `STAR_ID` is optional and
+its absence is not a legacy blocker. For a linked change, preserve
+`STAR_ID`/`INCREMENT_ID`/`CONTRIBUTION_TO_NORTH_STAR`, create the next artifact only for
+`CURRENT_INCREMENT`, and reject accidental `OUT_OF_SCOPE` /
+`FUTURE_INCREMENTS` materialization as `EVOLUTION_SCOPE_DRIFT`. Forward
+compatibility constraints guide design choices but do not authorize future
+implementation.
+
 **Steps**
 
 1. **If no change name provided, prompt for selection**
@@ -70,6 +80,8 @@ Continue working on a change by creating the next artifact.
      - Read any completed dependency files for context
      - Use `template` as the structure - fill in its sections
      - Apply `context` and `rules` as constraints when writing - but do NOT copy them into the file
+     - When linked, include/reconcile `## Evolution Context` and keep all
+       requirements/tasks inside the approved Current Increment
      - Write to the `resolvedOutputPath` specified in instructions. If it is a glob pattern, choose the concrete file path using the schema instruction and the change's context
    - Show what was created and what's now unlocked
    - STOP after creating ONE artifact
@@ -91,6 +103,7 @@ After each invocation, show:
 - Which artifact was created
 - Schema workflow being used
 - Current progress (N/M complete)
+- Evolution link, Current Increment, and Contribution to North Star when linked
 - What artifacts are now unlocked
 - Prompt: "Run `/opsx:continue` to create the next artifact"
 
@@ -119,3 +132,5 @@ For other schemas, follow the `instruction` field from the CLI output.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
+- Never require a North Star for standalone or legacy changes
+- Never move Future Increments into specs/tasks without a new approved handoff

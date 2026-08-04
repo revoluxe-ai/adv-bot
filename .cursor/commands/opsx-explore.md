@@ -18,6 +18,8 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 **Project config, policy, and WORKLOG:** At the start of exploration, read:
 - `openspec/config.yaml` for shared OpenSpec context and `rules.explore`
 - `openspec/policies/EXPLORE_POLICY.md` for Explore command policy
+- `openspec/policies/EVOLUTION_POLICY.md` when the discussion concerns a
+  long-lived capability, staged development, or a possible North Star
 
 Apply `rules.explore` from config and the `explore` policy from `EXPLORE_POLICY.md`.
 
@@ -45,6 +47,10 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
 8. Do not modify production code.
 9. Do not modify WORKLOG (deferred parks are written only by `/opsx-bound-scope:GO`).
+10. For capability-sized ideas, read `openspec/evolution/index.md` first and
+    inspect at most three strongest matching cards. Display matches as
+    `Title (STAR_ID)`. Explore may recommend reuse/relation/new-card, but must
+    not write the registry.
 
 **Required final output format:**
 
@@ -68,6 +74,29 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 
 ## Recommended Workflow
 Один из вариантов: short handoff / core OpenSpec / expanded OpenSpec.
+
+## Evolution Context (optional)
+Include for long-lived capability development or when the user asks how the
+functionality should evolve. Omit for local fixes/refactors where it adds no
+value.
+
+```text
+EVOLUTION_CANDIDATE:
+OVERLAP_CANDIDATES:
+- Title (STAR_ID) — why it may match
+NORTH_STAR:
+EVOLUTION_PATH:
+- <independently deliverable increment>
+CURRENT_INCREMENT:
+CONTRIBUTION_TO_NORTH_STAR:
+FORWARD_COMPATIBILITY_CONSTRAINTS:
+- <needed now to avoid a dead end; not future implementation>
+FUTURE_NON_DOD:
+- <context only>
+PERSIST_VIA: /opsx-evolution <human title or goal>
+```
+
+This block is exploratory, not durable, and not implementation GO.
 
 ## Now / Later (optional)
 Include when implementation-sized ideas crystallize **and** any of:
@@ -108,6 +137,8 @@ for the park; that is bound-scope → update.
 Что делать дальше. If `NOW_LATER` was emitted and the owner wants
 to commit the boundary, prefer pointing to `/opsx-bound-scope` (not a silent
 full-scope `/opsx-new` / `/opsx-ff` of everything).
+If an `EVOLUTION_CANDIDATE` is mature enough to persist, point to
+`/opsx-evolution <human title or goal>` before creating a linked change.
 
 ### Bug-episode / bug-team handback (when case= or finding= in scope)
 

@@ -11,6 +11,23 @@ Implement tasks from an OpenSpec change.
 
 **Architecture Decision Lookup:** Before changing code, resolve decision paths from the selected change context/`artifactPaths.decisions` first. Prefer exact listed paths over a full `openspec/decisions/**` walk. Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`: when the change name is known, do not rediscover it by scanning all changes; do not gate apply on unconditional `git status`—run git only when dirty-tree / branch identity is REQUIRED_FOR safe implementation. Search `openspec/decisions/**/*.md` only for remaining gaps after direct context paths are read (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Do **not** equate budget exhaustion with “no decision exists”: if ownership / layering / write-path / domain-invariant gaps remain unresolved after that budget (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without editing code. Use `Architecture Decision Missing` only when lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision. Implementation must cite relevant decisions in progress or completion notes. If planned code placement contradicts an accepted decision, stop before editing code and return `NO_GO` with the conflicting decision path. If placement depends on a proposed decision, use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied before deciding whether code can proceed. Passing tests are not sufficient if placement violates a decision.
 
+**Optional Evolution boundary:** Read
+`openspec/policies/EVOLUTION_POLICY.md`. After loading change context, detect an
+`## Evolution Context` / `EVOLUTION_HANDOFF`. For linked changes, resolve the
+exact `CARD_PATH`, report `Title (STAR_ID)` and Current Increment, and implement
+only `IN_SCOPE`. `FORWARD_COMPATIBILITY_CONSTRAINTS` constrain the current
+design; they do not authorize Future Increment work. If tasks/code requested by
+the invocation exceed the approved increment, stop that unit with
+`EVOLUTION_SCOPE_DRIFT` and route planning to `/opsx-update` (or
+`/opsx-bound-scope` when parking an oversized existing change). Absence of
+Evolution Context never blocks standalone or legacy apply.
+
+Before any linked code edit, emit the exact `NORTH_STAR_ALIGNMENT` receipt from
+`EVOLUTION_POLICY.md`. `FAIL` blocks code edits regardless of passing tests.
+Implementation-dependent `unknown` may produce `WARN`; missing source evidence
+needed to understand the linked constraint is an `EVIDENCE_GAP` and blocks.
+Standalone, legacy-unlinked, and not-applicable changes emit `NOT_APPLICABLE`.
+
 **Canonical testing rule:** Before implementation, read `.cursor/rules/testing-rules.mdc` as the only general test-design/execution policy. Do not treat `.cursor/rules/TESTING_RULES.mdc` as policy (migration pointer only). Do not copy large test-policy blocks into this command; follow the authority split below.
 
 **PG session mode:** New/changed production `sm(...)` / `get_async_session_maker(...)` MUST use explicit `read_only=` per intent (WRITE/RAW → `False`, PURE_READ → `True`). Bare `sm()` forbidden — see testing-rules § PG session mode; coverage will WEAK `PG_IMPLICIT_SESSION_MODE`.
@@ -74,6 +91,8 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    The files depend on the schema being used:
    - **spec-driven**: proposal, specs, design, tasks, and optional decisions when present
    - Other schemas: follow the contextFiles from CLI output
+   - If Evolution Context is present: read its exact card and extract Current
+     Increment, In Scope, Forward Compatibility Constraints, and Out of Scope.
 
 5. **Read canonical testing rule and optional TEST_COVERAGE_PACKET**
 
@@ -107,6 +126,8 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - Remaining tasks overview
    - Whether `TEST_COVERAGE_PACKET` was found (present / absent) and its status if present
    - Dynamic instruction from CLI
+   - Evolution link / Current Increment when linked
+   - `NORTH_STAR_ALIGNMENT` receipt before linked code edits
 
 8. **Implement tasks (loop until done or blocked)**
 
@@ -131,6 +152,8 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    **Pause if:**
    - Task is unclear → ask for clarification
    - Implementation reveals a design issue → suggest updating artifacts
+   - Implementation requires an Out-of-Scope/Future Increment unit → stop with
+     `EVOLUTION_SCOPE_DRIFT`; do not implement it opportunistically
    - Error or blocker encountered → report and wait for guidance
    - User interrupts
 
@@ -381,6 +404,8 @@ Never rewrite prior JSONL lines.
 - Stop with `NO_GO` when planned placement conflicts with an accepted architecture decision
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
+- Do not require Evolution linking for standalone/legacy changes; when linked,
+  do not implement Future Increments or reinterpret the card as Owner GO
 - Keep code changes minimal and scoped to each task
 - For new/changed PG/CH boundaries, prefer parent-opened session/client passed into child callables that execute DB/CH logic; treat hidden child-only session/client creation as a refactor gap unless explicitly justified by design constraints
 - After implementing tasks, treat any new production/exported symbol whose only callers are tests as dead surface: wire it into a runtime-reachable path or remove it before completion. Passing tests do not prove wiring.

@@ -13,6 +13,18 @@ Start a new change using the experimental artifact-driven approach.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` when exact paths/IDs appear later in the workflow; this command creates a new change and should not inventory unrelated trees first.
 
+**Optional Evolution handoff:** Read
+`openspec/policies/EVOLUTION_POLICY.md`. If the user supplies an
+`EVOLUTION_HANDOFF`, validate its exact `CARD_PATH` and carry
+`STAR_ID`/`INCREMENT_ID`/Current Increment boundary and
+`CONTRIBUTION_TO_NORTH_STAR` into the change context for `/opsx-continue`. Do
+not create artifacts in this command. Without a handoff,
+classify the change as `STANDALONE`, `LEGACY_UNLINKED`, `CANDIDATE`, or
+`NOT_APPLICABLE`; absence of `STAR_ID` is not a blocker. For a new
+capability-sized `CANDIDATE`, read `openspec/evolution/index.md` and show up to
+three likely `Title (STAR_ID)` matches as a soft recommendation—never create or
+merge a card silently.
+
 **Steps**
 
 1. **If no input provided, ask what they want to build**
@@ -54,7 +66,14 @@ Start a new change using the experimental artifact-driven approach.
    ```
    This outputs the template and context for creating the first artifact.
 
-6. **STOP and wait for user direction**
+6. **Preserve evolution context (when linked)**
+   - Emit the validated `EVOLUTION_HANDOFF` in the session handoff to
+     `/opsx-continue`.
+   - State that only `CURRENT_INCREMENT` is owed scope.
+   - Preserve `CONTRIBUTION_TO_NORTH_STAR`; do not infer it from `STAR_ID`.
+   - State that `FUTURE_INCREMENTS` are context and MUST NOT become tasks.
+
+7. **STOP and wait for user direction**
 
 **Output**
 
@@ -62,6 +81,8 @@ After completing the steps, summarize:
 - Change name and location
 - Schema/workflow being used and its artifact sequence
 - Current status (0/N artifacts complete)
+- Evolution link: `LINKED | STANDALONE | LEGACY_UNLINKED | CANDIDATE | NOT_APPLICABLE`
+- For `LINKED`: `Title (STAR_ID)` and Current Increment
 - The template for the first artifact
 - Prompt: "Ready to create the first artifact? Run `/opsx:continue` or just describe what this change is about and I'll draft it."
 
@@ -71,3 +92,5 @@ After completing the steps, summarize:
 - If the name is invalid (not kebab-case), ask for a valid name
 - If a change with that name already exists, suggest using `/opsx:continue` instead
 - Pass --schema if using a non-default workflow
+- Never require a North Star for every change or migrate legacy changes
+- Never broaden a linked Current Increment with Future Increments

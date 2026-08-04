@@ -14,6 +14,14 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Optional Evolution handoff:** Follow
+`openspec/policies/EVOLUTION_POLICY.md`. A supplied handoff may link or
+re-scope an existing change after Owner confirms edits. Keep Future Increments
+out of owed DoD, preserve parked-unit `REENTER_CONFIRMED` gates, and never
+require migration of legacy changes. Preserve `CONTRIBUTION_TO_NORTH_STAR` and
+surface planning-side `NORTH_STAR_ALIGNMENT` drift instead of silently
+unlinking.
+
 **Architecture Decision Lookup:** When revising artifacts, also check `openspec/decisions/**/*.md` and `artifactPaths.decisions.existingOutputPaths`. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.

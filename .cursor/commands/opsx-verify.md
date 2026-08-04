@@ -22,6 +22,28 @@ When a change name/id is known:
 * do not require `git status` before verify unless dirty-tree risk is REQUIRED_FOR the archive verdict;
 * include `SOURCE_RESOLUTION` / `EXECUTION_PREFLIGHT` in the final verify output.
 
+## Additive Evolution-boundary assurance
+
+Read `openspec/policies/EVOLUTION_POLICY.md`. If planning artifacts contain
+`## Evolution Context` / an `EVOLUTION_HANDOFF`, resolve its exact `CARD_PATH`
+and audit the linked Current Increment. Verify only behavior owed by
+`IN_SCOPE`; Future Increments are never missing requirements. Confirm that
+Forward Compatibility Constraints explicitly carried into the change were
+respected without speculative future implementation.
+
+Absence of Evolution Context does not block standalone or legacy changes.
+For a linked change, implementation/spec/tasks that materially include
+`OUT_OF_SCOPE` or Future Increment work are `EVOLUTION_SCOPE_DRIFT` and produce
+`NO_GO` until `/opsx-update` reconciles the artifacts (or
+`/opsx-bound-scope` parks the excess). A North Star card never overrides specs,
+accepted architecture decisions, test evidence, or archive gates.
+
+Emit the exact `NORTH_STAR_ALIGNMENT` receipt from `EVOLUTION_POLICY.md`.
+For linked changes, its `FAIL` is archive `NO_GO` even when tests pass.
+`WARN` is visible but does not block by itself. `unknown` for an explicit
+mandatory Forward Compatibility Constraint is `FAIL`. Standalone,
+legacy-unlinked, and not-applicable changes emit `NOT_APPLICABLE`.
+
 ## Additive test-coverage assurance
 
 Если в change artifacts, context files или явно переданном invariant output присутствует `TEST_COVERAGE_PACKET`, verify должен независимо проверить соответствие фактических tests этому packet.
@@ -275,6 +297,8 @@ Extract:
 * ownership and placement claims;
 * validation plan and targeted checks;
 * open questions.
+* Evolution link, Current Increment, In/Out of Scope, and Forward
+  Compatibility Constraints when present.
 
 #### TEST_COVERAGE_PACKET discovery
 
@@ -716,6 +740,9 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * actual test level is below the materialized `MINIMUM_TEST_LEVEL`;
 * `UNIT_SUFFICIENCY=insufficient`, but only unit-component evidence is provided;
 * packet and tests materially contradict each other.
+* linked `NORTH_STAR_ALIGNMENT.VERDICT=FAIL`;
+* a linked explicit mandatory Forward Compatibility Constraint remains
+  `unknown`;
 
 Do not set `NO_GO` only because:
 
@@ -765,6 +792,19 @@ Then:
 ```text
 ## Поведение
 Behavior matches spec: yes / no / partial
+
+## Evolution boundary
+NORTH_STAR_ALIGNMENT:
+EVOLUTION_LINK: LINKED | STANDALONE | LEGACY_UNLINKED | NOT_APPLICABLE
+STAR_LINK_VALID: yes | no | not_applicable
+INCREMENT_MATCH: yes | no | not_applicable
+CONTRIBUTION_STATUS: supported | weak | none | not_applicable
+CONTRIBUTION_EVIDENCE:
+SCOPE_CONFORMANCE: pass | drift | not_applicable
+FORWARD_COMPATIBILITY: pass | violated | unknown | not_applicable
+FUTURE_SCOPE_LEAK: none | found | not_applicable
+VERDICT: PASS | WARN | FAIL | NOT_APPLICABLE
+RATIONALE:
 
 ## Архитектурное размещение
 Implementation matches architecture decisions: yes / no / partial

@@ -18,6 +18,9 @@ This skill is a concise adapter. It is **not** the authoritative apply contract.
 
 1. `.cursor/commands/opsx-apply.md` — current apply workflow contract (including Architecture Decision Lookup and source-resolution/preflight semantics already present there)
 2. `.cursor/rules/testing-rules.mdc` — canonical general test-design/execution policy
+3. `openspec/policies/EVOLUTION_POLICY.md` — optional linked Current Increment
+   boundary and `NORTH_STAR_ALIGNMENT` receipt; linked `FAIL` blocks code edits,
+   while absence does not block standalone/legacy apply
 
 Do **not** treat `.cursor/rules/TESTING_RULES.mdc` as policy (deprecated migration pointer only).
 Do **not** treat `.cursor/skills/**` as authority over `.cursor/commands/**`.

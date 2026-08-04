@@ -23,6 +23,13 @@ change делает уже `/opsx-update` по handoff.
 2. Не потерять отложенные идеи — записать их в WORKLOG.
 3. Дать `/opsx-update` понятный пакет: что вырезать из ТЗ.
 
+Если change связан с North Star, дополнительно следовать
+`openspec/policies/EVOLUTION_POLICY.md`: сохранять `STAR_ID` /
+`INCREMENT_ID` / `CONTRIBUTION_TO_NORTH_STAR`, сверять KEEP с Current
+Increment, а DEFER помечать как кандидатов будущих increments. Эта команда не
+переписывает North Star card:
+семантическое обновление registry принадлежит `/opsx-evolution`.
+
 ## Когда использовать
 
 - ТЗ/tasks/specs раздулись («нафантазировали»).
@@ -155,6 +162,9 @@ ownership / layering / write-path / invariant. Дыры → `NO_GO`, не выд
 3. Прочитать нужные proposal/design/tasks/specs (+ decisions по ADL).
 3b. Если был `NOW_LATER` / подсказка «сейчас X, потом Y» — взять как старт,
     сверить с артефактами, показать расхождения простым языком.
+3c. Если artifacts содержат Evolution Context, прочитать точный `CARD_PATH`,
+    подтвердить `STAR_ID`/`INCREMENT_ID` и не выдавать Future Increment за
+    текущий owed scope.
 4. Разметить пункты:
 
 ```text
@@ -199,6 +209,9 @@ IMPLEMENTED_BUT_DEFERRED → в ТЗ хотим «потом», но в коде
 
 PRINTOUT_KEEP:
 CHANGE_ID: <id>
+STAR_ID: <id | none>
+INCREMENT_ID: <id | none>
+CONTRIBUTION_TO_NORTH_STAR: <claim | none>
 MVP_BOUNDARY: <one sentence>
 KEEP_UNITS:
 - <title> — <artifact path> — <why keep>
@@ -224,6 +237,8 @@ TARGET: DOTO/WORKLOG.md
 ENTRIES:
 - [ ] [deferred-from:<CHANGE_ID>] <короткий заголовок>
   source: openspec/changes/<CHANGE_ID>/<artifact>
+  star_id: <STAR_ID | none>
+  increment_candidate_for: <STAR_ID | none>
   reason: out_of_current_mvp | oversized | owner_park
   notes: <1–3 строки из старого ТЗ>
 ```
@@ -249,6 +264,9 @@ WORKLOG = сырые заметки, не второй tasks.md.
 UPDATE_HANDOFF:
 SOURCE_COMMAND: /opsx-bound-scope
 CHANGE_ID: <id>
+STAR_ID: <id | none>
+INCREMENT_ID: <id | none>
+CONTRIBUTION_TO_NORTH_STAR: <claim | none>
 STATUS: READY_FOR_UPDATE
 WORKLOG_APPENDED: yes | no
 WORKLOG_PATH: DOTO/WORKLOG.md
@@ -268,6 +286,8 @@ DO_NOT:
 NEXT_COMMAND: /opsx-update change=<CHANGE_ID>
 NOTE_FOR_UPDATE: After this handoff, open WORKLOG parks for this CHANGE_ID remain
   out of scope until owner replies REENTER_CONFIRMED on a later /opsx-update.
+EVOLUTION_DEFERRED_CANDIDATES:
+- <high-level candidate increment; semantic registry update remains /opsx-evolution>
 ```
 
 ---
