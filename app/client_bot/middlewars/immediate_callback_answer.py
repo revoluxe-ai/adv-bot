@@ -73,5 +73,10 @@ class ImmediateCallbackAnswerUpdateMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         if isinstance(event, Update) and event.callback_query is not None:
+            logger.debug(
+                "ImmediateCallbackAnswerUpdateMiddleware: callback received user=%s data=%r",
+                event.callback_query.from_user.id,
+                event.callback_query.data,
+            )
             _ = await safe_callback_query_answer(event.callback_query, text=self._text)
         return await handler(event, data)

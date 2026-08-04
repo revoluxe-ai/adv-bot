@@ -1,6 +1,7 @@
 """Middleware гейта: блокирует доступ пользователям с User.passed_gate=False."""
 
 from collections.abc import Awaitable, Callable
+import logging
 from typing import Any, cast
 
 from aiogram import BaseMiddleware
@@ -17,6 +18,7 @@ from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
 _sm = get_async_session_maker
+logger = logging.getLogger(__name__)
 
 PRESENTATION_ONLY_BLOCKED_TEXT = (
     "Доступ к функциям бота закрыт. Откройте меню через /start — запись на презентацию."
@@ -37,11 +39,20 @@ class GateMiddleware(BaseMiddleware):
     ) -> Any:
         event = cast(Message | CallbackQuery, event)
         telegram_id = event.from_user.id if event.from_user else None
+        logger.debug(
+            "GateMiddleware: enter type=%s user=%s callback=%r text=%r",
+            type(event).__name__,
+            telegram_id,
+            getattr(event, "data", None),
+            getattr(event, "text", None),
+        )
         if telegram_id is None:
+            logger.debug("GateMiddleware: no telegram_id, pass through")
             return await handler(event, data)
 
         admin_ok = is_bot_admin(telegram_id)
         if admin_ok:
+            logger.debug("GateMiddleware: admin bypass user=%s", telegram_id)
             return await handler(event, data)
 
         async with _sm(read_only=False) as session:
@@ -62,27 +73,56 @@ class GateMiddleware(BaseMiddleware):
                     username=event.from_user.username if event.from_user else None,
                     adv_updater_user_chat_id=chat_id,
                 )
+                logger.debug(
+                    "GateMiddleware: created user=%s chat_id=%s",
+                    telegram_id,
+                    chat_id,
+                )
+
+        logger.debug(
+            "GateMiddleware: loaded user=%s passed_gate=%s presentation_only=%s invite_gate=%s",
+            telegram_id,
+            user.passed_gate,
+            settings.presentation_only,
+            settings.invite_gate,
+        )
 
         if settings.presentation_only:
             passed_gate_effective = user.passed_gate
             if passed_gate_effective:
+                logger.debug("GateMiddleware: presentation_only passed_gate bypass user=%s", telegram_id)
                 return await handler(event, data)
 
             if isinstance(event, Message):
                 if is_start_command_message(event):
+                    logger.debug("GateMiddleware: presentation_only /start bypass user=%s", telegram_id)
                     return await handler(event, data)
                 state = data.get("state")
                 if state is not None:
                     current = await state.get_state()
+                    logger.debug(
+                        "GateMiddleware: presentation_only state user=%s state=%s",
+                        telegram_id,
+                        current,
+                    )
                     if current is not None and str(current).startswith(
                         "PresentationRequest:"
                     ):
+                        logger.debug(
+                            "GateMiddleware: presentation_only PresentationRequest bypass user=%s",
+                            telegram_id,
+                        )
                         return await handler(event, data)
             if (
                 isinstance(event, CallbackQuery)
                 and event.data
                 and event.data.startswith("presentation:")
             ):
+                logger.debug(
+                    "GateMiddleware: presentation_only callback bypass user=%s data=%r",
+                    telegram_id,
+                    event.data,
+                )
                 return await handler(event, data)
 
             if isinstance(event, Message):
@@ -94,10 +134,13 @@ class GateMiddleware(BaseMiddleware):
                     else None
                 )
             if chat_id is None:
+                logger.debug("GateMiddleware: presentation_only no chat_id, pass through user=%s", telegram_id)
                 return await handler(event, data)
             bot = data.get("bot")
             if bot is None:
+                logger.debug("GateMiddleware: presentation_only no bot, pass through user=%s", telegram_id)
                 return await handler(event, data)
+            logger.debug("GateMiddleware: presentation_only blocked user=%s chat_id=%s", telegram_id, chat_id)
             await bot.send_message(chat_id, PRESENTATION_ONLY_BLOCKED_TEXT)
             return None
 
@@ -105,6 +148,7 @@ class GateMiddleware(BaseMiddleware):
         if not settings.invite_gate:
             passed_gate = True
         if passed_gate:
+            logger.debug("GateMiddleware: passed_gate bypass user=%s", telegram_id)
             return await handler(event, data)
 
         # Whitelist для пользователя без passed_gate (все остальное → экран гейта):
@@ -113,14 +157,18 @@ class GateMiddleware(BaseMiddleware):
         # 3) Message в FSM GateInvite:* — ввод инвайт-кода
         if isinstance(event, CallbackQuery):
             if event.data and event.data.startswith("gate:"):
+                logger.debug("GateMiddleware: gate callback bypass user=%s data=%r", telegram_id, event.data)
                 return await handler(event, data)
         if isinstance(event, Message):
             if getattr(event, "successful_payment", None) is not None:
+                logger.debug("GateMiddleware: successful_payment bypass user=%s", telegram_id)
                 return await handler(event, data)
             state = data.get("state")
             if state is not None:
                 current = await state.get_state()
+                logger.debug("GateMiddleware: state user=%s state=%s", telegram_id, current)
                 if current is not None and current.startswith("GateInvite:"):
+                    logger.debug("GateMiddleware: GateInvite bypass user=%s", telegram_id)
                     return await handler(event, data)
 
         # Блокируем: показываем экран гейта
@@ -133,14 +181,17 @@ class GateMiddleware(BaseMiddleware):
                 else None
             )
         if chat_id is None:
+            logger.debug("GateMiddleware: blocked but no chat_id, pass through user=%s", telegram_id)
             return await handler(event, data)
 
         bot = data.get("bot")
         if bot is None:
+            logger.debug("GateMiddleware: blocked but no bot, pass through user=%s", telegram_id)
             return await handler(event, data)
 
         text = get_gate_message_text()
         keyboard = get_gate_keyboard()
+        logger.debug("GateMiddleware: blocking user=%s chat_id=%s", telegram_id, chat_id)
         await bot.send_message(
             chat_id,
             text,
