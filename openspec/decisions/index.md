@@ -19,6 +19,12 @@ architecture decisions belong here.
   - Scope: domain invariant — working-contour ClickHouse SQL MUST qualify
     database as `default_db.<object>` in query text; SQL-contract proof
     required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
+- [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
+  - Status: Accepted
+  - Scope: ownership/layering for operator `scripts/` + `/opsx-scripts` Job
+    WB API reads — existing access + `app/core/mp/wb/api` only; no new raw
+    HTTP client; `READ_ONLY_NO_MUTATION`; secret-strip L0 archives; Job-only
+    runtime (no Cursor→prod API).
 
 ## Change Requirements
 
