@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Chat, Message
 
 from app.client_bot.const import ADMINS, SUPPORT_CHANNEL_URL
@@ -127,6 +128,32 @@ async def test_channel_subscription_middleware_allows_check_subscribe_callback()
     await middleware(handler, event, {"bot": bot})
 
     handler.assert_awaited_once_with(event, {"bot": bot})
+
+
+@pytest.mark.asyncio
+async def test_channel_subscription_middleware_allows_gate_callback_before_subscription() -> None:
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_callback_event(445, callbacks.Gate(action="invite_enter").pack())
+    handler = AsyncMock()
+    bot = MagicMock()
+
+    await middleware(handler, event, {"bot": bot})
+
+    handler.assert_awaited_once_with(event, {"bot": bot})
+
+
+@pytest.mark.asyncio
+async def test_channel_subscription_middleware_allows_gate_invite_state_message() -> None:
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_message_event(446, "INVITE-CODE")
+    handler = AsyncMock()
+    bot = MagicMock()
+    state = AsyncMock(spec=FSMContext)
+    state.get_state = AsyncMock(return_value="GateInvite:waiting_code")
+
+    await middleware(handler, event, {"bot": bot, "state": state})
+
+    handler.assert_awaited_once_with(event, {"bot": bot, "state": state})
 
 
 @pytest.mark.asyncio

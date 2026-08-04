@@ -99,6 +99,7 @@ async def _load_user_with_wb_cabinets_in_session(
     return result.unique().scalar_one_or_none()
 
 
+
 async def _load_user_id_in_session(
     session: AsyncSession, user_telegram_id: int
 ) -> int | None:
@@ -233,10 +234,12 @@ async def callback_start_registration(
         callback.message.chat.id if callback.message is not None else None,
     )
 
+
     await state.clear()
     async with sm(read_only=True) as session:
         user_id = callback.from_user.id
         user = await _load_user_with_wb_cabinets_in_session(session, user_id)
+
         logger.debug(
             "callback_start_registration: user loaded user=%s exists=%s passed_gate=%s",
             user_id,

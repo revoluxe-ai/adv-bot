@@ -14,6 +14,7 @@ from typing import Any, cast
 
 from aiogram import BaseMiddleware, Bot
 from aiogram.exceptions import TelegramAPIError
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from app.client_bot.admin_access import is_bot_admin
@@ -44,6 +45,22 @@ def _is_whitelisted_event(event: Message | CallbackQuery) -> bool:
     if isinstance(event, Message):
         return is_start_command_message(event)
     return bool(event.data and event.data == callbacks.CheckSubscribe().pack())
+
+
+async def _is_gate_invite_flow_event(
+    event: Message | CallbackQuery,
+    data: dict[str, Any],
+) -> bool:
+    """Allow the invite-gate flow to proceed before subscription is checked."""
+    if isinstance(event, CallbackQuery):
+        return bool(event.data and event.data.startswith("gate:"))
+
+    state = data.get("state")
+    if not isinstance(state, FSMContext):
+        return False
+
+    current_state = await state.get_state()
+    return bool(current_state and current_state.startswith("GateInvite:"))
 
 
 def _build_subscription_cache_key(telegram_id: int) -> str:
@@ -165,13 +182,11 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
             logger.debug("ChannelSubscriptionMiddleware: no telegram_id, pass through")
             return await handler(event, data)
 
-        if is_bot_admin(telegram_id) or _is_whitelisted_event(event):
-            logger.debug(
-                "ChannelSubscriptionMiddleware: bypass user=%s admin=%s whitelisted=%s",
-                telegram_id,
-                is_bot_admin(telegram_id),
-                _is_whitelisted_event(event),
-            )
+        if (
+            is_bot_admin(telegram_id)
+            or _is_whitelisted_event(event)
+            or await _is_gate_invite_flow_event(event, data)
+        ):
             return await handler(event, data)
 
         # Structural admission: duck-typed bots (and unit MagicMock) must still
