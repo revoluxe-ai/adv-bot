@@ -24,6 +24,11 @@ architecture decisions belong here.
   - Scope: Neo4j MUST NOT be a mandatory part of runtime app config /
     application DI; reintroduction requires an explicit change with real
     driver/DI wiring (test `NEO4J_*` stubs are not the architecture).
+- [callback-start-entry-write-path](callback-start-entry-write-path/decision.md)
+  - Status: Accepted
+  - Scope: write-path — User creation belongs to message `/start` / write
+    middleware (`sm(read_only=False)`); Callback Start is menu-return
+    PURE_READ only and MUST NOT call `create_user`.
 
 ## Change Requirements
 
