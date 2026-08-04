@@ -1,0 +1,120 @@
+name: Scripts branch image (no PR)
+
+# Build+push app image from branch `scripts` for ops Jobs.
+# Does not require a PR. Does not deploy master/stage.
+on:
+  push:
+    branches: [scripts]
+  workflow_dispatch:
+
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: common-wb-adv-bot
+            repo_name: adv-bot
+            dockerfile: ./dockers/Dockerfile
+    env:
+      GHCR_NAMESPACE: revoluxe-ai
+      CR_REPOSITORY: ${{ matrix.repo_name }}
+      IMAGE_TAG: ${{ github.sha }}
+      LATEST_TAG: scripts
+      GHCR_REGISTRY: ghcr.io
+      HARBOR_REGISTRY: harbor.skyline360.ru
+      HARBOR_PROJECT: git-registry-cache
+      HARBOR_REPOSITORY: revoluxe-ai/adv-bot
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image to GHCR
+        id: ghcr_push
+        run: |
+          set -euo pipefail
+          GHCR_IMAGE="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}"
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            -t "${GHCR_IMAGE}:${{ env.IMAGE_TAG }}" \
+            -t "${GHCR_IMAGE}:${{ env.LATEST_TAG }}" \
+            -f ${{ matrix.dockerfile }} .
+          echo "ghcr_sha=${GHCR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
+          echo "ghcr_scripts=${GHCR_IMAGE}:${{ env.LATEST_TAG }}" >> "$GITHUB_OUTPUT"
+
+      - name: Push Docker image to Harbor (best-effort)
+        id: harbor_push
+        continue-on-error: true
+        env:
+          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
+          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+        run: |
+          set +e
+          set -u
+          HARBOR_IMAGE="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.HARBOR_REPOSITORY }}"
+          GHCR_IMAGE="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+
+          if ! echo "$HARBOR_PASSWORD" | docker login "${{ env.HARBOR_REGISTRY }}" \
+            -u "$HARBOR_USERNAME" --password-stdin; then
+            echo "::error::Harbor login failed (GHCR push already succeeded)"
+            exit 1
+          fi
+
+          if ! docker pull "$GHCR_IMAGE"; then
+            echo "::error::Failed to pull ${GHCR_IMAGE} for Harbor retag"
+            exit 1
+          fi
+
+          docker tag "$GHCR_IMAGE" "${HARBOR_IMAGE}:${{ env.IMAGE_TAG }}"
+          docker tag "$GHCR_IMAGE" "${HARBOR_IMAGE}:${{ env.LATEST_TAG }}"
+
+          HARBOR_FAILED=0
+          if ! docker push "${HARBOR_IMAGE}:${{ env.IMAGE_TAG }}"; then
+            echo "::error::Harbor push failed for sha tag"
+            HARBOR_FAILED=1
+          fi
+          if ! docker push "${HARBOR_IMAGE}:${{ env.LATEST_TAG }}"; then
+            echo "::error::Harbor push failed for scripts tag"
+            HARBOR_FAILED=1
+          fi
+          if [ "$HARBOR_FAILED" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "harbor_sha=${HARBOR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
+          echo "harbor_scripts=${HARBOR_IMAGE}:${{ env.LATEST_TAG }}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Publish image references
+        if: always()
+        run: |
+          {
+            echo "## Published images (scripts branch)"
+            echo ""
+            echo "**GHCR (required):**"
+            echo "- ${{ steps.ghcr_push.outputs.ghcr_sha }}"
+            echo "- ${{ steps.ghcr_push.outputs.ghcr_scripts }}"
+            echo ""
+            if [ "${{ steps.harbor_push.outcome }}" = "success" ]; then
+              echo "**Harbor (best-effort, preferred for cluster Jobs):**"
+              echo "- ${{ steps.harbor_push.outputs.harbor_sha }}"
+              echo "- ${{ steps.harbor_push.outputs.harbor_scripts }}"
+            else
+              echo "**Harbor:** push skipped or failed (cluster RUN should pass image= pullable ref)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
