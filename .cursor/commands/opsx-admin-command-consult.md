@@ -53,6 +53,7 @@ Reduce front-door uncertainty for process questions:
 - Process lesson after FIXED Bugbot/fix packet →
   `/opsx-admin-command-promote-process-lesson`
 - Commit process surfaces → `/opsx-admin-command-commit`
+- Portable zip of all OPSX trees → `/opsx-admin-command-export-bundle`
 - Product idea / OpenSpec feature thinking → `/opsx-explore`
 - Oversized change TZ / cut scope + park remainder to WORKLOG → `/opsx-bound-scope`
 - Product bug → `/opsx-fix-bug` / bug-hunt path
@@ -104,6 +105,7 @@ routed command (`fix-command-defects`, `design-command`, `pipeline UPDATE GO`,
 | `route_pipeline_navigate` | As-is next not-admin step | `/opsx-pipeline` |
 | `route_pipeline_update` | Shared graph stale / missing | `/opsx-pipeline UPDATE` |
 | `route_admin_commit` | Process files changed, need commit | `/opsx-admin-command-commit` |
+| `route_export_bundle` | Need portable zip of all OPSX trees | `/opsx-admin-command-export-bundle` |
 | `wrong_branch` | Typing or product logic | `/opsx-fix-types` / static-check or `/opsx-fix-bug` |
 | `needs_evidence` | Missing fact blocks safe route | one narrow question; `NEXT_ACTION: none` until answered |
 

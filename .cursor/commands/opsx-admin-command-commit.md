@@ -50,6 +50,7 @@ Only these paths may be staged/committed by this command:
 .cursor/static-check/**
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
+.cursor/opsx-export/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -68,6 +69,8 @@ contracts, check packs, registry, base prompts/rules, **and** agent runner
 scripts (e.g. `bin/run.sh`).
 Antipattern-gate companions under `.cursor/antipattern-gate/` (catalog,
 `PRACTICE_LEDGER.jsonl`, README) are in scope with `/opsx-antipattern-gate`.
+OPSX export packer under `.cursor/opsx-export/` is in scope with
+`/opsx-admin-command-export-bundle` (the zip artifacts under `.tmp/` are not).
 All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
@@ -82,10 +85,19 @@ Never stage or commit:
 - CI/infra (including `.github/workflows/**`, except the surfaces listed above)
 - local IDE prefs such as `.cursor/settings.json`
 - archives / junk under `.cursor/` (e.g. `commands.zip`)
+- portable OPSX export artifacts under `.tmp/opsx-export/` (produced by
+  `/opsx-admin-command-export-bundle` — never commit those zips)
 - `openspec/changes/**` product change packets
 - ordinary project docs outside the surfaces above
 
-If such files are dirty:
+If the operator needs a portable zip of OPSX trees (not a git commit):
+
+```text
+OUT_OF_SCOPE_REDIRECT:
+NEXT_ACTION: /opsx-admin-command-export-bundle GO
+```
+
+If such (other) files are dirty:
 
 ```text
 OUT_OF_SCOPE_REDIRECT:
