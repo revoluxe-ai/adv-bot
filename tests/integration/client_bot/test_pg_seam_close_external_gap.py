@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import jwt
 
 import pytest
 from sqlalchemy import select
@@ -25,18 +28,38 @@ from app.client_bot.user_interface.services.cpm_target_place_workbook import (
     apply_target_place_rows_in_session,
     load_keywords_for_target_place_workbook_in_session,
 )
+from app.modules.common_slaves.wildberries import super_cabinet_manager
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBCabinet,
 )
 from app.modules.common_slaves.wildberries.super_cabinet_manager import (
+    find_common_access_token_in_session,
     load_wb_cabinet_access_in_session,
     resolve_wb_cabinet_id_by_shop_id_in_session,
 )
 from app.utils.db.models import User
+from app.modules.common_slaves.wildberries.models import WBToken
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
+
+_FIXED_EXP = 1_900_000_000
+
+
+def _build_token(*, acc: int, for_field: str | None, t: bool) -> str:
+    """Собрать детерминированный JWT для integration-token seam теста."""
+    payload: dict[str, object] = {
+        "id": "test",
+        "s": 102,
+        "sid": "shop_test",
+        "exp": _FIXED_EXP,
+        "acc": acc,
+        "t": t,
+    }
+    if for_field is not None:
+        payload["for"] = for_field
+    return jwt.encode(payload, "secret", algorithm="HS256")
 
 
 async def test_load_user_phone_gate_fields_in_session_reads(
@@ -150,22 +173,25 @@ async def test_apply_target_place_rows_in_session_persists(
 ) -> None:
     """Import child updates target_place and re-read confirms."""
     adv, keywords = await _create_adv_with_keywords(async_session)
+    adv_pk = adv.id
+    keyword_pk = keywords[0].id
     summary = TargetPlaceImportSummary(processed_rows=1)
     rows = [
         {
-            "keyword_id": keywords[0].id,
+            "keyword_id": keyword_pk,
             "keyword": "alpha",
             "target_place": 9,
         }
     ]
     summary = await apply_target_place_rows_in_session(
-        async_session, adv.id, rows, summary
+        async_session, adv_pk, rows, summary
     )
     assert summary.updated_rows == 1
 
+    # Capture PKs before expire: expired instance attrs trigger MissingGreenlet.
     async_session.expire_all()
     place = await async_session.scalar(
-        select(KeywordSetting.target_place).where(KeywordSetting.id == keywords[0].id)
+        select(KeywordSetting.target_place).where(KeywordSetting.id == keyword_pk)
     )
     assert place == 9
 
@@ -186,14 +212,57 @@ async def test_resolve_and_load_wb_cabinet_access_in_session(
     )
     async_session.add(cabinet)
     await async_session.flush()
+    cabinet_pk = cabinet.id
 
     resolved = await resolve_wb_cabinet_id_by_shop_id_in_session(async_session, shop_id)
-    assert resolved == cabinet.id
+    assert resolved == cabinet_pk
 
-    outcome = await load_wb_cabinet_access_in_session(async_session, cabinet.id)
+    outcome = await load_wb_cabinet_access_in_session(async_session, cabinet_pk)
     assert outcome == shop_id
+    # Capture PKs before expire: expired instance attrs trigger MissingGreenlet.
     async_session.expire_all()
     active = await async_session.scalar(
-        select(WBCabinet.active).where(WBCabinet.id == cabinet.id)
+        select(WBCabinet.active).where(WBCabinet.id == cabinet_pk)
     )
     assert active is False
+
+
+async def test_find_common_access_token_in_session_reads_valid_personal_token(
+    async_session: AsyncSession,
+) -> None:
+    """Child common-access seam streams WBToken rows from live session and filters them."""
+    user = User(
+        user_telegram_id=9_200_001,
+        username="common_access_seam",
+    )
+    async_session.add(user)
+    await async_session.flush()
+
+    non_personal_token = WBToken(
+        api_key=_build_token(acc=1, for_field=None, t=False),
+        user_id=user.id,
+        active=True,
+        shop_id="shop-a",
+    )
+    personal_token = WBToken(
+        api_key=_build_token(acc=3, for_field="self", t=False),
+        user_id=user.id,
+        active=True,
+        shop_id="shop-a",
+    )
+    async_session.add_all([non_personal_token, personal_token])
+    await async_session.flush()
+    client_session = MagicMock()
+
+    with patch.object(
+        super_cabinet_manager.token_check_righter,
+        "check_all_rights",
+        new_callable=AsyncMock,
+        return_value=True,
+    ) as rights_mock:
+        found = await find_common_access_token_in_session(async_session, client_session)
+
+    assert found is not None
+    assert found.id == personal_token.id
+    assert found.api_key == personal_token.api_key
+    assert rights_mock.await_count == 1

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.user_interface.services.adv_excel_roundtrip.export_build import (
     build_adv_excel_export,
+    build_adv_excel_export_in_session,
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.import_apply import (
     AdvExcelImportError,
@@ -180,6 +181,35 @@ async def test_adv_excel_export_import_roundtrip_updates_adv(
     assert shelf.target_test_impressions == 700
     assert shelf.target_test_observation_minutes == 120
     assert shelf.test_share == pytest.approx(0.1)
+
+
+@pytest.mark.asyncio
+async def test_build_adv_excel_export_in_session_reads_live_session(
+    async_session: AsyncSession, excel_shop_bundle: dict[str, object]
+) -> None:
+    """Child export seam reads current DB state directly from injected session."""
+    wuc = excel_shop_bundle["wb_user_cabinet"]
+    assert isinstance(wuc, WBUserCabinet)
+    adv = excel_shop_bundle["adv"]
+    assert isinstance(adv, AdvSetting)
+    # Capture before expire: expired instance attrs trigger MissingGreenlet.
+    wuc_pk = wuc.id
+    adv_pk = adv.id
+    adv_wb_id = adv.adv_id
+    min_views = adv.min_views_for_ml_predict
+
+    async_session.expire_all()
+    with patch(_PATCH_EXPORT_FACT, _fact_snapshot_stub):
+        _headers, rows = await build_adv_excel_export_in_session(
+            async_session,
+            wb_user_cabinet_id=wuc_pk,
+        )
+
+    row = next(
+        item for item in rows if item[column_header("RO", "adv_setting_id")] == adv_pk
+    )
+    assert row[column_header("RO", "adv_id")] == adv_wb_id
+    assert row[edit_header("min_views_for_ml_predict")] == min_views
 
 
 @pytest.mark.asyncio

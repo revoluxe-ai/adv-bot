@@ -1,4 +1,7 @@
-"""Integration tests for shop menu data loading helpers."""
+"""Integration tests for shop menu data loading helpers.
+
+Требуют ``destructive_local``: используют fixture ``async_session`` (live PG).
+"""
 
 import pytest
 
@@ -8,7 +11,11 @@ from app.modules.shop_menu.message import ShopMenu
 from app.utils.db.models import User
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.asyncio,
+    pytest.mark.destructive_local,
+]
 
 
 async def test_get_wb_user_cabinet_with_user_and_wb_cabinet_loads_relations(

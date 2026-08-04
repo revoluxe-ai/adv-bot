@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -16,6 +18,15 @@ def _build_sm_context(session: MagicMock) -> MagicMock:
     cm = MagicMock()
     cm.__aenter__ = AsyncMock(return_value=session)
     cm.__aexit__ = AsyncMock(return_value=False)
+    return cm
+
+
+def _session_cm(session: MagicMock):
+    """Собрать async contextmanager для mock `sm` с записью вызова."""
+    @asynccontextmanager
+    async def cm(read_only: bool = False) -> AsyncGenerator[MagicMock, None]:
+        yield session
+
     return cm
 
 
@@ -81,3 +92,27 @@ async def test_get_access_deactivate_path_uses_write_session() -> None:
             await super_cabinet_manager.get_access_for_wb_cabinet(999)
 
     deactivate_mock.assert_awaited_once()
+
+
+async def test_get_common_access_parent_hands_off_session_to_child() -> None:
+    """get_common_access opens sm(read_only=True) and hands session to child."""
+    session = MagicMock()
+    client_session = MagicMock()
+    token = MagicMock(spec=super_cabinet_manager.WBToken)
+    sm_mock = MagicMock(side_effect=_session_cm(session))
+
+    with (
+        patch.object(super_cabinet_manager, "sm", sm_mock),
+        patch.object(
+            super_cabinet_manager,
+            "find_common_access_token_in_session",
+            new_callable=AsyncMock,
+            return_value=token,
+        ) as find_mock,
+    ):
+        result = await super_cabinet_manager.get_common_access(client_session)
+
+    assert result.tokens == [token]
+    find_mock.assert_awaited_once_with(session, client_session)
+    assert sm_mock.call_args is not None
+    assert sm_mock.call_args.kwargs.get("read_only") is True
