@@ -431,3 +431,50 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   source: explore Architecture Decision Missing (2026-07-31)
   reason: out_of_current_mvp
   notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.
+
+## Deferred from change wb-readonly-api-preflight (2026-08-04)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:wb-readonly-api-preflight] Web-sanitized RETURN / L2 package mode
+  source: openspec/changes/wb-readonly-api-preflight/specs/wb-api-read-only-preflight/spec.md (sanitized RETURN req)
+  star_id: wb-safe-readonly-collect
+  increment_candidate_for: INC-RO-04 or package flag
+  reason: owner_park (overhead for first research)
+  notes: metadata+counts only; no raw bodies/IDs; for Web COLLECTOR transfer
+
+- [ ] [deferred-from:wb-readonly-api-preflight] Owner-local quarantine then transfer pipeline
+  source: explore L0 vs quarantine discussion
+  star_id: wb-safe-readonly-collect
+  increment_candidate_for: wb-safe-readonly-collect
+  reason: oversized for MVP
+  notes: raw only in pod; outward L2 — not needed while dump stays Owner-local
+
+- [ ] [deferred-from:wb-readonly-api-preflight] Web CLEAN_DUMP / Stage B contract + accept gate
+  source: proposal Evolution OUT_OF_SCOPE / INC-RO-04
+  star_id: wb-safe-readonly-collect
+  increment_candidate_for: INC-RO-04
+  reason: out_of_current_mvp
+  notes: READ_ONLY_PREFLIGHT_PASS file gate; full period pagination CLEAN_DUMP
+
+- [ ] [deferred-from:wb-readonly-api-preflight] Swagger status/sync one-command
+  source: INC-RO-02 / wb-api-swagger-inventory-ops scaffold
+  star_id: wb-safe-readonly-collect
+  increment_candidate_for: INC-RO-02
+  reason: gap-triggered only
+  notes: only if research shows missing/stale endpoints
+
+- [ ] [deferred-from:wb-readonly-api-preflight] API Master path×method map from local swagger
+  source: INC-RO-03
+  star_id: wb-safe-readonly-collect
+  increment_candidate_for: INC-RO-03
+  reason: out_of_current_mvp
+  notes: after fresh swagger SoT
+
+- [ ] [deferred-from:wb-readonly-api-preflight] Read-only token / credential hardening
+  source: INC-RO-05
+  star_id: wb-safe-readonly-collect
+  increment_candidate_for: INC-RO-05
+  reason: out_of_current_mvp
+  notes: after working collect path

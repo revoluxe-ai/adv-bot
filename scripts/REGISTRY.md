@@ -47,6 +47,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
 | Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-04T02:35:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:7dcf1cc5bc85da2da95e220220e4748238d2c597 | Job Complete; all_users.xlsx 129991B copied; PYTHONPATH+/hold in template |
+| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | UNKNOWN | PARTIAL | NO | - | - | - | INC-RO-01; args `--shop-id <uuid> --mode preflight\|collect`; outputs `scripts/wb_api_readonly_ops/outputs/{wb_readonly_research.zip,report.json,archive.sha256}`; Owner-local L0 secret-strip; not Web PASS |
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
 ## Support (not Job entrypoints)
