@@ -48,5 +48,5 @@ swagger sync, API Master, read-only token) — не owed задачи ниже.
 
 - [x] 6.1 Прогнать targeted unit suite нового entrypoint
 - [x] 6.2 `poetry run pyright-strict` на затронутых scripts-модулях
-- [ ] 6.3 Cluster smoke через `/opsx-scripts` PLAN_RUN → RUN GO с arg Dilera shop_id; подтвердить абсолютный локальный путь архива и честный report (PARTIAL допустим)
+- [x] 6.3 Cluster smoke через `/opsx-scripts` PLAN_RUN → RUN GO с arg Dilera shop_id; подтвердить абсолютный локальный путь архива и честный report (PARTIAL допустим)
 - [x] 6.4 Отметить в proposed decision checklist «implementation layer matches decision» после размещения кода
