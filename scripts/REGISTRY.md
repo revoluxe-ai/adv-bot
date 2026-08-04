@@ -46,7 +46,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Test PG connection | scripts/test_pg_conn.py | UNKNOWN | NONE | NO | - | - | - | |
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
-| Users CSV export | scripts/users_csv_exporter/csv_export.py | UNKNOWN | NONE | NO | - | 2026-08-04T02:01:46Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:scripts | ImagePullBackOff again; need PUSH GO + image build | NONE | NO | - | 2026-08-04T01:54:17Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:scripts | ImagePullBackOff: tag :scripts not found |
+| Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-04T02:35:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:7dcf1cc5bc85da2da95e220220e4748238d2c597 | Job Complete; all_users.xlsx 129991B copied; PYTHONPATH+/hold in template |
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
 ## Support (not Job entrypoints)
