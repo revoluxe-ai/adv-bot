@@ -5,7 +5,12 @@ alwaysApply: false
 
 ## Front door (mandatory)
 
-**Workflow / gates:** Cursor command `/opsx-devops`  
+**Workflow / gates:** Cursor command `/opsx-devops`
+
+**Scripts ops (folder `scripts/`):** inventory / readiness / local check /
+scripts-branch image → Job → `/opsx-scripts`; infra bootstrap →
+`/opsx-scripts-prepare`. Ledger: `scripts/REGISTRY.md`. Do not overload
+`/opsx-devops` with that lifecycle.
 **This file:** domain knowledge only (namespaces, monitoring, CSI policy, links).  
 Do **not** treat attaching this rule alone as license for cluster writes.
 

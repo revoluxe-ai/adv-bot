@@ -33,6 +33,8 @@ kubectl paths per `.cursor/rules/terminal.mdc`).
 * NOT product bug fix (→ `/opsx-fix-bug` / bug-episode).
 * NOT OpenSpec change implement (→ `/opsx-apply`).
 * NOT process-command design (→ `/opsx-admin-command-design-command`).
+* NOT `scripts/` inventory, readiness ledger, local script test, or script Job
+  lifecycle (→ `/opsx-scripts`; infra bootstrap → `/opsx-scripts-prepare`).
 * NOT archive / verify / sync gate.
 * NOT a hard edge on `.cursor/pipeline/GRAPH.md` (side-lane; optional soft
   register via `/opsx-pipeline UPDATE GO` later).
@@ -48,6 +50,9 @@ kubectl paths per `.cursor/rules/terminal.mdc`).
 
 * Behavioral product bug → `/opsx-fix-bug` (`STATUS=REDIRECT_PRODUCT`).
 * Feature / OpenSpec work → `/opsx-new` / `/opsx-ff` / `/opsx-apply`.
+* `scripts/` inventory / readiness / local check / script image+Job run →
+  `/opsx-scripts` (`STATUS=REDIRECT_PROCESS` with that next action).
+* Missing scripts workflow / Job template / registry → `/opsx-scripts-prepare`.
 * Process/admin routing ambiguity → `/opsx-admin-command-consult`.
 * Local app debug via kubectl port-forward → forbidden; use
   `.cursor/rules/local-production-entrypoints.mdc`.

@@ -42,10 +42,15 @@ Reduce front-door uncertainty for process questions:
 - Ambiguous process ownership or bypass concern (discuss only; do not APPLY).
 - Human asks how to prepare client/distribution materials after a completed
   change → route to `/opsx-distribute-brief` (not redesign; not create-pr).
+- Human asks about `scripts/` inventory, readiness, local check, or
+  scripts-branch image → K8s Job run → route to `/opsx-scripts` (infra gap →
+  `/opsx-scripts-prepare`; generic cluster → `/opsx-devops`).
 
 ## When not to use
 
 - Known day-to-day next not-admin step → `/opsx-pipeline` (NAVIGATE)
+- Known `scripts/` ops (inventory / test / Job run) → `/opsx-scripts`
+- Known scripts infra bootstrap / repair → `/opsx-scripts-prepare`
 - Known completed-change client/CS brief → `/opsx-distribute-brief`
 - Known pipeline redesign / human-usability improvement pass →
   `/opsx-admin-command-analyze-pipeline`
@@ -110,6 +115,8 @@ routed command (`fix-command-defects`, `design-command`, `pipeline UPDATE GO`,
 | `route_pipeline_update` | Shared graph stale / missing | `/opsx-pipeline UPDATE` |
 | `route_admin_commit` | Process files changed, need commit | `/opsx-admin-command-commit` |
 | `route_resolve_conflicts` | Unmerged paths / merge\|rebase on process surfaces | `/opsx-admin-command-resolve-conflicts` |
+| `route_scripts_operate` | scripts/ inventory, readiness, local test, Job run | `/opsx-scripts` |
+| `route_scripts_prepare` | scripts infra gap (workflow / Job template / registry) | `/opsx-scripts-prepare` |
 | `wrong_branch` | Typing or product logic | `/opsx-fix-types` / static-check or `/opsx-fix-bug` |
 | `needs_evidence` | Missing fact blocks safe route | one narrow question; `NEXT_ACTION: none` until answered |
 
@@ -137,6 +144,14 @@ When asked about process-surface **git conflicts** vs **commits**:
 
 Prevention (advisory): avoid editing the same process file on two long-lived
 branches; serialize shared contracts before consumers.
+
+When asked about **scripts ops** vs **cluster devops**:
+
+| | `/opsx-scripts` (+ prepare) | `/opsx-devops` |
+|---|---|---|
+| Role | `scripts/` ledger, local check, scripts-branch image → Job | Generic cluster/manifest investigate + allowlisted apply |
+| Infra once | `/opsx-scripts-prepare` | n/a |
+| Writes | registry; Job under RUN GO | cluster under PLAN_WRITE + GO |
 
 ## Steps (READ_ONLY)
 
