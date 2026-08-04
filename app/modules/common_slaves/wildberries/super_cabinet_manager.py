@@ -129,6 +129,29 @@ async def load_wb_cabinet_access_in_session(
     )
 
 
+async def find_common_access_token_in_session(
+    session: AsyncSession,
+    client_session: ClientSession,
+) -> WBToken | None:
+    """Вернуть первый валидный personal-токен с правами общего доступа."""
+    stmt = select(WBToken)
+    async for wb_token in await session.stream_scalars(stmt):
+        wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
+        if not wb_token.check_valid():
+            logger.debug(f"Не валидный токен {wb_token.api_key}")
+            continue
+        if not wb_token.is_personal:
+            logger.debug(
+                "Не персональный токен в get_common_access, пропускаем: token_id=%s",
+                wb_token.id,
+            )
+            continue
+        result = await token_check_righter.check_all_rights(wb_token, client_session)
+        if result:
+            return wb_token
+    return None
+
+
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: int | str,
 ) -> WBCabinetAccess | None:
@@ -158,25 +181,11 @@ async def get_access_for_wb_cabinet(
 
 
 async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
-    stmt = select(WBToken)
+    """Открыть read-only PG-сессию и вернуть общий доступ по валидному токену."""
     async with sm(read_only=True) as session:
-        async for wb_token in await session.stream_scalars(stmt):
-            wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
-            if not wb_token.check_valid():
-                logger.debug(f"Не валидный токен {wb_token.api_key}")
-                continue
-            if not wb_token.is_personal:
-                logger.debug(
-                    "Не персональный токен в get_common_access, пропускаем: token_id=%s",
-                    wb_token.id,
-                )
-                continue
-            result = await token_check_righter.check_all_rights(
-                wb_token, client_session
+        wb_token = await find_common_access_token_in_session(session, client_session)
+        if wb_token is not None:
+            return WBCabinetAccess(
+                tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
             )
-            if result:
-                access = WBCabinetAccess(
-                    tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
-                )
-                return access
     raise ApiForbiddenError("Нет валидных токенов для доступа к API")

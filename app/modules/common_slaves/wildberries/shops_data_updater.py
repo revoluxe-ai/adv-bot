@@ -31,6 +31,18 @@ _QueueCoroutine = Coroutine[typing.Any, typing.Any, None]
 _coroutine_parallel_run_queue: asyncio.Queue[_QueueCoroutine] = asyncio.Queue()
 
 
+async def load_existing_advs_in_session(
+    session: AsyncSession,
+    adv_ids: Sequence[int],
+) -> Sequence[models.AdvSetting]:
+    """Вернуть существующие AdvSetting по adv_id из уже открытой PG-сессии."""
+    if not adv_ids:
+        return []
+    stmt = select(models.AdvSetting).where(models.AdvSetting.adv_id.in_(adv_ids))
+    exist_advs_result = (await session.execute(stmt)).unique()
+    return exist_advs_result.scalars().all()
+
+
 async def consumer() -> None:
     """Фоновый consumer очереди coroutine для параллельного обновления РК."""
     logger.info("Consumer started")
@@ -87,20 +99,14 @@ class ShopDataUpdater:
         wb_api = self.wb_api
         advert_api = wb_api
         adv_ids: list[int] = await advert_api.get_advertIds()
-        async with sm() as session:
-            stmt = select(models.AdvSetting).where(
-                models.AdvSetting.adv_id.in_(adv_ids)
-            )
-            exist_advs_result = (await session.execute(stmt)).unique()
-            existing_advs: Sequence[models.AdvSetting] = (
-                exist_advs_result.scalars().all()
-            )
-            existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
-            not_existing_adv_ids: set[int] = set(adv_ids) - existind_advs_ids
-            if not_existing_adv_ids:
-                await self.__quick_update_advs_in_db(not_existing_adv_ids)
-            func = self.__quick_update_advs_in_db(existind_advs_ids)
-            await _coroutine_parallel_run_queue.put(func) # pyright: ignore
+        async with sm(read_only=True) as session:
+            existing_advs = await load_existing_advs_in_session(session, adv_ids)
+        existind_advs_ids: set[int] = {adv.adv_id for adv in existing_advs}
+        not_existing_adv_ids: set[int] = set(adv_ids) - existind_advs_ids
+        if not_existing_adv_ids:
+            await self.__quick_update_advs_in_db(not_existing_adv_ids)
+        func = self.__quick_update_advs_in_db(existind_advs_ids)
+        await _coroutine_parallel_run_queue.put(func) # pyright: ignore
 
     async def __quick_update_advs_in_db(self, adv_ids: set[int]) -> None:
         """Обновить указанные РК и карточки в БД."""
