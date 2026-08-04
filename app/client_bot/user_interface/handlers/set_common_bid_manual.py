@@ -15,6 +15,7 @@ from aiogram import Bot, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.client_bot import const
@@ -83,7 +84,7 @@ async def _reload_adv_setting_menu(
     adv_setting_original_id: int,
 ) -> None:
     """Перезагрузить меню настроек кампании."""
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         wb_user_cabinet_result = await session.execute(
             select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
         )
@@ -97,7 +98,7 @@ async def _reload_adv_setting_menu(
         adv_setting_reload = adv_result.scalar_one_or_none()
 
     if wb_user_cabinet and adv_setting_reload:
-        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting_reload)()
+        _ = await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting_reload)()
 
 
 def _build_complex_adv(main_adv: AdvSetting, search_adv: AdvSetting, shop_id: str) -> ComplexAdv:
@@ -170,13 +171,19 @@ async def _apply_normquery_bids(
     )
 
 
-@router.callback_query(callbacks.SetCommonBidManual.filter())
-async def set_common_bid_manual_start(
+async def set_common_bid_manual_start_in_session(
+    session: AsyncSession,
     callback: types.CallbackQuery,
     callback_data: callbacks.SetCommonBidManual,
     bot: Bot,
     state: FSMContext,
 ) -> None:
+    """Открыть ручную установку common bid через переданную read-only session.
+
+    Parent ``set_common_bid_manual_start`` открывает ``sm(read_only=True)`` и
+    передаёт session сюда. Здесь загружаются обе кампании, вычисляется
+    минимальная ставка и сохраняется FSM-контекст для следующего шага.
+    """
     if callback.message is None:
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
@@ -184,49 +191,47 @@ async def set_common_bid_manual_start(
     adv_setting_original_id = callback_data.adv_setting_original_id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
 
-    async with sm(read_only=True) as session:
-        stmt = (
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_setting_original_id)
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting | None = result.scalar_one_or_none()
+    stmt = (
+        select(AdvSetting)
+        .options(joinedload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_setting_original_id)
+    )
+    result = await session.execute(stmt)
+    adv_setting: AdvSetting | None = result.scalar_one_or_none()
 
     if not adv_setting:
-        await bot.send_message(chat_id, "Кампания не найдена.")
+        _ = await bot.send_message(chat_id, "Кампания не найдена.")
         return
 
     if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
-        await bot.send_message(chat_id, AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG)
+        _ = await bot.send_message(chat_id, AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG)
         return
 
     if not adv_setting.search_adv_id:
-        await bot.send_message(
+        _ = await bot.send_message(
             chat_id,
             "У этой кампании нет поисковой (аукционной) РК.",
         )
         return
 
     search_adv_id = adv_setting.search_adv_id
-    async with sm(read_only=True) as session:
-        stmt_search = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
-        result_search = await session.execute(stmt_search)
-        search_adv_setting: AdvSetting | None = result_search.scalar_one_or_none()
+    stmt_search = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
+    result_search = await session.execute(stmt_search)
+    search_adv_setting: AdvSetting | None = result_search.scalar_one_or_none()
 
     if not search_adv_setting:
-        await bot.send_message(
+        _ = await bot.send_message(
             chat_id,
             "Поисковая РК не найдена в настройках.",
         )
         return
     if not _is_manual_search_campaign(search_adv_setting):
-        await bot.send_message(chat_id, "Эта кнопка доступна только для Поисковых РК.")
+        _ = await bot.send_message(chat_id, "Эта кнопка доступна только для Поисковых РК.")
         return
 
     shop_id = adv_setting.wb_cabinet.shop_id if adv_setting.wb_cabinet else None
     if not shop_id:
-        await bot.send_message(chat_id, "Магазин не привязан к кампании.")
+        _ = await bot.send_message(chat_id, "Магазин не привязан к кампании.")
         return
 
     complex_adv = _build_complex_adv(adv_setting, search_adv_setting, shop_id)
@@ -244,7 +249,7 @@ async def set_common_bid_manual_start(
             )
     except Exception:
         logger.exception("get_min_bids failed for adv_setting_id=%s", adv_setting_original_id)
-        await bot.send_message(
+        _ = await bot.send_message(
             chat_id,
             "Не удалось получить минимальную ставку из WB. Попробуйте позже.",
         )
@@ -252,7 +257,7 @@ async def set_common_bid_manual_start(
 
     nmids = list(adv_setting.nmids) if adv_setting.nmids else []
     if not nmids:
-        await bot.send_message(
+        _ = await bot.send_message(
             chat_id,
             "В кампании нет товаров (nmids). Невозможно получить минимальную ставку.",
         )
@@ -260,32 +265,56 @@ async def set_common_bid_manual_start(
 
     missing_nmids = [nmid for nmid in nmids if nmid not in min_bids.search]
     if missing_nmids:
-        await bot.send_message(
+        _ = await bot.send_message(
             chat_id,
             "Нет минимальных ставок в кеше для аукциона. Дождитесь обновления кеша.",
         )
         return
 
     min_common = max(min_bids.search[nmid] for nmid in nmids)
-    await state.update_data(
+    _ = await state.update_data(
         adv_setting_original_id=adv_setting_original_id,
         wb_user_cabinet_original_id=wb_user_cabinet_original_id,
         min_bid_search=min_common,
     )
     await state.set_state(states.SetCommonBidManual.waiting_for_bid)
-    await bot.send_message(
+    _ = await bot.send_message(
         chat_id,
         f"Минимальная ставка для аукциона: {min_common} р.\n"
         f"Введите ставку для Поисковой РК (руб., целое число, не менее {min_common}):",
     )
 
 
-@router.message(StateFilter(states.SetCommonBidManual.waiting_for_bid))
-async def set_common_bid_manual_apply(
+@router.callback_query(callbacks.SetCommonBidManual.filter())
+async def set_common_bid_manual_start(
+    callback: types.CallbackQuery,
+    callback_data: callbacks.SetCommonBidManual,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    """Открыть ручную установку common bid через injectable read-only session."""
+    async with sm(read_only=True) as session:
+        await set_common_bid_manual_start_in_session(
+            session,
+            callback,
+            callback_data,
+            bot,
+            state,
+        )
+
+
+async def set_common_bid_manual_apply_in_session(
+    session: AsyncSession,
     message: types.Message,
     bot: Bot,
     state: FSMContext,
 ) -> None:
+    """Применить common bid через переданную read-only session.
+
+    Parent ``set_common_bid_manual_apply`` открывает ``sm(read_only=True)`` и
+    передаёт session сюда. Здесь читаются актуальные данные РК, проверяется
+    режим A/B Hold и после WB-обновления перезагружается меню.
+    """
     chat_id = message.chat.id
     data: dict[str, Any] = await state.get_data()
 
@@ -295,7 +324,7 @@ async def set_common_bid_manual_apply(
 
     if adv_setting_original_id is None or wb_user_cabinet_original_id is None or min_bid is None:
         await state.set_state(None)
-        await message.answer(
+        _ = await message.answer(
             f"Произошла ошибка: не найдены сохраненные данные. Начните заново.\n\n"
             f"Если проблема будет повторяться, обратитесь в поддержку -> {const.SUPPORT_LINK}"
         )
@@ -303,74 +332,74 @@ async def set_common_bid_manual_apply(
         await asyncio.sleep(1)
 
         if wb_user_cabinet_original_id and adv_setting_original_id:
-            await _reload_adv_setting_menu(bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id)
+            await _reload_adv_setting_menu(
+                bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id
+            )
 
         return
 
     text = message.text or ""
     if not text.strip().isdigit():
-        await message.answer(
+        _ = await message.answer(
             f"Введите целое число (минимальная ставка {min_bid} р.).",
         )
         return
 
     bid_value = int(text.strip())
     if bid_value < min_bid:
-        await message.answer(
+        _ = await message.answer(
             f"Ставка не может быть меньше минимальной ({min_bid} р.).",
         )
         return
     if bid_value > MAX_BID_RUB:
-        await message.answer(
+        _ = await message.answer(
             f"Системное ограничение: ставка не более {MAX_BID_RUB} р.",
         )
         return
 
-    async with sm(read_only=True) as session:
-        stmt = (
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_setting_original_id)
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting | None = result.scalar_one_or_none()
+    stmt = (
+        select(AdvSetting)
+        .options(joinedload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_setting_original_id)
+    )
+    result = await session.execute(stmt)
+    adv_setting: AdvSetting | None = result.scalar_one_or_none()
 
     if not adv_setting or not adv_setting.search_adv_id:
         await state.set_state(None)
-        await message.answer("Кампания не найдена или нет поисковой РК.")
+        _ = await message.answer("Кампания не найдена или нет поисковой РК.")
         return
 
     if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
         await state.set_state(None)
-        await message.answer(AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG)
+        _ = await message.answer(AB_HOLD_MANUAL_COMMON_BID_BLOCKED_MSG)
         return
 
     search_adv_id = adv_setting.search_adv_id
-    async with sm(read_only=True) as session:
-        stmt_search = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
-        result_search = await session.execute(stmt_search)
-        search_adv_setting: AdvSetting | None = result_search.scalar_one_or_none()
+    stmt_search = select(AdvSetting).where(AdvSetting.adv_id == search_adv_id)
+    result_search = await session.execute(stmt_search)
+    search_adv_setting: AdvSetting | None = result_search.scalar_one_or_none()
 
     if not search_adv_setting:
         await state.set_state(None)
-        await message.answer("Поисковая РК не найдена.")
+        _ = await message.answer("Поисковая РК не найдена.")
         return
     if not _is_manual_search_campaign(search_adv_setting):
         await state.set_state(None)
-        await message.answer("Эта кнопка доступна только для Поисковых РК.")
+        _ = await message.answer("Эта кнопка доступна только для Поисковых РК.")
         return
 
     shop_id = adv_setting.wb_cabinet.shop_id if adv_setting.wb_cabinet else None
     if not shop_id:
         await state.set_state(None)
-        await message.answer("Магазин не привязан к кампании.")
+        _ = await message.answer("Магазин не привязан к кампании.")
         return
 
     complex_adv = _build_complex_adv(adv_setting, search_adv_setting, shop_id)
     nmids = adv_setting.nmids
     if not nmids:
         await state.set_state(None)
-        await message.answer("В кампании нет товаров (nmids).")
+        _ = await message.answer("В кампании нет товаров (nmids).")
         return
 
     command_items = [
@@ -384,7 +413,7 @@ async def set_common_bid_manual_apply(
     ]
     command = SetCommonBidsCommand(items=command_items)
 
-    await message.answer(
+    _ = await message.answer(
         "Отправляю новую ставку в WB для Поисковой РК и её ключей..."
     )
 
@@ -425,18 +454,20 @@ async def set_common_bid_manual_apply(
             adv_setting_original_id,
         )
         await state.set_state(None)
-        await message.answer(f"Ошибка при обновлении ставки на стороне WB,"
-                             f" при повторении ошибки обратитесь в поддержку -> {const.SUPPORT_LINK}")
+        _ = await message.answer(
+            f"Ошибка при обновлении ставки на стороне WB,"
+            f" при повторении ошибки обратитесь в поддержку -> {const.SUPPORT_LINK}"
+        )
         return
 
     await state.set_state(None)
     if normquery_result.total_keywords == 0:
-        await message.answer(
+        _ = await message.answer(
             f"Готово. Общая ставка поисковой РК установлена: {bid_value} ₽. "
             "Ключи поисковой кампании для обновления ставок не найдены."
         )
     elif normquery_result.updated_keywords == normquery_result.total_keywords:
-        await message.answer(
+        _ = await message.answer(
             f"Готово. Общая ставка поисковой РК установлена: {bid_value} ₽. "
             "Такая же ставка поставлена всем ключам кампании."
         )
@@ -444,10 +475,23 @@ async def set_common_bid_manual_apply(
         errors_text = "; ".join(normquery_result.errors[:3])
         if len(normquery_result.errors) > 3:
             errors_text += f"; и ещё {len(normquery_result.errors) - 3}"
-        await message.answer(
+        _ = await message.answer(
             f"Общая ставка установлена: {bid_value} ₽. "
             f"По ключам обновлено: {normquery_result.updated_keywords} "
             f"из {normquery_result.total_keywords}. Ошибки: {errors_text}"
         )
 
-    await _reload_adv_setting_menu(bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id)
+    await _reload_adv_setting_menu(
+        bot, chat_id, wb_user_cabinet_original_id, adv_setting_original_id
+    )
+
+
+@router.message(StateFilter(states.SetCommonBidManual.waiting_for_bid))
+async def set_common_bid_manual_apply(
+    message: types.Message,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    """Применить common bid через injectable read-only session."""
+    async with sm(read_only=True) as session:
+        await set_common_bid_manual_apply_in_session(session, message, bot, state)

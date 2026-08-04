@@ -5,6 +5,7 @@ from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from sqlalchemy import Result
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
 
@@ -72,6 +73,80 @@ async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
     return has_active_read_only_token and not token_status.valid_tokens
 
 
+async def turn_adv_on_in_session(
+    session: AsyncSession,
+    callback: types.CallbackQuery,
+    state: FSMContext,
+    callback_data: callbacks.TurnBot,
+    bot: aiogram.Bot,
+) -> None:
+    """Включить бота РК в переданной WRITE session и сохранить изменения в PG.
+
+    Parent ``turn_adv_on`` открывает ``sm(read_only=False)`` и передаёт session
+    сюда. Здесь выполняются загрузка кабинета и кампании, проверка баланса,
+    запись ``bot_active=True``, commit и повторная загрузка кабинета для меню.
+    """
+    if callback.message is None:
+        raise ValueError("Нет сообщения")
+    chat_id = callback.message.chat.id
+    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
+    adv_original_id = callback_data.adv_original_id
+    stmt = (
+        select(WBUserCabinet)
+        .join(WBUserCabinet.wb_cabinet)
+        .options(selectinload(WBUserCabinet.wb_cabinet))
+        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    )
+    result_for_wb_user_cabinet = await session.execute(stmt)
+    wb_user_cabinet: WBUserCabinet = result_for_wb_user_cabinet.scalar_one()
+    stmt = (
+        select(AdvSetting)
+        .options(selectinload(AdvSetting.payments))
+        .where(AdvSetting.id == adv_original_id)
+    )
+    result_for_adv_setting = await session.execute(stmt)
+    adv: AdvSetting = result_for_adv_setting.scalar_one()
+    wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
+    tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
+        session, wb_cabinet.shop_id
+    )
+    price_for_adv_for_day = pricer.get_tariff_for_day(int(tariff_for_month))
+    balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
+        wb_cabinet.id
+    )
+    sum_balance = balance + bonus
+    if sum_balance <= 0:
+        _ = await bot.send_message(
+            chat_id,
+            "Недостаточно средств на балансе кабинета для запуска. Пополните баланс.",
+        )
+        _ = await ShopMenu(
+            bot, chat_id, state, wb_user_cabinet_original_id
+        )()
+        return
+    if not sum_balance >= price_for_adv_for_day:
+        _ = await bot.send_message(chat_id, "Недостаточно средств")
+        _ = await ShopMenu(
+            bot, chat_id, state, wb_user_cabinet_original_id
+        )()
+        return
+    if await _shop_has_read_only_only_tokens(wb_cabinet.shop_id):
+        _ = await bot.send_message(chat_id, READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE)
+        _ = await ShopMenu(
+            bot, chat_id, state, wb_user_cabinet_original_id
+        )()
+        return
+    _ = await bot.send_message(chat_id, "Включаю бота")
+    adv.bot_active = True
+    await session.commit()
+    _ = await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
+    _ = await state.update_data(adv_original_id=adv.id)
+    stmt = select(WBUserCabinet).where(
+        WBUserCabinet.id == wb_user_cabinet_original_id
+    )
+    result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
+    wb_user_cabinet = result.scalar_one()
+    _ = await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter))
@@ -289,72 +364,8 @@ async def turn_adv_on(
 ) -> None:
     if callback.message is None:
         raise ValueError('Нет сообщения')
-    chat_id = callback.message.chat.id
-
-    wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-    adv_original_id = callback_data.adv_original_id
     async with sm(read_only=False) as session:
-        session.begin()
-        stmt = (
-            select(WBUserCabinet)
-            .join(WBUserCabinet.wb_cabinet)
-            .options(selectinload(WBUserCabinet.wb_cabinet))
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        )
-        result_for_wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result_for_wb_user_cabinet.scalar_one()
-        stmt = (
-            select(AdvSetting)
-            .options(selectinload(AdvSetting.payments))
-            .where(AdvSetting.id == adv_original_id)
-        )
-        result_for_adv_setting = await session.execute(stmt)
-        adv: AdvSetting = result_for_adv_setting .scalar_one()
-        wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-        tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
-            session, wb_cabinet.shop_id
-        )
-        price_for_adv_for_day = pricer.get_tariff_for_day(int(tariff_for_month))
-        balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
-            wb_cabinet.id
-        )
-        sum_balance = balance + bonus
-        if sum_balance <= 0:
-            await bot.send_message(
-                callback.message.chat.id,
-                "Недостаточно средств на балансе кабинета для запуска. Пополните баланс.",
-            )
-            await ShopMenu(
-                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
-            )()
-            return
-        if not sum_balance >= price_for_adv_for_day:
-            await bot.send_message(callback.message.chat.id, "Недостаточно средств")
-            await ShopMenu(
-                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
-            )()
-            return
-        if await _shop_has_read_only_only_tokens(wb_cabinet.shop_id):
-            await bot.send_message(
-                callback.message.chat.id, READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE
-            )
-            await ShopMenu(
-                bot, callback.message.chat.id, state, wb_user_cabinet_original_id
-            )()
-            return
-        await bot.send_message(callback.message.chat.id, "Включаю бота")
-        adv.bot_active = True
-        await session.commit()
-        wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-        await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
-        await state.update_data(adv_original_id=adv.id)
-        wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
-        stmt = select(WBUserCabinet).where(
-            WBUserCabinet.id == wb_user_cabinet_original_id
-        )
-        result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
-        wb_user_cabinet: WBUserCabinet = result.scalar_one()
-        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
+        await turn_adv_on_in_session(session, callback, state, callback_data, bot)
     return
 
 

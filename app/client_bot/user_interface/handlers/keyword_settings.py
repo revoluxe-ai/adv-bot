@@ -1008,34 +1008,38 @@ async def reset_added_clicks(
     return
 
 
-@router.callback_query(callbacks.ChangeKeywordTargetPlace.filter())
-async def change_keyword_target_place(
+async def change_keyword_target_place_in_session(
+    session: AsyncSession,
     callback_query: CallbackQuery,
     callback_data: callbacks.ChangeKeywordTargetPlace,
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
-    keyword_setting_original_id = callback_data.keyword_setting_original_id
-    async with _sm() as session:
-        stmt = (
-            select(KeywordSetting)
-            .options(selectinload(KeywordSetting.adv_setting))
-            .where(KeywordSetting.id == keyword_setting_original_id)
-        )
-        result = await session.execute(stmt)
-        keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
+    """Открыть ручное изменение target_place в переданной read-only session.
 
+    Parent ``change_keyword_target_place`` открывает ``_sm(read_only=True)`` и
+    передаёт session сюда. Здесь загружается KeywordSetting с AdvSetting,
+    проверяется lock A/B Hold и готовится экран ввода новой позиции.
+    """
+    keyword_setting_original_id = callback_data.keyword_setting_original_id
+    stmt = (
+        select(KeywordSetting)
+        .options(selectinload(KeywordSetting.adv_setting))
+        .where(KeywordSetting.id == keyword_setting_original_id)
+    )
+    result = await session.execute(stmt)
+    keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
     if keyword_setting is None:
         if callback_query.message:
-            await bot.send_message(
+            _ = await bot.send_message(
                 callback_query.message.chat.id,
                 "Не удалось найти настройки ключевого слова.",
             )
         return
     if keyword_setting.adv_setting and keyword_setting.adv_setting.auto_update_target_place:
-        await state.set_state(state=None)
+        _ = await state.set_state(state=None)
         if callback_query.message:
-            await bot.send_message(
+            _ = await bot.send_message(
                 callback_query.message.chat.id,
                 get_auto_target_place_manual_change_locked_text(),
             )
@@ -1058,12 +1062,14 @@ async def change_keyword_target_place(
         else "Не задана"
     )
 
-    await state.update_data(keyword_setting_for_target_place=keyword_setting_original_id)
-    await state.set_state(states.KeywordTargetPlace.waiting_for_new_target_place)
+    _ = await state.update_data(
+        keyword_setting_for_target_place=keyword_setting_original_id
+    )
+    _ = await state.set_state(states.KeywordTargetPlace.waiting_for_new_target_place)
     if not callback_query.message:
         return
 
-    await messages.KeywordTargetPlacePrompt(
+    _ = await messages.KeywordTargetPlacePrompt(
         bot,
         callback_query.message.chat.id,
         current_value_display,
@@ -1071,8 +1077,26 @@ async def change_keyword_target_place(
     )()
 
 
-@router.message(StateFilter(states.KeywordTargetPlace.waiting_for_new_target_place))
-async def keyword_target_place_value(
+@router.callback_query(callbacks.ChangeKeywordTargetPlace.filter())
+async def change_keyword_target_place(
+    callback_query: CallbackQuery,
+    callback_data: callbacks.ChangeKeywordTargetPlace,
+    bot: aiogram.Bot,
+    state: FSMContext,
+) -> None:
+    """Открыть ручное изменение target_place через injectable read-only session."""
+    async with _sm(read_only=True) as session:
+        await change_keyword_target_place_in_session(
+            session,
+            callback_query,
+            callback_data,
+            bot,
+            state,
+        )
+
+
+async def keyword_target_place_value_in_session(
+    session: AsyncSession,
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     """Сохраняет целевую позицию ключа; missing AdvSetting / A/B Hold — отказ.
@@ -1085,78 +1109,77 @@ async def keyword_target_place_value(
     data = await state.get_data()
     keyword_setting_original_id = data.get("keyword_setting_for_target_place")
     if not keyword_setting_original_id:
-        await bot.send_message(
+        _ = await bot.send_message(
             message.chat.id,
             "Не удалось определить ключ. Повторите выбор ключевого слова.",
         )
-        await state.set_state()
+        _ = await state.set_state()
         return
 
     text = message.text or ""
     try:
         target_place = int(text.strip())
     except ValueError:
-        await bot.send_message(
+        _ = await bot.send_message(
             message.chat.id,
             "Введите целое число (0 — использовать позицию кампании).",
         )
         return
     if target_place < 0:
-        await bot.send_message(message.chat.id, "Значение не может быть отрицательным.")
+        _ = await bot.send_message(message.chat.id, "Значение не может быть отрицательным.")
         return
 
-    async with _sm(read_only=False) as session:
-        stmt = (
-            select(KeywordSetting)
-            .options(selectinload(KeywordSetting.adv_setting))
-            .where(KeywordSetting.id == keyword_setting_original_id)
+    stmt = (
+        select(KeywordSetting)
+        .options(selectinload(KeywordSetting.adv_setting))
+        .where(KeywordSetting.id == keyword_setting_original_id)
+    )
+    result = await session.execute(stmt)
+    keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
+    if keyword_setting is None:
+        _ = await bot.send_message(
+            message.chat.id,
+            "Не удалось найти ключ. Повторите выбор ключевого слова.",
         )
-        result = await session.execute(stmt)
-        keyword_setting: KeywordSetting | None = result.scalar_one_or_none()
-        if keyword_setting is None:
-            await bot.send_message(
-                message.chat.id,
-                "Не удалось найти ключ. Повторите выбор ключевого слова.",
-            )
-            await state.set_state()
-            return
+        _ = await state.set_state()
+        return
 
-        adv_setting = keyword_setting.adv_setting
-        if adv_setting is None:
-            await bot.send_message(message.chat.id, "Кампания не найдена.")
-            await state.update_data(keyword_setting_for_target_place=None)
-            await state.set_state()
-            return
-        if adv_setting.auto_update_target_place:
-            await state.update_data(keyword_setting_for_target_place=None)
-            await state.set_state(state=None)
-            await bot.send_message(
-                message.chat.id,
-                get_auto_target_place_manual_change_locked_text(),
-            )
-            return
-        if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
-            await bot.send_message(
-                message.chat.id,
-                "Кампания в режиме A/B Hold — целевая позиция ключа "
-                "заморожена. Чтобы изменить позиции, выключите A/B Hold "
-                "на экране режима.",
-            )
-            await state.update_data(keyword_setting_for_target_place=None)
-            await state.set_state()
-            return
-        keyword_setting.target_place = target_place
-        await session.commit()
+    adv_setting = keyword_setting.adv_setting
+    if adv_setting is None:
+        _ = await bot.send_message(message.chat.id, "Кампания не найдена.")
+        _ = await state.update_data(keyword_setting_for_target_place=None)
+        _ = await state.set_state()
+        return
+    if adv_setting.auto_update_target_place:
+        _ = await state.update_data(keyword_setting_for_target_place=None)
+        _ = await state.set_state(state=None)
+        _ = await bot.send_message(
+            message.chat.id,
+            get_auto_target_place_manual_change_locked_text(),
+        )
+        return
+    if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+        _ = await bot.send_message(
+            message.chat.id,
+            "Кампания в режиме A/B Hold — целевая позиция ключа "
+            "заморожена. Чтобы изменить позиции, выключите A/B Hold "
+            "на экране режима.",
+        )
+        _ = await state.update_data(keyword_setting_for_target_place=None)
+        _ = await state.set_state()
+        return
+    keyword_setting.target_place = target_place
+    await session.commit()
 
     display_value = (
         str(target_place)
         if target_place > 0
         else "0 (мин. ставка WB)"
     )
-    await messages.KeywordTargetPlaceUpdated(bot, message.chat.id, display_value)()
+    _ = await messages.KeywordTargetPlaceUpdated(bot, message.chat.id, display_value)()
 
     page = data.get("last_keyword_setting_page", 1)
-    await messages.KeywordSettingMessage(
+    _ = await messages.KeywordSettingMessage(
         bot,
         message.chat.id,
         keyword_setting_original_id,
@@ -1164,8 +1187,17 @@ async def keyword_target_place_value(
         telegram_user_id=message.from_user.id,
     )()
 
-    await state.update_data(keyword_setting_for_target_place=None)
-    await state.set_state()
+    _ = await state.update_data(keyword_setting_for_target_place=None)
+    _ = await state.set_state()
+
+
+@router.message(StateFilter(states.KeywordTargetPlace.waiting_for_new_target_place))
+async def keyword_target_place_value(
+    message: types.Message, bot: aiogram.Bot, state: FSMContext
+) -> None:
+    """Сохранить target_place через injectable write session."""
+    async with _sm(read_only=False) as session:
+        await keyword_target_place_value_in_session(session, message, bot, state)
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F == "only_out_index")) # noqa

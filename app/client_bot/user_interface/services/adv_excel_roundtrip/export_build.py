@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, Awaitable, Callable
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.client_bot.user_interface.services.adv_excel_roundtrip.active_adv import (
@@ -130,42 +131,56 @@ async def build_adv_excel_export(
     wb_user_cabinet_id: int,
     progress_callback: ProgressCallback | None = None,
 ) -> tuple[list[str], list[dict[str, Any]]]:
-    """Вернуть (headers, rows) для выгрузки активных РК кабинета пользователя."""
+    """Открыть read-only PG-сессию и собрать выгрузку активных РК кабинета."""
     async with _sm(read_only=True) as session:
-        stmt = (
-            select(WBUserCabinet)
-            .options(joinedload(WBUserCabinet.wb_cabinet))
-            .where(WBUserCabinet.id == wb_user_cabinet_id)
+        return await build_adv_excel_export_in_session(
+            session,
+            wb_user_cabinet_id=wb_user_cabinet_id,
+            progress_callback=progress_callback,
         )
-        wuc = (await session.execute(stmt)).scalar_one_or_none()
-        if not wuc:
-            raise ValueError("WBUserCabinet not found")
-        cab_id = wuc.wb_cabinet_id
 
-        stmt_adv = select(AdvSetting).where(AdvSetting.wb_cabinet_id == cab_id)
-        advs = list((await session.execute(stmt_adv)).scalars().unique().all())
-        nmids_for_lookup: set[int] = set()
-        for adv in advs:
-            nmid = _first_nmid(adv)
-            if nmid is not None:
-                nmids_for_lookup.add(int(nmid))
 
-        offer_by_nmid: dict[int, str] = {}
-        if nmids_for_lookup:
-            stmt_cards = select(WBCard.nmid, WBCard.offer_id).where(
-                WBCard.nmid.in_(nmids_for_lookup)
-            )
-            for nmid, offer_id in (await session.execute(stmt_cards)).all():
-                if offer_id:
-                    offer_by_nmid[int(nmid)] = str(offer_id)
+async def build_adv_excel_export_in_session(
+    session: AsyncSession,
+    *,
+    wb_user_cabinet_id: int,
+    progress_callback: ProgressCallback | None = None,
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """Собрать export rows из уже открытой PG-сессии без создания own session."""
+    stmt = (
+        select(WBUserCabinet)
+        .options(joinedload(WBUserCabinet.wb_cabinet))
+        .where(WBUserCabinet.id == wb_user_cabinet_id)
+    )
+    wuc = (await session.execute(stmt)).scalar_one_or_none()
+    if not wuc:
+        raise ValueError("WBUserCabinet not found")
+    cab_id = wuc.wb_cabinet_id
 
-        shelf_settings_by_nmid: dict[int, AutoShelfBidControlSettings] = {}
-        if nmids_for_lookup:
-            stmt_shelf = select(AutoShelfBidControlSettings).where(
-                AutoShelfBidControlSettings.nmid.in_(nmids_for_lookup)
-            )
-            for settings in (await session.execute(stmt_shelf)).scalars().all():
-                shelf_settings_by_nmid[int(settings.nmid)] = settings
+    stmt_adv = select(AdvSetting).where(AdvSetting.wb_cabinet_id == cab_id)
+    advs = list((await session.execute(stmt_adv)).scalars().unique().all())
+    nmids_for_lookup: set[int] = set()
+    for adv in advs:
+        nmid = _first_nmid(adv)
+        if nmid is not None:
+            nmids_for_lookup.add(int(nmid))
+
+    offer_by_nmid: dict[int, str] = {}
+    if nmids_for_lookup:
+        stmt_cards = select(WBCard.nmid, WBCard.offer_id).where(
+            WBCard.nmid.in_(nmids_for_lookup)
+        )
+        for nmid, offer_id in (await session.execute(stmt_cards)).all():
+            if offer_id:
+                offer_by_nmid[int(nmid)] = str(offer_id)
+
+    shelf_settings_by_nmid: dict[int, AutoShelfBidControlSettings] = {}
+    if nmids_for_lookup:
+        stmt_shelf = select(AutoShelfBidControlSettings).where(
+            AutoShelfBidControlSettings.nmid.in_(nmids_for_lookup)
+        )
+        for settings in (await session.execute(stmt_shelf)).scalars().all():
+            shelf_settings_by_nmid[int(settings.nmid)] = settings
 
     active = [a for a in advs if is_active_adv(a)]
     headers = _base_ro_columns() + [edit_header(f) for f in _ordered_edit_fields()]
