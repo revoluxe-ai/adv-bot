@@ -20,7 +20,7 @@
 ## Coding Style & Naming Conventions
 - Python 3.11; follow Black formatting (line length 88) and Ruff lint rules.
 - Type checking is strict; prefer explicit types for public APIs.
-- If a call returns a value and the caller intentionally ignores it, assign `_ = ...` (do not leave a bare call). Prefer using the return when it matters. Enforced by pyright `reportUnusedCallResult`. See `.cursor/rules/python-unused-call-result.mdc`.
+- If a call returns a value (typed return ≠ `None`) and the caller intentionally ignores it, assign `_ = ...` (do not leave a bare call). For `-> None` / only-ever-returns-None callees, use a bare call/`await` (no `_ =`) — mypy `[func-returns-value]`. Prefer using the return when it matters. Enforced by pyright `reportUnusedCallResult`. See `.cursor/rules/python-unused-call-result.mdc`.
 - Tests and scripts use snake_case; classes use CapWords.
 - Avoid modifying generated client code under excluded paths in `pyproject.toml`.
 
