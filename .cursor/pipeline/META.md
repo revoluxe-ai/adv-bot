@@ -1,20 +1,23 @@
 # pipeline graph meta
 
-updated_at_utc: 2026-08-03T06:14:00Z
+updated_at_utc: 2026-08-04T16:05:52Z
 scope: ALL_NON_ADMIN_OPSX
-source_fingerprint: 29c989e65a123ae57c77d674bf3b7189
+source_fingerprint: f258e9518d2b3c9ff38f6469c77d7a2e
 fingerprint_strength: names_only
 fingerprint_algorithm: md5
 fingerprint_input_mode: names_only_newline_joined
-inventory_count: 38
+inventory_count: 43
 source_commit: pending_local
-approved_by_token: design-command GO OPTION_A (opsx-distribute-brief)
+approved_by_token: /opsx-pipeline UPDATE GO
 inventory_path: .cursor/pipeline/bug-team/controlled-tests/INVENTORY.json
-inventory_content_sha256: a9fe5477ae1229fe7e1e91b441a109a94638d5a54c6baa7f702ecd91bc38e024
 reproduction_command: python -c "import sys; sys.path.insert(0,'.cursor/pipeline/bug-team/runtime'); from graph_fingerprint import reproduce; print(reproduce())"
 notes: |
-  design-command GO OPTION_A 2026-08-03: materialize /opsx-distribute-brief
-  (post-archive soft companion for client/CS distribution brief); archive
-  soft NEXT; consult front-door route; inventory 38; fingerprint
-  29c989e65a123ae57c77d674bf3b7189. Prior META inventory 35 was stale vs disk.
-  F12 SOFT_CHAIN_CONTRACT_LAG remains open from prior UPDATE GO.
+  UPDATE GO 2026-08-04 from chat draft: inventory 43 /
+  fingerprint f258e9518d2b3c9ff38f6469c77d7a2e via reproduce().
+  Added side-lane stubs (evolution, devops, scripts-prepare, scripts,
+  supervisor, human-label-display). Patched apply/pyright for include
+  hygiene. Soft pyright section notes in-session hygiene. F12 remains
+  open (partial apply Post-apply fix). F13 closed on GRAPH nodes (watch
+  agent compliance). F14 open (FP counts admin-resolve-conflicts;
+  SCOPE-strict would be 42). propose still excluded_by_owner.
+  Wrote only GRAPH.md + META.md.

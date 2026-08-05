@@ -7,17 +7,19 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 38
+- inventory_count: 43
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
 - source_commit: pending_local
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  design-command GO OPTION_A: added /opsx-distribute-brief (post-archive
-  soft companion for client/CS distribution brief); inventory 38 via
-  graph_fingerprint.reproduce(); fingerprint 29c989e65a123ae57c77d674bf3b7189.
-  Prior META claimed 35 (stale vs disk); this refresh is names_only truth.
+  UPDATE GO 2026-08-04: inventory 43 via graph_fingerprint.reproduce();
+  fingerprint f258e9518d2b3c9ff38f6469c77d7a2e. Added side-lane command
+  stubs (evolution/devops/scripts/supervisor/human-label-display).
+  Patched apply + pyright nodes for pyrightconfig_strict include hygiene.
+  F12 remains open; F13/F14 added. FP still counts
+  opsx-admin-command-resolve-conflicts (F14); SCOPE-strict would be 42.
 
 ## States
 
@@ -116,6 +118,13 @@
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
 
+### Side-lanes / orchestration (soft; not core change DoD)
+- evolution_active: `/opsx-evolution` North Star / Current Increment handoff
+- devops_investigate: `/opsx-devops` READ_ONLY cluster/manifest work
+- scripts_infra_ready: `/opsx-scripts-prepare` CHECK/GO for scripts Job path
+- scripts_ops_active: `/opsx-scripts` inventory/test/push/run
+- supervisor_mission: `/opsx-supervisor` control-plane mission (delegates /opsx-*)
+
 ## Commands
 
 ### /opsx-explore
@@ -179,24 +188,24 @@
 - known_flaws: NOT_OPENED_BUDGET detail; update ≠ production GO; never closed_fixed from update; persist CLOSE_FINDING_INTENT on ROUTE_STATE
 
 ### /opsx-apply
-- purpose: implement tasks from an OpenSpec change; bug-episode path requires RED+Owner GO
+- purpose: implement tasks from an OpenSpec change; bug-episode path requires RED+Owner GO; owns in-session pyrightconfig_strict include hygiene for new in-policy production `.py` before pyright-gate `[x]`
 - input_state: apply_ready | implementing | verify_fail | task_delta_changed | production_go_ready
 - output_state: implementing | impl_done | fix_implementing
-- artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
-- artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
+- artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode; pyrightconfig_strict.json when new production `.py`
+- artifacts_written: production/code per tasks (after gate); optional additive pyrightconfig_strict include[]; ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
 - next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
-- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; apply soft handoff may omit antipattern (F12 / NOT_OPENED_BUDGET)
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; Guardrails one-liner may still omit antipattern (F12 residue); include hygiene owed even when coverage soft (F13)
 
 ### /opsx-pyright-strict-coverage
-- purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude)
-- input_state: implementing | impl_done | product_dirty
+- purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude); post-apply audit/catch-up — does not replace apply in-session include hygiene; never GO-include excluded OpenAPI generated/
+- input_state: implementing | impl_done | product_dirty | coverage_gaps
 - output_state: coverage_pass | coverage_gaps | blocked_needs_base
 - artifacts_read: git diff base...head; pyrightconfig_strict.json
-- artifacts_written: none without GO; with GO only additive include[] entries
+- artifacts_written: none without GO; with GO only additive include[] entries (never exclude matches)
 - decision_owner: coverage auditor; include expansion only with owner GO
 - next_typical: /opsx-external-call-coverage | /opsx-antipattern-gate | /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
-- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; contract NEXT may lag antipattern insert (F12)
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; THIS contract handoff may still skip antipattern (F12)
 
 ### /opsx-external-call-coverage
 - purpose: audit base..head production external-call surfaces (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests per testing-rules
@@ -503,6 +512,69 @@
 
 ### Explicitly excluded from graph
 - /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)
+- /opsx-admin-command-resolve-conflicts — admin surface; fingerprint may still count it (F14); do not recommend from not-admin NAVIGATE
+
+### Side-lane / orchestration stubs (skim evidence; deep fields NOT_OPENED_BUDGET)
+
+### /opsx-evolution
+- purpose: human-native North Star registry; hand off one Current Increment
+- input_state: change_idea | planning_revise | evolution_active
+- output_state: evolution_active | change_idea | planning_revise
+- artifacts_read: openspec/evolution/**; EVOLUTION_POLICY (NOT_OPENED_BUDGET detail)
+- artifacts_written: evolution cards with Owner GO (NOT_OPENED_BUDGET detail)
+- decision_owner: Owner for card GO; agent drafts
+- next_typical: /opsx-new | /opsx-ff | /opsx-update
+- known_flaws: NOT_OPENED_BUDGET deep modes; never treat handoff as production GO
+
+### /opsx-devops
+- purpose: DevOps side-lane — default READ_ONLY k8s/manifest investigate; PLAN_WRITE then GO for allowlisted mutations
+- input_state: devops_investigate | anytime (side-lane)
+- output_state: devops_investigate | product_dirty (if GO writes manifests)
+- artifacts_read: k8s/**; devops rules (NOT_OPENED_BUDGET detail)
+- artifacts_written: only under GO + allowlisted DEVOPS_WRITE_PLAN
+- decision_owner: Owner for GO mutations
+- next_typical: none | /opsx-scripts-prepare | /opsx-scripts
+- known_flaws: NOT_OPENED_BUDGET detail; not product bug-fix / apply
+
+### /opsx-scripts-prepare
+- purpose: rare scripts/ infra CHECK | GO materialize (GHA image path + Job template)
+- input_state: scripts_infra_ready | anytime (side-lane)
+- output_state: scripts_infra_ready
+- artifacts_read: workflows / Job templates (NOT_OPENED_BUDGET detail)
+- artifacts_written: missing allowlisted infra only with GO
+- decision_owner: Owner for GO materialize
+- next_typical: /opsx-scripts
+- known_flaws: NOT_OPENED_BUDGET detail; not daily script run
+
+### /opsx-scripts
+- purpose: daily scripts/ ops — inventory, local test, push branch scripts, plan/run K8s Job
+- input_state: scripts_ops_active | scripts_infra_ready | anytime (side-lane)
+- output_state: scripts_ops_active
+- artifacts_read: scripts/ ledger; human-label-display contract
+- artifacts_written: ledger / Job reports per mode (NOT_OPENED_BUDGET detail)
+- decision_owner: operator; GO for push/run modes
+- next_typical: none | /opsx-devops | /opsx-scripts-prepare
+- known_flaws: NOT_OPENED_BUDGET detail; display SoT is human-label-display
+
+### /opsx-supervisor
+- purpose: command-mediated control-plane orchestrator; delegates /opsx-* via subagents
+- input_state: supervisor_mission | anytime
+- output_state: supervisor_mission | terminal mission report
+- artifacts_read: mission record / DAG (NOT_OPENED_BUDGET detail)
+- artifacts_written: mission artifacts only (NOT_OPENED_BUDGET detail)
+- decision_owner: supervisor policy + Owner approvals for gated commands
+- next_typical: delegated /opsx-* (not a substitute for target command gates)
+- known_flaws: NOT_OPENED_BUDGET detail; control-plane only — does not weaken verify/archive gates
+
+### /opsx-human-label-display
+- purpose: shared Title (machine-id) display contract for inventories/pick-lists — cite-only
+- input_state: n/a (not a user-invoked workflow)
+- output_state: n/a
+- artifacts_read: none (contract text)
+- artifacts_written: none
+- decision_owner: command authors citing the contract
+- next_typical: none (do not invoke as /opsx-human-label-display)
+- known_flaws: file lives under commands/ but is not a workflow entry
 
 ## Transitions
 
@@ -632,6 +704,14 @@ implementing|impl_done --/opsx-test--> tests_authored
 # FIXED --/opsx-admin-command-promote-process-lesson--> process_lesson_candidate
 # process_lesson_candidate --DESIGN_BRIEF_READY--> /opsx-admin-command-design-command
 # process_lesson_candidate --EXTEND_EXISTING--> /opsx-admin-command-fix-command-defects
+# side-lanes (advisory; not core change DoD):
+change_idea|planning_revise --/opsx-evolution--> evolution_active|change_idea|planning_revise
+evolution_active --/opsx-new|/opsx-ff|/opsx-update--> change_scaffolded|apply_ready|planning_revise
+* --/opsx-devops--> devops_investigate
+* --/opsx-scripts-prepare--> scripts_infra_ready
+scripts_infra_ready --/opsx-scripts--> scripts_ops_active
+* --/opsx-scripts--> scripts_ops_active
+* --/opsx-supervisor--> supervisor_mission
 ```
 
 ## Soft recommendations (advisory only)
@@ -642,13 +722,14 @@ lifecycle authority.
 ### Post-apply pyright-strict allowlist coverage
 
 After `/opsx-apply` when production Python changed (`app/**/*.py` or
-top-level production scripts): recommend
-`/opsx-pyright-strict-coverage base=<BASE>` before
+top-level production scripts): apply owes **in-session**
+`pyrightconfig_strict` include hygiene first; then recommend
+`/opsx-pyright-strict-coverage base=<BASE>` (audit/catch-up) before
 `/opsx-external-call-coverage`, optional `/opsx-performance-review`,
 `/opsx-antipattern-gate`, `/opsx-static-check`, and `/opsx-verify`.
 `PASS` pyright-strict alone does **not** prove changed files are in
 `pyrightconfig_strict.json` include. Soft recommend — does not block
-archive by itself.
+archive by itself. Never add excluded OpenAPI `generated/` via coverage GO.
 
 ### Post-apply external-call coverage
 
@@ -910,14 +991,38 @@ serialize shared contracts before consumers.
   do_not_pretend_fixed: false (closed by this materialization)
 
 - id: F12 SOFT_CHAIN_CONTRACT_LAG
-  where: opsx-pyright-strict-coverage.md / opsx-performance-review.md vs
-    opsx-antipattern-gate.md soft position
+  where: opsx-pyright-strict-coverage.md / opsx-performance-review.md /
+    opsx-apply.md Guardrails one-liner vs opsx-antipattern-gate soft position
   symptom: |
-    pyright + performance-review contracts still NEXT → static without
-    antipattern; antipattern contract + owner soft-chain disagree
+    apply Post-apply section now includes antipattern before static, but
+    apply Guardrails one-liner and pyright/performance-review contract NEXT
+    may still skip antipattern → static
   operator_workaround: |
     follow GRAPH soft chain (antipattern before static); later
     /opsx-admin-command-fix-command-defects on lagging contracts
+  do_not_pretend_fixed: true
+
+- id: F13 APPLY_INCLUDE_HYGIENE_GRAPH_LAG
+  where: GRAPH apply/pyright nodes vs opsx-apply + testing-rules §7
+    (partially addressed by this UPDATE GO node patch)
+  symptom: |
+    navigator previously missed in-session pyrightconfig_strict include
+    hygiene; agents could claim green pyright-strict with uncovered paths
+  operator_workaround: |
+    follow apply include hygiene; then /opsx-pyright-strict-coverage
+    base=<BASE> as audit/catch-up; never include excluded generated/
+  do_not_pretend_fixed: false (GRAPH nodes patched this materialization;
+    keep watching apply Guardrails / agent compliance)
+
+- id: F14 FP_EXCLUDE_SCOPE_LEAK
+  where: .cursor/pipeline/bug-team/runtime/graph_fingerprint.py EXCLUDE
+    vs pipeline SCOPE (ALL_NON_ADMIN_OPSX excludes opsx-admin-command-*)
+  symptom: |
+    opsx-admin-command-resolve-conflicts.md counted in not-admin inventory
+    (43 vs SCOPE-strict 42)
+  operator_workaround: |
+    do not recommend admin-resolve-conflicts from not-admin NAVIGATE;
+    fix EXCLUDE list in a separate admin/runtime change
   do_not_pretend_fixed: true
 
 ## Terminal / recovery
@@ -941,8 +1046,8 @@ serialize shared contracts before consumers.
 - Class lesson: requires FANIN_READY; else LESSON_CANDIDATE_ONLY
 - Pre-PR product/runtime: `/opsx-project-bug-hunt` receipt before `/opsx-create-pr`
   (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
-- After apply with production `.py`: soft recommend
-  `/opsx-pyright-strict-coverage base=<BASE>` then
+- After apply with production `.py`: in-session include hygiene first; soft
+  recommend `/opsx-pyright-strict-coverage base=<BASE>` then
   `/opsx-external-call-coverage base=<BASE>` then conditional
   `/opsx-performance-review scope=base base=<BASE>` (when trigger applies)
   then `/opsx-antipattern-gate base=<BASE>` before `/opsx-static-check` /
