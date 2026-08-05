@@ -47,7 +47,8 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
 | Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-04T02:35:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:7dcf1cc5bc85da2da95e220220e4748238d2c597 | Job Complete; all_users.xlsx 129991B copied; PYTHONPATH+/hold in template |
-| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | - | 2026-08-04T06:53:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:2de3b822101014f91394dcfab0da742610042a67 | Job Complete; Dilera collect PARTIAL (norms adapter gaps); zip 11798B + report copied; Harbor proxy pull after GHCR-direct 403 |
+| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-05T04:25:00Z | 2026-08-04T06:53:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:2de3b822101014f91394dcfab0da742610042a67 | sales GET wired into ORDERS family; unit smoke 12 passed; cluster Dilera still prior image until RUN GO |
+
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
 ## Support (not Job entrypoints)
