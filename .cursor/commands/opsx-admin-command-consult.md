@@ -51,6 +51,7 @@ Reduce front-door uncertainty for process questions:
 - Known day-to-day next not-admin step → `/opsx-pipeline` (NAVIGATE)
 - Known `scripts/` ops (inventory / test / Job run) → `/opsx-scripts`
 - Known scripts infra bootstrap / repair → `/opsx-scripts-prepare`
+- Known OpenSpec tree hygiene / leftover / empty ghost change → `/opsx-doctor`
 - Known completed-change client/CS brief → `/opsx-distribute-brief`
 - Known pipeline redesign / human-usability improvement pass →
   `/opsx-admin-command-analyze-pipeline`
@@ -117,6 +118,7 @@ routed command (`fix-command-defects`, `design-command`, `pipeline UPDATE GO`,
 | `route_resolve_conflicts` | Unmerged paths / merge\|rebase on process surfaces | `/opsx-admin-command-resolve-conflicts` |
 | `route_scripts_operate` | scripts/ inventory, readiness, local test, Job run | `/opsx-scripts` |
 | `route_scripts_prepare` | scripts infra gap (workflow / Job template / registry) | `/opsx-scripts-prepare` |
+| `route_doctor` | OpenSpec leftover / empty ghost change / tree hygiene | `/opsx-doctor` |
 | `wrong_branch` | Typing or product logic | `/opsx-fix-types` / static-check or `/opsx-fix-bug` |
 | `needs_evidence` | Missing fact blocks safe route | one narrow question; `NEXT_ACTION: none` until answered |
 
@@ -151,6 +153,7 @@ When asked about **scripts ops** vs **cluster devops**:
 |---|---|---|
 | Role | `scripts/` ledger, local check, scripts-branch image → Job | Generic cluster/manifest investigate + allowlisted apply |
 | Infra once | `/opsx-scripts-prepare` | n/a |
+| OpenSpec hygiene | `/opsx-doctor` | n/a |
 | Writes | registry; Job under RUN GO | cluster under PLAN_WRITE + GO |
 
 ## Steps (READ_ONLY)

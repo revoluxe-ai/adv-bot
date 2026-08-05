@@ -97,6 +97,17 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
+   **Post-mv tripwire (narrow — not a full hygiene scan):**
+
+   1. Assert the pre-move `changeRoot` path no longer exists. If it still
+      exists → `ARCHIVE_INCOMPLETE`; do not claim Archive Complete.
+   2. Soft check (not an archive gate): if an active directory
+      `changes/<name>/` still exists after a successful move (unexpected
+      reappear / ghost), or required artifacts there look empty — report a
+      warning and soft-suggest `/opsx-doctor change=<name>` (or
+      `/opsx-doctor`). Do **not** delete leftovers from this command; do
+      **not** run full doctor checklist here.
+
 7. **Display summary**
 
    Show archive completion summary including:
@@ -105,6 +116,7 @@ Archive a completed change in the experimental workflow.
    - Archive location
    - Spec sync status (synced / sync skipped / no delta specs)
    - Note about any warnings (incomplete artifacts/tasks)
+   - Post-mv tripwire result (changeRoot gone: yes/no; soft hygiene hint if any)
 
 **Output On Success**
 
@@ -121,6 +133,8 @@ All artifacts complete. All tasks complete.
 ### Soft next (optional — not an archive gate)
 If client/CS distribution materials are needed:
 `/opsx-distribute-brief change=<change-name>`
+If post-mv tripwire saw a ghost/leftover or Owner wants hygiene:
+`/opsx-doctor` (or `/opsx-doctor change=<change-name>`)
 ```
 
 **Output On Success (No Delta Specs)**
@@ -138,6 +152,8 @@ All artifacts complete. All tasks complete.
 ### Soft next (optional — not an archive gate)
 If client/CS distribution materials are needed:
 `/opsx-distribute-brief change=<change-name>`
+If post-mv tripwire saw a ghost/leftover or Owner wants hygiene:
+`/opsx-doctor` (or `/opsx-doctor change=<change-name>`)
 ```
 
 **Output On Success With Warnings**
@@ -160,6 +176,8 @@ Review the archive if this was not intentional.
 ### Soft next (optional — not an archive gate)
 If client/CS distribution materials are needed:
 `/opsx-distribute-brief change=<change-name>`
+If post-mv tripwire saw a ghost/leftover or Owner wants hygiene:
+`/opsx-doctor` (or `/opsx-doctor change=<change-name>`)
 ```
 
 **Output On Error (Archive Exists)**
@@ -189,3 +207,5 @@ Target archive directory already exists.
 - If sync is requested, use the Skill tool to invoke `openspec-sync-specs` (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
 - Soft-suggest `/opsx-distribute-brief` after success when client/CS materials may be needed; never require it as an archive gate; never write the distribution brief from this command
+- After successful `mv`, assert pre-move `changeRoot` is gone; soft-suggest `/opsx-doctor` on ghost/leftover hints; never delete leftovers or run full hygiene scan from archive
+- Leftover GC belongs to `/opsx-doctor` (GO repair), not archive

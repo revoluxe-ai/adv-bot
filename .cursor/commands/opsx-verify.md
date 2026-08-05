@@ -300,6 +300,43 @@ Extract:
 * Evolution link, Current Increment, In/Out of Scope, and Forward
   Compatibility Constraints when present.
 
+#### Required planning artifact integrity (hard)
+
+After resolving `changeRoot` and required artifact paths from
+`artifactPaths` / status (typically `proposal.md`, `design.md`; plus any
+delta `specs/**/spec.md` listed as existing):
+
+1. Treat a required file as **empty/corrupt** when it is missing, size 0,
+   or whitespace-only (no meaningful markdown content).
+2. If any required artifact is empty/corrupt → overall verdict `NO_GO` with
+   blocker code `CORRUPT_OR_EMPTY_PLANNING_ARTIFACTS` (list exact paths).
+   Do not treat empty files as “present and done”.
+3. **Corrupt leftover vs archive:** if `changeRoot` exists under
+   `planningHome.changesDir/<name>` **and** at least one directory matches
+   `planningHome.changesDir/archive/*-<name>` (same logical change name),
+   **and** required active artifacts are empty/corrupt (or
+   `openspec validate "<name>" --type change --strict` fails for empty
+   artifacts) → `NO_GO` with blocker code `CORRUPT_LEFTOVER_ACTIVE_CHANGE`.
+   This is not a legitimate new change of an already-archived name.
+4. For `CORRUPT_LEFTOVER_ACTIVE_CHANGE`, next command MUST be hygiene clinic
+   (not `/opsx-apply`, not archive repair):
+
+```text
+/opsx-doctor
+```
+
+or, when Owner authorizes delete of qualifying leftovers:
+
+```text
+/opsx-doctor GO
+```
+
+(optional focus: `/opsx-doctor GO change=<name>`).
+
+Do not invent content into empty artifacts during verify (read-only).
+Empty required artifacts alone (no archive sibling) → `CORRUPT_OR_EMPTY_PLANNING_ARTIFACTS`
+with next `/opsx-update` or `/opsx-doctor` (diagnose), not silent apply.
+
 #### TEST_COVERAGE_PACKET discovery
 
 Если среди прочитанных artifacts или context files найден блок `TEST_COVERAGE_PACKET`, извлеки:
@@ -743,6 +780,8 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * linked `NORTH_STAR_ALIGNMENT.VERDICT=FAIL`;
 * a linked explicit mandatory Forward Compatibility Constraint remains
   `unknown`;
+* `CORRUPT_OR_EMPTY_PLANNING_ARTIFACTS` (required proposal/design empty or missing);
+* `CORRUPT_LEFTOVER_ACTIVE_CHANGE` (active ghost while archive sibling exists);
 
 Do not set `NO_GO` only because:
 
@@ -853,11 +892,16 @@ Other allowed next commands for blockers:
 
 ```text
 /opsx-update <change-name>
+/opsx-doctor
+/opsx-doctor GO
+/opsx-doctor GO change=<change-name>
 manual fix
 /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 /opsx-test case=<CASE_ID> finding=<FINDING_ID> verify
 /opsx-bug-debt-board case=<CASE_ID>
 ```
+
+For `CORRUPT_LEFTOVER_ACTIVE_CHANGE`, prefer `/opsx-doctor` / `/opsx-doctor GO` over `/opsx-apply`.
 
 Не создавай новый top-level output section для test coverage.
 
@@ -890,7 +934,8 @@ or:
 
 * Read-only only. Do not edit files.
 * Do not offer to fix code with a follow-up question like `Want me to fix?`.
-* Instead of offering a write action, state the next command: `/opsx-apply`, `/opsx-update`, or `manual fix`.
+* Instead of offering a write action, state the next command: `/opsx-apply`, `/opsx-update`, `/opsx-doctor`, or `manual fix`.
+* For `CORRUPT_LEFTOVER_ACTIVE_CHANGE`, next is `/opsx-doctor` (not apply/archive repair).
 * Do not mark verification successful when placement violates an accepted decision.
 * Do not treat passing tests as sufficient architecture proof.
 * Block async tests that manually mutate shared module-level dependencies around awaited code, especially shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings, and global flags.

@@ -7,19 +7,19 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 43
+- inventory_count: 44
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
 - source_commit: pending_local
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-08-04: inventory 43 via graph_fingerprint.reproduce();
-  fingerprint f258e9518d2b3c9ff38f6469c77d7a2e. Added side-lane command
-  stubs (evolution/devops/scripts/supervisor/human-label-display).
-  Patched apply + pyright nodes for pyrightconfig_strict include hygiene.
-  F12 remains open; F13/F14 added. FP still counts
-  opsx-admin-command-resolve-conflicts (F14); SCOPE-strict would be 42.
+  UPDATE GO 2026-08-05: inventory 44 via graph_fingerprint.reproduce();
+  fingerprint 116be47aa5665f6a53713f2a92ce1393. Confirmed /opsx-doctor
+  (simplified CHECK / GO leftover GC) + hygiene states/transitions; F15
+  added. F12 remains open; F13/F14 unchanged. FP still counts
+  opsx-admin-command-resolve-conflicts (F14); SCOPE-strict would be 43
+  with doctor included (was 42 before doctor).
 
 ## States
 
@@ -34,6 +34,9 @@
 - verify_pass: archive-eligible after `/opsx-verify`
 - verify_fail: back to apply/update
 - archived: `/opsx-archive` done
+- hygiene_ok: `/opsx-doctor` CHECK clean
+- hygiene_findings: `/opsx-doctor` reported FINDINGS (soft; not archive gate)
+- leftover_removed: `/opsx-doctor` GO deleted qualifying corrupt active changeRoot(s)
 - distribution_brief_ready: `/opsx-distribute-brief` produced client/CS distribution pack (soft post-archive; not a hard gate)
 - planning_revise: `/opsx-update` / `/opsx-explore`
 
@@ -348,8 +351,8 @@
 - artifacts_read: change artifacts, code, VERIFY_POLICY
 - artifacts_written: none (read-only)
 - decision_owner: verifier
-- next_typical: /opsx-archive | /opsx-apply | /opsx-update
-- known_flaws: none recorded
+- next_typical: /opsx-archive | /opsx-apply | /opsx-update | /opsx-doctor
+- known_flaws: CORRUPT_LEFTOVER → doctor (not apply); empty artifacts hard NO_GO
 
 ### /opsx-archive
 - purpose: archive a completed change
@@ -358,8 +361,18 @@
 - artifacts_read: change + decisions to promote
 - artifacts_written: archive move; promoted decisions
 - decision_owner: archiver
-- next_typical: none | /opsx-distribute-brief | /opsx-commit | /opsx-create-pr
-- known_flaws: NOT_OPENED_BUDGET detail; distribute-brief is soft suggest only
+- next_typical: none | /opsx-distribute-brief | /opsx-doctor | /opsx-commit | /opsx-create-pr
+- known_flaws: post-mv tripwire is soft for ghosts; full hygiene is /opsx-doctor; distribute-brief soft only
+
+### /opsx-doctor
+- purpose: change-tree hygiene — CHECK all active; GO deletes qualifying leftovers
+- input_state: anytime (post-archive soft next | suspicious list | pre-commit dirt)
+- output_state: hygiene_ok | hygiene_findings | leftover_removed
+- artifacts_read: openspec doctor; active changeRoots; archive siblings
+- artifacts_written: none on CHECK; qualifying corrupt active changeRoot delete(s) on GO
+- decision_owner: Owner for exact GO
+- next_typical: none | /opsx-doctor GO | /opsx-scripts | /opsx-admin-command-commit
+- known_flaws: not main-spec healer; empty-without-archive warn only (F15); gate archive+empty; ok≠GO
 
 ### /opsx-distribute-brief
 - purpose: full completed-change description for client/CS distribution materials
@@ -612,6 +625,9 @@ impl_done --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspects|anti
 impl_done --/opsx-verify--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 archived --/opsx-distribute-brief--> distribution_brief_ready
+archived --/opsx-doctor--> hygiene_ok|hygiene_findings|leftover_removed
+verify_fail --/opsx-doctor [CORRUPT_LEFTOVER]--> hygiene_findings|leftover_removed
+anytime --/opsx-doctor--> hygiene_ok|hygiene_findings|leftover_removed
 verify_pass --/opsx-distribute-brief [DRAFT only]--> distribution_brief_ready
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
 planning_revise --/opsx-update|/opsx-explore--> apply_ready|change_idea
@@ -1019,10 +1035,20 @@ serialize shared contracts before consumers.
     vs pipeline SCOPE (ALL_NON_ADMIN_OPSX excludes opsx-admin-command-*)
   symptom: |
     opsx-admin-command-resolve-conflicts.md counted in not-admin inventory
-    (43 vs SCOPE-strict 42)
+    (historical 43 vs SCOPE-strict 42; after /opsx-doctor inventory 44)
   operator_workaround: |
     do not recommend admin-resolve-conflicts from not-admin NAVIGATE;
     fix EXCLUDE list in a separate admin/runtime change
+  do_not_pretend_fixed: true
+
+- id: F15 DOCTOR_EMPTY_WITHOUT_ARCHIVE_NOT_GC
+  where: opsx-doctor.md
+  symptom: |
+    CHECK reports CORRUPT_OR_EMPTY on stub/incomplete active changes without
+    an archive sibling; Owner may expect `/opsx-doctor GO` to delete them
+  operator_workaround: |
+    GO only deletes leftover+archive+empty/corrupt required artifacts;
+    stubs without archive → leave or `/opsx-update`; not doctor GC
   do_not_pretend_fixed: true
 
 ## Terminal / recovery

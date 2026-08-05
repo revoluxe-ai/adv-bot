@@ -100,6 +100,10 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
+   **Post-mv tripwire:** Assert pre-move `changeRoot` is gone (`ARCHIVE_INCOMPLETE`
+   if not). Soft-suggest `/opsx-doctor` on ghost/leftover hints; do not delete
+   leftovers or run full hygiene from archive.
+
 7. **Display summary**
 
    Show archive completion summary including:
@@ -108,6 +112,7 @@ Archive a completed change in the experimental workflow.
    - Archive location
    - Whether specs were synced (if applicable)
    - Note about any warnings (incomplete artifacts/tasks)
+   - Soft next may include `/opsx-doctor` when hygiene is suspected
 
 **Output On Success**
 
@@ -132,3 +137,4 @@ All artifacts complete. All tasks complete.
 - Show clear summary of what happened
 - If sync is requested, use openspec-sync-specs approach (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- Post-mv: assert changeRoot gone; soft-suggest `/opsx-doctor` for leftovers; GC belongs to doctor
