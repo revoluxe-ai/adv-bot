@@ -1,0 +1,43 @@
+---
+description: "OPSX role ownership: plain text cannot transition /opsx-* roles or expand writes"
+alwaysApply: true
+---
+
+# OPSX Command Role Ownership
+
+## Контекст применения
+
+После любого явного `/opsx-*` в чате действует role ownership. Полный цикл
+одного change в одном чате разрешён. Скрытая смена роли и чужая работа —
+запрещены.
+
+Authority (полный контракт): `.cursor/commands/opsx-command-role-ownership.md`.
+
+## Основные принципы
+
+1. `ACTIVE_COMMAND` = последняя явно вызванная `/opsx-*` команда.
+2. Plain-text follow-up уточняет аргументы **только** этой команды; не
+   переключает роль и не расширяет `ALLOWED_WRITES`.
+3. Запрос вне контракта ACTIVE_COMMAND → `STATUS: ROLE_BOUNDARY_REFUSAL` +
+   pasteable owning `/opsx-*`; **без** mutation в этом ходе.
+4. `GO` / authorize token — только для ACTIVE_COMMAND и её allowlisted path.
+   Исторический `GO` другой команды недействителен.
+5. Durable state — OpenSpec / ledgers / receipts, не только память чата.
+6. Отдельный чат не обязателен для безопасности; fail-closed — роль + SoT.
+
+## Запрещённый паттерн (regression)
+
+```text
+/opsx-explore
+> Подключи X / сделай smoke / реализуй
+
+FORBIDDEN: edits в app/** или scripts/**; silent /opsx-apply
+REQUIRED: ROLE_BOUNDARY_REFUSAL → /opsx-new|/opsx-ff|/opsx-update затем /opsx-apply
+```
+
+## Ограничения
+
+- Не дублировать полный текст всех command contracts сюда.
+- Не требовать шумный `OPSX_CONTEXT` banner на каждый ответ, если команда
+  сама этого не требует.
+- Не путать side-lane `/opsx-scripts` с product `/opsx-apply`.

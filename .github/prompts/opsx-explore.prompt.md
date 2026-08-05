@@ -6,6 +6,11 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 
 **IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
 
+**Role ownership (mandatory):** Follow
+`.cursor/commands/opsx-command-role-ownership.md`. Plain-text follow-ups MUST NOT
+expand writes or silently become `/opsx-apply`. Out-of-scope mutation asks →
+`STATUS: ROLE_BOUNDARY_REFUSAL` + pasteable owning `/opsx-*` only.
+
 **This is a stance with a mandatory context pass.** Exploration stays read-only and adaptive, but this project requires config/WORKLOG loading and final evidence separation when you summarize findings.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
@@ -221,6 +226,7 @@ When things crystallize, you might offer a summary - but it's optional. Sometime
 ## Guardrails
 
 - **Don't implement** - Never write code or implement features. Creating OpenSpec artifacts is fine, writing application code is not.
+- **Don't leave explore on plain text** - Implementation asks → `ROLE_BOUNDARY_REFUSAL` + pasteable owning `/opsx-*` (see `.cursor/commands/opsx-command-role-ownership.md`).
 - **Don't fake understanding** - If something is unclear, dig deeper
 - **Don't rush** - Discovery is thinking time, not task time
 - **Don't force structure** - Let patterns emerge naturally

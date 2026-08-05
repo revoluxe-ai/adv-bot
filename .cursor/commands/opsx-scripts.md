@@ -26,9 +26,18 @@ This command specializes it for `scripts/` (`title` ledger field + path).
 Infra bootstrap / repair → `/opsx-scripts-prepare` (keep that out of daily context).
 
 Follow `.cursor/commands/opsx-source-resolution.md`,
-`.cursor/commands/opsx-execution-preflight.md`, and
-`.cursor/commands/opsx-human-label-display.md` (PowerShell kubectl per
+`.cursor/commands/opsx-execution-preflight.md`,
+`.cursor/commands/opsx-human-label-display.md`, and
+`.cursor/commands/opsx-command-role-ownership.md` (PowerShell kubectl per
 `.cursor/rules/terminal.mdc`).
+
+**Role ownership:** While this command is `ACTIVE_COMMAND`, stay inside scripts
+ops modes (`INVENTORY`/`STATUS`/`TEST_LOCAL`/`PUSH`/`PLAN_RUN`/`RUN`/
+`RECORD_BATTLE`). Plain-text «добавь фичу в скрипт / подключи клиент /
+реализуй» that needs OpenSpec product change →
+`STATUS: ROLE_BOUNDARY_REFUSAL` + pasteable `/opsx-new|/opsx-ff|/opsx-update`
+then `/opsx-apply`. Do not silently become product apply. `GO` here authorizes
+only this command's allowlisted push/Job/ledger paths.
 
 ## What this is
 
