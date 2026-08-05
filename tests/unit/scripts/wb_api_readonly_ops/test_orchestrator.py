@@ -75,7 +75,10 @@ async def test_ceiling_exhausted_stops_without_infinite_retry() -> None:
 def test_mutation_write_refused() -> None:
     """Denylist mutation ops → MutationWriteRefused."""
     assert_read_only_op("get_cards_list")  # allowed (not in denylist)
+    assert_read_only_op("get_supplier_orders")  # ORDERS read allowed
     with pytest.raises(MutationWriteRefused):
         assert_read_only_op("start_campaign")
     with pytest.raises(MutationWriteRefused):
         assert_read_only_op("top_up_budget")
+    with pytest.raises(MutationWriteRefused):
+        assert_read_only_op("create_payout")

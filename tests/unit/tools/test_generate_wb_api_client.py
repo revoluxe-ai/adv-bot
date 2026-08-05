@@ -43,6 +43,22 @@ def _make_args(
     )
 
 
+def test_reports_swagger_target_mapping_english_no_transliteration() -> None:
+    """INC-RO-06: `reports` в SWAGGER_TARGETS — en 12-reports, skip_transliteration.
+
+    Requirement: Reports client generation procedure / generator mapping.
+    """
+    mod = _load_generator_module()
+    assert "reports" in mod.SWAGGER_TARGETS
+    target = mod.SWAGGER_TARGETS["reports"]
+    assert target.spec_filename == "12-reports.yaml"
+    assert "12-reports.yaml" in target.spec_url
+    assert "/en/" in target.spec_url or target.spec_url.endswith("12-reports.yaml")
+    assert target.skip_transliteration is True
+    assert target.package_name == "reports_client"
+    assert target.target_root.name == "reports"
+
+
 def test_spec_lock_roundtrip_has_expected_fields(tmp_path: Path) -> None:
     mod = _load_generator_module()
     spec_bytes = b"openapi: 3.0.0\ninfo:\n  title: x\n"

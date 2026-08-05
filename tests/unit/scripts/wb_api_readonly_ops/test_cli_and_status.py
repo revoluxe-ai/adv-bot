@@ -29,9 +29,23 @@ def test_cli_requires_shop_id_and_mode() -> None:
     ns = parse_args(["--shop-id", "abc", "--mode", "preflight"])
     assert ns.shop_id == "abc"
     assert ns.mode == "preflight"
+    # ORDERS default dateFrom = pilot 2026-07-04 (not yesterday→today)
+    assert ns.orders_date_from == "2026-07-04"
 
     ns2 = parse_args(["--shop-id", "abc", "--mode", "collect"])
     assert ns2.mode == "collect"
+
+    ns3 = parse_args(
+        [
+            "--shop-id",
+            "abc",
+            "--mode",
+            "preflight",
+            "--orders-date-from",
+            "2026-07-10",
+        ]
+    )
+    assert ns3.orders_date_from == "2026-07-10"
 
 
 def test_overall_not_ok_when_family_gaps() -> None:
