@@ -58,6 +58,11 @@ Tracked only as notes; not run via `ops-script-runner` unless Owner promotes:
 * `scripts/set_path.py` — path bootstrap
 * `scripts/template_script.py` — authoring template
 * `scripts/__init__.py` and package `__init__.py` / helper modules under `send_message/utils`, `get_users/filters`, etc.
+* `tools/wb_api_master_map.py` — offline API Master inventory map
+  (path × method × family) from local `generated/<family>/vN/swagger`;
+  no network / no codegen / no shop_id. Usage:
+  `poetry run python tools/wb_api_master_map.py --output .tmp/wb-api-master-map/inventory.json`
+  Optional `--markdown`, `--family`, `--force-version`, `--swagger-file`.
 
 ## Infra pointers
 
