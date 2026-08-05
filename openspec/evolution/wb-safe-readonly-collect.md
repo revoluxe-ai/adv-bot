@@ -5,7 +5,7 @@ STAR_ID: wb-safe-readonly-collect
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-04T04:47:00Z
-UPDATED_AT: 2026-08-04T10:25:43Z
+UPDATED_AT: 2026-08-04T23:18:52Z
 ```
 
 ## North Star
@@ -26,6 +26,9 @@ allowlist семей эндпоинтов) в архив на локаль — �
 - Included outcomes:
   - INC-RO-01: preflight + best-effort 4-family collect + gap report +
     Owner-local L0 archive (secret-strip) on existing clients
+  - INC-RO-06: generated Reports client + narrow GET supplier orders/sales
+    adapter + ORDERS_OR_SALES_REPORTS_READ first in wb_api_readonly_ops
+    with honest dateFrom / first-page attestation
   - Stage B / map-driven permanent collect + Web CLEAN_DUMP accept (future)
   - one-command swagger status/sync при доказанном gap
   - API Master: карта path×method из локальных swagger
@@ -42,7 +45,7 @@ allowlist семей эндпоинтов) в архив на локаль — �
 
 ```text
 STATUS: DELIVERED
-LINKED_CHANGES: wb-readonly-api-preflight (archived 2026-08-04)
+LINKED_CHANGES: wb-readonly-api-preflight
 ```
 
 Outcome:
@@ -181,6 +184,41 @@ Evidence / completion:
 
 Доказанный bind token category + отсутствие write capability в прогоне.
 
+### INC-RO-06 — Domain adapter GET statistics-api ORDERS (+ sales) + wire
+
+```text
+STATUS: ACTIVE
+LINKED_CHANGES: statistics-orders-sales-get-adapter
+```
+
+Outcome:
+
+Полный generate Reports OpenAPI-клиента из inventory `12-reports.yaml` +
+узкий domain adapter/manager (только GET supplier orders и при необходимости
+sales) + wire семьи `ORDERS_OR_SALES_REPORTS_READ` **первой** в
+`wb_api_readonly_ops` preflight/collect. Stage A: `dateFrom` на начало
+пилотного окна, одна first page, `next_page_followed=NO`, честная attestation
+модели периода (не silent yesterday→today). Unit tests без live prod
+statistics-api.
+
+Contribution to North Star:
+
+Без GET orders/sales family нельзя честно закрыть COL-R03 / map-driven
+collect alias #1; funnel / FBS / search-report / promotion fullstats не
+являются ORDERS_OR_SALES.
+
+Scope boundary:
+
+Не включает COL-R03-009 RETURN packager / Web PASS, Stage B cursor
+pagination / CLEAN_DUMP, live Dilera preflight из Cursor, mass swagger
+regen (INC-RO-02), cards GET_ONLY workaround, finance/wallet/payout.
+
+Evidence / completion:
+
+Generated `reports/vN` + swagger lock; adapter/manager в `wb/api`;
+ORDERS family first в readonly_ops + MAPPING attestation; targeted unit
+tests green без live API.
+
 ## Forward Compatibility Constraints
 
 - Не вводить новый raw HTTP-клиент WB; расширять только существующие
@@ -194,6 +232,11 @@ Evidence / completion:
   INC-RO-01 не должен ломать эту конвенцию.
 - Policy исполнения API: `READ_ONLY_NO_MUTATION` (не литерал HTTP GET_ONLY).
 - Execution contour: API только из Owner-bot Job runtime; Cursor — plan/run/cp.
+- ORDERS_OR_SALES только через generated Reports + `wb/api` (no invent URL;
+  источник — swagger inventory `12-reports`).
+- ORDERS ≠ funnel / search-report / FBS assembly / promotion fullstats.
+- Для будущего COL-R03 GET_ONLY: POST-read ≠ GET; Stage A period = dateFrom /
+  cursor attestation, не ложный exact start+end.
 
 ## Non-Goals
 
@@ -210,9 +253,9 @@ Evidence / completion:
 
 ## History
 
-- 2026-08-04T10:25:43Z — INC-RO-01 DELIVERED; change `wb-readonly-api-preflight`
-  archived; main spec `wb-api-read-only-preflight` synced; decision
-  `scripts-wb-api-ops-stack` promoted Accepted.
+- 2026-08-04T23:18:52Z — INC-RO-06 ACTIVE (Reports GET orders/sales adapter
+  + ORDERS family wire); linked `statistics-orders-sales-get-adapter`;
+  INC-RO-01 marked DELIVERED (exactly one ACTIVE).
 - 2026-08-04T05:24:57Z — INC-RO-01 revised to B+L0 (preflight +
   best-effort collect + Owner-local secret-strip archive); linked
   `wb-readonly-api-preflight`; INC-RO-04 narrowed to map-driven /
