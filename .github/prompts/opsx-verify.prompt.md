@@ -25,7 +25,7 @@ python openspec/tools/check_config_contract.py
 - последняя строка: ровно `✅ GO` или `❌ NO_GO`
 - failed targeted tests, archive blockers, placement violations и task validation mismatch дают `NO_GO`
 
-**Input:** optionally specify a change name after `/opsx:verify` (example: `/opsx:verify add-auth`). Если имя не указано, infer только когда контекст однозначен; иначе запусти `openspec list --json` и попроси пользователя выбрать change.
+**Input:** optionally specify a change name after `/opsx-verify` (example: `/opsx-verify add-auth`). Если имя не указано, infer только когда контекст однозначен; иначе запусти `openspec list --json` и попроси пользователя выбрать change.
 
 ## Steps
 
@@ -35,7 +35,7 @@ python openspec/tools/check_config_contract.py
    - infer from conversation context only when unambiguous
    - если ambiguous, запусти `openspec list --json` и попроси выбрать
 
-   Всегда сообщи: `Проверяю change: <name>`. Для override: `/opsx:verify <other>`.
+   Всегда сообщи: `Проверяю change: <name>`. Для override: `/opsx-verify <other>`.
 
 2. **Load verify settings**
 

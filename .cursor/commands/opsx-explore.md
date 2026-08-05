@@ -181,7 +181,7 @@ ALSO_OK (if still unsure; separate paste — never with first-intake RAW_REPORT)
    `ALSO_OK` lines until a real id exists. Never paste handback `case=`
    into the same message as free-form first-intake `RAW_REPORT`.
 
-**Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
+**Input**: The argument after `/opsx-explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
 - A change name: "add-dark-mode" (to explore in context of that change)

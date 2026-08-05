@@ -67,7 +67,7 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 ## Next Action
 Что делать дальше.
 
-**Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
+**Input**: The argument after `/opsx-explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
 - A change name: "add-dark-mode" (to explore in context of that change)
