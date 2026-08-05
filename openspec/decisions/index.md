@@ -21,10 +21,15 @@ architecture decisions belong here.
     required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
 - [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
   - Status: Accepted
-  - Scope: ownership/layering for operator `scripts/` + `/opsx-scripts` Job
-    WB API reads — existing access + `app/core/mp/wb/api` only; no new raw
-    HTTP client; `READ_ONLY_NO_MUTATION`; secret-strip L0 archives; Job-only
-    runtime (no Cursor→prod API).
+  - Scope: ownership/layering for scripts/`/opsx-scripts` Job → existing
+    `app/core/mp/wb/api` stack; `READ_ONLY_NO_MUTATION`; no raw HTTP;
+    secret-strip Owner-local archive.
+- [orders-or-sales-reports-read-identity](orders-or-sales-reports-read-identity/decision.md)
+  - Status: Accepted
+  - Scope: domain invariant — `ORDERS_OR_SALES_REPORTS_READ` means only
+    statistics-api GET supplier orders/sales via generated Reports client +
+    narrow `wb/api` adapter; anti-substitution vs funnel/fullstats/FBS;
+    honest dateFrom/cursor period attestation.
 
 ## Change Requirements
 

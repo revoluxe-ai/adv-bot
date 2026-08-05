@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -92,13 +92,14 @@ Bad:
 
 ## Related specs
 
-- `openspec/specs/wb-api-read-only-preflight/spec.md` (delta в этом change)
+- `openspec/specs/wb-api-read-only-preflight/spec.md`
 - Frozen COL-R03-009 (context): aggregate promotion/analytics orders MUST NOT
   satisfy ORDERS_OR_SALES_REPORTS_READ
 
 ## Related changes
 
-- `openspec/changes/statistics-orders-sales-get-adapter` (INC-RO-06)
+- Proposed in: `statistics-orders-sales-get-adapter` (INC-RO-06);
+  archived as `openspec/changes/archive/2026-08-05-statistics-orders-sales-get-adapter`
 - Accepted baseline: `openspec/decisions/scripts-wb-api-ops-stack/decision.md`
 - Archived: `wb-readonly-api-preflight` (INC-RO-01; семьи без ORDERS)
 
@@ -113,3 +114,4 @@ Bad:
       reports client + narrow adapter/manager in `app/core/mp/wb/api`;
       ORDERS family first in `scripts/wb_api_readonly_ops`; no funnel
       substitution)
+- [x] promoted to `openspec/decisions/` as Accepted on archive 2026-08-05
