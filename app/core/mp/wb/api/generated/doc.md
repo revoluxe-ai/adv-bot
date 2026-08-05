@@ -22,7 +22,8 @@
 | Key | Спецификация | Транслитерация | Папка клиента | Пакет внутри версии |
 | --- | --- | --- | --- | --- |
 | `promotion` | `https://dev.wildberries.ru/api/swagger/yaml/en/08-promotion.yaml` | нет (англ. спецификация) | `app/core/mp/wb/api/generated/promotion` | `marketing_and_promotions_client` |
-| `products` | `https://dev.wildberries.ru/api/swagger/yaml/ru/02-products.yaml` | `app/core/mp/wb/api/generated/products` | `content_products_client` |
+| `products` | `https://dev.wildberries.ru/api/swagger/yaml/ru/02-products.yaml` | да | `app/core/mp/wb/api/generated/products` | `content_products_client` |
+| `reports` | `https://dev.wildberries.ru/api/swagger/yaml/en/12-reports.yaml` | нет (англ. спецификация) | `app/core/mp/wb/api/generated/reports` | `reports_client` |
 
 ```bash
 python tools/generate_wb_api_client.py
