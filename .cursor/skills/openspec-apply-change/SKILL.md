@@ -29,11 +29,14 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
 **Authority split:**
 
 - `.cursor/commands/opsx-apply.md` → current apply workflow contract
+  (including **pyrightconfig_strict include hygiene** for new in-policy
+  production `.py`)
 - `.cursor/rules/testing-rules.mdc` → general test-design/execution policy
 - `openspec/config.yaml` → `rules.tasks` → task-generation obligations
 - `/opsx-invariant` → `TEST_COVERAGE_PACKET` → change-specific test obligations
 - `/opsx-verify` → independent adequacy and archive verdict
-- `/opsx-pyright-strict-coverage` → post-apply recommend when production `.py` changed
+- `/opsx-pyright-strict-coverage` → post-apply allowlist audit / optional `GO`
+  catch-up when production `.py` changed (does not replace apply include hygiene)
 - `/opsx-external-call-coverage` → after pyright PASS; external-surface test coverage audit
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
@@ -205,6 +208,9 @@ What would you like to do?
 - Keep going through tasks until done or blocked
 - Always read `.cursor/commands/opsx-apply.md` before implementation
 - Always read `.cursor/rules/testing-rules.mdc` before implementation
+- Follow `/opsx-apply` **pyrightconfig_strict include hygiene** before
+  pyright-gate `[x]` / claiming green pyright-strict; never include excluded
+  generated clients; do not treat post-apply coverage recommend as a substitute
 - Always read context files before starting (from the apply instructions output)
 - Follow Architecture Decision Lookup from `/opsx-apply`, not a local conflicting copy
 - Stop with `NO_GO` when planned placement conflicts with an accepted architecture decision

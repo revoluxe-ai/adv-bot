@@ -19,6 +19,11 @@ argument-hint: "base=<branch|ref> [head=<ref>] [GO]"
   `/opsx-static-check` и `/opsx-verify`,
   когда в сессии/diff есть production `.py`.
 * Опционально `GO`: только **additive** записи в `include[]`.
+* **Relationship to apply:** `/opsx-apply` owes **in-session**
+  `pyrightconfig_strict` include hygiene for new in-policy production `.py`
+  (see `.cursor/commands/opsx-apply.md`). This command is the **audit /
+  catch-up** path (and pasteable hard-stop target when apply did not update
+  include). It does **not** replace apply hygiene.
 
 ## What this is NOT
 
@@ -26,6 +31,10 @@ argument-hint: "base=<branch|ref> [head=<ref>] [GO]"
 * NOT разбор/фикс typing diagnostics (→ `/opsx-fix-types`).
 * NOT archive / adequacy verdict (→ `/opsx-verify`).
 * NOT ослабление `typeCheckingMode`, удаление `exclude`, suppressions.
+* NOT a license to add excluded OpenAPI trees (e.g.
+  `app/core/mp/wb/api/generated`) into `include` via `GO` — `HIT_EXCLUDE`
+  stays exclude-owned; move code out of exclude or change exclude in a
+  separate explicit decision.
 * NOT external-call / integration coverage (→ `/opsx-external-call-coverage`).
 * NOT performance review (→ `/opsx-performance-review`).
 * NOT `/opsx-project-bug-hunt` и не product-bug triage.
@@ -152,7 +161,10 @@ disposition `HIT_EXCLUDE`.
 * Не объявляй archive `GO` / `NO_GO`.
 * Не подменяй `/opsx-static-check` и `/opsx-fix-types`.
 * Не считай PASS coverage доказательством отсутствия typing errors.
-* Recommendation после apply — soft; этот command не блокирует verify сам по себе.
+* Recommendation после apply — soft archive-wise; this command does not
+  block verify itself. Apply still owes in-session include hygiene
+  (testing-rules §7 / opsx-apply) before pyright-gate `[x]`.
+* `GO` never writes paths that match existing `exclude` entries.
 
 ## Final report (required)
 
@@ -219,7 +231,8 @@ DO_NOT_DO_YET:
 
 | From | To |
 |------|-----|
-| `/opsx-apply` (recommend) | this command with `base=` |
+| `/opsx-apply` (in-session include hygiene owed first) | this command with `base=` as audit/catch-up |
+| `/opsx-apply` hard-stop on uncovered paths | this with `base=<BASE> GO` |
 | this PASS | `/opsx-external-call-coverage` → conditional `/opsx-performance-review` → `/opsx-static-check` → `/opsx-verify` |
 | this FAIL + diagnostics later | `/opsx-fix-types` after static-check |
 

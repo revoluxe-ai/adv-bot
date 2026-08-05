@@ -15,6 +15,8 @@ Authority split (не дублировать полный policy в commands):
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + materialization обязательных tests
 - `/opsx-pyright-strict-coverage` — diff allowlist coverage для pyright-strict
+  (post-apply audit; apply owns in-session include hygiene — см. Execution
+  gates §7)
 - `/opsx-external-call-coverage` — executable diff gate: external surfaces
   (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests; kind taxonomy внутри одной команды
 - `/opsx-close-external-gap` — REFACTOR_AND_TEST closure for PG/CH from
@@ -37,7 +39,18 @@ Authority split (не дублировать полный policy в commands):
 4. Не запускай тесты через `cd tests` + bare `pytest` или аналоги
 5. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
 6. `ruff` и `black` не являются обязательными gates, если задача явно не просит lint/format
-7. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
+7. Если добавлен новый in-policy production Python module/file (`app/**` или
+   top-level production scripts), сначала обеспечь coverage в
+   `pyrightconfig_strict.json` `include` (additive minimal path; matching
+   rules как у `/opsx-pyright-strict-coverage`), **затем** запускай
+   `poetry run pyright-strict`. В writer-сессиях (`/opsx-apply`) это
+   **in-session** обязанность (**pyrightconfig_strict include hygiene** в
+   `.cursor/commands/opsx-apply.md`): нельзя помечать pyright-gate `[x]` /
+   считать зелёный pyright-strict достаточным при uncovered paths.
+   Не добавляй в `include` пути из `exclude` (в т.ч. OpenAPI
+   `app/core/mp/wb/api/generated` — intentional `HIT_EXCLUDE`).
+   `/opsx-pyright-strict-coverage` — post-apply audit / optional `GO`
+   catch-up, не замена in-session hygiene.
 8. На Windows PowerShell не используй bash-синтаксис: `||`, `&&`, `grep`, `sed`, `awk`, `true` как no-op
 
 ## Targeted и adjacent coverage

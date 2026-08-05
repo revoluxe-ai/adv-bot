@@ -33,13 +33,38 @@ Standalone, legacy-unlinked, and not-applicable changes emit `NOT_APPLICABLE`.
 **PG session mode:** New/changed production `sm(...)` / `get_async_session_maker(...)` MUST use explicit `read_only=` per intent (WRITE/RAW → `False`, PURE_READ → `True`). Bare `sm()` forbidden — see testing-rules § PG session mode; coverage will WEAK `PG_IMPLICIT_SESSION_MODE`.
 For PG/CH testability seams, default to parent→child handoff: open session/client in the parent orchestration callable and pass it to the child callable that performs store work; avoid hidden session/client creation only inside deep child callables.
 
+**pyrightconfig_strict include hygiene:** When apply adds/changes in-policy
+production `.py` (`app/**` or top-level production scripts), before marking any
+pyright-related task `[x]` or claiming a green `poetry run pyright-strict` gate:
+
+1. Check each new/changed path against `pyrightconfig_strict.json` `include` /
+   `exclude` using the same matching rules as `/opsx-pyright-strict-coverage`
+   (prefix match; exclude wins → `HIT_EXCLUDE`).
+2. If a path is uncovered (`MISSING_FROM_INCLUDE`) and is **not** intentional
+   `HIT_EXCLUDE` → in the same apply session either:
+   - additive-minimal update `include[]` for that path (preferred; aligns with
+     testing-rules § Execution gates item 7), **or**
+   - hard-stop that pyright gate: do **not** mark it `[x]`; emit pasteable
+     `/opsx-pyright-strict-coverage base=<BASE> GO` (ask once for `BASE` if
+     unknown — never invent).
+3. Never add paths that match `exclude` into `include` (especially
+   `app/core/mp/wb/api/generated` / OpenAPI generated clients). `HIT_EXCLUDE`
+   for generated trees is expected; do not “fix” by allowing them.
+4. A green `poetry run pyright-strict` alone is insufficient when the session
+   diff still has uncovered in-policy production `.py`.
+5. Post-apply `/opsx-pyright-strict-coverage` remains the audit/catch-up step;
+   it does **not** replace this in-session include hygiene.
+
 **Authority split for tests:**
 
 - `.cursor/rules/testing-rules.mdc` — general test-design and execution
 - `openspec/config.yaml` → `rules.tasks` — task-generation obligations
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
-- `/opsx-apply` — implementation + test materialization for owning tasks
-- `/opsx-pyright-strict-coverage` — post-apply soft recommend when production `.py` changed
+- `/opsx-apply` — implementation + test materialization for owning tasks;
+  owns in-session `pyrightconfig_strict.json` include hygiene for new
+  in-policy production `.py`
+- `/opsx-pyright-strict-coverage` — post-apply allowlist audit (and optional
+  `GO` additive include catch-up) when production `.py` changed
 - `/opsx-external-call-coverage` — after pyright-coverage PASS; soft recommend for external surfaces in diff
 - `/opsx-performance-review` — after external-call PASS when performance trigger applies (DB/query/queue/concurrency/pool/retry); soft recommend, not every-diff hard gate
 - `/opsx-verify` — independent adequacy and archive verdict
@@ -146,6 +171,9 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
      - materialize allowed sibling and residual/repeated-invocation scenarios when the packet/spec/task makes them mandatory;
      - run focused/targeted tests for the changed slice (and adjacent tests when a neighboring contract/workflow is affected)
    - Do **not** mark the task complete (`- [ ]` → `- [x]`) if its mandatory tests fail
+   - When the task (or its quality gate) depends on `pyright-strict` / new
+     in-policy production `.py`, apply **pyrightconfig_strict include hygiene**
+     above before marking that gate `[x]`
    - Mark task complete in the tasks file only after required implementation and mandatory focused tests for that task succeed: `- [ ]` → `- [x]`
    - Continue to next task
 
@@ -397,6 +425,9 @@ Never rewrite prior JSONL lines.
 - Keep going through tasks until done or blocked
 - Always read context files before starting (from the apply instructions output)
 - Always read `.cursor/rules/testing-rules.mdc` before implementation
+- When adding/changing in-policy production `.py`, apply **pyrightconfig_strict
+  include hygiene** before pyright-gate `[x]` / claiming green pyright-strict;
+  never include excluded generated clients
 - Read `TEST_COVERAGE_PACKET` when present in change artifacts/context; absence does not block legacy apply
 - Packet status alone does not block implementation and does not equal verify/archive verdict
 - Always perform Architecture Decision Lookup before code edits
