@@ -5,7 +5,7 @@ STAR_ID: wb-safe-readonly-collect
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-04T04:47:00Z
-UPDATED_AT: 2026-08-04T23:18:52Z
+UPDATED_AT: 2026-08-05T06:37:00Z
 ```
 
 ## North Star
@@ -29,6 +29,9 @@ allowlist семей эндпоинтов) в архив на локаль — �
   - INC-RO-06: generated Reports client + narrow GET supplier orders/sales
     adapter + ORDERS_OR_SALES_REPORTS_READ first in wb_api_readonly_ops
     with honest dateFrom / first-page attestation
+  - INC-RO-07: successful prod K8s Job collect on wired Reports
+    (ORDERS + sales Stage A) + Owner receives real ORDERS/sales data proving
+    generated clients collect; unit/smoke + ledger
   - Stage B / map-driven permanent collect + Web CLEAN_DUMP accept (future)
   - one-command swagger status/sync при доказанном gap
   - API Master: карта path×method из локальных swagger
@@ -187,7 +190,7 @@ Evidence / completion:
 ### INC-RO-06 — Domain adapter GET statistics-api ORDERS (+ sales) + wire
 
 ```text
-STATUS: ACTIVE
+STATUS: DELIVERED
 LINKED_CHANGES: statistics-orders-sales-get-adapter
 ```
 
@@ -218,6 +221,46 @@ Evidence / completion:
 Generated `reports/vN` + swagger lock; adapter/manager в `wb/api`;
 ORDERS family first в readonly_ops + MAPPING attestation; targeted unit
 tests green без live API.
+
+### INC-RO-07 — Prod Job collect + real ORDERS/sales data (wired Reports)
+
+```text
+STATUS: ACTIVE
+LINKED_CHANGES: wb-readonly-job-smoke-reports
+```
+
+Outcome:
+
+Успешный Kubernetes Job на prod (контур `/opsx-scripts` / Owner-bot) с
+`wb_api_readonly_ops --mode collect` на уже подключённом generated Reports +
+domain adapter path (ORDERS + sales GET Stage A). Оператор получает локальный
+research archive (payload + report, secret-strip) с **реальными** данными
+orders и/или sales (ненулевые rows), доказывающими что новые Reports-клиенты
+реально собирают данные — не unit mocks и не пустой Job без данных.
+Targeted unit/smoke + ledger обязательны как ворота, но недостаточны для
+закрытия increment. Без нового raw HTTP client, без Stage B pagination, без
+Web CLEAN_DUMP.
+
+Contribution to North Star:
+
+Live proof: «новые клиенты подключили» → prod Job → реальные ORDERS/sales
+данные у Owner — следующий кирпич к постоянному сбору.
+
+Scope boundary:
+
+Не включает INC-RO-02 swagger sync, INC-RO-03 API Master, INC-RO-04 Stage B /
+Web CLEAN_DUMP / `READ_ONLY_PREFLIGHT_PASS`, INC-RO-05 token hardening,
+finance/write, Cursor→prod WB calls. PARTIAL по *другим* семьям (norms и т.п.)
+не блокирует DoD. Пустой ORDERS+sales при «зелёном» Job **не** закрывает
+increment — нужен повтор/другое окно/`shop_id` до появления реальных rows.
+
+Evidence / completion:
+
+1. Sales+orders Stage A wire в ORDERS family + targeted unit/smoke green.
+2. Один успешный prod K8s Job `--mode collect` через `/opsx-scripts`.
+3. Локальный archive с ненулевыми rows ORDERS и/или sales + report attestation
+   Stage A (`dateFrom`, first page, `next_page_followed=NO`).
+4. Ledger обновлён из Job evidence (`runnable`, `last_cluster_*`, image, notes).
 
 ## Forward Compatibility Constraints
 
@@ -253,6 +296,13 @@ tests green без live API.
 
 ## History
 
+- 2026-08-05T06:37:00Z — INC-RO-07 DoD sharpened: successful prod K8s Job
+  collect + real ORDERS/sales archive data proving generated Reports clients;
+  LINKED_CHANGES → `wb-readonly-job-smoke-reports`; empty ORDERS+sales no longer
+  closes increment.
+- 2026-08-05T05:44:00Z — INC-RO-07 ACTIVE (Job smoke collect on wired
+  Reports ORDERS+sales Stage A + tests/ledger); INC-RO-06 marked DELIVERED
+  (exactly one ACTIVE); linked change pending `/opsx-ff` or `/opsx-new`.
 - 2026-08-04T23:18:52Z — INC-RO-06 ACTIVE (Reports GET orders/sales adapter
   + ORDERS family wire); linked `statistics-orders-sales-get-adapter`;
   INC-RO-01 marked DELIVERED (exactly one ACTIVE).

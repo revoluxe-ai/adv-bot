@@ -12,7 +12,7 @@ Human display is always `Title (STAR_ID)`.
 
 | Title | STAR_ID | Status | Card | Active increment |
 |-------|---------|--------|------|------------------|
-| Безопасный постоянный сбор WB API-данных | `wb-safe-readonly-collect` | ACTIVE | [wb-safe-readonly-collect.md](wb-safe-readonly-collect.md) | `INC-RO-06` ORDERS statistics-api adapter + wire |
+| Безопасный постоянный сбор WB API-данных | `wb-safe-readonly-collect` | ACTIVE | [wb-safe-readonly-collect.md](wb-safe-readonly-collect.md) | `INC-RO-07` prod Job collect + real ORDERS/sales data |
 
 ## Lookup rules
 
