@@ -42,6 +42,8 @@ Reduce front-door uncertainty for process questions:
 - Ambiguous process ownership or bypass concern (discuss only; do not APPLY).
 - Human asks how to prepare client/distribution materials after a completed
   change → route to `/opsx-distribute-brief` (not redesign; not create-pr).
+- Human asks for a portable OPSX/OpenSpec dump (commands + specs zip, absolute
+  path, no deletes) → route to `/opsx-admin-command-export-pack`.
 - Human asks about `scripts/` inventory, readiness, local check, or
   scripts-branch image → K8s Job run → route to `/opsx-scripts` (infra gap →
   `/opsx-scripts-prepare`; generic cluster → `/opsx-devops`).
@@ -64,6 +66,8 @@ Reduce front-door uncertainty for process questions:
 - Commit process surfaces → `/opsx-admin-command-commit`
 - Unmerged / merge|rebase conflicts on process surfaces →
   `/opsx-admin-command-resolve-conflicts`
+- Portable copy-only OPSX/OpenSpec pack (zip + absolute path; never delete) →
+  `/opsx-admin-command-export-pack`
 - Product idea / OpenSpec feature thinking → `/opsx-explore`
 - Oversized change TZ / cut scope + park remainder to WORKLOG → `/opsx-bound-scope`
 - Product bug → `/opsx-fix-bug` / bug-hunt path
@@ -116,6 +120,7 @@ routed command (`fix-command-defects`, `design-command`, `pipeline UPDATE GO`,
 | `route_pipeline_update` | Shared graph stale / missing | `/opsx-pipeline UPDATE` |
 | `route_admin_commit` | Process files changed, need commit | `/opsx-admin-command-commit` |
 | `route_resolve_conflicts` | Unmerged paths / merge\|rebase on process surfaces | `/opsx-admin-command-resolve-conflicts` |
+| `route_export_pack` | Need copy-only OPSX/OpenSpec zip + absolute path | `/opsx-admin-command-export-pack` |
 | `route_scripts_operate` | scripts/ inventory, readiness, local test, Job run | `/opsx-scripts` |
 | `route_scripts_prepare` | scripts infra gap (workflow / Job template / registry) | `/opsx-scripts-prepare` |
 | `route_doctor` | OpenSpec leftover / empty ghost change / tree hygiene | `/opsx-doctor` |

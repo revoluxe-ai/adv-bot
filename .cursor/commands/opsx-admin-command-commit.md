@@ -94,6 +94,8 @@ Never stage or commit:
 - CI/infra (including `.github/workflows/**`, except the surfaces listed above)
 - local IDE prefs such as `.cursor/settings.json`
 - archives / junk under `.cursor/` (e.g. `commands.zip`)
+- export packs from `/opsx-admin-command-export-pack` under
+  `.tmp/opsx-export/**` (including `opsx-pack.zip` / `MANIFEST.txt`)
 - `openspec/changes/**` product change packets
 - ordinary project docs outside the surfaces above
 
