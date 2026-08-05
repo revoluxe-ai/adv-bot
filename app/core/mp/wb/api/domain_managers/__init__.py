@@ -1,6 +1,7 @@
 from .analytics import AnalyticsManager
 from .products import ProductCardInfo, ProductsManager
 from .promotion import PromotionManager, CampaignBudgetInfo, BudgetTopUpResult
+from .reports import ReportsManager
 
 __all__ = [
     "AnalyticsManager",
@@ -9,4 +10,5 @@ __all__ = [
     "PromotionManager",
     "CampaignBudgetInfo",
     "BudgetTopUpResult",
+    "ReportsManager",
 ]
