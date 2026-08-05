@@ -1,10 +1,16 @@
 # Tasks — wb-readonly-job-smoke-reports
 
-Owed scope: **INC-RO-07** — successful prod K8s Job `--mode collect` + Owner
-receives **real** (non-empty) ORDERS and/or sales data proving generated
-Reports clients collect; plus Stage A wire + unit/smoke + ledger.  
-Не включать: Stage B / Web PASS / swagger sync / API Master / token hardening;
-не закрывать change при пустых ORDERS+sales.
+Owed scope (this change / `/opsx-apply`): **Stage A wire** ORDERS+sales в
+`ORDERS_OR_SALES_REPORTS_READ` на existing Reports stack + unit/local smoke
+(без live WB).
+
+Не включать в apply / не owed DoD этого change:
+- prod Job / `/opsx-scripts` RUN / kubectl cp / local archive delivery;
+- ledger update из cluster evidence;
+- закрытие evolution INC-RO-07 live-proof (это scripts/evolution lane).
+
+Не включать вообще: Stage B / Web PASS / swagger sync / API Master / token
+hardening.
 
 ## 1. Tests-first (characterization + regression)
 
@@ -20,8 +26,7 @@ Reports clients collect; plus Stage A wire + unit/smoke + ledger.
 - [x] 1.4 Добавить paired test: orders fail → family non-success / FAILED +
       orders gap (тот же requirement)
 - [x] 1.5 Добавить/обновить test empty first page: пустые orders и/или sales →
-      честный PARTIAL + gaps, не silent OK (runtime honesty; DoD close всё равно
-      требует non-empty на Job evidence)
+      честный PARTIAL + gaps, не silent OK (runtime honesty)
 - [x] 1.6 Убедиться, что anti-substitution (funnel/fullstats) по-прежнему не
       закрывает семью; sales не подменяется funnel
 
@@ -35,7 +40,7 @@ Reports clients collect; plus Stage A wire + unit/smoke + ledger.
       `period_parameter_model`); статус per design (sales fail → PARTIAL)
 - [x] 2.3 `assert_read_only_op` для sales; не вызывать другие Reports ops
 - [x] 2.4 Обновить module/method docstrings (русский) со ссылкой на delta
-      `wb-api-read-only-preflight` / INC-RO-07
+      `wb-api-read-only-preflight` / wire Stage A
 - [x] 2.5 Прогнать targeted unit:
       `poetry run pytest -m unit tests/unit/scripts/wb_api_readonly_ops/ -v`
 
@@ -45,32 +50,16 @@ Reports clients collect; plus Stage A wire + unit/smoke + ledger.
       `wb_api_readonly_ops` (без Cursor→prod WB)
 - [x] 3.2 При необходимости обновить notes в `scripts/REGISTRY.md` по
       local evidence (`tests=PARTIAL|COVERED`, `last_local_at`) — без
-      `battle_tested=YES`
+      `battle_tested=YES` и без cluster Job claim
 
-## 4. Prod Job evidence + real data (`/opsx-scripts`, Owner GO)
+## 4. Evolution link + gates
 
-- [x] 4.1 Подготовить PLAN_RUN: script WB API read-only preflight/collect,
-      **`--mode collect`**, `--shop-id` аргументом (Dilera допустим), prod
-      Owner-bot Job contour
-      → `openspec/changes/wb-readonly-job-smoke-reports/JOB_EVIDENCE_PLAN.md`
-- [ ] 4.2 После apply code green: Owner `/opsx-scripts RUN GO` — один Job;
-      дождаться successful terminal; скопировать known outputs / archive
-- [ ] 4.3 Проверить report: `ORDERS_OR_SALES_REPORTS_READ` Stage A orders+sales
-      attempts; PARTIAL других семей допустим
-- [ ] 4.4 Проверить archive: **ненулевые** rows ORDERS и/или sales; если оба
-      пусты — НЕ закрывать change, повторить с другим `dateFrom`/`shop_id`
-- [ ] 4.5 Обновить ledger из Job evidence (`runnable`, `last_cluster_*`,
-      `last_image_ref`, notes) — unit-only / empty ORDERS+sales ≠ Job proof
-- [ ] 4.6 Зафиксировать evidence path/Job name + note о non-empty rows в change
-      notes (для verify)
-
-## 5. Evolution link + gates
-
-- [x] 5.1 Проверить, что card INC-RO-07 уже имеет
+- [x] 4.1 Проверить, что card INC-RO-07 уже имеет
       `LINKED_CHANGES: wb-readonly-job-smoke-reports` (уже проставлено
       `/opsx-evolution`); при расхождении — поправить через evolution, не
-      invent scope
-- [x] 5.2 `poetry run pyright-strict` на затронутые пути (или project gate
+      invent scope. Live Job proof для increment — вне owed tasks этого change.
+- [x] 4.2 `poetry run pyright-strict` на затронутые пути (или project gate
       как принято) + `git diff --check`
-- [x] 5.3 Self-check: нет Stage B pagination, нет Web PASS claim, нет нового
-      raw client / swagger regen в diff этого change
+- [x] 4.3 Self-check: нет Stage B pagination, нет Web PASS claim, нет нового
+      raw client / swagger regen в diff этого change; нет `/opsx-scripts`
+      orchestration в apply code

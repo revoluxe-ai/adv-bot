@@ -176,44 +176,10 @@ when a page is empty or a call fails.
 - **AND** MUST assert that both orders and sales are requested under Stage A
 - **AND** MUST assert first-page / no-pagination attestation semantics
 
-### Requirement: Job evidence for wired Reports ORDERS+sales stack
+#### Scenario: Prod Job evidence is out of this change capability
 
-Proof that the generated Reports stack delivers real operator collect output
-MUST include one successful Owner-bot Kubernetes Job on the production contour
-with `--mode collect`, driven via `/opsx-scripts`, producing a structured
-report and Owner-local research archive (secret-strip) that contains **real
-non-empty** supplier orders and/or supplier sales rows from Stage A
-`ORDERS_OR_SALES_REPORTS_READ`, with the operator scripts readiness ledger
-updated from that terminal Job evidence.
-
-Honest PARTIAL for *other* families (for example norms) MUST NOT by itself
-invalidate this evidence. An empty ORDERS **and** empty sales result in the
-archive MUST NOT be treated as sufficient proof for the INC-RO-07 increment
-goal even if the Job exits successfully — the operator MUST retry with another
-period window and/or `shop_id` until non-empty ORDERS and/or sales data is
-received. The system MUST NOT treat local unit-only green as a sufficient
-substitute for this Job+data evidence.
-
-#### Scenario: Job run updates readiness from evidence
-
-- **WHEN** an Owner-authorized `/opsx-scripts` collect Job for this entrypoint
-  reaches a successful terminal state with report/outputs available
-- **THEN** the readiness ledger MUST be updated from that evidence
-  (`runnable` and cluster timing/image fields as applicable)
-- **AND** the report MUST show `ORDERS_OR_SALES_REPORTS_READ` was executed with
-  Stage A orders and sales attempts recorded
-
-#### Scenario: Real ORDERS or sales rows required to close
-
-- **WHEN** the Owner-local archive from the collect Job is inspected for
-  INC-RO-07 completion
-- **THEN** it MUST contain at least one non-empty supplier orders page payload
-  or one non-empty supplier sales page payload from the wired Reports stack
-- **AND** if both are empty, the increment MUST NOT be treated as delivered
-
-#### Scenario: Unit green alone is not Job proof
-
-- **WHEN** only local automated tests pass and no prod Job+real-data evidence
-  exists for this increment
-- **THEN** the increment MUST NOT be treated as having proven live collect
-  delivery on the wired Reports stack
+- **WHEN** this delta capability is evaluated for OpenSpec change completion
+- **THEN** successful prod `/opsx-scripts` Job, Owner-local archive copy, and
+  cluster ledger updates MUST NOT be required as acceptance of this change
+- **AND** live Job+real-data proof remains owned by the scripts/evolution lane
+  (INC-RO-07), not by `/opsx-apply` tasks for this change

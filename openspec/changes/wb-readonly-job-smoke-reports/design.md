@@ -3,13 +3,15 @@
 INC-RO-06 уже сдал generated Reports client + domain adapter/manager
 (`get_supplier_orders` / `get_supplier_sales`) и wire ORDERS first в
 `wb_api_readonly_ops`. Текущий family runner зовёт только orders Stage A;
-sales GET в стеке есть, но в семье не комбинируется. Unit-покрытие ORDERS
-есть; DoD конца change — успешный **prod** Job collect + **реальные**
-ORDERS/sales данные у Owner, доказывающие сбор через новые клиенты.
+sales GET в стеке есть, но в семье не комбинируется.
 
-Stakeholders: Owner (Job + ledger), operator scripts lane (`/opsx-scripts`).
-Constraints: `READ_ONLY_NO_MUTATION`, Job-only API, no invent URL, Stage A
-first page only.
+Этот change owed: **создать** комбинированный Stage A ORDERS+sales + unit.
+Live Job / Owner archive / ledger — ownership `/opsx-scripts` (и evolution
+INC-RO-07), не `/opsx-apply`.
+
+Stakeholders: implementer (wire+tests); Owner/scripts lane отдельно для Job.
+Constraints: `READ_ONLY_NO_MUTATION`, no invent URL, Stage A first page only;
+Cursor→prod WB запрещён в apply.
 
 ## Evolution Context
 
@@ -18,8 +20,8 @@ first page only.
 - **INCREMENT_ID:** `INC-RO-07`
 - **CURRENT_INCREMENT:** Successful prod K8s Job collect + Owner receives real
   ORDERS/sales data proving generated Reports clients collect
-- **CONTRIBUTION_TO_NORTH_STAR:** Live proof that new Reports clients deliver
-  real collect data via Job, not unit mocks
+- **CONTRIBUTION_TO_NORTH_STAR:** Wire ORDERS+sales Stage A on generated
+  Reports stack (unit-proven); live Job proof remains scripts/evolution lane
 - **LINKED_CHANGES (card):** `wb-readonly-job-smoke-reports` (уже на карточке)
 
 Как design уважает forward-compat без Future Increments:
@@ -30,8 +32,7 @@ first page only.
   `next_page_followed=NO` — Stage B pagination не открываем.
 - L0 archive/report path остаётся расширяемым; Web CLEAN_DUMP / PASS не
   объявляем.
-- Evidence plane = prod `/opsx-scripts` Job + локальный archive с реальными
-  rows + ledger; не Cursor→prod WB.
+- Apply **не** владеет evidence plane Job/cp/ledger.
 
 ## Goals / Non-Goals
 
@@ -39,12 +40,8 @@ first page only.
 
 - В Stage A семья `ORDERS_OR_SALES_REPORTS_READ` выполняет оба GET: supplier
   orders и supplier sales (один `dateFrom`, по одной first page).
-- Targeted unit (+ узкий smoke) подтверждают комбинированный payload /
-  attestation / gaps.
-- Один успешный prod Kubernetes Job `--mode collect` через `/opsx-scripts`
-  даёт report + Owner-local archive с ненулевыми rows ORDERS и/или sales и
-  обновляет ledger.
-- PARTIAL по *другим* семьям (norms и т.п.) допустим.
+- Targeted unit (+ узкий local smoke без live WB) подтверждают комбинированный
+  payload / attestation / gaps.
 
 **Non-Goals:**
 
@@ -52,14 +49,16 @@ first page only.
 - Swagger sync, API Master map, token hardening
 - Новый Reports client version / invent URL
 - Finance/write; Cursor→prod API
+- Prod `/opsx-scripts` Job, kubectl cp, Owner-local archive delivery, ledger
+  update from cluster — **не** apply DoD
+- Закрытие evolution INC-RO-07 live-proof внутри этого change
 - Требование «все семьи OK» как DoD
-- Закрытие increment при пустых ORDERS+sales (даже при terminal Job success)
 
 ## Architecture Decision References
 
 - `openspec/decisions/scripts-wb-api-ops-stack/decision.md` — Job-only
   execution, existing `wb/api`, finite retries, secret-strip L0,
-  `READ_ONLY_NO_MUTATION`
+  `READ_ONLY_NO_MUTATION` (Job path exists; this change does not own running it)
 - `openspec/decisions/orders-or-sales-reports-read-identity/decision.md` —
   identity ORDERS = statistics-api supplier orders/sales; Stage A first page;
   запрет funnel/FBS/fullstats substitute
@@ -70,20 +69,21 @@ first page only.
 
 | Layer | Role |
 |-------|------|
-| **Owner** | `scripts/wb_api_readonly_ops` — orchestration семьи, Stage A combine orders+sales, report/attestation fields |
-| **Allowed** | Existing `ReportsManager` / adapter / `WbDataManager.get_supplier_*`; unit tests under `tests/unit/scripts/wb_api_readonly_ops/`; ledger via `/opsx-scripts` |
+| **Owner (this change)** | `scripts/wb_api_readonly_ops` — orchestration семьи, Stage A combine orders+sales, report/attestation fields |
+| **Allowed** | Existing `ReportsManager` / adapter / `WbDataManager.get_supplier_*`; unit tests under `tests/unit/scripts/wb_api_readonly_ops/` |
+| **Not owed here** | `/opsx-scripts` RUN, Job template hold/cp, cluster ledger updates, Owner-local zip delivery |
 | **Forbidden** | Raw HTTP / invent statistics URL; calling funnel/search-report/fullstats/FBS as ORDERS; Cursor→prod WB; pagination follow in Stage A; mass swagger regen |
 
 Rationale: identity и stack ownership уже accepted; этот change только
-включает уже разрешённый sales surface в family runner и доказывает prod Job
-path с реальными данными.
+включает уже разрешённый sales surface в family runner. Live proof — отдельный
+process owner.
 
 ## Decisions
 
 1. **Sales обязателен в Stage A, не feature-flag «optional»**  
-   Почему: proposal DoD = ORDERS+sales; optional оставлял gap «client wired,
+   Почему: proposal = ORDERS+sales wire; optional оставлял gap «client wired,
    family не зовёт».  
-   Альтернатива: оставить optional — отвергнута (не доказывает contribution).
+   Альтернатива: оставить optional — отвергнута.
 
 2. **Один family result, два source-блока в payload**  
    Orders и sales в одном `FamilyResult` с attestation
@@ -94,45 +94,40 @@ path с реальными данными.
    preflight-first order).
 
 3. **Не трогать generated Reports `vN` / generator mapping**  
-   `get_supplier_sales` уже в adapter/manager. Apply = wire + tests + Job.  
+   `get_supplier_sales` уже в adapter/manager. Apply = wire + unit/local smoke.  
    Альтернатива: regen client «на всякий случай» — out of scope / INC-RO-02.
 
-4. **Evidence: успешный prod `/opsx-scripts` collect Job + real rows**  
-   Apply завершает code/tests; Job evidence — Owner `RUN GO` на prod contour;
-   archive MUST содержать ненулевые ORDERS и/или sales. Unit-only / empty
-   ORDERS+sales не закрывают INC-RO-07.  
-   Альтернатива: «Job terminal достаточно» — отвергнута Owner DoD.
+4. **Job/scripts evidence вне owed apply**  
+   Prod collect Job, local archive copy, ledger из cluster — `/opsx-scripts`
+   (+ evolution DoD), не tasks `/opsx-apply`. Change не требует Job green для
+   archive этого planning scope.  
+   Альтернатива: держать § Job evidence в tasks — отвергнута (смешивает
+   owners; см. pipeline analysis).
 
-5. **PARTIAL других семей не блокирует DoD; empty ORDERS+sales — блокирует**  
-   DoD смотрит на ORDERS+sales real data + prod Job + ledger.
+5. **PARTIAL других семей / empty pages — honesty, не Job DoD этого change**  
+   Unit фиксирует честный PARTIAL на empty; live non-empty rows — scripts lane.
 
 ## Risks / Trade-offs
 
-- [Пустая first page ORDERS+sales] → PARTIAL в report OK как honesty, но
-  change **не** DELIVERED → сменить `dateFrom`/`shop_id` и повторить Job.
-- [Sales API error при OK orders] → PARTIAL + sales gap; для close DoD нужны
-  ненулевые rows хотя бы в одной из двух лент (orders или sales).
-- [Job image/token/infra fail] → не крутить Cursor→WB; scripts/devops lane.
+- [Scope creep вернуть Job в apply] → update/verify drift = NO_GO.
 - [Scope creep в pagination/Web PASS] → verify drift = NO_GO.
-- [Dirty tree блокирует PUSH/RUN] → Job после clean/push tip.
+- [Evolution INC-RO-07 live DoD ≠ change apply complete] → явно: wire может
+  быть сдан, пока Job/archive ещё на scripts lane (не путать owners).
 
 ## Migration Plan
 
-1. Wire sales Stage A в ORDERS family runner + unit/smoke green.
-2. `/opsx-scripts` PLAN_RUN → RUN GO (Owner) `--mode collect` на Dilera /
-   `shop_id` аргументом (prod K8s).
-3. Скопировать known outputs; убедиться в ненулевых ORDERS и/или sales;
-   обновить `scripts/REGISTRY.md` по evidence.
-4. Evolution `LINKED_CHANGES` уже указывает на этот change — при archive не
-   забыть History.
+1. Wire sales Stage A в ORDERS family runner + unit/local smoke green.
+2. (Отдельно, не apply) Owner `/opsx-scripts` для live INC-RO-07 evidence —
+   вне owed tasks этого change.
+3. Evolution `LINKED_CHANGES` уже указывает на этот change — при archive не
+   забыть History; не утверждать live Job DoD только потому что wire сдан.
 
-**Rollback:** revert family runner + tests; ledger notes откатить; Reports
-client не откатывать.
+**Rollback:** revert family runner + tests; Reports client не откатывать.
 
 ## Open Questions
 
-- (закрыто) Job mode для evidence: **`collect`**.
 - (закрыто) sales-only failure при OK orders: family status **PARTIAL**.
+- (закрыто) Job evidence в apply tasks: **нет** — scripts lane.
 
 ## Review Checklist
 

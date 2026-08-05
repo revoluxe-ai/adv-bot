@@ -1,23 +1,16 @@
-# JOB_EVIDENCE_PLAN — INC-RO-07 (prepare only; no cluster mutate)
+# JOB_EVIDENCE_PLAN — superseded for this change
 
-Owner must authorize `/opsx-scripts RUN GO` separately.
+**Status:** OUT OF OWED SCOPE for `wb-readonly-job-smoke-reports` apply.
+
+Prod `/opsx-scripts` collect Job, archive copy, and ledger updates are **not**
+OpenSpec apply tasks for this change (revised `/opsx-update` 2026-08-05).
+
+Live INC-RO-07 evidence remains Owner scripts lane:
 
 ```text
-SCRIPTS_RUN_PLAN (draft):
-SCRIPT_TITLE: WB API read-only preflight/collect
-SCRIPT_PATH: scripts/wb_api_readonly_ops/run.py
-SCRIPT_DISPLAY: WB API read-only preflight/collect (scripts/wb_api_readonly_ops/run.py)
-MODE: collect
-ARGS: --shop-id <Dilera-or-Owner> --mode collect
-NS: (from k8s/jobs/ops-script-runner.yaml)
-TEMPLATE_PATH: k8s/jobs/ops-script-runner.yaml
-KNOWN_OUTPUTS: report + L0 archive (secret-strip)
-DoD_CHECK:
-- Job successful terminal on prod Owner-bot contour
-- Archive has non-empty ORDERS and/or sales rows from Stage A Reports stack
-- Ledger updated from evidence
-- Empty ORDERS+sales → retry dateFrom/shop_id; do not close INC-RO-07
-PASTEABLE:
-/opsx-scripts PLAN_RUN script=WB API read-only preflight/collect args=--shop-id <id> --mode collect
-/opsx-scripts RUN GO script=WB API read-only preflight/collect args=--shop-id <id> --mode collect
+/opsx-scripts PLAN_RUN …
+/opsx-scripts RUN GO …
 ```
+
+Previous plan content (shop-id, collect mode) may still be reused as an
+operator note when running scripts — it does not gate change archive/apply.
