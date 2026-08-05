@@ -90,11 +90,14 @@ async def _async_main(argv: list[str] | None = None) -> int:
             max_seconds=float(args.max_seconds),
             max_calls=int(args.max_calls),
         )
+        # ORDERS: pilot dateFrom from CLI (default 2026-07-04), not yesterday→today.
+        shared = {"orders_date_from": str(args.orders_date_from)}
         report = await run_ops(
             shop_id=shop_id,
             mode=mode,
             runners=runners,
             ceiling=ceiling,
+            shared=shared,
         )
         # placeholder sha then rewrite once with digest in report body
         report.archive_sha256 = None

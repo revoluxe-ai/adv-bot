@@ -27,7 +27,7 @@ async def run_ops(
     ceiling: RunCeiling,
     shared: dict[str, Any] | None = None,
 ) -> RunReport:
-    """Прогнать 4 семьи; PARTIAL при gaps; не заявлять Web PASS.
+    """Прогнать семьи (ORDERS первым); PARTIAL при gaps; не заявлять Web PASS.
 
     Args:
         shop_id: кабинет (arg only).

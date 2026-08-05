@@ -1,4 +1,8 @@
-"""Default family runners поверх existing WBManagerHub managers (без новых URL)."""
+"""Default family runners поверх existing WBManagerHub managers (без новых URL).
+
+INC-RO-06: ORDERS_OR_SALES_REPORTS_READ → statistics-api GET supplier orders
+через ReportsManager; не подменять funnel/fullstats/FBS.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +10,7 @@ import datetime as dt
 from typing import Any, cast
 
 from scripts.wb_api_readonly_ops.models import (
+    ORDERS_PERIOD_DATE_FROM_DEFAULT,
     FamilyName,
     FamilyResult,
     FamilyStatus,
@@ -42,20 +47,88 @@ def _jsonable(value: object) -> object:
 
 
 class HubFamilyRunners:
-    """Runners ads/cards/analytics/norms через WBDataManager / PromotionManager."""
+    """Runners ORDERS/ads/cards/analytics/norms через WBDataManager stack."""
 
     def __init__(self, wb_data_manager: object) -> None:
         """Args: wb_data_manager — hub.wb_data_manager (existing stack)."""
         self._dm = wb_data_manager
 
     def as_dict(self) -> dict[FamilyName, FamilyRunner]:
-        """Словарь runners для orchestrator."""
+        """Словарь runners для orchestrator (ORDERS первым в FAMILY_ORDER)."""
         return {
+            FamilyName.ORDERS_OR_SALES_REPORTS_READ: (
+                self.run_orders_or_sales_reports_read
+            ),
             FamilyName.ADS: self.run_ads,
             FamilyName.CARDS: self.run_cards,
             FamilyName.ANALYTICS: self.run_analytics,
             FamilyName.NORMS: self.run_norms,
         }
+
+    async def run_orders_or_sales_reports_read(
+        self, mode: Mode, ctx: dict[str, Any]
+    ) -> FamilyResult:
+        """GET statistics-api supplier orders (Stage A: dateFrom, one page).
+
+        Identity: ORDERS_OR_SALES_REPORTS_READ — только reports_manager /
+        get_supplier_orders. Не funnel / fullstats / FBS
+        (decision orders-or-sales-reports-read-identity).
+        """
+        assert_read_only_op("get_supplier_orders")
+        _ = mode  # preflight и collect Stage A: одна first page
+        date_from_raw = ctx.get("orders_date_from")
+        if isinstance(date_from_raw, str) and date_from_raw.strip():
+            date_from = date_from_raw.strip()
+        else:
+            date_from = ORDERS_PERIOD_DATE_FROM_DEFAULT.isoformat()
+
+        dm = cast(Any, self._dm)
+        reports_manager = getattr(dm, "reports_manager", None)
+        try:
+            if reports_manager is not None:
+                rows = await reports_manager.get_supplier_orders(
+                    date_from=date_from,
+                    flag=0,
+                )
+            else:
+                rows = await dm.get_supplier_orders(date_from=date_from, flag=0)
+        except Exception as exc:  # noqa: BLE001
+            return FamilyResult(
+                family=FamilyName.ORDERS_OR_SALES_REPORTS_READ,
+                status=FamilyStatus.FAILED,
+                gaps=["get_supplier_orders failed"],
+                error=f"{type(exc).__name__}: {exc}",
+                payload={
+                    "source": "statistics-api.supplier.orders",
+                    "date_from": date_from,
+                    "next_page_followed": "NO",
+                    "period_parameter_model": "DATE_FROM_CURSOR",
+                },
+            )
+
+        row_list = list(rows or [])
+        # Пустая страница — честный PARTIAL (окно могло не содержать изменений).
+        status = FamilyStatus.OK if row_list else FamilyStatus.PARTIAL
+        gaps: list[str] = []
+        if not row_list:
+            gaps.append("supplier orders first page empty for dateFrom window")
+        return FamilyResult(
+            family=FamilyName.ORDERS_OR_SALES_REPORTS_READ,
+            status=status,
+            gaps=gaps,
+            payload={
+                "source": "statistics-api.supplier.orders",
+                "date_from": date_from,
+                "next_page_followed": "NO",
+                "period_parameter_model": "DATE_FROM_CURSOR",
+                "rows_count": len(row_list),
+                "rows": _jsonable(row_list[:20]),
+            },
+            notes=[
+                "Stage A: no lastChangeDate cursor follow",
+                "funnel/fullstats/FBS MUST NOT satisfy this family",
+            ],
+        )
 
     async def run_ads(self, mode: Mode, ctx: dict[str, Any]) -> FamilyResult:
         """Probe/collect рекламных кампаний (promotion count + optional v2 adverts)."""

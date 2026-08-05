@@ -17,6 +17,11 @@ MUTATION_WRITE_OPS: frozenset[str] = frozenset(
         "set_minus_phrases",
         "create_campaign",
         "delete_campaign",
+        # finance / wallet — вне readonly ORDERS surface (INC-RO-06)
+        "get_balance",
+        "get_payments",
+        "create_payout",
+        "wallet_top_up",
     }
 )
 

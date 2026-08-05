@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 
-from scripts.wb_api_readonly_ops.models import Mode
+from scripts.wb_api_readonly_ops.models import (
+    ORDERS_PERIOD_DATE_FROM_DEFAULT,
+    Mode,
+)
 
 DEFAULT_MAX_SECONDS = 180.0
 DEFAULT_MAX_CALLS = 40
@@ -29,6 +32,15 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         choices=[Mode.PREFLIGHT.value, Mode.COLLECT.value],
         help="preflight=smallest probe; collect=best-effort pull",
+    )
+    parser.add_argument(
+        "--orders-date-from",
+        default=ORDERS_PERIOD_DATE_FROM_DEFAULT.isoformat(),
+        help=(
+            "ORDERS family dateFrom (YYYY-MM-DD, Moscow calendar). "
+            f"Default pilot {ORDERS_PERIOD_DATE_FROM_DEFAULT.isoformat()}; "
+            "NOT yesterday→today (analytics may still use that)."
+        ),
     )
     parser.add_argument(
         "--max-seconds",

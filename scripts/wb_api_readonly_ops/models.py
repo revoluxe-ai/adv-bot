@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -15,12 +16,17 @@ class Mode(str, Enum):
 
 
 class FamilyName(str, Enum):
-    """Четыре семьи endpoint aliases (INC-RO-01)."""
+    """Семьи endpoint aliases (INC-RO-01 + INC-RO-06 ORDERS)."""
 
+    ORDERS_OR_SALES_REPORTS_READ = "orders_or_sales_reports_read"
     ADS = "ads"
     CARDS = "cards"
     ANALYTICS = "analytics"
     NORMS = "norms"
+
+
+# COL-R03 pilot Stage A: dateFrom start (Europe/Moscow calendar date).
+ORDERS_PERIOD_DATE_FROM_DEFAULT: dt.date = dt.date(2026, 7, 4)
 
 
 class FamilyStatus(str, Enum):
@@ -41,6 +47,7 @@ class OverallStatus(str, Enum):
 
 
 FAMILY_ORDER: tuple[FamilyName, ...] = (
+    FamilyName.ORDERS_OR_SALES_REPORTS_READ,
     FamilyName.ADS,
     FamilyName.CARDS,
     FamilyName.ANALYTICS,
