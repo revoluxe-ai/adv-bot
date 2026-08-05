@@ -1,7 +1,8 @@
 """Default family runners поверх existing WBManagerHub managers (без новых URL).
 
-INC-RO-06: ORDERS_OR_SALES_REPORTS_READ → statistics-api GET supplier orders
-через ReportsManager; не подменять funnel/fullstats/FBS.
+INC-RO-06/07: ORDERS_OR_SALES_REPORTS_READ → statistics-api GET supplier
+orders + sales через ReportsManager (Stage A first page); не подменять
+funnel/fullstats/FBS (decision orders-or-sales-reports-read-identity).
 """
 
 from __future__ import annotations
@@ -68,14 +69,16 @@ class HubFamilyRunners:
     async def run_orders_or_sales_reports_read(
         self, mode: Mode, ctx: dict[str, Any]
     ) -> FamilyResult:
-        """GET statistics-api supplier orders (Stage A: dateFrom, one page).
+        """GET statistics-api supplier orders + sales (Stage A: dateFrom, one page each).
 
-        Identity: ORDERS_OR_SALES_REPORTS_READ — только reports_manager /
-        get_supplier_orders. Не funnel / fullstats / FBS
-        (decision orders-or-sales-reports-read-identity).
+        Spec delta wb-api-read-only-preflight / INC-RO-07: оба GET обязательны;
+        sales fail при OK orders → PARTIAL; orders fail → FAILED.
+        Identity: только reports_manager get_supplier_orders/sales.
+        Не funnel / fullstats / FBS (decision orders-or-sales-reports-read-identity).
         """
         assert_read_only_op("get_supplier_orders")
-        _ = mode  # preflight и collect Stage A: одна first page
+        assert_read_only_op("get_supplier_sales")
+        _ = mode  # preflight и collect Stage A: одна first page на каждый GET
         date_from_raw = ctx.get("orders_date_from")
         if isinstance(date_from_raw, str) and date_from_raw.strip():
             date_from = date_from_raw.strip()
@@ -84,14 +87,22 @@ class HubFamilyRunners:
 
         dm = cast(Any, self._dm)
         reports_manager = getattr(dm, "reports_manager", None)
+        attestation = {
+            "date_from": date_from,
+            "next_page_followed": "NO",
+            "period_parameter_model": "DATE_FROM_CURSOR",
+        }
+
         try:
             if reports_manager is not None:
-                rows = await reports_manager.get_supplier_orders(
+                orders_raw = await reports_manager.get_supplier_orders(
                     date_from=date_from,
                     flag=0,
                 )
             else:
-                rows = await dm.get_supplier_orders(date_from=date_from, flag=0)
+                orders_raw = await dm.get_supplier_orders(
+                    date_from=date_from, flag=0
+                )
         except Exception as exc:  # noqa: BLE001
             return FamilyResult(
                 family=FamilyName.ORDERS_OR_SALES_REPORTS_READ,
@@ -99,34 +110,72 @@ class HubFamilyRunners:
                 gaps=["get_supplier_orders failed"],
                 error=f"{type(exc).__name__}: {exc}",
                 payload={
-                    "source": "statistics-api.supplier.orders",
-                    "date_from": date_from,
-                    "next_page_followed": "NO",
-                    "period_parameter_model": "DATE_FROM_CURSOR",
+                    "source": "statistics-api.supplier.orders_and_sales",
+                    **attestation,
+                    "orders": {
+                        "source": "statistics-api.supplier.orders",
+                        "rows_count": 0,
+                        "rows": [],
+                    },
                 },
             )
 
-        row_list = list(rows or [])
-        # Пустая страница — честный PARTIAL (окно могло не содержать изменений).
-        status = FamilyStatus.OK if row_list else FamilyStatus.PARTIAL
+        orders_list = list(orders_raw or [])
         gaps: list[str] = []
-        if not row_list:
+        if not orders_list:
             gaps.append("supplier orders first page empty for dateFrom window")
+
+        sales_list: list[object] = []
+        sales_error: str | None = None
+        try:
+            if reports_manager is not None:
+                sales_raw = await reports_manager.get_supplier_sales(
+                    date_from=date_from,
+                    flag=0,
+                )
+            else:
+                sales_raw = await dm.get_supplier_sales(
+                    date_from=date_from, flag=0
+                )
+            sales_list = list(sales_raw or [])
+        except Exception as exc:  # noqa: BLE001
+            sales_error = f"{type(exc).__name__}: {exc}"
+            gaps.append("get_supplier_sales failed")
+
+        if not sales_error and not sales_list:
+            gaps.append("supplier sales first page empty for dateFrom window")
+
+        if sales_error:
+            status = FamilyStatus.PARTIAL
+        elif not orders_list or not sales_list:
+            status = FamilyStatus.PARTIAL
+        else:
+            status = FamilyStatus.OK
+
         return FamilyResult(
             family=FamilyName.ORDERS_OR_SALES_REPORTS_READ,
             status=status,
             gaps=gaps,
+            error=sales_error,
             payload={
-                "source": "statistics-api.supplier.orders",
-                "date_from": date_from,
-                "next_page_followed": "NO",
-                "period_parameter_model": "DATE_FROM_CURSOR",
-                "rows_count": len(row_list),
-                "rows": _jsonable(row_list[:20]),
+                "source": "statistics-api.supplier.orders_and_sales",
+                **attestation,
+                "orders": {
+                    "source": "statistics-api.supplier.orders",
+                    "rows_count": len(orders_list),
+                    "rows": _jsonable(orders_list[:20]),
+                },
+                "sales": {
+                    "source": "statistics-api.supplier.sales",
+                    "rows_count": len(sales_list),
+                    "rows": _jsonable(sales_list[:20]),
+                    **({"error": sales_error} if sales_error else {}),
+                },
             },
             notes=[
                 "Stage A: no lastChangeDate cursor follow",
                 "funnel/fullstats/FBS MUST NOT satisfy this family",
+                "INC-RO-07: orders+sales Stage A both required",
             ],
         )
 
