@@ -1,7 +1,7 @@
 # Capability: wb-api-read-only-preflight
 
-<!-- Synced from change statistics-orders-sales-get-adapter on archive 2026-08-05;
-     prior base from wb-readonly-api-preflight archive 2026-08-04 -->
+<!-- Synced from change wb-readonly-job-smoke-reports on archive 2026-08-05;
+     prior: statistics-orders-sales-get-adapter / wb-readonly-api-preflight -->
 
 Operator-facing read-only WB API preflight/collect for a given `shop_id`,
 run via `/opsx-scripts` Job in Owner-bot runtime, with Owner-local research
@@ -61,10 +61,12 @@ run so the Job cannot hang indefinitely.
 ### Requirement: ORDERS_OR_SALES_REPORTS_READ family
 
 The system SHALL treat `ORDERS_OR_SALES_REPORTS_READ` as a distinct
-endpoint-family alias meaning supplier orders and/or sales report reads from
-the WB Statistics/Reports API surface (`GET` supplier orders and, when used,
-supplier sales). The operator preflight/collect path MUST include this family
-and MUST execute it first among families in preflight order.
+endpoint-family alias meaning supplier orders **and** supplier sales report
+reads from the WB Statistics/Reports API surface (`GET` supplier orders and
+`GET` supplier sales). For Stage A preflight/collect of this capability, the
+operator path MUST request **both** GETs (not orders-only). The operator
+preflight/collect path MUST include this family and MUST execute it first among
+families in preflight order.
 
 #### Scenario: Preflight runs ORDERS family first
 
@@ -72,6 +74,16 @@ and MUST execute it first among families in preflight order.
 - **THEN** the Job SHALL probe `ORDERS_OR_SALES_REPORTS_READ` before other
   endpoint-family aliases
 - **AND** SHALL record per-family status for ORDERS in the structured report
+
+#### Scenario: Stage A requests orders and sales
+
+- **WHEN** preflight or collect runs `ORDERS_OR_SALES_REPORTS_READ` under
+  Stage A rules
+- **THEN** the Job SHALL perform supplier orders GET and supplier sales GET
+- **AND** SHALL record distinct orders and sales outcomes (counts and/or gaps)
+  in the structured report for that family
+- **AND** MUST NOT treat orders-only success as complete Stage A satisfaction
+  of the family when sales was not attempted
 
 #### Scenario: No substitute sources for ORDERS
 
@@ -115,10 +127,11 @@ Preferred offline regeneration for this change uses the Owner-local swagger
 inventory Reports English YAML as the cached spec input so generation does not
 depend on live download during apply.
 
-Operator/read-only entrypoints MUST expose only the supplier orders GET (and
-supplier sales GET when enabled for the same family) through domain adapters;
-other operations present in the full generated Reports client MUST NOT be
-invoked by this preflight/collect path.
+Operator/read-only entrypoints MUST expose only the supplier orders GET and
+supplier sales GET through domain adapters for this family; other operations
+present in the full generated Reports client MUST NOT be invoked by this
+preflight/collect path. Stage A of this capability MUST invoke both exposed
+GETs (orders and sales).
 
 #### Scenario: ORDERS uses generated Reports client
 
@@ -147,9 +160,9 @@ invoked by this preflight/collect path.
 
 #### Scenario: Narrow surface for operator path
 
-- **WHEN** `wb-api-read-only-preflight` runs ORDERS family work
-- **THEN** it MUST only request supplier orders GET and optionally supplier
-  sales GET for that family
+- **WHEN** `wb-api-read-only-preflight` runs ORDERS family work under Stage A
+- **THEN** it MUST request supplier orders GET and supplier sales GET for that
+  family
 - **AND** MUST NOT call other Reports-client operations (finances-adjacent,
   acceptance, region-sale, and similar) from this entrypoint
 
@@ -173,8 +186,8 @@ clients in the generated-clients guide):
    refresh workflows; it is not required to claim ORDERS family ready if
    inventory YAML + lock are present.
 6. After generation, wire domain adapters that expose **only** supplier orders
-   GET and optional supplier sales GET into the hub/managers used by
-   preflight/collect.
+   GET and supplier sales GET into the hub/managers used by preflight/collect
+   (Stage A MUST invoke both).
 
 #### Scenario: Generator mapping for Reports exists
 
@@ -195,28 +208,67 @@ clients in the generated-clients guide):
 
 For Stage A / preflight of `ORDERS_OR_SALES_REPORTS_READ`, the system SHALL use
 the Statistics/Reports period model honestly: required `dateFrom` (Europe/Moscow
-semantics per API), at most one successful first-page response, and
-MUST NOT follow `lastChangeDate` continuation/pagination in preflight.
-The contract window start `2026-07-04` MUST be applied as `dateFrom` when
-operating under the COL-R03 pilot period. The system MUST NOT silently use
-yesterday→today as a substitute for that window. Period semantics recorded in
-the report/mapping attestation MUST NOT claim a classic exact start+end query
-model if the API only supports `dateFrom`/cursor continuation.
+semantics per API) for **both** supplier orders and supplier sales requests, at
+most one successful first-page response per request, and MUST NOT follow
+`lastChangeDate` continuation/pagination in Stage A. The contract window start
+`2026-07-04` MUST be applied as `dateFrom` when operating under the COL-R03
+pilot period. The system MUST NOT silently use yesterday→today as a substitute
+for that window. Period semantics recorded in the report/mapping attestation
+MUST NOT claim a classic exact start+end query model if the API only supports
+`dateFrom`/cursor continuation.
 
 #### Scenario: Preflight single page from dateFrom
 
 - **GIVEN** pilot period start `2026-07-04` (Europe/Moscow)
-- **WHEN** preflight probes ORDERS
-- **THEN** the request SHALL use `dateFrom` aligned to that start
+- **WHEN** preflight probes ORDERS (orders and sales)
+- **THEN** each Stage A request SHALL use `dateFrom` aligned to that start
 - **AND** SHALL NOT follow a next page or `lastChangeDate` continuation
 - **AND** the report/attestation SHALL describe dateFrom/first-page semantics
-  honestly
+  honestly for the family
 
 #### Scenario: Forbidden silent yesterday-today for ORDERS
 
 - **WHEN** preflight runs ORDERS under the pilot period rules
 - **THEN** the system MUST NOT substitute a default yesterday→today range in
   place of the attested `dateFrom` window start
+
+### Requirement: Stage A family status when sales fails after orders
+
+When Stage A supplier orders GET succeeds and supplier sales GET fails, the
+family status MUST be PARTIAL (not overall family success), and the structured
+report MUST include an honest gap for sales while retaining orders evidence.
+When supplier orders GET fails, the family status MUST be FAILED (or equivalent
+non-success) and MUST record the orders failure.
+
+#### Scenario: Sales failure yields PARTIAL with orders retained
+
+- **GIVEN** Stage A supplier orders GET returns successfully
+- **WHEN** supplier sales GET fails
+- **THEN** the family status MUST be PARTIAL
+- **AND** the report MUST include a sales gap
+- **AND** MUST still record orders outcome data for the family
+
+#### Scenario: Orders failure is non-success
+
+- **WHEN** Stage A supplier orders GET fails
+- **THEN** the family status MUST NOT be reported as full success
+- **AND** the report MUST include an orders failure or gap
+
+### Requirement: Targeted automated coverage for ORDERS+sales Stage A
+
+The system SHALL have targeted automated tests (without live production WB API)
+that cover Stage A `ORDERS_OR_SALES_REPORTS_READ` behavior for both supplier
+orders and supplier sales, including attestation fields
+(`dateFrom` / first-page / no next-page follow) and honest PARTIAL/gap behavior
+when a page is empty or a call fails.
+
+#### Scenario: Unit coverage without live WB
+
+- **WHEN** the targeted automated suite for this capability runs
+- **THEN** it MUST exercise ORDERS+sales Stage A paths without calling live
+  production WB API
+- **AND** MUST assert that both orders and sales are requested under Stage A
+- **AND** MUST assert first-page / no-pagination attestation semantics
 
 ### Requirement: READ_ONLY_NO_MUTATION policy
 
