@@ -59,6 +59,8 @@ only this command's allowlisted push/Job/ledger paths.
 * NOT commit owner → `/opsx-commit` (product) or `/opsx-admin-command-commit` (process).
 * NOT force-push, push of non-`scripts` branches, merge, rebase, or reset.
 * NOT CSI / port-forward / secret dump / prod DB migration.
+* NOT a substitute for external handoff packs: research/side dumps ≠ declared
+  primary contract artifacts.
 
 ## When to use
 
@@ -250,19 +252,33 @@ the command can continue itself.
    `ImagePullBackOff` while its matching GHA build is still running, finish
    waiting for GHA, delete only this invocation's Job, and create it once more
    with the immutable SHA image. No retry for script/runtime/cluster errors.
-7. Discover declared/obvious output paths (script constants, plan metadata).
-   After Job success, copy known files from the pod with `kubectl cp` into
-   `.tmp/opsx-scripts/<UTC_TS>/outputs/`; report local paths and sizes.
-8. Update ledger only with terminal evidence:
-   - success → `runnable=WORKS`, timestamp, immutable image, concise note;
+7. Discover declared/obvious output paths (script constants, plan metadata,
+   `SCRIPTS_RUN_PLAN.KNOWN_OUTPUTS`). After Job success, copy known files from
+   the pod with `kubectl cp` into `.tmp/opsx-scripts/<UTC_TS>/outputs/`;
+   report local paths and sizes.
+   When the plan declares a **primary** contract/handoff artifact (see
+   **Artifact contract** below), that primary (+ checksum sidecar if declared)
+   is the success criterion — research/side dumps alone never suffice.
+8. **Artifact-contract gate** (when primary is declared): if primary file
+   missing, required sidecar missing, or `PRIMARY_SHA256` ≠ on-disk digest →
+   do **not** emit `RUN_DONE` as handoff success; set
+   `STATUS=FAIL_ARTIFACT_CONTRACT` (even if container exit 0 / script-reported
+   partial OK). Do not set `battle_tested` from this path.
+9. Update ledger only with terminal evidence:
+   - true success (gates pass) → `runnable=WORKS`, timestamp, immutable image,
+     concise note (include `ARTIFACT_CLASS` when set; do not claim external
+     handoff closed from side/research artifacts only);
+   - `FAIL_ARTIFACT_CONTRACT` → note primary missing/mismatch; do **not**
+     imply handoff ready;
    - script/runtime failure → `runnable=BROKEN`;
    - pre-start image/infra failure → keep `runnable=UNKNOWN`.
-9. Emit one terminal `SCRIPTS_REPORT`; do not ask for another GO between the
-   authorized stages.
+10. Emit one terminal `SCRIPTS_REPORT` (including artifact schema fields when
+    applicable); do not ask for another GO between the authorized stages.
 
 The command may stop early only on definitive GHA/Job failure, authentication
-or authorization denial, execution-critical dirty files, hard-forbid hit, or
-bounded timeout. A queued/running workflow is an expected wait, not a blocker.
+or authorization denial, execution-critical dirty files, hard-forbid hit,
+artifact-contract failure, or bounded timeout. A queued/running workflow is an
+expected wait, not a blocker.
 
 Hard forbids identical in spirit to `/opsx-devops` (CSI, port-forward,
 secret dump, namespace delete, uncontrolled force-delete, prod DB migration).
@@ -342,11 +358,51 @@ FORBIDDEN_CHECK: PASS | FAIL
 OWNER_GO_LINE:
 ```
 
+## Artifact contract (declared primary vs side dumps)
+
+When a RUN declares an artifact class and/or a **primary** handoff artifact
+(via ARGS, script docs, registry note, or `KNOWN_OUTPUTS`), this command must
+not treat container exit 0 alone as handoff success.
+
+* **Primary** = the file(s) named as the required deliverable for that run
+  (often a contract/return pack + checksum sidecar).
+* **Side / research** artifacts = optional dumps next to primary. They never
+  satisfy a declared-primary run by themselves and are not uploaded as the
+  handoff pack.
+* Product CLI must enforce its own accept/preflight gates; this command must
+  not re-label a side dump as an accepted primary.
+* If the product packager/flags required by the plan are missing → report the
+  gap; do not invent a primary from a research dump.
+
+### SCRIPTS_REPORT artifact schema (mandatory when applicable)
+
+When the run declares `ARTIFACT_CLASS`, `--contract` / `--artifact-class`
+(or equivalent), or a named primary in `KNOWN_OUTPUTS`, the durable
+`SCRIPTS_REPORT.md` and terminal report **MUST** include:
+
+```text
+ARTIFACT_CLASS=<script-declared class or NONE>
+PRIMARY_ARTIFACT=<filename|NONE>
+PRIMARY_SHA256=<hex|NONE>
+SIDE_ARTIFACT=<filename|NONE>
+EXTERNAL_HANDOFF_READY=YES|NO
+PREFLIGHT_ACCEPT_INPUT=YES|NO|N_A
+CONTRACT_ID=<id|NONE>
+```
+
+Rules:
+
+1. `EXTERNAL_HANDOFF_READY=YES` **only** if primary exists locally after copy
+   **and** `PRIMARY_SHA256` matches that file’s digest (when a sha is required).
+2. If primary was declared and only side/research output exists →
+   `EXTERNAL_HANDOFF_READY=NO` and `STATUS=FAIL_ARTIFACT_CONTRACT`.
+3. Do not claim handoff/ready-for-consumer YES without (1).
+
 ## Return contract (mandatory)
 
 ```text
 STATUS: INVENTORY_DONE | STATUS_DONE | TEST_DONE | PUSHED | RUN_PLAN_READY | RUN_DONE |
-        RUN_DONE_WITH_OUTPUT_GAP | LEDGER_UPDATED | BLOCKED |
+        RUN_DONE_WITH_OUTPUT_GAP | FAIL_ARTIFACT_CONTRACT | LEDGER_UPDATED | BLOCKED |
         REDIRECT_PREPARE | REDIRECT_DEVOPS | REDIRECT_TEST
 MODE: INVENTORY | STATUS | TEST_LOCAL | PUSH | PLAN_RUN | RUN | RECORD_BATTLE
 SCRIPTS_INFRA: READY | GAP | UNKNOWN
@@ -378,6 +434,13 @@ ATTEMPTS:
 LOG_SUMMARY:
 OUTPUTS:
 LEDGER_RESULT:
+ARTIFACT_CLASS:
+PRIMARY_ARTIFACT:
+PRIMARY_SHA256:
+SIDE_ARTIFACT:
+EXTERNAL_HANDOFF_READY:
+PREFLIGHT_ACCEPT_INPUT:
+CONTRACT_ID:
 ```
 
 When process-surface command files change (rare here): commit via
@@ -396,6 +459,9 @@ are operated here; Owner decides commit cadence.
   `/opsx-devops INVESTIGATE` if cluster-generic.
 * Script succeeds but known output copy fails → `RUN_DONE_WITH_OUTPUT_GAP`;
   preserve success evidence and state the exact retrieval gap.
+* Declared primary missing or sha mismatch after exit 0 →
+  `FAIL_ARTIFACT_CONTRACT`; do not treat as external handoff success; do not
+  promote side/research dumps as primary.
 * Push auth failure or execution-critical dirty tree → `BLOCKED`; no force.
 * Same mutate error ≥ 3 → stop; escalate Owner.
 
@@ -405,10 +471,11 @@ are operated here; Owner decides commit cadence.
 ENTRY_STATE: SCRIPTS_INFRA_READY + owner intent
 PREVIOUS: /opsx-scripts-prepare | prior /opsx-scripts | consult
 COMMAND_ACTION: inventory | test | push | autonomous run-to-result | record battle
-EXIT_STATE: PUSHED | RUN_DONE | RUN_DONE_WITH_OUTPUT_GAP | REPORT_READY |
-            LEDGER_UPDATED | BLOCKED | REDIRECT_*
+EXIT_STATE: PUSHED | RUN_DONE | RUN_DONE_WITH_OUTPUT_GAP | FAIL_ARTIFACT_CONTRACT |
+            REPORT_READY | LEDGER_UPDATED | BLOCKED | REDIRECT_*
 NEXT: Owner | next /opsx-scripts … | /opsx-devops | stop
-FAILURE: no bypass of prepare infra or devops forbids; no force-push
+FAILURE: no bypass of prepare infra or devops forbids; no force-push;
+         no side-dump-as-primary handoff success
 ```
 
 ## Self-check before finish
@@ -421,6 +488,8 @@ FAILURE: no bypass of prepare infra or devops forbids; no force-push
 - [ ] Matching GHA queued/running is monitored, not returned as a blocker
 - [ ] Only one image-readiness retry; no generic Job retry
 - [ ] Known outputs copied and reported after success
+- [ ] When primary declared: artifact schema fields present; primary gate applied
+- [ ] Side/research dumps not treated as external handoff success
 - [ ] battle_tested not set from RUN alone
 - [ ] Working scripts not rewritten by default
 - [ ] master/stage deploy workflows not touched
