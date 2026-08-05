@@ -47,7 +47,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
 | Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-04T02:35:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:7dcf1cc5bc85da2da95e220220e4748238d2c597 | Job Complete; all_users.xlsx 129991B copied; PYTHONPATH+/hold in template |
-| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-05T06:50:00Z | 2026-08-05T07:29:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:b1e6b2f8f59fed5f87ac80bb736577ce95fa8380 | Job ops-script-wb-ro-collect-20260805-072757 exit0; ORDERS 1188 + sales 801; overall PARTIAL (norms); local zip OK during hold |
+| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-05T06:50:00Z | 2026-08-05T08:49:17Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:b1e6b2f8f59fed5f87ac80bb736577ce95fa8380 | Job ops-script-wb-ro-collect-20260805-084208 (+cp) exit0; Dilera ORDERS 1189 + sales 802; overall PARTIAL (norms); zip+report local; Harbor push new tip failed → reused b1e6b2f8 |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
