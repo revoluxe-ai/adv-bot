@@ -18,6 +18,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from app.client_bot.admin_access import is_bot_admin
+from app.client_bot.callback_replay import serialize_callback_query
 from app.client_bot.const import SUPPORT_CHANNEL_ID
 from app.client_bot.start_command import is_start_command_message
 from app.client_bot.user_interface.views import callbacks
@@ -211,6 +212,13 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
         )
         if is_subscribed is None or is_subscribed is True:
             return await handler(event, data)
+
+        if isinstance(event, CallbackQuery):
+            state = data.get("state")
+            if isinstance(state, FSMContext):
+                await state.update_data(
+                    pending_subscription_callback=serialize_callback_query(event)
+                )
 
         logger.debug("ChannelSubscriptionMiddleware: blocking user=%s", telegram_id)
         await send_need_subscribe_message(bot, event)
