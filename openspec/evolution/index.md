@@ -12,7 +12,7 @@ Human display is always `Title (STAR_ID)`.
 
 | Title | STAR_ID | Status | Card | Active increment |
 |-------|---------|--------|------|------------------|
-| Безопасный постоянный сбор WB API-данных | `wb-safe-readonly-collect` | ACTIVE | [wb-safe-readonly-collect.md](wb-safe-readonly-collect.md) | `INC-RO-07` prod Job collect + real ORDERS/sales data |
+| Безопасный постоянный сбор WB API-данных | `wb-safe-readonly-collect` | ACTIVE | [wb-safe-readonly-collect.md](wb-safe-readonly-collect.md) | `INC-RO-03` API Master map from local swagger |
 
 ## Lookup rules
 

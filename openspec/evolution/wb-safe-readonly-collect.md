@@ -5,7 +5,7 @@ STAR_ID: wb-safe-readonly-collect
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-04T04:47:00Z
-UPDATED_AT: 2026-08-05T06:37:00Z
+UPDATED_AT: 2026-08-05T07:59:05Z
 ```
 
 ## North Star
@@ -112,7 +112,7 @@ Evidence / completion:
 ### INC-RO-03 — API Master: карта из локальных swagger
 
 ```text
-STATUS: CANDIDATE
+STATUS: ACTIVE
 LINKED_CHANGES: none
 ```
 
@@ -225,7 +225,7 @@ tests green без live API.
 ### INC-RO-07 — Prod Job collect + real ORDERS/sales data (wired Reports)
 
 ```text
-STATUS: ACTIVE
+STATUS: DELIVERED
 LINKED_CHANGES: wb-readonly-job-smoke-reports
 ```
 
@@ -256,11 +256,17 @@ increment — нужен повтор/другое окно/`shop_id` до по�
 
 Evidence / completion:
 
-1. Sales+orders Stage A wire в ORDERS family + targeted unit/smoke green.
-2. Один успешный prod K8s Job `--mode collect` через `/opsx-scripts`.
-3. Локальный archive с ненулевыми rows ORDERS и/или sales + report attestation
-   Stage A (`dateFrom`, first page, `next_page_followed=NO`).
-4. Ledger обновлён из Job evidence (`runnable`, `last_cluster_*`, image, notes).
+1. Sales+orders Stage A wire в ORDERS family + targeted unit/smoke green —
+   OpenSpec change archived
+   `openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/`.
+2. Prod Job `ops-script-wb-ro-collect-20260805-072757` (`--mode collect`)
+   Complete exit 0 via `/opsx-scripts`.
+3. Local archive
+   `.tmp/opsx-scripts/20260805-072757/outputs/wb_readonly_research.zip`
+   with ORDERS rows_count=1188 and sales rows_count=801 (Stage A
+   `dateFrom` / first page / `next_page_followed=NO`).
+4. Ledger `scripts/REGISTRY.md` updated from Job evidence
+   (`runnable=WORKS`, image `b1e6b2f8…`, notes).
 
 ## Forward Compatibility Constraints
 
@@ -296,6 +302,9 @@ Evidence / completion:
 
 ## History
 
+- 2026-08-05T07:59:05Z — INC-RO-07 DELIVERED (prod Job + real ORDERS/sales
+  archive; change archived); INC-RO-03 ACTIVE (API Master from local swagger);
+  exactly one ACTIVE.
 - 2026-08-05T06:37:00Z — INC-RO-07 DoD sharpened: successful prod K8s Job
   collect + real ORDERS/sales archive data proving generated Reports clients;
   LINKED_CHANGES → `wb-readonly-job-smoke-reports`; empty ORDERS+sales no longer
