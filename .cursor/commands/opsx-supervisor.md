@@ -265,7 +265,13 @@ REFACTOR
 TEST_GAP_CLOSURE
 PROCESS_REVIEW
 PR_READINESS
+USEFUL_WORK
 ```
+
+`USEFUL_WORK` — режим «сделай полезное»: rank/consume goal-like items
+(WORKLOG-derived / Owner list) with free-prose VALUE via `/opsx-explore`, then
+sequential units inside **one** mission until STOP, timebox, empty queue, or
+budget exhaustion. See §3.3.
 
 Для code-changing задач:
 
@@ -350,6 +356,56 @@ STOPPING
 ```
 
 Новая работа после terminal state требует новой mission.
+
+## 3.3 USEFUL_WORK — valued-goal consume (Option B)
+
+Когда Owner просит «сделай полезное» / useful-work / крутить цели по ценности
+до STOP, фиксируй:
+
+```text
+TASK_MODE=USEFUL_WORK
+HARD_DEADLINE: <required unless Owner explicitly waives with STOP-only policy>
+VALUED_GOAL_SOURCE: owner_list | worklog_ranked | mixed
+```
+
+Обязательный первый substantive dispatch (READ_ONLY):
+
+```text
+/opsx-explore
+```
+
+Explore must emit `VALUED_GOALS` per `openspec/policies/EXPLORE_POLICY.md`
+(`explore.valued_goals`) and `.cursor/commands/opsx-explore.md`:
+free-prose `VALUE` on every ranked item (draft allowed); WORKLOG stays
+`raw_notes` / not North Star SoT.
+
+Consume loop **inside the same mission** (do not start a second concurrent
+mission):
+
+1. Take the next open ranked item as the only active unit `IN_SCOPE`.
+2. Dispatch normal `/opsx-*` writers/checkers for that unit only
+   (typically `/opsx-new` / `/opsx-ff` / `/opsx-update` / bug path from
+   `NEXT_OPSX`) — no repository tools on the supervisor itself.
+3. On unit terminal (or Owner defer), advance to the next ranked item if:
+   - queue non-empty;
+   - `MISSION_STATUS` still allows work;
+   - before `NO_NEW_WORK_AFTER` / within `GLOBAL_EXECUTION_BUDGET`;
+   - Owner has not issued STOP.
+4. Stop when: empty queue | Owner STOP | `TIMEBOX_STOPPED` | budget exhausted |
+   `BLOCKED_*` that Owner must resolve.
+
+Запрещено в `USEFUL_WORK`:
+
+* обходить verify / commit / archive / Owner diff-review gates;
+* трактовать WORKLOG как source of truth North Star;
+* расширять unit до «починить весь repository»;
+* запускать новый unit после `NO_NEW_WORK_AFTER`;
+* писать product code напрямую с control-plane.
+
+Если `VALUED_GOALS.EMPTY_QUEUE=YES` после explore → terminal
+`ANALYSIS_COMPLETE` (нечего consume) с явным `NEXT_ACTION` для Owner
+(добавить цели в WORKLOG / уточнить список / сменить режим).
+
 
 После `STOPPING`:
 
@@ -1223,6 +1279,11 @@ MANDATORY_EXECUTION_ADVISOR_FOR_SUPERVISOR=YES
 project/domain clarification, но и для ответа «как лучше выполнить
 поставленную задачу» (§13.0) до первого scoped-write / conditional
 dispatch.
+
+В `TASK_MODE=USEFUL_WORK` explore additionally ranks goal-like candidates
+(`VALUED_GOALS`, free-prose VALUE gate). Ranking is advisory input to the
+supervisor consume loop; explore does not implement, does not write WORKLOG,
+and does not become a second lifecycle authority.
 
 Автоматическое назначение `EVIDENCE_WEIGHT=PRIMARY` только по имени
 команды **запрещено**.
