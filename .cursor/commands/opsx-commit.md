@@ -345,18 +345,48 @@ WHAT_HAPPENED: <1–2 lines what this run did / stopped on>
 WHY: <blocker class: typing | MISSING_FROM_INCLUDE | HIT_EXCLUDE | test_fail | FAIL_CLOSED | blocked_preflight | …>
 FAILED_STEP: <exact command + short result>
 CHECK_MODE: FAST_CHECK | FULL_CHECK
+```
 
+For **typing / pyright / mypy FAIL** (and likewise for **unit/test FAIL** with
+known nodeids), the entrance MUST also include an actionable diagnostic block
+**above** `OWNER_RUN_COMMAND` — not only a bare next-command name:
+
+```text
+ERROR_SUMMARY: <N> errors (show ≤12 lines; if more, say "+<remaining> more")
+- <path>:<line> - <code> - <short message>
+STAGED_HITS: <paths from the current staged commit group that appear in FAIL>
+OUTSIDE_STAGED_HITS: <other dirty/include paths that appear in FAIL, or none>
+```
+
+Rules for that block:
+
+1. Prefer **STAGED_HITS** lines first in `ERROR_SUMMARY`; then outside hits.
+2. Cap at **12** diagnostic lines; never dump an unbounded tool log into chat.
+3. Keep bare project `pyright-strict` SoT (do **not** path-scope to invent a
+   second type gate). Attribution is mandatory so the owner sees whether the
+   staged group itself is red vs poisoned by unstaged dirty include files.
+4. If **any** `STAGED_HITS` → `WHY: typing` (or `test_fail` for pytest) as usual.
+5. If **only** `OUTSIDE_STAGED_HITS` → still **COMMIT STOP** (working tree is
+   red vs owner SoT), but `WHAT_HAPPENED` / `WHY` MUST state the blocker is
+   **outside the staged commit group** (e.g. unstaged production / dirty
+   `pyrightconfig_strict.json` include). Put staging-order / remaining dirty
+   notes under `ALSO_OK` only; primary remains the heal command below.
+6. Do **not** heal-to-green inside this command.
+
+Then print:
+
+```text
 OWNER_RUN_COMMAND:
 ```
 
 Then **one** fenced literal command (fill known args; no empty placeholders when
-paths/nodeids are known):
+paths/nodeids/diagnostics are known):
 
 | WHY / class | Primary `OWNER_RUN_COMMAND` |
 |---|---|
-| typing / pyright errors | `/opsx-fix-types` |
+| typing / pyright / mypy errors | `/opsx-fix-types tool=<pyright-strict\|mypy> command="<exact failed command>" scope=<STAGED_HITS paths>` then paste the same `ERROR_SUMMARY` lines as raw diagnostic text in the fence (so `/opsx-fix-types` can triage without re-hunt). Bare `/opsx-fix-types` alone is **not** sufficient when diagnostics are known. |
 | `MISSING_FROM_INCLUDE` / `HIT_EXCLUDE` | `/opsx-pyright-strict-coverage` (list OUT paths in body above fence) |
-| unit/test FAIL | `/opsx-test-triage` (include failing path / nodeid when known) |
+| unit/test FAIL | `/opsx-test-triage` (include failing path / nodeid when known; put failing nodeids in `ERROR_SUMMARY`) |
 | `FAIL_CLOSED` (no related tests) | `/opsx-test-triage` + list uncovered production paths |
 | heal already done; finish commits | `/opsx-commit FAST_CHECK GO` or `/opsx-commit FULL_CHECK GO` (match this run’s mode) |
 | process surfaces only | `/opsx-admin-command-commit` |
@@ -652,17 +682,22 @@ REBASE_OR_SEQUENCER_IN_PROGRESS_LEFT_TO_OWNER:
 ```
 
 When `STATUS` is `COMMIT_STOP` or `PARTIAL` (blockers remain), **also** emit the
-mandatory human-native exit (see **Human-native exit** above):
+mandatory human-native exit (see **Human-native exit** above), including
+`ERROR_SUMMARY` / `STAGED_HITS` / `OUTSIDE_STAGED_HITS` when the FAIL class is
+typing or test_fail:
 
 ```text
 WHAT_HAPPENED:
 WHY:
 FAILED_STEP:
+ERROR_SUMMARY:   # required for typing / test_fail when diagnostics known
+STAGED_HITS:
+OUTSIDE_STAGED_HITS:
 OWNER_RUN_COMMAND:
 ```
 
 ```text
-<one fenced primary heal/finish command>
+<one fenced primary heal/finish command — for typing: filled /opsx-fix-types + raw errors>
 ```
 
 ```text
