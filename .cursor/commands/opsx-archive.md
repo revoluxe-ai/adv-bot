@@ -58,7 +58,7 @@ DO_NOT_DO_YET: sync / decision promote / archive move
 
    **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
 
-2. **Check artifact completion status**
+2. **Check planning compliance (mechanical — status JSON only)**
 
    Run `openspec status --change "<name>" --json` to check artifact completion.
 
@@ -67,25 +67,40 @@ DO_NOT_DO_YET: sync / decision promote / archive move
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context
    - `artifacts`: List of artifacts with their status (`done` or other)
 
-   The `decisions` artifact is optional. If `artifactPaths.decisions.existingOutputPaths` is empty and Architecture Decision Lookup does not require a proposed decision, do not count `decisions` as an incomplete artifact.
+   **Compliance axis (required non-task):** `proposal`, `design`, `specs`.
+   For each, require `artifacts[id].status == "done"`.
 
-   **If any non-optional artifacts are not `done`:**
-   - Display warning listing incomplete artifacts
-   - Prompt user for confirmation to continue
-   - Proceed if user confirms
+   The `decisions` artifact is optional. If `artifactPaths.decisions.existingOutputPaths` is empty and Architecture Decision Lookup does not require a proposed decision, do not count `decisions` as incomplete. If proposed decision files already exist under the change, require that artifact `done` (or treat missing acceptance as incomplete planning).
+
+   **Tasks are NOT on this axis.** Absence of `tasks.md` / `tasks` not `done` is **not** a planning compliance failure and must **not** block a full archive.
+
+   **If any of proposal | design | specs has status != `done`:**
+   - This is a planning defect (косяк), not soft confirmation territory
+   - Emit `ARCHIVE_BLOCKED_INCOMPLETE_PLANNING` (see Output)
+   - Stop. Do **not** `mv`. Do **not** accept `yes` / `ok` / `да` / free-form continue
+   - Do **not** accept `CONTINUE_ARCHIVE_INCOMPLETE` for missing proposal/design/specs
+   - Next: `/opsx-ff` | `/opsx-continue` | `/opsx-update` (разобраться), then re-run archive
+
+   **If proposal | design | specs are all `done`:** planning compliance OK → continue to step 3
 
 3. **Check task completion status**
 
-   Read the tasks file (typically `tasks.md`) to check for incomplete tasks.
+   Read the tasks file when `artifactPaths.tasks.existingOutputPaths` is non-empty.
 
-   Count tasks marked with `- [ ]` (incomplete) vs `- [x]` (complete).
+   **If no tasks file / empty `existingOutputPaths`:**
+   - Full archive path remains valid (spec-only / docs-capture allowed)
+   - Optional one-line note only: `Tasks: none (allowed)`
+   - Do **not** warn as incomplete; do **not** require a confirm token
 
-   **If incomplete tasks found:**
-   - Display warning showing count of incomplete tasks
-   - Prompt user for confirmation to continue
-   - Proceed if user confirms
+   **If tasks.md exists:** count `- [ ]` (incomplete) vs `- [x]` (complete).
 
-   **If no tasks file exists:** Proceed without task-related warning.
+   **If any `- [ ]` found:**
+   - Emit `ARCHIVE_WAITING_CONFIRM_OPEN_TASKS` (see Output)
+   - Stop until the user message contains the exact token `CONTINUE_ARCHIVE_INCOMPLETE`
+   - Refuse free-form `yes` / `ok` / `да` / `продолжай` without that token
+   - After the token: proceed (sync / ADL / mv); note open-task override in summary
+
+   **If all checkboxes are `[x]`:** proceed
 
 4. **Semantic write-target archive gate (hard stop)**
 
@@ -163,7 +178,7 @@ DO_NOT_DO_YET: sync / decision promote / archive move
    - Schema that was used
    - Archive location
    - Spec sync status (synced / sync skipped / no delta specs)
-   - Note about any warnings (incomplete artifacts/tasks)
+   - Tasks line: `none (allowed)` | `N/N complete` | `overridden open tasks via CONTINUE_ARCHIVE_INCOMPLETE`
 
 **Output On Success**
 
@@ -174,8 +189,9 @@ DO_NOT_DO_YET: sync / decision promote / archive move
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs
+**Tasks:** none (allowed) | <n>/<n> complete
 
-All artifacts complete. All tasks complete.
+Planning compliance OK (proposal|design|specs done).
 
 ### Soft next (optional — not an archive gate)
 If client/CS distribution materials are needed:
@@ -191,34 +207,64 @@ If client/CS distribution materials are needed:
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
 **Specs:** No delta specs
+**Tasks:** none (allowed) | <n>/<n> complete
 
-All artifacts complete. All tasks complete.
+Planning compliance OK (proposal|design|specs done).
 
 ### Soft next (optional — not an archive gate)
 If client/CS distribution materials are needed:
 `/opsx-distribute-brief change=<change-name>`
 ```
 
-**Output On Success With Warnings**
+**Output On Success (Sync Skipped / Open-Tasks Override)**
 
 ```
-## Archive Complete (with warnings)
+## Archive Complete (with notes)
 
 **Change:** <change-name>
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
-**Specs:** Sync skipped (user chose to skip)
+**Specs:** Sync skipped (user chose to skip) | ✓ Synced | No delta specs
+**Tasks:** overridden open checkboxes via CONTINUE_ARCHIVE_INCOMPLETE | …
 
-**Warnings:**
-- Archived with 2 incomplete artifacts
-- Archived with 3 incomplete tasks
-- Delta spec sync was skipped (user chose to skip)
-
-Review the archive if this was not intentional.
+Planning compliance OK (proposal|design|specs done). Missing tasks.md is never a warning.
 
 ### Soft next (optional — not an archive gate)
 If client/CS distribution materials are needed:
 `/opsx-distribute-brief change=<change-name>`
+```
+
+**Output On Blocked (Incomplete Planning)**
+
+```
+## Archive Blocked (incomplete planning)
+
+**Change:** <change-name>
+**Reason:** proposal|design|specs status != done (косяк — разобраться; not a soft confirm)
+**Incomplete:** <artifact id=status, …>
+**Tasks:** ignored for this gate (absence of tasks.md is allowed and is NOT listed here)
+
+Do not archive. Do not accept free-form confirm or CONTINUE_ARCHIVE_INCOMPLETE for this tier.
+
+**Next:**
+/opsx-ff
+# or /opsx-continue / /opsx-update — then re-run /opsx-archive <change-name>
+```
+
+**Output On Waiting (Open Task Checkboxes)**
+
+```
+## Archive Waiting Confirm (open tasks)
+
+**Change:** <change-name>
+**Open checkboxes:** <count> in tasks.md
+**Planning:** proposal|design|specs done
+
+To archive anyway, reply exactly:
+
+CONTINUE_ARCHIVE_INCOMPLETE
+
+(Free-form yes/ok/да is refused.)
 ```
 
 **Output On Error (Archive Exists)**
@@ -244,8 +290,10 @@ Target archive directory already exists.
   lacks a durable semantic write target (`unresolved_semantic_write_target` /
   `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`) — hard stop, not a warning
 - Explicitly report `Reusable architecture promotions: none` when there is nothing to promote
-- Use artifact graph (openspec status --json) for completion checking
-- Don't block archive on warnings - just inform and confirm
+- Use artifact graph (openspec status --json) for completion checking — mechanical predicates only (no agent vibes)
+- Absence of tasks.md does **not** prevent a full archive; do not treat it as incomplete planning
+- Missing proposal|design|specs → HARD_BLOCK (`ARCHIVE_BLOCKED_INCOMPLETE_PLANNING`); no soft override token
+- Open `- [ ]` in an existing tasks.md → stop until exact `CONTINUE_ARCHIVE_INCOMPLETE`
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
 - If sync is requested, use the Skill tool to invoke `openspec-sync-specs` (agent-driven)
