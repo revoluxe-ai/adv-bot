@@ -197,7 +197,7 @@
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode; pyrightconfig_strict.json when new production `.py`
 - artifacts_written: production/code per tasks (after gate); optional additive pyrightconfig_strict include[]; ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
-- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
+- next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage-task (ALSO_OK inline) | /opsx-performance-review-task (when trigger applies) | /opsx-antipattern-gate-task | /opsx-static-check-task | /opsx-verify-task | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
 - known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; Guardrails one-liner may still omit antipattern (F12 residue); include hygiene owed even when coverage soft (F13)
 
 ### /opsx-pyright-strict-coverage
@@ -207,7 +207,7 @@
 - artifacts_read: git diff base...head; pyrightconfig_strict.json
 - artifacts_written: none without GO; with GO only additive include[] entries (never exclude matches)
 - decision_owner: coverage auditor; include expansion only with owner GO
-- next_typical: /opsx-external-call-coverage | /opsx-antipattern-gate | /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
+- next_typical: /opsx-external-call-coverage-task (ALSO_OK inline) | /opsx-antipattern-gate-task | /opsx-static-check-task | /opsx-fix-types (after static FAIL) | /opsx-verify-task | retry with GO
 - known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; THIS contract handoff may still skip antipattern (F12)
 
 ### /opsx-external-call-coverage
@@ -353,6 +353,63 @@
 - decision_owner: verifier
 - next_typical: /opsx-archive | /opsx-apply | /opsx-update | /opsx-doctor
 - known_flaws: CORRUPT_LEFTOVER → doctor (not apply); empty artifacts hard NO_GO
+
+### /opsx-verify-task
+- purpose: fresh-Task wrapper for /opsx-verify (launch + relay only)
+- input_state: same as /opsx-verify
+- output_state: verify_pass | verify_fail (relay)
+- artifacts_read: opsx-verify.md + opsx-task-wrapper-contract.md
+- artifacts_written: none
+- decision_owner: verifier (target contract)
+- next_typical: same as /opsx-verify
+- known_flaws: Task unavailable → BLOCKED with inline /opsx-verify fallback
+
+### /opsx-external-call-coverage-task
+- purpose: fresh-Task wrapper for /opsx-external-call-coverage
+- input_state: same as target
+- output_state: same as target (relay)
+- artifacts_read: target contract + wrapper contract
+- artifacts_written: none
+- decision_owner: coverage auditor (target)
+- next_typical: same as /opsx-external-call-coverage (prefer *-task pasteables)
+
+### /opsx-performance-review-task
+- purpose: fresh-Task wrapper for /opsx-performance-review
+- input_state: same as target
+- output_state: same as target (relay)
+- artifacts_read: target contract + wrapper contract
+- artifacts_written: none
+- decision_owner: performance reviewer (target)
+- next_typical: same as /opsx-performance-review
+
+### /opsx-antipattern-gate-task
+- purpose: fresh-Task wrapper for /opsx-antipattern-gate
+- input_state: same as target
+- output_state: same as target (relay)
+- artifacts_read: target contract + wrapper contract
+- artifacts_written: none (ledger only inside Task if target GO)
+- decision_owner: antipattern auditor (target)
+- next_typical: same as /opsx-antipattern-gate
+
+### /opsx-static-check-task
+- purpose: fresh-Task wrapper for whole /opsx-static-check orchestrator
+- input_state: same as /opsx-static-check
+- output_state: static_check_done (relay)
+- artifacts_read: target contract + wrapper contract
+- artifacts_written: none
+- decision_owner: synthesizer (target)
+- next_typical: same as /opsx-static-check
+- known_flaws: nested Tasks (orchestrator Task → registry shell workers)
+
+### /opsx-pipeline-regression-task
+- purpose: fresh-Task wrapper for analyze-pipeline REGRESSION_PIPELINE_REVIEW
+- input_state: process_dirty | after process command changes
+- output_state: analysis report only (ephemeral)
+- artifacts_read: analyze-pipeline.md + wrapper contract
+- artifacts_written: none
+- decision_owner: process analyst
+- next_typical: /opsx-pipeline UPDATE | /opsx-admin-command-fix-command-defects | none
+- known_flaws: not product quality gate; not archive authority
 
 ### /opsx-archive
 - purpose: archive a completed change
@@ -735,14 +792,30 @@ scripts_infra_ready --/opsx-scripts--> scripts_ops_active
 NAVIGATE may surface these; they are **not** forced edges and **not**
 lifecycle authority.
 
+### Fresh-Task wrappers (preferred soft pasteables)
+
+For independence from apply-chat history, soft-prefer `*-task` wrappers
+(cite `.cursor/commands/opsx-task-wrapper-contract.md`):
+
+* `/opsx-external-call-coverage-task`
+* `/opsx-performance-review-task`
+* `/opsx-antipattern-gate-task`
+* `/opsx-static-check-task`
+* `/opsx-verify-task`
+* `/opsx-pipeline-regression-task` (process/admin regression only)
+
+Inline originals (`/opsx-verify`, `/opsx-static-check`, …) remain
+**ALSO_OK**. Wrappers do not change EXIT states or archive authority.
+
 ### Post-apply pyright-strict allowlist coverage
 
 After `/opsx-apply` when production Python changed (`app/**/*.py` or
 top-level production scripts): apply owes **in-session**
 `pyrightconfig_strict` include hygiene first; then recommend
 `/opsx-pyright-strict-coverage base=<BASE>` (audit/catch-up) before
-`/opsx-external-call-coverage`, optional `/opsx-performance-review`,
-`/opsx-antipattern-gate`, `/opsx-static-check`, and `/opsx-verify`.
+`/opsx-external-call-coverage-task` (ALSO_OK inline), optional
+`/opsx-performance-review-task`, `/opsx-antipattern-gate-task`,
+`/opsx-static-check-task`, and `/opsx-verify-task`.
 `PASS` pyright-strict alone does **not** prove changed files are in
 `pyrightconfig_strict.json` include. Soft recommend — does not block
 archive by itself. Never add excluded OpenAPI `generated/` via coverage GO.
@@ -751,13 +824,13 @@ archive by itself. Never add excluded OpenAPI `generated/` via coverage GO.
 
 After pyright-coverage `PASS` (or when allowlist already known good) and
 production `.py` changed: recommend
-`/opsx-external-call-coverage base=<BASE>` before conditional
-`/opsx-performance-review`, `/opsx-antipattern-gate`, `/opsx-static-check`,
-and `/opsx-verify`. One command covers HTTP/WB/PG/CH/Redis/OTHER via kind
-taxonomy (`focus=` optional for debug only). Soft recommend — absence of
-report does not auto-`NO_GO` verify; open gaps in a present
-`EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not** replace
-`TEST_COVERAGE_PACKET`.
+`/opsx-external-call-coverage-task base=<BASE>` (ALSO_OK inline) before
+conditional `/opsx-performance-review-task`, `/opsx-antipattern-gate-task`,
+`/opsx-static-check-task`, and `/opsx-verify-task`. One command covers
+HTTP/WB/PG/CH/Redis/OTHER via kind taxonomy (`focus=` optional for debug
+only). Soft recommend — absence of report does not auto-`NO_GO` verify;
+open gaps in a present `EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not**
+replace `TEST_COVERAGE_PACKET`.
 
 Closure split after FAIL:
 
@@ -770,11 +843,12 @@ Closure split after FAIL:
 After external-call `PASS`, when performance trigger applies (DB/query/
 repository; Queue/TasksManager/`run_tasks`/`gather`/`create_task`;
 Semaphore/Lock/Redis NX; pool/cap/rate-limit/retry/backpressure): soft
-recommend `/opsx-performance-review scope=base base=<BASE>` before
-`/opsx-antipattern-gate` then `/opsx-static-check`. Not every-diff
-mandatory. `FAIL` → `/opsx-performance-fix` + FIX_PACKET → independent
-re-audit via review (fixer self-report is never PASS). Measurement only
-under `READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
+recommend `/opsx-performance-review-task scope=base base=<BASE>`
+(ALSO_OK inline) before `/opsx-antipattern-gate-task` then
+`/opsx-static-check-task`. Not every-diff mandatory. `FAIL` →
+`/opsx-performance-fix` + FIX_PACKET → independent re-audit via review
+(fixer self-report is never PASS). Measurement only under
+`READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
 `/opsx-performance-run`. Operator may skip soft gate (deviation allowed).
 Direct `performance_pass → static-check` is demoted (operator skip only).
 
@@ -782,11 +856,12 @@ Direct `performance_pass → static-check` is demoted (operator skip only).
 
 After external-call `PASS` and optional performance
 `PASS|PASS_WITH_RISK|NOT_APPLICABLE` (or when perf skipped): soft recommend
-`/opsx-antipattern-gate base=<BASE>` before `/opsx-static-check` /
-`/opsx-verify`. Over-report by design. `PASS|PASS_WITH_SUSPECTS` →
-static-check (Owner may continue with suspects). `FAIL` → FIX_EXIT /
-re-scan; soft-block static until Owner continues. Soft recommend — not a
-hard archive gate. Optional practice ledger: `accept=` / `reject=` + GO.
+`/opsx-antipattern-gate-task base=<BASE>` (ALSO_OK inline) before
+`/opsx-static-check-task` / `/opsx-verify-task`. Over-report by design.
+`PASS|PASS_WITH_SUSPECTS` → static-check (Owner may continue with suspects).
+`FAIL` → FIX_EXIT / re-scan; soft-block static until Owner continues. Soft
+recommend — not a hard archive gate. Optional practice ledger:
+`accept=` / `reject=` + GO.
 
 ### Bug debt board (ALSO_OK anytime)
 

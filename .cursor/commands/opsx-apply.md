@@ -73,9 +73,9 @@ pyright-related task `[x]` or claiming a green `poetry run pyright-strict` gate:
   in-policy production `.py`
 - `/opsx-pyright-strict-coverage` — post-apply allowlist audit (and optional
   `GO` additive include catch-up) when production `.py` changed
-- `/opsx-external-call-coverage` — after pyright-coverage PASS; soft recommend for external surfaces in diff
-- `/opsx-performance-review` — after external-call PASS when performance trigger applies (DB/query/queue/concurrency/pool/retry); soft recommend, not every-diff hard gate
-- `/opsx-verify` — independent adequacy and archive verdict
+- `/opsx-external-call-coverage-task` (ALSO_OK inline `/opsx-external-call-coverage`) — after pyright-coverage PASS; soft recommend for external surfaces in diff
+- `/opsx-performance-review-task` (ALSO_OK inline) — after external-call PASS when performance trigger applies (DB/query/queue/concurrency/pool/retry); soft recommend, not every-diff hard gate
+- `/opsx-verify-task` (ALSO_OK inline `/opsx-verify`) — independent adequacy and archive verdict
 
 **Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -231,31 +231,36 @@ this change to a durable case):
    - Primary: `/opsx-pyright-strict-coverage base=<BASE>`
    - Если `BASE` неизвестен — спроси один раз: «На какую base branch/ref
      сверять pyright-strict / external-call coverage?» Не выдумывай base.
-   - After pyright-coverage `PASS`: recommend
-     `/opsx-external-call-coverage base=<BASE>`, затем после его `PASS`
+   - After pyright-coverage `PASS`: prefer fresh-Task wrappers
+     (cite `.cursor/commands/opsx-task-wrapper-contract.md`); inline
+     gate commands remain ALSO_OK:
+     `/opsx-external-call-coverage-task base=<BASE>`, затем после его `PASS`
      (`focus=all`):
      - если diff попадает под performance trigger
        (`PERFORMANCE_REVIEW_REQUIRED` / `RECOMMENDED` —
        DB/query/repository; Queue/TasksManager/`run_tasks`/`gather`/
        `create_task`; Semaphore/Lock/Redis NX; pool/cap/rate-limit/
        retry/backpressure; или неоднозначный hot async path) →
-       `/opsx-performance-review scope=base base=<BASE>`;
-     - иначе → `/opsx-antipattern-gate base=<BASE>`;
+       `/opsx-performance-review-task scope=base base=<BASE>`;
+     - иначе → `/opsx-antipattern-gate-task base=<BASE>`;
      - после performance `PASS` | `PASS_WITH_RISK` (или
        `NOT_APPLICABLE` / empty surfaces) →
-       `/opsx-antipattern-gate base=<BASE>`;
+       `/opsx-antipattern-gate-task base=<BASE>`;
      - после antipattern-gate `PASS` | `PASS_WITH_SUSPECTS`
-       (Owner may continue with suspects) → `/opsx-static-check`,
-       затем `/opsx-verify <change-name>`.
+       (Owner may continue with suspects) → `/opsx-static-check-task`,
+       затем `/opsx-verify-task <change-name>`.
    - Performance review **не** обязателен для каждого diff
      (docs/typing-only / нерелевантный tests-only → skip).
    - Antipattern-gate — soft over-report; не archive gate. `FAIL` →
      fix pasteable exit или `accept=`/`reject=` practice ledger, затем
-     re-run `/opsx-antipattern-gate base=<BASE>`.
+     re-run `/opsx-antipattern-gate-task base=<BASE>`
+     (ALSO_OK: `/opsx-antipattern-gate base=<BASE>`).
 2. Иначе (нет in-policy production `.py`):
-   - Primary: `/opsx-verify <change-name>`.
+   - Primary: `/opsx-verify-task <change-name>`
+     (ALSO_OK: `/opsx-verify <change-name>`).
    - Если в diff есть `tests/**` / process surfaces — soft recommend
-     `/opsx-antipattern-gate base=<BASE> focus=tests|process` before verify.
+     `/opsx-antipattern-gate-task base=<BASE> focus=tests|process`
+     before verify.
 
 Не объявляй archive readiness из apply.
 Не объявляй bug-card closed из apply.
@@ -292,16 +297,18 @@ Implementation tasks complete.
 
 If production Python changed (`app/**/*.py` or top-level production scripts):
   Next: `/opsx-pyright-strict-coverage base=<BASE>`
-  Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
-  Then: `/opsx-performance-review scope=base base=<BASE>` when trigger applies
-        (else skip)
-  Then: `/opsx-antipattern-gate base=<BASE>` (after external-call PASS, and
-        after performance PASS|PASS_WITH_RISK when review ran)
-  Then: `/opsx-static-check` (after antipattern-gate PASS|PASS_WITH_SUSPECTS)
-  Then: `/opsx-verify <change-name>`
+  Then: `/opsx-external-call-coverage-task base=<BASE>` (after pyright PASS;
+        ALSO_OK inline `/opsx-external-call-coverage`)
+  Then: `/opsx-performance-review-task scope=base base=<BASE>` when trigger
+        applies (else skip; ALSO_OK inline)
+  Then: `/opsx-antipattern-gate-task base=<BASE>` (after external-call PASS, and
+        after performance PASS|PASS_WITH_RISK when review ran; ALSO_OK inline)
+  Then: `/opsx-static-check-task` (after antipattern-gate PASS|PASS_WITH_SUSPECTS;
+        ALSO_OK `/opsx-static-check`)
+  Then: `/opsx-verify-task <change-name>` (ALSO_OK `/opsx-verify`)
 Else:
-  Next: `/opsx-verify <change-name>`
-  Soft: `/opsx-antipattern-gate base=<BASE> focus=tests|process` when those
+  Next: `/opsx-verify-task <change-name>` (ALSO_OK `/opsx-verify`)
+  Soft: `/opsx-antipattern-gate-task base=<BASE> focus=tests|process` when those
         paths changed
 
 Do not claim archive readiness from apply alone.
@@ -454,7 +461,7 @@ Never rewrite prior JSONL lines.
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience
-- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage`, then conditional `/opsx-performance-review`, then `/opsx-static-check` when production `.py` changed, else `/opsx-verify <change-name>`)
+- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage-task`, then conditional `/opsx-performance-review-task`, then `/opsx-antipattern-gate-task`, then `/opsx-static-check-task` when production `.py` changed, else `/opsx-verify-task <change-name>`; inline gate commands ALSO_OK)
 
 **Fluid Workflow Integration**
 
