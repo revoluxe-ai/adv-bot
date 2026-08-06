@@ -5,7 +5,7 @@ STAR_ID: wb-safe-readonly-collect
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-04T04:47:00Z
-UPDATED_AT: 2026-08-05T07:59:05Z
+UPDATED_AT: 2026-08-06T11:57:52Z
 ```
 
 ## North Star
@@ -32,9 +32,12 @@ allowlist семей эндпоинтов) в архив на локаль — �
   - INC-RO-07: successful prod K8s Job collect on wired Reports
     (ORDERS + sales Stage A) + Owner receives real ORDERS/sales data proving
     generated clients collect; unit/smoke + ledger
-  - Stage B / map-driven permanent collect + Web CLEAN_DUMP accept (future)
+  - INC-RO-03: API Master map path×method from local swagger (delivered)
+  - INC-RO-08: ORDERS/sales period collect with cursor/pagination over
+    COL-R03 window → Owner-local L0 research zip (not Stage A first page)
+  - Stage B / map-driven permanent collect + Web CLEAN_DUMP / RETURN accept
+    (future; includes COL-R03-009 contract_preflight)
   - one-command swagger status/sync при доказанном gap
-  - API Master: карта path×method из локальных swagger
 - Excluded outcomes:
   - finance / wallet / payout
   - WB write / mutation endpoints
@@ -112,8 +115,8 @@ Evidence / completion:
 ### INC-RO-03 — API Master: карта из локальных swagger
 
 ```text
-STATUS: ACTIVE
-LINKED_CHANGES: none
+STATUS: DELIVERED
+LINKED_CHANGES: wb-api-master-swagger-map
 ```
 
 Outcome:
@@ -132,7 +135,12 @@ Scope boundary:
 
 Evidence / completion:
 
-Воспроизводимый inventory-артефакт карты.
+1. Change archived
+   `openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/`
+   (tasks §1–3 complete).
+2. Main spec synced: `openspec/specs/wb-api-master-map/spec.md`.
+3. Accepted decision:
+   `openspec/decisions/wb-api-master-local-swagger-map/decision.md`.
 
 ### INC-RO-04 — Map-driven permanent collect + Web CLEAN_DUMP / Stage B
 
@@ -145,8 +153,9 @@ Outcome:
 
 Постоянный collect по allowlist API Master / карте, period args, Web
 CLEAN_DUMP package (L2 sanitize где нужен transfer), Stage B accept /
-`READ_ONLY_PREFLIGHT_PASS` gate для пилотного Web-контура. Не дублирует
-уже owed INC-RO-01 best-effort research collect + L0 archive.
+`READ_ONLY_PREFLIGHT_PASS` gate для пилотного Web-контура, включая
+COL-R03-009 `contract_preflight` / primary RETURN.zip. Не дублирует
+уже owed research L0 (INC-RO-01 / INC-RO-07 / INC-RO-08).
 
 Contribution to North Star:
 
@@ -155,8 +164,8 @@ Contribution to North Star:
 
 Scope boundary:
 
-Не Web PROCESSOR/RHP; не finance/write. Best-effort Job research dump
-уже закрыт INC-RO-01.
+Не Web PROCESSOR/RHP; не finance/write. Best-effort / period research
+L0 dumps закрыты INC-RO-01 / INC-RO-07 / INC-RO-08 — не Web PASS.
 
 Evidence / completion:
 
@@ -268,6 +277,49 @@ Evidence / completion:
 4. Ledger `scripts/REGISTRY.md` updated from Job evidence
    (`runnable=WORKS`, image `b1e6b2f8…`, notes).
 
+### INC-RO-08 — ORDERS/sales period collect + cursor (research L0)
+
+```text
+STATUS: ACTIVE
+LINKED_CHANGES: none
+```
+
+Outcome:
+
+Job `wb_api_readonly_ops --mode collect` для семьи
+`ORDERS_OR_SALES_REPORTS_READ` на bound «Дилера» /
+`WB-TEST-CABINET-001`, окно `2026-07-04..2026-08-02` Europe/Moscow.
+Не Stage A first-page: follow pagination / `lastChangeDate` (cursor)
+до покрытия period при finite page/time budget и честном stop reason.
+Owner получает L0 research zip (+ sha256) с реальными ORDERS и/или
+sales rows за окно; attestation периода/курсора честная.
+
+Contribution to North Star:
+
+Без period-coverage collect research остаётся на first-page smoke
+(INC-RO-07); добор страниц даёт пригодный для исследования срез
+ORDERS/sales по COL-R03 окну.
+
+Scope boundary:
+
+IN: только `ORDERS_OR_SALES_REPORTS_READ` через generated Reports +
+existing adapter; `mode=collect`; period выше; cursor/pagination follow;
+bound arg-only; Owner-local L0 + report; unit/smoke на cursor loop +
+ceiling; live Job через `/opsx-scripts`.
+
+OUT: Web COLLECTOR / COL-R03-009 RETURN / `contract_preflight`; Stage B
+accept / CLEAN_DUMP / `READ_ONLY_PREFLIGHT_PASS`; другие семьи как DoD;
+invent URL / raw HTTP; swagger sync / API Master / token hardening;
+Cursor→prod WB; finance/mutation; бесконечный pagination без ceiling.
+
+Evidence / completion:
+
+1. Code + targeted unit/smoke: cursor/period collect path green.
+2. Prod Job via `/opsx-scripts` Complete exit 0.
+3. Local L0 zip: ORDERS и/или sales rows за окно; attestation
+   `next_page_followed` / stop reason / period model.
+4. Ledger / SCRIPTS_REPORT обновлены по Job evidence.
+
 ## Forward Compatibility Constraints
 
 - Не вводить новый raw HTTP-клиент WB; расширять только существующие
@@ -276,7 +328,7 @@ Evidence / completion:
   finite budget, no hang.
 - Owner-local L0 archive (payload + report, secret-strip) должен допускать
   расширение до будущего Web CLEAN_DUMP / L2 package для тех же 4
-  endpoint aliases — без требования L2 в INC-RO-01.
+  endpoint aliases — без требования L2 в INC-RO-01 / INC-RO-08.
 - Путь `generated/<key>/vN/swagger/` остаётся будущим SoT для API Master;
   INC-RO-01 не должен ломать эту конвенцию.
 - Policy исполнения API: `READ_ONLY_NO_MUTATION` (не литерал HTTP GET_ONLY).
@@ -286,6 +338,10 @@ Evidence / completion:
 - ORDERS ≠ funnel / search-report / FBS assembly / promotion fullstats.
 - Для будущего COL-R03 GET_ONLY: POST-read ≠ GET; Stage A period = dateFrom /
   cursor attestation, не ложный exact start+end.
+- INC-RO-08 cursor/period collect MUST NOT объявлять Web PASS / RETURN /
+  `READ_ONLY_PREFLIGHT_PASS`; Web accept остаётся INC-RO-04.
+- Cursor/pagination MUST reuse honest dateFrom/`lastChangeDate` model from
+  `orders-or-sales-reports-read-identity`; finite page/time ceiling required.
 
 ## Non-Goals
 
@@ -302,6 +358,11 @@ Evidence / completion:
 
 ## History
 
+- 2026-08-06T11:57:52Z — INC-RO-03 marked DELIVERED (archived map change +
+  main spec); INC-RO-08 ACTIVE (ORDERS/sales period collect + cursor for
+  research L0; Дилера / WB-TEST-CABINET-001; window 2026-07-04..2026-08-02
+  Europe/Moscow); Web RETURN / COL-R03-009 parked under INC-RO-04 Future;
+  exactly one ACTIVE.
 - 2026-08-05T07:59:05Z — INC-RO-07 DELIVERED (prod Job + real ORDERS/sales
   archive; change archived); INC-RO-03 ACTIVE (API Master from local swagger);
   exactly one ACTIVE.
