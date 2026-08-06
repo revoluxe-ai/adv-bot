@@ -1,13 +1,26 @@
 """
-Entrypoint: WB API read-only preflight/collect → Owner-local L0 archive.
+Entrypoint: WB API read-only preflight/collect → L0 and/or COL-R03-009 RETURN.
 
-Job example:
+Job examples:
+  # Stage A Web COLLECTOR primary (Owner-bot; not Cursor→prod)
+  python scripts/wb_api_readonly_ops/run.py \\
+    --shop-id <uuid> --mode preflight \\
+    --contract COL-R03-009 --artifact-class contract_preflight \\
+    --bound-alias WB-TEST-CABINET-001 \\
+    --period-start 2026-07-04 --period-end 2026-08-02 \\
+    --output-dir <run_outputs>
+
+  # L0 research (Owner-local only; not Web handoff)
   python scripts/wb_api_readonly_ops/run.py --shop-id <uuid> --mode collect
 
-Known outputs (for /opsx-scripts kubectl cp):
-  scripts/wb_api_readonly_ops/outputs/wb_readonly_research.zip
-  scripts/wb_api_readonly_ops/outputs/report.json
-  scripts/wb_api_readonly_ops/outputs/archive.sha256
+Known outputs (/opsx-scripts):
+  PRIMARY (contract_preflight):
+    …_COL-R03-009_RETURN.zip + .sha256
+  SIDE / L0:
+    wb_readonly_research.zip, report.json, archive.sha256
+
+Decision: wb-readonly-contract-return-vs-l0 — L0 MUST NOT be primary under
+COL-R03-009. Spec: wb-readonly-contract-preflight-return.
 """
 
 from __future__ import annotations
@@ -38,28 +51,89 @@ from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.super_cabinet_manager import (
     get_access_for_wb_cabinet,
 )
-from scripts.wb_api_readonly_ops.archive import DEFAULT_OUTPUT_DIR, write_l0_archive
+from scripts.wb_api_readonly_ops.accept_gate import (
+    PreflightPassRequiredError,
+    require_preflight_pass_or_raise,
+)
+from scripts.wb_api_readonly_ops.archive import (
+    ARCHIVE_NAME,
+    DEFAULT_OUTPUT_DIR,
+    write_l0_archive,
+)
 from scripts.wb_api_readonly_ops.ceiling import RunCeiling
-from scripts.wb_api_readonly_ops.cli import parse_args
+from scripts.wb_api_readonly_ops.cli import parse_args, resolve_artifact_class
+from scripts.wb_api_readonly_ops.contract_flow import (
+    run_contract_preflight_sync,
+    write_operator_report,
+)
 from scripts.wb_api_readonly_ops.families import HubFamilyRunners
-from scripts.wb_api_readonly_ops.models import Mode, OverallStatus
+from scripts.wb_api_readonly_ops.models import (
+    ArtifactClass,
+    Mode,
+    OverallStatus,
+    RunReport,
+)
 from scripts.wb_api_readonly_ops.orchestrator import run_ops
 
 logger = logging.getLogger(__name__)
 
 
 async def _async_main(argv: list[str] | None = None) -> int:
-    """Bootstrap hub, run ops, write L0 archive. Returns process exit code."""
+    """Bootstrap: accept-gate → contract RETURN или L0 archive. Exit code."""
     args = parse_args(argv)
     mode = Mode(args.mode)
     shop_id = str(args.shop_id)
     output_dir = Path(args.output_dir) if args.output_dir else DEFAULT_OUTPUT_DIR
+    artifact_class = resolve_artifact_class(args)
+    require_pass_path = (
+        Path(args.require_preflight_pass) if args.require_preflight_pass else None
+    )
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
 
+    # Fail-closed BEFORE any API / redis (spec: Clean dump without pass).
+    needs_pass = (
+        artifact_class == ArtifactClass.CLEAN_DUMP or require_pass_path is not None
+    )
+    if needs_pass:
+        try:
+            require_preflight_pass_or_raise(require_pass_path)
+        except PreflightPassRequiredError as exc:
+            logger.error("%s", exc)
+            report = RunReport(
+                mode=mode,
+                shop_id=shop_id,
+                overall_status=OverallStatus.FAILED,
+                families=[],
+                ceiling_max_seconds=0.0,
+                ceiling_max_calls=0,
+                ceiling_calls_used=0,
+                ceiling_exhausted=False,
+                label="preflight_pass_required",
+                artifact_class=(artifact_class.value if artifact_class else None),
+                contract_id=args.contract,
+                web_collector_handoff=False,
+            )
+            write_operator_report(report, output_dir)
+            print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+            return 1
+
+    # Contract primary RETURN path (0 API by default; no Cursor→prod).
+    if artifact_class == ArtifactClass.CONTRACT_PREFLIGHT:
+        return run_contract_preflight_sync(
+            shop_id=shop_id,
+            output_dir=output_dir,
+            bound_alias=str(args.bound_alias),
+            period_start=str(args.period_start),
+            period_end=str(args.period_end),
+            mode=mode,
+            emit_l0_side=bool(args.emit_l0_side),
+        )
+
+    # Legacy / explicit L0 research path (and clean_dump after accept → L0 collect).
     app_config = AppConfig.create()
     redis_config = app_config.infrastructure.redis
     redis_client_raw: Redis[str] = Redis(
@@ -80,7 +154,6 @@ async def _async_main(argv: list[str] | None = None) -> int:
     )
 
     try:
-        # Access-plane proof; hub AuthClientHandler re-fetches tokens per call.
         access = await get_access_for_wb_cabinet(shop_id)
         _ = access
 
@@ -90,7 +163,6 @@ async def _async_main(argv: list[str] | None = None) -> int:
             max_seconds=float(args.max_seconds),
             max_calls=int(args.max_calls),
         )
-        # ORDERS: pilot dateFrom from CLI (default 2026-07-04), not yesterday→today.
         shared = {"orders_date_from": str(args.orders_date_from)}
         report = await run_ops(
             shop_id=shop_id,
@@ -99,11 +171,23 @@ async def _async_main(argv: list[str] | None = None) -> int:
             ceiling=ceiling,
             shared=shared,
         )
-        # placeholder sha then rewrite once with digest in report body
+        report.artifact_class = (
+            artifact_class.value
+            if artifact_class
+            else ArtifactClass.L0_RESEARCH.value
+        )
+        report.contract_id = None
+        report.web_collector_handoff = False
+        report.primary_artifact = None
+        report.primary_sha256 = None
+
         report.archive_sha256 = None
         archive_path, digest = write_l0_archive(report, output_dir=output_dir)
         report.archive_sha256 = digest
+        report.l0_side_artifact = ARCHIVE_NAME
+        # Re-write so archive_sha256 inside report matches on-disk zip.
         archive_path, digest = write_l0_archive(report, output_dir=output_dir)
+        report.archive_sha256 = digest
 
         logger.info(
             "wb_api_readonly_ops done mode=%s shop_id=%s overall=%s archive=%s sha256=%s",
@@ -116,6 +200,7 @@ async def _async_main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
         print(f"ARCHIVE_PATH={archive_path.resolve()}")
         print(f"ARCHIVE_SHA256={digest}")
+        print("WEB_COLLECTOR_HANDOFF=NO")
 
         if report.overall_status == OverallStatus.FAILED:
             return 1

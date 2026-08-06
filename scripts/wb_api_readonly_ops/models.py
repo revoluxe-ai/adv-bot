@@ -15,6 +15,18 @@ class Mode(str, Enum):
     COLLECT = "collect"
 
 
+class ArtifactClass(str, Enum):
+    """Класс артефакта: contract RETURN primary vs L0 side vs clean_dump.
+
+    Spec: Explicit contract and artifact-class CLI surface;
+    decision wb-readonly-contract-return-vs-l0.
+    """
+
+    CONTRACT_PREFLIGHT = "contract_preflight"
+    L0_RESEARCH = "l0_research"
+    CLEAN_DUMP = "clean_dump"
+
+
 class FamilyName(str, Enum):
     """Семьи endpoint aliases (INC-RO-01 + INC-RO-06 ORDERS)."""
 
@@ -85,7 +97,7 @@ class FamilyResult:
 
 @dataclass
 class RunReport:
-    """Структурированный отчёт Owner-local research dump (не Web CLEAN_DUMP)."""
+    """Структурированный отчёт Owner-local / contract run (не Web PASS claim)."""
 
     mode: Mode
     shop_id: str
@@ -98,9 +110,25 @@ class RunReport:
     archive_sha256: str | None = None
     label: str = "owner_local_research_dump"
     web_pass_claimed: bool = False
+    artifact_class: str | None = None
+    contract_id: str | None = None
+    primary_artifact: str | None = None
+    primary_sha256: str | None = None
+    l0_side_artifact: str | None = None
+    web_collector_handoff: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        """Сериализация отчёта; web_pass_claimed всегда false для этого класса."""
+        """Сериализация отчёта; web_pass_claimed всегда false для этого класса.
+
+        Spec: Operator report exposes contract artifact fields
+        (ARTIFACT_CLASS / PRIMARY_* / L0_SIDE / WEB_COLLECTOR_HANDOFF /
+        CONTRACT_ID); зеркала SIDE_ARTIFACT / EXTERNAL_HANDOFF_READY.
+        """
+        handoff = bool(
+            self.web_collector_handoff
+            and self.primary_artifact
+            and self.primary_sha256
+        )
         return {
             "label": self.label,
             "mode": self.mode.value,
@@ -115,9 +143,17 @@ class RunReport:
             },
             "archive_sha256": self.archive_sha256,
             "web_pass_claimed": False,
+            "ARTIFACT_CLASS": self.artifact_class,
+            "PRIMARY_ARTIFACT": self.primary_artifact,
+            "PRIMARY_SHA256": self.primary_sha256,
+            "L0_SIDE_ARTIFACT": self.l0_side_artifact or "NONE",
+            "SIDE_ARTIFACT": self.l0_side_artifact or "NONE",
+            "WEB_COLLECTOR_HANDOFF": "YES" if handoff else "NO",
+            "EXTERNAL_HANDOFF_READY": "YES" if handoff else "NO",
+            "CONTRACT_ID": self.contract_id or "NONE",
             "note": (
-                "Owner-local research dump (secret-strip). "
-                "NOT Web READ_ONLY_PREFLIGHT_PASS / CLEAN_DUMP."
+                "Owner-local research dump (secret-strip) and/or contract "
+                "RETURN. NOT Web READ_ONLY_PREFLIGHT_PASS / CLEAN_DUMP."
             ),
         }
 

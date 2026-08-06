@@ -1,5 +1,10 @@
-"""Owner-local WB API read-only preflight/collect ops entrypoint (INC-RO-01)."""
+"""Owner-local WB API read-only preflight/collect + COL-R03-009 contract RETURN.
 
-from scripts.wb_api_readonly_ops.models import FamilyName, Mode, OverallStatus
+Capabilities: `wb-api-read-only-preflight`, `wb-readonly-contract-preflight-return`.
+L0 research zip is not Web COLLECTOR primary under COL-R03-009
+(decision wb-readonly-contract-return-vs-l0).
+"""
 
-__all__ = ["FamilyName", "Mode", "OverallStatus"]
+from scripts.wb_api_readonly_ops.models import ArtifactClass, FamilyName, Mode, OverallStatus
+
+__all__ = ["ArtifactClass", "FamilyName", "Mode", "OverallStatus"]

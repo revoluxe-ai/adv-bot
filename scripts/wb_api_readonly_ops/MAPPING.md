@@ -10,6 +10,31 @@ No new URLs. Gaps are reported, not invented.
 | analytics | `WBDataManager.get_sales_funnel_products_history` for 1 nmid (from cards) yesterday→today | same for up to N nmids | analytics + promotion fullstats optional later |
 | norms | `PromotionManager.get_supplier_subjects(payment_type=cpm)` | subjects + note GAP for `/adv/v0/config` and content directories (no adapter) | promotion product_cards adapter |
 
+## COL-R03-009 contract_preflight (primary RETURN)
+
+Delta specs: `wb-readonly-contract-preflight-return`,
+`wb-api-read-only-preflight` (contract CLI).
+Decision: change-local `wb-readonly-contract-return-vs-l0` (+ accepted
+`scripts-wb-api-ops-stack`).
+
+| Artifact class | Primary | Side |
+|----------------|---------|------|
+| `contract_preflight` + `--contract COL-R03-009` | `…_COL-R03-009_RETURN.zip` + `.sha256` | L0 only with `--emit-l0-side` (opt-in) |
+| `l0_research` / no contract | `wb_readonly_research.zip` | n/a — **not** Web COLLECTOR handoff |
+| `clean_dump` | requires `READ_ONLY_PREFLIGHT_PASS=YES` accept file before API | Web PASS **not** claimed by Job |
+
+Mapping gate (honest, no invent URL):
+
+| Alias | Gate |
+|-------|------|
+| API-PROMOTION-CAMPAIGNS | PASS_MAP — GET `/adv/v1/promotion/count` (existing adapter) |
+| API-ORDERS-SALES | REFUSED + exact blockers (contemporaneous attestation not claimed PASS_MAP here) |
+| API-PROMOTION-STATISTICS | REFUSED + exact blockers |
+| API-CONTENT-CARDS | REFUSED — no GET-only cards list |
+
+`api_preflight=REFUSED` still packages RETURN. L0 research zip MUST NOT be
+primary under COL-R03-009. Job MUST NOT assert Web `READ_ONLY_PREFLIGHT_PASS`.
+
 ## ORDERS identity (INC-RO-06) — anti-substitution
 
 `ORDERS_OR_SALES_REPORTS_READ` = statistics-api GET `/api/v1/supplier/orders`
@@ -32,8 +57,11 @@ family (analytics may still use yesterday→today for its own probe).
 - Norms&limits `GET /adv/v0/config` — generated client only, no domain adapter
 - Content directories (categories/subjects/characteristics) — generated only, no adapter
 - ORDERS Stage B pagination / CLEAN_DUMP — Future Increment (not INC-RO-06)
+- Full contemporaneous PASS_CANDIDATE for all four COL-R03-009 aliases — Owner
+  follow-up; packager ships honest REFUSED RETURN today
 
 ## Access
 
-1. `get_access_for_wb_cabinet(shop_id)` — access plane proof
+1. `get_access_for_wb_cabinet(shop_id)` — access plane proof (L0 path)
 2. `WBManagerHubFactory.get_wb_manager_hub(shop_id)` — AuthClientHandler → managers
+3. Contract RETURN path: attestation packager; shop_id never inside RETURN zip

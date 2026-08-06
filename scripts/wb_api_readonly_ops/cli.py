@@ -1,11 +1,22 @@
-"""Argparse для wb_api_readonly_ops."""
+"""Argparse для wb_api_readonly_ops.
+
+Spec: Explicit contract and artifact-class CLI surface
+(wb-api-read-only-preflight / wb-readonly-contract-preflight-return).
+"""
 
 from __future__ import annotations
 
 import argparse
 
+from scripts.wb_api_readonly_ops.contract_constants import (
+    CONTRACT_ID,
+    DEFAULT_BOUND_ALIAS,
+    DEFAULT_PERIOD_END,
+    DEFAULT_PERIOD_START,
+)
 from scripts.wb_api_readonly_ops.models import (
     ORDERS_PERIOD_DATE_FROM_DEFAULT,
+    ArtifactClass,
     Mode,
 )
 
@@ -14,24 +25,69 @@ DEFAULT_MAX_CALLS = 40
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """CLI: обязательные --shop-id и --mode."""
+    """CLI: обязательные --shop-id и --mode; опциональный contract surface."""
     parser = argparse.ArgumentParser(
         prog="wb_api_readonly_ops",
         description=(
             "Owner-local WB API read-only preflight/collect via existing stack. "
-            "Not Web READ_ONLY_PREFLIGHT_PASS."
+            "Contract COL-R03-009 primary RETURN when --artifact-class "
+            "contract_preflight. Not Web READ_ONLY_PREFLIGHT_PASS."
         ),
     )
     parser.add_argument(
         "--shop-id",
         required=True,
-        help="WB cabinet shop_id (never hardcoded)",
+        help="WB cabinet shop_id (never hardcoded; never in RETURN zip)",
     )
     parser.add_argument(
         "--mode",
         required=True,
         choices=[Mode.PREFLIGHT.value, Mode.COLLECT.value],
         help="preflight=smallest probe; collect=best-effort pull",
+    )
+    parser.add_argument(
+        "--contract",
+        default=None,
+        choices=[CONTRACT_ID],
+        help=f"Frozen contract id (currently {CONTRACT_ID})",
+    )
+    parser.add_argument(
+        "--artifact-class",
+        default=None,
+        choices=[c.value for c in ArtifactClass],
+        help=(
+            "contract_preflight=COL-R03-009 RETURN primary; "
+            "l0_research=Owner-local research zip; "
+            "clean_dump=requires READ_ONLY_PREFLIGHT_PASS accept file"
+        ),
+    )
+    parser.add_argument(
+        "--bound-alias",
+        default=DEFAULT_BOUND_ALIAS,
+        help="Account alias for contract attestations (default WB-TEST-CABINET-001)",
+    )
+    parser.add_argument(
+        "--period-start",
+        default=DEFAULT_PERIOD_START,
+        help="Contract period start YYYY-MM-DD (Europe/Moscow calendar)",
+    )
+    parser.add_argument(
+        "--period-end",
+        default=DEFAULT_PERIOD_END,
+        help="Contract period end YYYY-MM-DD (Europe/Moscow calendar)",
+    )
+    parser.add_argument(
+        "--require-preflight-pass",
+        default=None,
+        help=(
+            "Path to accept file that must contain READ_ONLY_PREFLIGHT_PASS=YES "
+            "(required for artifact-class clean_dump)"
+        ),
+    )
+    parser.add_argument(
+        "--emit-l0-side",
+        action="store_true",
+        help="With contract_preflight, also write L0 research zip as side artifact",
     )
     parser.add_argument(
         "--orders-date-from",
@@ -65,3 +121,16 @@ def build_parser() -> argparse.ArgumentParser:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Разобрать argv; unknown mode → SystemExit non-zero via argparse."""
     return build_parser().parse_args(argv)
+
+
+def resolve_artifact_class(args: argparse.Namespace) -> ArtifactClass | None:
+    """Вывести ArtifactClass из --artifact-class / --contract.
+
+    Spec: contract COL-R03-009 или artifact-class contract_preflight →
+    contract path; иначе None (legacy L0) или явный l0_research/clean_dump.
+    """
+    if args.artifact_class:
+        return ArtifactClass(args.artifact_class)
+    if args.contract == CONTRACT_ID:
+        return ArtifactClass.CONTRACT_PREFLIGHT
+    return None
