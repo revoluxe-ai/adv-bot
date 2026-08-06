@@ -30,6 +30,11 @@ architecture decisions belong here.
     statistics-api GET supplier orders/sales via generated Reports client +
     narrow `wb/api` adapter; anti-substitution vs funnel/fullstats/FBS;
     honest dateFrom/cursor period attestation.
+- [wb-api-master-local-swagger-map](wb-api-master-local-swagger-map/decision.md)
+  - Status: Accepted
+  - Scope: ownership/layering for offline API Master map builder in `tools/`;
+    entries only from local vN swagger; no invent URL, download, or codegen;
+    map does not authorize WB calls.
 
 ## Change Requirements
 

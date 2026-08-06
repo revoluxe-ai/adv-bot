@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed
+Accepted
+
+<!-- Promoted to openspec/decisions/wb-api-master-local-swagger-map/ on archive -->
 
 ## Context
 
