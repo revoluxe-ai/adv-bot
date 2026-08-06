@@ -478,3 +478,6 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   increment_candidate_for: INC-RO-05
   reason: out_of_current_mvp
   notes: after working collect path
+
+
+Отключение Поиск РК, если все ключи в минусе  И ФАКТ CPO > MAX
