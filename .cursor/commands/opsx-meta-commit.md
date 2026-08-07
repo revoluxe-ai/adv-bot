@@ -8,16 +8,16 @@ source_path: .cursor/commands/opsx-meta-commit.md
 source_blob_sha: 89aec347dfabd8b6999c1ea4021d5c0c520a5330
 embedded_canonical_sha256: 94fae56b5cf1d6690784c7ea9c922ff4c2fccc81ec309c4595dfd6bd404ec10c
 upstream_snapshot: .opsx/upstream/a71601dba3b9/.cursor/commands/opsx-admin-command-commit.md
-required_adapters: ["opsx-lite", "vue-npm"]
-local_modification_note: "Full canonical body restored under target override (OPSX-GAME-FULL-BODY-CORRECTION-01); clarify COMMITTED vs NOT_COMMITTED_THIS_RUN report"
+required_adapters: ["opsx-lite"]
+local_modification_note: "Projectize 2026-08-07: vue-npm dropped; poetry-python; clarify COMMITTED vs NOT_COMMITTED_THIS_RUN"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-FULL-BODY-CORRECTION-01
+contract_id: OPSX-WB-META-SURFACE-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-FULL-BODY-CORRECTION-01`  
+**Contract:** `OPSX-WB-META-SURFACE-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins over the canonical source body for target paths, capabilities, safety stops, and authority.
 
@@ -29,7 +29,7 @@ newline_normalization: none
 - Schemas/templates: `openspec/schemas/**`
 - Activation/provenance: `.opsx/registry/**`
 - Frozen upstream: `.opsx/upstream/a71601dba3b9/`
-- Adapter: `.opsx/adapters/vue-npm/README.md`
+- Adapter: `.opsx/adapters/poetry-python/README.md`
 - Quality gates: `.opsx/project/quality-gates.md`
 
 ### Hard target bans
@@ -61,7 +61,7 @@ Owner unblocked this former-DEFERRED command (2026-08-03): execute canonical sou
 
 Hard bans still apply. Missing Poetry/pytest/pyright/kubectl (and other undeclared source capabilities) => UNAVAILABLE or FAIL_CLOSED — never PASS-by-absence. Do not invent missing adapters or import source product dumps. File/process operations only on target authority paths.
 
-### Target-local meta commit extensions (`OPSX-GAME-META-COMMIT-01`)
+### Target-local meta commit extensions (`OPSX-WB-META-COMMIT-01`)
 
 - Canonical active name: `/opsx-meta-commit` (upstream body may still say admin-command-commit).
 - **Process allowlist SoT:** `.opsx/sources.yaml` (`allowlist` / `hard_exclude`) —

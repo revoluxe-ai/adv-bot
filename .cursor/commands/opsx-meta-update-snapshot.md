@@ -4,10 +4,10 @@ component_version: 0.1.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
+required_adapters: ["opsx-lite"]
 local_modification_note: "Committed allowlist → central repo/branch snapshot Git; Owner GO"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-SNAPSHOT-01
+contract_id: OPSX-WB-META-SNAPSHOT-01
 newline_normalization: none
 ---
 
@@ -21,7 +21,7 @@ Same allowlist as `/opsx-meta-commit`. Product `openspec/**` / app code stay on
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-SNAPSHOT-01
+CONTRACT_ID: OPSX-WB-META-SNAPSHOT-01
 WRITES: central snapshot Git only
 ```
 

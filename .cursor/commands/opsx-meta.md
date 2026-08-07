@@ -4,16 +4,16 @@ component_version: 0.2.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
+required_adapters: ["opsx-lite"]
 local_modification_note: "Canonical META router for /opsx-meta-* command plane; supersedes /opsx-команда alias"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-01
+contract_id: OPSX-WB-META-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-META-01`  
+**Contract:** `OPSX-WB-META-01`  
 **Runtime class:** `ACTIVE`  
 Always `READ_ONLY`. Never write. Never execute recommended workers.
 
@@ -35,7 +35,7 @@ Shared: `.opsx/shared/meta-orientation.md`, `.opsx/shared/command-discovery.md`
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-01
+CONTRACT_ID: OPSX-WB-META-01
 LANE: META
 ```
 

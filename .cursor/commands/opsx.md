@@ -4,16 +4,16 @@ component_version: 0.1.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
+required_adapters: ["opsx-lite"]
 local_modification_note: "Target-native OPSX meta orientation: PRODUCT + COMMAND lanes; Owner request 2026-08-06"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-01
+contract_id: OPSX-WB-META-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-META-01`  
+**Contract:** `OPSX-WB-META-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins for target paths, write boundary, and bans.
 
@@ -65,7 +65,7 @@ pasteable next step. Shared contract: `.opsx/shared/meta-orientation.md`.
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-01
+CONTRACT_ID: OPSX-WB-META-01
 MODE_FAMILY: READ_ONLY_ORIENTATION
 ```
 

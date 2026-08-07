@@ -4,10 +4,10 @@ component_version: 0.2.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
+required_adapters: ["opsx-lite"]
 local_modification_note: "Bounded interesting-command recommendations; SURFACE STRUCTURE_CHANGED layout drift"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-DISCOVER-01
+contract_id: OPSX-WB-META-DISCOVER-01
 newline_normalization: none
 ---
 
@@ -18,7 +18,7 @@ READ_ONLY: what may help **this** repository from the central catalog index.
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-DISCOVER-01
+CONTRACT_ID: OPSX-WB-META-DISCOVER-01
 WRITES: none (optional .tmp packet only)
 ```
 

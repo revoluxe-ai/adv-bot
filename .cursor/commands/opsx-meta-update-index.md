@@ -4,10 +4,10 @@ component_version: 0.2.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
+required_adapters: ["opsx-lite"]
 local_modification_note: "Incremental catalog index from snapshot watermarks; Owner GO; STRUCTURE_HASH path-set integrity"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-INDEX-01
+contract_id: OPSX-WB-META-INDEX-01
 newline_normalization: none
 ---
 
@@ -18,7 +18,7 @@ Incremental catalog index over central branch snapshots.
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-INDEX-01
+CONTRACT_ID: OPSX-WB-META-INDEX-01
 WRITES: catalog Git only
 ```
 

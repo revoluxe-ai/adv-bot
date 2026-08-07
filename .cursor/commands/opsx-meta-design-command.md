@@ -8,16 +8,16 @@ source_path: .cursor/commands/opsx-meta-design-command.md
 source_blob_sha: 409430b17ff6b8f875b6fdd26a1354d3eec6f852
 embedded_canonical_sha256: 46e18e403cccf152c6bd58e4d737917bf03a596b6961390289df51149f388baa
 upstream_snapshot: .opsx/upstream/a71601dba3b9/.cursor/commands/opsx-admin-command-design-command.md
-required_adapters: ["opsx-lite", "vue-npm"]
-local_modification_note: "Full canonical body restored under target override (OPSX-GAME-FULL-BODY-CORRECTION-01)"
+required_adapters: ["opsx-lite"]
+local_modification_note: "Projectize 2026-08-07: vue-npm dropped; poetry-python adapter; OPSX-WB-META-SURFACE-01"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-FULL-BODY-CORRECTION-01
+contract_id: OPSX-WB-META-SURFACE-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-FULL-BODY-CORRECTION-01`  
+**Contract:** `OPSX-WB-META-SURFACE-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins over the canonical source body for target paths, capabilities, safety stops, and authority.
 
@@ -29,7 +29,7 @@ newline_normalization: none
 - Schemas/templates: `openspec/schemas/**`
 - Activation/provenance: `.opsx/registry/**`
 - Frozen upstream: `.opsx/upstream/a71601dba3b9/`
-- Adapter: `.opsx/adapters/vue-npm/README.md`
+- Adapter: `.opsx/adapters/poetry-python/README.md`
 - Quality gates: `.opsx/project/quality-gates.md`
 
 ### Hard target bans

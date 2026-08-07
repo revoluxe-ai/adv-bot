@@ -1,10 +1,12 @@
 ---
 component_id: opsx.commands.adapt_project
-component_version: 0.4.0
+component_version: 0.5.0
 runtime_class: ACTIVE_WITH_LIMITS
 ownership: TARGET_ONLY
-contract_id: OPSX-GAME-FULL-BODY-CORRECTION-01
+contract_id: OPSX-WB-ADAPT-PROJECT-01
 canonical_source_body: none
+required_adapters: ["opsx-lite"]
+local_modification_note: "v0.5 poetry-python adapter path; Owner projectize GO 2026-08-07"
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
@@ -37,14 +39,16 @@ Do not mutate planning artifacts or code until projectization is COMPLETE.
 
 ## `/opsx-adapt-project` (read-only)
 
-Detect current capabilities from `package.json` scripts and `.opsx/adapters/vue-npm/`. Report activation deltas. No writes.
+Detect current capabilities from `pyproject.toml` / Poetry scripts,
+`app/` layout, and `.opsx/adapters/poetry-python/`. Report activation deltas.
+No writes.
 
 ## `/opsx-adapt-project:GO`
 
 Updates only:
 
-- `.opsx/adapters/vue-npm/`
-- `.opsx/project/quality-gates.md` / context snippets
+- `.opsx/adapters/poetry-python/`
+- `.opsx/project/quality-gates.md` / context snippets (if present)
 - `.opsx/registry/command_activation.ndjson` statuses for capability-bound commands
 
 Does **not** touch `openspec/changes/**`, archive, or decisions.

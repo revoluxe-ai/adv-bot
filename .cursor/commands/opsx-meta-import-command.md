@@ -4,16 +4,16 @@ component_version: 0.1.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
+required_adapters: ["opsx-lite"]
 local_modification_note: "Unified meta import: index-first + raw-donor fallback; supersedes opsx-admin-command-inbound-opsx"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-IMPORT-01
+contract_id: OPSX-WB-META-IMPORT-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-META-IMPORT-01`  
+**Contract:** `OPSX-WB-META-IMPORT-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins for target paths, write boundary, and bans.
 
@@ -67,7 +67,7 @@ index; explicit raw repo/archive donors remain supported as fallback.
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-IMPORT-01
+CONTRACT_ID: OPSX-WB-META-IMPORT-01
 PRODUCT_WRITER: NO
 UPSTREAM_OVERWRITE_DEFAULT: NO
 DEFAULT_SCOPE: one primary command (+ demonstrated companions only)
@@ -174,7 +174,7 @@ Donor vs local, when present:
 
 | Disposition | Meaning |
 |---|---|
-| `USEFUL_CANDIDATE` | Likely helps this Vue/npm Soft-prod target after remapping |
+| `USEFUL_CANDIDATE` | Likely helps this WB Sky / Poetry target after remapping |
 | `SKIP_DOMAIN` | Harmful or wrong domain; do not merge |
 | `SKIP_DUPLICATE` | Already covered locally |
 | `CONFLICT_LOCAL_WINS_DEFAULT` | Diverged; keep local unless Owner KEEP |

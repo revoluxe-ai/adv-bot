@@ -1,10 +1,12 @@
 ---
 component_id: opsx.commands.projectize
-component_version: 0.4.0
+component_version: 0.5.0
 runtime_class: ACTIVE
 ownership: TARGET_ONLY
-contract_id: OPSX-GAME-FULL-BODY-CORRECTION-01
+contract_id: OPSX-WB-PROJECTIZE-01
 canonical_source_body: none
+required_adapters: ["opsx-lite"]
+local_modification_note: "v0.5 WB/poetry projectize: never wipe product openspec; vue-npm not assumed; Owner GO 2026-08-07"
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
@@ -14,7 +16,7 @@ Target-only generated command. No canonical source body.
 # /opsx-projectize
 
 Projectization of imported **or bootstrap-seeded** OPSX/OpenSpec surfaces for
-this Vue/npm game repository.
+this **WB Sky / Poetry (Python)** repository (`adv-bot` family).
 
 ## Runtime class
 
@@ -44,24 +46,29 @@ NEXT_COMMAND: /opsx-meta-bootstrap
    pipeline, openspec, `.opsx`). Prefer citing
    `.tmp/opsx-bootstrap/*/MERGE_RECEIPT.md` when present in this chat.
 2. Classify each: `KEEP` / `DELETE` / `REWRITE` / `DEFER`.
-3. Enumerate destructive paths (source changes/archives/specs/decisions/config).
-4. Detect target capabilities via `.opsx/adapters/vue-npm/` + `package.json` scripts.
+3. Enumerate destructive paths — and mark which are **forbidden** on this
+   product tree (existing WB `openspec/**` must stay).
+4. Detect target capabilities via `pyproject.toml` / Poetry, `app/`, tests,
+   and `.opsx/adapters/poetry-python/` (not Vue/`package.json` game scripts).
 5. Show activation changes and unresolved items.
 6. **No writes.**
 
 ### `/opsx-projectize:GO` (authorized apply)
 
-Requires explicit Owner GO (this task contract `OPSX-GAME-EXECUTION-01` grants the first run).
+Requires explicit Owner `:GO`.
 
-Apply the plan:
+Apply a **product-safe** plan for this repo:
 
-1. Remove source changes / archives / product specs if present.
-2. Reset decisions registry to clean template+index.
-3. Regenerate `openspec/config.yaml` from target facts.
-4. Adapt policies, schemas/templates, commands/rules/pipeline.
-5. Update activation + provenance.
+1. **Do not** remove `openspec/changes/**`, `openspec/changes/archive/**`,
+   `openspec/specs/**`, or accepted `openspec/decisions/**`.
+2. **Do not** reset the decisions registry to empty when product decisions exist.
+3. **Do not** regenerate `openspec/config.yaml` from a foreign game template;
+   keep WB Sky product config unless Owner explicitly authorizes a rewrite.
+4. Rewrite game-/vue-tainted process commands and adapter refs for Poetry/WB.
+5. Update `.opsx/manifest.yaml`, adapters, activation + provenance.
 6. Write `.opsx/project/manual_review.md`.
-7. Set `.opsx/projectization.yaml` to `COMPLETE` only after checks pass.
+7. Set `.opsx/projectization.yaml` to `COMPLETE` only after checks pass
+   (openspec product tree intact; required gate commands present; lock coherent).
 
 ## Lock semantics
 
@@ -77,10 +84,12 @@ After `COMPLETE`, a second `:GO` without Owner reset must fail closed.
 
 ## Forbidden
 
-- Modifying `src/**`, `public/**`, `package.json`, lockfile, vue config.
+- Modifying `app/**` product code, `tests/**` (except process-only if Owner asks),
+  `pyproject.toml`, Poetry lock, `.env*`.
 - Installing dependencies.
 - Commit / push / PR / deploy.
-- Importing WB product state into the active tree.
+- Assuming or seeding `.opsx/adapters/vue-npm/**`.
+- Blind wipe of product OpenSpec state from a game donor plan.
 
 ## When not to use (after COMPLETE)
 

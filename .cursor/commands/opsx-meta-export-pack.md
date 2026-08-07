@@ -4,16 +4,16 @@ component_version: 0.1.0
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
-required_adapters: ["opsx-lite", "vue-npm"]
-local_modification_note: "Inbound KEEP from opsx-pack.zip 20260805; target remap Vue/npm + .opsx allowlist; Owner GO inbound 2026-08-05"
+required_adapters: ["opsx-lite"]
+local_modification_note: "Projectize 2026-08-07: remapped Vue/npm → poetry-python / WB Sky; opsx-lite only"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-EXPORT-PACK-01
+contract_id: OPSX-WB-EXPORT-PACK-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-EXPORT-PACK-01`  
+**Contract:** `OPSX-WB-EXPORT-PACK-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins for target paths, write boundary, and bans.
 
@@ -59,7 +59,7 @@ and leave every source tree untouched.
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-EXPORT-PACK-01
+CONTRACT_ID: OPSX-WB-EXPORT-PACK-01
 MODE_FAMILY: COPY_ONLY
 ```
 
@@ -175,7 +175,7 @@ AGENTS.md
 Skip under these trees: archives/junk already present (e.g. `commands.zip`),
 `__pycache__/`, `*.pyc`, `node_modules/`.
 
-### Project-local OPSX (Vue/npm fork)
+### Project-local OPSX (WB Sky / Poetry)
 
 ```text
 .opsx/adapters/**
