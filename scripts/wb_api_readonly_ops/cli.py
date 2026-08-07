@@ -14,6 +14,7 @@ from scripts.wb_api_readonly_ops.contract_constants import (
     DEFAULT_PERIOD_END,
     DEFAULT_PERIOD_START,
 )
+from scripts.wb_api_readonly_ops.r04_constants import CONTRACT_ID_R04
 from scripts.wb_api_readonly_ops.models import (
     ORDERS_PERIOD_DATE_FROM_DEFAULT,
     ArtifactClass,
@@ -30,8 +31,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="wb_api_readonly_ops",
         description=(
             "Owner-local WB API read-only preflight/collect via existing stack. "
-            "Contract COL-R03-009 primary RETURN when --artifact-class "
-            "contract_preflight. Not Web READ_ONLY_PREFLIGHT_PASS."
+            "Contracts: COL-R03-009 or COL-R04-001 with --artifact-class "
+            "contract_preflight. Not Web READ_ONLY_PREFLIGHT_PASS. "
+            "Local Cursor must not call production cabinet/API."
         ),
     )
     parser.add_argument(
@@ -48,8 +50,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--contract",
         default=None,
-        choices=[CONTRACT_ID],
-        help=f"Frozen contract id (currently {CONTRACT_ID})",
+        choices=[CONTRACT_ID, CONTRACT_ID_R04],
+        help=(
+            f"Frozen contract id ({CONTRACT_ID} or {CONTRACT_ID_R04} r04 preflight)"
+        ),
     )
     parser.add_argument(
         "--artifact-class",
@@ -131,6 +135,6 @@ def resolve_artifact_class(args: argparse.Namespace) -> ArtifactClass | None:
     """
     if args.artifact_class:
         return ArtifactClass(args.artifact_class)
-    if args.contract == CONTRACT_ID:
+    if args.contract in (CONTRACT_ID, CONTRACT_ID_R04):
         return ArtifactClass.CONTRACT_PREFLIGHT
     return None

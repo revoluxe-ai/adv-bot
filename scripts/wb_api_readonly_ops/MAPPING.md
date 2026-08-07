@@ -10,6 +10,16 @@ No new URLs. Gaps are reported, not invented.
 | analytics | `WBDataManager.get_sales_funnel_products_history` for 1 nmid (from cards) yesterday→today | same for up to N nmids | analytics + promotion fullstats optional later |
 | norms | `PromotionManager.get_supplier_subjects(payment_type=cpm)` | subjects + note GAP for `/adv/v0/config` and content directories (no adapter) | promotion product_cards adapter |
 
+## COL-R04-001 contract_preflight (primary Lab ZIP)
+
+| Flag | Primary | Notes |
+|------|---------|-------|
+| `--contract COL-R04-001 --artifact-class contract_preflight` | `COL-R04-001_OWNER_LOCAL_READ_ONLY_PREFLIGHT_R04.zip` + `.sha256` | r04 authority under `authority/COL-R04-001/`; `GET_OR_DOCUMENTED_POST_AS_READ`; cabinet B1 must be NEW (r03/r03b bytes ≠ PASS); mass collection forbidden |
+
+Control-plane: Local Cursor must **not** call production cabinet/API. Credentialed
+execution = Owner-bot / cluster Job only. `shop_id` is Job/CLI binding only —
+never inside return ZIP.
+
 ## COL-R03-009 contract_preflight (primary RETURN)
 
 Delta specs: `wb-readonly-contract-preflight-return`,

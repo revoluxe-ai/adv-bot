@@ -62,6 +62,7 @@ from scripts.wb_api_readonly_ops.archive import (
 )
 from scripts.wb_api_readonly_ops.ceiling import RunCeiling
 from scripts.wb_api_readonly_ops.cli import parse_args, resolve_artifact_class
+from scripts.wb_api_readonly_ops.contract_constants import CONTRACT_ID
 from scripts.wb_api_readonly_ops.contract_flow import (
     run_contract_preflight_sync,
     write_operator_report,
@@ -123,6 +124,7 @@ async def _async_main(argv: list[str] | None = None) -> int:
 
     # Contract primary RETURN path (0 API by default; no Cursor→prod).
     if artifact_class == ArtifactClass.CONTRACT_PREFLIGHT:
+        contract_id = str(args.contract) if args.contract else CONTRACT_ID
         return run_contract_preflight_sync(
             shop_id=shop_id,
             output_dir=output_dir,
@@ -131,6 +133,7 @@ async def _async_main(argv: list[str] | None = None) -> int:
             period_end=str(args.period_end),
             mode=mode,
             emit_l0_side=bool(args.emit_l0_side),
+            contract_id=contract_id,
         )
 
     # Legacy / explicit L0 research path (and clean_dump after accept → L0 collect).
