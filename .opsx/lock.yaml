@@ -1,0 +1,10 @@
+# OPSX lock — scripts after projectize COMPLETE
+schema_version: 1
+repo_family_id: scripts
+note: "Completed via /opsx-projectize:GO 2026-08-07; publish via /opsx-meta-update-snapshot when ready"
+last_published:
+  source_commit: null
+  safe_tree_hash: null
+  snapshot_source_id: null
+  snapshot_head: null
+projectization_status: COMPLETE

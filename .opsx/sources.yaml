@@ -1,0 +1,26 @@
+# OPSX process-surface allowlist — bound by /opsx-meta-bootstrap GO
+# repo: meta-repo/scripts (consumer)
+schema_version: 1
+repo_family_id: scripts
+branch_id_source: git_branch_normalized
+
+central_root: C:\Users\vkita\my_code\opsx-central
+catalog_relpath: catalog
+sources_relpath: sources
+
+allowlist:
+  - .cursor/commands/**
+  - .cursor/rules/**
+  - .cursor/pipeline/**
+  - .opsx/**
+  - .agents/**
+  - AGENTS.md
+  - WORKLOG.md
+
+hard_exclude:
+  - .opsx/upstream/**
+  - openspec/changes/**
+  - openspec/archive/**
+  - app/**
+  - src/**
+  - .env*

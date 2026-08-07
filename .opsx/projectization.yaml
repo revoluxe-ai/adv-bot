@@ -1,0 +1,12 @@
+# OPSX projectization lock — scripts (WB Sky / Poetry)
+# contract: OPSX-SCRIPTS-PROJECTIZE-01
+status: COMPLETE
+normal_commands_enabled: true
+repo_family_id: scripts
+contract_id: OPSX-SCRIPTS-PROJECTIZE-01
+completed_at: 2026-08-07T06:02:24Z
+manual_review: .opsx/project/manual_review.md
+completed_by: opsx-projectize:GO
+seeded_from_central: C:\Users\vkita\my_code\opsx-central
+seeded_snapshot_ref: sources/game/go-to-prod
+notes: "Product OpenSpec KEEP; poetry-scripts adapter; no Vue wipe"

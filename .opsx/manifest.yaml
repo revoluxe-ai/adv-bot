@@ -1,0 +1,20 @@
+---
+ownership: PROJECT_LOCAL
+central_update_policy: NEVER_OVERWRITE
+---
+bootstrap_version: "0.5.0"
+projectize_version: "0.5.0"
+slice_id: OPSX-SCRIPTS-PROJECTIZE-01
+delivery_mode: project-local-scripts-poetry
+repo_family_id: scripts
+seeded_by: opsx-meta-bootstrap
+projectized_by: opsx-projectize:GO
+seeded_from: sources/game/go-to-prod
+runtime_dependency_on_upstream: false
+required_adapters:
+  - opsx-lite
+  - poetry-scripts
+authoritative_stores:
+  changes: openspec/changes
+  policies: openspec/policies
+  decisions: openspec/decisions
