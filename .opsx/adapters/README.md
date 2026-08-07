@@ -1,8 +1,13 @@
 # Adapters
 
-Bootstrap seeded this directory empty of stack adapters.
+Declared by `/opsx-projectize` for this repository.
 
-`/opsx-meta-bootstrap` is stack-agnostic (`required_adapters: ["opsx-lite"]` only).
-Do not assume `vue-npm` or any product stack here.
+| Adapter | Role |
+|---|---|
+| `opsx-lite` | Required process plane (commands/registry/shared) |
+| `poetry-python` | Target stack — WB Sky / Poetry (`adv-bot`) |
 
-Declare target adapters via `/opsx-projectize` / `/opsx-adapt-project`.
+Do **not** seed or require `vue-npm`. Root `package.json` (if present) is not
+the product runtime for this tree.
+
+Refresh notes via `/opsx-adapt-project` after tooling changes.
