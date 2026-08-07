@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "updated_at_utc": "2026-08-02T06:56:00Z",
+  "namespace": "prod-adv-bot",
+  "database_identity": "prod-adv-bot/postgres-db/adv_updater",
+  "alembic_head": "f2a3b4c5d6e7",
+  "application_baseline_status": "RECONCILED",
+  "application_source_history_hash": "interim-forensics-20260731T093353Z",
+  "control_baseline_status": "RECONCILED",
+  "prod_automation_enablement_allowed": "NO",
+  "image_repository": "harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot",
+  "image_tag": "fd6d2d0155fe08c3f1843da2118bf0194e612841",
+  "image_digest": "sha256:c021535fcb793850dc474db0a05e564d50653370a7ba96288888b03a0273b009",
+  "last_migrate_outcome": "SUCCESS_NOOP",
+  "last_control_outcome": "DRY_RUN_OK",
+  "entrypoints_on_image": [
+    "wb-sky-bot",
+    "adv-bot-updater",
+    "adv-bot-asq-worker",
+    "run-shop-update-worker",
+    "run-update-active-shop-ids",
+    "trunc-system-log-clickhouse",
+    "free-bot"
+  ],
+  "free_bot_replicas": 0,
+  "notes": [
+    "Harbor git-registry-cache is pull-through proxy",
+    "Do not laptop-alembic; Job path only under /opsx-devops SAFE_PROD_RELEASE"
+  ]
+}

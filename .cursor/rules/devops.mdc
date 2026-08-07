@@ -7,6 +7,8 @@ alwaysApply: false
 
 **Workflow / gates:** Cursor command `/opsx-devops`  
 **This file:** domain knowledge only (namespaces, monitoring, CSI policy, links).  
+**Durable ops memory:** `.cursor/devops/OPS_STATE.md` + `LAST.json` (past actions / current release posture).  
+**DB migrate procedure:** `DEVOPS_DB_MIGRATIONS.md` (CONTROL→Migrate→CAS).  
 Do **not** treat attaching this rule alone as license for cluster writes.
 
 | Mode | How | Mutates cluster? |
@@ -14,6 +16,7 @@ Do **not** treat attaching this rule alone as license for cluster writes.
 | Investigate (default) | `/opsx-devops` or `/opsx-devops INVESTIGATE …` | No — read-only kubectl + repo reads |
 | Plan write | `/opsx-devops PLAN_WRITE …` | No — plan + optional `--dry-run=client` |
 | Apply write | `/opsx-devops GO …` with scoped plan | Yes — allowlisted ops only |
+| Safe prod release | `/opsx-devops PLAN_WRITE\|GO intent=safe_prod_release …` | Yes — Job path + CAS only after GO |
 
 Hard forbids (all modes; details in `/opsx-devops` + `local-production-entrypoints.mdc` / `debug-runtime.mdc`):
 
@@ -21,8 +24,10 @@ Hard forbids (all modes; details in `/opsx-devops` + `local-production-entrypoin
 - `kubectl port-forward` / cluster Redis tunnel for local debug
 - printing Secret `data` values
 - product `app/**` bugfixes (→ `/opsx-fix-bug`)
+- laptop/`alembic upgrade` on prod; bare `kubectl set image` without CAS test+replace
 
-Acknowledgement is not write approval. Cluster mutations require exact `GO` on `/opsx-devops`.
+Acknowledgement is not write approval. Cluster mutations require exact `GO` on `/opsx-devops`.  
+`/opsx-devops` **must** read OPS_STATE at start and continue from it (not from empty chat).
 
 ## 📋 КОНТЕКСТ ПРОЕКТА
 
