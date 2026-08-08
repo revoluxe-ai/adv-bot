@@ -1809,6 +1809,7 @@ Supervisor не может:
 
 ```text
 SPEC_OR_PRODUCT_SEMANTICS_AMBIGUOUS
+BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION
 SCOPE_EXPANSION_REQUIRED
 DESTRUCTIVE_OR_PRODUCTION_ACTION_REQUIRED
 MATERIAL_RISK_ACCEPTANCE_REQUIRED
@@ -1825,6 +1826,39 @@ OPTIONS:
 RECOMMENDATION:
 CONSEQUENCES:
 ```
+
+### 21.1 Semantic write-target Owner propagation (mandatory)
+
+Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
+
+Если любой child worker (ff / update / apply / verify / archive / consultant)
+возвращает `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`:
+
+```text
+SUPERVISOR_STATUS: BLOCKED_OWNER_DECISION
+CHILD_STATUS: BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION
+DOWNSTREAM_DISPATCH: FORBIDDEN
+QUESTION_PROPAGATION: VERBATIM_REQUIRED
+GENERIC_SUMMARY_ONLY: FORBIDDEN
+ALTERNATE_WORKER_GUESS: FORBIDDEN
+OWNER_RESPONSE_DESTINATION: PLANNING_ARTIFACT_WRITER
+CHAT_ONLY_RESUME_APPLY: FORBIDDEN
+ONE_NEXT_ACTION: OWNER_DECISION_REQUIRED
+```
+
+Обязательные правила:
+
+* донести Owner **дословно** поля `BUSINESS_TERM`, `RUNTIME_CANDIDATES`,
+  `TARGET_EVIDENCE`, `QUESTION`, `OPTIONS`, `RECOMMENDATION`, `CONSEQUENCES`
+  из worker envelope — не сводить к generic `OWNER_DECISION_REQUIRED` и не
+  оставлять вопрос только внутри `OPEN_BLOCKERS`;
+* остановить все зависимые write / verify / archive / apply downstream tasks;
+* не dispatch-ить alternate writer для угадывания Auto/Search (или аналога);
+* независимые read-only DAG tasks могут завершиться, но mission не становится
+  successful, пока semantic gate открыт;
+* после ответа Owner сначала routing в `/opsx-update` (или другой planning
+  writer) для durable materialization target / allowed / forbidden adapters;
+* запрещено продолжать `/opsx-apply` на chat-only ответе.
 
 Если задача неразрешима без forbidden route:
 
