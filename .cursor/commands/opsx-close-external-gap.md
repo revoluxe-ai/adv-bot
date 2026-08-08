@@ -72,6 +72,8 @@ $ARGUMENTS
 |--------------|--------|
 | pasted `EXTERNAL_CALL_COVERAGE_REPORT` / `GAPS:` / `SURFACES:` | primary input |
 | pasted `REFACTOR_AND_TEST_PACKET` | packetized primary input (preferred for mixed FAIL pipeline) |
+| pasted `SCENARIO_REFACTOR_AND_TEST_PACKET` | PG/CH seam + provider integration from Scenario coverage |
+| pasted `SCENARIO_CERTIFY_PACKET` | authored PG/CH provider tests awaiting authorized execution |
 | `kind=pg` \| `kind=ch` | optional filter; default = все PG+CH FAIL gaps из packet |
 | `symbols=a,b` | optional subset of SYMBOL names |
 | `base=` | **запрещён** → `STATUS=BLOCKED`; скажи: base только у coverage |
@@ -95,19 +97,62 @@ $ARGUMENTS
 Если прислан `TEST_ONLY_PACKET` (без REFACTOR_AND_TEST items) →
 `STATUS=BLOCKED_REDIRECT_TEST_ONLY_PACKET` и отправь в `/opsx-test`.
 
+Если прислан `SCENARIO_TEST_ONLY_PACKET` без PG/CH refactor/certify items →
+`STATUS=BLOCKED_REDIRECT_TEST_ONLY_PACKET` и отправь в `/opsx-test`, сохранив
+Scenario/GAP identity.
+
 ## Required input
 
-Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH и нет
-`REFACTOR_AND_TEST_PACKET` с PG|CH items → `STATUS=BLOCKED_NEEDS_PACKET`.
+Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH, нет
+`REFACTOR_AND_TEST_PACKET`, `SCENARIO_REFACTOR_AND_TEST_PACKET` или
+`SCENARIO_CERTIFY_PACKET` с PG|CH items →
+`STATUS=BLOCKED_NEEDS_PACKET`.
 
 Спроси один раз:
 
 ```text
-Вставь EXTERNAL_CALL_COVERAGE_REPORT / GAPS или REFACTOR_AND_TEST_PACKET из
-/opsx-external-call-coverage. base= здесь не нужен.
+Вставь EXTERNAL_CALL_COVERAGE_REPORT / GAPS / REFACTOR_AND_TEST_PACKET из
+/opsx-external-call-coverage либо Scenario packet из
+/opsx-spec-scenario-coverage. base= здесь не нужен.
 ```
 
 Не выдумывай gaps из git diff.
+
+## Scenario coverage packets
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
+Taxonomy:
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
+
+Для `SCENARIO_REFACTOR_AND_TEST_PACKET`:
+
+1. принять только `SCHEMA_VERSION=1`, `DISPOSITION=REFACTOR_AND_TEST`,
+   `KIND=PG|CH`;
+2. сохранить `CHANGE_ID`, `GAP_ID`, `SCENARIO_ID`, `CONTRACT_ID` и hashes;
+3. сверить `SOURCE_SPEC_SHA`, `WORKTREE_FINGERPRINT` и `CONTRACT_SHA`;
+4. stale packet → `DATA_GAP`, без edits;
+5. создать минимальный production seam и real provider integration tests;
+6. использовать переданный reviewed `ContractCase`;
+7. не менять semantic expectation ContractCase/golden.
+
+Если production reality противоречит ContractCase:
+
+```text
+STATUS: BLOCKED_CONTRACT_MISMATCH
+```
+
+Не обновляй golden текущим provider output. Material behavior ambiguity
+принадлежит Owner/planning route.
+
+Для `SCENARIO_CERTIFY_PACKET`:
+
+1. production/test authorship не повторять без freshness gap;
+2. проверить exact provider test ids и все hashes;
+3. без valid independent re-audit и `AUTHORIZE_ONE_LIVE_RUN` вернуть
+   `BLOCKED_NEEDS_LIVE_RUN_AUTH` либо `BLOCKED_NEEDS_INDEPENDENT_REAUDIT`;
+4. после фактического запуска создать `PROVIDER_EXECUTION_RECEIPT`;
+5. не выдавать `SCENARIO_TEST_COVERAGE_PASS`.
 
 ## LOC_LINK (mandatory for report items)
 
@@ -197,6 +242,7 @@ Accept **only** together with:
 
 ```text
 INDEPENDENT_REAUDIT:
+  SOURCE_COMMAND: /opsx-external-call-coverage | /opsx-spec-scenario-coverage
   VERDICT: READY_FOR_ONE_AUTHORIZED_RUN
   AUDITED_HEAD: <sha>
   AUDITED_STATUS_SHA256: <sha256>
@@ -512,6 +558,8 @@ Allowed under autonomous refactor + causal scope:
 * local and shared test helpers/fixtures/factories when required by gap;
 * new local integration tests and mock-only unit tests;
 * docstrings on changed public symbols.
+* `.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_ID>.md`
+  только после фактического authorized provider run по Scenario packet.
 
 Forbidden:
 
@@ -527,7 +575,8 @@ Forbidden:
 ## Steps
 
 1. Разобрать packet; извлечь `BASE`, `HEAD`, FAIL gaps (или items из
-   `REFACTOR_AND_TEST_PACKET`); применить filter `kind` / `symbols`.
+   `REFACTOR_AND_TEST_PACKET` / Scenario packets); применить filter
+   `kind` / `symbols`.
    Для items с location перенести/сформировать `LOC_LINK`.
 2. Если `base=` в args → `BLOCKED` (не путать с BASE внутри packet).
 3. Если нет PG/CH FAIL gaps → `BLOCKED_NEEDS_PACKET` или
@@ -541,20 +590,24 @@ Forbidden:
    mock-only unit as needed.
 8. Do **NOT** run live/destructive pytest unless `AUTHORIZE_ONE_LIVE_RUN`
    + valid `INDEPENDENT_REAUDIT` present and audited-state preflight passes.
-9. Print Final report as self-report + pasteable independent re-audit
-   (`PACKET_BASE`).
+9. После Scenario live run создать `PROVIDER_EXECUTION_RECEIPT` по shared
+   schema; receipt не равен final coverage PASS.
+10. Print Final report as self-report + pasteable independent re-audit
+    (`PACKET_BASE` для ECC или Scenario identity для Scenario route).
 
 ## Status
 
 | STATUS | Когда |
 |--------|--------|
 | `READY_FOR_READ_ONLY_REAUDIT` | seam/helper/test code authored; mock-only checks done; awaiting independent coverage |
+| `PROVIDER_EXECUTION_RECEIPT_READY` | authorized Scenario provider tests выполнены; receipt создан; awaiting scenario certify |
 | `BLOCKED_NEEDS_PACKET` | нет входа из coverage |
 | `BLOCKED_REDIRECT_TEST_ONLY` | gaps не PG/CH refactor path → `/opsx-test` |
 | `BLOCKED_REDIRECT_TEST_ONLY_PACKET` | передан только `TEST_ONLY_PACKET` → `/opsx-test` |
 | `BLOCKED_NEEDS_SEAM_SCOPE` | нужна broad business feature, не seam/refactor → `/opsx-apply` |
 | `BLOCKED_NEEDS_LIVE_RUN_AUTH` | live invoke without `AUTHORIZE_ONE_LIVE_RUN` |
 | `BLOCKED_NEEDS_INDEPENDENT_REAUDIT` | live token without valid independent packet |
+| `BLOCKED_CONTRACT_MISMATCH` | provider reality и reviewed ContractCase расходятся; auto-update forbidden |
 | `DATA_GAP` | audited state changed / non-regular untracked / dangerous operational area / missing evidence |
 | `BLOCKED` | неизвестный token / `base=` в args / preflight |
 
@@ -566,10 +619,12 @@ as independent truth. Optional internal counters (`SEAMS_AUTHORED`,
 ## Final report (required)
 
 ```text
-STATUS: READY_FOR_READ_ONLY_REAUDIT | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_REDIRECT_TEST_ONLY_PACKET | BLOCKED_NEEDS_SEAM_SCOPE | BLOCKED_NEEDS_LIVE_RUN_AUTH | BLOCKED_NEEDS_INDEPENDENT_REAUDIT | DATA_GAP | BLOCKED
+STATUS: READY_FOR_READ_ONLY_REAUDIT | PROVIDER_EXECUTION_RECEIPT_READY | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_REDIRECT_TEST_ONLY_PACKET | BLOCKED_NEEDS_SEAM_SCOPE | BLOCKED_NEEDS_LIVE_RUN_AUTH | BLOCKED_NEEDS_INDEPENDENT_REAUDIT | BLOCKED_CONTRACT_MISMATCH | DATA_GAP | BLOCKED
 
 PACKET_BASE: <from report>
 PACKET_HEAD: <from report>
+SCENARIO_CHANGE_ID: <from Scenario packet | n/a>
+SCENARIO_GAP_IDS: <from Scenario packet | n/a>
 KIND_FILTER: pg|ch|pg+ch|…
 GAPS_SELECTED: <n>
 
@@ -592,6 +647,20 @@ TESTS_AUTHORED:
   TAG: SQL_CONTRACT_UNIT | HANDOFF_MOCK_ONLY | DESTRUCTIVE_AUTHORED_NOT_RUN | n/a
 
 LIVE_RUN: not_attempted | authorized_pass | authorized_fail | blocked_no_auth
+
+PROVIDER_EXECUTION_RECEIPTS:
+- PATH: .tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_ID>.md
+  GAP_ID:
+  SCENARIO_ID:
+  CONTRACT_ID:
+  CONTRACT_SHA:
+  TEST_CONTENT_SHA:
+  PRODUCTION_BOUNDARY_SHA:
+  SCHEMA_SHA:
+  WORKTREE_FINGERPRINT:
+  RESULT:
+  LOG_SHA:
+  SECRETS_REDACTED: YES
 
 CLOSE_RESULTS:
 - SYMBOL: <name>
@@ -620,6 +689,10 @@ DO_NOT_DO_YET:
   `/opsx-external-call-coverage base=<PACKET_BASE> focus=<kind>`  
   затем при focused PASS / independent live-ready verdict → owner may
   authorize one live run; then coverage `focus=all` as needed.
+  Для Scenario packet → `/opsx-spec-scenario-coverage mode=audit
+  change=<SCENARIO_CHANGE_ID>`.
+* `PROVIDER_EXECUTION_RECEIPT_READY` →
+  `/opsx-spec-scenario-coverage mode=certify change=<SCENARIO_CHANGE_ID>`.
 * `BLOCKED_REDIRECT_TEST_ONLY` → `/opsx-test` затем coverage rerun.
 * `BLOCKED_REDIRECT_TEST_ONLY_PACKET` → `/opsx-test` с этим packet, затем coverage rerun.
 * `BLOCKED_NEEDS_PACKET` → попросить paste report.
@@ -628,6 +701,8 @@ DO_NOT_DO_YET:
   independent `READY_FOR_ONE_AUTHORIZED_RUN`.
 * `BLOCKED_NEEDS_INDEPENDENT_REAUDIT` → run independent coverage/re-audit
   first.
+* `BLOCKED_CONTRACT_MISMATCH` → Owner/planning decision; не auto-update
+  ContractCase/golden.
 * `DATA_GAP` (`AUDITED_STATE_CHANGED` or operational danger) → new re-audit
   and/or redirect to the owning operational command.
 

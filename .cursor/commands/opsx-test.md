@@ -81,6 +81,124 @@ TEST_ONLY_PACKET:
 - Если packet пустой (`ITEMS` нет) → `NEXT_ACTION: /opsx-external-call-coverage base=<BASE>`
   для повторной проверки.
 
+## Packetized Scenario coverage input
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
+Taxonomy:
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
+
+Команда принимает:
+
+```text
+SCENARIO_TEST_ONLY_PACKET:
+  SCHEMA_VERSION: 1
+  SOURCE: SCENARIO_TEST_COVERAGE_REPORT
+  CHANGE_ID:
+  SOURCE_SPEC_SHA:
+  WORKTREE_FINGERPRINT:
+  ITEMS:
+    - GAP_ID:
+      SCENARIO_ID:
+      DISPOSITION: TEST_ONLY
+      REQUIRED_ARTIFACTS:
+      PRODUCTION_ENTRYPOINT:
+      REAL_BOUNDARY_SYMBOLS:
+      REALITY_CONSTRAINTS:
+      MOCKING_CONSTRAINTS:
+```
+
+### Validation
+
+До edits:
+
+1. проверить `SCHEMA_VERSION=1`, `SOURCE`, `CHANGE_ID`, непустые `ITEMS`;
+2. сохранить `GAP_ID` и `SCENARIO_ID` без переименования;
+3. сверить `SOURCE_SPEC_SHA` с текущим Scenario source;
+4. при stale spec вернуть `STATUS=BLOCKED_STALE_SCENARIO_PACKET`;
+5. принимать только `DISPOSITION=TEST_ONLY`;
+6. PG/CH `REFACTOR_AND_TEST` и `CERTIFY` items не поглощать — вернуть их
+   неизменными для `/opsx-close-external-gap`.
+
+### Authorship responsibility
+
+Для каждого item пакетно создать или обновить только необходимое в `tests/**`:
+
+- reviewed `ContractCase`/case vectors;
+- test fixtures/factories;
+- fake/stub после causal boundary;
+- `scenario_seam` test;
+- `stub_contract` test;
+- test-only `boundary_adapter` test, если production seam уже пригоден.
+
+`ContractCase` MUST быть общим executable source для scenario fake assertions
+и downstream provider integration. Запрещено:
+
+- автоматически генерировать или обновлять expected golden текущим live output;
+- полностью mock-ать `PRODUCTION_ENTRYPOINT` или causal/business boundary;
+- придумывать DTO/model fields;
+- заменять PG/CH provider proof session-mock unit-тестом;
+- менять `app/**` ради прохождения packet.
+
+Если item невозможно закрыть без production seam:
+
+```text
+ITEM_RESULT: REDIRECT_REFACTOR_AND_TEST
+NEXT: /opsx-close-external-gap
+```
+
+сформируй/сохрани совместимый `SCENARIO_REFACTOR_AND_TEST_PACKET`, не теряя
+identity/freshness fields.
+
+Если все test code написано, но требуется destructive/live provider run:
+
+```text
+ITEM_RESULT: AUTHORED_AWAITING_CERTIFICATION
+NEXT: /opsx-close-external-gap
+```
+
+сохрани `SCENARIO_CERTIFY_PACKET`. Не запускай live/destructive test из
+обычного `/opsx-test`.
+
+### Scenario packet result
+
+Верни per-item:
+
+```text
+SCENARIO_TEST_AUTHORSHIP_RESULT:
+  SCHEMA_VERSION: 1
+  CHANGE_ID:
+  SOURCE_SPEC_SHA:
+  WORKTREE_FINGERPRINT:
+  ITEMS:
+    - GAP_ID:
+      SCENARIO_ID:
+      RESULT: AUTHORED | ALREADY_COVERED | REDIRECT_REFACTOR_AND_TEST |
+              AUTHORED_AWAITING_CERTIFICATION | BLOCKED
+      CONTRACT_ID:
+      CONTRACT_CASES_PATH:
+      CONTRACT_SHA:
+      FAKE_OR_STUB_PATH:
+      FAKE_SHA:
+      TEST_IDS:
+      TEST_CONTENT_SHA:
+      TESTS_EXECUTED:
+      EXECUTION_RESULTS:
+      REMAINING_GAPS:
+      NEXT:
+```
+
+`AUTHORED` — writer self-report, не independent coverage PASS. После test-only
+items основной возврат:
+
+```text
+NEXT_ACTION: /opsx-spec-scenario-coverage mode=audit change=<CHANGE_ID>
+```
+
+При remaining PG/CH refactor/certify items основной `NEXT_ACTION` —
+`/opsx-close-external-gap` с соответствующим packet; повторный scenario audit
+остаётся следующим после writer closure.
+
 
 ## Route-trace event requirements (SCHEMA_VERSION 2)
 
@@ -153,6 +271,9 @@ NEXT_ACTION: /opsx-close-external-gap
   (paste the coverage report; no `base=` on close).
 - If input is `TEST_ONLY_PACKET`, process all `ITEMS` batch-wise and report
   per-item closure; do not require manual split from mixed coverage report.
+- If input is `SCENARIO_TEST_ONLY_PACKET`, process all `TEST_ONLY` items
+  batch-wise, preserve Scenario/GAP identity, and return
+  `SCENARIO_TEST_AUTHORSHIP_RESULT`; never claim final Scenario coverage PASS.
 - PG `sm(...)`: только явный `read_only=` (testing-rules § PG session mode).
   Bare `sm()` / wrong polarity — не TEST_ONLY; → `/opsx-close-external-gap`
   (или apply), не unit session-mock.
@@ -489,7 +610,8 @@ Result:
 - targeted command:
 - broader command, if needed:
 - remaining risks:
-- packet_source: none | TEST_ONLY_PACKET
+- packet_source: none | TEST_ONLY_PACKET | SCENARIO_TEST_ONLY_PACKET
+- scenario_authorship_result: none | SCENARIO_TEST_AUTHORSHIP_RESULT
 ```
 
 Return (bug-regression / verify):

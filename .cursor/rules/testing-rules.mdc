@@ -11,6 +11,9 @@ alwaysApply: false
 Authority split (не дублировать полный policy в commands):
 
 - `.cursor/rules/testing-rules.mdc` — общий test-design / execution policy
+- `.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` — единые определения
+  `unit_component`, `scenario_seam`, `boundary_integration`,
+  `stub_contract`, `destructive_local` и load/measurement evidence
 - `openspec/config.yaml` → `rules.tasks` — обязательства при генерации tasks
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + materialization обязательных tests
@@ -28,6 +31,29 @@ Authority split (не дублировать полный policy в commands):
 Это правило применяется при написании, правке и запуске тестов, а также при `/opsx-apply`, `/opsx-test` и любой работе, где нужно доказать observable behavior.
 
 Оно **не** запрещает писать production code в writer-сессиях (`/opsx-apply` и аналоги).
+
+## Test evidence taxonomy
+
+Используй
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` как словарь evidence и
+execution classes.
+
+Не смешивай:
+
+- pytest marker/path (`unit`, `integration`);
+- evidence class (`unit_component`, `scenario_seam`,
+  `boundary_integration`, `stub_contract`);
+- execution class (`fast_local`, `destructive_local`, `authorized_live`).
+
+`destructive_local` не означает автоматически ни полный Scenario coverage, ни
+production-destructive действие. `scenario_seam` может находиться в
+`tests/unit/`, если реальная causal logic проходит до тонкого внешнего конца.
+PG/CH provider contract по-прежнему требует live test provider согласно
+Kind defaults ниже.
+
+Найденный или authored test без исполнения отмечай `EXECUTED=NO`; он не
+является green evidence. Любой coverage verdict должен явно писать, что тест
+доказывает и чего не доказывает.
 
 ## Execution gates
 
