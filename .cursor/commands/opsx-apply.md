@@ -148,6 +148,13 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
      - do not create phantom model/DTO fields or impossible states;
      - do not fully mock the causal boundary under test;
      - materialize allowed sibling and residual/repeated-invocation scenarios when the packet/spec/task makes them mandatory;
+     - for Spec Scenario write/notify **thin ends** (WB pause/start, notify,
+       Telegram transport, etc.): prefer shared `ContractCase` + recording fake
+       in `tests/**` at the thin end (see
+       `.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md` /
+       `/opsx-spec-scenario-coverage`). Bare `MagicMock`/`AsyncMock` without
+       ContractCase is allowed only with explicit `TEST_DEBT` in task notes
+       listing stub symbols → `/opsx-test` (do not invent production APIs);
      - run focused/targeted tests for the changed slice (and adjacent tests when a neighboring contract/workflow is affected)
    - Do **not** mark the task complete (`- [ ]` → `- [x]`) if its mandatory tests fail
    - Mark task complete in the tasks file only after required implementation and mandatory focused tests for that task succeed: `- [ ]` → `- [x]`

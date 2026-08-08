@@ -15,6 +15,11 @@ You are allowed to edit tests only (plus durable RED/GREEN evidence under the ca
 
 Unchanged: author/update tests from a free-form request. Production code forbidden.
 
+When free-form input cites `SCENARIO_TEST_COVERAGE_FAIL`, `change=<id>`,
+stub gaps, or a pasted/prior `SCENARIO_TEST_ONLY_PACKET` — treat as scenario
+closure work: apply **Stub inventory before AUTHORED** (below), not a single
+obvious ContractCase family while other seam stubs remain open.
+
 ### Bug-regression mode (RED producer)
 
 When both are present:
@@ -141,6 +146,26 @@ SCENARIO_TEST_ONLY_PACKET:
 - придумывать DTO/model fields;
 - заменять PG/CH provider proof session-mock unit-тестом;
 - менять `app/**` ради прохождения packet.
+
+### Stub inventory before AUTHORED
+
+Перед `RESULT=AUTHORED` (packet batch **или** free-form closure после
+scenario FAIL) MUST:
+
+1. Построить `STUB_INVENTORY`: каждый stub/mock/fake thin end, используемый
+   mapped failing `scenario_seam` tests (WB pause/start, notify, Telegram
+   transport, injected PG/CH adapter после orchestration, и т.п.).
+2. Для каждого inventory entry либо:
+   - author shared `ContractCase` + scenario assert + `stub_contract` (+
+     `boundary_adapter` если seam уже пригоден), **или**
+   - оставить явный `REMAINING_GAPS` item с тем же GAP identity / stub symbol.
+3. Запрещено закрывать batch как «готово», если inventory непуст и gaps не
+   перечислены (пример дефекта: WB ContractCase authored, notify AsyncMock
+   без ContractCase, silent omit).
+
+В `SCENARIO_TEST_AUTHORSHIP_RESULT` при scenario context добавь поле
+`STUB_INVENTORY` (symbols + closed|remaining) на уровне результата или
+per-item `REMAINING_GAPS`.
 
 Если item невозможно закрыть без production seam:
 

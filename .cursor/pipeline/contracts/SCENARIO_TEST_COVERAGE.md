@@ -30,6 +30,7 @@ archive verdict.
 ```text
 /opsx-spec-scenario-coverage
   owns: plan, matrix, gap disposition, independent coverage verdict
+  CLI: mode=plan | mode=audit | mode=certify  (required; no silent default)
 
 /opsx-test
   owns: ContractCase, test fixtures/goldens, fake/stub, scenario tests
@@ -46,6 +47,34 @@ archive verdict.
 Owner
   owns: material behavior ambiguity, intentional golden/ContractCase semantic
         change, one-shot live authorization
+```
+
+## CLI modes (binding)
+
+Command surface for `/opsx-spec-scenario-coverage` MUST require:
+
+```text
+mode=plan | mode=audit | mode=certify
+change=<change-id>
+```
+
+| mode | Produces | Must not |
+|---|---|---|
+| `plan` | `SCENARIO_COVERAGE_PLAN` | claim tests exist; emit coverage PASS; execute tests |
+| `audit` | `SCENARIO_TEST_COVERAGE_REPORT` + gaps/packets (+ optional `INDEPENDENT_REAUDIT`) | silent-default when `mode=` missing; full PASS via `scenario=` focus |
+| `certify` | full-change report; PASS only with fresh `PROVIDER_EXECUTION_RECEIPT` when PG/CH required | PASS without receipts; accept `scenario=` focus as full certify |
+
+Fail-closed arg rules (missing `mode=`, unknown `mode=`, foreign tokens such as
+`base=` / `AUTHORIZE_ONE_LIVE_RUN` / writer `GO`, invalid combos) are owned by
+the command file Arg gate. Contract consumers and handoffs MUST pass explicit
+`mode=`; do not imply default `audit`.
+
+Recommended handoffs:
+
+```text
+/opsx-spec-scenario-coverage mode=plan change=<id>
+/opsx-spec-scenario-coverage mode=audit change=<id>
+/opsx-spec-scenario-coverage mode=certify change=<id>
 ```
 
 ## Lifecycle states
@@ -257,7 +286,8 @@ contract `/opsx-close-external-gap`.
 
 ## Independent provider re-audit
 
-До live authorization независимый `/opsx-spec-scenario-coverage mode=audit`
+До live authorization независимый
+`/opsx-spec-scenario-coverage mode=audit change=<CHANGE_ID>`
 должен проверить authored provider tests и current audited state:
 
 ```text
@@ -360,10 +390,18 @@ SCENARIO_TEST_COVERAGE_REPORT:
       ROW_VERDICT:
       GAPS:
   ROUTE_PACKETS:
-    TEST_ONLY_PACKET:
+    TEST_ONLY_PACKET:   # full SCENARIO_TEST_ONLY_PACKET when any TEST_ONLY gap
     REFACTOR_AND_TEST_PACKET:
     CERTIFY_PACKET:
 ```
+
+На `VERDICT=FAIL` с ≥1 gap disposition `TEST_ONLY`:
+`ROUTE_PACKETS.TEST_ONLY_PACKET` MUST быть полным pasteable
+`SCENARIO_TEST_ONLY_PACKET` (не пустой stub, не «см. GAPS»). Каждый blocking
+stub thin end → отдельный `ITEMS[]` (или явные `REQUIRED_ARTIFACTS` на item)
+с `CONTRACT_CASES` / `FAKE_OR_STUB` / `STUB_CONTRACT_TEST` /
+`BOUNDARY_ADAPTER_TEST` где применимо. FAIL без такого packet = неполный
+report (невалидный writer handoff).
 
 Full PASS требует:
 
@@ -403,3 +441,9 @@ identity/freshness and spot-checks acceptance-relevant evidence.
 - Re-audit uses current hashes, not chat memory.
 - FAIL packet routes to exactly one owning writer per item.
 - Receipt is provider evidence, not final certification.
+- FAIL with TEST_ONLY gaps without pasteable `SCENARIO_TEST_ONLY_PACKET` in
+  `ROUTE_PACKETS` is an incomplete auditor handoff — do not send Owner to
+  free-form `/opsx-test` with prose gaps alone.
+- Writer closing a TEST_ONLY batch MUST inventory stub thin ends used by failing
+  seams; partial closure (e.g. WB ContractCase only while notify stub remains)
+  without explicit `REMAINING_GAPS` is forbidden.
