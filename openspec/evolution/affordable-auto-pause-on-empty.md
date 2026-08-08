@@ -5,18 +5,20 @@ STAR_ID: affordable-auto-pause-on-empty
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-07T19:11:00Z
-UPDATED_AT: 2026-08-08T04:38:00Z
+UPDATED_AT: 2026-08-08T16:35:47Z
 DEPENDS_ON: none
 ```
 
 ## North Star
 
-Платный авто-бот честно останавливает неработающую РК (все ключи OFF → пауза
-кампании + периодическая перепроверка), остаётся в режиме «подключил и забыл»
-без путающего ручного отключения бота от рекламы, стоит 1000₽/мес за кампанию
-(в 5 раз дешевле прежних ~6000₽), честно тарифицирует ноги Auto/Search
-(половина при одной на паузе, ноль если обе на паузе — без обхода «пауза в
-момент списания»), и об этом ясно рассказывают пользователям.
+Платный авто-бот честно останавливает неработающие ноги рекламы по разным
+причинам: пустые ключи → пауза **Search**; исчерпанное тестирование ставок
+полок без ставки под нужный план → пауза **Auto** с отложенным перетестом;
+остаётся в режиме «подключил и забыл» без путающего ручного отключения бота
+от рекламы, стоит 1000₽/мес за кампанию (в 5 раз дешевле прежних ~6000₽),
+честно тарифицирует ноги Auto/Search (половина при одной на паузе, ноль если
+обе на паузе — без обхода «пауза в момент списания»), и об этом ясно
+рассказывают пользователям.
 
 Контекст: продукту почти 4 года; низкая популярность связана со сложным
 входом (настройка под ситуацию) и неочевидным выходом; статистика показывает,
@@ -24,24 +26,35 @@ DEPENDS_ON: none
 
 ## Capability Scope
 
-- Aliases: pause-on-empty-keywords, last-key-off-pause, тариф 1000, −80% цены,
-  подключил-и-забыл, retire bot_active OFF, half-price one leg paused,
-  fair pause billing, anti-gaming charge
-- Domains: auto-updater v3 (keyword OFF / last key); AutoAdvActiveControl /
+- Aliases: pause-on-empty-keywords, last-key-off-pause, Search-only empty
+  keywords, auto-shelf exhausted pause, shelf bid retest interval, тариф 1000,
+  −80% цены, подключил-и-забыл, retire bot_active OFF, half-price one leg
+  paused, fair pause billing, anti-gaming charge
+- Domains: auto-updater v3 (keyword OFF / last key); Auto Shelf Bid Control
+  (coverage / plan_distance / retest epoch); AutoAdvActiveControl /
   `ensure_campaigns_active`; billing `tariffs_for_auto_setting` / Pricer /
-  daily charge; WB active_status Auto+Search legs; Telegram UX;
-  Owner channel communications
+  daily charge; WB active_status Auto+Search legs; Telegram UX (pause reason +
+  shelf retest setting); Owner channel communications
 - Included outcomes:
-  - автопауза РК после отключения последнего ключа ботом;
-  - периодическое включение и перепроверка (корректно при окне статы 7 дней);
-  - сообщение пользователю о причине паузы/перепроверки;
+  - автопауза **Search** после отключения последнего ключа ботом;
+  - периодическое включение и перепроверка Search (корректно при окне статы
+    ≤7 дней);
+  - автопауза **Auto (полки)** когда эпоха тестирования ставок исчерпана и нет
+    ставки, дающей нужный план при допустимом CPO;
+  - отложенный перетест Auto: интервал задаёт пользователь + product default
+    (7 дней); новая эпоха не должна мгновенно «закрывать» покрытие старой
+    историей;
+  - сообщение пользователю о причине паузы/перепроверки (отдельно для
+    empty-keywords и shelf no-plan);
   - тариф авто 1000₽/мес за одну кампанию (базовая ставка);
   - тарификация по ногам: 1 активная нога → ~½; обе на паузе → 0 за эту пару;
     без обхода паузой «в момент списания»;
   - упрощение/снятие редкого ручного «отключить бота от РК»;
   - коммуникация изменений (TG и подходящие каналы).
 - Excluded outcomes:
-  - перепись логики автокампании за пределами pause/recheck/UX;
+  - пауза **обеих** ног из-за empty-keywords (Forbidden без нового Owner GO);
+  - перепись логики автокампании / shelf bid selection за пределами
+    pause/recheck/UX hooks;
   - ship полной бесплатной/упрощённой версии как DoD pause/price Changes
     (готовится отдельно; в анонсе — статус «готовится» + поддержка);
   - отдача paid automation core бесплатно (см. config free/paid граница);
@@ -65,7 +78,8 @@ Contribution to North Star: Честный «подключил и забыл» 
 кручения мёртвой рекламы; основа для цены и коммуникации.
 
 Scope boundary: только last-key-OFF → pause + recheck + UX + 7d proof; не тариф,
-не снятие `bot_active` toggle, не канал-анонс.
+не снятие `bot_active` toggle, не канал-анонс. (Первая поставка била в Auto-ногу;
+целевая нога уточнена в `INC-PAUSE-02`.)
 
 Evidence / completion: OpenSpec change `pause-auto-campaign-on-empty-keywords`
 verified GO (2026-08-08); archived
@@ -73,6 +87,78 @@ verified GO (2026-08-08); archived
 main spec `openspec/specs/pause-on-empty-keywords/spec.md`; ADL
 `openspec/decisions/empty-keywords-pause-write-path/decision.md` Accepted;
 7d-window risk closed in design/tests.
+
+### INC-PAUSE-02 — Empty-keywords pause/recheck только на Search
+
+```text
+STATUS: ACTIVE
+LINKED_CHANGES: retarget-empty-keywords-pause-to-search
+```
+
+Outcome (Owner 2026-08-08): Пауза и matching recheck/resume по причине
+empty-keywords применяются только к ноге **Search**
+(`pause_auction_campaign` / Search start). `pause_auto_campaign` для этой
+причины Forbidden; отсутствие Search MUST NOT fallback на Auto pause. Reason
+`empty_keywords`, intent latch, notify и 7d-invariants сохраняются. Остальная
+логика автокампании не меняется.
+
+Contribution to North Star: Честная остановка именно поисковой ноги при пустых
+ключах; Auto/полки живут отдельным lifecycle (`INC-AUTO-SHELF-PAUSE-01`).
+
+Scope boundary: retarget empty-keywords write-path Auto→Search + durable
+leg/adapters в decision/spec + paired tests; не тариф; не Auto shelf exhausted
+pause; не billing fair-pause; не канал-анонс; не BOTH-legs.
+
+Evidence / completion: active change
+`openspec/changes/retarget-empty-keywords-pause-to-search` (planning complete;
+implementation/verify in progress). Proposed ADL amendment
+`openspec/changes/retarget-empty-keywords-pause-to-search/decisions/empty-keywords-pause-write-path/decision.md`.
+
+### INC-AUTO-SHELF-PAUSE-01 — Пауза Auto/полок при исчерпании ставок без plan-fit + перетест
+
+```text
+STATUS: CANDIDATE
+LINKED_CHANGES: none
+```
+
+Outcome (Owner 2026-08-08): Нога **Auto (полки)** ставится на паузу только
+когда одновременно:
+
+1. текущая эпоха тестирования ставок **исчерпана** (больше нечего тестировать
+   в допустимом диапазоне / coverage epoch complete);
+2. среди квалифицированно протестированных ставок **нет** ставки, дающей
+   нужный план продаж при допустимом CPO (plan-fit / no plan-bid).
+
+После паузы обязателен **отложенный перетест**:
+
+- интервал задаёт пользователь в UI настроек полок;
+- product default = **7 дней** (согласован с окном статы PLAN_DISTANCE);
+- по наступлении интервала Auto снова стартует и начинается **новая эпоха**
+  тестирования;
+- окно покрытия для новой эпохи MUST NOT мгновенно закрывать все ставки из
+  старой истории (использовать `date_from = max(now-7d, retest_epoch_started_at)`
+  или эквивалент — зафиксировать в design Change).
+
+Отдельный activity reason (не маскировать под empty-keywords / schedule /
+budget / legacy `COST_RULE_FAILED` как terminal shelf-exhausted). Пользователь
+получает сообщение: почему пауза Auto и когда следующий перетест. Управление
+ставками полок (`auto_shelf_bid_control_enabled`) остаётся включённым; паузится
+WB Auto-нога. Бюджет / расписание / баланс / emergency latch имеют приоритет
+над retest-start.
+
+Contribution to North Star: Честная остановка полок, когда тест завершён и
+плана нет; периодический шанс снова найти рабочую ставку без ручного
+«отключить бота».
+
+Scope boundary: Auto shelf terminal pause + user/default retest interval +
+reason/notify + durable write-path decision (Architecture Decision Missing до
+proposed decision в Change); не empty-keywords Search path; не тариф 1000; не
+fair-pause billing; не канал-анонс; не перепись plan_distance math сверх
+terminal/retest hook.
+
+Evidence / completion: none yet. Перед apply-ready Change MUST proposed
+decision ownership: shelf manager (detect/intent/epoch) → activity-control
+(WB pause/start) → Telegram setting (interval).
 
 ### INC-PRICE-01 — Тариф авто 1000₽/мес за кампанию
 
@@ -88,9 +174,10 @@ Outcome: Новая стоимость авто — 1000 рублей в мес�
 Contribution to North Star: Доступный вход при честном отношении к неэффективной рекламе.
 
 Scope boundary: billing/pricer table/copy для 1000₽; не fair-pause metering
-(`INC-BILL-LEG-PAUSE-01`); не pause runtime empty-keywords.
+(`INC-BILL-LEG-PAUSE-01`); не pause runtime empty-keywords / shelf exhausted.
 
-Evidence / completion: none yet.
+Evidence / completion: none yet. Runtime baseline: `tariffs_for_auto_setting[1]
+= 6000`.
 
 ### INC-BILL-LEG-PAUSE-01 — Честная оплата Auto/Search при паузе ног
 
@@ -113,11 +200,12 @@ Outcome (Owner 2026-08-08): Для пары ног одной авто-наст�
    в секунду charge).
 
 Contribution to North Star: Платишь за реально работающие ноги; честный оффер
-рядом с empty-keywords pause и ценой 1000₽.
+рядом с empty-keywords / shelf pause и ценой 1000₽.
 
 Scope boundary: Pricer / daily billing metering + anti-gaming; UX отображения
 тарифа при паузе ног — в том же Change или тонкий follow-up. Не empty-keywords
-runtime; не смена базовой цифры 1000 (это `INC-PRICE-01`); не retire v2.
+runtime; не shelf exhausted pause; не смена базовой цифры 1000 (это
+`INC-PRICE-01`); не retire v2.
 
 Evidence / completion: none yet.
 
@@ -148,14 +236,18 @@ LINKED_CHANGES: none
 Outcome: Пакет для Telegram-канала (+ подходящие каналы) с полным перечнем
 пунктов ниже. Не product-code DoD.
 
-Обязательное содержание анонса (Owner 2026-08-07):
+Обязательное содержание анонса (Owner 2026-08-07 / уточнение 2026-08-08):
 
 1. Снижение цены на 80%; новая стоимость — 1000₽/мес за одну кампанию;
    посыл: бот сейчас в пять раз дешевле.
 1a. Честная тарификация ног: одна на паузе → половина; обе на паузе → 0;
     без обхода паузой в момент списания (когда `INC-BILL-LEG-PAUSE-01` готов).
-2. Новый функционал: автопауза РК, если бот отключил последний ключ;
-   периодическая повторная проверка / включение.
+2. Новый функционал:
+   - автопауза **Search**, если бот отключил последний ключ; периодическая
+     повторная проверка / включение Search;
+   - автопауза **Auto/полок**, если все ставки эпохи протестированы и нет
+     ставки под нужный план; перетест через интервал (user + default 7 дней)
+     — когда соответствующий increment готов.
 3. Причина: по наблюдениям Owner ~80% случаев рекламу лучше выключить —
    не даёт результата; статистика это подтверждает («упрямая вещь»),
    в т.ч. личный кейс Owner даже с ботом.
@@ -187,7 +279,7 @@ Outcome: Owner готовит улучшенную версию — просту
 новичкам; в коммуникации она позиционируется также как **бесплатная** более
 простая версия в целом. Снижает трение «надо настроить под конкретную
 ситуацию». К моменту текущего анонса ещё не готова — не текущий DoD
-`INC-PAUSE-01` / цены.
+pause/price increments.
 
 Contribution to North Star: Закрывает «сложно подключить»; freemium-вход
 согласован с vision free bot в `openspec/config.yaml` (не отдавать paid
@@ -200,10 +292,20 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 
 ## Forward Compatibility Constraints
 
-- Reason паузы «все ключи OFF» отличим от budget/schedule pause (reason code / UX).
+- Empty-keywords: TARGET_ENTITY_OR_LEG=SEARCH; FORBIDDEN Auto pause adapter
+  для этой причины; no Auto fallback if Search missing.
+- Reason «нет активных ключей» отличим от budget/schedule и от shelf
+  no-plan-bid reason (отдельные reason codes / UX).
 - Не менять auto keyword selection / bid logic beyond last-key → pause hook.
-- Recheck/resume MUST быть корректен при окне статистики ≤7 дней (не предполагать
-  более длинную историю).
+- Recheck/resume Search MUST быть корректен при окне статистики ≤7 дней.
+- Auto shelf terminal pause: detect/intent/epoch ownership и WB pause/start
+  ownership MUST быть в accepted/proposed architecture decision до
+  apply-ready (`Architecture Decision Missing` until Change proposes it).
+- Retest epoch для Auto MUST NOT требовать статы старше 7 дней и MUST NOT
+  считать эпоху «уже покрытой» только по истории до `retest_epoch_started_at`.
+- Для shelf-enabled кампаний terminal shelf-exhausted MUST NOT маскироваться
+  под ordinary `COST_RULE_FAILED` как единственный durable reason (legacy
+  non-shelf cost pause остаётся ортогональным).
 - `ensure_campaigns_active` / A/B Hold coexistence: freeze ≠ stop; activity-control
   остаётся ортогональным (см. card-ab-hold decisions).
 - Тарифный count по `bot_active` остаётся согласованным при любых UI-изменениях
@@ -215,6 +317,7 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 ## Non-Goals
 
 - Переписать автокампанию «заодно».
+- Пауза обеих ног из-за empty-keywords без отдельного Owner GO.
 - Сделать linking обязательным для всех legacy changes.
 - Включить free-bot / invite / unrelated freemium в DoD этой звезды.
 - Трактовать EVOLUTION_PATH как обещанный backlog.
@@ -226,6 +329,9 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 
 ## History
 
+- 2026-08-08T16:35:47Z — Owner GO: empty-keywords = Search-only; Auto/полки —
+  отдельный `INC-AUTO-SHELF-PAUSE-01` (exhausted bids + no plan-fit + user/default
+  7d retest); added ACTIVE `INC-PAUSE-02`; COMMS/forward-compat/non-goals updated.
 - 2026-08-08T03:52:00Z — Owner: `INC-BILL-LEG-PAUSE-01` — half tariff if one
   Auto/Search leg paused, zero if both paused; anti-abuse vs pause-at-charge;
   North Star / COMMS / forward-compat updated; PRICE stays base 1000.
