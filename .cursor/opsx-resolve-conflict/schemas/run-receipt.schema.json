@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/run-receipt.schema.json",
+  "title": "OPSX Resolve Conflict Run Receipt (R16)",
+  "type": "object",
+  "required": [
+    "schema",
+    "package_version",
+    "run_id",
+    "operation",
+    "repository_identity",
+    "start_head",
+    "final_head",
+    "initial_state_fingerprint",
+    "final_state_fingerprint",
+    "authority_sources",
+    "host_contract_sha256",
+    "host_contract_set_digest",
+    "registry_sha256",
+    "selected_check_ids",
+    "unit_receipt_hashes",
+    "ledger_final_hash",
+    "unmerged_entries",
+    "conflict_markers",
+    "forbidden_commands_executed",
+    "forbidden_command_argv",
+    "push_performed",
+    "background_processes",
+    "final_checks",
+    "cancellation_barrier_closed",
+    "final_validation",
+    "opsx_full_validation_claimed",
+    "resolved_claimed"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/run-receipt/v1"
+    },
+    "package_version": {
+      "const": "0.34.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operation": {
+      "enum": [
+        "merge",
+        "rebase",
+        "cherry-pick"
+      ]
+    },
+    "repository_identity": {
+      "type": "string"
+    },
+    "start_head": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+    "final_head": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+    "initial_state_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "final_state_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "authority_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "role"],
+        "properties": {
+          "path": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "role": {"type": "string"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "host_contract_sha256": {
+      "type": "object"
+    },
+    "host_contract_set_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "registry_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "selected_check_ids": {
+      "type": "array",
+      "minItems": 6,
+      "items": {"type": "string"}
+    },
+    "unit_receipt_hashes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "ledger_final_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "unmerged_entries": {
+      "const": 0
+    },
+    "conflict_markers": {
+      "const": 0
+    },
+    "forbidden_commands_executed": {
+      "const": 0
+    },
+    "forbidden_command_argv": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "push_performed": {
+      "const": false
+    },
+    "background_processes": {
+      "const": 0
+    },
+    "final_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["argv", "exit_code", "timeout_seconds", "stdout_sha256", "stderr_sha256"],
+        "properties": {
+          "argv": {"type": "array", "items": {"type": "string"}},
+          "exit_code": {"type": "integer"},
+          "timeout_seconds": {"type": "number"},
+          "stdout_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "stderr_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "cancellation_barrier_closed": {"const": true},
+    "final_validation": {
+      "const": "FULL"
+    },
+    "opsx_full_validation_claimed": {
+      "const": true
+    },
+    "resolved_claimed": {
+      "const": false
+    }
+  },
+  "additionalProperties": true
+}

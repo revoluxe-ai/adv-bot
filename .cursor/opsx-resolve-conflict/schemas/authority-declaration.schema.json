@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/authority-declaration/v5",
+  "title": "OPSX conflict authority declaration (signed issuer payload + capability evidence, R27)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "payload",
+    "issuer_key_id",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/authority-declaration/v5"
+    },
+    "issuer_key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "conflict_snapshot_id",
+        "source_commit",
+        "operation",
+        "conflicting_commit_oids",
+        "stage_blob_oids",
+        "paths",
+        "rename_lineage",
+        "symbols",
+        "capabilities",
+        "capability_evidence",
+        "symbol_extractor_version",
+        "contracts_inventory_digest",
+        "authority_inventory_digest",
+        "producer_contract_sha256",
+        "issuer",
+        "none_applicable",
+        "applicable_authorities"
+      ],
+      "properties": {
+        "schema": {
+          "const": "opsx-resolve-conflict/authority-declaration/v5"
+        },
+        "conflict_snapshot_id": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128
+        },
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$|^[0-9a-f]{64}$"
+        },
+        "operation": {
+          "type": "string",
+          "enum": ["merge", "rebase"]
+        },
+        "conflicting_commit_oids": {
+          "type": "object",
+          "required": ["head", "operation_head"],
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 7
+          }
+        },
+        "stage_blob_oids": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "1": { "type": "string" },
+              "2": { "type": "string" },
+              "3": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rename_lineage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "symbols": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "capability_evidence": {
+          "$ref": "#/$defs/capabilityEvidence"
+        },
+        "symbol_extractor_version": {
+          "const": "opsx-symbol-extractor/v1"
+        },
+        "contracts_inventory_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "authority_inventory_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "producer_contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "issuer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "contract_path"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "contract_path": { "type": "string", "minLength": 1 }
+          }
+        },
+        "none_applicable": { "type": "boolean" },
+        "applicable_authorities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "role", "sha256"],
+            "properties": {
+              "path": { "type": "string" },
+              "role": {
+                "type": "string",
+                "enum": ["main_spec", "accepted_decision", "active_change", "contract"]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "capabilityEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "classifier_id",
+        "classifier_version",
+        "conflict_snapshot_id",
+        "stage_coverage",
+        "capabilities",
+        "analysis_complete",
+        "unknown_targets",
+        "observations"
+      ],
+      "properties": {
+        "schema": {
+          "const": "opsx-resolve-conflict/capability-evidence/v1"
+        },
+        "classifier_id": { "type": "string", "minLength": 1 },
+        "classifier_version": { "type": "string", "minLength": 1 },
+        "conflict_snapshot_id": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128
+        },
+        "stage_coverage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "stage", "blob_oid"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "stage": { "type": "string", "minLength": 1 },
+              "blob_oid": { "type": "string", "minLength": 7 }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "analysis_complete": { "const": true },
+        "unknown_targets": {
+          "type": "array",
+          "maxItems": 0,
+          "items": { "type": "string" }
+        },
+        "observations": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    }
+  }
+}

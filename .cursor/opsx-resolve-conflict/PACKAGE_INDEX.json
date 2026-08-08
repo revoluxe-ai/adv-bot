@@ -1,0 +1,59 @@
+{
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R34",
+  "package_version": "0.34.0",
+  "author": "Cursor",
+  "contract_schema_version": "opsx-resolve-conflict/v2",
+  "go_capability": false,
+  "safe_usage_scope": "PREVIEW_ONLY",
+  "archive": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.zip",
+  "archive_sha256": null,
+  "archive_binding": "external_test_report_only",
+  "package_digest": "606d42c741aebfe28c26972437a6f7a003d11394e4d2e4e9679a258e7983f531",
+  "external_test_report": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.TEST_REPORT.json",
+  "external_sidecar": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.SIDECAR.json",
+  "open_blockers": [
+    "BLOCKER_AUTHORITY_PRODUCER_MISSING",
+    "BLOCKER_OS_SANDBOX_RUNNER_MISSING"
+  ],
+  "entrypoints": {
+    "command": "candidate/.cursor/commands/opsx-resolve-conflict.md",
+    "runtime": "candidate/.cursor/opsx-resolve-conflict/runtime/opsx_conflict/runtime.py",
+    "boot": "candidate/.cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py"
+  },
+  "review_docs": [
+    "00_SCOPE.md",
+    "01_REVIEW_STANDARD.md",
+    "02_REQUIRED_CONTEXT.md",
+    "03_VERDICT_SCHEMA.md",
+    "04_REVISION_CLOSURE_MATRIX.md",
+    "AUTHORSHIP.md",
+    "CHANGELOG.md",
+    "REVIEW_REQUEST.md",
+    "README_REVIEW.md",
+    "TRUST_ANCHOR.json",
+    "context/OPSX_CONTEXT_EXTRACT.md",
+    "context/host_contracts/",
+    "context/HOST_CONTRACT_HASHES.json",
+    "context/SOURCE_LINEAGE.json"
+  ],
+  "supersedes_rejected": [
+    "0.5.0",
+    "0.6.0",
+    "0.7.0",
+    "0.8.0",
+    "0.9.0",
+    "0.10.0",
+    "0.11.0",
+    "0.12.0",
+    "0.13.0",
+    "0.14.0",
+    "0.15.0",
+    "0.16.0",
+    "0.17.0",
+    "0.18.0",
+    "0.19.0",
+    "0.20.0"
+  ],
+  "external_archive_sha256_ref": "4c77f4240d91add1e9991c0ef1be77a12d7e618fdb966d2050f88ed7da0f35f8",
+  "raw_log_sha256_ref": "b1592f627365614070f4b291722836f55248e46cc26ebcd4085f2b15b5174d57"
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "opsx-resolve-conflict/process-surfaces/v2",
+  "prefixes": [
+    ".cursor/commands/",
+    ".cursor/rules/",
+    ".cursor/skills/",
+    ".cursor/agents/",
+    ".cursor/static-check/",
+    ".cursor/pipeline/",
+    ".cursor/antipattern-gate/",
+    ".agents/",
+    ".github/skills/",
+    ".github/prompts/"
+  ],
+  "exact": [
+    ".cursor/opsx-review-commands",
+    ".github/copilot-instructions.md",
+    ".github/git-commit-instructions.md",
+    "AGENTS.md",
+    "openspec/config.yaml",
+    "openspec/decisions/index.md"
+  ],
+  "pattern_prefixes": [
+    "openspec/policies/",
+    "openspec/decisions/",
+    "openspec/changes/",
+    ".tmp/opsx-bug-cases/"
+  ]
+}
