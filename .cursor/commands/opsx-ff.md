@@ -15,6 +15,16 @@ Fast-forward through artifact creation - generate everything needed to start imp
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` for any supplied exact change/decision paths; do not rediscover known artifacts via full-tree inventory.
 
+**Semantic write-target preflight:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. When the change plans a
+high-risk write and repository evidence exposes multiple plausible
+entities/legs/adapters, artifacts MUST durably name `TARGET_ENTITY_OR_LEG`,
+`ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and
+paired positive/negative tests. If evidence does not select one target, return
+`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`, ask the contract's single concrete
+Owner question, and do not declare the change apply-ready. Never infer product
+semantics from similar names.
+
 **Steps**
 
 1. **If no input provided, ask what they want to build**
@@ -73,7 +83,16 @@ Fast-forward through artifact creation - generate everything needed to start imp
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+5. **Confirm semantic write target**
+
+   Before declaring apply readiness, evaluate the shared semantic-target
+   contract against completed artifacts:
+   - `NOT_APPLICABLE` — continue;
+   - `RESOLVED` — confirm all required fields are materialized;
+   - `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` — stop and route the durable
+     answer back through planning; chat-only selection is insufficient.
+
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```

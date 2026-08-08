@@ -9,6 +9,15 @@ Implement tasks from an OpenSpec change.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Semantic write-target preflight:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. After context/decision
+read and **before any production edit**, re-check the semantic write target for
+high-risk multi-target mutations. `RESOLVED` requires planned symbols to be in
+`ALLOWED_ADAPTERS` and outside `FORBIDDEN_ADAPTERS`. Unresolved or chat-only
+Owner answers return `NO_GO` / `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and route
+to `/opsx-update` (or another planning writer) for durable materialization —
+never guess Auto vs Search or equivalent legs from similar names.
+
 **Architecture Decision Lookup:** Before changing code, resolve decision paths from the selected change context/`artifactPaths.decisions` first. Prefer exact listed paths over a full `openspec/decisions/**` walk. Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`: when the change name is known, do not rediscover it by scanning all changes; do not gate apply on unconditional `git status`—run git only when dirty-tree / branch identity is REQUIRED_FOR safe implementation. Search `openspec/decisions/**/*.md` only for remaining gaps after direct context paths are read (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Do **not** equate budget exhaustion with “no decision exists”: if ownership / layering / write-path / domain-invariant gaps remain unresolved after that budget (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without editing code. Use `Architecture Decision Missing` only when lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision. Implementation must cite relevant decisions in progress or completion notes. If planned code placement contradicts an accepted decision, stop before editing code and return `NO_GO` with the conflicting decision path. If placement depends on a proposed decision, use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied before deciding whether code can proceed. Passing tests are not sufficient if placement violates a decision.
 
 **Canonical testing rule:** Before implementation, read `.cursor/rules/testing-rules.mdc` as the only general test-design/execution policy. Do not treat `.cursor/rules/TESTING_RULES.mdc` as policy (migration pointer only). Do not copy large test-policy blocks into this command; follow the authority split below.
@@ -98,6 +107,20 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - If a proposed decision is required or present, get `openspec instructions decisions --change "<name>" --json` and apply `rules.decisions` before evaluating placement.
    - Compare planned implementation placement against accepted/proposed decisions before editing code.
    - If placement conflicts with an accepted decision, return `NO_GO` and do not edit code.
+
+6a. **Semantic write-target preflight (before production edit)**
+
+   Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`:
+   - If the change is not a high-risk multi-target write → `NOT_APPLICABLE` /
+     proceed.
+   - If artifacts durably resolve `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+     `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired tests →
+     `RESOLVED`; planned write symbols MUST be in `ALLOWED_ADAPTERS` and MUST
+     NOT be in `FORBIDDEN_ADAPTERS`.
+   - If multiple plausible targets remain, or resolution exists only in chat →
+     return `NO_GO` with `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`, ask the
+     contract's single Owner question, and route to `/opsx-update`. Do not edit
+     production code.
 
 7. **Show current progress**
 
@@ -377,8 +400,14 @@ Never rewrite prior JSONL lines.
 - Read `TEST_COVERAGE_PACKET` when present in change artifacts/context; absence does not block legacy apply
 - Packet status alone does not block implementation and does not equal verify/archive verdict
 - Always perform Architecture Decision Lookup before code edits
+- Always perform Semantic write-target preflight before production edits
 - Stop with `NO_GO` when the decision-lookup fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved
 - Stop with `NO_GO` when planned placement conflicts with an accepted architecture decision
+- Stop with `NO_GO` / `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` when a high-risk
+  write has multiple plausible targets or when Owner resolution is chat-only;
+  route to `/opsx-update` for durable artifact materialization
+- Stop with `NO_GO` when planned write symbols are in `FORBIDDEN_ADAPTERS` or
+  outside `ALLOWED_ADAPTERS` after a resolved semantic target
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
@@ -386,7 +415,7 @@ Never rewrite prior JSONL lines.
 - After implementing tasks, treat any new production/exported symbol whose only callers are tests as dead surface: wire it into a runtime-reachable path or remove it before completion. Passing tests do not prove wiring.
 - Update task checkbox immediately after completing each task; never mark `[x]` when mandatory tests for that task fail
 - When a completed task closes a decision-delta, sync every status mirror in the same pass: the tasks.md checkbox, the decision.md review-checklist annotation, and the design.md checklist/status mirror if present. Do not leave a shipped delta marked "proposed / not yet applied".
-- Pause on errors, blockers, or unclear requirements - don't guess
+- Pause on errors, blockers, or unclear requirements - don't guess product write targets from similar names
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience

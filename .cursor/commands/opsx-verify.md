@@ -389,6 +389,20 @@ and apply `rules.decisions`.
 
 Compare implementation placement against accepted/proposed decisions.
 
+### 5a. Semantic write-target gate
+
+Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
+
+* If the change is a high-risk multi-target write and artifacts do not durably
+  resolve `TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` / `FORBIDDEN_ADAPTERS`
+  (or status is `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`) → archive blocker
+  `unresolved_semantic_write_target` → overall `NO_GO`.
+* If implementation uses a symbol in `FORBIDDEN_ADAPTERS` (or outside
+  `ALLOWED_ADAPTERS`) → placement/behavior violation → `NO_GO`.
+* When paired proof is required: verify the allowed target side effect **and**
+  that the forbidden sibling target is not mutated. Green tests against an
+  ambiguous or wrong-target plan do not clear this gate.
+
 Passing tests не являются proof, если placement нарушает accepted decision.
 
 Passing tests также не доказывают автоматически:
@@ -700,6 +714,9 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * unresolved `EVIDENCE_GAP` after Architecture Decision Lookup budget exhaust (do not collapse this into Missing);
 * `Architecture Decision Missing` after conclusive in-budget lookup (or after a recorded `EVIDENCE_GAP` expansion);
 * unresolved open question blocks archive;
+* unresolved semantic write target (`unresolved_semantic_write_target`) blocks archive;
+* implementation uses a forbidden sibling write adapter after a resolved semantic target;
+* required paired positive/negative semantic-target proof is missing;
 * stale reference model blocks archive;
 * async test manually mutates module-level state around `await` with `module.attr = fake` and manual `try/finally` restore;
 * test stubs the pipeline so the real guard is never exercised;
@@ -734,6 +751,7 @@ Do not write a success claim that conflicts with the overall verdict.
 * tests failed;
 * placement violations exist;
 * architecture blockers are unresolved;
+* unresolved semantic write target remains;
 * a confirmed mandatory test-coverage blocker exists.
 
 ## Output
@@ -853,6 +871,9 @@ or:
 * Instead of offering a write action, state the next command: `/opsx-apply`, `/opsx-update`, or `manual fix`.
 * Do not mark verification successful when placement violates an accepted decision.
 * Do not treat passing tests as sufficient architecture proof.
+* Do not treat green tests as proof when the semantic write target is unresolved
+  or implementation hits a forbidden sibling adapter.
+* Treat `unresolved_semantic_write_target` as a hard archive blocker.
 * Block async tests that manually mutate shared module-level dependencies around awaited code, especially shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings, and global flags.
 * Block tests that stub the pipeline so the real guard is never exercised.
 * Block write-gate tests that only assert `assert_not_called()` or `count == 0` without proving candidate/handler/write-boundary filtering.
