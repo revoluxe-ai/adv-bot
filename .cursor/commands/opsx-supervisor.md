@@ -1402,7 +1402,7 @@ contract. Recursive Supervisor dispatch запрещён.
 /opsx-admin-command-analyze-pipeline
 /opsx-admin-command-commit
 /opsx-admin-command-design-command
-/opsx-admin-command-fix-command-defects
+/opsx-meta-fix-command-defects
 /opsx-admin-command-promote-process-lesson
 /opsx-archive
 /opsx-commit

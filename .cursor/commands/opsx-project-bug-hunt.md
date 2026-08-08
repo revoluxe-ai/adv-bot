@@ -33,7 +33,7 @@ audit command.
   sibling hunt after a known root packet).
 * NOT a general style / formatting / drive-by refactor audit.
 * NOT process-contract Bugbot on `.cursor/commands/**` (F6 →
-  `/opsx-admin-command-fix-command-defects`).
+  `/opsx-meta-fix-command-defects`).
 * NOT `/opsx-verify`, `/opsx-static-check`, or `/opsx-fix-types`.
 * NOT a guarantee that Bugbot will always be empty — honesty: residual risk
   remains; the contract is **maximize catch + learn from misses**.
@@ -152,7 +152,7 @@ not invent ADLs.
 | Claim / fix (manual queue path) | `/opsx-claim-next-bug` → `/opsx-fix-bug` |
 | Residual external review | **Bugbot** (safety net) |
 | Miss reached Bugbot (product/logic) | `/opsx-learn-from-bug` → update **this** checklist |
-| Process-contract Bugbot (F6) | `/opsx-admin-command-fix-command-defects` |
+| Process-contract Bugbot (F6) | `/opsx-meta-fix-command-defects` |
 
 Never re-decide another command's GO/NO_GO. Never treat chat paraphrase as
 durable case map.

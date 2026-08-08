@@ -296,7 +296,7 @@
 - decision_owner: adjudicator + claim gate + classify-first + Owner GO + RED-before-GO
 - next_typical: /opsx-classify-bug (if missing) | /opsx-test case= finding= | /opsx-fix-bug GO (after RED) | /opsx-claim-next-bug | /opsx-invariant | /opsx-bug-team handback (post-GO SECONDARY) | /opsx-learn-from-bug | none
 - known_flaws: |
-  F6: does not own process-contract defects → `/opsx-admin-command-fix-command-defects`;
+  F6: does not own process-contract defects → `/opsx-meta-fix-command-defects`;
   F7: durable STATUS ready_for_fix/adjudicating/implementing/verification blocks
   finding= path; F8: claimed+empty durable CLAIM_TOKEN → materialize repair;
   claim-first when available+CHAT_REQUIRED=true; classify-first before impl route;
@@ -626,10 +626,10 @@ typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
 implementing|impl_done|coverage_pass|external_call_pass|performance_pass|antipattern_pass|antipattern_suspects --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
-# command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
+# command_defect_signal --/opsx-meta-fix-command-defects--> FIXED
 # FIXED --/opsx-admin-command-promote-process-lesson--> process_lesson_candidate
 # process_lesson_candidate --DESIGN_BRIEF_READY--> /opsx-admin-command-design-command
-# process_lesson_candidate --EXTEND_EXISTING--> /opsx-admin-command-fix-command-defects
+# process_lesson_candidate --EXTEND_EXISTING--> /opsx-meta-fix-command-defects
 ```
 
 ## Soft recommendations (advisory only)
@@ -778,7 +778,7 @@ Hard reminders for NAVIGATE:
 1. **typing** → `/opsx-fix-types` / `/opsx-static-check` — no learning command
 2. **logic/product** → `/opsx-fix-bug` → `/opsx-learn-from-bug`
    (hunter miss → prefer project-bug-hunt checklist)
-3. **commands/process (F6)** → `/opsx-admin-command-fix-command-defects`
+3. **commands/process (F6)** → `/opsx-meta-fix-command-defects`
    → optional `/opsx-admin-command-promote-process-lesson`
    → `/opsx-admin-command-design-command` if `DESIGN_BRIEF_READY`
 
@@ -840,7 +840,7 @@ command-contract classes (F6).
   where: NAVIGATE / bug subgraph vs admin process surfaces
   symptom: Bugbot/review on `.cursor/commands/**` was routed to `/opsx-fix-bug` as bug_signal_raw
   operator_workaround: |
-    treat as `command_defect_signal`; `/opsx-admin-command-fix-command-defects`
+    treat as `command_defect_signal`; `/opsx-meta-fix-command-defects`
     (READ_ONLY then GO); do not open product bug case map; after FIXED, soft
     `/opsx-admin-command-promote-process-lesson` (not `/opsx-learn-from-bug`)
   do_not_pretend_fixed: false (routing recorded; example ADL apply instance closed in contracts 2026-07-27 — F6 still applies to future process Bugbots)
@@ -900,7 +900,7 @@ command-contract classes (F6).
     antipattern; antipattern contract + owner soft-chain disagree
   operator_workaround: |
     follow GRAPH soft chain (antipattern before static); later
-    /opsx-admin-command-fix-command-defects on lagging contracts
+    /opsx-meta-fix-command-defects on lagging contracts
   do_not_pretend_fixed: true
 
 ## Terminal / recovery
@@ -936,7 +936,7 @@ command-contract classes (F6).
 - Bug debt: `/opsx-bug-debt-board` ALSO_OK anytime; `CLEAR` ≠ card-close;
   verify/archive are **not** residual close while debt open
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
-- Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
+- Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-meta-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
   → `DESIGN_BRIEF_READY` → `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
 - Admin surfaces (consult, analyze-pipeline, fix-command-defects,

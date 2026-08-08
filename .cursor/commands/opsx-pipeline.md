@@ -87,7 +87,7 @@ ordering rules.
 - Unclear which process/admin command applies, or need to discuss
   command relationships / odd admin behavior → `/opsx-admin-command-consult`
 - Redesign or improve process contracts → `/opsx-admin-command-analyze-pipeline`
-- Fix command defects → `/opsx-admin-command-fix-command-defects`
+- Fix command defects → `/opsx-meta-fix-command-defects`
 - Design a new command → `/opsx-admin-command-design-command`
 - Commit process surfaces → `/opsx-admin-command-commit`
 - Commit product/code → `/opsx-commit`

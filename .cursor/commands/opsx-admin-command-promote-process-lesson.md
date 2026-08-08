@@ -9,7 +9,7 @@ argument-hint: "[Bugbot / FIXED packet / process defect notes]"
 # /opsx-admin-command-promote-process-lesson
 
 Adjudicate a **process / command-contract** lesson after a Bugbot finding or a
-`/opsx-admin-command-fix-command-defects` `FIXED` packet, then emit a pasteable
+`/opsx-meta-fix-command-defects` `FIXED` packet, then emit a pasteable
 `DESIGN_BRIEF_READY` for `/opsx-admin-command-design-command` (or route to
 extend an existing process file via fix-command-defects).
 
@@ -63,7 +63,7 @@ MUST NOT:
 ## Evidence sources (priority)
 
 1. `$ARGUMENTS` / pasted Bugbot or FIXED packet;
-2. latest same-chat `/opsx-admin-command-fix-command-defects` `FIXED` /
+2. latest same-chat `/opsx-meta-fix-command-defects` `FIXED` /
    `FIX_PLAN_READY` output;
 3. else ask **one** narrow question for the process defect source.
 
@@ -79,7 +79,7 @@ MUST NOT:
 | Disposition | Meaning | NEXT |
 |---|---|---|
 | `no_process_lesson` | one-off fix; no transferable class | `none` |
-| `extend_existing` | existing command/rule should gain a guardrail | `/opsx-admin-command-fix-command-defects` (+ hint FILES) |
+| `extend_existing` | existing command/rule should gain a guardrail | `/opsx-meta-fix-command-defects` (+ hint FILES) |
 | `design_brief_required` | needs new command / new check / coherent design | `/opsx-admin-command-design-command` + brief |
 | `needs_more_evidence` | class unclear | one extraction question |
 | `wrong_branch` | not process | redirect typing or logic |
@@ -140,7 +140,7 @@ DO_NOT_DO_YET:
 unclear process question → /opsx-admin-command-consult  (triage / route)
 typing  → /opsx-fix-types / static-check     (no promote-process-lesson)
 logic   → /opsx-fix-bug → /opsx-learn-from-bug
-process → /opsx-admin-command-fix-command-defects
+process → /opsx-meta-fix-command-defects
         → /opsx-admin-command-promote-process-lesson
         → /opsx-admin-command-design-command  (if DESIGN_BRIEF_READY)
 ```
