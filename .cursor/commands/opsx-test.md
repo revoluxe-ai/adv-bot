@@ -99,6 +99,7 @@ SCENARIO_TEST_ONLY_PACKET:
   WORKTREE_FINGERPRINT:
   ITEMS:
     - GAP_ID:
+      GAP_FILE_ID:
       SCENARIO_ID:
       DISPOSITION: TEST_ONLY
       REQUIRED_ARTIFACTS:
@@ -113,7 +114,8 @@ SCENARIO_TEST_ONLY_PACKET:
 До edits:
 
 1. проверить `SCHEMA_VERSION=1`, `SOURCE`, `CHANGE_ID`, непустые `ITEMS`;
-2. сохранить `GAP_ID` и `SCENARIO_ID` без переименования;
+2. сохранить `GAP_ID`, Windows-safe `GAP_FILE_ID` и `SCENARIO_ID` без
+   переименования;
 3. сверить `SOURCE_SPEC_SHA` с текущим Scenario source;
 4. при stale spec вернуть `STATUS=BLOCKED_STALE_SCENARIO_PACKET`;
 5. принимать только `DISPOSITION=TEST_ONLY`;
@@ -172,6 +174,7 @@ SCENARIO_TEST_AUTHORSHIP_RESULT:
   WORKTREE_FINGERPRINT:
   ITEMS:
     - GAP_ID:
+      GAP_FILE_ID:
       SCENARIO_ID:
       RESULT: AUTHORED | ALREADY_COVERED | REDIRECT_REFACTOR_AND_TEST |
               AUTHORED_AWAITING_CERTIFICATION | BLOCKED
@@ -597,6 +600,20 @@ GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW
    - Do **not** close error class / lesson from verify mode.
 
 Silent test weakening is forbidden.
+
+## Scenario packet simulation matrix
+
+| Input | Expected |
+|---|---|
+| valid `SCENARIO_TEST_ONLY_PACKET` | batch all TEST_ONLY items; preserve ids |
+| stale `SOURCE_SPEC_SHA` | `BLOCKED_STALE_SCENARIO_PACKET`; no edits |
+| empty Scenario packet | BLOCKED; request producer rerun |
+| item needs production seam | preserve item; `REDIRECT_REFACTOR_AND_TEST` |
+| PG/CH live proof required | author code only; `AUTHORED_AWAITING_CERTIFICATION` |
+| fake uses a private invented shape | reject; satisfy reality constraints |
+| real causal boundary patched away | reject as weak evidence |
+| ContractCase/fake/scenario tests authored | return ids + hashes; never coverage PASS |
+| all test-only items authored | rerun `/opsx-spec-scenario-coverage mode=audit` |
 
 ## Output format
 

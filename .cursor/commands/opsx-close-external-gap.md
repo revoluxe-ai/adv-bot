@@ -129,7 +129,8 @@ Taxonomy:
 
 1. принять только `SCHEMA_VERSION=1`, `DISPOSITION=REFACTOR_AND_TEST`,
    `KIND=PG|CH`;
-2. сохранить `CHANGE_ID`, `GAP_ID`, `SCENARIO_ID`, `CONTRACT_ID` и hashes;
+2. сохранить `CHANGE_ID`, `GAP_ID`, Windows-safe `GAP_FILE_ID`,
+   `SCENARIO_ID`, `CONTRACT_ID` и hashes;
 3. сверить `SOURCE_SPEC_SHA`, `WORKTREE_FINGERPRINT` и `CONTRACT_SHA`;
 4. stale packet → `DATA_GAP`, без edits;
 5. создать минимальный production seam и real provider integration tests;
@@ -149,10 +150,13 @@ STATUS: BLOCKED_CONTRACT_MISMATCH
 
 1. production/test authorship не повторять без freshness gap;
 2. проверить exact provider test ids и все hashes;
-3. без valid independent re-audit и `AUTHORIZE_ONE_LIVE_RUN` вернуть
+3. принять `INDEPENDENT_REAUDIT` только по schema
+   `.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`, включая
+   `GAP_FILE_IDS`, audited-state hashes и `ALLOWED_RUN_BLOCK_SHA256`;
+4. без valid independent re-audit и `AUTHORIZE_ONE_LIVE_RUN` вернуть
    `BLOCKED_NEEDS_LIVE_RUN_AUTH` либо `BLOCKED_NEEDS_INDEPENDENT_REAUDIT`;
-4. после фактического запуска создать `PROVIDER_EXECUTION_RECEIPT`;
-5. не выдавать `SCENARIO_TEST_COVERAGE_PASS`.
+5. после фактического запуска создать `PROVIDER_EXECUTION_RECEIPT`;
+6. не выдавать `SCENARIO_TEST_COVERAGE_PASS`.
 
 ## LOC_LINK (mandatory for report items)
 
@@ -558,7 +562,7 @@ Allowed under autonomous refactor + causal scope:
 * local and shared test helpers/fixtures/factories when required by gap;
 * new local integration tests and mock-only unit tests;
 * docstrings on changed public symbols.
-* `.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_ID>.md`
+* `.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md`
   только после фактического authorized provider run по Scenario packet.
 
 Forbidden:
@@ -649,8 +653,9 @@ TESTS_AUTHORED:
 LIVE_RUN: not_attempted | authorized_pass | authorized_fail | blocked_no_auth
 
 PROVIDER_EXECUTION_RECEIPTS:
-- PATH: .tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_ID>.md
+- PATH: .tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
   GAP_ID:
+  GAP_FILE_ID:
   SCENARIO_ID:
   CONTRACT_ID:
   CONTRACT_SHA:
@@ -731,6 +736,9 @@ DO_NOT_DO_YET:
 |------|-----|
 | `/opsx-external-call-coverage` FAIL PG/CH / UNTESTABLE | this (paste report) |
 | this `READY_FOR_READ_ONLY_REAUDIT` | coverage `focus=<kind>` → independent verdict → optional live auth → `focus=all` |
+| `/opsx-spec-scenario-coverage` PG/CH REFACTOR_AND_TEST | this (paste Scenario packet) |
+| this Scenario authorship self-report | `/opsx-spec-scenario-coverage mode=audit` |
+| this `PROVIDER_EXECUTION_RECEIPT_READY` | `/opsx-spec-scenario-coverage mode=certify` |
 | TEST_ONLY gaps | `/opsx-test` |
 | broad business feature | `/opsx-apply` |
 
@@ -756,6 +764,11 @@ DO_NOT_DO_YET:
 | 16 | Live token reuse | reject; need new re-audit + token |
 | 17 | Prod CH/PG SQL/db qualification rewritten; only handoff mock patches away rewritten callable | forbidden as sole pre-live proof; need `SQL_CONTRACT_UNIT` or `RESULT=REMAINING` / `NOTE=SQL_REWRITE_UNPROVEN` |
 | 18 | Prod SQL rewritten + capturing fake client asserts SQL contract | `TESTS_AUTHORED` tag `SQL_CONTRACT_UNIT`; store path may be AUTHORED (still not independent PASS) |
+| 19 | Valid Scenario REFACTOR packet | preserve Scenario/GAP/Contract identity; author seam + provider tests |
+| 20 | Scenario TEST_ONLY packet | redirect unchanged to `/opsx-test` |
+| 21 | Scenario ContractCase differs from provider reality | `BLOCKED_CONTRACT_MISMATCH`; no golden rewrite |
+| 22 | Valid Scenario certify + re-audit + live token | one run; Windows-safe provider receipt; no Scenario PASS |
+| 23 | Scenario receipt hashes stale after run | receipt remains evidence for old snapshot; certification must re-audit |
 
 ## Regression checks (self)
 

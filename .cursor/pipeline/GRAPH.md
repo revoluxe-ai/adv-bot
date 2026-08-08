@@ -27,6 +27,8 @@
 - change_scaffolded: change dir exists; first artifact pending (`/opsx-new`)
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
+- scenario_coverage_plan_ready: optional/versioned
+  `/opsx-spec-scenario-coverage mode=plan`; required evidence matrix known
 - scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
 - impl_done: tasks complete; PRIMARY `/opsx-verify mode=impl` (VERIFY_PHASES);
@@ -35,6 +37,14 @@
   `/opsx-verify mode=archive`
 - impl_verified: `mode=impl` ✅ IMPL_OK (not archive-eligible)
 - impl_gaps: `mode=impl` ❌ IMPL_GAPS → apply/update
+- scenario_coverage_gaps: scenario audit FAIL; route TEST_ONLY to `/opsx-test`,
+  PG/CH REFACTOR_AND_TEST or CERTIFY to `/opsx-close-external-gap`
+- scenario_coverage_tests_authored: writer self-report; independent audit pending
+- scenario_coverage_provider_ready: provider tests authored; independent
+  live-ready re-audit / authorization pending
+- scenario_coverage_receipt_ready: authorized provider run produced receipt;
+  `/opsx-spec-scenario-coverage mode=certify`
+- scenario_coverage_certified: fresh change-wide Scenario report PASS
 - verify_pass: archive-eligible after `/opsx-verify mode=archive` ✅ GO
 - verify_fail: back to apply/update (re-run mode=impl if DoD regressed)
 - archived: `/opsx-archive` done
@@ -213,6 +223,27 @@
 - next_typical: /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
 - known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration; NEXT rules beyond opened budget may lag antipattern (F12)
 
+### /opsx-spec-scenario-coverage
+- purpose: change-wide Spec Scenario plan/audit/certification; maps every
+  Scenario to scenario-seam, stub-contract and required provider evidence
+- input_state: apply_ready | scenario_coverage_plan_ready | impl_done |
+  scenario_coverage_gaps | scenario_coverage_tests_authored |
+  scenario_coverage_receipt_ready
+- output_state: scenario_coverage_plan_ready | scenario_coverage_gaps |
+  scenario_coverage_provider_ready | scenario_coverage_certified | blocked
+- artifacts_read: change delta specs/design/tasks; code/tests; optional
+  TEST_COVERAGE_PACKET; provider receipts; test-evidence taxonomy
+- artifacts_written: none in v1 command draft; plan/report/route packets in
+  command output (persistence requires an explicit compatible owner)
+- decision_owner: independent Scenario coverage auditor; not test/seam writer;
+  archive remains `/opsx-verify`
+- next_typical: `/opsx-apply` after plan | `/opsx-test` with
+  SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
+  REFACTOR/CERTIFY packet | `/opsx-verify` after certified PASS
+- known_flaws: command is new/uncommitted until meta lifecycle completes;
+  committed consumers use shared contract; required archive behavior is
+  versioned via SCENARIO_COVERAGE_REQUIRED
+
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
 - input_state: external_call_pass | impl_done | performance_reaudit_pending | performance_review_pending | product_dirty
@@ -254,14 +285,23 @@
 - known_flaws: soft only; CLEAR ≠ card-close; verify/archive are NOT residual close while debt open
 
 ### /opsx-close-external-gap
-- purpose: REFACTOR_AND_TEST closure for PG/CH gaps from coverage packet (minimal seam + live integration); no base=
-- input_state: external_call_gaps
-- output_state: external_gap_closed | external_gap_closing | external_call_gaps | tests_authored | implementing
-- artifacts_read: pasted EXTERNAL_CALL_COVERAGE_REPORT / GAPS; testing-rules; gap PATH symbols
-- artifacts_written: minimal app/** seam + tests/integration/** when REFACTOR_AND_TEST
-- decision_owner: closure writer; TEST_ONLY redirects to /opsx-test; oversized seam → /opsx-apply
-- next_typical: /opsx-external-call-coverage base=<PACKET_BASE> focus=pg|ch | /opsx-test | /opsx-apply
-- known_flaws: must not accept base=; session-mock unit ≠ CLOSED for PG/CH
+- purpose: REFACTOR_AND_TEST closure for PG/CH gaps (minimal seam + provider
+  integration) and authorized provider execution receipt; no base=
+- input_state: external_call_gaps | scenario_coverage_gaps |
+  scenario_coverage_provider_ready
+- output_state: external_gap_closed | external_gap_closing |
+  external_call_gaps | tests_authored | implementing |
+  scenario_coverage_tests_authored | scenario_coverage_receipt_ready
+- artifacts_read: pasted ECC or Scenario packets; testing-rules; ContractCase;
+  gap PATH symbols
+- artifacts_written: minimal app/** seam + tests/integration/** when
+  REFACTOR_AND_TEST; provider receipt only after authorized run
+- decision_owner: closure writer; TEST_ONLY redirects to /opsx-test; oversized
+  seam → /opsx-apply; never owns Scenario coverage PASS
+- next_typical: ECC focused re-audit | `/opsx-spec-scenario-coverage mode=audit`
+  after authorship | `mode=certify` after receipt | `/opsx-test` | `/opsx-apply`
+- known_flaws: must not accept base=; session-mock unit ≠ CLOSED for PG/CH;
+  provider receipt ≠ final Scenario certification
 
 ### /opsx-materialize-bug-queue
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist

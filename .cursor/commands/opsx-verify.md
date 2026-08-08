@@ -68,6 +68,37 @@ not_applicable
 
 Verify блокирует archive только при доказанном test-coverage mismatch, слабом тестовом evidence либо отсутствии обязательного behavioral scenario, которое следует из specification, invariant или materialized `TEST_COVERAGE_PACKET`.
 
+## Scenario coverage report assurance
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
+Taxonomy:
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
+
+`SCENARIO_TEST_COVERAGE_REPORT` — change-wide independent evidence:
+
+- каждый exact Spec Scenario имеет строку;
+- `scenario_seam` проходит causal production logic;
+- использованные stubs имеют executable contract parity;
+- требуемые provider integrations выполнены;
+- `PROVIDER_EXECUTION_RECEIPT` свежи по hashes.
+
+Verify не пересчитывает всю матрицу и не становится scenario coverage
+planner. Он проверяет identity/freshness, spot-checks acceptance-relevant rows
+и применяет activation:
+
+```text
+SCENARIO_COVERAGE_REQUIRED absent|false
+→ absence report is not automatic NO_GO (legacy compatibility)
+
+SCENARIO_COVERAGE_REQUIRED=true
+→ fresh report VERDICT=PASS is required for mode=archive
+→ missing/stale/FAIL/BLOCKED report is archive blocker
+```
+
+Provider receipt не равен final Scenario coverage PASS. Self-report writer-а
+из `/opsx-test` или `/opsx-close-external-gap` не заменяет independent report.
+
 ## Additive external-call coverage assurance
 
 Если в change artifacts, context files или явно переданном output присутствует
@@ -328,6 +359,42 @@ Compatibility mode: legacy
 и продолжай обычный verify.
 
 Отсутствие packet не отменяет существующую обязанность verify сопоставить implementation и tests со specification.
+
+#### SCENARIO_TEST_COVERAGE_REPORT discovery
+
+Если report передан явно или найден по declared path, извлеки:
+
+```text
+SCHEMA_VERSION
+CHANGE_ID
+SOURCE_SPEC_SHA
+WORKTREE_FINGERPRINT
+ACTIVATION.SCENARIO_COVERAGE_REQUIRED
+ACTIVATION.ACTIVATION_VERSION
+VERDICT
+SCENARIOS_TOTAL/PASS/FAIL/BLOCKED
+ROWS
+PROVIDER_RECEIPTS
+ROUTE_PACKETS
+```
+
+Проверь:
+
+- `CHANGE_ID` совпадает;
+- `SOURCE_SPEC_SHA` соответствует текущим delta specs;
+- worktree/test/contract/provider/schema hashes не stale;
+- rows покрывают все exact Scenarios;
+- receipts имеют `RESULT=PASS` и `SECRETS_REDACTED=YES`;
+- report producer — независимый `/opsx-spec-scenario-coverage`.
+
+Если report отсутствует:
+
+```text
+Scenario coverage report: absent
+Scenario coverage required: true | false | not_declared
+```
+
+Не восстанавливай report из chat summary или похожих test names.
 
 #### EXTERNAL_CALL_COVERAGE_REPORT discovery
 
@@ -747,6 +814,10 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * actual test level is below the materialized `MINIMUM_TEST_LEVEL`;
 * `UNIT_SUFFICIENCY=insufficient`, but only unit-component evidence is provided;
 * packet and tests materially contradict each other.
+* `SCENARIO_COVERAGE_REQUIRED=true`, но report missing/stale либо
+  `VERDICT=FAIL|BLOCKED`;
+* scenario report заявляет PASS, но Scenario rows/receipts/hashes неполны или
+  относятся к другому snapshot.
 
 Do not set `NO_GO` only because:
 
@@ -807,6 +878,8 @@ Targeted tests: passed / failed / not run
 Failed tests: none / список
 Test coverage packet: absent / ready / provisional / not_materialized / not_applicable
 Compatibility mode: legacy / packet-aware
+Scenario coverage report: absent / PASS / FAIL / BLOCKED / stale
+Scenario coverage required: true / false / not_declared
 Behavioral scenarios: covered / partial / not covered / unknown / not applicable
 Allowed sibling scenarios: covered / partial / not covered / unknown / not applicable
 Residual/repeated invocation: covered / partial / not covered / unknown / not applicable

@@ -80,11 +80,14 @@ planning artifacts ready
 ```text
 SCENARIO_ID=<repo-relative-delta-spec-path>::<exact Scenario heading>
 GAP_ID=<change-id>::<scenario-id-hash>::<ordinal>
+GAP_FILE_ID=<first-16-hex of sha256(GAP_ID)>
 CONTRACT_ID=<stable boundary + case-set identity>
 ```
 
 Не переименовывай Scenario только ради test mapping. Изменение exact Scenario
 heading инвалидирует прежнюю привязку и требует нового plan/audit.
+`GAP_ID` хранится только как data; для Windows-safe filenames используй только
+`GAP_FILE_ID` (`[0-9a-f]{16}`), без `:`, `/`, `\` или Scenario title.
 
 ## Common freshness envelope
 
@@ -93,6 +96,8 @@ heading инвалидирует прежнюю привязку и требуе
 ```text
 SCHEMA_VERSION: 1
 CHANGE_ID:
+GAP_ID:
+GAP_FILE_ID:
 SOURCE_SPEC_SHA:
 WORKTREE_FINGERPRINT:
 CONTRACT_ID:
@@ -170,6 +175,7 @@ SCENARIO_TEST_ONLY_PACKET:
   WORKTREE_FINGERPRINT:
   ITEMS:
     - GAP_ID:
+      GAP_FILE_ID:
       SCENARIO_ID:
       DISPOSITION: TEST_ONLY
       REQUIRED_ARTIFACTS:
@@ -201,6 +207,7 @@ SCENARIO_REFACTOR_AND_TEST_PACKET:
   WORKTREE_FINGERPRINT:
   ITEMS:
     - GAP_ID:
+      GAP_FILE_ID:
       SCENARIO_ID:
       DISPOSITION: REFACTOR_AND_TEST
       KIND: PG | CH
@@ -232,6 +239,7 @@ SCENARIO_CERTIFY_PACKET:
   WORKTREE_FINGERPRINT:
   ITEMS:
     - GAP_ID:
+      GAP_FILE_ID:
       SCENARIO_ID:
       DISPOSITION: CERTIFY
       KIND: PG | CH
@@ -247,6 +255,36 @@ SCENARIO_CERTIFY_PACKET:
 `AUTHORIZE_ONE_LIVE_RUN` остаётся one-shot и принимается только по собственному
 contract `/opsx-close-external-gap`.
 
+## Independent provider re-audit
+
+До live authorization независимый `/opsx-spec-scenario-coverage mode=audit`
+должен проверить authored provider tests и current audited state:
+
+```text
+INDEPENDENT_REAUDIT:
+  SCHEMA_VERSION: 1
+  SOURCE_COMMAND: /opsx-spec-scenario-coverage
+  VERDICT: READY_FOR_ONE_AUTHORIZED_RUN
+  CHANGE_ID:
+  GAP_IDS:
+  GAP_FILE_IDS:
+  CONTRACT_IDS:
+  CONTRACT_SHAS:
+  PROVIDER_TEST_IDS:
+  TEST_CONTENT_SHAS:
+  PRODUCTION_BOUNDARY_SHAS:
+  SCHEMA_SHAS:
+  AUDITED_HEAD:
+  AUDITED_STATUS_SHA256:
+  AUDITED_TRACKED_DIFF_SHA256:
+  AUDITED_UNTRACKED_MANIFEST_SHA256:
+  ALLOWED_RUN_BLOCK_SHA256:
+  CREATED_AT:
+```
+
+Любое изменение audited state после re-audit инвалидирует live readiness.
+Writer `/opsx-close-external-gap` MUST NOT выпускать этот verdict сам.
+
 ## PROVIDER_EXECUTION_RECEIPT
 
 Producer: `/opsx-close-external-gap` после фактического разрешённого запуска.
@@ -254,7 +292,7 @@ Producer: `/opsx-close-external-gap` после фактического раз�
 Recommended durable path:
 
 ```text
-.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_ID>.md
+.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
 ```
 
 Schema:
@@ -264,6 +302,7 @@ PROVIDER_EXECUTION_RECEIPT:
   SCHEMA_VERSION: 1
   CHANGE_ID:
   GAP_ID:
+  GAP_FILE_ID:
   SCENARIO_ID:
   KIND: PG | CH
   CONTRACT_ID:
@@ -311,6 +350,8 @@ SCENARIO_TEST_COVERAGE_REPORT:
   SCENARIOS_BLOCKED:
   ROWS:
     - SCENARIO_ID:
+      GAP_IDS:
+      GAP_FILE_IDS:
       REQUIRED_TEST_IDS:
       EXECUTED_TEST_IDS:
       STUB_CONTRACT_STATUS:
