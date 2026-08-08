@@ -29,6 +29,8 @@ REASON_CODE_TO_DISPLAY_TEXT: dict[str, str] = {
     AuctionReasonCode.SEARCH_LIMIT_OK.value: "Лим Аук в норме, запущ",
     AuctionReasonCode.SEARCH_LIMIT_0.value: "Лим Аук не зад",
     AuctionReasonCode.TIME_SCHEDULE.value: "Вне рас пок",
+    # Тот же UI-label, что у Auto enum value (shared string empty_keywords)
+    AuctionReasonCode.EMPTY_KEYWORDS.value: "Нет акт ключей",
 }
 
 

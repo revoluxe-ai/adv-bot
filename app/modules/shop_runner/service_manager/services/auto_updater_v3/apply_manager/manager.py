@@ -245,12 +245,13 @@ class ApplyManager:
                 maybe_set_empty_keywords_pause_intent,
             )
 
+            # INC-PAUSE-02: recheck intent после Search start — статус Search-ноги.
             await maybe_set_empty_keywords_pause_intent(
                 adv_id=int(complex_adv.adv_id),
                 bot_active=bool(complex_adv.bot_active),
                 keywords=ledger.keywords,
                 post_gate_actions=post_gate_actions,
-                campaign_status=complex_adv.auto_adv_active_status_str,
+                campaign_status=complex_adv.search_adv_active_status_str,
             )
 
         return V3ApplyResult(

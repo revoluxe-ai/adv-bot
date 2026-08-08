@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
     V3ActionType,
 )
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager.enums import (
+    AuctionReasonCode,
     AutoReasonCode,
 )
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
@@ -70,12 +71,21 @@ def should_request_empty_keywords_pause_intent(
 
 
 def is_empty_keywords_reason(reason_code: Any) -> bool:
-    """True если reason = empty_keywords (не schedule/budget/cost)."""
+    """True если reason = empty_keywords (не schedule/budget/cost).
+
+    INC-PAUSE-02: durable reason пишется на Search-lane
+    (``AuctionReasonCode.EMPTY_KEYWORDS``); value совпадает с Auto enum.
+    """
     if reason_code is None:
         return False
-    if reason_code == AutoReasonCode.EMPTY_KEYWORDS:
+    if reason_code in (
+        AutoReasonCode.EMPTY_KEYWORDS,
+        AuctionReasonCode.EMPTY_KEYWORDS,
+    ):
         return True
-    return getattr(reason_code, "value", None) == AutoReasonCode.EMPTY_KEYWORDS.value
+    return getattr(reason_code, "value", None) == (
+        AuctionReasonCode.EMPTY_KEYWORDS.value
+    )
 
 
 def stats_window_compatible_with_recheck(available_stats_days: int) -> bool:

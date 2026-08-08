@@ -38,6 +38,9 @@ async def maybe_set_empty_keywords_pause_intent(
 ) -> bool:
     """После OFF/apply: при пустом наборе поставить Redis intent (не pause).
 
+    ``campaign_status`` — статус **Search**-ноги (INC-PAUSE-02 recheck).
+    Intent keyed по ``adv_id`` комплекта; исполнение pause — Search adapters.
+
     Returns:
         True если intent записан.
     """
