@@ -1,4 +1,9 @@
 # mypy: ignore-errors
+"""Test bootstrap for the empty-keywords pause workflow.
+
+Keeps test environment defaults pinned to local containers and shared
+fixtures so the empty-keywords pause suite can run with stable inputs.
+"""
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
@@ -56,6 +61,15 @@ os.environ.setdefault("MIN_SUM", "0")
 os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
 os.environ.setdefault("PG_POOL_SIZE", "5")
 os.environ.setdefault("PG_MAX_OVERFLOW", "10")
+# Neo4j не в текущем стеке тестов; dummy defaults снимают ValidationError в AppConfig.create.
+# setdefault: реальный env (и .env при отсутствии ключей до load) может переопределить.
+os.environ.setdefault("NEO4J_URI", "bolt://127.0.0.1")
+os.environ.setdefault("NEO4J_NAME", "neo4j")
+os.environ.setdefault("NEO4J_PASSWORD", "test_neo4j_password")
+os.environ.setdefault("NEO4J_PORT", "7687")
+# TG sender tokens: settings.TG_TOKENS_FOR_SENDING raises ValueError if unset
+# (e.g. token_monitoring scheduler singleton → NotificationSender).
+os.environ.setdefault("TG_TOKENS_FOR_SENDING", "test_tg_token_for_sending")
 
 TEST_DB_POSTGRES_URL = (
     f"postgresql://test_user:test_password@{_TEST_PG_HOST}:5433/test_adv_bot_db"

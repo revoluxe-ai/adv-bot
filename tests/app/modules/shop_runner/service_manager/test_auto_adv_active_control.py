@@ -1,4 +1,6 @@
-﻿import asyncio
+﻿"""Unit coverage for empty-keywords pause and auto active control behavior."""
+
+import asyncio
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import Any, Awaitable, Callable
@@ -45,6 +47,15 @@ def _positive_cabinet_balance(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
         AsyncMock(return_value=(1000.0, 0.0)),
+    )
+
+
+@pytest.fixture(autouse=True)
+def _empty_keywords_intent_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Baseline suite: empty-keywords intent отсутствует (нет реального Redis)."""
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.intent.EmptyKeywordsPauseIntentManager.consume_intent",
+        AsyncMock(return_value=False),
     )
 async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
     """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""

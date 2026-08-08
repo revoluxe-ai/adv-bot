@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state.sales_states import (
@@ -13,6 +14,9 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import (
     V3Action,
     V3ActionType,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.intent import (
+    EmptyKeywordsPauseIntentManager,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     build_target_place_fallback_zero_by_keyword_id,
@@ -370,8 +374,14 @@ async def test_process_adv_v3_syncs_target_place_when_plan_fact_unchanged() -> N
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
-    """После MAX_CPA_GUARD пересобирается fallback-map; OFF NO_CH не force 0 в sync."""
+async def test_guard_rebuilds_sync_fallback_after_force_off(
+    fake_redis: FakeRedis,
+) -> None:
+    """После MAX_CPA_GUARD пересобирается fallback-map; OFF NO_CH не force 0 в sync.
+
+    ApplyManager после FORCE_OFF может писать empty-keywords intent в Redis —
+    unit изолирует это через fakeredis на ``EmptyKeywordsPauseIntentManager._client``.
+    """
     kw = _kw(
         ks_id=10,
         text="expensive no ch",
@@ -402,6 +412,7 @@ async def test_guard_rebuilds_sync_fallback_after_force_off() -> None:
     build_fallback = MagicMock(wraps=build_target_place_fallback_zero_by_keyword_id)
 
     with (
+        patch.object(EmptyKeywordsPauseIntentManager, "_client", fake_redis),
         patch(
             "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context",
             new=AsyncMock(return_value=(dto, {})),
