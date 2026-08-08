@@ -21,6 +21,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keyw
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.notify import (
     notify_empty_keywords_pause,
 )
+from tests.unit.auto_updater_v3.empty_keywords_pause.notify_empty_keywords_contract import (
+    NOTIFY_TELEGRAM_BOUNDARY_CASE,
+    assert_notify_kwargs_match_case,
+)
 
 
 def _session_cm(fake_session: object) -> MagicMock:
@@ -37,12 +41,13 @@ async def test_notify_sends_telegram_via_injected_sender(
     fake_redis: FakeRedis,
 ) -> None:
     """mark_notified OK → cabinets fake → notification_sender.send_message."""
+    case = NOTIFY_TELEGRAM_BOUNDARY_CASE
     sender = MagicMock()
     sender.send_message = AsyncMock(return_value=True)
     sm_mock = MagicMock(return_value=_session_cm(object()))
     expected = build_empty_keywords_pause_message(
-        campaign_name="РК Empty",
-        adv_id=9001,
+        campaign_name=case.campaign_name,
+        adv_id=case.adv_id,
         include_support_link=True,
     )
 
@@ -56,14 +61,13 @@ async def test_notify_sends_telegram_via_injected_sender(
     ):
         intent = EmptyKeywordsPauseIntentManager()
         await notify_empty_keywords_pause(
-            shop_id="shop-tg-1",
-            adv_id=9001,
-            campaign_name="РК Empty",
+            **case.as_required_kwargs(),
             notification_sender=sender,
             intent_manager=intent,
             session_maker=sm_mock,
         )
 
+    assert_notify_kwargs_match_case(case.as_required_kwargs(), case)
     sm_mock.assert_called_once_with(read_only=True)
     sender.send_message.assert_awaited_once()
     call = sender.send_message.await_args
@@ -92,10 +96,9 @@ async def test_notify_debounce_skips_second_send_message(
         ),
     ):
         intent = EmptyKeywordsPauseIntentManager()
+        case = NOTIFY_TELEGRAM_BOUNDARY_CASE
         kwargs = dict(
-            shop_id="shop-tg-1",
-            adv_id=9001,
-            campaign_name="РК Empty",
+            **case.as_required_kwargs(),
             notification_sender=sender,
             intent_manager=intent,
             session_maker=sm_mock,

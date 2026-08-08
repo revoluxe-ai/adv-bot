@@ -25,12 +25,15 @@ def test_message_contains_reason_recheck_and_support_link() -> None:
         include_support_link=True,
     )
     assert "паузу" in text.lower() or "пауз" in text.lower()
+    assert "поиск" in text.lower()
     assert "ключ" in text.lower()
     assert "перепровер" in text.lower()
     assert client_bot_const.SUPPORT_LINK in text
     assert "empty_keywords" not in text
     assert "EMPTY_KEYWORDS" not in text
     assert "AutoReasonCode" not in text
+    assert "pause_auto_campaign" not in text
+    assert "pause_auction_campaign" not in text
 
 
 @pytest.mark.unit

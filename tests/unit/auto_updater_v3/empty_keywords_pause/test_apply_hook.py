@@ -83,7 +83,7 @@ async def test_apply_hook_no_intent_when_keys_remain(
 async def test_apply_manager_sets_intent_without_wb_pause(
     fake_redis: FakeRedis,
 ) -> None:
-    """Ordering: ApplyManager после OFF ставит intent; pause_auto_campaign не зовётся."""
+    """Ordering: ApplyManager после OFF ставит intent; WB pause adapters не зовутся."""
     from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
         RedisCalculatedKeywordsCacheManager,
     )
@@ -101,6 +101,7 @@ async def test_apply_manager_sets_intent_without_wb_pause(
     complex_adv.shelf_promotion_active = False
     complex_adv.individual_keywords_target_place_mode = False
     complex_adv.auto_adv_active_status_str = WBAdvActiveStatus.STARTED
+    complex_adv.search_adv_active_status_str = WBAdvActiveStatus.STARTED
 
     ledger = MagicMock()
     ledger.apply_in_memory = MagicMock()
@@ -156,6 +157,10 @@ async def test_apply_manager_sets_intent_without_wb_pause(
             "app.core.mp.wb.api.managers.WBModifier.pause_auto_campaign",
             new=pause_spy,
         ),
+        patch(
+            "app.core.mp.wb.api.managers.WBModifier.pause_auction_campaign",
+            new=AsyncMock(),
+        ) as pause_search_spy,
     ):
         await ApplyManager().apply(
             V3ApplyInput(
@@ -168,3 +173,4 @@ async def test_apply_manager_sets_intent_without_wb_pause(
         )
         assert await EmptyKeywordsPauseIntentManager().peek_intent(77) is True
         pause_spy.assert_not_awaited()
+        pause_search_spy.assert_not_awaited()

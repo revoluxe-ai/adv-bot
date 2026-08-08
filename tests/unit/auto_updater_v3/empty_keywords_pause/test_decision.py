@@ -119,7 +119,12 @@ def test_should_request_intent_when_started_and_still_empty_recheck() -> None:
 @pytest.mark.unit
 def test_empty_keywords_reason_distinct_from_schedule_budget() -> None:
     """Spec Distinct pause reason: empty_keywords ≠ schedule/budget/cost."""
+    from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
+        AuctionReasonCode,
+    )
+
     assert is_empty_keywords_reason(AutoReasonCode.EMPTY_KEYWORDS) is True
+    assert is_empty_keywords_reason(AuctionReasonCode.EMPTY_KEYWORDS) is True
     assert is_empty_keywords_reason(AutoReasonCode.TIME_SCHEDULE) is False
     assert is_empty_keywords_reason(AutoReasonCode.COMMON_SPEND_EXCEEDED) is False
     assert is_empty_keywords_reason(AutoReasonCode.COST_RULE_FAILED) is False
