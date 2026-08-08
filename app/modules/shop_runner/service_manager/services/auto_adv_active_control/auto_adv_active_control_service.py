@@ -325,6 +325,47 @@ class AutoAdvActiveControlService:
             end_date,
         )
 
+    async def _maybe_pause_for_empty_keywords_intent(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+        auto_status: WBAdvActiveStatus,
+    ) -> bool:
+        """Потребить empty-keywords intent → pause + reason + notify.
+
+        Spec: pause = следующий шаг после OFF (не concurrent с OFF).
+        Returns:
+            True если intent был и обработан (handler должен выйти).
+        """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+            EmptyKeywordsPauseIntentManager,
+            notify_empty_keywords_pause,
+        )
+
+        intent_mgr = EmptyKeywordsPauseIntentManager()
+        if not await intent_mgr.consume_intent(int(auto_adv_id)):
+            return False
+        if auto_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Auto activity: pausing auto campaign (empty keywords) adv_id=%s shop_id=%s",
+                auto_adv_id,
+                adv.shop_id,
+            )
+            await self._wb_modifier.pause_auto_campaign(adv)
+        await self._set_auto_reason(
+            auto_adv_id,
+            CampaignActivityCommand.PAUSE,
+            AutoReasonCode.EMPTY_KEYWORDS,
+        )
+        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+        await notify_empty_keywords_pause(
+            shop_id=str(adv.shop_id or ""),
+            adv_id=int(auto_adv_id),
+            campaign_name=campaign_name,
+            intent_manager=intent_mgr,
+        )
+        return True
+
     async def _set_auto_reason(
         self,
         adv_id: int,
@@ -866,6 +907,13 @@ class AutoAdvActiveControlService:
             # branch above returns early when it is None.
             assert avg_cost_value is not None
             cost_rule_ok = avg_cost_value <= target_cost_value
+
+        # Spec pause-on-empty-keywords / ADL empty-keywords-pause-write-path:
+        # V3 ставит one-shot intent после OFF; pause = следующий шаг здесь.
+        # Schedule/budget/cost выше уже отработали (не перезаписываем их).
+        if await self._maybe_pause_for_empty_keywords_intent(adv, auto_adv_id, auto_status):
+            return None
+
         if (
             budget_ok
             and cost_rule_ok

@@ -29,6 +29,8 @@ class AutoReasonCode(StrEnum):
     REC_SYSTEM_MODE_OFF = "rec_system_mode_off"
     BUDGET_OK_COST_OK = "budget_ok_cost_ok"
     INSUFFICIENT_BALANCE = "insufficient_balance_auto"
+    # Spec pause-on-empty-keywords: пауза когда выключать больше нечего
+    EMPTY_KEYWORDS = "empty_keywords"
 
 
 class AuctionReasonCode(StrEnum):
