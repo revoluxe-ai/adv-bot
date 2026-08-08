@@ -29,9 +29,14 @@
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
 - scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
-- impl_done: tasks complete; soft-recommend pyright then external-call then conditional performance-review when production `.py`, then antipattern-gate, then static-check / verify
-- verify_pass: archive-eligible after `/opsx-verify`
-- verify_fail: back to apply/update
+- impl_done: tasks complete; PRIMARY `/opsx-verify mode=impl` (VERIFY_PHASES);
+  then soft-recommend pyright → external-call → conditional performance-review
+  when production `.py`, then antipattern-gate → static-check →
+  `/opsx-verify mode=archive`
+- impl_verified: `mode=impl` ✅ IMPL_OK (not archive-eligible)
+- impl_gaps: `mode=impl` ❌ IMPL_GAPS → apply/update
+- verify_pass: archive-eligible after `/opsx-verify mode=archive` ✅ GO
+- verify_fail: back to apply/update (re-run mode=impl if DoD regressed)
 - archived: `/opsx-archive` done
 - planning_revise: `/opsx-update` / `/opsx-explore`
 
@@ -333,14 +338,14 @@
   Owner-block must show A/B/C + optional explore + pasteable THEN_RETURN
 
 ### /opsx-verify
-- purpose: read-only audit before archive
-- input_state: impl_done
-- output_state: verify_pass | verify_fail
-- artifacts_read: change artifacts, code, VERIFY_POLICY
+- purpose: phased read-only audit (VERIFY_PHASES: mode=impl DoD | mode=archive gate)
+- input_state: impl_done | static_check_done | impl_verified
+- output_state: impl_verified | impl_gaps | verify_pass | verify_fail
+- artifacts_read: change artifacts, code, VERIFY_PHASES, VERIFY_POLICY
 - artifacts_written: none (read-only)
 - decision_owner: verifier
-- next_typical: /opsx-archive | /opsx-apply | /opsx-update
-- known_flaws: none recorded
+- next_typical: /opsx-pyright-strict-coverage (after IMPL_OK+prod.py) | /opsx-verify mode=archive | /opsx-archive (after GO) | /opsx-apply | /opsx-update
+- known_flaws: bare /opsx-verify defaults archive (WARN); ≠ /opsx-test verify
 
 ### /opsx-archive
 - purpose: archive a completed change
@@ -527,7 +532,12 @@ focus_pass_incomplete_gate --/opsx-external-call-coverage--> external_call_pass|
 impl_done --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 impl_done --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
 impl_done --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
-impl_done --/opsx-verify--> verify_pass|verify_fail
+impl_done --/opsx-verify mode=impl--> impl_verified|impl_gaps
+impl_gaps --/opsx-apply|/opsx-update--> implementing|planning_revise
+impl_verified --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
+impl_verified --/opsx-verify mode=archive--> verify_pass|verify_fail
+static_check_done --/opsx-verify mode=archive--> verify_pass|verify_fail
+impl_done --/opsx-verify mode=archive [legacy/skip-impl WARN]--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
 planning_revise --/opsx-update|/opsx-explore--> apply_ready|change_idea

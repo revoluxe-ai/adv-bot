@@ -34,7 +34,9 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
 - `/opsx-pyright-strict-coverage` — post-apply soft recommend when production `.py` changed
 - `/opsx-external-call-coverage` — after pyright-coverage PASS; soft recommend for external surfaces in diff
 - `/opsx-performance-review` — after external-call PASS when performance trigger applies (DB/query/queue/concurrency/pool/retry); soft recommend, not every-diff hard gate
-- `/opsx-verify` — independent adequacy and archive verdict
+- `/opsx-verify` — phased READ_ONLY audit via
+  `.cursor/pipeline/contracts/VERIFY_PHASES.md` (`mode=impl` DoD, then later
+  `mode=archive` archive GO)
 
 **Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -190,9 +192,14 @@ this change to a durable case):
 
 **OpenSpec-only** (no bug case context):
 
-1. Если в этой сессии или в diff change есть **in-policy production Python**
+0. **PRIMARY** всегда сначала DoD-фаза (VERIFY_PHASES):
+   `/opsx-verify mode=impl <change-name>`
+   `✅ IMPL_OK` ≠ archive; `❌ IMPL_GAPS` → apply/update, не quality chain
+   как замена DoD.
+
+1. После `IMPL_OK`, если есть **in-policy production Python**
    (`app/**/*.py` или top-level production `*.py` в корне, не `tests/**`):
-   - Primary: `/opsx-pyright-strict-coverage base=<BASE>`
+   - Next: `/opsx-pyright-strict-coverage base=<BASE>`
    - Если `BASE` неизвестен — спроси один раз: «На какую base branch/ref
      сверять pyright-strict / external-call coverage?» Не выдумывай base.
    - After pyright-coverage `PASS`: recommend
@@ -210,19 +217,20 @@ this change to a durable case):
        `/opsx-antipattern-gate base=<BASE>`;
      - после antipattern-gate `PASS` | `PASS_WITH_SUSPECTS`
        (Owner may continue with suspects) → `/opsx-static-check`,
-       затем `/opsx-verify <change-name>`.
+       затем `/opsx-verify mode=archive <change-name>`.
    - Performance review **не** обязателен для каждого diff
      (docs/typing-only / нерелевантный tests-only → skip).
    - Antipattern-gate — soft over-report; не archive gate. `FAIL` →
      fix pasteable exit или `accept=`/`reject=` practice ledger, затем
      re-run `/opsx-antipattern-gate base=<BASE>`.
-2. Иначе (нет in-policy production `.py`):
-   - Primary: `/opsx-verify <change-name>`.
+2. После `IMPL_OK`, если нет in-policy production `.py`:
+   - Next: `/opsx-verify mode=archive <change-name>`.
    - Если в diff есть `tests/**` / process surfaces — soft recommend
-     `/opsx-antipattern-gate base=<BASE> focus=tests|process` before verify.
+     `/opsx-antipattern-gate base=<BASE> focus=tests|process` before archive verify.
 
 Не объявляй archive readiness из apply.
 Не объявляй bug-card closed из apply.
+`DO_NOT_DO_YET: /opsx-archive` until `mode=archive` ✅ GO.
 
 **Output During Implementation**
 
@@ -254,21 +262,25 @@ Working on task 4/7: <task description>
 
 Implementation tasks complete.
 
-If production Python changed (`app/**/*.py` or top-level production scripts):
-  Next: `/opsx-pyright-strict-coverage base=<BASE>`
+Always first:
+  Next: `/opsx-verify mode=impl <change-name>`
+If production Python changed (`app/**/*.py` or top-level production scripts)
+after IMPL_OK:
+  Then: `/opsx-pyright-strict-coverage base=<BASE>`
   Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
   Then: `/opsx-performance-review scope=base base=<BASE>` when trigger applies
         (else skip)
   Then: `/opsx-antipattern-gate base=<BASE>` (after external-call PASS, and
         after performance PASS|PASS_WITH_RISK when review ran)
   Then: `/opsx-static-check` (after antipattern-gate PASS|PASS_WITH_SUSPECTS)
-  Then: `/opsx-verify <change-name>`
-Else:
-  Next: `/opsx-verify <change-name>`
+  Then: `/opsx-verify mode=archive <change-name>`
+Else after IMPL_OK:
+  Next: `/opsx-verify mode=archive <change-name>`
   Soft: `/opsx-antipattern-gate base=<BASE> focus=tests|process` when those
         paths changed
 
 Do not claim archive readiness from apply alone.
+DO_NOT_DO_YET: `/opsx-archive` until mode=archive ✅ GO.
 ```
 
 **Output On Pause (Issue Encountered)**
@@ -419,7 +431,7 @@ Never rewrite prior JSONL lines.
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience
-- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage`, then conditional `/opsx-performance-review`, then `/opsx-static-check` when production `.py` changed, else `/opsx-verify <change-name>`)
+- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-verify mode=impl` first, then `/opsx-pyright-strict-coverage` → `/opsx-external-call-coverage` → conditional `/opsx-performance-review` → `/opsx-antipattern-gate` → `/opsx-static-check` → `/opsx-verify mode=archive` when production `.py` changed; else `mode=impl` then `mode=archive`)
 
 **Fluid Workflow Integration**
 

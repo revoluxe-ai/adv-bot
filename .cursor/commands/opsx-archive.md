@@ -19,9 +19,28 @@ artifacts/decision. `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` or missing explicit
 destructive target is a **hard stop** — do not sync, promote decisions, or move
 the change. This is not an overridable warning.
 
+**Verify-phase hard stop:** Follow
+`.cursor/pipeline/contracts/VERIFY_PHASES.md`. Archive requires a recent
+`/opsx-verify mode=archive` with final marker `✅ GO` for this change.
+`✅ IMPL_OK` / `mode=impl` alone **never** authorizes archive. If the latest
+verify in-session was `mode=impl` only, or only `IMPL_OK`/`IMPL_GAPS` markers
+are present without archive `✅ GO`:
+
+```text
+STATUS: BLOCKED_NEEDS_ARCHIVE_VERIFY
+NEXT_ACTION: /opsx-verify mode=archive <change-name>
+DO_NOT_DO_YET: sync / decision promote / archive move
+```
+
 **Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
+
+0. **Archive-verify gate (before other steps that mutate planning home)**
+
+   Confirm in-session (or Owner-supplied) evidence of
+   `/opsx-verify mode=archive` → `✅ GO` for `<change>`. If missing → stop with
+   `BLOCKED_NEEDS_ARCHIVE_VERIFY` and the NEXT_ACTION above.
 
 1. **If no change name provided, prompt for selection**
 

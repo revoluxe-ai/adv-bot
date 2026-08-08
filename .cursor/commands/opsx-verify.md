@@ -3,12 +3,26 @@
 name: /opsx-verify
 id: opsx-verify
 category: Workflow
-description: Read-only audit of an OpenSpec change before archive
+description: Phased read-only OpenSpec audit (mode=impl DoD | mode=archive pre-archive GO)
 -----------------------------------------------------------------
 
 Verify является read-only audit command после `/opsx-apply` и до `/opsx-archive`.
 
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
+
+## Verify phase (mandatory — thin switch)
+
+Перед аудитом прочитай и выполни
+`.cursor/pipeline/contracts/VERIFY_PHASES.md`:
+
+1. Parse `mode=impl` | `mode=archive` (default **`archive`** if omitted; WARN to prefer explicit mode).
+2. If `mode=impl` → выполни только **PHASE_IMPL** из модуля; остановись; **не**
+   эмитируй `✅ GO` / `❌ NO_GO`; не продолжай archive-секции ниже.
+3. If `mode=archive` → выполни **PHASE_ARCHIVE** из модуля, затем полный
+   archive-audit **этого** файла (секции ниже) + маркеры `✅ GO` / `❌ NO_GO`.
+
+Не путать с `/opsx-test … verify` (bug GREEN). `✅ IMPL_OK` **никогда** не
+авторизует `/opsx-archive`.
 
 ## Source resolution (mandatory)
 

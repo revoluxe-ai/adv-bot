@@ -42,6 +42,11 @@ $ARGUMENTS
 
 Read-only quality gate. Не заменяет `/opsx-verify`, `/opsx-fix-types`, `/opsx-test-triage`, targeted gates в `/opsx-apply`.
 
+Когда run в pre-archive цепочке OpenSpec change: после PASS
+`NEXT_ACTION` MUST быть pasteable
+`/opsx-verify mode=archive <change-name>` (не bare `/opsx-verify`; не
+`mode=impl`). См. `.cursor/pipeline/contracts/VERIFY_PHASES.md`.
+
 ### Hard rules (абсолютно)
 
 - **READ_ONLY end-to-end:** не изменять никакие файлы репозитория.

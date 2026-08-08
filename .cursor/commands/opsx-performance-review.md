@@ -339,8 +339,8 @@ DO_NOT_DO_YET:
   `READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN`; owner may authorize fix
   measure mode
 * After measurement result → this command again for final verdict
-* `PASS` | `PASS_WITH_RISK` → `/opsx-static-check` (then `/opsx-verify`
-  if change active)
+* `PASS` | `PASS_WITH_RISK` → `/opsx-static-check` (then
+  `/opsx-verify mode=archive <change>` if change active)
 * Empty / no surfaces → `/opsx-static-check` when in pre-verify chain
 * `BLOCKED` → fix args
 
