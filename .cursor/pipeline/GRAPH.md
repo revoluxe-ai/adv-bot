@@ -226,6 +226,8 @@
 ### /opsx-spec-scenario-coverage
 - purpose: change-wide Spec Scenario plan/audit/certification; maps every
   Scenario to scenario-seam, stub-contract and required provider evidence
+- cli: required `mode=plan|audit|certify` + `change=`; fail-closed Arg gate
+  (no silent default mode)
 - input_state: apply_ready | scenario_coverage_plan_ready | impl_done |
   scenario_coverage_gaps | scenario_coverage_tests_authored |
   scenario_coverage_receipt_ready
@@ -237,12 +239,12 @@
   command output (persistence requires an explicit compatible owner)
 - decision_owner: independent Scenario coverage auditor; not test/seam writer;
   archive remains `/opsx-verify`
-- next_typical: `/opsx-apply` after plan | `/opsx-test` with
+- next_typical: `/opsx-apply` after `mode=plan` | `/opsx-test` with
   SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
-  REFACTOR/CERTIFY packet | `/opsx-verify` after certified PASS
-- known_flaws: command is new/uncommitted until meta lifecycle completes;
-  committed consumers use shared contract; required archive behavior is
-  versioned via SCENARIO_COVERAGE_REQUIRED
+  REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
+- known_flaws: durable plan/report persistence still chat-output in v1
+  (receipts may live under `.tmp/opsx-scenario-coverage/`); archive activation
+  remains versioned via `SCENARIO_COVERAGE_REQUIRED`
 
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
