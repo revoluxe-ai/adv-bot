@@ -18,9 +18,9 @@ def build_empty_keywords_pause_message(
     """
     name = (campaign_name or "").strip() or f"РК {adv_id}"
     lines = [
-        f"Кампания «{name}» (id {adv_id}) поставлена на паузу:",
+        f"Кампания «{name}» (id {adv_id}): нога Поиск поставлена на паузу:",
         "бот выключил все активные ключи — выключать больше нечего.",
-        "Периодически кампания будет снова включаться для перепроверки.",
+        "Периодически Поиск будет снова включаться для перепроверки.",
     ]
     if include_support_link:
         lines.append(f"Помощь: {client_bot_const.SUPPORT_LINK}")
