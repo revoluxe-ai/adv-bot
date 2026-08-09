@@ -118,18 +118,22 @@ case:
 
 1. State the recommended choice clearly.
 2. **Do not** silently “return to bug-team” or auto-dispatch team hops.
-3. Emit **pasteable** lines with durable IDs:
+3. Emit **pasteable** lines **only after** a durable `BUGCASE-…` id is
+   known (INDEX / LEDGER). Substitute the real id into the lines — do
+   **not** emit angle-bracket templates like `case=<CASE_ID>` (CMD-IX-001).
 
 ```text
-NEXT_ACTION (Owner answers in team chat OR pastes):
-/opsx-bug-team case=<CASE_ID> mode=continue
+NEXT_ACTION (Owner answers in team chat OR pastes; real BUGCASE-… required):
+/opsx-bug-team case=CASE_ID mode=continue
 
-ALSO_OK (if still unsure):
-/opsx-explore case=<CASE_ID> finding=<FINDING_ID>
+ALSO_OK (if still unsure; separate paste — never with first-intake RAW_REPORT):
+/opsx-explore case=CASE_ID finding=FINDING_ID
 ```
 
 4. Prefer INDEX / LEDGER `CASE_ID` over chat memory. If IDs unknown → ask
-   once or point to `.tmp/opsx-bug-cases/INDEX.md`.
+   once or point to `.tmp/opsx-bug-cases/INDEX.md`; **omit** `case=` /
+   `ALSO_OK` lines until a real id exists. Never paste handback `case=`
+   into the same message as free-form first-intake `RAW_REPORT`.
 
 **Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"

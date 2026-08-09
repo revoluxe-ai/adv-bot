@@ -55,7 +55,7 @@ contract and the activated companion command texts.
 
 - typing-only packets (`/opsx-fix-types`, static-check);
 - process / command-contract defects
-  (`/opsx-admin-command-fix-command-defects`,
+  (`/opsx-meta-fix-command-defects`,
   `/opsx-admin-command-promote-process-lesson`);
 - OpenSpec change apply/verify/archive lifecycle (except optional later GRAPH
   navigation edges);

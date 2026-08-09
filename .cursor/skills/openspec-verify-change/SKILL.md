@@ -13,6 +13,19 @@ metadata:
 Verify является read-only audit command после `/opsx-apply` и до `/opsx-archive`.
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
 
+**Verify phases:** Read and follow
+`.cursor/pipeline/contracts/VERIFY_PHASES.md` first (`mode=impl` | `mode=archive`,
+default archive). `mode=impl` → PHASE_IMPL only (`✅ IMPL_OK` / `❌ IMPL_GAPS`);
+never archive. `mode=archive` → PHASE_ARCHIVE + full `.cursor/commands/opsx-verify.md`
+audit (`✅ GO` / `❌ NO_GO`). Not the same as `/opsx-test … verify`.
+
+**Semantic write-target authority:** Read and follow
+`.cursor/commands/opsx-verify.md`, `openspec/policies/VERIFY_POLICY.md`, and
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. Unresolved high-risk
+multi-target writes are archive blocker `unresolved_semantic_write_target`
+(`NO_GO`). Forbidden sibling adapters and missing paired positive/negative
+proof also fail verify; green tests against an ambiguous target are insufficient.
+
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
 **OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:

@@ -11,6 +11,9 @@ alwaysApply: false
 Authority split (не дублировать полный policy в commands):
 
 - `.cursor/rules/testing-rules.mdc` — общий test-design / execution policy
+- `.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` — единые определения
+  `unit_component`, `scenario_seam`, `boundary_integration`,
+  `stub_contract`, `destructive_local` и load/measurement evidence
 - `openspec/config.yaml` → `rules.tasks` — обязательства при генерации tasks
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + materialization обязательных tests
@@ -29,6 +32,29 @@ Authority split (не дублировать полный policy в commands):
 
 Оно **не** запрещает писать production code в writer-сессиях (`/opsx-apply` и аналоги).
 
+## Test evidence taxonomy
+
+Используй
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` как словарь evidence и
+execution classes.
+
+Не смешивай:
+
+- pytest marker/path (`unit`, `integration`);
+- evidence class (`unit_component`, `scenario_seam`,
+  `boundary_integration`, `stub_contract`);
+- execution class (`fast_local`, `destructive_local`, `authorized_live`).
+
+`destructive_local` не означает автоматически ни полный Scenario coverage, ни
+production-destructive действие. `scenario_seam` может находиться в
+`tests/unit/`, если реальная causal logic проходит до тонкого внешнего конца.
+PG/CH provider contract по-прежнему требует live test provider согласно
+Kind defaults ниже.
+
+Найденный или authored test без исполнения отмечай `EXECUTED=NO`; он не
+является green evidence. Любой coverage verdict должен явно писать, что тест
+доказывает и чего не доказывает.
+
 ## Execution gates
 
 1. Все project commands запускай только через Poetry: `poetry run ...`
@@ -39,6 +65,18 @@ Authority split (не дублировать полный policy в commands):
 6. `ruff` и `black` не являются обязательными gates, если задача явно не просит lint/format
 7. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
 8. На Windows PowerShell не используй bash-синтаксис: `||`, `&&`, `grep`, `sed`, `awk`, `true` как no-op
+9. **Destructive cache (default on, all entry points):** если invocation
+   собирает любой `@pytest.mark.destructive_local`, перед запуском вызови
+   shared planner
+   `.cursor/static-check/bin/destructive_cache_plan.py` (contract:
+   `.cursor/static-check/contracts/destructive-selective-cache.md`).
+   Default `CACHE_MODE=dev` — беги только `MUST_RUN`; `CACHE_HIT` skip.
+   Полный прогон destructive — только явный `CACHE_OFF` или `CACHE_FORCE`
+   (Owner text / command token). `CACHE_HIT` ≠ archive EXECUTED green.
+   `authorized_live` / `AUTHORIZE_ONE_LIVE_RUN` — вне этого cache.
+   **INTERIM:** если planner отсутствует или падает — `CACHE_DEGRADED`:
+   гоняй все selected destructive; запрещено invent deselect/skip /
+   «уже зелёные на ветке» без planner receipt.
 
 ## Targeted и adjacent coverage
 

@@ -1,6 +1,6 @@
 ---
-description: "Единая read-only точка статических проверок: MODE=FULL|FAST; parallel Task workers; сводный отчёт."
-argument-hint: "[FAST|FULL] [PREFLIGHT]"
+description: "Единая read-only точка статических проверок: MODE=FULL|FAST; FULL defaults to destructive cache; parallel Task workers; сводный отчёт."
+argument-hint: "[FAST|FULL] [PREFLIGHT] [CACHE_OFF|CACHE_FORCE|CACHE_DEV]"
 ---
 
 # /opsx-static-check
@@ -29,26 +29,51 @@ $ARGUMENTS
 | (нет MODE) / `FULL` | `MODE=FULL` |
 | `FAST` | `MODE=FAST` |
 | `PREFLIGHT` | run optional env preflight before fan-out |
+| (нет CACHE_* на FULL) | `CACHE_MODE=dev` — selective `destructive_local` by fingerprint (default) |
+| `CACHE_OFF` | `CACHE_MODE=off` — run all destructive (archive / pre-PR) |
+| `CACHE_FORCE` | `CACHE_MODE=force` — run all destructive; rewrite local cache receipts |
+| `CACHE_DEV` | alias of default `CACHE_MODE=dev` (optional no-op) |
 | иное неизвестное | `STATUS=BLOCKED`, не запускать agents |
+
+`CACHE_*` на `FAST` → ignore (`CACHE_MODE=n/a`, no Wave B).
+
+Contract: `.cursor/static-check/contracts/destructive-selective-cache.md`.
+`CACHE_HIT` ≠ archive EXECUTED green — before archive/PR use `CACHE_OFF` or `CACHE_FORCE`.
+
+**INTERIM (planner missing):** if
+`.cursor/static-check/bin/destructive_cache_plan.py` is absent or broken →
+Wave B MUST run all destructive (`CACHE_DEGRADED=yes`); do **not** invent
+deselect/skip/nodeid filters. Token default stays `dev`; effective behavior
+is run-all until planner ships. Final report MUST print `CACHE_MODE` +
+`CACHE_DEGRADED` + `destructive_cache: ran=N cached=M`.
 
 Примеры:
 
-- `/opsx-static-check` → FULL, **без** preflight
-- `/opsx-static-check FAST` → FAST, без preflight
-- `/opsx-static-check FULL PREFLIGHT` → FULL + preflight
+- `/opsx-static-check` → FULL + cache **dev** (default), без preflight
+- `/opsx-static-check FAST` → FAST, без preflight, cache N/A
+- `/opsx-static-check FULL CACHE_OFF` → FULL, все destructive, без cache skip
+- `/opsx-static-check FULL CACHE_FORCE` → FULL, все destructive + rewrite cache
+- `/opsx-static-check FULL PREFLIGHT` → FULL + cache **dev** + preflight
 - `/opsx-static-check PREFLIGHT FAST` → FAST + preflight
 
 ## Purpose / boundaries
 
 Read-only quality gate. Не заменяет `/opsx-verify`, `/opsx-fix-types`, `/opsx-test-triage`, targeted gates в `/opsx-apply`.
 
+Когда run в pre-archive цепочке OpenSpec change: после PASS
+`NEXT_ACTION` MUST быть pasteable
+`/opsx-verify mode=archive <change-name>` (не bare `/opsx-verify`; не
+`mode=impl`). См. `.cursor/pipeline/contracts/VERIFY_PHASES.md`.
+
 ### Hard rules (абсолютно)
 
-- **READ_ONLY end-to-end:** не изменять никакие файлы репозитория.
-- Запрещено «чинить» даже инфраструктуру check-команды: `.cursor/commands/opsx-static-check.md`, `.cursor/static-check/**`, skills/rules этой подсистемы, `bin/run.sh`, configs.
+- **READ_ONLY end-to-end:** не изменять production/tests/commands/contracts.
+  Единственное исключение при implement cache: локальный gitignored receipt
+  `.cursor/static-check/.cache/destructive-last-run.json` (не product SoT).
+- Запрещено «чинить» даже инфраструктуру check-команды: `.cursor/commands/opsx-static-check.md`, `.cursor/static-check/**` (кроме `.cache/`), skills/rules этой подсистемы, `bin/run.sh`, configs.
 - Не автофиксить production/tests.
 - Не объявлять archive `GO`/`NO_GO`.
-- Не создавать durable artifacts по умолчанию.
+- Не создавать durable artifacts кроме локального destructive cache receipt.
 - При BLOCKED/FAIL: только отчёт + NEXT ACTION для **человека** / другой команды. **Этот** run ничего не патчит.
 - **Completion gate:** run считается незавершённым, пока **оркестратор** не
   напечатал блок Final report (`STATUS` + `CHECKS` + `NEXT ACTION`) в **своём**
@@ -73,6 +98,7 @@ Announce:
 ```text
 STATIC CHECK
 MODE: FULL|FAST
+CACHE_MODE: dev|off|force|n/a
 PREFLIGHT: off|on
 Parallel plan: <waves from registry>
 Checks: [ ] ...

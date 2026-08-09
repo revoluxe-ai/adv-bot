@@ -7,18 +7,20 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 35
+- inventory_count: 55
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: 7fbce8b13701c946da00f05997f59ab1ca844c60
+- source_commit: f8bd51fcc837f0164f12d1c83b3c6c957aaeab49
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-30T12:17:37Z: inventory 35; fingerprint
-  78bbacb3fcee9523e0bdf73df1a18a5d; added /opsx-antipattern-gate
-  and /opsx-bug-debt-board; soft chain pyright → ecc → optional
-  performance → antipattern → static-check; F11 closed; F12 open.
-  Prior: performance-review (2026-07-30T04:38:13Z); F10 closed.
+  UPDATE GO 2026-08-09T05:34:03Z INCREMENTAL: inventory 55; fingerprint
+  cb7ea54dea1568434d9b206f15b63012; add /opsx-test-env + local_test_env_*
+  states; soft chain antipattern → test-env UP → static FULL → test-env DOWN;
+  F14 closed (graph missing test-env); F13 open (companion lag); F12 still open.
+  Other newly inventoried commands (meta-*, supervisor, devops, …) remain
+  NOT_OPENED_BUDGET / unindexed beyond inventory count.
+  Prior: UPDATE GO 2026-07-30T12:17:37Z antipattern + bug-debt (F11).
 
 ## States
 
@@ -27,11 +29,27 @@
 - change_scaffolded: change dir exists; first artifact pending (`/opsx-new`)
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
+- scenario_coverage_plan_ready: optional/versioned
+  `/opsx-spec-scenario-coverage mode=plan`; required evidence matrix known
 - scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
-- impl_done: tasks complete; soft-recommend pyright then external-call then conditional performance-review when production `.py`, then antipattern-gate, then static-check / verify
-- verify_pass: archive-eligible after `/opsx-verify`
-- verify_fail: back to apply/update
+- impl_done: tasks complete; PRIMARY `/opsx-verify mode=impl` (VERIFY_PHASES);
+  then soft-recommend pyright → external-call → conditional performance-review
+  when production `.py`, then antipattern-gate → `/opsx-test-env UP` (before
+  destructive/FULL) → static-check → `/opsx-test-env DOWN` (after PASS) →
+  `/opsx-verify mode=archive`
+- impl_verified: `mode=impl` ✅ IMPL_OK (not archive-eligible)
+- impl_gaps: `mode=impl` ❌ IMPL_GAPS → apply/update
+- scenario_coverage_gaps: scenario audit FAIL; route TEST_ONLY to `/opsx-test`,
+  PG/CH REFACTOR_AND_TEST or CERTIFY to `/opsx-close-external-gap`
+- scenario_coverage_tests_authored: writer self-report; independent audit pending
+- scenario_coverage_provider_ready: provider tests authored; independent
+  live-ready re-audit / authorization pending
+- scenario_coverage_receipt_ready: authorized provider run produced receipt;
+  `/opsx-spec-scenario-coverage mode=certify`
+- scenario_coverage_certified: fresh change-wide Scenario report PASS
+- verify_pass: archive-eligible after `/opsx-verify mode=archive` ✅ GO
+- verify_fail: back to apply/update (re-run mode=impl if DoD regressed)
 - archived: `/opsx-archive` done
 - planning_revise: `/opsx-update` / `/opsx-explore`
 
@@ -110,6 +128,10 @@
 - antipattern_suspects: PASS_WITH_SUSPECTS (Owner may continue to static)
 - antipattern_fail: FAIL (FIX_EXIT / re-scan; static soft-blocked until Owner continues)
 - antipattern_blocked: missing/invalid `base=` / unknown token / ledger write without GO
+- local_test_env_ready: `/opsx-test-env UP` — PG:5433 + CH:8124 healthy; Redis:6379 external OK
+- local_test_env_stopped: `/opsx-test-env DOWN` — test compose torn down
+- local_test_env_degraded: PG/CH up but Redis missing (or partial health)
+- local_test_env_blocked: Docker/compose/ports FAIL_CLOSED|UNAVAILABLE
 - debt_clear: `/opsx-bug-debt-board` STATUS=CLEAR (spare-slot; not a hard gate; ≠ card-close)
 - debt_found: DEBT_FOUND (pasteable FIX_EXIT; verify/archive are NOT residual close)
 - static_check_done: `/opsx-static-check` synthesized
@@ -208,6 +230,29 @@
 - next_typical: /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
 - known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration; NEXT rules beyond opened budget may lag antipattern (F12)
 
+### /opsx-spec-scenario-coverage
+- purpose: change-wide Spec Scenario plan/audit/certification; maps every
+  Scenario to scenario-seam, stub-contract and required provider evidence
+- cli: required `mode=plan|audit|certify` + `change=`; fail-closed Arg gate
+  (no silent default mode)
+- input_state: apply_ready | scenario_coverage_plan_ready | impl_done |
+  scenario_coverage_gaps | scenario_coverage_tests_authored |
+  scenario_coverage_receipt_ready
+- output_state: scenario_coverage_plan_ready | scenario_coverage_gaps |
+  scenario_coverage_provider_ready | scenario_coverage_certified | blocked
+- artifacts_read: change delta specs/design/tasks; code/tests; optional
+  TEST_COVERAGE_PACKET; provider receipts; test-evidence taxonomy
+- artifacts_written: none in v1 command draft; plan/report/route packets in
+  command output (persistence requires an explicit compatible owner)
+- decision_owner: independent Scenario coverage auditor; not test/seam writer;
+  archive remains `/opsx-verify`
+- next_typical: `/opsx-apply` after `mode=plan` | `/opsx-test` with
+  SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
+  REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
+- known_flaws: durable plan/report persistence still chat-output in v1
+  (receipts may live under `.tmp/opsx-scenario-coverage/`); archive activation
+  remains versioned via `SCENARIO_COVERAGE_REQUIRED`
+
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
 - input_state: external_call_pass | impl_done | performance_reaudit_pending | performance_review_pending | product_dirty
@@ -235,8 +280,8 @@
 - artifacts_read: git diff base...head; catalog; PRACTICE_LEDGER.jsonl; optional change context
 - artifacts_written: none on SCAN; with accept/reject+GO append-only `.cursor/antipattern-gate/PRACTICE_LEDGER.jsonl`
 - decision_owner: antipattern auditor; ledger write only with Owner GO
-- next_typical: /opsx-static-check (PASS|PASS_WITH_SUSPECTS) | FIX_EXIT / re-scan (FAIL) | /opsx-verify
-- known_flaws: soft gate (not hard archive); over-report intentional; MATCHES_ACCEPTED_PRACTICE ≠ testing-rules proof
+- next_typical: /opsx-test-env UP (before FULL/destructive) | /opsx-static-check (unit-only/FAST or env already ready) | FIX_EXIT / re-scan (FAIL) | /opsx-verify
+- known_flaws: soft gate (not hard archive); over-report intentional; MATCHES_ACCEPTED_PRACTICE ≠ testing-rules proof; contract may still omit test-env (F13)
 
 ### /opsx-bug-debt-board
 - purpose: READ_ONLY cross-case bug debt inventory (INDEX + cases); pasteable recovery exits
@@ -249,14 +294,23 @@
 - known_flaws: soft only; CLEAR ≠ card-close; verify/archive are NOT residual close while debt open
 
 ### /opsx-close-external-gap
-- purpose: REFACTOR_AND_TEST closure for PG/CH gaps from coverage packet (minimal seam + live integration); no base=
-- input_state: external_call_gaps
-- output_state: external_gap_closed | external_gap_closing | external_call_gaps | tests_authored | implementing
-- artifacts_read: pasted EXTERNAL_CALL_COVERAGE_REPORT / GAPS; testing-rules; gap PATH symbols
-- artifacts_written: minimal app/** seam + tests/integration/** when REFACTOR_AND_TEST
-- decision_owner: closure writer; TEST_ONLY redirects to /opsx-test; oversized seam → /opsx-apply
-- next_typical: /opsx-external-call-coverage base=<PACKET_BASE> focus=pg|ch | /opsx-test | /opsx-apply
-- known_flaws: must not accept base=; session-mock unit ≠ CLOSED for PG/CH
+- purpose: REFACTOR_AND_TEST closure for PG/CH gaps (minimal seam + provider
+  integration) and authorized provider execution receipt; no base=
+- input_state: external_call_gaps | scenario_coverage_gaps |
+  scenario_coverage_provider_ready
+- output_state: external_gap_closed | external_gap_closing |
+  external_call_gaps | tests_authored | implementing |
+  scenario_coverage_tests_authored | scenario_coverage_receipt_ready
+- artifacts_read: pasted ECC or Scenario packets; testing-rules; ContractCase;
+  gap PATH symbols
+- artifacts_written: minimal app/** seam + tests/integration/** when
+  REFACTOR_AND_TEST; provider receipt only after authorized run
+- decision_owner: closure writer; TEST_ONLY redirects to /opsx-test; oversized
+  seam → /opsx-apply; never owns Scenario coverage PASS
+- next_typical: ECC focused re-audit | `/opsx-spec-scenario-coverage mode=audit`
+  after authorship | `mode=certify` after receipt | `/opsx-test` | `/opsx-apply`
+- known_flaws: must not accept base=; session-mock unit ≠ CLOSED for PG/CH;
+  provider receipt ≠ final Scenario certification
 
 ### /opsx-materialize-bug-queue
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist
@@ -291,7 +345,7 @@
 - decision_owner: adjudicator + claim gate + classify-first + Owner GO + RED-before-GO
 - next_typical: /opsx-classify-bug (if missing) | /opsx-test case= finding= | /opsx-fix-bug GO (after RED) | /opsx-claim-next-bug | /opsx-invariant | /opsx-bug-team handback (post-GO SECONDARY) | /opsx-learn-from-bug | none
 - known_flaws: |
-  F6: does not own process-contract defects → `/opsx-admin-command-fix-command-defects`;
+  F6: does not own process-contract defects → `/opsx-meta-fix-command-defects`;
   F7: durable STATUS ready_for_fix/adjudicating/implementing/verification blocks
   finding= path; F8: claimed+empty durable CLAIM_TOKEN → materialize repair;
   claim-first when available+CHAT_REQUIRED=true; classify-first before impl route;
@@ -333,14 +387,14 @@
   Owner-block must show A/B/C + optional explore + pasteable THEN_RETURN
 
 ### /opsx-verify
-- purpose: read-only audit before archive
-- input_state: impl_done
-- output_state: verify_pass | verify_fail
-- artifacts_read: change artifacts, code, VERIFY_POLICY
+- purpose: phased read-only audit (VERIFY_PHASES: mode=impl DoD | mode=archive gate)
+- input_state: impl_done | static_check_done | impl_verified
+- output_state: impl_verified | impl_gaps | verify_pass | verify_fail
+- artifacts_read: change artifacts, code, VERIFY_PHASES, VERIFY_POLICY
 - artifacts_written: none (read-only)
 - decision_owner: verifier
-- next_typical: /opsx-archive | /opsx-apply | /opsx-update
-- known_flaws: none recorded
+- next_typical: /opsx-pyright-strict-coverage (after IMPL_OK+prod.py) | /opsx-static-check FULL CACHE_OFF (when prior FULL was cache-dev) | /opsx-verify mode=archive | /opsx-archive (after GO) | /opsx-apply | /opsx-update
+- known_flaws: bare /opsx-verify defaults archive (WARN); ≠ /opsx-test verify; archive soft WARN if last FULL CACHE_MODE=dev
 
 ### /opsx-archive
 - purpose: archive a completed change
@@ -443,23 +497,33 @@
 
 ### /opsx-test-triage
 - purpose: triage failing/noisy tests
-- input_state: tests_authored | static_check_done
+- input_state: tests_authored | static_check_done | local_test_env_degraded | local_test_env_blocked
 - output_state: typing_packet | tests_authored
 - artifacts_read: test failures
 - artifacts_written: none or triage notes per contract
 - decision_owner: triage operator
-- next_typical: /opsx-fix-types | /opsx-test
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: /opsx-test-env UP (FLAKY_OR_ENV / connection refused) | /opsx-fix-types | /opsx-test
+- known_flaws: NOT_OPENED_BUDGET detail; may omit test-env hint until companions (F13)
+
+### /opsx-test-env
+- purpose: laptop test compose UP (default) / DOWN / PROBE before destructive/full pytest
+- input_state: antipattern_pass | antipattern_suspects | before_destructive_tests | static_check_done | local_test_env_degraded | local_test_env_blocked | local_test_env_stopped
+- output_state: local_test_env_ready | local_test_env_stopped | local_test_env_degraded | local_test_env_blocked
+- artifacts_read: tests/docker-compose.test.yml; env.sample (flag names only)
+- artifacts_written: none in git; docker compose project for test file only
+- decision_owner: test-env operator (LOCAL_TEST_ENV_STATUS only; not verify/archive)
+- next_typical: /opsx-static-check FULL (after UP) | /opsx-test (destructive) | /opsx-test-env DOWN (after PASS) | /opsx-test-triage
+- known_flaws: Redis external :6379 (test_redis commented in compose); not k8s (/opsx-devops); companion NEXT lag F13
 
 ### /opsx-static-check
 - purpose: orchestrated FAST/FULL static checks (read-only)
-- input_state: implementing | impl_done | antipattern_pass | antipattern_suspects | performance_pass | external_call_pass | static_check_done
+- input_state: implementing | impl_done | antipattern_pass | antipattern_suspects | local_test_env_ready | local_test_env_degraded | performance_pass | external_call_pass | static_check_done
 - output_state: static_check_done
 - artifacts_read: registry + check outputs
 - artifacts_written: none (read-only)
 - decision_owner: synthesizer
-- next_typical: one pasteable NEXT_ACTION from synthesis
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: /opsx-test-env DOWN (after FULL PASS; advisory) | /opsx-test-env UP (env-class FAIL) | one pasteable NEXT_ACTION from synthesis | /opsx-verify
+- known_flaws: PREFLIGHT=tooling files only (not docker services); may omit test-env NEXT until companions (F13)
 
 ### /opsx-commit
 - purpose: atomic local commits for product/code/OpenSpec/docs
@@ -511,7 +575,13 @@ performance_pass --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspec
 # demoted primary (was typical; keep as operator skip only):
 # performance_pass --/opsx-static-check--> static_check_done
 performance_pass --/opsx-static-check [operator skip / demoted primary]--> static_check_done
-antipattern_pass|antipattern_suspects --/opsx-static-check--> static_check_done
+antipattern_pass|antipattern_suspects --/opsx-test-env UP--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
+local_test_env_ready --/opsx-static-check FULL--> static_check_done
+local_test_env_degraded --/opsx-test-env UP|/redis-external-fix--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
+local_test_env_blocked --/opsx-test-env UP--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
+# demoted for FULL/destructive when env not ready (unit-only / FAST / skip env OK):
+antipattern_pass|antipattern_suspects --/opsx-static-check [unit-only/FAST / env skip]--> static_check_done
+static_check_done --/opsx-test-env DOWN [after FULL PASS; advisory]--> local_test_env_stopped
 antipattern_fail --FIX_EXIT|/opsx-antipattern-gate re-scan--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
 performance_fail --/opsx-performance-fix--> performance_reaudit_pending|performance_fixing
 performance_reaudit_pending --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
@@ -527,7 +597,13 @@ focus_pass_incomplete_gate --/opsx-external-call-coverage--> external_call_pass|
 impl_done --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 impl_done --/opsx-performance-review--> performance_pass|performance_fail|performance_measure_authorized
 impl_done --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspects|antipattern_fail|antipattern_blocked
-impl_done --/opsx-verify--> verify_pass|verify_fail
+impl_done --/opsx-verify mode=impl--> impl_verified|impl_gaps
+impl_gaps --/opsx-apply|/opsx-update--> implementing|planning_revise
+impl_verified --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
+impl_verified --/opsx-verify mode=archive--> verify_pass|verify_fail
+static_check_done --/opsx-static-check FULL CACHE_OFF [recommended when prior FULL was cache-dev]--> static_check_done
+static_check_done --/opsx-verify mode=archive [soft WARN if last FULL CACHE_MODE=dev]--> verify_pass|verify_fail
+impl_done --/opsx-verify mode=archive [legacy/skip-impl WARN]--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
 planning_revise --/opsx-update|/opsx-explore--> apply_ready|change_idea
@@ -613,13 +689,13 @@ family_learning --/opsx-bug-team CLOSURE--> family_closed
 # resume: /opsx-bug-team case=<CASE_ID> mode=resume-family-fanout
 fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|lesson_candidate_only
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
-implementing|impl_done|coverage_pass|external_call_pass|performance_pass|antipattern_pass|antipattern_suspects --/opsx-static-check--> static_check_done
+implementing|impl_done|coverage_pass|external_call_pass|performance_pass|antipattern_pass|antipattern_suspects|local_test_env_ready --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
 # off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
-# command_defect_signal --/opsx-admin-command-fix-command-defects--> FIXED
+# command_defect_signal --/opsx-meta-fix-command-defects--> FIXED
 # FIXED --/opsx-admin-command-promote-process-lesson--> process_lesson_candidate
 # process_lesson_candidate --DESIGN_BRIEF_READY--> /opsx-admin-command-design-command
-# process_lesson_candidate --EXTEND_EXISTING--> /opsx-admin-command-fix-command-defects
+# process_lesson_candidate --EXTEND_EXISTING--> /opsx-meta-fix-command-defects
 ```
 
 ## Soft recommendations (advisory only)
@@ -633,7 +709,8 @@ After `/opsx-apply` when production Python changed (`app/**/*.py` or
 top-level production scripts): recommend
 `/opsx-pyright-strict-coverage base=<BASE>` before
 `/opsx-external-call-coverage`, optional `/opsx-performance-review`,
-`/opsx-antipattern-gate`, `/opsx-static-check`, and `/opsx-verify`.
+`/opsx-antipattern-gate`, `/opsx-test-env UP` (FULL), `/opsx-static-check`,
+and `/opsx-verify`.
 `PASS` pyright-strict alone does **not** prove changed files are in
 `pyrightconfig_strict.json` include. Soft recommend — does not block
 archive by itself.
@@ -643,8 +720,9 @@ archive by itself.
 After pyright-coverage `PASS` (or when allowlist already known good) and
 production `.py` changed: recommend
 `/opsx-external-call-coverage base=<BASE>` before conditional
-`/opsx-performance-review`, `/opsx-antipattern-gate`, `/opsx-static-check`,
-and `/opsx-verify`. One command covers HTTP/WB/PG/CH/Redis/OTHER via kind
+`/opsx-performance-review`, `/opsx-antipattern-gate`, `/opsx-test-env UP`
+(FULL), `/opsx-static-check`, and `/opsx-verify`. One command covers
+HTTP/WB/PG/CH/Redis/OTHER via kind
 taxonomy (`focus=` optional for debug only). Soft recommend — absence of
 report does not auto-`NO_GO` verify; open gaps in a present
 `EXTERNAL_CALL_COVERAGE_REPORT` do. Does **not** replace
@@ -662,10 +740,11 @@ After external-call `PASS`, when performance trigger applies (DB/query/
 repository; Queue/TasksManager/`run_tasks`/`gather`/`create_task`;
 Semaphore/Lock/Redis NX; pool/cap/rate-limit/retry/backpressure): soft
 recommend `/opsx-performance-review scope=base base=<BASE>` before
-`/opsx-antipattern-gate` then `/opsx-static-check`. Not every-diff
-mandatory. `FAIL` → `/opsx-performance-fix` + FIX_PACKET → independent
-re-audit via review (fixer self-report is never PASS). Measurement only
-under `READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
+`/opsx-antipattern-gate` then `/opsx-test-env UP` (FULL) then
+`/opsx-static-check`. Not every-diff mandatory. `FAIL` →
+`/opsx-performance-fix` + FIX_PACKET → independent re-audit via review
+(fixer self-report is never PASS). Measurement only under
+`READY_FOR_ONE_AUTHORIZED_PERFORMANCE_RUN` inside fix — there is no
 `/opsx-performance-run`. Operator may skip soft gate (deviation allowed).
 Direct `performance_pass → static-check` is demoted (operator skip only).
 
@@ -673,11 +752,33 @@ Direct `performance_pass → static-check` is demoted (operator skip only).
 
 After external-call `PASS` and optional performance
 `PASS|PASS_WITH_RISK|NOT_APPLICABLE` (or when perf skipped): soft recommend
-`/opsx-antipattern-gate base=<BASE>` before `/opsx-static-check` /
-`/opsx-verify`. Over-report by design. `PASS|PASS_WITH_SUSPECTS` →
-static-check (Owner may continue with suspects). `FAIL` → FIX_EXIT /
-re-scan; soft-block static until Owner continues. Soft recommend — not a
-hard archive gate. Optional practice ledger: `accept=` / `reject=` + GO.
+`/opsx-antipattern-gate base=<BASE>` before `/opsx-test-env UP` (when
+FULL/destructive follows) then `/opsx-static-check` / `/opsx-verify`.
+Over-report by design. `PASS|PASS_WITH_SUSPECTS` → test-env UP (FULL) or
+static FAST/unit-only. `FAIL` → FIX_EXIT / re-scan; soft-block static until
+Owner continues. Soft recommend — not a hard archive gate. Optional
+practice ledger: `accept=` / `reject=` + GO.
+
+### Local test env (before destructive / pytest-full)
+
+After antipattern `PASS|PASS_WITH_SUSPECTS` (or when about to run
+pytest-full / live PG|CH): soft recommend `/opsx-test-env UP` before
+`/opsx-static-check FULL`. On connection refused / `FLAKY_OR_ENV` for
+`5433`|`8124`|`6379`: paste `/opsx-test-env UP`. After FULL `PASS`:
+recommend `/opsx-test-env DOWN` to free resources. Not a hard archive gate.
+Unit-only / FAST may skip. Does **not** replace static-check `PREFLIGHT`
+(tooling files only). Not `/opsx-devops` (k8s). Redis is external until
+compose `test_redis` enabled (Owner GO). Companion contracts may lag (F13).
+
+Destructive execution default (all entry points that select
+`destructive_local`): `CACHE_MODE=dev` via
+`.cursor/static-check/contracts/destructive-selective-cache.md` — run
+fingerprint `MUST_RUN` only. **INTERIM** (planner missing):
+`CACHE_DEGRADED` = run-all destructive; no improvised skips.
+Archive / pre-PR confidence → `/opsx-static-check FULL CACHE_OFF`
+(or `CACHE_FORCE`). `/opsx-verify mode=archive` soft-WARNs if last FULL
+was cache-dev. `CACHE_HIT` ≠ archive EXECUTED green. `authorized_live`
+remains out of this cache.
 
 ### Bug debt board (ALSO_OK anytime)
 
@@ -768,7 +869,7 @@ Hard reminders for NAVIGATE:
 1. **typing** → `/opsx-fix-types` / `/opsx-static-check` — no learning command
 2. **logic/product** → `/opsx-fix-bug` → `/opsx-learn-from-bug`
    (hunter miss → prefer project-bug-hunt checklist)
-3. **commands/process (F6)** → `/opsx-admin-command-fix-command-defects`
+3. **commands/process (F6)** → `/opsx-meta-fix-command-defects`
    → optional `/opsx-admin-command-promote-process-lesson`
    → `/opsx-admin-command-design-command` if `DESIGN_BRIEF_READY`
 
@@ -830,7 +931,7 @@ command-contract classes (F6).
   where: NAVIGATE / bug subgraph vs admin process surfaces
   symptom: Bugbot/review on `.cursor/commands/**` was routed to `/opsx-fix-bug` as bug_signal_raw
   operator_workaround: |
-    treat as `command_defect_signal`; `/opsx-admin-command-fix-command-defects`
+    treat as `command_defect_signal`; `/opsx-meta-fix-command-defects`
     (READ_ONLY then GO); do not open product bug case map; after FIXED, soft
     `/opsx-admin-command-promote-process-lesson` (not `/opsx-learn-from-bug`)
   do_not_pretend_fixed: false (routing recorded; example ADL apply instance closed in contracts 2026-07-27 — F6 still applies to future process Bugbots)
@@ -890,8 +991,28 @@ command-contract classes (F6).
     antipattern; antipattern contract + owner soft-chain disagree
   operator_workaround: |
     follow GRAPH soft chain (antipattern before static); later
-    /opsx-admin-command-fix-command-defects on lagging contracts
+    /opsx-meta-fix-command-defects on lagging contracts
   do_not_pretend_fixed: true
+
+- id: F13 TEST_ENV_COMPANION_LAG
+  where: opsx-static-check.md PREFLIGHT / synthesis; opsx-supervisor.md
+    allowlist; opsx-test.md; opsx-antipattern-gate.md NEXT prose
+  symptom: |
+    /opsx-test-env exists and GRAPH indexes it, but sibling contracts may
+    still jump antipattern→static FULL without UP; env fails look like
+    product FAIL; Supervisor may not dispatch /opsx-test-env
+  operator_workaround: |
+    /opsx-test-env UP then /opsx-static-check FULL; after PASS
+    /opsx-test-env DOWN; companions via /opsx-meta-fix-command-defects
+  do_not_pretend_fixed: true
+
+- id: F14 GRAPH_MISSING_TEST_ENV
+  where: .cursor/pipeline/GRAPH.md (pre 2026-08-09T05:34:03Z UPDATE)
+  symptom: |
+    NAVIGATE could not recommend /opsx-test-env; soft chain jumped
+    antipattern→static FULL without local compose stage
+  operator_workaround: /opsx-test-env UP|DOWN directly; then UPDATE GO
+  do_not_pretend_fixed: false (closed by this materialization)
 
 ## Terminal / recovery
 
@@ -926,7 +1047,7 @@ command-contract classes (F6).
 - Bug debt: `/opsx-bug-debt-board` ALSO_OK anytime; `CLEAR` ≠ card-close;
   verify/archive are **not** residual close while debt open
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
-- Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-admin-command-fix-command-defects` (F6); not `/opsx-fix-bug`
+- Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-meta-fix-command-defects` (F6); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
   → `DESIGN_BRIEF_READY` → `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
 - Admin surfaces (consult, analyze-pipeline, fix-command-defects,

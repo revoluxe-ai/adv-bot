@@ -325,11 +325,26 @@ Disposition:
 
 Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
 
+
+
+
+Зашифровать свой комп
+Навести порядок ChatGPT
+Навести порядок в CODEX
+
+Сделать проект для создания который пишет python тесты на деградацию промтов.
+
+
+Разобраться с MAx - там есть клиенты, а я их игнорю!
+
+Идея: епе бнмра
+
 opsx-bug-team to commant native
 
 opsx-bug-team - тест развилки от bug-hunt
 
 тесты на команды и team
+
 
 ## Deferred from change card-ab-hold-mode (2026-07-28)
 
@@ -351,6 +366,7 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   reason: oversized | owner_park
   notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
 
+
 ## Bound confirmed card-ab-hold-mode (2026-07-30)
 
 Via `/opsx-bound-scope:GO` — no new deferred checklist rows (picker / anti-drain /
@@ -364,6 +380,7 @@ KEEP_MVP_BOUNDARY (owed now, handoff → `/opsx-update`):
   wording must not say «ослабим защиту» if behavior is freeze-decide).
 - Pre-start hard|soft|self picker, anti-drain, mid-sync UX — remain out of DoD
   until REENTER_CONFIRMED.
+
 
 ## Deferred from change openspec-guard-size-recovery (2026-07-30)
 
@@ -391,6 +408,7 @@ No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only par
 
 Сделать мета-команды по ремонту-доработке обучению команд, которые обслуживают другие команды
 
+сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
 
 сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
 

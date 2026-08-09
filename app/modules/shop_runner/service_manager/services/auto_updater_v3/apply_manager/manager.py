@@ -239,6 +239,20 @@ class ApplyManager:
                     ledger.keywords,
                     int(complex_adv.adv_id),
                 )
+            # Spec pause-on-empty-keywords: OFF = текущий шаг; intent → pause следующим.
+            # Не вызываем WB pause здесь (ADL empty-keywords-pause-write-path).
+            from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+                maybe_set_empty_keywords_pause_intent,
+            )
+
+            # INC-PAUSE-02: recheck intent после Search start — статус Search-ноги.
+            await maybe_set_empty_keywords_pause_intent(
+                adv_id=int(complex_adv.adv_id),
+                bot_active=bool(complex_adv.bot_active),
+                keywords=ledger.keywords,
+                post_gate_actions=post_gate_actions,
+                campaign_status=complex_adv.search_adv_active_status_str,
+            )
 
         return V3ApplyResult(
             post_gate_actions=post_gate_actions,

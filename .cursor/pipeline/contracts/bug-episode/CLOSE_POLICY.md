@@ -90,8 +90,12 @@ When team needs Owner A/B/C (or policy):
 
 ```text
 OWNER_DECISION_REQUIRED: A | B | C | …
-OPTIONAL_IF_UNSURE: /opsx-explore case=<CASE_ID> finding=<FINDING_ID>
-THEN_RETURN (pasteable, not silent): /opsx-bug-team case=<CASE_ID> mode=…
+OPTIONAL_IF_UNSURE: /opsx-explore case=CASE_ID finding=FINDING_ID
+THEN_RETURN (pasteable, not silent): /opsx-bug-team case=CASE_ID mode=…
 ```
+
+Substitute durable `BUGCASE-…` / finding ids — never emit angle-bracket
+`case=<CASE_ID>` templates (CMD-IX-001). Omit until ids known. Do not paste
+into free-form first-intake `RAW_REPORT` (CMD-IX-002).
 
 Explore does not replace A/B/C; it clarifies before the answer.

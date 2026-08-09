@@ -3,12 +3,47 @@
 name: /opsx-verify
 id: opsx-verify
 category: Workflow
-description: Read-only audit of an OpenSpec change before archive
+description: Phased read-only OpenSpec audit (mode=impl DoD | mode=archive pre-archive GO)
 -----------------------------------------------------------------
 
 Verify является read-only audit command после `/opsx-apply` и до `/opsx-archive`.
 
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
+
+## Verify phase (mandatory — thin switch)
+
+Перед аудитом прочитай и выполни
+`.cursor/pipeline/contracts/VERIFY_PHASES.md`:
+
+1. Parse `mode=impl` | `mode=archive` (default **`archive`** if omitted; WARN to prefer explicit mode).
+2. If `mode=impl` → выполни только **PHASE_IMPL** из модуля; остановись; **не**
+   эмитируй `✅ GO` / `❌ NO_GO`; не продолжай archive-секции ниже.
+3. If `mode=archive` → выполни **PHASE_ARCHIVE** из модуля, затем полный
+   archive-audit **этого** файла (секции ниже) + маркеры `✅ GO` / `❌ NO_GO`.
+
+Не путать с `/opsx-test … verify` (bug GREEN). `✅ IMPL_OK` **никогда** не
+авторизует `/opsx-archive`.
+
+### Destructive cache soft gate (`mode=archive` only)
+
+Contract:
+`.cursor/static-check/contracts/destructive-selective-cache.md`.
+
+During PHASE_ARCHIVE / archive-audit, if chat or last `/opsx-static-check`
+FULL report shows `CACHE_MODE=dev`, `DESTRUCTIVE_CACHED>0`, or lacks an
+explicit `CACHE_OFF` / `CACHE_FORCE` receipt for the pre-archive FULL:
+
+1. Emit **WARN** (soft — not automatic `NO_GO` by itself):
+   `DESTRUCTIVE_CACHE_DEV_BEFORE_ARCHIVE`.
+2. Paste next confidence step:
+   `/opsx-static-check FULL CACHE_OFF`
+   (or `CACHE_FORCE`).
+3. Continue archive audit; Owner may still reach `✅ GO`, but the WARN MUST
+   appear in the verify report under readiness / caveats.
+4. `CACHE_HIT` / skipped destructive ≠ EXECUTED green evidence for archive.
+
+If last FULL was already `CACHE_OFF` / `CACHE_FORCE` / `CACHE_DEGRADED`
+(run-all) → no WARN.
 
 ## Source resolution (mandatory)
 
@@ -53,6 +88,37 @@ not_applicable
 сам по себе не даёт автоматический `NO_GO`.
 
 Verify блокирует archive только при доказанном test-coverage mismatch, слабом тестовом evidence либо отсутствии обязательного behavioral scenario, которое следует из specification, invariant или materialized `TEST_COVERAGE_PACKET`.
+
+## Scenario coverage report assurance
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
+Taxonomy:
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
+
+`SCENARIO_TEST_COVERAGE_REPORT` — change-wide independent evidence:
+
+- каждый exact Spec Scenario имеет строку;
+- `scenario_seam` проходит causal production logic;
+- использованные stubs имеют executable contract parity;
+- требуемые provider integrations выполнены;
+- `PROVIDER_EXECUTION_RECEIPT` свежи по hashes.
+
+Verify не пересчитывает всю матрицу и не становится scenario coverage
+planner. Он проверяет identity/freshness, spot-checks acceptance-relevant rows
+и применяет activation:
+
+```text
+SCENARIO_COVERAGE_REQUIRED absent|false
+→ absence report is not automatic NO_GO (legacy compatibility)
+
+SCENARIO_COVERAGE_REQUIRED=true
+→ fresh report VERDICT=PASS is required for mode=archive
+→ missing/stale/FAIL/BLOCKED report is archive blocker
+```
+
+Provider receipt не равен final Scenario coverage PASS. Self-report writer-а
+из `/opsx-test` или `/opsx-close-external-gap` не заменяет independent report.
 
 ## Additive external-call coverage assurance
 
@@ -315,6 +381,42 @@ Compatibility mode: legacy
 
 Отсутствие packet не отменяет существующую обязанность verify сопоставить implementation и tests со specification.
 
+#### SCENARIO_TEST_COVERAGE_REPORT discovery
+
+Если report передан явно или найден по declared path, извлеки:
+
+```text
+SCHEMA_VERSION
+CHANGE_ID
+SOURCE_SPEC_SHA
+WORKTREE_FINGERPRINT
+ACTIVATION.SCENARIO_COVERAGE_REQUIRED
+ACTIVATION.ACTIVATION_VERSION
+VERDICT
+SCENARIOS_TOTAL/PASS/FAIL/BLOCKED
+ROWS
+PROVIDER_RECEIPTS
+ROUTE_PACKETS
+```
+
+Проверь:
+
+- `CHANGE_ID` совпадает;
+- `SOURCE_SPEC_SHA` соответствует текущим delta specs;
+- worktree/test/contract/provider/schema hashes не stale;
+- rows покрывают все exact Scenarios;
+- receipts имеют `RESULT=PASS` и `SECRETS_REDACTED=YES`;
+- report producer — независимый `/opsx-spec-scenario-coverage`.
+
+Если report отсутствует:
+
+```text
+Scenario coverage report: absent
+Scenario coverage required: true | false | not_declared
+```
+
+Не восстанавливай report из chat summary или похожих test names.
+
 #### EXTERNAL_CALL_COVERAGE_REPORT discovery
 
 Если среди прочитанных artifacts или context files найден блок
@@ -388,6 +490,20 @@ openspec instructions decisions --change "<name>" --json
 and apply `rules.decisions`.
 
 Compare implementation placement against accepted/proposed decisions.
+
+### 5a. Semantic write-target gate
+
+Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
+
+* If the change is a high-risk multi-target write and artifacts do not durably
+  resolve `TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` / `FORBIDDEN_ADAPTERS`
+  (or status is `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`) → archive blocker
+  `unresolved_semantic_write_target` → overall `NO_GO`.
+* If implementation uses a symbol in `FORBIDDEN_ADAPTERS` (or outside
+  `ALLOWED_ADAPTERS`) → placement/behavior violation → `NO_GO`.
+* When paired proof is required: verify the allowed target side effect **and**
+  that the forbidden sibling target is not mutated. Green tests against an
+  ambiguous or wrong-target plan do not clear this gate.
 
 Passing tests не являются proof, если placement нарушает accepted decision.
 
@@ -700,6 +816,9 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * unresolved `EVIDENCE_GAP` after Architecture Decision Lookup budget exhaust (do not collapse this into Missing);
 * `Architecture Decision Missing` after conclusive in-budget lookup (or after a recorded `EVIDENCE_GAP` expansion);
 * unresolved open question blocks archive;
+* unresolved semantic write target (`unresolved_semantic_write_target`) blocks archive;
+* implementation uses a forbidden sibling write adapter after a resolved semantic target;
+* required paired positive/negative semantic-target proof is missing;
 * stale reference model blocks archive;
 * async test manually mutates module-level state around `await` with `module.attr = fake` and manual `try/finally` restore;
 * test stubs the pipeline so the real guard is never exercised;
@@ -716,6 +835,10 @@ The overall verdict MUST be `NO_GO` when any configured condition is true:
 * actual test level is below the materialized `MINIMUM_TEST_LEVEL`;
 * `UNIT_SUFFICIENCY=insufficient`, but only unit-component evidence is provided;
 * packet and tests materially contradict each other.
+* `SCENARIO_COVERAGE_REQUIRED=true`, но report missing/stale либо
+  `VERDICT=FAIL|BLOCKED`;
+* scenario report заявляет PASS, но Scenario rows/receipts/hashes неполны или
+  относятся к другому snapshot.
 
 Do not set `NO_GO` only because:
 
@@ -734,6 +857,7 @@ Do not write a success claim that conflicts with the overall verdict.
 * tests failed;
 * placement violations exist;
 * architecture blockers are unresolved;
+* unresolved semantic write target remains;
 * a confirmed mandatory test-coverage blocker exists.
 
 ## Output
@@ -775,6 +899,8 @@ Targeted tests: passed / failed / not run
 Failed tests: none / список
 Test coverage packet: absent / ready / provisional / not_materialized / not_applicable
 Compatibility mode: legacy / packet-aware
+Scenario coverage report: absent / PASS / FAIL / BLOCKED / stale
+Scenario coverage required: true / false / not_declared
 Behavioral scenarios: covered / partial / not covered / unknown / not applicable
 Allowed sibling scenarios: covered / partial / not covered / unknown / not applicable
 Residual/repeated invocation: covered / partial / not covered / unknown / not applicable
@@ -853,6 +979,9 @@ or:
 * Instead of offering a write action, state the next command: `/opsx-apply`, `/opsx-update`, or `manual fix`.
 * Do not mark verification successful when placement violates an accepted decision.
 * Do not treat passing tests as sufficient architecture proof.
+* Do not treat green tests as proof when the semantic write target is unresolved
+  or implementation hits a forbidden sibling adapter.
+* Treat `unresolved_semantic_write_target` as a hard archive blocker.
 * Block async tests that manually mutate shared module-level dependencies around awaited code, especially shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings, and global flags.
 * Block tests that stub the pipeline so the real guard is never exercised.
 * Block write-gate tests that only assert `assert_not_called()` or `count == 0` without proving candidate/handler/write-boundary filtering.

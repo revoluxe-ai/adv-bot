@@ -29,6 +29,9 @@ class AutoReasonCode(StrEnum):
     REC_SYSTEM_MODE_OFF = "rec_system_mode_off"
     BUDGET_OK_COST_OK = "budget_ok_cost_ok"
     INSUFFICIENT_BALANCE = "insufficient_balance_auto"
+    # Shared value с AuctionReasonCode; INC-PAUSE-02 пишет pause на Search-lane.
+    # Auto enum оставлен для parse_reason_code / legacy Redis Auto-lane.
+    EMPTY_KEYWORDS = "empty_keywords"
 
 
 class AuctionReasonCode(StrEnum):
@@ -42,6 +45,8 @@ class AuctionReasonCode(StrEnum):
     SEARCH_LIMIT_0 = "search_limit_0"
     TIME_SCHEDULE = "time_schedule"
     INSUFFICIENT_BALANCE = "insufficient_balance_auction"
+    # Spec pause-on-empty-keywords (INC-PAUSE-02): пауза Search при пустых ключах
+    EMPTY_KEYWORDS = "empty_keywords"
 
 
 CampaignReasonCode = AutoReasonCode | AuctionReasonCode

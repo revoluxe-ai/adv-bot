@@ -14,6 +14,13 @@ Fast-forward through artifact creation - generate everything needed to start imp
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Semantic write-target authority:** Read and follow
+`.cursor/commands/opsx-ff.md` and
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. For high-risk
+multi-target writes, do not declare apply readiness until artifacts explicitly
+materialize the target, allowed/forbidden adapters, evidence and paired tests.
+Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
+
 **Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.
 
 **Steps**

@@ -26,6 +26,17 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 **Architecture Decision Lookup:** When revising artifacts, resolve `artifactPaths.decisions.existingOutputPaths` first, then only needed accepted decisions under `openspec/decisions/`. Follow `.cursor/commands/opsx-source-resolution.md`; do not rediscover the selected change by scanning all changes. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
 
+**Semantic write-target preflight:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. When revising a high-risk
+write and repository evidence exposes multiple plausible entities/legs/adapters,
+artifacts MUST durably name `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+`FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired
+positive/negative tests. Chat-only Owner answers are insufficient: materialize
+them into planning artifacts before recommending `/opsx-apply`. If evidence does
+not select one target, return `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and ask the
+contract's single concrete Owner question. Never infer product semantics from
+similar names.
+
 **Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
@@ -499,6 +510,9 @@ align with the latest applicable event.
 
 **Guardrails**
 - Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx:apply`.
+- Do not mark artifacts coherent while a high-risk multi-target write remains
+  unresolved (`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`); materialize Owner
+  semantic answers into artifacts before recommending apply.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

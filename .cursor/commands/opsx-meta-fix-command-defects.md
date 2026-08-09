@@ -1,12 +1,76 @@
 ---
-name: /opsx-admin-command-fix-command-defects
-id: opsx-admin-command-fix-command-defects
+component_id: opsx.commands.meta_fix_command_defects
+component_version: 0.4.0
+ownership: EMBEDDED_SHARED
+runtime_class: ACTIVE
+source_commit: a71601dba3b9f5cd0076ea7185bdbbe56eaf2e3f
+source_path: .cursor/commands/opsx-meta-fix-command-defects.md
+source_blob_sha: b4aa7e232b2632e72dbdc3bce4006cc50cdc03cb
+embedded_canonical_sha256: f02553f3fe064eca1c74425afc49dbcc96d6306f0b80c4b9e911e0a912ab8274
+upstream_snapshot: .opsx/upstream/a71601dba3b9/.cursor/commands/opsx-admin-command-fix-command-defects.md
+required_adapters: ["opsx-lite"]
+local_modification_note: "Projectize 2026-08-07: vue-npm dropped; poetry-python adapter; OPSX-WB-META-SURFACE-01"
+local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
+contract_id: OPSX-WB-META-SURFACE-01
+newline_normalization: none
+---
+
+# TARGET OVERRIDE — HIGHEST PRIORITY
+
+**Contract:** `OPSX-WB-META-SURFACE-01`  
+**Runtime class:** `ACTIVE`  
+**Precedence:** This override wins over the canonical source body for target paths, capabilities, safety stops, and authority.
+
+### Target authority paths
+
+- Changes: `openspec/changes/**`
+- Policies: `openspec/policies/**`
+- Decisions: `openspec/decisions/**`
+- Schemas/templates: `openspec/schemas/**`
+- Activation/provenance: `.opsx/registry/**`
+- Frozen upstream: `.opsx/upstream/a71601dba3b9/`
+- Adapter: `.opsx/adapters/poetry-python/README.md`
+- Quality gates: `.opsx/project/quality-gates.md`
+
+### Hard target bans
+
+- Do not install dependencies / modify `package.json` or lockfile.
+- Do not access production / Kubernetes / secrets.
+- Do not push, open PR, rebase, force, or deploy.
+- Do not activate WB/product domain assumptions from the source body.
+- Replace Poetry/pytest/pyright/kubectl execution with capability checks; missing capability => unavailable or FAIL_CLOSED, never PASS-by-absence.
+- Mandatory declared executable check: `npm run build`.
+- Smoke/acceptance/lint/typecheck/frontend tests: UNAVAILABLE unless adapter says otherwise.
+
+### Projectization gate
+
+Read `.opsx/projectization.yaml` before any write.
+If `status` != `COMPLETE` or `normal_commands_enabled` is false:
+
+```text
+STATUS: FAIL_CLOSED
+REASON: OPSX_PROJECTIZATION_REQUIRED
+NEXT_COMMAND: /opsx-projectize
+```
+
+Exempt: `/opsx-projectize` and `/opsx-projectize:GO`.
+
+### ACTIVE allow
+
+Owner unblocked this former-DEFERRED command (2026-08-03): execute canonical source-body semantics **after** remapping paths to target authority above.
+
+Hard bans still apply. Missing Poetry/pytest/pyright/kubectl (and other undeclared source capabilities) => UNAVAILABLE or FAIL_CLOSED — never PASS-by-absence. Do not invent missing adapters or import source product dumps. File/process operations only on target authority paths.
+
+# BEGIN CANONICAL SOURCE BODY
+---
+name: /opsx-meta-fix-command-defects
+id: opsx-meta-fix-command-defects
 category: Workflow
 description: Plan (READ_ONLY) or apply (GO / AUTHORIZE_COMMAND_FIX) command-contract defect fixes with narrow sequential I/O
 argument-hint: "[optional packet or defect notes] [GO | AUTHORIZE_COMMAND_FIX]"
 ---
 
-# /opsx-admin-command-fix-command-defects
+# /opsx-meta-fix-command-defects
 
 Plan or apply confirmed command-contract defects on **process contracts only**
 (`.cursor/commands/**`, `.cursor/rules/**`, `.cursor/skills/**`,
@@ -23,7 +87,7 @@ dedicated commit command.
 
 If the human is still unsure whether the issue is a contract defect, a
 pipeline redesign topic, a new-command need, or only a relationship question
-→ `/opsx-admin-command-consult` first. Use this command when the defect target
+→ `/opsx-meta-consult` first. Use this command when the defect target
 is already identified (or a usable `FIX_PLAN_READY` / review packet exists).
 
 Follow `.cursor/commands/opsx-source-resolution.md` and
@@ -105,8 +169,8 @@ Do **not** reproduce the failure mode of bulk parallel Reads.
    the packet (plus shared contracts those FILES already cite by exact path).
    In READ_ONLY without a packet, derive a provisional file list only from
    cited paths in the chat evidence — never from a full command-set dump.
-2. Never open `opsx-admin-command-analyze-pipeline.md`, `opsx-learn-from-bug.md`,
-   `opsx-admin-command-design-command.md`, or other large siblings unless they
+2. Never open `opsx-meta-analyze-pipeline.md`, `opsx-learn-from-bug.md`,
+   `opsx-meta-design-command.md`, or other large siblings unless they
    appear in `FILES:` or are an exact cited dependency required for the current
    defect.
 3. Process **one defect at a time**, and within a defect **one file at a time**:
@@ -218,7 +282,7 @@ OWNER_RUN_COMMAND:
 ```
 
 ```text
-/opsx-admin-command-fix-command-defects AUTHORIZE_COMMAND_FIX
+/opsx-meta-fix-command-defects AUTHORIZE_COMMAND_FIX
 ```
 
 ```text
@@ -269,14 +333,14 @@ NEXT_ACTION:
 Review the diff. Commit is performed separately by the owner using the
 repository's dedicated commit command.
 
-(optional later, transferable process class?): /opsx-admin-command-promote-process-lesson
+(optional later, transferable process class?): /opsx-meta-promote-process-lesson
   (separate from product /opsx-learn-from-bug; never auto-print a commit command)
 ```
 
 After a successful APPLY that reaches `READY_FOR_COMMAND_DIFF_REVIEW`, if the
 defect class looks transferable (missing guardrail, wrong branch,
 durable-handoff omission, ADL/exhaust gap, etc.), prefer hinting
-`/opsx-admin-command-promote-process-lesson` as an optional later step —
+`/opsx-meta-promote-process-lesson` as an optional later step —
 do not mix into the forced stop before diff review, and do not print a
 commit command.
 
@@ -295,3 +359,20 @@ Before returning:
   no commit-command handoff;
 - when owner asked for copy-paste/exact commands in READ_ONLY:
   `OWNER_RUN_COMMAND` for apply token is printed (never a commit command).
+# END CANONICAL SOURCE BODY
+
+# TARGET ADAPTATION NOTES
+
+- upstream_snapshot: `.opsx/upstream/a71601dba3b9/.cursor/commands/opsx-admin-command-fix-command-defects.md`
+- runtime_class: `ACTIVE`
+- active_name: `/opsx-meta-fix-command-defects`
+- openspec_store: `openspec/changes/**` (not source multi-store / not `.opsx/changes` SoT)
+- quality: `npm run build` mandatory when in scope; smoke UNAVAILABLE
+- unresolved_source_sections: any Poetry/pytest/pyright/kubectl/WB-domain steps in the body are blocked by TARGET OVERRIDE until adapters exist
+- manual_review: `.opsx/project/manual_review.md`
+- central_discovery: when identity is missing/uncertain or a central replacement
+  may close the defect, compare BASE/LOCAL/CENTRAL using a fresh index. Stale
+  negative → `BLOCKED_NEEDS_FRESH_INDEX`. Valid central fix → hand off to
+  `/opsx-meta-import-command`. Do not merge command bodies in this command.
+- orientation: emit `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`
+- process lesson handoff: `/opsx-meta-promote-process-lesson`

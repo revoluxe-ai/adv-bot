@@ -1,6 +1,6 @@
 ---
 description: "Write targeted tests from the user's request without changing production code."
-argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDING_ID> [verify] [optional OpenSpec change-id]"
+argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDING_ID> [verify] [CACHE_OFF|CACHE_FORCE|CACHE_DEV] [optional OpenSpec change-id]"
 ---
 
 # /opsx:test
@@ -9,11 +9,42 @@ Write or update targeted tests based on the user's request.
 
 You are allowed to edit tests only (plus durable RED/GREEN evidence under the case map in bug-regression / verify modes).
 
+## Destructive cache (all runs that select `destructive_local`)
+
+Contract SoT:
+`.cursor/static-check/contracts/destructive-selective-cache.md`.
+
+When a pytest invocation under this command would collect any
+`@pytest.mark.destructive_local` node:
+
+| Token / default | Effect |
+|-----------------|--------|
+| (no `CACHE_*`) | `CACHE_MODE=dev` — run `MUST_RUN` only via shared planner |
+| `CACHE_OFF` | run all selected destructive |
+| `CACHE_FORCE` | run all selected destructive; rewrite local cache receipts |
+| `CACHE_DEV` | alias of default |
+
+Always print `CACHE_MODE` + `destructive ran/cached` counts when destructive
+nodes were in the plan. `CACHE_HIT` ≠ archive / certify EXECUTED green.
+`authorized_live` certify stays on `/opsx-close-external-gap` (out of scope).
+
+Planner: `.cursor/static-check/bin/destructive_cache_plan.py` (same artifact
+as `/opsx-static-check` FULL).
+
+**INTERIM:** planner missing/broken → run all selected destructive
+(`CACHE_DEGRADED=yes`); forbidden to invent skip/deselect/“branch already
+green” filters or claim `CACHE_HIT` without planner receipt.
+
 ## Modes
 
 ### Default (general test authoring)
 
 Unchanged: author/update tests from a free-form request. Production code forbidden.
+
+When free-form input cites `SCENARIO_TEST_COVERAGE_FAIL`, `change=<id>`,
+stub gaps, or a pasted/prior `SCENARIO_TEST_ONLY_PACKET` — treat as scenario
+closure work: apply **Stub inventory before AUTHORED** (below), not a single
+obvious ContractCase family while other seam stubs remain open.
 
 ### Bug-regression mode (RED producer)
 
@@ -80,6 +111,147 @@ TEST_ONLY_PACKET:
   не закрывай их здесь; верни redirect на `/opsx-close-external-gap`.
 - Если packet пустой (`ITEMS` нет) → `NEXT_ACTION: /opsx-external-call-coverage base=<BASE>`
   для повторной проверки.
+
+## Packetized Scenario coverage input
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
+Taxonomy:
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
+
+Команда принимает:
+
+```text
+SCENARIO_TEST_ONLY_PACKET:
+  SCHEMA_VERSION: 1
+  SOURCE: SCENARIO_TEST_COVERAGE_REPORT
+  CHANGE_ID:
+  SOURCE_SPEC_SHA:
+  WORKTREE_FINGERPRINT:
+  ITEMS:
+    - GAP_ID:
+      GAP_FILE_ID:
+      SCENARIO_ID:
+      DISPOSITION: TEST_ONLY
+      REQUIRED_ARTIFACTS:
+      PRODUCTION_ENTRYPOINT:
+      REAL_BOUNDARY_SYMBOLS:
+      REALITY_CONSTRAINTS:
+      MOCKING_CONSTRAINTS:
+```
+
+### Validation
+
+До edits:
+
+1. проверить `SCHEMA_VERSION=1`, `SOURCE`, `CHANGE_ID`, непустые `ITEMS`;
+2. сохранить `GAP_ID`, Windows-safe `GAP_FILE_ID` и `SCENARIO_ID` без
+   переименования;
+3. сверить `SOURCE_SPEC_SHA` с текущим Scenario source;
+4. при stale spec вернуть `STATUS=BLOCKED_STALE_SCENARIO_PACKET`;
+5. принимать только `DISPOSITION=TEST_ONLY`;
+6. PG/CH `REFACTOR_AND_TEST` и `CERTIFY` items не поглощать — вернуть их
+   неизменными для `/opsx-close-external-gap`.
+
+### Authorship responsibility
+
+Для каждого item пакетно создать или обновить только необходимое в `tests/**`:
+
+- reviewed `ContractCase`/case vectors;
+- test fixtures/factories;
+- fake/stub после causal boundary;
+- `scenario_seam` test;
+- `stub_contract` test;
+- test-only `boundary_adapter` test, если production seam уже пригоден.
+
+`ContractCase` MUST быть общим executable source для scenario fake assertions
+и downstream provider integration. Запрещено:
+
+- автоматически генерировать или обновлять expected golden текущим live output;
+- полностью mock-ать `PRODUCTION_ENTRYPOINT` или causal/business boundary;
+- придумывать DTO/model fields;
+- заменять PG/CH provider proof session-mock unit-тестом;
+- менять `app/**` ради прохождения packet.
+
+### Stub inventory before AUTHORED
+
+Перед `RESULT=AUTHORED` (packet batch **или** free-form closure после
+scenario FAIL) MUST:
+
+1. Построить `STUB_INVENTORY`: каждый stub/mock/fake thin end, используемый
+   mapped failing `scenario_seam` tests (WB pause/start, notify, Telegram
+   transport, injected PG/CH adapter после orchestration, и т.п.).
+2. Для каждого inventory entry либо:
+   - author shared `ContractCase` + scenario assert + `stub_contract` (+
+     `boundary_adapter` если seam уже пригоден), **или**
+   - оставить явный `REMAINING_GAPS` item с тем же GAP identity / stub symbol.
+3. Запрещено закрывать batch как «готово», если inventory непуст и gaps не
+   перечислены (пример дефекта: WB ContractCase authored, notify AsyncMock
+   без ContractCase, silent omit).
+
+В `SCENARIO_TEST_AUTHORSHIP_RESULT` при scenario context добавь поле
+`STUB_INVENTORY` (symbols + closed|remaining) на уровне результата или
+per-item `REMAINING_GAPS`.
+
+Если item невозможно закрыть без production seam:
+
+```text
+ITEM_RESULT: REDIRECT_REFACTOR_AND_TEST
+NEXT: /opsx-close-external-gap
+```
+
+сформируй/сохрани совместимый `SCENARIO_REFACTOR_AND_TEST_PACKET`, не теряя
+identity/freshness fields.
+
+Если все test code написано, но требуется destructive/live provider run:
+
+```text
+ITEM_RESULT: AUTHORED_AWAITING_CERTIFICATION
+NEXT: /opsx-close-external-gap
+```
+
+сохрани `SCENARIO_CERTIFY_PACKET`. Не запускай live/destructive test из
+обычного `/opsx-test`.
+
+### Scenario packet result
+
+Верни per-item:
+
+```text
+SCENARIO_TEST_AUTHORSHIP_RESULT:
+  SCHEMA_VERSION: 1
+  CHANGE_ID:
+  SOURCE_SPEC_SHA:
+  WORKTREE_FINGERPRINT:
+  ITEMS:
+    - GAP_ID:
+      GAP_FILE_ID:
+      SCENARIO_ID:
+      RESULT: AUTHORED | ALREADY_COVERED | REDIRECT_REFACTOR_AND_TEST |
+              AUTHORED_AWAITING_CERTIFICATION | BLOCKED
+      CONTRACT_ID:
+      CONTRACT_CASES_PATH:
+      CONTRACT_SHA:
+      FAKE_OR_STUB_PATH:
+      FAKE_SHA:
+      TEST_IDS:
+      TEST_CONTENT_SHA:
+      TESTS_EXECUTED:
+      EXECUTION_RESULTS:
+      REMAINING_GAPS:
+      NEXT:
+```
+
+`AUTHORED` — writer self-report, не independent coverage PASS. После test-only
+items основной возврат:
+
+```text
+NEXT_ACTION: /opsx-spec-scenario-coverage mode=audit change=<CHANGE_ID>
+```
+
+При remaining PG/CH refactor/certify items основной `NEXT_ACTION` —
+`/opsx-close-external-gap` с соответствующим packet; повторный scenario audit
+остаётся следующим после writer closure.
 
 
 ## Route-trace event requirements (SCHEMA_VERSION 2)
@@ -153,6 +325,9 @@ NEXT_ACTION: /opsx-close-external-gap
   (paste the coverage report; no `base=` on close).
 - If input is `TEST_ONLY_PACKET`, process all `ITEMS` batch-wise and report
   per-item closure; do not require manual split from mixed coverage report.
+- If input is `SCENARIO_TEST_ONLY_PACKET`, process all `TEST_ONLY` items
+  batch-wise, preserve Scenario/GAP identity, and return
+  `SCENARIO_TEST_AUTHORSHIP_RESULT`; never claim final Scenario coverage PASS.
 - PG `sm(...)`: только явный `read_only=` (testing-rules § PG session mode).
   Bare `sm()` / wrong polarity — не TEST_ONLY; → `/opsx-close-external-gap`
   (или apply), не unit session-mock.
@@ -477,6 +652,20 @@ GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW
 
 Silent test weakening is forbidden.
 
+## Scenario packet simulation matrix
+
+| Input | Expected |
+|---|---|
+| valid `SCENARIO_TEST_ONLY_PACKET` | batch all TEST_ONLY items; preserve ids |
+| stale `SOURCE_SPEC_SHA` | `BLOCKED_STALE_SCENARIO_PACKET`; no edits |
+| empty Scenario packet | BLOCKED; request producer rerun |
+| item needs production seam | preserve item; `REDIRECT_REFACTOR_AND_TEST` |
+| PG/CH live proof required | author code only; `AUTHORED_AWAITING_CERTIFICATION` |
+| fake uses a private invented shape | reject; satisfy reality constraints |
+| real causal boundary patched away | reject as weak evidence |
+| ContractCase/fake/scenario tests authored | return ids + hashes; never coverage PASS |
+| all test-only items authored | rerun `/opsx-spec-scenario-coverage mode=audit` |
+
 ## Output format
 
 Return (default mode):
@@ -489,7 +678,8 @@ Result:
 - targeted command:
 - broader command, if needed:
 - remaining risks:
-- packet_source: none | TEST_ONLY_PACKET
+- packet_source: none | TEST_ONLY_PACKET | SCENARIO_TEST_ONLY_PACKET
+- scenario_authorship_result: none | SCENARIO_TEST_AUTHORSHIP_RESULT
 ```
 
 Return (bug-regression / verify):

@@ -16,6 +16,12 @@ Archive a completed change in the experimental workflow.
 
 **Architecture Decision Lookup:** Before archiving, search `openspec/decisions/**/*.md` and read proposed decisions from `artifactPaths.decisions.existingOutputPaths`. Use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving the change into `changes/archive` when they are reusable architecture source of truth. If there is nothing reusable to promote, explicitly output `Reusable architecture promotions: none`. Do not archive when `design.md` contains a permanent architecture decision that has not been moved to `openspec/decisions/` or a proposed decision artifact.
 
+**Semantic write-target authority:** Read and follow
+`.cursor/commands/opsx-archive.md` and
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. Unresolved high-risk
+multi-target writes are a hard stop before sync, decision promotion, and archive
+move — not an overridable warning.
+
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
@@ -58,7 +64,14 @@ Archive a completed change in the experimental workflow.
 
    **If no tasks file exists:** Proceed without task-related warning.
 
-4. **Assess delta spec sync state**
+4. **Semantic write-target archive gate (hard stop)**
+
+   Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md` and
+   `.cursor/commands/opsx-archive.md` **before** sync, decision promotion, or
+   archive move. Unresolved high-risk multi-target write → `NO_GO` /
+   `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; not a confirmable warning.
+
+5. **Assess delta spec sync state**
 
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
@@ -73,7 +86,7 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
 
-5. **Perform Architecture Decision Archive Gate**
+6. **Perform Architecture Decision Archive Gate**
 
    - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Read proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
@@ -83,7 +96,7 @@ Archive a completed change in the experimental workflow.
    - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions that are not captured in `openspec/decisions/` or a proposed decision artifact, return `NO_GO` and do not archive.
    - If no proposed decision needs promotion, output `Reusable architecture promotions: none` and proceed.
 
-6. **Perform the archive**
+7. **Perform the archive**
 
    Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
@@ -100,7 +113,7 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
-7. **Display summary**
+8. **Display summary**
 
    Show archive completion summary including:
    - Change name
@@ -125,6 +138,8 @@ All artifacts complete. All tasks complete.
 **Guardrails**
 - Always prompt for change selection if not provided
 - Do not archive if reusable architecture decisions remain only in design.md
+- Do not archive, sync, or promote decisions when a high-risk multi-target write
+  lacks a durable semantic write target — hard stop, not a warning
 - Explicitly report `Reusable architecture promotions: none` when there is nothing to promote
 - Use artifact graph (openspec status --json) for completion checking
 - Don't block archive on warnings - just inform and confirm

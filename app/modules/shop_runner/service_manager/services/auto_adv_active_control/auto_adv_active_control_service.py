@@ -325,6 +325,102 @@ class AutoAdvActiveControlService:
             end_date,
         )
 
+    async def _maybe_pause_for_empty_keywords_intent(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+        search_status: WBAdvActiveStatus | None,
+    ) -> bool:
+        """Потребить empty-keywords intent → Search pause + reason + notify.
+
+        Spec pause-on-empty-keywords / INC-PAUSE-02: TARGET_ENTITY_OR_LEG=SEARCH.
+        ALLOWED: ``pause_auction_campaign``; FORBIDDEN: ``pause_auto_campaign``.
+        Pause = следующий шаг после OFF (не concurrent с OFF).
+
+        Перед pause перечитывает активные ключи из ``ComplexAdv.get_keywords``.
+        Если набор уже непустой (stale intent при TTL до 6h после recovery) —
+        intent потребляется без WB pause / EMPTY_KEYWORDS reason / notify, и
+        метод возвращает False, чтобы обычный activity-control продолжался.
+
+        Returns:
+            True если intent был и pause/reason/notify (или skip без Search)
+            выполнены; False если intent нет или отброшен как stale.
+        """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+            EmptyKeywordsPauseIntentManager,
+            count_active_keywords,
+            notify_empty_keywords_pause,
+        )
+
+        intent_mgr = EmptyKeywordsPauseIntentManager()
+        if not await intent_mgr.peek_intent(int(auto_adv_id)):
+            return False
+
+        # Re-validate before consume→pause: keywords may recover while intent pending.
+        keywords = await adv.get_keywords()
+        active_count = count_active_keywords(keywords)
+        if active_count > 0:
+            await intent_mgr.consume_intent(int(auto_adv_id))
+            logger.info(
+                "Search activity: empty-keywords intent discarded — active keywords "
+                "non-empty (stale intent) auto_adv_id=%s shop_id=%s active_count=%s",
+                auto_adv_id,
+                adv.shop_id,
+                active_count,
+            )
+            return False
+
+        if not await intent_mgr.consume_intent(int(auto_adv_id)):
+            return False
+
+        search_adv_id = adv.search_adv_id
+        if search_adv_id is None:
+            # Нет Search-ноги: consume + skip; MUST NOT fallback на Auto pause.
+            logger.info(
+                "Search activity: empty-keywords intent consumed but no Search leg "
+                "(skip pause, no Auto fallback) auto_adv_id=%s shop_id=%s",
+                auto_adv_id,
+                adv.shop_id,
+            )
+            return True
+
+        if search_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Search activity: pausing auction campaign (empty keywords) "
+                "search_adv_id=%s auto_adv_id=%s shop_id=%s",
+                search_adv_id,
+                auto_adv_id,
+                adv.shop_id,
+            )
+            await self._wb_modifier.pause_auction_campaign(adv)
+        await self._set_search_reason(
+            int(search_adv_id),
+            CampaignActivityCommand.PAUSE,
+            AuctionReasonCode.EMPTY_KEYWORDS,
+        )
+        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+        await notify_empty_keywords_pause(
+            shop_id=str(adv.shop_id or ""),
+            adv_id=int(auto_adv_id),
+            campaign_name=campaign_name,
+            intent_manager=intent_mgr,
+        )
+        return True
+
+    async def _drain_empty_keywords_intent_without_search(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+    ) -> None:
+        """Если Search-ноги нет — потребить intent без Auto pause (no fallback)."""
+        if adv.search_adv_id is not None:
+            return
+        await self._maybe_pause_for_empty_keywords_intent(
+            adv,
+            auto_adv_id,
+            search_status=None,
+        )
+
     async def _set_auto_reason(
         self,
         adv_id: int,
@@ -866,6 +962,11 @@ class AutoAdvActiveControlService:
             # branch above returns early when it is None.
             assert avg_cost_value is not None
             cost_rule_ok = avg_cost_value <= target_cost_value
+
+        # INC-PAUSE-02: empty-keywords pause исполняет Search handler.
+        # Без Search-ноги — drain intent здесь (no Auto fallback), Auto идёт дальше.
+        await self._drain_empty_keywords_intent_without_search(adv, auto_adv_id)
+
         if (
             budget_ok
             and cost_rule_ok
@@ -990,6 +1091,14 @@ class AutoAdvActiveControlService:
                     AuctionReasonCode.COMMON_SPEND_EXCEEDED,
                 )
                 return None
+            # Spec pause-on-empty-keywords: Search pause после schedule/budget gates.
+            auto_adv_id = adv.auto_adv_id
+            if await self._maybe_pause_for_empty_keywords_intent(
+                adv,
+                int(auto_adv_id),
+                search_status,
+            ):
+                return None
             if common_limit > 0 and combined_spend < common_limit and search_status in [
                 WBAdvActiveStatus.PAUSE,
                 WBAdvActiveStatus.READY_FOR_START,
@@ -1036,6 +1145,15 @@ class AutoAdvActiveControlService:
                 AuctionReasonCode.SEARCH_SPEND_EXCEEDED,
             )
             return
+
+        # Spec pause-on-empty-keywords / INC-PAUSE-02: Search pause после budget gates.
+        auto_adv_id = adv.auto_adv_id
+        if await self._maybe_pause_for_empty_keywords_intent(
+            adv,
+            int(auto_adv_id),
+            search_status,
+        ):
+            return None
 
         if search_limit > 0 and search_status in [WBAdvActiveStatus.PAUSE, WBAdvActiveStatus.READY_FOR_START]:
             logger.info(

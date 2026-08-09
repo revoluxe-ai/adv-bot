@@ -19,6 +19,11 @@ architecture decisions belong here.
   - Scope: domain invariant — working-contour ClickHouse SQL MUST qualify
     database as `default_db.<object>` in query text; SQL-contract proof
     required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
+- [empty-keywords-pause-write-path](empty-keywords-pause-write-path/decision.md)
+  - Status: Accepted
+  - Scope: ownership of empty-keywords detect → Redis intent → activity-control
+    pause/start + distinct reason + recheck + notify; orthogonal to Hold freeze
+    and mode-defaults; stats window ≤7d.
 
 ## Change Requirements
 
