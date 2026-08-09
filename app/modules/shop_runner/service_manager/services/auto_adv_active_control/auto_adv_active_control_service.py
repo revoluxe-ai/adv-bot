@@ -337,15 +337,39 @@ class AutoAdvActiveControlService:
         ALLOWED: ``pause_auction_campaign``; FORBIDDEN: ``pause_auto_campaign``.
         Pause = следующий шаг после OFF (не concurrent с OFF).
 
+        Перед pause перечитывает активные ключи из ``ComplexAdv.get_keywords``.
+        Если набор уже непустой (stale intent при TTL до 6h после recovery) —
+        intent потребляется без WB pause / EMPTY_KEYWORDS reason / notify, и
+        метод возвращает False, чтобы обычный activity-control продолжался.
+
         Returns:
-            True если intent был и обработан (search handler должен выйти).
+            True если intent был и pause/reason/notify (или skip без Search)
+            выполнены; False если intent нет или отброшен как stale.
         """
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
             EmptyKeywordsPauseIntentManager,
+            count_active_keywords,
             notify_empty_keywords_pause,
         )
 
         intent_mgr = EmptyKeywordsPauseIntentManager()
+        if not await intent_mgr.peek_intent(int(auto_adv_id)):
+            return False
+
+        # Re-validate before consume→pause: keywords may recover while intent pending.
+        keywords = await adv.get_keywords()
+        active_count = count_active_keywords(keywords)
+        if active_count > 0:
+            await intent_mgr.consume_intent(int(auto_adv_id))
+            logger.info(
+                "Search activity: empty-keywords intent discarded — active keywords "
+                "non-empty (stale intent) auto_adv_id=%s shop_id=%s active_count=%s",
+                auto_adv_id,
+                adv.shop_id,
+                active_count,
+            )
+            return False
+
         if not await intent_mgr.consume_intent(int(auto_adv_id)):
             return False
 
