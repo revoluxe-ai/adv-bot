@@ -49,12 +49,13 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `fd6d2d0155fe08c3f1843da2118bf0194e612841` |
-| Platform digest | `sha256:c021535fcb793850dc474db0a05e564d50653370a7ba96288888b03a0273b009` |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:fd6d2d0155fe08c3f1843da2118bf0194e612841` |
-| App Deployments on this image | yes (CAS 2026-08-01; `free-bot` replicas=0) |
-| Last migrate Job | `app-db-migrate-noop4edd-…` → SUCCESS_NOOP (head already `f2a3…`) |
-| Last CONTROL | dry-run `DRY_RUN_OK` on `fd6d2d…` (no lease) |
+| Image tag | `0e7273aec3bd41470f0fe664fa492f5eef10df99` |
+| Platform digest | `sha256:0c3ee41057f198ec7e6847847bfc20aea74c442312bc2cc5228c60a7b32c29e1` |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:0e7273aec3bd41470f0fe664fa492f5eef10df99` |
+| App Deployments on this image | yes (CAS 2026-08-09; `free-bot` replicas=0) |
+| Last migrate Job | skipped this GO (`CONTROL_DRY_RUN=1`, head already `f2a3…`; prior SUCCESS_NOOP) |
+| Last CONTROL | dry-run Job `app-db-control-0e7273ae-dry` → `DRY_RUN_OK` (no lease) |
+| Prepared fallback (prior LKG) | tag `fd6d2d0155fe08c3f1843da2118bf0194e612841` / digest `sha256:c021535fcb793850dc474db0a05e564d50653370a7ba96288888b03a0273b009` |
 
 ## Open risks / follow-ups
 
@@ -62,6 +63,7 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 * Harbor direct push from CI fails on proxy project; rely on pull-through.
 * Next Expand release must update APPLICATION `source_history_hash` (Owner) before acquire with real graph hash.
 * Shop-runner operational noise (`NotFoundActiveAdvCompany`, keywords cache miss) is not schema regression.
+* Watch empty-keywords Search pause path in prod after PR #429 image; rollback CAS to fallback if needed.
 
 ## Action log (append-only summary)
 
@@ -70,3 +72,4 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-07-31 | Expand + security cutover + migrate NOOP (`4edd75b…`) | schema at `f2a3…` |
 | 2026-08-01 | CONTROL dry-run + CAS all entrypoints → `fd6d2d…` | apps Running; no UndefinedColumn |
 | 2026-08-02 | OPTION_A: `/opsx-devops` + OPS_STATE memory landed in repo | process ready |
+| 2026-08-09 | CONTROL dry-run `0e7273ae` + CAS entrypoints (migrate/complete_release skipped) | apps Running on `0e7273ae…` @ `sha256:0c3ee410…` |
