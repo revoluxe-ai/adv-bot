@@ -51,3 +51,12 @@ class EmptyKeywordsPauseIntentManager(RedisManager):
         key = self._notify_key(adv_id)
         ok = await self.client.set(key, "1", ex=self._NOTIFY_TTL, nx=True)
         return bool(ok)
+
+    async def release_notified(self, adv_id: int) -> None:
+        """Снять debounce-ключ, если доставка не подтверждена.
+
+        Нужен, когда ``mark_notified`` уже занял окно TTL, но ни один
+        ``send_message`` не завершился успешно — иначе повтор в том же
+        окне будет подавлен без доставки.
+        """
+        await self.client.delete(self._notify_key(adv_id))

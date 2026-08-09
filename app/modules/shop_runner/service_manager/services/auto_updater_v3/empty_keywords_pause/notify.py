@@ -68,8 +68,13 @@ async def notify_empty_keywords_pause(
 ) -> None:
     """Once-per-enter notify: причина паузы + периодическая перепроверка.
 
-    Debounce через Redis NX. Ошибки доставки не пробрасываются наружу —
-    pause уже применён.
+    Debounce через Redis NX занимает слот на время попытки доставки.
+    Если доставка не подтверждена (пустой ``shop_id``, нет chat_ids, все
+    ``send_message`` False или unexpected error) — ключ снимается
+    (`release_notified`), чтобы повтор в том же 24h окне мог доставить.
+    Успех хотя бы в один чат оставляет debounce (once-per-enter).
+
+    Ошибки доставки не пробрасываются наружу — pause уже применён.
 
     PG session: parent открывает ``session_maker(read_only=True)`` и передаёт
     session в ``load_telegram_chat_ids_for_shop`` (PURE_READ).
@@ -77,20 +82,22 @@ async def notify_empty_keywords_pause(
     mgr = intent_manager or EmptyKeywordsPauseIntentManager()
     if not await mgr.mark_notified(adv_id):
         return
+
     text = build_empty_keywords_pause_message(
         campaign_name=campaign_name,
         adv_id=adv_id,
         include_support_link=True,
     )
     sender = notification_sender or get_notification_sender()
-    if not shop_id:
-        logger.warning(
-            "[adv_id=%s] empty-keywords notify skipped: empty shop_id",
-            adv_id,
-        )
-        return
-    sm: SessionMaker = session_maker or get_async_session_maker
+    delivered = False
     try:
+        if not shop_id:
+            logger.warning(
+                "[adv_id=%s] empty-keywords notify skipped: empty shop_id",
+                adv_id,
+            )
+            return
+        sm: SessionMaker = session_maker or get_async_session_maker
         async with sm(read_only=True) as session:
             chat_ids = await load_telegram_chat_ids_for_shop(session, shop_id)
         if not chat_ids:
@@ -106,7 +113,9 @@ async def notify_empty_keywords_pause(
                 text,
                 disable_web_page_preview=True,
             )
-            if not ok:
+            if ok:
+                delivered = True
+            else:
                 logger.error(
                     "[adv_id=%s] empty-keywords notify failed chat_id=%s",
                     adv_id,
@@ -117,3 +126,6 @@ async def notify_empty_keywords_pause(
             "[adv_id=%s] empty-keywords notify unexpected error",
             adv_id,
         )
+    finally:
+        if not delivered:
+            await mgr.release_notified(adv_id)
