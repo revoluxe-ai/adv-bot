@@ -49,10 +49,21 @@ verify:
     - stubbed_guard_pipeline
     - weak_write_gate_regression
     - required_scenario_coverage_not_pass
+    - product_acceptance_not_pass
+  product_acceptance:
+    contract: .cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md
+    # Kernel DONE: PA PASS (or NOT_REQUIRED). Soft tooling waive cannot clear.
+    required_for_archive_when: PRODUCT_ACCEPTANCE_REQUIRED
+    status_field: PRODUCT_ACCEPTANCE_STATUS
+    pass_values: [PASS, NOT_REQUIRED]
+    fail_is_archive_blocker: true
+    soft_waive_clears_pa: false
   scenario_coverage:
     contract: .cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md
     taxonomy: .cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md
     activation_field: SCENARIO_COVERAGE_REQUIRED
+    # Also forced when PRODUCT_ACCEPTANCE_REQUIRED=true (see PRODUCT_ACCEPTANCE.md)
+    product_acceptance_forces_lifecycle: true
     legacy_absence_is_blocker: false
     required_verdict: PASS
     require_fresh_source_spec_sha: true
