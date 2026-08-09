@@ -84,6 +84,7 @@ class _FakeComplexAdv:
         auto_adv_id: int = 9001,
         search_adv_id: int | None = 9002,
         search_limit: int = 100,
+        active_keywords: list[Any] | None = None,
     ) -> None:
         self.bot_active = True
         self.auto_budget_watchdog_enabled = True
@@ -100,6 +101,10 @@ class _FakeComplexAdv:
         )
         self._use_common_budget = False
         self._common_budget_daily_limit = None
+        # Default empty: positive empty-keywords pause path expects revalidation OK.
+        self._active_keywords: list[Any] = (
+            list(active_keywords) if active_keywords is not None else []
+        )
 
     @property
     def adv_setting(self) -> _FakeAdvSetting:
@@ -138,6 +143,11 @@ class _FakeComplexAdv:
                 raise ValueError("search missing")
             return self.search_adv_id
         raise ValueError(adv_type)
+
+    async def get_keywords(self, *, cache_only: bool = True) -> list[Any]:
+        """Active keywords seam for empty-keywords revalidation before pause."""
+        _ = cache_only
+        return list(self._active_keywords)
 
 
 async def _run_tasks(
