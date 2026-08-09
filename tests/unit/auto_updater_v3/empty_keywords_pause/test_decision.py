@@ -117,6 +117,32 @@ def test_should_request_intent_when_started_and_still_empty_recheck() -> None:
 
 
 @pytest.mark.unit
+def test_should_not_request_intent_on_warmup_false_empty() -> None:
+    """ROOT-001 / §7.2: warmup ``__empty__`` blocks no-prior-intent arm only."""
+    assert (
+        should_request_empty_keywords_pause_intent(
+            active_count=0,
+            bot_active=True,
+            bot_driven_off_completed=False,
+            campaign_is_started=True,
+            is_warmup_false_empty=True,
+        )
+        is False
+    )
+    # Bot-driven OFF is settled empty — warmup flag must not cancel it.
+    assert (
+        should_request_empty_keywords_pause_intent(
+            active_count=0,
+            bot_active=True,
+            bot_driven_off_completed=True,
+            campaign_is_started=False,
+            is_warmup_false_empty=True,
+        )
+        is True
+    )
+
+
+@pytest.mark.unit
 def test_empty_keywords_reason_distinct_from_schedule_budget() -> None:
     """Spec Distinct pause reason: empty_keywords ≠ schedule/budget/cost."""
     from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
