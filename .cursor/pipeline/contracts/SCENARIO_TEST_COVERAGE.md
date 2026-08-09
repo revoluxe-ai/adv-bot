@@ -410,6 +410,7 @@ SCENARIO_TEST_COVERAGE_REPORT:
   WORKTREE_FINGERPRINT:
   ACTIVATION:
     SCENARIO_COVERAGE_REQUIRED: true | false
+    PRODUCT_ACCEPTANCE_REQUIRED: true | false | unknown
     ACTIVATION_VERSION:
   VERDICT: PASS | FAIL | BLOCKED
   SCENARIOS_TOTAL:
@@ -454,14 +455,17 @@ no MISSING_STEADY_STATE_RECONCILE_SCENARIO when reconcile-on-observe applies
 
 ## Verify activation
 
-Legacy compatibility:
+Product Acceptance (kernel DONE) — see
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`:
 
 ```text
-SCENARIO_COVERAGE_REQUIRED absent|false
-→ report absence is not automatic archive NO_GO
+PRODUCT_ACCEPTANCE_REQUIRED=true
+→ LIFECYCLE_COVERAGE pillar requires fresh report VERDICT=PASS
+→ missing/stale/FAIL/BLOCKED is archive blocker
+→ legacy SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this pillar
 ```
 
-Versioned/opt-in:
+Standalone scenario flag (still honored):
 
 ```text
 SCENARIO_COVERAGE_REQUIRED=true
@@ -469,8 +473,17 @@ SCENARIO_COVERAGE_REQUIRED=true
 → missing/stale/FAIL/BLOCKED is archive blocker
 ```
 
+Legacy compatibility **only when Product Acceptance is NOT required**:
+
+```text
+PRODUCT_ACCEPTANCE_REQUIRED=false|NOT_REQUIRED
+AND SCENARIO_COVERAGE_REQUIRED absent|false
+→ report absence is not automatic archive NO_GO
+```
+
 Verify MUST NOT recompute the whole scenario matrix. It validates report
-identity/freshness and spot-checks acceptance-relevant evidence.
+identity/freshness and spot-checks acceptance-relevant evidence (including
+SIDE_EFFECT_PROOF rows when PA required).
 
 ## Anti-loop rules
 

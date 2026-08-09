@@ -109,13 +109,24 @@ planner. Он проверяет identity/freshness, spot-checks acceptance-rele
 и применяет activation:
 
 ```text
-SCENARIO_COVERAGE_REQUIRED absent|false
-→ absence report is not automatic NO_GO (legacy compatibility)
+PRODUCT_ACCEPTANCE_REQUIRED=true
+→ LIFECYCLE_COVERAGE requires fresh report VERDICT=PASS for mode=archive
+→ missing/stale/FAIL/BLOCKED is archive blocker (PA pillar LIFECYCLE)
+→ SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this
 
 SCENARIO_COVERAGE_REQUIRED=true
 → fresh report VERDICT=PASS is required for mode=archive
 → missing/stale/FAIL/BLOCKED report is archive blocker
+
+PRODUCT_ACCEPTANCE_REQUIRED=false|NOT_REQUIRED
+AND SCENARIO_COVERAGE_REQUIRED absent|false
+→ absence report is not automatic NO_GO (legacy compatibility only)
 ```
+
+Kernel DONE contract:
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. Soft tooling
+PASS/waive never creates archive DONE without
+`PRODUCT_ACCEPTANCE_STATUS=PASS` (or `NOT_REQUIRED`).
 
 Provider receipt не равен final Scenario coverage PASS. Self-report writer-а
 из `/opsx-test` или `/opsx-close-external-gap` не заменяет independent report.
@@ -504,8 +515,28 @@ Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
 * When paired proof is required: verify the allowed target side effect **and**
   that the forbidden sibling target is not mutated. Green tests against an
   ambiguous or wrong-target plan do not clear this gate.
+* Competing legs/adapters MUST NOT be closed with SEMANTIC `NOT_APPLICABLE`
+  (Product Acceptance MEANING_LOCK anti-abuse).
 
 Passing tests не являются proof, если placement нарушает accepted decision.
+
+### 5b. Product Acceptance (kernel DONE)
+
+Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` in `mode=archive`.
+
+* Decide `PRODUCT_ACCEPTANCE_REQUIRED` (high-risk multi-leg, evolution-linked,
+  material user-visible lifecycle write, or explicit flag).
+* Emit `PRODUCT_ACCEPTANCE_STATUS` and, on failure,
+  `PRODUCT_ACCEPTANCE_FAIL_PILLAR` (`MEANING_LOCK` | `LIFECYCLE_COVERAGE` |
+  `SIDE_EFFECT_PROOF` | `MULTI`).
+* When required: `PASS` only if MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧
+  SIDE_EFFECT_PROOF. Else archive blocker `product_acceptance_not_pass` →
+  overall `NO_GO`.
+* Soft sections (ECC / performance / antipattern / static / destructive-cache
+  WARN / Owner soft-waive) MUST state they do **not** authorize archive
+  without PA PASS / NOT_REQUIRED.
+* Intent-only / OR-armed acceptance tests without this-run external effect →
+  SIDE_EFFECT_PROOF fail (taxonomy `side_effect_proof`).
 
 Passing tests также не доказывают автоматически:
 
@@ -982,6 +1013,9 @@ or:
 * Do not treat green tests as proof when the semantic write target is unresolved
   or implementation hits a forbidden sibling adapter.
 * Treat `unresolved_semantic_write_target` as a hard archive blocker.
+* Treat `product_acceptance_not_pass` as a hard archive blocker when
+  `PRODUCT_ACCEPTANCE_REQUIRED=true`. Soft tooling waive cannot clear PA.
+* Do not invent a `/opsx-product-acceptance` command; verify owns archive DONE.
 * Block async tests that manually mutate shared module-level dependencies around awaited code, especially shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings, and global flags.
 * Block tests that stub the pipeline so the real guard is never exercised.
 * Block write-gate tests that only assert `assert_not_called()` or `count == 0` without proving candidate/handler/write-boundary filtering.

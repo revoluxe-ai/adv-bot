@@ -161,11 +161,18 @@ before `/opsx-archive`.
 3. Execute the full archive audit already defined in
    `.cursor/commands/opsx-verify.md` (behavior, placement, tests, tasks,
    additive packet/reports, SWT, VERIFY_POLICY blockers).
-4. Re-check spec/tasks coherence after any fixes done during quality chain
+4. **Product Acceptance (kernel DONE):** follow
+   `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. Compute
+   `PRODUCT_ACCEPTANCE_REQUIRED` / `PRODUCT_ACCEPTANCE_STATUS`. When required,
+   `PASS` needs MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧ SIDE_EFFECT_PROOF.
+   `FAIL` / `BLOCKED` / missing required evidence → archive blocker
+   `product_acceptance_not_pass` (pillar in output). Soft tooling PASS/waive
+   does **not** clear PA.
+5. Re-check spec/tasks coherence after any fixes done during quality chain
    (drift since `mode=impl` → `NO_GO`).
-5. Final markers only from VERIFY_POLICY: `✅ GO` / `❌ NO_GO`.
-6. `## Готовность к archive` + pasteable next command (include cache WARN
-   if raised).
+6. Final markers only from VERIFY_POLICY: `✅ GO` / `❌ NO_GO`.
+7. `## Готовность к archive` + pasteable next command (include cache WARN
+   and PA status/pillar if raised).
 
 ### NEXT_ACTION after PHASE_ARCHIVE
 
@@ -193,7 +200,7 @@ If DoD itself regressed, after repair prefer re-run
 | verify `mode=impl` IMPL_OK + prod `.py` | `/opsx-pyright-strict-coverage base=<BASE>` |
 | verify `mode=impl` IMPL_OK + no prod `.py` | `/opsx-verify mode=archive <change>` |
 | verify `mode=impl` IMPL_GAPS | `/opsx-apply <change>` |
-| pyright / ecc / perf / antipattern PASS | continue chain; final verify = `mode=archive` |
+| pyright / ecc / perf / antipattern PASS | continue chain (soft); final verify = `mode=archive` (PA still required when applicable) |
 | `/opsx-static-check` PASS + cache-dev / cached>0 | `/opsx-static-check FULL CACHE_OFF` then `/opsx-verify mode=archive <change>` |
 | `/opsx-static-check` PASS + CACHE_OFF/FORCE/DEGRADED | `/opsx-verify mode=archive <change>` |
 | verify `mode=archive` GO | `/opsx-archive <change>` |

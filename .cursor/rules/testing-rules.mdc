@@ -12,8 +12,12 @@ Authority split (не дублировать полный policy в commands):
 
 - `.cursor/rules/testing-rules.mdc` — общий test-design / execution policy
 - `.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` — единые определения
-  `unit_component`, `scenario_seam`, `boundary_integration`,
-  `stub_contract`, `destructive_local` и load/measurement evidence
+  `unit_component`, `scenario_seam`, `side_effect_proof` (`PA_SIDE_EFFECT_PROOF`),
+  `boundary_integration`, `stub_contract`, `destructive_local` и
+  load/measurement evidence
+- `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` — kernel DONE
+  (MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧ SIDE_EFFECT_PROOF); soft tooling
+  cannot create archive DONE
 - `openspec/config.yaml` → `rules.tasks` — обязательства при генерации tasks
 - `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
 - `/opsx-apply` — implementation + materialization обязательных tests
@@ -23,6 +27,7 @@ Authority split (не дублировать полный policy в commands):
 - `/opsx-close-external-gap` — REFACTOR_AND_TEST closure for PG/CH from
   coverage packet (no `base=`); TEST_ONLY остаётся `/opsx-test`
 - `/opsx-verify` — независимая adequacy-проверка и archive verdict `GO` / `NO_GO`
+  (Product Acceptance when required)
 
 Устаревший файл `.cursor/rules/TESTING_RULES.mdc` — только migration pointer; не использовать как policy.
 
@@ -41,7 +46,7 @@ execution classes.
 Не смешивай:
 
 - pytest marker/path (`unit`, `integration`);
-- evidence class (`unit_component`, `scenario_seam`,
+- evidence class (`unit_component`, `scenario_seam`, `side_effect_proof`,
   `boundary_integration`, `stub_contract`);
 - execution class (`fast_local`, `destructive_local`, `authorized_live`).
 
@@ -50,6 +55,12 @@ production-destructive действие. `scenario_seam` может находи
 `tests/unit/`, если реальная causal logic проходит до тонкого внешнего конца.
 PG/CH provider contract по-прежнему требует live test provider согласно
 Kind defaults ниже.
+
+Для Product Acceptance (когда required): acceptance scenarios с внешней
+mutation MUST нести `side_effect_proof` / `PA_SIDE_EFFECT_PROOF` — this-run
+external call или explicit forbidden sibling non-effect. Intent-only /
+durable-reason-only / OR-armed proxies без this-run mutation — **не**
+достаточны для archive DONE.
 
 Найденный или authored test без исполнения отмечай `EXECUTED=NO`; он не
 является green evidence. Любой coverage verdict должен явно писать, что тест
