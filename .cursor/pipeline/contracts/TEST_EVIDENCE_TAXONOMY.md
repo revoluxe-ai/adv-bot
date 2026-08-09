@@ -152,6 +152,9 @@ READ_AFTER_WRITE → sm(read_only=False)
 - считать `destructive_local` полным Spec Scenario evidence;
 - считать unit-mock proof для PG/CH;
 - считать найденный, но не выполненный тест green evidence;
+- считать `CACHE_HIT` / `SKIPPED_CACHED` (destructive selective cache)
+  EXECUTED=YES green evidence для archive, Scenario certify или
+  `authorized_live`;
 - считать static performance review нагрузочным тестом;
 - полностью mock-ать causal boundary проверяемого Scenario;
 - автоматически обновлять golden/ContractCase текущим live output.
@@ -170,6 +173,13 @@ WORKTREE_FINGERPRINT:
 ```
 
 Несовпадение обязательного hash делает evidence stale, а не PASS.
+
+`CACHE_HIT` / `SKIPPED_CACHED` из
+`.cursor/static-check/contracts/destructive-selective-cache.md` — только
+optimization receipt для `CACHE_MODE=dev`. Это не замена свежего
+executed run для `/opsx-verify` archive, Scenario certify или
+`authorized_live`. Перед archive/PR confidence используй `CACHE_OFF` /
+`CACHE_FORCE` (или INTERIM `CACHE_DEGRADED` run-all).
 
 ## Ownership
 

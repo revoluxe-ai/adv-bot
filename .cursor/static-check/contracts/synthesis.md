@@ -51,3 +51,16 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
 9. **Delivery:** Final report is mandatory after fan-in even when Agent Team /
    UI already displayed a failed subagent. Orchestrator prints it; do not
    treat Task completion notifications as the report.
+10. **Destructive cache SUMMARY (mandatory when pytest-full ran or
+    destructive was in plan):** Final report SUMMARY MUST include exactly:
+    ```text
+    CACHE_MODE: <dev|off|force|n/a>
+    CACHE_DEGRADED: <yes|no|n/a>
+    destructive_cache: ran=N cached=M (CACHE_HIT ≠ archive EXECUTED green)
+    ```
+    If pytest-full PASS but these lines are missing while MODE=FULL → treat
+    Final report as **incomplete**; re-emit with lines (do not invent cached
+    skips). Prefer `CACHE_DEGRADED=yes` when planner missing.
+11. **NEXT_ACTION after FULL PASS + CACHE_MODE=dev + cached>0** (soft):
+    prefer paste `/opsx-static-check FULL CACHE_OFF` before archive verify;
+    otherwise `/opsx-verify mode=archive <change>` when in pre-archive chain.

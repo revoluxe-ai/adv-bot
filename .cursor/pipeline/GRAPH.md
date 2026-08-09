@@ -393,8 +393,8 @@
 - artifacts_read: change artifacts, code, VERIFY_PHASES, VERIFY_POLICY
 - artifacts_written: none (read-only)
 - decision_owner: verifier
-- next_typical: /opsx-pyright-strict-coverage (after IMPL_OK+prod.py) | /opsx-verify mode=archive | /opsx-archive (after GO) | /opsx-apply | /opsx-update
-- known_flaws: bare /opsx-verify defaults archive (WARN); ≠ /opsx-test verify
+- next_typical: /opsx-pyright-strict-coverage (after IMPL_OK+prod.py) | /opsx-static-check FULL CACHE_OFF (when prior FULL was cache-dev) | /opsx-verify mode=archive | /opsx-archive (after GO) | /opsx-apply | /opsx-update
+- known_flaws: bare /opsx-verify defaults archive (WARN); ≠ /opsx-test verify; archive soft WARN if last FULL CACHE_MODE=dev
 
 ### /opsx-archive
 - purpose: archive a completed change
@@ -601,7 +601,8 @@ impl_done --/opsx-verify mode=impl--> impl_verified|impl_gaps
 impl_gaps --/opsx-apply|/opsx-update--> implementing|planning_revise
 impl_verified --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 impl_verified --/opsx-verify mode=archive--> verify_pass|verify_fail
-static_check_done --/opsx-verify mode=archive--> verify_pass|verify_fail
+static_check_done --/opsx-static-check FULL CACHE_OFF [recommended when prior FULL was cache-dev]--> static_check_done
+static_check_done --/opsx-verify mode=archive [soft WARN if last FULL CACHE_MODE=dev]--> verify_pass|verify_fail
 impl_done --/opsx-verify mode=archive [legacy/skip-impl WARN]--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
@@ -768,6 +769,16 @@ recommend `/opsx-test-env DOWN` to free resources. Not a hard archive gate.
 Unit-only / FAST may skip. Does **not** replace static-check `PREFLIGHT`
 (tooling files only). Not `/opsx-devops` (k8s). Redis is external until
 compose `test_redis` enabled (Owner GO). Companion contracts may lag (F13).
+
+Destructive execution default (all entry points that select
+`destructive_local`): `CACHE_MODE=dev` via
+`.cursor/static-check/contracts/destructive-selective-cache.md` — run
+fingerprint `MUST_RUN` only. **INTERIM** (planner missing):
+`CACHE_DEGRADED` = run-all destructive; no improvised skips.
+Archive / pre-PR confidence → `/opsx-static-check FULL CACHE_OFF`
+(or `CACHE_FORCE`). `/opsx-verify mode=archive` soft-WARNs if last FULL
+was cache-dev. `CACHE_HIT` ≠ archive EXECUTED green. `authorized_live`
+remains out of this cache.
 
 ### Bug debt board (ALSO_OK anytime)
 

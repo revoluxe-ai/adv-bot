@@ -24,6 +24,27 @@ Verify является read-only audit command после `/opsx-apply` и до
 Не путать с `/opsx-test … verify` (bug GREEN). `✅ IMPL_OK` **никогда** не
 авторизует `/opsx-archive`.
 
+### Destructive cache soft gate (`mode=archive` only)
+
+Contract:
+`.cursor/static-check/contracts/destructive-selective-cache.md`.
+
+During PHASE_ARCHIVE / archive-audit, if chat or last `/opsx-static-check`
+FULL report shows `CACHE_MODE=dev`, `DESTRUCTIVE_CACHED>0`, or lacks an
+explicit `CACHE_OFF` / `CACHE_FORCE` receipt for the pre-archive FULL:
+
+1. Emit **WARN** (soft — not automatic `NO_GO` by itself):
+   `DESTRUCTIVE_CACHE_DEV_BEFORE_ARCHIVE`.
+2. Paste next confidence step:
+   `/opsx-static-check FULL CACHE_OFF`
+   (or `CACHE_FORCE`).
+3. Continue archive audit; Owner may still reach `✅ GO`, but the WARN MUST
+   appear in the verify report under readiness / caveats.
+4. `CACHE_HIT` / skipped destructive ≠ EXECUTED green evidence for archive.
+
+If last FULL was already `CACHE_OFF` / `CACHE_FORCE` / `CACHE_DEGRADED`
+(run-all) → no WARN.
+
 ## Source resolution (mandatory)
 
 Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`.

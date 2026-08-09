@@ -1,6 +1,6 @@
 ---
 description: "Write targeted tests from the user's request without changing production code."
-argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDING_ID> [verify] [optional OpenSpec change-id]"
+argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDING_ID> [verify] [CACHE_OFF|CACHE_FORCE|CACHE_DEV] [optional OpenSpec change-id]"
 ---
 
 # /opsx:test
@@ -8,6 +8,32 @@ argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDIN
 Write or update targeted tests based on the user's request.
 
 You are allowed to edit tests only (plus durable RED/GREEN evidence under the case map in bug-regression / verify modes).
+
+## Destructive cache (all runs that select `destructive_local`)
+
+Contract SoT:
+`.cursor/static-check/contracts/destructive-selective-cache.md`.
+
+When a pytest invocation under this command would collect any
+`@pytest.mark.destructive_local` node:
+
+| Token / default | Effect |
+|-----------------|--------|
+| (no `CACHE_*`) | `CACHE_MODE=dev` — run `MUST_RUN` only via shared planner |
+| `CACHE_OFF` | run all selected destructive |
+| `CACHE_FORCE` | run all selected destructive; rewrite local cache receipts |
+| `CACHE_DEV` | alias of default |
+
+Always print `CACHE_MODE` + `destructive ran/cached` counts when destructive
+nodes were in the plan. `CACHE_HIT` ≠ archive / certify EXECUTED green.
+`authorized_live` certify stays on `/opsx-close-external-gap` (out of scope).
+
+Planner: `.cursor/static-check/bin/destructive_cache_plan.py` (same artifact
+as `/opsx-static-check` FULL).
+
+**INTERIM:** planner missing/broken → run all selected destructive
+(`CACHE_DEGRADED=yes`); forbidden to invent skip/deselect/“branch already
+green” filters or claim `CACHE_HIT` without planner receipt.
 
 ## Modes
 

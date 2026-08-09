@@ -26,3 +26,20 @@ STATUS rules:
 - FAIL — tool ran; diagnostics/failures present
 - BLOCKED — cannot run (missing poetry/config/script)
 - ERROR — unexpected crash / invalid execution
+
+## Destructive cache extras (`CHECK_ID=pytest-full` or destructive in plan)
+
+When the check planned any `@pytest.mark.destructive_local` node, append
+after `ERROR:` (required — omit only if destructive not in plan):
+
+```text
+CACHE_MODE: off|dev|force
+DESTRUCTIVE_TOTAL: <int>
+DESTRUCTIVE_RAN: <int>
+DESTRUCTIVE_CACHED: <int>
+DESTRUCTIVE_FORCED: <int>
+CACHE_DEGRADED: yes|no
+```
+
+INTERIM (planner missing): `CACHE_DEGRADED=yes`, `DESTRUCTIVE_CACHED=0`,
+`DESTRUCTIVE_RAN=DESTRUCTIVE_TOTAL`. Never claim cached skips without planner.

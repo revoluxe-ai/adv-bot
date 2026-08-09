@@ -65,6 +65,18 @@ Kind defaults ниже.
 6. `ruff` и `black` не являются обязательными gates, если задача явно не просит lint/format
 7. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
 8. На Windows PowerShell не используй bash-синтаксис: `||`, `&&`, `grep`, `sed`, `awk`, `true` как no-op
+9. **Destructive cache (default on, all entry points):** если invocation
+   собирает любой `@pytest.mark.destructive_local`, перед запуском вызови
+   shared planner
+   `.cursor/static-check/bin/destructive_cache_plan.py` (contract:
+   `.cursor/static-check/contracts/destructive-selective-cache.md`).
+   Default `CACHE_MODE=dev` — беги только `MUST_RUN`; `CACHE_HIT` skip.
+   Полный прогон destructive — только явный `CACHE_OFF` или `CACHE_FORCE`
+   (Owner text / command token). `CACHE_HIT` ≠ archive EXECUTED green.
+   `authorized_live` / `AUTHORIZE_ONE_LIVE_RUN` — вне этого cache.
+   **INTERIM:** если planner отсутствует или падает — `CACHE_DEGRADED`:
+   гоняй все selected destructive; запрещено invent deselect/skip /
+   «уже зелёные на ветке» без planner receipt.
 
 ## Targeted и adjacent coverage
 
