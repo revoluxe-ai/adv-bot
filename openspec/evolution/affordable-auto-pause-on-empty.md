@@ -5,7 +5,7 @@ STAR_ID: affordable-auto-pause-on-empty
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-07T19:11:00Z
-UPDATED_AT: 2026-08-08T16:35:47Z
+UPDATED_AT: 2026-08-09T06:48:30Z
 DEPENDS_ON: none
 ```
 
@@ -62,6 +62,10 @@ DEPENDS_ON: none
 
 ## Evolution Path
 
+Owner achievement route (2026-08-09, advisory — not DoD):
+`INC-PAUSE-02` → `INC-BILL-LEG-PAUSE-01` → `INC-AUTO-SHELF-PAUSE-01` →
+`INC-PRICE-01` → `INC-COMMS-01`. Hypothesis order below matches that route.
+
 ### INC-PAUSE-01 — Автопауза при пустых ключах + перепроверка
 
 ```text
@@ -114,6 +118,37 @@ Evidence / completion: active change
 implementation/verify in progress). Proposed ADL amendment
 `openspec/changes/retarget-empty-keywords-pause-to-search/decisions/empty-keywords-pause-write-path/decision.md`.
 
+### INC-BILL-LEG-PAUSE-01 — Честная оплата Auto/Search при паузе ног
+
+```text
+STATUS: CANDIDATE
+LINKED_CHANGES: none
+```
+
+Outcome (Owner 2026-08-08 / route 2026-08-09): Для пары ног одной авто-настройки
+(вид РК Auto и вид РК Search); Owner: **второе** после `INC-PAUSE-02`, до
+`INC-COMMS-01`:
+
+1. Если используется только **одна** нога (started), а вторая на паузе — платишь
+   **половину** базового тарифа за эту кампанию/комплект.
+2. Если **обе** ноги на паузе — **не платишь** за них (0 за этот комплект
+   в периоде тарифа).
+3. **Anti-abuse:** нельзя обойти оплату, кратковременно ставя ногу(и) на паузу
+   «под момент списания» (и сходные трюки). Нужен durable fair rule
+   (например окно активности / доля времени в биллинг-периоде / latch —
+   выбрать в design Change; не оставлять snapshot-only на instant WB status
+   в секунду charge).
+
+Contribution to North Star: Платишь за реально работающие / started ноги;
+честный оффер рядом с empty-keywords / shelf pause и ценой 1000₽.
+
+Scope boundary: Pricer / daily billing metering + anti-gaming; UX отображения
+тарифа при паузе ног — в том же Change или тонкий follow-up. Не empty-keywords
+runtime; не shelf exhausted pause; не смена базовой цифры 1000 (это
+`INC-PRICE-01`); не retire v2; не канал-анонс.
+
+Evidence / completion: none yet.
+
 ### INC-AUTO-SHELF-PAUSE-01 — Пауза Auto/полок при исчерпании ставок без plan-fit + перетест
 
 ```text
@@ -121,8 +156,8 @@ STATUS: CANDIDATE
 LINKED_CHANGES: none
 ```
 
-Outcome (Owner 2026-08-08): Нога **Auto (полки)** ставится на паузу только
-когда одновременно:
+Outcome (Owner 2026-08-08 / route 2026-08-09): Нога **Auto (полки)** ставится
+на паузу только когда одновременно (Owner: после `INC-BILL-LEG-PAUSE-01`):
 
 1. текущая эпоха тестирования ставок **исчерпана** (больше нечего тестировать
    в допустимом диапазоне / coverage epoch complete);
@@ -167,47 +202,20 @@ STATUS: CANDIDATE
 LINKED_CHANGES: none
 ```
 
-Outcome: Новая стоимость авто — 1000 рублей в месяц за одну кампанию
-(−80% / в 5 раз дешевле относительно прежнего entry ~6000₽) как **базовая**
-ставка полного комплекта (обе ноги в работе по правилам тарифа).
+Outcome (route 2026-08-09): Новая стоимость авто — 1000 рублей в месяц за одну
+кампанию (−80% / в 5 раз дешевле относительно прежнего entry ~6000₽) как
+**базовая** ставка полного комплекта (обе ноги в работе по правилам тарифа).
+Owner: **на потом**, обязательно до `INC-COMMS-01` / прессрелиза; не next
+после `INC-PAUSE-02`.
 
 Contribution to North Star: Доступный вход при честном отношении к неэффективной рекламе.
 
 Scope boundary: billing/pricer table/copy для 1000₽; не fair-pause metering
-(`INC-BILL-LEG-PAUSE-01`); не pause runtime empty-keywords / shelf exhausted.
+(`INC-BILL-LEG-PAUSE-01`); не pause runtime empty-keywords / shelf exhausted;
+не канал-анонс как substitute для смены цифры.
 
 Evidence / completion: none yet. Runtime baseline: `tariffs_for_auto_setting[1]
 = 6000`.
-
-### INC-BILL-LEG-PAUSE-01 — Честная оплата Auto/Search при паузе ног
-
-```text
-STATUS: CANDIDATE
-LINKED_CHANGES: none
-```
-
-Outcome (Owner 2026-08-08): Для пары ног одной авто-настройки (вид РК Auto и
-вид РК Search):
-
-1. Если используется только **одна** нога, а вторая на паузе — платишь
-   **половину** базового тарифа за эту кампанию/комплект.
-2. Если **обе** ноги на паузе — **не платишь** за них (0 за этот комплект
-   в периоде тарифа).
-3. **Anti-abuse:** нельзя обойти оплату, кратковременно ставя ногу(и) на паузу
-   «под момент списания» (и сходные трюки). Нужен durable fair rule
-   (например окно активности / доля времени в биллинг-периоде / latch —
-   выбрать в design Change; не оставлять snapshot-only на instant WB status
-   в секунду charge).
-
-Contribution to North Star: Платишь за реально работающие ноги; честный оффер
-рядом с empty-keywords / shelf pause и ценой 1000₽.
-
-Scope boundary: Pricer / daily billing metering + anti-gaming; UX отображения
-тарифа при паузе ног — в том же Change или тонкий follow-up. Не empty-keywords
-runtime; не shelf exhausted pause; не смена базовой цифры 1000 (это
-`INC-PRICE-01`); не retire v2.
-
-Evidence / completion: none yet.
 
 ### INC-DISCONNECT-01 — Убрать путающее ручное отключение бота от РК
 
@@ -265,6 +273,8 @@ Contribution to North Star: Донести оффер, доверие и чес�
 «упрощение ещё в пути + поддержка сейчас».
 
 Scope boundary: копирайт/канал; не реализация free-bot; не pause/billing code.
+Не публиковать обещание ½/0 / 1000₽ / shelf-pause, пока соответствующие
+increments не поставлены (Owner route 2026-08-09).
 
 Evidence / completion: none yet.
 
@@ -329,6 +339,10 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 
 ## History
 
+- 2026-08-09T06:48:30Z — Owner GO + RECOMMENDED: close `INC-PAUSE-02` first;
+  achievement route reorder PAUSE-02 → BILL-LEG → AUTO-SHELF → PRICE → COMMS;
+  PRICE explicitly deferred until before press release; BILL is second before
+  COMMS; STAR_ROUTE / EVOLUTION_PATH section order updated (hypotheses, not DoD).
 - 2026-08-08T16:35:47Z — Owner GO: empty-keywords = Search-only; Auto/полки —
   отдельный `INC-AUTO-SHELF-PAUSE-01` (exhausted bids + no plan-fit + user/default
   7d retest); added ACTIVE `INC-PAUSE-02`; COMMS/forward-compat/non-goals updated.
