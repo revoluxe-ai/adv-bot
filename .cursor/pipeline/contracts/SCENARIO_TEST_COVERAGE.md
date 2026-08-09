@@ -118,6 +118,42 @@ heading инвалидирует прежнюю привязку и требуе
 `GAP_ID` хранится только как data; для Windows-safe filenames используй только
 `GAP_FILE_ID` (`[0-9a-f]{16}`), без `:`, `/`, `\` или Scenario title.
 
+## Steady-state / already-true reconcile (mandatory)
+
+When Spec, design, or an accepted decision implies an invariant that must hold
+on **observe / reconcile / deploy** (not only after a producer event), the
+change MUST include at least one Spec Scenario shaped as:
+
+```text
+GIVEN already-true precondition state (no fresh producer event required)
+WHEN periodic / ensure / reconcile entrypoint runs
+THEN the same allowed effect as the post-event transition path
+     (+ paired forbidden sibling if the Scenario is a gate)
+```
+
+Encoding **only** post-event transition producers for that invariant is
+**FAIL_CLOSED**:
+
+| Where | Required outcome |
+|---|---|
+| `mode=plan` | `OPEN_QUESTIONS` (or `PLAN_STATUS=provisional\|blocked`) naming the missing steady-state Scenario |
+| `mode=audit` / `mode=certify` | gap class `MISSING_STEADY_STATE_RECONCILE_SCENARIO` → row/report FAIL |
+
+Disposition:
+
+```text
+Spec omits the steady-state Scenario
+→ PLANNING_UPDATE → /opsx-update
+
+Spec has the Scenario but evidence is missing/weak
+→ TEST_ONLY → /opsx-test
+```
+
+Non-normative class note (do not treat as product requirement text here):
+ROOT-001 / empty-keywords — empty active keywords + Search STARTED + bot on
+must arm Search EMPTY_KEYWORDS pause without a prior V3 intent (activity-control
+reconcile), not only after a FORCE_OFF → intent producer hop.
+
 ## Common freshness envelope
 
 Каждый packet/report/receipt MUST содержать применимые поля:
@@ -189,6 +225,8 @@ CERTIFY
 
 PLANNING_UPDATE
   Spec/target/behavior неоднозначны
+  (includes MISSING_STEADY_STATE_RECONCILE_SCENARIO when Spec omits
+   already-true / reconcile Scenario for a reconcile-on-observe invariant)
 ```
 
 ## SCENARIO_TEST_ONLY_PACKET
@@ -411,6 +449,7 @@ all required scenario tests executed green
 all used stubs have executable contract parity
 all required provider receipts present, PASS and fresh
 no weak/missing/blocked row
+no MISSING_STEADY_STATE_RECONCILE_SCENARIO when reconcile-on-observe applies
 ```
 
 ## Verify activation

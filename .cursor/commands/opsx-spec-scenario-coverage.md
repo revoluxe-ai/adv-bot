@@ -238,7 +238,8 @@ read-only review, а не нагрузочным прогоном.
 
 Построй одну строку на каждый `#### Scenario:` во всех delta specs change.
 Не пропускай negative, sibling, failure, empty-state, retry, residual,
-next-tick и idempotency scenarios.
+next-tick, idempotency и (когда применимо) steady-state / already-true
+reconcile scenarios.
 
 ```text
 SCENARIO_EVIDENCE_ROW:
@@ -277,6 +278,31 @@ SCENARIO_EVIDENCE_ROW:
 5. execution evidence на текущем snapshot для полного PASS.
 
 Unit tests могут быть дополнительными, но не заменяют `scenario_seam`.
+
+### Steady-state / already-true reconcile (mandatory when applicable)
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md` →
+**Steady-state / already-true reconcile (mandatory)**.
+
+When Spec, design, or an accepted decision implies an invariant that must hold
+on observe / reconcile / deploy (not only after a producer event):
+
+1. The change MUST include at least one Spec Scenario with
+   `GIVEN` already-true precondition (no fresh producer event),
+   `WHEN` periodic / ensure / reconcile entrypoint,
+   `THEN` the same allowed effect as the post-event transition path
+   (+ forbidden sibling if gated).
+2. Encoding **only** post-event transition producers for that invariant is
+   FAIL_CLOSED:
+   - `mode=plan` → `OPEN_QUESTIONS` (or provisional/blocked plan) naming the gap;
+   - `mode=audit` / `mode=certify` → gap class
+     `MISSING_STEADY_STATE_RECONCILE_SCENARIO` → FAIL (not PASS).
+3. Do not treat transition-producer Scenario alone as covering deploy-safe /
+   already-true reconcile.
+
+Non-normative class note: ROOT-001 empty-keywords — empty keywords + Search
+STARTED + bot on must arm Search EMPTY_KEYWORDS pause without prior V3 intent.
 
 ### Split write/read rule
 
@@ -557,7 +583,13 @@ PRODUCTION_CAUSAL_PATH_UNTESTABLE
 ```text
 SPEC_SCENARIO_AMBIGUOUS
 WRITE_TARGET_AMBIGUOUS
+MISSING_STEADY_STATE_RECONCILE_SCENARIO   # Spec omits already-true / reconcile Scenario
 → /opsx-update <change-id>
+```
+
+```text
+MISSING_STEADY_STATE_RECONCILE_SCENARIO   # Spec has Scenario; evidence missing/weak
+→ /opsx-test
 ```
 
 Не исправляй gap внутри этой команды.
@@ -713,3 +745,6 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 - Output includes one clear next action without performing fixes.
 - FAIL with TEST_ONLY gaps includes pasteable `ROUTE_PACKETS.TEST_ONLY_PACKET`
   covering every blocking stub thin end (not prose-only GAPS).
+- When reconcile-on-observe applies: steady-state / already-true Scenario is
+  present, or explicit `MISSING_STEADY_STATE_RECONCILE_SCENARIO` FAIL / plan
+  `OPEN_QUESTIONS` (not silent PASS on transition-only Scenario sets).
