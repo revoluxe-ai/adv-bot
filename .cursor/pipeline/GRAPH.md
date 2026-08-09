@@ -546,14 +546,14 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-create-pr
-- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only
+- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only; after successful gh pr create launch one Cursor Task bugbot (Diff branch changes, Base=PR base) and emit BUGBOT_POST_PR (invoked/ran/findings); escape SKIP_BUGBOT_POST_PR; does not replace project-bug-hunt
 - input_state: pr_ready
 - output_state: pr_ready
 - artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT
-- artifacts_written: remote PR (via gh)
+- artifacts_written: remote PR (via gh); chat BUGBOT_POST_PR report
 - decision_owner: PR author
-- next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks)
-- known_flaws: receipt gate is command-owned (not soft graph advice)
+- next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks) | residual Bugbot findings → intake/learn path if product/logic
+- known_flaws: receipt gate is command-owned (not soft graph advice); post-PR Bugbot is Cursor Task residual, not GitHub-hosted CI wait
 
 ### Explicitly excluded from graph
 - /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)

@@ -341,6 +341,8 @@ If `GO` is present:
 5. Write PR body to a temporary file.
 6. Push current branch.
 7. Create PR with `gh pr create`.
+8. Run **Post-PR Cursor Bugbot** (below) unless `SKIP_BUGBOT_POST_PR`.
+9. Emit final output including `BUGBOT_POST_PR`.
 
 ## Commands after explicit GO only
 
@@ -364,6 +366,60 @@ gh pr create \
 
 Do not run `git push` or `gh pr create` before explicit `GO`.
 
+## Post-PR Cursor Bugbot (mandatory after successful create)
+
+Runs **only** after a successful `gh pr create` that returned a PR URL.
+Does **not** replace `/opsx-project-bug-hunt` (pre-PR primary). Does **not**
+auto-fix findings. Does **not** wait for GitHub-hosted Bugbot CI as a
+substitute for this step.
+
+Escape: if user `GO` message contains the exact token `SKIP_BUGBOT_POST_PR`,
+skip the subagent and emit:
+
+```text
+BUGBOT_POST_PR:
+- invoked: no
+- ran: n/a
+- findings_count: n/a
+- skip_reason: SKIP_BUGBOT_POST_PR
+```
+
+Otherwise:
+
+1. Launch **exactly one** Task with:
+   - `subagent_type: bugbot`
+   - `description: "Bugbot"`
+   - `run_in_background: false`
+   - prompt shape (Cursor `review-bugbot` skill contract):
+
+```text
+Full Repository Path: <absolute workspace / repo root>
+Diff: branch changes
+Base Branch: <PR target/base branch>
+```
+
+2. Retry policy: follow `review-bugbot` (one retry on bad invocation; one
+   natural-language Diff fallback only if diff could not be computed; then stop).
+3. Emit in the create-pr reply (before product-fix handoffs):
+
+```text
+BUGBOT_POST_PR:
+- invoked: yes
+- ran: yes | no | failed
+- findings_count: <N or n/a>
+- findings: none | <markdown table Severity | Location | Finding>
+- error: <short blocker if ran=failed; else omit>
+```
+
+Priority of the report for the owner:
+
+1. Did Bugbot run at all? (`invoked` / `ran`)
+2. If yes: are there findings? (`findings_count`)
+3. If yes: which? (table)
+
+Do not invent findings. Do not open a second Bugbot Task in the same create-pr
+turn after a completed report.
+
 ## Output format before GO
 
 1. Target/base branch:
@@ -385,4 +441,5 @@ Do not run `git push` or `gh pr create` before explicit `GO`.
 3. Head branch:
 4. PR title:
 5. PR URL:
-6. Next recommended action:
+6. BUGBOT_POST_PR: (invoked / ran / findings_count / findings|error|skip)
+7. Next recommended action:
