@@ -89,9 +89,11 @@ def is_empty_keywords_reason(reason_code: Any) -> bool:
 
 
 def stats_window_compatible_with_recheck(available_stats_days: int) -> bool:
-    """Recheck валиден при окне статы ≤7 дней (spec Seven-day statistics).
+    """True, если окно доступной статистики совместимо с recheck (≤7 дней).
 
-    Зачем: тест MUST падать, если кто-то потребует available_stats_days > 7.
+    Продуктовый инвариант spec Seven-day statistics / ADL: recheck и pause
+    path для empty-keywords не требуют окна статы больше
+    ``STATS_WINDOW_DAYS_MAX`` (7). Отрицательные значения — несовместимы.
     """
     if available_stats_days < 0:
         return False

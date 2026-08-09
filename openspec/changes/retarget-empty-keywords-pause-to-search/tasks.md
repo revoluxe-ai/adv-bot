@@ -44,3 +44,10 @@
 - [x] 6.1 Targeted unit (+ нужные integration) для Search/Auto paired matrix; `poetry run pyright-strict` на затронутых модулях при необходимости.
 - [x] 6.2 Проверить отсутствие EVOLUTION_SCOPE_DRIFT: нет billing/tariff/disconnect/comms/onboard/BOTH-legs/v2 tasks в коде.
 - [ ] 6.3 После verify: обновить `LINKED_CHANGES` / INC-PAUSE-02 evidence на карточке звезды (не расширять DoD).
+
+<!-- OWNER_CORRECTION (antipattern FAIL, not a task checkbox): 2026-08-08
+  Un-exported `stats_window_compatible_with_recheck` and `STATS_WINDOW_DAYS_MAX`
+  from `empty_keywords_pause/__init__.py` public `__all__` (remain on `decision.py`;
+  tests import module-direct). Rewrote product docstring on
+  `stats_window_compatible_with_recheck` (7d invariant; no «тест MUST падать»).
+  DISPATCH D-APPLY-ANTI-01 / MISSION-PAUSE02-GATES-20260808. -->
