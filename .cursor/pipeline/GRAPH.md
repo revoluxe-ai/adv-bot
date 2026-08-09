@@ -546,14 +546,14 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-create-pr
-- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only; after successful gh pr create launch one Cursor Task bugbot (Diff branch changes, Base=PR base) and emit BUGBOT_POST_PR (invoked/ran/findings); escape SKIP_BUGBOT_POST_PR; does not replace project-bug-hunt
+- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only; after successful gh pr create emit dual-channel BUGBOT_POST_PR — cursor_task (one Cursor Task bugbot, Diff branch changes, Base=PR base) plus bounded github_cursor_bot fetch of PR comments from cursor[bot] (pending≠zero; thin Task empty envelope=incomplete); escape SKIP_BUGBOT_POST_PR skips both; does not replace project-bug-hunt; does not auto-fix
 - input_state: pr_ready
 - output_state: pr_ready
-- artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT
-- artifacts_written: remote PR (via gh); chat BUGBOT_POST_PR report
+- artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT; post-create gh PR cursor[bot] comments (bounded)
+- artifacts_written: remote PR (via gh); chat dual-channel BUGBOT_POST_PR report
 - decision_owner: PR author
 - next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks) | residual Bugbot findings → intake/learn path if product/logic
-- known_flaws: receipt gate is command-owned (not soft graph advice); post-PR Bugbot is Cursor Task residual, not GitHub-hosted CI wait
+- known_flaws: receipt gate is command-owned (not soft graph advice); cursor_task ≠ GitHub cursor[bot] — must not collapse channels into one silent zero; bounded fetch ≠ unbounded CI wait
 
 ### Explicitly excluded from graph
 - /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)
