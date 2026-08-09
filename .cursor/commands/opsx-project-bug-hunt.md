@@ -271,6 +271,10 @@ BUG_TEAM_HANDOFF (PRIMARY when ACTIVE):
   /opsx-bug-team
   (RAW_REPORT / structured finding block as free-form raw envelope;
   team materializes — no prerequisite materialize or fix-bug)
+- **First-intake paste fence (CMD-IX-002):** that paste MUST be RAW_REPORT-only —
+  no `case=` resume lines, no `ALSO_OK` `/opsx-explore` templates, no
+  angle-bracket `case=<CASE_ID>` placeholders (CMD-IX-001). Explore handbacks
+  only after a durable CASE_ID exists, in a separate message.
 
 ALTERNATE_INTAKE_HANDOFF (when team not ACTIVE, or owner escape hatch):
 - for each SEPARATE_ADJUDICATION_REQUIRED=true finding, pasteable either:

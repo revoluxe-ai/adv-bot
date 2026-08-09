@@ -557,6 +557,24 @@ class Orchestrator:
                 raise AssertionError(f"shared WEX between {a} and {b}")
 
 
+def _is_placeholder_case_id(case_id: Optional[str]) -> bool:
+    """True for template/non-durable case= values (must not trigger CASE_RESUME).
+
+    CMD-IX-001: pasted ``case=<CASE_ID>`` from explore/ALSO_OK handbacks must
+    not make free-form first intake ``BLOCKED_AMBIGUOUS_INVOCATION``.
+    """
+    if case_id is None:
+        return True
+    cid = case_id.strip().strip('"').rstrip(".,;")
+    if not cid:
+        return True
+    if cid.upper() in {"CASE_ID", "<CASE_ID>"}:
+        return True
+    if cid.startswith("<") and cid.endswith(">"):
+        return True
+    return False
+
+
 def parse_invocation(args: str, context_text: str = "") -> Dict[str, Any]:
     """Parse /opsx-bug-team invocation modes (orchestrator-only)."""
     text = (args or "").strip()
@@ -567,6 +585,8 @@ def parse_invocation(args: str, context_text: str = "") -> Dict[str, Any]:
         for tok in text.split():
             if tok.startswith("case="):
                 case_id = tok.split("=", 1)[1].strip().strip('"')
+        if _is_placeholder_case_id(case_id):
+            case_id = None
     if "signal=" in text:
         # signal="..."
         start = text.find("signal=")
