@@ -10,6 +10,7 @@ import pytest
 from fakeredis.aioredis import FakeRedis
 
 from app.core.redis_manager_v2.redis_client import RedisClient
+from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.service_manager.services.auto_adv_active_control import (
@@ -185,6 +186,13 @@ def _contract(case_id: str):
         if case.case_id == case_id:
             return case
     raise KeyError(case_id)
+
+
+def _active_keyword() -> MagicMock:
+    """Один активный (не OFF) ключ — для сценария recovery / non-empty set."""
+    kw = MagicMock()
+    kw.strategy_mode = KeywordStrategyMode.OPTIMUM
+    return kw
 
 
 @asynccontextmanager
@@ -468,7 +476,8 @@ async def test_recheck_continue_when_keywords_active_no_empty_pause(
             await service.ensure_campaigns_active([adv])
         assert "start_auction_campaign" in wb.methods_called()
 
-        # Keywords "became active": no new empty-keywords intent; Search STARTED.
+        # Keywords became active: non-empty set + no intent → Search stays up.
+        adv._active_keywords = [_active_keyword()]
         adv.search_adv_active_status_str = WBAdvActiveStatus.STARTED
         wb.calls.clear()
         async with _ensure_active(
