@@ -331,11 +331,17 @@ class AutoAdvActiveControlService:
         auto_adv_id: int,
         search_status: WBAdvActiveStatus | None,
     ) -> bool:
-        """Потребить empty-keywords intent → Search pause + reason + notify.
+        """Потребить/вооружить empty-keywords intent → Search pause + reason + notify.
 
         Spec pause-on-empty-keywords / INC-PAUSE-02: TARGET_ENTITY_OR_LEG=SEARCH.
         ALLOWED: ``pause_auction_campaign``; FORBIDDEN: ``pause_auto_campaign``.
         Pause = следующий шаг после OFF (не concurrent с OFF).
+
+        Источники arm:
+        1. Уже есть Redis intent (V3 apply после FORCE_OFF / recheck).
+        2. ROOT-001: intent отсутствует, но активных ключей 0 и Search STARTED —
+           activity-control сам ставит intent и исполняет Search pause
+           (не зависит от Auto pause/STARTED и не требует prior V3 intent).
 
         Перед pause перечитывает активные ключи из ``ComplexAdv.get_keywords``.
         Если набор уже непустой (stale intent при TTL до 6h после recovery) —
@@ -343,23 +349,44 @@ class AutoAdvActiveControlService:
         метод возвращает False, чтобы обычный activity-control продолжался.
 
         Returns:
-            True если intent был и pause/reason/notify (или skip без Search)
-            выполнены; False если intent нет или отброшен как stale.
+            True если intent был (или вооружён) и pause/reason/notify (или skip
+            без Search) выполнены; False если arm не нужен / intent отброшен
+            как stale.
         """
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
             EmptyKeywordsPauseIntentManager,
             count_active_keywords,
             notify_empty_keywords_pause,
+            should_request_empty_keywords_pause_intent,
         )
 
         intent_mgr = EmptyKeywordsPauseIntentManager()
-        if not await intent_mgr.peek_intent(int(auto_adv_id)):
-            return False
-
-        # Re-validate before consume→pause: keywords may recover while intent pending.
         keywords = await adv.get_keywords()
         active_count = count_active_keywords(keywords)
-        if active_count > 0:
+        has_intent = await intent_mgr.peek_intent(int(auto_adv_id))
+
+        if not has_intent:
+            # Без prior V3 intent: arm только при empty + Search STARTED + bot on.
+            # Search PAUSE → не ставим intent (иначе блокируется recheck-start).
+            campaign_is_started = search_status == WBAdvActiveStatus.STARTED
+            if not should_request_empty_keywords_pause_intent(
+                active_count=active_count,
+                bot_active=bool(adv.bot_active),
+                bot_driven_off_completed=False,
+                campaign_is_started=campaign_is_started,
+            ):
+                return False
+            await intent_mgr.set_intent(int(auto_adv_id))
+            logger.info(
+                "Search activity: empty-keywords intent armed without prior V3 intent "
+                "(empty keywords + Search STARTED) auto_adv_id=%s shop_id=%s "
+                "active_count=%s",
+                auto_adv_id,
+                adv.shop_id,
+                active_count,
+            )
+        elif active_count > 0:
+            # Re-validate before consume→pause: keywords may recover while intent pending.
             await intent_mgr.consume_intent(int(auto_adv_id))
             logger.info(
                 "Search activity: empty-keywords intent discarded — active keywords "
