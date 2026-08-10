@@ -1,11 +1,11 @@
-"""ROOT-001: empty keywords + Search STARTED must arm this-run WB Search pause.
+"""ROOT-001: empty keywords + Search STARTED → two-tick latch then Search pause.
 
-Regression for empty-keywords silent skip (product path) and for false-green
-in ROOT-001 tests that accepted Redis intent / durable EMPTY_KEYWORDS reason
-without this-run ``pause_auction_campaign`` (pause_search_allowed contract).
+Owner ``TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE``: no-prior observe empty
+latches intent on tick1 (no pause); tick2 still empty arms this-run
+``pause_auction_campaign`` (pause_search_allowed).
 
-Puna-like IDs; no prod Redis. Distinct from stale-intent revalidation and
-notify-debounce suites.
+Also guards false-green that accepted Redis intent / durable EMPTY_KEYWORDS
+reason without this-run WB pause. Puna-like IDs; no prod Redis.
 """
 
 from __future__ import annotations
@@ -92,13 +92,13 @@ def test_empty_kw_search_pause_armed_rejects_durable_reason_without_this_run_wb_
 async def test_empty_keywords_intent_and_search_pause_armed_when_search_started(
     fake_redis: FakeRedis,
 ) -> None:
-    """ROOT-001: empty active keywords + Search STARTED → this-run Search pause.
+    """ROOT-001: empty + Search STARTED → tick1 latch, tick2 this-run Search pause.
 
     GIVEN paid Auto+Search комплект (Puna-like IDs), bot on, Auto=pause,
     Search=STARTED, active keywords empty, **no** prior Redis empty-keywords intent
-    WHEN AutoAdvActiveControlService.ensure_campaigns_active runs
-    THEN pause_search_allowed WB contract MUST fire this run (not Redis intent
-    alone; not durable EMPTY_KEYWORDS reason alone).
+    WHEN ``ensure_campaigns_active`` runs twice while still empty
+    THEN tick1 latches intent without pause; tick2 fires pause_search_allowed
+    (not Redis intent alone; not durable EMPTY_KEYWORDS reason alone).
     """
     adv = _FakeComplexAdv(
         auto_status="pause",
@@ -112,13 +112,32 @@ async def test_empty_keywords_intent_and_search_pause_armed_when_search_started(
     )
     wb = RecordingWbLifecycleModifier()
     notify_mock = AsyncMock()
+    intent_mgr = EmptyKeywordsPauseIntentManager()
 
     with patch.object(EmptyKeywordsPauseIntentManager, "_client", fake_redis):
-        assert (
-            await EmptyKeywordsPauseIntentManager().peek_intent(_PUNA_AUTO_ADV_ID)
-            is False
-        ), "precondition: no prior intent (reproduce Puna miss)"
+        assert await intent_mgr.peek_intent(_PUNA_AUTO_ADV_ID) is False, (
+            "precondition: no prior intent (reproduce Puna miss)"
+        )
 
+        # Tick1: latch only.
+        async with _ensure_active(
+            adv=adv,
+            wb=wb,
+            reason_manager=reason_manager,
+            notify=notify_mock,
+        ) as service:
+            await service.ensure_campaigns_active([adv])
+
+        assert "pause_auction_campaign" not in wb.methods_called(), (
+            "TWO_TICK: tick1 MUST NOT pause Search "
+            f"methods={wb.methods_called()}"
+        )
+        assert await intent_mgr.peek_intent(_PUNA_AUTO_ADV_ID) is True, (
+            "TWO_TICK: tick1 MUST latch confirmation intent"
+        )
+
+        # Tick2: still empty → this-run WB Search pause.
+        wb.calls.clear()
         async with _ensure_active(
             adv=adv,
             wb=wb,
@@ -132,14 +151,13 @@ async def test_empty_keywords_intent_and_search_pause_armed_when_search_started(
             wb=wb, stored_search=stored_search
         )
 
-        # This-run WB Search pause required (not intent_after OR durable reason).
         wb.assert_matches_case(
             _contract("pause_search_allowed"),
             complex_adv=adv,
             must_have_been_called=True,
         )
         assert pause_path_armed, (
-            "ROOT-001: empty keywords + Search STARTED did not arm this-run "
+            "ROOT-001: tick2 empty + Search STARTED did not arm this-run "
             "Search pause "
             f"(auto={_PUNA_AUTO_ADV_ID}, search={_PUNA_SEARCH_ADV_ID}, "
             f"methods={wb.methods_called()}, search_reason={stored_search})"
@@ -164,7 +182,7 @@ async def test_empty_keywords_intent_and_search_pause_armed_when_search_started(
 async def test_empty_keywords_no_silent_skip_when_auto_started_search_started(
     fake_redis: FakeRedis,
 ) -> None:
-    """Paired: same this-run pause_search_allowed requirement with Auto STARTED."""
+    """Paired: Auto STARTED — tick1 latch, tick2 pause_search_allowed."""
     adv = _FakeComplexAdv(
         auto_status="started",
         search_status="started",
@@ -176,8 +194,18 @@ async def test_empty_keywords_no_silent_skip_when_auto_started_search_started(
         redis_client=RedisClient(redis_client=fake_redis)
     )
     wb = RecordingWbLifecycleModifier()
+    intent_mgr = EmptyKeywordsPauseIntentManager()
 
     with patch.object(EmptyKeywordsPauseIntentManager, "_client", fake_redis):
+        async with _ensure_active(
+            adv=adv, wb=wb, reason_manager=reason_manager
+        ) as service:
+            await service.ensure_campaigns_active([adv])
+
+        assert "pause_auction_campaign" not in wb.methods_called()
+        assert await intent_mgr.peek_intent(_PUNA_AUTO_ADV_ID) is True
+
+        wb.calls.clear()
         async with _ensure_active(
             adv=adv, wb=wb, reason_manager=reason_manager
         ) as service:
@@ -193,7 +221,7 @@ async def test_empty_keywords_no_silent_skip_when_auto_started_search_started(
             must_have_been_called=True,
         )
         assert pause_path_armed, (
-            "ROOT-001 (Auto STARTED): this-run Search EMPTY_KEYWORDS pause missing "
+            "ROOT-001 (Auto STARTED): tick2 Search EMPTY_KEYWORDS pause missing "
             f"methods={wb.methods_called()} search_reason={stored_search}"
         )
         assert "pause_auto_campaign" not in wb.methods_called()
