@@ -1,5 +1,5 @@
 ---
-description: "Atomic local commits for product/code/OpenSpec/docs. AI/process surfaces redirect to /opsx-admin-command-commit."
+description: "Atomic local commits for product/code/OpenSpec/docs. AI/process surfaces redirect to /opsx-meta-commit."
 argument-hint: "[FULL_CHECK|FAST_CHECK] GO [optional change-id / base=<ref> / context]"
 ---
 
@@ -35,7 +35,7 @@ Rules:
 1. If **both** `FULL_CHECK` and `FAST_CHECK` are present → `STATUS: BLOCKED_AMBIGUOUS_CHECK_MODE`; do not stage or commit.
 2. If neither is present → `CHECK_MODE=FULL_CHECK`.
 3. `CHECK_MODE` is **not** commit authorization. `GO` is still required to stage/commit.
-4. Check tokens do not authorize process-surface commits (still `/opsx-admin-command-commit`).
+4. Check tokens do not authorize process-surface commits (still `/opsx-meta-commit`).
 
 Optional `base=<ref>` in `$ARGUMENTS` is used by `FULL_CHECK` AI soft-chain steps. If absent, resolve merge-base against upstream tracking branch, else `stage`, else `main` / `master`; document the chosen ref. If base cannot be resolved on `FULL_CHECK` when AI steps apply → do not commit that group (`BLOCKED` for AI steps).
 
@@ -48,7 +48,7 @@ for **product/code/OpenSpec/docs** changes.
 
 Process surfaces (AI/process artifacts: commands, rules, skills, agents,
 static-check, prompt/skill mirrors, root agent guides) are **out of scope**.
-They belong exclusively to `/opsx-admin-command-commit`.
+They belong exclusively to `/opsx-meta-commit`.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md`. If an OpenSpec change-id is provided or exactly one `openspec/changes/<id>/` is touched, read that change via canonical paths only; do not inventory all changes.
 
@@ -78,14 +78,14 @@ If any of these are dirty:
 
 ```text
 OUT_OF_SCOPE_REDIRECT:
-NEXT_ACTION: /opsx-admin-command-commit
+NEXT_ACTION: /opsx-meta-commit
 ```
 
 If the dirty tree is **only** process surfaces, do not invent product commits:
 
 ```text
 STATUS: OUT_OF_SCOPE_REDIRECT
-NEXT_ACTION: /opsx-admin-command-commit
+NEXT_ACTION: /opsx-meta-commit
 DO_NOT_DO_YET: commit process files via /opsx-commit
 ```
 
@@ -429,7 +429,7 @@ Commit plan:
 - files per commit
 - check matrix per commit (commands that WOULD run; not executed)
 - suspicious files
-- process-surface files left for /opsx-admin-command-commit
+- process-surface files left for /opsx-meta-commit
 ```
 
 If `GO` is present, execute the commit plan.
@@ -468,7 +468,7 @@ Skipped:
 - groups not committed:
 
 OUT_OF_SCOPE_REDIRECT:
-- process-surface files left for /opsx-admin-command-commit:
+- process-surface files left for /opsx-meta-commit:
 
 CHECK_MODE:
 - FULL_CHECK | FAST_CHECK
@@ -480,7 +480,7 @@ Verification:
 - skipped / not_applicable:
 
 Next:
-- if process surfaces remain dirty: /opsx-admin-command-commit
+- if process surfaces remain dirty: /opsx-meta-commit
 - optional later: /opsx-pipeline UPDATE (refresh /opsx-commit graph node for check modes)
 - recommended PR command, but do not push
 ```

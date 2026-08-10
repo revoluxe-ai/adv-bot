@@ -180,7 +180,7 @@ Default:
 * never run git status as step 0 before reading known case/finding.
 
 ### C. Git-mutating / PR / split / commit workflows
-Examples: `/opsx-commit`, `/opsx-admin-command-commit`, `/opsx-create-pr`, `/opsx-split-for-pr`.
+Examples: `/opsx-commit`, `/opsx-meta-commit`, `/opsx-create-pr`, `/opsx-split-for-pr`.
 
 Default:
 
