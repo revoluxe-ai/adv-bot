@@ -584,7 +584,7 @@ DO_NOT_DO_YET:
 
 When process-surface files changed (`.cursor/commands/**`, rules, skills, agents,
 static-check, mirrors, `AGENTS.md`),
-`NEXT_ACTION` MUST point to `/opsx-admin-command-commit` (not `/opsx-commit`).
+`NEXT_ACTION` MUST point to `/opsx-meta-commit` (not `/opsx-commit`).
 
 ---
 

@@ -1477,6 +1477,7 @@ contract. Recursive Supervisor dispatch запрещён.
 
 ```text
 /opsx-admin-command-analyze-pipeline
+/opsx-meta-commit
 /opsx-admin-command-commit
 /opsx-admin-command-design-command
 /opsx-meta-fix-command-defects

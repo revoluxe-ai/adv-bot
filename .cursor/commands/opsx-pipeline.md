@@ -89,7 +89,7 @@ ordering rules.
 - Redesign or improve process contracts → `/opsx-admin-command-analyze-pipeline`
 - Fix command defects → `/opsx-meta-fix-command-defects`
 - Design a new command → `/opsx-admin-command-design-command`
-- Commit process surfaces → `/opsx-admin-command-commit`
+- Commit process surfaces → `/opsx-meta-commit`
 - Commit product/code → `/opsx-commit`
 - Execute apply / verify / archive / bug-fix / etc. — only **recommend** them
 
@@ -209,7 +209,7 @@ Requires exact token `GO` as part of `UPDATE GO`.
 4. After write, hand off commit:
 
 ```text
-NEXT_ACTION: /opsx-admin-command-commit
+NEXT_ACTION: /opsx-meta-commit
 ```
 
 If `GO` is absent while mode would be UPDATE: stay on UPDATE (no write).
@@ -328,7 +328,7 @@ with `case=` IDs. Never recommend a silent return to bug-team.
 | Evidence budget exhausted on UPDATE | `BLOCKED_NEEDS_EVIDENCE` | narrow extraction request |
 | Redesign needed (not navigation) | stay navigational | `/opsx-admin-command-analyze-pipeline` |
 | Process ambiguity / which admin command? | stay navigational | `/opsx-admin-command-consult` |
-| After UPDATE GO | `GRAPH_MATERIALIZED` | `/opsx-admin-command-commit` |
+| After UPDATE GO | `GRAPH_MATERIALIZED` | `/opsx-meta-commit` |
 
 ## Anti-patterns (reject)
 
@@ -356,4 +356,4 @@ Before returning:
 - [ ] Graph not claimed as lifecycle authority or forced path
 - [ ] Off-graph deviation allowed without framing as failure
 - [ ] Known flaws surfaced when relevant
-- [ ] After UPDATE GO, next step is `/opsx-admin-command-commit`
+- [ ] After UPDATE GO, next step is `/opsx-meta-commit`
