@@ -110,8 +110,10 @@ planner. Он проверяет identity/freshness, spot-checks acceptance-rele
 
 ```text
 PRODUCT_ACCEPTANCE_REQUIRED=true
-→ LIFECYCLE_COVERAGE requires fresh report VERDICT=PASS for mode=archive
-→ missing/stale/FAIL/BLOCKED is archive blocker (PA pillar LIFECYCLE)
+→ LIFECYCLE_COVERAGE requires durable OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE
+→ AND fresh report VERDICT=PASS with rows mapped to echo steps (mode=archive)
+→ missing echo / unconfirmed / unmapped / stale/FAIL/BLOCKED is archive blocker
+→ scenario PASS alone does NOT clear LIFECYCLE without confirmed echo
 → SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this
 
 SCENARIO_COVERAGE_REQUIRED=true
@@ -532,6 +534,11 @@ Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` in `mode=archive`.
 * When required: `PASS` only if MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧
   SIDE_EFFECT_PROOF. Else archive blocker `product_acceptance_not_pass` →
   overall `NO_GO`.
+* LIFECYCLE_COVERAGE under PA requires durable `OWNER_LIFECYCLE_ECHO` +
+  Owner `CONFIRM_LIFECYCLE` **and** fresh scenario report `VERDICT=PASS`
+  with acceptance rows mapped to echo steps. Scenario PASS alone with
+  missing/unconfirmed echo ⇒ `PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar
+  `LIFECYCLE_COVERAGE` (change spirit lost). Soft waive cannot clear this.
 * Soft sections (ECC / performance / antipattern / static / destructive-cache
   WARN / Owner soft-waive) MUST state they do **not** authorize archive
   without PA PASS / NOT_REQUIRED.

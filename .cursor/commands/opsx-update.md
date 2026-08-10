@@ -41,9 +41,12 @@ similar names. Competing legs MUST NOT be closed with SEMANTIC
 **Product Acceptance preflight:** Follow
 `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When revising planning,
 record/update `PRODUCT_ACCEPTANCE_REQUIRED`. If required, keep MEANING_LOCK
-durable and keep lifecycle coverage on the path
+durable; write or refresh durable `OWNER_LIFECYCLE_ECHO` (3–7 temporal steps)
+in design/decision/spec; obtain Owner `CONFIRM_LIFECYCLE` (or `CORRECT` →
+rewrite → confirm); keep lifecycle coverage on the path
 (`/opsx-spec-scenario-coverage mode=plan` then later audit/certify). Soft
-tooling waivers never substitute for Product Acceptance.
+tooling waivers never substitute for Product Acceptance. Chat-only lifecycle
+is not durable.
 
 **Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -522,7 +525,8 @@ align with the latest applicable event.
   unresolved (`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`); materialize Owner
   semantic answers into artifacts before recommending apply.
 - Do not recommend apply-ready when `PRODUCT_ACCEPTANCE_REQUIRED=true` and
-  MEANING_LOCK is missing/blocked; lifecycle plan is not optional under PA.
+  MEANING_LOCK is missing/blocked, **or** `OWNER_LIFECYCLE_ECHO` /
+  `CONFIRM_LIFECYCLE` is missing; lifecycle plan is not optional under PA.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

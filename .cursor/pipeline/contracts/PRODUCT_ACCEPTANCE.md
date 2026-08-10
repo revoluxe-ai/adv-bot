@@ -72,10 +72,32 @@ Chat-only Owner answers are not durable (see SEMANTIC_WRITE_TARGET).
 
 ### 2) LIFECYCLE_COVERAGE
 
+When `PRODUCT_ACCEPTANCE_REQUIRED=true`, this pillar is **MEANING of time**
+plus scenario evidence — not scenario machinery alone.
+
+**Owner change spirit (mandatory under PA):**
+
+1. Durable `OWNER_LIFECYCLE_ECHO` in the change planning artifacts
+   (`design.md` and/or decision/spec with an explicit temporal section):
+   3–7 ordered steps of what must happen **across time** (e.g. observe →
+   latch → act → resume), not a single same-tick predicate.
+2. Owner token `CONFIRM_LIFECYCLE` after the echo is written (or
+   `CORRECT` → rewrite echo → `CONFIRM_LIFECYCLE` again).
+
+Chat-only Owner lifecycle answers are **not** durable (same ban as
+SEMANTIC_WRITE_TARGET for meaning). Missing echo, chat-only echo, or
+missing `CONFIRM_LIFECYCLE` ⇒
+`PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar `LIFECYCLE_COVERAGE`
+(even if a scenario report says `VERDICT=PASS`).
+
+**Scenario evidence (also mandatory under PA):**
+
 - `/opsx-spec-scenario-coverage mode=plan` evidence exists for the change, and
 - fresh independent scenario report with `VERDICT=PASS` via `mode=audit` or
   `mode=certify` as required by `SCENARIO_TEST_COVERAGE.md`
-  (certify when PG/CH provider receipts are required).
+  (certify when PG/CH provider receipts are required), and
+- acceptance-relevant scenario rows **map 1:1** to steps in
+  `OWNER_LIFECYCLE_ECHO` (see `SCENARIO_TEST_COVERAGE.md`).
 
 Missing / stale / FAIL / BLOCKED scenario report ⇒
 `PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar `LIFECYCLE_COVERAGE`.
@@ -84,6 +106,10 @@ When PA is required, legacy
 `SCENARIO_COVERAGE_REQUIRED absent|false` **does not** waive this pillar.
 Treat PA-required as forcing lifecycle coverage (equivalent to
 `SCENARIO_COVERAGE_REQUIRED=true` for archive).
+
+Planning writers (`/opsx-ff`, `/opsx-update`) own authoring and confirming
+`OWNER_LIFECYCLE_ECHO`. Scenario commands **consume** the echo; they do not
+replace it and must not invent a parallel DONE command.
 
 ### 3) SIDE_EFFECT_PROOF
 
@@ -131,17 +157,22 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 
 - Decide `PRODUCT_ACCEPTANCE_REQUIRED`.
 - Complete MEANING_LOCK before apply-ready when required.
-- When PA required, ensure scenario `mode=plan` is on the path (not optional).
+- When PA required: write durable `OWNER_LIFECYCLE_ECHO`, obtain
+  `CONFIRM_LIFECYCLE`, and ensure scenario `mode=plan` is on the path
+  (not optional). Do **not** declare apply-ready without confirmed echo.
 
 ### Apply (`/opsx-apply`)
 
 - Re-check MEANING_LOCK before production edits when PA required.
+- Re-check durable `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE` when PA
+  required; do not implement against chat-only lifecycle.
 - Do not treat task checkboxes alone as DONE.
 - Author tests that can satisfy SIDE_EFFECT_PROOF for acceptance seams.
 
 ### Scenario (`/opsx-spec-scenario-coverage`)
 
-- Owns LIFECYCLE_COVERAGE evidence; does not declare archive DONE.
+- Owns scenario half of LIFECYCLE_COVERAGE evidence; consumes
+  `OWNER_LIFECYCLE_ECHO`; does not declare archive DONE.
 
 ### Verify (`/opsx-verify`)
 
@@ -157,8 +188,10 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 
 - Owner soft-waive of tooling ≠ PA clear.
 - Meaning blocks → Owner semantic decision + planning writer.
-- Lifecycle/side-effect blocks → route to scenario / test producers, not
-  “continue soft chain to archive”.
+- Missing / unconfirmed `OWNER_LIFECYCLE_ECHO` → planning writer
+  (`/opsx-update` / `/opsx-ff`), not soft chain or bug-team.
+- Lifecycle scenario / side-effect blocks → route to scenario / test
+  producers, not “continue soft chain to archive”.
 
 ## Explicit non-goals
 
@@ -177,3 +210,6 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 4. Soft ECC/pyright Owner waive while PA FAIL → verify/archive still blocked.
 5. Docs-only change with explicit NOT_REQUIRED → PA NOT_REQUIRED → archive may
    proceed without scenario certify.
+6. PA required + scenario report PASS but no durable `OWNER_LIFECYCLE_ECHO`
+   / no `CONFIRM_LIFECYCLE` → PA FAIL LIFECYCLE → archive NO_GO
+   (change spirit lost to chat).

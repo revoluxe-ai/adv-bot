@@ -46,8 +46,34 @@ archive verdict.
 
 Owner
   owns: material behavior ambiguity, intentional golden/ContractCase semantic
-        change, one-shot live authorization
+        change, one-shot live authorization,
+        CONFIRM_LIFECYCLE for OWNER_LIFECYCLE_ECHO (Product Acceptance)
+
+Planning writers (/opsx-ff, /opsx-update)
+  own: durable OWNER_LIFECYCLE_ECHO in change artifacts when
+       PRODUCT_ACCEPTANCE_REQUIRED=true
 ```
+
+## Owner lifecycle echo (Product Acceptance)
+
+When `PRODUCT_ACCEPTANCE_REQUIRED=true` (see
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`):
+
+```text
+OWNER_LIFECYCLE_ECHO   = durable 3–7 temporal steps in change design/decision/spec
+CONFIRM_LIFECYCLE      = Owner token after echo is written
+```
+
+- `/opsx-spec-scenario-coverage` **consumes** the echo; it does not author it
+  and does not edit OpenSpec artifacts.
+- `mode=plan` without durable echo → `BLOCKED_NEEDS_OWNER_LIFECYCLE`
+  (NEXT: `/opsx-update` or `/opsx-ff`), not a provisional coverage plan that
+  invents steps from chat.
+- `mode=audit` / `mode=certify`: every acceptance-relevant matrix row MUST
+  cite the matching `OWNER_LIFECYCLE_ECHO` step id/text. Rows without mapping
+  → FAIL/BLOCKED for that scenario (and cannot support PA LIFECYCLE PASS).
+- Scenario report `VERDICT=PASS` **does not** clear PA LIFECYCLE if echo or
+  `CONFIRM_LIFECYCLE` is missing.
 
 ## CLI modes (binding)
 
@@ -460,9 +486,12 @@ Product Acceptance (kernel DONE) — see
 
 ```text
 PRODUCT_ACCEPTANCE_REQUIRED=true
-→ LIFECYCLE_COVERAGE pillar requires fresh report VERDICT=PASS
-→ missing/stale/FAIL/BLOCKED is archive blocker
+→ LIFECYCLE_COVERAGE requires durable OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE
+→ AND fresh report VERDICT=PASS with rows mapped to echo steps
+→ missing echo / unconfirmed / unmapped rows / stale/FAIL/BLOCKED report
+   is archive blocker
 → legacy SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this pillar
+→ scenario PASS alone never creates DONE without confirmed echo
 ```
 
 Standalone scenario flag (still honored):

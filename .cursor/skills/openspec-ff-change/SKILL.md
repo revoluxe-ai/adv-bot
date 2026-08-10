@@ -81,7 +81,20 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+5. **Product Acceptance before apply-ready**
+
+   Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` (mirror
+   `.cursor/commands/opsx-ff.md`):
+   - Decide/record `PRODUCT_ACCEPTANCE_REQUIRED`.
+   - When required: durable MEANING_LOCK; durable `OWNER_LIFECYCLE_ECHO`
+     (3–7 temporal steps) in design/decision/spec; Owner
+     `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm); schedule
+     `/opsx-spec-scenario-coverage mode=plan`.
+   - Do **not** claim apply-ready / "Ready for implementation" if PA
+     required and echo/`CONFIRM_LIFECYCLE` is missing (chat-only lifecycle
+     is not durable).
+
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -92,6 +105,8 @@ After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
 - What's ready: "All artifacts created! Ready for implementation."
+  (only if PA gates above allow; otherwise BLOCKED awaiting
+  `CONFIRM_LIFECYCLE` / MEANING_LOCK)
 - Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
 
 **Artifact Creation Guidelines**
@@ -110,3 +125,5 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, suggest continuing that change instead
 - Verify each artifact file exists after writing before proceeding to next
+- When `PRODUCT_ACCEPTANCE_REQUIRED=true`, never treat apply-ready as true
+  without durable `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE`

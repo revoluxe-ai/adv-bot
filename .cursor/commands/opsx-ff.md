@@ -98,11 +98,14 @@ semantics from similar names.
    Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` before
    apply-ready:
    - Decide and record `PRODUCT_ACCEPTANCE_REQUIRED`.
-   - When required: MEANING_LOCK must be durable; schedule
-     `/opsx-spec-scenario-coverage mode=plan` (lifecycle not optional);
-     note SIDE_EFFECT_PROOF obligations for acceptance tests.
+   - When required: MEANING_LOCK must be durable; write durable
+     `OWNER_LIFECYCLE_ECHO` (3–7 temporal steps) into design/decision/spec;
+     obtain Owner `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm);
+     schedule `/opsx-spec-scenario-coverage mode=plan` (lifecycle not
+     optional); note SIDE_EFFECT_PROOF obligations for acceptance tests.
    - Do not declare apply-ready if PA required and MEANING_LOCK is missing
-     or blocked.
+     or blocked, **or** `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is
+     missing (chat-only lifecycle is not durable).
 
 7. **Show final status**
    ```bash
