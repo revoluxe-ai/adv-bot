@@ -40,6 +40,45 @@ analysis / improvement options — not as a general OPSX meta front-door.
 
 ------------------------------------------------------------------------
 
+# TOPIC_INTENT gate (mandatory — before Modes / transcript search)
+
+**Defect class:** sticky prior-turn topic hijacks a new Owner ask
+(CMD-ANALYZE-PIPELINE-TOPIC-STICKY-001).
+
+Before any transcript search, chat-history framing, `CURRENT_GRAPH` build, or
+`IMPROVEMENT_PROPOSAL`, resolve exactly one:
+
+```text
+TOPIC_INTENT: PRODUCT_BRIEF | PROCESS_PIPELINE | AMBIGUOUS
+```
+
+Rules:
+
+1. Decide from the **current** user message first. Prior turns are hints only;
+   they MUST NOT become the default topic.
+2. Forbidden: treat «обучение» / learning / promote / DEFERRED from an earlier
+   turn as the topic of a new ask that never names learning/process.
+3. If `AMBIGUOUS` (e.g. bare «задача», «найди чаты где я объяснял») → ask
+   **one** narrow question and stop; do not answer yet:
+
+   ```text
+   PRODUCT_BRIEF (продуктовая постановка / North Star / evolution)
+   или PROCESS_PIPELINE (команды, gates, обучение process, UX пайплайна)?
+   ```
+
+4. `PRODUCT_BRIEF` → this command MUST NOT reframe as learning/promote
+   analysis. Locate Owner product briefs / cite durable product SoT
+   (`openspec/evolution/**` when applicable) or emit `WRONG_SURFACE` with
+   pasteable next: `/opsx-evolution` or `/opsx-explore`. Learning is out of
+   scope unless Owner explicitly names it in the current message.
+
+5. `PROCESS_PIPELINE` → proceed with Modes below (process design only). Do
+   not rewrite product domain specs as the primary answer.
+
+Emit `TOPIC_INTENT:` in the first status block of every run.
+
+------------------------------------------------------------------------
+
 # Core evaluation question
 
 Ask:
@@ -517,6 +556,9 @@ NEXT_ACTION:
 
 Before returning:
 
+-   `TOPIC_INTENT` resolved from the current user message and emitted;
+    AMBIGUOUS did not get a full answer; PRODUCT_BRIEF was not answered as
+    learning/promote; sticky prior-turn «обучение» was not used as default.
 -   Do not optimize only for AI execution.
 -   Do not reduce complexity without considering clarity.
 -   Do not invent states without evidence.
