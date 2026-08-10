@@ -19,10 +19,15 @@ newline_normalization: none
 
 ### Target authority / export roots
 
-- Process: `.cursor/commands/**`, `.cursor/rules/**`, `.cursor/pipeline/**`, …
-- OpenSpec static: `openspec/config.yaml`, `policies`, `schemas`, `specs`, `decisions`, `tools`
+- Process: `.cursor/commands/**`, `.cursor/rules/**`, `.cursor/pipeline/**`,
+  `.cursor/devops/**`, …
+- OpenSpec static: `openspec/__init__.py`, `openspec/config.yaml`, `policies`,
+  `schemas`, `specs`, `decisions`, `evolution`, `tools`
 - Project-local OPSX: `.opsx/adapters/**`, `.opsx/registry/**`, `.opsx/shared/**`,
-  `.opsx/project/**`, `.opsx/import/**`, `.opsx/manifest.yaml`, `.opsx/projectization.yaml`
+  `.opsx/project/**`, `.opsx/import/**`, `.opsx/manifest.yaml`,
+  `.opsx/projectization.yaml`, `.opsx/lock.yaml`, `.opsx/sources.yaml`
+- Runtime packets: `.tmp/**` except `.tmp/opsx-export/**` (on `scope=default` /
+  `scope=tmp` / `scope=all_safe`)
 - Export writes **only**: `.tmp/opsx-export/<utc_ts>/`
 
 ### Hard target bans
@@ -35,6 +40,7 @@ newline_normalization: none
   `.env*`, or secrets.
 - Do not include `.opsx/upstream/**` unless Owner passes
   `include_upstream_snapshot` (large frozen snapshot).
+- Do not copy `.tmp/opsx-export/**` into the pack (write-root; nesting ban).
 - Never PASS-by-absence.
 
 ### Projectization gate
@@ -74,14 +80,16 @@ Follow `.cursor/commands/opsx-source-resolution.md` and
 ## Purpose
 
 1. Give the human one portable pack of **this repo’s** OPSX process + OpenSpec SoT
-   (including project-local `.opsx` adapters/registry — not only `.cursor/`).
+   (including project-local `.opsx` adapters/registry — not only `.cursor/`)
+   plus local `.tmp` runtime packets (except the export write-root).
 2. Reduce ad-hoc zips under `.cursor/` (junk that must not be committed).
 3. Guarantee **no delete / no move / no rename** of sources — even if the user
    types `GO`, `cleanup`, or `delete`.
 
 ## When to use
 
-- Need a shareable / offline / backup snapshot of local OPSX commands + specs.
+- Need a shareable / offline / backup snapshot of local OPSX commands + specs
+  (+ `.tmp` packets on default scope).
 - Preparing inbound into another fork / external review without cloning.
 - Publish a `BOOTSTRAP_PROFILE` pack for `/opsx-meta-bootstrap`
   (`scope=bootstrap_profile`) into central `bootstrap/profile/` (Owner copy).
@@ -106,11 +114,12 @@ Optional tokens:
 
 | Token | Meaning |
 |---|---|
-| `scope=default` | process + openspec static + project-local `.opsx` (default) |
-| `scope=process` | process surfaces only (`.cursor/**` allowlist + AGENTS mirrors) |
+| `scope=default` | process + openspec static + project-local `.opsx` + `.tmp/**` (except `.tmp/opsx-export/**`) |
+| `scope=process` | process surfaces only (`.cursor/**` allowlist + AGENTS mirrors; no `.tmp`) |
 | `scope=openspec` | openspec static SoT only |
 | `scope=opsx` | project-local `.opsx` allowlist only |
-| `scope=bootstrap_profile` | only paths listed in `.opsx/shared/bootstrap-profile.md` (for central `bootstrap/profile/` publish) |
+| `scope=tmp` | `.tmp/**` only (HARD skip `.tmp/opsx-export/**`) |
+| `scope=bootstrap_profile` | only paths listed in `.opsx/shared/bootstrap-profile.md` (for central `bootstrap/profile/` publish; no `.tmp`) |
 | `scope=all_safe` | same as default (alias; still bounded) |
 | `include_active_changes` | also copy `openspec/changes/*` active roots (not archive/) |
 | `include_archived_changes` | also copy `openspec/changes/archive/**` (can be large) |
@@ -163,6 +172,7 @@ MUST:
 .cursor/static-check/**
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
+.cursor/devops/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -173,7 +183,7 @@ AGENTS.md
 ```
 
 Skip under these trees: archives/junk already present (e.g. `commands.zip`),
-`__pycache__/`, `*.pyc`, `node_modules/`.
+`__pycache__/`, `*.pyc`, `node_modules/`. Never include `.cursor/settings.json`.
 
 ### Project-local OPSX (WB Sky / Poetry)
 
@@ -185,6 +195,8 @@ Skip under these trees: archives/junk already present (e.g. `commands.zip`),
 .opsx/import/**
 .opsx/manifest.yaml
 .opsx/projectization.yaml
+.opsx/lock.yaml
+.opsx/sources.yaml
 ```
 
 Default **exclude**: `.opsx/upstream/**` (opt-in via `include_upstream_snapshot`).
@@ -192,6 +204,7 @@ Default **exclude**: `.opsx/upstream/**` (opt-in via `include_upstream_snapshot`
 ### OpenSpec static SoT
 
 ```text
+openspec/__init__.py
 openspec/config.yaml
 openspec/specs/**
 openspec/decisions/**
@@ -202,6 +215,22 @@ openspec/tools/**
 ```
 
 (Missing roots → EXCLUDED note; do not invent.)
+
+### Runtime packets (`.tmp`) — on `scope=default` / `scope=tmp` / `scope=all_safe`
+
+```text
+.tmp/**
+```
+
+HARD **exclude** (always): `.tmp/opsx-export/**` — this command’s write-root;
+never nest prior export zips into a new pack.
+
+Skip under `.tmp` walks: `__pycache__/`, `*.pyc`, `.pytest_cache/`,
+`node_modules/`, and other obvious junk dirs.
+
+`scope=process` / `scope=openspec` / `scope=opsx` / `scope=bootstrap_profile`
+do **not** include `.tmp`. Use `scope=default` (or `scope=all_safe`) for the
+full pack, or `scope=tmp` for runtime packets only.
 
 ### Bootstrap profile (`scope=bootstrap_profile`)
 
@@ -220,7 +249,8 @@ include_archived_changes   → openspec/changes/archive/**
 include_upstream_snapshot  → .opsx/upstream/**
 ```
 
-Never include: `openspec/changes/**/__pycache__`, binary Job artifacts, secrets.
+Never include: `openspec/changes/**/__pycache__`, binary Job artifacts, secrets,
+`.tmp/opsx-export/**`.
 
 ## Pipeline position
 
@@ -240,12 +270,15 @@ FAILURE_OR_RECOVERY_STEP: leave partial export dir; never delete sources; re-run
    `STATUS: REFUSED_DELETE_REQUEST`, stop, no writes.
 3. Resolve `scope` (default=`default`) and optional include flags.
 4. Build include-root list from allowlist; verify at least one root exists.
+   When `.tmp/**` is in scope, always skip `.tmp/opsx-export/**`.
 5. Create `.tmp/opsx-export/<utc_ts>/` (utc like `20260805-191530`).
 6. Copy allowlisted trees into a staging folder **or** add directly to zip
    with stable relative paths from repo root. Prefer zip name:
    `opsx-pack.zip`.
 7. Write `MANIFEST.txt` beside the zip listing:
-   - utc_ts, scope, include flags, root paths included, skip patterns,
+   - utc_ts, scope, include flags, whether `.tmp` was included,
+   - root paths included, skip patterns (must list `.tmp/opsx-export/**` when
+     `.tmp` was walked),
    - file count / approximate size if cheap.
 8. Compute absolute path to `opsx-pack.zip` (Windows: full `C:\...` path).
 9. Return output contract. Do **not** stage, commit, push, or delete sources.
@@ -259,8 +292,10 @@ FAILURE_OR_RECOVERY_STEP: leave partial export dir; never delete sources; re-run
 - Cleaning the export staging folder after zip is **optional** and only allowed
   **inside** the new `.tmp/opsx-export/<utc_ts>/` directory created this run —
   never outside it. Prefer leaving staging + zip both present if unsure.
-- Time-budget large `include_archived_changes` / `include_upstream_snapshot`
-  walks; on hang → `BLOCKED_IO`.
+- When walking `.tmp`, do not follow/copy into the just-created
+  `.tmp/opsx-export/<utc_ts>/` (exclude the whole `opsx-export` tree).
+- Time-budget large `.tmp` / `include_archived_changes` /
+  `include_upstream_snapshot` walks; on hang → `BLOCKED_IO`.
 
 ## Output contract
 
@@ -272,13 +307,14 @@ COMMAND: /opsx-meta-export-pack
 EXPORT_PACK_RECEIPT:
 - utc_ts:
 - scope:
+- include_tmp: true|false
 - include_active_changes: true|false
 - include_archived_changes: true|false
 - include_upstream_snapshot: true|false
 - absolute_archive_path:
 - manifest_path:
 - roots_included: [paths]
-- excluded_or_skipped: [notes]
+- excluded_or_skipped: [notes; must mention .tmp/opsx-export/** when include_tmp]
 - delete_performed: false
 
 WHAT_HAPPENED:
@@ -324,10 +360,13 @@ the same chat for other reasons — never to commit the zip.
 
 - Naming or describing this as “archive the change”
 - Deleting old `.tmp/opsx-export/*` “to save space” from this command
+- Nesting prior `.tmp/opsx-export/**` contents into a new pack
 - Dumping whole monorepo / `src/` / `public/`
 - Committing `opsx-pack.zip` into `.cursor/`
 - Using `GO` to unlock delete
 - Default-including `.opsx/upstream/**` without opt-in
+- Omitting `.opsx/lock.yaml` / `.opsx/sources.yaml` / `.cursor/devops/**` from
+  default while claiming a full process dump
 
 ## Self-review checklist
 
@@ -337,5 +376,8 @@ Before returning:
 - [ ] Writes only under this run’s `.tmp/opsx-export/<utc_ts>/`
 - [ ] `absolute_archive_path` is absolute and clickable/copyable
 - [ ] Not confused with `/opsx-archive` or `/opsx-meta-import-command`
-- [ ] Allowlist not expanded into product/secrets
-- [ ] `.opsx` adapters/registry included on `scope=default` when present
+- [ ] Allowlist not expanded into product/secrets / `.cursor/settings.json`
+- [ ] `.opsx` adapters/registry + `lock.yaml`/`sources.yaml` on `scope=default`
+- [ ] `.cursor/devops/**` included on `scope=default` / `scope=process` when present
+- [ ] On default/tmp: `.tmp/**` included and `.tmp/opsx-export/**` skipped
+- [ ] `include_tmp` in receipt matches whether `.tmp` was walked
