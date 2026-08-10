@@ -58,6 +58,9 @@ verify:
     pass_values: [PASS, NOT_REQUIRED]
     fail_is_archive_blocker: true
     soft_waive_clears_pa: false
+    # LIFECYCLE_COVERAGE under PA: durable OWNER_LIFECYCLE_ECHO + Owner
+    # CONFIRM_LIFECYCLE required; scenario VERDICT=PASS alone is insufficient.
+    lifecycle_requires_owner_echo_and_confirm: true
   scenario_coverage:
     contract: .cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md
     taxonomy: .cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md
