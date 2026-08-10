@@ -12,6 +12,53 @@ Any OPSX command that references it MUST follow it for git/status/diff/find/rg/t
 Companion contract: `.cursor/commands/opsx-source-resolution.md` (artifact resolution).
 This contract covers **execution cost / hang risk**, not path rediscovery.
 
+## TOPIC_INTENT / Owner-message re-anchor (mandatory)
+
+**Defect class:** sticky prior-turn topic hijacks a new Owner ask
+(`PF-TOPIC-INTENT-REANCHOR-001`; pattern donor:
+`opsx-admin-command-analyze-pipeline.md` /
+`CMD-ANALYZE-PIPELINE-TOPIC-STICKY-001`).
+
+Authority cited (enforce, do not invent a parallel DONE gate):
+
+```text
+.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md  (MEANING_LOCK)
+.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md
+```
+
+Any OPSX command that references this preflight contract MUST, **before**
+interpreting Owner text, choosing a branch (product vs process/learning),
+or running transcript/history search as the primary frame:
+
+1. Resolve exactly one topic from the **current** user message first.
+   Prior turns are hints only; they MUST NOT become the default topic.
+
+```text
+TOPIC_INTENT: PRODUCT_BRIEF | PROCESS_PIPELINE | AMBIGUOUS
+```
+
+   Commands MAY use an equivalent local enum that preserves
+   **current-message-first** (same sticky-topic ban).
+
+2. Forbidden: treat «обучение» / learning / promote / `DEFERRED` from an
+   earlier turn as the topic of a new ask that never names those.
+
+3. If `AMBIGUOUS` (e.g. bare «задача», «найди чаты где я объяснял») → ask
+   **one** narrow disambiguation question and stop; do not answer from the
+   sticky prior topic yet.
+
+4. For product-touching work: when the current message does not name
+   learning/promote/process, prefer durable product SoT
+   (`openspec/evolution/**` / active STAR when applicable) over the last-chat
+   learning / promote / `DEFERRED` thread.
+
+5. Emit `TOPIC_INTENT:` (and, when product-touching and a STAR is known,
+   a one-line `ACTIVE_PRODUCT_INTENT` echo from that durable path) in the
+   **first** status block of the run.
+
+This section does **not** authorize creating a new `/opsx-*` command file;
+consumers extend behavior by following this shared contract.
+
 ## Goal
 
 Prevent hangs on unconditional preflight shells when those results are not required for the current command decision.
