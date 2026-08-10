@@ -126,7 +126,8 @@ Rules:
    runbook / devops.mdc — never chat history, never `.tmp` alone.
 6. Commit ownership after updates:
    - `.cursor/devops/**` (OPS_STATE / LAST.json) + `.cursor/commands/opsx-devops.md`
-     + `.cursor/rules/devops.mdc` → `/opsx-admin-command-commit` (not `/opsx-commit`);
+     + `.cursor/rules/devops.mdc` → `/opsx-meta-commit` (not `/opsx-commit`;
+     `/opsx-admin-command-commit` is obsolete redirect-only);
    - `DEVOPS_DB_MIGRATIONS.md` (ordinary project docs) → `/opsx-commit`.
 
 ## Modes
@@ -313,7 +314,7 @@ NEXT_ACTION:
 DO_NOT_DO_YET:
 ```
 
-`NEXT_ACTION` must be pasteable (next `/opsx-devops …`, `/opsx-admin-command-commit`,
+`NEXT_ACTION` must be pasteable (next `/opsx-devops …`, `/opsx-meta-commit`,
 product redirect, or stop).
 
 ## Failure / recovery

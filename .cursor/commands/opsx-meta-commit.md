@@ -64,10 +64,13 @@ Hard bans still apply. Missing Poetry/pytest/pyright/kubectl (and other undeclar
 ### Target-local meta commit extensions (`OPSX-WB-META-COMMIT-01`)
 
 - Canonical active name: `/opsx-meta-commit` (upstream body may still say admin-command-commit).
+- **Sole process-commit front-door:** `/opsx-admin-command-commit` is a thin
+  redirect/deprecate surface only — do not treat it as a second allowlist SoT.
 - **Process allowlist SoT:** `.opsx/sources.yaml` (`allowlist` / `hard_exclude`) —
   единый список с `/opsx-meta-update-snapshot` и process-exclusion у `/opsx-commit`.
   Canonical «In-scope surfaces» ниже — legacy template; при расхождении побеждает
-  `sources.yaml` + этот OVERRIDE.
+  `sources.yaml` + этот OVERRIDE. Includes `.cursor/devops/**` (OPS_STATE /
+  LAST.json; never secrets/DSN).
 - **Local-only:** never update central snapshot or catalog repos. After success, if snapshot may be stale, recommend `/opsx-meta-update-snapshot` only.
 - Every terminal report must include `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`.
 - **Owner scope map (mandatory mental model):**
@@ -216,6 +219,7 @@ Only these paths may be staged/committed by this command:
 .cursor/static-check/**
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
+.cursor/devops/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -234,6 +238,8 @@ contracts, check packs, registry, base prompts/rules, **and** agent runner
 scripts (e.g. `bin/run.sh`).
 Antipattern-gate companions under `.cursor/antipattern-gate/` (catalog,
 `PRACTICE_LEDGER.jsonl`, README) are in scope with `/opsx-antipattern-gate`.
+Durable DevOps ops memory under `.cursor/devops/**` (`OPS_STATE.md`,
+`LAST.json`, …) is in scope with `/opsx-devops` (never secrets/DSN values).
 All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
@@ -328,7 +334,9 @@ Preferred grouping:
    to the same disclosed packet
 7. antipattern-gate companions (.cursor/antipattern-gate/**) — with the
    `/opsx-antipattern-gate` command packet when they change together
-8. unrelated process edits — separate commits by concern
+8. devops durable memory (.cursor/devops/**) — with `/opsx-devops` OPS_STATE
+   / LAST.json updates (never secrets); separate from product `/opsx-commit`
+9. unrelated process edits — separate commits by concern
 ```
 
 Do **not**:
@@ -581,6 +589,7 @@ Never re-decide product commit grouping for `/opsx-commit`.
 - quality: `npm run build` mandatory when in scope; smoke UNAVAILABLE
 - unresolved_source_sections: any Poetry/pytest/pyright/kubectl/WB-domain steps in the body are blocked by TARGET OVERRIDE until adapters exist
 - manual_review: `.opsx/project/manual_review.md`
-- process_allowlist_sot: `.opsx/sources.yaml` (shared with snapshot + `/opsx-commit` exclusion)
+- process_allowlist_sot: `.opsx/sources.yaml` (shared with snapshot + `/opsx-commit` exclusion; includes `.cursor/devops/**`)
+- sole_front_door: `/opsx-meta-commit`; `/opsx-admin-command-commit` = thin redirect only
 - local_only: never writes central snapshot/catalog; next may be `/opsx-meta-update-snapshot`
 - orientation: emit `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`
