@@ -340,8 +340,9 @@ class AutoAdvActiveControlService:
         Двухтиковое подтверждение пустоты (Owner
         ``TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`` / ROOT-001):
         1. Уже есть Redis intent (V3 apply после FORCE_OFF / тик-1 latch) и
-           набор всё ещё пуст → consume→pause Search. Warmup ``__empty__`` не
-           блокирует этот путь (prior intent = settled confirmation).
+           набор всё ещё пуст → consume→pause Search **только если Search
+           STARTED**. Warmup ``__empty__`` не блокирует этот путь (prior
+           intent = settled confirmation).
         2. No-prior-intent: активных ключей 0 и Search STARTED + **settled
            empty** (не Redis warmup ``__empty__`` / transient false-empty) →
            только ``set_intent`` (latch) и return False без consume/pause.
@@ -353,10 +354,19 @@ class AutoAdvActiveControlService:
         intent потребляется без WB pause / EMPTY_KEYWORDS reason / notify, и
         метод возвращает False, чтобы обычный activity-control продолжался.
 
+        Tick2 consume при Search **не** STARTED (budget/schedule pause между
+        тиками): intent потребляется, но MUST NOT ``_set_search_reason(
+        EMPTY_KEYWORDS)``, MUST NOT ``notify_empty_keywords_pause`` (resume
+        episode gate) и MUST NOT ``pause_auction_campaign`` — prior
+        schedule/budget reason сохраняется. Return True (как skip без
+        Search-ноги): activity-control не стартует Search при всё ещё
+        пустых ключах.
+
         Returns:
             True если intent был потреблён и pause/reason/notify (или skip
-            без Search) выполнены; False если arm не нужен / только latch
-            на тике-1 / intent отброшен как stale / warmup false-empty.
+            без Search / skip при Search не STARTED) выполнены; False если
+            arm не нужен / только latch на тике-1 / intent отброшен как
+            stale / warmup false-empty.
         """
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
             EmptyKeywordsPauseIntentManager,
@@ -447,17 +457,30 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auction_campaign(adv)
-        await self._set_search_reason(
-            int(search_adv_id),
-            CampaignActivityCommand.PAUSE,
-            AuctionReasonCode.EMPTY_KEYWORDS,
-        )
-        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
-        await notify_empty_keywords_pause(
-            shop_id=str(adv.shop_id or ""),
-            adv_id=int(auto_adv_id),
-            campaign_name=campaign_name,
-            intent_manager=intent_mgr,
+            await self._set_search_reason(
+                int(search_adv_id),
+                CampaignActivityCommand.PAUSE,
+                AuctionReasonCode.EMPTY_KEYWORDS,
+            )
+            campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+            await notify_empty_keywords_pause(
+                shop_id=str(adv.shop_id or ""),
+                adv_id=int(auto_adv_id),
+                campaign_name=campaign_name,
+                intent_manager=intent_mgr,
+            )
+            return True
+
+        # Search не STARTED: intent уже потреблён; не маскируем prior
+        # schedule/budget reason EMPTY_KEYWORDS и не arm'им resume gate.
+        logger.info(
+            "Search activity: empty-keywords intent consumed but Search not "
+            "STARTED (skip pause/reason/notify) search_adv_id=%s "
+            "auto_adv_id=%s shop_id=%s search_status=%s",
+            search_adv_id,
+            auto_adv_id,
+            adv.shop_id,
+            search_status,
         )
         return True
 
