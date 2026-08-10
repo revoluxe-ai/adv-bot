@@ -106,7 +106,9 @@ DO_NOT_DO_YET: sync / decision promote / archive move
    - if `PRODUCT_ACCEPTANCE_REQUIRED=true` and status is not PASS → stop with
      `product_acceptance_not_pass` (include fail pillar when known);
    - soft ECC/pyright/static Owner waives do **not** clear this gate;
-   - route MEANING → `/opsx-update`; LIFECYCLE →
+   - route MEANING → `/opsx-update`; LIFECYCLE missing/unconfirmed
+     `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` → `/opsx-update` (or
+     `/opsx-ff`); LIFECYCLE scenario report / unmapped rows →
      `/opsx-spec-scenario-coverage`; SIDE_EFFECT → `/opsx-test` /
      apply test materialization — then `/opsx-verify mode=archive`.
 

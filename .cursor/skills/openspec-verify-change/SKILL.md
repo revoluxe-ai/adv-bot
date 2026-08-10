@@ -26,6 +26,14 @@ multi-target writes are archive blocker `unresolved_semantic_write_target`
 (`NO_GO`). Forbidden sibling adapters and missing paired positive/negative
 proof also fail verify; green tests against an ambiguous target are insufficient.
 
+**Product Acceptance (kernel DONE, `mode=archive`):** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` via `opsx-verify.md`.
+When `PRODUCT_ACCEPTANCE_REQUIRED=true`, `LIFECYCLE_COVERAGE` needs durable
+`OWNER_LIFECYCLE_ECHO` + Owner `CONFIRM_LIFECYCLE` **and** scenario
+`VERDICT=PASS` with acceptance rows mapped 1:1 to echo steps. Scenario PASS
+alone does not clear LIFECYCLE; soft tooling waive cannot clear PA. Details
+remain in `.cursor/commands/opsx-verify.md`.
+
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
 **OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:

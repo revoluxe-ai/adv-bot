@@ -136,6 +136,10 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`:
    - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and MEANING_LOCK is not durable →
      `NO_GO`; route to `/opsx-update` / Owner semantic decision.
+   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and durable `OWNER_LIFECYCLE_ECHO`
+     is missing/chat-only, **or** Owner `CONFIRM_LIFECYCLE` is missing →
+     `NO_GO`; route to `/opsx-update` (or `/opsx-ff`). Do not implement
+     against chat-only lifecycle.
    - When implementing acceptance seams with external mutation, materialize
      tests that satisfy SIDE_EFFECT_PROOF (`side_effect_proof` /
      `PA_SIDE_EFFECT_PROOF` in TEST_EVIDENCE_TAXONOMY). Intent-only /
