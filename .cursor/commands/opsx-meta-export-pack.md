@@ -1,11 +1,11 @@
 ---
 component_id: opsx.commands.meta_export_pack
-component_version: 0.2.0
+component_version: 0.2.1
 ownership: TARGET_ONLY
 runtime_class: ACTIVE
 canonical_source_body: none
 required_adapters: ["opsx-lite"]
-local_modification_note: "Projectize 2026-08-07: remapped Vue/npm → poetry-python / WB Sky; opsx-lite only. 2026-08-10: EXP-01 write-root opsx-export/ + dated zip; EXP-02 default full .opsx/**+openspec/** discovery, GO optional, ROOT_COVERAGE."
+local_modification_note: "Projectize 2026-08-07: remapped Vue/npm → poetry-python / WB Sky; opsx-lite only. 2026-08-10: EXP-01/02 write-root + full discovery + ROOT_COVERAGE; EXP-03 one export = opsx-export/<utc_ts>/{opsx-pack.zip, MANIFEST.txt} + absolute_export_dir_path."
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
 contract_id: OPSX-WB-EXPORT-PACK-01
 newline_normalization: none
@@ -26,7 +26,8 @@ newline_normalization: none
 - Project-local OPSX: entire `.opsx/**` present on disk (auto-discovers new
   top-level children, including `upstream/**` when present)
 - Runtime packets: `.tmp/**` (on `scope=default` / `scope=tmp` / `scope=all_safe`)
-- Export writes **only**: repo-root `opsx-export/` (separate from `.tmp`)
+- Export writes **only**: `opsx-export/<utc_ts>/` under repo-root `opsx-export/`
+  (one run = one dated folder; separate from `.tmp`)
 
 ### Hard target bans
 
@@ -56,10 +57,11 @@ NEXT_COMMAND: /opsx-projectize
 # /opsx-meta-export-pack
 
 Side-lane **copy-only** utility: collect OPSX process surfaces + **entire**
-`.opsx/**` + **entire** `openspec/**` (+ `.tmp` on default) into a new zip under
-repo-root `opsx-export/` with **datetime in the archive filename**, print the
-**absolute** archive path and a **ROOT_COVERAGE** report, and leave every source
-tree untouched.
+`.opsx/**` + **entire** `openspec/**` (+ `.tmp` on default) into a **new**
+dated folder `opsx-export/<utc_ts>/` containing exactly `opsx-pack.zip` +
+`MANIFEST.txt`, print the **absolute folder path** (primary handoff) plus zip/
+manifest paths and a **ROOT_COVERAGE** report, and leave every source tree
+untouched.
 
 `GO` is **optional**. Empty invoke (no args) runs the same COPY_ONLY pack.
 
@@ -88,6 +90,8 @@ Follow `.cursor/commands/opsx-source-resolution.md` and
 3. Guarantee **no delete / no move / no rename** of sources — even if the user
    types `GO`, `cleanup`, or `delete`.
 4. Tell the Owner per **root folder** what was FULLY_INCLUDED vs SKIPPED.
+5. Keep runs isolated: **1 export = 1 dated folder** with exactly two files
+   (zip + manifest) so Owner can share that folder without mixing runs.
 
 ## When to use
 
@@ -137,7 +141,7 @@ Unrecognized tokens that request delete/cleanup/rm → `REFUSED_DELETE_REQUEST`.
 
 | Input | Mode | Writes |
 |---|---|---|
-| empty args / any scope flags | `COPY_ONLY` | **only** new files under repo-root `opsx-export/` |
+| empty args / any scope flags | `COPY_ONLY` | **only** new files under `opsx-export/<utc_ts>/` |
 | `GO` | optional synonym | same — still COPY_ONLY; never delete |
 | delete / cleanup / rm requests | refuse | **no** writes that remove anything |
 
@@ -149,27 +153,32 @@ does **not** mean read-only — it runs the pack.
 MUST NOT:
 
 - delete, unlink, truncate, move, or rename any source path;
-- `git clean`, `git reset --hard`, or overwrite an existing dated export zip;
-- write outside repo-root `opsx-export/`;
-- stage or commit the zip;
+- `git clean`, `git reset --hard`, or overwrite an existing dated export dir;
+- write outside `opsx-export/<utc_ts>/` (except creating parent `opsx-export/`);
+- stage or commit the zip / manifest / export dir;
 - expand into `src/`, `public/`, `backend/` application code, `.env*`,
   secrets, or IDE prefs (`.cursor/settings.json`);
 - substitute for `/opsx-archive` lifecycle;
 - claim verify / archive / commit readiness from this utility;
-- claim `FULLY_INCLUDED` for a missing root path.
+- claim `FULLY_INCLUDED` for a missing root path;
+- dump many runs as flat siblings under `opsx-export/` without a dated subdir.
 
 MUST:
 
 - ensure repo-root `opsx-export/` exists (create if missing);
-- write a **new** archive whose filename **must** include UTC datetime
-  (`utc_ts` like `20260805-191530`): prefer `opsx-pack-<utc_ts>.zip`;
-- write sibling `MANIFEST-<utc_ts>.txt` beside that zip;
+- create a **new** per-run directory `opsx-export/<utc_ts>/`
+  (`utc_ts` like `20260805-191530`); if it already exists → new `utc_ts` or
+  `BLOCKED_IO` (never overwrite);
+- inside that directory write exactly:
+  - `opsx-pack.zip` (default scopes; bootstrap: `opsx-bootstrap-profile.zip`)
+  - `MANIFEST.txt`
+  Isolation is the **folder** name; keep inner names simple for handoff;
 - on `scope=default` / `all_safe` / `opsx` / `openspec`: **discover** actual
   top-level children under `.opsx/` and/or `openspec/` each run (new
   structures included automatically);
-- copy files into zip (or optional staging under `opsx-export/` only) without
-  mutating sources;
-- emit Windows-style absolute path to the zip when on Windows;
+- copy files into zip without mutating sources;
+- emit Windows-style **absolute path to the export folder** as the primary
+  handoff (`absolute_export_dir_path`), plus absolute zip and manifest paths;
 - skip `__pycache__/`, `*.pyc`, `.pytest_cache/`, `node_modules/`, and other
   obvious junk dirs when walking trees;
 - HARD skip `opsx-export/**` from pack contents (write-root; nesting ban);
@@ -249,9 +258,9 @@ full pack, or `scope=tmp` for runtime packets only.
 ### Bootstrap profile (`scope=bootstrap_profile`)
 
 Copy **only** paths listed in `.opsx/shared/bootstrap-profile.md`
-(`BOOTSTRAP_PROFILE` + do not include hard excludes). Prefer zip name
-`opsx-bootstrap-profile-<utc_ts>.zip` (datetime mandatory in filename). Owner
-may place the result under central `bootstrap/profile/` for
+(`BOOTSTRAP_PROFILE` + do not include hard excludes). Same per-run layout:
+`opsx-export/<utc_ts>/opsx-bootstrap-profile.zip` + `MANIFEST.txt`. Owner may
+place the result under central `bootstrap/profile/` for
 `/opsx-meta-bootstrap central=…` consumers.
 
 Missing shared contract → `FAIL_CLOSED` `REASON: BOOTSTRAP_PROFILE_CONTRACT_MISSING`.
@@ -269,7 +278,8 @@ Never include: secrets, product app trees, `opsx-export/**`,
 
 ## ROOT_COVERAGE (mandatory)
 
-After the pack, receipt + `MANIFEST-<utc_ts>.txt` MUST list root folders:
+After the pack, receipt + `MANIFEST.txt` (inside the dated export dir) MUST
+list root folders:
 
 **Must cover at least:**
 
@@ -307,10 +317,10 @@ ROOT_COVERAGE:
 ```text
 ENTRY_STATE: any (repo with include roots)
 PREVIOUS_ALLOWED_STEP: /opsx-meta-consult route | direct invoke
-COMMAND_ACTION: copy default/full trees → new dated zip under opsx-export/; emit ABSOLUTE_ARCHIVE_PATH + ROOT_COVERAGE
+COMMAND_ACTION: create opsx-export/<utc_ts>/{opsx-pack.zip, MANIFEST.txt}; emit absolute_export_dir_path + ROOT_COVERAGE
 EXIT_STATE: EXPORT_PACK_READY | BLOCKED_NEEDS_INPUT | BLOCKED_IO | REFUSED_DELETE_REQUEST | FAIL_CLOSED
-NEXT_ALLOWED_STEP: human uses path; /opsx-meta-bootstrap central=<zip|dir> on empty peer; /opsx-meta-import-command on peer; consult/pipeline
-FAILURE_OR_RECOVERY_STEP: leave partial export artifacts under opsx-export/; never delete sources; re-run (new ts)
+NEXT_ALLOWED_STEP: human uses folder path; /opsx-meta-bootstrap central=<zip|dir> on empty peer; /opsx-meta-import-command on peer; consult/pipeline
+FAILURE_OR_RECOVERY_STEP: leave partial artifacts under opsx-export/<utc_ts>/; never delete sources; re-run (new ts)
 ```
 
 ## Steps
@@ -328,38 +338,36 @@ FAILURE_OR_RECOVERY_STEP: leave partial export artifacts under opsx-export/; nev
    - `.tmp` when scoped.
    Verify at least one existing root. Always HARD skip `opsx-export/**`.
 5. Ensure repo-root `opsx-export/` exists. Compute `utc_ts`
-   (utc like `20260805-191530`).
-6. Copy trees into optional staging under `opsx-export/` **or** add directly
-   to zip with stable relative paths from repo root. Zip name **must** include
-   datetime: `opsx-pack-<utc_ts>.zip`
-   (bootstrap scope: `opsx-bootstrap-profile-<utc_ts>.zip`).
-   If that exact path already exists → do not overwrite; pick a new `utc_ts`
-   or `BLOCKED_IO`.
-7. Write `MANIFEST-<utc_ts>.txt` beside the zip listing:
+   (utc like `20260805-191530`). Create **new** dir `opsx-export/<utc_ts>/`
+   (`exist_ok=False`). If exists → new `utc_ts` or `BLOCKED_IO`.
+6. Copy trees into zip at `opsx-export/<utc_ts>/opsx-pack.zip` with stable
+   relative paths from repo root (bootstrap: `opsx-bootstrap-profile.zip` in
+   the same dir). Do not overwrite.
+7. Write `opsx-export/<utc_ts>/MANIFEST.txt` listing:
    - utc_ts, scope, include_tmp, whether discovery mode was used,
    - ROOT_COVERAGE (FULLY_INCLUDED / SKIPPED + reason),
    - skip patterns (must list `opsx-export/**`),
    - file count / approximate size if cheap.
-8. Compute absolute path to `opsx-pack-<utc_ts>.zip` (Windows: full `C:\...`
-   path).
-9. Return output contract including ROOT_COVERAGE. Do **not** stage, commit,
-   push, or delete sources.
+8. Compute absolute Windows paths:
+   - `absolute_export_dir_path` → `…\opsx-export\<utc_ts>\` (**primary**)
+   - `absolute_archive_path` → `…\opsx-pack.zip`
+   - `manifest_path` → `…\MANIFEST.txt`
+9. Return output contract including ROOT_COVERAGE and the folder path. Do
+   **not** stage, commit, push, or delete sources.
 
 ### Implementation notes (agent)
 
 - Prefer PowerShell/`Compress-Archive`, `zip`, or Python zipfile; bash on this
   repo is fine if paths are correct and sources untouched.
-- Never `rm -rf` staging of **sources**. Optional staging under `opsx-export/`
-  may be left as-is after zip; do not delete source trees to “clean up”.
-- Cleaning optional staging after zip is **optional** and only allowed
-  **inside** repo-root `opsx-export/` for artifacts created this run —
-  never outside it; never delete prior dated packs. Prefer leaving zip +
-  manifest both present if unsure.
+- Never `rm -rf` staging of **sources**. Never delete prior dated export dirs.
+- Prefer leaving `opsx-pack.zip` + `MANIFEST.txt` both present in the new dir.
 - When walking any tree, do not follow/copy into `opsx-export/**`.
 - Discovery: `Path('.opsx').iterdir()` / `Path('openspec').iterdir()` — do not
   require a frozen subpath list for those two roots.
 - Time-budget large `.tmp` / large `openspec/changes/archive` /
   `.opsx/upstream` walks; on hang → `BLOCKED_IO`.
+- Legacy flat files already under `opsx-export/*.zip` from older runs are left
+  untouched (this command never deletes them).
 
 ## Output contract
 
@@ -374,6 +382,7 @@ EXPORT_PACK_RECEIPT:
 - include_tmp: true|false
 - discovery_opsx: true|false
 - discovery_openspec: true|false
+- absolute_export_dir_path:   # PRIMARY handoff — share this folder (2 files inside)
 - absolute_archive_path:
 - manifest_path:
 - ROOT_COVERAGE:
@@ -428,7 +437,8 @@ the same chat for other reasons — never to commit the zip.
 - Nesting prior `opsx-export/**` contents into a new pack
 - Writing under `.tmp/opsx-export/` again (legacy; write-root is repo-root
   `opsx-export/`)
-- Using a zip name without datetime (e.g. bare `opsx-pack.zip`)
+- Flat multi-run dump under `opsx-export/` without `opsx-export/<utc_ts>/`
+- Omitting `absolute_export_dir_path` from the receipt
 - Dumping whole monorepo / `src/` / `public/`
 - Committing dated packs into `.cursor/` or `opsx-export/` via process commit
 - Using `GO` to unlock delete
@@ -444,10 +454,10 @@ Before returning:
 
 - [ ] `delete_performed: false`
 - [ ] Empty invoke or `GO` both run COPY_ONLY (GO optional)
-- [ ] Writes only under repo-root `opsx-export/`
-- [ ] Archive filename includes `utc_ts` (`opsx-pack-<utc_ts>.zip` or
-      bootstrap dated equivalent)
-- [ ] `absolute_archive_path` is absolute and clickable/copyable
+- [ ] Writes only under new `opsx-export/<utc_ts>/`
+- [ ] That dir contains `opsx-pack.zip` (or bootstrap zip) + `MANIFEST.txt`
+- [ ] `absolute_export_dir_path` is absolute and is the primary handoff
+- [ ] `absolute_archive_path` and `manifest_path` are absolute
 - [ ] Not confused with `/opsx-archive` or `/opsx-meta-import-command`
 - [ ] Not expanded into product/secrets / `.cursor/settings.json`
 - [ ] On default: entire `.opsx/**` + entire `openspec/**` discovered
