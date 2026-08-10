@@ -19,6 +19,8 @@ Start a new change using the experimental artifact-driven approach.
 
    **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
 
+   If the Owner request is substantially ambiguous about the desired result, ask the same existing open-ended clarification question before scaffolding. Do not invent product decisions or silently expand scope. Do not create a new clarification framework.
+
 2. **Determine the workflow schema**
 
    Use the default schema (omit `--schema`) unless the user explicitly requests a different workflow.
@@ -36,32 +38,90 @@ Start a new change using the experimental artifact-driven approach.
    Add `--schema <name>` only if the user requested a specific workflow.
    This creates a scaffolded change in the planning home resolved by the CLI.
 
-4. **Show the artifact status**
+4. **Create Owner Contract (companion file — not a schema artifact)**
+
+   Immediately after a successful scaffold, write
+   `<changeRoot>/owner-contract.md` from the Owner request and available
+   change context.
+
+   This file is a **human-facing companion** for Owner review. It is **not**
+   registered in the OpenSpec schema, **not** part of `openspec status`
+   artifact sequence, and **must not** be copied into `spec` or treated as
+   canonical authority for specs/design/tasks.
+
+   Use plain human language. Do not use internal orchestration vocabulary
+   (evolution links, STAR/INCREMENT ids, HARD/FORWARD, ADL, placement jargon,
+   paired regression, authoritative path, etc.) unless those terms are
+   themselves part of the Owner's stated task. Do not mechanically shorten or
+   copy `proposal.md`. Aim for roughly 10–30 substantive lines.
+
+   Required structure:
+
+   ```markdown
+   # Owner Contract
+
+   ## Что хотим получить
+
+   Короткое описание конечного результата человеческим языком.
+
+   ## Зачем
+
+   Почему изменение вообще нужно и какую проблему решает.
+
+   ## Что должно остаться неизменным
+
+   Только существенные invariants / существующее поведение, которое нельзя случайно сломать.
+
+   ## Чего сейчас не делаем
+
+   Короткий scope-out. Только реально важные границы.
+
+   ## Как поймём, что получилось
+
+   Несколько observable критериев результата человеческим языком.
+
+   ## Решения Owner
+
+   Только существенные semantic/product decisions, которые Owner уже явно принял.
+
+   Если таких решений нет:
+
+   `Нет отдельных решений Owner.`
+   ```
+
+   Empty/inapplicable sections may stay minimal. Reflect the original Owner
+   request only — no speculative future scope, no invented product decisions.
+
+5. **Show the artifact status**
    ```bash
    openspec status --change "<name>" --json
    ```
    Use the returned `planningHome`, `changeRoot`, `artifactPaths`, and `nextSteps` instead of assuming repo-local paths.
+   Owner Contract must **not** appear as a schema artifact in this status.
 
-5. **Get instructions for the first artifact**
+6. **Get instructions for the first artifact**
    The first artifact depends on the schema. Check the status output to find the first artifact with status "ready".
    ```bash
    openspec instructions <first-artifact-id> --change "<name>"
    ```
    This outputs the template and context for creating the first artifact.
 
-6. **STOP and wait for user direction**
+7. **STOP and wait for user direction**
 
 **Output**
 
 After completing the steps, summarize:
 - Change name and location
 - Schema/workflow being used and its artifact sequence
-- Current status (0/N artifacts complete)
-- The template for the first artifact
+- Current status (0/N schema artifacts complete)
+- Path to `owner-contract.md` and its full contents (or a short readable rendering) so Owner can verify understanding in tens of seconds
+- The template for the first schema artifact
 - Prompt: "Ready to create the first artifact? Run `/opsx:continue` or just describe what this change is about and I'll draft it."
 
 **Guardrails**
-- Do NOT create any artifacts yet - just show the instructions
+- Do NOT create schema artifacts yet (proposal/specs/design/decisions/tasks) — only the companion `owner-contract.md` plus scaffold
+- Do NOT register Owner Contract in `schema.yaml` or make `continue`/`ff`/`apply`/`verify` require it
+- Do NOT inject Owner Contract content into `spec` or other schema artifacts
 - Do NOT advance beyond showing the first artifact template
 - If the name is invalid (not kebab-case), ask for a valid name
 - If a change with that name already exists, suggest using `/opsx:continue` instead
