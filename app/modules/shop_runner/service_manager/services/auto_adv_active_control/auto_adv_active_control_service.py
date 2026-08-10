@@ -337,12 +337,16 @@ class AutoAdvActiveControlService:
         ALLOWED: ``pause_auction_campaign``; FORBIDDEN: ``pause_auto_campaign``.
         Pause = следующий шаг после OFF (не concurrent с OFF).
 
-        Источники arm:
-        1. Уже есть Redis intent (V3 apply после FORCE_OFF / recheck) — settled
-           empty; warmup ``__empty__`` не блокирует consume→pause.
+        Двухтиковое подтверждение пустоты (Owner
+        ``TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`` / ROOT-001):
+        1. Уже есть Redis intent (V3 apply после FORCE_OFF / тик-1 latch) и
+           набор всё ещё пуст → consume→pause Search. Warmup ``__empty__`` не
+           блокирует этот путь (prior intent = settled confirmation).
         2. No-prior-intent: активных ключей 0 и Search STARTED + **settled
-           empty** (не Redis warmup ``__empty__`` / transient false-empty).
-           ROOT-001 / tasks §7.2: warmup marker MUST NOT arm.
+           empty** (не Redis warmup ``__empty__`` / transient false-empty) →
+           только ``set_intent`` (latch) и return False без consume/pause.
+           Pause — на следующем ``ensure``, если intent ещё есть и пустота
+           подтвердилась. ROOT-001 / tasks §7.2: warmup marker MUST NOT arm.
 
         Перед pause перечитывает активные ключи из ``ComplexAdv.get_keywords``.
         Если набор уже непустой (stale intent при TTL до 6h после recovery) —
@@ -350,9 +354,9 @@ class AutoAdvActiveControlService:
         метод возвращает False, чтобы обычный activity-control продолжался.
 
         Returns:
-            True если intent был (или вооружён) и pause/reason/notify (или skip
-            без Search) выполнены; False если arm не нужен / intent отброшен
-            как stale / warmup false-empty.
+            True если intent был потреблён и pause/reason/notify (или skip
+            без Search) выполнены; False если arm не нужен / только latch
+            на тике-1 / intent отброшен как stale / warmup false-empty.
         """
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
             EmptyKeywordsPauseIntentManager,
@@ -370,7 +374,7 @@ class AutoAdvActiveControlService:
         has_intent = await intent_mgr.peek_intent(int(auto_adv_id))
 
         if not has_intent:
-            # Без prior V3 intent: arm только при settled empty + Search STARTED.
+            # Тик-1 (нет prior intent): только latch confirmation, без pause.
             # Redis ``__empty__`` warmup / Adv warmup seam → refuse (ROOT-001).
             # Search PAUSE → не ставим intent (иначе блокируется recheck-start).
             campaign_is_started = search_status == WBAdvActiveStatus.STARTED
@@ -398,14 +402,17 @@ class AutoAdvActiveControlService:
                 return False
             await intent_mgr.set_intent(int(auto_adv_id))
             logger.info(
-                "Search activity: empty-keywords intent armed without prior V3 intent "
-                "(settled empty + Search STARTED) auto_adv_id=%s shop_id=%s "
-                "active_count=%s",
+                "Search activity: empty-keywords intent latched (tick1 confirmation) "
+                "without pause — await tick2 if still empty "
+                "auto_adv_id=%s shop_id=%s active_count=%s",
                 auto_adv_id,
                 adv.shop_id,
                 active_count,
             )
-        elif active_count > 0:
+            # Owner two-tick: same-tick set_intent→consume→pause запрещён.
+            return False
+
+        if active_count > 0:
             # Re-validate before consume→pause: keywords may recover while intent pending.
             await intent_mgr.consume_intent(int(auto_adv_id))
             logger.info(
