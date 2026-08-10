@@ -49,6 +49,30 @@ runtime-reachable orchestration seam.
 - observable THEN и forbidden/allowed effects проверены;
 - тест падает при удалении requirement или guard.
 
+### `side_effect_proof` (`PA_SIDE_EFFECT_PROOF`)
+
+Доказательство **this-run** внешнего эффекта (или forbidden sibling
+non-effect) для Product Acceptance
+(`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` pillar SIDE_EFFECT_PROOF).
+
+Обязательно, когда acceptance scenario утверждает mutation наружу
+(WB pause/start, paid notify send, billing write, эквивалент):
+
+- в том же test run наблюдается вызов/adapter эффекта (methods_called /
+  await assert / equivalent), **или**
+- явно доказан forbidden non-effect на sibling target;
+
+Запрещено считать PA-sufficient:
+
+- только Redis intent / durable reason / latch без this-run mutation;
+- OR-armed proxies (`intent_after OR pause_path_armed`), где GREEN возможен
+  без this-run external call;
+- «кампания уже была paused» как успех текущего arm-path без this-run call.
+
+Маркер: `EVIDENCE_CLASS=side_effect_proof` (или `PROVES` includes
+`PA_SIDE_EFFECT_PROOF`). Weak/missing ⇒ Product Acceptance FAIL pillar
+`SIDE_EFFECT_PROOF`, не archive GO.
+
 ### `runtime_entrypoint`
 
 Проверка реального runtime handler/scheduler/worker entrypoint с допустимыми

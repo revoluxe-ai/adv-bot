@@ -80,6 +80,16 @@ NEXT:   /opsx-apply   |   /opsx-update <change> if PLANNING_UPDATE / blocked
 `mode=plan` **never** executes tests. Treat as `run=none`. Do not emit
 full-change `SCENARIO_TEST_COVERAGE_REPORT VERDICT=PASS`.
 
+**Product Acceptance / change spirit:** When
+`PRODUCT_ACCEPTANCE_REQUIRED=true`, require durable `OWNER_LIFECYCLE_ECHO`
+in change design/decision/spec (see
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`). If missing or
+chat-only only → stop with `STATUS=BLOCKED`,
+`REASON=BLOCKED_NEEDS_OWNER_LIFECYCLE`,
+`NEXT_ACTION=/opsx-update <change>` (or `/opsx-ff`). Do **not** invent
+temporal steps from chat or emit a ready/provisional plan that replaces
+Owner spirit. This command never writes OpenSpec artifacts.
+
 #### `mode=audit`
 
 ```text
@@ -90,6 +100,11 @@ OUTPUT: SCENARIO_TEST_COVERAGE_REPORT + GAPS + ROUTE_PACKETS
 SUCCESS: not required to proceed; FAIL routes to writers
 NEXT:   /opsx-test | /opsx-close-external-gap | /opsx-update | re-audit
 ```
+
+When `PRODUCT_ACCEPTANCE_REQUIRED=true`, each acceptance-relevant matrix row
+MUST cite the matching `OWNER_LIFECYCLE_ECHO` step. Unmapped rows →
+FAIL/BLOCKED for that scenario (cannot support PA LIFECYCLE PASS). If echo
+itself is missing → `BLOCKED_NEEDS_OWNER_LIFECYCLE` (NEXT: `/opsx-update`).
 
 #### `mode=certify`
 
@@ -102,7 +117,8 @@ NEXT:   /opsx-verify mode=archive <change>   | recovery on FAIL/BLOCKED
 ```
 
 `mode=certify` is **full-change only**. Missing/stale receipts →
-`BLOCKED_NEEDS_PROVIDER_RECEIPT` (not PASS).
+`BLOCKED_NEEDS_PROVIDER_RECEIPT` (not PASS). Same PA echo-mapping rules as
+`mode=audit` apply when `PRODUCT_ACCEPTANCE_REQUIRED=true`.
 
 ### Arg gate (fail-closed — run first)
 
@@ -238,7 +254,8 @@ read-only review, а не нагрузочным прогоном.
 
 Построй одну строку на каждый `#### Scenario:` во всех delta specs change.
 Не пропускай negative, sibling, failure, empty-state, retry, residual,
-next-tick и idempotency scenarios.
+next-tick, idempotency и (когда применимо) steady-state / already-true
+reconcile scenarios.
 
 ```text
 SCENARIO_EVIDENCE_ROW:
@@ -277,6 +294,31 @@ SCENARIO_EVIDENCE_ROW:
 5. execution evidence на текущем snapshot для полного PASS.
 
 Unit tests могут быть дополнительными, но не заменяют `scenario_seam`.
+
+### Steady-state / already-true reconcile (mandatory when applicable)
+
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md` →
+**Steady-state / already-true reconcile (mandatory)**.
+
+When Spec, design, or an accepted decision implies an invariant that must hold
+on observe / reconcile / deploy (not only after a producer event):
+
+1. The change MUST include at least one Spec Scenario with
+   `GIVEN` already-true precondition (no fresh producer event),
+   `WHEN` periodic / ensure / reconcile entrypoint,
+   `THEN` the same allowed effect as the post-event transition path
+   (+ forbidden sibling if gated).
+2. Encoding **only** post-event transition producers for that invariant is
+   FAIL_CLOSED:
+   - `mode=plan` → `OPEN_QUESTIONS` (or provisional/blocked plan) naming the gap;
+   - `mode=audit` / `mode=certify` → gap class
+     `MISSING_STEADY_STATE_RECONCILE_SCENARIO` → FAIL (not PASS).
+3. Do not treat transition-producer Scenario alone as covering deploy-safe /
+   already-true reconcile.
+
+Non-normative class note: ROOT-001 empty-keywords — empty keywords + Search
+STARTED + bot on must arm Search EMPTY_KEYWORDS pause without prior V3 intent.
 
 ### Split write/read rule
 
@@ -557,7 +599,13 @@ PRODUCTION_CAUSAL_PATH_UNTESTABLE
 ```text
 SPEC_SCENARIO_AMBIGUOUS
 WRITE_TARGET_AMBIGUOUS
+MISSING_STEADY_STATE_RECONCILE_SCENARIO   # Spec omits already-true / reconcile Scenario
 → /opsx-update <change-id>
+```
+
+```text
+MISSING_STEADY_STATE_RECONCILE_SCENARIO   # Spec has Scenario; evidence missing/weak
+→ /opsx-test
 ```
 
 Не исправляй gap внутри этой команды.
@@ -684,6 +732,9 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 
 - Never edit production, tests, OpenSpec artifacts, commands or policies.
 - Never create/update durable report in v1; report is chat output.
+- Never invent or author `OWNER_LIFECYCLE_ECHO` here — planning writers only.
+- Never treat scenario `VERDICT=PASS` as clearing Product Acceptance without
+  durable confirmed Owner lifecycle echo (verify owns PA DONE).
 - Never stage, commit, push, create PR, archive, deploy or run migrations.
 - Never access production credentials, production DB, WB seller account or
   Kubernetes.
@@ -694,12 +745,16 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 - Never proceed past Arg gate with missing/unknown/wrong `mode=` or foreign tokens.
 - Never emit `mode=plan` coverage PASS or `mode=certify` PASS without fresh
   provider receipts when PG/CH evidence is required.
+- Never emit ready/provisional `mode=plan` under PA when
+  `OWNER_LIFECYCLE_ECHO` is missing.
 
 ## Self-review
 
 - `mode=` and `change=` parsed; Arg gate ran before scenario work.
 - `SCENARIO_MODE` in output matches requested `mode=`.
 - `mode=plan` produced `SCENARIO_COVERAGE_PLAN`, not certified PASS.
+- Under PA, `mode=plan` blocked on missing `OWNER_LIFECYCLE_ECHO` when required.
+- Under PA, audit/certify rows mapped to echo steps (or FAIL/BLOCKED).
 - `mode=certify` checked receipt freshness before PASS.
 - Every exact Spec Scenario has one matrix row (`audit`/`certify`).
 - Every Scenario has an adequate scenario-seam or an explicit FAIL.
@@ -713,3 +768,6 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 - Output includes one clear next action without performing fixes.
 - FAIL with TEST_ONLY gaps includes pasteable `ROUTE_PACKETS.TEST_ONLY_PACKET`
   covering every blocking stub thin end (not prose-only GAPS).
+- When reconcile-on-observe applies: steady-state / already-true Scenario is
+  present, or explicit `MISSING_STEADY_STATE_RECONCILE_SCENARIO` FAIL / plan
+  `OPEN_QUESTIONS` (not silent PASS on transition-only Scenario sets).

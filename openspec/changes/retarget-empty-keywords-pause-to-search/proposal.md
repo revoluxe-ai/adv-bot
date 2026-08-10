@@ -49,6 +49,33 @@ latch, notify и 7d recheck invariants остаются.
 - Durable SEMANTIC_WRITE_TARGET: TARGET_ENTITY_OR_LEG=SEARCH,
   ALLOWED_ADAPTERS / FORBIDDEN_ADAPTERS materialized в decision + design +
   delta spec + paired tests.
+- **Settled-empty gate (warmup ROOT-001 / SPEC_GAP):** empty-keywords Search
+  pause MUST NOT arm на Redis warmup-маркере `__empty__` / transient
+  zero-active keyword read, пока snapshot warmup ещё может заполнить
+  keywords. Distinguishing: warmup false-empty ≠ bot-driven settled empty.
+  No-prior-intent arm MUST refuse warmup false-empty so
+  `pause_auction_campaign` не срабатывает в этом окне.
+- **Notify fanout (notify-fanout ROOT-001 / Owner
+  `B_MUST_NOTIFY_ALL_SHOP_LINKED_USERS`):** empty-keywords pause Telegram
+  notify MUST reach ALL shop-linked users with non-null
+  `user_telegram_id` via `WBUserCabinet` (same resolution as
+  `load_telegram_chat_ids_for_shop` / token NotificationManager «all users
+  of a shop»), not only one primary user. Debounce once-per-enter: attempt
+  all; KEEP if any delivered.
+- **Resume/re-enable notify (no-resume-notify ROOT-001 / SPEC_GAP):** after
+  a delivered empty-keywords pause notify, when Search/keywords resume or
+  re-enable, MUST send a distinct resume/re-enable Telegram notify to the
+  same shop-linked recipients. Pause-entry notify and recheck-mention
+  inside the pause message MUST NOT substitute for resume notify.
+- **Two-tick empty confirmation before Search pause (puna-empty-shape
+  ROOT-001 / Owner `D_TWO_TICK_EMPTY_CONFIRMATION` /
+  `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`):** for no-prior-intent
+  settled-empty confirmation, tick1 empty active keywords + Search STARTED
+  MUST only record/latch (MUST NOT `pause_auction_campaign`); tick2 still
+  empty THEN pause Search (`EMPTY_KEYWORDS`); later tick with keywords
+  present → start/resume Search; ticks continue across this lifecycle.
+  Warmup Redis `__empty__` remains non-settled (D8); two-tick latch is the
+  Owner settled-empty confirmation path when there is no prior V3 intent.
 
 ### Scope in
 
@@ -61,6 +88,21 @@ latch, notify и 7d recheck invariants остаются.
 - Paired tests: Search paused; Auto NOT paused этим path; wrong-adapter
   regression fails if `pause_auto_campaign` used for this reason.
 - Keep: reason EMPTY_KEYWORDS, intent latch, notify, 7d recheck.
+- Settled-empty vs Redis `__empty__` warmup: durable contract in
+  decision + delta spec; implementation guard on no-prior-intent arm;
+  RED regression that warmup marker MUST NOT pause Search.
+- **Notify fanout (Owner `B_MUST_NOTIFY_ALL_SHOP_LINKED_USERS`):** User
+  notification MUST reach ALL shop-linked Telegram users
+  (`WBUserCabinet` + non-null `user_telegram_id`); multi-recipient scenario
+  + RED; debounce once-per-enter with any-success KEEP.
+- **Resume/re-enable notify (no-resume-notify ROOT-001):** Requirement +
+  scenarios + RED/impl tasks for notify after delivered pause notify when
+  Search/keywords resume; same recipients; distinct copy.
+- **Two-tick empty confirmation (puna-empty-shape ROOT-001 / Owner
+  `D_TWO_TICK_EMPTY_CONFIRMATION`):** Requirement + decision + design +
+  RED tasks — tick1 latch only (no pause); tick2 still empty →
+  `pause_auction_campaign`; later non-empty → Search start/resume; ticks
+  continue; warmup `__empty__` still non-settled.
 
 ### Out of scope
 
@@ -109,7 +151,11 @@ latch, notify и 7d recheck invariants остаются.
   — defaults overlays не трогаем.
 - Proposed (this change): amendment того же write-path decision —
   TARGET_ENTITY_OR_LEG=SEARCH; ALLOWED=`pause_auction_campaign` (+ Search
-  start for recheck); FORBIDDEN=`pause_auto_campaign` for EMPTY_KEYWORDS.
+  start for recheck); FORBIDDEN=`pause_auto_campaign` for EMPTY_KEYWORDS;
+  FORBIDDEN arm/pause on Redis `__empty__` warmup / transient false-empty
+  (settled-empty only after bot-driven confirmed empty or equivalent);
+  two-tick empty confirmation latch for no-prior-intent
+  (Owner `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`).
 
 ## Semantic write target
 

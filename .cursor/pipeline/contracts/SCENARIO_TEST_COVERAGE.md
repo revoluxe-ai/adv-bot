@@ -46,8 +46,34 @@ archive verdict.
 
 Owner
   owns: material behavior ambiguity, intentional golden/ContractCase semantic
-        change, one-shot live authorization
+        change, one-shot live authorization,
+        CONFIRM_LIFECYCLE for OWNER_LIFECYCLE_ECHO (Product Acceptance)
+
+Planning writers (/opsx-ff, /opsx-update)
+  own: durable OWNER_LIFECYCLE_ECHO in change artifacts when
+       PRODUCT_ACCEPTANCE_REQUIRED=true
 ```
+
+## Owner lifecycle echo (Product Acceptance)
+
+When `PRODUCT_ACCEPTANCE_REQUIRED=true` (see
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`):
+
+```text
+OWNER_LIFECYCLE_ECHO   = durable 3–7 temporal steps in change design/decision/spec
+CONFIRM_LIFECYCLE      = Owner token after echo is written
+```
+
+- `/opsx-spec-scenario-coverage` **consumes** the echo; it does not author it
+  and does not edit OpenSpec artifacts.
+- `mode=plan` without durable echo → `BLOCKED_NEEDS_OWNER_LIFECYCLE`
+  (NEXT: `/opsx-update` or `/opsx-ff`), not a provisional coverage plan that
+  invents steps from chat.
+- `mode=audit` / `mode=certify`: every acceptance-relevant matrix row MUST
+  cite the matching `OWNER_LIFECYCLE_ECHO` step id/text. Rows without mapping
+  → FAIL/BLOCKED for that scenario (and cannot support PA LIFECYCLE PASS).
+- Scenario report `VERDICT=PASS` **does not** clear PA LIFECYCLE if echo or
+  `CONFIRM_LIFECYCLE` is missing.
 
 ## CLI modes (binding)
 
@@ -117,6 +143,42 @@ CONTRACT_ID=<stable boundary + case-set identity>
 heading инвалидирует прежнюю привязку и требует нового plan/audit.
 `GAP_ID` хранится только как data; для Windows-safe filenames используй только
 `GAP_FILE_ID` (`[0-9a-f]{16}`), без `:`, `/`, `\` или Scenario title.
+
+## Steady-state / already-true reconcile (mandatory)
+
+When Spec, design, or an accepted decision implies an invariant that must hold
+on **observe / reconcile / deploy** (not only after a producer event), the
+change MUST include at least one Spec Scenario shaped as:
+
+```text
+GIVEN already-true precondition state (no fresh producer event required)
+WHEN periodic / ensure / reconcile entrypoint runs
+THEN the same allowed effect as the post-event transition path
+     (+ paired forbidden sibling if the Scenario is a gate)
+```
+
+Encoding **only** post-event transition producers for that invariant is
+**FAIL_CLOSED**:
+
+| Where | Required outcome |
+|---|---|
+| `mode=plan` | `OPEN_QUESTIONS` (or `PLAN_STATUS=provisional\|blocked`) naming the missing steady-state Scenario |
+| `mode=audit` / `mode=certify` | gap class `MISSING_STEADY_STATE_RECONCILE_SCENARIO` → row/report FAIL |
+
+Disposition:
+
+```text
+Spec omits the steady-state Scenario
+→ PLANNING_UPDATE → /opsx-update
+
+Spec has the Scenario but evidence is missing/weak
+→ TEST_ONLY → /opsx-test
+```
+
+Non-normative class note (do not treat as product requirement text here):
+ROOT-001 / empty-keywords — empty active keywords + Search STARTED + bot on
+must arm Search EMPTY_KEYWORDS pause without a prior V3 intent (activity-control
+reconcile), not only after a FORCE_OFF → intent producer hop.
 
 ## Common freshness envelope
 
@@ -189,6 +251,8 @@ CERTIFY
 
 PLANNING_UPDATE
   Spec/target/behavior неоднозначны
+  (includes MISSING_STEADY_STATE_RECONCILE_SCENARIO when Spec omits
+   already-true / reconcile Scenario for a reconcile-on-observe invariant)
 ```
 
 ## SCENARIO_TEST_ONLY_PACKET
@@ -372,6 +436,7 @@ SCENARIO_TEST_COVERAGE_REPORT:
   WORKTREE_FINGERPRINT:
   ACTIVATION:
     SCENARIO_COVERAGE_REQUIRED: true | false
+    PRODUCT_ACCEPTANCE_REQUIRED: true | false | unknown
     ACTIVATION_VERSION:
   VERDICT: PASS | FAIL | BLOCKED
   SCENARIOS_TOTAL:
@@ -411,18 +476,25 @@ all required scenario tests executed green
 all used stubs have executable contract parity
 all required provider receipts present, PASS and fresh
 no weak/missing/blocked row
+no MISSING_STEADY_STATE_RECONCILE_SCENARIO when reconcile-on-observe applies
 ```
 
 ## Verify activation
 
-Legacy compatibility:
+Product Acceptance (kernel DONE) — see
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`:
 
 ```text
-SCENARIO_COVERAGE_REQUIRED absent|false
-→ report absence is not automatic archive NO_GO
+PRODUCT_ACCEPTANCE_REQUIRED=true
+→ LIFECYCLE_COVERAGE requires durable OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE
+→ AND fresh report VERDICT=PASS with rows mapped to echo steps
+→ missing echo / unconfirmed / unmapped rows / stale/FAIL/BLOCKED report
+   is archive blocker
+→ legacy SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this pillar
+→ scenario PASS alone never creates DONE without confirmed echo
 ```
 
-Versioned/opt-in:
+Standalone scenario flag (still honored):
 
 ```text
 SCENARIO_COVERAGE_REQUIRED=true
@@ -430,8 +502,17 @@ SCENARIO_COVERAGE_REQUIRED=true
 → missing/stale/FAIL/BLOCKED is archive blocker
 ```
 
+Legacy compatibility **only when Product Acceptance is NOT required**:
+
+```text
+PRODUCT_ACCEPTANCE_REQUIRED=false|NOT_REQUIRED
+AND SCENARIO_COVERAGE_REQUIRED absent|false
+→ report absence is not automatic archive NO_GO
+```
+
 Verify MUST NOT recompute the whole scenario matrix. It validates report
-identity/freshness and spot-checks acceptance-relevant evidence.
+identity/freshness and spot-checks acceptance-relevant evidence (including
+SIDE_EFFECT_PROOF rows when PA required).
 
 ## Anti-loop rules
 

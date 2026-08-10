@@ -331,35 +331,99 @@ class AutoAdvActiveControlService:
         auto_adv_id: int,
         search_status: WBAdvActiveStatus | None,
     ) -> bool:
-        """Потребить empty-keywords intent → Search pause + reason + notify.
+        """Потребить/вооружить empty-keywords intent → Search pause + reason + notify.
 
         Spec pause-on-empty-keywords / INC-PAUSE-02: TARGET_ENTITY_OR_LEG=SEARCH.
         ALLOWED: ``pause_auction_campaign``; FORBIDDEN: ``pause_auto_campaign``.
         Pause = следующий шаг после OFF (не concurrent с OFF).
+
+        Двухтиковое подтверждение пустоты (Owner
+        ``TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`` / ROOT-001):
+        1. Уже есть Redis intent (V3 apply после FORCE_OFF / тик-1 latch) и
+           набор всё ещё пуст → consume→pause Search **только если Search
+           STARTED**. Warmup ``__empty__`` не блокирует этот путь (prior
+           intent = settled confirmation).
+        2. No-prior-intent: активных ключей 0 и Search STARTED + **settled
+           empty** (не Redis warmup ``__empty__`` / transient false-empty) →
+           только ``set_intent`` (latch) и return False без consume/pause.
+           Pause — на следующем ``ensure``, если intent ещё есть и пустота
+           подтвердилась. ROOT-001 / tasks §7.2: warmup marker MUST NOT arm.
 
         Перед pause перечитывает активные ключи из ``ComplexAdv.get_keywords``.
         Если набор уже непустой (stale intent при TTL до 6h после recovery) —
         intent потребляется без WB pause / EMPTY_KEYWORDS reason / notify, и
         метод возвращает False, чтобы обычный activity-control продолжался.
 
+        Tick2 consume при Search **не** STARTED (budget/schedule pause между
+        тиками): intent потребляется, но MUST NOT ``_set_search_reason(
+        EMPTY_KEYWORDS)``, MUST NOT ``notify_empty_keywords_pause`` (resume
+        episode gate) и MUST NOT ``pause_auction_campaign`` — prior
+        schedule/budget reason сохраняется. Return True (как skip без
+        Search-ноги): activity-control не стартует Search при всё ещё
+        пустых ключах.
+
         Returns:
-            True если intent был и pause/reason/notify (или skip без Search)
-            выполнены; False если intent нет или отброшен как stale.
+            True если intent был потреблён и pause/reason/notify (или skip
+            без Search / skip при Search не STARTED) выполнены; False если
+            arm не нужен / только latch на тике-1 / intent отброшен как
+            stale / warmup false-empty.
         """
         from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
             EmptyKeywordsPauseIntentManager,
             count_active_keywords,
             notify_empty_keywords_pause,
+            should_request_empty_keywords_pause_intent,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.decision import (
+            is_warmup_false_empty_keywords,
         )
 
         intent_mgr = EmptyKeywordsPauseIntentManager()
-        if not await intent_mgr.peek_intent(int(auto_adv_id)):
-            return False
-
-        # Re-validate before consume→pause: keywords may recover while intent pending.
         keywords = await adv.get_keywords()
         active_count = count_active_keywords(keywords)
+        has_intent = await intent_mgr.peek_intent(int(auto_adv_id))
+
+        if not has_intent:
+            # Тик-1 (нет prior intent): только latch confirmation, без pause.
+            # Redis ``__empty__`` warmup / Adv warmup seam → refuse (ROOT-001).
+            # Search PAUSE → не ставим intent (иначе блокируется recheck-start).
+            campaign_is_started = search_status == WBAdvActiveStatus.STARTED
+            warmup_false_empty = await is_warmup_false_empty_keywords(
+                adv=adv,
+                redis_client=intent_mgr.client,
+                adv_id=int(auto_adv_id),
+            )
+            if not should_request_empty_keywords_pause_intent(
+                active_count=active_count,
+                bot_active=bool(adv.bot_active),
+                bot_driven_off_completed=False,
+                campaign_is_started=campaign_is_started,
+                is_warmup_false_empty=warmup_false_empty,
+            ):
+                if warmup_false_empty and active_count == 0 and campaign_is_started:
+                    logger.info(
+                        "Search activity: skip empty-keywords arm — Redis __empty__ "
+                        "warmup / transient false-empty (not settled empty) "
+                        "auto_adv_id=%s shop_id=%s active_count=%s",
+                        auto_adv_id,
+                        adv.shop_id,
+                        active_count,
+                    )
+                return False
+            await intent_mgr.set_intent(int(auto_adv_id))
+            logger.info(
+                "Search activity: empty-keywords intent latched (tick1 confirmation) "
+                "without pause — await tick2 if still empty "
+                "auto_adv_id=%s shop_id=%s active_count=%s",
+                auto_adv_id,
+                adv.shop_id,
+                active_count,
+            )
+            # Owner two-tick: same-tick set_intent→consume→pause запрещён.
+            return False
+
         if active_count > 0:
+            # Re-validate before consume→pause: keywords may recover while intent pending.
             await intent_mgr.consume_intent(int(auto_adv_id))
             logger.info(
                 "Search activity: empty-keywords intent discarded — active keywords "
@@ -393,17 +457,30 @@ class AutoAdvActiveControlService:
                 adv.shop_id,
             )
             await self._wb_modifier.pause_auction_campaign(adv)
-        await self._set_search_reason(
-            int(search_adv_id),
-            CampaignActivityCommand.PAUSE,
-            AuctionReasonCode.EMPTY_KEYWORDS,
-        )
-        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
-        await notify_empty_keywords_pause(
-            shop_id=str(adv.shop_id or ""),
-            adv_id=int(auto_adv_id),
-            campaign_name=campaign_name,
-            intent_manager=intent_mgr,
+            await self._set_search_reason(
+                int(search_adv_id),
+                CampaignActivityCommand.PAUSE,
+                AuctionReasonCode.EMPTY_KEYWORDS,
+            )
+            campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+            await notify_empty_keywords_pause(
+                shop_id=str(adv.shop_id or ""),
+                adv_id=int(auto_adv_id),
+                campaign_name=campaign_name,
+                intent_manager=intent_mgr,
+            )
+            return True
+
+        # Search не STARTED: intent уже потреблён; не маскируем prior
+        # schedule/budget reason EMPTY_KEYWORDS и не arm'им resume gate.
+        logger.info(
+            "Search activity: empty-keywords intent consumed but Search not "
+            "STARTED (skip pause/reason/notify) search_adv_id=%s "
+            "auto_adv_id=%s shop_id=%s search_status=%s",
+            search_adv_id,
+            auto_adv_id,
+            adv.shop_id,
+            search_status,
         )
         return True
 
@@ -419,6 +496,39 @@ class AutoAdvActiveControlService:
             adv,
             auto_adv_id,
             search_status=None,
+        )
+
+    async def _maybe_notify_empty_keywords_resume_after_search_start(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+    ) -> None:
+        """Resume notify после Search start или уже-STARTED recheck.
+
+        Spec ``User notification on empty-keywords resume/re-enable``.
+        Вызывается и из PAUSE/READY → start, и из Search STARTED веток
+        (common-budget / search-limit), когда keywords восстановились после
+        delivered pause episode (HUNT-001).
+
+        Gate внутри ``notify_empty_keywords_resume`` — debounce-ключ pause
+        notify. Дополнительно требуем active keywords > 0, чтобы recheck
+        start при пустых ключах не слал «возобновлено».
+        """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+            EmptyKeywordsPauseIntentManager,
+            count_active_keywords,
+            notify_empty_keywords_resume,
+        )
+
+        keywords = await adv.get_keywords()
+        if count_active_keywords(keywords) <= 0:
+            return
+        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+        await notify_empty_keywords_resume(
+            shop_id=str(adv.shop_id or ""),
+            adv_id=int(auto_adv_id),
+            campaign_name=campaign_name,
+            intent_manager=EmptyKeywordsPauseIntentManager(),
         )
 
     async def _set_auto_reason(
@@ -1114,15 +1224,26 @@ class AutoAdvActiveControlService:
                     CampaignActivityCommand.STARTED,
                     AuctionReasonCode.COMMON_OK,
                 )
+                await self._maybe_notify_empty_keywords_resume_after_search_start(
+                    adv,
+                    int(auto_adv_id),
+                )
             elif (
                 common_limit > 0
                 and combined_spend < common_limit
                 and search_status == WBAdvActiveStatus.STARTED
             ):
+                # HUNT-001: Search уже STARTED; keywords могли восстановиться
+                # после delivered pause — resume notify на том же helper, что
+                # и при PAUSE/READY → start.
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.STARTED,
                     AuctionReasonCode.COMMON_OK,
+                )
+                await self._maybe_notify_empty_keywords_resume_after_search_start(
+                    adv,
+                    int(auto_adv_id),
                 )
             return None
 
@@ -1167,11 +1288,22 @@ class AutoAdvActiveControlService:
                 CampaignActivityCommand.STARTED,
                 AuctionReasonCode.SEARCH_LIMIT_OK,
             )
+            await self._maybe_notify_empty_keywords_resume_after_search_start(
+                adv,
+                int(auto_adv_id),
+            )
         elif search_limit > 0 and search_status == WBAdvActiveStatus.STARTED:
+            # HUNT-001: Search уже STARTED; keywords могли восстановиться
+            # после delivered pause — resume notify на том же helper, что
+            # и при PAUSE/READY → start.
             await self._set_search_reason(
                 adv_id,
                 CampaignActivityCommand.STARTED,
                 AuctionReasonCode.SEARCH_LIMIT_OK,
+            )
+            await self._maybe_notify_empty_keywords_resume_after_search_start(
+                adv,
+                int(auto_adv_id),
             )
         elif search_limit == 0 and search_status == WBAdvActiveStatus.STARTED:
             logger.info(

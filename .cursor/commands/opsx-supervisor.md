@@ -1937,6 +1937,29 @@ ONE_NEXT_ACTION: OWNER_DECISION_REQUIRED
   writer) для durable materialization target / allowed / forbidden adapters;
 * запрещено продолжать `/opsx-apply` на chat-only ответе.
 
+### 21.2 Product Acceptance (kernel DONE) — no soft bypass
+
+Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`.
+
+```text
+SOFT_WAIVE_CLEARS_PRODUCT_ACCEPTANCE: FORBIDDEN
+SOFT_PASS_CREATES_DONE: FORBIDDEN
+```
+
+Rules:
+
+* Owner waive of soft tooling (pyright / ECC / perf / antipattern / static /
+  env) MUST NOT dispatch `/opsx-verify mode=archive` or `/opsx-archive` while
+  `PRODUCT_ACCEPTANCE_REQUIRED=true` and `PRODUCT_ACCEPTANCE_STATUS` is not
+  `PASS`.
+* On PA FAIL / BLOCKED, route by pillar — do **not** “continue soft chain”:
+  - `MEANING_LOCK` → Owner semantic decision + `/opsx-update` (durable);
+  - `LIFECYCLE_COVERAGE` → `/opsx-spec-scenario-coverage` plan/audit/certify;
+  - `SIDE_EFFECT_PROOF` → `/opsx-test` / apply test materialization with
+    `side_effect_proof` / `PA_SIDE_EFFECT_PROOF`.
+* Mission SUCCESS / archive path requires PA PASS or NOT_REQUIRED.
+* Do not invent `/opsx-product-acceptance`; verify remains sole archive GO.
+
 Если задача неразрешима без forbidden route:
 
 ```text

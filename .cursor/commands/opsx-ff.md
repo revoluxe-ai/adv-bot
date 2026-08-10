@@ -87,12 +87,27 @@ semantics from similar names.
 
    Before declaring apply readiness, evaluate the shared semantic-target
    contract against completed artifacts:
-   - `NOT_APPLICABLE` — continue;
+   - `NOT_APPLICABLE` — continue only when justified (single proven target);
+     competing legs/adapters MUST NOT use `NOT_APPLICABLE`;
    - `RESOLVED` — confirm all required fields are materialized;
    - `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` — stop and route the durable
      answer back through planning; chat-only selection is insufficient.
 
-6. **Show final status**
+6. **Product Acceptance (kernel DONE path)**
+
+   Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` before
+   apply-ready:
+   - Decide and record `PRODUCT_ACCEPTANCE_REQUIRED`.
+   - When required: MEANING_LOCK must be durable; write durable
+     `OWNER_LIFECYCLE_ECHO` (3–7 temporal steps) into design/decision/spec;
+     obtain Owner `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm);
+     schedule `/opsx-spec-scenario-coverage mode=plan` (lifecycle not
+     optional); note SIDE_EFFECT_PROOF obligations for acceptance tests.
+   - Do not declare apply-ready if PA required and MEANING_LOCK is missing
+     or blocked, **or** `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is
+     missing (chat-only lifecycle is not durable).
+
+7. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```

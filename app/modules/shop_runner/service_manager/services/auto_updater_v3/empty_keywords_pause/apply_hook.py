@@ -15,6 +15,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.dto import
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.decision import (
     count_active_keywords,
     had_force_off_action,
+    is_warmup_false_empty_keywords,
     should_request_empty_keywords_pause_intent,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.intent import (
@@ -41,6 +42,10 @@ async def maybe_set_empty_keywords_pause_intent(
     ``campaign_status`` — статус **Search**-ноги (INC-PAUSE-02 recheck).
     Intent keyed по ``adv_id`` комплекта; исполнение pause — Search adapters.
 
+    Redis ``__empty__`` warmup / transient false-empty (без FORCE_OFF) MUST NOT
+    arm intent — тот же gate, что ROOT-001 no-prior arm (tasks §7.2).
+    Bot-driven FORCE_OFF + empty set по-прежнему arms (settled empty).
+
     Returns:
         True если intent записан.
     """
@@ -56,14 +61,39 @@ async def maybe_set_empty_keywords_pause_intent(
             )
         except ValueError:
             campaign_is_started = False
+
+    intent_mgr = EmptyKeywordsPauseIntentManager()
+    # Apply_hook не получает ComplexAdv; Redis HEXISTS ``__empty__`` — канон
+    # (ROOT-001 helper ``is_warmup_false_empty_keywords``).
+    warmup_false_empty = await is_warmup_false_empty_keywords(
+        adv=object(),
+        redis_client=intent_mgr.client,
+        adv_id=int(adv_id),
+    )
     if not should_request_empty_keywords_pause_intent(
         active_count=active_count,
         bot_active=bot_active,
         bot_driven_off_completed=bot_driven_off,
         campaign_is_started=campaign_is_started,
+        is_warmup_false_empty=warmup_false_empty,
     ):
+        if (
+            warmup_false_empty
+            and not bot_driven_off
+            and active_count == 0
+            and campaign_is_started
+            and bot_active
+        ):
+            logger.info(
+                "[adv_id=%s] empty-keywords: skip intent arm — Redis __empty__ "
+                "warmup / transient false-empty (not settled empty; no FORCE_OFF) "
+                "active=%s started=%s",
+                adv_id,
+                active_count,
+                campaign_is_started,
+            )
         return False
-    await EmptyKeywordsPauseIntentManager().set_intent(int(adv_id))
+    await intent_mgr.set_intent(int(adv_id))
     logger.info(
         "[adv_id=%s] empty-keywords: pause intent set (active=%s off=%s started=%s)",
         adv_id,

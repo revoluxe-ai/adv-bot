@@ -341,6 +341,8 @@ If `GO` is present:
 5. Write PR body to a temporary file.
 6. Push current branch.
 7. Create PR with `gh pr create`.
+8. Run **Post-PR Bugbot report** (below) unless noted escapes.
+9. Emit final output including dual-channel `BUGBOT_POST_PR`.
 
 ## Commands after explicit GO only
 
@@ -364,6 +366,111 @@ gh pr create \
 
 Do not run `git push` or `gh pr create` before explicit `GO`.
 
+## Post-PR Bugbot report (mandatory after successful create)
+
+Runs **only** after a successful `gh pr create` that returned a PR URL/number.
+Does **not** replace `/opsx-project-bug-hunt` (pre-PR primary). Does **not**
+auto-fix findings.
+
+Two **different channels** must not be collapsed into one silent zero:
+
+| Channel | What it is |
+|---|---|
+| `cursor_task` | One in-chat Cursor Task (`subagent_type: bugbot`) on branch diff vs PR base |
+| `github_cursor_bot` | Review/issue comments posted on the PR by GitHub user `cursor[bot]` |
+
+`cursor_task` alone is **not** authority that GitHub Bugbot is empty.
+A thin chat reply «Bugbot found no bugs» while PR UI shows findings is a
+contract failure of the report shape — fix the report, do not tell Owner
+«0 findings» without a `github_cursor_bot` status.
+
+Does **not** treat unbounded waiting on GitHub CI as a substitute for
+`cursor_task`. Bounded fetch of already-posted `cursor[bot]` comments is
+required (see below).
+
+### Escape: `SKIP_BUGBOT_POST_PR`
+
+If user `GO` message contains the exact token `SKIP_BUGBOT_POST_PR`,
+skip the Cursor Task **and** skip GitHub fetch; emit:
+
+```text
+BUGBOT_POST_PR:
+- cursor_task:
+  - invoked: no
+  - ran: n/a
+  - findings_count: n/a
+  - findings_envelope: n/a
+  - skip_reason: SKIP_BUGBOT_POST_PR
+- github_cursor_bot:
+  - status: skipped
+  - findings_count: n/a
+  - skip_reason: SKIP_BUGBOT_POST_PR
+```
+
+### Otherwise (default)
+
+1. Launch **exactly one** Task with:
+   - `subagent_type: bugbot`
+   - `description: "Bugbot"`
+   - `run_in_background: false`
+   - prompt shape (Cursor `review-bugbot` skill contract):
+
+```text
+Full Repository Path: <absolute workspace / repo root>
+Diff: branch changes
+Base Branch: <PR target/base branch>
+```
+
+2. Retry policy: follow `review-bugbot` (one retry on bad invocation; one
+   natural-language Diff fallback only if diff could not be computed; then stop).
+3. Classify `cursor_task.findings_envelope`:
+   - `complete` — reply includes usable Severity | Location | Finding rows
+     (or an explicit empty table / «none» with structured fields);
+   - `incomplete` — prose-only empty claim (e.g. «Bugbot found no bugs»)
+     without that table shape → **must not** be presented as definitive
+     empty without `github_cursor_bot` status.
+4. **Bounded GitHub `cursor[bot]` fetch** (required; not a CI wait loop):
+   - TIME_BUDGET: ≤60s total; at most **2** attempts; sleep ≤15s between
+     attempts if first returns no comments;
+   - Prefer: `gh api` pull review comments + issue comments / reviews for
+     the new PR number, filter `user.login == cursor[bot]` (or equivalent);
+   - Map each finding to Severity | Location | Finding when parseable;
+   - Status values:
+     - `findings` — ≥1 comment/finding mapped (`findings_count` = N);
+     - `pending` — PR exists, no `cursor[bot]` comments yet after attempts
+       (**not** the same as zero findings);
+     - `unavailable` — `gh`/API error or auth gap (record short `error`);
+     - `skipped` — only with `SKIP_BUGBOT_POST_PR`.
+5. Emit in the create-pr reply (before product-fix handoffs):
+
+```text
+BUGBOT_POST_PR:
+- cursor_task:
+  - invoked: yes
+  - ran: yes | no | failed
+  - findings_count: <N or n/a>
+  - findings_envelope: complete | incomplete | n/a
+  - findings: none | <markdown table Severity | Location | Finding>
+  - error: <short blocker if ran=failed; else omit>
+- github_cursor_bot:
+  - status: findings | pending | unavailable | skipped
+  - findings_count: <N or n/a>
+  - findings: none | <markdown table Severity | Location | Finding>
+  - error: <short blocker if unavailable; else omit>
+```
+
+Priority of the report for the owner:
+
+1. Were **both** channels reported? (`cursor_task` + `github_cursor_bot`)
+2. Did Cursor Task run? (`cursor_task.invoked` / `ran` / `findings_envelope`)
+3. What does GitHub `cursor[bot]` show? (`github_cursor_bot.status` / count)
+4. Tables for whichever channel has findings — do not invent rows.
+
+Do not invent findings. Do not open a second Bugbot Task in the same create-pr
+turn after a completed `cursor_task` report. Do not claim «0 Bugbot findings»
+when `github_cursor_bot.status=pending` or `unavailable`, or when
+`cursor_task.findings_envelope=incomplete` and GitHub was not fetched.
+
 ## Output format before GO
 
 1. Target/base branch:
@@ -385,4 +492,5 @@ Do not run `git push` or `gh pr create` before explicit `GO`.
 3. Head branch:
 4. PR title:
 5. PR URL:
-6. Next recommended action:
+6. BUGBOT_POST_PR: (dual-channel `cursor_task` + `github_cursor_bot`)
+7. Next recommended action:

@@ -52,11 +52,22 @@ class EmptyKeywordsPauseIntentManager(RedisManager):
         ok = await self.client.set(key, "1", ex=self._NOTIFY_TTL, nx=True)
         return bool(ok)
 
+    async def was_notified(self, adv_id: int) -> bool:
+        """True если debounce-ключ pause notify ещё активен (delivered episode).
+
+        Используется resume/re-enable notify: без prior pause-notify episode
+        ordinary Search start MUST NOT слать resume-сообщение.
+        """
+        raw = await self.client.get(self._notify_key(adv_id))
+        return bool(raw)
+
     async def release_notified(self, adv_id: int) -> None:
         """Снять debounce-ключ, если доставка не подтверждена.
 
         Нужен, когда ``mark_notified`` уже занял окно TTL, но ни один
         ``send_message`` не завершился успешно — иначе повтор в том же
         окне будет подавлен без доставки.
+
+        Также закрывает episode после успешного resume/re-enable notify.
         """
         await self.client.delete(self._notify_key(adv_id))

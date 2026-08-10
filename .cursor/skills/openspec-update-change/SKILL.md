@@ -24,6 +24,13 @@ allowed/forbidden adapters, evidence and paired tests. Chat-only Owner answers
 are insufficient; unresolved choice returns
 `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and must not be marked apply-ready.
 
+**Product Acceptance / change spirit:** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When
+`PRODUCT_ACCEPTANCE_REQUIRED=true`, revise planning until durable
+`OWNER_LIFECYCLE_ECHO` (3–7 temporal steps) exists in design/decision/spec
+and Owner has issued `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm).
+Chat-only lifecycle is insufficient; do not mark apply-ready without it.
+
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
@@ -101,6 +108,8 @@ After each invocation, show:
 - Do not mark artifacts coherent while a high-risk multi-target write remains
   unresolved (`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`); materialize Owner
   semantic answers into artifacts before recommending apply.
+- Do not recommend apply-ready when `PRODUCT_ACCEPTANCE_REQUIRED=true` and
+  `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is missing.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

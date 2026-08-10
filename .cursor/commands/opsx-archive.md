@@ -19,6 +19,13 @@ artifacts/decision. `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` or missing explicit
 destructive target is a **hard stop** — do not sync, promote decisions, or move
 the change. This is not an overridable warning.
 
+**Product Acceptance hard stop:** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. Archive requires
+`PRODUCT_ACCEPTANCE_STATUS=PASS` or `NOT_REQUIRED` from the archive verify.
+When `PRODUCT_ACCEPTANCE_REQUIRED=true`, `FAIL` / `BLOCKED` / missing PA is a
+**hard stop** — soft tooling waives do not clear it. Do not sync, promote, or
+move the change.
+
 **Verify-phase hard stop:** Follow
 `.cursor/pipeline/contracts/VERIFY_PHASES.md`. Archive requires a recent
 `/opsx-verify mode=archive` with final marker `✅ GO` for this change.
@@ -89,6 +96,21 @@ DO_NOT_DO_YET: sync / decision promote / archive move
      `NO_GO` / `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; stop;
    - do **not** treat this as a confirmable warning;
    - route Owner to `/opsx-update` for durable materialization.
+
+4a. **Product Acceptance archive gate (hard stop)**
+
+   Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` **before** sync,
+   decision promotion, or archive move:
+   - require archive-verify evidence of `PRODUCT_ACCEPTANCE_STATUS=PASS` or
+     `NOT_REQUIRED`;
+   - if `PRODUCT_ACCEPTANCE_REQUIRED=true` and status is not PASS → stop with
+     `product_acceptance_not_pass` (include fail pillar when known);
+   - soft ECC/pyright/static Owner waives do **not** clear this gate;
+   - route MEANING → `/opsx-update`; LIFECYCLE missing/unconfirmed
+     `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` → `/opsx-update` (or
+     `/opsx-ff`); LIFECYCLE scenario report / unmapped rows →
+     `/opsx-spec-scenario-coverage`; SIDE_EFFECT → `/opsx-test` /
+     apply test materialization — then `/opsx-verify mode=archive`.
 
 5. **Assess delta spec sync state**
 

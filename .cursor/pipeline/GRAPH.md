@@ -29,15 +29,22 @@
 - change_scaffolded: change dir exists; first artifact pending (`/opsx-new`)
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
-- scenario_coverage_plan_ready: optional/versioned
-  `/opsx-spec-scenario-coverage mode=plan`; required evidence matrix known
+- product_acceptance_required: PA kernel on
+  (`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`); DONE ≠ soft tooling
+- product_acceptance_pass: PRODUCT_ACCEPTANCE_STATUS=PASS (or NOT_REQUIRED)
+- product_acceptance_fail: PA FAIL/BLOCKED; archive blocked by pillar
+- scenario_coverage_plan_ready: `/opsx-spec-scenario-coverage mode=plan`;
+  **hard** when `PRODUCT_ACCEPTANCE_REQUIRED=true`; else legacy
+  optional/versioned via `SCENARIO_COVERAGE_REQUIRED` alone
 - scope_bounded: scope split "now vs later" agreed; deferred parks prepared for update handoff
 - implementing: `/opsx-apply` in progress
 - impl_done: tasks complete; PRIMARY `/opsx-verify mode=impl` (VERIFY_PHASES);
+  when PA required: scenario audit/certify toward product_acceptance_pass;
   then soft-recommend pyright → external-call → conditional performance-review
   when production `.py`, then antipattern-gate → `/opsx-test-env UP` (before
   destructive/FULL) → static-check → `/opsx-test-env DOWN` (after PASS) →
-  `/opsx-verify mode=archive`
+  `/opsx-verify mode=archive` (archive GO needs product_acceptance_pass;
+  soft tooling cannot create DONE)
 - impl_verified: `mode=impl` ✅ IMPL_OK (not archive-eligible)
 - impl_gaps: `mode=impl` ❌ IMPL_GAPS → apply/update
 - scenario_coverage_gaps: scenario audit FAIL; route TEST_ONLY to `/opsx-test`,
@@ -251,7 +258,8 @@
   REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
 - known_flaws: durable plan/report persistence still chat-output in v1
   (receipts may live under `.tmp/opsx-scenario-coverage/`); archive activation
-  remains versioned via `SCENARIO_COVERAGE_REQUIRED`
+  via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
+  `PRODUCT_ACCEPTANCE_REQUIRED=true` (legacy opt-out alone cannot waive PA)
 
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
@@ -387,20 +395,24 @@
   Owner-block must show A/B/C + optional explore + pasteable THEN_RETURN
 
 ### /opsx-verify
-- purpose: phased read-only audit (VERIFY_PHASES: mode=impl DoD | mode=archive gate)
-- input_state: impl_done | static_check_done | impl_verified
-- output_state: impl_verified | impl_gaps | verify_pass | verify_fail
-- artifacts_read: change artifacts, code, VERIFY_PHASES, VERIFY_POLICY
+- purpose: phased read-only audit (VERIFY_PHASES: mode=impl DoD | mode=archive gate);
+  sole archive DONE consumer for Product Acceptance
+- input_state: impl_done | static_check_done | impl_verified |
+  product_acceptance_required | scenario_coverage_certified
+- output_state: impl_verified | impl_gaps | product_acceptance_pass |
+  product_acceptance_fail | verify_pass | verify_fail
+- artifacts_read: change artifacts, code, VERIFY_PHASES, VERIFY_POLICY,
+  PRODUCT_ACCEPTANCE, SEMANTIC_WRITE_TARGET, scenario report when applicable
 - artifacts_written: none (read-only)
 - decision_owner: verifier
-- next_typical: /opsx-pyright-strict-coverage (after IMPL_OK+prod.py) | /opsx-static-check FULL CACHE_OFF (when prior FULL was cache-dev) | /opsx-verify mode=archive | /opsx-archive (after GO) | /opsx-apply | /opsx-update
-- known_flaws: bare /opsx-verify defaults archive (WARN); ≠ /opsx-test verify; archive soft WARN if last FULL CACHE_MODE=dev
+- next_typical: /opsx-pyright-strict-coverage (after IMPL_OK+prod.py) | /opsx-static-check FULL CACHE_OFF (when prior FULL was cache-dev) | /opsx-verify mode=archive | /opsx-archive (after GO+PA) | /opsx-apply | /opsx-update | /opsx-spec-scenario-coverage (PA LIFECYCLE fail)
+- known_flaws: bare /opsx-verify defaults archive (WARN); ≠ /opsx-test verify; archive soft WARN if last FULL CACHE_MODE=dev; soft tooling still advisory vs PA
 
 ### /opsx-archive
 - purpose: archive a completed change
-- input_state: verify_pass
+- input_state: verify_pass | product_acceptance_pass
 - output_state: archived
-- artifacts_read: change + decisions to promote
+- artifacts_read: change + decisions to promote; PA status from archive verify
 - artifacts_written: archive move; promoted decisions
 - decision_owner: archiver
 - next_typical: none | /opsx-commit | /opsx-create-pr
@@ -546,14 +558,14 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-create-pr
-- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only
+- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only; after successful gh pr create emit dual-channel BUGBOT_POST_PR — cursor_task (one Cursor Task bugbot, Diff branch changes, Base=PR base) plus bounded github_cursor_bot fetch of PR comments from cursor[bot] (pending≠zero; thin Task empty envelope=incomplete); escape SKIP_BUGBOT_POST_PR skips both; does not replace project-bug-hunt; does not auto-fix
 - input_state: pr_ready
 - output_state: pr_ready
-- artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT
-- artifacts_written: remote PR (via gh)
+- artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT; post-create gh PR cursor[bot] comments (bounded)
+- artifacts_written: remote PR (via gh); chat dual-channel BUGBOT_POST_PR report
 - decision_owner: PR author
-- next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks)
-- known_flaws: receipt gate is command-owned (not soft graph advice)
+- next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks) | residual Bugbot findings → intake/learn path if product/logic
+- known_flaws: receipt gate is command-owned (not soft graph advice); cursor_task ≠ GitHub cursor[bot] — must not collapse channels into one silent zero; bounded fetch ≠ unbounded CI wait
 
 ### Explicitly excluded from graph
 - /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)

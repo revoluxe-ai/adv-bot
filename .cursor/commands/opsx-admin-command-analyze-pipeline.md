@@ -40,6 +40,45 @@ analysis / improvement options — not as a general OPSX meta front-door.
 
 ------------------------------------------------------------------------
 
+# TOPIC_INTENT gate (mandatory — before Modes / transcript search)
+
+**Defect class:** sticky prior-turn topic hijacks a new Owner ask
+(CMD-ANALYZE-PIPELINE-TOPIC-STICKY-001).
+
+Before any transcript search, chat-history framing, `CURRENT_GRAPH` build, or
+`IMPROVEMENT_PROPOSAL`, resolve exactly one:
+
+```text
+TOPIC_INTENT: PRODUCT_BRIEF | PROCESS_PIPELINE | AMBIGUOUS
+```
+
+Rules:
+
+1. Decide from the **current** user message first. Prior turns are hints only;
+   they MUST NOT become the default topic.
+2. Forbidden: treat «обучение» / learning / promote / DEFERRED from an earlier
+   turn as the topic of a new ask that never names learning/process.
+3. If `AMBIGUOUS` (e.g. bare «задача», «найди чаты где я объяснял») → ask
+   **one** narrow question and stop; do not answer yet:
+
+   ```text
+   PRODUCT_BRIEF (продуктовая постановка / North Star / evolution)
+   или PROCESS_PIPELINE (команды, gates, обучение process, UX пайплайна)?
+   ```
+
+4. `PRODUCT_BRIEF` → this command MUST NOT reframe as learning/promote
+   analysis. Locate Owner product briefs / cite durable product SoT
+   (`openspec/evolution/**` when applicable) or emit `WRONG_SURFACE` with
+   pasteable next: `/opsx-evolution` or `/opsx-explore`. Learning is out of
+   scope unless Owner explicitly names it in the current message.
+
+5. `PROCESS_PIPELINE` → proceed with Modes below (process design only). Do
+   not rewrite product domain specs as the primary answer.
+
+Emit `TOPIC_INTENT:` in the first status block of every run.
+
+------------------------------------------------------------------------
+
 # Core evaluation question
 
 Ask:
@@ -79,7 +118,38 @@ Show:
 -   problem;
 -   proposed behavior;
 -   human impact;
--   risks.
+-   risks;
+-   `REMEDY_CLASS` (required — see Class vs local remedy).
+
+## Class vs local remedy (mandatory)
+
+Every `IMPROVEMENT_OPTION` MUST declare exactly one:
+
+| `REMEDY_CLASS` | Meaning |
+|---|---|
+| `LOCAL_SYMPTOM` | Narrow patch to one command/gate symptom; does not create DONE |
+| `CLASS_KERNEL` | Recurring class failure (ownership, DONE authority, lifecycle meaning, durable handoff) |
+| `AUTHORITY_ALREADY_EXISTS` | Durable contract already covers the class; need enforce/hand-off, not a new parallel gate |
+
+When evidence shows a class/kernel gap (especially DONE = procedural greenness
+vs Owner meaning / lifecycle / side-effect proof):
+
+1. Prefer citing exact durable paths already in-repo. Default authority for
+   product DONE meaning:
+   `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`
+   (MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧ SIDE_EFFECT_PROOF).
+2. `RECOMMENDED_OPTION` MUST be `CLASS_KERNEL` or `AUTHORITY_ALREADY_EXISTS`
+   when such evidence is present — not a menu of new soft gates.
+3. `NEXT_ACTION` / `CLASS_HANDOFF` MUST prefer:
+   - `/opsx-admin-command-promote-process-lesson` (transferable process class),
+     and/or
+   - `/opsx-admin-command-design-command` with `EXTEND_EXISTING` on the cited
+     authority — not inventing a parallel local gate bundle as the primary fix.
+4. **Forbidden as primary recommendation** when class gap is evidenced:
+   inventing soft-gate option bundles that duplicate Product Acceptance pillars
+   (extra MEANING / LIFECYCLE / SIDE_EFFECT checklists sold as new DONE gates).
+5. `LOCAL_SYMPTOM` options may appear only as **secondary**, explicitly labeled
+   non-kernel, and MUST NOT claim they create archive-eligible DONE.
 
 ## REGRESSION_PIPELINE_REVIEW
 
@@ -403,6 +473,9 @@ The user should be able to predict:
 ``` text
 PIPELINE_IMPROVEMENT_PROPOSAL:
 
+REMEDY_CLASS:
+LOCAL_SYMPTOM | CLASS_KERNEL | AUTHORITY_ALREADY_EXISTS
+
 CURRENT_FLOW:
 
 PROBLEM:
@@ -419,6 +492,15 @@ lower | same | higher
 RISK:
 
 FILES_AFFECTED:
+
+DURABLE_AUTHORITY_CITED:
+(exact path(s); required for CLASS_KERNEL and AUTHORITY_ALREADY_EXISTS;
+ prefer .cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md when DONE/meaning)
+
+CLASS_HANDOFF:
+/opsx-admin-command-promote-process-lesson
+| /opsx-admin-command-design-command EXTEND_EXISTING
+| none (LOCAL_SYMPTOM secondary only)
 
 OWNER_DECISION_REQUIRED:
 ```
@@ -444,6 +526,18 @@ HUMAN_USABILITY_SCORE:
 PROBLEMS_FOUND:
 
 IMPROVEMENT_OPTIONS:
+(each option MUST include REMEDY_CLASS)
+
+REMEDY_CLASS_SUMMARY:
+LOCAL_SYMPTOM: N
+CLASS_KERNEL: N
+AUTHORITY_ALREADY_EXISTS: N
+
+DURABLE_AUTHORITY_CITED:
+(exact path(s) for class/authority options; or none)
+
+CLASS_HANDOFF:
+(command + target authority; or none if only LOCAL_SYMPTOM)
 
 RECOMMENDED_OPTION:
 
@@ -452,6 +546,8 @@ REASON:
 REGRESSION_RISKS:
 
 NEXT_ACTION:
+(when class/authority evidenced: promote-process-lesson and/or
+ design-command EXTEND_EXISTING — not a primary local soft-gate menu)
 ```
 
 ------------------------------------------------------------------------
@@ -460,8 +556,15 @@ NEXT_ACTION:
 
 Before returning:
 
+-   `TOPIC_INTENT` resolved from the current user message and emitted;
+    AMBIGUOUS did not get a full answer; PRODUCT_BRIEF was not answered as
+    learning/promote; sticky prior-turn «обучение» was not used as default.
 -   Do not optimize only for AI execution.
 -   Do not reduce complexity without considering clarity.
 -   Do not invent states without evidence.
 -   Do not propose changes without explaining human impact.
 -   Keep analysis separate from implementation.
+-   Every IMPROVEMENT_OPTION has REMEDY_CLASS.
+-   Class/authority evidence ⇒ RECOMMENDED_OPTION is not a new parallel soft-gate
+    bundle; DURABLE_AUTHORITY_CITED and CLASS_HANDOFF are filled.
+-   LOCAL_SYMPTOM options do not claim they create DONE.
