@@ -16,6 +16,7 @@ local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
 **Contract:** `OPSX-WB-EVOLUTION-01`  
 **Runtime class:** `ACTIVE`  
 **Authority:** project-local North Star planning under `openspec/evolution/**`.
+`DOTO/WORKLOG.md` is secondary raw Owner notes only — never the registry SoT.
 
 ## Target safety and authority
 
@@ -35,6 +36,7 @@ policy:   openspec/policies/EVOLUTION_POLICY.md
 index:    openspec/evolution/index.md
 template: openspec/evolution/_template/north-star.md
 cards:    openspec/evolution/<star-slug>.md
+worklog:  DOTO/WORKLOG.md   (secondary peek; raw notes; not SoT)
 decisions: openspec/decisions/**
 ```
 
@@ -105,6 +107,12 @@ Future Increments  = context only, never current DoD
 
 This command never creates an OpenSpec change, edits implementation, applies a
 task, verifies a change, archives it, or commits it.
+
+`DOTO/WORKLOG.md` is **secondary** raw notes (per `EVOLUTION_POLICY` Authority):
+it may mention `STAR_ID` / `INCREMENT_ID` / deferred parks. Peek and account for
+relevant lines; never treat WORKLOG as North Star registry, Current Increment
+DoD, or paste SoT. This command never writes or appends WORKLOG
+(`/opsx-bound-scope:GO` owns deferred parks).
 
 ## Relationship to other commands
 
@@ -247,9 +255,33 @@ override `RECOMMENDED`. Do **not** emit `COPY_BLOCK` until Owner pick/confirm.
 ## READ_ONLY plan flow
 
 1. Read the policy and `openspec/evolution/index.md` first.
+1b. **Secondary WORKLOG peek** (mandatory on draft / advice / `ROUTE_SHOWN` /
+    pick-prep / handoff turns; lightweight or skippable only for pure
+    `MAP_SHOWN` «что есть?» / index-only):
+
+    - Path: `DOTO/WORKLOG.md`. If missing → continue with
+      `WORKLOG not found, continuing without it.` (never FAIL / never
+      `EVIDENCE_GAP` solely for absence).
+    - Prefer bounded `Grep` for selected `STAR_ID`, theme aliases,
+      `[deferred-from:…]`, or Owner goal keywords; do **not** dump the whole
+      inbox into advice.
+    - Emit chat-only **`WORKLOG_CONTEXT`** (label notes `Worklog-derived`):
+
+      ```text
+      WORKLOG_CONTEXT:
+      - status: read | missing_continue
+      - relevant_notes: <0..N one-liners, Worklog-derived>
+      - influence: none | overlap_hint | priority_hint | deferred_park_seen
+      ```
+
+    - Use as overlap / priority / deferred-park hints only. Do **not**
+      auto-promote every WORKLOG line into `CURRENT_INCREMENT`,
+      `CHANGE_CANDIDATES`, `FUTURE_INCREMENTS`, or `COPY_BLOCK`. On conflict,
+      prefer registry card + `ARTIFACT_CONTEXT` over WORKLOG.
 2. Resolve an exact selected card, or read at most three strongest candidates.
 3. Search overlap using titles/aliases, capability scope, domains, linked
-   active/archived changes, and Current/Future Increment outcomes.
+   active/archived changes, Current/Future Increment outcomes, and any
+   `WORKLOG_CONTEXT` hints from step 1b.
 4. Display candidates as `Title (STAR_ID)` with one-line overlap reasons.
 5. If several plausible cards exist, ask one Owner question:
 
@@ -449,6 +481,7 @@ GAP (as a section header)
 DECISIONS (dumps / cite lists)
 STAR_ROUTE / VALUE_CHAIN / ARTIFACT_CONTEXT / DEPENDS_ON*
 CHANGE_CANDIDATES / RECOMMENDED
+WORKLOG_CONTEXT / Worklog-derived dumps
 any /opsx-* slash command
 live-deploy / devops / soft_prod_server_ops “do this now” prose
 RENAME_HINT
@@ -462,7 +495,8 @@ Thin forbid/re-do boundaries belong in `OUT_OF_SCOPE` / `KEEP` /
 
 Still emit for this conversation when useful: `STAR_ROUTE`,
 `CHANGE_CANDIDATES`, `RECOMMENDED`, `ARTIFACT_CONTEXT` (incl. ALREADY_DELIVERED
-/ GAP / validation notes), `DEPENDS_ON`, `DEPENDS_ON_WARN`, `VALUE_CHAIN`,
+/ GAP / validation notes), `WORKLOG_CONTEXT` (secondary raw notes; never SoT),
+`DEPENDS_ON`, `DEPENDS_ON_WARN`, `VALUE_CHAIN`,
 contribution notes, decision cites, `CARD_PATH` / North Star title. These help
 humans here; they are **not** the paste payload and must not replace
 COPY_BLOCK.
@@ -552,6 +586,7 @@ DEPENDS_ON:
 DEPENDS_ON_WARN:
 VALUE_CHAIN:
 ARTIFACT_CONTEXT:
+WORKLOG_CONTEXT: (secondary; omit only pure MAP_SHOWN or missing+noted)
 EXISTING_CHANGE_COLLISION: (when applicable; else omit or none)
 RENAME_HINT: (when triggered; else omit or none)
 OWNER_DECISION_REQUIRED: yes | no
@@ -594,6 +629,16 @@ optional until advice/handoff.
 - Never require linking for every change.
 - Never migrate legacy changes automatically.
 - Never store cards in `WORKLOG.md`.
+- Never treat `DOTO/WORKLOG.md` as North Star registry, Current Increment DoD,
+  or paste SoT; peek as secondary raw notes only.
+- Never omit the WORKLOG peek (`WORKLOG_CONTEXT`) on draft / advice /
+  `ROUTE_SHOWN` / pick-prep / handoff turns when the file exists (pure
+  `MAP_SHOWN` may keep it lightweight or skip; missing file → continue, not
+  fail).
+- Never write, append, or rewrite `DOTO/WORKLOG.md` from this command
+  (deferred parks: `/opsx-bound-scope:GO` only).
+- Never auto-promote every WORKLOG line into `CURRENT_INCREMENT`,
+  `CHANGE_CANDIDATES`, `FUTURE_INCREMENTS`, or `COPY_BLOCK`.
 - Never promote an `EVOLUTION_CANDIDATE` without Owner `GO`.
 - Never treat `EVOLUTION_PATH` as a promised backlog.
 - Never add Future Increments to specs, acceptance, or tasks.
@@ -610,6 +655,7 @@ optional until advice/handoff.
 - Never omit `CHANGE_CANDIDATES` + exactly one `RECOMMENDED` on advice /
   `ROUTE_SHOWN` / pick-prep turns (pure `MAP_SHOWN` is the only skip).
 - Never put `CHANGE_CANDIDATES` / `RECOMMENDED` **inside** COPY_BLOCK.
+- Never put `WORKLOG_CONTEXT` / Worklog-derived dumps **inside** COPY_BLOCK.
 - Never use diff size, file/module/task count, or specs/tasks/models count as
   the primary Change-boundary signal.
 - Never mechanically split a human-natural single finished function into
@@ -620,8 +666,8 @@ optional until advice/handoff.
 - Never put non-canonical bait sections inside COPY_BLOCK
   (`VALIDATION*`, `ALREADY_DELIVERED`, `GAP`, `DECISIONS` dumps, `STAR_ROUTE`,
   `CHANGE_CANDIDATES`, `RECOMMENDED`, `VALUE_CHAIN`, `ARTIFACT_CONTEXT`,
-  `DEPENDS_ON*`, `EXISTING_CHANGE_COLLISION`, `RENAME_HINT`, deploy/devops
-  “do now” prose); keep those chat-only.
+  `WORKLOG_CONTEXT`, `DEPENDS_ON*`, `EXISTING_CHANGE_COLLISION`, `RENAME_HINT`,
+  deploy/devops “do now” prose); keep those chat-only.
 - Never put outcome essays under `FUTURE_INCREMENTS` (ids only).
 - Never omit COPY_BLOCK after OWNER_PICK when emitting CURRENT_INCREMENT_READY.
 - Never emit a thin/incomplete COPY_BLOCK that forces consumers to read the
