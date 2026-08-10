@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-08-09T10:35:00Z",
+  "updated_at_utc": "2026-08-10T05:58:00Z",
   "namespace": "prod-adv-bot",
   "database_identity": "prod-adv-bot/postgres-db/adv_updater",
   "alembic_head": "f2a3b4c5d6e7",
@@ -9,14 +9,14 @@
   "control_baseline_status": "RECONCILED",
   "prod_automation_enablement_allowed": "NO",
   "image_repository": "harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot",
-  "image_tag": "0e7273aec3bd41470f0fe664fa492f5eef10df99",
-  "image_digest": "sha256:0c3ee41057f198ec7e6847847bfc20aea74c442312bc2cc5228c60a7b32c29e1",
-  "fallback_image_tag": "fd6d2d0155fe08c3f1843da2118bf0194e612841",
-  "fallback_image_digest": "sha256:c021535fcb793850dc474db0a05e564d50653370a7ba96288888b03a0273b009",
+  "image_tag": "4f2a84a086947bbf80174d354be495e6ba14ddd3",
+  "image_digest": "sha256:40b39f4f866f25bb3d8a3a0bc533a6662c7fe3495cc4534aeda7e4e6bc52668d",
+  "fallback_image_tag": "0e7273aec3bd41470f0fe664fa492f5eef10df99",
+  "fallback_image_digest": "sha256:0c3ee41057f198ec7e6847847bfc20aea74c442312bc2cc5228c60a7b32c29e1",
   "last_migrate_outcome": "SKIPPED_SCHEMA_ALREADY_AT_HEAD",
   "last_control_outcome": "DRY_RUN_OK",
-  "last_control_job": "app-db-control-0e7273ae-dry",
-  "workflow_run_id": "31307330107",
+  "last_control_job": "app-db-control-4f2a84a0-dry",
+  "workflow_run_id": "31359209312",
   "entrypoints_on_image": [
     "wb-sky-bot",
     "adv-bot-updater",
@@ -30,6 +30,6 @@
   "notes": [
     "Harbor git-registry-cache is pull-through proxy",
     "Do not laptop-alembic; Job path only under /opsx-devops SAFE_PROD_RELEASE",
-    "2026-08-09 GO: CONTROL_DRY_RUN=1; migrate and complete_release skipped; CAS to PR#429 merge image"
+    "2026-08-10 GO: CONTROL_DRY_RUN=1; migrate and complete_release skipped; CAS to PR#430 merge image"
   ]
 }

@@ -49,13 +49,13 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `0e7273aec3bd41470f0fe664fa492f5eef10df99` |
-| Platform digest | `sha256:0c3ee41057f198ec7e6847847bfc20aea74c442312bc2cc5228c60a7b32c29e1` |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:0e7273aec3bd41470f0fe664fa492f5eef10df99` |
-| App Deployments on this image | yes (CAS 2026-08-09; `free-bot` replicas=0) |
-| Last migrate Job | skipped this GO (`CONTROL_DRY_RUN=1`, head already `f2a3…`; prior SUCCESS_NOOP) |
-| Last CONTROL | dry-run Job `app-db-control-0e7273ae-dry` → `DRY_RUN_OK` (no lease) |
-| Prepared fallback (prior LKG) | tag `fd6d2d0155fe08c3f1843da2118bf0194e612841` / digest `sha256:c021535fcb793850dc474db0a05e564d50653370a7ba96288888b03a0273b009` |
+| Image tag | `4f2a84a086947bbf80174d354be495e6ba14ddd3` |
+| Platform digest | `sha256:40b39f4f866f25bb3d8a3a0bc533a6662c7fe3495cc4534aeda7e4e6bc52668d` |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:4f2a84a086947bbf80174d354be495e6ba14ddd3` |
+| App Deployments on this image | yes (CAS 2026-08-10; `free-bot` replicas=0) |
+| Last migrate Job | skipped this GO (`CONTROL_DRY_RUN=1`, head already `f2a3…`; no alembic files in PR #430) |
+| Last CONTROL | dry-run Job `app-db-control-4f2a84a0-dry` → `DRY_RUN_OK` (no lease) |
+| Prepared fallback (prior LKG) | tag `0e7273aec3bd41470f0fe664fa492f5eef10df99` / digest `sha256:0c3ee41057f198ec7e6847847bfc20aea74c442312bc2cc5228c60a7b32c29e1` |
 
 ## Open risks / follow-ups
 
@@ -63,7 +63,7 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 * Harbor direct push from CI fails on proxy project; rely on pull-through.
 * Next Expand release must update APPLICATION `source_history_hash` (Owner) before acquire with real graph hash.
 * Shop-runner operational noise (`NotFoundActiveAdvCompany`, keywords cache miss) is not schema regression.
-* Watch empty-keywords Search pause path in prod after PR #429 image; rollback CAS to fallback if needed.
+* Watch empty-keywords Search pause path in prod after PR #430 image (two-tick + warmup gate); rollback CAS to fallback if needed.
 
 ## Action log (append-only summary)
 
@@ -73,3 +73,4 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-01 | CONTROL dry-run + CAS all entrypoints → `fd6d2d…` | apps Running; no UndefinedColumn |
 | 2026-08-02 | OPTION_A: `/opsx-devops` + OPS_STATE memory landed in repo | process ready |
 | 2026-08-09 | CONTROL dry-run `0e7273ae` + CAS entrypoints (migrate/complete_release skipped) | apps Running on `0e7273ae…` @ `sha256:0c3ee410…` |
+| 2026-08-10 | CONTROL dry-run `4f2a84a0` + CAS entrypoints (migrate/complete_release skipped; PR #430) | apps Running on `4f2a84a0…` @ `sha256:40b39f4f…` |
