@@ -63,6 +63,14 @@ Start a new change using the experimental artifact-driven approach.
    themselves part of the Owner's stated task. Do not mechanically shorten or
    copy `proposal.md`. Aim for roughly 10–30 substantive lines.
 
+   **UI labels preference:** When describing product behavior in Owner Contract,
+   prefer the exact button / menu / screen labels the user sees in the UI
+   (quote them or write «как на кнопке: …») whenever those labels are known
+   from the Owner request, change context, or existing UI copy. If no UI label
+   is known, fall back to ordinary domain language — never invent button names.
+   This is a preference for the companion `owner-contract.md` only, not a
+   scaffold blocker and not a requirement for schema artifacts.
+
    Required structure:
 
    ```markdown
