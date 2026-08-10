@@ -67,6 +67,15 @@ latch, notify и 7d recheck invariants остаются.
   re-enable, MUST send a distinct resume/re-enable Telegram notify to the
   same shop-linked recipients. Pause-entry notify and recheck-mention
   inside the pause message MUST NOT substitute for resume notify.
+- **Two-tick empty confirmation before Search pause (puna-empty-shape
+  ROOT-001 / Owner `D_TWO_TICK_EMPTY_CONFIRMATION` /
+  `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`):** for no-prior-intent
+  settled-empty confirmation, tick1 empty active keywords + Search STARTED
+  MUST only record/latch (MUST NOT `pause_auction_campaign`); tick2 still
+  empty THEN pause Search (`EMPTY_KEYWORDS`); later tick with keywords
+  present → start/resume Search; ticks continue across this lifecycle.
+  Warmup Redis `__empty__` remains non-settled (D8); two-tick latch is the
+  Owner settled-empty confirmation path when there is no prior V3 intent.
 
 ### Scope in
 
@@ -89,6 +98,11 @@ latch, notify и 7d recheck invariants остаются.
 - **Resume/re-enable notify (no-resume-notify ROOT-001):** Requirement +
   scenarios + RED/impl tasks for notify after delivered pause notify when
   Search/keywords resume; same recipients; distinct copy.
+- **Two-tick empty confirmation (puna-empty-shape ROOT-001 / Owner
+  `D_TWO_TICK_EMPTY_CONFIRMATION`):** Requirement + decision + design +
+  RED tasks — tick1 latch only (no pause); tick2 still empty →
+  `pause_auction_campaign`; later non-empty → Search start/resume; ticks
+  continue; warmup `__empty__` still non-settled.
 
 ### Out of scope
 
@@ -139,7 +153,9 @@ latch, notify и 7d recheck invariants остаются.
   TARGET_ENTITY_OR_LEG=SEARCH; ALLOWED=`pause_auction_campaign` (+ Search
   start for recheck); FORBIDDEN=`pause_auto_campaign` for EMPTY_KEYWORDS;
   FORBIDDEN arm/pause on Redis `__empty__` warmup / transient false-empty
-  (settled-empty only after bot-driven confirmed empty or equivalent).
+  (settled-empty only after bot-driven confirmed empty or equivalent);
+  two-tick empty confirmation latch for no-prior-intent
+  (Owner `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`).
 
 ## Semantic write target
 

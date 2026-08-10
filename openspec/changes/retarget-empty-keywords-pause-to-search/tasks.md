@@ -80,6 +80,37 @@ the pause message.
 - [x] 9.3 Implementation (after RED fails / exposes gap): add resume/re-enable notify emit (sibling of `notify_empty_keywords_pause` / message builder) on Search/keywords resume after empty-keywords pause episode; same recipient resolution as pause fanout; do not redesign pause write-path / adapters; do not treat pause-entry or recheck-mention as sufficient.
   Evidence (ROOT-001 / BUGCASE-EMPTY-KW-NO-RESUME-NOTIFY-20260809T214041Z): FIX `FIXED` (`notify_empty_keywords_resume` + message builder + Search-start call-site) + GREEN `GREEN_CONFIRMED` same frozen suite; see `results/FIX-ROOT-001.md`, `results/GREEN-ROOT-001.md`.
 
+## 10. Two-tick empty confirmation before Search pause (ROOT-001 / SPEC_GAP puna-empty-shape)
+
+Owner `D_TWO_TICK_EMPTY_CONFIRMATION` /
+`TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE` (BUGCASE-EMPTY-KW-PUNA-EMPTY-SHAPE):
+for no-prior-intent settled-empty confirmation — tick1 empty + Search
+STARTED = record/latch ONLY (MUST NOT `pause_auction_campaign`); tick2
+still empty = THEN pause Search (`EMPTY_KEYWORDS`); later tick keywords
+present = start/resume Search; ticks continue. Warmup Redis `__empty__`
+remains non-settled (section 7 / D8); two-tick latch is the Owner
+settled-empty confirmation path when there is no prior V3 intent.
+
+- [x] 10.1 Spec/decision/design contract: delta Requirement
+  `Two-tick empty confirmation before Search pause` + scenarios (tick1
+  latch no pause; tick2 pause; later non-empty start/resume; ticks
+  continue); proposed decision clause 9; design D9 / Ownership row.
+- [x] 10.2 RED regression (tests-first via `/opsx-fix-bug` / `/opsx-test`
+  before production GO):
+  - tick1 empty + Search STARTED + no prior settled latch → intent/latch
+    set, `pause_auction_campaign` NOT awaited;
+  - tick2 still empty → `pause_auction_campaign` fires + Search-lane
+    EMPTY_KEYWORDS;
+  - later non-empty → Search start path available (existing resume
+    behavior may remain).
+  Paired: warmup `__empty__` still MUST NOT count as tick1 settled
+  confirmation (section 7).
+- [x] 10.3 Implementation (after RED fails / exposes gap): durable
+  two-tick latch in empty-keywords arm/decision seam; forbid same-tick
+  arm+pause on first empty observe for no-prior-intent; preserve D8
+  warmup non-settled; do not stop ticks; do not redesign Search/Auto
+  adapters matrix.
+
 <!-- OWNER_CORRECTION (antipattern FAIL, not a task checkbox): 2026-08-08
   Un-exported `stats_window_compatible_with_recheck` and `STATS_WINDOW_DAYS_MAX`
   from `empty_keywords_pause/__init__.py` public `__all__` (remain on `decision.py`;

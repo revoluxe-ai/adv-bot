@@ -34,6 +34,11 @@ seams, paid Telegram notify. Linked star
   доставленного empty-keywords pause notify, при Search/keywords resume
   или re-enable — отдельный Telegram notify тем же shop-linked
   recipients; distinct от pause-entry и recheck-mention в pause message.
+- Two-tick empty confirmation before Search pause (puna-empty-shape
+  ROOT-001 / Owner `D_TWO_TICK_EMPTY_CONFIRMATION`): tick1 empty →
+  record/latch only (MUST NOT pause Search); tick2 still empty → THEN
+  `pause_auction_campaign`; later keywords → start/resume Search; ticks
+  continue. Warmup `__empty__` remains non-settled (D8).
 
 **Non-Goals:**
 
@@ -52,7 +57,9 @@ seams, paid Telegram notify. Linked star
   (Proposed) — TARGET_ENTITY_OR_LEG=SEARCH; ALLOWED/FORBIDDEN adapters;
   settled-empty vs `__empty__`; User notify MUST all shop-linked recipients
   (Owner `B_MUST_NOTIFY_ALL_SHOP_LINKED_USERS`); User notify on
-  resume/re-enable after delivered pause notify (no-resume-notify ROOT-001).
+  resume/re-enable after delivered pause notify (no-resume-notify ROOT-001);
+  two-tick empty confirmation latch
+  (`TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE` / puna-empty-shape ROOT-001).
 - `openspec/decisions/mode-defaults-policy-ownership/decision.md` (Accepted) —
   defaults overlays не трогаем.
 - Coexistence: A/B Hold freeze ≠ stop (card-ab-hold) — без изменений.
@@ -68,6 +75,7 @@ seams, paid Telegram notify. Linked star
 | Intent latch | Redis empty-keywords intent (komplekt / auto adv id key ok) | Mode-defaults overlays |
 | Notify fanout (pause entry) | `notify_empty_keywords_pause` → `load_telegram_chat_ids_for_shop` / `get_wb_user_cabinets_for_shop` → `NotificationSender.send_message` per chat_id | Single-primary hardcode; channel/marketing copy; non-cabinet UX links without contract |
 | Notify resume/re-enable | empty-keywords resume notify emit (sibling of pause notify; same recipient resolution) after delivered pause-notify episode when Search/keywords resume | Treating pause-entry or recheck-mention as resume notify; ordinary Search start spam without prior pause-notify episode; single-primary hardcode |
+| Two-tick empty confirmation (no-prior-intent) | empty-keywords arm/decision seam: tick1 latch/record only; tick2 still-empty → Search pause; later non-empty → Search start/resume; ticks continue | Same-tick arm+`pause_auction_campaign` on first empty observe; treating warmup `__empty__` as settled; skipping latch and pausing on tick1 |
 
 Placement MUST match proposed amended `empty-keywords-pause-write-path`.
 
@@ -253,6 +261,52 @@ warmup-marker signal); не ломать intentional re-fetch `[]` в
 нет prior V3 intent + нет bot-driven OFF → MUST NOT `pause_auction_campaign`
 / MUST NOT set EMPTY_KEYWORDS reason.
 
+### D9. Two-tick empty confirmation before Search pause
+(puna-empty-shape ROOT-001 / Owner `D_TWO_TICK_EMPTY_CONFIRMATION`)
+
+**Проблема:** accepted/delta D8 различает warmup Redis `__empty__` vs
+settled-empty, но **не** кодирует Owner lifecycle для no-prior-intent:
+«ключи реально пусты и Search STARTED — можно ли сразу паузить без
+старого intent? — нет; фиксируем; после второго тика снова пусто —
+тогда пауза; тики продолжаются; позже если ключи есть — включается РК».
+Текущий same-tick arm+`pause_auction_campaign` на первом empty observe
+конфликтует с этим правилом.
+
+**Выбор (Owner `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`):**
+
+1. **Tick1** — empty active keywords + Search STARTED: MUST
+   record/latch only (intent / confirmation latch). MUST NOT
+   `pause_auction_campaign` / MUST NOT поставить Search на паузу по
+   EMPTY_KEYWORDS в этом тике.
+2. **Tick2** — всё ещё empty: THEN pause Search
+   (`pause_auction_campaign` + Search-lane `empty_keywords`).
+3. **Later tick** — keywords present: MUST иметь путь start/resume
+   Search (существующий recheck/resume behavior может остаться).
+4. **Ticks continue** across this lifecycle (не останавливать тики
+   после latch или после pause).
+
+**Отношение к D8:** Redis warmup `__empty__` остаётся **non-settled**
+и MUST NOT arm даже tick1 latch как settled confirmation.
+Two-tick latch — Owner settled-empty confirmation path для
+**no-prior-intent** (когда нет prior V3 bot-driven intent). Bot-driven
+V3 post-OFF intent path (settled empty после OFF) остаётся allowed
+arm source из D8 и не обязан проходить «два тика наблюдения» заново,
+если intent уже установлен как settled confirmation.
+
+**Placement:** empty-keywords decision/arm seam в activity-control
+(или рядом с `should_request_empty_keywords_pause_intent` /
+`_maybe_pause_for_empty_keywords_intent`): durable per-komplekt /
+per-adv latch across ticks; pause write только после второго
+подтверждённого empty tick.
+
+**Paired RED (owed):**
+1. Tick1 empty + Search STARTED + no prior settled latch → intent/latch
+   set, `pause_auction_campaign` NOT awaited.
+2. Tick2 still empty → `pause_auction_campaign` fires + Search-lane
+   EMPTY_KEYWORDS.
+3. Later non-empty → Search start/resume path available (existing
+   resume behavior may remain).
+
 ## Risks / Trade-offs
 
 - [Auto остаётся STARTED при пустых ключах] → осознанный Owner trade-off
@@ -264,6 +318,8 @@ warmup-marker signal); не ломать intentional re-fetch `[]` в
   для common codes; display по string value; tests на value `empty_keywords`.
 - [Warmup `__empty__` → premature Search pause] → D8 settled-empty gate +
   RED regression; не отключать re-fetch `[]` в `get_keywords`.
+- [Same-tick arm+pause on first empty observe] → D9 two-tick latch +
+  RED (tick1 no pause / tick2 pause); не путать с warmup `__empty__`.
 
 ## Migration Plan
 

@@ -71,6 +71,22 @@ activity-control; distinct reason; recheck; notify; ≤7d; Hold orthogonality).
    notify. Ordinary Search start без prior delivered pause-notify episode
    MUST NOT слать resume notify «за эту причину». Placement: notify emit
    seam (sibling of pause notify), не redesign pause write-path / adapters.
+9. **Two-tick empty confirmation before Search pause (puna-empty-shape
+   ROOT-001 / Owner `D_TWO_TICK_EMPTY_CONFIRMATION` /
+   `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`):** для no-prior-intent
+   settled-empty confirmation lifecycle:
+   - **Tick1** empty active keywords + Search STARTED → MUST
+     record/latch only; MUST NOT `pause_auction_campaign` / MUST NOT
+     pause Search в этом тике.
+   - **Tick2** still empty → THEN pause Search
+     (`pause_auction_campaign` + Search-lane `empty_keywords`).
+   - **Later tick** keywords present → start/resume Search path MUST
+     быть доступен (существующий recheck/resume может остаться).
+   - **Ticks continue** across latch → pause → resume lifecycle.
+   Warmup Redis `__empty__` остаётся non-settled (clause 6 / D8) и
+   MUST NOT считаться tick1 settled confirmation. Two-tick latch — Owner
+   settled-empty confirmation path когда нет prior V3 bot-driven intent.
+   Same-tick arm+pause на первом empty observe — Forbidden.
 
 При archive: promote поверх accepted decision (тот же slug) со Status Accepted.
 
@@ -99,6 +115,10 @@ activity-control; distinct reason; recheck; notify; ≤7d; Hold orthogonality).
 - Keep V3 detect / Redis intent / 7d / Hold orthogonality
 - Guard no-prior-intent arm against Redis `__empty__` / warmup false-empty
   (require settled-empty confirmation)
+- No-prior-intent two-tick latch: tick1 empty → record/latch only; tick2
+  still empty → `pause_auction_campaign`; later non-empty → Search
+  start/resume; ticks continue (Owner
+  `TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`)
 
 ## Forbidden
 
@@ -120,6 +140,9 @@ activity-control; distinct reason; recheck; notify; ≤7d; Hold orthogonality).
   sufficient)
 - Emit empty-keywords resume notify on ordinary Search start without a
   prior delivered pause-notify episode
+- Same-tick arm + `pause_auction_campaign` on first empty observe for
+  no-prior-intent (skipping two-tick confirmation latch)
+- Treating Redis warmup `__empty__` as tick1 settled confirmation
 
 ## Examples
 
@@ -134,6 +157,9 @@ Good:
   after empty-keywords Search pause enter
 - Delivered pause notify → Search resume / keywords re-enable → distinct
   resume `send_message` to each shop-linked chat_id
+- Tick1 empty + Search STARTED + no prior V3 intent → latch/record only,
+  no `pause_auction_campaign`; tick2 still empty → Search pause; later
+  keywords → Search start/resume; ticks continue
 
 Bad:
 - `_maybe_pause_for_empty_keywords_intent` вызывает `pause_auto_campaign`
@@ -145,6 +171,8 @@ Bad:
   multiple shop-linked telegram ids exist
 - Pause notify delivered, Search resumes, no resume/re-enable notify
 - Resume notify text identical to pause-entry / only recheck-mention
+- First empty observe (no prior intent) immediately calls
+  `pause_auction_campaign` without a second confirming empty tick
 
 ## Related specs
 

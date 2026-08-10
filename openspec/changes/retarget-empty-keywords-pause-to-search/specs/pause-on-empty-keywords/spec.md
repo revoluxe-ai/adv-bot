@@ -231,3 +231,68 @@ snapshot warmup ещё может заполнить keywords) как settled em
 - **WHEN** система применяет empty-keywords pause path
 - **THEN** нога Search MUST быть поставлена на паузу с причиной
   empty-keywords (при наличии Search и допустимом статусе), без Auto pause
+
+### Requirement: Two-tick empty confirmation before Search pause
+
+Для no-prior-intent подтверждения settled-empty (когда нет prior V3
+bot-driven empty-keywords intent) система MUST применять Owner rule
+`TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`:
+
+1. **Tick1** — активных ключей нет и нога Search в STARTED: система MUST
+   только зафиксировать / установить latch (record/intent latch). Система
+   MUST NOT в этом тике вызывать Search pause (`pause_auction_campaign`)
+   и MUST NOT ставить Search на паузу по причине empty-keywords.
+2. **Tick2** — активных ключей по-прежнему нет: система MUST THEN
+   поставить ногу Search на паузу через `pause_auction_campaign` с
+   причиной empty-keywords.
+3. **Later tick** — активные ключи снова есть: путь start/resume Search
+   MUST быть доступен (существующее recheck/resume поведение MAY
+   остаться).
+4. Тики MUST продолжаться across этого lifecycle (latch → pause →
+   resume).
+
+Redis warmup-маркер `__empty__` остаётся non-settled (см. Requirement
+«Settled empty vs Redis warmup false-empty») и MUST NOT считаться
+tick1 settled confirmation. Two-tick latch — Owner settled-empty
+confirmation path для no-prior-intent.
+
+#### Scenario: Tick1 empty only latches — no Search pause
+
+- **GIVEN** paid авто-настройка с ботом, нога Search в STARTED, активных
+  ключей нет, prior V3 empty-keywords intent отсутствует, Redis warmup
+  `__empty__` не является единственным «settled» сигналом, и two-tick
+  latch ещё не установлен
+- **WHEN** activity-control оценивает no-prior-intent empty-keywords path
+  на первом таком тике
+- **THEN** система MUST установить record/latch (intent/confirmation
+  latch) и MUST NOT вызвать `pause_auction_campaign` / MUST NOT поставить
+  Search на паузу по empty-keywords в этом тике
+
+#### Scenario: Tick2 still empty pauses Search
+
+- **GIVEN** на предыдущем тике уже установлен two-tick / empty-confirmation
+  latch при empty active keywords + Search STARTED, и на текущем тике
+  активных ключей по-прежнему нет
+- **WHEN** система обрабатывает empty-keywords path на втором
+  подтверждающем тике
+- **THEN** система MUST вызвать `pause_auction_campaign` и поставить ногу
+  Search на паузу с причиной empty-keywords (при допустимом статусе),
+  без Auto pause
+
+#### Scenario: Later non-empty allows Search start/resume
+
+- **GIVEN** lifecycle two-tick confirmation / empty-keywords Search pause
+  (или latch) уже имел место, и на более позднем тике снова есть хотя бы
+  один активный ключ без нарушения других pause-правил Search
+- **WHEN** система обрабатывает этот тик
+- **THEN** путь start/resume ноги Search MUST быть доступен (Search MUST
+  NOT оставаться на паузе исключительно из-за устаревшего empty-keywords
+  без возможности resume)
+
+#### Scenario: Ticks continue across latch-pause-resume lifecycle
+
+- **GIVEN** empty-keywords two-tick latch и/или Search pause по
+  empty-keywords
+- **WHEN** проходит последующий shop-runner / activity-control тик
+- **THEN** тики MUST продолжаться (lifecycle не останавливает дальнейшие
+  оценки empty/non-empty и resume)
