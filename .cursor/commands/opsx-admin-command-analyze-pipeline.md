@@ -79,7 +79,38 @@ Show:
 -   problem;
 -   proposed behavior;
 -   human impact;
--   risks.
+-   risks;
+-   `REMEDY_CLASS` (required — see Class vs local remedy).
+
+## Class vs local remedy (mandatory)
+
+Every `IMPROVEMENT_OPTION` MUST declare exactly one:
+
+| `REMEDY_CLASS` | Meaning |
+|---|---|
+| `LOCAL_SYMPTOM` | Narrow patch to one command/gate symptom; does not create DONE |
+| `CLASS_KERNEL` | Recurring class failure (ownership, DONE authority, lifecycle meaning, durable handoff) |
+| `AUTHORITY_ALREADY_EXISTS` | Durable contract already covers the class; need enforce/hand-off, not a new parallel gate |
+
+When evidence shows a class/kernel gap (especially DONE = procedural greenness
+vs Owner meaning / lifecycle / side-effect proof):
+
+1. Prefer citing exact durable paths already in-repo. Default authority for
+   product DONE meaning:
+   `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`
+   (MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧ SIDE_EFFECT_PROOF).
+2. `RECOMMENDED_OPTION` MUST be `CLASS_KERNEL` or `AUTHORITY_ALREADY_EXISTS`
+   when such evidence is present — not a menu of new soft gates.
+3. `NEXT_ACTION` / `CLASS_HANDOFF` MUST prefer:
+   - `/opsx-admin-command-promote-process-lesson` (transferable process class),
+     and/or
+   - `/opsx-admin-command-design-command` with `EXTEND_EXISTING` on the cited
+     authority — not inventing a parallel local gate bundle as the primary fix.
+4. **Forbidden as primary recommendation** when class gap is evidenced:
+   inventing soft-gate option bundles that duplicate Product Acceptance pillars
+   (extra MEANING / LIFECYCLE / SIDE_EFFECT checklists sold as new DONE gates).
+5. `LOCAL_SYMPTOM` options may appear only as **secondary**, explicitly labeled
+   non-kernel, and MUST NOT claim they create archive-eligible DONE.
 
 ## REGRESSION_PIPELINE_REVIEW
 
@@ -403,6 +434,9 @@ The user should be able to predict:
 ``` text
 PIPELINE_IMPROVEMENT_PROPOSAL:
 
+REMEDY_CLASS:
+LOCAL_SYMPTOM | CLASS_KERNEL | AUTHORITY_ALREADY_EXISTS
+
 CURRENT_FLOW:
 
 PROBLEM:
@@ -419,6 +453,15 @@ lower | same | higher
 RISK:
 
 FILES_AFFECTED:
+
+DURABLE_AUTHORITY_CITED:
+(exact path(s); required for CLASS_KERNEL and AUTHORITY_ALREADY_EXISTS;
+ prefer .cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md when DONE/meaning)
+
+CLASS_HANDOFF:
+/opsx-admin-command-promote-process-lesson
+| /opsx-admin-command-design-command EXTEND_EXISTING
+| none (LOCAL_SYMPTOM secondary only)
 
 OWNER_DECISION_REQUIRED:
 ```
@@ -444,6 +487,18 @@ HUMAN_USABILITY_SCORE:
 PROBLEMS_FOUND:
 
 IMPROVEMENT_OPTIONS:
+(each option MUST include REMEDY_CLASS)
+
+REMEDY_CLASS_SUMMARY:
+LOCAL_SYMPTOM: N
+CLASS_KERNEL: N
+AUTHORITY_ALREADY_EXISTS: N
+
+DURABLE_AUTHORITY_CITED:
+(exact path(s) for class/authority options; or none)
+
+CLASS_HANDOFF:
+(command + target authority; or none if only LOCAL_SYMPTOM)
 
 RECOMMENDED_OPTION:
 
@@ -452,6 +507,8 @@ REASON:
 REGRESSION_RISKS:
 
 NEXT_ACTION:
+(when class/authority evidenced: promote-process-lesson and/or
+ design-command EXTEND_EXISTING — not a primary local soft-gate menu)
 ```
 
 ------------------------------------------------------------------------
@@ -465,3 +522,7 @@ Before returning:
 -   Do not invent states without evidence.
 -   Do not propose changes without explaining human impact.
 -   Keep analysis separate from implementation.
+-   Every IMPROVEMENT_OPTION has REMEDY_CLASS.
+-   Class/authority evidence ⇒ RECOMMENDED_OPTION is not a new parallel soft-gate
+    bundle; DURABLE_AUTHORITY_CITED and CLASS_HANDOFF are filled.
+-   LOCAL_SYMPTOM options do not claim they create DONE.
