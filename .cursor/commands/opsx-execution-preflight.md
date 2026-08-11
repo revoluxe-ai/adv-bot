@@ -82,6 +82,20 @@ FAILURE_BEHAVIOR:
 
 If `REQUIRED_FOR` is empty or not needed for the current decision, **skip** the operation.
 
+### REQUIRED_GATE_INPUT materialization (pointer)
+
+When a command output is a later independent gate input (not merely chat
+narration), prefer durable evidence over chat history as SoT. Canonical
+cross-cutting rule:
+
+```text
+.cursor/pipeline/GRAPH.md → ## Process invariants
+  → REQUIRED_GATE_INPUT must materialize
+```
+
+Do not invent a second competing rule here. Do not materialize every
+transient preflight/shell result under that invariant.
+
 ## Default time budgets
 
 | Operation class | Default TIME_BUDGET | Notes |

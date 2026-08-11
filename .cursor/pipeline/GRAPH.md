@@ -26,6 +26,37 @@
   supervisor; F5 closed as graph-exclusion; F12/F13 open; F15/F16 added.
   Prior: UPDATE GO 2026-08-09T05:34:03Z test-env (F14 closed).
 
+## Process invariants
+
+### REQUIRED_GATE_INPUT must materialize
+
+An OPSX command output MUST be materialized as durable, independently
+inspectable evidence when **all** of the following hold:
+
+1. it is required for a later state transition / control-plane gate; AND
+2. a later independent consumer must verify it; AND
+3. recomputing it implicitly would duplicate authority or lose provenance.
+
+```text
+REQUIRED_GATE_INPUT MUST NOT depend only on chat history.
+```
+
+When a receipt / content-hash convention exists, consumers MUST classify
+evidence as exactly one of:
+
+```text
+MISSING | CURRENT | STALE | INTEGRITY_FAIL
+```
+
+Do **not** auto-materialize every transient command output. New instances
+prefer EXTEND of the existing producer/consumer contracts over a new
+command.
+
+Worked example (instance): `/opsx-spec-scenario-coverage mode=plan` →
+`openspec/changes/<change>/scenario-coverage/plan.md` +
+`plan.receipt.json` (see `SCENARIO_TEST_COVERAGE.md` **DURABLE_PLAN_EVIDENCE**;
+consumers: task generation, `/opsx-planning-review` P6).
+
 ## States
 
 ### Core change lifecycle
@@ -295,16 +326,20 @@
   scenario_coverage_provider_ready | scenario_coverage_certified | blocked
 - artifacts_read: change delta specs/design/tasks; code/tests; optional
   TEST_COVERAGE_PACKET; provider receipts; test-evidence taxonomy
-- artifacts_written: none in v1 command draft; plan/report/route packets in
-  command output (persistence requires an explicit compatible owner)
+- artifacts_written: `mode=plan` ONLY may write Change-local durable plan
+  evidence under `openspec/changes/<id>/scenario-coverage/plan.md` +
+  `plan.receipt.json` (see `SCENARIO_TEST_COVERAGE.md` DURABLE_PLAN_EVIDENCE);
+  audit/certify reports remain chat (+ `.tmp` provider receipts); never
+  product design/spec/tasks
 - decision_owner: independent Scenario coverage auditor; not test/seam writer;
   archive remains `/opsx-verify`
 - next_typical: `/opsx-apply` after `mode=plan` | `/opsx-test` with
   SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
   REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
-- known_flaws: durable plan/report persistence still chat-output in v1
-  (receipts may live under `.tmp/opsx-scenario-coverage/`); archive activation
-  via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
+- known_flaws: audit/certify full-report persistence may still be chat-output;
+  provider receipts may live under `.tmp/opsx-scenario-coverage/`; plan
+  evidence SoT is Change-local `scenario-coverage/` (not `.tmp`); archive
+  activation via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
   `PRODUCT_ACCEPTANCE_REQUIRED=true` (legacy opt-out alone cannot waive PA)
 
 ### /opsx-performance-review
