@@ -98,14 +98,33 @@ semantics from similar names.
    Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` before
    apply-ready:
    - Decide and record `PRODUCT_ACCEPTANCE_REQUIRED`.
-   - When required: MEANING_LOCK must be durable; write durable
-     `OWNER_LIFECYCLE_ECHO` (3–7 temporal steps) into design/decision/spec;
-     obtain Owner `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm);
-     schedule `/opsx-spec-scenario-coverage mode=plan` (lifecycle not
-     optional); note SIDE_EFFECT_PROOF obligations for acceptance tests.
+   - When required: MEANING_LOCK must be durable.
+   - **Derived Lifecycle (same rules as `/opsx-continue`):** for temporal/
+     stateful Changes, design MUST include a durable Lifecycle section with
+     `LIFECYCLE_STATUS: DERIVED` and per-step `SOURCE:` provenance, derived
+     from reviewed `owner-contract.md` + decisions + repo facts + prior
+     planning artifacts. Do **not** invent semantics. Step count is not
+     fixed to 3–7.
+   - When Lifecycle is uniquely determined by reviewed Owner Contract →
+     **do not** require a second Owner `CONFIRM_LIFECYCLE`. Authority remains
+     the reviewed Owner Contract.
+   - If a material transition is A|B with no Owner resolution → stop with
+     `LIFECYCLE_STATUS: UNRESOLVED` and
+     `NEXT_ACTION: /opsx-owner-contract-review change=<name>` (not a parallel
+     confirm contour inside ff).
+   - **Legacy fallback only:** Changes without reviewed `owner-contract.md`
+     may still use durable `OWNER_LIFECYCLE_ECHO` + Owner `CONFIRM_LIFECYCLE`
+     (or `CORRECT` → rewrite → confirm).
+   - Schedule `/opsx-spec-scenario-coverage mode=plan` (lifecycle↔scenario
+     coverage; not optional under PA); note SIDE_EFFECT_PROOF obligations.
    - Do not declare apply-ready if PA required and MEANING_LOCK is missing
-     or blocked, **or** `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is
-     missing (chat-only lifecycle is not durable).
+     or blocked, **or** (for reviewed-contract Changes) Derived Lifecycle is
+     missing/UNRESOLVED when temporal behavior applies, **or** (legacy path
+     only) `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is missing.
+     Chat-only lifecycle is not durable.
+   - Invariant vs continue: same Owner Contract + same repository state →
+     semantically equivalent lifecycle/design/spec whether built via
+     sequential `/opsx-continue` or `/opsx-ff` (advancement mode differs only).
 
 7. **Show final status**
    ```bash
@@ -126,6 +145,10 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- When creating `design.md` for temporal/stateful behavior: apply the same
+  Derived Lifecycle rules as `/opsx-continue` (`LIFECYCLE_STATUS: DERIVED`,
+  per-step SOURCE, no invented transitions, UNRESOLVED → owner-contract-review).
+  Specs MUST cover material lifecycle transitions (or explicit not-needed proof).
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output

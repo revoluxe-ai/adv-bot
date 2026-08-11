@@ -81,14 +81,38 @@ NEXT:   /opsx-apply   |   /opsx-update <change> if PLANNING_UPDATE / blocked
 full-change `SCENARIO_TEST_COVERAGE_REPORT VERDICT=PASS`.
 
 **Product Acceptance / change spirit:** When
-`PRODUCT_ACCEPTANCE_REQUIRED=true`, require durable `OWNER_LIFECYCLE_ECHO`
-in change design/decision/spec (see
-`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`). If missing or
-chat-only only → stop with `STATUS=BLOCKED`,
-`REASON=BLOCKED_NEEDS_OWNER_LIFECYCLE`,
-`NEXT_ACTION=/opsx-update <change>` (or `/opsx-ff`). Do **not** invent
-temporal steps from chat or emit a ready/provisional plan that replaces
-Owner spirit. This command never writes OpenSpec artifacts.
+`PRODUCT_ACCEPTANCE_REQUIRED=true`, resolve lifecycle as follows (see
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` and
+`SCENARIO_TEST_COVERAGE.md`):
+
+1. Prefer durable Derived Lifecycle in `design.md`
+   (`LIFECYCLE_STATUS: DERIVED` + per-step SOURCE), verified against
+   reviewed `owner-contract.md`.
+2. If design lacks an explicit section but lifecycle is unambiguously
+   derivable from owner-contract + decisions + specs without inventing
+   semantics → treat as DERIVED for planning; note
+   `PLANNING_LIFECYCLE_GAP` only when a known Owner transition was omitted
+   from planning representation.
+3. Build `LIFECYCLE_COVERAGE` (L* ↔ Spec Scenarios). Do **not** invent
+   temporal steps from chat. Do **not** require
+   `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` on this primary path.
+4. Missing Spec Scenario for a known L* → plan/gap
+   `SPEC_SCENARIO_MISSING` / `SPEC_COVERAGE_GAP` with
+   `REPAIR_TARGET: spec` / planning writer (`/opsx-continue` |
+   `/opsx-ff` | `/opsx-update`) — **not** `NEEDS_OWNER` /
+   `BLOCKED_NEEDS_OWNER_LIFECYCLE`.
+5. Genuine unresolved product fork → `STATUS=BLOCKED`,
+   `REASON=UNRESOLVED_PRODUCT_SEMANTICS`,
+   `NEXT_ACTION=/opsx-owner-contract-review change=<change>`
+   (no `CONFIRM_LIFECYCLE` contour).
+6. **Legacy only** (no reviewed `owner-contract.md`): if durable
+   `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` missing →
+   `STATUS=BLOCKED`, `REASON=BLOCKED_NEEDS_OWNER_LIFECYCLE`,
+   `NEXT_ACTION=/opsx-update <change>` (or `/opsx-ff`).
+7. Non-temporal Changes: do not force artificial 3–7 step lifecycle;
+   remain usable without ceremony.
+
+This command never writes OpenSpec artifacts.
 
 #### `mode=audit`
 
@@ -102,9 +126,15 @@ NEXT:   /opsx-test | /opsx-close-external-gap | /opsx-update | re-audit
 ```
 
 When `PRODUCT_ACCEPTANCE_REQUIRED=true`, each acceptance-relevant matrix row
-MUST cite the matching `OWNER_LIFECYCLE_ECHO` step. Unmapped rows →
-FAIL/BLOCKED for that scenario (cannot support PA LIFECYCLE PASS). If echo
-itself is missing → `BLOCKED_NEEDS_OWNER_LIFECYCLE` (NEXT: `/opsx-update`).
+MUST cite the matching Derived Lifecycle step (prefer design.md). Unmapped
+rows → FAIL/BLOCKED for that scenario (cannot support PA LIFECYCLE PASS).
+If Derived Lifecycle is missing and cannot be derived without invention →
+`PLANNING_LIFECYCLE_GAP` or `UNRESOLVED_PRODUCT_SEMANTICS` (NEXT: planning
+writer or `/opsx-owner-contract-review`). Do **not** emit
+`BLOCKED_NEEDS_OWNER_LIFECYCLE` when a reviewed Owner Contract exists and
+lifecycle is DERIVED / derivable. Legacy path (no owner-contract): missing
+echo → `BLOCKED_NEEDS_OWNER_LIFECYCLE` (NEXT: `/opsx-update`).
+Spec inventing unsupported behavior → `SEMANTIC_DRIFT` (not PASS).
 
 #### `mode=certify`
 
@@ -600,7 +630,16 @@ PRODUCTION_CAUSAL_PATH_UNTESTABLE
 SPEC_SCENARIO_AMBIGUOUS
 WRITE_TARGET_AMBIGUOUS
 MISSING_STEADY_STATE_RECONCILE_SCENARIO   # Spec omits already-true / reconcile Scenario
-→ /opsx-update <change-id>
+SPEC_SCENARIO_MISSING / SPEC_COVERAGE_GAP # Lifecycle known; Spec Scenario absent
+PLANNING_LIFECYCLE_GAP                   # Owner semantics known; design omitted L*
+SEMANTIC_DRIFT                           # Spec invents unsupported behavior
+→ /opsx-update <change-id>   |   /opsx-continue | /opsx-ff (planning writer)
+```
+
+```text
+UNRESOLVED_PRODUCT_SEMANTICS             # Owner Contract leaves material fork open
+→ /opsx-owner-contract-review change=<change-id>
+  (NOT CONFIRM_LIFECYCLE; NOT NEEDS_OWNER via scenario-coverage inventing meaning)
 ```
 
 ```text
@@ -642,11 +681,13 @@ PG/CH `REFACTOR_AND_TEST` / `CERTIFY` gaps → соответствующие pa
 Для `mode=plan` достаточно plan-shaped output:
 
 ```text
-STATUS: ORIENTED | BLOCKED
+STATUS: ORIENTED | BLOCKED | GAP
 VERDICT: not_applicable
 MODE: READ_ONLY
 SCENARIO_MODE: plan
 CHANGE:
+LIFECYCLE_STATUS: DERIVED | UNRESOLVED | LEGACY_ECHO | NOT_APPLICABLE
+LIFECYCLE_COVERAGE: ...   # L* ↔ Spec Scenario mapping (or gaps)
 SCENARIO_COVERAGE_PLAN: ...
 NEXT_ACTION:
 ```
@@ -732,9 +773,10 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 
 - Never edit production, tests, OpenSpec artifacts, commands or policies.
 - Never create/update durable report in v1; report is chat output.
-- Never invent or author `OWNER_LIFECYCLE_ECHO` here — planning writers only.
+- Never invent or author Derived Lifecycle / `OWNER_LIFECYCLE_ECHO` here —
+  planning writers only (`/opsx-continue` / `/opsx-ff` / `/opsx-update`).
 - Never treat scenario `VERDICT=PASS` as clearing Product Acceptance without
-  durable confirmed Owner lifecycle echo (verify owns PA DONE).
+  durable Derived Lifecycle (or legacy confirmed echo); verify owns PA DONE.
 - Never stage, commit, push, create PR, archive, deploy or run migrations.
 - Never access production credentials, production DB, WB seller account or
   Kubernetes.
@@ -745,16 +787,23 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 - Never proceed past Arg gate with missing/unknown/wrong `mode=` or foreign tokens.
 - Never emit `mode=plan` coverage PASS or `mode=certify` PASS without fresh
   provider receipts when PG/CH evidence is required.
-- Never emit ready/provisional `mode=plan` under PA when
-  `OWNER_LIFECYCLE_ECHO` is missing.
+- Never emit `BLOCKED_NEEDS_OWNER_LIFECYCLE` for Changes with reviewed
+  Owner Contract when Derived Lifecycle is present or unambiguously
+  derivable; never require `CONFIRM_LIFECYCLE` on that primary path.
+- Never emit ready/provisional `mode=plan` under PA when Derived Lifecycle
+  (primary) or legacy echo (legacy-only) is missing/UNRESOLVED and temporal
+  behavior applies — use the correct failure class
+  (`PLANNING_LIFECYCLE_GAP` / `UNRESOLVED_PRODUCT_SEMANTICS` /
+  `BLOCKED_NEEDS_OWNER_LIFECYCLE` legacy).
 
 ## Self-review
 
 - `mode=` and `change=` parsed; Arg gate ran before scenario work.
 - `SCENARIO_MODE` in output matches requested `mode=`.
-- `mode=plan` produced `SCENARIO_COVERAGE_PLAN`, not certified PASS.
-- Under PA, `mode=plan` blocked on missing `OWNER_LIFECYCLE_ECHO` when required.
-- Under PA, audit/certify rows mapped to echo steps (or FAIL/BLOCKED).
+- `mode=plan` produced `SCENARIO_COVERAGE_PLAN` / `LIFECYCLE_COVERAGE`, not certified PASS.
+- Under PA primary path, `mode=plan` uses Derived Lifecycle; does not demand
+  `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` when reviewed Owner Contract exists.
+- Under PA, audit/certify rows mapped to Derived Lifecycle steps (or FAIL/BLOCKED).
 - `mode=certify` checked receipt freshness before PASS.
 - Every exact Spec Scenario has one matrix row (`audit`/`certify`).
 - Every Scenario has an adequate scenario-seam or an explicit FAIL.

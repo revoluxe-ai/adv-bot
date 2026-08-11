@@ -47,33 +47,72 @@ archive verdict.
 Owner
   owns: material behavior ambiguity, intentional golden/ContractCase semantic
         change, one-shot live authorization,
-        CONFIRM_LIFECYCLE for OWNER_LIFECYCLE_ECHO (Product Acceptance)
+        owner-contract.md semantics (via /opsx-owner-contract-review);
+        legacy CONFIRM_LIFECYCLE only for Changes without reviewed owner-contract
 
-Planning writers (/opsx-ff, /opsx-update)
-  own: durable OWNER_LIFECYCLE_ECHO in change artifacts when
-       PRODUCT_ACCEPTANCE_REQUIRED=true
+Planning writers (/opsx-continue, /opsx-ff, /opsx-update)
+  own: Derived Lifecycle in design (LIFECYCLE_STATUS: DERIVED) from reviewed
+       Owner Contract when PRODUCT_ACCEPTANCE_REQUIRED=true and temporal;
+       legacy OWNER_LIFECYCLE_ECHO + CONFIRM only when no reviewed owner-contract
 ```
 
-## Owner lifecycle echo (Product Acceptance)
+## Derived Lifecycle ↔ Spec Scenarios (Product Acceptance)
 
 When `PRODUCT_ACCEPTANCE_REQUIRED=true` (see
 `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`):
 
+**Primary path** (reviewed `owner-contract.md` present):
+
 ```text
-OWNER_LIFECYCLE_ECHO   = durable 3–7 temporal steps in change design/decision/spec
+DERIVED_LIFECYCLE     = durable design.md Lifecycle (prefer) with
+                        LIFECYCLE_STATUS: DERIVED + per-step SOURCE
+OWNER_CONTRACT_SOURCE = openspec/changes/<change>/owner-contract.md
+```
+
+- `/opsx-spec-scenario-coverage` **consumes** Derived Lifecycle (+ Owner
+  Contract for semantic verification); it does not author OpenSpec artifacts
+  and does not re-ask Owner for product meaning.
+- Prefer primary planning source: `design.md` Lifecycle. Fall back to
+  deriving the same sequence from owner-contract + decisions + specs when
+  design omits an explicit section — if derivation would invent semantics →
+  `PLANNING_LIFECYCLE_GAP` or `UNRESOLVED_PRODUCT_SEMANTICS` (do not invent).
+- `mode=plan` with Derived Lifecycle (or unambiguously derivable equivalent)
+  → build `SCENARIO_COVERAGE_PLAN` / `LIFECYCLE_COVERAGE` matrix
+  (L* ↔ Spec Scenarios). Do **NOT** emit `BLOCKED_NEEDS_OWNER_LIFECYCLE` or
+  require `CONFIRM_LIFECYCLE`.
+- Missing Spec Scenario for a known L* → `SPEC_SCENARIO_MISSING` /
+  `SPEC_COVERAGE_GAP` (NEXT: `/opsx-continue` | `/opsx-ff` | `/opsx-update`
+  planning writer) — **not** `NEEDS_OWNER`.
+- Design omits a transition proven by Owner Contract →
+  `PLANNING_LIFECYCLE_GAP` (repair planning; do not re-quiz Owner).
+- Spec invents behavior absent from lifecycle/Owner Contract →
+  `SEMANTIC_DRIFT` (not PASS).
+- Genuine unresolved product fork → `UNRESOLVED_PRODUCT_SEMANTICS` →
+  `/opsx-owner-contract-review` (not `CONFIRM_LIFECYCLE`).
+- `mode=audit` / `mode=certify`: acceptance-relevant rows MUST map to
+  Derived Lifecycle steps. Unmapped → FAIL/BLOCKED for that scenario.
+
+**Legacy compatibility** (Changes **without** reviewed owner-contract):
+
+```text
+OWNER_LIFECYCLE_ECHO   = durable temporal steps in design/decision/spec
 CONFIRM_LIFECYCLE      = Owner token after echo is written
 ```
 
-- `/opsx-spec-scenario-coverage` **consumes** the echo; it does not author it
-  and does not edit OpenSpec artifacts.
-- `mode=plan` without durable echo → `BLOCKED_NEEDS_OWNER_LIFECYCLE`
-  (NEXT: `/opsx-update` or `/opsx-ff`), not a provisional coverage plan that
-  invents steps from chat.
-- `mode=audit` / `mode=certify`: every acceptance-relevant matrix row MUST
-  cite the matching `OWNER_LIFECYCLE_ECHO` step id/text. Rows without mapping
-  → FAIL/BLOCKED for that scenario (and cannot support PA LIFECYCLE PASS).
-- Scenario report `VERDICT=PASS` **does not** clear PA LIFECYCLE if echo or
-  `CONFIRM_LIFECYCLE` is missing.
+- `mode=plan` without durable echo on this legacy path only →
+  `BLOCKED_NEEDS_OWNER_LIFECYCLE` (NEXT: `/opsx-update` or `/opsx-ff`).
+- Scenario report `VERDICT=PASS` **does not** clear PA LIFECYCLE if
+  Derived Lifecycle (primary) or legacy echo/CONFIRM (legacy) is missing
+  when required.
+
+Example plan-oriented output shape:
+
+```text
+LIFECYCLE_COVERAGE
+L1 … → COVERED: S-01
+L2 … → COVERED: S-02
+L6 … → PARTIAL / SPEC_SCENARIO_MISSING: …
+```
 
 ## CLI modes (binding)
 
@@ -486,12 +525,19 @@ Product Acceptance (kernel DONE) — see
 
 ```text
 PRODUCT_ACCEPTANCE_REQUIRED=true
-→ LIFECYCLE_COVERAGE requires durable OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE
-→ AND fresh report VERDICT=PASS with rows mapped to echo steps
-→ missing echo / unconfirmed / unmapped rows / stale/FAIL/BLOCKED report
-   is archive blocker
+→ LIFECYCLE_COVERAGE requires durable Derived Lifecycle
+  (LIFECYCLE_STATUS: DERIVED; prefer design.md) from reviewed Owner Contract
+  OR legacy OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE when no reviewed
+  owner-contract
+→ AND fresh report VERDICT=PASS with rows mapped to lifecycle steps
+→ missing Derived Lifecycle (primary) / missing legacy echo+CONFIRM (legacy) /
+  UNRESOLVED product forks / unmapped rows / stale/FAIL/BLOCKED report
+  is archive blocker
+→ do NOT fail solely for absent CONFIRM_LIFECYCLE when Derived Lifecycle
+  is present under reviewed Owner Contract
 → legacy SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this pillar
-→ scenario PASS alone never creates DONE without confirmed echo
+→ scenario PASS alone never creates DONE without Derived Lifecycle (or
+  legacy confirmed echo)
 ```
 
 Standalone scenario flag (still honored):

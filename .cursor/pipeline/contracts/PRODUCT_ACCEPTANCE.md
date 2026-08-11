@@ -75,20 +75,43 @@ Chat-only Owner answers are not durable (see SEMANTIC_WRITE_TARGET).
 When `PRODUCT_ACCEPTANCE_REQUIRED=true`, this pillar is **MEANING of time**
 plus scenario evidence — not scenario machinery alone.
 
-**Owner change spirit (mandatory under PA):**
+**Authority:**
 
-1. Durable `OWNER_LIFECYCLE_ECHO` in the change planning artifacts
-   (`design.md` and/or decision/spec with an explicit temporal section):
-   3–7 ordered steps of what must happen **across time** (e.g. observe →
-   latch → act → resume), not a single same-tick predicate.
-2. Owner token `CONFIRM_LIFECYCLE` after the echo is written (or
-   `CORRECT` → rewrite echo → `CONFIRM_LIFECYCLE` again).
+```text
+reviewed owner-contract.md  = semantic authority for the Change
+Derived Lifecycle in design = planning representation (no new product authority)
+scenario coverage           = LIFECYCLE ↔ SPEC SCENARIOS verifier
+```
 
-Chat-only Owner lifecycle answers are **not** durable (same ban as
-SEMANTIC_WRITE_TARGET for meaning). Missing echo, chat-only echo, or
-missing `CONFIRM_LIFECYCLE` ⇒
-`PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar `LIFECYCLE_COVERAGE`
+`DERIVED` may restructure already-authorized semantics in time; it MUST NOT
+add product semantics. Silent “sensible lifecycle defaults” are forbidden.
+
+**Primary path (reviewed Owner Contract present):**
+
+1. Durable **Derived Lifecycle** in planning artifacts (prefer `design.md`
+   `## Lifecycle` with `LIFECYCLE_STATUS: DERIVED` and per-step `SOURCE:`
+   provenance from owner-contract / decisions / repository facts).
+2. Step count is **not** fixed to 3–7 — minimal sequence sufficient for the
+   Change. Non-temporal Changes need no ceremonial lifecycle.
+3. **No second Owner confirmation** (`CONFIRM_LIFECYCLE`) when the lifecycle
+   is uniquely determined by reviewed Owner Contract semantics.
+4. Unresolved material A|B forks → `LIFECYCLE_STATUS: UNRESOLVED` /
+   `UNRESOLVED_PRODUCT_SEMANTICS` → `/opsx-owner-contract-review`
+   (not invent; not a parallel confirm contour).
+
+Missing Derived Lifecycle when temporal behavior applies, chat-only
+lifecycle, or `UNRESOLVED` left open ⇒
+`PRODUCT_ACCEPTANCE_STATUS=FAIL` (or `BLOCKED`) pillar `LIFECYCLE_COVERAGE`
 (even if a scenario report says `VERDICT=PASS`).
+
+**Legacy compatibility** (only Changes **without** reviewed
+`owner-contract.md`):
+
+1. Durable `OWNER_LIFECYCLE_ECHO` in design/decision/spec (ordered temporal
+   steps), and
+2. Owner token `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm).
+
+Missing legacy echo/CONFIRM on that legacy path ⇒ same FAIL pillar.
 
 **Scenario evidence (also mandatory under PA):**
 
@@ -96,8 +119,17 @@ missing `CONFIRM_LIFECYCLE` ⇒
 - fresh independent scenario report with `VERDICT=PASS` via `mode=audit` or
   `mode=certify` as required by `SCENARIO_TEST_COVERAGE.md`
   (certify when PG/CH provider receipts are required), and
-- acceptance-relevant scenario rows **map 1:1** to steps in
-  `OWNER_LIFECYCLE_ECHO` (see `SCENARIO_TEST_COVERAGE.md`).
+- acceptance-relevant scenario rows **map** to Derived Lifecycle steps
+  (or legacy `OWNER_LIFECYCLE_ECHO` steps on the legacy path).
+
+Failure classes (do not conflate):
+
+| Class | Meaning | Typical NEXT |
+|---|---|---|
+| `UNRESOLVED_PRODUCT_SEMANTICS` | Owner Contract leaves a material transition open | `/opsx-owner-contract-review` |
+| `PLANNING_LIFECYCLE_GAP` / `PLANNING_DEFECT` | Semantics known; design omitted them | `/opsx-continue` / `/opsx-ff` / `/opsx-update` |
+| `SPEC_COVERAGE_GAP` / `SPEC_SCENARIO_MISSING` | Lifecycle known; spec scenario missing | planning writer (spec) |
+| `SEMANTIC_DRIFT` | Spec invents behavior not in lifecycle/Owner Contract | planning writer |
 
 Missing / stale / FAIL / BLOCKED scenario report ⇒
 `PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar `LIFECYCLE_COVERAGE`.
@@ -107,9 +139,11 @@ When PA is required, legacy
 Treat PA-required as forcing lifecycle coverage (equivalent to
 `SCENARIO_COVERAGE_REQUIRED=true` for archive).
 
-Planning writers (`/opsx-ff`, `/opsx-update`) own authoring and confirming
-`OWNER_LIFECYCLE_ECHO`. Scenario commands **consume** the echo; they do not
-replace it and must not invent a parallel DONE command.
+Planning writers (`/opsx-continue`, `/opsx-ff`, `/opsx-update`) **derive**
+Lifecycle from reviewed Owner Contract (primary) or author legacy echo
+(legacy only). Scenario commands **consume** Derived Lifecycle (or legacy
+echo); they do not replace Owner Contract and must not invent a parallel
+DONE or `CONFIRM_LIFECYCLE` contour.
 
 ### 3) SIDE_EFFECT_PROOF
 
@@ -153,26 +187,33 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 
 ## Stage behavior
 
-### Planning (`/opsx-ff`, `/opsx-update`)
+### Planning (`/opsx-continue`, `/opsx-ff`, `/opsx-update`)
 
 - Decide `PRODUCT_ACCEPTANCE_REQUIRED`.
 - Complete MEANING_LOCK before apply-ready when required.
-- When PA required: write durable `OWNER_LIFECYCLE_ECHO`, obtain
-  `CONFIRM_LIFECYCLE`, and ensure scenario `mode=plan` is on the path
-  (not optional). Do **not** declare apply-ready without confirmed echo.
+- When PA required and temporal behavior applies: derive durable Lifecycle
+  into design (`LIFECYCLE_STATUS: DERIVED`) from reviewed Owner Contract;
+  do **not** re-ask `CONFIRM_LIFECYCLE` when unambiguous. UNRESOLVED forks →
+  `/opsx-owner-contract-review`. Legacy Changes without owner-contract may
+  still use `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE`. Ensure scenario
+  `mode=plan` is on the path (not optional). Do **not** declare apply-ready
+  without Derived Lifecycle (or legacy confirmed echo).
 
 ### Apply (`/opsx-apply`)
 
 - Re-check MEANING_LOCK before production edits when PA required.
-- Re-check durable `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE` when PA
-  required; do not implement against chat-only lifecycle.
+- Re-check durable Derived Lifecycle (`LIFECYCLE_STATUS: DERIVED`) — or
+  legacy `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE` — when PA required;
+  do not implement against chat-only lifecycle.
 - Do not treat task checkboxes alone as DONE.
 - Author tests that can satisfy SIDE_EFFECT_PROOF for acceptance seams.
 
 ### Scenario (`/opsx-spec-scenario-coverage`)
 
-- Owns scenario half of LIFECYCLE_COVERAGE evidence; consumes
-  `OWNER_LIFECYCLE_ECHO`; does not declare archive DONE.
+- Owns scenario half of LIFECYCLE_COVERAGE evidence; consumes Derived
+  Lifecycle (prefer `design.md`) or legacy echo; verifies
+  LIFECYCLE ↔ SPEC SCENARIOS; does not declare archive DONE; does not
+  re-author product meaning or require `CONFIRM_LIFECYCLE` on the primary path.
 
 ### Verify (`/opsx-verify`)
 
@@ -188,8 +229,9 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 
 - Owner soft-waive of tooling ≠ PA clear.
 - Meaning blocks → Owner semantic decision + planning writer.
-- Missing / unconfirmed `OWNER_LIFECYCLE_ECHO` → planning writer
-  (`/opsx-update` / `/opsx-ff`), not soft chain or bug-team.
+- Missing Derived Lifecycle (or legacy unconfirmed echo) → planning writer
+  (`/opsx-continue` / `/opsx-update` / `/opsx-ff`), not soft chain or bug-team.
+  Genuine unresolved product forks → `/opsx-owner-contract-review`.
 - Lifecycle scenario / side-effect blocks → route to scenario / test
   producers, not “continue soft chain to archive”.
 
@@ -198,6 +240,9 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 - No `/opsx-product-acceptance` command.
 - No bug-team redesign.
 - No replacement of SEMANTIC or scenario producers — composition only.
+- No second Owner lifecycle confirmation when reviewed Owner Contract already
+  uniquely determines temporal behavior.
+- No default `owner-lifecycle.md` companion file.
 
 ## Regression matrix (process)
 
@@ -210,6 +255,9 @@ Supervisor MUST NOT dispatch verify-archive / archive while
 4. Soft ECC/pyright Owner waive while PA FAIL → verify/archive still blocked.
 5. Docs-only change with explicit NOT_REQUIRED → PA NOT_REQUIRED → archive may
    proceed without scenario certify.
-6. PA required + scenario report PASS but no durable `OWNER_LIFECYCLE_ECHO`
-   / no `CONFIRM_LIFECYCLE` → PA FAIL LIFECYCLE → archive NO_GO
-   (change spirit lost to chat).
+6. PA required + reviewed Owner Contract + Derived Lifecycle present → must
+   **not** FAIL solely for absent `CONFIRM_LIFECYCLE` / `OWNER_LIFECYCLE_ECHO`.
+7. PA required + no reviewed owner-contract + no durable echo/CONFIRM → PA FAIL
+   LIFECYCLE → archive NO_GO (legacy path).
+8. PA required + scenario invents behavior absent from lifecycle/Owner Contract
+   → SEMANTIC_DRIFT / scenario FAIL (not PASS).

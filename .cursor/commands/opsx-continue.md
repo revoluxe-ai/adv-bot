@@ -105,9 +105,85 @@ Common artifact patterns:
   - The Capabilities section is critical - each capability listed will need a spec file.
 - **specs/<capability>/spec.md**: Create one spec per capability listed in the proposal's Capabilities section (use the capability name, not the change name).
 - **design.md**: Document technical decisions, architecture, and implementation approach.
+  When the Change has temporal/stateful behavior, also emit a **Derived Lifecycle**
+  section (see below) — planning representation only, not a new Owner authority.
 - **tasks.md**: Break down implementation into checkboxed tasks.
+- After a Derived Lifecycle exists in design, each **specs/<capability>/spec.md**
+  MUST cover every materially observable lifecycle transition with a requirement/
+  scenario, or record an explicit proof that a separate scenario is not needed.
+  Spec MUST NOT invent behavior absent from lifecycle / reviewed Owner Contract.
 
 For other schemas, follow the `instruction` field from the CLI output.
+
+### Derived Lifecycle (design — temporal / stateful Changes)
+
+Authority model:
+
+```text
+owner-contract.md (+ owner-contract-review PASS) = semantic authority
+design Lifecycle                               = DERIVED planning representation
+continue / ff                                  = no product authority
+```
+
+When creating `design.md` for a Change with temporal/stateful behavior:
+
+1. Derive a minimal ordered Lifecycle (`L1..Ln`) from, in order:
+   - reviewed `openspec/changes/<change>/owner-contract.md`;
+   - accepted/proposed decisions for this change;
+   - repository facts;
+   - already-created planning artifacts (proposal/specs/decisions).
+2. Step count is **not** fixed to 3–7 — use the shortest sequence sufficient
+   for this Change. Non-temporal / simple Changes: do **not** invent a
+   ceremonial lifecycle.
+3. Each step MUST carry local provenance, e.g.:
+   `SOURCE: owner-contract.md / decision D-003 / repository fact`.
+4. Record status:
+   - `LIFECYCLE_STATUS: DERIVED` when every material transition is uniquely
+     determined by reviewed Owner semantics (do **not** ask Owner to
+     re-confirm via `CONFIRM_LIFECYCLE` / parallel Owner gate).
+5. If after A the Owner Contract leaves B|C unresolved → **stop** writing
+   further planning that depends on that fork:
+
+```text
+LIFECYCLE_STATUS: UNRESOLVED
+UNRESOLVED_TRANSITION: <exact fork>
+SOURCE_GAP: <what Owner Contract / decision lacks>
+NEXT_ACTION: /opsx-owner-contract-review change=<change>
+```
+
+Do **not** invent semantic transitions. Do **not** create `CONFIRM_LIFECYCLE`
+or a second Owner confirmation contour inside continue.
+`DERIVED` may restructure already-authorized semantics in time; it MUST NOT
+add product semantics.
+
+Example Lifecycle skeleton (illustrative — adapt to the Change):
+
+```text
+## Lifecycle
+
+LIFECYCLE_STATUS: DERIVED
+
+L1. Entry / gate
+SOURCE: owner-contract.md / …
+
+L2. Active operation
+SOURCE: …
+
+L3. Trigger / terminal condition
+SOURCE: …
+
+L4. State transition / side effect
+SOURCE: …
+
+L5. Waiting / paused behavior
+SOURCE: …
+
+L6. Recovery / clear condition
+SOURCE: …
+
+L7. Conditional resume / next epoch
+SOURCE: …
+```
 
 **Guardrails**
 - Create ONE artifact per invocation
@@ -116,6 +192,9 @@ For other schemas, follow the `instruction` field from the CLI output.
 - If context is unclear, ask the user before creating
 - Verify the artifact file exists after writing before marking progress
 - Use the schema's artifact sequence, don't assume specific artifact names
+- For temporal Changes: design MUST include Derived Lifecycle with provenance
+  when behavior is temporal/stateful; unresolved forks → owner-contract-review
+  (not `CONFIRM_LIFECYCLE`)
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
