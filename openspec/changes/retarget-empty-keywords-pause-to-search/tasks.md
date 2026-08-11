@@ -43,7 +43,8 @@
 
 - [x] 6.1 Targeted unit (+ нужные integration) для Search/Auto paired matrix; `poetry run pyright-strict` на затронутых модулях при необходимости.
 - [x] 6.2 Проверить отсутствие EVOLUTION_SCOPE_DRIFT: нет billing/tariff/disconnect/comms/onboard/BOTH-legs/v2 tasks в коде.
-- [ ] 6.3 После verify: обновить `LINKED_CHANGES` / INC-PAUSE-02 evidence на карточке звезды (не расширять DoD).
+- [x] 6.3 После verify: обновить `LINKED_CHANGES` / INC-PAUSE-02 evidence на карточке звезды (не расширять DoD).
+  Evidence (2026-08-11): `openspec/evolution/affordable-auto-pause-on-empty.md` INC-PAUSE-02 — LINKED_CHANGES unchanged (`retarget-empty-keywords-pause-to-search`); Evidence/completion updated after archive-verify ✅ GO / PA PASS (archive move still pending Owner sync confirm).
 
 ## 7. Settled-empty vs Redis `__empty__` warmup (ROOT-001 / SPEC_GAP)
 

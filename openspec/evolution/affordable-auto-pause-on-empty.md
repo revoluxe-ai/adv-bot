@@ -5,7 +5,7 @@ STAR_ID: affordable-auto-pause-on-empty
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-07T19:11:00Z
-UPDATED_AT: 2026-08-10T09:02:00Z
+UPDATED_AT: 2026-08-11T07:54:00Z
 DEPENDS_ON: none
 ```
 
@@ -119,10 +119,16 @@ Scope boundary: retarget empty-keywords write-path Auto→Search + durable
 leg/adapters в decision/spec + paired tests; не тариф; не Auto shelf exhausted
 pause; не billing fair-pause; не канал-анонс; не BOTH-legs.
 
-Evidence / completion: active change
-`openspec/changes/retarget-empty-keywords-pause-to-search` (planning complete;
-implementation/verify in progress). Proposed ADL amendment
-`openspec/changes/retarget-empty-keywords-pause-to-search/decisions/empty-keywords-pause-write-path/decision.md`.
+Evidence / completion: OpenSpec change
+`retarget-empty-keywords-pause-to-search` — implementation complete;
+`/opsx-verify mode=archive` ✅ GO (2026-08-11); Product Acceptance PASS
+(OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE + scenario coverage PASS, 22
+exact Spec Scenarios). Still active under
+`openspec/changes/retarget-empty-keywords-pause-to-search` until archive
+move (sync main spec + promote ADL amendment). Proposed ADL amendment
+`openspec/changes/retarget-empty-keywords-pause-to-search/decisions/empty-keywords-pause-write-path/decision.md`
+(promote to `openspec/decisions/empty-keywords-pause-write-path/decision.md`
+Accepted on archive).
 
 ### INC-BILL-LEG-PAUSE-01 — Честная оплата Auto/Search при паузе ног
 
