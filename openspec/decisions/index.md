@@ -24,6 +24,11 @@ architecture decisions belong here.
   - Scope: ownership of empty-keywords detect → Redis intent → activity-control
     pause/start + distinct reason + recheck + notify; orthogonal to Hold freeze
     and mode-defaults; stats window ≤7d.
+- [auto-bid-module-coexistence-write-path](auto-bid-module-coexistence-write-path/decision.md)
+  - Status: Accepted
+  - Scope: mutual exclusion of automated Auto bid writers («для Авто» vs
+    «в полках»); reason split vs `cost_rule_failed`; orthogonal to empty-keywords,
+    mode-defaults, and Hold freeze.
 
 ## Change Requirements
 
