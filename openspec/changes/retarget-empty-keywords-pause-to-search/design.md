@@ -107,6 +107,36 @@ OWNER_DECISION_SOURCE: EVOLUTION_HANDOFF + proposed decision + this design + del
 REQUIRED_PAIRED_TESTS: Search paused; Auto NOT paused by empty-keywords path; wrong-adapter regression fails if pause_auto_campaign used
 ```
 
+## Product Acceptance
+
+```text
+PRODUCT_ACCEPTANCE_REQUIRED: true
+SCENARIO_COVERAGE_REQUIRED: true
+REASON: SEMANTIC_WRITE_TARGET (Search vs Auto) + EVOLUTION_LINK INC-PAUSE-02
+  + material Search pause/start + paid Telegram notify lifecycle
+```
+
+## OWNER_LIFECYCLE_ECHO
+
+Упорядоченный смысл во времени (INC-PAUSE-02 / pause-on-empty-keywords):
+
+1. После bot-driven OFF последнего ключа **или** на тике наблюдаем settled empty
+   активных ключей при Search STARTED (warmup Redis `__empty__` / transient
+   false-empty **не** считаются settled).
+2. Tick1 (no prior intent): только latch/intent — **без** `pause_auction_campaign`
+   и без Search pause в этом тике.
+3. Tick2 (всё ещё empty) **или** consume уже settled intent: пауза **только Search**
+   (`pause_auction_campaign` + Search-lane `empty_keywords`); Auto **не** паузится
+   этим path (`pause_auto_campaign` Forbidden); нет Search-ноги → skip, не Auto fallback.
+4. При входе в Search pause — Telegram notify **всем** shop-linked recipients
+   (debounce once-per-enter, any-success KEEP).
+5. Пока Search на empty-keywords pause: периодический recheck стартует **Search**;
+   Auto-only start не закрывает recheck; снова empty → снова Search pause.
+6. После **доставленного** pause notify, когда Search/keywords resume/re-enable —
+   отдельный resume notify тем же recipients (не pause-entry / не recheck-mention).
+
+`CONFIRM_LIFECYCLE`: **confirmed** (Owner, 2026-08-11) — echo accepted; PA MEANING_LOCK + Owner lifecycle spirit locked; scenario report still required before archive verify GO.
+
 ## Decisions
 
 ### D1. Pause adapter = Search only
