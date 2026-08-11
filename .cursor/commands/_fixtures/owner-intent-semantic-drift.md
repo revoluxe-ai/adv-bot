@@ -89,6 +89,33 @@ Given an old handoff **without** `OWNER_INTENT`:
 
 Absence of `OWNER_INTENT` alone MUST NOT invalidate the handoff.
 
+## OpenSpec history layers (explore context)
+
+When `OWNER_INTENT` is present, explore MUST do a **targeted** OpenSpec pass:
+
+1. current `openspec/specs/**`
+2. Accepted `openspec/decisions/**` (ADL budgets intact)
+3. relevant `openspec/changes/archive/**` as **history only**
+4. then current code/tests
+
+### PASS
+
+- Lookup keyed from OWNER_INTENT / capability / UI terms / related specs /
+  known IDs / runtime entities — **not** a broad archive scan.
+- `EXPLORE_HANDOFF` separates `CURRENT_CONTRACT`, `ACCEPTED_DECISIONS`,
+  `HISTORICAL_EVIDENCE`, `REPOSITORY_FINDINGS`, and `CONTRACT_VS_REPO`.
+- On `current main spec` vs `archived change`: main spec is acting contract;
+  archive stays under `HISTORICAL_EVIDENCE`.
+- On contract vs code mismatch: `CONTRACT_VS_REPO` is explicit (not silent).
+- Archive / OpenSpec interpretation does **not** rewrite `OWNER_INTENT`.
+
+### FAIL
+
+- Broad recursive dump of `openspec/changes/archive/**`.
+- Archive used as acting SoT over current main spec.
+- Silent choice when contract and repo disagree.
+- Historical reading folded into `OWNER_INTENT`.
+
 ## Static check matrix (dry-run)
 
 | Check | Expected |
@@ -98,6 +125,11 @@ Absence of `OWNER_INTENT` alone MUST NOT invalidate the handoff.
 | explore emits `EXPLORE_HANDOFF` when `OWNER_INTENT` present | yes |
 | explore copies `OWNER_INTENT` verbatim | yes |
 | explore puts code symbols under findings/mapping, not OWNER_INTENT | yes |
+| explore requires targeted specs + decisions + relevant archive | yes |
+| explore forbids broad archive scan | yes |
+| EXPLORE_HANDOFF has CURRENT_CONTRACT / HISTORICAL_EVIDENCE / CONTRACT_VS_REPO | yes |
+| main spec > archive on conflict | yes |
+| archive must not rewrite OWNER_INTENT | yes |
 | new prioritizes `OWNER_INTENT` for owner-contract semantics | yes |
 | new falls back when `OWNER_INTENT` absent | yes |
 | continue / ff / apply / verify contracts unchanged by this fixture | n/a (out of scope) |
@@ -108,7 +140,10 @@ Absence of `OWNER_INTENT` alone MUST NOT invalidate the handoff.
 Given Owner intent about old Auto bid control vs shelf bid control
 When evolution forms handoff
 And explore finds cost watchdog / OLD_UPDATE_CPM_BIDDER / related paths
+And explore also checks relevant current specs / Accepted decisions /
+    targeted archive history
 And explore output is passed to new
 Then owner-contract.md still describes old vs new bid-control modules
 And cost watchdog is NOT the new Owner intent without Owner correction
+And archive history did not become OWNER_INTENT or acting SoT over main spec
 ```
