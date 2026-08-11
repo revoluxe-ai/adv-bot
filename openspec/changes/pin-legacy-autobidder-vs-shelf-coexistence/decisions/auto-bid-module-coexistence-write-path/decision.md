@@ -126,4 +126,6 @@ Bad:
   empty-keywords / mode-defaults / CH — не закрывают этот gap)
 - [x] relevant decisions cited (ортогональность empty-keywords; Hold freeze≠stop)
 - [x] new decision proposed because accepted decision was missing
-- [ ] implementation layer matches decision (после `/opsx-apply`)
+- [x] implementation layer matches decision (`run_bidder_process_for_adv` Auto
+  `update_cpm` gated by `auto_shelf_bid_control_enabled`; Search ветка без
+  изменений; `/opsx-apply` 2026-08-11)

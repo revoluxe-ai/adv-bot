@@ -47,6 +47,35 @@ Owner rule: если **«Управление ставкой в полках»**
 
 Placement MUST match proposed `auto-bid-module-coexistence-write-path`.
 
+## Semantic Write Target (RESOLVED)
+
+```text
+SEMANTIC_WRITE_TARGET_STATUS: RESOLVED
+BUSINESS_TERM: automated запись ставки ноги Авто («для Авто» vs «в полках»)
+TARGET_ENTITY_OR_LEG: Auto-leg bid on Wildberries
+ALLOWED_ADAPTERS:
+  - auto_shelf_bid_control_enabled=true → AutoShelfBidControlManager set_bid / _set_target_bid
+  - auto_shelf_bid_control_enabled=false AND bidder_for_auto=true → wb_api.update_cpm(auto_adv_id, …) legacy bidder path
+FORBIDDEN_ADAPTERS:
+  - auto_shelf_bid_control_enabled=true → wb_api.update_cpm(auto_adv_id, …) via «управление ставкой для Авто»
+  - auto_shelf_bid_control_enabled=false → shelf set_bid write
+TARGET_EVIDENCE: owner-contract.md; proposal Desired behavior; decision auto-bid-module-coexistence-write-path; spec auto-bid-module-coexistence
+OWNER_DECISION_SOURCE: openspec/changes/pin-legacy-autobidder-vs-shelf-coexistence/owner-contract.md (Решения Owner)
+REQUIRED_PAIRED_TESTS: shelf ON → legacy Auto update_cpm blocked; shelf OFF → legacy Auto update_cpm allowed / shelf not writing
+```
+
+## OWNER_LIFECYCLE_ECHO
+
+Упорядоченный смысл во времени (Owner Contract):
+
+1. Пользователь в настройках РК задаёт **«Управление ставкой для Авто»** и/или **«Управление ставкой в полках»**.
+2. На тике shop-runner оба модуля *могут* иметь повод писать ставку Авто.
+3. Если **«Управление ставкой в полках»** включено — ставку Авто меняет только он; путь **«для Авто»** не доводит запись до успеха.
+4. Если **«Управление ставкой в полках»** выключено — он ставку не пишет; при включённом **«для Авто»** старый путь MAY писать ставку Авто.
+5. Пауза/старт по себестоимости (`cost_rule_failed`) остаётся отдельным контуром и не подменяет запись ставки полок.
+
+`CONFIRM_LIFECYCLE`: **confirmed** (Owner, 2026-08-11) — echo accepted; production gate apply allowed.
+
 ## Decisions
 
 1. **Pin-then-gate, не rewrite.** Сначала characterization: кто реально пишет ставку при обоих флагах. Если при включённом **«Управление ставкой в полках»** путь **«для Авто»** всё ещё успешно пишет — добавить узкий skip/ignore до write; не трогать math выбора ставки полок.
@@ -94,4 +123,4 @@ Performance: один bool-check на тик старого path — negligible.
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`auto-bid-module-coexistence-write-path`)
-- [ ] implementation layer matches decision (после `/opsx-apply`)
+- [x] implementation layer matches decision (`bidder_func.run_bidder_process_for_adv` Auto write gated; `/opsx-apply` 2026-08-11)
