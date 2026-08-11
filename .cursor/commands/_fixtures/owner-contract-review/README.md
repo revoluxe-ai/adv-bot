@@ -13,6 +13,10 @@ stated).
 These fixtures do **not** authorize writes. They do **not** hard-gate
 `continue` / `ff`.
 
+Cross-contract: Fixture 10 handoff shape MUST be accepted by
+`/opsx-new` REPAIR MODE without human rewrite — see sibling directory
+`../opsx-new-owner-contract-repair/`.
+
 ## Index
 
 | ID | File | Primary check / theme | Expected REVIEW_STATE |
@@ -26,9 +30,9 @@ These fixtures do **not** authorize writes. They do **not** hard-gate
 | 07 | `07-needs-context-missing-handoff.md` | T1 missing handoff | NEEDS_CONTEXT (not FAIL) |
 | 08 | `08-needs-owner-epoch-choice.md` | T2 / Finding B | NEEDS_OWNER |
 | 09 | `09-stale-writer-auto-restart.md` | T3 / Finding A | READY_FOR_REPAIR; OWNER_INPUT_REQUIRED NO |
-| 10 | `10-ready-for-repair-handoff.md` | T4 handoff | READY_FOR_REPAIR + OWNER_REVIEW_HANDOFF |
-| 11 | `11-pass-after-repair.md` | T5 repaired | PASS |
-| 12 | `12-writer-regression.md` | T6 regression | not PASS; bounded new cycle |
+| 10 | `10-ready-for-repair-handoff.md` | T4 handoff literal | READY_FOR_REPAIR + pasteable `/opsx-new` + OWNER_REVIEW_HANDOFF |
+| 11 | `11-pass-after-repair.md` | T9 repaired | PASS |
+| 12 | `12-writer-regression.md` | T10 regression | not PASS; bounded new cycle |
 
 ## Static matrix
 
@@ -46,10 +50,11 @@ These fixtures do **not** authorize writes. They do **not** hard-gate
 | REVIEW_STATE NEEDS_OWNER | 03, 08, 04 (no durable proof) |
 | REVIEW_STATE READY_FOR_REPAIR | 05, 09, 10, 04 (with durable proof) |
 | REVIEW_STATE PASS | 06, 11 |
-| OWNER_REVIEW_HANDOFF + REPAIR_COMMAND `/opsx-new` | 10 |
+| OWNER_REVIEW_HANDOFF MODE REPAIR_EXISTING_OWNER_CONTRACT | 10 |
+| pasteable `/opsx-new` + handoff (no Owner rewrite) | 10 |
 | OWNER_INPUT_REQUIRED NO for proven writer defects | 05, 09 |
 | Re-review / writer regression | 11, 12 |
-| MODE READ_ONLY / FILES_CHANGED none (T7) | all |
+| MODE READ_ONLY / FILES_CHANGED none | all |
 | continue/ff/apply/verify/Supervisor untouched by this command’s writes | n/a (out of fixture scope; meta-design invariant) |
 
 ## Ideal interactive transcript (normative sketch)
@@ -62,10 +67,16 @@ Owner pastes handoff
 → REVIEW_STATE: NEEDS_OWNER    (one real product question)
 
 Owner answers
-→ REVIEW_STATE: READY_FOR_REPAIR + OWNER_REVIEW_HANDOFF
-  REPAIR_COMMAND: /opsx-new
+→ REVIEW_STATE: READY_FOR_REPAIR
+  UX: "Скопируйте блок ниже в новый/Writer чат:"
+  pasteable:
+    /opsx-new
+    OWNER_REVIEW_HANDOFF
+    MODE: REPAIR_EXISTING_OWNER_CONTRACT
+    ...
 
-/opsx-new applies handoff (sole writer)
+Owner pastes block into writer chat unchanged
+→ /opsx-new REPAIR MODE applies only owner-contract.md
 → /opsx-owner-contract-review change=X
 → REVIEW_STATE: PASS
   MODE: READ_ONLY

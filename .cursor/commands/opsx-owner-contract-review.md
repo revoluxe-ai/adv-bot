@@ -178,8 +178,8 @@ and semantics not yet answered in this cycle?
 contract already matches proven semantics?
   ├─ YES → REVIEW_STATE: PASS
   └─ NO  → REVIEW_STATE: READY_FOR_REPAIR
-           emit OWNER_REVIEW_HANDOFF
-           REPAIR_COMMAND: /opsx-new
+           emit pasteable `/opsx-new` + OWNER_REVIEW_HANDOFF
+           (MODE: REPAIR_EXISTING_OWNER_CONTRACT)
            AFTER_REPAIR: /opsx-owner-contract-review change=<change>
 ```
 
@@ -323,48 +323,73 @@ Rules:
 
 ## OWNER_REVIEW_HANDOFF (required at READY_FOR_REPAIR)
 
-Emit one self-contained block transferable to `/opsx-new` without extra
-prose:
+Literal shared contract with `/opsx-new` REPAIR MODE. Emit **one**
+self-contained pasteable block (command line + handoff). Owner must be able
+to copy it into a writer chat **without rewriting**.
+
+Human UX lead-in:
 
 ```text
+Все необходимые решения получены.
+Контракт требует <N> исправления.
+
+Скопируйте блок ниже в новый/Writer чат:
+```
+
+Then exactly one fenced block:
+
+```text
+/opsx-new
+
 OWNER_REVIEW_HANDOFF
 CHANGE_ID: <change>
+TARGET_WRITER: /opsx-new
+MODE: REPAIR_EXISTING_OWNER_CONTRACT
 
-REVIEW_SOURCE:
-- owner-contract.md: <path>
-- OWNER_INTENT: <source>
-- OWNER_DECISIONS: <sources>
-- relevant handoffs: <sources>
+REVIEWED_ARTIFACT:
+openspec/changes/<change>/owner-contract.md
+
+OWNER_INTENT:
+<durable preserved meaning or source>
 
 CONFIRMED_OWNER_DECISIONS:
-- D-01: <full semantic statement — not "Owner chose A">
-- ...
+
+D-001:
+<full semantic statement — not "Owner chose A">
+
+D-002:
+...
 
 REPAIRS_REQUIRED:
 
 R-001
 SECTION: <section>
-CURRENT_TEXT: <current problematic meaning/text>
-PROBLEM: <semantic defect>
-REQUIRED_SEMANTICS: <what contract must say>
+CURRENT_SEMANTICS: <problematic current meaning>
+PROBLEM: <why wrong>
+REQUIRED_SEMANTICS: <exact desired meaning>
+EVIDENCE:
+- <Owner decision/source>
 OWNER_INPUT_REQUIRED: NO
-SOURCE: <durable evidence>
 
 R-002
 ...
 
 DO_NOT_CHANGE:
-- <confirmed semantics not implicated by findings>
+- <confirmed semantic invariant>
+- ...
+- <unaffected scope>
 - ...
 
-REPAIR_BOUNDARY:
-- modify owner-contract.md only
-- do not create proposal/spec/design/tasks
-- do not reinterpret OWNER_INTENT
-- do not introduce new product decisions
+WRITE_BOUNDARY:
+- owner-contract.md only
 
-REPAIR_COMMAND:
-/opsx-new
+FORBIDDEN:
+- create proposal/spec/design/tasks
+- change Evolution/Explore
+- reinterpret OWNER_INTENT
+- introduce new product decisions
+- expand scope
+- modify anything outside listed repairs
 
 AFTER_REPAIR:
 /opsx-owner-contract-review change=<change>
@@ -376,17 +401,13 @@ Notes:
 * New Owner answers from this cycle **must** appear under
   `CONFIRMED_OWNER_DECISIONS` as full semantics (chat-stable).
 * Never route repair as “Owner + owning writer”, “manual edit”, or vague
-  “owning writer”. Always `REPAIR_COMMAND: /opsx-new`.
-
-If `/opsx-new` cannot safely apply the handoff (no repair-only mode for an
-existing change), still emit the handoff and add:
-
-```text
-DEPENDENCY_FOUND:
-/opsx-new lacks REPAIR mode for OWNER_REVIEW_HANDOFF on existing change
-```
-
-Do **not** silently redesign `/opsx-new` from this command.
+  “owning writer”. Always lead with `/opsx-new` + this handoff.
+* Every `REPAIRS_REQUIRED` item MUST have `OWNER_INPUT_REQUIRED: NO` and
+  fully resolved `REQUIRED_SEMANTICS` (no A/B for the writer).
+* Field names above are **literal** and must match `/opsx-new` REPAIR
+  validation. Do not invent alternate synonyms (`REPAIR_BOUNDARY`,
+  `REPAIR_COMMAND`, `CURRENT_TEXT`, `REVIEW_SOURCE`) in new handoffs.
+* Do **not** silently redesign `/opsx-new` from this command.
 
 ## Re-review behavior
 
@@ -436,9 +457,14 @@ Short plain language. Examples:
 `READY_FOR_REPAIR`:
 
 ```text
-Все нужные semantic decisions определены.
-Контракт требует writer repairs — ниже OWNER_REVIEW_HANDOFF для /opsx-new.
+Все необходимые решения получены.
+Контракт требует <N> исправления.
+
+Скопируйте блок ниже в новый/Writer чат:
 ```
+
+followed by the pasteable `/opsx-new` + `OWNER_REVIEW_HANDOFF` block
+(see handoff section).
 
 `PASS`:
 
@@ -477,7 +503,9 @@ Use the findings contract above. Omit empty finding dump when
 
 ### 4) OWNER_REVIEW_HANDOFF
 
-Required when `REVIEW_STATE: READY_FOR_REPAIR`. Omit otherwise.
+Required when `REVIEW_STATE: READY_FOR_REPAIR`. Must be the pasteable
+`/opsx-new` + literal handoff block (shared contract with REPAIR MODE).
+Omit otherwise.
 
 ### 5) Footer (mandatory)
 
@@ -493,8 +521,8 @@ NEXT_ACTION:
   NEEDS_CONTEXT     → supply the exact requested durable source; re-invoke
                       or continue in this chat
   NEEDS_OWNER       → answer OWNER_QUESTION(s); continue same review cycle
-  READY_FOR_REPAIR  → run REPAIR_COMMAND (/opsx-new) with OWNER_REVIEW_HANDOFF;
-                      then AFTER_REPAIR
+  READY_FOR_REPAIR  → paste the emitted `/opsx-new` + OWNER_REVIEW_HANDOFF
+                      block into a writer chat unchanged; then AFTER_REPAIR
   PASS              → /opsx-continue or /opsx-ff (recommended)
   FAIL              → treat as READY_FOR_REPAIR when repairs known;
                       otherwise escalate with explicit blocker
@@ -504,7 +532,20 @@ DO_NOT_DO_YET:
   - do not edit owner-contract from this command
   - do not assume continue/ff will enforce this gate (v1 soft only)
   - do not ask Owner to manually invent recovery or rewrite the contract
+  - do not ask Owner to rewrite findings into a custom /opsx-new prompt
 ```
+
+## Authority (recovery loop)
+
+```text
+Owner                         → product semantics / unresolved decisions only
+opsx-owner-contract-review    → READ_ONLY diagnosis + clarification + handoff
+opsx-new                      → sole writer of owner-contract.md
+                                (CREATE or REPAIR_EXISTING_OWNER_CONTRACT)
+```
+
+No other command gains write authority over `owner-contract.md` from this
+review loop.
 
 ## Self-check before return
 
@@ -515,7 +556,8 @@ DO_NOT_DO_YET:
 - [ ] Did not choose technical implementation
 - [ ] Did not ask Owner questions where `OWNER_INPUT_REQUIRED: NO`
 - [ ] Did not end as FAIL solely for missing context or missing Owner choice
-- [ ] `READY_FOR_REPAIR` includes `OWNER_REVIEW_HANDOFF` + `REPAIR_COMMAND: /opsx-new`
+- [ ] `READY_FOR_REPAIR` includes pasteable `/opsx-new` + literal
+      `OWNER_REVIEW_HANDOFF` (`MODE: REPAIR_EXISTING_OWNER_CONTRACT`)
 - [ ] Human summary is short; dump only when findings exist
 - [ ] Machine block present with `REVIEW_STATE` and all check keys
 - [ ] Footer `MODE: READ_ONLY` / `FILES_CHANGED: none`
