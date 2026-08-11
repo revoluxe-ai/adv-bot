@@ -91,8 +91,12 @@ When an approved handoff is supplied:
 
 Consumers must not silently broaden `CURRENT_INCREMENT`, move
 `FUTURE_INCREMENTS` into tasks, or reinterpret a card as implementation GO.
-Canonical paste keys live in `/opsx-evolution` COPY_BLOCK; consumers MUST NOT
-re-open the North Star card body to invent Future scope.
+Canonical paste keys live in `/opsx-evolution` COPY_BLOCK (including mandatory
+`OWNER_INTENT` — Owner product meaning). Consumers MUST NOT re-open the North
+Star card body to invent Future scope, and MUST NOT rewrite `OWNER_INTENT`
+from repository inference or explore findings without explicit Owner
+correction. `/opsx-explore` may add evidence/mapping alongside a handoff but
+must pass `OWNER_INTENT` through unchanged.
 
 ## NORTH_STAR_ALIGNMENT contract
 
