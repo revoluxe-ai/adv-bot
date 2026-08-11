@@ -85,7 +85,12 @@ semantics from similar names.
       - **If the artifact is `tasks`:** follow
         `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Build draft
         tasks, then run full `TASK_GENERATION_READINESS` (including
-        post-generation `NORMATIVE_PRESERVATION_CHECK`). On
+        post-generation `NORMATIVE_PRESERVATION_CHECK`). When scenario
+        coverage is required, `SCENARIO_REQUIREMENTS_CONSUMED: yes` needs a
+        CURRENT durable `scenario-coverage/plan.receipt.json` (never chat-only);
+        missing/stale → `BLOCKED` /
+        `SCENARIO_PLAN_EVIDENCE_MISSING|STALE|INTEGRITY_FAIL` and
+        `NEXT: /opsx-spec-scenario-coverage mode=plan`. On
         `TASKS_STATUS: BLOCKED` stop the loop without writing `tasks.md`
         (`FILES_CHANGED: none`); return the unresolved item / drift +
         artifact to fix. Do not auto-ask Owner for technical design gaps.
@@ -141,7 +146,10 @@ semantics from similar names.
      may still use durable `OWNER_LIFECYCLE_ECHO` + Owner `CONFIRM_LIFECYCLE`
      (or `CORRECT` → rewrite → confirm).
    - Schedule `/opsx-spec-scenario-coverage mode=plan` (lifecycle↔scenario
-     coverage; not optional under PA); note SIDE_EFFECT_PROOF obligations.
+     coverage; not optional under PA); that command MUST materialize durable
+     `scenario-coverage/plan.md` + `plan.receipt.json`. Chat-only plan is
+     not a valid gate input for tasks / planning-review. Note
+     SIDE_EFFECT_PROOF obligations.
    - Do not declare apply-ready if PA required and MEANING_LOCK is missing
      or blocked, **or** (for reviewed-contract Changes) Derived Lifecycle is
      missing/UNRESOLVED when temporal behavior applies, **or** (legacy path
@@ -191,7 +199,8 @@ After completing all artifacts, summarize:
   no implementer architecture choices,
   `LEGACY_BASELINE` / `TARGET_REGRESSION` / `FINAL_ACCEPTANCE`,
   MUST/MUST NOT modality + conditional-branch preservation,
-  epoch coupling when applicable, continue≡ff equivalence).
+  epoch coupling when applicable, continue≡ff equivalence;
+  durable CURRENT scenario-plan receipt required when scenarios apply).
   On BLOCKED do not write `tasks.md`.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact

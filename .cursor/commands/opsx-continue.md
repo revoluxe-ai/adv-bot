@@ -215,7 +215,24 @@ UPSTREAM_NORMATIVE_CONFLICTS: none
 NORMATIVE_MODALITY_PRESERVED: yes
 CONDITIONAL_BRANCHES_PRESERVED: yes
 SCENARIO_REQUIREMENTS_CONSUMED: yes | not_required
+SCENARIO_PLAN_EVIDENCE_ID: <id> | not_required
+SCENARIO_PLAN_STATUS: ready | not_required
+SCENARIO_PLAN_FRESHNESS: current | not_required
 TASKS_STATUS: READY
+```
+
+When scenario coverage is required, `SCENARIO_REQUIREMENTS_CONSUMED: yes`
+requires a CURRENT durable receipt at
+`openspec/changes/<change>/scenario-coverage/plan.receipt.json`
+(see `TASK_GENERATION.md` §6 / `SCENARIO_TEST_COVERAGE.md`
+DURABLE_PLAN_EVIDENCE). Chat-only plan is insufficient.
+
+```text
+TASKS_STATUS: BLOCKED
+REASON: SCENARIO_PLAN_EVIDENCE_MISSING | SCENARIO_PLAN_EVIDENCE_STALE |
+  SCENARIO_PLAN_EVIDENCE_INTEGRITY_FAIL
+NEXT: /opsx-spec-scenario-coverage mode=plan change=<change>
+FILES_CHANGED: none
 ```
 
 4. If any unresolved technical design choice would become an implementer

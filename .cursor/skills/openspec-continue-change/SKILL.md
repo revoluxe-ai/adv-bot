@@ -143,10 +143,16 @@ command `/opsx-continue` / `/opsx-ff`:
 - Build draft tasks, then run readiness **after** draft (post-generation
   `NORMATIVE_PRESERVATION_CHECK`). On
   `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` /
-  `NORMATIVE_MODALITY_DRIFT` / `CONDITIONAL_BRANCH_COLLAPSE` →
+  `NORMATIVE_MODALITY_DRIFT` / `CONDITIONAL_BRANCH_COLLAPSE` /
+  `SCENARIO_PLAN_EVIDENCE_MISSING` / `SCENARIO_PLAN_EVIDENCE_STALE` /
+  `SCENARIO_PLAN_EVIDENCE_INTEGRITY_FAIL` →
   `TASKS_STATUS: BLOCKED`, `FILES_CHANGED: none`.
 - READY requires `NORMATIVE_MODALITY_PRESERVED: yes` and
   `CONDITIONAL_BRANCHES_PRESERVED: yes`.
+- When scenario coverage is required: `SCENARIO_REQUIREMENTS_CONSUMED: yes`
+  only with CURRENT durable `scenario-coverage/plan.receipt.json` and
+  matching `SCENARIO_PLAN_EVIDENCE_ID` (never chat-only). Else BLOCKED and
+  `NEXT: /opsx-spec-scenario-coverage mode=plan`.
 - Evidence roles: `LEGACY_BASELINE` | `TARGET_REGRESSION` | `FINAL_ACCEPTANCE`.
 - Preserve `MUST` / `MUST NOT` / `MAY` (no weakening); preserve conditional
   branches (no collapse to MAY); epoch only after actual start when applicable.

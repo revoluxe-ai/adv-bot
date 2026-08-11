@@ -106,7 +106,8 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
    - When required: durable MEANING_LOCK; durable `OWNER_LIFECYCLE_ECHO`
      (3–7 temporal steps) in design/decision/spec; Owner
      `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm); schedule
-     `/opsx-spec-scenario-coverage mode=plan`.
+     `/opsx-spec-scenario-coverage mode=plan` (must materialize durable
+     `scenario-coverage/plan.md` + `plan.receipt.json`; chat-only insufficient).
    - Do **not** claim apply-ready / "Ready for implementation" if PA
      required and echo/`CONFIRM_LIFECYCLE` is missing (chat-only lifecycle
      is not durable).
@@ -136,7 +137,8 @@ After completing all artifacts, summarize:
 - When creating `design.md`: follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
   (identical to `/opsx-continue`; draft → post-generation check; continue≡ff).
 - When creating `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
-  (identical to `/opsx-continue`; draft → post-generation check; continue≡ff).
+  (identical to `/opsx-continue`; draft → post-generation check; continue≡ff;
+  CURRENT durable scenario-plan receipt required when scenarios apply).
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output

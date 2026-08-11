@@ -143,7 +143,9 @@ decisions/**/*.md
 design.md
 specs/**/*.md
 tasks.md
-SCENARIO_COVERAGE_PLAN / durable scenario-plan evidence metadata
+SCENARIO_COVERAGE_PLAN / durable scenario-plan evidence:
+  openspec/changes/<change>/scenario-coverage/plan.md
+  openspec/changes/<change>/scenario-coverage/plan.receipt.json
 Evolution/Explore linkage when required by other contracts
 ```
 
@@ -287,17 +289,31 @@ representation): `UNRESOLVED_PRODUCT_SEMANTICS` → usually `NEEDS_OWNER`.
 
 ### P6 — SPEC_COVERAGE
 
-Do **not** rebuild scenario coverage. Check:
+Do **not** rebuild scenario coverage. Do **not** require Owner/user to paste
+chat `SCENARIO_COVERAGE_PLAN` when durable evidence exists. Do **not** treat
+`tasks.md` `SCENARIO_REQUIREMENTS_CONSUMED: yes` as authority.
 
-* plan exists when required;
-* plan corresponds to current spec/design versions;
-* no unresolved material coverage gaps;
-* material lifecycle transitions represented.
+When scenario plan is required for the Change:
 
-If specialized command returned `PLAN_STATUS: ready`, verify
-applicability/coherence only.
+1. Locate canonical pair:
+   `openspec/changes/<change>/scenario-coverage/plan.md`
+   `openspec/changes/<change>/scenario-coverage/plan.receipt.json`
+2. Missing → `STATUS: BLOCKED` (or REPAIR path as applicable), type
+   `SPEC_COVERAGE_EVIDENCE_MISSING` (prefer over vague `SPEC_COVERAGE_GAP`
+   when the gap is absent durable evidence).
+3. Validate `PLAN_CONTENT_HASH` vs `plan.md` → mismatch →
+   `EVIDENCE_INTEGRITY_FAIL`.
+4. Validate receipt `INPUTS.*` hashes vs current design/specs → mismatch →
+   `STALE_DERIVED_ARTIFACT` (scenario-plan evidence STALE).
+5. Validate `PLAN_STATUS` (ready/provisional/blocked) and consume human plan /
+   receipt coverage for unresolved material gaps and lifecycle representation.
+6. PASS only when evidence is CURRENT, integrity-ok, and coverage coherent.
 
-Failure type: `SPEC_COVERAGE_GAP`  
+If specialized command returned durable `PLAN_STATUS: ready` with CURRENT
+receipt, verify applicability/coherence only — do not rebuild the matrix.
+
+Failure types: `SPEC_COVERAGE_GAP` | `SPEC_COVERAGE_EVIDENCE_MISSING` |
+`STALE_DERIVED_ARTIFACT` | `EVIDENCE_INTEGRITY_FAIL`  
 `NOT_APPLICABLE` when scenario plan not required for this Change.
 
 ### P7 — TASK_DECOMPOSITION
@@ -341,7 +357,8 @@ Each finding:
 FINDING_ID: P-NNN
 TYPE: SEMANTIC_DRIFT | NORMATIVE_DRIFT | UNRESOLVED_PRODUCT_SEMANTICS |
       DESIGN_READINESS_GAP | AUTHORITY_OR_SOT_GAP | LIFECYCLE_GAP |
-      SPEC_COVERAGE_GAP | TASK_DECOMPOSITION_GAP | SCOPE_DRIFT |
+      SPEC_COVERAGE_GAP | SPEC_COVERAGE_EVIDENCE_MISSING |
+      EVIDENCE_INTEGRITY_FAIL | TASK_DECOMPOSITION_GAP | SCOPE_DRIFT |
       STALE_DERIVED_ARTIFACT
 SEVERITY: BLOCKING | HIGH | MEDIUM | LOW
 

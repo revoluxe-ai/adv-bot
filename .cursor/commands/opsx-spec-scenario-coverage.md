@@ -2,7 +2,7 @@
 name: /opsx-spec-scenario-coverage
 id: opsx-spec-scenario-coverage
 category: Workflow
-description: "READ_ONLY Spec Scenario coverage: mode=plan|audit|certify (required). Plan required evidence; audit matrix/gaps; certify with provider receipts."
+description: "Spec Scenario coverage: mode=plan|audit|certify (required). Plan materializes durable evidence; audit matrix/gaps; certify with provider receipts."
 argument-hint: "mode=plan|audit|certify change=<change-id> [run=targeted|none] [scenario=<exact-title>]"
 ---
 
@@ -34,12 +34,19 @@ Authority: `.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
 7. (`mode=certify`) Есть ли свежие provider receipts для обязательных PG/CH ends?
 
 ```text
-COMMAND_MODE=READ_ONLY
+COMMAND_MODE=READ_ONLY          # audit/certify always; plan analysis is read-only
 PRODUCT_WRITE=FORBIDDEN
 TEST_WRITE=FORBIDDEN
-OPENSPEC_WRITE=FORBIDDEN
+OPENSPEC_WRITE=FORBIDDEN        # except mode=plan DURABLE_PLAN_EVIDENCE paths below
+PLAN_EVIDENCE_WRITE=mode=plan ONLY
+  → openspec/changes/<change>/scenario-coverage/plan.md
+  → openspec/changes/<change>/scenario-coverage/plan.receipt.json
 ARCHIVE_VERDICT_OWNER=/opsx-verify
 ```
+
+Authority for durable plan paths:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md` → **DURABLE_PLAN_EVIDENCE**.
+Producer MUST NOT edit owner-contract / design / specs / tasks / decisions.
 
 ## User input
 
@@ -71,14 +78,26 @@ wrong-place tokens → stop **before** any scenario work (см. Arg gate).
 
 ```text
 INPUT:  apply_ready / planning artifacts (delta specs, design, tasks)
-ACTION: build required-evidence matrix; do not claim tests exist or PASS
-OUTPUT: SCENARIO_COVERAGE_PLAN (PLAN_STATUS=ready|provisional|blocked)
+ACTION: build required-evidence matrix; do not claim tests exist or PASS;
+        materialize durable plan.md + plan.receipt.json (sole writer)
+OUTPUT: SCENARIO_COVERAGE_PLAN + SCENARIO_COVERAGE_PLAN_RESULT
+        (PLAN_STATUS + MATERIALIZATION_STATUS)
 SUCCESS: PLAN_STATUS=ready (or provisional with explicit OPEN_QUESTIONS)
-NEXT:   /opsx-apply   |   /opsx-update <change> if PLANNING_UPDATE / blocked
+         AND MATERIALIZATION_STATUS=COMMITTED|ALREADY_CURRENT
+NEXT:   /opsx-continue|/opsx-ff (tasks) | /opsx-planning-review |
+        /opsx-update <change> if PLANNING_UPDATE / blocked
 ```
 
 `mode=plan` **never** executes tests. Treat as `run=none`. Do not emit
 full-change `SCENARIO_TEST_COVERAGE_REPORT VERDICT=PASS`.
+
+Durable materialization is **mandatory** when plan is a later gate input:
+compute → validate → write `scenario-coverage/plan.md` then
+`plan.receipt.json` atomically. Analysis OK + write fail →
+`PLAN_STATUS: NOT_COMMITTED`, `MATERIALIZATION_STATUS: FAILED` (no durable
+ready). Identical inputs → `ALREADY_CURRENT` / same `PLAN_EVIDENCE_ID`.
+Stale prior pair → replace single CURRENT pair. See contract
+**DURABLE_PLAN_EVIDENCE**.
 
 **Product Acceptance / change spirit:** When
 `PRODUCT_ACCEPTANCE_REQUIRED=true`, resolve lifecycle as follows (see
@@ -678,7 +697,7 @@ PG/CH `REFACTOR_AND_TEST` / `CERTIFY` gaps → соответствующие pa
 
 ## Required output
 
-Для `mode=plan` достаточно plan-shaped output:
+Для `mode=plan` — plan-shaped output **plus** durable materialization result:
 
 ```text
 STATUS: ORIENTED | BLOCKED | GAP
@@ -689,8 +708,24 @@ CHANGE:
 LIFECYCLE_STATUS: DERIVED | UNRESOLVED | LEGACY_ECHO | NOT_APPLICABLE
 LIFECYCLE_COVERAGE: ...   # L* ↔ Spec Scenario mapping (or gaps)
 SCENARIO_COVERAGE_PLAN: ...
+
+SCENARIO_COVERAGE_PLAN_RESULT
+CHANGE_ID:
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked | NOT_COMMITTED
+MATERIALIZATION_STATUS: COMMITTED | ALREADY_CURRENT | FAILED
+PLAN_EVIDENCE_ID:
+PLAN_PATH: openspec/changes/<change>/scenario-coverage/plan.md
+RECEIPT_PATH: openspec/changes/<change>/scenario-coverage/plan.receipt.json
+INPUT_FRESHNESS: current | stale | missing | n/a
+UNRESOLVED_GAPS:
+
+FILES_CHANGED: scenario-coverage/plan.md | plan.receipt.json | none
 NEXT_ACTION:
 ```
+
+Durable `PLAN_STATUS: ready|provisional` is valid for consumers **only** when
+`MATERIALIZATION_STATUS` is `COMMITTED` or `ALREADY_CURRENT`.
 
 Для `mode=audit` / `mode=certify`:
 
@@ -771,8 +806,13 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 
 ## Safety
 
-- Never edit production, tests, OpenSpec artifacts, commands or policies.
-- Never create/update durable report in v1; report is chat output.
+- Never edit production, tests, commands, policies, or product OpenSpec
+  artifacts (owner-contract / design / specs / tasks / decisions).
+- `mode=plan` MAY write **only** the two durable plan-evidence files under
+  `openspec/changes/<change>/scenario-coverage/` per **DURABLE_PLAN_EVIDENCE**.
+  Analysis-without-successful-materialization MUST NOT claim durable ready.
+- `mode=audit` / `mode=certify`: never create/update durable plan evidence;
+  audit/certify reports remain chat output (provider receipts may use `.tmp`).
 - Never invent or author Derived Lifecycle / `OWNER_LIFECYCLE_ECHO` here —
   planning writers only (`/opsx-continue` / `/opsx-ff` / `/opsx-update`).
 - Never treat scenario `VERDICT=PASS` as clearing Product Acceptance without
@@ -795,12 +835,17 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
   behavior applies — use the correct failure class
   (`PLANNING_LIFECYCLE_GAP` / `UNRESOLVED_PRODUCT_SEMANTICS` /
   `BLOCKED_NEEDS_OWNER_LIFECYCLE` legacy).
+- Never treat chat history as durable plan SoT for downstream gates.
 
 ## Self-review
 
 - `mode=` and `change=` parsed; Arg gate ran before scenario work.
 - `SCENARIO_MODE` in output matches requested `mode=`.
 - `mode=plan` produced `SCENARIO_COVERAGE_PLAN` / `LIFECYCLE_COVERAGE`, not certified PASS.
+- `mode=plan` attempted durable materialization; durable ready only with
+  `MATERIALIZATION_STATUS: COMMITTED|ALREADY_CURRENT` and matching
+  `plan.md` + `plan.receipt.json`; write failure → `NOT_COMMITTED`/`FAILED`.
+- `mode=plan` did not edit product OpenSpec beyond the two evidence paths.
 - Under PA primary path, `mode=plan` uses Derived Lifecycle; does not demand
   `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` when reviewed Owner Contract exists.
 - Under PA, audit/certify rows mapped to Derived Lifecycle steps (or FAIL/BLOCKED).

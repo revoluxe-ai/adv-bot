@@ -38,10 +38,16 @@ scenario-coverage = verifier only
 | 06 | `06-semantic-drift.md` | T6 | SEMANTIC_DRIFT; not PASS |
 | 07 | `07-planning-lifecycle-gap.md` | T7 | PLANNING_LIFECYCLE_GAP; not re-quiz Owner |
 | 08 | `08-non-temporal.md` | T8 | no forced 3–7 ceremonial lifecycle |
-| 09 | `09-auto-shelf-exhausted-pause-retest-plan.md` | real Change | no BLOCKED_NEEDS_OWNER_LIFECYCLE |
+| 09 | `09-auto-shelf-exhausted-pause-retest-plan.md` | real Change | no BLOCKED_NEEDS_OWNER_LIFECYCLE; durable plan+receipt when ready |
+
+Also see sibling suite
+`.cursor/commands/_fixtures/scenario-coverage-plan-evidence/` for
+materialization / freshness / consumer discoverability (T1–T12).
 
 ## Forbidden outcomes (any fixture with reviewed Owner Contract)
 
 - `BLOCKED_NEEDS_OWNER_LIFECYCLE` solely because echo/CONFIRM absent
 - `CONFIRM_LIFECYCLE` as a second semantic gate
 - inventing product transitions when Owner Contract is silent
+- claiming `PLAN_STATUS: ready` for gate consumption without durable
+  `scenario-coverage/plan.md` + `plan.receipt.json`

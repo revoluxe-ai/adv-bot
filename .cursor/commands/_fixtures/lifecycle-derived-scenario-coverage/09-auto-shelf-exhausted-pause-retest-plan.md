@@ -52,6 +52,13 @@ MUST return one of:
   STATUS: GAP                + SPEC_SCENARIO_MISSING / SPEC_COVERAGE_GAP /
                                PLANNING_LIFECYCLE_GAP / SEMANTIC_DRIFT
                                (if artifacts truly incomplete)
+
+AND when PLAN_STATUS is ready|provisional for gate consumption:
+  MATERIALIZATION_STATUS: COMMITTED | ALREADY_CURRENT
+  durable files exist:
+    openspec/changes/auto-shelf-exhausted-pause-retest/scenario-coverage/plan.md
+    openspec/changes/auto-shelf-exhausted-pause-retest/scenario-coverage/plan.receipt.json
+  PLAN_EVIDENCE_ID present; INPUTS hashes match current design/specs
 ```
 
 ## Note
@@ -60,3 +67,4 @@ This fixture documents the **process** regression. It does not rewrite the
 product Change artifacts. If design lacks an explicit `## Lifecycle` section,
 scenario-coverage may derive L* from owner-contract + planning without
 asking Owner again — or emit `PLANNING_LIFECYCLE_GAP` for the planning writer.
+Chat-only plan without durable materialization is a **process FAIL**.

@@ -40,10 +40,15 @@ LEGACY_BASELINE ≠ TARGET_REGRESSION
 | 08 | `08-epoch-coupling.md` | T4 epoch | epoch only after actual start |
 | 09 | `09-conflicting-upstream-modality.md` | T5 conflict | BLOCKED UPSTREAM_NORMATIVE_CONFLICT |
 | 10 | `10-post-generation-modality-drift.md` | T6 post-check | BLOCKED NORMATIVE_MODALITY_DRIFT |
+| 11 | `11-scenario-plan-evidence-missing.md` | durable plan | BLOCKED SCENARIO_PLAN_EVIDENCE_MISSING |
+| 12 | `12-scenario-plan-evidence-stale.md` | durable plan | BLOCKED SCENARIO_PLAN_EVIDENCE_STALE |
+| 13 | `13-scenario-plan-evidence-current.md` | durable plan | consumed yes + PLAN_EVIDENCE_ID |
 
 ## Non-goals
 
 - Do not edit product `openspec/changes/auto-shelf-exhausted-pause-retest/**`
   as part of applying this fixture pack.
-- Do not change `/opsx-new`, owner-contract-review, scenario-coverage,
-  design-generation, Product Acceptance, apply/verify/archive in these fixtures.
+- Do not change `/opsx-new`, owner-contract-review, design-generation,
+  Product Acceptance, apply/verify/archive in these fixtures.
+- Task generation MUST NOT manufacture scenario-coverage receipts
+  (sole writer: `/opsx-spec-scenario-coverage mode=plan`).

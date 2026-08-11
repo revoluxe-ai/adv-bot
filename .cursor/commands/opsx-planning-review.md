@@ -115,7 +115,9 @@ openspec/changes/<change>/decisions/**/*.md
 openspec/changes/<change>/design.md
 openspec/changes/<change>/specs/**/*.md
 openspec/changes/<change>/tasks.md
-scenario coverage plan / durable plan metadata (when required)
+scenario coverage plan / durable plan evidence (when required):
+  openspec/changes/<change>/scenario-coverage/plan.md
+  openspec/changes/<change>/scenario-coverage/plan.receipt.json
 ```
 
 Bounded contracts:
@@ -166,7 +168,7 @@ Full definitions: `PLANNING_REVIEW.md`.
 | P3 | DESIGN_READINESS | DESIGN_READINESS_GAP |
 | P4 | AUTHORITY_AND_SOT | AUTHORITY_OR_SOT_GAP |
 | P5 | LIFECYCLE_COMPLETENESS | LIFECYCLE_GAP / UNRESOLVED_PRODUCT_SEMANTICS |
-| P6 | SPEC_COVERAGE | SPEC_COVERAGE_GAP |
+| P6 | SPEC_COVERAGE | SPEC_COVERAGE_GAP / SPEC_COVERAGE_EVIDENCE_MISSING / STALE_DERIVED_ARTIFACT / EVIDENCE_INTEGRITY_FAIL |
 | P7 | TASK_DECOMPOSITION | TASK_DECOMPOSITION_GAP |
 | P8 | SCOPE_CONTINUITY | SCOPE_DRIFT |
 

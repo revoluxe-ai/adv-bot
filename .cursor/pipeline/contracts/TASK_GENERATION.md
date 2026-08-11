@@ -96,11 +96,15 @@ UPSTREAM_NORMATIVE_CONFLICTS: none | <pair>
 NORMATIVE_MODALITY_PRESERVED: yes | no
 CONDITIONAL_BRANCHES_PRESERVED: yes | no
 SCENARIO_REQUIREMENTS_CONSUMED: yes | no | not_required
+SCENARIO_PLAN_EVIDENCE_ID: <id> | none | not_required
+SCENARIO_PLAN_STATUS: ready | provisional | blocked | missing | not_required
+SCENARIO_PLAN_FRESHNESS: current | stale | missing | integrity_fail | not_required
 
 TASKS_STATUS: READY | BLOCKED
 REASON: <none | TECHNICAL_DESIGN_UNRESOLVED | UNRESOLVED_PRODUCT_CHOICE |
   UPSTREAM_NORMATIVE_CONFLICT | NORMATIVE_MODALITY_DRIFT |
-  CONDITIONAL_BRANCH_COLLAPSE | …>
+  CONDITIONAL_BRANCH_COLLAPSE | SCENARIO_PLAN_EVIDENCE_MISSING |
+  SCENARIO_PLAN_EVIDENCE_STALE | SCENARIO_PLAN_EVIDENCE_INTEGRITY_FAIL | …>
 ```
 
 Write `tasks.md` only when:
@@ -112,6 +116,10 @@ UPSTREAM_NORMATIVE_CONFLICTS: none
 NORMATIVE_MODALITY_PRESERVED: yes
 CONDITIONAL_BRANCHES_PRESERVED: yes
 SCENARIO_REQUIREMENTS_CONSUMED: yes | not_required
+# when consumed=yes, also require:
+#   SCENARIO_PLAN_EVIDENCE_ID present
+#   SCENARIO_PLAN_STATUS: ready
+#   SCENARIO_PLAN_FRESHNESS: current
 TASKS_STATUS: READY
 ```
 
@@ -119,6 +127,10 @@ Forbidden false readiness: declaring
 `UPSTREAM_NORMATIVE_CONFLICTS: none` + `TASKS_STATUS: READY` and then
 emitting draft text that weakens upstream `MUST` / collapses conditional
 branches. Preflight that ignores draft content is a contract defect.
+
+Forbidden false readiness: `SCENARIO_REQUIREMENTS_CONSUMED: yes` from chat
+context alone without a CURRENT durable
+`openspec/changes/<change>/scenario-coverage/plan.receipt.json`.
 
 ---
 
@@ -342,13 +354,40 @@ When the Change has material scenario coverage obligations (e.g. Derived
 Lifecycle + `/opsx-spec-scenario-coverage`, or explicit scenario requirements
 in specs):
 
-- `SCENARIO_REQUIREMENTS_CONSUMED: yes` — every material scenario/requirement
-  that implementation must satisfy is reflected in tasks (or explicitly
-  deferred with a named follow-up that is itself a task), **or**
+- Locate canonical durable evidence first:
+  `openspec/changes/<change>/scenario-coverage/plan.receipt.json`
+  (+ matching `plan.md`). Authority:
+  `SCENARIO_TEST_COVERAGE.md` **DURABLE_PLAN_EVIDENCE**.
+- Validate freshness (`CURRENT` / `STALE` / `MISSING` / `INTEGRITY_FAIL`)
+  against current design/spec(/lifecycle) content hashes in the receipt.
+- `SCENARIO_REQUIREMENTS_CONSUMED: yes` — **only** when:
+  - durable receipt exists;
+  - `PLAN_STATUS: ready` (v1 gate; provisional alone does not unlock READY);
+  - freshness is `current`;
+  - integrity checks pass;
+  - tasks reflect that exact `PLAN_EVIDENCE_ID`'s material scenarios
+    (or explicitly defer with a named follow-up task).
+  Emit with the readiness block:
+  `SCENARIO_PLAN_EVIDENCE_ID`, `SCENARIO_PLAN_STATUS: ready`,
+  `SCENARIO_PLAN_FRESHNESS: current`.
 - `SCENARIO_REQUIREMENTS_CONSUMED: not_required` — only when scenarios are
   not applicable for this Change (document why briefly).
 - `SCENARIO_REQUIREMENTS_CONSUMED: no` — applicable scenarios missing from
   draft → readiness failure.
+
+Missing / unusable durable plan evidence:
+
+```text
+TASKS_STATUS: BLOCKED
+REASON: SCENARIO_PLAN_EVIDENCE_MISSING
+  | SCENARIO_PLAN_EVIDENCE_STALE
+  | SCENARIO_PLAN_EVIDENCE_INTEGRITY_FAIL
+FILES_CHANGED: none
+NEXT: /opsx-spec-scenario-coverage mode=plan change=<change>
+```
+
+Task generation MUST NOT manufacture receipts, MUST NOT use chat history as
+SoT, and MUST NOT self-attest `consumed: yes` without the CURRENT receipt.
 
 Missing consumption with applicable scenarios → treat as readiness failure
 (prefer fixing task draft before READY; do not silently drop scenarios).

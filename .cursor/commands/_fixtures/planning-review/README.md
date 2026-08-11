@@ -29,6 +29,9 @@ Cross-contract: REPAIR handoff shape MUST be acceptable to `/opsx-update`
 | T10 | `10-read-only.md` | any case | FILES_CHANGED: none |
 | T11 | `11-idempotency.md` | twice unchanged | same findings/status |
 | T12 | `12-repair-loop.md` | handoff → repair → PASS | second PASS |
+| T13 | `13-scenario-plan-evidence-missing.md` | no durable plan receipt | BLOCKED SPEC_COVERAGE_EVIDENCE_MISSING |
+| T14 | `14-scenario-plan-evidence-stale.md` | receipt INPUTS stale | BLOCKED/REPAIR STALE_DERIVED_ARTIFACT |
+| T15 | `15-scenario-plan-evidence-current.md` | CURRENT durable plan | P6 PASS without chat paste |
 
 ## Static matrix
 
@@ -39,9 +42,9 @@ Cross-contract: REPAIR handoff shape MUST be acceptable to `/opsx-update`
 | DESIGN_READINESS | T4 |
 | AUTHORITY_AND_SOT | T4 |
 | LIFECYCLE / Owner ambiguity | T5 |
-| SPEC_COVERAGE | T6 |
+| SPEC_COVERAGE | T6, T13, T14, T15 |
 | TASK_DECOMPOSITION | T3, T7, T8 |
-| STALE_DERIVED_ARTIFACT | T8 |
+| STALE_DERIVED_ARTIFACT | T8, T14 |
 | Self-attestation not authority | T9 |
 | READ_ONLY | T10 |
 | Idempotency | T11 |
@@ -52,3 +55,7 @@ Cross-contract: REPAIR handoff shape MUST be acceptable to `/opsx-update`
 `auto-shelf-exhausted-pause-retest` may already align Owner/design/tasks on
 MAY for conditional start — do not force T2 FAIL on live disk without
 checking authoritative Owner modality. Use synthetic T2 for MUST→MAY.
+
+After `/opsx-spec-scenario-coverage mode=plan` materializes durable evidence
+for that Change, T15-style P6 discovery MUST succeed in a fresh chat without
+pasted plan output.

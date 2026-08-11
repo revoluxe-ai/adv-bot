@@ -276,6 +276,151 @@ SCENARIO_COVERAGE_PLAN:
 
 Material behavior ambiguity → `/opsx-update`, не догадка planner-а.
 
+## DURABLE_PLAN_EVIDENCE (`mode=plan` only)
+
+When scenario coverage planning is a required gate input for a later
+independent consumer (`/opsx-continue` / `/opsx-ff` task generation,
+`/opsx-planning-review` P6, Product Acceptance lifecycle coverage), the
+plan MUST be materialized as durable, machine-checkable Change evidence.
+Chat output alone is **not** SoT.
+
+### Canonical paths
+
+```text
+openspec/changes/<CHANGE_ID>/scenario-coverage/plan.md
+openspec/changes/<CHANGE_ID>/scenario-coverage/plan.receipt.json
+```
+
+One logical evidence pair. Do **not** use `.tmp` as the canonical
+cross-command SoT for plan evidence (`.tmp/opsx-scenario-coverage/` remains
+for provider/audit receipts only).
+
+### Sole writer
+
+```text
+SOLE_WRITER: /opsx-spec-scenario-coverage mode=plan
+```
+
+`/opsx-continue`, `/opsx-ff`, `/opsx-update`, `/opsx-planning-review` MUST
+NOT create or repair plan evidence. They only read, validate, consume, or
+request rerun.
+
+### Human plan (`plan.md`)
+
+Reviewable content MUST include at least:
+
+```text
+CHANGE_ID
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked
+PLAN_EVIDENCE_ID
+LIFECYCLE_STATUS
+LIFECYCLE_COVERAGE   # L* ↔ Spec Scenario mapping (or gaps)
+SCENARIO_COVERAGE_PLAN  # matrix / required evidence (schema above)
+UNRESOLVED_GAPS | OPEN_QUESTIONS
+GENERATED_FROM         # authoritative input identities/hashes
+```
+
+Plan is **DERIVED PLANNING EVIDENCE** only. It MUST NOT invent product
+semantics or become Owner/design/spec authority.
+
+### Machine receipt (`plan.receipt.json`)
+
+```text
+SCHEMA_VERSION: 1
+SCENARIO_COVERAGE_RECEIPT: true
+CHANGE_ID:
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked
+PLAN_EVIDENCE_ID:
+PLAN_CONTENT_HASH:        # sha256 of canonical plan.md bytes (LF-normalized)
+PLAN_PATH:
+RECEIPT_PATH:
+SCENARIO_COUNT:
+LIFECYCLE_COVERAGE:
+  covered: []
+  gaps: []
+UNRESOLVED_GAPS: []
+INPUTS:
+  DESIGN_REVISION: { path, content_hash }
+  SPEC_REVISION: [ { path, content_hash }, ... ]
+  LIFECYCLE_REVISION: { source, content_hash }
+  OWNER_CONTRACT_REVISION: { path, content_hash } | omitted
+GENERATED_FROM:           # same hashes as INPUTS (deterministic identity)
+MATERIALIZATION_STATUS: COMMITTED
+```
+
+Optional timestamps MUST NOT enter `PLAN_EVIDENCE_ID` / `PLAN_CONTENT_HASH`.
+
+`content_hash` = sha256 of LF-normalized file bytes. v1 conservatism:
+`DESIGN_REVISION` / `LIFECYCLE_REVISION` MAY both hash whole `design.md`
+(any design change → STALE is acceptable).
+
+### Freshness / integrity
+
+Consumers MUST classify evidence as exactly one of:
+
+```text
+MISSING | CURRENT | STALE | INTEGRITY_FAIL
+```
+
+- missing plan or receipt → `MISSING`
+- any `INPUTS.*` hash ≠ current file hash → `STALE`
+- `PLAN_CONTENT_HASH` ≠ hash(`plan.md`) → `INTEGRITY_FAIL`
+- otherwise → `CURRENT`
+
+`PLAN_READY(design=A, spec=B)` MUST NOT silently remain CURRENT after
+design=A2 or covered-spec=B2.
+
+### Atomicity
+
+```text
+compute full result → validate → write plan.md → write receipt
+```
+
+Partial materialization MUST NOT yield durable `ready`. On write failure:
+
+```text
+MATERIALIZATION_STATUS: FAILED
+PLAN_STATUS: NOT_COMMITTED   # chat may report analysis, not durable ready
+```
+
+Recovery: rerun `mode=plan`. Do not leave two ambiguous CURRENT pairs;
+rerun replaces/supersedes the canonical pair.
+
+### Idempotency
+
+Identical authoritative inputs + same deterministic plan semantics →
+same `PLAN_EVIDENCE_ID` / `PLAN_CONTENT_HASH`. Second run MAY report
+`MATERIALIZATION_STATUS: ALREADY_CURRENT` without rewrite.
+
+### Result envelope (chat + durable)
+
+After materialization attempt, producer returns:
+
+```text
+SCENARIO_COVERAGE_PLAN_RESULT
+CHANGE_ID:
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked | NOT_COMMITTED
+MATERIALIZATION_STATUS: COMMITTED | ALREADY_CURRENT | FAILED
+PLAN_EVIDENCE_ID:
+PLAN_PATH:
+RECEIPT_PATH:
+INPUT_FRESHNESS: current | stale | missing | n/a
+UNRESOLVED_GAPS:
+```
+
+Only `COMMITTED` / `ALREADY_CURRENT` may be treated as durable gate input.
+
+### Mode isolation
+
+```text
+PLAN evidence ≠ audit report evidence ≠ certify / provider evidence
+```
+
+This section authorizes durable writes for `mode=plan` evidence paths only.
+
 ## Gap dispositions
 
 ```text

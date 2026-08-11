@@ -27,7 +27,10 @@ first-bad-artifact algorithm, and `PLANNING_REVIEW_HANDOFF`.
   `NORMATIVE_MODALITY_PRESERVED: yes` without body checks.
 * Do not invent Owner semantics; do not auto-repair; do not call
   `/opsx-update` yourself.
-* Soft gate before apply (v1). Not OCR, scenario coverage, PA, or verify.
+* Soft gate before apply (v1). Not OCR, scenario coverage producer, PA, or verify.
+* P6: locate durable `scenario-coverage/plan.md` + `plan.receipt.json`;
+  never require pasted chat plan; never trust tasks self-attestation alone.
+  See `PLANNING_REVIEW.md` P6 / `SCENARIO_TEST_COVERAGE.md` DURABLE_PLAN_EVIDENCE.
 
 ## Output
 
