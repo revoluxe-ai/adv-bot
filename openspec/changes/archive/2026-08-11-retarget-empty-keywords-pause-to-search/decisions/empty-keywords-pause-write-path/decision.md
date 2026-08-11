@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (promoted 2026-08-11 → `openspec/decisions/empty-keywords-pause-write-path/decision.md`)
 
 ## Context
 
