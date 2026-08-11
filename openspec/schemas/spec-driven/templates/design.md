@@ -27,7 +27,12 @@ Explain how implementation placement matches the cited architecture decisions.
 
 ## Decisions
 
-<!-- Key design decisions and rationale -->
+<!--
+Key design decisions and rationale.
+Implementation-critical architecture (SoT, ownership, write authority,
+recovery) MUST be resolved here — never deferred to apply.
+See .cursor/pipeline/contracts/DESIGN_GENERATION.md
+-->
 
 ## Risks / Trade-offs
 
@@ -39,7 +44,15 @@ Explain how implementation placement matches the cited architecture decisions.
 
 ## Open Questions
 
-<!-- Outstanding decisions or unknowns to resolve -->
+<!--
+Allowed: harmless naming only (exact enum/field/helper names) AFTER
+state authority, write/recovery contract, and product semantics are fixed.
+
+Forbidden here (keep design BLOCKED instead):
+SoT / PG vs Redis / ownership / write authority / epoch-start semantics /
+implementation-critical architecture deferred to apply.
+See .cursor/pipeline/contracts/DESIGN_GENERATION.md
+-->
 
 ## Review Checklist
 
