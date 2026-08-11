@@ -8,6 +8,12 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 **Architecture Decision Lookup:** When revising artifacts, also check `openspec/decisions/**/*.md` and `artifactPaths.decisions.existingOutputPaths`. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
 
+**Design Generation gate:** When revising `design.md`, follow
+`.cursor/pipeline/contracts/DESIGN_GENERATION.md` (same as `/opsx-continue` /
+`/opsx-ff`). Run `DESIGN_READINESS`; resolve SoT/ownership/write/recovery or
+`DESIGN_STATUS: BLOCKED`; preserve MUST/MUST NOT; never defer architecture to
+apply. Do not mark design coherent while BLOCKED.
+
 **Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
@@ -82,6 +88,9 @@ After each invocation, show:
 
 **Guardrails**
 - Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx:apply`.
+- When revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do not mark design
+  coherent if `DESIGN_STATUS: BLOCKED` or architecture is deferred to apply.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

@@ -80,11 +80,14 @@ plus scenario evidence — not scenario machinery alone.
 ```text
 reviewed owner-contract.md  = semantic authority for the Change
 Derived Lifecycle in design = planning representation (no new product authority)
+DESIGN_GENERATION.md        = design readiness (SoT/ownership/write/recovery;
+                              normative modality; no apply-time architecture)
 scenario coverage           = LIFECYCLE ↔ SPEC SCENARIOS verifier
 ```
 
 `DERIVED` may restructure already-authorized semantics in time; it MUST NOT
 add product semantics. Silent “sensible lifecycle defaults” are forbidden.
+Lifecycle DERIVED does **not** waive `.cursor/pipeline/contracts/DESIGN_GENERATION.md`.
 
 **Primary path (reviewed Owner Contract present):**
 
@@ -98,11 +101,23 @@ add product semantics. Silent “sensible lifecycle defaults” are forbidden.
 4. Unresolved material A|B forks → `LIFECYCLE_STATUS: UNRESOLVED` /
    `UNRESOLVED_PRODUCT_SEMANTICS` → `/opsx-owner-contract-review`
    (not invent; not a parallel confirm contour).
+5. When `design.md` exists or is being written/revised: satisfy
+   `.cursor/pipeline/contracts/DESIGN_GENERATION.md` —
+   `DESIGN_READINESS` must hold (`DESIGN_STATUS: READY` with SoT/ownership/
+   write/recovery resolved or `not_applicable`; `NORMATIVE_CONFLICTS: none`;
+   no implementation-critical Open Questions). Forbidden: READY design that
+   defers SoT/ownership/write-path to apply, or weakens MUST→MAY.
 
 Missing Derived Lifecycle when temporal behavior applies, chat-only
 lifecycle, or `UNRESOLVED` left open ⇒
 `PRODUCT_ACCEPTANCE_STATUS=FAIL` (or `BLOCKED`) pillar `LIFECYCLE_COVERAGE`
 (even if a scenario report says `VERDICT=PASS`).
+
+READY (or purported-complete) `design.md` with deferred architecture,
+implementation-critical Open Questions, or MUST/MUST NOT modality weaken ⇒
+`PRODUCT_ACCEPTANCE_STATUS=FAIL` (or `BLOCKED`) pillar `PLANNING_DEFECT`
+(subclass `PLANNING_DESIGN_READINESS_GAP`) — route to planning writers,
+**not** apply.
 
 **Legacy compatibility** (only Changes **without** reviewed
 `owner-contract.md`):
@@ -128,6 +143,7 @@ Failure classes (do not conflate):
 |---|---|---|
 | `UNRESOLVED_PRODUCT_SEMANTICS` | Owner Contract leaves a material transition open | `/opsx-owner-contract-review` |
 | `PLANNING_LIFECYCLE_GAP` / `PLANNING_DEFECT` | Semantics known; design omitted them | `/opsx-continue` / `/opsx-ff` / `/opsx-update` |
+| `PLANNING_DESIGN_READINESS_GAP` | design present but DESIGN_READINESS fails (deferred SoT/ownership/write, modality weaken, critical Open Questions) | `/opsx-update` / `/opsx-continue` / `/opsx-ff` (not apply) |
 | `SPEC_COVERAGE_GAP` / `SPEC_SCENARIO_MISSING` | Lifecycle known; spec scenario missing | planning writer (spec) |
 | `SEMANTIC_DRIFT` | Spec invents behavior not in lifecycle/Owner Contract | planning writer |
 
@@ -141,7 +157,9 @@ Treat PA-required as forcing lifecycle coverage (equivalent to
 
 Planning writers (`/opsx-continue`, `/opsx-ff`, `/opsx-update`) **derive**
 Lifecycle from reviewed Owner Contract (primary) or author legacy echo
-(legacy only). Scenario commands **consume** Derived Lifecycle (or legacy
+(legacy only). When they create or revise `design.md`, they MUST also
+satisfy `.cursor/pipeline/contracts/DESIGN_GENERATION.md` (`DESIGN_READINESS`).
+Scenario commands **consume** Derived Lifecycle (or legacy
 echo); they do not replace Owner Contract and must not invent a parallel
 DONE or `CONFIRM_LIFECYCLE` contour.
 
@@ -198,6 +216,10 @@ Supervisor MUST NOT dispatch verify-archive / archive while
   still use `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE`. Ensure scenario
   `mode=plan` is on the path (not optional). Do **not** declare apply-ready
   without Derived Lifecycle (or legacy confirmed echo).
+- When creating or revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do **not** declare
+  apply-ready if `DESIGN_STATUS: BLOCKED`, architecture is deferred to
+  apply, or MUST/MUST NOT was weakened.
 
 ### Apply (`/opsx-apply`)
 

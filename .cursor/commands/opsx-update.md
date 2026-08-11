@@ -53,6 +53,23 @@ scenario coverage on the path (`/opsx-spec-scenario-coverage mode=plan`
 then later audit/certify). Soft tooling waivers never substitute for
 Product Acceptance. Chat-only lifecycle is not durable.
 
+**Design Generation gate (when revising `design.md`):** Follow
+`.cursor/pipeline/contracts/DESIGN_GENERATION.md` (same SoT as
+`/opsx-continue` / `/opsx-ff`). Before treating a revised `design.md` as
+coherent / complete:
+
+1. Run `DESIGN_READINESS` (SoT/ownership/write/recovery resolved or
+   `not_applicable`; normative conflicts none; no implementation-critical
+   Open Questions).
+2. Resolve technical architecture from repository evidence + decisions, or
+   stop with `DESIGN_STATUS: BLOCKED` /
+   `REASON: TECHNICAL_DESIGN_UNRESOLVED` (or `UPSTREAM_NORMATIVE_CONFLICT`).
+3. Preserve upstream `MUST` / `MUST NOT` / `MAY` (no `MUST→MAY` weakening).
+4. Forbidden: «выбрать в apply», «PG/Redis — apply-time», READY design with
+   architecture deferred to implementation.
+
+Lifecycle DERIVED does **not** waive this gate.
+
 **Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
@@ -536,6 +553,10 @@ align with the latest applicable event.
   `CONFIRM_LIFECYCLE` is missing; lifecycle plan is not optional under PA.
   Do not demand a second `CONFIRM_LIFECYCLE` when `LIFECYCLE_STATUS: DERIVED`
   uniquely follows from reviewed Owner Contract.
+- When revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do not mark design
+  coherent or recommend apply-ready if `DESIGN_STATUS: BLOCKED`, SoT/
+  ownership/write-path is deferred to apply, or MUST/MUST NOT was weakened.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

@@ -70,6 +70,15 @@ semantics from similar names.
         - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
+      - **If the artifact is `design`:** follow
+        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first. Run
+        `DESIGN_READINESS`. Resolve technical SoT/ownership/write/recovery from
+        evidence (or `DESIGN_STATUS: BLOCKED` /
+        `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT`).
+        Preserve MUST/MUST NOT/MAY. Never defer architecture to apply.
+        On BLOCKED stop the loop without declaring design complete
+        (`FILES_CHANGED: none`). On READY, create design with the same
+        Derived Lifecycle rules as `/opsx-continue`.
       - **If the artifact is `tasks`:** follow
         `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Run
         `TASK_GENERATION_READINESS`. On `TASKS_STATUS: BLOCKED` stop the
@@ -111,7 +120,9 @@ semantics from similar names.
      `LIFECYCLE_STATUS: DERIVED` and per-step `SOURCE:` provenance, derived
      from reviewed `owner-contract.md` + decisions + repo facts + prior
      planning artifacts. Do **not** invent semantics. Step count is not
-     fixed to 3–7.
+     fixed to 3–7. Also apply `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+     (`DESIGN_READINESS`) before declaring design complete — never defer
+     SoT/ownership/write-path to apply; preserve MUST/MUST NOT/MAY.
    - When Lifecycle is uniquely determined by reviewed Owner Contract →
      **do not** require a second Owner `CONFIRM_LIFECYCLE`. Authority remains
      the reviewed Owner Contract.
@@ -152,10 +163,16 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
-- When creating `design.md` for temporal/stateful behavior: apply the same
-  Derived Lifecycle rules as `/opsx-continue` (`LIFECYCLE_STATUS: DERIVED`,
-  per-step SOURCE, no invented transitions, UNRESOLVED → owner-contract-review).
-  Specs MUST cover material lifecycle transitions (or explicit not-needed proof).
+- When creating `design.md`: apply the same Design Generation rules as
+  `/opsx-continue` via `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (`DESIGN_READINESS`, resolve or BLOCK technical architecture — never
+  apply-time SoT/ownership/write-path, MUST/MUST NOT modality preservation,
+  Open Questions only for harmless naming, continue≡ff equivalence).
+  For temporal/stateful behavior: also apply Derived Lifecycle
+  (`LIFECYCLE_STATUS: DERIVED`, per-step SOURCE, no invented transitions,
+  UNRESOLVED → owner-contract-review). Specs MUST cover material lifecycle
+  transitions (or explicit not-needed proof).
+  On BLOCKED do not declare design complete.
 - When creating `tasks.md`: apply the same Task Generation rules as
   `/opsx-continue` via `.cursor/pipeline/contracts/TASK_GENERATION.md`
   (`TASK_GENERATION_READINESS`, no implementer architecture choices,
@@ -172,5 +189,8 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; on BLOCKED do not declare
+  design complete (never defer architecture to apply; preserve MUST/MUST NOT)
 - Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
   on BLOCKED leave `FILES_CHANGED: none` (do not create tasks that complete design)

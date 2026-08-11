@@ -105,13 +105,30 @@ Common artifact patterns:
 - **proposal.md**: Ask user about the change if not clear. Fill in Why, What Changes, Capabilities, Impact.
   - The Capabilities section is critical - each capability listed will need a spec file.
 - **specs/<capability>/spec.md**: Create one spec per capability listed in the proposal's Capabilities section (use the capability name, not the change name).
-- **design.md**: Document technical decisions, architecture, and implementation approach.
+- **design.md**: Document technical decisions, architecture, and implementation
+  approach **only after** `DESIGN_READINESS` passes. See **Design Generation**
+  below. Never defer SoT/ownership/write-path to apply; preserve MUST/MUST NOT.
 - **tasks.md**: Break down implementation into checkboxed tasks **only after**
   `TASK_GENERATION_READINESS` passes. See **Task Generation** below.
   `tasks.md` implements resolved design — MUST NOT complete unresolved
   architecture/SoT/ownership/write-path/semantic choices.
 
 For other schemas, follow the `instruction` field from the CLI output.
+
+### Design Generation (design.md — shared with `/opsx-ff`)
+
+Follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md` (SoT). Same rules as
+command `/opsx-continue` / `/opsx-ff`:
+
+- Run `DESIGN_READINESS` before declaring design complete; on
+  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` →
+  `DESIGN_STATUS: BLOCKED`, do not mark design ready.
+- Resolve technical SoT/ownership/write/recovery from evidence + decisions
+  (WHAT/WHO/WHERE/WHO-writes/HOW-recover + rationale). Forbidden: apply-time
+  architecture / «выбрать в apply».
+- Preserve `MUST` / `MUST NOT` / `MAY` (no weakening).
+- Open Questions: harmless naming only after authority is fixed.
+- continue ≡ ff for identical upstream context.
 
 ### Task Generation (tasks.md — shared with `/opsx-ff`)
 
@@ -132,6 +149,8 @@ command `/opsx-continue` / `/opsx-ff`:
 - If context is unclear, ask the user before creating
 - Verify the artifact file exists after writing before marking progress
 - Use the schema's artifact sequence, don't assume specific artifact names
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
 - Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact

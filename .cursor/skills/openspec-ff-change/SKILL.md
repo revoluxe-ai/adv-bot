@@ -68,6 +68,13 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
         - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
+      - **If the artifact is `design`:** follow
+        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first
+        (`DESIGN_READINESS`). Resolve SoT/ownership/write/recovery or
+        BLOCK (`TECHNICAL_DESIGN_UNRESOLVED` /
+        `UPSTREAM_NORMATIVE_CONFLICT`). Preserve MUST/MUST NOT. Never defer
+        architecture to apply. On BLOCKED stop without declaring design
+        complete. On READY, same design rules as `/opsx-continue`.
       - **If the artifact is `tasks`:** follow
         `.cursor/pipeline/contracts/TASK_GENERATION.md` first
         (`TASK_GENERATION_READINESS`). On BLOCKED stop without writing
@@ -120,6 +127,8 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- When creating `design.md`: follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (identical to `/opsx-continue`; continue≡ff).
 - When creating `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
   (identical to `/opsx-continue`; continue≡ff).
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
@@ -132,6 +141,9 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, suggest continuing that change instead
 - Verify each artifact file exists after writing before proceeding to next
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; on BLOCKED do not declare
+  design complete
 - Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
   on BLOCKED leave `FILES_CHANGED: none`
 - When `PRODUCT_ACCEPTANCE_REQUIRED=true`, never treat apply-ready as true

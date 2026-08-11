@@ -30,6 +30,14 @@ are insufficient; unresolved choice returns
 `OWNER_LIFECYCLE_ECHO` (3–7 temporal steps) exists in design/decision/spec
 and Owner has issued `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm).
 Chat-only lifecycle is insufficient; do not mark apply-ready without it.
+(Prefer Derived Lifecycle from reviewed owner-contract when that path applies —
+mirror `.cursor/commands/opsx-update.md`.)
+
+**Design Generation gate:** When revising `design.md`, follow
+`.cursor/pipeline/contracts/DESIGN_GENERATION.md` (identical to
+`/opsx-continue` / `/opsx-ff`). Run `DESIGN_READINESS`; resolve SoT/ownership/
+write/recovery or `DESIGN_STATUS: BLOCKED`; preserve MUST/MUST NOT; never
+defer architecture to apply. Do not mark design coherent while BLOCKED.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -110,6 +118,9 @@ After each invocation, show:
   semantic answers into artifacts before recommending apply.
 - Do not recommend apply-ready when `PRODUCT_ACCEPTANCE_REQUIRED=true` and
   `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is missing.
+- When revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do not mark design
+  coherent if `DESIGN_STATUS: BLOCKED` or architecture is deferred to apply.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

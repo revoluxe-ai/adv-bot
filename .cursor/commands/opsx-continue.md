@@ -104,9 +104,12 @@ Common artifact patterns:
 - **proposal.md**: Ask user about the change if not clear. Fill in Why, What Changes, Capabilities, Impact.
   - The Capabilities section is critical - each capability listed will need a spec file.
 - **specs/<capability>/spec.md**: Create one spec per capability listed in the proposal's Capabilities section (use the capability name, not the change name).
-- **design.md**: Document technical decisions, architecture, and implementation approach.
-  When the Change has temporal/stateful behavior, also emit a **Derived Lifecycle**
-  section (see below) — planning representation only, not a new Owner authority.
+- **design.md**: Document technical decisions, architecture, and implementation
+  approach **only after** `DESIGN_READINESS` passes (see **Design Generation**
+  below). Resolve SoT/ownership/write-path/recovery before READY; never defer
+  those to apply. When the Change has temporal/stateful behavior, also emit a
+  **Derived Lifecycle** section (see below) — planning representation only,
+  not a new Owner authority. Preserve upstream MUST / MUST NOT / MAY.
 - **tasks.md**: Break down implementation into checkboxed tasks **only after**
   `TASK_GENERATION_READINESS` passes (see **Task Generation** below).
   `tasks.md` implements already-resolved design — it MUST NOT complete
@@ -117,6 +120,64 @@ Common artifact patterns:
   Spec MUST NOT invent behavior absent from lifecycle / reviewed Owner Contract.
 
 For other schemas, follow the `instruction` field from the CLI output.
+
+### Design Generation (design.md — shared with `/opsx-ff`)
+
+**Authority:** `.cursor/pipeline/contracts/DESIGN_GENERATION.md` (SoT).
+`/opsx-continue` and `/opsx-ff` MUST produce semantically equivalent designs
+from the same upstream context (advancement mode differs only).
+
+When the ready artifact is `design` (or you are about to write `design.md`):
+
+1. Read dependency artifacts (owner-contract, proposal, specs, decisions) and
+   relevant repository evidence / architecture decisions (context-first).
+2. Run `DESIGN_READINESS` from the contract before declaring design complete:
+
+```text
+DESIGN_READINESS
+PRODUCT_SEMANTICS_RESOLVED: yes
+STATE_OWNERSHIP_RESOLVED: yes | not_applicable
+DURABLE_SOT_RESOLVED: yes | not_applicable
+WRITE_AUTHORITY_RESOLVED: yes | not_applicable
+RECOVERY_SEMANTICS_RESOLVED: yes | not_applicable
+NORMATIVE_CONFLICTS: none
+IMPLEMENTATION_CRITICAL_OPEN_QUESTIONS: none
+DESIGN_STATUS: READY
+```
+
+3. Technical architecture choices (PG vs Redis, existing vs new state,
+   owner component, write authority, recovery) MUST be resolved in design
+   from evidence + decisions, with WHAT/WHO/WHERE/WHO-writes/HOW-recover +
+   rationale. Owner confirm is not required when WHAT/SCOPE/ACCEPTANCE are
+   unchanged. Forbidden: «выбрать в apply», «PG/Redis — apply-time»,
+   READY + deferred architecture.
+
+4. If a required technical choice cannot be safely resolved:
+
+```text
+DESIGN_STATUS: BLOCKED
+REASON: TECHNICAL_DESIGN_UNRESOLVED
+UNRESOLVED: <exact choice>
+EVIDENCE_MISSING: <gap>
+FILES_CHANGED: none
+```
+
+Do **not** mark design complete. Do **not** invent apply-time authority.
+
+5. Preserve normative modality from authoritative upstream:
+   `MUST→MUST`, `MUST NOT→MUST NOT`, `MAY→MAY`.
+   Forbidden: `MUST→MAY`, `MUST→SHOULD`, `MUST NOT→SHOULD NOT`.
+   Upstream modality conflict →
+   `DESIGN_STATUS: BLOCKED` / `REASON: UPSTREAM_NORMATIVE_CONFLICT`.
+
+6. `Open Questions` may list only harmless naming (enum/field/helper) after
+   authority/semantics are fixed. Implementation-critical questions
+   (SoT, ownership, write authority, epoch/recovery semantics) → BLOCKED.
+
+7. For temporal/stateful Changes, also apply **Derived Lifecycle** below.
+   Lifecycle DERIVED does not waive technical-choice or modality rules.
+
+8. Only then write/complete `design.md` with `DESIGN_STATUS: READY`.
 
 ### Task Generation (tasks.md — shared with `/opsx-ff`)
 
@@ -247,6 +308,9 @@ SOURCE: …
 - For temporal Changes: design MUST include Derived Lifecycle with provenance
   when behavior is temporal/stateful; unresolved forks → owner-contract-review
   (not `CONFIRM_LIFECYCLE`)
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; on BLOCKED do not declare
+  design complete (never defer SoT/ownership/write-path to apply; preserve MUST)
 - Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
   on BLOCKED leave `FILES_CHANGED: none` (do not create tasks that complete design)
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
