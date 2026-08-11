@@ -8,19 +8,23 @@
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
 - inventory_count: 55
+- indexed_commands: 55
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
+- source_fingerprint: cb7ea54dea1568434d9b206f15b63012
 - source_commit: f8bd51fcc837f0164f12d1c83b3c6c957aaeab49
-- excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
+- excluded_by_owner: (none)
+- scope_excluded_files: |
+  opsx-admin-command-*; opsx-execution-preflight.md;
+  opsx-source-resolution.md; opsx-pipeline.md
 - evidence_note: |
-  UPDATE GO 2026-08-09T05:34:03Z INCREMENTAL: inventory 55; fingerprint
-  cb7ea54dea1568434d9b206f15b63012; add /opsx-test-env + local_test_env_*
-  states; soft chain antipattern → test-env UP → static FULL → test-env DOWN;
-  F14 closed (graph missing test-env); F13 open (companion lag); F12 still open.
-  Other newly inventoried commands (meta-*, supervisor, devops, …) remain
-  NOT_OPENED_BUDGET / unindexed beyond inventory count.
-  Prior: UPDATE GO 2026-07-30T12:17:37Z antipattern + bug-debt (F11).
+  UPDATE GO 2026-08-11T03:07:21Z MAX_INDEX: inventory 55 unchanged
+  (fingerprint cb7ea54dea1568434d9b206f15b63012 names_only); index all
+  not-admin commands including /opsx-propose (Owner removed F5 exclusion);
+  add meta plane, projectize/adapt, commit-all, evolution, devops,
+  supervisor; F5 closed as graph-exclusion; F12/F13 open; F15/F16 added.
+  Prior: UPDATE GO 2026-08-09T05:34:03Z test-env (F14 closed).
 
 ## States
 
@@ -109,10 +113,12 @@
 - family_learning: FAMILY_LEARNING_WORKER packet complete
 - family_closed: family closure + HUMAN_SUMMARY; uncommitted owner review
 - family_open_blocked: INCONCLUSIVE or blocking branch unresolved
-- command_defect_signal: off-graph — Bugbot/review on process contracts
-  (`.cursor/commands/**`, rules/skills/static-check, mirrors); not a not-admin edge
-- process_lesson_candidate: off-graph — after process FIXED / process Bugbot;
-  `/opsx-admin-command-promote-process-lesson` (not `/opsx-learn-from-bug`)
+- command_defect_signal: Bugbot/review on process contracts
+  (`.cursor/commands/**`, rules/skills/static-check, mirrors); route
+  `/opsx-meta-fix-command-defects` (indexed; not product `/opsx-fix-bug`)
+- process_lesson_candidate: after process FIXED / process Bugbot;
+  soft `/opsx-admin-command-promote-process-lesson` (admin; not
+  `/opsx-learn-from-bug`) or meta-design when DESIGN_BRIEF_READY
 
 ### Typing / quality / ship
 - typing_packet: pyright/mypy → `/opsx-fix-types`
@@ -144,6 +150,33 @@
 - static_check_done: `/opsx-static-check` synthesized
 - product_dirty: need `/opsx-commit`
 - pr_ready: `/opsx-create-pr` / `/opsx-split-for-pr`
+
+### Meta / projectization / process plane
+- meta_orientation: `/opsx-meta` READ_ONLY command-plane router
+- bootstrap_in_progress: `/opsx-meta-bootstrap` STEP bind→meta→lifecycle→support
+- projectization_required: lock ≠ COMPLETE → FAIL_CLOSED → `/opsx-projectize`
+- projectization_complete: `.opsx/projectization.yaml` COMPLETE; normal commands on
+- adapt_pending: `/opsx-adapt-project` read or `:GO` adapter refresh
+- index_stale: central catalog index needs `/opsx-meta-update-index`
+- snapshot_stale: local snapshot needs `/opsx-meta-update-snapshot`
+- discovery_ready: `/opsx-meta-discover` candidates available
+- import_packet_ready: `/opsx-meta-import-command` KEEP/merge in progress
+- export_pack_ready: `/opsx-meta-export-pack` produced path/zip (not commit)
+- process_consult: `/opsx-meta-consult` relationship/triage desk
+- process_designing: `/opsx-meta-design-command` new/improve process command
+- process_defect_fixing: `/opsx-meta-fix-command-defects` plan or APPLY
+- chat_audit_recorded: `/opsx-meta-chat-command-audit` GO wrote `.tmp` registry
+- process_dirty: process surfaces changed; need `/opsx-meta-commit`
+- process_committed: process commits done
+- dual_lane_commit: `/opsx-commit-all` product+process orchestration
+
+### Evolution / devops / supervisor (side lanes)
+- evolution_mapping: `/opsx-evolution` North Star / candidates
+- evolution_handoff_ready: COPY_BLOCK ready → Owner new chat → new|ff|update
+- devops_investigate: `/opsx-devops` INVESTIGATE (READ_ONLY)
+- devops_plan_ready: DEVOPS_WRITE_PLAN from PLAN_WRITE
+- devops_applied: allowlisted cluster mutate after GO
+- supervisor_mission_active: `/opsx-supervisor` control-plane mission in flight
 
 ## Commands
 
@@ -544,7 +577,7 @@
 - artifacts_read: git status/diff
 - artifacts_written: git commits (product scope)
 - decision_owner: committer
-- next_typical: /opsx-project-bug-hunt | /opsx-create-pr | /opsx-admin-command-commit (process only; admin off-graph)
+- next_typical: /opsx-project-bug-hunt | /opsx-create-pr | /opsx-meta-commit (process) | /opsx-commit-all
 - known_flaws: none recorded
 
 ### /opsx-split-for-pr
@@ -567,8 +600,202 @@
 - next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks) | residual Bugbot findings → intake/learn path if product/logic
 - known_flaws: receipt gate is command-owned (not soft graph advice); cursor_task ≠ GitHub cursor[bot] — must not collapse channels into one silent zero; bounded fetch ≠ unbounded CI wait
 
-### Explicitly excluded from graph
-- /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)
+### /opsx-propose
+- purpose: scaffold change + generate applyRequires artifacts in one invoke (on disk; Owner wants indexed)
+- input_state: change_idea
+- output_state: apply_ready | change_scaffolded | planning_revise
+- artifacts_read: openspec status/instructions; decisions context-first
+- artifacts_written: change dir + proposal/design/tasks (when live path runs)
+- decision_owner: operator
+- next_typical: /opsx-apply | /opsx-new | /opsx-ff | /opsx-update
+- known_flaws: |
+  contract body may still print OBSOLETE redirect (companion lag); graph
+  indexes and may recommend; F5 graph-exclusion closed by Owner 2026-08-11;
+  live semantics vs redirect = command contract authority until meta-fix
+
+### /opsx-meta
+- purpose: READ_ONLY orientation for `/opsx-meta-*` command plane → one NEXT_ACTION
+- input_state: any | meta_orientation
+- output_state: meta_orientation | projectization_required | bootstrap_in_progress | process_dirty | discovery_ready | index_stale | snapshot_stale
+- artifacts_read: `.opsx/projectization.yaml`; snapshot/index freshness signals; pending `.tmp/opsx-*` ids only
+- artifacts_written: none
+- decision_owner: router
+- next_typical: /opsx-meta-bootstrap | /opsx-projectize | /opsx-meta-commit | /opsx-meta-consult | /opsx-meta-discover | /opsx-meta-fix-command-defects
+- known_flaws: NOT_OPENED_BUDGET deep routing table; F15 admin↔meta name remap in sibling prose
+
+### /opsx-meta-bootstrap
+- purpose: first-contact seed/bind OPSX; bare GO = one STEP (bind→meta→lifecycle→support); STEP=all opt-in; SAVE = central lessons
+- input_state: change_idea | empty/partial `.opsx` | bootstrap_in_progress
+- output_state: bootstrap_in_progress | projectization_required
+- artifacts_read: central profile; `.tmp/opsx-bootstrap/**`; local `.opsx/**`
+- artifacts_written: staged bootstrap surfaces under allowlist; no product openspec wipe; no auto projectize:GO
+- decision_owner: bootstrap operator (GO/SAVE exclusive)
+- next_typical: /opsx-projectize | /opsx-meta-bootstrap GO (next STEP)
+- known_flaws: contract_id still GAME-named; poetry remap via projectize
+
+### /opsx-projectize
+- purpose: projectize bootstrap/import for WB Sky/Poetry; `:GO` sets COMPLETE; forbid product openspec wipe
+- input_state: projectization_required | bootstrap_in_progress
+- output_state: projectization_complete | projectization_required
+- artifacts_read: imported/raw/bootstrap surfaces; `pyproject.toml`; adapters
+- artifacts_written: with `:GO` — `.opsx/**` activation/adapters/`projectization.yaml`; never `app/**`
+- decision_owner: Owner `:GO`
+- next_typical: /opsx-meta | /opsx-meta-import-command | /opsx-adapt-project
+- known_flaws: second `:GO` without Owner reset fail-closed
+
+### /opsx-adapt-project
+- purpose: adapter/capability refresh after COMPLETE; read-only or `:GO`; not foreign command merge
+- input_state: projectization_complete | adapt_pending
+- output_state: adapt_pending | projectization_complete | process_dirty
+- artifacts_read: `.opsx/adapters/**`; capability probes
+- artifacts_written: with `:GO` adapter/project docs only
+- decision_owner: Owner `:GO`
+- next_typical: /opsx-meta-commit | /opsx-meta
+- known_flaws: NOT_OPENED_BUDGET detail
+
+### /opsx-meta-update-index
+- purpose: plan/apply central catalog index refresh
+- input_state: meta_orientation | index_stale | discovery_ready
+- output_state: index_stale | discovery_ready | meta_orientation
+- artifacts_read: central catalog tools / local index
+- artifacts_written: index apply only with explicit apply mode per contract
+- decision_owner: index operator
+- next_typical: /opsx-meta-discover | /opsx-meta
+- known_flaws: NOT_OPENED_BUDGET detail
+
+### /opsx-meta-update-snapshot
+- purpose: refresh local OPSX snapshot freshness after process commits / drift
+- input_state: meta_orientation | snapshot_stale | process_committed
+- output_state: snapshot_stale | meta_orientation
+- artifacts_read: sources.yaml / snapshot inputs
+- artifacts_written: local snapshot artifacts per contract
+- decision_owner: snapshot operator
+- next_typical: /opsx-meta | /opsx-meta-discover
+- known_flaws: NOT_OPENED_BUDGET detail
+
+### /opsx-meta-discover
+- purpose: READ_ONLY what central catalog may help this repo
+- input_state: meta_orientation | discovery_ready | index_stale
+- output_state: discovery_ready | index_stale
+- artifacts_read: central index
+- artifacts_written: none
+- decision_owner: discoverer
+- next_typical: /opsx-meta-import-command OCCURRENCE=<id> | /opsx-meta-update-index | /opsx-meta
+- known_flaws: NOT_OPENED_BUDGET detail; BLOCKED_NEEDS_FRESH_INDEX → update-index
+
+### /opsx-meta-import-command
+- purpose: sole command-import owner (index default / raw donor); KEEP-gated materialize
+- input_state: discovery_ready | import_packet_ready | projectization_complete
+- output_state: import_packet_ready | process_dirty | projectization_required
+- artifacts_read: index OCCURRENCE / ADOPTION_PACKET / donor path; staging `.tmp/opsx-inbound/**`
+- artifacts_written: selected command packet + companions under allowlist (GO)
+- decision_owner: Owner KEEP set + GO
+- next_typical: /opsx-meta-commit | /opsx-adapt-project | /opsx-projectize | /opsx-meta-bootstrap
+- known_flaws: NOT_OPENED_BUDGET deep KEEP matrix; no foreign product openspec import
+
+### /opsx-meta-export-pack
+- purpose: export BOOTSTRAP_PROFILE / process pack for peers; zip out of meta-commit scope
+- input_state: projectization_complete | meta_orientation | process_consult
+- output_state: export_pack_ready
+- artifacts_read: local process surfaces / profile
+- artifacts_written: export folder/zip under contract paths (not git commit by default)
+- decision_owner: exporter
+- next_typical: human path | peer `/opsx-meta-bootstrap` | peer `/opsx-meta-import-command` | /opsx-meta
+- known_flaws: NOT_OPENED_BUDGET detail; do not confuse with `/opsx-archive`
+
+### /opsx-meta-consult
+- purpose: READ_ONLY process desk — relationships, triage, one pasteable next
+- input_state: any | process_consult | command_defect_signal
+- output_state: process_consult | process_defect_fixing | process_designing | meta_orientation
+- artifacts_read: cited `/opsx-*` contracts; GRAPH/META read-only
+- artifacts_written: none
+- decision_owner: consult desk
+- next_typical: /opsx-meta-fix-command-defects | /opsx-meta-design-command | /opsx-pipeline | /opsx-meta-commit | /opsx-fix-types | /opsx-fix-bug
+- known_flaws: F15 — emits `/opsx-meta-*`; residual admin names may appear in upstream snapshots
+
+### /opsx-meta-design-command
+- purpose: design new/improved process command; GO may create NEW files only; committed IMPROVE → fix-defects
+- input_state: process_consult | process_designing | process_lesson_candidate
+- output_state: process_designing | process_dirty | process_defect_fixing
+- artifacts_read: ecosystem commands; design packet
+- artifacts_written: new command files after Owner GO OPTION_*; not committed-path IMPROVE
+- decision_owner: designer + Owner GO
+- next_typical: /opsx-meta-commit | /opsx-meta-fix-command-defects | /opsx-meta-import-command | /opsx-meta-update-index
+- known_flaws: NOT_OPENED_BUDGET phase detail; F15 name remap
+
+### /opsx-meta-fix-command-defects
+- purpose: plan (READ_ONLY) or APPLY (GO) process-contract defects only; never product; never commit
+- input_state: command_defect_signal | process_defect_fixing | process_consult | chat_audit_recorded
+- output_state: process_defect_fixing | process_dirty
+- artifacts_read: FIX_PLAN_READY / listed process paths
+- artifacts_written: listed `.cursor/commands|rules|skills|…` only with GO
+- decision_owner: fixer + Owner GO / AUTHORIZE_COMMAND_FIX
+- next_typical: /opsx-meta-commit | /opsx-meta-consult | /opsx-pipeline UPDATE
+- known_flaws: none recorded beyond F6 routing history
+
+### /opsx-meta-chat-command-audit
+- purpose: walk this-repo agent chats via `.tmp/opsx-chat-audit`; GO writes registry only; handoff fix/design
+- input_state: meta_orientation | process_consult | after messy commit-all/evolution
+- output_state: chat_audit_recorded | process_defect_fixing | process_designing
+- artifacts_read: agent transcripts (READ_ONLY); registry
+- artifacts_written: `.tmp/opsx-chat-audit/**` only with GO
+- decision_owner: auditor
+- next_typical: /opsx-meta-fix-command-defects | /opsx-meta-design-command | /opsx-meta-consult | /opsx-meta-commit
+- known_flaws: NOT_OPENED_BUDGET detail; never APPLY contracts here
+
+### /opsx-meta-commit
+- purpose: sole process-commit front-door (allowlist `.opsx/sources.yaml`); default current-chat; `ALL` cleanup
+- input_state: process_dirty | process_committed
+- output_state: process_committed | process_dirty | snapshot_stale
+- artifacts_read: git status/diff; sources.yaml allowlist
+- artifacts_written: local git commits (process scope only); never push/PR
+- decision_owner: committer (GO required)
+- next_typical: /opsx-meta | /opsx-meta-update-snapshot | /opsx-create-pr | /opsx-commit-all
+- known_flaws: admin-command-commit is thin redirect; prefer this name
+
+### /opsx-commit-all
+- purpose: orchestrate `/opsx-commit` + `/opsx-meta-commit` (parallel plan Tasks → serial child GO)
+- input_state: product_dirty | process_dirty | dual_lane_commit
+- output_state: dual_lane_commit | pr_ready | process_committed | product_dirty
+- artifacts_read: child contracts; git status
+- artifacts_written: none directly — children commit; SUMMARY only
+- decision_owner: orchestrator (Owner GO / ALL GO)
+- next_typical: /opsx-create-pr | /opsx-static-check FULL (if product blocked) | re-run failed child
+- known_flaws: NOT_OPENED_BUDGET orchestration detail; does not launch static-check itself
+
+### /opsx-evolution
+- purpose: North Star registry + CHANGE_CANDIDATES + COPY_BLOCK handoff to Owner-chosen new|ff|update
+- input_state: change_idea | planning_revise | evolution_mapping
+- output_state: evolution_mapping | evolution_handoff_ready
+- artifacts_read: `openspec/evolution/**`; EVOLUTION_POLICY; optional WORKLOG peek
+- artifacts_written: star cards/index only with accepted draft + GO
+- decision_owner: Owner pick + GO for persistence
+- next_typical: Owner new chat → /opsx-new | /opsx-ff | /opsx-update
+- known_flaws: NOT_OPENED_BUDGET deep STAR_ROUTE; must not auto-invoke downstream `/opsx-*`
+
+### /opsx-devops
+- purpose: k8s/infra side-lane; INVESTIGATE → PLAN_WRITE → GO allowlisted mutate; OPS_STATE memory
+- input_state: any (side-lane) | devops_investigate | devops_plan_ready
+- output_state: devops_investigate | devops_plan_ready | devops_applied
+- artifacts_read: `.cursor/rules/devops.mdc`; `k8s/**`; `.cursor/devops/OPS_STATE.md`
+- artifacts_written: OPS_STATE/LAST.json; cluster only under GO + allowlisted plan
+- decision_owner: devops operator + Owner GO
+- next_typical: none | re-invoke | REDIRECT_PRODUCT → /opsx-fix-bug
+- known_flaws: not hard core-lifecycle edge; not laptop test-env; CSI apply forbidden
+
+### /opsx-supervisor
+- purpose: control-plane orchestrator; mission/DAG; dispatches `/opsx-*` via subagents; no direct repo tools
+- input_state: any Owner free-text | supervisor_mission_active
+- output_state: supervisor_mission_active | (mission terminal in chat ledger)
+- artifacts_read: none directly (FORBIDDEN); workers read
+- artifacts_written: none directly; mission ledger in chat
+- decision_owner: supervisor control-plane + Owner policy
+- next_typical: mediated /opsx-explore then scoped workers per DAG
+- known_flaws: F16 allowlist may lag (/opsx-test-env F13); not GRAPH authority; not direct git/pytest
+
+### Scope-excluded (not Commands; not inventory)
+- opsx-admin-command-* / opsx-execution-preflight / opsx-source-resolution / opsx-pipeline
+- `.cursor/opsx-review-commands` (admin review surface)
 
 ## Transitions
 
@@ -703,12 +930,40 @@ fixed_or_closed --/opsx-learn-from-bug [finding-local]--> learning_candidate|les
 typing_packet --/opsx-fix-types--> typing_packet|bug_signal_raw
 implementing|impl_done|coverage_pass|external_call_pass|performance_pass|antipattern_pass|antipattern_suspects|local_test_env_ready --/opsx-static-check--> static_check_done
 implementing|impl_done --/opsx-test--> tests_authored
-# off-graph (not a not-admin transition; recorded for NAVIGATE orientation):
-# command_defect_signal --/opsx-meta-fix-command-defects--> FIXED
-# FIXED --/opsx-admin-command-promote-process-lesson--> process_lesson_candidate
-# process_lesson_candidate --DESIGN_BRIEF_READY--> /opsx-admin-command-design-command
+# propose (indexed; contract may still redirect — command authority wins)
+change_idea --/opsx-propose--> apply_ready|change_scaffolded|planning_revise
+
+# meta / projectization plane
+* --/opsx-meta--> meta_orientation
+meta_orientation --/opsx-meta-bootstrap--> bootstrap_in_progress|projectization_required
+bootstrap_in_progress --/opsx-projectize|:GO--> projectization_complete|projectization_required
+projectization_required --/opsx-projectize:GO--> projectization_complete
+projectization_complete --/opsx-adapt-project|:GO--> adapt_pending|projectization_complete|process_dirty
+meta_orientation --/opsx-meta-update-index--> index_stale|discovery_ready|meta_orientation
+meta_orientation|process_committed --/opsx-meta-update-snapshot--> snapshot_stale|meta_orientation
+meta_orientation|index_stale --/opsx-meta-discover--> discovery_ready|index_stale
+discovery_ready --/opsx-meta-import-command--> import_packet_ready|process_dirty|projectization_required
+* --/opsx-meta-export-pack--> export_pack_ready
+* --/opsx-meta-consult--> process_consult
+process_consult --/opsx-meta-fix-command-defects--> process_defect_fixing|process_dirty
+process_consult --/opsx-meta-design-command--> process_designing|process_dirty
+command_defect_signal --/opsx-meta-fix-command-defects--> process_defect_fixing|process_dirty
+process_dirty --/opsx-meta-commit--> process_committed|snapshot_stale
+product_dirty|process_dirty --/opsx-commit-all--> dual_lane_commit|pr_ready|process_committed|product_dirty
+* --/opsx-meta-chat-command-audit--> chat_audit_recorded|process_defect_fixing
+
+# evolution / devops / supervisor (side / soft)
+change_idea|planning_revise --/opsx-evolution--> evolution_mapping|evolution_handoff_ready
+evolution_handoff_ready --Owner /opsx-new|/opsx-ff|/opsx-update--> change_scaffolded|apply_ready|planning_revise
+* --/opsx-devops--> devops_investigate|devops_plan_ready|devops_applied
+* --/opsx-supervisor--> supervisor_mission_active
+
+# process lesson (admin remains soft/off-graph edge; recorded for orientation)
+# process_dirty|FIXED --/opsx-admin-command-promote-process-lesson--> process_lesson_candidate
+# process_lesson_candidate --DESIGN_BRIEF_READY--> /opsx-admin-command-design-command|/opsx-meta-design-command
 # process_lesson_candidate --EXTEND_EXISTING--> /opsx-meta-fix-command-defects
 ```
+
 
 ## Soft recommendations (advisory only)
 
@@ -893,7 +1148,8 @@ When a **process gap** looks like a missing command (not a one-line fix):
    process Bugbot / FIXED packet (emits `DESIGN_BRIEF_READY`).
 2. Or paste the problem into `/opsx-admin-command-design-command` directly.
 3. Wait for design need verdict (`NEW_COMMAND_REQUIRED` vs improve existing).
-4. Owner `GO OPTION_*` → implement companions → `/opsx-admin-command-commit`.
+4. Owner `GO OPTION_*` → implement companions → `/opsx-meta-commit`
+   (or `/opsx-meta-design-command` path when already on meta plane).
 5. Optional: `/opsx-pipeline UPDATE` → `UPDATE GO` to refresh this graph.
 
 Do **not** invent a new not-admin `/opsx-*` to “learn process contracts”.
@@ -902,7 +1158,8 @@ command-contract classes (F6).
 
 ### After process FIXED
 
-- Primary: `/opsx-admin-command-commit` if process files changed.
+- Primary: `/opsx-meta-commit` if process files changed (`/opsx-commit-all` when
+  product+process dirty). Admin-command-commit is thin redirect only.
 - Soft: `/opsx-admin-command-promote-process-lesson` when the defect class
   looks transferable (guardrail gap, wrong branch, durable handoff omission,
   ADL exhaust, etc.).
@@ -933,11 +1190,16 @@ command-contract classes (F6).
   operator_workaround: this materialization
   do_not_pretend_fixed: false (addressed by this GRAPH.md)
 
-- id: F5 PROPOSE_OBSOLETE_OFF_GRAPH
-  where: opsx-propose.md still on disk
-  symptom: agents may still suggest `/opsx-propose` from muscle memory
-  operator_workaround: use `/opsx-new` + `/opsx-continue` or `/opsx-ff`
-  do_not_pretend_fixed: true (graph exclusion ≠ file deletion)
+- id: F5 PROPOSE_GRAPH_EXCLUSION
+  where: opsx-propose.md + prior GRAPH exclusion
+  symptom: |
+    historically excluded from GRAPH as obsolescent; contract body may still
+    print OBSOLETE redirect while Owner wants propose indexed/recommendable
+  operator_workaround: |
+    graph indexes `/opsx-propose`; if contract redirects, follow redirect or
+    `/opsx-meta-fix-command-defects` to restore live propose semantics
+  do_not_pretend_fixed: false (graph-exclusion closed 2026-08-11 UPDATE GO;
+    companion contract lag may remain)
 
 - id: F6 COMMAND_CONTRACT_DEFECT_OFF_GRAPH
   where: NAVIGATE / bug subgraph vs admin process surfaces
@@ -1026,6 +1288,32 @@ command-contract classes (F6).
   operator_workaround: /opsx-test-env UP|DOWN directly; then UPDATE GO
   do_not_pretend_fixed: false (closed by this materialization)
 
+- id: F15 META_ADMIN_NAME_REMAP
+  where: meta-* TARGET OVERRIDE vs residual `/opsx-admin-command-*` prose
+  symptom: |
+    user-facing plane is `/opsx-meta-*`, but upstream snapshots / soft docs
+    still mention admin-command-* names
+  operator_workaround: |
+    prefer `/opsx-meta-*` pasteables; treat admin names as redirects/legacy
+  do_not_pretend_fixed: true
+
+- id: F16 SUPERVISOR_ALLOWLIST_LAG
+  where: opsx-supervisor.md dispatch allowlist vs GRAPH soft chain
+  symptom: |
+    supervisor may omit `/opsx-test-env` or other soft-chain nodes; control-plane
+    cannot read GRAPH.md directly
+  operator_workaround: |
+    Owner/policy include test-env; or run `/opsx-test-env` outside supervisor
+  do_not_pretend_fixed: true
+
+- id: F17 GRAPH_MAX_INDEX_2026_08_11
+  where: .cursor/pipeline/GRAPH.md (pre this UPDATE GO)
+  symptom: |
+    meta/projectize/devops/evolution/supervisor/commit-all/propose were
+    inventory-only (NOT_OPENED_BUDGET) — NAVIGATE could not orient on them
+  operator_workaround: this materialization
+  do_not_pretend_fixed: false (closed by this materialization)
+
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
@@ -1059,13 +1347,19 @@ command-contract classes (F6).
 - Bug debt: `/opsx-bug-debt-board` ALSO_OK anytime; `CLEAR` ≠ card-close;
   verify/archive are **not** residual close while debt open
 - `/opsx-static-check` / `/opsx-verify`: read-only; no auto-fix inside those commands
-- Process-contract defect (Bugbot on commands/rules/skills/static-check): off-graph → `/opsx-meta-fix-command-defects` (F6); not `/opsx-fix-bug`
+- Process-contract defect (Bugbot on commands/rules/skills/static-check):
+  `/opsx-meta-fix-command-defects` (F6; indexed); not `/opsx-fix-bug`
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
-  → `DESIGN_BRIEF_READY` → `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
-- Admin surfaces (consult, analyze-pipeline, fix-command-defects,
-  promote-process-lesson, design-command, admin-commit, opsx-review-commands):
-  off-graph by design
-- Process ambiguity / command-relationship / admin misbehavior triage (before
-  knowing fix vs analyze vs design): `/opsx-admin-command-consult` (READ_ONLY;
-  routes to one specialized next step; does not own GRAPH.md)
-- Uncommitted process edits after design/fix/pipeline UPDATE GO: `/opsx-admin-command-commit` (not `/opsx-commit`)
+  → `DESIGN_BRIEF_READY` → `/opsx-meta-design-command` |
+  `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
+- Admin-only surfaces still out of not-admin inventory: analyze-pipeline,
+  promote-process-lesson (admin), design/consult/commit admin thin redirects,
+  opsx-review-commands — prefer `/opsx-meta-*` user-facing names (F15)
+- Process ambiguity / command-relationship triage: `/opsx-meta-consult`
+  (ALSO_OK `/opsx-admin-command-consult` redirect); does not own GRAPH.md
+- Uncommitted process edits after design/fix/pipeline UPDATE GO:
+  `/opsx-meta-commit` (not `/opsx-commit`); dual dirty → `/opsx-commit-all`
+- Empty/partial OPSX tree: `/opsx-meta-bootstrap` then `/opsx-projectize`
+- k8s/infra: `/opsx-devops` side-lane (not test-env)
+- Free-text multi-command mission: `/opsx-supervisor` (advisory control-plane)
+- Product North Star → change handoff: `/opsx-evolution` → Owner COPY_BLOCK
