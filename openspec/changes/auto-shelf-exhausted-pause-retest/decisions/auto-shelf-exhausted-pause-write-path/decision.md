@@ -40,12 +40,19 @@ Reusable write-path capability `auto-shelf-exhausted-pause`:
      исчерпана + нет проходных vs resolve CPO при gate модуль ON + «Best
      plan»); durable epoch / наш pause-block / intent; тик-пересчёт
      resolve; сигнал clear нашего блока (календарь / проходные на тике).
+     **Canonical SoT** our-block / epoch / recorded resolve CPO / due /
+     interval days = **PG** (`AutoShelfBidControlState` /
+     `AutoShelfBidControlSettings`).
    - **Activity-control** — исполнение WB pause/start Авто; запись
-     distinct Auto-lane reason; уважение приоритета budget / schedule /
-     balance / emergency над стартом; **не** detect terminal math.
+     distinct Auto-lane reason в **Redis**
+     `RedisCampaignActivityReasonManager` (Auto-lane) как **mirror** для
+     display/priority — **не** sole SoT нашего блока; уважение приоритета
+     budget / schedule / balance / emergency над стартом; **не** detect
+     terminal math. После рестарта воркера MAY re-assert Redis reason из
+     PG, если наш block ещё жив.
    - **Telegram setting / UX полок** — интервал суток (product default 7),
      notify (почему + какой resolve CPO + когда перетест), кнопка
-     «Сбросить паузу» = clear только нашего блока.
+     «Сбросить паузу» = clear только нашего блока (PG).
 5. **Distinct reason** — durable terminal reason MUST NOT быть единственным
    `empty_keywords`, schedule/budget, или ordinary `cost_rule_failed`.
 6. **Clear-our-block** — кнопка / тик / календарь снимают только наш блок
@@ -144,4 +151,14 @@ ALLOWED_ADAPTERS: pause_auto_campaign; matching Auto start when no higher-priori
 FORBIDDEN_ADAPTERS: pause_auction_campaign (for this reason); BOTH-legs pause; sole cost_rule_failed as terminal mask
 OWNER_DECISION_SOURCE: EVOLUTION_HANDOFF INC-AUTO-SHELF-PAUSE-01 + owner-contract + this Proposed decision
 REQUIRED_PAIRED_TESTS: Auto paused for terminal; Search NOT paused by this path; clear-our-block without forced start; no mid-cycle cost pause when shelf module ON
+```
+
+## Durable state SoT (resolved)
+
+```text
+DURABLE_SOT_STATUS: RESOLVED
+CANONICAL_BLOCK_EPOCH_RESOLVE_DUE_INTERVAL: PG AutoShelfBidControlState + AutoShelfBidControlSettings
+ACTIVITY_REASON_MIRROR: Redis RedisCampaignActivityReasonManager Auto-lane (not sole SoT of block)
+RECOVERY: worker restart → read PG; MAY re-assert Redis reason from PG
+FORBIDDEN: defer PG vs Redis choice to apply; Redis-only our-block SoT
 ```

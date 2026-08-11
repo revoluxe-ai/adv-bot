@@ -137,11 +137,29 @@ SOURCE: owner-contract.md (старт только без других blockers;
 2. **Terminal predicate** — нет next test по мин. шагу в окне эпохи AND нет
    qualified-tested bid с expected CPO в пределах **текущего resolve CPO**
    (цель vs макс от плана/прогноза). Не «всегда Max».
-3. **Durable** — наш block + reason + resolve value/kind (+ timestamps для
-   due-retest / epoch_start). Точная схема PG/Redis — apply-time, но SoT
-   нашего блока MUST переживать рестарт воркера.
+3. **Durable SoT (resolved — not apply-time):**
+   - **WHAT:** our pause-block; `epoch_start`; recorded resolve CPO
+     kind/value; due-retest timestamps; retest interval days (default 7);
+     Auto-lane activity reason for display/priority with other blockers.
+   - **WHERE / WHO owns canonical state:**
+     - **PG** `AutoShelfBidControlSettings` — interval days (product default
+       7). Shelf settings SoT.
+     - **PG** `AutoShelfBidControlState` — canonical our-block / epoch /
+       recorded resolve CPO / due timestamps. Shelf owns this SoT; MUST
+       survive worker restart.
+     - **Redis** `RedisCampaignActivityReasonManager` Auto-lane — **mirror
+       only** of the distinct activity reason (same pattern as
+       empty-keywords / cost reasons). MUST NOT be the sole SoT of our
+       pause-block.
+   - **WHO may write:** shelf repository → PG block/epoch/resolve/interval;
+     activity-control → Redis Auto reason + WB pause/start; Telegram →
+     clear signal that clears PG our-block only (no forced start).
+   - **HOW recover:** after worker restart, shelf reads PG; if our-block
+     still set and Auto remains paused for this reason, activity-control
+     MAY re-assert Redis Auto reason from PG.
 4. **Reason** — новый Auto-lane code, distinct от `empty_keywords` /
-   schedule / budget / sole `cost_rule_failed`.
+   schedule / budget / sole `cost_rule_failed` (Redis mirror; PG holds
+   recorded resolve CPO + block).
 5. **Clear-our-block** — due interval / button / tick fit снимают только наш
    block. Activity-control MAY start Auto только если нет других blockers.
    Новая эпоха + coverage clamp — при реальном старте Авто после clear.
@@ -191,10 +209,27 @@ coverage/epoch).
 
 ## Open Questions
 
-- Точное имя reason string / enum (design-default в apply: например
-  `shelf_exhausted_no_plan` — уточнить при реализации, без смены семантики).
-- Минимальный PG vs Redis для нашего block — выбрать в apply по соседним
-  patterns activity-reason + shelf state (семантика clear/epoch фиксирована).
+Harmless naming only (authority/SoT fixed above):
+
+- Exact Auto-lane reason string / enum (design-default:
+  `shelf_exhausted_no_plan` — may rename without changing semantics).
+- Exact PG column / migration names for block/epoch/resolve/due/interval
+  fields.
+
+## DESIGN_READINESS
+
+```text
+PRODUCT_SEMANTICS_RESOLVED: yes
+STATE_OWNERSHIP_RESOLVED: yes
+DURABLE_SOT_RESOLVED: yes
+WRITE_AUTHORITY_RESOLVED: yes
+RECOVERY_SEMANTICS_RESOLVED: yes
+NORMATIVE_CONFLICTS: none
+NORMATIVE_MODALITY_PRESERVED: yes
+IMPLEMENTATION_CRITICAL_OPEN_QUESTIONS: none
+DESIGN_STATUS: READY
+REASON: none
+```
 
 ## Review Checklist
 
@@ -202,3 +237,4 @@ coverage/epoch).
 - [x] relevant decisions cited
 - [x] new decision proposed if missing (`auto-shelf-exhausted-pause-write-path`)
 - [x] implementation layer matches decision (shelf → activity-control → Telegram)
+- [x] durable SoT / write authority / recovery resolved (not deferred to apply)
