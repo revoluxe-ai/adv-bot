@@ -5,7 +5,7 @@ STAR_ID: affordable-auto-pause-on-empty
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-07T19:11:00Z
-UPDATED_AT: 2026-08-11T08:00:00Z
+UPDATED_AT: 2026-08-11T05:12:00Z
 DEPENDS_ON: none
 ```
 
@@ -161,40 +161,38 @@ Evidence / completion: none yet.
 ### INC-AUTO-COST-SHELF-COEXIST-01 — Pin legacy autobidder vs shelf coexistence
 
 ```text
-STATUS: ACTIVE
-LINKED_CHANGES: none
+STATUS: DONE
+LINKED_CHANGES: pin-legacy-autobidder-vs-shelf-coexistence
 ```
 
 Outcome (Owner 2026-08-10): Зафиксировать и доказать coexistence contract:
-legacy Auto cost/min pause path (`cost_rule_failed` / `OLD_UPDATE_CPM_BIDDER`
-и смежный activity-control cost watchdog) и Auto Shelf Bid Control **не
-ломают** друг друга при `auto_shelf_bid_control_enabled` ON и OFF. Observable
-reasons, pause/start и bid writes остаются различимы; ни одна механика не
-подменяет другую. Characterization + paired regression; **без** terminal
+при включённом **«Управление ставкой в полках»** старый путь **«управление
+ставкой для Авто»** не пишет ставку; reasons записи ставки vs cost-паузы
+различимы. Characterization + paired regression; **без** terminal
 shelf-exhausted pause/retest и **без** rewrite биддера / plan_distance.
 
 Contribution to North Star: Безопасный фундамент перед честной паузой полок
-(`INC-AUTO-SHELF-PAUSE-01`), чтобы новый terminal reason не смешивался с
-legacy cost pause и shelf ON не ломал старый cost/min path.
+(`INC-AUTO-SHELF-PAUSE-01`).
 
-Scope boundary: pin/prove current coexistence (tests + thin spec/design as
-needed); не terminal Auto shelf pause; не retest interval/epoch; не
-empty-keywords Search; не billing; не 1000₽; не comms; не retire v2; не
-перепись selection math.
+Scope boundary: pin/prove coexistence; не terminal Auto shelf pause; не
+retest; не empty-keywords Search; не billing; не 1000₽; не comms.
 
-Evidence / completion: none yet. Suggested change
-`pin-legacy-autobidder-vs-shelf-coexistence` (Owner pick 2026-08-10).
+Evidence / completion: archived
+`openspec/changes/archive/2026-08-11-pin-legacy-autobidder-vs-shelf-coexistence`;
+main spec `openspec/specs/auto-bid-module-coexistence/spec.md`; ADL
+`openspec/decisions/auto-bid-module-coexistence-write-path/decision.md`.
 
 ### INC-AUTO-SHELF-PAUSE-01 — Пауза Auto/полок при исчерпании ставок без plan-fit + перетест
 
 ```text
-STATUS: CANDIDATE
+STATUS: ACTIVE
 LINKED_CHANGES: none
 ```
 
-Outcome (Owner 2026-08-08 / route 2026-08-10): Нога **Auto (полки)** ставится
-на паузу только когда одновременно (Owner: после coexistence pin
-`INC-AUTO-COST-SHELF-COEXIST-01`; BILL остаётся отдельным hypothesis):
+Outcome (Owner 2026-08-08 / return 2026-08-11 — **авто-отключение Авто-РК**):
+Нога **Auto (полки)** ставится на паузу только когда одновременно
+(после DONE `INC-AUTO-COST-SHELF-COEXIST-01`; BILL остаётся отдельным
+hypothesis):
 
 1. текущая эпоха тестирования ставок **исчерпана** (больше нечего тестировать
    в допустимом диапазоне / coverage epoch complete);
@@ -353,9 +351,10 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 - Для shelf-enabled кампаний terminal shelf-exhausted MUST NOT маскироваться
   под ordinary `COST_RULE_FAILED` как единственный durable reason (legacy
   non-shelf cost pause остаётся ортогональным).
-- Legacy cost/min (`cost_rule_failed` / OLD_UPDATE path) и shelf bid control
-  MUST иметь pinned coexistence contract (ON/OFF) до apply-ready terminal
-  shelf pause (`INC-AUTO-COST-SHELF-COEXIST-01`).
+- Legacy bid-module coexistence (`INC-AUTO-COST-SHELF-COEXIST-01` DONE) MUST
+  remain valid; terminal shelf pause MUST NOT break «полки ON → старый путь
+  ставки игнорируется» и MUST NOT маскировать terminal reason под ordinary
+  cost pause.
 - `ensure_campaigns_active` / A/B Hold coexistence: freeze ≠ stop; activity-control
   остаётся ортогональным (см. card-ab-hold decisions).
 - Тарифный count по `bot_active` остаётся согласованным при любых UI-изменениях
@@ -379,6 +378,10 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 
 ## History
 
+- 2026-08-11T05:12:00Z — Owner GO return: задача = **авто-отключение Авто-РК**
+  → `INC-AUTO-SHELF-PAUSE-01` ACTIVE; `INC-AUTO-COST-SHELF-COEXIST-01` marked
+  DONE (archive 2026-08-11); index Active → AUTO-SHELF; OWNER_INTENT product
+  language preserved in handoff.
 - 2026-08-10T09:02:00Z — Owner GO: next Change =
   `pin-legacy-autobidder-vs-shelf-coexistence` /
   `INC-AUTO-COST-SHELF-COEXIST-01` (ENABLING_FOUNDATION before

@@ -12,7 +12,7 @@ Human display is always `Title (STAR_ID)`.
 
 | Title | STAR_ID | Status | Card | Active increment | Depends on |
 |-------|---------|--------|------|------------------|------------|
-| Доступная автокампания: пауза при пустых ключах + тариф 1000₽ | `affordable-auto-pause-on-empty` | ACTIVE | [affordable-auto-pause-on-empty.md](affordable-auto-pause-on-empty.md) | `INC-AUTO-COST-SHELF-COEXIST-01` | none |
+| Доступная автокампания: пауза при пустых ключах + тариф 1000₽ | `affordable-auto-pause-on-empty` | ACTIVE | [affordable-auto-pause-on-empty.md](affordable-auto-pause-on-empty.md) | `INC-AUTO-SHELF-PAUSE-01` | none |
 | Канареечный pipeline: новые фичи на ограниченном числе магазинов | `shop-canary-feature-pipeline` | ACTIVE | [shop-canary-feature-pipeline.md](shop-canary-feature-pipeline.md) | `INC-CANARY-ALLOWLIST-01` | none |
 | V3-only: обесточить и выпилить updater v2 | `v3-only-retire-v2` | ACTIVE | [v3-only-retire-v2.md](v3-only-retire-v2.md) | `INC-V2-MIGRATE-01` | none |
 
