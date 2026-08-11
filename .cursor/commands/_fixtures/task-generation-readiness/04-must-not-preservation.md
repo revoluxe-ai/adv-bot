@@ -1,4 +1,4 @@
-# T4 — MUST NOT modality preserved
+# T2 — MUST NOT modality preserved
 
 ## Given
 
@@ -11,13 +11,15 @@ other blocker remains
 
 ## When
 
-Generator decomposes that requirement into a task line.
+Generator decomposes that requirement into a task line, then runs
+post-generation `NORMATIVE_PRESERVATION_CHECK`.
 
 ## Expected
 
 ```text
 task text contains: MUST NOT
 (e.g. Auto MUST NOT be force-started / MUST NOT forced start)
+NORMATIVE_MODALITY_PRESERVED: yes
 TASKS_STATUS: READY
 ```
 

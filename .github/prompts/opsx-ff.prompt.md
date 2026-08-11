@@ -54,15 +54,22 @@ Fast-forward through artifact creation - generate everything needed to start imp
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
       - **If the artifact is `design`:** follow
-        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first
-        (`DESIGN_READINESS`). Resolve SoT/ownership/write/recovery or
-        BLOCK. Preserve MUST/MUST NOT. Never defer architecture to apply.
-        On BLOCKED stop without declaring design complete.
-      - **If the artifact is `tasks`:** follow
-        `.cursor/pipeline/contracts/TASK_GENERATION.md` first
-        (`TASK_GENERATION_READINESS`). On BLOCKED stop without writing
-        `tasks.md`. On READY, same evidence-role + modality rules as
+        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first. Build draft,
+        then run `DESIGN_READINESS` (post-generation
+        `NORMATIVE_PRESERVATION_CHECK`). Resolve SoT/ownership/write/recovery
+        or BLOCK (`TECHNICAL_DESIGN_UNRESOLVED` /
+        `UPSTREAM_NORMATIVE_CONFLICT` / `NORMATIVE_MODALITY_DRIFT`).
+        Preserve MUST/MUST NOT. Never defer architecture to apply. On
+        BLOCKED stop without declaring design complete. On READY
+        (`NORMATIVE_MODALITY_PRESERVED: yes`), same design rules as
         `/opsx-continue`.
+      - **If the artifact is `tasks`:** follow
+        `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Build draft,
+        then run `TASK_GENERATION_READINESS` (post-generation
+        `NORMATIVE_PRESERVATION_CHECK`). On BLOCKED stop without writing
+        `tasks.md`. On READY (`NORMATIVE_MODALITY_PRESERVED: yes` and
+        `CONDITIONAL_BRANCHES_PRESERVED: yes`), same evidence-role +
+        modality + conditional-branch rules as `/opsx-continue`.
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "✓ Created <artifact-id>"
@@ -96,9 +103,9 @@ After completing all artifacts, summarize:
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
 - When creating `design.md`: follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
-  (identical to `/opsx-continue`; continue≡ff).
+  (identical to `/opsx-continue`; draft → post-generation check; continue≡ff).
 - When creating `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
-  (identical to `/opsx-continue`; continue≡ff).
+  (identical to `/opsx-continue`; draft → post-generation check; continue≡ff).
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
@@ -110,7 +117,9 @@ After completing all artifacts, summarize:
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
 - Before writing/completing `design.md`: follow
-  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; on BLOCKED do not declare
-  design complete
-- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (draft → post-generation check; `NORMATIVE_MODALITY_PRESERVED` required);
+  on BLOCKED do not declare design complete
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (draft → post-generation check; modality + conditional branches required);
   on BLOCKED leave `FILES_CHANGED: none`

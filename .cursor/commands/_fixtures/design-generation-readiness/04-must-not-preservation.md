@@ -11,13 +11,15 @@ if another blocker remains
 
 ## When
 
-Generator writes clear-our-block / resume behavior in design.
+Generator writes clear-our-block / resume behavior in design, then runs
+post-generation `NORMATIVE_PRESERVATION_CHECK`.
 
 ## Expected
 
 ```text
 design preserves: MUST NOT force-start
   (or equivalent prohibition)
+NORMATIVE_MODALITY_PRESERVED: yes
 DESIGN_STATUS: READY
 ```
 

@@ -25,6 +25,7 @@ DESIGN MUST RESOLVE ARCHITECTURE BEFORE IMPLEMENTATION
 design.md = resolved technical plan for already-authorized product semantics
 same upstream context → semantically equivalent design
   (/opsx-continue ≡ /opsx-ff; advancement mode differs only)
+DESIGN GENERATION MUST PRESERVE UPSTREAM NORMATIVE MODALITY
 MUST/MUST NOT/MAY modality preserved from authoritative upstream
 ```
 
@@ -38,10 +39,29 @@ Apply executes design. Apply MUST NOT receive tasks that choose:
 
 ## When this gate runs
 
-Immediately **before** declaring `openspec/changes/<change>/design.md`
-complete (before marking the design artifact done / unlocking tasks).
+Two phases — both required before declaring
+`openspec/changes/<change>/design.md` complete (before marking the design
+artifact done / unlocking tasks):
 
-If the gate fails:
+```text
+UPSTREAM_REQUIREMENTS
+        ↓
+DRAFT_DESIGN  (in memory / scratch — not yet declared complete)
+        ↓
+NORMATIVE_PRESERVATION_CHECK  (post-generation)
+        ↓
+READY | BLOCKED
+```
+
+1. **Pre-draft / while drafting:** resolve technical choices; scan upstream
+   for modality conflicts and implementation-critical open questions.
+2. **Post-draft:** validate the **actually generated** draft design content
+   for normative modality preservation.
+
+`DESIGN_STATUS: READY` is allowed **only after** the post-generation check
+passes. A clean upstream scan alone is **not** sufficient.
+
+If either phase fails:
 
 ```text
 DESIGN_STATUS: BLOCKED
@@ -57,7 +77,8 @@ complete.
 
 Emit (chat and/or durable note in the continue/ff progress output, and
 prefer a short `DESIGN_READINESS` / `DESIGN_STATUS` block inside
-`design.md` when READY):
+`design.md` when READY) **after** draft construction and post-generation
+validation:
 
 ```text
 DESIGN_READINESS
@@ -68,10 +89,12 @@ DURABLE_SOT_RESOLVED: yes | not_applicable
 WRITE_AUTHORITY_RESOLVED: yes | not_applicable
 RECOVERY_SEMANTICS_RESOLVED: yes | not_applicable
 NORMATIVE_CONFLICTS: none
+NORMATIVE_MODALITY_PRESERVED: yes | no
 IMPLEMENTATION_CRITICAL_OPEN_QUESTIONS: none
 
 DESIGN_STATUS: READY | BLOCKED
-REASON: <none | TECHNICAL_DESIGN_UNRESOLVED | UPSTREAM_NORMATIVE_CONFLICT | …>
+REASON: <none | TECHNICAL_DESIGN_UNRESOLVED | UPSTREAM_NORMATIVE_CONFLICT |
+  NORMATIVE_MODALITY_DRIFT | …>
 ```
 
 Declare design complete only when:
@@ -83,6 +106,7 @@ DURABLE_SOT_RESOLVED: yes | not_applicable
 WRITE_AUTHORITY_RESOLVED: yes | not_applicable
 RECOVERY_SEMANTICS_RESOLVED: yes | not_applicable
 NORMATIVE_CONFLICTS: none
+NORMATIVE_MODALITY_PRESERVED: yes
 IMPLEMENTATION_CRITICAL_OPEN_QUESTIONS: none
 DESIGN_STATUS: READY
 ```
@@ -90,6 +114,11 @@ DESIGN_STATUS: READY
 Use `not_applicable` only when the Change truly has no durable/stateful
 write/recovery surface (document why briefly). Durable-state Changes MUST
 NOT mark SoT/ownership/write/recovery as `not_applicable`.
+
+Forbidden false readiness: declaring `NORMATIVE_CONFLICTS: none` +
+`DESIGN_STATUS: READY` and then emitting draft text that weakens upstream
+`MUST` / `MUST NOT`. Preflight that ignores draft content is a contract
+defect.
 
 ---
 
@@ -217,6 +246,28 @@ NEXT_ACTION: reconcile upstream planning (not silent compromise wording)
 
 Do **not** model-select the more convenient semantics. If a single
 authoritative source is unambiguous, design MUST match it.
+
+### Post-generation drift (mandatory)
+
+After draft design exists, re-check draft wording against upstream
+obligations.
+
+If draft weakens an upstream obligation (e.g. upstream `MUST start`, draft
+`MAY start`):
+
+```text
+NORMATIVE_MODALITY_PRESERVED: no
+DESIGN_STATUS: BLOCKED
+REASON: NORMATIVE_MODALITY_DRIFT
+DRIFT: <upstream obligation> → <draft wording>
+FILES_CHANGED: none | partial-draft-only-if-explicitly-kept-unready
+```
+
+Do **not** declare design complete. Fix the draft (preserve modality) or
+stop.
+
+This catch is required even when the pre-draft upstream scan reported
+`NORMATIVE_CONFLICTS: none` — the generator itself can introduce drift.
 
 ---
 

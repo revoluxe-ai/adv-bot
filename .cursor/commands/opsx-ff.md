@@ -71,21 +71,28 @@ semantics from similar names.
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
       - **If the artifact is `design`:** follow
-        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first. Run
-        `DESIGN_READINESS`. Resolve technical SoT/ownership/write/recovery from
-        evidence (or `DESIGN_STATUS: BLOCKED` /
-        `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT`).
+        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first. Build draft
+        design, then run full `DESIGN_READINESS` (including post-generation
+        `NORMATIVE_PRESERVATION_CHECK`). Resolve technical
+        SoT/ownership/write/recovery from evidence (or
+        `DESIGN_STATUS: BLOCKED` / `TECHNICAL_DESIGN_UNRESOLVED` /
+        `UPSTREAM_NORMATIVE_CONFLICT` / `NORMATIVE_MODALITY_DRIFT`).
         Preserve MUST/MUST NOT/MAY. Never defer architecture to apply.
         On BLOCKED stop the loop without declaring design complete
-        (`FILES_CHANGED: none`). On READY, create design with the same
+        (`FILES_CHANGED: none`). On READY
+        (`NORMATIVE_MODALITY_PRESERVED: yes`), create design with the same
         Derived Lifecycle rules as `/opsx-continue`.
       - **If the artifact is `tasks`:** follow
-        `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Run
-        `TASK_GENERATION_READINESS`. On `TASKS_STATUS: BLOCKED` stop the
-        loop without writing `tasks.md` (`FILES_CHANGED: none`); return
-        the unresolved item + artifact to fix. Do not auto-ask Owner for
-        technical design gaps. On `READY`, create tasks with evidence roles
-        and preserved normative modality (same rules as `/opsx-continue`).
+        `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Build draft
+        tasks, then run full `TASK_GENERATION_READINESS` (including
+        post-generation `NORMATIVE_PRESERVATION_CHECK`). On
+        `TASKS_STATUS: BLOCKED` stop the loop without writing `tasks.md`
+        (`FILES_CHANGED: none`); return the unresolved item / drift +
+        artifact to fix. Do not auto-ask Owner for technical design gaps.
+        On `READY` (`NORMATIVE_MODALITY_PRESERVED: yes` and
+        `CONDITIONAL_BRANCHES_PRESERVED: yes`), create tasks with evidence
+        roles and preserved normative modality (same rules as
+        `/opsx-continue`).
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "✓ Created <artifact-id>"
@@ -165,9 +172,11 @@ After completing all artifacts, summarize:
 - Use `template` as the structure for your output file - fill in its sections
 - When creating `design.md`: apply the same Design Generation rules as
   `/opsx-continue` via `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
-  (`DESIGN_READINESS`, resolve or BLOCK technical architecture — never
-  apply-time SoT/ownership/write-path, MUST/MUST NOT modality preservation,
-  Open Questions only for harmless naming, continue≡ff equivalence).
+  (`DESIGN_READINESS` after draft + post-generation check; resolve or BLOCK
+  technical architecture — never apply-time SoT/ownership/write-path;
+  MUST/MUST NOT modality preservation with
+  `NORMATIVE_MODALITY_PRESERVED: yes` required for READY; Open Questions only
+  for harmless naming; continue≡ff equivalence).
   For temporal/stateful behavior: also apply Derived Lifecycle
   (`LIFECYCLE_STATUS: DERIVED`, per-step SOURCE, no invented transitions,
   UNRESOLVED → owner-contract-review). Specs MUST cover material lifecycle
@@ -175,9 +184,11 @@ After completing all artifacts, summarize:
   On BLOCKED do not declare design complete.
 - When creating `tasks.md`: apply the same Task Generation rules as
   `/opsx-continue` via `.cursor/pipeline/contracts/TASK_GENERATION.md`
-  (`TASK_GENERATION_READINESS`, no implementer architecture choices,
+  (`TASK_GENERATION_READINESS` after draft + post-generation check,
+  no implementer architecture choices,
   `LEGACY_BASELINE` / `TARGET_REGRESSION` / `FINAL_ACCEPTANCE`,
-  MUST/MUST NOT modality preservation, continue≡ff equivalence).
+  MUST/MUST NOT modality + conditional-branch preservation,
+  epoch coupling when applicable, continue≡ff equivalence).
   On BLOCKED do not write `tasks.md`.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
@@ -190,7 +201,13 @@ After completing all artifacts, summarize:
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
 - Before writing/completing `design.md`: follow
-  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; on BLOCKED do not declare
-  design complete (never defer architecture to apply; preserve MUST/MUST NOT)
-- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
-  on BLOCKED leave `FILES_CHANGED: none` (do not create tasks that complete design)
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (draft → post-generation `NORMATIVE_PRESERVATION_CHECK`;
+  `NORMATIVE_MODALITY_PRESERVED: yes` required for READY); on BLOCKED do not
+  declare design complete (never defer architecture to apply; preserve
+  MUST/MUST NOT)
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (draft → post-generation `NORMATIVE_PRESERVATION_CHECK`;
+  `NORMATIVE_MODALITY_PRESERVED` + `CONDITIONAL_BRANCHES_PRESERVED` required
+  for READY); on BLOCKED leave `FILES_CHANGED: none`
+  (do not create tasks that complete design)

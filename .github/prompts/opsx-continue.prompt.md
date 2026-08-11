@@ -112,9 +112,12 @@ For other schemas, follow the `instruction` field from the CLI output.
 Follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md` (SoT). Same rules as
 command `/opsx-continue` / `/opsx-ff`:
 
-- Run `DESIGN_READINESS` before declaring design complete; on
-  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` →
-  `DESIGN_STATUS: BLOCKED`, do not mark design ready.
+- Build draft design, then run `DESIGN_READINESS` **after** draft
+  (post-generation `NORMATIVE_PRESERVATION_CHECK`). On
+  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` /
+  `NORMATIVE_MODALITY_DRIFT` → `DESIGN_STATUS: BLOCKED`, do not mark design
+  ready.
+- READY requires `NORMATIVE_MODALITY_PRESERVED: yes`.
 - Resolve technical SoT/ownership/write/recovery from evidence + decisions.
   Forbidden: apply-time architecture / «выбрать в apply».
 - Preserve `MUST` / `MUST NOT` / `MAY` (no weakening).
@@ -126,11 +129,16 @@ command `/opsx-continue` / `/opsx-ff`:
 Follow `.cursor/pipeline/contracts/TASK_GENERATION.md` (SoT). Same rules as
 command `/opsx-continue` / `/opsx-ff`:
 
-- Run readiness before write; on
-  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` →
+- Build draft tasks, then run readiness **after** draft (post-generation
+  `NORMATIVE_PRESERVATION_CHECK`). On
+  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` /
+  `NORMATIVE_MODALITY_DRIFT` / `CONDITIONAL_BRANCH_COLLAPSE` →
   `TASKS_STATUS: BLOCKED`, `FILES_CHANGED: none`.
+- READY requires `NORMATIVE_MODALITY_PRESERVED: yes` and
+  `CONDITIONAL_BRANCHES_PRESERVED: yes`.
 - Evidence roles: `LEGACY_BASELINE` | `TARGET_REGRESSION` | `FINAL_ACCEPTANCE`.
-- Preserve `MUST` / `MUST NOT` / `MAY` (no weakening).
+- Preserve `MUST` / `MUST NOT` / `MAY` (no weakening); preserve conditional
+  branches (no collapse to MAY); epoch only after actual start when applicable.
 - continue ≡ ff for identical upstream artifacts.
 
 **Guardrails**
@@ -142,7 +150,9 @@ command `/opsx-continue` / `/opsx-ff`:
 - Use the schema's artifact sequence, don't assume specific artifact names
 - Before writing/completing `design.md`: follow
   `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (draft → post-generation check; `NORMATIVE_MODALITY_PRESERVED` required)
 - Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (draft → post-generation check; modality + conditional branches required)
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output

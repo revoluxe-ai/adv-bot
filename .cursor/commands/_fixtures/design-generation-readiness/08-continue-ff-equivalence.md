@@ -14,6 +14,7 @@ repository evidence).
 ```text
 semantically equivalent design
 same DESIGN_READINESS outcome
+  (including NORMATIVE_MODALITY_PRESERVED)
 same SoT / ownership / write / recovery choices
 same MUST / MUST NOT modality
 ```
@@ -26,4 +27,5 @@ the single SoT. Advancement mode differs only.
 ```text
 continue-only vs ff-only divergent design rules
 ff READY while continue would BLOCK (or reverse) on same input
+post-generation check present in only one command
 ```

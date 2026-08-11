@@ -15,6 +15,8 @@ decisions, owner-contract as applicable).
 ```text
 semantically equivalent tasks
 same TASK_GENERATION_READINESS outcome
+  (including NORMATIVE_MODALITY_PRESERVED /
+   CONDITIONAL_BRANCHES_PRESERVED)
 same BLOCKED reasons / same READY task obligations
 advancement mode differs only
 ```
@@ -24,4 +26,5 @@ advancement mode differs only
 ```text
 continue-only vs ff-only divergent task rules
 different modality or evidence-role treatment per command
+post-generation check present in only one command
 ```
