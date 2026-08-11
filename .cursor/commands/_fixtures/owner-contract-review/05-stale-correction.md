@@ -29,10 +29,17 @@ remove mid-cycle cost pause when shelf bid module is ON
 
 ```text
 STALE_ASSUMPTIONS: FAIL
-VERDICT: FAIL
+REVIEW_STATE: READY_FOR_REPAIR
+OWNER_INPUT_REQUIRED: NO
+REPAIR_REQUIRED: YES
+REPAIR_SEMANTICS: remove stale "mid-cycle pause unchanged" keep bullet;
+                  keep Owner decision to remove mid-cycle pause when module ON
+must NOT re-ask Owner to confirm the correction
+must NOT be overall NEEDS_OWNER solely for this finding
 ```
 
 ## Why
 
 Owner correction changed meaning, but the old assumption remains in another
-section. Reviewer must flag stale residue; must not silently delete or rewrite.
+section. Reviewer must flag stale residue; must not silently delete or rewrite;
+must emit writer repair in OWNER_REVIEW_HANDOFF when other blockers are clear.

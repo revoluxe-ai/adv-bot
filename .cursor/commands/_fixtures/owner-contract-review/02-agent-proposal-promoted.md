@@ -24,10 +24,20 @@ Owner:
 
 ```text
 OWNER_DECISION_PROVENANCE: FAIL
-# or NEEDS_OWNER if reviewer treats missing confirmation as Owner question
-# (must NOT be PASS)
+REVIEW_STATE: READY_FOR_REPAIR | NEEDS_OWNER
 
-VERDICT: FAIL | NEEDS_OWNER
+# Prefer READY_FOR_REPAIR when reviewer instructs removal of unproven bullet
+# (Owner already confirmed module ON only — do NOT re-ask module ON).
+# NEEDS_OWNER only if reviewer treats PLAN_DISTANCE as a live product fork
+# still needing an explicit A/B choice.
+
+OWNER_INPUT_REQUIRED: NO   # for module ON (already confirmed)
+# For PLAN_DISTANCE bullet:
+#   OWNER_INPUT_REQUIRED: YES  only if asking whether to adopt it
+#   OR REPAIR_REQUIRED: YES to drop unproven bullet without re-asking
+
+must NOT be PASS
+must NOT treat PLAN_DISTANCE as confirmed OWNER_DECISION
 ```
 
 ## Finding focus
