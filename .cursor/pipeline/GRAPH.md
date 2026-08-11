@@ -33,6 +33,9 @@
 - change_scaffolded: change dir exists; first artifact pending (`/opsx-new`)
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
+- planning_package_reviewed: soft PASS from `/opsx-planning-review`
+  (independent package coherence; not hard apply gate v1; READY markers
+  alone insufficient — `.cursor/pipeline/contracts/PLANNING_REVIEW.md`)
 - product_acceptance_required: PA kernel on
   (`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`); DONE ≠ soft tooling
 - product_acceptance_pass: PRODUCT_ACCEPTANCE_STATUS=PASS (or NOT_REQUIRED)
@@ -217,7 +220,7 @@
 - artifacts_read: change artifacts / openspec status
 - artifacts_written: next ready artifact
 - decision_owner: operator
-- next_typical: /opsx-continue | /opsx-apply
+- next_typical: /opsx-continue | /opsx-planning-review (when applyRequires complete) | /opsx-apply (ALSO_OK soft skip)
 - known_flaws: none recorded
 
 ### /opsx-ff
@@ -227,28 +230,38 @@
 - artifacts_read: openspec status/instructions
 - artifacts_written: all applyRequires artifacts
 - decision_owner: operator
-- next_typical: /opsx-apply
+- next_typical: /opsx-planning-review | /opsx-apply (ALSO_OK soft skip)
 - known_flaws: none recorded
 
+### /opsx-planning-review
+- purpose: READ_ONLY independent coherence review of finished planning package before apply
+- input_state: apply_ready | planning_revise
+- output_state: planning_package_reviewed | planning_revise | apply_ready
+- artifacts_read: owner-contract, proposal, decisions, design, specs, tasks, scenario plan evidence; PLANNING_REVIEW.md
+- artifacts_written: none (FILES_CHANGED: none)
+- decision_owner: verifier only (Owner for NEEDS_OWNER product forks)
+- next_typical: /opsx-apply (on PASS) | /opsx-update + PLANNING_REVIEW_HANDOFF (on REPAIR_REQUIRED) | Owner question (NEEDS_OWNER)
+- known_flaws: soft recommend only in v1 (not hard apply gate)
+
 ### /opsx-update
-- purpose: revise existing planning artifacts coherently; on bug-episode spec route emit TASK_DELTA
+- purpose: revise existing planning artifacts coherently; on bug-episode spec route emit TASK_DELTA; consume PLANNING_REVIEW_HANDOFF (REPAIR_PLANNING_PACKAGE)
 - input_state: planning_revise | apply_ready | verify_fail | classified_spec
 - output_state: apply_ready | planning_revise | task_delta_changed | task_delta_unchanged
-- artifacts_read: change planning artifacts; optional case ROUTE_STATE
+- artifacts_read: change planning artifacts; optional case ROUTE_STATE; optional PLANNING_REVIEW_HANDOFF
 - artifacts_written: revised planning artifacts; TASK-DELTA-*.md; ROUTE-TRACE.jsonl; ROUTE_STATE
 - decision_owner: operator
-- next_typical: /opsx-apply (TASK_DELTA CHANGED) | /opsx-fix-bug GO path (TASK_DELTA UNCHANGED) | /opsx-bug-team handback (SECONDARY) | /opsx-continue
+- next_typical: /opsx-planning-review (after REPAIR_PLANNING_PACKAGE) | /opsx-apply (TASK_DELTA CHANGED) | /opsx-fix-bug GO path (TASK_DELTA UNCHANGED) | /opsx-bug-team handback (SECONDARY) | /opsx-continue
 - known_flaws: NOT_OPENED_BUDGET detail; update ≠ production GO; never closed_fixed from update; persist CLOSE_FINDING_INTENT on ROUTE_STATE
 
 ### /opsx-apply
 - purpose: implement tasks from an OpenSpec change; bug-episode path requires RED+Owner GO
-- input_state: apply_ready | implementing | verify_fail | task_delta_changed | production_go_ready
+- input_state: apply_ready | planning_package_reviewed | implementing | verify_fail | task_delta_changed | production_go_ready
 - output_state: implementing | impl_done | fix_implementing
 - artifacts_read: tasks.md, design, decisions (context-first); RED evidence when bug-episode
 - artifacts_written: production/code per tasks (after gate); ROUTE-TRACE.jsonl
 - decision_owner: implementer + architecture decisions + Owner GO when bug-episode
 - next_typical: /opsx-pyright-strict-coverage (when production .py changed) | /opsx-external-call-coverage | /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-verify | /opsx-test verify (bug-episode PRIMARY) | /opsx-bug-team handback (SECONDARY) | /opsx-project-bug-hunt
-- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; apply soft handoff may omit antipattern (F12 / NOT_OPENED_BUDGET)
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; apply soft handoff may omit antipattern (F12 / NOT_OPENED_BUDGET); planning-review soft preflight only (v1, not hard gate)
 
 ### /opsx-pyright-strict-coverage
 - purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude)
@@ -804,7 +817,10 @@ change_idea --/opsx-new--> change_scaffolded
 change_scaffolded --/opsx-continue--> artifacts_in_progress|apply_ready
 change_idea --/opsx-ff--> apply_ready
 artifacts_in_progress --/opsx-continue--> apply_ready
-apply_ready --/opsx-apply--> implementing|impl_done
+apply_ready --/opsx-planning-review [soft recommend]--> planning_package_reviewed|planning_revise|apply_ready
+planning_package_reviewed --/opsx-apply--> implementing|impl_done
+apply_ready --/opsx-apply [ALSO_OK soft skip]--> implementing|impl_done
+planning_revise --/opsx-update [PLANNING_REVIEW_HANDOFF]--> apply_ready|planning_revise
 impl_done --/opsx-pyright-strict-coverage--> coverage_pass|coverage_gaps
 coverage_pass --/opsx-external-call-coverage--> external_call_pass|external_call_gaps|focus_pass_incomplete_gate
 external_call_pass --/opsx-performance-review [trigger REQUIRED|RECOMMENDED]--> performance_pass|performance_fail|performance_measure_authorized|performance_review_pending

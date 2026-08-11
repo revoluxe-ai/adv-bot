@@ -20,6 +20,33 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 `/opsx-update` MUST treat `[deferred-from:<CHANGE_ID>]` (and matching titles/notes for this change) as **out of current owed DoD** until the owner explicitly confirms re-entry. Silent re-inflation of a bounded change is forbidden.
 
+**Planning-review repair front-door:** When the user pastes or references a
+`PLANNING_REVIEW_HANDOFF` with `MODE: REPAIR_PLANNING_PACKAGE` (and/or
+`TARGET_WRITER: /opsx-update`), treat that handoff as the authoritative
+repair request for this invocation. Handoff field names and repair semantics
+are defined in `.cursor/pipeline/contracts/PLANNING_REVIEW.md` (producer:
+`/opsx-planning-review`). Confirm-before-write still applies.
+
+Algorithm:
+
+1. Validate handoff: `CHANGE_ID`, `FINDINGS`, `FIRST_BAD_ARTIFACT`,
+   `EXPECTED_SEMANTICS`, `DO_NOT_CHANGE`, `WRITE_BOUNDARY`.
+2. Repair `FIRST_BAD_ARTIFACT` first using `EXPECTED_SEMANTICS` / per-finding
+   `REPAIR_REQUIRED` — do not invent product decisions or expand scope.
+3. Then repair/regenerate only `AFFECTED_DOWNSTREAM` / stale derivatives;
+   do not modify unaffected upstream.
+4. Do **not** edit `owner-contract.md` unless the finding explicitly routes
+   Owner-contract repair via `/opsx-owner-contract-review` + `/opsx-new`
+   (out of this mode).
+5. Forbidden: production code, apply, new product decisions, scope expansion
+   beyond the handoff.
+6. After successful repair, soft-recommend
+   `/opsx-planning-review change=<id>` (not `/opsx-apply`) until that review
+   returns `STATUS: PASS`.
+
+Keep `UPDATE_HANDOFF` / coherence / bug-episode paths unchanged when no
+planning-review handoff is present.
+
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_update --strict`. Stop on non-zero exit and report the guard output.
@@ -145,6 +172,10 @@ Lifecycle DERIVED does **not** waive this gate.
    - Consuming `UPDATE_HANDOFF` that only **removes/narrows** to KEEP MUST NOT treat deferred parks as re-entry; still print `DEFERRED_PARKS_FOR_CHANGE` as situational awareness.
 
 3. **Understand the request**
+   - If the user pasted or referenced a `PLANNING_REVIEW_HANDOFF` with
+     `MODE: REPAIR_PLANNING_PACKAGE`, treat that as the authoritative repair
+     request (see **Planning-review repair front-door** above). Do not mix
+     with bound-scope KEEP/DEFER unless the handoff explicitly allows.
    - If the user pasted or referenced an `/opsx-bound-scope` `UPDATE_HANDOFF`, treat that as the authoritative KEEP revision request for this invocation (apply KEEP / remove-or-narrow deferred units; do not re-park WORKLOG — bound-scope already did). Do not re-add DEFER units from that handoff.
    - If the user asked for a specific revision ("the design now uses X"), that is the starting edit — run it through the Deferred re-entry gate in 2b when it overlaps parks.
    - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication. Coherence MUST NOT silently restore parked scope; if coherence “wants” a deferred unit back, use `DEFERRED_REENTRY_REQUIRED`.
@@ -177,7 +208,12 @@ Lifecycle DERIVED does **not** waive this gate.
      ```
 
 7. **Point to the next step (guidance only - NEVER act on it)**
+   - After `MODE: REPAIR_PLANNING_PACKAGE` repair → soft-recommend
+     `/opsx-planning-review change=<id>` before `/opsx-apply`.
    - Artifacts still missing -> suggest `/opsx:continue` to create them.
+   - Planning package coherent / review PASS and not yet implemented ->
+     soft-recommend `/opsx-planning-review` if not just PASSed, else
+     `/opsx:apply`.
    - Change already implemented (tasks checked off / already applied) -> the code may no longer match the revised plan; suggest `/opsx:apply` to carry the delta into code.
    - Everything done and implemented -> suggest `/opsx:archive`.
 

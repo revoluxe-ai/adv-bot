@@ -48,7 +48,12 @@ Continue working on a change by creating the next artifact.
    **If all artifacts are complete (`isComplete: true`)**:
    - Congratulate the user
    - Show final status including the schema used
-   - Suggest: "All artifacts created! You can now implement this change with `/opsx:apply` or archive it with `/opsx:archive`."
+   - Soft-recommend (PRIMARY): independent planning-package review before apply:
+     `/opsx-planning-review change=<name>`
+     (READY markers alone are not sufficient; see
+     `.cursor/pipeline/contracts/PLANNING_REVIEW.md`).
+   - ALSO_OK: `/opsx:apply` after review PASS (or if Owner explicitly skips
+     the soft gate); or `/opsx:archive` when appropriate.
    - STOP
 
    ---

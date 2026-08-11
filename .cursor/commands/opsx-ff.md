@@ -161,8 +161,11 @@ semantics from similar names.
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
-- What's ready: "All artifacts created! Ready for implementation."
-- Prompt: "Run `/opsx:apply` to start implementing."
+- What's ready: "All artifacts created! Ready for planning review, then implementation."
+- Soft-recommend (PRIMARY): `/opsx-planning-review change=<name>`
+  (independent package coherence; READY markers alone insufficient —
+  `.cursor/pipeline/contracts/PLANNING_REVIEW.md`).
+- ALSO_OK: `/opsx:apply` after review PASS (or if Owner skips the soft gate).
 
 **Artifact Creation Guidelines**
 

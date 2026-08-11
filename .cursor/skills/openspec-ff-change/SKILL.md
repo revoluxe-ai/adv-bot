@@ -121,10 +121,11 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
-- What's ready: "All artifacts created! Ready for implementation."
+- What's ready: "All artifacts created! Ready for planning review, then implementation."
   (only if PA gates above allow; otherwise BLOCKED awaiting
   `CONFIRM_LIFECYCLE` / MEANING_LOCK)
-- Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
+- Soft-recommend (PRIMARY): `/opsx-planning-review change=<name>`
+- ALSO_OK: `/opsx:apply` after review PASS (or if Owner skips the soft gate).
 
 **Artifact Creation Guidelines**
 

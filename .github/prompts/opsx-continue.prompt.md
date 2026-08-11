@@ -41,7 +41,9 @@ Continue working on a change by creating the next artifact.
    **If all artifacts are complete (`isComplete: true`)**:
    - Congratulate the user
    - Show final status including the schema used
-   - Suggest: "All artifacts created! You can now implement this change with `/opsx:apply` or archive it with `/opsx:archive`."
+   - Soft-recommend (PRIMARY): `/opsx-planning-review change=<name>`
+     before apply (READY markers alone insufficient).
+   - ALSO_OK: `/opsx:apply` after review PASS, or `/opsx:archive` when appropriate.
    - STOP
 
    ---
