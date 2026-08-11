@@ -18,8 +18,12 @@ Verify является read-only audit command после `/opsx-apply` и до
 1. Parse `mode=impl` | `mode=archive` (default **`archive`** if omitted; WARN to prefer explicit mode).
 2. If `mode=impl` → выполни только **PHASE_IMPL** из модуля; остановись; **не**
    эмитируй `✅ GO` / `❌ NO_GO`; не продолжай archive-секции ниже.
+   Output shape + markers + **LOCAL_HOP_COPY_BLOCK** — из VERIFY_PHASES
+   (bare `NEXT_ACTION` / `## Следующая команда` alone insufficient for
+   Owner-local hop).
 3. If `mode=archive` → выполни **PHASE_ARCHIVE** из модуля, затем полный
-   archive-audit **этого** файла (секции ниже) + маркеры `✅ GO` / `❌ NO_GO`.
+   archive-audit **этого** файла (секции ниже) + маркеры `✅ GO` / `❌ NO_GO`
+   + **LOCAL_HOP_COPY_BLOCK** из VERIFY_PHASES.
 
 Не путать с `/opsx-test … verify` (bug GREEN). `✅ IMPL_OK` **никогда** не
 авторизует `/opsx-archive`.
@@ -994,6 +998,23 @@ manual fix
 /opsx-test case=<CASE_ID> finding=<FINDING_ID> verify
 /opsx-bug-debt-board case=<CASE_ID>
 ```
+
+### LOCAL_HOP_COPY_BLOCK (mandatory — mode=archive Output)
+
+Authority: `.cursor/pipeline/contracts/VERIFY_PHASES.md`
+(`LOCAL_HOP_COPY_BLOCK` after PHASE_ARCHIVE).
+
+After `## Следующая команда` and **before** the final marker
+(`✅ GO` / `❌ NO_GO`), when the next step is a local `/opsx-*` hop in this
+Cursor workspace, emit exactly **one** fenced copy-paste prompt containing
+workspace path, change name, `mode=archive` + marker, blockers (on `NO_GO`),
+exact next Command, and applicable `DO_NOT_DO_YET` / `ALSO_OK`. Outside the
+fence (except the required final marker): ≤1 status line. No Web four-block
+(`Ссылка` / `Папка`) for this hop. Bare `## Следующая команда` alone is
+**not** a sufficient Owner-local handoff. Final marker stays the last line.
+
+(`mode=impl` uses the PHASE_IMPL Output + LOCAL_HOP_COPY_BLOCK from
+VERIFY_PHASES only — do not emit archive GO/NO_GO sections.)
 
 Не создавай новый top-level output section для test coverage.
 
