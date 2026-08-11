@@ -70,6 +70,13 @@ semantics from similar names.
         - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
+      - **If the artifact is `tasks`:** follow
+        `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Run
+        `TASK_GENERATION_READINESS`. On `TASKS_STATUS: BLOCKED` stop the
+        loop without writing `tasks.md` (`FILES_CHANGED: none`); return
+        the unresolved item + artifact to fix. Do not auto-ask Owner for
+        technical design gaps. On `READY`, create tasks with evidence roles
+        and preserved normative modality (same rules as `/opsx-continue`).
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "✓ Created <artifact-id>"
@@ -149,6 +156,12 @@ After completing all artifacts, summarize:
   Derived Lifecycle rules as `/opsx-continue` (`LIFECYCLE_STATUS: DERIVED`,
   per-step SOURCE, no invented transitions, UNRESOLVED → owner-contract-review).
   Specs MUST cover material lifecycle transitions (or explicit not-needed proof).
+- When creating `tasks.md`: apply the same Task Generation rules as
+  `/opsx-continue` via `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (`TASK_GENERATION_READINESS`, no implementer architecture choices,
+  `LEGACY_BASELINE` / `TARGET_REGRESSION` / `FINAL_ACCEPTANCE`,
+  MUST/MUST NOT modality preservation, continue≡ff equivalence).
+  On BLOCKED do not write `tasks.md`.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
@@ -159,3 +172,5 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
+  on BLOCKED leave `FILES_CHANGED: none` (do not create tasks that complete design)

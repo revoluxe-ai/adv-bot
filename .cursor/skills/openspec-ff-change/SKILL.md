@@ -68,6 +68,11 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
         - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
+      - **If the artifact is `tasks`:** follow
+        `.cursor/pipeline/contracts/TASK_GENERATION.md` first
+        (`TASK_GENERATION_READINESS`). On BLOCKED stop without writing
+        `tasks.md`. On READY, same evidence-role + modality rules as
+        `/opsx-continue`.
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "✓ Created <artifact-id>"
@@ -115,6 +120,8 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- When creating `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (identical to `/opsx-continue`; continue≡ff).
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
@@ -125,5 +132,7 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, suggest continuing that change instead
 - Verify each artifact file exists after writing before proceeding to next
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
+  on BLOCKED leave `FILES_CHANGED: none`
 - When `PRODUCT_ACCEPTANCE_REQUIRED=true`, never treat apply-ready as true
   without durable `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE`

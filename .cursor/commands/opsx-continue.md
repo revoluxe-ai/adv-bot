@@ -107,13 +107,65 @@ Common artifact patterns:
 - **design.md**: Document technical decisions, architecture, and implementation approach.
   When the Change has temporal/stateful behavior, also emit a **Derived Lifecycle**
   section (see below) — planning representation only, not a new Owner authority.
-- **tasks.md**: Break down implementation into checkboxed tasks.
+- **tasks.md**: Break down implementation into checkboxed tasks **only after**
+  `TASK_GENERATION_READINESS` passes (see **Task Generation** below).
+  `tasks.md` implements already-resolved design — it MUST NOT complete
+  unresolved architecture/SoT/ownership/write-path/semantic choices.
 - After a Derived Lifecycle exists in design, each **specs/<capability>/spec.md**
   MUST cover every materially observable lifecycle transition with a requirement/
   scenario, or record an explicit proof that a separate scenario is not needed.
   Spec MUST NOT invent behavior absent from lifecycle / reviewed Owner Contract.
 
 For other schemas, follow the `instruction` field from the CLI output.
+
+### Task Generation (tasks.md — shared with `/opsx-ff`)
+
+**Authority:** `.cursor/pipeline/contracts/TASK_GENERATION.md` (SoT).
+`/opsx-continue` and `/opsx-ff` MUST produce semantically equivalent tasks
+from the same upstream artifacts.
+
+When the ready artifact is `tasks` (or you are about to write `tasks.md`):
+
+1. Read dependency artifacts (design, specs, decisions, owner-contract as
+   applicable).
+2. Run `TASK_GENERATION_READINESS` from the contract before any write:
+
+```text
+TASK_GENERATION_READINESS
+UNRESOLVED_DESIGN_CHOICES: none
+UNRESOLVED_PRODUCT_CHOICES: none
+UPSTREAM_NORMATIVE_CONFLICTS: none
+SCENARIO_REQUIREMENTS_CONSUMED: yes | not_required
+TASKS_STATUS: READY
+```
+
+3. If any unresolved technical design choice would become an implementer
+   task («выбрать SoT», «PG или Redis», ownership, write-path, architecture,
+   semantic behavior) and upstream does not resolve it:
+
+```text
+TASKS_STATUS: BLOCKED
+REASON: TECHNICAL_DESIGN_UNRESOLVED
+FILES_CHANGED: none
+```
+
+Return the exact unresolved item + artifact to fix. Do **not** ask Owner
+automatically (technical design gap ≠ Owner semantic gap). Do **not** write
+`tasks.md`.
+
+4. Evidence roles when behavior intentionally changes:
+   `LEGACY_BASELINE` | `TARGET_REGRESSION` | `FINAL_ACCEPTANCE`.
+   Forbidden: require old characterization assertions to stay green after
+   the intentional semantic change; forbidden plan contradiction
+   OLD MUST / OLD MUST NOT.
+
+5. Preserve normative modality from upstream:
+   `MUST→MUST`, `MUST NOT→MUST NOT`, `MAY→MAY`.
+   Forbidden: `MUST→MAY`, `MUST NOT→SHOULD NOT`, or other weakening.
+   Upstream modality conflict →
+   `TASKS_STATUS: BLOCKED` / `REASON: UPSTREAM_NORMATIVE_CONFLICT`.
+
+6. Only then write `tasks.md` with `TASKS_STATUS: READY`.
 
 ### Derived Lifecycle (design — temporal / stateful Changes)
 
@@ -195,6 +247,8 @@ SOURCE: …
 - For temporal Changes: design MUST include Derived Lifecycle with provenance
   when behavior is temporal/stateful; unresolved forks → owner-contract-review
   (not `CONFIRM_LIFECYCLE`)
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`;
+  on BLOCKED leave `FILES_CHANGED: none` (do not create tasks that complete design)
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output

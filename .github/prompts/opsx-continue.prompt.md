@@ -98,9 +98,24 @@ Common artifact patterns:
   - The Capabilities section is critical - each capability listed will need a spec file.
 - **specs/<capability>/spec.md**: Create one spec per capability listed in the proposal's Capabilities section (use the capability name, not the change name).
 - **design.md**: Document technical decisions, architecture, and implementation approach.
-- **tasks.md**: Break down implementation into checkboxed tasks.
+- **tasks.md**: Break down implementation into checkboxed tasks **only after**
+  `TASK_GENERATION_READINESS` passes. See **Task Generation** below.
+  `tasks.md` implements resolved design — MUST NOT complete unresolved
+  architecture/SoT/ownership/write-path/semantic choices.
 
 For other schemas, follow the `instruction` field from the CLI output.
+
+### Task Generation (tasks.md — shared with `/opsx-ff`)
+
+Follow `.cursor/pipeline/contracts/TASK_GENERATION.md` (SoT). Same rules as
+command `/opsx-continue` / `/opsx-ff`:
+
+- Run readiness before write; on
+  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` →
+  `TASKS_STATUS: BLOCKED`, `FILES_CHANGED: none`.
+- Evidence roles: `LEGACY_BASELINE` | `TARGET_REGRESSION` | `FINAL_ACCEPTANCE`.
+- Preserve `MUST` / `MUST NOT` / `MAY` (no weakening).
+- continue ≡ ff for identical upstream artifacts.
 
 **Guardrails**
 - Create ONE artifact per invocation
@@ -109,6 +124,7 @@ For other schemas, follow the `instruction` field from the CLI output.
 - If context is unclear, ask the user before creating
 - Verify the artifact file exists after writing before marking progress
 - Use the schema's artifact sequence, don't assume specific artifact names
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
