@@ -48,11 +48,45 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
 8. Do not modify production code.
 9. Do not modify WORKLOG.
+10. If input contains `EVOLUTION_HANDOFF` / `OWNER_INTENT`: treat `OWNER_INTENT`
+    as the fixed semantic target. Map Owner terms onto runtime/code under
+    separate findings — never replace `OWNER_INTENT`.
+11. If Owner↔runtime mapping is ambiguous: emit `UNRESOLVED` /
+    `CANDIDATE_MAPPING` and clarify; do **not** rewrite `OWNER_INTENT`.
+
+**OWNER_INTENT authority (when present):**
+`explore(OWNER_INTENT, repository)` MUST NOT return a different `OWNER_INTENT`
+only because repository evidence supports another technical reading.
 
 **Required final output format:**
 
+When input includes `OWNER_INTENT`, emit this pasteable block **before** the
+narrative sections. Copy `OWNER_INTENT` **verbatim**.
+
+```text
+EXPLORE_HANDOFF
+OWNER_INTENT:
+<verbatim copy from EVOLUTION_HANDOFF / input — do not reinterpret>
+CURRENT_INCREMENT: <passthrough if present>
+IN_SCOPE:
+- <passthrough if present>
+OUT_OF_SCOPE:
+- <passthrough if present>
+REPOSITORY_FINDINGS:
+- <confirmed file/path/behavior facts>
+RUNTIME_MAPPING:
+- <Owner/UI term → candidate code/runtime path>
+UNRESOLVED:
+- <ambiguities / contradictions; empty if none>
+CANDIDATE_MAPPING:
+- <optional alternate mappings that need Owner confirmation>
+```
+
+If `OWNER_INTENT` is absent, skip `EXPLORE_HANDOFF` (backward compatible).
+
 ## Short Decision
-Короткий вывод по исследованию.
+Короткий вывод по исследованию. When `OWNER_INTENT` is present, stay
+consistent with it; technical reframes go under evidence/mapping/unresolved.
 
 ## Repository Evidence
 Что подтверждено файлами репозитория.
@@ -344,6 +378,10 @@ But this summary is optional. Sometimes the thinking IS the value.
 - **Don't rush** - Discovery is thinking time, not task time
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
+- **Don't rewrite OWNER_INTENT** - When present, pass it through verbatim in
+  `EXPLORE_HANDOFF`; put code/runtime mappings under findings/mapping/unresolved
+- **Don't replace Owner meaning with a plausible code story** without explicit
+  Owner correction
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
 - **Do question assumptions** - Including the user's and your own

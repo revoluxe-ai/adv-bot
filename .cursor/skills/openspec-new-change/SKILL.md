@@ -57,19 +57,35 @@ Start a new change using the experimental artifact-driven approach.
    artifact sequence, and **must not** be copied into `spec` or treated as
    canonical authority for specs/design/tasks.
 
+   **Semantic source priority (OWNER_INTENT):**
+
+   ```text
+   if OWNER_INTENT is present (EVOLUTION_HANDOFF and/or EXPLORE_HANDOFF):
+       owner-contract semantic meaning MUST derive primarily from OWNER_INTENT
+   else:
+       current behavior — Owner request + available change context
+   ```
+
+   KEEP/HARD/FORWARD/CURRENT_INCREMENT/IN_SCOPE/OUT_OF_SCOPE and explore
+   REPOSITORY_FINDINGS/RUNTIME_MAPPING/evidence MAY refine constraints and
+   «Чего не делаем» — they MUST NOT silently redefine what OWNER_INTENT says
+   the change is about.
+
    Use plain human language. Do not use internal orchestration vocabulary
    (evolution links, STAR/INCREMENT ids, HARD/FORWARD, ADL, placement jargon,
    paired regression, authoritative path, etc.) unless those terms are
-   themselves part of the Owner's stated task. Do not mechanically shorten or
-   copy `proposal.md`. Aim for roughly 10–30 substantive lines.
+   themselves part of the Owner's stated task / `OWNER_INTENT`. Do not
+   mechanically shorten or copy `proposal.md`. Aim for roughly 10–30
+   substantive lines.
 
    **UI labels preference:** When describing product behavior in Owner Contract,
    prefer the exact button / menu / screen labels the user sees in the UI
    (quote them or write «как на кнопке: …») whenever those labels are known
-   from the Owner request, change context, or existing UI copy. If no UI label
-   is known, fall back to ordinary domain language — never invent button names.
-   This is a preference for the companion `owner-contract.md` only, not a
-   scaffold blocker and not a requirement for schema artifacts.
+   from `OWNER_INTENT`, the Owner request, change context, or existing UI
+   copy. If no UI label is known, fall back to ordinary domain language —
+   never invent button names. This is a preference for the companion
+   `owner-contract.md` only, not a scaffold blocker and not a requirement
+   for schema artifacts.
 
    Required structure:
 
@@ -106,7 +122,8 @@ Start a new change using the experimental artifact-driven approach.
    ```
 
    Empty/inapplicable sections may stay minimal. Reflect the original Owner
-   request only — no speculative future scope, no invented product decisions.
+   request / `OWNER_INTENT` only — no speculative future scope, no invented
+   product decisions, and no silent swap to an explore technical framing.
 
 5. **Show the artifact status**
    ```bash
@@ -139,6 +156,8 @@ After completing the steps, summarize:
 - Do NOT create schema artifacts yet (proposal/specs/design/decisions/tasks) — only the companion `owner-contract.md` plus scaffold
 - Do NOT register Owner Contract in `schema.yaml` or make `continue`/`ff`/`apply`/`verify` require it
 - Do NOT inject Owner Contract content into `spec` or other schema artifacts
+- Do NOT let explore findings / KEEP/HARD/FORWARD / repository mapping silently
+  replace `OWNER_INTENT` as the semantic source of `owner-contract.md`
 - Do NOT advance beyond showing the first artifact template
 - If the name is invalid (not kebab-case), ask for a valid name
 - If a change with that name already exists, suggest continuing that change instead
