@@ -354,6 +354,26 @@ Rules:
 
 Do not implement only the new file when companion updates are required.
 
+## Independent verifier / gate companion wire-up (mandatory)
+
+When the proposed command is an **independent READ_ONLY verifier or
+lifecycle gate** (exemplar: `/opsx-planning-review` +
+`.cursor/pipeline/contracts/PLANNING_REVIEW.md`):
+
+1. State **soft vs hard gate** explicitly (v1 soft recommend vs hard block).
+2. `REQUIRED_COMPANION_UPDATES` / `EXISTING_FILES_TO_UPDATE` MUST list at least:
+   - (a) handoff consumer on the repair writer (e.g. `/opsx-update`
+     `MODE: REPAIR_*` + handoff token);
+   - (b) soft `NEXT_ACTION` on producers that previously jumped to apply
+     (e.g. `/opsx-continue` / `/opsx-ff` after tasks complete);
+   - (c) `GRAPH` state and/or transition edge for the hop;
+   - (d) soft preflight note on `/opsx-apply` when applicable.
+3. Do **not** claim `COMPATIBLE` when those companions are missing for this
+   command class — use `COMPATIBLE_WITH_REQUIRED_COMPANION_UPDATES` and
+   disclose the full checklist before GO. Apply companions only when the
+   approved packet lists them (same coherent change); never leave wire-up
+   undisclosed.
+
 ---
 
 # Phase 3 — Design proposal
@@ -424,6 +444,8 @@ COGNITIVE_LOAD_IMPACT:
 RISKS:
 
 REQUIRED_COMPANION_UPDATES:
+(for independent verifier/gate proposals: mandatory checklist items (a)–(d)
+ under Integration verdict → Independent verifier / gate companion wire-up)
 
 REGRESSION_CHECKS:
 ```
