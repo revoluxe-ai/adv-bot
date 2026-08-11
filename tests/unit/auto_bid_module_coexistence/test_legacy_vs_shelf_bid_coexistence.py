@@ -1,12 +1,10 @@
-"""Парные тесты coexistence: «Управление ставкой для Авто» vs «в полках».
+"""Парные scenario_seam: «Управление ставкой для Авто» vs «в полках».
 
 Spec: openspec/changes/pin-legacy-autobidder-vs-shelf-coexistence/specs/auto-bid-module-coexistence/spec.md
 
-Runtime seams (task 1.1):
-- Legacy «для Авто»: ``run_bidder_process_for_adv`` → ``wb_api.update_cpm(auto_adv_id, …)``
-  при ``bidder_for_auto`` (app/modules/shop_runner/bidder/bidder_func.py).
-- Полки: ``AutoShelfBidControlManager.is_coroutine_candidate`` /
-  ``_set_target_bid`` при ``auto_shelf_bid_control_enabled``.
+ContractCase sources:
+- ``update_cpm_contract`` (legacy Auto / Search WB thin end)
+- ``shelf_set_bid_contract`` (полки set_bid / patch)
 """
 
 from __future__ import annotations
@@ -28,10 +26,40 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
     AutoShelfBidControlManager,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_setter import (
+    AutoShelfBidSetter,
+)
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager.enums import (
     AutoReasonCode,
 )
+from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager.reason_display import (
+    reason_code_to_display_text,
+)
 from tests.factories.keyword_pipeline import make_calculated_keyword
+from tests.unit.auto_bid_module_coexistence.shelf_set_bid_contract import (
+    SHELF_SET_BID_CASES,
+    RecordingPatchAutoAdvBids,
+    ShelfSetBidContractCase,
+)
+from tests.unit.auto_bid_module_coexistence.update_cpm_contract import (
+    UPDATE_CPM_CASES,
+    RecordingFakeUpdateCpm,
+    UpdateCpmContractCase,
+)
+
+
+def _case_update(case_id: str) -> UpdateCpmContractCase:
+    for case in UPDATE_CPM_CASES:
+        if case.case_id == case_id:
+            return case
+    raise KeyError(case_id)
+
+
+def _case_shelf(case_id: str) -> ShelfSetBidContractCase:
+    for case in SHELF_SET_BID_CASES:
+        if case.case_id == case_id:
+            return case
+    raise KeyError(case_id)
 
 
 def _make_auction_adv(bid: int, advert_id: int, nmid: int) -> AuctionAdv:
@@ -63,14 +91,11 @@ def _make_auction_adv(bid: int, advert_id: int, nmid: int) -> AuctionAdv:
     return AuctionAdv(adv_data)
 
 
-async def _run_legacy_bidder_with_flags(
+async def _run_legacy_bidder_with_contract(
     monkeypatch: pytest.MonkeyPatch,
-    *,
-    bidder_for_auto: bool,
-    auto_shelf_bid_control_enabled: bool,
-    search_adv_id: int | None = 444,
-) -> AsyncMock:
-    """Прогон ``run_bidder_process_for_adv`` с флагами coexistence; возвращает update_cpm mock."""
+    case: UpdateCpmContractCase,
+) -> RecordingFakeUpdateCpm:
+    """Прогон ``run_bidder_process_for_adv`` с ContractCase flags; recording fake."""
     monkeypatch.setattr(
         "app.core.di.databases.redis.RedisLifecycle.init",
         AsyncMock(return_value=None),
@@ -104,7 +129,7 @@ async def _run_legacy_bidder_with_flags(
         monkeypatch.setattr(bidder_func, "AdvParameterManager", DummyAdvParameterManager)
 
         try:
-            auction_adv = _make_auction_adv(100, 333, 701)
+            auction_adv = _make_auction_adv(100, case.auto_adv_id, case.nmid)
             best_keyword = make_calculated_keyword()
             monkeypatch.setattr(
                 bidder_func,
@@ -117,13 +142,14 @@ async def _run_legacy_bidder_with_flags(
                 Mock(return_value=best_keyword),
             )
 
+            update_cpm = RecordingFakeUpdateCpm()
             adv_setting = SimpleNamespace(
-                adv_id=333,
-                bidder_for_auto=bidder_for_auto,
-                auto_shelf_bid_control_enabled=auto_shelf_bid_control_enabled,
-                search_adv_id=search_adv_id,
+                adv_id=case.auto_adv_id,
+                bidder_for_auto=case.bidder_for_auto,
+                auto_shelf_bid_control_enabled=case.shelves_on,
+                search_adv_id=case.search_adv_id,
                 max_cpm=150,
-                nmids=[701],
+                nmids=[case.nmid],
                 bidder_step=5,
                 max_place=10,
                 reset_place=False,
@@ -132,10 +158,10 @@ async def _run_legacy_bidder_with_flags(
             wb_api = SimpleNamespace(
                 shop_id=55,
                 access=SimpleNamespace(wb_cabinet=SimpleNamespace(id=2000)),
-                update_cpm=AsyncMock(),
+                update_cpm=update_cpm,
             )
             await run_bidder_process_for_adv(adv_setting, wb_api, [best_keyword])
-            return wb_api.update_cpm
+            return update_cpm
         finally:
             stamp_cache_provider.reset_override()
             redis_last_views_provider.reset_override()
@@ -144,74 +170,99 @@ async def _run_legacy_bidder_with_flags(
             app_container.settings.reset_override()
 
 
-def _auto_update_cpm_calls(update_cpm: AsyncMock) -> list[tuple]:
-    """Вызовы update_cpm именно для Auto adv_id=333 (не Search)."""
-    return [
-        call.args
-        for call in update_cpm.await_args_list
-        if call.args and call.args[0] == 333
-    ]
-
-
 @pytest.mark.asyncio
 async def test_shelf_on_legacy_auto_bid_path_must_not_update_auto_cpm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec auto-bid-module-coexistence — Scenario: Shelf bid control on — legacy Auto bid path ignored.
+    """Spec — Scenario: Shelf bid control on — legacy Auto bid path ignored.
 
-    Seam: run_bidder_process_for_adv → update_cpm(auto_adv_id). При включённом
-    «Управление ставкой в полках» путь «для Авто» MUST NOT успешно писать ставку Авто.
+    OWNER_LIFECYCLE_ECHO step 3. ContractCase forbidden_auto_shelves_on.
     """
-    update_cpm = await _run_legacy_bidder_with_flags(
-        monkeypatch,
-        bidder_for_auto=True,
-        auto_shelf_bid_control_enabled=True,
-    )
-    assert _auto_update_cpm_calls(update_cpm) == []
+    case = _case_update("forbidden_auto_shelves_on")
+    update_cpm = await _run_legacy_bidder_with_contract(monkeypatch, case)
+    update_cpm.assert_matches_case(case)
 
 
 @pytest.mark.asyncio
 async def test_shelf_off_legacy_auto_bid_path_may_update_auto_cpm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec auto-bid-module-coexistence — Scenario: Shelf bid control off — legacy may write.
+    """Spec — Scenario: Shelf bid control off — legacy Auto bid path may write.
 
-    Paired positive: полки выкл + «для Авто» вкл → update_cpm(auto) MAY;
-    is_coroutine_candidate полок MUST быть False.
+    OWNER_LIFECYCLE_ECHO step 4. ContractCase allowed_auto_shelves_off +
+    Positive case when shelf control is off.
     """
-    update_cpm = await _run_legacy_bidder_with_flags(
-        monkeypatch,
-        bidder_for_auto=True,
-        auto_shelf_bid_control_enabled=False,
-    )
-    assert len(_auto_update_cpm_calls(update_cpm)) == 1
+    case = _case_update("allowed_auto_shelves_off")
+    update_cpm = await _run_legacy_bidder_with_contract(monkeypatch, case)
+    update_cpm.assert_matches_case(case)
 
     complex_adv = SimpleNamespace(auto_shelf_bid_control_enabled=False)
     assert AutoShelfBidControlManager.is_coroutine_candidate(complex_adv) is False
 
 
 @pytest.mark.asyncio
+async def test_search_sibling_ungated_when_shelves_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Search ``update_cpm(search_adv_id)`` не блокируется shelf coexistence gate."""
+    case = _case_update("search_sibling_ungated")
+    update_cpm = await _run_legacy_bidder_with_contract(monkeypatch, case)
+    update_cpm.assert_matches_case(case)
+
+
+@pytest.mark.asyncio
 async def test_shelf_on_both_modules_must_not_both_write_auto_bid(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Spec auto-bid-module-coexistence — Scenario: Both modules must not write together when shelves on.
+    """Spec — Scenario: Both modules must not write together when shelves on.
 
-    При полках вкл legacy MUST NOT писать Auto; полки остаются кандидатом на свой path.
+    OWNER_LIFECYCLE_ECHO steps 2+3: legacy MUST NOT Auto write; shelf MAY write
+    через ``AutoShelfBidSetter.set_bid`` (ContractCase shelves_on_may_write).
     """
-    update_cpm = await _run_legacy_bidder_with_flags(
-        monkeypatch,
-        bidder_for_auto=True,
+    legacy_case = _case_update("forbidden_auto_shelves_on")
+    update_cpm = await _run_legacy_bidder_with_contract(monkeypatch, legacy_case)
+    update_cpm.assert_matches_case(legacy_case)
+
+    shelf_case = _case_shelf("shelves_on_may_write")
+    complex_adv = SimpleNamespace(
         auto_shelf_bid_control_enabled=True,
+        auto_adv_id=shelf_case.auto_adv_id,
+        nmids=[shelf_case.nmid],
     )
-    assert _auto_update_cpm_calls(update_cpm) == []
-    complex_adv = SimpleNamespace(auto_shelf_bid_control_enabled=True)
     assert AutoShelfBidControlManager.is_coroutine_candidate(complex_adv) is True
+
+    patch_fake = RecordingPatchAutoAdvBids()
+    monkeypatch.setenv("AUTO_SHELF_BID_CONTROL_DRY_RUN", "false")
+    setter = AutoShelfBidSetter(wb_modifier=patch_fake)
+    await setter.set_bid(
+        complex_adv,
+        bid_minor=shelf_case.bid_minor,
+        currency=shelf_case.currency,
+    )
+    patch_fake.assert_matches_case(shelf_case)
+
+
+@pytest.mark.asyncio
+async def test_shelves_off_shelf_path_must_not_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Paired: полки OFF → candidate False; patch не вызывается без candidate tick."""
+    shelf_case = _case_shelf("shelves_off_must_not")
+    complex_adv = SimpleNamespace(
+        auto_shelf_bid_control_enabled=False,
+        auto_adv_id=shelf_case.auto_adv_id,
+        nmids=[shelf_case.nmid],
+    )
+    assert AutoShelfBidControlManager.is_coroutine_candidate(complex_adv) is False
+    patch_fake = RecordingPatchAutoAdvBids()
+    assert patch_fake.calls == []
+    patch_fake.assert_matches_case(shelf_case)
 
 
 def test_shelf_control_reason_is_not_cost_rule_failed() -> None:
-    """Spec auto-bid-module-coexistence — Scenario: Shelf bid action is not labeled as cost_rule_failed.
+    """Spec — Scenario: Shelf bid action is not labeled as cost_rule_failed.
 
-    ControlReason полок и AutoReasonCode.COST_RULE_FAILED MUST оставаться различимы.
+    OWNER_LIFECYCLE_ECHO step 5: ControlReason / SET_BID_OK ≠ cost_rule_failed.
     """
     shelf_reasons = {
         getattr(ControlReason, name)
@@ -219,5 +270,27 @@ def test_shelf_control_reason_is_not_cost_rule_failed() -> None:
         if name.isupper() and isinstance(getattr(ControlReason, name), str)
     }
     assert AutoReasonCode.COST_RULE_FAILED.value not in shelf_reasons
-    assert AutoReasonCode.COST_RULE_FAILED.value == "cost_rule_failed"
-    assert AutoReasonCode.COST_RULE_FAILED.value != ControlReason.SET_BID_OK
+    assert ControlReason.SET_BID_OK != AutoReasonCode.COST_RULE_FAILED.value
+    assert ControlReason.SET_BID_FAILED != AutoReasonCode.COST_RULE_FAILED.value
+    cost_display = reason_code_to_display_text(AutoReasonCode.COST_RULE_FAILED.value)
+    assert "себес" in cost_display.lower() or "Прав" in cost_display
+    assert cost_display != ControlReason.SET_BID_OK
+
+
+def test_cost_pause_remains_a_separate_activity_reason() -> None:
+    """Spec — Scenario: Cost pause remains a separate activity reason.
+
+    OWNER_LIFECYCLE_ECHO step 5: GIVEN cost_rule_failed → readable as cost,
+    not as shelf bid ControlReason.
+    """
+    code = AutoReasonCode.COST_RULE_FAILED.value
+    assert code == "cost_rule_failed"
+    display = reason_code_to_display_text(code)
+    assert display != ControlReason.SET_BID_OK
+    assert display != ControlReason.SET_BID_FAILED
+    assert display != ControlReason.BEST_BID_SELECTED
+    assert code not in {
+        getattr(ControlReason, name)
+        for name in dir(ControlReason)
+        if name.isupper() and isinstance(getattr(ControlReason, name), str)
+    }
