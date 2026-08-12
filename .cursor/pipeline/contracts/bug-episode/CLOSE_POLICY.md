@@ -16,6 +16,13 @@ IMPLEMENTATION_STATUS: LIVE_ACTIVATED
 
 Closing finding ≠ closing class ≠ OpenSpec archive.
 
+Envelope terminal kinds (`CLOSED_GREEN`, `CLOSED_FALSE_POSITIVE`,
+`ROUTED_OUT_OF_SCOPE`, `CLOSED_WITH_ACCEPTED_DISPOSITION`) map to durable
+statuses via
+`.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md`
+§ FINDING_TERMINAL_KIND ↔ durable STATUS map. Do not invent a second map
+here.
+
 ## Durable intent fields (cross-chat)
 
 Write on LEDGER `## ROUTE_STATE` and echo on TASK-DELTA / finding when known:
