@@ -1,6 +1,7 @@
 {
   "schema": "opsx-resolve-conflict/process-surfaces/v2",
   "prefixes": [
+    ".cursor/",
     ".cursor/commands/",
     ".cursor/rules/",
     ".cursor/skills/",

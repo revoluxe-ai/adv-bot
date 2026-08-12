@@ -20,11 +20,12 @@ Author: **Cursor**
 
 - BUGBOT-MEDIUM-001: removed stale committed `_preview_all.json` (0.34.0
   multi-path workspace dump; not in runtime/MANIFEST inventory)
+- BUGBOT-MEDIUM-002: `process_surfaces.json` prefixes now include `.cursor/`
+  (covers `opsx-resolve-conflict/`, `devops/`, matches command §10.5)
 
 ### Deferred (unchanged)
 
 - BUGBOT-HIGH-001 (commit routing ownership for `.cursor/opsx-resolve-conflict/**`)
-- BUGBOT-MEDIUM-002 (`process_surfaces.json` path gaps)
 - R33-GATE-PROCESS-002
 - R25-MEDIUM-002 / R25-PROCESS-001
 

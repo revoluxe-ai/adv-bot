@@ -376,6 +376,7 @@ historical findings, not current-delivery digests/test totals. -->
 |---|---|---|
 | BUGBOT-HIGH-002 | Explicit single-path PREVIEW; multi-conflict without `--path` STOPs | `preview_advisory.py`; `tests/test_r40_single_path_preview.py` |
 | BUGBOT-MEDIUM-001 | Delete stale committed `_preview_all.json` workspace dump | file removed; not in MANIFEST/runtime |
+| BUGBOT-MEDIUM-002 | `process_surfaces.json` prefixes include `.cursor/` (§10.5 align) | registry covers `opsx-resolve-conflict/`, `devops/` |
 
 ## Residual limitations disclosed for review (R40)
 
@@ -386,4 +387,3 @@ historical findings, not current-delivery digests/test totals. -->
 5. Linux/macOS explicitly UNSUPPORTED
 6. R33-GATE-PROCESS-002 (deferred — inner/outer platform matrix evidence-identical)
 7. BUGBOT-HIGH-001 commit routing ownership (deferred)
-8. BUGBOT-MEDIUM-002 `process_surfaces.json` path gaps (deferred)

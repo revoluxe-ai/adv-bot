@@ -162,7 +162,7 @@
     "runtime/opsx_conflict/validation.py": "098d2742a0c80cc5672b3e01d84b24514b9228cca6c10ea21fcf590432496509",
     "runtime/opsx_conflict/write_atomic.py": "0de4b3780c73f4c30194b15326d151a36658668bba3e6fb27eb65fc0daf5ae84",
     "runtime/boot_opsx_conflict.py": "a4656adb4d0ecae1f55ad7f7486f8b23acb0d90fac5dd8ccd97b41211152e160",
-    "process_surfaces.json": "ebfde641390da019cf38b19afac49cc6a4d3cb5555cdf3d67f5773e4b5267dac",
+    "process_surfaces.json": "ea2135bc991dd555fe3258a327e6dd64e1d659504866e1af490e5d481e9c1ca9",
     "candidate/.cursor/commands/opsx-resolve-conflict.md": "59de647703c951c09bb537d079d96b1ea4f775a3a91320dac7faa9b58304e298",
     "schemas/scope-manifest.schema.json": "2e6a83b982ce844a3df25a3d7929152282ad22c74bd6e7cb4c8d862819a0c058",
     "schemas/ledger-record.schema.json": "8430628a42e7a7634dcb70404586c8049b7db2c032dd20ba2c86b86cb27de445",
@@ -172,8 +172,8 @@
     "MANIFEST.security.json": "e44fd0c054082fd725c8d2575608c5808d53fe2206147d20247542e2b01d5696"
   },
   "installed_command_sha256": "59de647703c951c09bb537d079d96b1ea4f775a3a91320dac7faa9b58304e298",
-  "package_digest": "d9a3b068f954e57eb6993764abe28d077207abf9f60049fb3633f2d6f607df76",
-  "trust_anchor_sha256": "fbc400039dcc98b5ed3e8e2830f3673b006511a8e7a6864fb1bf0415980940d2",
+  "package_digest": "7513f933c75572ab814993a09ed66c0c6b69656e913227f30566fba180be04bb",
+  "trust_anchor_sha256": "12ce1d6989a7e0b085c38ca0d8d64f280376b0e4f0c09386469efc9f2f608935",
   "host_contract_sha256": {
     ".cursor/commands/opsx-source-resolution.md": "41f87dff8dcb0ab67d2821df2c7febbb40bc0ac28da5f5991a0b823ec9a0d5d7",
     ".cursor/commands/opsx-execution-preflight.md": "ca652b5feabbc6c0be0b55bb79bd5b3114083b10b2c3bc94aa4e4266cd827f79",
