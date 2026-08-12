@@ -1110,8 +1110,15 @@ Supervisor **обязан** проконсультироваться с `/opsx-e
 (`READ_ONLY_ADVISORY`) о том, **как лучше выполнить** поставленную
 Owner-задачу.
 
-Исключение из gate — только bootstrap triad самого консультационного
-контура:
+**Исключение — `BUG_MISSION` sequential mode (§25):** когда mission уже
+привязана к durable case/findings и следующий hop задан verified
+`ROUTE_TRANSITION` envelope, `/opsx-explore` **не** является route
+authority и **не** выбирает `NEXT_COMMAND`. Explore-as-planner skip
+разрешён; optional domain consult не переопределяет envelope.
+`route_authority=worker_transition_envelope` (см.
+`contracts/bug-episode/SUPERVISOR_POLICY.md`).
+
+Исключение из gate (bootstrap triad) — только консультационный контур:
 
 ```text
 /opsx-admin-command-consult
@@ -1381,6 +1388,7 @@ Stale discovery record не подтверждает `FOUND_IN_CURRENT_REPOSITOR
 /opsx-pyright-strict-coverage
 /opsx-sync
 /opsx-test
+/opsx-test-env
 /opsx-update
 ```
 
@@ -2179,53 +2187,147 @@ unauthorized writes, reliability changes, forbidden routes.
 
 ---
 
-# 25. Bug lifecycle and routing templates
+# 25. BUG_MISSION — sequential multi-finding orchestration
 
-Bug не считается закрытым на `CLAIMED` / `RED_CONFIRMED` / `GREEN_CONFIRMED`.
-
-Ожидаемый путь через разрешённые команды:
+Authority schemas (do not duplicate route semantics here):
 
 ```text
-MATERIALIZED
-→ CLAIMED
-→ CLASSIFIED
-→ RED_CONFIRMED
-→ IMPLEMENTED
-→ GREEN_CONFIRMED
-→ BOUNDED_HUNT
-→ FAMILY_FANOUT
-→ FANIN_READY
-→ TERMINAL_CASE_STATE
+.cursor/pipeline/ORCHESTRATION_MVP.md          # Routes A–D, RED-before-GO
+.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md
+.cursor/pipeline/contracts/bug-episode/SUPERVISOR_POLICY.md
+.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md
+.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md
 ```
 
-Базовый routing (authority всегда подтверждается через consult при сомнении):
+## 25.1 Mode activation
+
+Activate `BUG_MISSION` when Owner task is a durable bug case / multi-finding
+queue (explicit `case=` / mission packet / materialized findings), not a
+free-form product change DAG.
+
+Default v1 policy:
+
+```text
+SUPERVISOR_POLICY
+execution_strategy: sequential
+route_authority: worker_transition_envelope
+max_active_findings: 1
+on_blocked: stop
+on_paused: stop
+on_needs_owner: stop
+on_worker_failure: stop
+require_claim: yes
+require_evidence_for_transition: yes
+require_terminal_evidence_for_close: yes
+mission_completion: queue_exhausted_and_all_terminal
+```
+
+Forbidden supervisor options: `route_a_next=…`, `skip_test_for_simple_bug`,
+scenario→command workflow tables.
+
+## 25.2 Core invariant
+
+```text
+NEXT_TRANSITION
+=
+transition(durable_current_state, verified_worker_ROUTE_TRANSITION)
+```
+
+Supervisor MUST NOT classify findings, invent `CHOSEN_ROUTE`, edit
+production/spec, treat worker `PASS` as mission success, bypass RED/GREEN
+gates, or continue after ambiguous/contradictory envelopes.
+
+```text
+SUPERVISOR = deterministic state-transition executor
+SUPERVISOR ≠ LLM workflow planner
+```
+
+## 25.3 Sequential loop
+
+```text
+MAX_ACTIVE_FINDINGS: 1
+ACTIVE_FINDING_ID = zero or one
+
+load durable mission/case state via worker envelopes
+  (DIRECT_REPOSITORY_ACCESS remains FORBIDDEN)
+
+while true:
+  if blocking recovery pending → return PAUSED/BLOCKED
+
+  if no ACTIVE_FINDING:
+    candidate = NEXT_ELIGIBLE_FINDING
+      (order: /opsx-claim-next-bug — CLAIM_PRIORITY → ledger → FINDING_ID)
+    if none:
+      verify all-terminal + no orphan claim + no pending recovery
+      → MISSION_COMPLETE: yes
+    claim/select candidate → set ACTIVE_FINDING
+
+  transition = resolve_allowed_transition(ACTIVE_FINDING + envelope)
+  if ambiguous vs PRECONDITIONS/route contract:
+    → PAUSED / ROUTE_CONTRACT_CONFLICT (no guessed next)
+
+  dispatch exactly one primary /opsx-* command
+  validate envelope (ROUTE_TRANSITION.md checklist)
+  reduce durable finding state
+
+  if BLOCKED|PAUSED|NEEDS_OWNER|ENVELOPE_INTEGRITY_FAIL|EXECUTION_OUTCOME_UNKNOWN:
+    stop_mission (do not start later findings)
+
+  if FINDING_TERMINAL with required evidence:
+    finalize finding; clear ACTIVE_FINDING; continue
+```
+
+Worker `TERMINAL_STATUS: PASS` + `MISSION_COMPLETE: no` means command
+succeeded only — mission stays ACTIVE.
+
+Finding terminal only when contract says e.g.
+`CLOSED_GREEN` | `CLOSED_FALSE_POSITIVE` | `ROUTED_OUT_OF_SCOPE` |
+`CLOSED_WITH_ACCEPTED_DISPOSITION` (or durable equivalents).
+
+## 25.4 Envelope validation + recovery
+
+Minimum identity checks before ADVANCE: `MISSION_ID`/`TASK_ID`, `COMMAND`,
+`CASE_ID`, `FINDING_ID==ACTIVE_FINDING_ID`, claim, route fields, evidence
+refs. Mismatch → `PAUSED` / `ENVELOPE_INTEGRITY_FAIL`.
+
+Recovery outcomes: `ADVANCE` | `RETRY_ALLOWED` | `PAUSED` | `BLOCKED` |
+`NEEDS_OWNER` | `TERMINAL`. No implicit continue. Retry needs idempotency
+key; else pause. Writer may have run without committed envelope →
+`EXECUTION_OUTCOME_UNKNOWN` (no blind replay).
+
+Resume: reconstruct from durable case + last verified transition; chat
+history not required.
+
+Prefer `EVENT_TYPE=supervisor_transition` on existing ROUTE-TRACE.
+
+## 25.5 Soft capability map (NOT route authority)
+
+Bug lifecycle **semantics** come only from ORCHESTRATION_MVP + worker
+`ROUTE_TRANSITION`. The list below is capability discovery only — never
+overrides envelope `NEXT_COMMAND`.
 
 ```text
 pipeline uncertainty → /opsx-pipeline
 command authority → /opsx-admin-command-consult
-project/domain + how-to-execute (mandatory §13.0) → /opsx-explore
+domain consult (optional; not planner in BUG_MISSION) → /opsx-explore
 bug debt → /opsx-bug-debt-board
 case hygiene → /opsx-materialize-bug-queue
-claim → /opsx-claim-next-bug
+claim / next eligible → /opsx-claim-next-bug
 classification → /opsx-classify-bug
-bug implementation/family → /opsx-bug-team
-project bug discovery → /opsx-project-bug-hunt
-pyright coverage → /opsx-pyright-strict-coverage
-external boundary → /opsx-external-call-coverage
-external gap → /opsx-close-external-gap
-performance → /opsx-performance-review
-antipatterns → /opsx-antipattern-gate
-static/tests → /opsx-static-check
-test failure classification → /opsx-test-triage
-final verification → /opsx-verify
+Route A adjudication / GO → /opsx-fix-bug (per envelope; WITHOUT GO until allowed)
+RED / GREEN → /opsx-test (per envelope)
+Route B planning → /opsx-update (per envelope)
+family fanout / handback → /opsx-bug-team only when envelope/HANDBACK says so
 ```
 
-Любая denylisted команда остаётся запрещённой, даже если появляется в
-routing recommendation.
+Denylisted commands stay forbidden even if recommended.
 
-Code-changing work представляется task graph phases (intake → debt/discovery →
-implementation → focused gates → static/full → closure), но исполняется через
-DAG dependencies, а не как слепой linear router.
+Default free-text (non-BUG_MISSION) missions still use DAG + §13.0 explore
+gate; they must not silently claim `MISSION_COMPLETE` from one worker PASS
+when a durable multi-finding case is in scope.
+
+Finding not closed on `CLAIMED` / `RED_CONFIRMED` / `GREEN_CONFIRMED` alone —
+see CLOSE_POLICY.
 
 ---
 
