@@ -458,12 +458,16 @@ function cmdSnapshotApply(repoRoot, headOnly) {
     { cwd: paths.snapshotDir },
   );
   const snapHead = sh(["git", "rev-parse", "HEAD"], { cwd: paths.snapshotDir });
-  // optional push if remote exists
+  // optional push if remote exists — pushed only on exit 0 (allowFail must not imply success)
   const remotes = sh(["git", "remote"], { cwd: paths.snapshotDir, allowFail: true });
   let pushed = false;
   if (remotes.split(/\r?\n/).filter(Boolean).length) {
-    sh(["git", "push"], { cwd: paths.snapshotDir, allowFail: true });
-    pushed = true;
+    const push = spawnSync("git", ["push"], {
+      encoding: "utf8",
+      cwd: paths.snapshotDir,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    pushed = (push.status ?? 1) === 0;
   }
   console.log(
     JSON.stringify(
