@@ -16,6 +16,7 @@ EXCLUDE = {
     "opsx-admin-command-design-command.md",
     "opsx-admin-command-fix-command-defects.md",
     "opsx-admin-command-promote-process-lesson.md",
+    "opsx-admin-command-resolve-conflicts.md",
     "opsx-execution-preflight.md",
     "opsx-source-resolution.md",
     "opsx-pipeline.md",

@@ -7,21 +7,22 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 57
+- inventory_count: 56
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: afa3f4d4201b1781672204f3a953460ec241d5de
+- source_commit: efc003a83e092207dff1972b36ccda1f4ba9eed4
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  resolve-conflicts GO 2026-08-12T21:00:03Z (rebase pick e49d56999 onto
-  afa3f4d42): semantic merge — HEAD lifecycle (PA, Scenario, phased verify,
-  test-env, F13/F14) + soft /opsx-distribute-brief (post-archive only; not
-  PA/archive gate) + process conflict-resolution soft guidance; normalize
-  process-commit nav to /opsx-meta-commit (admin-command-commit = obsolete
-  alias only); fix-defects → /opsx-meta-fix-command-defects. Inventory 57;
-  fingerprint c8eba2db5fabc15466f48d8e175f40b3 via graph_fingerprint.reproduce().
-  Prior conflict sides' 55/38 inventories discarded as stale.
+  resolve-conflicts GO 2026-08-13T09:39:25Z (rebase pick 14636d5c0 onto
+  afa3f4d42): keep HEAD lifecycle (PA, Scenario, phased verify, test-env,
+  F13/F14) + soft /opsx-distribute-brief (post-archive only; not PA/archive
+  gate) + process conflict-resolution soft guidance; normalize process-commit
+  nav to /opsx-meta-commit (admin-command-commit = obsolete alias only);
+  fix-defects → /opsx-meta-fix-command-defects. Discarded incoming
+  Corrective V2 inventory-38 evidence as stale. Inventory 56; fingerprint
+  302182dfcd9ba13b965d935646cfc380 via graph_fingerprint.reproduce().
+
 
 ## States
 
