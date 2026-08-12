@@ -284,6 +284,7 @@ Run the smallest set that answers the need:
 ```bash
 git branch --show-current
 git status --short
+git ls-files -u
 git diff --stat
 git diff --name-status
 git diff --cached --stat
@@ -308,6 +309,30 @@ GO_ON_PROTECTED_BRANCH
 ```
 
 Even with `GO_ON_PROTECTED_BRANCH`, never push.
+
+### Unresolved conflict gate (mandatory — PLAN and GO)
+
+Before proposing commit groups **or** staging/committing, inspect the
+**planned in-scope set** (current-chat set, or full in-scope dirty under
+`ALL` / `INCLUDE_FULL_DIRTY_TREE`). This gate is a safety stop: it applies in
+both `FAST_CHECK` and `FULL_CHECK`.
+
+1. **Unmerged index** — if any planned/staged in-scope path appears in
+   `git ls-files -u` output → stop.
+2. **Conflict markers** — Grep those text paths (working tree and staged
+   blob) for lines matching `^<<<<<<<`, `^=======`, or `^>>>>>>>`. Any hit
+   → stop.
+
+On either hit: do **not** stage, do **not** commit, do **not** invent a local
+merge or strip markers.
+
+```text
+STATUS: BLOCKED_UNRESOLVED_CONFLICT
+UNMERGED_OR_MARKED_PATHS:
+- <path>
+NEXT_ACTION: /opsx-resolve-conflict
+DO_NOT_DO_YET: /opsx-meta-commit GO; strip markers; Accept Both
+```
 
 ## Semantic grouping rules
 
@@ -441,8 +466,13 @@ current commit group** (not the whole dirty tree).
 
 For process-only commits:
 
+- unresolved-conflict gate MUST pass for the planned/staged in-scope set
+  (`git ls-files -u` empty for those paths; no `<<<<<<<` / `=======` /
+  `>>>>>>>` markers). Failure → `STATUS: BLOCKED_UNRESOLVED_CONFLICT`
+  (COMMIT STOP); see Mandatory preflight;
 - focused automated tests are usually not inferred;
-- commit is allowed with `Verification: not run - process contract change`;
+- commit is allowed with `Verification: not run - process contract change`
+  only after the unresolved-conflict gate passes;
 - if the change claims a redirect/GO gate, do a quick Grep self-check that the
   named tokens exist in the touched files before committing that group.
 
@@ -525,7 +555,7 @@ Only expand the detailed buckets when something was actually left out
 - Empty `add -p` is **not** a gate and must not look like one.
 
 ```text
-STATUS: COMMITTED | PARTIAL | BLOCKED
+STATUS: COMMITTED | PARTIAL | BLOCKED | BLOCKED_UNRESOLVED_CONFLICT
 
 Done:
 - commits created:
@@ -578,6 +608,10 @@ git clean -fd
 
 Never commit paths outside the in-scope surfaces list.
 Never re-decide product commit grouping for `/opsx-commit`.
+Never stage or commit when the unresolved-conflict gate fails (`git ls-files -u`
+non-empty for planned/staged in-scope paths, or conflict markers present).
+Never strip markers or invent a merge inside this command — hand off to
+`/opsx-resolve-conflict`.
 # END CANONICAL SOURCE BODY
 
 # TARGET ADAPTATION NOTES
