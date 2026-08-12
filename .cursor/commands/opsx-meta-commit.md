@@ -39,7 +39,7 @@ newline_normalization: none
 - Do not push, open PR, rebase, force, or deploy.
 - Do not activate WB/product domain assumptions from the source body.
 - Replace Poetry/pytest/pyright/kubectl execution with capability checks; missing capability => unavailable or FAIL_CLOSED, never PASS-by-absence.
-- Mandatory declared executable check: `npm run build`.
+- Mandatory declared executable checks: per `.opsx/project/quality-gates.md` (poetry-python). `npm run build` is UNAVAILABLE / not applicable (vue-npm dropped; no root build script).
 - Smoke/acceptance/lint/typecheck/frontend tests: UNAVAILABLE unless adapter says otherwise.
 
 ### Projectization gate
@@ -620,7 +620,7 @@ Never strip markers or invent a merge inside this command — hand off to
 - runtime_class: `ACTIVE`
 - active_name: `/opsx-meta-commit`
 - openspec_store: `openspec/changes/**` (not source multi-store / not `.opsx/changes` SoT)
-- quality: `npm run build` mandatory when in scope; smoke UNAVAILABLE
+- quality: poetry-python gates per `.opsx/project/quality-gates.md` when in scope; `npm run build` UNAVAILABLE; smoke/frontend UNAVAILABLE
 - unresolved_source_sections: any Poetry/pytest/pyright/kubectl/WB-domain steps in the body are blocked by TARGET OVERRIDE until adapters exist
 - manual_review: `.opsx/project/manual_review.md`
 - process_allowlist_sot: `.opsx/sources.yaml` (shared with snapshot + `/opsx-commit` exclusion; includes `.cursor/devops/**`)
