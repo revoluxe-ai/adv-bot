@@ -1,42 +1,44 @@
 # Manual review — projectize COMPLETE
 
-Generated: 20260807T181322Z
+Generated: 20260812T214200Z
 Source: `/opsx-projectize:GO`
 Central bind: `C:/Users/vkita/my_code/opsx-central` (from `.opsx/sources.yaml`)
-Bootstrap evidence: `.tmp/opsx-bootstrap/20260807T172840Z/MERGE_RECEIPT.md`
+Bootstrap evidence: `.tmp/opsx-bootstrap/20260812T212300Z/MERGE_RECEIPT.md`
+Prior projectize: 20260807T181322Z (WB/poetry already applied; this run re-locks after bind reseed)
 
 ## Target
 
 - Product: WB Sky (`adv-bot` Poetry package)
 - Adapters: `opsx-lite` + `poetry-python`
-- Not a Vue/npm game tree — game donor wipe plan was rejected
+- Not a Vue/npm game tree — `vue-npm` not seeded
 
-## Applied
+## Applied (this :GO)
 
-- Rewrote `/opsx-projectize` and `/opsx-adapt-project` for Poetry/WB
-- Dropped `vue-npm` from seeded meta `required_adapters`
-- Remapped game contract ids on meta surfaces → `OPSX-WB-*`
-- Seeded `.opsx/adapters/poetry-python/README.md`
-- Rebuilt activation (DEFAULT/CORE 27) + provenance event
-- Deleted typo file `.cursor/opsx-meta-bootstram` (if present)
+- Rewrote `.opsx/projectization.yaml` → `COMPLETE` + `normal_commands_enabled: true`
+- Rewrote `.opsx/manifest.yaml` to WB COMPLETE record
+- Appended `projectize_complete` provenance
+- Left activation registry rows intact (DEFAULT/CORE + prior imports)
+- Did **not** touch `openspec/**`, `app/**`, `tests/**`, `pyproject.toml`
 
 ## Preserved (must stay)
 
-- Full product `openspec/**` (changes, archive, specs, decisions, `config.yaml`)
-- Product lifecycle command bodies that already won locally
+- Full product `openspec/**` (changes, archive, specs, decisions, policies, evolution)
+- Product lifecycle + meta command bodies already on disk
 - `.cursor/rules/**`, `.cursor/pipeline/**`
+- Absolute `central_root` in `.opsx/sources.yaml`
 
 ## Deferred
 
-- Registering ~33 extra on-disk commands not in DEFAULT activation
-  (bug-hunt, admin-command*, test*, …) — use `/opsx-meta-import-command`
-  or a later adapt pass if Owner wants them activated
-- Spec Kit (`.specify/`) remains deferred
-- `repo_family_id` in sources/lock still `unknown` until snapshot/index
+- Extra on-disk commands not in DEFAULT activation (bug-*, admin-*, test*, …)
+  → `/opsx-meta-import-command` if Owner wants activation
+- Spec Kit (`.specify/`)
+- `repo_family_id` still `unknown` until snapshot/index
+- `openspec/config.yaml` missing — **not** regenerated from game template
+- Optional remap of `opsx-meta-bootstrap` `OPSX-GAME-*` contract id
 
 ## Checks before COMPLETE
 
-- [x] `openspec/` file count unchanged by this APPLY
+- [x] `openspec/` product tree not modified by this APPLY
 - [x] Gate commands present under `.cursor/commands/`
 - [x] `poetry-python` adapter README present
 - [x] `vue-npm` adapter absent
