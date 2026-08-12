@@ -155,6 +155,15 @@ Used by `/opsx-meta-bootstrap` (including bare `GO` / `SAVE`):
 4. Repo-relative `../opsx-central` (+ `bootstrap/profile` or unambiguous `sources/*/*`)
 5. Else unresolved → `BLOCKED_NEEDS_CENTRAL` for `GO`/`SAVE`
 
+### Portable central bind (committed files)
+
+Never persist machine-absolute or user-home `central_root` into committed
+`.opsx/sources.yaml` / `.opsx/projectization.yaml` / `.opsx/MERGE_RECEIPT.md`.
+Prefer omit the key and bind via `central=` / `OPSX_CENTRAL_ROOT` /
+`default_relative`. Relative persist only when it matches `../opsx-central`.
+Receipts use `CENTRAL_RESOLVE:` + redacted `CENTRAL: <CENTRAL>` (and
+`<CENTRAL>/…` in Actions).
+
 ```text
 sources/<repo_family_id>/<branch>/
 catalog/

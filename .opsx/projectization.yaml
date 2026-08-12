@@ -6,7 +6,6 @@ contract_id: OPSX-WB-PROJECTIZE-01
 completed_at: 20260812T214008Z
 completed_by: opsx-projectize
 manual_review: .opsx/project/manual_review.md
-central_root: C:/Users/vkita/my_code/opsx-central
 adapters:
   - opsx-lite
   - poetry-python

@@ -1,13 +1,13 @@
 # OPSX process-surface allowlist — shared SoT
 #
 # Seeded by /opsx-meta-bootstrap step 1 (bind) for adv-bot.
-# central_root bound to Owner-supplied central=.
+# Do not commit machine-absolute central_root (username leak; non-portable).
+# Bind via central= arg, env OPSX_CENTRAL_ROOT, or default_relative ../opsx-central.
 
 schema_version: 1
 repo_family_id: adv-bot
 branch_id_source: git_branch_normalized
 
-central_root: C:/Users/vkita/my_code/opsx-central
 catalog_relpath: catalog
 sources_relpath: sources
 
