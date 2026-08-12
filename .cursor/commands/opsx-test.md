@@ -598,6 +598,58 @@ If `ROUTE_STATE` / TASK_DELTA says `EXPECTED_EXECUTION_ROUTE=/opsx-apply`:
 Owner may append production `GO` only when
 `BUG_CONFIRMED ∧ FIX_NOW ∧ (RED_CONFIRMED ∨ RED_NOT_APPLICABLE_APPROVED)`.
 
+### ROUTE_TRANSITION (bug-regression / verify — mandatory for supervisor)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md`.
+Narrative `NEXT_ACTION` is UX only. `MISSION_COMPLETE` on this worker is
+always `no`. Finding close is owned by CLOSE_POLICY / materialize — not by
+a lone `GREEN_CONFIRMED` unless close evidence is already recorded.
+
+```text
+RED_CONFIRMED:
+  FROM_STATE: AWAITING_RED | <prior>
+  RESULT: RED_CONFIRMED
+  TO_STATE: AWAITING_OWNER_GO | AWAITING_FIX_BUG_RED
+  NEXT_COMMAND: /opsx-fix-bug   # or /opsx-apply when EXPECTED_EXECUTION_ROUTE says so
+  NEXT_ARGS: case=… finding=… claim_token=…   # WITHOUT inventing GO
+  PRECONDITIONS.GO_TOKEN: REQUIRED            # Owner appends GO separately
+  PRECONDITIONS.RED_REQUIRED: satisfied
+  REQUIRED_EVIDENCE: RED_EVIDENCE_PATH
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
+RED fail statuses (TEST_NOT_REPRODUCING | RED_WRONG_REASON | TEST_SETUP_DEFECT |
+BUG_NOT_TESTABLE | BLOCKED | TIMEOUT):
+  RECOVERY_CLASS: BLOCKED | PAUSED | NEEDS_OWNER
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+  NEXT_COMMAND: per existing recovery / none (no guessed route)
+
+GREEN_CONFIRMED (evidence written; close not yet proven):
+  FROM_STATE: AWAITING_GREEN | <prior>
+  RESULT: GREEN_CONFIRMED
+  TO_STATE: AWAITING_CLOSE | HANDBACK
+  NEXT_COMMAND: HANDBACK_COMMAND | materialize close=fixed | per CLOSE_POLICY
+  REQUIRED_EVIDENCE: GREEN_EVIDENCE_PATH
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
+GREEN_CONFIRMED + durable close evidence already recorded this turn
+(solo auto_after_green / materialize close=fixed succeeded):
+  FINDING_TERMINAL: yes
+  FINDING_TERMINAL_KIND: CLOSED_GREEN
+  RECOVERY_CLASS: TERMINAL
+  MISSION_COMPLETE: no
+  NEXT_COMMAND: none | next-eligible via supervisor
+
+GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW:
+  RECOVERY_CLASS: PAUSED | NEEDS_OWNER
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+```
+
 ## Verify mode (GREEN writer)
 
 Required:
@@ -694,6 +746,11 @@ FAILURE_MATCH:          # RED only
 STATUS:                 # RED_* or GREEN_* / GREEN_BLOCKED_*
 RED_EVIDENCE_PATH:      # or GREEN_EVIDENCE_PATH
 NEXT_ACTION:
+ROUTE_TRANSITION:       # mandatory; schema ROUTE_TRANSITION.md
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL:
+  RECOVERY_CLASS:
+  NEXT_COMMAND:
 SOURCE_RESOLUTION:
 EXECUTION_PREFLIGHT:
 ```

@@ -512,7 +512,32 @@ POST_GREEN_OWNER:
 HANDBACK_COMMAND:
 NEXT_ACTION:
 ALSO_OK:
+
+ROUTE_TRANSITION:
+  (schema: .cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md)
+  FROM_STATE: AWAITING_SPEC_UPDATE | <prior>
+  RESULT: TASK_DELTA_CHANGED | TASK_DELTA_UNCHANGED
+  TO_STATE: AWAITING_APPLY_RED | AWAITING_FIX_BUG_RED
+  NEXT_COMMAND: /opsx-apply | /opsx-fix-bug
+  NEXT_ARGS: WITHOUT GO   # GO is Owner-later; RED still required
+  PRECONDITIONS:
+    GO_TOKEN: FORBIDDEN
+    RED_REQUIRED: yes
+  REQUIRED_EVIDENCE: TASK_DELTA_EVIDENCE_PATH
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
 ```
+
+Rules for `/opsx-update` as worker envelope:
+
+* `EXPECTED_EXECUTION_ROUTE` / `ACTUAL_EXECUTION_ROUTE` MUST NEVER be
+  `/opsx-update` (update is process step only).
+* `MISSION_COMPLETE: no` always on this worker.
+* `FINDING_TERMINAL: no` unless a separate terminal disposition is already
+  proven (update alone does not close a finding).
+* Blockers (`blocked_needs_classify_first` / `BLOCKED_ROUTE_MISMATCH`):
+  `RECOVERY_CLASS: BLOCKED | PAUSED`; no invented next route.
 
 Also keep the normal OpenSpec update summary (artifacts revised / rejected /
 deferred).

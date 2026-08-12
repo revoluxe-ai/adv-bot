@@ -416,6 +416,21 @@ COMMAND_RECEIPT:
   OUTPUT_PATH:
   NEXT_ACTION: /opsx-classify-bug case=<CASE_ID> finding=<FINDING_ID>
 
+ROUTE_TRANSITION:
+  FROM_STATE: QUEUED | AVAILABLE | <prior>
+  RESULT: CLAIMED
+  TO_STATE: CLAIMED | AWAITING_CLASSIFY
+  NEXT_COMMAND: /opsx-classify-bug
+  NEXT_ARGS: case=… intake=… finding=… claim_token=…
+  PRECONDITIONS:
+    GO_TOKEN: FORBIDDEN
+    CLAIM_REQUIRED: satisfied
+    RED_REQUIRED: not_applicable
+  REQUIRED_EVIDENCE: durable CLAIM_TOKEN + STATUS=claimed
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
 SOURCE_RESOLUTION:
 - mode: canonical_id
 - primary_path:
@@ -424,6 +439,14 @@ SOURCE_RESOLUTION:
 - search_scope: .tmp/opsx-bug-cases/<CASE_ID>
 - unresolved_gap:
 ```
+
+### ROUTE_TRANSITION (claim — mandatory for supervisor)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md`.
+Successful claim sets `ACTIVE_FINDING_ID` for BUG_MISSION sequential mode
+(max_active=1). Stale/invalid claim / `none_available` / corrupt durable
+token → `RECOVERY_CLASS: BLOCKED | PAUSED | NEEDS_OWNER`; **no** writer
+dispatch; `MISSION_COMPLETE: no`; `FINDING_TERMINAL: no`.
 
 `CLAIM_TOKEN` в `COMMAND_RECEIPT`:
 
