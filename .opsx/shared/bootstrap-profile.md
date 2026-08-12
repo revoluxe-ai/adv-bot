@@ -8,18 +8,24 @@ Shared contract for `/opsx-meta-bootstrap` and
 Define the allowlisted **first-contact / bind / default-install** process packet
 for any OPSX state (absent → complete).
 
-Default Owner path `/opsx-meta-bootstrap GO` (= `PROFILE_KEEP=recommended`)
-installs **working OPSX**, not only the importer: CORE + `DEFAULT_INSTALL`.
-After that APPLY, a separate `/opsx-meta-import-command` is **optional** — only
-for commands outside this profile (extras / later catalog picks).
+Default Owner path `/opsx-meta-bootstrap GO` (= `PROFILE_KEEP=recommended`
+≡ `STEP=next`) advances **one** incomplete recommended step toward
+**working OPSX** (destination = CORE + `DEFAULT_INSTALL` across
+`1 bind → 2 meta → 3 lifecycle → 4 support`). Bare `GO` must **not**
+apply all four steps in one turn. One-shot full set:
+`/opsx-meta-bootstrap GO STEP=all` (or `PROFILE_KEEP=all`).
+After recommended steps complete, a separate `/opsx-meta-import-command`
+is **optional** — only for commands outside this profile (extras /
+later catalog picks).
 
 Every bootstrap run **loads central requirements first** when present; otherwise
 `REQUIREMENTS_SOURCE: EMBEDDED_DEFAULT`. Optional `/opsx-meta-bootstrap SAVE`
 writes lesson reports under central `bootstrap/reports/` for later centralized
 updates to `bootstrap/requirements.md` / instruction (not auto-merged).
 
-This is still **not** a silent whole-repo dump: `GO` applies disclosed
-Recommended rows; `SAVE` writes reports only.
+This is still **not** a silent whole-repo dump: bare `GO` applies the next
+disclosed recommended step only; `STEP=all` applies all incomplete
+recommended steps; `SAVE` writes reports only.
 
 ## Local state tokens
 
@@ -27,19 +33,20 @@ Recommended rows; `SAVE` writes reports only.
 LOCAL_STATE: OPSX_ABSENT | OPSX_PARTIAL | PROJECTIZATION_REQUIRED | PROJECTIZATION_COMPLETE
 ```
 
-| Token | Meaning | Bootstrap job (`recommended`) |
+| Token | Meaning | Bootstrap job (`recommended` destination) |
 |---|---|---|
-| `OPSX_ABSENT` | No `.opsx/` | Seed CORE + DEFAULT_INSTALL + bind |
-| `OPSX_PARTIAL` | Some surfaces; lock incomplete | Fill missing CORE/DEFAULT; bind; preserve TARGET OVERRIDE |
+| `OPSX_ABSENT` | No `.opsx/` | Reach CORE + DEFAULT_INSTALL + bind via repeated `GO` or one `STEP=all` |
+| `OPSX_PARTIAL` | Some surfaces; lock incomplete | Fill missing CORE/DEFAULT step-by-step; bind; preserve TARGET OVERRIDE |
 | `PROJECTIZATION_REQUIRED` | lock not COMPLETE | Same fill + bind; handoff projectize |
-| `PROJECTIZATION_COMPLETE` | lock COMPLETE | Rebind; seed **missing** CORE/DEFAULT only; no wipe; no COMPLETE downgrade |
+| `PROJECTIZATION_COMPLETE` | lock COMPLETE | Rebind; seed **missing** CORE/DEFAULT steps only; no wipe; no COMPLETE downgrade |
 
 ## KEEP aliases
 
 | Token | Expands to |
 |---|---|
-| `PROFILE_KEEP=recommended` | all Recommended rows = CORE gaps + DEFAULT_INSTALL gaps (+ safe UPDATED when disposition says so) |
-| `PROFILE_KEEP=core` | CORE_REQUIRED gaps only (minimal bind) |
+| `PROFILE_KEEP=recommended` | ≡ `STEP=next` / bare `GO`: **one** incomplete recommended step toward CORE + DEFAULT_INSTALL (not big-bang) |
+| `PROFILE_KEEP=all` | ≡ `STEP=all`: all incomplete CORE + DEFAULT_INSTALL steps in one APPLY |
+| `PROFILE_KEEP=core` | CORE_REQUIRED gaps only (minimal bind / step 1) |
 | `PROFILE_KEEP=…` | explicit ids/paths |
 
 ## CORE_REQUIRED
@@ -65,8 +72,8 @@ Minimum coherent seed (importer + orient + projectize + bind stubs):
 
 ## DEFAULT_INSTALL
 
-Usable process plane after one recommended APPLY. Includes CORE paths by
-reference, plus:
+Usable process plane after recommended steps complete (repeated bare `GO`
+or one `STEP=all`). Includes CORE paths by reference, plus:
 
 ### Commands — product lifecycle gates
 
@@ -185,8 +192,9 @@ profile-root `.opsx/shared/bootstrap-profile.md`. If none → EMBEDDED_DEFAULT
 (command-embedded CORE/DEFAULT lists). Missing requirements file alone must
 not block default execution.
 
-Happy path: hand-copy `opsx-meta-bootstrap.md` → `/opsx-meta-bootstrap GO`.
-Lesson path: `/opsx-meta-bootstrap SAVE` →
+Happy path: hand-copy `opsx-meta-bootstrap.md` → repeat
+`/opsx-meta-bootstrap GO` until steps 1–4 complete (or one
+`GO STEP=all`). Lesson path: `/opsx-meta-bootstrap SAVE` →
 `bootstrap/reports/<UTC>_<repo_family_or_unknown>.md`.
 
 ## Future central freeze (not enforced yet)
@@ -208,8 +216,9 @@ SAVE reports feed human/central processing into `bootstrap/requirements.md`.
 
 | After | Separate import needed? | NEXT_ACTION |
 |---|---|---|
-| `GO`, DEFAULT seeded, lock incomplete | **No** for DEFAULT_INSTALL | `/opsx-projectize` |
-| `GO`, DEFAULT seeded, COMPLETE | **No** for DEFAULT; **yes** only for extras | import extras if wanted |
+| bare `GO`, more steps remain | n/a | `/opsx-meta-bootstrap GO` |
+| recommended steps done (repeated `GO` or `STEP=all`), lock incomplete | **No** for DEFAULT_INSTALL | `/opsx-projectize` |
+| recommended steps done, COMPLETE | **No** for DEFAULT; **yes** only for extras | import extras if wanted |
 | `SAVE` → REPORT_SAVED | n/a | none (central later folds reports) |
 | `PROFILE_KEEP=core` only | Yes for non-CORE | bare `GO` again or import |
 | process dirty after `GO` | — | `/opsx-meta-commit` |
