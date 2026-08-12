@@ -7,13 +7,13 @@ canonical_source_body: none
 required_adapters: ["opsx-lite"]
 local_modification_note: "v0.6: bare GO = next small STEP only (bind→meta→lifecycle→support); STEP=all opt-in; Owner 2026-08-07"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-GAME-META-BOOTSTRAP-01
+contract_id: OPSX-WB-META-BOOTSTRAP-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-GAME-META-BOOTSTRAP-01`  
+**Contract:** `OPSX-WB-META-BOOTSTRAP-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins for target paths, write boundary, and bans.
 
@@ -88,7 +88,7 @@ Lessons to central (no local seed):
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-GAME-META-BOOTSTRAP-01
+CONTRACT_ID: OPSX-WB-META-BOOTSTRAP-01
 PRODUCT_WRITER: NO
 STACK_ADAPTER: none (opsx-lite process only)
 UPSTREAM_OVERWRITE_DEFAULT: NO
