@@ -1,7 +1,7 @@
 ---
 name: /opsx-resolve-conflict
 id: opsx-resolve-conflict
-package_version: 0.34.0
+package_version: 0.39.0
 contract_schema_version: opsx-resolve-conflict/v2
 status: candidate_for_independent_review
 author: Cursor
@@ -23,7 +23,7 @@ argument-hint: "[PREVIEW|GO] [change=<CHANGE_ID>] [store=<STORE_ID>]"
 ## 0. Status and installation boundary
 
 This file is one component of package
-`OPSX_RESOLVE_CONFLICT_COMMAND_001_R34`.
+`OPSX_RESOLVE_CONFLICT_COMMAND_001_R39`.
 
 Packages `0.5.0` / R05 through `0.13.0` / R13 are **REJECTED** and must not be
 used for GO.
@@ -96,17 +96,24 @@ Parse exact tokens.
 
 Default when `GO` is absent or `PREVIEW` is present.
 
-PREVIEW is read-only:
+PREVIEW is a **repository-context conflict assistant** (not an autonomous
+resolver and not a line-diff chooser). It is read-only:
 
-- validate package compatibility;
-- detect operation;
-- freeze evidence;
-- identify OPSX authority;
-- construct stage-role matrix;
-- construct full operation change graph;
-- classify textual and logical conflicts;
-- propose frozen scope and test plan;
-- do not edit, stage, continue, abort, skip, commit, or push.
+- load stage 1/2/3 blobs via the sealed R34 exact Git operation grammar;
+- collect a bounded structured context packet (siblings, callers/usages,
+  tests, accepted decisions/specs) without shell/rg subprocesses;
+- separate FACTS from INTERPRETATIONS; attach evidence IDs;
+- list coherent resolution options and Owner questions;
+- recommend a side **only** when evidence has both a strong
+  `authority_class` **and** `authority_verified=true` (explicit accepted
+  status / canonical current-spec / verified contract / API invariant);
+- path location alone never proves normative authority; draft/proposed/
+  rejected/superseded decisions and change-local specs do not recommend;
+- never recommend `keep_ours`/`keep_theirs` from textual subset alone;
+- never edit, stage, continue, abort, skip, commit, or push.
+
+Human output leads with Russian behavioral explanation; Git OIDs/hashes are
+secondary evidence below.
 
 ### GO
 
@@ -987,24 +994,26 @@ the package, repository objects, and receipts.
 
 ## 20. PREVIEW output
 
+PREVIEW returns an advisory report (`preview-report/v2`) plus Russian human
+sections: Коротко / Факты / OURS / THEIRS / Контекст / Расхождение /
+Интерпретации / Вопросы владельцу / Варианты / Рекомендация / Как проверить /
+Ограничения. Machine JSON preserves `CONTEXT_EVIDENCE` with authority-classified
+items and evidence IDs.
+
 ```text
 STATUS=PREVIEW_READY
 COMMAND=/opsx-resolve-conflict
-PACKAGE_VERSION=0.34.0
+PACKAGE_VERSION=0.39.0
+SAFE_USAGE_SCOPE=PREVIEW_ONLY
+GO_CAPABILITY=false
 OPERATION=
-STATE_FINGERPRINT=
-STAGE_ROLE_MATRIX=
-AUTHORITY_LANES=
-AUTHORITY_SOURCES=
-TEXTUAL_UNITS=
-LOGICAL_UNITS=
-HIGH_RISK_UNITS=
-FROZEN_SCOPE_PROPOSAL=
-REQUIRED_TEST_MATRIX=
-UNTRACKED_GATE=
-OWNER_DECISION_REQUIRED=none
-NEXT_ACTION=/opsx-resolve-conflict GO
-DO_NOT_DO_YET=edit, stage, continue, abort, skip, commit, push
+PATH=
+CONTEXT_EVIDENCE=
+CONTRACT_SIGNAL=
+OWNER_DECISION_REQUIRED=
+RECOMMENDATION=null|<option_id with evidence_refs>
+NEXT_ACTION=Owner verifies analysis, edits files manually, accepts responsibility
+DO_NOT_DO_YET=edit-by-runtime, stage, continue, abort, skip, commit, push, GO
 ```
 
 ## 21. Success output
@@ -1012,7 +1021,7 @@ DO_NOT_DO_YET=edit, stage, continue, abort, skip, commit, push
 ```text
 STATUS=READY_FOR_OWNER_CONTINUE
 COMMAND=/opsx-resolve-conflict
-PACKAGE_VERSION=0.34.0
+PACKAGE_VERSION=0.39.0
 RUN_ID=
 OPERATION=
 START_HEAD=
@@ -1054,7 +1063,7 @@ Next action after Owner continue (out of band):
 ```text
 STATUS=STOP_FOR_OWNER
 COMMAND=/opsx-resolve-conflict
-PACKAGE_VERSION=0.34.0
+PACKAGE_VERSION=0.39.0
 RUN_ID=
 OPERATION=
 CURRENT_HEAD=

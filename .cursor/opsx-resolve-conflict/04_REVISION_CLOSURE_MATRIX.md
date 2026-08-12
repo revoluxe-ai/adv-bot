@@ -324,5 +324,57 @@ historical findings, not current-delivery digests/test totals. -->
 3. R25-MEDIUM-002 trusted-Git execution boundary (not claimed atomic) — **explicitly open**
 4. R25-PROCESS-001
 5. Linux/macOS explicitly UNSUPPORTED
-6. R33-GATE-HIGH-002 weak semantic recommendation (deferred)
+6. R33-GATE-HIGH-002 weak semantic recommendation — closed in R35
 7. R33-GATE-PROCESS-001 / R33-GATE-PROCESS-002 (deferred)
+
+## R34 → R35 mandatory closure
+
+| Finding | R35 change | Acceptance evidence |
+|---|---|---|
+| R33-GATE-HIGH-002 | Evidence+advisory layers; bounded context; no textual-subset recommendation | `preview_context.py`, `preview_advisory.py`, `tests/test_r35_preview_context.py` |
+
+## Residual limitations disclosed for review (R35)
+
+1. BLOCKER_AUTHORITY_PRODUCER_MISSING
+2. BLOCKER_OS_SANDBOX_RUNNER_MISSING
+3. R25-MEDIUM-002 trusted-Git execution boundary (not claimed atomic) — **explicitly open**
+4. R25-PROCESS-001
+5. Linux/macOS explicitly UNSUPPORTED
+6. R33-GATE-PROCESS-001 / R33-GATE-PROCESS-002 (deferred)
+7. R35-GATE-AUTHORITY-001 pathname-as-authority — closed in R36
+8. R36-GATE-AUTHORITY-002 contract lifecycle precedence — closed in R37
+9. R33-GATE-PROCESS-001 immutable PREVIEW evidence — closed in R38
+10. R38-GATE-PROCESS-001 PREVIEW evidence path sanitization — closed in R39
+
+## R35 → R36 mandatory closure
+
+| Finding | R36 change | Acceptance evidence |
+|---|---|---|
+| R35-GATE-AUTHORITY-001 | Proven authority_verified gate; lifecycle matrix; bounded authority search | `preview_context.py`, `preview_advisory.py`, `tests/test_r36_authority_verification.py` |
+
+## R36 → R37 mandatory closure
+
+| Finding | R37 change | Acceptance evidence |
+|---|---|---|
+| R36-GATE-AUTHORITY-002 | CONTRACT: explicit non-active lifecycle vetoes before normative marker | `preview_context.py` CONTRACT branch; `tests/test_r37_contract_lifecycle.py` |
+
+## R37 → R38 mandatory closure
+
+| Finding | R38 change | Acceptance evidence |
+|---|---|---|
+| R33-GATE-PROCESS-001 | Immutable real merge/rebase PREVIEW evidence in review bundle | `scripts/build_preview_evidence.py`; ship/bundle validator; `tests/test_r38_preview_evidence.py` |
+
+## R38 → R39 mandatory closure
+
+| Finding | R39 change | Acceptance evidence |
+|---|---|---|
+| R38-GATE-PROCESS-001 | Recursive JSON path scan + `<TRUSTED_GIT_EXECUTABLE>` tokenization | `build_preview_evidence.py`; `tests/test_r39_preview_evidence_paths.py` |
+
+## Residual limitations disclosed for review (R39)
+
+1. BLOCKER_AUTHORITY_PRODUCER_MISSING
+2. BLOCKER_OS_SANDBOX_RUNNER_MISSING
+3. R25-MEDIUM-002 trusted-Git execution boundary (not claimed atomic) — **explicitly open**
+4. R25-PROCESS-001
+5. Linux/macOS explicitly UNSUPPORTED
+6. R33-GATE-PROCESS-002 (deferred — inner/outer platform matrix evidence-identical)

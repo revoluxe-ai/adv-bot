@@ -37,7 +37,7 @@
       "const": "opsx-resolve-conflict/run-receipt/v1"
     },
     "package_version": {
-      "const": "0.34.0"
+      "const": "0.39.0"
     },
     "run_id": {
       "type": "string",

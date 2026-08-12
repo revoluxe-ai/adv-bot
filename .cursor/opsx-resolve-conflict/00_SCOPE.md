@@ -1,11 +1,12 @@
-# 00_SCOPE — Independent review scope (R34 / 0.34.0)
+# 00_SCOPE — Independent review scope (R39 / 0.39.0)
 
 ## In scope
 
 - Packaged command: `candidate/.cursor/commands/opsx-resolve-conflict.md`
 - Runtime under `runtime/opsx_conflict/**` (R30/R31 trust-store frozen for GO)
 - Windows PREVIEW_ONLY advisory conflict analysis (`preview_advisory.py`)
-- Exact operation-ID Git grammar (`preview_readonly_git.py`; no arbitrary argv)
+- Exact operation-ID Git grammar (`preview_readonly_git.py`; R34 byte-frozen)
+- Bounded repository context evidence (`preview_context.py`) + advisory reasoning
 - Architecture baseline / workflow / handoff / decision docs
 - Platform gate: Windows only; Linux/macOS UNSUPPORTED
 - Evidence pipeline: ZIP + TEST_REPORT/SIDECAR/platform matrix
@@ -30,4 +31,4 @@ Cursor (packaged for OPSX independent review).
 
 ## Prior package
 
-`0.5.0`–`0.33.0` REJECTED or REVISION_REQUIRED — not in SAFE_TO_USE scope.
+`0.5.0`–`0.35.0` REJECTED or REVISION_REQUIRED — not in SAFE_TO_USE scope.

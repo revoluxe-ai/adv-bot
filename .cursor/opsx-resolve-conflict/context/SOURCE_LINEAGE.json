@@ -1,8 +1,8 @@
 {
   "schema": "opsx-resolve-conflict/source-lineage/v2",
   "origin_source_commit": "2f13557d799438ef4cd5104d29eef8de2c72d57b",
-  "host_contract_snapshot_commit": "c64949cb1ffca0d8bdd26bc61716649695d292ab",
-  "package_version": "0.34.0",
+  "host_contract_snapshot_commit": "78aa902fc961a7244f75e557a58b864d142fa47c",
+  "package_version": "0.39.0",
   "note": "host_contract_snapshot_commit is a synthetic immutable tree of packaged contracts and must never be treated as OPSX origin source_commit.",
   "files": [
     {

@@ -1,4 +1,4 @@
-# 01_ARCHITECTURE_BASELINE — OPSX resolve-conflict (R34)
+# 01_ARCHITECTURE_BASELINE — OPSX resolve-conflict (R39)
 
 ## Decision
 

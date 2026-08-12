@@ -1,4 +1,4 @@
-# 04_DECISION_LOG — platform & preview (R34)
+# 04_DECISION_LOG — platform & preview (R39)
 
 ## ADR-OPSX-RC-PLATFORM-001
 

@@ -1,8 +1,8 @@
 {
   "schema": "opsx-resolve-conflict/replay-evidence/v6",
-  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R34",
-  "package_version": "0.34.0",
-  "built_at_utc": "2026-08-04T17:02:02Z",
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39",
+  "package_version": "0.39.0",
+  "built_at_utc": "2026-08-12T09:17:15Z",
   "go_capability": false,
   "execution_location": "native-temp staging copy of packaged runtime (not author source workspace)",
   "path_normalization": {
@@ -21,7 +21,7 @@
   "note": "R29 exact-match replay: state proves merge/rebase operation detection; scoped GO proves PACKAGE_GO_CAPABILITY_DISABLED at package_compatibility_gate. Nonzero exit alone is never PASS. Not production GO readiness.",
   "builder": {
     "path": "scripts/build_replay_evidence.py",
-    "sha256": "3150d603a550fd77a7f4025de8cbd9bba16a63febcd556afba7d4c86552dea50"
+    "sha256": "15c7fa7158e6a7ebaa658ce852dac7d16adf75414ad23c6f04c5e5d7678986fe"
   },
   "environment": {
     "python_version": "3.11.0",
@@ -118,14 +118,14 @@
         },
         {
           "name": "operation_head",
-          "expected": "991c005521fb07f96fb779d08f7b1b1efc020666",
-          "actual": "991c005521fb07f96fb779d08f7b1b1efc020666",
+          "expected": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+          "actual": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
           "passed": true
         },
         {
           "name": "refs_immutable",
-          "expected": "refs/heads/feature 991c005521fb07f96fb779d08f7b1b1efc020666\nrefs/heads/master 1e0d8b41d33052429367a63fb79b51cf4fe38947\n",
-          "actual": "refs/heads/feature 991c005521fb07f96fb779d08f7b1b1efc020666\nrefs/heads/master 1e0d8b41d33052429367a63fb79b51cf4fe38947\n",
+          "expected": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
+          "actual": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
           "passed": true
         },
         {
@@ -174,12 +174,12 @@
         "ok": true,
         "source": "stdout",
         "value": {
-          "fingerprint": "453a94c8f24377c4caa75472b719ac94e520cb6648fd8ad86b0d8eaf161fa5d1",
+          "fingerprint": "f97934370b83d561f1ec64a9ee482d2b1834311496b4f1d9cfc5c38545ccada7",
           "stage_matrix": {
             "conflict.py": [
               {
                 "actual_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
-                "commit_oid": "cbccffe49edcb2adf25c5f3fad5c3273532c932c",
+                "commit_oid": "d5c486368c09d9a3373e51a0ddecd2c927cd8ff8",
                 "expected_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
                 "note": "verified",
                 "role": "merge_base",
@@ -188,7 +188,7 @@
               },
               {
                 "actual_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
-                "commit_oid": "1e0d8b41d33052429367a63fb79b51cf4fe38947",
+                "commit_oid": "2135b91f772b7a2127371506be6579e526fef48a",
                 "expected_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
                 "note": "verified",
                 "role": "current_HEAD",
@@ -197,7 +197,7 @@
               },
               {
                 "actual_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
-                "commit_oid": "991c005521fb07f96fb779d08f7b1b1efc020666",
+                "commit_oid": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
                 "expected_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
                 "note": "verified",
                 "role": "incoming_MERGE_HEAD",
@@ -208,13 +208,13 @@
           },
           "state": {
             "branch": "master",
-            "fingerprint": "453a94c8f24377c4caa75472b719ac94e520cb6648fd8ad86b0d8eaf161fa5d1",
-            "git_dir": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34_REPLAY_STAGING\\fixtures\\merge\\repo\\.git",
-            "head": "1e0d8b41d33052429367a63fb79b51cf4fe38947",
+            "fingerprint": "f97934370b83d561f1ec64a9ee482d2b1834311496b4f1d9cfc5c38545ccada7",
+            "git_dir": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REPLAY_STAGING\\fixtures\\merge\\repo\\.git",
+            "head": "2135b91f772b7a2127371506be6579e526fef48a",
             "operation": "merge",
-            "operation_head": "991c005521fb07f96fb779d08f7b1b1efc020666",
-            "repository_identity": "c9a229ac9bbfa86da8bddf1dd53ce0feed9f527e8ef6de50cede61d65166e13b",
-            "sequencer_tree_hash": "29906463aa700a10f254e4c0491b6881cd7fc79c7c1b02e564c4dfa4e271edc5",
+            "operation_head": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+            "repository_identity": "f61ec248552dffa321c0b6f0c31defae4ca7fa6cc5dcc8bfea6a7109b9108cc2",
+            "sequencer_tree_hash": "1c0e14d42b36ce7e05aa2814af9dbd90aedc2e9f205b67415f221d9885b3d031",
             "staged_paths": [],
             "unmerged": [
               {
@@ -250,10 +250,10 @@
       "fixture_meta": {
         "operation": "merge",
         "merge_returncode": "1",
-        "base": "cbccffe49edcb2adf25c5f3fad5c3273532c932c",
-        "feature": "991c005521fb07f96fb779d08f7b1b1efc020666",
-        "mainline": "1e0d8b41d33052429367a63fb79b51cf4fe38947",
-        "expected_operation_head": "991c005521fb07f96fb779d08f7b1b1efc020666",
+        "base": "d5c486368c09d9a3373e51a0ddecd2c927cd8ff8",
+        "feature": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+        "mainline": "2135b91f772b7a2127371506be6579e526fef48a",
+        "expected_operation_head": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
         "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
       },
       "argv": [
@@ -266,9 +266,9 @@
       "refs_immutable": true,
       "no_push_continue_abort_in_argv": true,
       "process_delta": [],
-      "stdout_sha256_raw": "2deabf2285293dd9f6107f76d1de4c09d5d6add289402c85484ed6e1de6ec7b7",
+      "stdout_sha256_raw": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "2deabf2285293dd9f6107f76d1de4c09d5d6add289402c85484ed6e1de6ec7b7",
+      "stdout_sha256_normalized": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
     },
@@ -356,8 +356,8 @@
         },
         {
           "name": "refs_immutable",
-          "expected": "refs/heads/feature 991c005521fb07f96fb779d08f7b1b1efc020666\nrefs/heads/master 1e0d8b41d33052429367a63fb79b51cf4fe38947\n",
-          "actual": "refs/heads/feature 991c005521fb07f96fb779d08f7b1b1efc020666\nrefs/heads/master 1e0d8b41d33052429367a63fb79b51cf4fe38947\n",
+          "expected": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
+          "actual": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
           "passed": true
         },
         {
@@ -417,7 +417,7 @@
             "go_capability": false,
             "status": "preview_only_no_go"
           },
-          "package_version": "0.34.0",
+          "package_version": "0.39.0",
           "reached_gate": "package_compatibility_gate",
           "reason": "PACKAGE_GO_CAPABILITY_DISABLED",
           "schema": "opsx-resolve-conflict/cli-stop-envelope/v1",
@@ -427,7 +427,7 @@
         "error": null
       },
       "scope_manifest": {
-        "frozen_at_state_fingerprint": "453a94c8f24377c4caa75472b719ac94e520cb6648fd8ad86b0d8eaf161fa5d1",
+        "frozen_at_state_fingerprint": "f97934370b83d561f1ec64a9ee482d2b1834311496b4f1d9cfc5c38545ccada7",
         "items": [
           {
             "allowed_operation": "write",
@@ -455,17 +455,17 @@
             "unit_id": "unit-conflict.py"
           }
         ],
-        "manifest_sha256": "5efa7dcd28df1b3104d45e520a4a63fc449f63f812bc9885f441214048b5cdd2",
+        "manifest_sha256": "795c0ebba2f4f7c2787e1622eb7acb3e6627ebb58bb3c91b419e8549e7dfa7e9",
         "run_id": "replay-merge_go_package_capability_disabled",
         "schema": "opsx-resolve-conflict/scope-manifest/v2"
       },
       "fixture_meta": {
         "operation": "merge",
         "merge_returncode": "1",
-        "base": "cbccffe49edcb2adf25c5f3fad5c3273532c932c",
-        "feature": "991c005521fb07f96fb779d08f7b1b1efc020666",
-        "mainline": "1e0d8b41d33052429367a63fb79b51cf4fe38947",
-        "expected_operation_head": "991c005521fb07f96fb779d08f7b1b1efc020666",
+        "base": "d5c486368c09d9a3373e51a0ddecd2c927cd8ff8",
+        "feature": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+        "mainline": "2135b91f772b7a2127371506be6579e526fef48a",
+        "expected_operation_head": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
         "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
       },
       "argv": [
@@ -480,9 +480,9 @@
       "refs_immutable": true,
       "no_push_continue_abort_in_argv": true,
       "process_delta": [],
-      "stdout_sha256_raw": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
     },
@@ -575,14 +575,14 @@
         },
         {
           "name": "operation_head",
-          "expected": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
-          "actual": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
+          "expected": "390acff10802fba26189e4325d0c0aa741793ffa",
+          "actual": "390acff10802fba26189e4325d0c0aa741793ffa",
           "passed": true
         },
         {
           "name": "refs_immutable",
-          "expected": "refs/heads/feature 9ff43272039c7c4096af5f879339e35c2ee8ee4a\nrefs/heads/master 529085e3ddd9896cf756b8da1e0f934ea2b2d07e\n",
-          "actual": "refs/heads/feature 9ff43272039c7c4096af5f879339e35c2ee8ee4a\nrefs/heads/master 529085e3ddd9896cf756b8da1e0f934ea2b2d07e\n",
+          "expected": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
+          "actual": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
           "passed": true
         },
         {
@@ -599,8 +599,8 @@
         },
         {
           "name": "conflict_worktree_immutable",
-          "expected": "b7903e2b6a8af0506d20e3153177742c31548df23cb8b3ecf1f8e32bae0b78d1",
-          "actual": "b7903e2b6a8af0506d20e3153177742c31548df23cb8b3ecf1f8e32bae0b78d1",
+          "expected": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+          "actual": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
           "passed": true
         },
         {
@@ -631,12 +631,12 @@
         "ok": true,
         "source": "stdout",
         "value": {
-          "fingerprint": "7a3cd2097def6ed512eb4570f72d556680dc59ab2f2d76cd983d9efbfc3540f3",
+          "fingerprint": "bdc99683b474cd5a28152ce7791c8996ab16f75a86cd357aba4f7088e207a3e6",
           "stage_matrix": {
             "conflict.py": [
               {
                 "actual_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
-                "commit_oid": "9ff43272039c7c4096af5f879339e35c2ee8ee4a^",
+                "commit_oid": "390acff10802fba26189e4325d0c0aa741793ffa^",
                 "expected_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
                 "note": "verified",
                 "role": "parent_of_replayed_commit",
@@ -645,7 +645,7 @@
               },
               {
                 "actual_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
-                "commit_oid": "529085e3ddd9896cf756b8da1e0f934ea2b2d07e",
+                "commit_oid": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
                 "expected_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
                 "note": "verified",
                 "role": "accumulated_onto_plus_replayed_commits",
@@ -654,7 +654,7 @@
               },
               {
                 "actual_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
-                "commit_oid": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
+                "commit_oid": "390acff10802fba26189e4325d0c0aa741793ffa",
                 "expected_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
                 "note": "verified",
                 "role": "current_replayed_commit",
@@ -665,13 +665,13 @@
           },
           "state": {
             "branch": "",
-            "fingerprint": "7a3cd2097def6ed512eb4570f72d556680dc59ab2f2d76cd983d9efbfc3540f3",
-            "git_dir": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34_REPLAY_STAGING\\fixtures\\rebase\\repo\\.git",
-            "head": "529085e3ddd9896cf756b8da1e0f934ea2b2d07e",
+            "fingerprint": "bdc99683b474cd5a28152ce7791c8996ab16f75a86cd357aba4f7088e207a3e6",
+            "git_dir": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REPLAY_STAGING\\fixtures\\rebase\\repo\\.git",
+            "head": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
             "operation": "rebase",
-            "operation_head": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
-            "repository_identity": "53b73abf8873fab9b231e6e663112d288616a2e6ae0495d941194dd0df7ee718",
-            "sequencer_tree_hash": "c6d99a5fa540c2ac34bc2c1900b87a89265f72e71e298bc0efd46b17e815d872",
+            "operation_head": "390acff10802fba26189e4325d0c0aa741793ffa",
+            "repository_identity": "f3d9486e120f5d6385e093a90e0eebc4d4f5c4b6cb80c24213107548cd7b5930",
+            "sequencer_tree_hash": "206daffc9e78775d49123aad5b18a2854244925c64edb344b18b6622fc3f220e",
             "staged_paths": [],
             "unmerged": [
               {
@@ -707,10 +707,10 @@
       "fixture_meta": {
         "operation": "rebase",
         "rebase_returncode": "1",
-        "base": "09afbd7e75ce9d644b64634ac829d72848f1864a",
-        "feature": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
-        "mainline": "529085e3ddd9896cf756b8da1e0f934ea2b2d07e",
-        "expected_operation_head": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
+        "base": "7405307a59b0c7a7361272602a8f4d22e577da3c",
+        "feature": "390acff10802fba26189e4325d0c0aa741793ffa",
+        "mainline": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
+        "expected_operation_head": "390acff10802fba26189e4325d0c0aa741793ffa",
         "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
       },
       "argv": [
@@ -723,9 +723,9 @@
       "refs_immutable": true,
       "no_push_continue_abort_in_argv": true,
       "process_delta": [],
-      "stdout_sha256_raw": "21e2592ff270baa3368092742d20ba5cdf48e255c1085c601d29b31b21786c18",
+      "stdout_sha256_raw": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "21e2592ff270baa3368092742d20ba5cdf48e255c1085c601d29b31b21786c18",
+      "stdout_sha256_normalized": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
     },
@@ -813,8 +813,8 @@
         },
         {
           "name": "refs_immutable",
-          "expected": "refs/heads/feature 9ff43272039c7c4096af5f879339e35c2ee8ee4a\nrefs/heads/master 529085e3ddd9896cf756b8da1e0f934ea2b2d07e\n",
-          "actual": "refs/heads/feature 9ff43272039c7c4096af5f879339e35c2ee8ee4a\nrefs/heads/master 529085e3ddd9896cf756b8da1e0f934ea2b2d07e\n",
+          "expected": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
+          "actual": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
           "passed": true
         },
         {
@@ -831,8 +831,8 @@
         },
         {
           "name": "conflict_worktree_immutable",
-          "expected": "b7903e2b6a8af0506d20e3153177742c31548df23cb8b3ecf1f8e32bae0b78d1",
-          "actual": "b7903e2b6a8af0506d20e3153177742c31548df23cb8b3ecf1f8e32bae0b78d1",
+          "expected": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+          "actual": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
           "passed": true
         },
         {
@@ -874,7 +874,7 @@
             "go_capability": false,
             "status": "preview_only_no_go"
           },
-          "package_version": "0.34.0",
+          "package_version": "0.39.0",
           "reached_gate": "package_compatibility_gate",
           "reason": "PACKAGE_GO_CAPABILITY_DISABLED",
           "schema": "opsx-resolve-conflict/cli-stop-envelope/v1",
@@ -884,7 +884,7 @@
         "error": null
       },
       "scope_manifest": {
-        "frozen_at_state_fingerprint": "7a3cd2097def6ed512eb4570f72d556680dc59ab2f2d76cd983d9efbfc3540f3",
+        "frozen_at_state_fingerprint": "bdc99683b474cd5a28152ce7791c8996ab16f75a86cd357aba4f7088e207a3e6",
         "items": [
           {
             "allowed_operation": "write",
@@ -896,7 +896,7 @@
               "2": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
               "3": "403e7cd438cbb126e495a254b43991ecaba293d0"
             },
-            "initial_worktree_sha256": "b7903e2b6a8af0506d20e3153177742c31548df23cb8b3ecf1f8e32bae0b78d1",
+            "initial_worktree_sha256": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
             "path": "conflict.py",
             "reason": "unmerged_conflict",
             "required_checks": [
@@ -912,17 +912,17 @@
             "unit_id": "unit-conflict.py"
           }
         ],
-        "manifest_sha256": "8c0844a12d8d2b875ba2744170cf9487032c1cd6120950b1c7c772673a85691d",
+        "manifest_sha256": "b91ce01672fefe494a801bf35dc5140cc2766b21a0a6f4be335df9aeb59ab1fb",
         "run_id": "replay-rebase_go_package_capability_disabled",
         "schema": "opsx-resolve-conflict/scope-manifest/v2"
       },
       "fixture_meta": {
         "operation": "rebase",
         "rebase_returncode": "1",
-        "base": "09afbd7e75ce9d644b64634ac829d72848f1864a",
-        "feature": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
-        "mainline": "529085e3ddd9896cf756b8da1e0f934ea2b2d07e",
-        "expected_operation_head": "9ff43272039c7c4096af5f879339e35c2ee8ee4a",
+        "base": "7405307a59b0c7a7361272602a8f4d22e577da3c",
+        "feature": "390acff10802fba26189e4325d0c0aa741793ffa",
+        "mainline": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
+        "expected_operation_head": "390acff10802fba26189e4325d0c0aa741793ffa",
         "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
       },
       "argv": [
@@ -937,9 +937,9 @@
       "refs_immutable": true,
       "no_push_continue_abort_in_argv": true,
       "process_delta": [],
-      "stdout_sha256_raw": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
     }
@@ -967,9 +967,9 @@
         "<FIXTURE_REPO_0>"
       ],
       "returncode": 0,
-      "stdout_sha256_raw": "2deabf2285293dd9f6107f76d1de4c09d5d6add289402c85484ed6e1de6ec7b7",
+      "stdout_sha256_raw": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "2deabf2285293dd9f6107f76d1de4c09d5d6add289402c85484ed6e1de6ec7b7",
+      "stdout_sha256_normalized": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
@@ -998,9 +998,9 @@
         "<REPLAY_STAGING>\\fixtures\\merge\\state\\replay-merge_go_package_capability_disabled.scope.json"
       ],
       "returncode": 78,
-      "stdout_sha256_raw": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
@@ -1025,9 +1025,9 @@
         "<FIXTURE_REPO_1>"
       ],
       "returncode": 0,
-      "stdout_sha256_raw": "21e2592ff270baa3368092742d20ba5cdf48e255c1085c601d29b31b21786c18",
+      "stdout_sha256_raw": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "21e2592ff270baa3368092742d20ba5cdf48e255c1085c601d29b31b21786c18",
+      "stdout_sha256_normalized": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
@@ -1056,9 +1056,9 @@
         "<REPLAY_STAGING>\\fixtures\\rebase\\state\\replay-rebase_go_package_capability_disabled.scope.json"
       ],
       "returncode": 78,
-      "stdout_sha256_raw": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256_normalized": "fb9026753c9be6b9ca6e0fecbf45953e61cccc7a72ed0b9d04622e3974e6a2a1",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
       "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ],

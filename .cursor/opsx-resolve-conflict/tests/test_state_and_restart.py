@@ -57,7 +57,7 @@ def test_restart_requires_exact_last_verified_fingerprint(git_repo: Path, isolat
 
     manifest = RunManifest(
         run_id="run-1",
-        package_version="0.34.0",
+        package_version="0.39.0",
         repository_identity=state.repository_identity,
         repository_root=str(git_repo.resolve()),
         operation=state.operation,

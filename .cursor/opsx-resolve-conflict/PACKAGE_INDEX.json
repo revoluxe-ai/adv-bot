@@ -1,16 +1,16 @@
 {
-  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R34",
-  "package_version": "0.34.0",
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39",
+  "package_version": "0.39.0",
   "author": "Cursor",
   "contract_schema_version": "opsx-resolve-conflict/v2",
   "go_capability": false,
   "safe_usage_scope": "PREVIEW_ONLY",
-  "archive": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.zip",
+  "archive": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.zip",
   "archive_sha256": null,
   "archive_binding": "external_test_report_only",
-  "package_digest": "606d42c741aebfe28c26972437a6f7a003d11394e4d2e4e9679a258e7983f531",
-  "external_test_report": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.TEST_REPORT.json",
-  "external_sidecar": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.SIDECAR.json",
+  "package_digest": "fccf8bc542d4824671c237701f8272547edc976bab3e1634e1d7ff0e3ec8c808",
+  "external_test_report": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.TEST_REPORT.json",
+  "external_sidecar": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.SIDECAR.json",
   "open_blockers": [
     "BLOCKER_AUTHORITY_PRODUCER_MISSING",
     "BLOCKER_OS_SANDBOX_RUNNER_MISSING"
@@ -54,6 +54,6 @@
     "0.19.0",
     "0.20.0"
   ],
-  "external_archive_sha256_ref": "4c77f4240d91add1e9991c0ef1be77a12d7e618fdb966d2050f88ed7da0f35f8",
-  "raw_log_sha256_ref": "b1592f627365614070f4b291722836f55248e46cc26ebcd4085f2b15b5174d57"
+  "external_archive_sha256_ref": "45eca30256afde87b4c0a322e7d8ad2e75099c25e1395a48b5479b32124fe990",
+  "raw_log_sha256_ref": "c2147d0191bd15e3cdca5aa47ab4119f7a116a94aef6fd35aa2efb6828780766"
 }

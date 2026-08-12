@@ -1,4 +1,4 @@
-# 03_VERDICT_SCHEMA — machine-readable review result (R34)
+# 03_VERDICT_SCHEMA — machine-readable review result (R39)
 
 Aligned with project review policy.
 
@@ -10,7 +10,7 @@ Aligned with project review policy.
     "OPSX_CONTEXTUAL_REVIEW": "PERFORMED_PASSED | PERFORMED_FAILED | NOT_PERFORMED_*",
     "SCENARIO_EVIDENCE_REVIEW": "PERFORMED_PASSED | PERFORMED_FAILED | NOT_PERFORMED_*"
   },
-  "PACKAGE_VERSION": "0.34.0",
+  "PACKAGE_VERSION": "0.39.0",
   "CONTRACT_SCHEMA_VERSION": "opsx-resolve-conflict/v2",
   "CONTEXT_SUFFICIENCY": "SUFFICIENT | INSUFFICIENT",
   "SOURCE_COMMIT_STATUS": {

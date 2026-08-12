@@ -37,13 +37,17 @@ from path_workspace import (  # noqa: E402
     platform_id,
     scan_source_for_hardcoded_windows_temp,
 )
+from build_preview_evidence import (  # noqa: E402
+    build_preview_evidence_for_ship,
+    validate_preview_evidence_artifacts,
+)
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 OUT_DIR = native_artifact_root()
-PACKAGE_VERSION = "0.34.0"
-PACKAGE_NAME = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R34"
-REVISION = "R34"
+PACKAGE_VERSION = "0.39.0"
+PACKAGE_NAME = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39"
+REVISION = "R39"
 PLATFORM_DECISION_ID = "ADR-OPSX-RC-PLATFORM-001"
 PLATFORM_DISPOSITION = "WINDOWS_PREVIEW_ONLY"
 
@@ -212,11 +216,11 @@ Package digest for the immutable inner tree is recorded in `MANIFEST.json`,
 
 ## Claimed closures for {REVISION}
 
-1. R33 ADR-OPSX-RC-PLATFORM-001 WINDOWS_PREVIEW_ONLY (advisory; Linux/macOS UNSUPPORTED)
-2. R33 read-only preview report from stage 1/2/3 blobs; no worktree/index/ref writes
-3. R33 typed `UNSUPPORTED_PLATFORM` fail-closed on non-Windows CLI/GO
-4. R32 native artifact workspace + path-flavor separation retained
-5. R31/R30 trust-store frozen; R26–R29 retained
+1. R38-GATE-PROCESS-001: PREVIEW evidence path sanitization (`<TRUSTED_GIT_EXECUTABLE>`)
+2. Recursive JSON string-value path scan (closes R38 JSON-escaping validator bypass)
+3. Real merge/rebase PREVIEW evidence rebuilt without author-profile paths
+4. Executable digests preserved; `atomicity_claim=false`; R25-MEDIUM-002 remains open
+5. R37 preview runtime hashes byte-identical; R33–R38 retained closures unchanged
 6. `GO_CAPABILITY` remains false; `SAFE_USAGE_SCOPE=PREVIEW_ONLY`
 
 ## Architect-closed, pending reviewer confirmation
@@ -309,6 +313,7 @@ def validate_shipping_scripts_portability() -> None:
         "ship_review_package.py",
         "build_review_archive.py",
         "build_replay_evidence.py",
+        "build_preview_evidence.py",
         "path_workspace.py",
     ):
         path = PACKAGE_ROOT / "scripts" / name
@@ -678,6 +683,31 @@ def validate_review_bundle(
         raise SystemExit("validator STOP: TEST_REPORT package_digest mismatch")
     if report.get("go_capability") is not False:
         raise SystemExit("validator STOP: TEST_REPORT go_capability must be false")
+
+    # R38: real merge/rebase PREVIEW evidence must ship and bind digests.
+    merge_name = f"{PACKAGE_NAME}.MERGE_PREVIEW_EVIDENCE.json"
+    rebase_name = f"{PACKAGE_NAME}.REBASE_PREVIEW_EVIDENCE.json"
+    index_name = f"{PACKAGE_NAME}.PREVIEW_EVIDENCE_INDEX.json"
+    for required in (merge_name, rebase_name, index_name):
+        if required not in members:
+            raise SystemExit(f"validator STOP: missing bundle member {required}")
+    validate_preview_evidence_artifacts(
+        merge_path=OUT_DIR / merge_name,
+        rebase_path=OUT_DIR / rebase_name,
+        package_name=PACKAGE_NAME,
+        package_version=PACKAGE_VERSION,
+        package_digest=package_digest,
+        inner_archive_sha256=archive_sha,
+    )
+    for name in (merge_name, rebase_name, index_name):
+        on_disk = hashlib.sha256((OUT_DIR / name).read_bytes()).hexdigest()
+        if members[name]["sha256"] != on_disk:
+            raise SystemExit(f"validator STOP: BUNDLE_INDEX hash drift for {name}")
+    index_doc = json.loads((OUT_DIR / index_name).read_text(encoding="utf-8"))
+    if index_doc.get("package_digest") != package_digest:
+        raise SystemExit("validator STOP: PREVIEW_EVIDENCE_INDEX digest mismatch")
+    if index_doc.get("inner_archive_sha256") != archive_sha:
+        raise SystemExit("validator STOP: PREVIEW_EVIDENCE_INDEX archive mismatch")
     print("POST_BUILD_VALIDATOR_OK")
 
 
@@ -1086,6 +1116,15 @@ def write_external_artifacts(
             "sidecar": str(OUT_DIR / f"{PACKAGE_NAME}.SIDECAR.json"),
             "skip_inventory": str(OUT_DIR / f"{PACKAGE_NAME}.SKIP_INVENTORY.json"),
             "replay_evidence": str(OUT_DIR / f"{PACKAGE_NAME}.REPLAY_EVIDENCE.zip"),
+            "merge_preview_evidence": str(
+                OUT_DIR / f"{PACKAGE_NAME}.MERGE_PREVIEW_EVIDENCE.json"
+            ),
+            "rebase_preview_evidence": str(
+                OUT_DIR / f"{PACKAGE_NAME}.REBASE_PREVIEW_EVIDENCE.json"
+            ),
+            "preview_evidence_index": str(
+                OUT_DIR / f"{PACKAGE_NAME}.PREVIEW_EVIDENCE_INDEX.json"
+            ),
             "lineage": "context/SOURCE_LINEAGE.json",
         },
         "post_test_zip_immutable": True,
@@ -1152,6 +1191,9 @@ def build_review_bundle(
         sidecar_path,
         OUT_DIR / f"{PACKAGE_NAME}.SKIP_INVENTORY.json",
         OUT_DIR / f"{PACKAGE_NAME}.REPLAY_EVIDENCE.zip",
+        OUT_DIR / f"{PACKAGE_NAME}.MERGE_PREVIEW_EVIDENCE.json",
+        OUT_DIR / f"{PACKAGE_NAME}.REBASE_PREVIEW_EVIDENCE.json",
+        OUT_DIR / f"{PACKAGE_NAME}.PREVIEW_EVIDENCE_INDEX.json",
         OUT_DIR / f"{PACKAGE_NAME}.AUTHOR.txt",
         OUT_DIR / f"{PACKAGE_NAME}.PLATFORM_CAPABILITY_MATRIX.json",
     ]
@@ -1234,6 +1276,17 @@ def main() -> None:
     windows_report = host_report if platform_id() == "windows" else None
     # ADR: do not attempt Linux enablement evidence; linux/macos are UNSUPPORTED.
     write_external_platform_matrix(windows_report=windows_report)
+    # R38: real merge/rebase PREVIEW evidence from packaged ZIP runtime.
+    build_preview_evidence_for_ship(
+        archive_path=zip_path,
+        out_dir=OUT_DIR,
+        package_name=PACKAGE_NAME,
+        package_version=PACKAGE_VERSION,
+        package_digest=package_digest,
+        inner_archive_sha256=frozen_sha,
+    )
+    if sha256_file(zip_path) != frozen_sha:
+        raise SystemExit("ZIP mutated during preview evidence generation")
     bundle_path, bundle_sha = build_review_bundle(
         package_digest=package_digest,
         archive_sha=frozen_sha,

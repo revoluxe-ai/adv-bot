@@ -1,5 +1,103 @@
 # Changelog — OPSX_RESOLVE_CONFLICT_COMMAND_001
 
+## 0.39.0 (R39) — independent review candidate
+
+Author: **Cursor**
+
+### Closure targeting R38-GATE-PROCESS-001 (PREVIEW evidence path sanitization)
+
+- Tokenize trusted-Git executable paths to `<TRUSTED_GIT_EXECUTABLE>` in shipped evidence
+- Recursive JSON string-value path scan (closes R38 JSON-escaping validator bypass)
+- Preserve expected/observed executable digests + `atomicity_claim=false`
+- Rebuild real merge/rebase PREVIEW evidence without author-profile paths
+- R37 preview runtime hashes remain byte-identical
+- GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
+
+### Deferred (unchanged)
+
+- R33-GATE-PROCESS-002
+- R25-MEDIUM-002 / R25-PROCESS-001
+
+## 0.38.0 (R38) — independent review candidate
+
+Author: **Cursor**
+
+### Closure targeting R33-GATE-PROCESS-001 (immutable PREVIEW evidence)
+
+- Ship real merge + rebase PREVIEW execution evidence in the review bundle
+- Evidence generated from packaged ZIP runtime (`boot_opsx_conflict.py preview`)
+- FIXTURE_SETUP ledger separated from PREVIEW command_ledger (R34 read-only ops)
+- Before/after digests prove conflict state immutability under PREVIEW
+- Post-build validator requires both evidence artifacts + digest binding
+- R37 preview runtime hashes remain byte-identical
+- GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
+
+### Deferred (unchanged)
+
+- R33-GATE-PROCESS-002
+- R25-MEDIUM-002 / R25-PROCESS-001
+
+## 0.37.0 (R37) — independent review candidate
+
+Author: **Cursor**
+
+### Closure targeting R36-GATE-AUTHORITY-002 (contract lifecycle precedence)
+
+- CONTRACT verification evaluates explicit lifecycle **before** normative marker
+- Explicit non-active lifecycle (`draft`/`proposed`/`rejected`/`superseded`/`unknown`/other) → `authority_verified=false`
+- Accepted/active/current + canonical + normative marker may still verify
+- No-status canonical normative contract behavior unchanged
+- Unverified contracts excluded from `_strong_evidence` / RECOMMENDATION
+- R34 `preview_readonly_git.py` remains byte-identical
+- GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
+
+### Deferred (unchanged)
+
+- R33-GATE-PROCESS-001 / R33-GATE-PROCESS-002
+- R25-MEDIUM-002 / R25-PROCESS-001
+
+## 0.36.0 (R36) — independent review candidate
+
+Author: **Cursor**
+
+### Closure targeting R35-GATE-AUTHORITY-001 (proven authority)
+
+- Separated provisional `authority_class` from `authority_verified` / `authority_basis`
+- ACCEPTED_DECISION verified only with explicit `status: accepted` (+ index consistency)
+- draft/proposed/rejected/superseded decisions never verify
+- Change-local specs → `CHANGE_CONTEXT` (non-normative)
+- Arbitrary `*contract*.md` not verified; canonical `openspec/contracts/` + marker only
+- RECOMMENDATION uses only `authority_verified=true` strong classes
+- Contradictory verified authorities → RECOMMENDATION=null
+- Decision/spec discovery consumes bounded-reader budgets (no unbounded rglob)
+- R34 `preview_readonly_git.py` remains byte-identical
+- GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
+
+### Deferred (unchanged)
+
+- R33-GATE-PROCESS-001 / R33-GATE-PROCESS-002
+- R25-MEDIUM-002 / R25-PROCESS-001
+
+## 0.35.0 (R35) — independent review candidate
+
+Author: **Cursor**
+
+### Closure targeting R33-GATE-HIGH-002 (repository-context assistant)
+
+- Split PREVIEW into evidence layer (`preview_context.py`) + advisory reasoning
+- Bounded read-only context reader (no shell/rg; symlink/escape STOP; budgets)
+- Authority-classified evidence (decisions/specs/tests/siblings/source)
+- Removed unsafe textual-subset → keep_ours/keep_theirs heuristic
+- Recommendation only from strong authority; else RECOMMENDATION=null + Owner Q
+- Russian human report leads with behavioral disagreement, not OIDs
+- R34 `preview_readonly_git.py` remains byte-identical
+- GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
+
+### Deferred (unchanged)
+
+- R33-GATE-PROCESS-001 / R33-GATE-PROCESS-002
+- R25-MEDIUM-002 / R25-PROCESS-001
+
 ## 0.34.0 (R34) — independent review candidate
 
 Author: **Cursor**

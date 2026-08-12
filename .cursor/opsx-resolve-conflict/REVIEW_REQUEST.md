@@ -1,12 +1,12 @@
-# REPEAT REVIEW REQUEST — `/opsx-resolve-conflict` R34 / 0.34.0
+# REPEAT REVIEW REQUEST — `/opsx-resolve-conflict` R39 / 0.39.0
 
 Review package (single delivery archive):
 
 ```text
-<NATIVE_ARTIFACT_ROOT>/OPSX_RESOLVE_CONFLICT_COMMAND_001_R34_REVIEW_BUNDLE.zip
+<NATIVE_ARTIFACT_ROOT>/OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REVIEW_BUNDLE.zip
 
-OPSX_RESOLVE_CONFLICT_COMMAND_001_R34
-PACKAGE_VERSION=0.34.0
+OPSX_RESOLVE_CONFLICT_COMMAND_001_R39
+PACKAGE_VERSION=0.39.0
 CONTRACT_SCHEMA_VERSION=opsx-resolve-conflict/v2
 AUTHOR=Cursor
 STATUS=preview_only_no_go
@@ -25,19 +25,19 @@ This **inner** document intentionally omits:
 Authoritative values for those fields are only in external evidence:
 
 - `BUNDLE_INDEX.json`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.TEST_REPORT.json`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R34.SIDECAR.json`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.TEST_REPORT.json`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.SIDECAR.json`
 
 Package digest for the immutable inner tree is recorded in `MANIFEST.json`,
 `TRUST_ANCHOR.json`, and `SHA256SUMS` and must match those artifacts.
 
-## Claimed closures for R34
+## Claimed closures for R39
 
-1. R33 ADR-OPSX-RC-PLATFORM-001 WINDOWS_PREVIEW_ONLY (advisory; Linux/macOS UNSUPPORTED)
-2. R33 read-only preview report from stage 1/2/3 blobs; no worktree/index/ref writes
-3. R33 typed `UNSUPPORTED_PLATFORM` fail-closed on non-Windows CLI/GO
-4. R32 native artifact workspace + path-flavor separation retained
-5. R31/R30 trust-store frozen; R26–R29 retained
+1. R38-GATE-PROCESS-001: PREVIEW evidence path sanitization (`<TRUSTED_GIT_EXECUTABLE>`)
+2. Recursive JSON string-value path scan (closes R38 JSON-escaping validator bypass)
+3. Real merge/rebase PREVIEW evidence rebuilt without author-profile paths
+4. Executable digests preserved; `atomicity_claim=false`; R25-MEDIUM-002 remains open
+5. R37 preview runtime hashes byte-identical; R33–R38 retained closures unchanged
 6. `GO_CAPABILITY` remains false; `SAFE_USAGE_SCOPE=PREVIEW_ONLY`
 
 ## Architect-closed, pending reviewer confirmation

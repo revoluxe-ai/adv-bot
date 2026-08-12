@@ -1,17 +1,15 @@
-"""Windows PREVIEW_ONLY advisory conflict analysis (read-only).
+"""Windows PREVIEW_ONLY advisory conflict analysis (read-only, R35).
 
-ADR-OPSX-RC-PLATFORM-001 / WINDOWS_PREVIEW_ONLY:
+Two layers:
+1. Evidence — stage blobs + bounded repository context (``preview_context``).
+2. Advisory reasoning — fact/inference separation and options; never mutates.
 
-- Explains active merge/rebase conflicts from stage 1/2/3 blobs.
-- Never writes worktree/index/refs.
-- Missing authority producer / OS_VERIFIED sandbox are LIMITATIONS, not STOP.
-- Does not claim authenticated resolution or GO readiness.
+ADR-OPSX-RC-PLATFORM-001 / WINDOWS_PREVIEW_ONLY. GO_CAPABILITY=false.
 """
 
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,12 +17,22 @@ from typing import Any
 
 from .attestation import PACKAGE_VERSION, assert_supported_platform
 from .errors import StopRequired
+from .preview_context import collect_conflict_context
 from .preview_readonly_git import PreviewReadonlyGit
 
-PREVIEW_REPORT_SCHEMA = "opsx-resolve-conflict/preview-report/v1"
+PREVIEW_REPORT_SCHEMA = "opsx-resolve-conflict/preview-report/v2"
 SAFETY_LABEL_RU = (
     "ADVISORY PREVIEW — изменения не применялись.\n"
     "Решение должен проверить и применить пользователь."
+)
+
+_STRONG_AUTHORITY = frozenset(
+    {
+        "ACCEPTED_DECISION",
+        "CURRENT_SPEC",
+        "CONTRACT",
+        "API_INVARIANT",
+    }
 )
 
 
@@ -149,209 +157,639 @@ def _load_conflict_paths(
         stages: dict[int, StageBlob] = {}
         for stage, meta in by_path[path].items():
             blob = git.read_stage_blob(meta.oid)
-            # cat-file may return binary; keep text with replace.
             stages[stage] = StageBlob(stage, meta.mode, meta.oid, blob)
         snapshots.append(ConflictPathSnapshot(path=path, stages=stages))
     return snapshots
 
 
-def _summarize_side(text: str | None, *, label: str) -> str:
-    """Concise factual summary of one side's blob."""
+def _side_behavior(text: str | None, *, label: str) -> dict[str, Any]:
+    """Describe observable behavior of one side without recommending it."""
     if text is None:
-        return f"{label}: blob отсутствует в индексе (unmerged stage missing)."
-    lines = text.splitlines()
+        return {
+            "label": label,
+            "summary_ru": f"{label}: blob отсутствует в индексе.",
+            "read_only": None,
+            "functions": [],
+            "evidence_refs": [],
+        }
     funcs = re.findall(r"^\s*(?:async\s+)?def\s+(\w+)\s*\(", text, flags=re.M)
     classes = re.findall(r"^\s*class\s+(\w+)\s*[\(:]", text, flags=re.M)
-    bits = [f"{label}: {len(lines)} строк(и)."]
+    read_only_vals = re.findall(r"\bread_only\s*=\s*(True|False)\b", text)
+    bits = [f"{len(text.splitlines())} строк(и)"]
     if funcs:
-        bits.append("Функции: " + ", ".join(funcs[:12]) + ("…" if len(funcs) > 12 else ""))
+        bits.append("функции: " + ", ".join(funcs[:12]))
     if classes:
-        bits.append("Классы: " + ", ".join(classes[:8]))
-    return " ".join(bits)
+        bits.append("классы: " + ", ".join(classes[:8]))
+    if read_only_vals:
+        bits.append("read_only=" + ", ".join(read_only_vals))
+    return {
+        "label": label,
+        "summary_ru": f"{label}: " + "; ".join(bits) + ".",
+        "read_only": read_only_vals[-1] if read_only_vals else None,
+        "functions": funcs[:12],
+        "classes": classes[:8],
+        "evidence_refs": [],
+    }
 
 
 def _diff_lines(a: str | None, b: str | None) -> tuple[list[str], list[str]]:
-    """Return lines only in a / only in b (simple set diff of stripped lines)."""
+    """Return lines only in a / only in b (observational; never drives recommendation)."""
     sa = {ln for ln in (a or "").splitlines() if ln.strip()}
     sb = {ln for ln in (b or "").splitlines() if ln.strip()}
     return sorted(sa - sb), sorted(sb - sa)
 
 
-def _build_options(
+def _strong_evidence(context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return verified strong-authority evidence only (R36 gate)."""
+    return [
+        e
+        for e in (context.get("evidence") or [])
+        if e.get("authority_class") in _STRONG_AUTHORITY
+        and e.get("authority_verified") is True
+    ]
+
+
+def _recommendation_polarity(excerpt: str) -> str | None:
+    """Map verified authority excerpt to a coarse behavioral polarity."""
+    low = excerpt.lower()
+    existing = any(
+        tok in low
+        for tok in (
+            "existing-users-only",
+            "existing_users_only",
+            "existing users only",
+            "только для существующих",
+            "navigation for existing",
+        )
+    )
+    alias = any(
+        tok in low
+        for tok in (
+            "full /start alias",
+            "full start alias",
+            "алиас /start",
+            "create path",
+        )
+    )
+    if existing and not alias:
+        return "existing_users_only"
+    if alias and not existing:
+        return "full_alias"
+    return None
+
+
+def _build_advisory_reasoning(
     *,
     path: str,
-    base: str | None,
-    ours: str | None,
-    theirs: str | None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any] | None]:
-    """Build resolution options, owner decisions, optional recommendation."""
+    ours_t: str | None,
+    theirs_t: str | None,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Deterministic advisory contract over the evidence packet (no mutation)."""
+    ours = _side_behavior(ours_t, label="OURS")
+    theirs = _side_behavior(theirs_t, label="THEIRS")
+    only_ours, only_theirs = _diff_lines(ours_t, theirs_t)
+    evidence = list(context.get("evidence") or [])
+    strong = _strong_evidence(context)
+    siblings = [e for e in evidence if e.get("authority_class") == "SIBLING_IMPLEMENTATION"]
+    tests = [e for e in evidence if e.get("authority_class") == "TEST_EVIDENCE"]
+    char_tests = [e for e in tests if e.get("test_kind") == "characterization"]
+    contract_tests = [e for e in tests if e.get("test_kind") == "contract"]
+
+    facts: list[dict[str, Any]] = []
+    facts.append(
+        {
+            "text": f"Конфликтный путь: {path}.",
+            "evidence_refs": ["conflict_blobs"],
+        }
+    )
+    if ours["read_only"] is not None or theirs["read_only"] is not None:
+        facts.append(
+            {
+                "text": (
+                    f"OURS read_only={ours['read_only']}; "
+                    f"THEIRS read_only={theirs['read_only']}."
+                ),
+                "evidence_refs": ["conflict_blobs"],
+            }
+        )
+    if siblings:
+        facts.append(
+            {
+                "text": (
+                    "Найдена sibling-реализация: "
+                    + ", ".join(sorted({e['path'] for e in siblings})[:5])
+                    + "."
+                ),
+                "evidence_refs": [e["evidence_id"] for e in siblings[:5]],
+            }
+        )
+        # Sibling API difference is a fact when observable in excerpts.
+        sib_ro = []
+        for e in siblings:
+            m = re.search(r"\bread_only\s*=\s*(True|False)\b", e.get("excerpt") or "")
+            if m:
+                sib_ro.append((e["evidence_id"], m.group(1)))
+        if sib_ro and (ours["read_only"] or theirs["read_only"]):
+            facts.append(
+                {
+                    "text": (
+                        "Sibling использует read_only="
+                        + ", ".join(v for _, v in sib_ro[:3])
+                        + " — это наблюдение, не норма."
+                    ),
+                    "evidence_refs": [i for i, _ in sib_ro[:3]],
+                }
+            )
+    if tests:
+        facts.append(
+            {
+                "text": f"Найдены тестовые упоминания ({len(tests)}).",
+                "evidence_refs": [e["evidence_id"] for e in tests[:5]],
+            }
+        )
+    if char_tests:
+        facts.append(
+            {
+                "text": (
+                    "Есть characterization-тесты текущего поведения; "
+                    "они не доказывают intended product contract."
+                ),
+                "evidence_refs": [e["evidence_id"] for e in char_tests[:5]],
+            }
+        )
+    if strong:
+        facts.append(
+            {
+                "text": (
+                    "Найден verified strong authority: "
+                    + ", ".join(
+                        sorted(
+                            {
+                                f"{e['authority_class']}:{e['path']}"
+                                f"({e.get('authority_basis')})"
+                                for e in strong
+                            }
+                        )[:5]
+                    )
+                    + "."
+                ),
+                "evidence_refs": [e["evidence_id"] for e in strong[:5]],
+            }
+        )
+    unverified_labeled = [
+        e
+        for e in evidence
+        if e.get("authority_class") in _STRONG_AUTHORITY
+        and e.get("authority_verified") is not True
+    ]
+    if unverified_labeled:
+        facts.append(
+            {
+                "text": (
+                    f"Есть {len(unverified_labeled)} элемент(ов) с сильным "
+                    "authority_class без authority_verified — они не влияют "
+                    "на RECOMMENDATION."
+                ),
+                "evidence_refs": [e["evidence_id"] for e in unverified_labeled[:5]],
+            }
+        )
+
+    interpretations: list[dict[str, Any]] = []
+    # Callback-style pattern: create vs navigation / read_only disagreement.
+    callbackish = (
+        "create_user" in (ours_t or "") + (theirs_t or "")
+        or "callback" in path.lower()
+        or (
+            ours["read_only"] is not None
+            and theirs["read_only"] is not None
+            and ours["read_only"] != theirs["read_only"]
+        )
+    )
+    if siblings and (ours["read_only"] or theirs["read_only"]):
+        interpretations.append(
+            {
+                "mark": "inference",
+                "text": (
+                    "Если callback должен быть полным алиасом sibling create-path, "
+                    "то read_only=True может быть дефектом."
+                ),
+                "evidence_refs": [e["evidence_id"] for e in siblings[:3]],
+            }
+        )
+        interpretations.append(
+            {
+                "mark": "inference",
+                "text": (
+                    "Если callback предназначен только для существующих пользователей "
+                    "(navigation), то read_only=True согласован, а create_user-ветка "
+                    "может быть мёртвой/несогласованной."
+                ),
+                "evidence_refs": [e["evidence_id"] for e in siblings[:3]],
+            }
+        )
+    elif only_ours and only_theirs:
+        interpretations.append(
+            {
+                "mark": "inference",
+                "text": (
+                    "Уникальные изменения на обеих сторонах могут означать "
+                    "разные product contracts; line-diff сам по себе не выбирает сторону."
+                ),
+                "evidence_refs": ["conflict_blobs"],
+            }
+        )
+    else:
+        interpretations.append(
+            {
+                "mark": "inference",
+                "text": (
+                    "Текстовое включение/совпадение строк не доказывает intended behavior."
+                ),
+                "evidence_refs": ["conflict_blobs"],
+            }
+        )
+
+    contract_signal: dict[str, Any] | None = None
+    if strong:
+        top = strong[0]
+        contract_signal = {
+            "authority_class": top["authority_class"],
+            "evidence_id": top["evidence_id"],
+            "path": top["path"],
+            "authority_verified": True,
+            "authority_basis": top.get("authority_basis"),
+            "lifecycle_status": top.get("lifecycle_status"),
+            "summary_ru": (
+                "Verified strong authority: "
+                f"{top['path']} ({top['authority_class']}; "
+                f"basis={top.get('authority_basis')}; "
+                f"status={top.get('lifecycle_status')})."
+            ),
+            "excerpt": top.get("excerpt"),
+        }
+
+    contradictions: list[dict[str, Any]] = []
+    if siblings and ours["read_only"] and theirs["read_only"]:
+        if ours["read_only"] != theirs["read_only"]:
+            contradictions.append(
+                {
+                    "text": "OURS и THEIRS расходятся по read_only.",
+                    "evidence_refs": ["conflict_blobs"],
+                }
+            )
+    if char_tests and strong:
+        contradictions.append(
+            {
+                "text": (
+                    "Characterization-тесты фиксируют текущее поведение, "
+                    "а verified accepted/spec контекст может требовать другого."
+                ),
+                "evidence_refs": [
+                    *[e["evidence_id"] for e in char_tests[:2]],
+                    *[e["evidence_id"] for e in strong[:2]],
+                ],
+            }
+        )
+
+    # Contradictory verified authorities → null recommendation.
+    polarities: dict[str, list[str]] = {}
+    for e in strong:
+        pol = _recommendation_polarity(e.get("excerpt") or "")
+        if pol:
+            polarities.setdefault(pol, []).append(e["evidence_id"])
+    if len(polarities) >= 2:
+        contradictions.append(
+            {
+                "text": (
+                    "Два verified strong authority противоречат друг другу "
+                    f"({', '.join(sorted(polarities))}); выбор стороны невозможен."
+                ),
+                "evidence_refs": [i for ids in polarities.values() for i in ids][:6],
+            }
+        )
+
     owner: list[dict[str, Any]] = []
-    options: list[dict[str, Any]] = []
-    only_ours, only_theirs = _diff_lines(ours, theirs)
-    options.append(
-        {
-            "id": "keep_ours",
-            "title": "Оставить сторону OURS (stage 2)",
-            "resulting_behavior": "Поведение как на текущей ветке (ours).",
-            "retained_changes": "Все строки/символы stage 2.",
-            "discarded_changes": "Все уникальные изменения stage 3.",
-            "risks": [
-                "Потеря функциональности, внесённой в theirs.",
-                "Тесты/контракты, рассчитанные на theirs, могут упасть.",
-            ],
-            "affected_tests_contracts": [
-                "Целевые тесты вокруг изменённых функций path=" + path
-            ],
-        }
-    )
-    options.append(
-        {
-            "id": "keep_theirs",
-            "title": "Оставить сторону THEIRS (stage 3)",
-            "resulting_behavior": "Поведение как на входящей стороне (theirs).",
-            "retained_changes": "Все строки/символы stage 3.",
-            "discarded_changes": "Все уникальные изменения stage 2.",
-            "risks": [
-                "Потеря локальных изменений ours.",
-                "Регрессии относительно ожиданий текущей ветки.",
-            ],
-            "affected_tests_contracts": [
-                "Целевые тесты вокруг изменённых функций path=" + path
-            ],
-        }
-    )
     recommendation: dict[str, Any] | None = None
-    if only_ours and only_theirs:
+
+    # Recommendation ONLY from verified strong authority — never textual subset.
+    if len(polarities) >= 2:
+        recommendation = None
         owner.append(
             {
-                "id": "product_contract_choice",
+                "id": "contradictory_verified_authorities",
                 "question": (
-                    "Какой контракт поведения должен остаться для "
-                    f"{path}: модель ours, модель theirs или явная комбинация?"
+                    f"Какой из противоречащих verified contracts для {path} "
+                    "является действующим?"
                 ),
                 "why_unprovable": (
-                    "Обе стороны содержат уникальные изменения; "
-                    "репозиторий не доказывает единственный intended contract."
+                    "Два authority_verified=true источника расходятся; "
+                    "порядок чтения не выбирает победителя."
                 ),
+                "evidence_refs": [i for ids in polarities.values() for i in ids][:6],
                 "mark": "inference_gap",
             }
         )
-        options.append(
-            {
-                "id": "manual_combine",
-                "title": "Явно скомбинировать ours и theirs",
-                "resulting_behavior": (
-                    "Поведение после ручного объединения выбранных фрагментов."
-                ),
-                "retained_changes": "Выбранные фрагменты обеих сторон.",
-                "discarded_changes": "Отклонённые фрагменты по решению Owner.",
-                "risks": [
-                    "Ошибочная комбинация может нарушить оба исходных контракта.",
-                    "Требует ручной проверки Owner.",
-                ],
-                "affected_tests_contracts": [
-                    "Все тесты, покрывающие пересекающиеся символы"
-                ],
-            }
+    elif strong:
+        # Per-item polarities already computed; do not join excerpts (masks conflicts).
+        prefers_existing = set(polarities) == {"existing_users_only"}
+        prefers_alias = set(polarities) == {"full_alias"}
+        why_accepted = "; ".join(
+            f"{e['path']}: {e.get('authority_basis')} "
+            f"(status={e.get('lifecycle_status')})"
+            for e in strong[:3]
         )
-        # Evidence supports multiple valid contracts — no recommendation.
-        recommendation = None
-    elif only_ours and not only_theirs:
-        recommendation = {
-            "option_id": "keep_ours",
-            "rationale": (
-                "Наблюдаемые уникальные изменения есть только на стороне ours; "
-                "theirs не добавляет отдельных строк относительно ours."
-            ),
-        }
-    elif only_theirs and not only_ours:
-        recommendation = {
-            "option_id": "keep_theirs",
-            "rationale": (
-                "Наблюдаемые уникальные изменения есть только на стороне theirs; "
-                "ours не добавляет отдельных строк относительно theirs."
-            ),
-        }
-    else:
-        if (ours or "") == (theirs or ""):
-            recommendation = {
-                "option_id": "keep_ours",
-                "rationale": "Тексты stage 2 и stage 3 совпадают.",
-            }
-        else:
+        if prefers_existing and not prefers_alias:
+            prefer_side = None
+            if ours["read_only"] == "True" and theirs["read_only"] != "True":
+                prefer_side = "keep_ours"
+            elif theirs["read_only"] == "True" and ours["read_only"] != "True":
+                prefer_side = "keep_theirs"
+            if prefer_side:
+                recommendation = {
+                    "option_id": prefer_side,
+                    "rationale": (
+                        "Verified accepted/current contract указывает "
+                        "existing-users-only; сторона с read_only=True согласована. "
+                        f"Почему accepted: {why_accepted}. "
+                        "Файлы не изменялись."
+                    ),
+                    "evidence_refs": [e["evidence_id"] for e in strong[:5]],
+                    "strength": "verified_strong_authority",
+                    "authority_basis": why_accepted,
+                }
+            else:
+                recommendation = {
+                    "option_id": "align_to_contract",
+                    "rationale": (
+                        "Есть verified репозиторный контракт; реализацию нужно "
+                        "выровнять вручную. "
+                        f"Почему accepted: {why_accepted}."
+                    ),
+                    "evidence_refs": [e["evidence_id"] for e in strong[:5]],
+                    "strength": "verified_strong_authority",
+                    "authority_basis": why_accepted,
+                }
+        elif prefers_alias and not prefers_existing:
+            prefer_side = None
+            if ours["read_only"] == "False" and theirs["read_only"] != "False":
+                prefer_side = "keep_ours"
+            elif theirs["read_only"] == "False" and ours["read_only"] != "False":
+                prefer_side = "keep_theirs"
+            if prefer_side:
+                recommendation = {
+                    "option_id": prefer_side,
+                    "rationale": (
+                        "Verified contract указывает полный alias create-path; "
+                        "сторона с read_only=False согласована. "
+                        f"Почему accepted: {why_accepted}."
+                    ),
+                    "evidence_refs": [e["evidence_id"] for e in strong[:5]],
+                    "strength": "verified_strong_authority",
+                    "authority_basis": why_accepted,
+                }
+        if recommendation is None and len(polarities) < 2:
             owner.append(
                 {
-                    "id": "semantic_equivalence_unknown",
+                    "id": "contract_present_but_ambiguous",
                     "question": (
-                        f"Эквивалентны ли семантически варианты {path}, "
-                        "несмотря на текстовые различия?"
+                        f"Какой контракт для {path} следует из "
+                        f"{strong[0]['path']} и как его применить к OURS/THEIRS?"
                     ),
                     "why_unprovable": (
-                        "Простой line-diff не доказывает семантическую эквивалентность."
+                        "Verified authority найден, но не различает стороны "
+                        "однозначно по наблюдаемым признакам."
                     ),
+                    "evidence_refs": [e["evidence_id"] for e in strong[:3]],
                     "mark": "inference_gap",
                 }
             )
-            recommendation = None
-    return options, owner, recommendation
+    else:
+        if callbackish:
+            owner.append(
+                {
+                    "id": "callback_contract_choice",
+                    "question": (
+                        f"Какой контракт у callback в {path}: "
+                        "полный алиас create-path (/start) или navigation "
+                        "только для существующих пользователей?"
+                    ),
+                    "why_unprovable": (
+                        "Sibling/test evidence не является нормативной authority; "
+                        "accepted decision/spec не найдены в бюджете."
+                    ),
+                    "evidence_refs": [
+                        *[e["evidence_id"] for e in siblings[:2]],
+                        *[e["evidence_id"] for e in tests[:2]],
+                    ],
+                    "mark": "inference_gap",
+                }
+            )
+        else:
+            owner.append(
+                {
+                    "id": "product_contract_choice",
+                    "question": (
+                        f"Какой контракт поведения должен остаться для {path}?"
+                    ),
+                    "why_unprovable": (
+                        "Нет ACCEPTED_DECISION/CURRENT_SPEC/CONTRACT/API_INVARIANT; "
+                        "текстовый subset/sibling similarity не являются authority."
+                    ),
+                    "evidence_refs": ["conflict_blobs"],
+                    "mark": "inference_gap",
+                }
+            )
+        recommendation = None
+
+    options = [
+        {
+            "id": "keep_ours",
+            "title": "Оставить сторону OURS",
+            "behavior_after": ours["summary_ru"],
+            "retained_from_ours": "Содержимое stage 2",
+            "retained_from_theirs": "ничего",
+            "supporting_evidence": [],
+            "contradicting_evidence": [e["evidence_id"] for e in strong[:3]]
+            if recommendation and recommendation.get("option_id") == "keep_theirs"
+            else [],
+            "risk": "Потеря изменений THEIRS; возможное расхождение с sibling/контрактом.",
+            "validation_needed": [f"Проверить поведение {path} после выбора OURS"],
+        },
+        {
+            "id": "keep_theirs",
+            "title": "Оставить сторону THEIRS",
+            "behavior_after": theirs["summary_ru"],
+            "retained_from_ours": "ничего",
+            "retained_from_theirs": "Содержимое stage 3",
+            "supporting_evidence": [],
+            "contradicting_evidence": [e["evidence_id"] for e in strong[:3]]
+            if recommendation and recommendation.get("option_id") == "keep_ours"
+            else [],
+            "risk": "Потеря изменений OURS; возможное расхождение с текущей веткой.",
+            "validation_needed": [f"Проверить поведение {path} после выбора THEIRS"],
+        },
+        {
+            "id": "manual_combine",
+            "title": "Вручную скомбинировать стороны под выбранный контракт",
+            "behavior_after": "Поведение после явного объединения фрагментов Owner.",
+            "retained_from_ours": "Выбранные фрагменты",
+            "retained_from_theirs": "Выбранные фрагменты",
+            "supporting_evidence": [e["evidence_id"] for e in strong[:3]],
+            "contradicting_evidence": [],
+            "risk": "Ошибочная комбинация; требует проверки Owner.",
+            "validation_needed": [
+                "Точечные тесты вокруг изменённых символов",
+                "Проверка согласованности со sibling/контрактом",
+            ],
+        },
+    ]
+    if recommendation and recommendation.get("option_id") == "align_to_contract":
+        options.append(
+            {
+                "id": "align_to_contract",
+                "title": "Выровнять реализацию под явный репозиторный контракт",
+                "behavior_after": recommendation["rationale"],
+                "retained_from_ours": "Только согласованное с контрактом",
+                "retained_from_theirs": "Только согласованное с контрактом",
+                "supporting_evidence": recommendation.get("evidence_refs") or [],
+                "contradicting_evidence": [e["evidence_id"] for e in char_tests[:3]],
+                "risk": "Characterization-тесты могут потребовать обновления.",
+                "validation_needed": [
+                    "Обновить/добавить contract tests под accepted decision",
+                    "Проверить мёртвые ветки (например create_user)",
+                ],
+            }
+        )
+
+    disagreement_ru = (
+        "Стороны расходятся по наблюдаемому поведению "
+        f"(уникальных строк ours={len(only_ours)}, theirs={len(only_theirs)}). "
+    )
+    if ours["read_only"] != theirs["read_only"]:
+        disagreement_ru += (
+            f"Различие read_only: OURS={ours['read_only']} vs "
+            f"THEIRS={theirs['read_only']}. "
+        )
+    if siblings:
+        disagreement_ru += (
+            "Sibling-код показывает иной/похожий API-паттерн, но не является нормой. "
+        )
+    if not strong:
+        disagreement_ru += (
+            "Авторитетный контракт в бюджете не найден — выбор стороны требует Owner."
+        )
+    else:
+        disagreement_ru += "Есть авторитетный контекст; см. CONTRACT_SIGNAL."
+
+    short_ru = (
+        f"Конфликт в «{path}»: нужно понять, какое поведение согласовано с "
+        "остальным проектом. Изменения не применялись."
+    )
+
+    return {
+        "SHORT_RU": short_ru,
+        "FACTS": facts,
+        "OURS": ours,
+        "THEIRS": theirs,
+        "DISAGREEMENT_RU": disagreement_ru,
+        "INTERPRETATIONS": interpretations,
+        "CONTRACT_SIGNAL": contract_signal,
+        "CONTRADICTIONS": contradictions,
+        "OWNER_DECISIONS_REQUIRED": owner,
+        "RESOLUTION_OPTIONS": options,
+        "RECOMMENDATION": recommendation,
+        "CHARACTERIZATION_TESTS": [
+            {"evidence_id": e["evidence_id"], "path": e["path"], "kind": e.get("test_kind")}
+            for e in char_tests
+        ],
+        "CONTRACT_TESTS": [
+            {"evidence_id": e["evidence_id"], "path": e["path"], "kind": e.get("test_kind")}
+            for e in contract_tests
+        ],
+        "TEXTUAL_SUBSET_NOTE": (
+            "Текстовое включение/line-set equivalence никогда не создаёт "
+            "рекомендацию keep_ours/keep_theirs."
+        ),
+    }
 
 
 def _human_report_ru(report: dict[str, Any]) -> str:
-    """Render Russian human-readable advisory report."""
+    """Render Russian human-readable advisory report (behavior first)."""
     lines: list[str] = [SAFETY_LABEL_RU, ""]
-    cur = report["CURRENT_CONFLICT"]
-    lines.append("## Текущий конфликт")
-    lines.append(f"Операция: {cur.get('operation')}")
-    lines.append(f"Путь: {cur.get('path')}")
-    lines.append(
-        "Stage blobs: "
-        f"base={cur.get('base_available')} "
-        f"ours={cur.get('ours_available')} "
-        f"theirs={cur.get('theirs_available')}"
-    )
+    lines.append("## Коротко")
+    lines.append(str(report.get("SHORT_RU") or ""))
     lines.append("")
     lines.append("## Факты")
     for fact in report.get("FACTS") or []:
-        lines.append(f"- {fact}")
+        if isinstance(fact, dict):
+            refs = ",".join(fact.get("evidence_refs") or [])
+            suffix = f" [{refs}]" if refs else ""
+            lines.append(f"- {fact.get('text')}{suffix}")
+        else:
+            lines.append(f"- {fact}")
     lines.append("")
-    lines.append("## OURS")
-    lines.append(str(report.get("OURS") or ""))
+    ours = report.get("OURS") or {}
+    theirs = report.get("THEIRS") or {}
+    lines.append("## Что делает OURS")
+    lines.append(str(ours.get("summary_ru") if isinstance(ours, dict) else ours))
     lines.append("")
-    lines.append("## THEIRS")
-    lines.append(str(report.get("THEIRS") or ""))
+    lines.append("## Что делает THEIRS")
+    lines.append(str(theirs.get("summary_ru") if isinstance(theirs, dict) else theirs))
     lines.append("")
-    lines.append("## Семантический конфликт")
-    lines.append(str(report.get("SEMANTIC_CONFLICT") or ""))
+    lines.append("## Контекст репозитория")
+    ctx = report.get("CONTEXT_EVIDENCE") or {}
+    for e in (ctx.get("evidence") or [])[:12]:
+        lines.append(
+            f"- [{e.get('evidence_id')}] {e.get('authority_class')} "
+            f"{e.get('path')}:{e.get('line_start')}-{e.get('line_end')} — "
+            f"{e.get('match_reason')}"
+        )
+    gaps = ctx.get("evidence_gaps") or []
+    if gaps:
+        lines.append("Пробелы evidence:")
+        for g in gaps:
+            lines.append(f"- EVIDENCE_GAP: {g}")
     lines.append("")
-    lines.append("## Интерпретации (выводы, не факты)")
+    lines.append("## В чём реальное расхождение")
+    lines.append(str(report.get("DISAGREEMENT_RU") or report.get("SEMANTIC_CONFLICT") or ""))
+    lines.append("")
+    lines.append("## Интерпретации")
     for item in report.get("INTERPRETATIONS") or []:
-        lines.append(f"- [{item.get('mark')}] {item.get('text')}")
+        refs = ",".join(item.get("evidence_refs") or [])
+        suffix = f" [{refs}]" if refs else ""
+        lines.append(f"- [{item.get('mark')}] {item.get('text')}{suffix}")
     lines.append("")
-    lines.append("## Решения Owner")
+    lines.append("## Вопросы владельцу")
     decisions = report.get("OWNER_DECISIONS_REQUIRED") or []
     if not decisions:
-        lines.append("- Нет: по текущим фактам Owner-решение не требуется.")
+        lines.append("- Нет обязательного Owner-вопроса по текущим фактам.")
     else:
         for d in decisions:
             lines.append(f"- {d.get('question')}")
     lines.append("")
-    lines.append("## Варианты разрешения")
+    lines.append("## Варианты")
     for opt in report.get("RESOLUTION_OPTIONS") or []:
         lines.append(f"### {opt.get('id')}: {opt.get('title')}")
-        lines.append(str(opt.get("resulting_behavior") or ""))
+        lines.append(str(opt.get("behavior_after") or opt.get("resulting_behavior") or ""))
+        if opt.get("risk"):
+            lines.append(f"Риск: {opt.get('risk')}")
     lines.append("")
     rec = report.get("RECOMMENDATION")
     lines.append("## Рекомендация")
     if rec is None:
         lines.append(
-            "Рекомендация не обоснована: недостаточно доказательств для "
-            "единственного контракта. Нужно решение Owner."
+            "RECOMMENDATION=null — недостаточно сильного репозиторного authority, "
+            "чтобы выбрать сторону. Нужно решение Owner."
         )
     else:
         lines.append(f"Предпочтительный вариант: {rec.get('option_id')}")
         lines.append(str(rec.get("rationale") or ""))
+        refs = ",".join(rec.get("evidence_refs") or [])
+        if refs:
+            lines.append(f"Evidence: {refs}")
     lines.append("")
-    lines.append("## План проверки")
+    lines.append("## Как проверить")
     for step in report.get("VALIDATION_PLAN") or []:
         lines.append(f"- {step}")
     lines.append("")
@@ -359,12 +797,17 @@ def _human_report_ru(report: dict[str, Any]) -> str:
     for lim in report.get("LIMITATIONS") or []:
         lines.append(f"- {lim}")
     lines.append("")
+    # Low-level Git details last.
+    cur = report.get("CURRENT_CONFLICT") or {}
+    lines.append("## Технические детали Git (ниже объяснения)")
+    lines.append(f"Операция: {cur.get('operation')}")
+    lines.append(f"Путь: {cur.get('path')}")
+    ids = cur.get("stage_blob_identities") or {}
+    lines.append(f"Stage OIDs: base={ids.get('1')} ours={ids.get('2')} theirs={ids.get('3')}")
     mut = report.get("MUTATION_ASSERTION") or {}
-    lines.append("## Неизменность состояния")
     lines.append(
-        f"worktree={mut.get('worktree_unchanged')} "
-        f"index={mut.get('index_unchanged')} "
-        f"refs={mut.get('refs_unchanged')}"
+        f"Неизменность: worktree={mut.get('worktree_unchanged')} "
+        f"index={mut.get('index_unchanged')} refs={mut.get('refs_unchanged')}"
     )
     return "\n".join(lines) + "\n"
 
@@ -378,17 +821,13 @@ def run_preview_advisory(
 
     Raises:
         StopRequired: typed fail-closed conditions (platform, no conflict,
-            mutation, allowlist violation, etc.).
+            mutation, context path escape/symlink, etc.).
     """
     assert_supported_platform()
     repo = Path(repo_root).resolve()
-    if not (repo / ".git").exists() and not (repo / ".git").is_file():
-        # Allow bare detection via rev-parse later.
-        pass
     git = PreviewReadonlyGit(repo)
     try:
         operation = _detect_operation(git)
-        # First pass: discover paths for worktree digest capture.
         probe = git.read_unmerged_index()
         probe_rows = _parse_unmerged(probe or "")
         if not probe_rows:
@@ -406,7 +845,6 @@ def run_preview_advisory(
             focus_paths = all_paths
         before = _capture_state(git, paths=focus_paths)
         snapshots = _load_conflict_paths(git, path_filter=path)
-        # Analyze first selected path as primary report focus.
         primary = snapshots[0]
         base_b = primary.stages.get(1)
         ours_b = primary.stages.get(2)
@@ -419,61 +857,37 @@ def run_preview_advisory(
                 "PREVIEW_STAGE_BLOBS_UNREADABLE",
                 {"path": primary.path},
             )
-        facts = [
-            f"Операция Git: {operation}",
-            f"Конфликтный путь: {primary.path}",
-            f"Stage1(base) oid={base_b.oid if base_b else None}",
-            f"Stage2(ours) oid={ours_b.oid if ours_b else None}",
-            f"Stage3(theirs) oid={theirs_b.oid if theirs_b else None}",
-            f"HEAD={before['head']}",
-        ]
-        only_ours, only_theirs = _diff_lines(ours_t, theirs_t)
-        facts.append(
-            f"Уникальных непустых строк только в ours: {len(only_ours)}; "
-            f"только в theirs: {len(only_theirs)}"
+
+        stage_oids = {
+            "1": base_b.oid if base_b else None,
+            "2": ours_b.oid if ours_b else None,
+            "3": theirs_b.oid if theirs_b else None,
+        }
+        context = collect_conflict_context(
+            repo,
+            conflict_path=primary.path,
+            operation=operation,
+            base_text=base_t,
+            ours_text=ours_t,
+            theirs_text=theirs_t,
+            stage_oids=stage_oids,
         )
-        semantic = (
-            "Текстовое пересечение unmerged index не доказывает само по себе "
-            "семантический конфликт. "
-        )
-        if only_ours and only_theirs:
-            semantic += (
-                "Наблюдаются уникальные изменения на обеих сторонах — вероятный "
-                "семантический/контрактный конфликт, требующий решения Owner."
-            )
-        elif only_ours or only_theirs:
-            semantic += (
-                "Уникальные изменения сосредоточены на одной стороне; "
-                "текстовый overlap может быть односторонним."
-            )
-        else:
-            semantic += (
-                "Line-set diff не выявил уникальных строк; возможны пробелы/"
-                "порядок/семантические отличия без простого line-delta."
-            )
-        interpretations = [
-            {
-                "mark": "inference",
-                "text": (
-                    "Различие sibling-кода само по себе не доказывает дефект; "
-                    "нужен intended contract от Owner."
-                ),
-            }
-        ]
-        options, owner, recommendation = _build_options(
+        reasoning = _build_advisory_reasoning(
             path=primary.path,
-            base=base_t,
-            ours=ours_t,
-            theirs=theirs_t,
+            ours_t=ours_t,
+            theirs_t=theirs_t,
+            context=context,
         )
+
         validation_plan = [
-            f"Точечные тесты/проверки для символов в {primary.path}",
-            "Прогон смежных unit-тестов модуля после ручного разрешения",
-            "При необходимости — статический анализ затронутого контура",
+            f"Точечные тесты для символов в {primary.path}",
+            "Сверить выбор со sibling/контрактом из CONTEXT_EVIDENCE",
+            "При изменении characterization-тестов — явно зафиксировать новый контракт",
         ]
         limitations = [
             "Результат advisory; требуется проверка человеком.",
             "Изменения не применялись и не должны применяться автоматически.",
+            "Sibling-код и characterization-тесты — evidence, не нормативная authority.",
             "Внешний authority declaration producer недоступен / не использовался.",
             "OS_VERIFIED sandbox недоступен / не использовался.",
             "Принадлежность source commit к pack/membership не верифицировалась "
@@ -481,6 +895,7 @@ def run_preview_advisory(
             "Trusted-Git execution не заявляется как atomic (R25-MEDIUM-002 открыт).",
             "GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY.",
         ]
+
         after = _capture_state(git, paths=focus_paths)
         if before["index_digest"] != after["index_digest"]:
             raise StopRequired(
@@ -509,6 +924,14 @@ def run_preview_advisory(
                 },
             )
         git.assert_ledger_has_no_mutations()
+
+        # Compatibility aliases for prior report consumers.
+        fact_strings = [
+            f["text"] if isinstance(f, dict) else str(f) for f in reasoning["FACTS"]
+        ]
+        fact_strings.append(f"Операция Git: {operation}")
+        fact_strings.append(reasoning["TEXTUAL_SUBSET_NOTE"])
+
         report: dict[str, Any] = {
             "schema": PREVIEW_REPORT_SCHEMA,
             "status": "PREVIEW_READY",
@@ -521,30 +944,29 @@ def run_preview_advisory(
                 "operation": operation,
                 "path": primary.path,
                 "all_unmerged_paths": all_paths,
-                "stage_blob_identities": {
-                    "1": base_b.oid if base_b else None,
-                    "2": ours_b.oid if ours_b else None,
-                    "3": theirs_b.oid if theirs_b else None,
-                },
+                "stage_blob_identities": stage_oids,
                 "base_available": base_b is not None,
                 "ours_available": ours_b is not None,
                 "theirs_available": theirs_b is not None,
             },
-            "FACTS": facts,
-            "OURS": _summarize_side(ours_t, label="OURS"),
-            "THEIRS": _summarize_side(theirs_t, label="THEIRS"),
-            "SEMANTIC_CONFLICT": semantic,
+            "SHORT_RU": reasoning["SHORT_RU"],
+            "FACTS": reasoning["FACTS"],
+            "FACTS_TEXT": fact_strings,
+            "OURS": reasoning["OURS"],
+            "THEIRS": reasoning["THEIRS"],
+            "DISAGREEMENT_RU": reasoning["DISAGREEMENT_RU"],
+            "SEMANTIC_CONFLICT": reasoning["DISAGREEMENT_RU"],
             "CONTEXT": {
                 "paths_analyzed": [s.path for s in snapshots],
-                "note": (
-                    "Ограниченный контекст: stage blobs + line-set diff; "
-                    "полный call-graph не строится."
-                ),
+                "note": "R35 bounded repository context evidence layer.",
             },
-            "INTERPRETATIONS": interpretations,
-            "OWNER_DECISIONS_REQUIRED": owner,
-            "RESOLUTION_OPTIONS": options,
-            "RECOMMENDATION": recommendation,
+            "CONTEXT_EVIDENCE": context,
+            "INTERPRETATIONS": reasoning["INTERPRETATIONS"],
+            "CONTRACT_SIGNAL": reasoning["CONTRACT_SIGNAL"],
+            "CONTRADICTIONS": reasoning["CONTRADICTIONS"],
+            "OWNER_DECISIONS_REQUIRED": reasoning["OWNER_DECISIONS_REQUIRED"],
+            "RESOLUTION_OPTIONS": reasoning["RESOLUTION_OPTIONS"],
+            "RECOMMENDATION": reasoning["RECOMMENDATION"],
             "VALIDATION_PLAN": validation_plan,
             "LIMITATIONS": limitations,
             "MUTATION_ASSERTION": {
@@ -572,7 +994,7 @@ def run_preview_advisory(
         return report
     except StopRequired:
         raise
-    except Exception as exc:  # noqa: BLE001 — convert to typed STOP, never fake success
+    except Exception as exc:  # noqa: BLE001 — convert to typed STOP
         raise StopRequired(
             "PREVIEW_UNEXPECTED_EXCEPTION",
             {

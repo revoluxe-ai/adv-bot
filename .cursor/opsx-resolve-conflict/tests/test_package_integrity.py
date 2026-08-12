@@ -21,7 +21,7 @@ def test_manifest_and_front_matter_versions_match() -> None:
         assert text.startswith("---\n")
         _, front, _ = text.split("---", 2)
         metadata = yaml.safe_load(front)
-        assert metadata["package_version"] == manifest["package_version"] == "0.34.0"
+        assert metadata["package_version"] == manifest["package_version"] == "0.39.0"
         assert (
             metadata["contract_schema_version"]
             == manifest["contract_schema_version"]
@@ -92,13 +92,13 @@ def test_review_control_documents_present() -> None:
 def test_all_version_bearing_review_documents_are_r11() -> None:
     """Reject stale review-control lineage in R24 review headers."""
     expected = {
-        "AUTHORSHIP.md": ("OPSX_RESOLVE_CONFLICT_COMMAND_001_R34", "0.34.0"),
-        "00_SCOPE.md": ("R34", "0.34.0"),
-        "01_REVIEW_STANDARD.md": ("R34",),
-        "02_REQUIRED_CONTEXT.md": ("R34",),
-        "03_VERDICT_SCHEMA.md": ("R34", '"PACKAGE_VERSION": "0.34.0"'),
-        "README_REVIEW.md": ("0.34.0",),
-        "context/OPSX_CONTEXT_EXTRACT.md": ("R34", "0.34.0"),
+        "AUTHORSHIP.md": ("OPSX_RESOLVE_CONFLICT_COMMAND_001_R39", "0.39.0"),
+        "00_SCOPE.md": ("R39", "0.39.0"),
+        "01_REVIEW_STANDARD.md": ("R39",),
+        "02_REQUIRED_CONTEXT.md": ("R39",),
+        "03_VERDICT_SCHEMA.md": ("R39", '"PACKAGE_VERSION": "0.39.0"'),
+        "README_REVIEW.md": ("0.39.0",),
+        "context/OPSX_CONTEXT_EXTRACT.md": ("R39", "0.39.0"),
     }
     for rel, tokens in expected.items():
         text = (PACKAGE_ROOT / rel).read_text(encoding="utf-8")
