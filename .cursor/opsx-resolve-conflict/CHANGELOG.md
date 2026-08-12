@@ -1,5 +1,29 @@
 # Changelog — OPSX_RESOLVE_CONFLICT_COMMAND_001
 
+## 0.40.0 (R40) — independent review candidate
+
+Author: **Cursor**
+
+### Closure targeting BUGBOT-HIGH-002 (single-path PREVIEW contract)
+
+- One PREVIEW invocation analyzes exactly one conflicted path
+- Multiple unmerged paths without `--path` → typed STOP
+  `PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS` with sorted inventory
+- Successful report binds path / `paths_analyzed` / reasoning / evidence /
+  recommendation to the selected path only
+- `unmerged_paths_inventory` / `all_unmerged_paths` labeled inventory-only
+- R34 `preview_readonly_git.py` remains byte-identical
+- R37 `preview_context.py` remains byte-identical
+- GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
+
+### Deferred (unchanged)
+
+- BUGBOT-HIGH-001 (commit routing ownership for `.cursor/opsx-resolve-conflict/**`)
+- BUGBOT-MEDIUM-001 (stale `_preview_all.json`)
+- BUGBOT-MEDIUM-002 (`process_surfaces.json` path gaps)
+- R33-GATE-PROCESS-002
+- R25-MEDIUM-002 / R25-PROCESS-001
+
 ## 0.39.0 (R39) — independent review candidate
 
 Author: **Cursor**

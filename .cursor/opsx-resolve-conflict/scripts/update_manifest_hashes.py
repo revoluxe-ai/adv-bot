@@ -23,7 +23,7 @@ def main() -> None:
     """Refresh MANIFEST inventory hashes and TRUST_ANCHOR digest."""
     manifest_path = PACKAGE_ROOT / "MANIFEST.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["package_name"] = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39"
+    manifest["package_name"] = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40"
     manifest["package_version"] = PACKAGE_VERSION
     manifest["contract_schema_version"] = "opsx-resolve-conflict/v2"
     manifest["status"] = "preview_only_no_go"

@@ -1,12 +1,12 @@
-# REPEAT REVIEW REQUEST — `/opsx-resolve-conflict` R39 / 0.39.0
+# REPEAT REVIEW REQUEST — `/opsx-resolve-conflict` R40 / 0.40.0
 
 Review package (single delivery archive):
 
 ```text
-<NATIVE_ARTIFACT_ROOT>/OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REVIEW_BUNDLE.zip
+<NATIVE_ARTIFACT_ROOT>/OPSX_RESOLVE_CONFLICT_COMMAND_001_R40_REVIEW_BUNDLE.zip
 
-OPSX_RESOLVE_CONFLICT_COMMAND_001_R39
-PACKAGE_VERSION=0.39.0
+OPSX_RESOLVE_CONFLICT_COMMAND_001_R40
+PACKAGE_VERSION=0.40.0
 CONTRACT_SCHEMA_VERSION=opsx-resolve-conflict/v2
 AUTHOR=Cursor
 STATUS=preview_only_no_go
@@ -25,13 +25,13 @@ This **inner** document intentionally omits:
 Authoritative values for those fields are only in external evidence:
 
 - `BUNDLE_INDEX.json`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.TEST_REPORT.json`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.SIDECAR.json`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.TEST_REPORT.json`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.SIDECAR.json`
 
 Package digest for the immutable inner tree is recorded in `MANIFEST.json`,
 `TRUST_ANCHOR.json`, and `SHA256SUMS` and must match those artifacts.
 
-## Claimed closures for R39
+## Claimed closures for R40
 
 1. R38-GATE-PROCESS-001: PREVIEW evidence path sanitization (`<TRUSTED_GIT_EXECUTABLE>`)
 2. Recursive JSON string-value path scan (closes R38 JSON-escaping validator bypass)

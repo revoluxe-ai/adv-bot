@@ -68,7 +68,7 @@ def _stop_stdout(*, reason: str, gate: str) -> str:
             "reason": reason,
             "details": {"go_capability": False},
             "command": "go",
-            "package_version": "0.39.0",
+            "package_version": "0.40.0",
             "reached_gate": gate,
         },
         indent=2,

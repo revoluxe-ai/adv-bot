@@ -22,8 +22,8 @@ from path_workspace import native_artifact_root  # noqa: E402
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 OUT_DIR = native_artifact_root()
-PACKAGE_NAME = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39"
-PACKAGE_VERSION = "0.39.0"
+PACKAGE_NAME = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40"
+PACKAGE_VERSION = "0.40.0"
 STAGING = OUT_DIR / PACKAGE_NAME
 ZIP_PATH = OUT_DIR / f"{PACKAGE_NAME}.zip"
 

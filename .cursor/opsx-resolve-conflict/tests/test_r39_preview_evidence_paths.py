@@ -51,8 +51,8 @@ def evidence_pair(tmp_path_factory) -> tuple[dict, dict, Path, Path]:
     merge_p, rebase_p, _index_p = write_evidence_pair(
         out_dir=out,
         package_staging=package_staging,
-        package_name="OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_TEST",
-        package_version="0.39.0",
+        package_name="OPSX_RESOLVE_CONFLICT_COMMAND_001_R40_TEST",
+        package_version="0.40.0",
         package_digest="a" * 64,
         inner_archive_sha256="b" * 64,
     )

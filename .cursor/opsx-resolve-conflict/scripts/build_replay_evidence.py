@@ -38,8 +38,8 @@ from path_workspace import native_artifact_root  # noqa: E402
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
 OUT_DIR = native_artifact_root()
-PACKAGE_NAME = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39"
-PACKAGE_VERSION = "0.39.0"
+PACKAGE_NAME = "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40"
+PACKAGE_VERSION = "0.40.0"
 NORMALIZATION_SCHEMA = "opsx-resolve-conflict/path-normalization/v2"
 REPLAY_SUMMARY_SCHEMA = "opsx-resolve-conflict/replay-evidence/v6"
 REPLAY_EXPECTATION_SCHEMA = "opsx-resolve-conflict/replay-expectation/v1"

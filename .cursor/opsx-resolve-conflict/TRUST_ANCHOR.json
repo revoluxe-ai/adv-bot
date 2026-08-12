@@ -5,7 +5,7 @@
     "BLOCKER_AUTHORITY_PRODUCER_MISSING",
     "BLOCKER_OS_SANDBOX_RUNNER_MISSING"
   ],
-  "package_digest": "fccf8bc542d4824671c237701f8272547edc976bab3e1634e1d7ff0e3ec8c808",
-  "package_version": "0.39.0",
+  "package_digest": "d9a3b068f954e57eb6993764abe28d077207abf9f60049fb3633f2d6f607df76",
+  "package_version": "0.40.0",
   "schema": "opsx-resolve-conflict/trust-anchor/v1"
 }

@@ -1,7 +1,7 @@
 ---
 name: /opsx-resolve-conflict
 id: opsx-resolve-conflict
-package_version: 0.39.0
+package_version: 0.40.0
 contract_schema_version: opsx-resolve-conflict/v2
 status: candidate_for_independent_review
 author: Cursor
@@ -23,7 +23,7 @@ argument-hint: "[PREVIEW|GO] [change=<CHANGE_ID>] [store=<STORE_ID>]"
 ## 0. Status and installation boundary
 
 This file is one component of package
-`OPSX_RESOLVE_CONFLICT_COMMAND_001_R39`.
+`OPSX_RESOLVE_CONFLICT_COMMAND_001_R40`.
 
 Packages `0.5.0` / R05 through `0.13.0` / R13 are **REJECTED** and must not be
 used for GO.
@@ -99,6 +99,11 @@ Default when `GO` is absent or `PREVIEW` is present.
 PREVIEW is a **repository-context conflict assistant** (not an autonomous
 resolver and not a line-diff chooser). It is read-only:
 
+- analyze **exactly one** conflicted path per invocation (R40);
+- when ``--path`` is omitted and exactly one path is unmerged, analyze that path;
+- when ``--path`` is omitted and multiple paths are unmerged, STOP with
+  ``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`` (envelope lists sorted paths);
+- when ``--path`` is supplied, analyze only that unmerged path;
 - load stage 1/2/3 blobs via the sealed R34 exact Git operation grammar;
 - collect a bounded structured context packet (siblings, callers/usages,
   tests, accepted decisions/specs) without shell/rg subprocesses;
@@ -111,6 +116,11 @@ resolver and not a line-diff chooser). It is read-only:
   rejected/superseded decisions and change-local specs do not recommend;
 - never recommend `keep_ours`/`keep_theirs` from textual subset alone;
 - never edit, stage, continue, abort, skip, commit, or push.
+
+Successful PREVIEW reports bind ``CURRENT_CONFLICT.path``,
+``CONTEXT.paths_analyzed``, reasoning, evidence, and recommendation to the
+selected path only. ``unmerged_paths_inventory`` / ``all_unmerged_paths`` are
+inventory, not analysis coverage.
 
 Human output leads with Russian behavioral explanation; Git OIDs/hashes are
 secondary evidence below.
@@ -1003,7 +1013,7 @@ items and evidence IDs.
 ```text
 STATUS=PREVIEW_READY
 COMMAND=/opsx-resolve-conflict
-PACKAGE_VERSION=0.39.0
+PACKAGE_VERSION=0.40.0
 SAFE_USAGE_SCOPE=PREVIEW_ONLY
 GO_CAPABILITY=false
 OPERATION=
@@ -1021,7 +1031,7 @@ DO_NOT_DO_YET=edit-by-runtime, stage, continue, abort, skip, commit, push, GO
 ```text
 STATUS=READY_FOR_OWNER_CONTINUE
 COMMAND=/opsx-resolve-conflict
-PACKAGE_VERSION=0.39.0
+PACKAGE_VERSION=0.40.0
 RUN_ID=
 OPERATION=
 START_HEAD=
@@ -1063,7 +1073,7 @@ Next action after Owner continue (out of band):
 ```text
 STATUS=STOP_FOR_OWNER
 COMMAND=/opsx-resolve-conflict
-PACKAGE_VERSION=0.39.0
+PACKAGE_VERSION=0.40.0
 RUN_ID=
 OPERATION=
 CURRENT_HEAD=

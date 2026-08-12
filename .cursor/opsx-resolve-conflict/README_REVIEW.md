@@ -1,39 +1,35 @@
-# Independent re-review — `/opsx-resolve-conflict` 0.39.0
+# Independent re-review — `/opsx-resolve-conflict` 0.40.0
 
-Author: **Cursor**  
-Status: `preview_only_no_go` · `GO_CAPABILITY=false` · `SAFE_USAGE_SCOPE=PREVIEW_ONLY`  
-Platform: **Windows only** (ADR-OPSX-RC-PLATFORM-001 / WINDOWS_PREVIEW_ONLY)
+Author: Cursor  
+Status: `preview_only_no_go` · `GO_CAPABILITY=false` · `SAFE_USAGE_SCOPE=PREVIEW_ONLY`
 
-## Architect-closed, pending reviewer confirmation
+## Why re-review
 
-- R25-HIGH-001
-- R25-HIGH-002
-- R25-HIGH-003
-- R25-MEDIUM-001
-- R25-MEDIUM-003 (R30/R31 OS trust-store path protection + per-right AccessCheck)
-- R25-MEDIUM-004 (R32 portability + Windows PREVIEW_ONLY ADR)
-- R33-GATE-PROCESS-001 (immutable PREVIEW evidence — closed in R38)
-- R38-GATE-PROCESS-001 (PREVIEW evidence path sanitization — closed in R39)
+R39 closed R38-GATE-PROCESS-001 (PREVIEW evidence path sanitization). Independent
+review of PR #432 / commit `e22993c4…` raised **BUGBOT-HIGH-002**: PREVIEW could
+load multiple unmerged paths into report metadata while semantically analyzing
+only `snapshots[0]`.
 
-## Still open
+R40 makes the single-path contract explicit and fail-closed.
 
-- R25-MEDIUM-002 (trusted-Git boundary is **not** atomic)
-- R25-PROCESS-001
-- R33-GATE-PROCESS-002 (inner/outer platform matrix evidence-identical)
-- `BLOCKER_AUTHORITY_PRODUCER_MISSING`
-- `BLOCKER_OS_SANDBOX_RUNNER_MISSING`
+## Claimed closures
 
-## Critical fixes claimed (R39)
+- BUGBOT-HIGH-002 (single-path PREVIEW contract — closed in R40)
+- R38-GATE-PROCESS-001 (retained from R39)
+- R33-GATE-PROCESS-001 (retained from R38)
+- R36-GATE-AUTHORITY-002 / R35-GATE-AUTHORITY-001 (retained)
 
-1. R39: tokenize trusted-Git paths to `<TRUSTED_GIT_EXECUTABLE>` in shipped PREVIEW evidence
-2. R39: recursive JSON string-value path scan (closes R38 JSON-escaping bypass)
-3. R39: rebuild real merge/rebase PREVIEW evidence without author-profile paths
-4. R38 real PREVIEW evidence + FIXTURE_SETUP / command_ledger separation retained
-5. R37 preview runtime hashes remain byte-identical; GO_CAPABILITY remains false
+## Critical fixes claimed (R40)
 
-## Single delivery archive
+1. Multi-conflict without `--path` → `PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`
+2. Successful PREVIEW binds analysis surfaces to exactly one selected path
+3. Inventory fields explicitly labeled not-analyzed
+4. R34 `preview_readonly_git.py` remains byte-identical
+5. GO_CAPABILITY remains false
 
-- `<NATIVE_ARTIFACT_ROOT>/OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REVIEW_BUNDLE.zip`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.TEST_REPORT.json`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.SIDECAR.json`
-- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.PLATFORM_CAPABILITY_MATRIX.json`
+## Artifacts (after ship)
+
+- `<NATIVE_ARTIFACT_ROOT>/OPSX_RESOLVE_CONFLICT_COMMAND_001_R40_REVIEW_BUNDLE.zip`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.TEST_REPORT.json`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.SIDECAR.json`
+- `OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.PLATFORM_CAPABILITY_MATRIX.json`

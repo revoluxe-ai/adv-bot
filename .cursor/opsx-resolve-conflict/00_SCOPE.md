@@ -1,4 +1,4 @@
-# 00_SCOPE — Independent review scope (R39 / 0.39.0)
+# 00_SCOPE — Independent review scope (R40 / 0.40.0)
 
 ## In scope
 
@@ -7,12 +7,14 @@
 - Windows PREVIEW_ONLY advisory conflict analysis (`preview_advisory.py`)
 - Exact operation-ID Git grammar (`preview_readonly_git.py`; R34 byte-frozen)
 - Bounded repository context evidence (`preview_context.py`) + advisory reasoning
+- R40 single-path PREVIEW contract (BUGBOT-HIGH-002)
 - Architecture baseline / workflow / handoff / decision docs
 - Platform gate: Windows only; Linux/macOS UNSUPPORTED
 - Evidence pipeline: ZIP + TEST_REPORT/SIDECAR/platform matrix
 
 ## Out of scope
 
+- Multi-path semantic aggregator / combined multi-conflict reasoning
 - Automatic conflict resolution / worktree or index writes
 - GO enablement (`GO_CAPABILITY` remains false)
 - Authority producer implementation
@@ -20,6 +22,7 @@
 - Linux or macOS enablement
 - Changes to trusted-Git / authority / validation / trust-store GO architecture
 - Claiming R25-MEDIUM-002 or R25-PROCESS-001 closed
+- BUGBOT-HIGH-001 / BUGBOT-MEDIUM-001 / BUGBOT-MEDIUM-002 (deferred)
 
 ## Operational scope
 
@@ -31,4 +34,4 @@ Cursor (packaged for OPSX independent review).
 
 ## Prior package
 
-`0.5.0`–`0.35.0` REJECTED or REVISION_REQUIRED — not in SAFE_TO_USE scope.
+`0.5.0`–`0.39.0` REJECTED or REVISION_REQUIRED — not in SAFE_TO_USE scope.

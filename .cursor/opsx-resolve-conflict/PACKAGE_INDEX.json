@@ -1,16 +1,16 @@
 {
-  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39",
-  "package_version": "0.39.0",
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40",
+  "package_version": "0.40.0",
   "author": "Cursor",
   "contract_schema_version": "opsx-resolve-conflict/v2",
   "go_capability": false,
   "safe_usage_scope": "PREVIEW_ONLY",
-  "archive": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.zip",
+  "archive": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.zip",
   "archive_sha256": null,
   "archive_binding": "external_test_report_only",
   "package_digest": "fccf8bc542d4824671c237701f8272547edc976bab3e1634e1d7ff0e3ec8c808",
-  "external_test_report": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.TEST_REPORT.json",
-  "external_sidecar": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39.SIDECAR.json",
+  "external_test_report": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.TEST_REPORT.json",
+  "external_sidecar": "C:\\\\Temp\\\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.SIDECAR.json",
   "open_blockers": [
     "BLOCKER_AUTHORITY_PRODUCER_MISSING",
     "BLOCKER_OS_SANDBOX_RUNNER_MISSING"

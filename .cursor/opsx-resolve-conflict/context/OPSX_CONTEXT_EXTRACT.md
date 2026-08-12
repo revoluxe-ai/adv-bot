@@ -1,4 +1,4 @@
-# OPSX_CONTEXT_EXTRACT — R39 / 0.39.0
+# OPSX_CONTEXT_EXTRACT — R40 / 0.40.0
 
 Author: Cursor
 

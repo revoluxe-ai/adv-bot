@@ -194,7 +194,7 @@ def _patch_gate(
             if path.is_file()
         }
         return {
-            "package_version": "0.39.0",
+            "package_version": "0.40.0",
             "contract_schema_version": "opsx-resolve-conflict/v2",
             "hashes": {},
             "package_digest": "0" * 64,

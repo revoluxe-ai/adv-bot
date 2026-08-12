@@ -18,7 +18,7 @@ from typing import Any
 from .errors import StopRequired
 from .hashutil import sha256_canonical
 
-PACKAGE_VERSION = "0.39.0"
+PACKAGE_VERSION = "0.40.0"
 CONTRACT_SCHEMA_VERSION = "opsx-resolve-conflict/v2"
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 PLATFORM_DISPOSITION = "WINDOWS_PREVIEW_ONLY"

@@ -370,7 +370,13 @@ historical findings, not current-delivery digests/test totals. -->
 |---|---|---|
 | R38-GATE-PROCESS-001 | Recursive JSON path scan + `<TRUSTED_GIT_EXECUTABLE>` tokenization | `build_preview_evidence.py`; `tests/test_r39_preview_evidence_paths.py` |
 
-## Residual limitations disclosed for review (R39)
+## R39 → R40 mandatory closure
+
+| Finding | R40 change | Acceptance evidence |
+|---|---|---|
+| BUGBOT-HIGH-002 | Explicit single-path PREVIEW; multi-conflict without `--path` STOPs | `preview_advisory.py`; `tests/test_r40_single_path_preview.py` |
+
+## Residual limitations disclosed for review (R40)
 
 1. BLOCKER_AUTHORITY_PRODUCER_MISSING
 2. BLOCKER_OS_SANDBOX_RUNNER_MISSING
@@ -378,3 +384,6 @@ historical findings, not current-delivery digests/test totals. -->
 4. R25-PROCESS-001
 5. Linux/macOS explicitly UNSUPPORTED
 6. R33-GATE-PROCESS-002 (deferred — inner/outer platform matrix evidence-identical)
+7. BUGBOT-HIGH-001 commit routing ownership (deferred)
+8. BUGBOT-MEDIUM-001 stale `_preview_all.json` (deferred)
+9. BUGBOT-MEDIUM-002 `process_surfaces.json` path gaps (deferred)

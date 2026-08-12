@@ -1,8 +1,8 @@
 # Authorship attestation
 
 **Author:** Cursor  
-**Package:** OPSX_RESOLVE_CONFLICT_COMMAND_001_R39  
-**Version:** 0.39.0
+**Package:** OPSX_RESOLVE_CONFLICT_COMMAND_001_R40  
+**Version:** 0.40.0
 **Contract:** opsx-resolve-conflict/v2  
 
 This package (command entrypoint, typed runtime, schemas, review-control

@@ -185,8 +185,8 @@ def test_shipping_scripts_have_no_hardcoded_windows_temp() -> None:
 
 
 def test_package_version_is_r26() -> None:
-    """Current package metadata pin (R39)."""
+    """Current package metadata pin (R40)."""
     ship = _load_ship_module()
-    assert ship.PACKAGE_VERSION == "0.39.0"
-    assert ship.PACKAGE_NAME.endswith("_R39")
-    assert ship.REVISION == "R39"
+    assert ship.PACKAGE_VERSION == "0.40.0"
+    assert ship.PACKAGE_NAME.endswith("_R40")
+    assert ship.REVISION == "R40"

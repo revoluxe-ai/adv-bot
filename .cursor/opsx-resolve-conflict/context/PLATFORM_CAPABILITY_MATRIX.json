@@ -2,8 +2,8 @@
   "schema": "opsx-resolve-conflict/platform-capability-matrix/v2",
   "decision_id": "ADR-OPSX-RC-PLATFORM-001",
   "disposition": "WINDOWS_PREVIEW_ONLY",
-  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R39",
-  "package_version": "0.39.0",
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40",
+  "package_version": "0.40.0",
   "supported_platforms": [
     "windows"
   ],

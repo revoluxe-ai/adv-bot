@@ -1,8 +1,12 @@
-"""Windows PREVIEW_ONLY advisory conflict analysis (read-only, R35).
+"""Windows PREVIEW_ONLY advisory conflict analysis (read-only, R40).
 
 Two layers:
 1. Evidence — stage blobs + bounded repository context (``preview_context``).
 2. Advisory reasoning — fact/inference separation and options; never mutates.
+
+R40 invariant: one PREVIEW invocation analyzes exactly one conflicted path.
+When ``--path`` is omitted and multiple unmerged paths exist, STOP with
+``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`` (no multi-path semantic coverage).
 
 ADR-OPSX-RC-PLATFORM-001 / WINDOWS_PREVIEW_ONLY. GO_CAPABILITY=false.
 """
@@ -133,9 +137,20 @@ def _capture_state(
 def _load_conflict_paths(
     git: PreviewReadonlyGit,
     *,
-    path_filter: str | None,
+    path_filter: str,
 ) -> list[ConflictPathSnapshot]:
-    """Load stage 1/2/3 blobs for unmerged paths."""
+    """Load stage 1/2/3 blobs for exactly one unmerged path.
+
+    Args:
+        git: Read-only preview Git boundary.
+        path_filter: Repository-relative unmerged path to load (required).
+
+    Returns:
+        Single-element list of ``ConflictPathSnapshot`` for ``path_filter``.
+
+    Raises:
+        StopRequired: No unmerged paths, or ``path_filter`` is not unmerged.
+    """
     raw = git.read_unmerged_index()
     rows = _parse_unmerged(raw or "")
     if not rows:
@@ -143,23 +158,62 @@ def _load_conflict_paths(
     by_path: dict[str, dict[int, StageBlob]] = {}
     for mode, oid, stage, path in rows:
         by_path.setdefault(path, {})[stage] = StageBlob(stage, mode, oid, None)
-    paths = sorted(by_path)
-    if path_filter:
-        norm = path_filter.replace("\\", "/")
-        if norm not in by_path:
+    inventory = sorted(by_path)
+    norm = path_filter.replace("\\", "/")
+    if norm not in by_path:
+        raise StopRequired(
+            "PREVIEW_PATH_NOT_UNMERGED",
+            {"path": norm, "unmerged": inventory},
+        )
+    stages: dict[int, StageBlob] = {}
+    for stage, meta in by_path[norm].items():
+        blob = git.read_stage_blob(meta.oid)
+        stages[stage] = StageBlob(stage, meta.mode, meta.oid, blob)
+    return [ConflictPathSnapshot(path=norm, stages=stages)]
+
+
+def _select_preview_path(
+    all_paths: list[str],
+    *,
+    path: str | None,
+) -> str:
+    """Resolve the single path this PREVIEW invocation may analyze.
+
+    Args:
+        all_paths: Sorted repository-relative unmerged paths.
+        path: Optional ``--path`` argument.
+
+    Returns:
+        Exactly one selected conflicted path.
+
+    Raises:
+        StopRequired: Zero paths, multiple paths without ``--path``, or
+            ``--path`` not in the unmerged inventory.
+    """
+    if not all_paths:
+        raise StopRequired("PREVIEW_NO_UNMERGED_PATHS")
+    if path:
+        norm = path.replace("\\", "/")
+        if norm not in all_paths:
             raise StopRequired(
                 "PREVIEW_PATH_NOT_UNMERGED",
-                {"path": norm, "unmerged": paths},
+                {"path": norm, "unmerged": all_paths},
             )
-        paths = [norm]
-    snapshots: list[ConflictPathSnapshot] = []
-    for path in paths:
-        stages: dict[int, StageBlob] = {}
-        for stage, meta in by_path[path].items():
-            blob = git.read_stage_blob(meta.oid)
-            stages[stage] = StageBlob(stage, meta.mode, meta.oid, blob)
-        snapshots.append(ConflictPathSnapshot(path=path, stages=stages))
-    return snapshots
+        return norm
+    if len(all_paths) > 1:
+        raise StopRequired(
+            "PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS",
+            {
+                "unmerged_paths": all_paths,
+                "path_count": len(all_paths),
+                "hint": (
+                    "Pass --path <one-of-unmerged-paths> to analyze a "
+                    "single conflict. Multi-path semantic analysis is "
+                    "out of scope."
+                ),
+            },
+        )
+    return all_paths[0]
 
 
 def _side_behavior(text: str | None, *, label: str) -> dict[str, Any]:
@@ -819,9 +873,14 @@ def run_preview_advisory(
 ) -> dict[str, Any]:
     """Run Windows PREVIEW_ONLY advisory analysis; return report dict.
 
+    Analyzes exactly one conflicted path per invocation (R40). When ``path``
+    is omitted and multiple unmerged paths exist, raises
+    ``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS``.
+
     Raises:
         StopRequired: typed fail-closed conditions (platform, no conflict,
-            mutation, context path escape/symlink, etc.).
+            multi-path without ``--path``, mutation, context path
+            escape/symlink, etc.).
     """
     assert_supported_platform()
     repo = Path(repo_root).resolve()
@@ -833,18 +892,10 @@ def run_preview_advisory(
         if not probe_rows:
             raise StopRequired("PREVIEW_NO_UNMERGED_PATHS")
         all_paths = sorted({row[3] for row in probe_rows})
-        if path:
-            norm = path.replace("\\", "/")
-            if norm not in all_paths:
-                raise StopRequired(
-                    "PREVIEW_PATH_NOT_UNMERGED",
-                    {"path": norm, "unmerged": all_paths},
-                )
-            focus_paths = [norm]
-        else:
-            focus_paths = all_paths
+        selected_path = _select_preview_path(all_paths, path=path)
+        focus_paths = [selected_path]
         before = _capture_state(git, paths=focus_paths)
-        snapshots = _load_conflict_paths(git, path_filter=path)
+        snapshots = _load_conflict_paths(git, path_filter=selected_path)
         primary = snapshots[0]
         base_b = primary.stages.get(1)
         ours_b = primary.stages.get(2)
@@ -943,7 +994,10 @@ def run_preview_advisory(
             "CURRENT_CONFLICT": {
                 "operation": operation,
                 "path": primary.path,
+                # Inventory of unmerged paths in the repo — not analysis coverage.
+                "unmerged_paths_inventory": all_paths,
                 "all_unmerged_paths": all_paths,
+                "all_unmerged_paths_role": "inventory_not_analyzed",
                 "stage_blob_identities": stage_oids,
                 "base_available": base_b is not None,
                 "ours_available": ours_b is not None,
@@ -957,8 +1011,12 @@ def run_preview_advisory(
             "DISAGREEMENT_RU": reasoning["DISAGREEMENT_RU"],
             "SEMANTIC_CONFLICT": reasoning["DISAGREEMENT_RU"],
             "CONTEXT": {
-                "paths_analyzed": [s.path for s in snapshots],
-                "note": "R35 bounded repository context evidence layer.",
+                "paths_analyzed": [primary.path],
+                "note": (
+                    "R40: semantic analysis covers exactly one selected path. "
+                    "CURRENT_CONFLICT.unmerged_paths_inventory / "
+                    "all_unmerged_paths are inventory only, not analysis coverage."
+                ),
             },
             "CONTEXT_EVIDENCE": context,
             "INTERPRETATIONS": reasoning["INTERPRETATIONS"],

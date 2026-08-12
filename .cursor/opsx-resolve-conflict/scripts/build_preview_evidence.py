@@ -41,7 +41,8 @@ REPO_ROOT = PACKAGE_ROOT.parents[1]
 EVIDENCE_SCHEMA = "opsx-resolve-conflict/preview-execution-evidence/v1"
 INDEX_SCHEMA = "opsx-resolve-conflict/preview-evidence-index/v1"
 
-# Frozen R37 preview runtime (byte-identical pins; R38 must not change these).
+# Frozen preview runtime pins (R40): readonly_git + context stay R37-byte-identical;
+# preview_advisory.py updates for single-path PREVIEW contract (BUGBOT-HIGH-002).
 FROZEN_PREVIEW_RUNTIME_HASHES = {
     "preview_readonly_git.py": (
         "5daea3ebc38e9a6de6de22a0c590d8cf1ebe3e57bd4797ddb26a93fcf95129bd"
@@ -50,7 +51,7 @@ FROZEN_PREVIEW_RUNTIME_HASHES = {
         "30f83c34b543545488f340de6ac35afe1f7fe8c7e6b548b489e07951815f0cee"
     ),
     "preview_advisory.py": (
-        "85b461d36315872122a0e946147207cf9d484b724b27cc8884e8969a4d38d5a3"
+        "7acf724423eaa4bd6cc2b7c5faeb5201509b0ffae4fb2bae05e06384983ab447"
     ),
 }
 
