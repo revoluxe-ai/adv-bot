@@ -65,6 +65,7 @@ Never stage or commit these paths; leave them untouched and redirect:
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
 .cursor/devops/**
+.cursor/opsx-resolve-conflict/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -198,6 +199,7 @@ Zone `docs` means ordinary project documentation only.
 It does **not** include `.cursor/commands/**`, `.cursor/skills/**`,
 `.cursor/rules/**`, `.cursor/agents/**`, `.cursor/static-check/**`,
 `.cursor/pipeline/**`, `.cursor/antipattern-gate/**`, `.cursor/devops/**`,
+`.cursor/opsx-resolve-conflict/**`,
 `.agents/**`, `.github/prompts/**`, `.github/skills/**`,
 `.github/copilot-instructions.md`, `.github/git-commit-instructions.md`,
 or `AGENTS.md`.
