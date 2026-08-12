@@ -2,7 +2,7 @@
   "schema": "opsx-resolve-conflict/clean-unpack-report/v1",
   "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40",
   "package_version": "0.40.0",
-  "package_digest": "fccf8bc542d4824671c237701f8272547edc976bab3e1634e1d7ff0e3ec8c808",
+  "package_digest": "7513f933c75572ab814993a09ed66c0c6b69656e913227f30566fba180be04bb",
   "archive_sha256": null,
   "archive_binding": "external_test_report_only",
   "external_report_path": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.TEST_REPORT.json",
