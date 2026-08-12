@@ -16,10 +16,14 @@ Author: **Cursor**
 - R37 `preview_context.py` remains byte-identical
 - GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
 
+### Also closed (process hygiene)
+
+- BUGBOT-MEDIUM-001: removed stale committed `_preview_all.json` (0.34.0
+  multi-path workspace dump; not in runtime/MANIFEST inventory)
+
 ### Deferred (unchanged)
 
 - BUGBOT-HIGH-001 (commit routing ownership for `.cursor/opsx-resolve-conflict/**`)
-- BUGBOT-MEDIUM-001 (stale `_preview_all.json`)
 - BUGBOT-MEDIUM-002 (`process_surfaces.json` path gaps)
 - R33-GATE-PROCESS-002
 - R25-MEDIUM-002 / R25-PROCESS-001
