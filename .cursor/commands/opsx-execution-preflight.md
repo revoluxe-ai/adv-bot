@@ -143,6 +143,31 @@ Reserved high-risk gate-pair section-Reads inside `/opsx-review-commands`
 and still obey parallel `Read` ≤ **2** — they are prioritization, not a
 budget exemption.
 
+## Shell payload I/O (anti-heredoc)
+
+Fourth failure class (after unbounded search, unconditional git, mass Reads):
+**fragile multi-line Shell payloads via bash heredoc**.
+
+Hard rules for every OPSX command that runs Shell:
+
+1. **Forbidden for multi-line / nested-quote payloads** (JSON, Python, scripts,
+   multi-paragraph commit/PR bodies, nested quotes):
+   - bash heredoc: `cat <<EOF`, `cat <<'EOF'`, `$(cat <<'EOF' ...)`
+   - embedding the full body as one quoted Shell argument when quotes or
+     truncation regularly break the run
+2. **Required pattern:** write the payload with the **Write** tool (or an
+   equivalent file write) to a workspace path, then invoke by path:
+   - `python path\to\script.py`
+   - `git commit -F path\to\COMMIT_MSG.txt`
+   - `gh pr create ... --body-file path\to\pr_body.md`
+3. Single-line Shell args with no nested quotes remain OK.
+4. Do not teach bash-heredoc recipes in command bodies for those payloads;
+   prefer Write → path / `--body-file` / `-F`.
+5. If a Shell heredoc truncates or fails quoting → stop retrying heredoc;
+   switch to Write→path once and continue (do not loop).
+
+Defect class id (for learn/promote): `HEREDOC-SHELL-PAYLOAD-001`.
+
 ## Failure / timeout behavior
 
 When a preflight operation times out, hangs, or fails:

@@ -348,20 +348,20 @@ If `GO` is present:
 
 After user says `GO`, run:
 
-```bash
-CURRENT_BRANCH="$(git branch --show-current)"
+1. Resolve `CURRENT_BRANCH` (e.g. `git branch --show-current`).
+2. **Write** the final PR body with the Write tool to a workspace path such as
+   `.tmp/pr_body.md` (do **not** use bash heredoc `cat <<'EOF'` — see
+   `opsx-execution-preflight.md` → Shell payload I/O).
+3. Push and create PR:
 
-cat > /tmp/pr_body.md <<'EOF'
-<FINAL_PR_BODY>
-EOF
-
-git push -u origin "$CURRENT_BRANCH"
+```text
+git push -u origin <CURRENT_BRANCH>
 
 gh pr create \
   --base "<TARGET_BRANCH>" \
-  --head "$CURRENT_BRANCH" \
+  --head "<CURRENT_BRANCH>" \
   --title "<PR_TITLE>" \
-  --body-file /tmp/pr_body.md
+  --body-file .tmp/pr_body.md
 ```
 
 Do not run `git push` or `gh pr create` before explicit `GO`.
