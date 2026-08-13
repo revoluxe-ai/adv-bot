@@ -19,6 +19,41 @@ from opsx_conflict.attestation import (  # noqa: E402
 )
 
 
+def invalidate_archive_binding_after_digest_refresh(digest: str) -> None:
+    """Сбросить ZIP/pytest binding после digest-only re-pin.
+
+    CLEAN_UNPACK / PACKAGE_INDEX не входят в package_digest inventory, но
+    могут хранить external_archive_sha256_ref от предыдущего ship. После
+    обновления digest эти ссылки и pytest totals обязаны стать placeholder
+    (null / удалены), иначе новый digest окажется привязан к чужому ZIP.
+    Полный rebind — только через ship_review_package.
+    """
+    clean_path = PACKAGE_ROOT / "CLEAN_UNPACK_TEST_REPORT.json"
+    if clean_path.is_file():
+        clean = json.loads(clean_path.read_text(encoding="utf-8"))
+        clean["package_digest"] = digest
+        clean["archive_sha256"] = None
+        clean["passed"] = None
+        clean["skipped"] = None
+        clean["pytest_exit_code"] = None
+        clean.pop("external_archive_sha256_ref", None)
+        clean.pop("raw_log_sha256_ref", None)
+        clean_path.write_text(
+            json.dumps(clean, indent=2) + "\n", encoding="utf-8"
+        )
+
+    index_path = PACKAGE_ROOT / "PACKAGE_INDEX.json"
+    if index_path.is_file():
+        index = json.loads(index_path.read_text(encoding="utf-8"))
+        index["package_digest"] = digest
+        index["archive_sha256"] = None
+        index.pop("external_archive_sha256_ref", None)
+        index.pop("raw_log_sha256_ref", None)
+        index_path.write_text(
+            json.dumps(index, indent=2) + "\n", encoding="utf-8"
+        )
+
+
 def main() -> None:
     """Refresh MANIFEST inventory hashes and TRUST_ANCHOR digest."""
     manifest_path = PACKAGE_ROOT / "MANIFEST.json"
@@ -157,6 +192,7 @@ def main() -> None:
     )
     manifest["installed_command_sha256"] = _file_sha256(cmd)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    invalidate_archive_binding_after_digest_refresh(digest)
     print(f"updated {manifest_path} version={PACKAGE_VERSION} digest={digest[:16]}…")
 
 

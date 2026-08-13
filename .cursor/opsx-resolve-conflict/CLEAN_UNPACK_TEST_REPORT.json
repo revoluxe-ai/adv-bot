@@ -7,16 +7,14 @@
   "archive_binding": "external_test_report_only",
   "external_report_path": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.TEST_REPORT.json",
   "raw_log_path": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R40.TEST_REPORT.log",
-  "passed": 420,
-  "skipped": 16,
-  "pytest_exit_code": 0,
+  "passed": null,
+  "skipped": null,
+  "pytest_exit_code": null,
   "author": "Cursor",
-  "note": "In-archive archive_sha256 is intentionally null to avoid self-referential ZIP hash drift. Authoritative archive binding is the external TEST_REPORT next to the ZIP.",
+  "note": "In-archive archive_sha256 is intentionally null to avoid self-referential ZIP hash drift. Authoritative archive binding is the external TEST_REPORT next to the ZIP. Digest-only re-pin clears pytest/archive refs until ship_review_package rebinds them.",
   "open_blockers": [
     "BLOCKER_AUTHORITY_PRODUCER_MISSING",
     "BLOCKER_OS_SANDBOX_RUNNER_MISSING"
   ],
-  "go_capability": false,
-  "external_archive_sha256_ref": "45eca30256afde87b4c0a322e7d8ad2e75099c25e1395a48b5479b32124fe990",
-  "raw_log_sha256_ref": "c2147d0191bd15e3cdca5aa47ab4119f7a116a94aef6fd35aa2efb6828780766"
+  "go_capability": false
 }

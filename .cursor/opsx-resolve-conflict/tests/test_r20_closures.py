@@ -33,6 +33,37 @@ def test_packaged_evidence_digest_matches_manifest_and_anchor() -> None:
     assert index.get("archive_sha256") in (None, "")
 
 
+def test_archive_binding_refs_coherent_or_cleared() -> None:
+    """Digest-only re-pin must not leave a foreign ZIP/pytest claim.
+
+    Placeholder state: no external_archive_sha256_ref / raw_log_sha256_ref and
+    null pytest totals. Ship state: both CLEAN_UNPACK and PACKAGE_INDEX share
+    the same non-empty archive+log refs (ZIP bytes not verified here).
+    """
+    clean = json.loads(
+        (PACKAGE_ROOT / "CLEAN_UNPACK_TEST_REPORT.json").read_text(encoding="utf-8")
+    )
+    index = json.loads((PACKAGE_ROOT / "PACKAGE_INDEX.json").read_text(encoding="utf-8"))
+    clean_arch = clean.get("external_archive_sha256_ref") or None
+    index_arch = index.get("external_archive_sha256_ref") or None
+    clean_log = clean.get("raw_log_sha256_ref") or None
+    index_log = index.get("raw_log_sha256_ref") or None
+    if clean_arch is None and index_arch is None:
+        assert clean.get("passed") is None
+        assert clean.get("skipped") is None
+        assert clean.get("pytest_exit_code") is None
+        assert clean_log is None
+        assert index_log is None
+        return
+    assert clean_arch == index_arch
+    assert clean_log == index_log
+    assert isinstance(clean_arch, str) and len(clean_arch) == 64
+    assert isinstance(clean_log, str) and len(clean_log) == 64
+    assert clean.get("passed") is not None
+    assert clean.get("skipped") is not None
+    assert clean.get("pytest_exit_code") is not None
+
+
 def test_poetry_missing_still_blocks_unpatched_executor(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
