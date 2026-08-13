@@ -1285,6 +1285,17 @@ DISPATCH_ALLOWED=NO
 denylist, не commit/push/PR, не отмена mandatory gates. Authority при
 сомнении по command contract — через `/opsx-admin-command-consult`.
 
+```text
+ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
+EXPLORE_NEXT_COMMAND_ALONE_SETS_READY=FORBIDDEN
+```
+
+`NEXT_COMMAND` / `RECOMMENDED_ROUTE` от explore, pipeline или admin-consult
+**не** переводят mission в `READY_FOR_OWNER_DIFF_REVIEW` и **не**
+заменяют §20 evidence checklist. Denylisted `NEXT_COMMAND` → §14.7
+reject path (continue allowed KEEP work or `NOT_READY_PROCESS_INCOMPLETE`),
+не false readiness.
+
 `SCOPE_UNCHANGED=YES` / routine operational path **не** отменяет этот
 gate: execution-advice consultation обязательна на каждой новой
 существенной mission до первого scoped-write / conditional dispatch.
@@ -1381,6 +1392,13 @@ EXPLORE_EXECUTION_ADVICE_RECEIVED=YES
 
 Он не может разрешать denylist, commit/push/PR, создание/изменение команд,
 material semantic choice Owner или отмену непереопределяемых запретов.
+
+```text
+ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
+```
+
+Explore advice alone never satisfies §20 `READY_FOR_OWNER_DIFF_REVIEW`
+gates (`REQUIRED_TESTS_EXECUTED`, independent review, final diff review).
 
 ## 13.2 Claims and evidence schema
 
@@ -1645,7 +1663,30 @@ RECOMMENDATION_STATUS=REJECTED_BY_SUPERVISOR_POLICY
 DISPATCH_CREATED=NO
 COMMAND_RELIABILITY=UNCHANGED_BY_RECOMMENDATION_ALONE
 REPORT_ENTRY_REQUIRED=YES
+ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
+READY_FOR_OWNER_DIFF_REVIEW=FORBIDDEN
 ```
+
+После reject **не** останавливать mission как будто route уже выполнен.
+Обязательный выбор:
+
+1. **Continue allowed KEEP** — dispatch разрешённые surrogate hops из
+   advice (`/opsx-test`, coverage, triage, …) пока acceptance / green-proof
+   не закрыты accepted evidence; **или**
+2. **Publication-only leftover** — если единственный остаточный шаг Owner —
+   denylisted publication (`/opsx-commit`, `/opsx-meta-commit`, PR, …) и
+   allowed residual work отсутствует:
+
+```text
+MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
+  (или BLOCKED_FORBIDDEN_ROUTE, если forbidden route — единственный путь)
+ONE_NEXT_ACTION=OWNER_DECISION_REQUIRED
+```
+
+Допускается optional `OWNER_SIDE_HOP` (pasteable Owner-side текст) в теле
+отчёта. Запрещено: выдавать `READY_FOR_OWNER_DIFF_REVIEW`,
+`ONE_NEXT_ACTION=REVIEW_THE_REPORTED_DIFF`, или изобретать токены вроде
+`OWNER_RUN_COMMIT_*` как будто §20 readiness выполнена.
 
 Не деградировать command reliability только за факт advisory-рекомендации
 запрещённой команды.
@@ -1937,7 +1978,10 @@ STOP_UNCONFIRMED_WORKERS_REPORTED=YES
 
 но каждый такой worker должен быть перечислен в final report.
 
-Для `READY_FOR_OWNER_DIFF_REVIEW` дополнительно:
+Для `READY_FOR_OWNER_DIFF_REVIEW` дополнительно **все** поля ниже
+должны быть `YES` с `CLAIMS_TRACEABLE` evidence
+(`EXECUTED_CHECKER_EVIDENCE` или `DIRECT_COMMAND_ARTIFACT` — **не**
+advisory explore / pipeline prose alone):
 
 ```text
 FINAL_SNAPSHOT_CURRENT=YES
@@ -1947,6 +1991,19 @@ REQUIRED_TESTS_EXECUTED=YES
 FINAL_DIFF_REVIEW_ACCEPTED=YES
 PUBLICATION_ACTIONS_ABSENT=YES
 ```
+
+Hard gate:
+
+```text
+ANY_§20_READY_FIELD_MISSING_OR_ADVISORY_ONLY=YES
+→ READY_FOR_OWNER_DIFF_REVIEW=FORBIDDEN
+→ stay ACTIVE (dispatch allowed KEEP green-proof) OR
+  MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
+```
+
+Если acceptance criteria требуют green-proof и нет accepted executed
+`/opsx-test` (или equivalent checker) evidence → readiness запрещена
+даже при «Owner should commit next» advice.
 
 Также command evidence должно подтверждать:
 
@@ -1970,7 +2027,9 @@ STOP_UNCONFIRMED_WORKERS_REPORTED=NO
 Тогда mission получает blocked, cancelled или timebox status через
 terminalization controller.
 
-Если все functional gates пройдены, но процесс incomplete:
+Если все functional gates пройдены, но процесс incomplete
+(включая: только denylisted publication остаётся; §20 checklist
+незакрыт; green-proof не executed):
 
 ```text
 MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
@@ -2559,6 +2618,11 @@ ONE_NEXT_ACTION:
 
 Верни ровно одно следующее действие Owner.
 
+`ONE_NEXT_ACTION` **обязан** быть ровно одним токеном из карты ниже.
+Изобретение токенов (`OWNER_RUN_COMMIT_*`, `OWNER_RUN_*`, и т.п.)
+**запрещено**. Optional pasteable Owner-side hop → поле `OWNER_SIDE_HOP`
+в теле отчёта, **не** замена `ONE_NEXT_ACTION`.
+
 ```text
 READY_FOR_OWNER_DIFF_REVIEW → ONE_NEXT_ACTION=REVIEW_THE_REPORTED_DIFF
 TIMEBOX_STOPPED → ONE_NEXT_ACTION=OWNER_REVIEW_TIMEBOX_RESULT
@@ -2568,6 +2632,11 @@ BLOCKED_FORBIDDEN_ROUTE / BLOCKED_OWNER_DECISION / BLOCKED_POLICY_VIOLATION
 ANALYSIS_COMPLETE → ONE_NEXT_ACTION=NONE
 NOT_READY_PROCESS_INCOMPLETE → ONE_NEXT_ACTION=OWNER_DECISION_REQUIRED
 ```
+
+Publication-only leftover (denylist commit/meta-commit) ⇒
+`NOT_READY_PROCESS_INCOMPLETE` + `OWNER_DECISION_REQUIRED`, never
+`READY_FOR_OWNER_DIFF_REVIEW` / `REVIEW_THE_REPORTED_DIFF` from advisory
+alone.
 
 ---
 
