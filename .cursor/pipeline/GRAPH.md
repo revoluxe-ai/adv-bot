@@ -7,24 +7,24 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 55
-- indexed_commands: 55
+- inventory_count: 57
+- indexed_commands: 57
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_fingerprint: cb7ea54dea1568434d9b206f15b63012
-- source_commit: f8bd51fcc837f0164f12d1c83b3c6c957aaeab49
+- source_fingerprint: d006b15039bc6f2e04f3e96e16cb52bb
+- source_commit: 19260f0a375b9f8adfd56f008a70229eef34805d
 - excluded_by_owner: (none)
 - scope_excluded_files: |
   opsx-admin-command-*; opsx-execution-preflight.md;
   opsx-source-resolution.md; opsx-pipeline.md
 - evidence_note: |
-  UPDATE GO 2026-08-11T03:07:21Z MAX_INDEX: inventory 55 unchanged
-  (fingerprint cb7ea54dea1568434d9b206f15b63012 names_only); index all
-  not-admin commands including /opsx-propose (Owner removed F5 exclusion);
-  add meta plane, projectize/adapt, commit-all, evolution, devops,
-  supervisor; F5 closed as graph-exclusion; F12/F13 open; F15/F16 added.
-  Prior: UPDATE GO 2026-08-09T05:34:03Z test-env (F14 closed).
+  UPDATE GO 2026-08-11T14:44:35Z: inventory 57 (fingerprint
+  d006b15039bc6f2e04f3e96e16cb52bb names_only); index
+  /opsx-owner-contract-review; soft new→OCR→continue/ff edges;
+  REPAIR via OWNER_REVIEW_HANDOFF; F18 closed; refresh META lag
+  (prior META 55 / body 56 vs live 57). Prior: UPDATE GO
+  2026-08-11T03:07:21Z MAX_INDEX (F5/F15/F16/F17).
 
 ## Process invariants
 
@@ -61,7 +61,14 @@ consumers: task generation, `/opsx-planning-review` P6).
 
 ### Core change lifecycle
 - change_idea: need named change / description
-- change_scaffolded: change dir exists; first artifact pending (`/opsx-new`)
+- change_scaffolded: change dir exists; `owner-contract.md` written/repaired
+  (`/opsx-new` CREATE or REPAIR); soft next is OCR before continue/ff
+- owner_contract_under_review: `/opsx-owner-contract-review` cycle
+  (`NEEDS_CONTEXT` / `NEEDS_OWNER`); not FAIL
+- owner_contract_ready_for_repair: OCR `READY_FOR_REPAIR` + pasteable
+  `OWNER_REVIEW_HANDOFF` for `/opsx-new` REPAIR
+- owner_contract_reviewed: OCR `PASS` (soft precondition before continue/ff;
+  not hard gate in continue/ff/apply/verify/supervisor v1)
 - artifacts_in_progress: `/opsx-continue` filling artifacts
 - apply_ready: applyRequires done (`/opsx-ff` or continue complete)
 - planning_package_reviewed: soft PASS from `/opsx-planning-review`
@@ -175,9 +182,9 @@ consumers: task generation, `/opsx-planning-review` P6).
 - antipattern_suspects: PASS_WITH_SUSPECTS (Owner may continue to static)
 - antipattern_fail: FAIL (FIX_EXIT / re-scan; static soft-blocked until Owner continues)
 - antipattern_blocked: missing/invalid `base=` / unknown token / ledger write without GO
-- local_test_env_ready: `/opsx-test-env UP` — PG:5433 + CH:8124 healthy; Redis:6379 external OK
-- local_test_env_stopped: `/opsx-test-env DOWN` — test compose torn down
-- local_test_env_degraded: PG/CH up but Redis missing (or partial health)
+- local_test_env_ready: `/opsx-test-env UP` — PG:5433 + CH:8124 + Redis:6390 (compose `test_redis`) healthy
+- local_test_env_stopped: `/opsx-test-env DOWN` — test compose torn down (PG+CH+Redis)
+- local_test_env_degraded: PG/CH up but Redis:6390 missing (or partial health)
 - local_test_env_blocked: Docker/compose/ports FAIL_CLOSED|UNAVAILABLE
 - debt_clear: `/opsx-bug-debt-board` STATUS=CLEAR (spare-slot; not a hard gate; ≠ card-close)
 - debt_found: DEBT_FOUND (pasteable FIX_EXIT; verify/archive are NOT residual close)
@@ -235,34 +242,44 @@ consumers: task generation, `/opsx-planning-review` P6).
 - known_flaws: none recorded
 
 ### /opsx-new
-- purpose: scaffold a new OpenSpec change; stop before creating artifacts
-- input_state: change_idea
+- purpose: CREATE scaffold + `owner-contract.md`, or REPAIR that file only from `OWNER_REVIEW_HANDOFF`
+- input_state: change_idea | owner_contract_ready_for_repair
 - output_state: change_scaffolded
-- artifacts_read: openspec status/instructions
-- artifacts_written: change scaffold only
-- decision_owner: operator
-- next_typical: /opsx-continue
-- known_flaws: none recorded
+- artifacts_read: openspec status/instructions; optional EVOLUTION/EXPLORE handoffs; REPAIR requires `OWNER_REVIEW_HANDOFF`
+- artifacts_written: CREATE change scaffold + owner-contract.md; REPAIR only owner-contract.md
+- decision_owner: operator (sole writer of owner-contract.md; never emits OCR PASS)
+- next_typical: /opsx-owner-contract-review change=<name> (soft; CREATE and after REPAIR)
+- known_flaws: soft OCR only (not hard gate); ALSO_OK skip to continue/ff allowed
+
+### /opsx-owner-contract-review
+- purpose: READ_ONLY interactive semantic review of owner-contract.md; Owner dialog; emit OWNER_REVIEW_HANDOFF for /opsx-new REPAIR
+- input_state: change_scaffolded | owner_contract_under_review | owner_contract_ready_for_repair
+- output_state: owner_contract_under_review | owner_contract_ready_for_repair | owner_contract_reviewed
+- artifacts_read: owner-contract.md; optional EVOLUTION_HANDOFF / EXPLORE_HANDOFF / prior OWNER_REVIEW_HANDOFF; bounded specs/decisions
+- artifacts_written: none (FILES_CHANGED: none)
+- decision_owner: Owner (semantics); reviewer (diagnosis + handoff only)
+- next_typical: Owner supplies context/answers | /opsx-new + OWNER_REVIEW_HANDOFF (READY_FOR_REPAIR) | /opsx-continue | /opsx-ff (PASS, soft)
+- known_flaws: soft recommend only v1 (not hard gate in continue/ff/apply/verify/supervisor)
 
 ### /opsx-continue
 - purpose: create next planning artifact for an existing change
-- input_state: change_scaffolded | artifacts_in_progress
+- input_state: change_scaffolded | owner_contract_reviewed | artifacts_in_progress
 - output_state: artifacts_in_progress | apply_ready
 - artifacts_read: change artifacts / openspec status
 - artifacts_written: next ready artifact
 - decision_owner: operator
-- next_typical: /opsx-continue | /opsx-planning-review (when applyRequires complete) | /opsx-apply (ALSO_OK soft skip)
-- known_flaws: none recorded
+- next_typical: /opsx-owner-contract-review (if OCR not PASS; soft) | /opsx-continue | /opsx-planning-review (when applyRequires complete) | /opsx-apply (ALSO_OK soft skip)
+- known_flaws: OCR soft precondition may be skipped; NOT_OPENED_BUDGET deep body beyond grep
 
 ### /opsx-ff
 - purpose: fast-forward all applyRequires artifacts
-- input_state: change_idea | change_scaffolded
+- input_state: change_idea | change_scaffolded | owner_contract_reviewed
 - output_state: apply_ready
 - artifacts_read: openspec status/instructions
 - artifacts_written: all applyRequires artifacts
 - decision_owner: operator
-- next_typical: /opsx-planning-review | /opsx-apply (ALSO_OK soft skip)
-- known_flaws: none recorded
+- next_typical: /opsx-owner-contract-review (if OCR not PASS after new; soft) | /opsx-planning-review | /opsx-apply (ALSO_OK soft skip)
+- known_flaws: OCR soft precondition may be skipped; NOT_OPENED_BUDGET deep body beyond grep
 
 ### /opsx-planning-review
 - purpose: READ_ONLY independent coherence review of finished planning package before apply
@@ -272,16 +289,16 @@ consumers: task generation, `/opsx-planning-review` P6).
 - artifacts_written: none (FILES_CHANGED: none)
 - decision_owner: verifier only (Owner for NEEDS_OWNER product forks)
 - next_typical: /opsx-apply (on PASS) | /opsx-update + PLANNING_REVIEW_HANDOFF (on REPAIR_REQUIRED) | Owner question (NEEDS_OWNER)
-- known_flaws: soft recommend only in v1 (not hard apply gate)
+- known_flaws: soft recommend only in v1 (not hard apply gate); earlier hop is /opsx-owner-contract-review (Owner Contract only), not this command
 
 ### /opsx-update
-- purpose: revise existing planning artifacts coherently; on bug-episode spec route emit TASK_DELTA; consume PLANNING_REVIEW_HANDOFF (REPAIR_PLANNING_PACKAGE)
+- purpose: revise existing planning artifacts coherently; on bug-episode spec route emit TASK_DELTA; consume PLANNING_REVIEW_HANDOFF (REPAIR_PLANNING_PACKAGE); owner-contract text repair stays /opsx-owner-contract-review + /opsx-new
 - input_state: planning_revise | apply_ready | verify_fail | classified_spec
 - output_state: apply_ready | planning_revise | task_delta_changed | task_delta_unchanged
 - artifacts_read: change planning artifacts; optional case ROUTE_STATE; optional PLANNING_REVIEW_HANDOFF
 - artifacts_written: revised planning artifacts; TASK-DELTA-*.md; ROUTE-TRACE.jsonl; ROUTE_STATE
 - decision_owner: operator
-- next_typical: /opsx-planning-review (after REPAIR_PLANNING_PACKAGE) | /opsx-apply (TASK_DELTA CHANGED) | /opsx-fix-bug GO path (TASK_DELTA UNCHANGED) | /opsx-bug-team handback (SECONDARY) | /opsx-continue
+- next_typical: /opsx-planning-review (after REPAIR_PLANNING_PACKAGE) | /opsx-apply (TASK_DELTA CHANGED) | /opsx-fix-bug GO path (TASK_DELTA UNCHANGED) | /opsx-bug-team handback (SECONDARY) | /opsx-continue | /opsx-owner-contract-review (owner-contract semantic path)
 - known_flaws: NOT_OPENED_BUDGET detail; update ≠ production GO; never closed_fixed from update; persist CLOSE_FINDING_INTENT on ROUTE_STATE
 
 ### /opsx-apply
@@ -606,7 +623,7 @@ consumers: task generation, `/opsx-planning-review` P6).
 - artifacts_written: none in git; docker compose project for test file only
 - decision_owner: test-env operator (LOCAL_TEST_ENV_STATUS only; not verify/archive)
 - next_typical: /opsx-static-check FULL (after UP) | /opsx-test (destructive) | /opsx-test-env DOWN (after PASS) | /opsx-test-triage
-- known_flaws: Redis external :6379 (test_redis commented in compose); not k8s (/opsx-devops); companion NEXT lag F13
+- known_flaws: must use REDIS_PORT=6390 for pytest against compose Redis (host :6379 out of scope); not k8s (/opsx-devops); companion NEXT lag F13 partially closed by D4–D5
 
 ### /opsx-static-check
 - purpose: orchestrated FAST/FULL static checks (read-only)
@@ -832,14 +849,14 @@ consumers: task generation, `/opsx-planning-review` P6).
 - known_flaws: not hard core-lifecycle edge; not laptop test-env; CSI apply forbidden
 
 ### /opsx-supervisor
-- purpose: control-plane orchestrator; mission/DAG; dispatches `/opsx-*` via subagents; no direct repo tools
-- input_state: any Owner free-text | supervisor_mission_active
-- output_state: supervisor_mission_active | (mission terminal in chat ledger)
-- artifacts_read: none directly (FORBIDDEN); workers read
-- artifacts_written: none directly; mission ledger in chat
-- decision_owner: supervisor control-plane + Owner policy
-- next_typical: mediated /opsx-explore then scoped workers per DAG
-- known_flaws: F16 allowlist may lag (/opsx-test-env F13); not GRAPH authority; not direct git/pytest
+- purpose: control-plane orchestrator; free-text DAG **or** BUG_MISSION sequential multi-finding reducer; dispatches `/opsx-*` via subagents; no direct repo tools
+- input_state: any Owner free-text | supervisor_mission_active | durable bug case (BUG_MISSION)
+- output_state: supervisor_mission_active | mission terminal | MISSION_COMPLETE (all findings terminal)
+- artifacts_read: none directly (FORBIDDEN); workers return ROUTE_TRANSITION envelopes
+- artifacts_written: none directly; mission ledger in chat; prefer ROUTE-TRACE supervisor_transition via workers
+- decision_owner: supervisor control-plane + SUPERVISOR_POLICY; route authority = worker envelopes / ORCHESTRATION_MVP (not explore planner in BUG_MISSION)
+- next_typical: BUG_MISSION → claim → classify → envelope NEXT_COMMAND …; free-text → mediated /opsx-explore then DAG workers
+- known_flaws: F16 allowlist may lag for new soft-chain nodes; not GRAPH authority; not direct git/pytest; live PLANFIT regression needs durable case on disk
 
 ### Scope-excluded (not Commands; not inventory)
 - opsx-admin-command-* / opsx-execution-preflight / opsx-source-resolution / opsx-pipeline
@@ -849,7 +866,13 @@ consumers: task generation, `/opsx-planning-review` P6).
 
 ```text
 change_idea --/opsx-new--> change_scaffolded
-change_scaffolded --/opsx-continue--> artifacts_in_progress|apply_ready
+change_scaffolded --/opsx-owner-contract-review [soft recommend]--> owner_contract_under_review|owner_contract_ready_for_repair|owner_contract_reviewed
+owner_contract_under_review --Owner context/answers + /opsx-owner-contract-review--> owner_contract_under_review|owner_contract_ready_for_repair|owner_contract_reviewed
+owner_contract_ready_for_repair --/opsx-new [REPAIR + OWNER_REVIEW_HANDOFF]--> change_scaffolded
+change_scaffolded --/opsx-new [REPAIR]--> change_scaffolded
+owner_contract_reviewed --/opsx-continue|/opsx-ff [recommended]--> artifacts_in_progress|apply_ready
+change_scaffolded --/opsx-continue [ALSO_OK skip OCR]--> artifacts_in_progress|apply_ready
+change_scaffolded --/opsx-ff [ALSO_OK skip OCR]--> apply_ready
 change_idea --/opsx-ff--> apply_ready
 artifacts_in_progress --/opsx-continue--> apply_ready
 apply_ready --/opsx-planning-review [soft recommend]--> planning_package_reviewed|planning_revise|apply_ready
@@ -867,7 +890,7 @@ performance_pass --/opsx-antipattern-gate--> antipattern_pass|antipattern_suspec
 performance_pass --/opsx-static-check [operator skip / demoted primary]--> static_check_done
 antipattern_pass|antipattern_suspects --/opsx-test-env UP--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
 local_test_env_ready --/opsx-static-check FULL--> static_check_done
-local_test_env_degraded --/opsx-test-env UP|/redis-external-fix--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
+local_test_env_degraded --/opsx-test-env UP--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
 local_test_env_blocked --/opsx-test-env UP--> local_test_env_ready|local_test_env_degraded|local_test_env_blocked
 # demoted for FULL/destructive when env not ready (unit-only / FAST / skip env OK):
 antipattern_pass|antipattern_suspects --/opsx-static-check [unit-only/FAST / env skip]--> static_check_done
@@ -1082,11 +1105,13 @@ practice ledger: `accept=` / `reject=` + GO.
 After antipattern `PASS|PASS_WITH_SUSPECTS` (or when about to run
 pytest-full / live PG|CH): soft recommend `/opsx-test-env UP` before
 `/opsx-static-check FULL`. On connection refused / `FLAKY_OR_ENV` for
-`5433`|`8124`|`6379`: paste `/opsx-test-env UP`. After FULL `PASS`:
-recommend `/opsx-test-env DOWN` to free resources. Not a hard archive gate.
-Unit-only / FAST may skip. Does **not** replace static-check `PREFLIGHT`
-(tooling files only). Not `/opsx-devops` (k8s). Redis is external until
-compose `test_redis` enabled (Owner GO). Companion contracts may lag (F13).
+`5433`|`8124`|`6390`: paste `/opsx-test-env UP` (session `REDIS_PORT=6390`).
+After FULL `PASS`: recommend `/opsx-test-env DOWN` to free resources
+(including compose Redis). Not a hard archive gate. Unit-only / FAST may
+skip. Does **not** replace static-check `PREFLIGHT` (tooling files only).
+Not `/opsx-devops` (k8s). Compose owns Redis on host **6390** (never bind
+host **6379** from `tests/docker-compose.test.yml`). Companion lag F13
+closed for ports/Supervisor when D4–D5 applied.
 
 Destructive execution default (all entry points that select
 `destructive_local`): `CACHE_MODE=dev` via
@@ -1323,12 +1348,14 @@ command-contract classes (F6).
   where: opsx-static-check.md PREFLIGHT / synthesis; opsx-supervisor.md
     allowlist; opsx-test.md; opsx-antipattern-gate.md NEXT prose
   symptom: |
-    /opsx-test-env exists and GRAPH indexes it, but sibling contracts may
-    still jump antipattern→static FULL without UP; env fails look like
-    product FAIL; Supervisor may not dispatch /opsx-test-env
+    /opsx-test-env exists and GRAPH indexes compose Redis :6390, but some
+    sibling contracts may still jump antipattern→static FULL without UP;
+    env fails look like product FAIL; Supervisor may omit /opsx-test-env
+    until allowlist includes it (see F16 / D4)
   operator_workaround: |
-    /opsx-test-env UP then /opsx-static-check FULL; after PASS
-    /opsx-test-env DOWN; companions via /opsx-meta-fix-command-defects
+    /opsx-test-env UP (REDIS_PORT=6390) then /opsx-static-check FULL;
+    after PASS /opsx-test-env DOWN; remaining companions via
+    /opsx-meta-fix-command-defects
   do_not_pretend_fixed: true
 
 - id: F14 GRAPH_MISSING_TEST_ENV
@@ -1351,22 +1378,36 @@ command-contract classes (F6).
 - id: F16 SUPERVISOR_ALLOWLIST_LAG
   where: opsx-supervisor.md dispatch allowlist vs GRAPH soft chain
   symptom: |
-    supervisor may omit `/opsx-test-env` or other soft-chain nodes; control-plane
-    cannot read GRAPH.md directly
+    supervisor may omit newly indexed soft-chain nodes until §14 allowlist
+    catches up; `/opsx-test-env` was added to §14.3 (2026-08-12 defect fix)
   operator_workaround: |
-    Owner/policy include test-env; or run `/opsx-test-env` outside supervisor
+    Owner/policy include missing node; or run soft-chain command outside supervisor
   do_not_pretend_fixed: true
 
 - id: F17 GRAPH_MAX_INDEX_2026_08_11
-  where: .cursor/pipeline/GRAPH.md (pre this UPDATE GO)
+  where: .cursor/pipeline/GRAPH.md (pre 2026-08-11T03:07:21Z UPDATE GO)
   symptom: |
     meta/projectize/devops/evolution/supervisor/commit-all/propose were
     inventory-only (NOT_OPENED_BUDGET) — NAVIGATE could not orient on them
   operator_workaround: this materialization
+  do_not_pretend_fixed: false (closed by 2026-08-11T03:07:21Z materialization)
+
+- id: F18 GRAPH_MISSING_OWNER_CONTRACT_REVIEW
+  where: .cursor/pipeline/GRAPH.md (pre 2026-08-11T14:44:35Z UPDATE GO)
+  symptom: |
+    /opsx-owner-contract-review lived in inventory but was unindexed;
+    NAVIGATE after /opsx-new pointed at continue/ff and skipped soft OCR;
+    META fingerprint lagged body (55 names vs 56 indexed)
+  operator_workaround: |
+    /opsx-owner-contract-review change=<name> directly; then UPDATE GO
   do_not_pretend_fixed: false (closed by this materialization)
 
 ## Terminal / recovery
 
+- After `/opsx-new` (CREATE or REPAIR): soft-recommend
+  `/opsx-owner-contract-review change=<name>` before continue/ff;
+  READY_FOR_REPAIR → paste `/opsx-new` + `OWNER_REVIEW_HANDOFF` then re-OCR;
+  OCR PASS → `/opsx-continue` | `/opsx-ff` (ALSO_OK skip OCR allowed; not hard gate v1)
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
 - Bug recovery: `.tmp/opsx-bug-cases/INDEX.md` pasteable NEXT_ACTION
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
