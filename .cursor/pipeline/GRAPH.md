@@ -351,13 +351,17 @@ consumers: task generation, `/opsx-planning-review` P6).
 - decision_owner: independent Scenario coverage auditor; not test/seam writer;
   archive remains `/opsx-verify`
 - next_typical: `/opsx-apply` after `mode=plan` | `/opsx-test` with
-  SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
-  REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
+  SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` **only after**
+  chat/durable `ROUTE_PACKETS` / `SCENARIO_*_PACKET` exists (never with
+  placeholder paste) | `/opsx-verify` after `mode=certify` PASS
 - known_flaws: audit/certify full-report persistence may still be chat-output;
   provider receipts may live under `.tmp/opsx-scenario-coverage/`; plan
   evidence SoT is Change-local `scenario-coverage/` (not `.tmp`); archive
   activation via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
-  `PRODUCT_ACCEPTANCE_REQUIRED=true` (legacy opt-out alone cannot waive PA)
+  `PRODUCT_ACCEPTANCE_REQUIRED=true` (legacy opt-out alone cannot waive PA);
+  NAVIGATE must not recommend close-external-gap as current hop before
+  `mode=audit` (or plan) has emitted pasteable Scenario packets — PRIMARY
+  = packet-producing `mode=` for position; consumer only sequenced ALSO_OK
 
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
@@ -416,7 +420,9 @@ consumers: task generation, `/opsx-planning-review` P6).
 - next_typical: ECC focused re-audit | `/opsx-spec-scenario-coverage mode=audit`
   after authorship | `mode=certify` after receipt | `/opsx-test` | `/opsx-apply`
 - known_flaws: must not accept base=; session-mock unit ≠ CLOSED for PG/CH;
-  provider receipt ≠ final Scenario certification
+  provider receipt ≠ final Scenario certification; pasteable only when
+  ECC/Scenario packet fence is already in chat evidence — never
+  `<paste that packet>` stubs from NAVIGATE
 
 ### /opsx-materialize-bug-queue
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist
@@ -1074,6 +1080,24 @@ Closure split after FAIL:
 * TEST_ONLY (Redis/WB/…) → `/opsx-test` → focused re-audit
 * REFACTOR_AND_TEST (PG/CH) → `/opsx-close-external-gap` with pasted
   report (**no** `base=` on close) → focused re-audit
+
+### Scenario coverage → close-external-gap (packet provenance)
+
+When PA LIFECYCLE / `SCENARIO_COVERAGE_REQUIRED` needs Scenario
+REFACTOR_AND_TEST or CERTIFY provider work:
+
+1. PRIMARY `NEXT_ACTION` = packet-producing hop for position
+   (`/opsx-spec-scenario-coverage mode=plan|audit|certify` as required) —
+   must be executable now with filled `change=` / `mode=`.
+2. `/opsx-close-external-gap` is **not** current hop until
+   `ROUTE_PACKETS` / `SCENARIO_REFACTOR_AND_TEST_PACKET` /
+   `SCENARIO_CERTIFY_PACKET` fence exists in chat (or durable receipt path
+   the consumer accepts). NAVIGATE must put the consumer only in
+   sequenced `ALSO_OK` / `DO_NOT_DO_YET`
+   (“after audit returns ROUTE_PACKETS, paste that fence into
+   `/opsx-close-external-gap`”), never as `NEXT_ACTION` with
+   `<paste that packet>`.
+3. Emit `LOCAL_HOP_COPY_BLOCK` for the PRIMARY command only.
 
 ### Post-apply performance review (conditional)
 
