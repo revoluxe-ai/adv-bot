@@ -10,7 +10,7 @@ inventory_count: 56
 source_commit: efc003a83e092207dff1972b36ccda1f4ba9eed4
 approved_by_token: resolve-conflicts GO (semantic GRAPH/META rebase merge)
 inventory_path: .cursor/pipeline/bug-team/controlled-tests/INVENTORY.json
-inventory_content_sha256: 78d0d0b70d31bdec0c1a2f7fa092c369a69058f094ee800e9b5a9549abb864fb
+inventory_content_sha256: c282593ccfc8d4b6d50c2406a1269ee12cdab3306ae9e3c629f05cb069b1bdef
 reproduction_command: python -c "import sys; sys.path.insert(0,'.cursor/pipeline/bug-team/runtime'); from graph_fingerprint import reproduce; print(reproduce())"
 notes: |
   resolve-conflicts GO 2026-08-13T09:39:25Z: rebase pick 14636d5c0 onto
