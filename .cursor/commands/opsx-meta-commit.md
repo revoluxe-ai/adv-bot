@@ -74,8 +74,11 @@ Hard bans still apply. Missing Poetry/pytest/pyright/kubectl (and other undeclar
 - **Local-only:** never update central snapshot or catalog repos. After success, if snapshot may be stale, recommend `/opsx-meta-update-snapshot` only.
 - Every terminal report must include `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`.
 - **Owner scope map (mandatory mental model):**
-  - **Default (no `ALL`):** ONLY current-chat in-scope process files; leave
-    `LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE`; never invent a full-tree plan.
+  - **Default (no `ALL`):** all dirty allowlisted `.cursor/commands/**`, PLUS
+    current-chat-attributed dirty paths under other allowlisted process roots;
+    leave other non-commands leftovers as `LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE`;
+    never invent a full allowlist dirty-tree plan without `ALL` /
+    `INCLUDE_FULL_DIRTY_TREE`. Report `CHAT_SCOPE: DEFAULT_COMMANDS_DIR`.
   - **`ALL`:** intentional cleanup of leftover in-scope process dirty tree after
     chats — inventory all in-scope dirty, split into logical meaning groups,
     propose/commit those groups (still not one silent blob); chat-provenance
@@ -97,13 +100,17 @@ argument-hint: "[ALL] [FAST_CHECK|FULL_CHECK] [INCLUDE_FULL_DIRTY_TREE] GO [opti
 
 | Invoke | What gets committed (in-scope process only) |
 |---|---|
-| `/opsx-meta-commit` / `… GO` (no `ALL`) | **Current chat only** — default |
+| `/opsx-meta-commit` / `… GO` (no `ALL`) | **Default:** all dirty `.cursor/commands/**` + chat-attributed other roots |
 | `/opsx-meta-commit ALL` / `… ALL GO` | **All** in-scope dirty — post-chat cleanup: split into logical meaning groups, then commit |
 | `+ FULL_CHECK` | Optional stronger verify (default remains `FAST_CHECK`) |
 
-**Defaults (no `ALL`):** current-chat commit scope + additive chat
-coherent-signal + `CHECK_MODE=FAST_CHECK`. Never expand to the whole dirty
-tree to “finish leftovers” without `ALL` / `INCLUDE_FULL_DIRTY_TREE`.
+**Defaults (no `ALL`):** `CHAT_SCOPE=DEFAULT_COMMANDS_DIR` — all dirty
+allowlisted paths under `.cursor/commands/**` (no chat-provenance filter for
+that directory), plus current-chat-attributed dirty paths under other
+allowlisted process roots; additive chat coherent-signal for non-commands
+roots; `CHECK_MODE=FAST_CHECK`. Never expand to the whole allowlist dirty
+tree to “finish leftovers” without `ALL` / `INCLUDE_FULL_DIRTY_TREE`. Keep
+meaning-group splits (do not dump unrelated commands into one silent blob).
 
 **`ALL` mode (post-chat debris cleanup):** full in-scope dirty tree;
 **chat-provenance fully absent** (no current-chat selection filter, no
@@ -145,7 +152,7 @@ Parse exact case-sensitive tokens in `$ARGUMENTS`:
 |---|---|
 | `FAST_CHECK` | Light process verification (**default** when neither check token is present) |
 | `FULL_CHECK` | Stronger process self-check before commit (opt-in) |
-| `ALL` | Full dirty-tree scope; chat-provenance fully absent (see Current-chat scope) |
+| `ALL` | Full dirty-tree scope; chat-provenance fully absent (see Default commit scope) |
 
 Rules:
 
@@ -157,8 +164,8 @@ Rules:
 ## Purpose
 
 Analyze dirty **process-surface** files and create safe atomic local commits
-**by meaning** — **defaulting to the current-chat work set**, not the entire
-dirty tree.
+**by meaning** — **defaulting to dirty `.cursor/commands/**` plus
+current-chat-attributed other roots**, not the entire allowlist dirty tree.
 
 Two phases:
 
@@ -168,16 +175,23 @@ Two phases:
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md`.
 **Execution budgets:** Follow `.cursor/commands/opsx-execution-preflight.md` (git-mutating class).
 
-## Current-chat commit scope (default)
+## Default commit scope (`DEFAULT_COMMANDS_DIR`)
 
-**Default selection:** only in-scope process-surface files attributable to work
-done in the **current chat** (agent edits in this conversation, explicit paths
-named here, or other clear chat evidence). Plan, stage, and commit only that set.
+**Default selection** (no `ALL` / `INCLUDE_FULL_DIRTY_TREE`):
 
-In-scope dirty files outside the current-chat set:
+1. **All** dirty allowlisted paths under `.cursor/commands/**` — no
+   chat-provenance filter for that directory.
+2. **Plus** in-scope dirty process-surface files under other allowlisted roots
+   that are attributable to work done in the **current chat** (agent edits in
+   this conversation, explicit paths named here, or other clear chat evidence).
+
+Plan, stage, and commit that union. Report `CHAT_SCOPE: DEFAULT_COMMANDS_DIR`.
+
+In-scope dirty files outside that default set (e.g. dirty rules/skills/devops
+not attributed to this chat):
 
 - leave unstaged;
-- do not expand selection to “finish the tree”;
+- do not expand selection to “finish the allowlist tree”;
 - report as `LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE`.
 
 **Overrides (full dirty tree):**
@@ -189,23 +203,32 @@ In-scope dirty files outside the current-chat set:
 
 Still never stage product/OpenSpec paths. Keep meaning-group splits and other
 gates — `ALL` is post-chat in-scope dirty cleanup, not a silent one-blob dump.
+Default still forbids dumping unrelated `.cursor/commands/**` intents into one
+commit when meaning groups differ.
 
 If both `ALL` and `INCLUDE_FULL_DIRTY_TREE` are present → treat as `ALL`
 (full scope + chat-provenance absent).
 
-**Ambiguous attribution:** if `ALL` / `INCLUDE_FULL_DIRTY_TREE` are absent and
-the current-chat set is empty or cannot be resolved with confidence →
-`STATUS: BLOCKED_NEEDS_CHAT_SCOPE`; do not invent a full-tree commit plan; ask
-one narrow path list or require `ALL` / `INCLUDE_FULL_DIRTY_TREE`.
+**Ambiguous attribution (non-commands roots only):** if `ALL` /
+`INCLUDE_FULL_DIRTY_TREE` are absent and the **non-commands** current-chat set
+cannot be resolved with confidence → omit uncertain non-commands paths (report
+them under `LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE` or ask one narrow path list). Do
+**not** `BLOCKED_NEEDS_CHAT_SCOPE` when dirty `.cursor/commands/**` alone
+supplies a usable default set. Only if the default set is empty (no dirty
+commands and no confident chat-attributed other roots) →
+`STATUS: BLOCKED_NEEDS_CHAT_SCOPE`; ask one narrow path list or require `ALL` /
+`INCLUDE_FULL_DIRTY_TREE`.
 
-**Coherent-commit signal (additive):** when **not** in `ALL` mode (including
-default current-chat selection and `INCLUDE_FULL_DIRTY_TREE`), treat “same
-current-chat work set” as an **additional** verification factor that those
-files deserve a **separate coherent commit**. Under `ALL`, this signal is
-**absent** (do not invent chat-provenance). The signal must **not** cancel or
-down-weight existing factors: meaning groups, unrelated process splits,
-out-of-scope redirect, mixed-file `git add -p` rules, protected-branch / `GO`
-gates, or `CHECK_MODE` rules.
+**Coherent-commit signal (additive):** when **not** in `ALL` mode:
+- dirty `.cursor/commands/**` in the default set are selected without chat
+  provenance, but still split by meaning groups;
+- for non-commands roots and under `INCLUDE_FULL_DIRTY_TREE`, treat “same
+  current-chat work set” as an **additional** verification factor that those
+  files deserve a **separate coherent commit**.
+Under `ALL`, this signal is **absent** (do not invent chat-provenance). The
+signal must **not** cancel or down-weight existing factors: meaning groups,
+unrelated process splits, out-of-scope redirect, mixed-file `git add -p`
+rules, protected-branch / `GO` gates, or `CHECK_MODE` rules.
 
 ## In-scope surfaces (exclusive)
 
@@ -313,9 +336,9 @@ Even with `GO_ON_PROTECTED_BRANCH`, never push.
 ### Unresolved conflict gate (mandatory — PLAN and GO)
 
 Before proposing commit groups **or** staging/committing, inspect the
-**planned in-scope set** (current-chat set, or full in-scope dirty under
-`ALL` / `INCLUDE_FULL_DIRTY_TREE`). This gate is a safety stop: it applies in
-both `FAST_CHECK` and `FULL_CHECK`.
+**planned in-scope set** (default `DEFAULT_COMMANDS_DIR` union, or full
+in-scope dirty under `ALL` / `INCLUDE_FULL_DIRTY_TREE`). This gate is a safety
+stop: it applies in both `FAST_CHECK` and `FULL_CHECK`.
 
 1. **Unmerged index** — if any planned/staged in-scope path appears in
    `git ls-files -u` output → stop.
@@ -336,8 +359,9 @@ DO_NOT_DO_YET: /opsx-meta-commit GO; strip markers; Accept Both
 
 ## Semantic grouping rules
 
-Classify every **in-scope** file in the **current-chat commit set** (or full
-in-scope dirty tree when `ALL` or `INCLUDE_FULL_DIRTY_TREE` is present) into
+Classify every **in-scope** file in the **default commit set**
+(`DEFAULT_COMMANDS_DIR` union) — or full in-scope dirty tree when `ALL` or
+`INCLUDE_FULL_DIRTY_TREE` is present — into
 meaning groups. Prefer fewer clear commits over noise, but never merge
 unrelated concerns. Files listed under `LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE` are
 not classified for automatic commits. (`ALL` does **not** require a product
@@ -494,7 +518,7 @@ In addition to FAST_CHECK:
 STATUS: PLAN_READY
 
 Commit plan:
-- CHAT_SCOPE: current-chat | ALL | INCLUDE_FULL_DIRTY_TREE
+- CHAT_SCOPE: DEFAULT_COMMANDS_DIR | ALL | INCLUDE_FULL_DIRTY_TREE
 - CHECK_MODE: FAST_CHECK | FULL_CHECK  (default FAST_CHECK)
 - proposed commits (subject + files + why this split)
 - commands that would be run
@@ -513,7 +537,7 @@ DO_NOT_DO_YET: push; /opsx-commit for in-scope process files; mix product files 
 
 ### With `GO` → execute plan
 
-For each in-scope group in the chat-scoped (or override) plan:
+For each in-scope group in the default-scoped (or override) plan:
 
 1. Stage files for that group only.
 2. Inspect staged diff.
@@ -572,7 +596,7 @@ OUT_OF_SCOPE_REDIRECT:
 - files left for /opsx-commit:
 
 CHAT_SCOPE:
-- current-chat | ALL | INCLUDE_FULL_DIRTY_TREE
+- DEFAULT_COMMANDS_DIR | ALL | INCLUDE_FULL_DIRTY_TREE
 
 CHECK_MODE:
 - FAST_CHECK | FULL_CHECK
