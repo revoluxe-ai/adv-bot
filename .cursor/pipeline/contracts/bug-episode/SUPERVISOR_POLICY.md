@@ -138,6 +138,38 @@ EXECUTION_OUTCOME_UNKNOWN
 
 No blind replay.
 
+### Platform Task abort / interrupt (same recovery)
+
+Top-level Cursor Task ending as `aborted` | `interrupted` | `tool_error`
+| empty envelope (Owner tool cancel, platform kill, mid-flight interrupt)
+maps to the same recovery — including when the primary command is
+`/opsx-bug-team` or `/opsx-static-check`:
+
+```text
+PAUSED
+EXECUTION_OUTCOME_UNKNOWN
+ADVANCE: no
+CLAIM_NEXT: no
+BLIND_REPLAY: no
+```
+
+If supervisor hang clocks are exceeded first → `TIMEOUT` (stricter) with
+the same bans. Pasteable resume of the **same** primary command is
+required; do not invent success or skip to the next finding.
+
+Authority for numeric clocks / Owner-visible long-orchestrator rules:
+`/opsx-supervisor` §12.0–§12.4.
+
+## Top-level hang clocks (policy pointer)
+
+```text
+ordinary hop defaults: TIMEOUT=1800s NO_PROGRESS=600s
+internal orchestrator defaults: TIMEOUT=3600s NO_PROGRESS=900s
+empty clocks: FORBIDDEN
+```
+
+Exact field names and STOP_ACK / HEARTBEAT live in `/opsx-supervisor` §12.0.
+
 ## SUPERVISOR_EVENT (prefer ROUTE-TRACE)
 
 Minimal event fields (append via existing ROUTE-TRACE conventions when

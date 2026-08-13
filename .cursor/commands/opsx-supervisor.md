@@ -682,12 +682,21 @@ EXPECTED_SNAPSHOT:
 TIMEOUT:
 HEARTBEAT_INTERVAL:
 NO_PROGRESS_TIMEOUT:
+STOP_ACK_TIMEOUT:
 AUTONOMY_DEADLINE:
 
 MODEL_MODE:
 REQUESTED_MODEL:
 MODEL_SELECTION_REASON:
 ```
+
+Каждый top-level Task dispatch **обязан** заполнить `TIMEOUT` /
+`HEARTBEAT_INTERVAL` / `NO_PROGRESS_TIMEOUT` / `STOP_ACK_TIMEOUT`
+числовыми defaults из §12.0 (или более строгими). Пустые часы
+запрещены — unbounded wait = contract violation.
+
+Для `/opsx-bug-team` и `/opsx-static-check` дополнительно §12.4
+(`OWNER_VISIBLE` + предпочтительно `run_in_background=true`).
 
 В subagent prompt обязательно укажи footer:
 
@@ -834,6 +843,33 @@ TASK_STATUS=FAILED
 FAILURE_CLASS=CONTRACT_VIOLATION
 RESULT_VALIDATION=REJECTED_RETRYABLE
 ```
+
+### 9.1 Durable evidence gate (bug-episode RED / GREEN / CLOSE)
+
+Supervisor **не** читает repository files. Для transitions, у которых
+`ROUTE_TRANSITION` / PRECONDITIONS требуют RED, GREEN или CLOSE evidence,
+`RESULT_VALIDATION=ACCEPTED` только если envelope содержит **все**:
+
+```text
+REQUIRED_EVIDENCE_PATH_PRESENT=YES
+  (non-empty RED_EVIDENCE_PATH | GREEN_EVIDENCE_PATH |
+   OWNER-CLOSURE / close evidence path as applicable)
+STATUS_MATCHES_PATH_KIND=YES
+  (e.g. STATUS: GREEN_CONFIRMED with GREEN_EVIDENCE_PATH)
+DURABLE_FILE_WRITTEN=YES
+  (worker attestation that the path was written this hop)
+```
+
+Prose-only `GREEN_CONFIRMED` / `CLOSED_*` / ROUTE-TRACE claim **без**
+path + `DURABLE_FILE_WRITTEN=YES` →
+
+```text
+RESULT_VALIDATION=REJECTED_RETRYABLE
+FAILURE_CLASS=EVIDENCE_INCOMPLETE
+```
+
+После исчерпания retry → `PAUSED` (не `ADVANCE`, не claim-next).
+Orphan ROUTE-TRACE без durable artifact не является accepted evidence.
 
 Ошибочный report не переводит task в `COMPLETED`.
 
@@ -995,6 +1031,40 @@ MAX_REVIEW_ROUNDS_PER_SURFACE=2
 
 # 12. Heartbeat, hang and retries
 
+## 12.0 Mandatory numeric defaults (top-level Task)
+
+Каждый Supervisor Task dispatch заполняет часы **до** launch.
+Пустые / omitted values запрещены.
+
+Ordinary writer / checker / consultant (single primary `/opsx-*`,
+не internal orchestrator):
+
+```text
+TIMEOUT_SECONDS=1800
+HEARTBEAT_INTERVAL_SECONDS=120
+NO_PROGRESS_TIMEOUT_SECONDS=600
+STOP_ACK_TIMEOUT_SECONDS=60
+```
+
+Internal orchestrators (`/opsx-bug-team`, `/opsx-static-check`):
+
+```text
+TIMEOUT_SECONDS=3600
+HEARTBEAT_INTERVAL_SECONDS=180
+NO_PROGRESS_TIMEOUT_SECONDS=900
+STOP_ACK_TIMEOUT_SECONDS=120
+```
+
+Допускается только **более строгий** (меньший) timeout, не больший без
+Owner timebox / explicit mission clock. Map fields:
+
+```text
+TIMEOUT ← TIMEOUT_SECONDS
+HEARTBEAT_INTERVAL ← HEARTBEAT_INTERVAL_SECONDS
+NO_PROGRESS_TIMEOUT ← NO_PROGRESS_TIMEOUT_SECONDS
+STOP_ACK_TIMEOUT ← STOP_ACK_TIMEOUT_SECONDS
+```
+
 ## 12.1 Heartbeat
 
 ```text
@@ -1028,7 +1098,8 @@ DUPLICATE_RESTART=FORBIDDEN
 После hang:
 
 1. Task → `TIMEOUT`.
-2. Worker получает stop/cancel.
+2. Worker получает stop/cancel (`interrupt=true` на running Task, если
+   платформа поддерживает).
 3. Supervisor ждёт acknowledgement только до `STOP_ACK_TIMEOUT`.
 4. Partial evidence сохраняется как unaccepted.
 5. Разрешён максимум один restart.
@@ -1046,6 +1117,32 @@ MAX_RESTARTS_EXCEEDED=NO
 * result содержит partial execution;
 * top-level task не становится `COMPLETED`, если completion criteria не выполнены;
 * после остановки top-level не остаётся активных children.
+
+## 12.2.1 Platform abort / interrupt / empty envelope
+
+Если top-level Task завершается как `aborted` | `interrupted` |
+`tool_error` | empty / missing envelope (Owner cancel tool, platform
+kill, mid-flight interrupt) **без** accepted result:
+
+```text
+RECOVERY_CLASS=PAUSED
+DISPOSITION=EXECUTION_OUTCOME_UNKNOWN
+ADVANCE=FORBIDDEN
+CLAIM_NEXT=FORBIDDEN
+NEW_FINDING=FORBIDDEN
+BLIND_REPLAY=FORBIDDEN
+```
+
+Если одновременно превышены часы §12.0 → `TIMEOUT` (строже) с тем же
+запретом blind replay.
+
+Owner report обязан содержать pasteable resume **той же** primary
+команды + `ATTEMPT+1` только при `RETRY_ALLOWED=yes` и idempotency key;
+иначе pasteable reconcile / Owner decision. Нельзя молча продолжать
+mission как будто hop успешен.
+
+Writer/orchestrator side effects возможны → no duplicate production GO
+без durable reconcile (см. SUPERVISOR_POLICY `EXECUTION_OUTCOME_UNKNOWN`).
 
 ## 12.3 Budgets
 
@@ -1071,6 +1168,29 @@ UNCHANGED_SCOPE
 RETRY_BUDGET_EXHAUSTED=YES
 MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
 ```
+
+## 12.4 Long internal orchestrator (Owner-visible)
+
+Перед top-level dispatch `/opsx-bug-team` или `/opsx-static-check`
+Supervisor **обязан** показать Owner (в том же turn, до/при launch):
+
+```text
+OWNER_VISIBLE_DISPATCH:
+  COMMAND:
+  CASE_ID:
+  EXPECTED_WALL_CLOCK_SECONDS:   # from §12.0 TIMEOUT or stricter
+  NO_PROGRESS_TIMEOUT_SECONDS:
+  INTERRUPT_POLICY: interrupt=true on timeout/hang when platform allows
+  SILENCE_NOTE: silence until NO_PROGRESS is not proof of hang; after
+                NO_PROGRESS Supervisor must TIMEOUT/PAUSED per §12.2
+```
+
+Предпочтительно `run_in_background=true` для этих orchestrators, когда
+платформа позволяет heartbeat / completion notification; иначе sync
+Task **с** часами §12.0 (unbounded sync wait запрещён).
+
+На timeout / abort → тот же turn заканчивается pasteable resume
+(§12.2.1), не silent wait.
 
 ---
 
@@ -2290,10 +2410,20 @@ Minimum identity checks before ADVANCE: `MISSION_ID`/`TASK_ID`, `COMMAND`,
 `CASE_ID`, `FINDING_ID==ACTIVE_FINDING_ID`, claim, route fields, evidence
 refs. Mismatch → `PAUSED` / `ENVELOPE_INTEGRITY_FAIL`.
 
+For RED / GREEN / CLOSE hops also apply §9.1 durable evidence gate
+(`DURABLE_FILE_WRITTEN=YES` + path). Prose-only GREEN/CLOSE → reject,
+not ADVANCE.
+
 Recovery outcomes: `ADVANCE` | `RETRY_ALLOWED` | `PAUSED` | `BLOCKED` |
 `NEEDS_OWNER` | `TERMINAL`. No implicit continue. Retry needs idempotency
 key; else pause. Writer may have run without committed envelope →
 `EXECUTION_OUTCOME_UNKNOWN` (no blind replay).
+
+Platform Task `aborted` | `interrupted` | `tool_error` | empty envelope
+on any primary hop (including `/opsx-bug-team`) → same
+`PAUSED` / `EXECUTION_OUTCOME_UNKNOWN` (or `TIMEOUT` if §12.0 clocks
+exceeded). Do not claim-next or start later findings. Pasteable resume
+required (§12.2.1).
 
 Resume: reconstruct from durable case + last verified transition; chat
 history not required.

@@ -30,6 +30,9 @@ No production writes. No LLM route invention.
 | 13 | `13-route-b.md` | T14 | NEXT=/opsx-update not hardcoded Route A |
 | 14 | `14-deterministic-replay.md` | T15 | same state+envelopes ⇒ same NEXT |
 | 15 | `15-planfit-regression.md` | SUP-ASEP-FULL-ENV-002 | structural classify; no mission complete; GO_TOKEN=FORBIDDEN |
+| 16 | `16-top-level-timeout-defaults.md` | SUP-DEF-001 | empty clocks forbidden; §12.0 defaults mandatory |
+| 17 | `17-task-abort-execution-outcome-unknown.md` | SUP-DEF-002 | Task abort → PAUSED EXECUTION_OUTCOME_UNKNOWN |
+| 18 | `18-green-prose-without-path-rejected.md` | SUP-DEF-003 | prose GREEN without path → REJECTED |
 
 ## Static matrix
 
@@ -43,6 +46,9 @@ No production writes. No LLM route invention.
 | ENVELOPE_INTEGRITY_FAIL | 08 |
 | claim gate | 09 |
 | resume | 10, 14 |
-| EXECUTION_OUTCOME_UNKNOWN | 11 |
+| EXECUTION_OUTCOME_UNKNOWN | 11, 17 |
 | Route C / B | 12, 13 |
 | policy ≠ route semantics | 13, 14 |
+| top-level timeout defaults | 16 |
+| platform Task abort | 17 |
+| durable GREEN evidence gate | 18 |

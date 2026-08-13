@@ -102,6 +102,10 @@ TERMINAL_STATUS present
 NEXT_COMMAND / transition present or TERMINAL
 MISSION_COMPLETE == no for ordinary workers
 required evidence refs present when REQUIRED_EVIDENCE non-empty
+for RED / GREEN / CLOSE hops: non-empty evidence path field
+  (RED_EVIDENCE_PATH | GREEN_EVIDENCE_PATH | OWNER-CLOSURE path)
+  AND DURABLE_FILE_WRITTEN=YES (worker attestation)
+  — prose-only STATUS without path/attestation → reject (not ADVANCE)
 ```
 
 Mismatch →:
@@ -110,6 +114,11 @@ Mismatch →:
 PAUSED
 ENVELOPE_INTEGRITY_FAIL
 ```
+
+Evidence-incomplete GREEN/CLOSE (missing path or
+`DURABLE_FILE_WRITTEN`) may also be classified
+`RESULT_VALIDATION=REJECTED_RETRYABLE` per `/opsx-supervisor` §9.1
+before PAUSED on retry exhaustion.
 
 ## Alias note (state names)
 

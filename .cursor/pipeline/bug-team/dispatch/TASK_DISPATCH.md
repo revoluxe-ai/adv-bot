@@ -72,6 +72,23 @@ arguments:
 
 `model` must never be set. Prefer registry `TASK_SUBAGENT_TYPE`.
 
+## Supervisor host top-level (cross-ref)
+
+When `/opsx-supervisor` launches **this whole command** as one top-level
+Task (`/opsx-bug-team` primary), host clocks and Owner-visible rules come
+from `/opsx-supervisor` §12.0–§12.4 (not from the child-role table alone):
+
+```text
+TOP_LEVEL_TIMEOUT_SECONDS default: 3600
+TOP_LEVEL_NO_PROGRESS_TIMEOUT_SECONDS default: 900
+OWNER_VISIBLE_DISPATCH: required before/at launch
+run_in_background: preferred true when platform heartbeat works
+platform abort/interrupt → PAUSED EXECUTION_OUTCOME_UNKNOWN (no ADVANCE)
+```
+
+Child worker `TIMEOUT_SECONDS` rows in `TIMEOUT_POLICY.md` still apply
+**inside** the team; they do not authorize unbounded host wait.
+
 ## Dispatch record (durable)
 
 After each Task launch / completion, orchestrator appends one line to:
