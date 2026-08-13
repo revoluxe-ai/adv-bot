@@ -400,9 +400,12 @@ gh pr edit <EXISTING_PR_NUMBER> \
 
 Do not run `git push`, `gh pr create`, or `gh pr edit` before explicit `GO`.
 
-## Post-PR Bugbot report (mandatory after successful create)
+## Post-PR Bugbot report (mandatory after successful create or update)
 
-Runs **only** after a successful `gh pr create` that returned a PR URL/number.
+Runs after a successful PR publish that yields a PR URL/number in either MODE:
+- `CREATE_PR` — after successful `gh pr create`;
+- `UPDATE_PR` — after successful `git push` + `gh pr edit` on the existing PR.
+
 Does **not** replace `/opsx-project-bug-hunt` (pre-PR primary). Does **not**
 auto-fix findings.
 
@@ -467,7 +470,7 @@ Base Branch: <PR target/base branch>
    - TIME_BUDGET: ≤60s total; at most **2** attempts; sleep ≤15s between
      attempts if first returns no comments;
    - Prefer: `gh api` pull review comments + issue comments / reviews for
-     the new PR number, filter `user.login == cursor[bot]` (or equivalent);
+     that PR number, filter `user.login == cursor[bot]` (or equivalent);
    - Map each finding to Severity | Location | Finding when parseable;
    - Status values:
      - `findings` — ≥1 comment/finding mapped (`findings_count` = N);
