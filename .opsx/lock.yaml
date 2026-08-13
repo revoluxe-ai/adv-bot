@@ -1,0 +1,10 @@
+# Generated / maintained by OPSX meta snapshot+index flows.
+# Records last published safe-tree state for this project family/branch.
+schema_version: 1
+repo_family_id: adv-bot
+note: "Populate via /opsx-meta-update-snapshot; not hand-authored authority."
+last_published:
+  source_commit: null
+  safe_tree_hash: null
+  snapshot_source_id: null
+  snapshot_head: null

@@ -1,0 +1,54 @@
+# OPSX process-surface allowlist — shared SoT
+#
+# Seeded by /opsx-meta-bootstrap step 1 (bind) for adv-bot.
+# Do not commit machine-absolute central_root (username leak; non-portable).
+# Bind via central= arg, env OPSX_CENTRAL_ROOT, or default_relative ../opsx-central.
+
+schema_version: 1
+repo_family_id: adv-bot
+branch_id_source: git_branch_normalized
+
+catalog_relpath: catalog
+sources_relpath: sources
+
+allowlist:
+  - .cursor/commands/**
+  - .cursor/rules/**
+  - .cursor/skills/**
+  - .cursor/agents/**
+  - .cursor/static-check/**
+  - .cursor/pipeline/**
+  - .cursor/antipattern-gate/**
+  - .cursor/devops/**
+  - .cursor/opsx-resolve-conflict/**
+  - .agents/**
+  - .github/skills/**
+  - .github/prompts/**
+  - AGENTS.md
+  - WORKLOG.md
+  - .opsx/adapters/**
+  - .opsx/registry/**
+  - .opsx/shared/**
+  - .opsx/project/**
+  - .opsx/import/**
+  - .opsx/manifest.yaml
+  - .opsx/projectization.yaml
+  - .opsx/sources.yaml
+  - .opsx/lock.yaml
+  - .opsx/tools/**
+
+hard_exclude:
+  - .env
+  - .env.*
+  - "**/.env"
+  - "**/.env.*"
+  - "**/node_modules/**"
+  - "**/.git/**"
+  - "**/__pycache__/**"
+  - .opsx/upstream/**
+  - .opsx/changes/**
+  - src/**
+  - public/**
+  - backend/**
+  - app/**
+  - "**/*.zip"

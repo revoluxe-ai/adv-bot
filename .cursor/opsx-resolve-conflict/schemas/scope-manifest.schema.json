@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/scope-manifest.schema.json",
+  "title": "OPSX Resolve Conflict Frozen Scope Manifest",
+  "type": "object",
+  "required": [
+    "schema",
+    "run_id",
+    "frozen_at_state_fingerprint",
+    "items",
+    "manifest_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/scope-manifest/v2"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "frozen_at_state_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "unit_id",
+          "reason",
+          "authority_source",
+          "authority_sha256",
+          "allowed_operation",
+          "expected_semantic_change",
+          "initial_stage_oids",
+          "initial_worktree_sha256",
+          "required_checks"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "unit_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "authority_source": {
+            "type": "string"
+          },
+          "authority_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "allowed_operation": {
+            "const": "write"
+          },
+          "expected_semantic_change": {
+            "type": "string"
+          },
+          "initial_stage_oids": {
+            "type": "object"
+          },
+          "initial_worktree_sha256": {
+            "type": "string"
+          },
+          "required_checks": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

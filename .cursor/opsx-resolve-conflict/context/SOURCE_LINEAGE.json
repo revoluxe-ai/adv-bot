@@ -1,0 +1,198 @@
+{
+  "schema": "opsx-resolve-conflict/source-lineage/v2",
+  "origin_source_commit": "2f13557d799438ef4cd5104d29eef8de2c72d57b",
+  "host_contract_snapshot_commit": "78aa902fc961a7244f75e557a58b864d142fa47c",
+  "package_version": "0.40.0",
+  "note": "host_contract_snapshot_commit is a synthetic immutable tree of packaged contracts and must never be treated as OPSX origin source_commit.",
+  "files": [
+    {
+      "repository_path": ".cursor/commands/opsx-execution-preflight.md",
+      "package_path": "context/host_contracts/.cursor/commands/opsx-execution-preflight.md",
+      "origin_blob_oid": "f8fd50af4376dd242bb988abde46101161095988",
+      "snapshot_blob_oid": "f8fd50af4376dd242bb988abde46101161095988",
+      "sha256": "ca652b5feabbc6c0be0b55bb79bd5b3114083b10b2c3bc94aa4e4266cd827f79",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/commands/opsx-source-resolution.md",
+      "package_path": "context/host_contracts/.cursor/commands/opsx-source-resolution.md",
+      "origin_blob_oid": "f86e885d901a83bc3f08f51a64b3905eb5c4725c",
+      "snapshot_blob_oid": "f86e885d901a83bc3f08f51a64b3905eb5c4725c",
+      "sha256": "41f87dff8dcb0ab67d2821df2c7febbb40bc0ac28da5f5991a0b823ec9a0d5d7",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/opsx-review-commands",
+      "package_path": "context/host_contracts/.cursor/opsx-review-commands",
+      "origin_blob_oid": "568e62d3cf4f2a18f31213f480d1c086083388aa",
+      "snapshot_blob_oid": "568e62d3cf4f2a18f31213f480d1c086083388aa",
+      "sha256": "53476ca213509f7487d45e26c129dcbe8b181f56cd78f8323c0fe1b3900f6afb",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/pipeline/GRAPH.md",
+      "package_path": "context/host_contracts/.cursor/pipeline/GRAPH.md",
+      "origin_blob_oid": "fa9caa78e48352434d46a917e92c1fc0901dd71c",
+      "snapshot_blob_oid": "fa9caa78e48352434d46a917e92c1fc0901dd71c",
+      "sha256": "49a42842bf94c18c659d4194f02d3f639f9bb93b5eb9aa11842f631b52b38365",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/pipeline/META.md",
+      "package_path": "context/host_contracts/.cursor/pipeline/META.md",
+      "origin_blob_oid": "6ffdc287c935ba5f6678e16537233a3dad75b263",
+      "snapshot_blob_oid": "6ffdc287c935ba5f6678e16537233a3dad75b263",
+      "sha256": "2d362834ca24357774d02a3a8e4a420a156bf95caeba93606c9c68037014c262",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/rules/testing-rules.mdc",
+      "package_path": "context/host_contracts/.cursor/rules/testing-rules.mdc",
+      "origin_blob_oid": "417372360479438f95f161cfedcfd9f5275a401a",
+      "snapshot_blob_oid": "417372360479438f95f161cfedcfd9f5275a401a",
+      "sha256": "d0d978a5a5f20f950b4d6e3a88c7fded3f9468effc53dcd8cb834da954519b05",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/mypy/context.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/mypy/context.md",
+      "origin_blob_oid": "b48e679e46451e82026ad3111f0b3dccd9504b7b",
+      "snapshot_blob_oid": "b48e679e46451e82026ad3111f0b3dccd9504b7b",
+      "sha256": "f1cf7f8aaadbe8b5344ba36fb3a16188a9ad55693f4a916f309e503cd040878c",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/mypy/instructions.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/mypy/instructions.md",
+      "origin_blob_oid": "e6d543e23d06fb9a8d7136734b86ed4728950930",
+      "snapshot_blob_oid": "e6d543e23d06fb9a8d7136734b86ed4728950930",
+      "sha256": "beb77d10db151f23a99b211658c4810aad5a300b131ab255b9fa692803a9ef1d",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/pyright-strict/context.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/pyright-strict/context.md",
+      "origin_blob_oid": "70b5a579816ebf321398287381c73580b85210fe",
+      "snapshot_blob_oid": "70b5a579816ebf321398287381c73580b85210fe",
+      "sha256": "1ff720948ebcf5e4f0464a2f0879df627d934af2307aa6c6cff09dba241cd493",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/pyright-strict/instructions.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/pyright-strict/instructions.md",
+      "origin_blob_oid": "be88eb76bcfac4483f5c3e564328488020cbc23f",
+      "snapshot_blob_oid": "be88eb76bcfac4483f5c3e564328488020cbc23f",
+      "sha256": "01c952895a141eae8ffc2ced3fb302529267949ed755e42c122d26be9c71bf88",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/pytest-full/context.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/pytest-full/context.md",
+      "origin_blob_oid": "e92075c563d75d6f59bb0d2392e59d8593c6467f",
+      "snapshot_blob_oid": "e92075c563d75d6f59bb0d2392e59d8593c6467f",
+      "sha256": "a0bfbc728faf21bfa3896ff57863d34a6478c5eebe690f01076f308f38a18f0c",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/pytest-full/instructions.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/pytest-full/instructions.md",
+      "origin_blob_oid": "ccef0da24832262447c5fb885c842729a94901a1",
+      "snapshot_blob_oid": "ccef0da24832262447c5fb885c842729a94901a1",
+      "sha256": "9359dda05c6fd385720c29b4ae1e9f419fcfff8149e247027ff7b59feed096e4",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/pytest-unit/context.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/pytest-unit/context.md",
+      "origin_blob_oid": "b6f14d2e38580fc4963327efccc16d18f8e37ff9",
+      "snapshot_blob_oid": "b6f14d2e38580fc4963327efccc16d18f8e37ff9",
+      "sha256": "97447235fc177ac3cbd8609bd6c6db20fc49a5b5400933fa869cffadae36eecc",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/checks/pytest-unit/instructions.md",
+      "package_path": "context/host_contracts/.cursor/static-check/checks/pytest-unit/instructions.md",
+      "origin_blob_oid": "82bcefefa255aba1f30b9ca12c8f0b5a6eeab429",
+      "snapshot_blob_oid": "82bcefefa255aba1f30b9ca12c8f0b5a6eeab429",
+      "sha256": "2f8d1c97eab854d43321da9b897d89f2138df2076370cd6c77d9db9d50c5d99d",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/contracts/synthesis.md",
+      "package_path": "context/host_contracts/.cursor/static-check/contracts/synthesis.md",
+      "origin_blob_oid": "60debe5ee93a96cdb58ef5ab7651c0615557593e",
+      "snapshot_blob_oid": "60debe5ee93a96cdb58ef5ab7651c0615557593e",
+      "sha256": "c283f019d78e2e3863cb9ccb0b6aea0c6c41623b85ec0b9d9e4107a426ad2ccb",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".cursor/static-check/registry.yaml",
+      "package_path": "context/host_contracts/.cursor/static-check/registry.yaml",
+      "origin_blob_oid": "7aa382737c8452332de5ad2ade333a433a80204e",
+      "snapshot_blob_oid": "7aa382737c8452332de5ad2ade333a433a80204e",
+      "sha256": "aa0314ed0a3fa12298bc7185496859b93eba40ee8c24886dbce385a2b0579915",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".github/copilot-instructions.md",
+      "package_path": "context/host_contracts/.github/copilot-instructions.md",
+      "origin_blob_oid": "f0c4b1a3452ca5a3f507a8b239507981bb4330b5",
+      "snapshot_blob_oid": "f0c4b1a3452ca5a3f507a8b239507981bb4330b5",
+      "sha256": "527b9526d0a68c2a57365e2602d50ce4db36bc3314603df745656040b5a2e2a7",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": ".github/git-commit-instructions.md",
+      "package_path": "context/host_contracts/.github/git-commit-instructions.md",
+      "origin_blob_oid": "34adcd9f824120cb7b9f6d241ab808cc6a7139da",
+      "snapshot_blob_oid": "34adcd9f824120cb7b9f6d241ab808cc6a7139da",
+      "sha256": "4d8432a37a607aefe89fed3c0e79290e9dccab9812b2889f7efb865262267d94",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": "openspec/config.yaml",
+      "package_path": "context/host_contracts/openspec/config.yaml",
+      "origin_blob_oid": "523ac2a3f1e5d8745dfb11dd198adb3502fb14e0",
+      "snapshot_blob_oid": "523ac2a3f1e5d8745dfb11dd198adb3502fb14e0",
+      "sha256": "113ba80917a1dbfd5c96f24a478dabf225368f88d811931b491555ea08028464",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": "openspec/decisions/index.md",
+      "package_path": "context/host_contracts/openspec/decisions/index.md",
+      "origin_blob_oid": "923ac52069a9cfdd56fe869f337e4e345425dca3",
+      "snapshot_blob_oid": "923ac52069a9cfdd56fe869f337e4e345425dca3",
+      "sha256": "48878aeed6653ac157e72c58471274df44e722d5a1e36a2df4c2f1c314d41ed3",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    },
+    {
+      "repository_path": "openspec/policies/VERIFY_POLICY.md",
+      "package_path": "context/host_contracts/openspec/policies/VERIFY_POLICY.md",
+      "origin_blob_oid": "ddfd00af0982d872cf477e9ec634695051e130c3",
+      "snapshot_blob_oid": "ddfd00af0982d872cf477e9ec634695051e130c3",
+      "sha256": "6e5503afee442137bce890359dabd480c55aedd4a5475b766599334483f1e69d",
+      "binding": "origin_source_blob",
+      "note": "Packaged bytes match origin_source_commit blob; snapshot commit proves packaged-byte immutability only."
+    }
+  ]
+}
