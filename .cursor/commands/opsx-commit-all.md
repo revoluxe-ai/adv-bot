@@ -182,9 +182,39 @@ Only **stricter** (smaller) values are allowed without Owner timebox.
 Map into Task launch metadata / prompt footer as `TIMEOUT` /
 `HEARTBEAT_INTERVAL` / `NO_PROGRESS_TIMEOUT` / `STOP_ACK_TIMEOUT`.
 
-Prefer `run_in_background=true` for PLAN and EXECUTE children when the
-platform delivers completion notifications; otherwise sync Task **with**
-the clocks above.
+### Task wait discipline (HARD — false-hang prevention)
+
+Platform Task completion arrives as a **Task completion notification**, not
+via shell tools. Parent MUST NOT invent a busy-wait that never wakes.
+
+```text
+FORBIDDEN_WHILE_WAITING_ON_TASK_CHILDREN:
+- AwaitShell (does not receive Task completion notifications)
+- Shell sleep / sleep loops
+- polling subagent transcript files as a wait strategy
+- any in-turn busy-wait after background Task launch
+```
+
+```text
+AWAIT_SHELL_TIMEOUT_IS_NOT_CHILD_HANG=YES
+SILENCE_PLUS_SHELL_SLEEP_IS_NOT_HANG_PROOF=YES
+```
+
+**Background mode** (`run_in_background=true`):
+
+1. Launch child Task(s) with clocks filled.
+2. Print `OWNER_VISIBLE_DISPATCH` including that progress resumes **only**
+   on platform Task completion notification.
+3. **End the parent turn immediately** — no further tool calls that wait.
+4. On completion notification: resume that lane immediately; do not re-PLAN
+   blindly; do not treat prior silence as hang.
+
+**Sync mode** (`run_in_background=false`): allowed with clocks filled; result
+returns in-turn. Prefer sync for **serial EXECUTE** when `PARENT_HAS_GO=yes`
+so the parent can chain without notification dependency.
+
+Parallel PLAN fan-out may still use background; after both plan
+notifications land, start EXECUTE per §2 (prefer sync).
 
 ### OWNER_VISIBLE_DISPATCH (before every child launch)
 
@@ -199,8 +229,11 @@ OWNER_VISIBLE_DISPATCH:
   EXPECTED_WALL_CLOCK_SECONDS:   # from clocks above
   NO_PROGRESS_TIMEOUT_SECONDS:
   INTERRUPT_POLICY: interrupt=true on timeout/hang when platform allows
+  WAIT_MODE: background_end_turn | sync_in_turn
   SILENCE_NOTE: silence until NO_PROGRESS is not proof of hang; after
-                NO_PROGRESS parent must TIMEOUT/PAUSED that lane
+                NO_PROGRESS parent must TIMEOUT/PAUSED that lane;
+                AwaitShell/shell-sleep is FORBIDDEN and is not hang proof;
+                background mode resumes only on Task completion notification
 ```
 
 ### Platform abort / interrupt / empty envelope
@@ -267,11 +300,15 @@ Do not wait for Owner between the two plan launches.
 As each plan Task completes successfully with an actionable in-scope plan
 (not pure `OUT_OF_SCOPE_REDIRECT` / empty / hard `BLOCKED` that forbids GO):
 
-1. If an execute Task is already running → wait for it to finish (serialize),
-   observing EXECUTE clocks / NO_PROGRESS (do not unbounded-wait).
-2. Print `OWNER_VISIBLE_DISPATCH` for that lane’s EXECUTE.
+1. If an execute Task is already running → serialize: do not launch a second
+   execute; resume only when the running execute’s Task completion
+   notification (or sync return) arrives. Never AwaitShell / sleep-poll.
+2. Print `OWNER_VISIBLE_DISPATCH` for that lane’s EXECUTE
+   (`WAIT_MODE=sync_in_turn` preferred).
 3. Launch exactly one execute Task for that ready lane with `EXEC_ARGS`
-   and EXECUTE clocks filled (prefer `run_in_background=true` when allowed).
+   and EXECUTE clocks filled. **Prefer `run_in_background=false` (sync)**
+   so the result returns in-turn. If background: end turn immediately;
+   continue on Task completion notification only.
 4. Prompt MUST:
    - Read/follow the same child command file as PRIMARY
    - Treat `EXEC_ARGS` as `$ARGUMENTS` (includes `GO`)
@@ -282,8 +319,9 @@ As each plan Task completes successfully with an actionable in-scope plan
 5. When that execute finishes, start the next ready lane’s execute (if any).
 
 **As-ready order:** first successfully planned actionable lane executes first;
-the second waits. If both plans are ready before either execute starts,
-prefer order: `LANE_PROCESS` then `LANE_PRODUCT` (stable default).
+the second waits (notification- or sync-serialized — never shell-wait).
+If both plans are ready before either execute starts, prefer order:
+`LANE_PROCESS` then `LANE_PRODUCT` (stable default).
 
 If a lane’s plan is non-actionable (clean / out-of-scope only / blocked):
 
@@ -338,7 +376,8 @@ successful child commit report for that attempted lane — use `PARTIAL` or
   only with explicit Owner resume / ATTEMPT+1 — no blind replay), or
 - Run the failed child alone (`/opsx-commit` or `/opsx-meta-commit`).
 - On confirmed hang: interrupt child when platform allows; wait at most
-  `STOP_ACK_TIMEOUT`; then TIMEOUT/PAUSED that lane per clocks above.
+  `STOP_ACK_TIMEOUT` via platform interrupt ack — **not** AwaitShell /
+  shell sleep; then TIMEOUT/PAUSED that lane per clocks above.
 
 ## Final report (parent)
 
