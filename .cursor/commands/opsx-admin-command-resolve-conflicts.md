@@ -236,9 +236,15 @@ Apply / continue / abort on protected branches requires
 4. If any Class (B) unmerged path exists → emit mandatory non-empty
    `ALLOWLIST_GAP:` (paths + proposed `sources.yaml` allowlist lines).
    Do **not** treat Class (B) as MIXED_SCOPE or redirect to `/opsx-commit`.
-   Overall STATUS: `ALLOWLIST_GAP` when no Class (A) remains to plan, else
-   `PLAN_READY` / `BLOCKED_OWNER` with `ALLOWLIST_GAP` block still present.
+   Overall STATUS: `ALLOWLIST_GAP` whenever any Class (B) UU remains
+   (never `PLAN_READY`, even if Class (A) paths are still plannable).
+   Class (A) draft resolutions may still appear in the plan body under
+   that STATUS. If Class (A) also needs Owner choices, list them in
+   `OWNER_DECISION_REQUIRED` under `ALLOWLIST_GAP` (gap blocks finish
+   first; do not emit `BLOCKED_OWNER` while Class B UU remains).
    `FINISH_OP: none` while any Class (B) UU remains.
+   `NEXT_ACTION`: allowlist handoff (`/opsx-meta-fix-command-defects`),
+   not `GO`.
 5. For each Class (A) path: Grep/Read only that file (section budget);
    classify exactly one conflict class; draft resolution text or options.
 6. List `OWNER_DECISIONS_REQUIRED` for every `AUTHORITY_TOKEN` path.
@@ -367,8 +373,8 @@ blocked_preflight_timeout
 | STATUS | NEXT_ACTION |
 |---|---|
 | `PLAN_READY` (no owner gaps; no Class B UU) | Reply: `GO` |
-| `BLOCKED_OWNER` | Owner answers listed decisions, then `GO` |
-| `ALLOWLIST_GAP` | `/opsx-meta-fix-command-defects` (add proposed allowlist lines); re-run this command |
+| `BLOCKED_OWNER` (no Class B UU) | Owner answers listed decisions, then `GO` |
+| `ALLOWLIST_GAP` (any Class B UU; Class A drafts optional in body) | `/opsx-meta-fix-command-defects` (add proposed allowlist lines); re-run this command — not `GO` |
 | `BLOCKED_MIXED_SCOPE` | finish Class (C) product conflicts first; re-run this command |
 | `RESOLVED` | `/opsx-meta-commit` if dirty; else optional `/opsx-create-pr` |
 | `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-meta-fix-command-defects` |
@@ -383,8 +389,8 @@ Class (B) paths.
 | Condition | Behavior |
 |---|---|
 | No conflicts / not in merge|rebase | `PLAN_READY` or short no-op; redirect commit if dirty |
-| Missing Owner choices | `BLOCKED_OWNER`; no writes |
-| Class (B) UU present (alone or with Class A) | `ALLOWLIST_GAP` (or `PLAN_READY` + mandatory gap block if Class A still plannable); `FINISH_OP: none`; no resolve/add of Class B; hand off allowlist fix |
+| Missing Owner choices (and no Class B UU) | `BLOCKED_OWNER`; no writes |
+| Class (B) UU present (alone or with Class A) | `ALLOWLIST_GAP` only (never `PLAN_READY`); Class (A) drafts allowed in body; `FINISH_OP: none`; no resolve/add of Class B; hand off allowlist fix (not `GO`) |
 | Class (C) + Class (A) unmerged together | `BLOCKED_MIXED_SCOPE`; no allowlist apply until product UU cleared |
 | Continue fails | report git error; leave tree; do not force |
 | Read timeout on required conflict file | `blocked_preflight_timeout` / `EVIDENCE_GAP` |
@@ -393,6 +399,7 @@ Class (B) paths.
 
 - [ ] Allowlist SoT (`.opsx/sources.yaml`) respected; no product / hard_exclude writes
 - [ ] Class (B) never treated as MIXED_SCOPE or redirected to `/opsx-commit`
+- [ ] Class (B) UU never yields `PLAN_READY` (STATUS `ALLOWLIST_GAP`; `FINISH_OP: none`; not `GO`)
 - [ ] No apply without `GO`
 - [ ] No silent `AUTHORITY_TOKEN` ours/theirs
 - [ ] No push / force-push / hard reset / clean -fd
