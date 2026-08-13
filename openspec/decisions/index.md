@@ -31,6 +31,13 @@ architecture decisions belong here.
   - Scope: mutual exclusion of automated Auto bid writers («для Авто» vs
     «в полках»); reason split vs `cost_rule_failed`; orthogonal to empty-keywords,
     mode-defaults, and Hold freeze.
+- [auto-shelf-exhausted-pause-write-path](auto-shelf-exhausted-pause-write-path/decision.md)
+  - Status: Accepted
+  - Scope: ownership of shelf-exhausted Auto terminal pause/retest
+    (detect/PG SoT → activity-control `pause_auto_campaign` + Redis Auto-lane
+    mirror → clear-our-block / conditional start / notify); TARGET_ENTITY_OR_LEG=AUTO;
+    forbid `pause_auction_campaign` for this reason; mid-cycle cost gate while
+    shelves ON; orthogonal to empty-keywords, coexistence, and Hold freeze.
 
 ## Change Requirements
 
