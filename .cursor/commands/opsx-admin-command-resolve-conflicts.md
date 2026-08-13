@@ -112,7 +112,7 @@ Everything else is **out of scope** for resolution writes.
 | `TRIVIAL_TEXTUAL` | Non-overlapping hunks / whitespace / import-order noise | yes | yes under GO if plan showed them |
 | `SECTION_OVERLAP` | Same markdown/code section edited both sides | semantic merge proposal | yes under GO if plan proposal accepted (no OWNER_DECISION left) |
 | `AUTHORITY_TOKEN` | OWNER / STATUS / GATE / disposition / forbid-list / denylist / exclusive-owner prose diverged | propose options only | **no** — need Owner choice |
-| `CROSS_FILE_CONTRACT` | Merge would break producer/consumer or create dual authority across files | propose + warn | GO may merge text; must set handoff to fix-defects when broken |
+| `CROSS_FILE_CONTRACT` | Merge would break producer/consumer or create dual authority across files (includes META/GRAPH fingerprint attestation without regenerating `inventory_path`) | propose + warn | GO may merge text; must set handoff to fix-defects when broken |
 | `MIXED_SCOPE` | Same conflict set includes out-of-scope (product) paths | do not resolve product | **stop** — `BLOCKED_MIXED_SCOPE` |
 
 ## Prevention note (operator)
@@ -122,6 +122,8 @@ Prefer fewer conflicts upstream:
 - avoid editing the same process file on two long-lived branches;
 - serialize shared contracts (`opsx-execution-preflight`,
   `opsx-source-resolution`, pipeline GRAPH/META);
+- never attest META/GRAPH fingerprint fields without regenerating
+  `inventory_path` in the same apply;
 - merge process PRs shared-contracts → consumers → routing/consult.
 
 Prevention does not replace this command when `UU` already exists.
@@ -196,19 +198,36 @@ Then:
 
 1. Write resolved content for each planned in-scope path (no conflict
    markers left).
-2. `git add -- <in-scope-resolved-paths>` only.
-3. Re-check `git status --short`: no `U` paths remain.
-4. If merge in progress → `git merge --continue` (non-interactive; if the
+2. **Pipeline fingerprint ↔ inventory guard (mandatory when triggered):**
+   If this GO touched `.cursor/pipeline/META.md` and/or GRAPH inventory
+   attestation fields (`inventory_count`, `source_fingerprint`,
+   `fingerprint_*`, `inventory_content_sha256`, or notes claiming a
+   recomputed fingerprint), then **before** `git add`:
+   - run `graph_fingerprint.write_inventory` on META `inventory_path`
+     (default `.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json`);
+   - align META `inventory_count` / `source_fingerprint` /
+     `inventory_content_sha256` to the regenerated artifact and
+     `graph_fingerprint.reproduce()`;
+   - include the regenerated `INVENTORY.json` among in-scope paths to add.
+   Do **not** claim `RESOLVED` while `inventory_path` disagrees with
+   `reproduce()` or META attestation.
+3. `git add -- <in-scope-resolved-paths>` only.
+4. Re-check `git status --short`: no `U` paths remain.
+5. If merge in progress → `git merge --continue` (non-interactive; if the
    editor would open, use a simple merge message describing process-surface
    conflict resolution — do not invent product behavior claims).
-5. If rebase in progress → `git rebase --continue` under the same rules.
-6. Contract recheck (bounded): skim changed command handoff/ownership
-   tokens for dual-authority or producer-without-consumer. If broken →
-   `CONTRACT_BROKEN_AFTER_MERGE` and `NEXT_ACTION` =
-   `/opsx-admin-command-fix-command-defects`.
-7. If tree still has ordinary (non-conflict) process dirt →
+6. If rebase in progress → `git rebase --continue` under the same rules.
+7. Contract recheck (bounded): skim changed command handoff/ownership
+   tokens for dual-authority or producer-without-consumer; **and** verify
+   `inventory_path` count/fingerprint/`INVENTORY_CONTENT_SHA256` agree with
+   META attestation and `graph_fingerprint.reproduce()` when META/GRAPH
+   attestation was in scope for this GO (or when those files are dirty).
+   If broken → `CONTRACT_BROKEN_AFTER_MERGE` and `NEXT_ACTION` =
+   `/opsx-meta-fix-command-defects` (legacy
+   `/opsx-admin-command-fix-command-defects` still accepted).
+8. If tree still has ordinary (non-conflict) process dirt →
    `NEXT_ACTION: /opsx-admin-command-commit`.
-8. Never `git push`, `rebase` onto remote as a new op, `reset --hard`,
+9. Never `git push`, `rebase` onto remote as a new op, `reset --hard`,
    or `clean -fd`.
 
 ## Hard prohibitions
@@ -228,6 +247,8 @@ Never:
   without explicit Owner choice recorded in the plan output;
 - resolve or stage out-of-scope product paths;
 - claim `RESOLVED` while unmerged paths remain;
+- claim `RESOLVED` while META/GRAPH fingerprint attestation disagrees with
+  `inventory_path` / `graph_fingerprint.reproduce()`;
 - treat abort as success without `ABORT_* GO`;
 - open PRs or call `/opsx-create-pr` as a side effect.
 
@@ -275,7 +296,7 @@ blocked_preflight_timeout
 | `BLOCKED_OWNER` | Owner answers listed decisions, then `GO` |
 | `BLOCKED_MIXED_SCOPE` | split/finish product conflicts first; re-run this command |
 | `RESOLVED` | `/opsx-admin-command-commit` if dirty; else optional `/opsx-create-pr` |
-| `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-admin-command-fix-command-defects` |
+| `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-meta-fix-command-defects` (legacy admin-fix alias ok) |
 | `ABORTED_BY_OWNER` | operator chooses next branch action; not create-pr |
 
 `DO_NOT_DO_YET` must include at least: push; force-push; admin-commit while
