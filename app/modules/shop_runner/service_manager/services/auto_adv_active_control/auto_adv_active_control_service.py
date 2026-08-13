@@ -665,7 +665,13 @@ class AutoAdvActiveControlService:
             )
 
     async def _maybe_open_shelf_exhausted_epoch(self, adv: ComplexAdv) -> None:
-        """После реального Auto start: открыть эпоху если epoch_pending."""
+        """Открыть shelf-exhausted эпоху если ``epoch_pending``.
+
+        Вызывается после перехода Auto в STARTED **и** когда Auto уже
+        STARTED (clear мог выставить pending без start-transition). Без
+        ветки already-STARTED pending залипает и detect вечно no-op
+        (ROOT-001 / ASEP-EPOCH-PENDING-STUCK).
+        """
         nmids: list[int] = adv.nmids
         if not nmids:
             return None
@@ -1285,6 +1291,9 @@ class AutoAdvActiveControlService:
                 CampaignActivityCommand.STARTED,
                 AutoReasonCode.BUDGET_OK_COST_OK,
             )
+            # Clear may set epoch_pending while Auto is already STARTED;
+            # there is no start-transition, so consume pending here too.
+            await self._maybe_open_shelf_exhausted_epoch(adv)
 
     async def _search_campaign_handler(
         self,
