@@ -51,6 +51,7 @@ from .bid_units import (
     truncate_datetime_to_seconds,
     wb_min_cpm_rub_to_bid_minor,
 )
+from .exhausted_pause.decision import coverage_date_from_for_epoch
 from .dto import (
     AutoShelfBidControlViewDTO,
     AutoShelfBidSelectedCpoContract,
@@ -963,9 +964,27 @@ class AutoShelfBidControlViewProvider:
             )
             coverage_rows: list[BidCoverage] = []
             if coverage_first_available_bucket_start is not None:
+                # После Auto start / mark_shelf_exhausted_epoch_started окно
+                # coverage MUST учитывать epoch_start, иначе pre-epoch CH
+                # история закрывает ставки новой эпохи (ROOT-001).
+                epoch_start = (
+                    getattr(state, "shelf_exhausted_epoch_start", None)
+                    if state is not None
+                    else None
+                )
+                epoch_window_from = coverage_date_from_for_epoch(
+                    now=now_utc,
+                    epoch_start=epoch_start
+                    if isinstance(epoch_start, datetime)
+                    else None,
+                )
+                coverage_date_from = max(
+                    coverage_first_available_bucket_start,
+                    epoch_window_from,
+                )
                 coverage_rows = await self._analytics.get_bid_coverages(
                     nmid=nmid,
-                    date_from=coverage_first_available_bucket_start,
+                    date_from=coverage_date_from,
                     date_to=now_utc,
                     currency=currency,
                     price_minor=None,
@@ -1224,6 +1243,11 @@ class AutoShelfBidControlViewProvider:
             target_main_observation_minutes=target_main_observation_minutes,
             min_bid_distance_minor=(
                 int(settings_obj.min_bid_distance_minor) if settings_obj else None
+            ),
+            retest_interval_days=(
+                int(getattr(settings_obj, "retest_interval_days", 7))
+                if settings_obj
+                else 7
             ),
             test_impressions=test_impressions,
             main_impressions=main_impressions,

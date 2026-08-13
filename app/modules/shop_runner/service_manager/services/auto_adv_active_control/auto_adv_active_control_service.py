@@ -184,6 +184,7 @@ class AutoAdvActiveControlService:
             [ComplexAdv, Literal["auto", "search"]], Awaitable[None]
         ]
         | None = None,
+        shelf_bid_control_repository: Any | None = None,
     ) -> None:
         self._wb_modifier = wb_modifier
         self._tasks_manager = tasks_manager
@@ -191,6 +192,8 @@ class AutoAdvActiveControlService:
         self._auto_shelf_bid_control_view_provider = auto_shelf_bid_control_view_provider
         self._reason_manager = redis_campaign_activity_reason_manager
         self._budget_ensure_before_start_retry = budget_ensure_before_start_retry
+        # Injectable PG SoT reader for shelf-exhausted our-block (tests / wiring).
+        self._shelf_bid_control_repository = shelf_bid_control_repository
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
         """Привести активность РК в соответствие с бюджетом и расписанием.
@@ -544,6 +547,143 @@ class AutoAdvActiveControlService:
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
 
+    async def _maybe_apply_shelf_exhausted_pause(
+        self,
+        adv: ComplexAdv,
+        *,
+        auto_adv_id: int,
+        auto_status: str,
+    ) -> bool:
+        """Если PG our-block активен — pause Auto / re-assert Redis; True = stop handler.
+
+        Paid Telegram notify on enter when ``shelf_exhausted_notify_sent_at`` is
+        None — including when Auto is already PAUSE/READY (budget/schedule/
+        balance may have paused first). STARTED: pause campaign + reason + notify.
+        Already not STARTED: re-assert Redis reason + notify if latch unset.
+        MUST NOT pause Search. Module stays ON. Dedupe via notify_sent_at.
+
+        Returns:
+            True если our-block активен и handler должен остановиться; иначе False.
+        """
+        if not bool(getattr(adv.adv_setting, "auto_shelf_bid_control_enabled", False)):
+            return False
+        nmids: list[int] = adv.nmids
+        if not nmids:
+            return False
+        nmid: int = nmids[0]
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+            AutoShelfBidControlRepository,
+        )
+
+        repo = self._shelf_bid_control_repository or AutoShelfBidControlRepository()
+        state = await repo.get_state(nmid)
+        if state is None or not bool(state.shelf_exhausted_pause_active):
+            return False
+
+        if auto_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Auto watchdog: pausing auto campaign (shelf exhausted no plan) "
+                "adv_id=%s shop_id=%s nmid=%s",
+                auto_adv_id,
+                adv.shop_id,
+                nmid,
+            )
+            await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.SHELF_EXHAUSTED_NO_PLAN,
+            )
+            if state.shelf_exhausted_notify_sent_at is None:
+                await self._notify_shelf_exhausted_enter(
+                    adv,
+                    state_nmid=nmid,
+                    resolve_cpo_kind=state.shelf_exhausted_resolve_cpo_kind or "max",
+                    resolve_cpo_value=float(
+                        state.shelf_exhausted_resolve_cpo_value or 0.0
+                    ),
+                    due_at=state.shelf_exhausted_due_at,
+                    repository=repo,
+                )
+            return True
+
+        # Already paused / ready: re-assert Redis mirror from PG SoT.
+        # Enter notify must still fire when latch unset (ROOT-001).
+        await self._set_auto_reason(
+            auto_adv_id,
+            CampaignActivityCommand.PAUSE,
+            AutoReasonCode.SHELF_EXHAUSTED_NO_PLAN,
+        )
+        if state.shelf_exhausted_notify_sent_at is None:
+            await self._notify_shelf_exhausted_enter(
+                adv,
+                state_nmid=nmid,
+                resolve_cpo_kind=state.shelf_exhausted_resolve_cpo_kind or "max",
+                resolve_cpo_value=float(
+                    state.shelf_exhausted_resolve_cpo_value or 0.0
+                ),
+                due_at=state.shelf_exhausted_due_at,
+                repository=repo,
+            )
+        return True
+
+    async def _notify_shelf_exhausted_enter(
+        self,
+        adv: ComplexAdv,
+        *,
+        state_nmid: int,
+        resolve_cpo_kind: str,
+        resolve_cpo_value: float,
+        due_at: datetime | None,
+        repository: Any | None = None,
+    ) -> None:
+        """Paid notify once per enter; mark PG notify_sent_at."""
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+            AutoShelfBidControlRepository,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.exhausted_pause.notify import (
+            notify_shelf_exhausted_pause,
+        )
+
+        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+        shop_name = str(getattr(adv, "shop_name", None) or adv.shop_id or "")
+        delivered = await notify_shelf_exhausted_pause(
+            shop_id=str(adv.shop_id or ""),
+            adv_id=int(adv.auto_adv_id),
+            shop_name=shop_name,
+            campaign_name=campaign_name,
+            resolve_cpo_kind=resolve_cpo_kind,
+            resolve_cpo_value=resolve_cpo_value,
+            due_at=due_at,
+            adv_setting_original_id=int(adv.adv_setting.id),
+        )
+        if delivered:
+            repo = repository or self._shelf_bid_control_repository or AutoShelfBidControlRepository()
+            await repo.mark_shelf_exhausted_notify_sent(
+                state_nmid,
+                sent_at=datetime.now(timezone.utc),
+            )
+
+    async def _maybe_open_shelf_exhausted_epoch(self, adv: ComplexAdv) -> None:
+        """После реального Auto start: открыть эпоху если epoch_pending."""
+        nmids: list[int] = adv.nmids
+        if not nmids:
+            return None
+        nmid: int = nmids[0]
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+            AutoShelfBidControlRepository,
+        )
+
+        repo = self._shelf_bid_control_repository or AutoShelfBidControlRepository()
+        state = await repo.get_state(nmid)
+        if state is None or not bool(getattr(state, "shelf_exhausted_epoch_pending", False)):
+            return None
+        await repo.mark_shelf_exhausted_epoch_started(
+            nmid,
+            epoch_start=datetime.now(timezone.utc),
+        )
+        return None
+
     async def _set_search_reason(
         self,
         adv_id: int,
@@ -764,6 +904,12 @@ class AutoAdvActiveControlService:
         db_state: TimeSettingsDbState | None,
         wb_wallet_cache: WbWalletOkCache,
     ) -> None:
+        """Контроль Auto: budget/cost + terminal shelf-exhausted pause.
+
+        Early-return при отсутствии ordinary cost data сохраняет запрет
+        cost-rule pause, но перед ним вызывается
+        ``_maybe_apply_shelf_exhausted_pause`` (модуль ON / PG our-block).
+        """
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
@@ -934,6 +1080,12 @@ class AutoAdvActiveControlService:
                 auto_adv_id,
                 adv.shop_id,
             )
+            # ROOT-001 / INC-AUTO-SHELF-PAUSE-01: missing ordinary cost data must
+            # not skip terminal shelf-exhausted pause (PG our-block). Ordinary
+            # cost-rule pause remains blocked by this early-return.
+            await self._maybe_apply_shelf_exhausted_pause(
+                adv, auto_adv_id=auto_adv_id, auto_status=auto_status
+            )
             return None
         target_cost = resolve_target_cost(
             plan.orders if plan else None,
@@ -961,12 +1113,16 @@ class AutoAdvActiveControlService:
 
         # When target cost is missing or not comparable, do not pause by cost-rule.
         # Also do not record PAUSE here, because WB state may still be running.
+        # Terminal shelf-exhausted pause still runs (same invariant as above).
         if target_cost_value is None:
             logger.info(
                 "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
                 cost_log_suffix,
                 auto_adv_id,
                 adv.shop_id,
+            )
+            await self._maybe_apply_shelf_exhausted_pause(
+                adv, auto_adv_id=auto_adv_id, auto_status=auto_status
             )
             return None
         fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
@@ -1029,24 +1185,42 @@ class AutoAdvActiveControlService:
             else fact_pay_for_order_value
         )
         if cost_rule_failed and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto watchdog: pausing auto campaign%s due to high cost "
-                "%.2f and total CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
-                cost_log_suffix,
-                cost_value_for_log,
-                fact_pay_for_order_value,
-                target_cost_value,
-                auto_adv_id,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-            await self._set_auto_reason(
-                auto_adv_id,
-                CampaignActivityCommand.PAUSE,
-                AutoReasonCode.COST_RULE_FAILED,
-            )
-            return None
-        if cost_rule_failed and auto_status != WBAdvActiveStatus.STARTED:
+            if bool(adv.adv_setting.auto_shelf_bid_control_enabled):
+                # INC-AUTO-SHELF-PAUSE-01: mid-cycle ordinary cost pause Forbidden
+                # while shelf module ON (terminal path owns Auto pause).
+                logger.info(
+                    "Auto watchdog: skip mid-cycle cost pause (shelf module on)%s "
+                    "adv_id=%s shop_id=%s best_cpo=%s fact_cpo=%s target=%s",
+                    cost_log_suffix,
+                    auto_adv_id,
+                    adv.shop_id,
+                    best_cpo_value,
+                    fact_pay_for_order_value,
+                    target_cost_value,
+                )
+            else:
+                logger.info(
+                    "Auto watchdog: pausing auto campaign%s due to high cost "
+                    "%.2f and total CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
+                    cost_log_suffix,
+                    cost_value_for_log,
+                    fact_pay_for_order_value,
+                    target_cost_value,
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode.COST_RULE_FAILED,
+                )
+                return None
+        if (
+            cost_rule_failed
+            and auto_status != WBAdvActiveStatus.STARTED
+            and not bool(adv.adv_setting.auto_shelf_bid_control_enabled)
+        ):
             await self._set_auto_reason(
                 auto_adv_id,
                 CampaignActivityCommand.PAUSE,
@@ -1056,22 +1230,22 @@ class AutoAdvActiveControlService:
 
         # Determine cost_rule_ok (used for resume/start) using same authoritative
         # source as pause decision to avoid resume mismatches.
-        if bool(adv.adv_setting.auto_shelf_bid_control_enabled) and (
-            self._auto_shelf_bid_control_view_provider is not None
-        ):
-            # If we have authoritative best_cpo_value, use it for resume decision.
-            if best_cpo_value is not None:
-                cost_rule_ok = best_cpo_value <= target_cost_value
-            else:
-                # degraded (missing/invalid best CPO, build_view error, no
-                # provider, or no callable build_view): allow start/resume,
-                # because there is no authoritative bidder input to block it.
-                cost_rule_ok = True
+        if bool(adv.adv_setting.auto_shelf_bid_control_enabled):
+            # Shelf ON: ordinary cost is not a start blocker; terminal our-block
+            # and other priority reasons gate start instead.
+            cost_rule_ok = True
         else:
             # avg_cost_value is guaranteed non-None here: the legacy pause-decision
             # branch above returns early when it is None.
             assert avg_cost_value is not None
             cost_rule_ok = avg_cost_value <= target_cost_value
+
+        # INC-AUTO-SHELF-PAUSE-01: execute / re-assert terminal shelf-exhausted.
+        shelf_block = await self._maybe_apply_shelf_exhausted_pause(
+            adv, auto_adv_id=auto_adv_id, auto_status=auto_status
+        )
+        if shelf_block:
+            return None
 
         # INC-PAUSE-02: empty-keywords pause исполняет Search handler.
         # Без Search-ноги — drain intent здесь (no Auto fallback), Auto идёт дальше.
@@ -1094,6 +1268,7 @@ class AutoAdvActiveControlService:
                 CampaignActivityCommand.STARTED,
                 AutoReasonCode.BUDGET_OK_COST_OK,
             )
+            await self._maybe_open_shelf_exhausted_epoch(adv)
         elif budget_ok and cost_rule_ok and auto_status == WBAdvActiveStatus.STARTED:
             await self._set_auto_reason(
                 auto_adv_id,
