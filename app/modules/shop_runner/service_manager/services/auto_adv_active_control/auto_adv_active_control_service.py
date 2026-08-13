@@ -906,13 +906,23 @@ class AutoAdvActiveControlService:
     ) -> None:
         """Контроль Auto: budget/cost + terminal shelf-exhausted pause.
 
-        Early-return при отсутствии ordinary cost data сохраняет запрет
-        cost-rule pause, но перед ним вызывается
-        ``_maybe_apply_shelf_exhausted_pause`` (модуль ON / PG our-block).
+        Terminal PG our-block (``_maybe_apply_shelf_exhausted_pause``) runs
+        **before** schedule/balance/budget early-returns so paid enter-notify
+        and Auto pause are not skipped while a higher-priority gate already
+        holds the campaign. Cost-data early-returns still call the same helper
+        before refusing ordinary cost-rule pause.
         """
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
+
+        # INC-AUTO-SHELF-PAUSE-01 / PBH-007: shelf our-block before schedule/
+        # balance/budget/rec_system returns — otherwise enter notify is silent
+        # for the whole window those gates keep Auto paused.
+        if await self._maybe_apply_shelf_exhausted_pause(
+            adv, auto_adv_id=auto_adv_id, auto_status=auto_status
+        ):
+            return None
 
         # Расписание/даты из настроек времени; без настроек — показы разрешены
         time_allowed = (
