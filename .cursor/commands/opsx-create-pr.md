@@ -162,14 +162,21 @@ Do not create PR if author intent is unclear and PR body would become generic.
 
 ## CREATE vs UPDATE mode
 
-After `gh pr list --head <current-branch> --state open`:
+After the open-PR JSON check (must include `baseRefName`; see Required
+read-only checks):
+
+Resolve MODE by comparing each open PR's `baseRefName` to the requested
+`<TARGET_BRANCH>` with an exact string match (as returned by `gh`).
 
 | Open PRs for head | MODE | On `GO` |
 |---|---|---|
 | none | `CREATE_PR` | `git push` + `gh pr create` |
-| exactly one, and its base == requested target/base | `UPDATE_PR` | `git push` + `gh pr edit` (title/body); **never** `gh pr create` |
-| exactly one, but base ≠ requested target/base | STOP | explain base mismatch; do not push/create/edit |
+| exactly one, and its `baseRefName` == requested target/base | `UPDATE_PR` | `git push` + `gh pr edit` (title/body); **never** `gh pr create` |
+| exactly one, but `baseRefName` ≠ requested target/base | STOP | explain base mismatch; do not push/create/edit |
 | more than one | STOP | explain ambiguity; do not push/create/edit |
+
+Do **not** resolve MODE from default table `gh pr list` output — it omits
+base and cannot detect mismatch.
 
 An existing open PR is **not** a hard stop when MODE resolves to `UPDATE_PR`.
 
@@ -225,10 +232,12 @@ git diff --name-only origin/<TARGET_BRANCH>...HEAD
 git log --oneline origin/<TARGET_BRANCH>..HEAD
 ```
 
-Check existing PR:
+Check existing PR (REQUIRED_FOR CREATE vs UPDATE / base mismatch STOP).
+Must request `baseRefName` — default table output is not enough:
 
 ```bash
-gh pr list --head "$(git branch --show-current)" --state open
+gh pr list --head "$(git branch --show-current)" --state open \
+  --json number,url,title,baseRefName,headRefName
 ```
 
 Check GitHub auth:
