@@ -13,7 +13,8 @@ Author: **Cursor**
   recommendation to the selected path only
 - `unmerged_paths_inventory` / `all_unmerged_paths` labeled inventory-only
 - R34 `preview_readonly_git.py` remains byte-identical
-- R37 `preview_context.py` remains byte-identical
+- R40 re-pins `preview_context.py` + `preview_advisory.py` hashes
+  (polarity/excerpt + single-path PREVIEW edits; not R37-byte-identical)
 - GO_CAPABILITY=false; SAFE_USAGE_SCOPE=PREVIEW_ONLY
 
 ### Also closed (process hygiene)

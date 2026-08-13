@@ -41,17 +41,18 @@ REPO_ROOT = PACKAGE_ROOT.parents[1]
 EVIDENCE_SCHEMA = "opsx-resolve-conflict/preview-execution-evidence/v1"
 INDEX_SCHEMA = "opsx-resolve-conflict/preview-evidence-index/v1"
 
-# Frozen preview runtime pins (R40): readonly_git + context stay R37-byte-identical;
-# preview_advisory.py updates for single-path PREVIEW contract (BUGBOT-HIGH-002).
+# Frozen preview runtime pins (R40): R34 preview_readonly_git.py remains
+# byte-identical; preview_context.py + preview_advisory.py re-pinned for R40
+# polarity/excerpt + single-path PREVIEW contract (BUGBOT-HIGH-002).
 FROZEN_PREVIEW_RUNTIME_HASHES = {
     "preview_readonly_git.py": (
         "5daea3ebc38e9a6de6de22a0c590d8cf1ebe3e57bd4797ddb26a93fcf95129bd"
     ),
     "preview_context.py": (
-        "30f83c34b543545488f340de6ac35afe1f7fe8c7e6b548b489e07951815f0cee"
+        "0a33009d520878311c28ceb3f5a213996c834bf87399e56d65c3dce03812a3b0"
     ),
     "preview_advisory.py": (
-        "7acf724423eaa4bd6cc2b7c5faeb5201509b0ffae4fb2bae05e06384983ab447"
+        "250885b117f895a5843240d25585a0bce0f60f59d2a77d9876f0b5ef9949f0b8"
     ),
 }
 
@@ -589,7 +590,7 @@ def sanitize_evidence_paths(
 
 
 def assert_frozen_preview_runtime(package_staging: Path) -> dict[str, str]:
-    """Verify packaged preview modules match frozen R37 hashes."""
+    """Verify packaged preview modules match FROZEN_PREVIEW_RUNTIME_HASHES."""
     observed: dict[str, str] = {}
     for name, expected in FROZEN_PREVIEW_RUNTIME_HASHES.items():
         path = package_staging / "runtime" / "opsx_conflict" / name

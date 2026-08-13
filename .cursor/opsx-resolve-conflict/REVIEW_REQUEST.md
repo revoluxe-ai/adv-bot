@@ -37,7 +37,7 @@ Package digest for the immutable inner tree is recorded in `MANIFEST.json`,
 2. Recursive JSON string-value path scan (closes R38 JSON-escaping validator bypass)
 3. Real merge/rebase PREVIEW evidence rebuilt without author-profile paths
 4. Executable digests preserved; `atomicity_claim=false`; R25-MEDIUM-002 remains open
-5. R37 preview runtime hashes byte-identical; R33–R38 retained closures unchanged
+5. R34 `preview_readonly_git.py` sealed; `preview_context`/`preview_advisory` re-pinned for R40; R33–R38 retained closures unchanged
 6. `GO_CAPABILITY` remains false; `SAFE_USAGE_SCOPE=PREVIEW_ONLY`
 
 ## Architect-closed, pending reviewer confirmation
