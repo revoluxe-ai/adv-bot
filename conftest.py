@@ -56,7 +56,9 @@ os.environ.setdefault("BIDDER_STEP_RUB", "1")
 os.environ["REDIS_MASTER_HOST"] = "localhost"
 os.environ["REDIS_REPLICA_HOST"] = "localhost"
 os.environ["REDIS_HOST"] = "localhost"
-os.environ["REDIS_PORT"] = "6379"
+# Honor outer REDIS_PORT (e.g. session REDIS_PORT=6390); default aligns with
+# tests/docker-compose.test.yml test_redis host mapping (6390:6379).
+os.environ.setdefault("REDIS_PORT", "6390")
 os.environ.setdefault("MIN_SUM", "0")
 os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
 os.environ.setdefault("PG_POOL_SIZE", "5")
