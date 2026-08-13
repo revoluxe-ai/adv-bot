@@ -21,9 +21,12 @@ allowlist:
   - .cursor/antipattern-gate/**
   - .cursor/devops/**
   - .cursor/opsx-resolve-conflict/**
+  - .cursor/opsx-review-commands
   - .agents/**
   - .github/skills/**
   - .github/prompts/**
+  - .github/copilot-instructions.md
+  - .github/git-commit-instructions.md
   - AGENTS.md
   - WORKLOG.md
   - .opsx/adapters/**

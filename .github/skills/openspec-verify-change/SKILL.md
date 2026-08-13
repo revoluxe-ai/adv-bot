@@ -43,7 +43,7 @@ python openspec/tools/check_config_contract.py
    - infer from conversation context only when unambiguous
    - если ambiguous, запусти `openspec list --json` и попроси выбрать
 
-   Всегда сообщи: `Проверяю change: <name>`. Для override: `/opsx:verify <other>`.
+   Всегда сообщи: `Проверяю change: <name>`. Для override: `/opsx-verify <other>`.
 
 2. **Load verify settings**
 

@@ -28,7 +28,7 @@ from runtime import (  # noqa: E402
     packets,
     route_trace,
 )
-from runtime.graph_fingerprint import inventory_names, reproduce, write_inventory  # noqa: E402
+from runtime.graph_fingerprint import check_attested_inventory  # noqa: E402
 from runtime.worker_contracts import allowed_pairs  # noqa: E402
 
 Result = Tuple[bool, str, str]
@@ -992,11 +992,10 @@ def reg_trace() -> Result:
 
 
 def reg_fp() -> Result:
+    """Read-only attested INVENTORY vs live reproduce() (no rewrite masking)."""
     inv_path = Path(".cursor/pipeline/bug-team/controlled-tests/INVENTORY.json")
-    payload = write_inventory(inv_path)
-    count, fp = reproduce()
-    ok = payload["INVENTORY_COUNT"] == count and payload["FINGERPRINT"] == fp
-    return ok, "graph fingerprint reproduction", "CONTRACT_STATIC"
+    ok, _detail = check_attested_inventory(inv_path)
+    return ok, "graph fingerprint attested coherence", "CONTRACT_STATIC"
 
 
 def reg_prepare_all_workers() -> Result:

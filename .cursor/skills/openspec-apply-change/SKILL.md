@@ -51,7 +51,7 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
    - Auto-select if only one active change exists
    - If ambiguous, run `openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/opsx:apply <other>`).
+   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-apply <other>`).
 
 2. **Check status to understand the schema**
    ```bash
@@ -75,7 +75,7 @@ Do **not** duplicate the full testing policy or a conflicting local Architecture
    - Dynamic instruction based on current state
 
    **Handle states:**
-   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx:continue` / openspec-continue-change
+   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx-continue` / openspec-continue-change
    - If `state: "all_done"`: congratulate, then follow **Post-apply next-step recommend** in `.cursor/commands/opsx-apply.md` (not archive readiness)
    - Otherwise: proceed to implementation
 

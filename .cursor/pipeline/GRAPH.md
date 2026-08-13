@@ -7,20 +7,22 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 55
+- inventory_count: 56
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: f8bd51fcc837f0164f12d1c83b3c6c957aaeab49
+- source_commit: efc003a83e092207dff1972b36ccda1f4ba9eed4
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-08-09T05:34:03Z INCREMENTAL: inventory 55; fingerprint
-  cb7ea54dea1568434d9b206f15b63012; add /opsx-test-env + local_test_env_*
-  states; soft chain antipattern → test-env UP → static FULL → test-env DOWN;
-  F14 closed (graph missing test-env); F13 open (companion lag); F12 still open.
-  Other newly inventoried commands (meta-*, supervisor, devops, …) remain
-  NOT_OPENED_BUDGET / unindexed beyond inventory count.
-  Prior: UPDATE GO 2026-07-30T12:17:37Z antipattern + bug-debt (F11).
+  resolve-conflicts GO 2026-08-13T09:39:25Z (rebase pick 14636d5c0 onto
+  afa3f4d42): keep HEAD lifecycle (PA, Scenario, phased verify, test-env,
+  F13/F14) + soft /opsx-distribute-brief (post-archive only; not PA/archive
+  gate) + process conflict-resolution soft guidance; normalize process-commit
+  nav to /opsx-meta-commit (admin-command-commit = obsolete alias only);
+  fix-defects → /opsx-meta-fix-command-defects. Discarded incoming
+  Corrective V2 inventory-38 evidence as stale. Inventory 56; fingerprint
+  302182dfcd9ba13b965d935646cfc380 via graph_fingerprint.reproduce().
+
 
 ## States
 
@@ -58,6 +60,7 @@
 - verify_pass: archive-eligible after `/opsx-verify mode=archive` ✅ GO
 - verify_fail: back to apply/update (re-run mode=impl if DoD regressed)
 - archived: `/opsx-archive` done
+- distribution_brief_ready: `/opsx-distribute-brief` produced client/CS distribution pack (soft post-archive; not a hard gate)
 - planning_revise: `/opsx-update` / `/opsx-explore`
 
 ### Bug / case map
@@ -256,9 +259,10 @@
 - next_typical: `/opsx-apply` after `mode=plan` | `/opsx-test` with
   SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
   REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
-- known_flaws: durable plan/report persistence still chat-output in v1
-  (receipts may live under `.tmp/opsx-scenario-coverage/`); archive activation
-  via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
+- known_flaws: plan/report often chat-output in v1; provider receipts may be
+  under `.tmp/opsx-scenario-coverage/` (contract SoT:
+  `SCENARIO_TEST_COVERAGE.md`; GRAPH is navigation_snapshot_only); archive
+  activation via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
   `PRODUCT_ACCEPTANCE_REQUIRED=true` (legacy opt-out alone cannot waive PA)
 
 ### /opsx-performance-review
@@ -415,8 +419,18 @@
 - artifacts_read: change + decisions to promote; PA status from archive verify
 - artifacts_written: archive move; promoted decisions
 - decision_owner: archiver
-- next_typical: none | /opsx-commit | /opsx-create-pr
-- known_flaws: NOT_OPENED_BUDGET detail
+- next_typical: none | /opsx-distribute-brief | /opsx-commit | /opsx-create-pr
+- known_flaws: NOT_OPENED_BUDGET detail; distribute-brief is soft suggest only
+
+### /opsx-distribute-brief
+- purpose: full completed-change description for client/CS distribution materials
+- input_state: archived | verify_pass
+- output_state: distribution_brief_ready
+- artifacts_read: change proposal/design/tasks/specs (+ optional PR/commits)
+- artifacts_written: optional DISTRIBUTION_BRIEF.md (archive root or .tmp)
+- decision_owner: brief author (unevidenced claims → OWNER_DECISION / DO_NOT_PROMISE)
+- next_typical: none (human adapts brief outside OPSX)
+- known_flaws: verify_pass entry must stay DRAFT_BRIEF; not a hard archive gate
 
 ### /opsx-sync
 - purpose: sync delta specs to main specs
@@ -544,7 +558,7 @@
 - artifacts_read: git status/diff
 - artifacts_written: git commits (product scope)
 - decision_owner: committer
-- next_typical: /opsx-project-bug-hunt | /opsx-create-pr | /opsx-admin-command-commit (process only; admin off-graph)
+- next_typical: /opsx-project-bug-hunt | /opsx-create-pr | /opsx-meta-commit (process only; admin off-graph; `/opsx-admin-command-commit` = obsolete alias)
 - known_flaws: none recorded
 
 ### /opsx-split-for-pr
@@ -617,6 +631,8 @@ static_check_done --/opsx-static-check FULL CACHE_OFF [recommended when prior FU
 static_check_done --/opsx-verify mode=archive [soft WARN if last FULL CACHE_MODE=dev]--> verify_pass|verify_fail
 impl_done --/opsx-verify mode=archive [legacy/skip-impl WARN]--> verify_pass|verify_fail
 verify_pass --/opsx-archive--> archived
+archived --/opsx-distribute-brief--> distribution_brief_ready
+verify_pass --/opsx-distribute-brief [DRAFT only]--> distribution_brief_ready
 verify_fail --/opsx-apply|/opsx-update--> implementing|planning_revise
 planning_revise --/opsx-update|/opsx-explore--> apply_ready|change_idea
 planning_revise --/opsx-bound-scope [after TЗ discussion in /opsx-explore]--> planning_revise|scope_bounded
@@ -893,7 +909,8 @@ When a **process gap** looks like a missing command (not a one-line fix):
    process Bugbot / FIXED packet (emits `DESIGN_BRIEF_READY`).
 2. Or paste the problem into `/opsx-admin-command-design-command` directly.
 3. Wait for design need verdict (`NEW_COMMAND_REQUIRED` vs improve existing).
-4. Owner `GO OPTION_*` → implement companions → `/opsx-admin-command-commit`.
+4. Owner `GO OPTION_*` → implement companions → `/opsx-meta-commit`
+   (`/opsx-admin-command-commit` = obsolete alias/redirect only).
 5. Optional: `/opsx-pipeline UPDATE` → `UPDATE GO` to refresh this graph.
 
 Do **not** invent a new not-admin `/opsx-*` to “learn process contracts”.
@@ -902,10 +919,27 @@ command-contract classes (F6).
 
 ### After process FIXED
 
-- Primary: `/opsx-admin-command-commit` if process files changed.
+- Primary: `/opsx-meta-commit` if process files changed
+  (`/opsx-admin-command-commit` = obsolete alias/redirect only).
 - Soft: `/opsx-admin-command-promote-process-lesson` when the defect class
   looks transferable (guardrail gap, wrong branch, durable handoff omission,
   ADL exhaust, etc.).
+
+### Process-surface git conflicts (admin path — soft)
+
+When merge/rebase leaves unmerged paths on process surfaces
+(`.cursor/commands/**`, rules, skills, static-check, mirrors, …):
+
+1. `/opsx-admin-command-resolve-conflicts` (plan, then Owner `GO`).
+2. Then `/opsx-meta-commit` if ordinary process dirt remains
+   (`/opsx-admin-command-commit` = obsolete alias only).
+3. If merge created dual-authority / broken handoff →
+   `/opsx-meta-fix-command-defects`.
+
+Do **not** use `/opsx-meta-commit` (or obsolete `/opsx-admin-command-commit`)
+or `/opsx-create-pr` while unmerged paths remain. Do **not** silent
+`-X ours/theirs` on authority tokens. Prevention: avoid dual long-lived
+edits of the same process file; serialize shared contracts before consumers.
 
 ## Known pipeline flaws
 
@@ -1028,7 +1062,9 @@ command-contract classes (F6).
 
 ## Terminal / recovery
 
-- Lifecycle terminal: `archived` (commit/PR may happen earlier)
+- Lifecycle terminal: `archived` (commit/PR may happen earlier;
+  `/opsx-distribute-brief` is soft post-archive companion for client/CS
+  materials — not required to close the change)
 - Bug recovery: `.tmp/opsx-bug-cases/INDEX.md` pasteable NEXT_ACTION
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
 - Known-root skip-claim: `CHAT_REQUIRED=false` + durable `available` → fix-bug (±GO) without claim-next
@@ -1063,9 +1099,12 @@ command-contract classes (F6).
 - Process lesson after FIXED: soft → `/opsx-admin-command-promote-process-lesson`
   → `DESIGN_BRIEF_READY` → `/opsx-admin-command-design-command` | `EXTEND_EXISTING` → fix-command-defects
 - Admin surfaces (consult, analyze-pipeline, fix-command-defects,
-  promote-process-lesson, design-command, admin-commit, opsx-review-commands):
-  off-graph by design
+  promote-process-lesson, design-command, meta-commit, resolve-conflicts,
+  opsx-review-commands): off-graph by design
+  (`/opsx-admin-command-commit` = obsolete alias to `/opsx-meta-commit` only)
 - Process ambiguity / command-relationship / admin misbehavior triage (before
   knowing fix vs analyze vs design): `/opsx-admin-command-consult` (READ_ONLY;
   routes to one specialized next step; does not own GRAPH.md)
-- Uncommitted process edits after design/fix/pipeline UPDATE GO: `/opsx-admin-command-commit` (not `/opsx-commit`)
+- Unmerged process-surface paths / merge|rebase conflicts: `/opsx-admin-command-resolve-conflicts`
+  (then `/opsx-meta-commit` if dirty; not create-pr while conflicted)
+- Uncommitted process edits after design/fix/pipeline UPDATE GO: `/opsx-meta-commit` (not `/opsx-commit`; `/opsx-admin-command-commit` obsolete alias only)

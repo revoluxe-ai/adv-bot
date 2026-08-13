@@ -350,11 +350,12 @@ Leave them untouched.
 
 ## Mandatory preflight
 
-These git ops are **REQUIRED_FOR** commit planning (branch protection + inventory).
-Apply budgets; on timeout return `blocked_preflight_timeout` rather than hanging.
+These git ops are **REQUIRED_FOR** commit planning (conflicted-tree +
+branch protection + inventory). Apply budgets; on timeout return
+`blocked_preflight_timeout` rather than hanging.
 
 ```text
-OPERATION_REASON: process-surface commit plan + protected-branch gate
+OPERATION_REASON: process-surface commit plan + conflicted-tree + protected-branch gate
 REQUIRED_FOR: commit decision
 SKIP_IF: never when GO path is taken (preview may use status/diff only)
 TIME_BUDGET: branch 5s; status 10s; each diff 15s
@@ -374,6 +375,28 @@ git diff --cached --name-status
 ```
 
 Do not run `git fetch` unless remote state becomes REQUIRED_FOR.
+
+### Conflicted-tree gate (mandatory — plan and GO)
+
+If the working tree has **unmerged paths** (status codes with `U`, e.g.
+`UU`, `AA`, `DU`, `UD`, `AU`, `UA`, `DD`) **or** a merge/rebase is in
+progress, do **not** propose ordinary commits, do not stage, and do not
+commit. Stop with:
+
+```text
+STATUS: BLOCKED_CONFLICTED_TREE
+NEXT_ACTION: /opsx-admin-command-resolve-conflicts
+DO_NOT_DO_YET: stage; commit; push; create-pr
+```
+
+Product-only conflicts (no process-surface unmerged paths) are out of
+scope here too — report them and do not invent a product merge workflow;
+still do not ordinary-commit while any unmerged paths or merge|rebase
+remains in progress.
+
+This gate applies on **both** plan-only and `GO` paths. It is the sole
+front-door counterpart of the obsolete `/opsx-admin-command-commit`
+alias stop (GRAPH: do not use `/opsx-meta-commit` while unmerged).
 
 Block execution if current branch is:
 
@@ -412,9 +435,16 @@ merge or strip markers.
 STATUS: BLOCKED_UNRESOLVED_CONFLICT
 UNMERGED_OR_MARKED_PATHS:
 - <path>
-NEXT_ACTION: /opsx-resolve-conflict
+NEXT_ACTION: /opsx-admin-command-resolve-conflicts
 DO_NOT_DO_YET: /opsx-meta-commit GO; strip markers; Accept Both
 ```
+
+Exclusive process-surface conflict front-door from this command (both
+`BLOCKED_CONFLICTED_TREE` and `BLOCKED_UNRESOLVED_CONFLICT`) is
+`/opsx-admin-command-resolve-conflicts`. `/opsx-resolve-conflict` is the
+packaged typed runtime under `.cursor/opsx-resolve-conflict/**` (its own
+PREVIEW/GO lane) — not a second meta-commit owner of allowlisted process
+UU/markers, and not a substitute for that front-door.
 
 ## Semantic grouping rules
 
@@ -712,10 +742,6 @@ git clean -fd
 
 Never commit paths outside the in-scope surfaces list.
 Never re-decide product commit grouping for `/opsx-commit`.
-Never stage or commit when the unresolved-conflict gate fails (`git ls-files -u`
-non-empty for planned/staged in-scope paths, or conflict markers present).
-Never strip markers or invent a merge inside this command — hand off to
-`/opsx-resolve-conflict`.
 # END CANONICAL SOURCE BODY
 
 # TARGET ADAPTATION NOTES

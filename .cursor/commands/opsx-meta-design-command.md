@@ -811,6 +811,10 @@ Before returning any proposal, confirm:
 - Required external/committed fixes are listed for handoff, not applied here.
 - No authority duplication was introduced.
 - No safety gate was bypassed.
+- If proposing a sole front-door plus an obsolete thin redirect: every
+  safety stop / `BLOCKED_*` / `DO_NOT_DO_YET` on the alias MUST also appear
+  on the live front-door (GRAPH or nav prose alone is insufficient; agents
+  follow the SoT command body).
 - Human next action is explicit.
 - Writes remain blocked until GO; GO touches only own uncommitted paths.
 # END CANONICAL SOURCE BODY

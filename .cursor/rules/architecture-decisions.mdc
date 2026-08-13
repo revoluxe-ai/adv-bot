@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Контекст применения
 
-Правило действует для всех OpenSpec changes и `/opsx:*` workflow. Registry в
+Правило действует для всех OpenSpec changes и `/opsx-*` workflow. Registry в
 `openspec/decisions/` является постоянным source of truth для ownership,
 layering, write-path placement и domain invariants.
 

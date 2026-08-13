@@ -107,7 +107,7 @@ After completing all artifacts, summarize:
 - What's ready: "All artifacts created! Ready for implementation."
   (only if PA gates above allow; otherwise BLOCKED awaiting
   `CONFIRM_LIFECYCLE` / MEANING_LOCK)
-- Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
+- Prompt: "Run `/opsx-apply` or ask me to implement to start working on the tasks."
 
 **Artifact Creation Guidelines**
 

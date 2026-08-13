@@ -521,7 +521,10 @@ Stop immediately and ask the user if:
 - split requires force push;
 - tests fail before any split work;
 - a file cannot be assigned to one PR part;
-- plan artifact conflicts with existing worklog policy.
+- plan artifact conflicts with existing worklog policy;
+- working tree has unmerged paths or merge|rebase is in progress
+  → `NEXT_ACTION: /opsx-admin-command-resolve-conflicts` (process surfaces)
+  or stop for product-only conflicts; do not split while conflicted.
 
 ## Forbidden shortcuts
 

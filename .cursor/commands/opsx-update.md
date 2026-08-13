@@ -48,7 +48,7 @@ rewrite → confirm); keep lifecycle coverage on the path
 tooling waivers never substitute for Product Acceptance. Chat-only lifecycle
 is not durable.
 
-**Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Input**: Optionally specify a change name after `/opsx-update` (e.g., `/opsx-update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -143,7 +143,7 @@ is not durable.
    - Apply the requested edit. Then check every other existing artifact against it - in ANY direction: an edit to a later artifact may require revising an earlier one, not only the other way around. Build order is a useful reading order, not a constraint on which artifacts may be revised.
    - Note everything that is now inconsistent, missing, or contradictory.
    - If a revision introduces or changes reusable architecture ownership, update/create a proposed decision under `decisions/<slug>/decision.md` before treating the artifacts as coherent. Get `openspec instructions decisions --change "<name>" --json` first and follow `rules.decisions`.
-   - Revise only files that already exist (`existingOutputPaths`). Do NOT create change artifacts that don't exist yet, and do NOT invent new files under a glob artifact - note them and point the user to `/opsx:continue` to create them. Exception: proposed architecture decisions may be created under the change's `decisions/` artifact when required by Architecture Decision Lookup.
+   - Revise only files that already exist (`existingOutputPaths`). Do NOT create change artifacts that don't exist yet, and do NOT invent new files under a glob artifact - note them and point the user to `/opsx-continue` to create them. Exception: proposed architecture decisions may be created under the change's `decisions/` artifact when required by Architecture Decision Lookup.
    - If the change is already coherent, say so and make no edits.
 
 6. **Confirm and apply, one artifact at a time**
@@ -155,16 +155,16 @@ is not durable.
      ```
 
 7. **Point to the next step (guidance only - NEVER act on it)**
-   - Artifacts still missing -> suggest `/opsx:continue` to create them.
-   - Change already implemented (tasks checked off / already applied) -> the code may no longer match the revised plan; suggest `/opsx:apply` to carry the delta into code.
-   - Everything done and implemented -> suggest `/opsx:archive`.
+   - Artifacts still missing -> suggest `/opsx-continue` to create them.
+   - Change already implemented (tasks checked off / already applied) -> the code may no longer match the revised plan; suggest `/opsx-apply` to carry the delta into code.
+   - Everything done and implemented -> suggest `/opsx-archive`.
 
 **Output**
 
 After each invocation, show:
 - `DEFERRED_PARKS_FOR_CHANGE` / any `DEFERRED_REENTRY_REQUIRED` outcomes
 - Which artifacts were revised (and which proposed revisions were rejected)
-- Anything deferred to `/opsx:continue` (not-yet-created artifacts or files)
+- Anything deferred to `/opsx-continue` (not-yet-created artifacts or files)
 - WORKLOG annotations made on confirmed re-entry (if any)
 - Where the change stands and the recommended next command
 
@@ -520,7 +520,7 @@ Never rewrite prior JSONL events. Snapshot LEDGER `## ROUTE_STATE` must
 align with the latest applicable event.
 
 **Guardrails**
-- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx:apply`.
+- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx-apply`.
 - Do not mark artifacts coherent while a high-risk multi-target write remains
   unresolved (`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`); materialize Owner
   semantic answers into artifacts before recommending apply.
@@ -530,8 +530,8 @@ align with the latest applicable event.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.
-- Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx:continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
+- Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx-continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
 - Confirm every edit with the user before writing.
 - Deferred parks: always surface `DEFERRED_PARKS_FOR_CHANGE` when WORKLOG exists; never silently restore `[deferred-from:<CHANGE_ID>]` into owed DoD; re-entry requires `REENTER_CONFIRMED`; the only allowed WORKLOG write from this command is annotating confirmed re-entry (`[re-entered:<CHANGE_ID>]`). Parking new deferrals remains `/opsx-bound-scope:GO` only.
-- If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx:new` (the "Update vs. Start Fresh" heuristic).
+- If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx-new` (the "Update vs. Start Fresh" heuristic).
 - Bug-episode: never write OpenSpec / TASK_DELTA without durable Route B receipt (`CLASSIFICATION` + `CHOSEN_ROUTE=ROUTE_B` + `EXPECTED_NEXT_COMMAND=/opsx-update` or `CURRENT_ROUTE_STATE=AWAITING_SPEC_UPDATE`); never store `/opsx-update` as `EXPECTED_EXECUTION_ROUTE` / `ACTUAL_EXECUTION_ROUTE`; never write legacy `TASK_DELTA_STATUS` / `CURRENT_ROUTE` in new artifacts.
