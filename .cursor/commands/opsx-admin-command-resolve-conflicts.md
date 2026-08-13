@@ -17,8 +17,8 @@ surfaces, or when another command redirected here because the tree is
 conflicted.
 
 This command does **not** own ordinary semantic commits after a clean tree
-(`/opsx-admin-command-commit`), product conflict resolution, push, or
-force-push.
+(`/opsx-meta-commit`; `/opsx-admin-command-commit` = obsolete redirect only),
+product conflict resolution, push, or force-push.
 
 You may mutate the working tree / index / finish merge|rebase **only** when
 user input contains the exact token `GO`.
@@ -53,25 +53,25 @@ $ARGUMENTS
 - `git status` shows unmerged paths (`UU`, `AA`, `DU`, `UD`, `AU`, `UA`, `DD`)
   under process surfaces.
 - Merge or rebase is in progress and process files are conflicted.
-- `/opsx-admin-command-commit`, `/opsx-create-pr`, or `/opsx-split-for-pr`
-  redirected here.
+- `/opsx-meta-commit` (or obsolete `/opsx-admin-command-commit`),
+  `/opsx-create-pr`, or `/opsx-split-for-pr` redirected here.
 - Operator asks how to finish merging command/rule edits across branches.
 
 ## When not to use
 
 - Clean working tree / no merge|rebase in progress → nothing to resolve;
-  if dirty process files need commits → `/opsx-admin-command-commit`.
+  if dirty process files need commits → `/opsx-meta-commit`.
 - Only **product** paths conflicted → stop with `BLOCKED_MIXED_SCOPE` or
   product-only note; do not rewrite app/tests as “process success”.
-- Designing a new command → `/opsx-admin-command-design-command`.
-- Contract defect after a clean merge → `/opsx-admin-command-fix-command-defects`.
+- Designing a new command → `/opsx-meta-design-command`.
+- Contract defect after a clean merge → `/opsx-meta-fix-command-defects`.
 - Day-to-day navigation → `/opsx-pipeline`.
 - Unclear which admin command applies (no conflict evidence) →
   `/opsx-admin-command-consult`.
 
 ## In-scope surfaces (exclusive write/resolve)
 
-Same process set as `/opsx-admin-command-commit`:
+Same process set as `/opsx-meta-commit`:
 
 ```text
 .cursor/commands/**
@@ -223,10 +223,9 @@ Then:
    META attestation and `graph_fingerprint.reproduce()` when META/GRAPH
    attestation was in scope for this GO (or when those files are dirty).
    If broken → `CONTRACT_BROKEN_AFTER_MERGE` and `NEXT_ACTION` =
-   `/opsx-meta-fix-command-defects` (legacy
-   `/opsx-admin-command-fix-command-defects` still accepted).
+   `/opsx-meta-fix-command-defects`.
 8. If tree still has ordinary (non-conflict) process dirt →
-   `NEXT_ACTION: /opsx-admin-command-commit`.
+   `NEXT_ACTION: /opsx-meta-commit`.
 9. Never `git push`, `rebase` onto remote as a new op, `reset --hard`,
    or `clean -fd`.
 
@@ -295,8 +294,8 @@ blocked_preflight_timeout
 | `PLAN_READY` (no owner gaps) | Reply: `GO` |
 | `BLOCKED_OWNER` | Owner answers listed decisions, then `GO` |
 | `BLOCKED_MIXED_SCOPE` | split/finish product conflicts first; re-run this command |
-| `RESOLVED` | `/opsx-admin-command-commit` if dirty; else optional `/opsx-create-pr` |
-| `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-meta-fix-command-defects` (legacy admin-fix alias ok) |
+| `RESOLVED` | `/opsx-meta-commit` if dirty; else optional `/opsx-create-pr` |
+| `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-meta-fix-command-defects` |
 | `ABORTED_BY_OWNER` | operator chooses next branch action; not create-pr |
 
 `DO_NOT_DO_YET` must include at least: push; force-push; admin-commit while
