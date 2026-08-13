@@ -74,9 +74,13 @@ Hard bans still apply. Missing Poetry/pytest/pyright/kubectl (and other undeclar
 - **ALLOWLIST_GAP (mandatory inventory class):** dirty paths that match
   `/opsx-commit` process-exclusion prefixes (or this command’s «In-scope
   surfaces» prefixes) but are **not** on `sources.yaml` allowlist are **not**
-  true product out-of-scope. Emit `STATUS: ALLOWLIST_GAP` with proposed YAML
-  lines and `NEXT_ACTION: /opsx-meta-fix-command-defects`. Never redirect
-  those paths to `/opsx-commit` (dead-end: commit excludes them too).
+  true product out-of-scope. Never stage them; never redirect them to
+  `/opsx-commit` (dead-end: commit excludes them too). **STATUS precedence:**
+  eligible Class A in this run → keep overall `PLAN_READY` /
+  `COMMITTED|PARTIAL` and emit a **mandatory non-empty** `ALLOWLIST_GAP`
+  block; no eligible Class A → overall `STATUS: ALLOWLIST_GAP` (no GO).
+  Gap remediation: `NEXT_ACTION: /opsx-meta-fix-command-defects` (or Owner
+  edit of `.opsx/sources.yaml`).
 - **Local-only:** never update central snapshot or catalog repos. After success, if snapshot may be stale, recommend `/opsx-meta-update-snapshot` only.
 - Every terminal report must include `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`.
 - **Owner scope map (mandatory mental model):**
@@ -283,7 +287,7 @@ On every inventory (plan or `GO`), classify **each** dirty path into exactly one
 | Class | When | Action |
 |---|---|---|
 | `(A) IN_SCOPE` | Matches `.opsx/sources.yaml` allowlist and not `hard_exclude` | Eligible for this command’s selection / commit groups |
-| `(B) ALLOWLIST_GAP` | Matches `/opsx-commit` process-exclusion prefixes **or** the «In-scope surfaces» prefixes above, but **not** on the allowlist | Do **not** stage. Emit `ALLOWLIST_GAP` (below). Do **not** use `OUT_OF_SCOPE_REDIRECT` → `/opsx-commit` |
+| `(B) ALLOWLIST_GAP` | Matches `/opsx-commit` process-exclusion prefixes **or** the «In-scope surfaces» prefixes above, but **not** on the allowlist | Do **not** stage. Emit `ALLOWLIST_GAP` per STATUS precedence (below). Do **not** use `OUT_OF_SCOPE_REDIRECT` → `/opsx-commit` |
 | `(C) OUT_OF_SCOPE` | True product/app/other (not process-looking) | `OUT_OF_SCOPE_REDIRECT` → `/opsx-commit` |
 
 `sources.yaml` wins over the legacy «In-scope surfaces» template for (A).
@@ -292,7 +296,22 @@ in-scope until the allowlist lists it.
 
 ### (B) ALLOWLIST_GAP output
 
-When any dirty path is class (B):
+When any dirty path is class (B): **never stage** those paths. Emit the
+`ALLOWLIST_GAP` block (paths + proposed `sources.yaml` lines). Do **not**
+treat Class B as Class C / `OUT_OF_SCOPE_REDIRECT`.
+
+**STATUS precedence (mandatory — resolves PLAN_READY vs ALLOWLIST_GAP):**
+
+1. **Eligible Class A in this run’s selection** → overall STATUS stays
+   `PLAN_READY` (no `GO`) or `COMMITTED` / `PARTIAL` (with `GO`). Include a
+   **mandatory non-empty** `ALLOWLIST_GAP:` block. `GO` may commit Class A
+   only; Class B stays unstaged. Also note
+   `NEXT_ACTION: /opsx-meta-fix-command-defects` for the gap (plan may still
+   offer `/opsx-meta-commit GO` for Class A).
+2. **No eligible Class A** (only Class B, or B+C) → overall
+   `STATUS: ALLOWLIST_GAP`; do **not** emit `PLAN_READY`; do **not** run `GO`.
+
+Gap-only overall status shape:
 
 ```text
 STATUS: ALLOWLIST_GAP
@@ -303,8 +322,9 @@ NEXT_ACTION: /opsx-meta-fix-command-defects
 DO_NOT_DO_YET: /opsx-commit for these paths; invent product commits; stage them under meta-commit
 ```
 
-Leave them untouched until allowlist is fixed (separate fix-command-defects /
-Owner edit of `.opsx/sources.yaml`).
+Leave Class B untouched until allowlist is fixed (separate
+`/opsx-meta-fix-command-defects` / Owner edit of `.opsx/sources.yaml`).
+Class A commits must not wait on that fix when precedence rule 1 applies.
 
 ### (C) Out of scope (redirect)
 
@@ -555,16 +575,23 @@ In addition to FAST_CHECK:
 
 ### No `GO` → plan only
 
+**STATUS precedence with Class B:** if this run has eligible Class A →
+`STATUS: PLAN_READY` and a **mandatory non-empty** `ALLOWLIST_GAP` block
+(Class B never staged). If no eligible Class A and Class B present → emit
+overall `STATUS: ALLOWLIST_GAP` only (see Class B section); do **not** use
+the `PLAN_READY` template below.
+
 ```text
 STATUS: PLAN_READY
 
 Commit plan:
 - CHAT_SCOPE: DEFAULT_COMMANDS_DIR | ALL | INCLUDE_FULL_DIRTY_TREE
 - CHECK_MODE: FAST_CHECK | FULL_CHECK  (default FAST_CHECK)
-- proposed commits (subject + files + why this split)
+- proposed commits (subject + files + why this split) — Class A only
 - commands that would be run
 - LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE:
-- ALLOWLIST_GAP: (paths + proposed sources.yaml lines; or empty)
+- ALLOWLIST_GAP: omit when none; when Class B present — mandatory non-empty
+  (paths + proposed sources.yaml lines; never optional/skip)
 - out-of-scope files (redirect to /opsx-commit) — class C only
 - files requiring manual git add -p
 - suspicious/unrelated process files
@@ -574,7 +601,9 @@ WHY:
 CURRENT_STATE:
 OWNER_DECISION_REQUIRED: yes — accept plan or adjust groups
 NEXT_ACTION: /opsx-meta-commit GO
-DO_NOT_DO_YET: push; /opsx-commit for in-scope process files; mix product files into GO
+  (when ALLOWLIST_GAP non-empty, also note /opsx-meta-fix-command-defects
+   for the gap — GO still allowed for Class A only)
+DO_NOT_DO_YET: push; /opsx-commit for in-scope process files; mix product files into GO; stage Class B
 ```
 
 ### With `GO` → execute plan
@@ -619,6 +648,9 @@ Only expand the detailed buckets when something was actually left out
 - Do **not** print `files requiring manual add -p: none` (or other `…: none`
   bullets) — empty subsections are omitted entirely.
 - Empty `add -p` is **not** a gate and must not look like one.
+- Class B leftovers use nested `ALLOWLIST_GAP:` under overall
+  `COMMITTED` / `PARTIAL` / `BLOCKED*` — they do **not** replace that overall
+  STATUS (see Class B STATUS precedence). Omit the block when empty.
 
 ```text
 STATUS: COMMITTED | PARTIAL | BLOCKED | BLOCKED_UNRESOLVED_CONFLICT
@@ -638,7 +670,7 @@ OUT_OF_SCOPE_REDIRECT:
 - files left for /opsx-commit:  (class C only)
 
 ALLOWLIST_GAP:
-- paths:  (class B; or empty / omit when none)
+- paths:  (class B; omit entire block when none — when present, mandatory non-empty)
 - proposed_sources_yaml_allowlist_lines:
 - NEXT_ACTION: /opsx-meta-fix-command-defects  (when non-empty)
 
