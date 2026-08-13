@@ -2,23 +2,25 @@
 name: /opsx-admin-command-resolve-conflicts
 id: opsx-admin-command-resolve-conflicts
 category: Workflow
-description: "Plan (READ_ONLY) or apply (GO) semantic git conflict resolution on AI/process surfaces only; finish merge/rebase continue"
+description: "Plan (READ_ONLY) or apply (GO) semantic git conflict resolution on OPSX allowlist surfaces; finish merge/rebase continue"
 argument-hint: "GO [optional topic] | ABORT_MERGE GO | ABORT_REBASE GO"
 ---
 
 # /opsx-admin-command-resolve-conflicts
 
-Exclusive owner of **git conflict resolution** on **AI / process surfaces**
-(Cursor/agent commands, rules, skills, agents, static-check, pipeline graph,
-antipattern-gate, prompt/skill mirrors, and root agent guides).
+Exclusive owner of **git conflict resolution** on **OPSX process surfaces**
+(allowlisted Cursor/agent trees, `.opsx` project/registry/adapters/tools,
+devops memory, resolve-conflict package, prompt/skill mirrors, and root
+agent guides).
 
-Use when merge or rebase left conflict markers / unmerged paths on process
-surfaces, or when another command redirected here because the tree is
-conflicted.
+Use when merge or rebase left conflict markers / unmerged paths on
+allowlisted process surfaces, or when another command redirected here
+because the tree is conflicted.
 
 This command does **not** own ordinary semantic commits after a clean tree
 (`/opsx-meta-commit`; `/opsx-admin-command-commit` = obsolete redirect only),
-product conflict resolution, push, or force-push.
+product conflict resolution (`app/**`, product `openspec/**`, etc.), push,
+or force-push.
 
 You may mutate the working tree / index / finish merge|rebase **only** when
 user input contains the exact token `GO`.
@@ -40,10 +42,10 @@ $ARGUMENTS
 
 ## Purpose
 
-1. **Plan** (no `GO`) — inventory unmerged process paths, classify each
+1. **Plan** (no `GO`) — inventory unmerged allowlisted paths, classify each
    conflict, propose resolutions, list Owner decisions.
 2. **Execute** (`GO`) — apply approved resolutions, `git add` resolved
-   process paths, finish `git merge --continue` or `git rebase --continue`
+   allowlisted paths, finish `git merge --continue` or `git rebase --continue`
    when safe.
 3. **Recheck** — after resolve, spot producer/consumer and dual-authority
    breakage; hand off to fix-defects when needed.
@@ -51,18 +53,21 @@ $ARGUMENTS
 ## When to use
 
 - `git status` shows unmerged paths (`UU`, `AA`, `DU`, `UD`, `AU`, `UA`, `DD`)
-  under process surfaces.
-- Merge or rebase is in progress and process files are conflicted.
+  under `.opsx/sources.yaml` allowlist surfaces (including `.opsx/project/**`,
+  `.cursor/devops/**`, `.cursor/opsx-resolve-conflict/**`, command/rule trees).
+- Merge or rebase is in progress and allowlisted process files are conflicted.
 - `/opsx-meta-commit` (or obsolete `/opsx-admin-command-commit`),
   `/opsx-create-pr`, or `/opsx-split-for-pr` redirected here.
-- Operator asks how to finish merging command/rule edits across branches.
+- Operator asks how to finish merging OPSX process / projectize edits across
+  branches.
 
 ## When not to use
 
 - Clean working tree / no merge|rebase in progress → nothing to resolve;
   if dirty process files need commits → `/opsx-meta-commit`.
-- Only **product** paths conflicted → stop with `BLOCKED_MIXED_SCOPE` or
-  product-only note; do not rewrite app/tests as “process success”.
+- Only **non-allowlist** (product / hard_exclude) paths conflicted → stop with
+  `BLOCKED_MIXED_SCOPE` or product-only note; do not rewrite `app/**` /
+  product tests as “process success”.
 - Designing a new command → `/opsx-meta-design-command`.
 - Contract defect after a clean merge → `/opsx-meta-fix-command-defects`.
 - Day-to-day navigation → `/opsx-pipeline`.
@@ -71,7 +76,13 @@ $ARGUMENTS
 
 ## In-scope surfaces (exclusive write/resolve)
 
-Same process set as `/opsx-meta-commit`:
+**Process allowlist SoT:** `.opsx/sources.yaml` (`allowlist` / `hard_exclude`) —
+same class-(A) rule as `/opsx-meta-commit`. A path is in-scope for resolve /
+`git add` / finish-merge only when it matches `allowlist` and does **not**
+match `hard_exclude`. The legacy prefix list below is documentation only;
+on mismatch `sources.yaml` wins.
+
+Legacy template (keep aligned with allowlist; do not treat as a second SoT):
 
 ```text
 .cursor/commands/**
@@ -81,6 +92,8 @@ Same process set as `/opsx-meta-commit`:
 .cursor/static-check/**
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
+.cursor/devops/**
+.cursor/opsx-resolve-conflict/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -88,17 +101,31 @@ Same process set as `/opsx-meta-commit`:
 .github/copilot-instructions.md
 .github/git-commit-instructions.md
 AGENTS.md
+WORKLOG.md
+.opsx/adapters/**
+.opsx/registry/**
+.opsx/shared/**
+.opsx/project/**
+.opsx/import/**
+.opsx/manifest.yaml
+.opsx/projectization.yaml
+.opsx/sources.yaml
+.opsx/lock.yaml
+.opsx/tools/**
 ```
 
-Everything else is **out of scope** for resolution writes.
+Never resolve or stage (even if dirty): `hard_exclude` entries (e.g.
+`.opsx/upstream/**`, `.opsx/changes/**`, `.env*`), nor true product trees
+(`app/**`, product `openspec/**`, etc.) unless they appear on the allowlist
+(they must not).
 
 ## Authority boundary (mandatory)
 
 - Owns: conflict classification, proposed/applied file resolutions on
-  in-scope paths, `git add` of those paths, `merge --continue` /
-  `rebase --continue` when all in-scope conflicts are cleared and no
-  out-of-scope unmerged paths remain.
-- Does **not** own: ordinary post-merge semantic commits (→ admin-commit),
+  allowlisted in-scope paths, `git add` of those paths, `merge --continue` /
+  `rebase --continue` when every unmerged path is allowlisted and resolved
+  (no remaining non-allowlist UU).
+- Does **not** own: ordinary post-merge semantic commits (→ `/opsx-meta-commit`),
   product commits (→ `/opsx-commit`), PR creation, push, force-push,
   verify/archive/approval gates, silent redesign of command contracts.
 - Does **not** silently re-decide another command’s ownership tokens.
@@ -113,7 +140,7 @@ Everything else is **out of scope** for resolution writes.
 | `SECTION_OVERLAP` | Same markdown/code section edited both sides | semantic merge proposal | yes under GO if plan proposal accepted (no OWNER_DECISION left) |
 | `AUTHORITY_TOKEN` | OWNER / STATUS / GATE / disposition / forbid-list / denylist / exclusive-owner prose diverged | propose options only | **no** — need Owner choice |
 | `CROSS_FILE_CONTRACT` | Merge would break producer/consumer or create dual authority across files (includes META/GRAPH fingerprint attestation without regenerating `inventory_path`) | propose + warn | GO may merge text; must set handoff to fix-defects when broken |
-| `MIXED_SCOPE` | Same conflict set includes out-of-scope (product) paths | do not resolve product | **stop** — `BLOCKED_MIXED_SCOPE` |
+| `MIXED_SCOPE` | Same conflict set includes **non-allowlist** (product / hard_exclude) unmerged paths | do not resolve those paths | **stop** — `BLOCKED_MIXED_SCOPE` |
 
 ## Prevention note (operator)
 
@@ -174,9 +201,13 @@ Apply / continue / abort on protected branches requires
 ## Plan steps (READ_ONLY)
 
 1. Confirm merge and/or rebase in progress, or unmerged paths present.
-2. List every unmerged path; partition **in-scope** vs **out-of-scope**.
+2. Read `.opsx/sources.yaml` allowlist / `hard_exclude` (bounded). List every
+   unmerged path; classify each as **in-scope** (allowlist ∩ ¬hard_exclude)
+   vs **out-of-scope** (everything else).
 3. If any out-of-scope unmerged path exists → `BLOCKED_MIXED_SCOPE` (or
-   product-only status). Do not propose resolving product files here.
+   product-only status). Do not propose resolving non-allowlist files here.
+   Allowlisted `.opsx/**` UU (e.g. `.opsx/project/manual_review.md`) are
+   **in-scope**, not MIXED_SCOPE.
 4. For each in-scope path: Grep/Read only that file (section budget);
    classify exactly one conflict class; draft resolution text or options.
 5. List `OWNER_DECISIONS_REQUIRED` for every `AUTHORITY_TOKEN` path.
@@ -191,7 +222,7 @@ Preconditions:
 
 - usable plan from this chat or `$ARGUMENTS`;
 - every `AUTHORITY_TOKEN` item has an Owner choice;
-- no unresolved `MIXED_SCOPE` / out-of-scope unmerged paths;
+- no unresolved `MIXED_SCOPE` / non-allowlist unmerged paths;
 - protected-branch rule satisfied if applicable.
 
 Then:
@@ -244,7 +275,7 @@ Never:
 
 - `-X ours` / `-X theirs` / checkout --ours|--theirs on `AUTHORITY_TOKEN`
   without explicit Owner choice recorded in the plan output;
-- resolve or stage out-of-scope product paths;
+- resolve or stage non-allowlist / hard_exclude / product paths;
 - claim `RESOLVED` while unmerged paths remain;
 - claim `RESOLVED` while META/GRAPH fingerprint attestation disagrees with
   `inventory_path` / `graph_fingerprint.reproduce()`;
@@ -293,7 +324,7 @@ blocked_preflight_timeout
 |---|---|
 | `PLAN_READY` (no owner gaps) | Reply: `GO` |
 | `BLOCKED_OWNER` | Owner answers listed decisions, then `GO` |
-| `BLOCKED_MIXED_SCOPE` | split/finish product conflicts first; re-run this command |
+| `BLOCKED_MIXED_SCOPE` | finish non-allowlist (product) conflicts first; re-run this command |
 | `RESOLVED` | `/opsx-meta-commit` if dirty; else optional `/opsx-create-pr` |
 | `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-meta-fix-command-defects` |
 | `ABORTED_BY_OWNER` | operator chooses next branch action; not create-pr |
@@ -307,13 +338,13 @@ unmerged paths remain; create-pr while conflicted.
 |---|---|
 | No conflicts / not in merge|rebase | `PLAN_READY` or short no-op; redirect commit if dirty |
 | Missing Owner choices | `BLOCKED_OWNER`; no writes |
-| Product + process unmerged | `BLOCKED_MIXED_SCOPE`; no process apply |
+| Non-allowlist + allowlist unmerged together | `BLOCKED_MIXED_SCOPE`; no allowlist apply until product UU cleared |
 | Continue fails | report git error; leave tree; do not force |
 | Read timeout on required conflict file | `blocked_preflight_timeout` / `EVIDENCE_GAP` |
 
 ## Self-review checklist
 
-- [ ] Process-only write scope respected
+- [ ] Allowlist SoT (`.opsx/sources.yaml`) respected; no product / hard_exclude writes
 - [ ] No apply without `GO`
 - [ ] No silent `AUTHORITY_TOKEN` ours/theirs
 - [ ] No push / force-push / hard reset / clean -fd

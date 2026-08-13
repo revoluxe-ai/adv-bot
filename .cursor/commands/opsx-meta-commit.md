@@ -435,9 +435,16 @@ merge or strip markers.
 STATUS: BLOCKED_UNRESOLVED_CONFLICT
 UNMERGED_OR_MARKED_PATHS:
 - <path>
-NEXT_ACTION: /opsx-resolve-conflict
+NEXT_ACTION: /opsx-admin-command-resolve-conflicts
 DO_NOT_DO_YET: /opsx-meta-commit GO; strip markers; Accept Both
 ```
+
+Exclusive process-surface conflict front-door from this command (both
+`BLOCKED_CONFLICTED_TREE` and `BLOCKED_UNRESOLVED_CONFLICT`) is
+`/opsx-admin-command-resolve-conflicts`. `/opsx-resolve-conflict` is the
+packaged typed runtime under `.cursor/opsx-resolve-conflict/**` (its own
+PREVIEW/GO lane) — not a second meta-commit owner of allowlisted process
+UU/markers, and not a substitute for that front-door.
 
 ## Semantic grouping rules
 
