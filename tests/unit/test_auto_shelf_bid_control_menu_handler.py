@@ -24,20 +24,44 @@ pytestmark = pytest.mark.unit
 
 @dataclass
 class FakeMessage:
+    """Message double for handlers that narrow via ``isinstance(..., Message)``.
+
+    Production ``_tg_message`` uses the ``Message`` symbol imported in the
+    handler module. Autouse fixture below patches that symbol to this class
+    so unit doubles pass the same narrow without constructing aiogram models.
+    """
+
     text: str
     answers: list[str] = field(default_factory=list)
+    edit_text: AsyncMock = field(default_factory=AsyncMock)
+    chat: SimpleNamespace = field(default_factory=lambda: SimpleNamespace(id=1))
 
     async def answer(self, text: str, **_: object) -> None:
         self.answers.append(text)
+
+
+@pytest.fixture(autouse=True)
+def _patch_handler_message_for_isinstance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Align FakeMessage with handler ``isinstance(..., Message)`` narrowing."""
+    monkeypatch.setattr(handler, "Message", FakeMessage)
 
 
 @dataclass
 class FakeState:
     data: dict[str, object]
     cleared: bool = False
+    state: object | None = None
 
     async def get_data(self) -> dict[str, object]:
         return self.data
+
+    async def update_data(self, **kwargs: object) -> None:
+        self.data.update(kwargs)
+
+    async def set_state(self, state: object) -> None:
+        self.state = state
 
     async def clear(self) -> None:
         self.cleared = True
@@ -276,8 +300,7 @@ async def test_send_strategy_screen_uses_strategy_renderer(
 async def test_strategy_switch_updates_strategy_message(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    callback_message = AsyncMock()
-    callback_message.text = "strategy"
+    callback_message = FakeMessage(text="strategy")
     callback = SimpleNamespace(
         message=callback_message,
         from_user=SimpleNamespace(id=1),
@@ -319,3 +342,148 @@ async def test_strategy_switch_updates_strategy_message(
     )
 
     callback_message.edit_text.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_set_retest_interval_days_enters_waiting_fsm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Settings action rid → FSM waiting_for_retest_interval_days."""
+    from app.client_bot.user_interface import states
+
+    callback_message = FakeMessage(text="settings")
+    callback = SimpleNamespace(
+        message=callback_message,
+        from_user=SimpleNamespace(id=1),
+    )
+    state = FakeState(data={})
+    monkeypatch.setattr(
+        handler,
+        "AutoShelfBidControlTelegramService",
+        lambda **_: object(),
+    )
+
+    await handler.auto_shelf_bid_control_menu_router(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        callback_data=callbacks.AutoShelfBidControlMenu(
+            action="rid",
+            adv_setting_original_id=42,
+        ),
+        state=state,  # pyright: ignore[reportArgumentType]
+        bot=AsyncMock(),  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    assert state.data.get("adv_setting_original_id") == 42
+    assert state.state == states.AutoShelfBidControlFSM.waiting_for_retest_interval_days
+    assert any("перетест" in a.lower() for a in callback_message.answers)
+
+
+@pytest.mark.asyncio
+async def test_waiting_for_retest_interval_days_persists_via_update_method(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """FSM handler routes to update_retest_interval_days and clears state."""
+    message = FakeMessage(text="14")
+    state = FakeState(data={"adv_setting_original_id": 7})
+    update = AsyncMock(return_value=_view())
+    fake_service = type(
+        "FakeService",
+        (),
+        {
+            "update_retest_interval_days": update,
+            "build_view": AsyncMock(return_value=_view()),
+        },
+    )
+    monkeypatch.setattr(
+        handler, "AutoShelfBidControlTelegramService", lambda **_: fake_service()
+    )
+    monkeypatch.setattr(
+        handler, "render_auto_shelf_bid_settings_message", lambda *_: "settings"
+    )
+    monkeypatch.setattr(
+        handler, "build_auto_shelf_bid_settings_keyboard", lambda *_: object()
+    )
+
+    await handler.auto_shelf_waiting_for_retest_interval_days(
+        message=message,  # pyright: ignore[reportArgumentType]
+        state=state,  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    update.assert_awaited_once_with(7, "14")
+    assert state.cleared is True
+    assert "Настройка сохранена." in message.answers
+
+
+@pytest.mark.asyncio
+async def test_asb_exh_reset_clears_pause_when_block_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """asb_exh_reset:<id> clears PG block and confirms without forced Auto start."""
+    callback_message = FakeMessage(text="")
+    callback = SimpleNamespace(data="asb_exh_reset:99", message=callback_message)
+    clear = AsyncMock(return_value=True)
+    fake_service = type(
+        "FakeService",
+        (),
+        {"clear_shelf_exhausted_pause": clear},
+    )
+    monkeypatch.setattr(
+        handler, "AutoShelfBidControlTelegramService", lambda **_: fake_service()
+    )
+
+    await handler.auto_shelf_exhausted_reset_pause(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    clear.assert_awaited_once_with(99)
+    assert any("Снят только блок паузы" in a for a in callback_message.answers)
+
+
+@pytest.mark.asyncio
+async def test_asb_exh_reset_reports_when_no_active_block(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    callback_message = FakeMessage(text="")
+    callback = SimpleNamespace(data="asb_exh_reset:5", message=callback_message)
+    clear = AsyncMock(return_value=False)
+    fake_service = type(
+        "FakeService",
+        (),
+        {"clear_shelf_exhausted_pause": clear},
+    )
+    monkeypatch.setattr(
+        handler, "AutoShelfBidControlTelegramService", lambda **_: fake_service()
+    )
+
+    await handler.auto_shelf_exhausted_reset_pause(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    clear.assert_awaited_once_with(5)
+    assert any("не найдено" in a.lower() for a in callback_message.answers)
+
+
+@pytest.mark.asyncio
+async def test_asb_exh_reset_rejects_malformed_callback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    callback_message = FakeMessage(text="")
+    callback = SimpleNamespace(data="asb_exh_reset:not-an-id", message=callback_message)
+    clear = AsyncMock()
+    monkeypatch.setattr(
+        handler,
+        "AutoShelfBidControlTelegramService",
+        lambda **_: type("S", (), {"clear_shelf_exhausted_pause": clear})(),
+    )
+
+    await handler.auto_shelf_exhausted_reset_pause(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    clear.assert_not_awaited()
+    assert any("Некорректная" in a for a in callback_message.answers)
