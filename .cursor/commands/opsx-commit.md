@@ -48,9 +48,10 @@ It must **not** rewrite working-tree **content** to make verification pass.
 
 **Allowed content operations:** none for product/config. Staging (`git add`)
 may include paths that are **already** dirty or **already** conflict-resolved
-in the working tree before this command started. If a path is still unmerged
-and resolution would require choosing or inventing product semantics →
-**COMMIT STOP**; leave resolution to the owner (or a separate fix command).
+in the working tree before this command started. Any still-unmerged path, or
+any conflict marker in the commit-group files → **COMMIT STOP** (see
+**Unresolved conflicts hard gate**). Never clear markers or invent resolution
+semantics here; leave that to the owner (or a separate fix command).
 
 `GO` authorizes commit creation only. It does **not** authorize heal-to-green.
 
@@ -169,6 +170,33 @@ git diff --cached --name-status
 ```
 
 Do not run `git fetch` here unless remote state becomes REQUIRED_FOR.
+
+### Unresolved conflicts hard gate (mandatory)
+
+After `git status --short` (and before any `git add` / `git commit`), **COMMIT STOP**
+if either condition holds:
+
+1. **Unmerged paths** — porcelain status shows any unmerged index state
+   (`UU`, `AA`, `DD`, `AU`, `UA`, `DU`, `UD`) or status text reports
+   `Unmerged paths` / both-modified without resolution.
+2. **Conflict markers** — any file in the current commit group (already staged
+   or about to be staged) contains unresolved conflict marker lines
+   (`<<<<<<<`, `=======`, `>>>>>>>`).
+
+On hit:
+
+```text
+STATUS: COMMIT_STOP
+WHY: unresolved_conflicts
+DO_NOT_DO_YET: clear/choose conflict markers inside /opsx-commit; git add of unmerged paths; rebase/merge/cherry-pick --continue/--skip/--abort; push; force-push
+```
+
+- do **not** stage or commit;
+- do **not** clear, edit, or invent resolution for conflict markers;
+- leave resolution to the owner (or a separate fix command).
+
+Already-resolved paths (no unmerged state, no markers) may still be staged.
+
 Block execution if current branch is:
 
 ```text
@@ -193,7 +221,10 @@ Detect an in-progress git sequencer from `git status` and/or presence of
 `REVERT_HEAD`.
 
 If a sequencer is in progress:
-- planning and (with `GO`) creating the authorized local commit(s) remain allowed;
+- the **Unresolved conflicts hard gate** still applies first (any unmerged /
+  markers → **COMMIT STOP**, no stage/commit);
+- only when that gate is clear: planning and (with `GO`) creating the
+  authorized local commit(s) remain allowed;
 - after those commits (or after plan-only output), **hard stop** this command;
 - never run rebase/merge/cherry-pick `--continue|--skip|--abort` or otherwise
   advance the sequencer;

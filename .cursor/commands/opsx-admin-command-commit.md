@@ -132,6 +132,32 @@ git diff --cached --name-status
 
 Do not run `git fetch` unless remote state becomes REQUIRED_FOR.
 
+### Unresolved conflicts hard gate (mandatory)
+
+After `git status --short` (and before any `git add` / `git commit`), **stop**
+with `STATUS: BLOCKED` / `WHY: unresolved_conflicts` if either condition holds:
+
+1. **Unmerged paths** — porcelain status shows any unmerged index state
+   (`UU`, `AA`, `DD`, `AU`, `UA`, `DU`, `UD`) or status text reports
+   `Unmerged paths` / both-modified without resolution.
+2. **Conflict markers** — any file in the current commit group (already staged
+   or about to be staged) contains unresolved conflict marker lines
+   (`<<<<<<<`, `=======`, `>>>>>>>`).
+
+On hit:
+
+- do **not** stage or commit;
+- do **not** clear, edit, or invent resolution for conflict markers;
+- leave resolution to the owner (or a separate fix command);
+- include in the report:
+
+```text
+WHY: unresolved_conflicts
+DO_NOT_DO_YET: clear/choose conflict markers inside /opsx-admin-command-commit; git add of unmerged paths; rebase/merge/cherry-pick --continue/--skip/--abort; push; force-push
+```
+
+Already-resolved paths (no unmerged state, no markers) may still be staged.
+
 Block execution if current branch is:
 
 ```text
