@@ -39,6 +39,43 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _infer_resolve_cpo_kind(
+    complex_adv: ComplexAdv,
+    resolved: float,
+) -> ResolveCpoKind:
+    """Честный target|max для fallback, когда на ComplexAdv нет resolve_cpo_kind.
+
+    Production ``get_complex_advs`` кладёт только ``resolve_cpo`` (без plan /
+    fact_predict_orders / resolve_cpo_kind). Сравниваем live value с plan
+    target/max на ``adv_setting``, если они есть. Если сравнить нельзя —
+    НЕ форсируем ``target`` (PBH-GH-002): предпочитаем ``max`` (как activity-
+    control при absent PG kind).
+    """
+    adv = getattr(complex_adv, "adv_setting", None)
+    plan_target = (
+        getattr(adv, "target_price_for_order", None) if adv is not None else None
+    )
+    plan_max = (
+        getattr(adv, "max_price_for_order", None) if adv is not None else None
+    )
+    if plan_target is None:
+        plan_target = getattr(complex_adv, "target_price_for_order", None)
+    if plan_max is None:
+        plan_max = getattr(complex_adv, "max_price_for_order", None)
+    if plan_target is not None and plan_max is not None:
+        target_v = float(plan_target)
+        max_v = float(plan_max)
+        if resolved == max_v and resolved != target_v:
+            return "max"
+        if resolved == target_v and resolved != max_v:
+            return "target"
+        if resolved == max_v:
+            return "max"
+        if resolved == target_v:
+            return "target"
+    return "max"
+
+
 def _resolve_cpo_from_adv(
     complex_adv: ComplexAdv,
 ) -> tuple[float, ResolveCpoKind] | None:
@@ -67,9 +104,10 @@ def _resolve_cpo_from_adv(
         if resolved is None:
             return None
         kind_raw = getattr(complex_adv, "resolve_cpo_kind", None)
-        kind: ResolveCpoKind = "max" if kind_raw == "max" else "target"
         if kind_raw in ("target", "max"):
-            kind = kind_raw
+            kind: ResolveCpoKind = kind_raw
+        else:
+            kind = _infer_resolve_cpo_kind(complex_adv, float(resolved))
         return (float(resolved), kind)
     return (float(pair[0]), pair[1])
 
@@ -143,6 +181,10 @@ async def apply_shelf_exhausted_tick(
             qualified_tested_bid_minors=qualified_tested_bid_minors,
             resolve_cpo_value=resolve_value,
             resolve_cpo_kind=resolve_kind,
+            # Clear alone ≠ new cycle: honor pending until real Auto start.
+            epoch_pending=bool(
+                getattr(state, "shelf_exhausted_epoch_pending", False)
+            ),
         )
     )
     if not detect.should_latch:

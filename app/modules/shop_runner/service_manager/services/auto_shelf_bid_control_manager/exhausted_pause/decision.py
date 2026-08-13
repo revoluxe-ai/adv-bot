@@ -26,7 +26,12 @@ ResolveCpoKind = Literal["target", "max"]
 
 @dataclass(frozen=True)
 class TerminalDetectInput:
-    """Входы terminal detect на тике полок."""
+    """Входы terminal detect на тике полок.
+
+    ``epoch_pending``: после clear our-block до реального Auto start
+    (ADL: clear alone ≠ новый цикл). Пока True — не latch по старому
+    exhausted epoch (пустой ``next_test_bid``).
+    """
 
     module_enabled: bool
     strategy: AutoShelfBidControlStrategy | str | None
@@ -35,6 +40,7 @@ class TerminalDetectInput:
     qualified_tested_bid_minors: Sequence[int] | None
     resolve_cpo_value: float | None
     resolve_cpo_kind: ResolveCpoKind | None
+    epoch_pending: bool = False
 
 
 @dataclass(frozen=True)
@@ -103,7 +109,11 @@ def has_resolve_cpo_plan_fit(
 
 
 def should_latch_terminal_block(inp: TerminalDetectInput) -> TerminalDetectResult:
-    """Нужен ли latch PG our-block на этом тике."""
+    """Нужен ли latch PG our-block на этом тике.
+
+    Пока ``epoch_pending`` (ожидание нового Auto epoch после clear) —
+    не latch даже при пустом ``next_test_bid`` старой эпохи.
+    """
     if not gate_allows_shelf_exhausted_path(
         module_enabled=inp.module_enabled,
         strategy=inp.strategy,
@@ -120,6 +130,13 @@ def should_latch_terminal_block(inp: TerminalDetectInput) -> TerminalDetectResul
         qualified_tested_bid_minors=inp.qualified_tested_bid_minors,
         resolve_cpo_value=inp.resolve_cpo_value,
     )
+    if inp.epoch_pending:
+        return TerminalDetectResult(
+            should_latch=False,
+            reason="epoch_pending_awaiting_new_epoch",
+            has_plan_fit=plan_fit,
+            epoch_exhausted=epoch_exhausted,
+        )
     if not epoch_exhausted:
         return TerminalDetectResult(
             should_latch=False,
