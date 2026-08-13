@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/cli-stop-envelope/v1",
+  "title": "CLI StopRequired envelope",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "status",
+    "reason",
+    "details",
+    "command",
+    "package_version"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/cli-stop-envelope/v1"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "status": {
+      "const": "STOP"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "details": {
+      "type": "object"
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "package_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reached_gate": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}

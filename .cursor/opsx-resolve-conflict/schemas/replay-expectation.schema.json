@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/replay-expectation/v1",
+  "title": "Replay command-case expectation",
+  "type": "object",
+  "required": [
+    "schema",
+    "case_id",
+    "command_kind",
+    "expected_exit_code",
+    "expected_status",
+    "expected_stop_reason",
+    "expected_operation",
+    "expected_gate",
+    "expected_state"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/replay-expectation/v1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command_kind": {
+      "type": "string",
+      "enum": ["state", "go"]
+    },
+    "expected_exit_code": {
+      "type": "integer"
+    },
+    "expected_status": {
+      "type": ["string", "null"]
+    },
+    "expected_stop_reason": {
+      "type": ["string", "null"]
+    },
+    "expected_operation": {
+      "type": ["string", "null"]
+    },
+    "expected_gate": {
+      "type": ["string", "null"]
+    },
+    "expected_state": {
+      "type": "object",
+      "properties": {
+        "require_unmerged_nonempty": { "type": "boolean" },
+        "require_stage_oids": { "type": "boolean" },
+        "require_operation_head": { "type": "boolean" },
+        "refs_immutable": { "type": "boolean" },
+        "index_immutable": { "type": "boolean" },
+        "worktree_conflict_immutable": { "type": "boolean" },
+        "process_delta_empty": { "type": "boolean" },
+        "forbid_traceback": { "type": "boolean" },
+        "forbid_scope_file_required_as_pass": { "type": "boolean" },
+        "go_capability": { "type": ["boolean", "null"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

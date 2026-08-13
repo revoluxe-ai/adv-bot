@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/unit-receipt.schema.json",
+  "title": "OPSX Resolve Conflict Unit Receipt (R16)",
+  "type": "object",
+  "required": [
+    "schema",
+    "package_version",
+    "run_id",
+    "step_id",
+    "unit_id",
+    "operation",
+    "paths",
+    "stage_roles",
+    "authority_sources",
+    "scope_manifest_hash",
+    "state_fingerprint_before",
+    "state_fingerprint_after",
+    "worktree_hashes_before",
+    "worktree_hashes_after",
+    "diff_sha256",
+    "behavior_preserved",
+    "behavior_superseded",
+    "checks",
+    "risk",
+    "confidence",
+    "ledger_record_hash",
+    "path",
+    "topology",
+    "write_proof",
+    "semantic_proof",
+    "fingerprint_after",
+    "stage_oids",
+    "staged_candidate"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/unit-receipt/v1"
+    },
+    "package_version": {
+      "const": "0.40.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "topology": {
+      "type": "string"
+    },
+    "step_id": {"type": "string", "minLength": 1},
+    "unit_id": {"type": "string", "minLength": 1},
+    "operation": {"enum": ["merge", "rebase", "cherry-pick"]},
+    "paths": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string"}
+    },
+    "stage_roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "stage", "role", "actual_blob_oid", "expected_blob_oid", "verified"],
+        "properties": {
+          "path": {"type": "string"},
+          "stage": {"enum": [1, 2, 3]},
+          "role": {"type": "string"},
+          "actual_blob_oid": {"type": ["string", "null"]},
+          "expected_blob_oid": {"type": ["string", "null"]},
+          "verified": {"const": true}
+        },
+        "additionalProperties": true
+      }
+    },
+    "authority_sources": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "scope_manifest_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "state_fingerprint_before": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "state_fingerprint_after": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "worktree_hashes_before": {"type": "object"},
+    "worktree_hashes_after": {"type": "object"},
+    "diff_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "behavior_preserved": {"type": "array", "items": {"type": "string"}},
+    "behavior_superseded": {"type": "array", "items": {"type": "object"}},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "risk": {"enum": ["LOW", "MEDIUM", "HIGH"]},
+    "confidence": {"enum": ["HIGH", "NOT_HIGH"]},
+    "remaining_risks": {"type": "array", "items": {"type": "string"}},
+    "ledger_record_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "write_proof": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semantic_proof": {
+      "type": "object"
+    },
+    "fingerprint_after": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "stage_oids": {"type": "object"},
+    "staged_candidate": {
+      "type": "object",
+      "required": [
+        "path",
+        "blob_oid",
+        "mode",
+        "content_sha256",
+        "worktree_sha256",
+        "staged_blob_sha256"
+      ],
+      "properties": {
+        "path": {"type": "string"},
+        "blob_oid": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+        "mode": {"enum": ["100644", "100755"]},
+        "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "worktree_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "staged_blob_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

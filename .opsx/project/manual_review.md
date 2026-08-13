@@ -1,43 +1,39 @@
-# Manual review — projectize COMPLETE
+# Manual review — projectize COMPLETE (restore)
 
-Generated: 20260807T181322Z
+Generated: 20260812T235831Z
 Source: `/opsx-projectize:GO`
-Central bind: `C:/Users/vkita/my_code/opsx-central` (from `.opsx/sources.yaml`)
-Bootstrap evidence: `.tmp/opsx-bootstrap/20260807T172840Z/MERGE_RECEIPT.md`
+Mode: restore mid-rebase (lock yaml absent from WT; tip already COMPLETE)
 
 ## Target
 
 - Product: WB Sky (`adv-bot` Poetry package)
 - Adapters: `opsx-lite` + `poetry-python`
-- Not a Vue/npm game tree — game donor wipe plan was rejected
+- Not a Vue/npm game tree
 
 ## Applied
 
-- Rewrote `/opsx-projectize` and `/opsx-adapt-project` for Poetry/WB
-- Dropped `vue-npm` from seeded meta `required_adapters`
-- Remapped game contract ids on meta surfaces → `OPSX-WB-*`
-- Seeded `.opsx/adapters/poetry-python/README.md`
-- Rebuilt activation (DEFAULT/CORE 27) + provenance event
-- Deleted typo file `.cursor/opsx-meta-bootstram` (if present)
+- Restored `.opsx/projectization.yaml`, `sources.yaml`, `manifest.yaml`, `lock.yaml` from branch tip `implement-resolve-conflict-command` @ `(19e4d939f)`
+- Did **not** wipe product `openspec/**`
+- Did **not** seed `vue-npm`
+- Did **not** modify active rebase UU paths (`opsx-devops`, `opsx-admin-command-commit`, devops state)
+- Left `opsx-resolve-conflict` to rebase todo / later import
 
-## Preserved (must stay)
+## Preserved
 
-- Full product `openspec/**` (changes, archive, specs, decisions, `config.yaml`)
-- Product lifecycle command bodies that already won locally
-- `.cursor/rules/**`, `.cursor/pipeline/**`
+- Full product `openspec/**`
+- Existing `.opsx/adapters/poetry-python/**`, shared contracts, activation registry
+- Gate/meta command files already on disk
 
-## Deferred
+## Deferred / Owner follow-up
 
-- Registering ~33 extra on-disk commands not in DEFAULT activation
-  (bug-hunt, admin-command*, test*, …) — use `/opsx-meta-import-command`
-  or a later adapt pass if Owner wants them activated
-- Spec Kit (`.specify/`) remains deferred
-- `repo_family_id` in sources/lock still `unknown` until snapshot/index
+- Finish interactive rebase UU → `git rebase --continue`
+- `opsx-resolve-conflict` arrives in later rebase picks (or import if still ABSENT)
+- Optional: `/opsx-meta-commit` for restored yaml if tip files differ from committed tip after rebase
 
 ## Checks before COMPLETE
 
 - [x] `openspec/` file count unchanged by this APPLY
-- [x] Gate commands present under `.cursor/commands/`
-- [x] `poetry-python` adapter README present
-- [x] `vue-npm` adapter absent
+- [x] Gate commands present
+- [x] `poetry-python` present; `vue-npm` absent
 - [x] Lock set to COMPLETE with `normal_commands_enabled: true`
+- [x] `sources.yaml` without machine-absolute `central_root` (tip version)
