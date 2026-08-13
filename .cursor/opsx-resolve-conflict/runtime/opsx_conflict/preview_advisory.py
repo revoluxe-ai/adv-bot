@@ -263,32 +263,33 @@ def _strong_evidence(context: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+# Explicit, domain-agnostic markers only (never product phrases like
+# "create path" / "existing-users-only" — those false-fire on unrelated specs).
+_POLARITY_PREFER_READ_ONLY = (
+    "opsx_conflict_polarity: prefer_read_only",
+    "opsx_conflict_polarity:prefer_read_only",
+)
+_POLARITY_PREFER_MUTABLE = (
+    "opsx_conflict_polarity: prefer_mutable",
+    "opsx_conflict_polarity:prefer_mutable",
+)
+
+
 def _recommendation_polarity(excerpt: str) -> str | None:
-    """Map verified authority excerpt to a coarse behavioral polarity."""
+    """Map verified authority excerpt to polarity via explicit markers only.
+
+    Product/domain vocabulary in specs must not drive keep_ours/keep_theirs.
+    Contracts that want advisory polarity must declare
+    ``opsx_conflict_polarity: prefer_read_only`` or
+    ``opsx_conflict_polarity: prefer_mutable``.
+    """
     low = excerpt.lower()
-    existing = any(
-        tok in low
-        for tok in (
-            "existing-users-only",
-            "existing_users_only",
-            "existing users only",
-            "только для существующих",
-            "navigation for existing",
-        )
-    )
-    alias = any(
-        tok in low
-        for tok in (
-            "full /start alias",
-            "full start alias",
-            "алиас /start",
-            "create path",
-        )
-    )
-    if existing and not alias:
-        return "existing_users_only"
-    if alias and not existing:
-        return "full_alias"
+    prefer_ro = any(tok in low for tok in _POLARITY_PREFER_READ_ONLY)
+    prefer_mut = any(tok in low for tok in _POLARITY_PREFER_MUTABLE)
+    if prefer_ro and not prefer_mut:
+        return "prefer_read_only"
+    if prefer_mut and not prefer_ro:
+        return "prefer_mutable"
     return None
 
 
@@ -546,14 +547,14 @@ def _build_advisory_reasoning(
         )
     elif strong:
         # Per-item polarities already computed; do not join excerpts (masks conflicts).
-        prefers_existing = set(polarities) == {"existing_users_only"}
-        prefers_alias = set(polarities) == {"full_alias"}
+        prefers_read_only = set(polarities) == {"prefer_read_only"}
+        prefers_mutable = set(polarities) == {"prefer_mutable"}
         why_accepted = "; ".join(
             f"{e['path']}: {e.get('authority_basis')} "
             f"(status={e.get('lifecycle_status')})"
             for e in strong[:3]
         )
-        if prefers_existing and not prefers_alias:
+        if prefers_read_only and not prefers_mutable:
             prefer_side = None
             if ours["read_only"] == "True" and theirs["read_only"] != "True":
                 prefer_side = "keep_ours"
@@ -563,8 +564,9 @@ def _build_advisory_reasoning(
                 recommendation = {
                     "option_id": prefer_side,
                     "rationale": (
-                        "Verified accepted/current contract указывает "
-                        "existing-users-only; сторона с read_only=True согласована. "
+                        "Verified accepted/current contract declares "
+                        "opsx_conflict_polarity: prefer_read_only; "
+                        "сторона с read_only=True согласована. "
                         f"Почему accepted: {why_accepted}. "
                         "Файлы не изменялись."
                     ),
@@ -584,7 +586,7 @@ def _build_advisory_reasoning(
                     "strength": "verified_strong_authority",
                     "authority_basis": why_accepted,
                 }
-        elif prefers_alias and not prefers_existing:
+        elif prefers_mutable and not prefers_read_only:
             prefer_side = None
             if ours["read_only"] == "False" and theirs["read_only"] != "False":
                 prefer_side = "keep_ours"
@@ -594,7 +596,8 @@ def _build_advisory_reasoning(
                 recommendation = {
                     "option_id": prefer_side,
                     "rationale": (
-                        "Verified contract указывает полный alias create-path; "
+                        "Verified contract declares "
+                        "opsx_conflict_polarity: prefer_mutable; "
                         "сторона с read_only=False согласована. "
                         f"Почему accepted: {why_accepted}."
                     ),

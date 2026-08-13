@@ -96,6 +96,7 @@ def _write_callback_fixture(repo: Path, *, decision_status: str | None) -> None:
         (dec / "ADR-CALLBACK.md").write_text(
             "# ADR callback contract\n"
             f"\nstatus: {decision_status}\n\n"
+            "opsx_conflict_polarity: prefer_read_only\n"
             "The callback is existing-users-only navigation.\n"
             "It must use read_only=True and must not create users.\n",
             encoding="utf-8",
@@ -232,6 +233,7 @@ def test_contradictory_verified_authorities(git_repo: Path) -> None:
     dec = git_repo / "openspec" / "decisions"
     (dec / "ADR-CALLBACK-ALIAS.md").write_text(
         "# opposite\n\nstatus: accepted\n\n"
+        "opsx_conflict_polarity: prefer_mutable\n"
         "The callback is a full /start alias create path.\n",
         encoding="utf-8",
     )
@@ -272,6 +274,23 @@ def test_unverified_cannot_generate_recommendation() -> None:
     from opsx_conflict.preview_advisory import _strong_evidence
 
     assert _strong_evidence(packet) == []
+
+
+def test_recommendation_polarity_requires_explicit_marker() -> None:
+    """Product phrases must not map to keep_* polarity; markers must."""
+    from opsx_conflict.preview_advisory import _recommendation_polarity
+
+    assert _recommendation_polarity("create path for users") is None
+    assert _recommendation_polarity("existing-users-only navigation") is None
+    assert _recommendation_polarity("full /start alias create path") is None
+    assert (
+        _recommendation_polarity("opsx_conflict_polarity: prefer_read_only")
+        == "prefer_read_only"
+    )
+    assert (
+        _recommendation_polarity("opsx_conflict_polarity: prefer_mutable")
+        == "prefer_mutable"
+    )
 
 
 def test_authority_scan_budget_exhaustion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -297,7 +297,7 @@ class BoundedContextReader:
     def _authority_excerpt(
         self, *, path: str, full_text: str | None, fallback: str
     ) -> tuple[str, int, int]:
-        """Build an excerpt that retains status + contract polarity cues."""
+        """Build an excerpt that retains status + explicit polarity markers."""
         if not full_text:
             return fallback[:800], 1, max(1, fallback.count("\n") + 1)
         lines = full_text.splitlines()
@@ -307,12 +307,9 @@ class BoundedContextReader:
             if _STATUS_RE.match(line) or any(
                 tok in low
                 for tok in (
-                    "existing-users-only",
-                    "existing users only",
-                    "existing_users_only",
-                    "full /start alias",
-                    "full start alias",
-                    "create path",
+                    "opsx_conflict_polarity:",
+                    "prefer_read_only",
+                    "prefer_mutable",
                     "read_only",
                     "contract_kind",
                     "normative",
@@ -869,7 +866,7 @@ def collect_conflict_context(
                 token = "read_only"
                 break
         if token is None:
-            token = "existing-users-only"
+            token = "opsx_conflict_polarity"
         if all(t[0] != token for t in intents):
             intents.append(
                 (

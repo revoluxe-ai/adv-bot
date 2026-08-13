@@ -19,7 +19,11 @@ R34_PREVIEW_READONLY_GIT_SHA256 = (
 )
 
 _CONTRACT_PATH = "openspec/contracts/callback.md"
-_NORMATIVE = "contract_kind: normative\nThe callback is existing-users-only.\n"
+_NORMATIVE = (
+    "contract_kind: normative\n"
+    "opsx_conflict_polarity: prefer_read_only\n"
+    "The callback is existing-users-only.\n"
+)
 
 
 def _run(argv: list[str], cwd: Path) -> None:
@@ -85,6 +89,7 @@ def test_r36_counterexample_draft_normative_not_verified() -> None:
     text = (
         "status: draft\n"
         "contract_kind: normative\n"
+        "opsx_conflict_polarity: prefer_read_only\n"
         "The callback is existing-users-only.\n"
     )
     result = verify_authority(_CONTRACT_PATH, text)
@@ -125,6 +130,7 @@ def _write_callback_conflict(repo: Path, *, contract_status: str | None) -> None
     (contracts / "callback.md").write_text(
         f"# callback contract\n\n{status_block}"
         "contract_kind: normative\n"
+        "opsx_conflict_polarity: prefer_read_only\n"
         "The callback is existing-users-only navigation.\n"
         "It must use read_only=True.\n",
         encoding="utf-8",
@@ -195,6 +201,7 @@ def test_contradictory_accepted_authorities_still_null(git_repo: Path) -> None:
     dec.mkdir(parents=True, exist_ok=True)
     (dec / "ADR-ALIAS.md").write_text(
         "# opposite\n\nstatus: accepted\n\n"
+        "opsx_conflict_polarity: prefer_mutable\n"
         "The callback is a full /start alias create path.\n",
         encoding="utf-8",
     )

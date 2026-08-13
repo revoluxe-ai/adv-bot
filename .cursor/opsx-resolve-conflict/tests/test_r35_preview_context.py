@@ -120,6 +120,7 @@ def _write_callback_fixture(repo: Path, *, with_decision: bool) -> None:
             "\n"
             "status: accepted\n"
             "\n"
+            "opsx_conflict_polarity: prefer_read_only\n"
             "The callback is existing-users-only navigation.\n"
             "It must use read_only=True and must not create users.\n"
             "create_user branch in callback is inconsistent with this contract.\n",
