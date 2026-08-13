@@ -140,6 +140,7 @@ def test_date_pagination_helpers_clamp_dates() -> None:
     assert page_range == (date(2026, 6, 3), date(2026, 6, 9))
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_history_manager_returns_page_range(monkeypatch: pytest.MonkeyPatch) -> None:
     """Менеджер должен возвращать диапазон, который использовал для выборки."""
@@ -171,8 +172,19 @@ async def test_history_manager_returns_page_range(monkeypatch: pytest.MonkeyPatc
     async def fake_load_rows(*args, **kwargs) -> list[KeywordDailyStat]:
         return []
 
+    async def fake_get_rebound_wb_adv_ids(
+        _adv_setting_id: int,
+    ) -> tuple[set[int], set[int]]:
+        """Unit: no live BaseRedis via get_rebound_wb_adv_ids."""
+        return set(), set()
+
     monkeypatch.setattr(manager, "get_earliest_date", fake_get_earliest_date)
     monkeypatch.setattr(manager, "_load_history_rows", fake_load_rows)
+    monkeypatch.setattr(
+        "app.modules.wb_adv_updater.keyword_daily_history."
+        "keyword_daily_history_manager.get_rebound_wb_adv_ids",
+        fake_get_rebound_wb_adv_ids,
+    )
 
     stats, current_page, total_pages, page_range = await manager.get_history_page(
         keyword_setting,
