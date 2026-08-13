@@ -19,6 +19,8 @@ allowlist:
   - .cursor/static-check/**
   - .cursor/pipeline/**
   - .cursor/antipattern-gate/**
+  - .cursor/devops/**
+  - .cursor/opsx-resolve-conflict/**
   - .agents/**
   - .github/skills/**
   - .github/prompts/**

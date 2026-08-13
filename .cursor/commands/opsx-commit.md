@@ -90,6 +90,21 @@ NEXT_ACTION: /opsx-meta-commit
 DO_NOT_DO_YET: commit process files via /opsx-commit
 ```
 
+### Allowlist sync (mandatory companion)
+
+Process-exclusion above is **not** enough for `/opsx-meta-commit` in-scope.
+Meta-commit SoT is `.opsx/sources.yaml` allowlist.
+
+When **adding or renaming** an entry in this Process-surface exclusion list,
+the **same coherent packet** MUST also add the matching
+`.opsx/sources.yaml` `allowlist:` line (or fail closed). Exclusion alone
+with a missing allowlist row produces `ALLOWLIST_GAP` on meta-commit
+(dead-end if redirected back here).
+
+Do **not** remove an allowlist row while the exclusion list still names
+that prefix, unless a deliberate dual-surface retirement is documented in
+the same packet.
+
 Commit subjects MUST be in English with a short Russian explanation in parentheses:
 
 ```text

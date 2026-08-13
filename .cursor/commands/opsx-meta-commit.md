@@ -70,7 +70,13 @@ Hard bans still apply. Missing Poetry/pytest/pyright/kubectl (and other undeclar
   единый список с `/opsx-meta-update-snapshot` и process-exclusion у `/opsx-commit`.
   Canonical «In-scope surfaces» ниже — legacy template; при расхождении побеждает
   `sources.yaml` + этот OVERRIDE. Includes `.cursor/devops/**` (OPS_STATE /
-  LAST.json; never secrets/DSN).
+  LAST.json; never secrets/DSN) and `.cursor/opsx-resolve-conflict/**`.
+- **ALLOWLIST_GAP (mandatory inventory class):** dirty paths that match
+  `/opsx-commit` process-exclusion prefixes (or this command’s «In-scope
+  surfaces» prefixes) but are **not** on `sources.yaml` allowlist are **not**
+  true product out-of-scope. Emit `STATUS: ALLOWLIST_GAP` with proposed YAML
+  lines and `NEXT_ACTION: /opsx-meta-fix-command-defects`. Never redirect
+  those paths to `/opsx-commit` (dead-end: commit excludes them too).
 - **Local-only:** never update central snapshot or catalog repos. After success, if snapshot may be stale, recommend `/opsx-meta-update-snapshot` only.
 - Every terminal report must include `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`.
 - **Owner scope map (mandatory mental model):**
@@ -243,6 +249,7 @@ Only these paths may be staged/committed by this command:
 .cursor/pipeline/**
 .cursor/antipattern-gate/**
 .cursor/devops/**
+.cursor/opsx-resolve-conflict/**
 .cursor/opsx-review-commands
 .agents/**
 .github/skills/**
@@ -263,11 +270,43 @@ Antipattern-gate companions under `.cursor/antipattern-gate/` (catalog,
 `PRACTICE_LEDGER.jsonl`, README) are in scope with `/opsx-antipattern-gate`.
 Durable DevOps ops memory under `.cursor/devops/**` (`OPS_STATE.md`,
 `LAST.json`, …) is in scope with `/opsx-devops` (never secrets/DSN values).
+`/opsx-resolve-conflict` package under `.cursor/opsx-resolve-conflict/**`
+(runtime, MANIFEST/TRUST_ANCHOR, scripts, tests) is in scope with that command.
 All files under `.agents/**` (not only `skills/`) are in scope.
 
 Everything else is **out of scope** for this command.
 
-## Out of scope (redirect)
+## Dirty-path three-way classify (mandatory)
+
+On every inventory (plan or `GO`), classify **each** dirty path into exactly one:
+
+| Class | When | Action |
+|---|---|---|
+| `(A) IN_SCOPE` | Matches `.opsx/sources.yaml` allowlist and not `hard_exclude` | Eligible for this command’s selection / commit groups |
+| `(B) ALLOWLIST_GAP` | Matches `/opsx-commit` process-exclusion prefixes **or** the «In-scope surfaces» prefixes above, but **not** on the allowlist | Do **not** stage. Emit `ALLOWLIST_GAP` (below). Do **not** use `OUT_OF_SCOPE_REDIRECT` → `/opsx-commit` |
+| `(C) OUT_OF_SCOPE` | True product/app/other (not process-looking) | `OUT_OF_SCOPE_REDIRECT` → `/opsx-commit` |
+
+`sources.yaml` wins over the legacy «In-scope surfaces» template for (A).
+Exclusion from `/opsx-commit` alone does **not** make a path meta-commit
+in-scope until the allowlist lists it.
+
+### (B) ALLOWLIST_GAP output
+
+When any dirty path is class (B):
+
+```text
+STATUS: ALLOWLIST_GAP
+ALLOWLIST_GAP:
+- paths:
+- proposed_sources_yaml_allowlist_lines:
+NEXT_ACTION: /opsx-meta-fix-command-defects
+DO_NOT_DO_YET: /opsx-commit for these paths; invent product commits; stage them under meta-commit
+```
+
+Leave them untouched until allowlist is fixed (separate fix-command-defects /
+Owner edit of `.opsx/sources.yaml`).
+
+### (C) Out of scope (redirect)
 
 Never stage or commit:
 
@@ -280,7 +319,7 @@ Never stage or commit:
 - `openspec/changes/**` product change packets
 - ordinary project docs outside the surfaces above
 
-If such files are dirty:
+If such files are dirty (class C only):
 
 ```text
 OUT_OF_SCOPE_REDIRECT:
@@ -385,7 +424,9 @@ Preferred grouping:
    `/opsx-antipattern-gate` command packet when they change together
 8. devops durable memory (.cursor/devops/**) — with `/opsx-devops` OPS_STATE
    / LAST.json updates (never secrets); separate from product `/opsx-commit`
-9. unrelated process edits — separate commits by concern
+9. resolve-conflict package (.cursor/opsx-resolve-conflict/**) — with
+   `/opsx-resolve-conflict` hash/MANIFEST/runtime packet when it changes
+10. unrelated process edits — separate commits by concern
 ```
 
 Do **not**:
@@ -523,7 +564,8 @@ Commit plan:
 - proposed commits (subject + files + why this split)
 - commands that would be run
 - LEFT_UNSTAGED_OUTSIDE_CHAT_SCOPE:
-- out-of-scope files (redirect to /opsx-commit)
+- ALLOWLIST_GAP: (paths + proposed sources.yaml lines; or empty)
+- out-of-scope files (redirect to /opsx-commit) — class C only
 - files requiring manual git add -p
 - suspicious/unrelated process files
 
@@ -593,7 +635,12 @@ NOT_COMMITTED_THIS_RUN: none — all planned groups committed
 - groups not committed: <names>
 
 OUT_OF_SCOPE_REDIRECT:
-- files left for /opsx-commit:
+- files left for /opsx-commit:  (class C only)
+
+ALLOWLIST_GAP:
+- paths:  (class B; or empty / omit when none)
+- proposed_sources_yaml_allowlist_lines:
+- NEXT_ACTION: /opsx-meta-fix-command-defects  (when non-empty)
 
 CHAT_SCOPE:
 - DEFAULT_COMMANDS_DIR | ALL | INCLUDE_FULL_DIRTY_TREE
@@ -611,10 +658,11 @@ WHY:
 CURRENT_STATE:
 OWNER_DECISION_REQUIRED:
 NEXT_ACTION:
+- if ALLOWLIST_GAP non-empty: /opsx-meta-fix-command-defects
 - if product files remain dirty: /opsx-commit
 - else if snapshot may be stale: /opsx-meta-update-snapshot
 - else optional: /opsx-create-pr (do not push)
-DO_NOT_DO_YET: push; rebase; force-push
+DO_NOT_DO_YET: push; rebase; force-push; /opsx-commit for ALLOWLIST_GAP paths
 ```
 
 ## Absolute prohibitions
@@ -647,7 +695,7 @@ Never strip markers or invent a merge inside this command — hand off to
 - quality: poetry-python gates per `.opsx/project/quality-gates.md` when in scope; `npm run build` UNAVAILABLE; smoke/frontend UNAVAILABLE
 - unresolved_source_sections: any Poetry/pytest/pyright/kubectl/WB-domain steps in the body are blocked by TARGET OVERRIDE until adapters exist
 - manual_review: `.opsx/project/manual_review.md`
-- process_allowlist_sot: `.opsx/sources.yaml` (shared with snapshot + `/opsx-commit` exclusion; includes `.cursor/devops/**`)
+- process_allowlist_sot: `.opsx/sources.yaml` (shared with snapshot + `/opsx-commit` exclusion; includes `.cursor/devops/**` and `.cursor/opsx-resolve-conflict/**`)
 - sole_front_door: `/opsx-meta-commit`; `/opsx-admin-command-commit` = thin redirect only
 - local_only: never writes central snapshot/catalog; next may be `/opsx-meta-update-snapshot`
 - orientation: emit `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`
