@@ -268,11 +268,12 @@ Leave them untouched.
 
 ## Mandatory preflight
 
-These git ops are **REQUIRED_FOR** commit planning (branch protection + inventory).
-Apply budgets; on timeout return `blocked_preflight_timeout` rather than hanging.
+These git ops are **REQUIRED_FOR** commit planning (conflicted-tree +
+branch protection + inventory). Apply budgets; on timeout return
+`blocked_preflight_timeout` rather than hanging.
 
 ```text
-OPERATION_REASON: process-surface commit plan + protected-branch gate
+OPERATION_REASON: process-surface commit plan + conflicted-tree + protected-branch gate
 REQUIRED_FOR: commit decision
 SKIP_IF: never when GO path is taken (preview may use status/diff only)
 TIME_BUDGET: branch 5s; status 10s; each diff 15s
@@ -291,6 +292,28 @@ git diff --cached --name-status
 ```
 
 Do not run `git fetch` unless remote state becomes REQUIRED_FOR.
+
+### Conflicted-tree gate (mandatory — plan and GO)
+
+If the working tree has **unmerged paths** (status codes with `U`, e.g.
+`UU`, `AA`, `DU`, `UD`, `AU`, `UA`, `DD`) **or** a merge/rebase is in
+progress, do **not** propose ordinary commits, do not stage, and do not
+commit. Stop with:
+
+```text
+STATUS: BLOCKED_CONFLICTED_TREE
+NEXT_ACTION: /opsx-admin-command-resolve-conflicts
+DO_NOT_DO_YET: stage; commit; push; create-pr
+```
+
+Product-only conflicts (no process-surface unmerged paths) are out of
+scope here too — report them and do not invent a product merge workflow;
+still do not ordinary-commit while any unmerged paths or merge|rebase
+remains in progress.
+
+This gate applies on **both** plan-only and `GO` paths. It is the sole
+front-door counterpart of the obsolete `/opsx-admin-command-commit`
+alias stop (GRAPH: do not use `/opsx-meta-commit` while unmerged).
 
 Block execution if current branch is:
 
@@ -578,6 +601,8 @@ git clean -fd
 
 Never commit paths outside the in-scope surfaces list.
 Never re-decide product commit grouping for `/opsx-commit`.
+Never stage or commit while unmerged paths remain or merge|rebase is in
+progress (`BLOCKED_CONFLICTED_TREE` → `/opsx-admin-command-resolve-conflicts`).
 # END CANONICAL SOURCE BODY
 
 # TARGET ADAPTATION NOTES
