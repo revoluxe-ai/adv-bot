@@ -65,9 +65,12 @@ $ARGUMENTS
 
 - Clean working tree / no merge|rebase in progress → nothing to resolve;
   if dirty process files need commits → `/opsx-meta-commit`.
-- Only **non-allowlist** (product / hard_exclude) paths conflicted → stop with
+- Only **true product / hard_exclude** paths conflicted → stop with
   `BLOCKED_MIXED_SCOPE` or product-only note; do not rewrite `app/**` /
   product tests as “process success”.
+- Unmerged paths that are process-looking but missing from the allowlist
+  → this command still owns the inventory (`ALLOWLIST_GAP`); do **not**
+  redirect those to `/opsx-commit`.
 - Designing a new command → `/opsx-meta-design-command`.
 - Contract defect after a clean merge → `/opsx-meta-fix-command-defects`.
 - Day-to-day navigation → `/opsx-pipeline`.
@@ -77,10 +80,23 @@ $ARGUMENTS
 ## In-scope surfaces (exclusive write/resolve)
 
 **Process allowlist SoT:** `.opsx/sources.yaml` (`allowlist` / `hard_exclude`) —
-same class-(A) rule as `/opsx-meta-commit`. A path is in-scope for resolve /
-`git add` / finish-merge only when it matches `allowlist` and does **not**
-match `hard_exclude`. The legacy prefix list below is documentation only;
-on mismatch `sources.yaml` wins.
+same class-(A) rule as `/opsx-meta-commit`. Resolve / `git add` /
+finish-merge may touch a path only when it matches `allowlist` and does
+**not** match `hard_exclude`.
+
+Classify **every** unmerged path into exactly one inventory class (mirror
+`/opsx-meta-commit`):
+
+| Inventory | When | Resolve / `git add` / finish? |
+|---|---|---|
+| `(A) IN_SCOPE` | Matches allowlist and not `hard_exclude` | Yes (subject to conflict class) |
+| `(B) ALLOWLIST_GAP` | Matches the legacy template below **or** `/opsx-commit` process-exclusion prefixes, but **not** on the allowlist | **No** — emit `ALLOWLIST_GAP`; never `MIXED_SCOPE`; never `/opsx-commit` |
+| `(C) OUT_OF_SCOPE` | True product / hard_exclude / other non-process | **No** — `BLOCKED_MIXED_SCOPE` when present with any in-scope UU |
+
+The legacy prefix list below is documentation + Class (B) detector only;
+on mismatch for Class (A), `sources.yaml` wins. Exclusion from
+`/opsx-commit` alone does **not** make a path Class (A) until the
+allowlist lists it.
 
 Legacy template (keep aligned with allowlist; do not treat as a second SoT):
 
@@ -114,25 +130,32 @@ WORKLOG.md
 .opsx/tools/**
 ```
 
-Never resolve or stage (even if dirty): `hard_exclude` entries (e.g.
-`.opsx/upstream/**`, `.opsx/changes/**`, `.env*`), nor true product trees
-(`app/**`, product `openspec/**`, etc.) unless they appear on the allowlist
-(they must not).
+Never resolve or stage (even if dirty): Class (B) until allowlist is fixed,
+`hard_exclude` entries (e.g. `.opsx/upstream/**`, `.opsx/changes/**`,
+`.env*`), nor true product trees (`app/**`, product `openspec/**`, etc.)
+unless they appear on the allowlist (they must not).
 
 ## Authority boundary (mandatory)
 
-- Owns: conflict classification, proposed/applied file resolutions on
-  allowlisted in-scope paths, `git add` of those paths, `merge --continue` /
-  `rebase --continue` when every unmerged path is allowlisted and resolved
-  (no remaining non-allowlist UU).
+- Owns: conflict classification (including `ALLOWLIST_GAP` inventory),
+  proposed/applied file resolutions on Class (A) paths, `git add` of those
+  paths, `merge --continue` / `rebase --continue` when every unmerged path
+  is Class (A) and resolved (no remaining Class B/C UU).
 - Does **not** own: ordinary post-merge semantic commits (→ `/opsx-meta-commit`),
   product commits (→ `/opsx-commit`), PR creation, push, force-push,
-  verify/archive/approval gates, silent redesign of command contracts.
+  verify/archive/approval gates, silent redesign of command contracts,
+  resolving or staging Class (B) paths before allowlist sync.
 - Does **not** silently re-decide another command’s ownership tokens.
 - `AUTHORITY_TOKEN` conflicts require explicit Owner choice in the plan
   (or in `$ARGUMENTS` on the GO turn) before apply.
+- Class (B) handoff: `NEXT_ACTION: /opsx-meta-fix-command-defects`
+  (proposed `sources.yaml` allowlist lines). Do **not** use
+  `OUT_OF_SCOPE_REDIRECT` → `/opsx-commit` for Class (B).
 
 ## Conflict classes (exactly one per path)
+
+Per-path conflict class applies to Class (A) paths after inventory. Class
+(B)/(C) are inventory outcomes, not textual merge strategies.
 
 | Class | Meaning | Auto-propose? | Apply without per-path Owner note? |
 |---|---|---|---|
@@ -140,7 +163,8 @@ Never resolve or stage (even if dirty): `hard_exclude` entries (e.g.
 | `SECTION_OVERLAP` | Same markdown/code section edited both sides | semantic merge proposal | yes under GO if plan proposal accepted (no OWNER_DECISION left) |
 | `AUTHORITY_TOKEN` | OWNER / STATUS / GATE / disposition / forbid-list / denylist / exclusive-owner prose diverged | propose options only | **no** — need Owner choice |
 | `CROSS_FILE_CONTRACT` | Merge would break producer/consumer or create dual authority across files (includes META/GRAPH fingerprint attestation without regenerating `inventory_path`) | propose + warn | GO may merge text; must set handoff to fix-defects when broken |
-| `MIXED_SCOPE` | Same conflict set includes **non-allowlist** (product / hard_exclude) unmerged paths | do not resolve those paths | **stop** — `BLOCKED_MIXED_SCOPE` |
+| `ALLOWLIST_GAP` | Unmerged path is Class (B): process-looking (legacy template or `/opsx-commit` exclusions) but not on `sources.yaml` allowlist | propose allowlist lines only | **no** — do not resolve/add; `FINISH_OP: none` while any Class B UU remains |
+| `MIXED_SCOPE` | Same conflict set includes Class (C) true product / hard_exclude unmerged paths | do not resolve those paths | **stop** — `BLOCKED_MIXED_SCOPE` (Class B alone is **not** MIXED_SCOPE) |
 
 ## Prevention note (operator)
 
@@ -202,17 +226,25 @@ Apply / continue / abort on protected branches requires
 
 1. Confirm merge and/or rebase in progress, or unmerged paths present.
 2. Read `.opsx/sources.yaml` allowlist / `hard_exclude` (bounded). List every
-   unmerged path; classify each as **in-scope** (allowlist ∩ ¬hard_exclude)
-   vs **out-of-scope** (everything else).
-3. If any out-of-scope unmerged path exists → `BLOCKED_MIXED_SCOPE` (or
-   product-only status). Do not propose resolving non-allowlist files here.
+   unmerged path; classify each into inventory **(A) IN_SCOPE** /
+   **(B) ALLOWLIST_GAP** / **(C) OUT_OF_SCOPE** (same rules as
+   `/opsx-meta-commit`; legacy template + `/opsx-commit` exclusions detect B).
+3. If any Class (C) unmerged path exists → `BLOCKED_MIXED_SCOPE` (or
+   product-only status). Do not propose resolving Class (C) here.
    Allowlisted `.opsx/**` UU (e.g. `.opsx/project/manual_review.md`) are
-   **in-scope**, not MIXED_SCOPE.
-4. For each in-scope path: Grep/Read only that file (section budget);
+   Class (A), not MIXED_SCOPE.
+4. If any Class (B) unmerged path exists → emit mandatory non-empty
+   `ALLOWLIST_GAP:` (paths + proposed `sources.yaml` allowlist lines).
+   Do **not** treat Class (B) as MIXED_SCOPE or redirect to `/opsx-commit`.
+   Overall STATUS: `ALLOWLIST_GAP` when no Class (A) remains to plan, else
+   `PLAN_READY` / `BLOCKED_OWNER` with `ALLOWLIST_GAP` block still present.
+   `FINISH_OP: none` while any Class (B) UU remains.
+5. For each Class (A) path: Grep/Read only that file (section budget);
    classify exactly one conflict class; draft resolution text or options.
-5. List `OWNER_DECISIONS_REQUIRED` for every `AUTHORITY_TOKEN` path.
-6. State intended finish op: `merge --continue` | `rebase --continue` | none.
-7. Emit output contract. Stop.
+6. List `OWNER_DECISIONS_REQUIRED` for every `AUTHORITY_TOKEN` path.
+7. State intended finish op: `merge --continue` | `rebase --continue` | none
+   (must be `none` if any Class B or C UU remains).
+8. Emit output contract. Stop.
 
 I/O: parallel Read max **2**; no full `.cursor/commands/**` dump.
 
@@ -222,12 +254,14 @@ Preconditions:
 
 - usable plan from this chat or `$ARGUMENTS`;
 - every `AUTHORITY_TOKEN` item has an Owner choice;
-- no unresolved `MIXED_SCOPE` / non-allowlist unmerged paths;
+- no unresolved Class (C) / `MIXED_SCOPE` unmerged paths;
+- no remaining Class (B) / `ALLOWLIST_GAP` unmerged paths (allowlist must
+  already list them so they reclassify as Class A, or they must be cleared);
 - protected-branch rule satisfied if applicable.
 
 Then:
 
-1. Write resolved content for each planned in-scope path (no conflict
+1. Write resolved content for each planned Class (A) path (no conflict
    markers left).
 2. **Pipeline fingerprint ↔ inventory guard (mandatory when triggered):**
    If this GO touched `.cursor/pipeline/META.md` and/or GRAPH inventory
@@ -242,7 +276,7 @@ Then:
    - include the regenerated `INVENTORY.json` among in-scope paths to add.
    Do **not** claim `RESOLVED` while `inventory_path` disagrees with
    `reproduce()` or META attestation.
-3. `git add -- <in-scope-resolved-paths>` only.
+3. `git add -- <in-scope-resolved-paths>` only (Class A only).
 4. Re-check `git status --short`: no `U` paths remain.
 5. If merge in progress → `git merge --continue` (non-interactive; if the
    editor would open, use a simple merge message describing process-surface
@@ -275,10 +309,13 @@ Never:
 
 - `-X ours` / `-X theirs` / checkout --ours|--theirs on `AUTHORITY_TOKEN`
   without explicit Owner choice recorded in the plan output;
-- resolve or stage non-allowlist / hard_exclude / product paths;
+- resolve or stage Class (B) ALLOWLIST_GAP, Class (C), hard_exclude, or
+  product paths;
 - claim `RESOLVED` while unmerged paths remain;
 - claim `RESOLVED` while META/GRAPH fingerprint attestation disagrees with
   `inventory_path` / `graph_fingerprint.reproduce()`;
+- treat Class (B) as `BLOCKED_MIXED_SCOPE` or redirect Class (B) to
+  `/opsx-commit`;
 - treat abort as success without `ABORT_* GO`;
 - open PRs or call `/opsx-create-pr` as a side effect.
 
@@ -292,9 +329,12 @@ WHY:
 GIT_STATE: merge_in_progress | rebase_in_progress | conflicted_paths | clean | unknown
 IN_SCOPE_CONFLICTS:
 - path:
-  class: TRIVIAL_TEXTUAL | SECTION_OVERLAP | AUTHORITY_TOKEN | CROSS_FILE_CONTRACT | MIXED_SCOPE
+  class: TRIVIAL_TEXTUAL | SECTION_OVERLAP | AUTHORITY_TOKEN | CROSS_FILE_CONTRACT | ALLOWLIST_GAP | MIXED_SCOPE
   proposal:
   owner_decision: pending | <choice> | n/a
+ALLOWLIST_GAP:
+- paths:
+- proposed_sources_yaml_allowlist_lines:
 OUT_OF_SCOPE_UNMERGED:
 OWNER_DECISIONS_REQUIRED:
 FINISH_OP: merge --continue | rebase --continue | none | abort
@@ -305,6 +345,9 @@ NEXT_ACTION:
 DO_NOT_DO_YET:
 ```
 
+Omit `ALLOWLIST_GAP:` when none; when Class (B) present it is mandatory
+non-empty.
+
 ### STATUS values
 
 ```text
@@ -312,6 +355,7 @@ PLAN_READY
 RESOLVED
 BLOCKED_OWNER
 BLOCKED_MIXED_SCOPE
+ALLOWLIST_GAP
 BLOCKED_NEEDS_EVIDENCE
 CONTRACT_BROKEN_AFTER_MERGE
 ABORTED_BY_OWNER
@@ -322,15 +366,17 @@ blocked_preflight_timeout
 
 | STATUS | NEXT_ACTION |
 |---|---|
-| `PLAN_READY` (no owner gaps) | Reply: `GO` |
+| `PLAN_READY` (no owner gaps; no Class B UU) | Reply: `GO` |
 | `BLOCKED_OWNER` | Owner answers listed decisions, then `GO` |
-| `BLOCKED_MIXED_SCOPE` | finish non-allowlist (product) conflicts first; re-run this command |
+| `ALLOWLIST_GAP` | `/opsx-meta-fix-command-defects` (add proposed allowlist lines); re-run this command |
+| `BLOCKED_MIXED_SCOPE` | finish Class (C) product conflicts first; re-run this command |
 | `RESOLVED` | `/opsx-meta-commit` if dirty; else optional `/opsx-create-pr` |
 | `CONTRACT_BROKEN_AFTER_MERGE` | `/opsx-meta-fix-command-defects` |
 | `ABORTED_BY_OWNER` | operator chooses next branch action; not create-pr |
 
 `DO_NOT_DO_YET` must include at least: push; force-push; admin-commit while
-unmerged paths remain; create-pr while conflicted.
+unmerged paths remain; create-pr while conflicted; `/opsx-commit` for
+Class (B) paths.
 
 ## Failure / recovery
 
@@ -338,13 +384,15 @@ unmerged paths remain; create-pr while conflicted.
 |---|---|
 | No conflicts / not in merge|rebase | `PLAN_READY` or short no-op; redirect commit if dirty |
 | Missing Owner choices | `BLOCKED_OWNER`; no writes |
-| Non-allowlist + allowlist unmerged together | `BLOCKED_MIXED_SCOPE`; no allowlist apply until product UU cleared |
+| Class (B) UU present (alone or with Class A) | `ALLOWLIST_GAP` (or `PLAN_READY` + mandatory gap block if Class A still plannable); `FINISH_OP: none`; no resolve/add of Class B; hand off allowlist fix |
+| Class (C) + Class (A) unmerged together | `BLOCKED_MIXED_SCOPE`; no allowlist apply until product UU cleared |
 | Continue fails | report git error; leave tree; do not force |
 | Read timeout on required conflict file | `blocked_preflight_timeout` / `EVIDENCE_GAP` |
 
 ## Self-review checklist
 
 - [ ] Allowlist SoT (`.opsx/sources.yaml`) respected; no product / hard_exclude writes
+- [ ] Class (B) never treated as MIXED_SCOPE or redirected to `/opsx-commit`
 - [ ] No apply without `GO`
 - [ ] No silent `AUTHORITY_TOKEN` ours/theirs
 - [ ] No push / force-push / hard reset / clean -fd
