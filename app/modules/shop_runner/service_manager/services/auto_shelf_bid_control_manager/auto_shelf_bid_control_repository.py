@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import Select, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
@@ -33,21 +34,63 @@ DEFAULT_RETEST_INTERVAL_DAYS = 7
 class AutoShelfBidControlRepository:
     """Чтение/запись настроек и состояния control-модуля."""
 
+    async def get_settings_in_session(
+        self,
+        session: AsyncSession,
+        nmid: int,
+    ) -> AutoShelfBidControlSettings | None:
+        """PURE_READ settings в переданной session (parent handoff)."""
+        stmt: Select[tuple[AutoShelfBidControlSettings]] = select(
+            AutoShelfBidControlSettings
+        ).where(AutoShelfBidControlSettings.nmid == nmid)
+        return (await session.execute(stmt)).scalar_one_or_none()
+
     async def get_settings(self, nmid: int) -> AutoShelfBidControlSettings | None:
         """Вернуть настройки control для nmid."""
         async with get_session_maker(read_only=True) as session:
-            stmt: Select[tuple[AutoShelfBidControlSettings]] = select(
-                AutoShelfBidControlSettings
-            ).where(AutoShelfBidControlSettings.nmid == nmid)
-            return (await session.execute(stmt)).scalar_one_or_none()
+            return await self.get_settings_in_session(session, nmid)
+
+    async def get_state_in_session(
+        self,
+        session: AsyncSession,
+        nmid: int,
+    ) -> AutoShelfBidControlState | None:
+        """PURE_READ state в переданной session (parent handoff)."""
+        stmt: Select[tuple[AutoShelfBidControlState]] = select(
+            AutoShelfBidControlState
+        ).where(AutoShelfBidControlState.nmid == nmid)
+        return (await session.execute(stmt)).scalar_one_or_none()
 
     async def get_state(self, nmid: int) -> AutoShelfBidControlState | None:
         """Вернуть state control для nmid."""
         async with get_session_maker(read_only=True) as session:
-            stmt: Select[tuple[AutoShelfBidControlState]] = select(
-                AutoShelfBidControlState
-            ).where(AutoShelfBidControlState.nmid == nmid)
-            return (await session.execute(stmt)).scalar_one_or_none()
+            return await self.get_state_in_session(session, nmid)
+
+    async def get_or_create_settings_in_session(
+        self,
+        session: AsyncSession,
+        nmid: int,
+        default_max_bid_minor: int,
+        currency: str = "RUB",
+    ) -> AutoShelfBidControlSettings:
+        """READ_AFTER_WRITE settings create/get в переданной session."""
+        settings_obj = await self.get_settings_in_session(session, nmid)
+        if settings_obj is not None:
+            return settings_obj
+        created = AutoShelfBidControlSettings(
+            nmid=nmid,
+            max_bid_minor=int(default_max_bid_minor),
+            currency=currency,
+            min_bid_distance_minor=DEFAULT_MIN_BID_DISTANCE_MINOR,
+            target_test_impressions=DEFAULT_TARGET_TEST_IMPRESSIONS,
+            target_test_observation_minutes=DEFAULT_TARGET_TEST_OBSERVATION_MINUTES,
+            test_share=DEFAULT_TEST_SHARE,
+            retest_interval_days=DEFAULT_RETEST_INTERVAL_DAYS,
+        )
+        session.add(created)
+        await session.flush()
+        await session.refresh(created)
+        return created
 
     async def get_or_create_settings(
         self,
@@ -56,26 +99,16 @@ class AutoShelfBidControlRepository:
         currency: str = "RUB",
     ) -> AutoShelfBidControlSettings:
         """Вернуть существующие settings или создать default-настройки для nmid."""
-        async with get_session_maker() as session:
-            stmt: Select[tuple[AutoShelfBidControlSettings]] = select(
-                AutoShelfBidControlSettings
-            ).where(AutoShelfBidControlSettings.nmid == nmid)
-            settings_obj = (await session.execute(stmt)).scalar_one_or_none()
-            if settings_obj is not None:
-                return settings_obj
-            created = AutoShelfBidControlSettings(
-                nmid=nmid,
-                max_bid_minor=int(default_max_bid_minor),
+        async with get_session_maker(read_only=False) as session:
+            existing = await self.get_settings_in_session(session, nmid)
+            if existing is not None:
+                return existing
+            created = await self.get_or_create_settings_in_session(
+                session,
+                nmid,
+                default_max_bid_minor,
                 currency=currency,
-                min_bid_distance_minor=DEFAULT_MIN_BID_DISTANCE_MINOR,
-                target_test_impressions=DEFAULT_TARGET_TEST_IMPRESSIONS,
-                target_test_observation_minutes=DEFAULT_TARGET_TEST_OBSERVATION_MINUTES,
-                test_share=DEFAULT_TEST_SHARE,
-                retest_interval_days=DEFAULT_RETEST_INTERVAL_DAYS,
             )
-            session.add(created)
-            await session.flush()
-            await session.refresh(created)
             await session.commit()
             return created
 
@@ -257,6 +290,32 @@ class AutoShelfBidControlRepository:
             await session.commit()
             return existing
 
+    async def latch_shelf_exhausted_pause_in_session(
+        self,
+        session: AsyncSession,
+        nmid: int,
+        *,
+        now: datetime,
+        due_at: datetime,
+        resolve_cpo_kind: str,
+        resolve_cpo_value: float,
+    ) -> AutoShelfBidControlState | None:
+        """WRITE our-block + resolve CPO в переданной session (без commit).
+
+        Не вызывает WB pause — ownership activity-control.
+        """
+        state = await self.get_state_in_session(session, nmid)
+        if state is None:
+            return None
+        state.shelf_exhausted_pause_active = True
+        state.shelf_exhausted_paused_at = now
+        state.shelf_exhausted_due_at = due_at
+        state.shelf_exhausted_resolve_cpo_kind = resolve_cpo_kind
+        state.shelf_exhausted_resolve_cpo_value = float(resolve_cpo_value)
+        await session.flush()
+        await session.refresh(state)
+        return state
+
     async def latch_shelf_exhausted_pause(
         self,
         nmid: int,
@@ -271,21 +330,42 @@ class AutoShelfBidControlRepository:
         Не вызывает WB pause — это ownership activity-control.
         """
         async with get_session_maker(read_only=False) as session:
-            stmt: Select[tuple[AutoShelfBidControlState]] = select(
-                AutoShelfBidControlState
-            ).where(AutoShelfBidControlState.nmid == nmid)
-            state = (await session.execute(stmt)).scalar_one_or_none()
-            if state is None:
-                return None
-            state.shelf_exhausted_pause_active = True
-            state.shelf_exhausted_paused_at = now
-            state.shelf_exhausted_due_at = due_at
-            state.shelf_exhausted_resolve_cpo_kind = resolve_cpo_kind
-            state.shelf_exhausted_resolve_cpo_value = float(resolve_cpo_value)
-            await session.flush()
-            await session.refresh(state)
-            await session.commit()
+            state = await self.latch_shelf_exhausted_pause_in_session(
+                session,
+                nmid,
+                now=now,
+                due_at=due_at,
+                resolve_cpo_kind=resolve_cpo_kind,
+                resolve_cpo_value=resolve_cpo_value,
+            )
+            if state is not None:
+                await session.commit()
             return state
+
+    async def clear_shelf_exhausted_pause_in_session(
+        self,
+        session: AsyncSession,
+        nmid: int,
+    ) -> bool:
+        """WRITE clear our-block в переданной session (без commit).
+
+        Returns:
+            True если блок был активен и снят; False если нечего снимать.
+        """
+        state = await self.get_state_in_session(session, nmid)
+        if state is None or not bool(state.shelf_exhausted_pause_active):
+            return False
+        state.shelf_exhausted_pause_active = False
+        state.shelf_exhausted_paused_at = None
+        state.shelf_exhausted_due_at = None
+        state.shelf_exhausted_epoch_pending = True
+        # Enter-scoped UX latch: clear ends the pause episode, so the next
+        # enter must be allowed to notify again (once-per-enter dedupe).
+        state.shelf_exhausted_notify_sent_at = None
+        # resolve / epoch_start оставляем для аудита;
+        # epoch_start обновляется только при реальном Auto start.
+        await session.flush()
+        return True
 
     async def clear_shelf_exhausted_pause(
         self,
@@ -303,24 +383,29 @@ class AutoShelfBidControlRepository:
             True если блок был активен и снят; False если нечего снимать.
         """
         async with get_session_maker(read_only=False) as session:
-            stmt: Select[tuple[AutoShelfBidControlState]] = select(
-                AutoShelfBidControlState
-            ).where(AutoShelfBidControlState.nmid == nmid)
-            state = (await session.execute(stmt)).scalar_one_or_none()
-            if state is None or not bool(state.shelf_exhausted_pause_active):
-                return False
-            state.shelf_exhausted_pause_active = False
-            state.shelf_exhausted_paused_at = None
-            state.shelf_exhausted_due_at = None
-            state.shelf_exhausted_epoch_pending = True
-            # Enter-scoped UX latch: clear ends the pause episode, so the next
-            # enter must be allowed to notify again (once-per-enter dedupe).
-            state.shelf_exhausted_notify_sent_at = None
-            # resolve / epoch_start оставляем для аудита;
-            # epoch_start обновляется только при реальном Auto start.
-            await session.flush()
-            await session.commit()
-            return True
+            cleared = await self.clear_shelf_exhausted_pause_in_session(
+                session, nmid
+            )
+            if cleared:
+                await session.commit()
+            return cleared
+
+    async def mark_shelf_exhausted_epoch_started_in_session(
+        self,
+        session: AsyncSession,
+        nmid: int,
+        *,
+        epoch_start: datetime,
+    ) -> AutoShelfBidControlState | None:
+        """WRITE epoch_start после реального Auto start в переданной session."""
+        state = await self.get_state_in_session(session, nmid)
+        if state is None:
+            return None
+        state.shelf_exhausted_epoch_start = epoch_start
+        state.shelf_exhausted_epoch_pending = False
+        await session.flush()
+        await session.refresh(state)
+        return state
 
     async def mark_shelf_exhausted_epoch_started(
         self,
@@ -330,16 +415,13 @@ class AutoShelfBidControlRepository:
     ) -> None:
         """Зафиксировать epoch_start после реального Auto start (consume pending)."""
         async with get_session_maker(read_only=False) as session:
-            stmt: Select[tuple[AutoShelfBidControlState]] = select(
-                AutoShelfBidControlState
-            ).where(AutoShelfBidControlState.nmid == nmid)
-            state = (await session.execute(stmt)).scalar_one_or_none()
-            if state is None:
-                return None
-            state.shelf_exhausted_epoch_start = epoch_start
-            state.shelf_exhausted_epoch_pending = False
-            await session.flush()
-            await session.commit()
+            state = await self.mark_shelf_exhausted_epoch_started_in_session(
+                session,
+                nmid,
+                epoch_start=epoch_start,
+            )
+            if state is not None:
+                await session.commit()
             return None
 
     async def mark_shelf_exhausted_notify_sent(
