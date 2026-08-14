@@ -16,6 +16,9 @@ from app.core.wb_api.mixins.excs import CardNotFoundInWB
 from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.common_slaves.wildberries import wb_db_manager
+from app.modules.common_slaves.wildberries.search_adv_settings import (
+    ensure_search_adv_setting_for_main_adv,
+)
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.utils.db.session_maker import get_async_session_maker as sm
 from .exc import (
@@ -231,6 +234,18 @@ class MainAdvManager:
                 "hard_min_ctr": 0.1,
             }
             await self._perform_adv_setting_upsert(session, adv_data)
+            result = await session.execute(
+                select(AdvSetting).where(AdvSetting.adv_id == auto_adv_id)
+            )
+            main_adv = result.scalar_one()
+            await ensure_search_adv_setting_for_main_adv(
+                session,
+                main_adv,
+                search_adv_id,
+                active_status=None,
+                nmids=[nmid],
+            )
+            await session.commit()
 
         await self._apply_default_settings_to_adv(auto_adv_id)
 
@@ -339,6 +354,18 @@ class MainAdvManager:
                 "hard_min_ctr": 0.1,
             }
             await self._perform_adv_setting_upsert(session, adv_data)
+            result = await session.execute(
+                select(AdvSetting).where(AdvSetting.adv_id == existing_auto_adv_id)
+            )
+            main_adv = result.scalar_one()
+            await ensure_search_adv_setting_for_main_adv(
+                session,
+                main_adv,
+                search_adv_id,
+                active_status=None,
+                nmids=[nmid],
+            )
+            await session.commit()
 
         await self._apply_default_settings_to_adv(existing_auto_adv_id)
 
@@ -424,6 +451,18 @@ class MainAdvManager:
                 "hard_min_ctr": 0.1,
             }
             await self._perform_adv_setting_upsert(session, adv_data)
+            result = await session.execute(
+                select(AdvSetting).where(AdvSetting.adv_id == auto_adv_id)
+            )
+            main_adv = result.scalar_one()
+            await ensure_search_adv_setting_for_main_adv(
+                session,
+                main_adv,
+                existing_search_adv_id,
+                active_status=None,
+                nmids=[nmid],
+            )
+            await session.commit()
 
         await self._apply_default_settings_to_adv(auto_adv_id)
 

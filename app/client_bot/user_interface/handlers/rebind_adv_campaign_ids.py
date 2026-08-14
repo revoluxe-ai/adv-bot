@@ -23,6 +23,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabin
 from app.modules.common_slaves.wildberries.rebind_wb_adv_ids_history import (
     append_rebound_wb_adv_id,
 )
+from app.modules.common_slaves.wildberries.search_adv_settings import (
+    ensure_search_adv_setting_for_main_adv,
+)
 from app.modules.connect_existing_advs.candidates_service import (
     classify_wb_campaign_for_rebind,
 )
@@ -407,6 +410,13 @@ async def _apply_rebind_message(
             if old_id is not None and old_id != new_id:
                 rebound_old_id = old_id
             field_setter(adv, new_id)
+            if expected_kind == "auction":
+                await ensure_search_adv_setting_for_main_adv(
+                    session,
+                    adv,
+                    new_id,
+                    nmids=adv.nmids,
+                )
             await session.commit()
         if rebound_old_id is not None:
             await append_rebound_wb_adv_id(adv_oid, expected_kind, rebound_old_id)

@@ -206,7 +206,13 @@ class ComplexAdv:
     def search_adv_active_status_str(self) -> WBAdvActiveStatus | None:
         if self._search_adv is None:
             return None
-        return WBAdvActiveStatus(self._search_adv.active_status)
+        raw_status = self._search_adv.active_status
+        if not raw_status:
+            return None
+        try:
+            return WBAdvActiveStatus(raw_status)
+        except ValueError:
+            return None
 
     @property
     def auto_adv_active_status_str(self) -> WBAdvActiveStatus:

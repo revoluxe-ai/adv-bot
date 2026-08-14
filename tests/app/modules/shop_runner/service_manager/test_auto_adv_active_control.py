@@ -421,6 +421,58 @@ async def test_auto_adv_active_control_service_starts_and_pauses_campaigns():
 
 
 @pytest.mark.asyncio
+async def test_auto_adv_active_control_does_not_start_auction_for_unknown_search_status():
+    """Unknown search status must not be treated as ready_for_start/pause for Auction launch."""
+    adv = _FakeComplexAdv(
+        auto_limit=100,
+        auto_status="pause",
+        search_limit=50,
+        search_status="pause",
+        auto_adv_id=101,
+        search_adv_id=202,
+    )
+    adv.search_adv.active_status = "unknown"
+    adv.search_adv_active_status_str = None
+
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    async def mock_run_tasks(
+        handlers: list[Callable[[], Awaitable[None]]], *args, **kwargs
+    ):
+        return [await handler() for handler in handlers]
+
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(
+        side_effect=_mock_load_time_settings_for_adv_ids
+    )
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=mock_run_tasks,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    wb_modifier.start_auction_campaign.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_auto_adv_active_control_pauses_auto_campaign_when_rec_system_mode_off():
     """When rec_system (shelf promotion) mode is off, auto campaign is paused and not started."""
     adv = _FakeComplexAdv(
