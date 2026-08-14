@@ -266,7 +266,11 @@ Detect:
 - artifact path drift;
 - different meanings under the same token;
 - required output that is never persisted;
-- persisted output that no command consumes.
+- persisted output that no command consumes;
+- advertised MODE / durable handoff consumer in description, intro, or
+  guardrails without early Mode detection + executable Steps before the
+  default path → class `ADVERTISED_MODE_WITHOUT_EXECUTABLE_BRANCH`
+  (exemplar: `/opsx-new` `REPAIR_EXISTING_OWNER_CONTRACT` gap).
 
 ---
 
@@ -363,7 +367,9 @@ lifecycle gate** (exemplar: `/opsx-planning-review` +
 1. State **soft vs hard gate** explicitly (v1 soft recommend vs hard block).
 2. `REQUIRED_COMPANION_UPDATES` / `EXISTING_FILES_TO_UPDATE` MUST list at least:
    - (a) handoff consumer on the repair writer (e.g. `/opsx-update`
-     `MODE: REPAIR_*` + handoff token);
+     `MODE: REPAIR_*` + handoff token) — **executable** early Mode
+     detection + Steps, not description/guardrail-only; when the writer is
+     dual-mode, skill/prompt mirrors must advertise the same Mode branch;
    - (b) soft `NEXT_ACTION` on producers that previously jumped to apply
      (e.g. `/opsx-continue` / `/opsx-ff` after tasks complete);
    - (c) `GRAPH` state and/or transition edge for the hop;

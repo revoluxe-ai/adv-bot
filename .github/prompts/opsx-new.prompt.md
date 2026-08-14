@@ -1,14 +1,48 @@
 ---
-description: Start a new change using the experimental artifact workflow (OPSX)
+description: Start a new change (CREATE) or repair owner-contract.md from OWNER_REVIEW_HANDOFF (REPAIR) — OPSX
 ---
 
-Start a new change using the experimental artifact-driven approach.
+Start a new change using the experimental artifact-driven approach, **or**
+repair an existing Change's `owner-contract.md` from a valid
+`OWNER_REVIEW_HANDOFF`.
+
+Canonical: `.cursor/commands/opsx-new.md`.
+Fixtures: `.cursor/commands/_fixtures/opsx-new-owner-contract-repair/`.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
-**Input**: The argument after `/opsx-new` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx-new` is the change name (kebab-case), OR a description of what the user wants to build, **or** a pasteable `/opsx-new` + `OWNER_REVIEW_HANDOFF` block from `/opsx-owner-contract-review`.
 
-**Steps**
+## Mode detection (mandatory first)
+
+```text
+if input contains literal OWNER_REVIEW_HANDOFF
+   AND MODE: REPAIR_EXISTING_OWNER_CONTRACT:
+    → REPAIR MODE (skip CREATE steps)
+else:
+    → CREATE MODE
+```
+
+Do **not** enter REPAIR from vague NL without that literal trigger.
+Accept OCR pasteable fields without renaming.
+
+---
+
+## REPAIR MODE
+
+1. Parse handoff; resolve existing `openspec/changes/<CHANGE_ID>/owner-contract.md`.
+2. Validate before write — else `PAUSE` / `FILES_CHANGED: none`:
+   - `UNRESOLVED_SEMANTIC_CHOICE` (A/B or `OWNER_INPUT_REQUIRED: YES`)
+   - `INVALID_REPAIR_BOUNDARY` (scope beyond owner-contract.md)
+   - `INVALID_REPAIR_HANDOFF` (bad/missing shell or target)
+3. Do **not** scaffold, recreate, touch schema artifacts, or emit OCR PASS.
+4. Apply only `REPAIRS_REQUIRED`; preserve `DO_NOT_CHANGE`; idempotent re-paste OK.
+5. Emit `OWNER_CONTRACT_REPAIR_RESULT` →
+   `NEXT_ACTION: /opsx-owner-contract-review change=<CHANGE_ID>`.
+
+---
+
+## CREATE MODE
 
 1. **If no input provided, ask what they want to build**
 
@@ -37,6 +71,9 @@ Start a new change using the experimental artifact-driven approach.
    ```
    Add `--schema <name>` only if the user requested a specific workflow.
    This creates a scaffolded change in the planning home resolved by the CLI.
+
+   If a change with that name already exists (and no REPAIR handoff) → stop and
+   suggest `/opsx-continue` instead. Do not recreate scaffold. Do not silently REPAIR.
 
 4. **Create Owner Contract (companion file — not a schema artifact)**
 
@@ -133,7 +170,7 @@ Start a new change using the experimental artifact-driven approach.
 
 7. **STOP and wait for user direction**
 
-**Output**
+**CREATE Output**
 
 After completing the steps, summarize:
 - Change name and location
@@ -141,9 +178,10 @@ After completing the steps, summarize:
 - Current status (0/N schema artifacts complete)
 - Path to `owner-contract.md` and its full contents (or a short readable rendering) so Owner can verify understanding in tens of seconds
 - The template for the first schema artifact
+- Soft next: `/opsx-owner-contract-review change=<name>`
 - Prompt: "Ready to create the first artifact? Run `/opsx:continue` or just describe what this change is about and I'll draft it."
 
-**Guardrails**
+**CREATE Guardrails**
 - Do NOT create schema artifacts yet (proposal/specs/design/decisions/tasks) — only the companion `owner-contract.md` plus scaffold
 - Do NOT register Owner Contract in `schema.yaml` or make `continue`/`ff`/`apply`/`verify` require it
 - Do NOT inject Owner Contract content into `spec` or other schema artifacts
@@ -151,5 +189,8 @@ After completing the steps, summarize:
   replace `OWNER_INTENT` as the semantic source of `owner-contract.md`
 - Do NOT advance beyond showing the first artifact template
 - If the name is invalid (not kebab-case), ask for a valid name
-- If a change with that name already exists, suggest using `/opsx-continue` instead
+- If a change with that name already exists (and no REPAIR handoff), suggest using `/opsx-continue` instead — do not silently REPAIR
 - Pass --schema if using a non-default workflow
+- Do NOT enter REPAIR MODE without literal `OWNER_REVIEW_HANDOFF` /
+  `MODE: REPAIR_EXISTING_OWNER_CONTRACT`
+- CREATE does not require `OWNER_REVIEW_HANDOFF`

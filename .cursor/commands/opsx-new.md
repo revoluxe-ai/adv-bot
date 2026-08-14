@@ -11,11 +11,134 @@ repair an existing Change's `owner-contract.md` from a valid
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
-**Input**: The argument after `/opsx:new` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx:new` is the change name (kebab-case), OR a description of what the user wants to build, **or** a pasteable `/opsx-new` + `OWNER_REVIEW_HANDOFF` block from `/opsx-owner-contract-review`.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` when exact paths/IDs appear later in the workflow; this command creates a new change and should not inventory unrelated trees first.
 
-**Steps**
+**Regression fixtures (dry-run / acceptance):**
+`.cursor/commands/_fixtures/opsx-new-owner-contract-repair/`
+
+## Mode detection (mandatory first)
+
+Before any CREATE scaffolding:
+
+```text
+if input contains literal OWNER_REVIEW_HANDOFF
+   AND MODE: REPAIR_EXISTING_OWNER_CONTRACT:
+    → enter REPAIR MODE (do not run CREATE steps)
+else:
+    → CREATE MODE (legacy path below)
+```
+
+Do **not** enter REPAIR MODE from vague natural language (“fix the contract”,
+“repair owner contract”, “update companion”) without that literal handoff
+trigger. `TARGET_WRITER: /opsx-new` when present must match; reject handoffs
+aimed at another writer.
+
+Accept the reviewer pasteable block **without** field renaming. Forbidden
+aliases (do not require Owner to adapt): `REVIEW_SOURCE`, `REPAIR_BOUNDARY`,
+`REPAIR_COMMAND`, `CURRENT_TEXT`.
+
+---
+
+## REPAIR MODE
+
+Sole writer path for bounded repairs to an **existing** `owner-contract.md`
+from `/opsx-owner-contract-review` `READY_FOR_REPAIR`.
+
+### REPAIR Steps
+
+1. **Parse handoff**
+   Require literal fields (shared contract with OCR):
+   `CHANGE_ID`, `MODE: REPAIR_EXISTING_OWNER_CONTRACT`,
+   `REVIEWED_ARTIFACT`, `OWNER_INTENT`, `CONFIRMED_OWNER_DECISIONS`,
+   `REPAIRS_REQUIRED`, `DO_NOT_CHANGE`, `WRITE_BOUNDARY`, `FORBIDDEN`,
+   `AFTER_REPAIR`. Resolve target path from `CHANGE_ID` /
+   `REVIEWED_ARTIFACT` → existing
+   `openspec/changes/<CHANGE_ID>/owner-contract.md` (or store-resolved
+   equivalent). Change + file **must already exist**.
+
+2. **Validate before any write** — on failure `PAUSE`, `FILES_CHANGED: none`:
+   - Missing/invalid shell, wrong `TARGET_WRITER`, missing change or
+     `owner-contract.md` → `INVALID_REPAIR_HANDOFF`
+   - Any `R-*` with unresolved A/B choice, `OWNER_INPUT_REQUIRED: YES`,
+     or incomplete `REQUIRED_SEMANTICS` → `UNRESOLVED_SEMANTIC_CHOICE`
+     (or `INVALID_REPAIR_HANDOFF` naming the `R-*`); do **not** pick A/B
+   - `WRITE_BOUNDARY` not limited to `owner-contract.md` only, **or**
+     repairs/FORBIDDEN imply edits to proposal/spec/design/tasks/
+     decisions/code/tests/Evolution/Explore → `INVALID_REPAIR_BOUNDARY`
+     (do **not** partially edit the contract and claim success)
+
+3. **Hard non-actions while repairing**
+   - Do **not** run `openspec new change`
+   - Do **not** recreate scaffold
+   - Do **not** create or edit proposal/spec/design/decisions/tasks
+   - Do **not** reinterpret `OWNER_INTENT` or invent new product decisions
+   - Do **not** emit independent OCR `PASS` from `/opsx-new`
+
+4. **Apply bounded repairs**
+   Edit **only** `owner-contract.md`. For each `R-*` in
+   `REPAIRS_REQUIRED`, rewrite the named section so
+   `REQUIRED_SEMANTICS` is true (evidence-backed). Preserve every
+   `DO_NOT_CHANGE` item. Do not polish unrelated sections. Fold
+   `CONFIRMED_OWNER_DECISIONS` into «Решения Owner» only as stated —
+   no extras.
+
+5. **Idempotency**
+   If a re-pasted identical handoff finds `REQUIRED_SEMANTICS` already
+   satisfied: do not duplicate bullets/sections; do not broaden edits.
+   List those `R-*` as already satisfied under `REPAIRS_APPLIED` (or note
+   under `REPAIRS_NOT_APPLIED` with already-satisfied) and keep
+   `OTHER_FILES_CHANGED: none`.
+
+6. **STOP after repair result**
+   Do not advance into CREATE status/instructions / first-artifact drafting.
+
+### REPAIR Output
+
+Emit:
+
+```text
+MODE: REPAIR_EXISTING_OWNER_CONTRACT
+CHANGE_ID: <change>
+FILES_CHANGED:
+  openspec/changes/<CHANGE_ID>/owner-contract.md
+OTHER_FILES_CHANGED: none
+
+OWNER_CONTRACT_REPAIR_RESULT
+REPAIRS_APPLIED:
+  - R-*: <short note>
+REPAIRS_NOT_APPLIED: none | <list with reason>
+NEW_PRODUCT_DECISIONS_INTRODUCED: none
+NEXT_ACTION: /opsx-owner-contract-review change=<CHANGE_ID>
+```
+
+On validation pause:
+
+```text
+MODE: REPAIR_EXISTING_OWNER_CONTRACT
+PAUSE
+REASON: UNRESOLVED_SEMANTIC_CHOICE | INVALID_REPAIR_BOUNDARY | INVALID_REPAIR_HANDOFF
+FILES_CHANGED: none
+```
+
+### REPAIR Guardrails
+
+- Write boundary: `owner-contract.md` only
+- Do NOT scaffold, recreate, or touch schema artifacts
+- Do NOT enter REPAIR from vague NL without literal handoff + mode
+- Do NOT require Owner to rewrite OCR field names
+- Do NOT claim review PASS; next hop is `/opsx-owner-contract-review`
+- Acceptance dry-run: fixtures `01`–`07` under
+  `_fixtures/opsx-new-owner-contract-repair/`
+
+---
+
+## CREATE MODE
+
+Use only when Mode detection did **not** select REPAIR.
+
+### CREATE Steps
 
 1. **If no input provided, ask what they want to build**
 
@@ -46,7 +169,8 @@ repair an existing Change's `owner-contract.md` from a valid
    This creates a scaffolded change in the planning home resolved by the CLI.
 
    If a change with that name already exists (and no REPAIR handoff) → stop and
-   suggest `/opsx:continue` instead. Do not recreate scaffold.
+   suggest `/opsx:continue` instead. Do not recreate scaffold. Do **not**
+   silently enter REPAIR.
 
 4. **Create Owner Contract (companion file — not a schema artifact)**
 
@@ -156,16 +280,18 @@ repair an existing Change's `owner-contract.md` from a valid
 
 7. **STOP and wait for user direction**
 
-**CREATE Output**
+### CREATE Output
 
 After completing the steps, summarize:
 - Change name and location
 - Schema/workflow being used and its artifact sequence
 - Current status (0/N artifacts complete)
 - The template for the first artifact
+- Soft next: `/opsx-owner-contract-review change=<name>` (recommended before continue/ff)
 - Prompt: "Ready to create the first artifact? Run `/opsx:continue` or just describe what this change is about and I'll draft it."
 
-**CREATE Guardrails**
+### CREATE Guardrails
+
 - Do NOT create schema artifacts yet (proposal/specs/design/decisions/tasks) — only the companion `owner-contract.md` plus scaffold
 - Do NOT register Owner Contract in `schema.yaml` or make `continue`/`ff`/`apply`/`verify` require it
 - Do NOT inject Owner Contract content into `spec` or other schema artifacts
@@ -173,7 +299,8 @@ After completing the steps, summarize:
   replace `OWNER_INTENT` as the semantic source of `owner-contract.md`
 - Do NOT advance beyond showing the first artifact template
 - If the name is invalid (not kebab-case), ask for a valid name
-- If a change with that name already exists, suggest using `/opsx:continue` instead
+- If a change with that name already exists (and no REPAIR handoff), suggest using `/opsx:continue` instead — do not silently REPAIR
 - Pass --schema if using a non-default workflow
 - Do NOT enter REPAIR MODE from vague natural language without the literal
   `OWNER_REVIEW_HANDOFF` / `MODE: REPAIR_EXISTING_OWNER_CONTRACT` trigger
+- CREATE does not require `OWNER_REVIEW_HANDOFF`

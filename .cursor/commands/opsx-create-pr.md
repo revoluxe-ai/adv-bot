@@ -381,7 +381,10 @@ If `GO` is present:
 
 ## Commands after explicit GO only
 
-After user says `GO`, run shared prep + push, then branch on MODE:
+After user says `GO`, run one MODE recipe end-to-end. Both recipes write the
+same body file path (`/tmp/pr_body.md`) that `gh` then reads.
+
+CREATE (`MODE=CREATE_PR`):
 
 ```bash
 CURRENT_BRANCH="$(git branch --show-current)"
@@ -392,17 +395,24 @@ EOF
 
 git push -u origin "$CURRENT_BRANCH"
 
-```bash
 gh pr create \
   --base "<TARGET_BRANCH>" \
   --head "<CURRENT_BRANCH>" \
   --title "<PR_TITLE>" \
-  --body-file .tmp/pr_body.md
+  --body-file /tmp/pr_body.md
 ```
 
 UPDATE (`MODE=UPDATE_PR` — exactly one open PR, base matches target):
 
 ```bash
+CURRENT_BRANCH="$(git branch --show-current)"
+
+cat > /tmp/pr_body.md <<'EOF'
+<FINAL_PR_BODY>
+EOF
+
+git push -u origin "$CURRENT_BRANCH"
+
 gh pr edit <EXISTING_PR_NUMBER> \
   --title "<PR_TITLE>" \
   --body-file /tmp/pr_body.md
