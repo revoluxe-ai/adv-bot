@@ -46,7 +46,7 @@ Tool: Task
 arguments:
   description: "opsx-bug-team/<WORKER_ID>"   # short UI title
   subagent_type: <TASK_SUBAGENT_TYPE from REGISTRY>
-  # model: OMIT — inherit / auto only
+  model: inherit
   run_in_background: false | true   # true only for long workers with heartbeat
   prompt: |
     WORKER_ID: <WORKER_ID>
@@ -63,14 +63,14 @@ arguments:
     MAX_ATTEMPTS: <n>
     CHECKPOINT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/CHECKPOINT.md
     HEARTBEAT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/heartbeats/<WEX>.json
-    MODEL_SELECTION_POLICY: auto
+    MODEL_SELECTION_POLICY: inherit
     FORBIDDEN: do not perform other workers' duties
     REQUIRED: write OUTPUT_PACKET only within WRITE_BOUNDARY;
               update HEARTBEAT_PATH periodically;
               exit with terminal STATUS in output packet
 ```
 
-`model` must never be set. Prefer registry `TASK_SUBAGENT_TYPE`.
+`model` must always be `inherit` (explicit). Prefer registry `TASK_SUBAGENT_TYPE`.
 
 ## Dispatch record (durable)
 

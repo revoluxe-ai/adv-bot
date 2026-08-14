@@ -20,7 +20,8 @@ CONTRACT_VERSION=OPSX_SUPERVISOR_ORCHESTRATION_V2
 4. соблюдать зависимости, parallel limits и resource locks;
 5. валидировать результаты отдельно от завершения worker;
 6. разрешать conflicts, hangs, retries и cancellation;
-7. применять Owner-approved command policy и Auto-first model routing;
+7. применять Owner-approved command policy и inherit-only model routing
+   (`.cursor/pipeline/shared/MODEL_DISPATCH.md`);
 8. довести mission до terminal state либо корректно остановиться;
 9. выдать Owner один итоговый отчёт с terminalization proof.
 
@@ -681,10 +682,13 @@ HEARTBEAT_INTERVAL:
 NO_PROGRESS_TIMEOUT:
 AUTONOMY_DEADLINE:
 
-MODEL_MODE:
-REQUESTED_MODEL:
-MODEL_SELECTION_REASON:
+MODEL_MODE: INHERIT
+REQUESTED_MODEL: inherit
+MODEL_SELECTION_REASON: OPSX_MODEL_DISPATCH_INHERIT_V1
 ```
+
+Task tool: **always** pass `model: inherit` (explicit — never omit, never
+`auto`). See `.cursor/pipeline/shared/MODEL_DISPATCH.md`.
 
 В subagent prompt обязательно укажи footer:
 
@@ -1461,55 +1465,39 @@ OR REPEATED_ROUTE_AFTER_EXPLICIT_RESTRICTION=YES
 
 # 15. Model routing
 
-Default для обычного top-level dispatch:
+Authority: `.cursor/pipeline/shared/MODEL_DISPATCH.md`
+Registry: `.cursor/pipeline/shared/MODEL_REGISTRY.json`
+
+Default для **всех** Supervisor Task dispatches (interim Owner policy):
 
 ```text
-MODEL_MODE=AUTO
-REQUESTED_MODEL=AUTO
-EXPLICIT_PREMIUM_MODEL=NO
-MAX_MODE=NO
+MODEL_MODE=INHERIT
+REQUESTED_MODEL=inherit
+MODEL_SELECTION_REASON=OPSX_MODEL_DISPATCH_INHERIT_V1
+Task.model=inherit          # explicit — mandatory
 ```
 
-Если actual model не раскрыта:
+Запрещено (policy violation):
 
 ```text
-ACTUAL_MODEL_REPORTED=UNKNOWN_PLATFORM_SELECTED
-```
-
-Это не считается ошибкой.
-
-Explicit model допустима только если:
-
-```text
-MODEL_CLASS=OWNER_APPROVED_LOW_COST
-TASK_ELIGIBLE_FOR_LOW_COST_MODEL=YES
-MODEL_AVAILABLE_IN_CURRENT_RUNTIME=YES
-MODEL_SELECTION_REASON=<present>
-MODEL_MODE=EXPLICIT_LOW_COST
-MODEL_POLICY_COMPLIANT=YES
-```
-
-Явное имя модели без Owner-approved classification отклоняется.
-
-Запрещено:
-
-```text
+omit Task.model               # silent platform Auto
+Task.model=auto | MODEL=auto
+DEFAULT_CHILD_MODEL mini/fast fallback
 EXPLICIT_PREMIUM_MODEL
 MAX_MODE
 ```
 
-Для `/opsx-bug-team` и `/opsx-static-check`, если child model не раскрыта:
+Owner `MODEL=<slug>` override — **deferred**; when enabled, slug must match
+`MODEL_REGISTRY.json` exactly (sync via `/opsx-meta-sync-models`).
+
+Для `/opsx-bug-team` и `/opsx-static-check`:
 
 ```text
-CHILD_MODEL_POLICY=UNKNOWN_NOT_ENFORCEABLE
-POLICY_VIOLATION=NO
-OBSERVABILITY_GAP=YES
+CHILD_MODEL_POLICY=INHERIT_EXPLICIT
+POLICY_VIOLATION=YES when model omitted or auto/premium slug detected
 ```
 
-Явно обнаруженный premium или MAX route — policy violation.
-
-Supervisor / Task subagents: model inherit / Auto only. Не передавай
-explicit premium model IDs в Task.
+Явно обнаруженный premium, MAX, или `auto` route — policy violation.
 
 ---
 
@@ -2266,7 +2254,7 @@ OPSX SUPERVISOR
   → ограничивает параллелизм и locks
   → обрабатывает hang / retry / conflict / cancel / timebox
   → применяет Owner-approved command policy
-  → использует Auto-first model routing
+  → использует inherit-only model routing (MODEL_DISPATCH.md)
   → допускает /opsx-bug-team и /opsx-static-check как internal
     orchestrators с contract-declared INTERNAL_TASK_FANOUT=ALLOWED
   → запрещает SELF_DISPATCH / recursive supervisor

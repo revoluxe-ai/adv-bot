@@ -10,7 +10,7 @@ BUG_FAMILY_FANOUT_ENABLED: true
 BUG_FAMILY_FANOUT_STATUS: ACTIVE
 ORCHESTRATOR_MODEL: registry_driven_cursor_task_pipeline
 WORKER_MODEL: cursor_task_enum_worker
-MODEL_SELECTION_POLICY: auto
+MODEL_SELECTION_POLICY: inherit
 ```
 
 ## How workers are invoked
@@ -27,7 +27,7 @@ WORKER_SPECS_DIR: .cursor/pipeline/bug-team/workers/
    with:
    - `subagent_type` mapped from `TASK_SUBAGENT_TYPE` below (or
      `generalPurpose` when no specialized enum exists);
-   - model inherit only (**omit** `model`);
+   - **`model: inherit`** (explicit — see `.cursor/pipeline/shared/MODEL_DISPATCH.md`);
    - unique `WORKER_EXECUTION_ID`;
    - input packet path under
      `.tmp/opsx-bug-cases/<CASE_ID>/team/packets/`;

@@ -190,14 +190,14 @@ def build_task_prompt(
             "PRODUCT_WRITES: FORBIDDEN when EXECUTION_MODE=REVIEW_PROOF_ONLY.",
             "Do not create Owner GO receipts. Do not call owner registration APIs.",
             "Do not perform other workers' duties.",
-            "MODEL_SELECTION_POLICY: auto",
+            "MODEL_SELECTION_POLICY: inherit",
         ]
     )
     return {
         "description": f"opsx-bug-team/{worker_id}",
         "subagent_type": "generalPurpose",
+        "model": "inherit",
         "prompt": prompt,
-        # model omitted — auto/inherit only
     }
 
 

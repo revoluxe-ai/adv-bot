@@ -64,8 +64,8 @@ child-GO, and print a SUMMARY.
 ---
 
 ---
-description: "Orchestrate /opsx-commit + /opsx-meta-commit: parallel plan Tasks (mini→auto), then serial child-GO; one SUMMARY."
-argument-hint: "[ALL] [FAST_CHECK|FULL_CHECK] [INCLUDE_FULL_DIRTY_TREE] [MODEL=<slug>|MODEL=auto] GO [optional context]"
+description: "Orchestrate /opsx-commit + /opsx-meta-commit: parallel plan Tasks (inherit), then serial child-GO; one SUMMARY."
+argument-hint: "[ALL] [FAST_CHECK|FULL_CHECK] [INCLUDE_FULL_DIRTY_TREE] GO [optional context]"
 ---
 
 # /opsx-commit-all
@@ -111,18 +111,17 @@ Parse case-sensitive tokens from `$ARGUMENTS`:
 | `ALL` | Forwarded to both children (product lane still needs static-check FULL receipt when that child requires it) |
 | `FAST_CHECK` / `FULL_CHECK` | Forwarded as child check mode |
 | `INCLUDE_FULL_DIRTY_TREE` | Forwarded as child scope token |
-| `MODEL=<slug>` | Force child Task model (`auto` = host Auto / omit model) |
-| `MODEL=auto` | Explicit Auto fallback (same as FALLBACK_CHILD_MODEL) |
 
-Strip `MODEL=*` from forwarded child args (orchestrator-only token). All other
-non-`MODEL=*` tokens that belong to the child argument contracts are forwarded
-**identically** to both lanes (same string), except `GO` handling below.
+All other non-orchestrator tokens that belong to the child argument contracts
+are forwarded **identically** to both lanes (same string), except `GO` handling
+below. Owner `MODEL=<slug>` override is **deferred** (see
+`.cursor/pipeline/shared/MODEL_DISPATCH.md`).
 
 ### GO handling (mandatory)
 
 ```text
 PARENT_HAS_GO: yes | no
-PLAN_ARGS: $ARGUMENTS with exact token GO removed and MODEL=* stripped
+PLAN_ARGS: $ARGUMENTS with exact token GO removed
 EXEC_ARGS: PLAN_ARGS + exact token GO
 ```
 
@@ -130,27 +129,19 @@ EXEC_ARGS: PLAN_ARGS + exact token GO
 - Execute Tasks receive `EXEC_ARGS` only when `PARENT_HAS_GO=yes`.
 - If `GO` is absent: plan both lanes, print SUMMARY, stop (no execute Tasks).
 
-## Child model (mini default, auto fallback)
+## Child model (inherit only)
+
+Authority: `.cursor/pipeline/shared/MODEL_DISPATCH.md`
 
 ```text
-DEFAULT_CHILD_MODEL: gpt-5.4-mini-high
-FALLBACK_CHILD_MODEL: auto
+RESOLVED_CHILD_MODEL: inherit
 ```
 
-Resolution order:
+Every plan and execute Task MUST pass `model: inherit` (explicit — never omit,
+never `auto`, never mini/premium slug fallback).
 
-1. If `MODEL=<slug>` present (including `MODEL=auto`) → use that as
-   `RESOLVED_CHILD_MODEL`.
-2. Else try Task `model` = `DEFAULT_CHILD_MODEL` (`gpt-5.4-mini-high`).
-3. If mini is **not** in the live Task allowlist, or the Task launch fails
-   with a model-unavailable / invalid-model error → **one** retry with
-   `FALLBACK_CHILD_MODEL: auto`:
-   - omit the Task `model` parameter, or pass host-equivalent Auto / `inherit`
-     if the live API requires an explicit token;
-   - report `CHILD_MODEL_FALLBACK: auto` in SUMMARY.
-4. Do **not** silently upgrade to an explicit premium / high-tier slug.
-5. Owner `MODEL=<invalid>` that is neither allowlisted nor `auto` →
-   `FAIL_CLOSED` / `BLOCKED_INVALID_MODEL` (no invent).
+Owner `MODEL=<slug>` override — deferred until Owner enables registry-backed
+slug routing via a separate fix-defects packet.
 
 `subagent_type`: `generalPurpose` (children must Read contracts + run git).
 
@@ -171,7 +162,7 @@ Launch **two** Task subagents in the **same** parent turn (parallel):
 TASK_A:
   PRIMARY: /opsx-commit
   ARGS: PLAN_ARGS
-  MODEL: RESOLVED_CHILD_MODEL (mini → auto fallback rules)
+  MODEL: inherit (mandatory explicit)
   PROMPT_MUST:
     - Read and follow .cursor/commands/opsx-commit.md as PRIMARY
     - Treat ARGS as $ARGUMENTS (no GO)
@@ -295,8 +286,8 @@ MODE: PLAN_ONLY | PLAN_THEN_SERIAL_GO
 PARENT_HAS_GO: yes | no
 FORWARDED_PLAN_ARGS: ...
 FORWARDED_EXEC_ARGS: ... | n/a
-CHILD_MODEL: gpt-5.4-mini-high | auto | <override>
-CHILD_MODEL_FALLBACK: none | auto
+CHILD_MODEL: inherit
+CHILD_MODEL_FALLBACK: none
 WHAT_HAPPENED:
 WHY:
 CURRENT_STATE:
@@ -339,7 +330,7 @@ ORIENTATION_HINT:
 
 - Parent git writes
 - Parallel execute Tasks (plans may be parallel; GO executes are serial)
-- Silent premium model upgrade (auto fallback only; never invent premium slugs)
+- Explicit non-inherit Task model (`auto`, mini, premium slug)
 - Committing process files via product child or product via process child
 - Push / PR / rebase / force from this command
 - Seeding or requiring `vue-npm` / `npm run build` on this target
@@ -349,7 +340,7 @@ ORIENTATION_HINT:
 - active_name: `/opsx-commit-all`
 - children: `/opsx-commit`, `/opsx-meta-commit`
 - pattern: parallel plan + serial child-GO (option B; not parent-writer)
-- child_model: `gpt-5.4-mini-high` default; fallback `auto` (omit/inherit)
+- child_model: `inherit` explicit (`.cursor/pipeline/shared/MODEL_DISPATCH.md`)
 - target: WB Sky / Poetry (`opsx-lite` + `poetry-python`)
 - donor: game/go-to-prod occurrence `ac2a8c0791763d3f` @ `5ddca9a94f6d87176c64f888511996009f59bedc`
 - companions (external): registry activation, `/opsx-meta` router, pipeline GRAPH

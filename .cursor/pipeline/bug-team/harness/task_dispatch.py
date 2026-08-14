@@ -104,12 +104,12 @@ class TaskCallSpec:
     heartbeat_path: str
     task_subagent_type: str = "generalPurpose"
     description: str = ""
-    model: Optional[str] = None  # must remain None (auto/inherit)
+    model: str = "inherit"  # must remain inherit (MODEL_DISPATCH.md)
 
     def to_cursor_task_arguments(self) -> Dict[str, Any]:
-        """Build exact Task tool arguments (model omitted)."""
-        if self.model is not None:
-            raise ValueError("MODEL_SELECTION_POLICY=auto forbids explicit model")
+        """Build exact Task tool arguments with explicit model: inherit."""
+        if self.model != "inherit":
+            raise ValueError("MODEL_SELECTION_POLICY=inherit forbids non-inherit model")
         prompt = "\n".join(
             [
                 f"WORKER_ID: {self.worker_id}",
@@ -126,7 +126,7 @@ class TaskCallSpec:
                 f"MAX_ATTEMPTS: {self.max_attempts}",
                 f"CHECKPOINT_PATH: {self.checkpoint_path}",
                 f"HEARTBEAT_PATH: {self.heartbeat_path}",
-                "MODEL_SELECTION_POLICY: auto",
+                "MODEL_SELECTION_POLICY: inherit",
                 "FORBIDDEN: do not perform other workers' duties",
                 "REQUIRED: write OUTPUT_PACKET only within WRITE_BOUNDARY; "
                 "update HEARTBEAT_PATH; exit with terminal STATUS",
@@ -135,8 +135,8 @@ class TaskCallSpec:
         return {
             "description": self.description or f"opsx-bug-team/{self.worker_id}",
             "subagent_type": self.task_subagent_type,
+            "model": "inherit",
             "prompt": prompt,
-            # model intentionally omitted
         }
 
 
