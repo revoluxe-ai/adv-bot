@@ -112,23 +112,34 @@ jobs:
           poetry run alembic upgrade head
           # Do NOT run `alembic check` here: stub schema ≠ full models (expected drift).
           test "$(poetry run alembic current | awk '{print $1}')" = "$HEAD"
+          # Head e8f9 adds shelf-exhausted SoT columns; stamp(parent) skips f2a3
+          # Expand DDL, so do not assert card_ab_hold_emergency_* on advsetting.
           poetry run python - <<'PY'
           from sqlalchemy import create_engine, text
           eng = create_engine("postgresql://replay:replay@localhost:5432/replay_db")
           with eng.connect() as conn:
-              rows = conn.execute(
+              settings_rows = conn.execute(
                   text(
                       "SELECT column_name FROM information_schema.columns "
-                      "WHERE table_name='advsetting' AND column_name IN "
-                      "('card_ab_hold_emergency_latch','card_ab_hold_emergency_educated')"
+                      "WHERE table_name='auto_shelf_bid_control_settings' "
+                      "AND column_name IN ('retest_interval_days')"
                   )
               ).fetchall()
-              cols = {r[0] for r in rows}
-              assert cols == {
-                  "card_ab_hold_emergency_latch",
-                  "card_ab_hold_emergency_educated",
-              }, cols
-              print("expand columns ok", sorted(cols))
+              settings_cols = {r[0] for r in settings_rows}
+              assert settings_cols == {"retest_interval_days"}, settings_cols
+              state_rows = conn.execute(
+                  text(
+                      "SELECT column_name FROM information_schema.columns "
+                      "WHERE table_name='auto_shelf_bid_control_state' "
+                      "AND column_name IN ('shelf_exhausted_pause_active')"
+                  )
+              ).fetchall()
+              state_cols = {r[0] for r in state_rows}
+              assert state_cols == {"shelf_exhausted_pause_active"}, state_cols
+              print(
+                  "e8f9 shelf-exhausted columns ok",
+                  sorted(settings_cols | state_cols),
+              )
           eng.dispose()
           PY
           # Missing alembic_version ⇒ BASE (42P01 only)
