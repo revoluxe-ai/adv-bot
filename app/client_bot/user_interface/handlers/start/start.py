@@ -74,6 +74,8 @@ router = Router()
 
 redis_manager = RedisManager()
 
+DUPLICATE_TOKEN_MESSAGE = "Этот токен уже есть в системе."
+
 
 async def callback_start_registration(
     callback: CallbackQuery, bot: aiogram.Bot, state: FSMContext
@@ -536,6 +538,47 @@ async def add_app_token(
     await messages.AddNewTokenGet(bot, chat_id, cabinet_name)()
 
 
+def _normalize_token_user_id(raw_user_id: object) -> int | object | None:
+    """Normalize persisted token owner ids for safe equality checks."""
+    try:
+        return int(raw_user_id) if raw_user_id is not None else None
+    except Exception:
+        return raw_user_id
+
+
+def _can_show_shop_for_duplicate_token(
+    *,
+    existing_token: WBToken,
+    current_user_id: int,
+    current_user_telegram_id: int,
+) -> bool:
+    """Allow shop reveal only for the token owner or a bot admin."""
+    token_owner_id = _normalize_token_user_id(getattr(existing_token, "user_id", None))
+    return token_owner_id == current_user_id or is_bot_admin(current_user_telegram_id)
+
+
+async def _handle_duplicate_token_for_existing_shop(
+    *,
+    bot: aiogram.Bot,
+    state: FSMContext,
+    chat_id: int,
+    current_user_id: int,
+    current_user_telegram_id: int,
+    existing_token: WBToken,
+    wb_user_cabinet_original_id: int,
+) -> None:
+    """Send duplicate-token UX response and show the shop only when access is safe."""
+    await bot.send_message(chat_id, DUPLICATE_TOKEN_MESSAGE)
+    if not _can_show_shop_for_duplicate_token(
+        existing_token=existing_token,
+        current_user_id=current_user_id,
+        current_user_telegram_id=current_user_telegram_id,
+    ):
+        return
+    await state.clear()
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
+
+
 @router.message(StateFilter(states.AddNewToken.token))
 async def process_add_new_token(
     message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
@@ -689,28 +732,16 @@ async def process_add_new_token(
         existing_token = result.scalar()
 
         if existing_token:
-            # If token already exists, check ownership.
-            existing_user_id = getattr(existing_token, "user_id", None)
-
-            # Normalize simple numeric/string ids
-            try:
-                normalized_existing_user_id = (
-                    int(existing_user_id) if existing_user_id is not None else None
-                )
-            except Exception:
-                normalized_existing_user_id = existing_user_id
-
-            if normalized_existing_user_id == user_id:
-                # Token already saved for the same user — nothing to change.
-                await bot.send_message(chat_id, "Этот токен уже есть в системе.")
-                await state.clear()
-                return None
-            else:
-                # Token belongs to another user — users must have unique tokens.
-                await bot.send_message(
-                    chat_id, "Ошибка: этот токен используется другим пользователем."
-                )
-                return None
+            await _handle_duplicate_token_for_existing_shop(
+                bot=bot,
+                state=state,
+                chat_id=chat_id,
+                current_user_id=user_id,
+                current_user_telegram_id=user_telegram_id,
+                existing_token=existing_token,
+                wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+            )
+            return None
 
         # Сохранение токена. Пытаемся атомарно вставить — при гонке может быть
         # IntegrityError (уникальность токена на уровне БД). В этом случае
@@ -733,23 +764,16 @@ async def process_add_new_token(
             existing_token = result_existing.scalar()
 
             if existing_token:
-                existing_user_id = getattr(existing_token, "user_id", None)
-                try:
-                    normalized_existing_user_id = (
-                        int(existing_user_id) if existing_user_id is not None else None
-                    )
-                except Exception:
-                    normalized_existing_user_id = existing_user_id
-
-                if normalized_existing_user_id == user_id:
-                    await bot.send_message(chat_id, "Этот токен уже есть в системе.")
-                    await state.clear()
-                    return None
-                else:
-                    await bot.send_message(
-                        chat_id, "Ошибка: этот токен используется другим пользователем."
-                    )
-                    return None
+                await _handle_duplicate_token_for_existing_shop(
+                    bot=bot,
+                    state=state,
+                    chat_id=chat_id,
+                    current_user_id=user_id,
+                    current_user_telegram_id=user_telegram_id,
+                    existing_token=existing_token,
+                    wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+                )
+                return None
             # Если по какой-то причине existing_token не найден — сообщаем об общей ошибке
             await bot.send_message(
                 chat_id, "Ошибка при добавлении токена. Попробуйте снова."
