@@ -11,11 +11,11 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message
 
 from app import file_handler
+from app.client_bot.const import TELEGRAM_CAPTION_LIMIT
 
 from .base import Base
 
 logger = logging.getLogger(__name__)
-MAX_TELEGRAM_CAPTION_LEN = 1024
 _CAPTION_OVERFLOW_SUFFIX = "\n..."
 
 
@@ -207,7 +207,7 @@ class TextWithKeyboardAndImage(Base):
             )
             caption, overflow = self._split_caption(
                 full_caption,
-                limit=MAX_TELEGRAM_CAPTION_LEN - 64,
+                limit=TELEGRAM_CAPTION_LIMIT - 64,
             )
             message = await self.bot.send_photo(
                 chat_id=self.chat_id,
@@ -229,7 +229,7 @@ class TextWithKeyboardAndImage(Base):
     @staticmethod
     def _split_caption(
         caption: str,
-        limit: int = MAX_TELEGRAM_CAPTION_LEN,
+        limit: int = TELEGRAM_CAPTION_LIMIT,
     ) -> tuple[str, str]:
         if len(caption) <= limit:
             return caption, ""
