@@ -47,33 +47,72 @@ archive verdict.
 Owner
   owns: material behavior ambiguity, intentional golden/ContractCase semantic
         change, one-shot live authorization,
-        CONFIRM_LIFECYCLE for OWNER_LIFECYCLE_ECHO (Product Acceptance)
+        owner-contract.md semantics (via /opsx-owner-contract-review);
+        legacy CONFIRM_LIFECYCLE only for Changes without reviewed owner-contract
 
-Planning writers (/opsx-ff, /opsx-update)
-  own: durable OWNER_LIFECYCLE_ECHO in change artifacts when
-       PRODUCT_ACCEPTANCE_REQUIRED=true
+Planning writers (/opsx-continue, /opsx-ff, /opsx-update)
+  own: Derived Lifecycle in design (LIFECYCLE_STATUS: DERIVED) from reviewed
+       Owner Contract when PRODUCT_ACCEPTANCE_REQUIRED=true and temporal;
+       legacy OWNER_LIFECYCLE_ECHO + CONFIRM only when no reviewed owner-contract
 ```
 
-## Owner lifecycle echo (Product Acceptance)
+## Derived Lifecycle ↔ Spec Scenarios (Product Acceptance)
 
 When `PRODUCT_ACCEPTANCE_REQUIRED=true` (see
 `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`):
 
+**Primary path** (reviewed `owner-contract.md` present):
+
 ```text
-OWNER_LIFECYCLE_ECHO   = durable 3–7 temporal steps in change design/decision/spec
+DERIVED_LIFECYCLE     = durable design.md Lifecycle (prefer) with
+                        LIFECYCLE_STATUS: DERIVED + per-step SOURCE
+OWNER_CONTRACT_SOURCE = openspec/changes/<change>/owner-contract.md
+```
+
+- `/opsx-spec-scenario-coverage` **consumes** Derived Lifecycle (+ Owner
+  Contract for semantic verification); it does not author OpenSpec artifacts
+  and does not re-ask Owner for product meaning.
+- Prefer primary planning source: `design.md` Lifecycle. Fall back to
+  deriving the same sequence from owner-contract + decisions + specs when
+  design omits an explicit section — if derivation would invent semantics →
+  `PLANNING_LIFECYCLE_GAP` or `UNRESOLVED_PRODUCT_SEMANTICS` (do not invent).
+- `mode=plan` with Derived Lifecycle (or unambiguously derivable equivalent)
+  → build `SCENARIO_COVERAGE_PLAN` / `LIFECYCLE_COVERAGE` matrix
+  (L* ↔ Spec Scenarios). Do **NOT** emit `BLOCKED_NEEDS_OWNER_LIFECYCLE` or
+  require `CONFIRM_LIFECYCLE`.
+- Missing Spec Scenario for a known L* → `SPEC_SCENARIO_MISSING` /
+  `SPEC_COVERAGE_GAP` (NEXT: `/opsx-continue` | `/opsx-ff` | `/opsx-update`
+  planning writer) — **not** `NEEDS_OWNER`.
+- Design omits a transition proven by Owner Contract →
+  `PLANNING_LIFECYCLE_GAP` (repair planning; do not re-quiz Owner).
+- Spec invents behavior absent from lifecycle/Owner Contract →
+  `SEMANTIC_DRIFT` (not PASS).
+- Genuine unresolved product fork → `UNRESOLVED_PRODUCT_SEMANTICS` →
+  `/opsx-owner-contract-review` (not `CONFIRM_LIFECYCLE`).
+- `mode=audit` / `mode=certify`: acceptance-relevant rows MUST map to
+  Derived Lifecycle steps. Unmapped → FAIL/BLOCKED for that scenario.
+
+**Legacy compatibility** (Changes **without** reviewed owner-contract):
+
+```text
+OWNER_LIFECYCLE_ECHO   = durable temporal steps in design/decision/spec
 CONFIRM_LIFECYCLE      = Owner token after echo is written
 ```
 
-- `/opsx-spec-scenario-coverage` **consumes** the echo; it does not author it
-  and does not edit OpenSpec artifacts.
-- `mode=plan` without durable echo → `BLOCKED_NEEDS_OWNER_LIFECYCLE`
-  (NEXT: `/opsx-update` or `/opsx-ff`), not a provisional coverage plan that
-  invents steps from chat.
-- `mode=audit` / `mode=certify`: every acceptance-relevant matrix row MUST
-  cite the matching `OWNER_LIFECYCLE_ECHO` step id/text. Rows without mapping
-  → FAIL/BLOCKED for that scenario (and cannot support PA LIFECYCLE PASS).
-- Scenario report `VERDICT=PASS` **does not** clear PA LIFECYCLE if echo or
-  `CONFIRM_LIFECYCLE` is missing.
+- `mode=plan` without durable echo on this legacy path only →
+  `BLOCKED_NEEDS_OWNER_LIFECYCLE` (NEXT: `/opsx-update` or `/opsx-ff`).
+- Scenario report `VERDICT=PASS` **does not** clear PA LIFECYCLE if
+  Derived Lifecycle (primary) or legacy echo/CONFIRM (legacy) is missing
+  when required.
+
+Example plan-oriented output shape:
+
+```text
+LIFECYCLE_COVERAGE
+L1 … → COVERED: S-01
+L2 … → COVERED: S-02
+L6 … → PARTIAL / SPEC_SCENARIO_MISSING: …
+```
 
 ## CLI modes (binding)
 
@@ -236,6 +275,151 @@ SCENARIO_COVERAGE_PLAN:
 ```
 
 Material behavior ambiguity → `/opsx-update`, не догадка planner-а.
+
+## DURABLE_PLAN_EVIDENCE (`mode=plan` only)
+
+When scenario coverage planning is a required gate input for a later
+independent consumer (`/opsx-continue` / `/opsx-ff` task generation,
+`/opsx-planning-review` P6, Product Acceptance lifecycle coverage), the
+plan MUST be materialized as durable, machine-checkable Change evidence.
+Chat output alone is **not** SoT.
+
+### Canonical paths
+
+```text
+openspec/changes/<CHANGE_ID>/scenario-coverage/plan.md
+openspec/changes/<CHANGE_ID>/scenario-coverage/plan.receipt.json
+```
+
+One logical evidence pair. Do **not** use `.tmp` as the canonical
+cross-command SoT for plan evidence (`.tmp/opsx-scenario-coverage/` remains
+for provider/audit receipts only).
+
+### Sole writer
+
+```text
+SOLE_WRITER: /opsx-spec-scenario-coverage mode=plan
+```
+
+`/opsx-continue`, `/opsx-ff`, `/opsx-update`, `/opsx-planning-review` MUST
+NOT create or repair plan evidence. They only read, validate, consume, or
+request rerun.
+
+### Human plan (`plan.md`)
+
+Reviewable content MUST include at least:
+
+```text
+CHANGE_ID
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked
+PLAN_EVIDENCE_ID
+LIFECYCLE_STATUS
+LIFECYCLE_COVERAGE   # L* ↔ Spec Scenario mapping (or gaps)
+SCENARIO_COVERAGE_PLAN  # matrix / required evidence (schema above)
+UNRESOLVED_GAPS | OPEN_QUESTIONS
+GENERATED_FROM         # authoritative input identities/hashes
+```
+
+Plan is **DERIVED PLANNING EVIDENCE** only. It MUST NOT invent product
+semantics or become Owner/design/spec authority.
+
+### Machine receipt (`plan.receipt.json`)
+
+```text
+SCHEMA_VERSION: 1
+SCENARIO_COVERAGE_RECEIPT: true
+CHANGE_ID:
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked
+PLAN_EVIDENCE_ID:
+PLAN_CONTENT_HASH:        # sha256 of canonical plan.md bytes (LF-normalized)
+PLAN_PATH:
+RECEIPT_PATH:
+SCENARIO_COUNT:
+LIFECYCLE_COVERAGE:
+  covered: []
+  gaps: []
+UNRESOLVED_GAPS: []
+INPUTS:
+  DESIGN_REVISION: { path, content_hash }
+  SPEC_REVISION: [ { path, content_hash }, ... ]
+  LIFECYCLE_REVISION: { source, content_hash }
+  OWNER_CONTRACT_REVISION: { path, content_hash } | omitted
+GENERATED_FROM:           # same hashes as INPUTS (deterministic identity)
+MATERIALIZATION_STATUS: COMMITTED
+```
+
+Optional timestamps MUST NOT enter `PLAN_EVIDENCE_ID` / `PLAN_CONTENT_HASH`.
+
+`content_hash` = sha256 of LF-normalized file bytes. v1 conservatism:
+`DESIGN_REVISION` / `LIFECYCLE_REVISION` MAY both hash whole `design.md`
+(any design change → STALE is acceptable).
+
+### Freshness / integrity
+
+Consumers MUST classify evidence as exactly one of:
+
+```text
+MISSING | CURRENT | STALE | INTEGRITY_FAIL
+```
+
+- missing plan or receipt → `MISSING`
+- any `INPUTS.*` hash ≠ current file hash → `STALE`
+- `PLAN_CONTENT_HASH` ≠ hash(`plan.md`) → `INTEGRITY_FAIL`
+- otherwise → `CURRENT`
+
+`PLAN_READY(design=A, spec=B)` MUST NOT silently remain CURRENT after
+design=A2 or covered-spec=B2.
+
+### Atomicity
+
+```text
+compute full result → validate → write plan.md → write receipt
+```
+
+Partial materialization MUST NOT yield durable `ready`. On write failure:
+
+```text
+MATERIALIZATION_STATUS: FAILED
+PLAN_STATUS: NOT_COMMITTED   # chat may report analysis, not durable ready
+```
+
+Recovery: rerun `mode=plan`. Do not leave two ambiguous CURRENT pairs;
+rerun replaces/supersedes the canonical pair.
+
+### Idempotency
+
+Identical authoritative inputs + same deterministic plan semantics →
+same `PLAN_EVIDENCE_ID` / `PLAN_CONTENT_HASH`. Second run MAY report
+`MATERIALIZATION_STATUS: ALREADY_CURRENT` without rewrite.
+
+### Result envelope (chat + durable)
+
+After materialization attempt, producer returns:
+
+```text
+SCENARIO_COVERAGE_PLAN_RESULT
+CHANGE_ID:
+MODE: plan
+PLAN_STATUS: ready | provisional | blocked | NOT_COMMITTED
+MATERIALIZATION_STATUS: COMMITTED | ALREADY_CURRENT | FAILED
+PLAN_EVIDENCE_ID:
+PLAN_PATH:
+RECEIPT_PATH:
+INPUT_FRESHNESS: current | stale | missing | n/a
+UNRESOLVED_GAPS:
+```
+
+Only `COMMITTED` / `ALREADY_CURRENT` may be treated as durable gate input.
+
+### Mode isolation
+
+```text
+PLAN evidence ≠ audit report evidence ≠ certify / provider evidence
+```
+
+This section authorizes durable writes for `mode=plan` evidence paths only.
 
 ## Gap dispositions
 
@@ -486,12 +670,19 @@ Product Acceptance (kernel DONE) — see
 
 ```text
 PRODUCT_ACCEPTANCE_REQUIRED=true
-→ LIFECYCLE_COVERAGE requires durable OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE
-→ AND fresh report VERDICT=PASS with rows mapped to echo steps
-→ missing echo / unconfirmed / unmapped rows / stale/FAIL/BLOCKED report
-   is archive blocker
+→ LIFECYCLE_COVERAGE requires durable Derived Lifecycle
+  (LIFECYCLE_STATUS: DERIVED; prefer design.md) from reviewed Owner Contract
+  OR legacy OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE when no reviewed
+  owner-contract
+→ AND fresh report VERDICT=PASS with rows mapped to lifecycle steps
+→ missing Derived Lifecycle (primary) / missing legacy echo+CONFIRM (legacy) /
+  UNRESOLVED product forks / unmapped rows / stale/FAIL/BLOCKED report
+  is archive blocker
+→ do NOT fail solely for absent CONFIRM_LIFECYCLE when Derived Lifecycle
+  is present under reviewed Owner Contract
 → legacy SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this pillar
-→ scenario PASS alone never creates DONE without confirmed echo
+→ scenario PASS alone never creates DONE without Derived Lifecycle (or
+  legacy confirmed echo)
 ```
 
 Standalone scenario flag (still honored):

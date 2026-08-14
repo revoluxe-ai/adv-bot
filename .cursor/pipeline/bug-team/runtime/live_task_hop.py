@@ -191,6 +191,12 @@ def build_task_prompt(
             "Do not create Owner GO receipts. Do not call owner registration APIs.",
             "Do not perform other workers' duties.",
             "MODEL_SELECTION_POLICY: auto",
+            # HEREDOC-SHELL-PAYLOAD-001 — cite opsx-execution-preflight § Shell payload I/O
+            "FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python/packet writes.",
+            "REQUIRED: Write tool (or write .py/.json to path) then run/read by path; "
+            "encoding=utf-8; ensure_ascii=True. On heredoc failure: do not retry "
+            "heredoc — switch Write->path once. Cite preflight Shell payload I/O "
+            "(anti-heredoc) + Windows Shell JSON/JSONL write safety.",
         ]
     )
     return {

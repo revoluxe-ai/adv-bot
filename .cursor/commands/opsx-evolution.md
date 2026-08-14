@@ -439,19 +439,22 @@ contain **only** the template keys below (exact headers). Downstream
 keys** as DoD SoT — they MUST NOT re-open the North Star card body to invent
 Future scope or broaden `IN_SCOPE`.
 
-**Completeness invariant:** `IN_SCOPE`, `OUT_OF_SCOPE`, `FORWARD_COMPATIBILITY`,
-`KEEP`, and `HARD` MUST be concrete enough that a consumer with paste alone can
-scaffold/ff/continue without reading `openspec/evolution/<card>.md` for DoD.
-If study shows the handoff would be incomplete → `EVIDENCE_GAP`; do **not**
-emit COPY_BLOCK until fixed or Owner accepts STANDALONE with recorded gap.
-Never recommend pasting chat-only fields (`CARD_PATH`, `STAR_ROUTE`,
-`ARTIFACT_CONTEXT`, …) into new/ff/continue.
+**Completeness invariant:** `OWNER_INTENT`, `IN_SCOPE`, `OUT_OF_SCOPE`,
+`FORWARD_COMPATIBILITY`, `KEEP`, and `HARD` MUST be concrete enough that a
+consumer with paste alone can scaffold/ff/continue without reading
+`openspec/evolution/<card>.md` for DoD. `OWNER_INTENT` MUST preserve the
+Owner's human meaning (see rules below). If study shows the handoff would be
+incomplete → `EVIDENCE_GAP`; do **not** emit COPY_BLOCK until fixed or Owner
+accepts STANDALONE with recorded gap. Never recommend pasting chat-only
+fields (`CARD_PATH`, `STAR_ROUTE`, `ARTIFACT_CONTEXT`, …) into new/ff/continue.
 
 ```text
 EVOLUTION_HANDOFF
 EVOLUTION_LINK: LINKED
 STAR_ID: <stable id>
 INCREMENT_ID: <stable id>
+OWNER_INTENT:
+<short human Owner meaning — product/UI language; not implementation mapping>
 CURRENT_INCREMENT: <one independently verifiable outcome>
 IN_SCOPE:
 - <owed unit>
@@ -468,6 +471,38 @@ HARD: EVOLUTION_SCOPE_DRIFT if artifacts/tasks include OUT_OF_SCOPE or FUTURE_IN
 
 `FUTURE_INCREMENTS`: **INCREMENT_ID lines only** — no outcome/title essays that
 invite “prep” tasks.
+
+### OWNER_INTENT (mandatory canonical key)
+
+`OWNER_INTENT` is the durable semantic input for `/opsx-explore` → `/opsx-new`.
+It is **not** a technical solution description and **not** interchangeable with
+`CURRENT_INCREMENT` / `KEEP` / `HARD`.
+
+**Source:** only Owner words, or a later explicit Owner correction. Agent
+inference, repository findings, evolution decomposition, KEEP/HARD/FORWARD, and
+implementation mapping MUST NOT silently rewrite it.
+
+**MUST**
+
+- preserve Owner terminology and UI / product names when Owner used them;
+- describe the desired result / observable behavior, not presumed code paths;
+- stay short and readable to Owner without internal jargon Owner did not use;
+- survive further evolution decomposition unchanged in meaning.
+
+**MUST NOT**
+
+- replace Owner product language with code identifiers found in the repo
+  (e.g. Owner «старое управление ставкой» → `cost_rule_failed` /
+  `cost watchdog`) without explicit Owner confirmation;
+- treat repository-plausible mappings as a new Owner intent;
+- omit the field from COPY_BLOCK after OWNER_PICK when emitting
+  `CURRENT_INCREMENT_READY`.
+
+Repository evidence and candidate mappings belong in chat-only context
+(`ARTIFACT_CONTEXT`, study notes) — never as a substitute for `OWNER_INTENT`.
+If Owner wording contradicts repository reality → ask one clarification via
+existing Owner-question flow; do **not** rewrite `OWNER_INTENT` to match the
+code.
 
 ### FORBIDDEN inside COPY_BLOCK fence
 
@@ -670,8 +705,12 @@ optional until advice/handoff.
   deploy/devops “do now” prose); keep those chat-only.
 - Never put outcome essays under `FUTURE_INCREMENTS` (ids only).
 - Never omit COPY_BLOCK after OWNER_PICK when emitting CURRENT_INCREMENT_READY.
+- Never omit `OWNER_INTENT` from COPY_BLOCK after OWNER_PICK.
+- Never silently rewrite `OWNER_INTENT` from repository findings, agent
+  inference, decomposition, or KEEP/HARD/FORWARD mapping; only Owner words or
+  explicit Owner correction may set/change it.
 - Never emit a thin/incomplete COPY_BLOCK that forces consumers to read the
-  North Star card body for DoD (`IN_SCOPE` / `OUT_OF_SCOPE` /
+  North Star card body for DoD (`OWNER_INTENT` / `IN_SCOPE` / `OUT_OF_SCOPE` /
   `FORWARD_COMPATIBILITY` / `KEEP` / `HARD` must be paste-sufficient).
 - Never recommend `CARD_PATH` or other chat-only bait as paste into
   `/opsx-new` / `/opsx-ff` / `/opsx-continue` / change artifacts.

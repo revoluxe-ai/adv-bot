@@ -102,6 +102,9 @@ class _FakeComplexAdv:
         )
         self._use_common_budget = False
         self._common_budget_daily_limit = None
+        # Empty: skip shelf-exhausted epoch open (needs nmids attribute parity
+        # with ComplexAdv after Auto pause→start; avoid PG get_state in unit).
+        self.nmids: list[int] = []
         # Default empty: positive empty-keywords pause path expects revalidation OK.
         self._active_keywords: list[Any] = (
             list(active_keywords) if active_keywords is not None else []

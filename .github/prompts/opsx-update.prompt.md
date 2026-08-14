@@ -4,11 +4,24 @@ description: Update a change - revise existing planning artifacts and keep them 
 
 Revise a change's existing planning artifacts and keep them coherent. Never edit code.
 
+**Planning-review repair:** When a `PLANNING_REVIEW_HANDOFF` with
+`MODE: REPAIR_PLANNING_PACKAGE` is pasted, follow
+`.cursor/commands/opsx-update.md` **Planning-review repair front-door** and
+`.cursor/pipeline/contracts/PLANNING_REVIEW.md`: validate handoff → repair
+`FIRST_BAD_ARTIFACT` then affected downstream only → soft-recommend
+`/opsx-planning-review change=<id>` (not apply) after repair.
+
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Architecture Decision Lookup:** When revising artifacts, also check `openspec/decisions/**/*.md` and `artifactPaths.decisions.existingOutputPaths`. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
 
-**Input**: Optionally specify a change name after `/opsx-update` (e.g., `/opsx-update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Design Generation gate:** When revising `design.md`, follow
+`.cursor/pipeline/contracts/DESIGN_GENERATION.md` (same as `/opsx-continue` /
+`/opsx-ff`). Run `DESIGN_READINESS`; resolve SoT/ownership/write/recovery or
+`DESIGN_STATUS: BLOCKED`; preserve MUST/MUST NOT; never defer architecture to
+apply. Do not mark design coherent while BLOCKED.
+
+**Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -41,6 +54,8 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
    The files to edit are `artifactPaths.<id>.existingOutputPaths` - the concrete files that exist on disk, already glob-expanded for glob artifacts (e.g. `specs/**/*.md`). Do NOT write to `resolvedOutputPath`: for a glob artifact it is still the glob pattern, not a real file.
 
 3. **Understand the request**
+   - If a `PLANNING_REVIEW_HANDOFF` (`MODE: REPAIR_PLANNING_PACKAGE`) is
+     pasted, follow the **Planning-review repair** front-door above.
    - If the user asked for a specific revision ("the design now uses X"), that is the starting edit.
    - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication.
 
@@ -69,9 +84,10 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
      ```
 
 7. **Point to the next step (guidance only - NEVER act on it)**
-   - Artifacts still missing -> suggest `/opsx-continue` to create them.
-   - Change already implemented (tasks checked off / already applied) -> the code may no longer match the revised plan; suggest `/opsx-apply` to carry the delta into code.
-   - Everything done and implemented -> suggest `/opsx-archive`.
+   - After planning-review repair → `/opsx-planning-review change=<id>` before apply.
+   - Artifacts still missing -> suggest `/opsx:continue` to create them.
+   - Change already implemented (tasks checked off / already applied) -> the code may no longer match the revised plan; suggest `/opsx:apply` to carry the delta into code.
+   - Everything done and implemented -> suggest `/opsx:archive`.
 
 **Output**
 
@@ -81,7 +97,10 @@ After each invocation, show:
 - Where the change stands and the recommended next command
 
 **Guardrails**
-- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx-apply`.
+- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx:apply`.
+- When revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do not mark design
+  coherent if `DESIGN_STATUS: BLOCKED` or architecture is deferred to apply.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.

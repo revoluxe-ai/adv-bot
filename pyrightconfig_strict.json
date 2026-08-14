@@ -64,8 +64,14 @@
     "app/client_bot/user_interface/services/keyword_v3_ui_sort.py",
     "app/client_bot/user_interface/views/keyword_v3_profile_ui.py",
     "app/modules/common_slaves/wildberries/models/models.py",
+    "app/modules/common_slaves/wildberries/models/auto_shelf_bid_control.py",
     "app/modules/shop_runner/service_manager/services/auto_reset_bid_service.py",
-    "app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py"
+    "app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py",
+    "app/db",
+    "app/client_bot/user_interface/handlers/auto_shelf_bid_control_menu.py",
+    "app/client_bot/user_interface/states.py",
+    "app/client_bot/user_interface/views/callbacks.py",
+    "app/client_bot/user_interface/views/messages/auto_shelf_bid_control_render.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

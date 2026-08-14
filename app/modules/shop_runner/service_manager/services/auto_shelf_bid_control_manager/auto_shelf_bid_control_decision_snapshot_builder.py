@@ -273,13 +273,14 @@ async def build_decision_snapshot(
     _coverages, _current_layer, _covered_anchor_count, coverage_next_test = (
         await manager._build_coverage_snapshot(
             nmid=complex_adv.main_nmid,
-            currency=state.currency,
+            currency=str(settings_obj.currency),
             min_bid_minor=min_bid_minor,
             max_bid_minor=max_bid_minor,
             target_test_impressions=target_test_impressions,
             target_test_observation_hours=target_test_observation_hours,
             min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
             date_to=now,
+            epoch_start=manager._shelf_exhausted_epoch_start(state),
         )
     )
     covered_bids = [

@@ -18,8 +18,12 @@ Verify является read-only audit command после `/opsx-apply` и до
 1. Parse `mode=impl` | `mode=archive` (default **`archive`** if omitted; WARN to prefer explicit mode).
 2. If `mode=impl` → выполни только **PHASE_IMPL** из модуля; остановись; **не**
    эмитируй `✅ GO` / `❌ NO_GO`; не продолжай archive-секции ниже.
+   Output shape + markers + **LOCAL_HOP_COPY_BLOCK** — из VERIFY_PHASES
+   (bare `NEXT_ACTION` / `## Следующая команда` alone insufficient for
+   Owner-local hop).
 3. If `mode=archive` → выполни **PHASE_ARCHIVE** из модуля, затем полный
-   archive-audit **этого** файла (секции ниже) + маркеры `✅ GO` / `❌ NO_GO`.
+   archive-audit **этого** файла (секции ниже) + маркеры `✅ GO` / `❌ NO_GO`
+   + **LOCAL_HOP_COPY_BLOCK** из VERIFY_PHASES.
 
 Не путать с `/opsx-test … verify` (bug GREEN). `✅ IMPL_OK` **никогда** не
 авторизует `/opsx-archive`.
@@ -110,10 +114,17 @@ planner. Он проверяет identity/freshness, spot-checks acceptance-rele
 
 ```text
 PRODUCT_ACCEPTANCE_REQUIRED=true
-→ LIFECYCLE_COVERAGE requires durable OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE
-→ AND fresh report VERDICT=PASS with rows mapped to echo steps (mode=archive)
-→ missing echo / unconfirmed / unmapped / stale/FAIL/BLOCKED is archive blocker
-→ scenario PASS alone does NOT clear LIFECYCLE without confirmed echo
+→ LIFECYCLE_COVERAGE requires durable Derived Lifecycle
+  (LIFECYCLE_STATUS: DERIVED; prefer design.md) from reviewed Owner Contract
+  OR legacy OWNER_LIFECYCLE_ECHO + CONFIRM_LIFECYCLE when no reviewed
+  owner-contract
+→ AND fresh report VERDICT=PASS with rows mapped to lifecycle steps (mode=archive)
+→ missing Derived Lifecycle (primary) / missing legacy echo+CONFIRM (legacy) /
+  UNRESOLVED / unmapped / stale/FAIL/BLOCKED is archive blocker
+→ do NOT fail solely for absent CONFIRM_LIFECYCLE when Derived Lifecycle is
+  present under reviewed Owner Contract
+→ scenario PASS alone does NOT clear LIFECYCLE without Derived Lifecycle
+  (or legacy confirmed echo)
 → SCENARIO_COVERAGE_REQUIRED absent|false does NOT waive this
 
 SCENARIO_COVERAGE_REQUIRED=true
@@ -534,11 +545,16 @@ Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` in `mode=archive`.
 * When required: `PASS` only if MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧
   SIDE_EFFECT_PROOF. Else archive blocker `product_acceptance_not_pass` →
   overall `NO_GO`.
-* LIFECYCLE_COVERAGE under PA requires durable `OWNER_LIFECYCLE_ECHO` +
-  Owner `CONFIRM_LIFECYCLE` **and** fresh scenario report `VERDICT=PASS`
-  with acceptance rows mapped to echo steps. Scenario PASS alone with
-  missing/unconfirmed echo ⇒ `PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar
-  `LIFECYCLE_COVERAGE` (change spirit lost). Soft waive cannot clear this.
+* LIFECYCLE_COVERAGE under PA requires durable Derived Lifecycle
+  (`LIFECYCLE_STATUS: DERIVED`, prefer `design.md`) from reviewed Owner
+  Contract — **or** legacy `OWNER_LIFECYCLE_ECHO` + Owner `CONFIRM_LIFECYCLE`
+  when no reviewed owner-contract — **and** fresh scenario report
+  `VERDICT=PASS` with acceptance rows mapped to lifecycle steps. Do **not**
+  FAIL solely for absent `CONFIRM_LIFECYCLE` when Derived Lifecycle is
+  present under reviewed Owner Contract. Scenario PASS alone with missing
+  Derived Lifecycle (or legacy unconfirmed echo) ⇒
+  `PRODUCT_ACCEPTANCE_STATUS=FAIL` pillar `LIFECYCLE_COVERAGE`. Soft waive
+  cannot clear this.
 * Soft sections (ECC / performance / antipattern / static / destructive-cache
   WARN / Owner soft-waive) MUST state they do **not** authorize archive
   without PA PASS / NOT_REQUIRED.
@@ -982,6 +998,23 @@ manual fix
 /opsx-test case=<CASE_ID> finding=<FINDING_ID> verify
 /opsx-bug-debt-board case=<CASE_ID>
 ```
+
+### LOCAL_HOP_COPY_BLOCK (mandatory — mode=archive Output)
+
+Authority: `.cursor/pipeline/contracts/VERIFY_PHASES.md`
+(`LOCAL_HOP_COPY_BLOCK` after PHASE_ARCHIVE).
+
+After `## Следующая команда` and **before** the final marker
+(`✅ GO` / `❌ NO_GO`), when the next step is a local `/opsx-*` hop in this
+Cursor workspace, emit exactly **one** fenced copy-paste prompt containing
+workspace path, change name, `mode=archive` + marker, blockers (on `NO_GO`),
+exact next Command, and applicable `DO_NOT_DO_YET` / `ALSO_OK`. Outside the
+fence (except the required final marker): ≤1 status line. No Web four-block
+(`Ссылка` / `Папка`) for this hop. Bare `## Следующая команда` alone is
+**not** a sufficient Owner-local handoff. Final marker stays the last line.
+
+(`mode=impl` uses the PHASE_IMPL Output + LOCAL_HOP_COPY_BLOCK from
+VERIFY_PHASES only — do not emit archive GO/NO_GO sections.)
 
 Не создавай новый top-level output section для test coverage.
 

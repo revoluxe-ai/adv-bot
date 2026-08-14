@@ -13,6 +13,22 @@ INPUT:  .tmp/opsx-bug-cases/<CASE_ID>/team/packets/<WEX>.in.md
 OUTPUT: .tmp/opsx-bug-cases/<CASE_ID>/team/packets/<WEX>.out.md
 ```
 
+## Write safety (mandatory — packets / JSONL)
+
+When writing `OUTPUT_PACKET`, heartbeats, `ROUTE-TRACE.jsonl`, or other
+durable JSON via agent Shell/Python, follow
+`.cursor/commands/opsx-execution-preflight.md` →
+**Shell payload I/O (anti-heredoc)** and
+**Windows Shell JSON / JSONL write safety**
+(defect class `HEREDOC-SHELL-PAYLOAD-001`):
+
+```text
+FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python/packet writes
+REQUIRED: Write tool (or write .py/.json to path) then run/read by path
+encoding=utf-8; ensure_ascii=True for agent-authored recipes
+on heredoc failure: do not retry heredoc — switch Write->path once
+```
+
 ## Common input header
 
 ```text

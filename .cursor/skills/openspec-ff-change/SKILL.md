@@ -68,6 +68,23 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
         - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
+      - **If the artifact is `design`:** follow
+        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first. Build draft,
+        then run `DESIGN_READINESS` (post-generation
+        `NORMATIVE_PRESERVATION_CHECK`). Resolve SoT/ownership/write/recovery
+        or BLOCK (`TECHNICAL_DESIGN_UNRESOLVED` /
+        `UPSTREAM_NORMATIVE_CONFLICT` / `NORMATIVE_MODALITY_DRIFT`).
+        Preserve MUST/MUST NOT. Never defer architecture to apply. On
+        BLOCKED stop without declaring design complete. On READY
+        (`NORMATIVE_MODALITY_PRESERVED: yes`), same design rules as
+        `/opsx-continue`.
+      - **If the artifact is `tasks`:** follow
+        `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Build draft,
+        then run `TASK_GENERATION_READINESS` (post-generation
+        `NORMATIVE_PRESERVATION_CHECK`). On BLOCKED stop without writing
+        `tasks.md`. On READY (`NORMATIVE_MODALITY_PRESERVED: yes` and
+        `CONDITIONAL_BRANCHES_PRESERVED: yes`), same evidence-role +
+        modality + conditional-branch rules as `/opsx-continue`.
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "✓ Created <artifact-id>"
@@ -89,7 +106,8 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
    - When required: durable MEANING_LOCK; durable `OWNER_LIFECYCLE_ECHO`
      (3–7 temporal steps) in design/decision/spec; Owner
      `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm); schedule
-     `/opsx-spec-scenario-coverage mode=plan`.
+     `/opsx-spec-scenario-coverage mode=plan` (must materialize durable
+     `scenario-coverage/plan.md` + `plan.receipt.json`; chat-only insufficient).
    - Do **not** claim apply-ready / "Ready for implementation" if PA
      required and echo/`CONFIRM_LIFECYCLE` is missing (chat-only lifecycle
      is not durable).
@@ -104,10 +122,10 @@ Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
-- What's ready: "All artifacts created! Ready for implementation."
+- What's ready: "All artifacts created! Ready for planning review, then implementation."
   (only if PA gates above allow; otherwise BLOCKED awaiting
   `CONFIRM_LIFECYCLE` / MEANING_LOCK)
-- Prompt: "Run `/opsx-apply` or ask me to implement to start working on the tasks."
+- Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
 
 **Artifact Creation Guidelines**
 
@@ -115,6 +133,11 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- When creating `design.md`: follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (identical to `/opsx-continue`; draft → post-generation check; continue≡ff).
+- When creating `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (identical to `/opsx-continue`; draft → post-generation check; continue≡ff;
+  CURRENT durable scenario-plan receipt required when scenarios apply).
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
@@ -125,5 +148,12 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, suggest continuing that change instead
 - Verify each artifact file exists after writing before proceeding to next
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (draft → post-generation check; `NORMATIVE_MODALITY_PRESERVED` required);
+  on BLOCKED do not declare design complete
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (draft → post-generation check; modality + conditional branches required);
+  on BLOCKED leave `FILES_CHANGED: none`
 - When `PRODUCT_ACCEPTANCE_REQUIRED=true`, never treat apply-ready as true
   without durable `OWNER_LIFECYCLE_ECHO` + `CONFIRM_LIFECYCLE`

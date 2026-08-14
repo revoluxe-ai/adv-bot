@@ -154,6 +154,105 @@ Resolution order:
 
 `subagent_type`: `generalPurpose` (children must Read contracts + run git).
 
+## Child Task clocks (mandatory — hang prevention)
+
+Empty clocks on any child Task launch are a **contract violation**.
+Unbounded sync wait is forbidden (mirror supervisor §12.0 ordinary-writer /
+heavy-writer classes).
+
+### PLAN Task defaults (each of TASK_A / TASK_B)
+
+```text
+TIMEOUT_SECONDS=1800
+HEARTBEAT_INTERVAL_SECONDS=120
+NO_PROGRESS_TIMEOUT_SECONDS=600
+STOP_ACK_TIMEOUT_SECONDS=60
+```
+
+### EXECUTE Task defaults (each serial GO child)
+
+```text
+TIMEOUT_SECONDS=3600
+HEARTBEAT_INTERVAL_SECONDS=180
+NO_PROGRESS_TIMEOUT_SECONDS=900
+STOP_ACK_TIMEOUT_SECONDS=120
+```
+
+Only **stricter** (smaller) values are allowed without Owner timebox.
+Map into Task launch metadata / prompt footer as `TIMEOUT` /
+`HEARTBEAT_INTERVAL` / `NO_PROGRESS_TIMEOUT` / `STOP_ACK_TIMEOUT`.
+
+### Task wait discipline (HARD — false-hang prevention)
+
+Platform Task completion arrives as a **Task completion notification**, not
+via shell tools. Parent MUST NOT invent a busy-wait that never wakes.
+
+```text
+FORBIDDEN_WHILE_WAITING_ON_TASK_CHILDREN:
+- AwaitShell (does not receive Task completion notifications)
+- Shell sleep / sleep loops
+- polling subagent transcript files as a wait strategy
+- any in-turn busy-wait after background Task launch
+```
+
+```text
+AWAIT_SHELL_TIMEOUT_IS_NOT_CHILD_HANG=YES
+SILENCE_PLUS_SHELL_SLEEP_IS_NOT_HANG_PROOF=YES
+```
+
+**Background mode** (`run_in_background=true`):
+
+1. Launch child Task(s) with clocks filled.
+2. Print `OWNER_VISIBLE_DISPATCH` including that progress resumes **only**
+   on platform Task completion notification.
+3. **End the parent turn immediately** — no further tool calls that wait.
+4. On completion notification: resume that lane immediately; do not re-PLAN
+   blindly; do not treat prior silence as hang.
+
+**Sync mode** (`run_in_background=false`): allowed with clocks filled; result
+returns in-turn. Prefer sync for **serial EXECUTE** when `PARENT_HAS_GO=yes`
+so the parent can chain without notification dependency.
+
+Parallel PLAN fan-out may still use background; after both plan
+notifications land, start EXECUTE per §2 (prefer sync).
+
+### OWNER_VISIBLE_DISPATCH (before every child launch)
+
+In the same parent turn, before launching a PLAN fan-out or an EXECUTE
+Task, print:
+
+```text
+OWNER_VISIBLE_DISPATCH:
+  COMMAND: /opsx-commit | /opsx-meta-commit
+  LANE: LANE_PRODUCT | LANE_PROCESS
+  PHASE: PLAN | EXECUTE
+  EXPECTED_WALL_CLOCK_SECONDS:   # from clocks above
+  NO_PROGRESS_TIMEOUT_SECONDS:
+  INTERRUPT_POLICY: interrupt=true on timeout/hang when platform allows
+  WAIT_MODE: background_end_turn | sync_in_turn
+  SILENCE_NOTE: silence until NO_PROGRESS is not proof of hang; after
+                NO_PROGRESS parent must TIMEOUT/PAUSED that lane;
+                AwaitShell/shell-sleep is FORBIDDEN and is not hang proof;
+                background mode resumes only on Task completion notification
+```
+
+### Platform abort / interrupt / empty envelope
+
+If a child Task ends as `aborted` | `interrupted` | `tool_error` | empty /
+missing envelope **without** an accepted plan or commit report:
+
+```text
+LANE_STATUS: PAUSED | PARTIAL
+DISPOSITION: EXECUTION_OUTCOME_UNKNOWN
+ADVANCE: FORBIDDEN for that lane
+BLIND_REPLAY: FORBIDDEN
+```
+
+Parent SUMMARY must include a pasteable resume of the **same** primary
+(`/opsx-commit-all` with same tokens, or the failed child alone) with
+`ATTEMPT+1` only when idempotent; else Owner reconcile. Do not treat the
+lane as planned/committed.
+
 ## Phase machine
 
 ### 0) Preflight
@@ -165,24 +264,31 @@ Resolution order:
 
 ### 1) Parallel PLAN fan-out (mandatory)
 
-Launch **two** Task subagents in the **same** parent turn (parallel):
+Print `OWNER_VISIBLE_DISPATCH` for both plan lanes (may be one combined
+block). Then launch **two** Task subagents in the **same** parent turn
+(parallel) with PLAN clocks filled:
 
 ```text
 TASK_A:
   PRIMARY: /opsx-commit
   ARGS: PLAN_ARGS
   MODEL: RESOLVED_CHILD_MODEL (mini → auto fallback rules)
+  TIMEOUT / HEARTBEAT / NO_PROGRESS / STOP_ACK: PLAN defaults
   PROMPT_MUST:
     - Read and follow .cursor/commands/opsx-commit.md as PRIMARY
     - Treat ARGS as $ARGUMENTS (no GO)
     - Plan only: no stage/commit/amend
+    - Obey opsx-execution-preflight TIME_BUDGET; on timeout return
+      blocked_preflight_timeout — do not hang
     - Return the child’s normal no-GO plan report verbatim at the end
 
 TASK_B:
   PRIMARY: /opsx-meta-commit
   ARGS: PLAN_ARGS
   MODEL: same as TASK_A
+  TIMEOUT / HEARTBEAT / NO_PROGRESS / STOP_ACK: PLAN defaults
   PROMPT_MUST: analogous for .cursor/commands/opsx-meta-commit.md
+    (including preflight budgets / blocked_preflight_timeout)
 ```
 
 Do not wait for Owner between the two plan launches.
@@ -194,18 +300,28 @@ Do not wait for Owner between the two plan launches.
 As each plan Task completes successfully with an actionable in-scope plan
 (not pure `OUT_OF_SCOPE_REDIRECT` / empty / hard `BLOCKED` that forbids GO):
 
-1. If an execute Task is already running → wait for it to finish (serialize).
-2. Launch exactly one execute Task for that ready lane with `EXEC_ARGS`.
-3. Prompt MUST:
+1. If an execute Task is already running → serialize: do not launch a second
+   execute; resume only when the running execute’s Task completion
+   notification (or sync return) arrives. Never AwaitShell / sleep-poll.
+2. Print `OWNER_VISIBLE_DISPATCH` for that lane’s EXECUTE
+   (`WAIT_MODE=sync_in_turn` preferred).
+3. Launch exactly one execute Task for that ready lane with `EXEC_ARGS`
+   and EXECUTE clocks filled. **Prefer `run_in_background=false` (sync)**
+   so the result returns in-turn. If background: end turn immediately;
+   continue on Task completion notification only.
+4. Prompt MUST:
    - Read/follow the same child command file as PRIMARY
    - Treat `EXEC_ARGS` as `$ARGUMENTS` (includes `GO`)
    - Prefer executing the plan just produced for this lane (attach plan text)
    - Still obey all child gates (receipt, protected branch, matrices, scope)
-4. When that execute finishes, start the next ready lane’s execute (if any).
+   - Obey opsx-execution-preflight TIME_BUDGET; return
+     `blocked_preflight_timeout` rather than hang
+5. When that execute finishes, start the next ready lane’s execute (if any).
 
 **As-ready order:** first successfully planned actionable lane executes first;
-the second waits. If both plans are ready before either execute starts,
-prefer order: `LANE_PROCESS` then `LANE_PRODUCT` (stable default).
+the second waits (notification- or sync-serialized — never shell-wait).
+If both plans are ready before either execute starts, prefer order:
+`LANE_PROCESS` then `LANE_PRODUCT` (stable default).
 
 If a lane’s plan is non-actionable (clean / out-of-scope only / blocked):
 
@@ -219,7 +335,8 @@ Do not invent commits for skipped lanes.
 ### 3) Fan-in SUMMARY (mandatory)
 
 Always print a parent SUMMARY after plan phase (and after execute phase when
-`GO` was present), even when a lane skipped or failed.
+`GO` was present), even when a lane skipped or failed. Include any
+`EXECUTION_OUTCOME_UNKNOWN` / pasteable resume lines for interrupted lanes.
 
 ## Authority rules
 
@@ -242,7 +359,8 @@ FORBIDDEN_FOR_PARENT:
 
 | Situation | Parent status | Action |
 |---|---|---|
-| Plan Task errors / times out | `BLOCKED` or `PARTIAL` | Do not execute that lane; continue other lane plan/execute rules |
+| Plan Task errors / times out (clocks exceeded) | `BLOCKED` or `PARTIAL` | Do not execute that lane; continue other lane plan/execute rules |
+| Plan/Execute `aborted` / `interrupted` / empty envelope | `PARTIAL` / `PAUSED` | `EXECUTION_OUTCOME_UNKNOWN`; no ADVANCE that lane; pasteable resume |
 | Execute Task fails child gate | `PARTIAL` / `BLOCKED` | Surface child report; do not retry silently more than once |
 | `index.lock` / git lock on execute | one serial re-dispatch of **that** lane only | Then stop that lane if still failing |
 | Both lanes skipped | `COMPLETE_NOOP` | SUMMARY explains clean/out-of-scope |
@@ -254,8 +372,12 @@ successful child commit report for that attempted lane — use `PARTIAL` or
 
 ## Recovery
 
-- Re-run `/opsx-commit-all` with same tokens, or
+- Re-run `/opsx-commit-all` with same tokens (after `EXECUTION_OUTCOME_UNKNOWN`,
+  only with explicit Owner resume / ATTEMPT+1 — no blind replay), or
 - Run the failed child alone (`/opsx-commit` or `/opsx-meta-commit`).
+- On confirmed hang: interrupt child when platform allows; wait at most
+  `STOP_ACK_TIMEOUT` via platform interrupt ack — **not** AwaitShell /
+  shell sleep; then TIMEOUT/PAUSED that lane per clocks above.
 
 ## Final report (parent)
 

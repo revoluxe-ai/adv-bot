@@ -128,8 +128,14 @@ class TaskCallSpec:
                 f"HEARTBEAT_PATH: {self.heartbeat_path}",
                 "MODEL_SELECTION_POLICY: auto",
                 "FORBIDDEN: do not perform other workers' duties",
+                "FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line "
+                "JSON/Python/packet writes.",
                 "REQUIRED: write OUTPUT_PACKET only within WRITE_BOUNDARY; "
-                "update HEARTBEAT_PATH; exit with terminal STATUS",
+                "update HEARTBEAT_PATH; exit with terminal STATUS; "
+                "Write tool (or write .py/.json to path) then run/read by path; "
+                "encoding=utf-8; ensure_ascii=True. On heredoc failure: do not "
+                "retry heredoc — switch Write->path once. Cite preflight Shell "
+                "payload I/O (anti-heredoc) + Windows Shell JSON/JSONL write safety.",
             ]
         )
         return {

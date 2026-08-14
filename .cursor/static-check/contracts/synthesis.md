@@ -27,7 +27,7 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
    - `fix_cmd` — recommended repair command for this group:
      - STATIC bucket → `/opsx-fix-types`
      - TESTS bucket → `/opsx-test-triage`
-     - env/config group (if any) → short recover step text (not opsx-fix-*)
+     - env/config group (if any) → `/opsx-test-env UP` (ports `5433`/`8124`/`6390`; session `REDIS_PORT=6390`; not `/opsx-devops`)
    - `seen_in`
    Evidence lines inside a group: ≤4.
 5. **Rank** within each bucket (then print STATIC first, then TESTS):
@@ -43,7 +43,7 @@ exactly; do not paste worker RAW_TAIL or full FINDINGS lists into the report.
 7. **Forbidden in Final report:** worker `RAW_TAIL`, full `FINDINGS` dumps,
    repeating the same stack/source blob across groups.
 8. **One NEXT_ACTION** (what to run *first* now; still exactly one line):
-   - env/config → recover step
+   - env/config → `/opsx-test-env UP` (then re-run FULL with `REDIS_PORT=6390`)
    - else typing / multi-tool typing → `/opsx-fix-types`
    - else pytest → `/opsx-test-triage`
    - PASS → continue (optional `/opsx-verify` hint only; never archive GO)

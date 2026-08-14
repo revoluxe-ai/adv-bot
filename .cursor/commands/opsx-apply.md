@@ -25,6 +25,13 @@ is missing/blocked. Author acceptance tests with `side_effect_proof` /
 `PA_SIDE_EFFECT_PROOF` for external mutations (this-run effect or forbidden
 sibling non-effect). Task checkboxes and soft tooling green are not DONE.
 
+**Planning-review soft preflight (v1, not a hard gate):** Prefer a recent
+`/opsx-planning-review change=<name>` with `STATUS: PASS` /
+`APPLY_PLANNING_GATE: PASS` before implementing. If the Owner has not just
+completed that review for this change, soft-recommend it once (READY markers
+alone are insufficient — `.cursor/pipeline/contracts/PLANNING_REVIEW.md`).
+Do **not** hard-block `/opsx-apply` when review was skipped.
+
 **Architecture Decision Lookup:** Before changing code, resolve decision paths from the selected change context/`artifactPaths.decisions` first. Prefer exact listed paths over a full `openspec/decisions/**` walk. Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`: when the change name is known, do not rediscover it by scanning all changes; do not gate apply on unconditional `git status`—run git only when dirty-tree / branch identity is REQUIRED_FOR safe implementation. Search `openspec/decisions/**/*.md` only for remaining gaps after direct context paths are read (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Do **not** equate budget exhaustion with “no decision exists”: if ownership / layering / write-path / domain-invariant gaps remain unresolved after that budget (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without editing code. Use `Architecture Decision Missing` only when lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision. Implementation must cite relevant decisions in progress or completion notes. If planned code placement contradicts an accepted decision, stop before editing code and return `NO_GO` with the conflicting decision path. If placement depends on a proposed decision, use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied before deciding whether code can proceed. Passing tests are not sufficient if placement violates a decision.
 
 **Canonical testing rule:** Before implementation, read `.cursor/rules/testing-rules.mdc` as the only general test-design/execution policy. Do not treat `.cursor/rules/TESTING_RULES.mdc` as policy (migration pointer only). Do not copy large test-policy blocks into this command; follow the authority split below.
@@ -136,10 +143,18 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`:
    - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and MEANING_LOCK is not durable →
      `NO_GO`; route to `/opsx-update` / Owner semantic decision.
-   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and durable `OWNER_LIFECYCLE_ECHO`
-     is missing/chat-only, **or** Owner `CONFIRM_LIFECYCLE` is missing →
-     `NO_GO`; route to `/opsx-update` (or `/opsx-ff`). Do not implement
-     against chat-only lifecycle.
+   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and temporal behavior applies:
+     - **Primary:** durable Derived Lifecycle
+       (`LIFECYCLE_STATUS: DERIVED` in design, from reviewed Owner Contract)
+       must be present (or unambiguously derivable without invention). Do
+       **not** `NO_GO` solely for absent `CONFIRM_LIFECYCLE` /
+       `OWNER_LIFECYCLE_ECHO` on this path.
+     - **Unresolved forks:** `LIFECYCLE_STATUS: UNRESOLVED` → `NO_GO`;
+       route to `/opsx-owner-contract-review`.
+     - **Legacy** (no reviewed owner-contract): missing/chat-only
+       `OWNER_LIFECYCLE_ECHO` or missing `CONFIRM_LIFECYCLE` → `NO_GO`;
+       route to `/opsx-update` (or `/opsx-ff`).
+     Do not implement against chat-only lifecycle.
    - When implementing acceptance seams with external mutation, materialize
      tests that satisfy SIDE_EFFECT_PROOF (`side_effect_proof` /
      `PA_SIDE_EFFECT_PROOF` in TEST_EVIDENCE_TAXONOMY). Intent-only /

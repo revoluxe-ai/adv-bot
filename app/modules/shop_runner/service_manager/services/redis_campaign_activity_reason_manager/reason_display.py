@@ -23,6 +23,7 @@ REASON_CODE_TO_DISPLAY_TEXT: dict[str, str] = {
     AutoReasonCode.BUDGET_OK_COST_OK.value: "Бюд и себес в норме, зап",
     AutoReasonCode.INSUFFICIENT_BALANCE.value: "Недостаточно средств",
     AutoReasonCode.EMPTY_KEYWORDS.value: "Нет акт ключей",
+    AutoReasonCode.SHELF_EXHAUSTED_NO_PLAN.value: "Полки: нет ставки под план",
     # Auction
     AuctionReasonCode.COMMON_OK.value: "Об бюд в норме, зап",
     AuctionReasonCode.SEARCH_SPEND_EXCEEDED.value: "Лимит Аук исч",

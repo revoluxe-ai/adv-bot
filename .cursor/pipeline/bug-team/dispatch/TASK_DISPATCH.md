@@ -65,12 +65,39 @@ arguments:
     HEARTBEAT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/heartbeats/<WEX>.json
     MODEL_SELECTION_POLICY: auto
     FORBIDDEN: do not perform other workers' duties
+    FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python/packet writes
     REQUIRED: write OUTPUT_PACKET only within WRITE_BOUNDARY;
               update HEARTBEAT_PATH periodically;
-              exit with terminal STATUS in output packet
+              exit with terminal STATUS in output packet;
+              Write tool (or write .py/.json to path) then run/read by path;
+              encoding=utf-8; ensure_ascii=True;
+              on heredoc failure: do not retry heredoc — switch Write->path once;
+              cite preflight Shell payload I/O (anti-heredoc) + Windows Shell JSON/JSONL write safety
 ```
 
 `model` must never be set. Prefer registry `TASK_SUBAGENT_TYPE`.
+
+Worker packet / JSONL writes MUST follow
+`.cursor/commands/opsx-execution-preflight.md` →
+**Shell payload I/O (anti-heredoc)** and **Windows Shell JSON / JSONL write safety**
+(defect class `HEREDOC-SHELL-PAYLOAD-001`).
+
+## Supervisor host top-level (cross-ref)
+
+When `/opsx-supervisor` launches **this whole command** as one top-level
+Task (`/opsx-bug-team` primary), host clocks and Owner-visible rules come
+from `/opsx-supervisor` §12.0–§12.4 (not from the child-role table alone):
+
+```text
+TOP_LEVEL_TIMEOUT_SECONDS default: 3600
+TOP_LEVEL_NO_PROGRESS_TIMEOUT_SECONDS default: 900
+OWNER_VISIBLE_DISPATCH: required before/at launch
+run_in_background: preferred true when platform heartbeat works
+platform abort/interrupt → PAUSED EXECUTION_OUTCOME_UNKNOWN (no ADVANCE)
+```
+
+Child worker `TIMEOUT_SECONDS` rows in `TIMEOUT_POLICY.md` still apply
+**inside** the team; they do not authorize unbounded host wait.
 
 ## Dispatch record (durable)
 
@@ -111,9 +138,12 @@ helpers) over ad-hoc stdin Python.
 
 If the orchestrator must append via Shell/Python, follow
 `.cursor/commands/opsx-execution-preflight.md` →
+**Shell payload I/O (anti-heredoc)** and
 **Windows Shell JSON / JSONL write safety**:
 
 ```text
+no bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python payloads
+Write tool (or write .py to path) then run by path; on heredoc failure switch Write->path once
 encoding="utf-8" on every open/write
 ensure_ascii=True for agent-authored recipes
 no print of the JSONL line to a cp1251 console

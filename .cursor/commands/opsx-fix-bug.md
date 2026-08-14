@@ -1033,6 +1033,78 @@ COMMAND_RECEIPT:
   PERSISTENCE_DECISION:
   CANONICAL_INTAKE_ID:
   RELATED_FINDING_ID:
+
+ROUTE_TRANSITION:
+  (schema: .cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md)
+  FROM_STATE:
+  RESULT:
+  TO_STATE:
+  NEXT_COMMAND:
+  NEXT_ARGS:
+  PRECONDITIONS:
+  REQUIRED_EVIDENCE:
+  RECOVERY_CLASS:
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no | yes
+  FINDING_TERMINAL_KIND: none | …
+```
+
+## ROUTE_TRANSITION (mandatory for supervisor)
+
+Authority: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md`.
+Narrative `Следующее действие` / prose stop conditions are UX only — they
+MUST NOT invent a competing `NEXT_COMMAND` when structured fields exist.
+`MISSION_COMPLETE` on this worker is always `no` (supervisor owns mission).
+
+Canonical hop packets (emit the matching one):
+
+```text
+fix_now (без GO):
+  TO_STATE: AWAITING_RED
+  NEXT_COMMAND: /opsx-test
+  NEXT_ARGS: case=… finding=…   # bug-regression / RED author
+  PRECONDITIONS.GO_TOKEN: NOT_APPLICABLE
+  PRECONDITIONS.RED_REQUIRED: yes
+  REQUIRED_EVIDENCE: none yet (RED owned by /opsx-test)
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
+GO applied (production patch done):
+  TO_STATE: AWAITING_GREEN
+  NEXT_COMMAND: /opsx-test
+  NEXT_ARGS: case=… finding=… verify
+  PRECONDITIONS.GREEN_REQUIRED: yes
+  REQUIRED_EVIDENCE: writer execution evidence / diff refs
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
+blocked_needs_red_before_go:
+  RECOVERY_CLASS: BLOCKED
+  NEXT_COMMAND: /opsx-test
+  PRECONDITIONS.RED_REQUIRED: yes
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
+claim / status / route_mismatch blockers:
+  RECOVERY_CLASS: BLOCKED | PAUSED | NEEDS_OWNER
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+  NEXT_COMMAND: per existing pasteable next (claim-next / classify / none)
+
+false_positive (finding terminal disposition):
+  FINDING_TERMINAL: yes
+  FINDING_TERMINAL_KIND: CLOSED_FALSE_POSITIVE
+  RECOVERY_CLASS: TERMINAL
+  MISSION_COMPLETE: no
+  NEXT_COMMAND: CLOSED_NO_IMPLEMENTATION | materialize close path
+
+plan_only | needs_entrypoint_map | needs_openspec_update:
+  RECOVERY_CLASS: PAUSED | NEEDS_OWNER | ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+  NEXT_COMMAND: exact pasteable from existing contract (no invented route)
 ```
 
 `RESULT` в receipt без `GO` обычно одно из: `adjudicated`, `false_positive`, `needs_entrypoint_map`, `plan_only`, `blocked`, `duplicate_intake`.

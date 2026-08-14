@@ -22,8 +22,22 @@ architecture decisions belong here.
 - [empty-keywords-pause-write-path](empty-keywords-pause-write-path/decision.md)
   - Status: Accepted
   - Scope: ownership of empty-keywords detect → Redis intent → activity-control
-    pause/start + distinct reason + recheck + notify; orthogonal to Hold freeze
+    pause/start + distinct reason + recheck + notify; TARGET_ENTITY_OR_LEG=SEARCH
+    (`pause_auction_campaign`; forbid `pause_auto_campaign` for this reason);
+    settled-empty / two-tick / shop-linked notify; orthogonal to Hold freeze
     and mode-defaults; stats window ≤7d.
+- [auto-bid-module-coexistence-write-path](auto-bid-module-coexistence-write-path/decision.md)
+  - Status: Accepted
+  - Scope: mutual exclusion of automated Auto bid writers («для Авто» vs
+    «в полках»); reason split vs `cost_rule_failed`; orthogonal to empty-keywords,
+    mode-defaults, and Hold freeze.
+- [auto-shelf-exhausted-pause-write-path](auto-shelf-exhausted-pause-write-path/decision.md)
+  - Status: Accepted
+  - Scope: ownership of shelf-exhausted Auto terminal pause/retest
+    (detect/PG SoT → activity-control `pause_auto_campaign` + Redis Auto-lane
+    mirror → clear-our-block / conditional start / notify); TARGET_ENTITY_OR_LEG=AUTO;
+    forbid `pause_auction_campaign` for this reason; mid-cycle cost gate while
+    shelves ON; orthogonal to empty-keywords, coexistence, and Hold freeze.
 - [card-ab-hold-write-path-ownership](card-ab-hold-write-path-ownership/decision.md)
   - Status: Accepted
   - Scope: A/B Hold setup/hold write-path ownership, structural freeze ACT,

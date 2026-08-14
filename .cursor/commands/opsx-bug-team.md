@@ -262,9 +262,11 @@ Rules:
   `TASK_DISPATCH.md` **Append recipe** (prefer `live_task_hop`; ad-hoc
   Shell/Python MUST follow
   `.cursor/commands/opsx-execution-preflight.md` →
+  **Shell payload I/O (anti-heredoc)** and
   **Windows Shell JSON / JSONL write safety** —
-  `encoding="utf-8"` + `ensure_ascii=True`; no `ensure_ascii=False` stdin
-  recipes; no unsafe console print of the line);
+  no bash heredoc for multi-line JSON/Python; Write→path first; on heredoc
+  failure switch Write→path once; `encoding="utf-8"` + `ensure_ascii=True`;
+  no `ensure_ascii=False` stdin recipes; no unsafe console print of the line);
 - never invent missing worker output.
 
 ## Waves

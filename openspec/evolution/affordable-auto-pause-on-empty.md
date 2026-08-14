@@ -5,7 +5,7 @@ STAR_ID: affordable-auto-pause-on-empty
 STATUS: ACTIVE
 OWNER: Owner
 CREATED_AT: 2026-08-07T19:11:00Z
-UPDATED_AT: 2026-08-09T06:48:30Z
+UPDATED_AT: 2026-08-11T05:12:00Z
 DEPENDS_ON: none
 ```
 
@@ -62,9 +62,11 @@ DEPENDS_ON: none
 
 ## Evolution Path
 
-Owner achievement route (2026-08-09, advisory — not DoD):
-`INC-PAUSE-02` → `INC-BILL-LEG-PAUSE-01` → `INC-AUTO-SHELF-PAUSE-01` →
-`INC-PRICE-01` → `INC-COMMS-01`. Hypothesis order below matches that route.
+Owner achievement route (2026-08-10, advisory — not DoD):
+`INC-PAUSE-02` → `INC-AUTO-COST-SHELF-COEXIST-01` → `INC-BILL-LEG-PAUSE-01` →
+`INC-AUTO-SHELF-PAUSE-01` → `INC-PRICE-01` → `INC-COMMS-01`.
+Hypothesis order below matches that route (PAUSE-02 Search delivery may
+continue in parallel; COEXIST is ENABLING_FOUNDATION before AUTO-SHELF).
 
 ### INC-PAUSE-01 — Автопауза при пустых ключах + перепроверка
 
@@ -95,7 +97,7 @@ main spec `openspec/specs/pause-on-empty-keywords/spec.md`; ADL
 ### INC-PAUSE-02 — Empty-keywords pause/recheck только на Search
 
 ```text
-STATUS: ACTIVE
+STATUS: DONE
 LINKED_CHANGES: retarget-empty-keywords-pause-to-search
 ```
 
@@ -106,6 +108,10 @@ empty-keywords применяются только к ноге **Search**
 `empty_keywords`, intent latch, notify и 7d-invariants сохраняются. Остальная
 логика автокампании не меняется.
 
+Note (Owner 2026-08-10): Search delivery continues via linked change in
+parallel; star **handoff** Active increment for next Change is
+`INC-AUTO-COST-SHELF-COEXIST-01` (orthogonal Auto/shelf foundation).
+
 Contribution to North Star: Честная остановка именно поисковой ноги при пустых
 ключах; Auto/полки живут отдельным lifecycle (`INC-AUTO-SHELF-PAUSE-01`).
 
@@ -113,10 +119,13 @@ Scope boundary: retarget empty-keywords write-path Auto→Search + durable
 leg/adapters в decision/spec + paired tests; не тариф; не Auto shelf exhausted
 pause; не billing fair-pause; не канал-анонс; не BOTH-legs.
 
-Evidence / completion: active change
-`openspec/changes/retarget-empty-keywords-pause-to-search` (planning complete;
-implementation/verify in progress). Proposed ADL amendment
-`openspec/changes/retarget-empty-keywords-pause-to-search/decisions/empty-keywords-pause-write-path/decision.md`.
+Evidence / completion: OpenSpec change `retarget-empty-keywords-pause-to-search`
+verified GO (2026-08-11); Product Acceptance PASS; archived
+`openspec/changes/archive/2026-08-11-retarget-empty-keywords-pause-to-search`;
+main spec `openspec/specs/pause-on-empty-keywords/spec.md` synced (Search
+leg); ADL `openspec/decisions/empty-keywords-pause-write-path/decision.md`
+Accepted (TARGET_ENTITY_OR_LEG=SEARCH; forbid `pause_auto_campaign` for
+empty-keywords).
 
 ### INC-BILL-LEG-PAUSE-01 — Честная оплата Auto/Search при паузе ног
 
@@ -149,15 +158,41 @@ runtime; не shelf exhausted pause; не смена базовой цифры 1
 
 Evidence / completion: none yet.
 
+### INC-AUTO-COST-SHELF-COEXIST-01 — Pin legacy autobidder vs shelf coexistence
+
+```text
+STATUS: DONE
+LINKED_CHANGES: pin-legacy-autobidder-vs-shelf-coexistence
+```
+
+Outcome (Owner 2026-08-10): Зафиксировать и доказать coexistence contract:
+при включённом **«Управление ставкой в полках»** старый путь **«управление
+ставкой для Авто»** не пишет ставку; reasons записи ставки vs cost-паузы
+различимы. Characterization + paired regression; **без** terminal
+shelf-exhausted pause/retest и **без** rewrite биддера / plan_distance.
+
+Contribution to North Star: Безопасный фундамент перед честной паузой полок
+(`INC-AUTO-SHELF-PAUSE-01`).
+
+Scope boundary: pin/prove coexistence; не terminal Auto shelf pause; не
+retest; не empty-keywords Search; не billing; не 1000₽; не comms.
+
+Evidence / completion: archived
+`openspec/changes/archive/2026-08-11-pin-legacy-autobidder-vs-shelf-coexistence`;
+main spec `openspec/specs/auto-bid-module-coexistence/spec.md`; ADL
+`openspec/decisions/auto-bid-module-coexistence-write-path/decision.md`.
+
 ### INC-AUTO-SHELF-PAUSE-01 — Пауза Auto/полок при исчерпании ставок без plan-fit + перетест
 
 ```text
-STATUS: CANDIDATE
+STATUS: ACTIVE
 LINKED_CHANGES: none
 ```
 
-Outcome (Owner 2026-08-08 / route 2026-08-09): Нога **Auto (полки)** ставится
-на паузу только когда одновременно (Owner: после `INC-BILL-LEG-PAUSE-01`):
+Outcome (Owner 2026-08-08 / return 2026-08-11 — **авто-отключение Авто-РК**):
+Нога **Auto (полки)** ставится на паузу только когда одновременно
+(после DONE `INC-AUTO-COST-SHELF-COEXIST-01`; BILL остаётся отдельным
+hypothesis):
 
 1. текущая эпоха тестирования ставок **исчерпана** (больше нечего тестировать
    в допустимом диапазоне / coverage epoch complete);
@@ -316,6 +351,10 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 - Для shelf-enabled кампаний terminal shelf-exhausted MUST NOT маскироваться
   под ordinary `COST_RULE_FAILED` как единственный durable reason (legacy
   non-shelf cost pause остаётся ортогональным).
+- Legacy bid-module coexistence (`INC-AUTO-COST-SHELF-COEXIST-01` DONE) MUST
+  remain valid; terminal shelf pause MUST NOT break «полки ON → старый путь
+  ставки игнорируется» и MUST NOT маскировать terminal reason под ordinary
+  cost pause.
 - `ensure_campaigns_active` / A/B Hold coexistence: freeze ≠ stop; activity-control
   остаётся ортогональным (см. card-ab-hold decisions).
 - Тарифный count по `bot_active` остаётся согласованным при любых UI-изменениях
@@ -339,6 +378,16 @@ Evidence / completion: none yet (Owner: in progress, not shipped).
 
 ## History
 
+- 2026-08-11T05:12:00Z — Owner GO return: задача = **авто-отключение Авто-РК**
+  → `INC-AUTO-SHELF-PAUSE-01` ACTIVE; `INC-AUTO-COST-SHELF-COEXIST-01` marked
+  DONE (archive 2026-08-11); index Active → AUTO-SHELF; OWNER_INTENT product
+  language preserved in handoff.
+- 2026-08-10T09:02:00Z — Owner GO: next Change =
+  `pin-legacy-autobidder-vs-shelf-coexistence` /
+  `INC-AUTO-COST-SHELF-COEXIST-01` (ENABLING_FOUNDATION before
+  `INC-AUTO-SHELF-PAUSE-01`); PAUSE-02 Search remains orthogonal/parallel;
+  achievement route inserts COEXIST before BILL/AUTO-SHELF; forward-compat
+  coexistence pin added.
 - 2026-08-09T06:48:30Z — Owner GO + RECOMMENDED: close `INC-PAUSE-02` first;
   achievement route reorder PAUSE-02 → BILL-LEG → AUTO-SHELF → PRICE → COMMS;
   PRICE explicitly deferred until before press release; BILL is second before

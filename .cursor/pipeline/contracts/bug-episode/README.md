@@ -29,6 +29,8 @@ must not invent a second schema root.
 | `LESSON_GATE.md` | Class-level lesson gate preconditions |
 | `TERMINAL_STATUS_MAP.md` | Episode terminal ↔ durable LEDGER status |
 | `ROUTE_TRACE.md` | Append-only `ROUTE-TRACE.jsonl` event schema |
+| `ROUTE_TRANSITION.md` | Machine hop packet consumed by `/opsx-supervisor` BUG_MISSION |
+| `SUPERVISOR_POLICY.md` | Sequential mission execution policy (not route semantics) |
 | `TASK_DELTA.md` | Post-`/opsx-update` task-delta → apply vs fix-bug |
 | `CLOSE_POLICY.md` | Finding/case/class close; handback; solo walk; Owner-block explore |
 

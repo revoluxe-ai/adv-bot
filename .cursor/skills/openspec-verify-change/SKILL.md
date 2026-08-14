@@ -18,6 +18,10 @@ Verify является read-only audit command после `/opsx-apply` и до
 default archive). `mode=impl` → PHASE_IMPL only (`✅ IMPL_OK` / `❌ IMPL_GAPS`);
 never archive. `mode=archive` → PHASE_ARCHIVE + full `.cursor/commands/opsx-verify.md`
 audit (`✅ GO` / `❌ NO_GO`). Not the same as `/opsx-test … verify`.
+After either phase, when the next step is a local `/opsx-*` hop in this
+workspace, emit **LOCAL_HOP_COPY_BLOCK** (one fenced Owner-local prompt) per
+VERIFY_PHASES — bare `NEXT_ACTION` / `## Следующая команда` alone is
+insufficient.
 
 **Semantic write-target authority:** Read and follow
 `.cursor/commands/opsx-verify.md`, `openspec/policies/VERIFY_POLICY.md`, and
@@ -216,6 +220,16 @@ or for `NO_GO`:
 
 Other allowed next commands for blockers: `/opsx-update <change-name>` or `manual fix`.
 
+### LOCAL_HOP_COPY_BLOCK (mandatory)
+
+Authority: `.cursor/pipeline/contracts/VERIFY_PHASES.md`.
+
+After `## Следующая команда` and **before** the final marker, when the next
+step is a local `/opsx-*` hop in this workspace, emit exactly **one** fenced
+Owner-local copy-paste prompt (workspace, change, mode+marker, gaps/blockers,
+exact Command, `DO_NOT_DO_YET` / `ALSO_OK` as applicable). Bare next-command
+line alone is insufficient. No Web four-block for this hop.
+
 The final line must be exactly one configured marker and nothing after it:
 
 ```text
@@ -227,6 +241,9 @@ or
 ```text
 ❌ NO_GO
 ```
+
+(`mode=impl`: use PHASE_IMPL markers `✅ IMPL_OK` / `❌ IMPL_GAPS` and the
+LOCAL_HOP_COPY_BLOCK rules from VERIFY_PHASES — do not emit archive GO/NO_GO.)
 
 ## Guardrails
 

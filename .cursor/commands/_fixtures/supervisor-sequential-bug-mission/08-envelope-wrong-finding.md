@@ -1,0 +1,14 @@
+# 08 — T9 wrong finding envelope
+
+```text
+DISPATCHED: FINDING_ID=ROOT-001
+RETURNED_ENVELOPE: FINDING_ID=ROOT-002
+```
+
+## Expected
+
+```text
+PAUSED
+ENVELOPE_INTEGRITY_FAIL
+no state ADVANCE
+```

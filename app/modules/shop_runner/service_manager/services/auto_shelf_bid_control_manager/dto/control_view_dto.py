@@ -137,3 +137,4 @@ class AutoShelfBidControlViewDTO:
     auto_shelf_bid_control_strategy: AutoShelfBidControlStrategy = (
         AutoShelfBidControlStrategy.PLAN_DISTANCE
     )
+    retest_interval_days: int = 7

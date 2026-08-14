@@ -112,6 +112,8 @@ class _FakeComplexAdv:
         )
         self._use_common_budget = False
         self._common_budget_daily_limit = None
+        # Empty: skip shelf-exhausted epoch open (ComplexAdv.nmids parity).
+        self.nmids: list[int] = []
         self._active_keywords: list[Any] = (
             list(active_keywords) if active_keywords is not None else [_active_keyword()]
         )

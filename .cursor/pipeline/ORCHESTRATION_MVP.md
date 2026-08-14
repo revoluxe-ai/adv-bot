@@ -95,6 +95,13 @@ CLASSIFICATION: IMPLEMENTATION_BUG
 → /opsx-test verify → GREEN_CONFIRMED
 ```
 
+Classify seed state for the first hop: `CURRENT_ROUTE_STATE=AWAITING_FIX_BUG`
+with machine `ROUTE_TRANSITION.PRECONDITIONS.GO_TOKEN=FORBIDDEN` (see
+`contracts/bug-episode/ROUTE_TRANSITION.md`). That is **not** the same
+token as post-`TASK_DELTA` `AWAITING_FIX_BUG_RED`. Supervisor must consume
+the structured transition; prose «no GO until RED» does not replace
+`NEXT_COMMAND=/opsx-fix-bug` with `/opsx-test`.
+
 ### Route B — specification defect or gap
 
 ```text
