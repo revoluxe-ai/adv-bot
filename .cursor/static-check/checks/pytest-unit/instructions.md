@@ -18,12 +18,15 @@ If targeted is FAIL/BLOCKED/ERROR → do **not** run this check (`SKIPPED`).
 
 ## Stale-pytest hygiene (mandatory before first run and before INFRA retry)
 
-Budget ≤ ~5s. Windows-first. Before invoking the canonical command:
+Budget ≤ ~5s hard wall. Windows-first. Before invoking the canonical command:
 
 1. Capture `RUN_START_TS` at the beginning of this check (before process probe).
 2. Probe processes whose CommandLine matches this `REPO_ROOT` and
    `pytest` / `xdist` / `run.sh -- poetry run pytest`, collecting
    `pid`, `ppid`, `started_at` (if available), and commandline.
+   Prefer a fast narrow probe (e.g. filtered `tasklist` / short PowerShell
+   with timeout). Do **not** run unbounded full `Win32_Process` CIM scans
+   that routinely exceed the budget.
 3. Build current process tree roots for this run (orchestrator shell/python).
 4. A process is **eligible orphan** only if ALL conditions are true:
    - matches repo-root + pytest/xdist signature;
@@ -35,9 +38,26 @@ Budget ≤ ~5s. Windows-first. Before invoking the canonical command:
 8. If probe cannot reliably determine ancestry/start-time for candidates
    (ambiguous ownership), stop with `STATUS=BLOCKED` and
    `ERROR=blocked_hygiene_ambiguous` (do not blind-kill).
+9. If the probe itself exceeds ~5s wall without a reliable answer: abort the
+   probe, do **not** blind-kill, document
+   `WORKER HYGIENE: pytest-unit → none (found=0 eligible=0 killed=0 skipped_current_tree=0)`
+   with NOTES `hygiene_probe_timeout`, and proceed to the unit Shell
+   (treat as no orphans found). Do **not** spend tens of seconds on hygiene.
 
 Document progress with counters:
 `WORKER HYGIENE: pytest-unit → cleared|none|blocked (found=<n> eligible=<n> killed=<n> skipped_current_tree=<n>)`.
+
+## Long-suite heartbeat (SERIAL / orchestrator Shell)
+
+Before starting the canonical xdist command, emit:
+`WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`.
+Prefer sliced Shell waits (~60–120s) or background Shell + `AwaitShell` with
+periodic `WORKER RUNNING: pytest-unit (still in progress; ~Nm elapsed)`.
+Do **not** rely on one opaque multi-tens-of-minutes silent wait.
+Owner «зависло» while this suite’s `pytest`/`run.sh` is alive is **not**
+launch-infra retry. On Owner `STOP_RUN` / Shell interrupt / abort: packet
+`STATUS=ERROR`, `ERROR=interrupted` or `STOP_RUN`, then orchestrator Final
+(later waves SKIPPED) — see `opsx-static-check.md`.
 
 ## Rules
 
@@ -61,6 +81,7 @@ Collection problems → severity `collection-error`.
 | Non-zero **with** failed node ids / assertion failures | FAIL |
 | `INTERNALERROR` / `Unexpectedly no active workers` / exit ∈ {2,3} **and** no failed node ids | ERROR (`infra_suite`) — **not** product FAIL |
 | Fallback non-xdist also crashes with no failed nodes | ERROR (`infra_suite_hard`) |
+| Owner STOP_RUN / Shell interrupt / abort mid-suite | ERROR (`interrupted` / `STOP_RUN`) — not product FAIL |
 
 ### INFRA recovery ladder (exactly once per stage per CHECK_ID per run)
 
@@ -86,3 +107,4 @@ When STATUS would be ERROR `infra_suite`:
 7. Never ask for manual "kill + full rerun" as first reaction after xdist retry
    exhaustion. The ladder must produce an in-run deterministic verdict unless
    fallback also infra-crashes.
+8. Do **not** enter this ladder for `interrupted` / `STOP_RUN` packets.

@@ -11,6 +11,19 @@ Unless the Owner message contains the **exact** token `PARALLEL_TASKS`:
 - Registry `task_type` / wave `parallel` are ignored under this default.
 - Complete the cascade, then emit the Final report (`STATUS` + `CHECKS` +
   `NEXT ACTION`). Progress-only lines are never terminal.
+- **Long-suite heartbeat (pytest-unit / similarly long Shell):** before starting
+  the unit xdist Shell, emit
+  `WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`. Prefer sliced
+  waits (~60–120s) or background Shell + `AwaitShell` with periodic
+  `WORKER RUNNING: pytest-unit (still in progress; ~Nm elapsed)` — **not** one
+  opaque multi-tens-of-minutes silence. Align with `opsx-static-check.md` /
+  `checks/pytest-unit/instructions.md`.
+- Owner «зависло»/hang while SERIAL `pytest`/`run.sh` is **alive** is **not**
+  launch-infra; keep heartbeat/poll or, if Owner aborts, treat as STOP_RUN.
+- Owner `STOP_RUN` / Shell tool interrupted / abort mid-check → **no** retry;
+  in-flight check `STATUS=ERROR` (`interrupted` / `STOP_RUN`); later pytest
+  waves `SKIPPED`; fan-in known packets; **mandatory** Final **same turn**.
+  Never leave mid-cascade silence or progress-only as terminal.
 
 ## Opt-in: `PARALLEL_TASKS` (legacy Task fan-out)
 
@@ -103,8 +116,11 @@ and the **same** prompt body (still READ_ONLY; same `run.sh` command).
 - Do not reclassify Agent Looping / empty packet / silent stall as a product
   test failure.
 - **Not** launch-infra: matching `pytest`/`run.sh` is alive (e.g. PG lock
-  hang) → env / concurrent-suite; owner `STOP_RUN` of entire static-check →
-  no retry.
+  hang) → env / concurrent-suite; Owner «зависло» while SERIAL pytest is alive
+  → not launch-infra (heartbeat/poll or STOP_RUN if abort).
+- **Not** launch-infra: owner `STOP_RUN` / Shell interrupt / abort of entire
+  static-check → no retry; mandatory Final with ERROR+SKIPPED same turn
+  (see SERIAL section above and `opsx-static-check.md`).
 - **Not** launch-infra: pytest finished with `INTERNALERROR` / «no active
   workers» without failed nodes → that is **INFRA suite** recovery on
   pytest-unit (orchestrator path above), not a Task retry.
@@ -132,8 +148,12 @@ Under default `SERIAL_ORCHESTRATOR`, every check is already orchestrator Shell
   - “waiting for packets”
   - “cascade continues”
   - any equivalent progress-only wording without Final `STATUS:` + `CHECKS`
+- Under SERIAL: long suites may emit `WORKER RUNNING` heartbeats / sliced
+  waits **inside** the turn; still must Final when cascade completes **or**
+  on STOP_RUN / Shell interrupt / Owner abort.
 - After background launch (`PARALLEL_TASKS`), ending the turn is only to receive
-  completion notifications — not to stop the command. Resume until Final.
+  completion notifications — not to stop the command. Resume until Final
+  **or** apply STOP_RUN Final.
 - On each worker notification **or** silent-stall signal: record packet **or**
   apply Launch-infra Task retry once **or** (after Task budget) orchestrator-direct;
   if wave still open → keep waiting; if wave complete → continue immediately
@@ -144,5 +164,8 @@ Under default `SERIAL_ORCHESTRATOR`, every check is already orchestrator Shell
   the orchestrator’s next user-visible message MUST include the full Final
   report (`STATUS` + `CHECKS` + `NEXT ACTION`) from `opsx-static-check.md` §5.
   Stopping after a red subagent packet alone = **contract violation**.
+- On known abort (STOP_RUN / Shell interrupt): synthesize from packets already
+  collected + in-flight ERROR + later SKIPPED — never leave `INCOMPLETE_RUN`
+  as the only outcome when abort is known.
 - Do not paste worker `RAW_TAIL` into the user Final report; synthesize per
   `contracts/synthesis.md`.

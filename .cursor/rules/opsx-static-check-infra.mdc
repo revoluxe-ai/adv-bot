@@ -44,13 +44,16 @@ alwaysApply: false
     **forbidden as terminal**; treat as `INCOMPLETE_RUN` for envelopes.
     Under `PARALLEL_TASKS`: never stop after fan-out / partial WORKER READY;
     resume on each Task notification **or** silent-stall signal until packets
-    are in, then Final.
+    are in, then Final. Under SERIAL: long suites may emit `WORKER RUNNING`
+    heartbeats / sliced waits **inside** the turn; still must Final when
+    cascade completes **or** on STOP_RUN / Shell interrupt / Owner abort.
 13. **Launch-infra retry (`PARALLEL_TASKS` Task checks only):** empty/missing
     worker packet, Agent Looping, Task abort without packet, **or silent stall**
     → interrupt open Task if needed → exactly one Task `generalPurpose` retry
     (same prompt). Not a pytest FAIL. Never more than one Task retry per
     CHECK_ID. Exclude live pytest (PG lock) and full `STOP_RUN`. Does **not**
-    apply to pytest-unit (`orchestrator`) or default SERIAL path.
+    apply to pytest-unit (`orchestrator`) or default SERIAL path. Owner
+    «зависло» while SERIAL `pytest`/`run.sh` is alive is **not** launch-infra.
 14. **Orchestrator-direct (`PARALLEL_TASKS` only):** after Task launch-infra
     budget exhausted and the check never started → one orchestrator Shell
     `run.sh` + synthesize packet. Not a second Task retry. Then ERROR if that
@@ -63,3 +66,12 @@ alwaysApply: false
     Record `UNIT_RECOVERY_PATH=xdist_retry|fallback_non_xdist`.
     Do not first-route to manual kill+full-rerun loops; do not sole-route to
     `/opsx-test-triage` for worker-death without failed nodes.
+16. **SERIAL long-suite heartbeat:** before pytest-unit (xdist) Shell, emit
+    `WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`. Prefer sliced
+    / `AwaitShell` re-block with periodic still-in-progress lines — forbid
+    one opaque multi-tens-of-minutes silent wait as the only UX.
+17. **STOP_RUN / interrupt Final (mandatory):** Owner `STOP_RUN`, Shell tool
+    interrupted mid-check, or Owner abort while a SERIAL check is in-flight →
+    no retry; in-flight check `ERROR` (`interrupted`/`STOP_RUN`); later pytest
+    waves `SKIPPED`; fan-in known packets; print Final **same turn**. Never
+    terminal mid-cascade silence.

@@ -43,12 +43,20 @@ Run metadata contract (printed in Final SUMMARY):
       kill leftover pytest for REPO_ROOT, inspect env/xdist instability,
       re-run `/opsx-static-check` Wave U (or canonical unit command) —
       **not** `/opsx-test-triage`
-     - env/config group (if any) → short recover step text (not opsx-fix-*)
+     - TESTS / pytest-unit `ERROR interrupted` / `STOP_RUN` (Owner abort or
+       Shell interrupt; no failed nodes) → re-run `/opsx-static-check` (or
+       `FROM_WAVE=U` only with valid `A_REUSE_FINGERPRINT`) after confirming
+       no leftover pytest; **not** `/opsx-test-triage`
+     - env/config group (if any) → `/opsx-test-env UP` (not ad-hoc
+      `docker-compose` / `/opsx-devops`; laptop test compose owns PG:5433 +
+      CH:8124; Redis is external `:6379` while `test_redis` stays commented —
+      UP may return DEGRADED until Redis is up; not `/opsx-fix-*`)
    - `seen_in`
    Evidence lines inside a group: ≤4.
 5. **Rank** within each bucket (then print STATIC first, then TESTS):
-   environment/config → infra_suite (xdist worker-death) → collection →
-   multi-tool typing → typing → multi-seen pytest → other pytest → other.
+   environment/config → STOP_RUN/interrupted → infra_suite (xdist worker-death) →
+   collection → multi-tool typing → typing → multi-seen pytest → other pytest →
+   other.
 6. **Hard body budget** (Final PROBLEMS section only, ~half chat max):
    - ≤12 problem groups total across both buckets
    - ≤80 lines AND ≤3500 characters for the PROBLEMS body
@@ -59,14 +67,22 @@ Run metadata contract (printed in Final SUMMARY):
 7. **Forbidden in Final report:** worker `RAW_TAIL`, full `FINDINGS` dumps,
    repeating the same stack/source blob across groups.
 8. **One NEXT_ACTION** (what to run *first* now; still exactly one line):
-   - env/config → recover step
-  - else pytest-unit `ERROR infra_suite_hard` / fallback infra crash without
-    failed nodes → kill leftover pytest; recover env; re-run unit/static-check
-    (not test-triage)
+   - env/config → `/opsx-test-env UP` (then PROBE; if DEGRADED on Redis
+     `:6379`, start external Redis or Owner-separate enable of compose
+     `test_redis` — not silent uncomment from static-check)
+   - else pytest-unit `ERROR infra_suite_hard` / fallback infra crash without
+     failed nodes → kill leftover pytest; recover env; re-run unit/static-check
+     (not test-triage)
+   - else pytest-unit / suite `ERROR interrupted` / `STOP_RUN` → re-run
+     `/opsx-static-check` (full or valid `FROM_WAVE=U`); not test-triage
    - else typing / multi-tool typing → `/opsx-fix-types`
    - else pytest with failed nodes → `/opsx-test-triage`
-   - PASS → continue (optional `/opsx-verify` hint only; never archive GO)
+   - PASS → continue (optional `/opsx-verify`; after FULL with live services,
+     soft advisory `/opsx-test-env DOWN`; never archive GO)
    Per-group `fix_cmd` does **not** replace this single NEXT_ACTION.
 9. **Delivery:** Final report is mandatory after fan-in even when Agent Team /
    UI already displayed a failed subagent. Orchestrator prints it; do not
-   treat Task completion notifications as the report.
+   treat Task completion notifications as the report. Final is also mandatory
+   on Owner `STOP_RUN` / Shell interrupt / abort mid-cascade: synthesize from
+   packets already collected + in-flight ERROR + later SKIPPED — never leave
+   `INCOMPLETE_RUN` as the only outcome when abort is known.

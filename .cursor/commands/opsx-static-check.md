@@ -65,6 +65,16 @@ Read-only quality gate. Не заменяет `/opsx-verify`, `/opsx-fix-types`,
 
 Shared contracts: `.cursor/commands/opsx-source-resolution.md`, `.cursor/commands/opsx-execution-preflight.md` (общий opsx preflight ≠ optional PREFLIGHT этой команды).
 
+**Local test services (soft, not this command):** optional token `PREFLIGHT` checks
+tooling files only — it does **not** bring up Docker services. Before FULL /
+`pytest-destructive` / live PG|CH|Redis integration, soft-recommend
+`/opsx-test-env UP` (`tests/docker-compose.test.yml`: PG `5433`, CH `8124`;
+Redis external `:6379` while compose `test_redis` remains commented — UP may be
+`DEGRADED` until Redis is available). Env-class FAIL in Final → NEXT from
+`contracts/synthesis.md` (`/opsx-test-env UP`, not ad-hoc root compose /
+`/opsx-devops`). After FULL `PASS` with live services: soft advisory
+`/opsx-test-env DOWN`. This command never mutates compose or starts Redis.
+
 ## Steps
 
 ### 1. Load registry
@@ -103,6 +113,9 @@ A_REUSED: yes|no (fingerprint=<id|n/a>)
 **По умолчанию шаг пропускается** (`PREFLIGHT: off`).
 
 Выполнять `.cursor/static-check/base/preflight.md` **только** если в `$ARGUMENTS` есть точный токен `PREFLIGHT`.
+
+`PREFLIGHT` ≠ `/opsx-test-env`: preflight = tooling/files probe; services =
+`/opsx-test-env UP` (separate Owner step before FULL/destructive when needed).
 
 Если `PREFLIGHT` задан и probe fail → STOP:
 
@@ -146,6 +159,17 @@ If xdist retry is exhausted with another infra death (still no failed nodes),
 run one deterministic non-xdist classifier (`poetry run pytest -m unit -x`)
 inside the same run. Record `UNIT_RECOVERY_PATH=xdist_retry|fallback_non_xdist`.
 Only fallback infra crash may remain `ERROR infra_suite_hard`.
+
+**SERIAL long-suite heartbeat (pytest-unit / similarly long Shell):** before
+starting the canonical unit Shell, emit interim
+`WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`. Prefer sliced
+waits (Shell `block_until_ms` in ~60–120s slices **or** background Shell +
+`AwaitShell` re-block) with a periodic progress line such as
+`WORKER RUNNING: pytest-unit (still in progress; ~Nm elapsed)` — **not** one
+opaque multi-tens-of-minutes silence. Progress lines remain interim-only;
+Final is still mandatory when the check (or STOP_RUN) closes. Live
+`pytest`/`run.sh` under SERIAL + Owner «зависло»/hang report is **not**
+launch-infra retry (pytest is running).
 
 #### Opt-in: `PARALLEL_TASKS` (legacy Task fan-out)
 
@@ -200,9 +224,14 @@ pytest-unit uses INFRA recovery when xdist workers die after a real start.
 **Not** launch-infra / not orchestrator-direct (do not retry for these):
 
 - matching `pytest`/`run.sh` is alive (e.g. PG/`DROP SCHEMA` lock hang) →
-  env / concurrent-suite issue;
-- owner `STOP_RUN` / abort of the entire `/opsx-static-check` → no retry;
-  Final report with ERROR/SKIPPED as appropriate.
+  env / concurrent-suite issue (not Task launch-infra);
+- Owner «зависло»/hang while SERIAL pytest-unit/`run.sh` is **alive** →
+  not launch-infra; keep heartbeat/poll or, if Owner aborts, treat as STOP_RUN;
+- owner `STOP_RUN` / abort of the entire `/opsx-static-check` / Shell tool
+  interrupted mid-check → **no** retry; **mandatory** Final in the same
+  turn: in-flight check `STATUS=ERROR` (`interrupted` / `STOP_RUN`), later
+  pytest waves `SKIPPED`, fan-in already-known packets (incl. Wave A typing),
+  then §5 Final. Never leave mid-cascade silence or progress-only as terminal.
 
 Task prompt MUST match `base/worker-prompt.md` (required body).
 
@@ -211,6 +240,8 @@ Progress lines (interim only — never terminal):
 ```text
 WORKER READY: <check_id> → <STATUS> (findings=<n>)
 WORKER HYGIENE: pytest-unit → cleared|none|blocked (found=<n> eligible=<n> killed=<n> skipped_current_tree=<n>)
+WORKER RUNNING: pytest-unit (xdist; expect multi-minute)
+WORKER RUNNING: pytest-unit (still in progress; ~Nm elapsed)
 WORKER INFRA RETRY: pytest-unit → orchestrator-shell
 WORKER INFRA FALLBACK: pytest-unit → non-xdist-classifier
 WORKER RETRY: <check_id> → generalPurpose (launch-infra)
@@ -238,9 +269,12 @@ followed by the required `CHECKS` / synthesis fields is an **incomplete run**
 
 Under default `SERIAL_ORCHESTRATOR`, complete the cascade in the orchestrator
 turn (Shell steps until every scheduled check has a packet), then emit Final.
-Do not end the turn after launching background work with only a progress
-sentence. Under `PARALLEL_TASKS`, WAIT until packets land, then Final — never
-treat progress as completion.
+Long suites may use sliced/background Shell + `WORKER RUNNING` heartbeats
+**inside** that turn; do **not** end the turn with only a progress sentence
+while work is still intended to continue. On STOP_RUN / Shell interrupt /
+Owner abort: stop the cascade and emit Final immediately (see STOP_RUN
+rules above). Under `PARALLEL_TASKS`, WAIT until packets land **or** apply
+STOP_RUN Final — never treat progress as completion.
 
 Pytest cascade (registry waves; hard stop on FAIL|BLOCKED|ERROR):
 
@@ -324,12 +358,19 @@ Budgets, dedupe, `fix_cmd` mapping, and single NEXT_ACTION rank: only in
 ## Human checklist
 
 - PREFLIGHT off unless explicitly requested?
+- Soft `/opsx-test-env UP` before FULL/destructive when live PG|CH|Redis needed
+  (not confused with PREFLIGHT; Redis `:6379` external while `test_redis`
+  commented)?
 - No self-repair of command/infra during this run?
 - Default launch `SERIAL_ORCHESTRATOR` (no nested Task) unless exact token
   `PARALLEL_TASKS`? No custom agent names?
 - pytest-unit: orchestrator Shell + stale-pytest hygiene; INFRA retry once on
   xdist worker-death without failed nodes; if still infra, one in-run fallback
   `pytest -m unit -x` before declaring `infra_suite_hard`?
+- SERIAL long-suite: `WORKER RUNNING` before unit Shell + sliced/heartbeat
+  waits (no opaque multi-tens-of-minutes silence)?
+- STOP_RUN / Shell interrupt / Owner abort: mandatory Final with
+  ERROR+SKIPPED same turn (never INCOMPLETE mid-cascade)?
 - `PARALLEL_TASKS` only: Launch-infra one Task GP retry; then orchestrator-direct
   once if suite never started?
 - Registry-driven waves? xdist only on full unit?

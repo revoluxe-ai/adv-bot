@@ -64,5 +64,18 @@ Do **not** invoke bare `poetry run pytest` (no marker) — retired with
   Concurrent second `-n` suite on the same tree is unsupported.
   Kill only eligible pre-run orphans outside current run tree; ambiguous
   ownership => `blocked_hygiene_ambiguous` (do not blind-kill).
+  Hygiene probe budget ≤ ~5s hard wall; on probe timeout → treat as no orphans
+  (`hygiene_probe_timeout`), do not blind-kill, proceed to unit Shell (see
+  pytest-unit pack).
 - **pytest-unit owner:** orchestrator Shell (`task_type: orchestrator`), not a
   nested Task.
+- **SERIAL long-suite heartbeat:** before
+  `poetry run pytest -m unit -n 8 --dist=worksteal`, emit
+  `WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`. Prefer sliced
+  Shell / `AwaitShell` re-block with periodic still-in-progress lines (see
+  `opsx-static-check.md` + pytest-unit pack). Do not rely on one opaque
+  multi-tens-of-minutes silent wait.
+- **STOP_RUN / Shell interrupt:** Owner abort or Shell tool interrupted
+  mid-suite → pytest-unit packet `ERROR` (`interrupted` / `STOP_RUN`); later
+  pytest waves SKIPPED; orchestrator mandatory Final same turn — not
+  progress-only / not INFRA ladder.
