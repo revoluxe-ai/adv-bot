@@ -105,7 +105,10 @@
     "app/client_bot/user_interface/views/messages/strategy_display.py",
     "app/modules/common_slaves/wildberries/models/enums",
     "app/modules/shop_runner/service_manager/services/v3_status_mode_sync.py",
-    "app/utils/db/session_maker.py"
+    "app/utils/db/session_maker.py",
+    "app/client_bot/dispatcher_factory.py",
+    "app/client_bot/user_interface/handlers/invite_show.py",
+    "app/modules/partner_program"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",
