@@ -203,6 +203,20 @@ As each plan Task completes successfully with an actionable in-scope plan
    - Still obey all child gates (receipt, protected branch, matrices, scope)
 4. When that execute finishes, start the next ready lane’s execute (if any).
 
+**Owner-visible wait identity (mandatory — CA-WAIT-OPAQUE):** before launching
+an execute Task, and again whenever the parent is blocked waiting for a running
+execute Task to finish, emit exactly one progress block (plain text, not silent):
+
+```text
+LANE_WAIT: parent=/opsx-commit-all waiting_for=<LANE_PROCESS|/opsx-meta-commit | LANE_PRODUCT|/opsx-commit>
+OWNER_AWAITED: no
+NEXT_LANE_AFTER: <LANE_PRODUCT|/opsx-commit | LANE_PROCESS|/opsx-meta-commit | none>
+```
+
+Do **not** imply Owner/gate wait during serial execute serialization. Owner is
+not awaited between plan fan-out and serial child-GO (plans already authorized
+by parent `GO`).
+
 **As-ready order:** first successfully planned actionable lane executes first;
 the second waits. If both plans are ready before either execute starts,
 prefer order: `LANE_PROCESS` then `LANE_PRODUCT` (stable default).
@@ -247,6 +261,7 @@ FORBIDDEN_FOR_PARENT:
 | `index.lock` / git lock on execute | one serial re-dispatch of **that** lane only | Then stop that lane if still failing |
 | Both lanes skipped | `COMPLETE_NOOP` | SUMMARY explains clean/out-of-scope |
 | Parent args missing required child receipt under forwarded `ALL` | child blocks product lane | Parent surfaces; may still run process lane |
+| Execute child `COMMITTED` but parent interrupted / Task delivery lost before SUMMARY or next-lane launch | `PARTIAL` | Recover child status from transcript and/or `git log`; print SUMMARY with known lane results; **do not** re-dispatch a lane whose planned groups are already committed; resume only remaining actionable lane |
 
 Never mark parent `COMPLETE` if any execute was attempted and failed without a
 successful child commit report for that attempted lane — use `PARTIAL` or
@@ -256,6 +271,21 @@ successful child commit report for that attempted lane — use `PARTIAL` or
 
 - Re-run `/opsx-commit-all` with same tokens, or
 - Run the failed child alone (`/opsx-commit` or `/opsx-meta-commit`).
+
+**Interrupt after child COMMITTED (mandatory — CA-INTERRUPT-RECOVERY):**
+
+1. If a child execute report is recoverable (Task transcript `STATUS: COMMITTED`,
+   or `git log` shows the planned group SHAs / process or product tree clean for
+   that lane’s planned files) → treat that lane as `EXECUTE=COMMITTED` / SKIPPED
+   on re-dispatch — **never** re-commit the same planned groups.
+2. Parent MUST still attempt a fan-in SUMMARY with whatever lane results are
+   known (`COMMITTED` / `PARTIAL` / interrupted / not started).
+3. `NEXT_ACTION` must name the **remaining** actionable lane only, e.g.
+   `/opsx-commit ALL GO` (process already done) or `/opsx-meta-commit ALL GO`
+   (product already done), or `/opsx-commit-all ALL GO` with the completed lane
+   marked SKIPPED in the parent prompt context.
+4. Do not invent a full dual-lane re-run that would duplicate already-landed
+   commits.
 
 ## Final report (parent)
 
