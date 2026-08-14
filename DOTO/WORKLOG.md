@@ -1,5 +1,4 @@
-INBOX
- Переключить всех на корзины - они опять появились
+Переключить всех на корзины - они опять появились
  CH: иногда 500 на тяжёлых запросах
  отписать WB на форум о проблеме с корзинами
  Метрики оплаты: sent → click → paid
@@ -95,9 +94,6 @@ INBOX
 Добавить показы в статистику карточки
 Добавить тексты в линтеры
 Поменять тесты ставки в Авто Время из PG на CH
-
-TODAY (WIP<=2)
-
 TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Зачем: prod-логов недостаточно, чтобы понять где пропадает NewBid(560) в update_cluster_bids для exact кейса.
 - Exact case: shop_id=db28efff-f7a9-52f8-8342-f1a58f7d8ed3, adv_id=32824944, search_adv_id=29734515, nmid=10749810, ks_id=17783715, key="антивозрастной матирующий крем".
@@ -105,22 +101,20 @@ TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Batch per-shop: CoroutinesManager → ClusterBidsManagerContainer(shop_id) → WBManager(shop_id); trace shop_id = wb_manager._shop_id, не advs[0].
 - После root cause: выключить env на prod, удалить cluster_bid_trace.py + trace calls + test_cluster_bid_trace.py (или оставить guard под флагом, если решим оставить навсегда).
 
+ UI message test infra:
+ - централизовать HTML escaping для всех HTML-экранов
+ - убрать оставшиеся локальные лимиты 4096/1024
+ - постепенно покрыть все message builders documentation regression tests
+ - вынести user-facing copy из handlers в view/message layer
+ - добавить warning-linter для сырых технических строк
+ - ввести pattern "? Что это?" для сложных экранов
 - централизовать в v3 экзекуторах получение фраз
 - сделать в v3 экзекуторах нормальную только релеватные фразы фильтрацию
 
 
-NEXT
 
- P1: события оплаты + ежедневный отчёт
 
- P2: Safe mode
 
- Safe mode при балансе 0 (идея)
-
-DONE
- P0: CH лимит параллелизма + кэш результата
- WB: у части магазинов нет корзин по API → переключил на заказы
- P0: сообщение пользователям про корзины + тикет WB
 
 проверить
 
