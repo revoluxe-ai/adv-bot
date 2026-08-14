@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-08-14T09:05:00Z",
+  "updated_at_utc": "2026-08-14T09:53:00Z",
   "namespace": "prod-adv-bot",
   "database_identity": "prod-adv-bot/postgres-db/adv_updater",
   "alembic_head": "e8f9a0b1c2d3",
@@ -44,7 +44,7 @@
     "Harbor git-registry-cache is pull-through proxy",
     "Do not laptop-alembic; Job path only under /opsx-devops SAFE_PROD_RELEASE",
     "2026-08-14 SAFE_PROD_RELEASE completed: CONTROL IDEMPOTENT_HIT token=1 → mark_started → migrate f2a3→e8f9 → mark_succeeded → begin → CAS → complete_release",
-    "run-update-active-shop-ids flaky Error restarts observed post-CAS; investigate separately (pre-existing pattern)",
+    "2026-08-14 prod-wb-gram: POSTGRES_MASTER/REPLICA_HOST=postgres-db.prod-adv-bot.svc.cluster.local; POSTGRES_SSL_MODE=disable (pooler off, PG ssl=off)",
     "Zalando status UpdateFailed after adding release_controller; patroni.pg_hba host-all-md5 pinned"
   ]
 }

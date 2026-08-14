@@ -28,7 +28,7 @@ that changes release posture. Never store secrets, DSN, passwords, or tokens.
 | `adv-bot-updater` | updater |
 | `adv-bot-asq-worker` | ASQ worker |
 | `run-shop-update-worker` | shop runner |
-| `run-update-active-shop-ids` | active shops (watch CrashLoop / DNS) |
+| `run-update-active-shop-ids` | active shops |
 | `trunc-system-log-clickhouse` | log trunc |
 | `free-bot` | often `replicas=0` — still CAS image when present |
 
@@ -62,7 +62,8 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 * **Authz repair DONE (2026-08-14):** `release_controller` LOGIN exists; `app-db-control` → `release_controller` with EXECUTE on all 8 release-control functions; `app_migrator` has **no** release-control EXECUTE.
 * Zalando status `UpdateFailed` after adding `release_controller` (operator sync unhappy). Role/grants/secret work; CR pins `patroni.pg_hba` `host all all all md5` because `ssl=off` + default `hostnossl reject` broke remote Jobs. Investigate UpdateFailed separately.
-* `run-update-active-shop-ids` CrashLoopBackOff post-CAS (`socket.gaierror` Name or service not known on PG connect) — **not** schema UndefinedColumn; pre-existing flaky / DNS. Investigate separately; other entrypoints Running.
+* **prod-wb-gram PG routing (2026-08-14):** `POSTGRES_MASTER_HOST`/`REPLICA_HOST` → `postgres-db.prod-adv-bot.svc.cluster.local` (pooler disabled in CR); `POSTGRES_SSL_MODE=disable` (PG `ssl=off`). Cluster-only CM — not in git.
+* Orphan `postgres-db-pooler-external` LB (no pooler pods/endpoints) — cleanup optional.
 * Automation still `NO` — staff `/opsx-devops` path only.
 * Harbor direct push from CI fails on proxy project; rely on pull-through.
 * Next Expand release must update APPLICATION `source_history_hash` (Owner) before acquire with real graph hash.
@@ -81,3 +82,4 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-14 | Authz repair mission (inspect-only) | `release_controller` missing; FAIL CLOSED — remediation packet |
 | 2026-08-14 | Authz repair APPLY (kubectl) | CR user + ROLE/GRANT/REVOKE + Secret rewire + pg_hba host-md5; verify PASS; no migrate/CAS |
 | 2026-08-14 | GO resume safe_prod_release `3ad2d7d6…` CONTROL_DRY_RUN=0 | CONTROL IDEMPOTENT_HIT token=1 → mark_started → migrate SUCCESS → mark_succeeded → begin → CAS all entrypoints → complete_release OK; alembic `e8f9…`; LKG now `3ad2d7d6…` |
+| 2026-08-14 | GO CONFIG_PATCH prod-wb-gram PG hosts + SSL | pooler host → postgres-db direct; SSL require → disable; all entrypoints rolled out; run-update-active-shop-ids Running |
