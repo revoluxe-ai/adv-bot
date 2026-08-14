@@ -274,6 +274,13 @@ class InviteShow(CallbackData, prefix="invite"):
     action: str = "show"
 
 
+class PartnerAdminAction(CallbackData, prefix="partner_admin"):
+    """Admin callbacks for partner statistics and partner payouts."""
+
+    action: str
+    partner_user_id: int | None = None
+
+
 class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
     action: str
     adv_original_id: int
