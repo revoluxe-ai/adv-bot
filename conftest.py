@@ -48,9 +48,10 @@ os.environ["CLICK_HOUSE_PASSWORD"] = "password"  # Password from docker-compose.
 os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
 os.environ.setdefault("CH_MAX_THREAD", "10")
 os.environ.setdefault("BIDDER_STEP_RUB", "1")
-os.environ["REDIS_MASTER_HOST"] = "localhost"
-os.environ["REDIS_REPLICA_HOST"] = "localhost"
-os.environ["REDIS_HOST"] = "localhost"
+# Redis: same IPv4 loopback as PG/CH (Windows localhost→::1 breaks compose Redis).
+os.environ["REDIS_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_REPLICA_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_HOST"] = _TEST_PG_HOST
 os.environ["REDIS_PORT"] = "6379"
 os.environ.setdefault("MIN_SUM", "0")
 os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
@@ -74,9 +75,9 @@ os.environ["POSTGRES_PORT"] = "5433"
 os.environ["POSTGRES_DBNAME"] = "test_adv_bot_db"
 os.environ["CLICKHOUSE_PORT"] = "8124"
 os.environ["CLICK_HOUSE_HOST"] = _TEST_PG_HOST
-os.environ["REDIS_MASTER_HOST"] = "localhost"
-os.environ["REDIS_REPLICA_HOST"] = "localhost"
-os.environ["REDIS_HOST"] = "localhost"
+os.environ["REDIS_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_REPLICA_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_HOST"] = _TEST_PG_HOST
 os.environ["BOT_TOKEN"] = "test_token_123"
 os.environ["TELEGRAM_BOT_TOKEN"] = "test_token_123"
 os.environ["YOOKASSA_TOKEN"] = "test_yookassa"
