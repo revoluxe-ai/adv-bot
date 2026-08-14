@@ -3,7 +3,7 @@ description: "Write targeted tests from the user's request without changing prod
 argument-hint: "<test request / bug / behavior> | case=<CASE_ID> finding=<FINDING_ID> [verify] [CACHE_OFF|CACHE_FORCE|CACHE_DEV] [optional OpenSpec change-id]"
 ---
 
-# /opsx:test
+# /opsx-test
 
 Write or update targeted tests based on the user's request.
 

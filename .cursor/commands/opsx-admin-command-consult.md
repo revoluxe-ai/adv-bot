@@ -40,10 +40,13 @@ Reduce front-door uncertainty for process questions:
 - An admin or pipeline command “behaved wrongly” and triage is needed before
   fix / analyze / design.
 - Ambiguous process ownership or bypass concern (discuss only; do not APPLY).
+- Human asks how to prepare client/distribution materials after a completed
+  change → route to `/opsx-distribute-brief` (not redesign; not create-pr).
 
 ## When not to use
 
 - Known day-to-day next not-admin step → `/opsx-pipeline` (NAVIGATE)
+- Known completed-change client/CS brief → `/opsx-distribute-brief`
 - Known pipeline redesign / human-usability improvement pass →
   `/opsx-admin-command-analyze-pipeline`
 - Confirmed command-contract defect ready to plan/apply →
@@ -53,6 +56,9 @@ Reduce front-door uncertainty for process questions:
 - Process lesson after FIXED Bugbot/fix packet →
   `/opsx-admin-command-promote-process-lesson`
 - Commit process surfaces → `/opsx-meta-commit`
+  (`/opsx-admin-command-commit` = obsolete alias/redirect only)
+- Unmerged / merge|rebase conflicts on process surfaces →
+  `/opsx-admin-command-resolve-conflicts`
 - Product idea / OpenSpec feature thinking → `/opsx-explore`
 - Oversized change TZ / cut scope + park remainder to WORKLOG → `/opsx-bound-scope`
 - Product bug → `/opsx-fix-bug` / bug-hunt path
@@ -89,7 +95,7 @@ states the process question or incident.
 
 If the user includes `GO`: still no writes. Explain that APPLY lives on the
 routed command (`fix-command-defects`, `design-command`, `pipeline UPDATE GO`,
-`admin-commit`), not here.
+`meta-commit`, `resolve-conflicts`), not here.
 
 ## Topic classes (exactly one)
 
@@ -104,6 +110,7 @@ routed command (`fix-command-defects`, `design-command`, `pipeline UPDATE GO`,
 | `route_pipeline_navigate` | As-is next not-admin step | `/opsx-pipeline` |
 | `route_pipeline_update` | Shared graph stale / missing | `/opsx-pipeline UPDATE` |
 | `route_admin_commit` | Process files changed, need commit | `/opsx-meta-commit` |
+| `route_resolve_conflicts` | Unmerged paths / merge\|rebase on process surfaces | `/opsx-admin-command-resolve-conflicts` |
 | `wrong_branch` | Typing or product logic | `/opsx-fix-types` / static-check or `/opsx-fix-bug` |
 | `needs_evidence` | Missing fact blocks safe route | one narrow question; `NEXT_ACTION: none` until answered |
 
@@ -120,6 +127,20 @@ When asked about `/opsx-pipeline` vs `/opsx-admin-command-analyze-pipeline`:
 | Bridge | May consume analyze draft as **evidence** for UPDATE only | Draft is not the operator map until UPDATE GO |
 
 Do not invent alternate durable graph locations.
+
+When asked about process-surface **git conflicts** vs **commits**:
+
+| | `/opsx-admin-command-resolve-conflicts` | `/opsx-meta-commit` |
+|---|---|---|
+| Role | Resolve unmerged process paths; finish merge/rebase continue | Semantic local commits on a **non-conflicted** process tree |
+| Writes | Only with `GO` (resolved files + continue/abort) | Only with `GO` (stage + commit) |
+| Refuse | Product-only / mixed-scope without split | Merge/rebase / unmerged paths (redirect to resolve) |
+
+`/opsx-admin-command-commit` is an obsolete thin redirect to `/opsx-meta-commit`
+(and conflicted-tree → resolve-conflicts); not a second commit SoT.
+
+Prevention (advisory): avoid editing the same process file on two long-lived
+branches; serialize shared contracts before consumers.
 
 ## Steps (READ_ONLY)
 

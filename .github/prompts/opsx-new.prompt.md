@@ -6,7 +6,7 @@ Start a new change using the experimental artifact-driven approach.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
-**Input**: The argument after `/opsx:new` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx-new` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Steps**
 
@@ -151,5 +151,5 @@ After completing the steps, summarize:
   replace `OWNER_INTENT` as the semantic source of `owner-contract.md`
 - Do NOT advance beyond showing the first artifact template
 - If the name is invalid (not kebab-case), ask for a valid name
-- If a change with that name already exists, suggest using `/opsx:continue` instead
+- If a change with that name already exists, suggest using `/opsx-continue` instead
 - Pass --schema if using a non-default workflow

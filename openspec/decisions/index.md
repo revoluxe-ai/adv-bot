@@ -38,6 +38,20 @@ architecture decisions belong here.
     mirror → clear-our-block / conditional start / notify); TARGET_ENTITY_OR_LEG=AUTO;
     forbid `pause_auction_campaign` for this reason; mid-cycle cost gate while
     shelves ON; orthogonal to empty-keywords, coexistence, and Hold freeze.
+- [card-ab-hold-write-path-ownership](card-ab-hold-write-path-ownership/decision.md)
+  - Status: Accepted
+  - Scope: A/B Hold setup/hold write-path ownership, structural freeze ACT,
+    allowed-set snapshot/enforcement, stale-stats freeze, Search common-bid
+    ENTER reset-then-freeze, Excel write-path out of MVP.
+- [ab-hold-epoch-lifecycle-and-generation-ownership](ab-hold-epoch-lifecycle-and-generation-ownership/decision.md)
+  - Status: Accepted
+  - Scope: WARM_UP durable pre-epoch stage, epoch/generation model, durable
+    PENDING intent before WB sync, partial-sync recovery, same-generation retry.
+- [ab-hold-confirmed-epoch-parameters-sot](ab-hold-confirmed-epoch-parameters-sot/decision.md)
+  - Status: Accepted
+  - Scope: confirmed keyword set / target places / Auto participation / Auto
+    bid as durable epoch SoT, separate from factual position; Auto bid freeze
+    while ACTIVE.
 
 ## Change Requirements
 

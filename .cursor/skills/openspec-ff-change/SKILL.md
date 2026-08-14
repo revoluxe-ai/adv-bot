@@ -125,8 +125,7 @@ After completing all artifacts, summarize:
 - What's ready: "All artifacts created! Ready for planning review, then implementation."
   (only if PA gates above allow; otherwise BLOCKED awaiting
   `CONFIRM_LIFECYCLE` / MEANING_LOCK)
-- Soft-recommend (PRIMARY): `/opsx-planning-review change=<name>`
-- ALSO_OK: `/opsx:apply` after review PASS (or if Owner skips the soft gate).
+- Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
 
 **Artifact Creation Guidelines**
 

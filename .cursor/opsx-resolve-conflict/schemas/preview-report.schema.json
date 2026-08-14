@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/preview-report/v2",
+  "title": "OPSX resolve-conflict PREVIEW_ONLY advisory report (R35)",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "package_version",
+    "safe_usage_scope",
+    "go_capability",
+    "CURRENT_CONFLICT",
+    "SHORT_RU",
+    "FACTS",
+    "OURS",
+    "THEIRS",
+    "DISAGREEMENT_RU",
+    "CONTEXT_EVIDENCE",
+    "INTERPRETATIONS",
+    "OWNER_DECISIONS_REQUIRED",
+    "RESOLUTION_OPTIONS",
+    "RECOMMENDATION",
+    "VALIDATION_PLAN",
+    "LIMITATIONS",
+    "MUTATION_ASSERTION",
+    "command_ledger",
+    "human_report_ru"
+  ],
+  "properties": {
+    "schema": { "const": "opsx-resolve-conflict/preview-report/v2" },
+    "status": { "const": "PREVIEW_READY" },
+    "safe_usage_scope": { "const": "PREVIEW_ONLY" },
+    "go_capability": { "const": false },
+    "CURRENT_CONFLICT": { "type": "object" },
+    "SHORT_RU": { "type": "string", "minLength": 1 },
+    "FACTS": { "type": "array" },
+    "OURS": { "type": "object" },
+    "THEIRS": { "type": "object" },
+    "DISAGREEMENT_RU": { "type": "string" },
+    "CONTEXT_EVIDENCE": {
+      "type": "object",
+      "required": ["schema", "evidence", "evidence_gaps", "search_budgets", "reader_contract"],
+      "properties": {
+        "schema": { "const": "opsx-resolve-conflict/preview-context/v2" },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "evidence_id",
+              "authority_class",
+              "authority_verified",
+              "authority_basis",
+              "path"
+            ]
+          }
+        },
+        "evidence_gaps": { "type": "array" },
+        "search_budgets": { "type": "object" },
+        "reader_contract": {
+          "type": "object",
+          "required": ["subprocess", "writes", "authority_path_alone"],
+          "properties": {
+            "subprocess": { "const": false },
+            "writes": { "const": false },
+            "authority_path_alone": { "const": false },
+            "recommendation_requires_authority_verified": { "const": true }
+          }
+        }
+      }
+    },
+    "INTERPRETATIONS": { "type": "array" },
+    "OWNER_DECISIONS_REQUIRED": { "type": "array" },
+    "RESOLUTION_OPTIONS": { "type": "array", "minItems": 1 },
+    "RECOMMENDATION": { "type": ["object", "null"] },
+    "LIMITATIONS": { "type": "array", "minItems": 1 },
+    "MUTATION_ASSERTION": { "type": "object" },
+    "command_ledger": { "type": "array" },
+    "human_report_ru": { "type": "string", "minLength": 1 }
+  }
+}

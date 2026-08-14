@@ -22,7 +22,10 @@ If this command and the policy conflict:
 
 ## Purpose
 
-Create a GitHub PR from the current branch.
+Create a GitHub PR from the current branch, or **update** an existing open PR
+for the same head when one already exists.
+
+No extra token is required for update: the same `GO` covers CREATE and UPDATE.
 
 The PR must explain the task, not just the diff:
 
@@ -46,7 +49,7 @@ Before preparing or creating a PR that changes product/runtime behavior
    `/opsx-project-bug-hunt` for this `base..head` (target/base = PR base,
    head = current branch tip).
 2. If the receipt is missing:
-   - do **not** push/create the PR even when `GO` is present;
+   - do **not** push / create / update the PR even when `GO` is present;
    - set pasteable `NEXT_ACTION` to
      `/opsx-project-bug-hunt base=<target> head=<current-branch> …`;
    - allow skip only when the user message contains the exact token
@@ -104,20 +107,24 @@ Do not infer target branch from:
 
 ## GO rule
 
-Creating a PR requires explicit user confirmation.
+Creating or updating a PR requires explicit user confirmation.
 
-The PR may be pushed/created ONLY if the current user message contains the exact token:
+The PR may be pushed / created / updated ONLY if the current user message
+contains the exact token:
 
 ```text
 GO
 ```
 
+No separate `UPDATE_PR` (or similar) token is required. `GO` alone selects
+CREATE or UPDATE from the open-PR check.
+
 If `GO` is absent:
 
 - do not push;
-- do not create PR;
+- do not create or update a PR;
 - do not modify files;
-- output only the proposed PR plan, title, and body.
+- output only the proposed PR plan, title, and body (including MODE).
 
 ## User PR context handling
 
@@ -153,9 +160,29 @@ If `User PR context` conflicts with actual diff:
 
 Do not create PR if author intent is unclear and PR body would become generic.
 
+## CREATE vs UPDATE mode
+
+After the open-PR JSON check (must include `baseRefName`; see Required
+read-only checks):
+
+Resolve MODE by comparing each open PR's `baseRefName` to the requested
+`<TARGET_BRANCH>` with an exact string match (as returned by `gh`).
+
+| Open PRs for head | MODE | On `GO` |
+|---|---|---|
+| none | `CREATE_PR` | `git push` + `gh pr create` |
+| exactly one, and its `baseRefName` == requested target/base | `UPDATE_PR` | `git push` + `gh pr edit` (title/body); **never** `gh pr create` |
+| exactly one, but `baseRefName` ≠ requested target/base | STOP | explain base mismatch; do not push/create/edit |
+| more than one | STOP | explain ambiguity; do not push/create/edit |
+
+Do **not** resolve MODE from default table `gh pr list` output — it omits
+base and cannot detect mismatch.
+
+An existing open PR is **not** a hard stop when MODE resolves to `UPDATE_PR`.
+
 ## Hard stop conditions
 
-Stop before PR creation if:
+Stop before PR create/update if:
 
 - target/base branch is missing;
 - current branch is unknown;
@@ -166,9 +193,13 @@ Stop before PR creation if:
 - `gh` is not authenticated;
 - target branch does not exist on origin;
 - no commits exist ahead of target/base branch;
-- an open PR already exists for the current branch;
+- open-PR check yields base mismatch or more than one open PR for head;
 - PR title/body would be generic or meaningless;
-- `GO` is absent.
+- `GO` is absent;
+- working tree has unmerged paths (`UU` / `AA` / …) or merge|rebase is in
+  progress — especially on process surfaces
+  (`.cursor/commands/**`, rules, skills, mirrors, …):
+  set `NEXT_ACTION: /opsx-admin-command-resolve-conflicts` and do not open a PR.
 
 ## Required read-only checks before PR
 
@@ -205,10 +236,12 @@ git diff --name-only origin/<TARGET_BRANCH>...HEAD
 git log --oneline origin/<TARGET_BRANCH>..HEAD
 ```
 
-Check existing PR:
+Check existing PR (REQUIRED_FOR CREATE vs UPDATE / base mismatch STOP).
+Must request `baseRefName` — default table output is not enough:
 
 ```bash
-gh pr list --head "$(git branch --show-current)" --state open
+gh pr list --head "$(git branch --show-current)" --state open \
+  --json number,url,title,baseRefName,headRefName
 ```
 
 Check GitHub auth:
@@ -318,45 +351,48 @@ Good:
 - `Проверь, что SQLAlchemy query не меняет cardinality и не грузит лишние relationships.`
 - `Проверь, что callback flow не ломает старую навигацию.`
 
-## PR creation flow
+## PR create-or-update flow
 
 If `GO` is absent:
 
 1. Validate that target/base branch was explicitly provided.
-2. Run read-only checks.
-3. Inspect commits and diff against target/base branch.
-4. Compare user intent with actual diff.
-5. Build Russian PR title.
-6. Build Russian PR body.
-7. Output the final title/body.
-8. Stop and wait for `GO`.
+2. Run read-only checks (including open-PR list).
+3. Resolve MODE (`CREATE_PR` | `UPDATE_PR` | STOP).
+4. Inspect commits and diff against target/base branch.
+5. Compare user intent with actual diff.
+6. Build Russian PR title.
+7. Build Russian PR body.
+8. Output the final MODE, title/body (and existing PR #/URL if UPDATE).
+9. Stop and wait for `GO`.
 
 If `GO` is present:
 
 1. Validate that target/base branch was explicitly provided.
 2. Enforce **Project bug-hunt gate** (receipt or
    `OVERRIDE_SKIP_PROJECT_BUG_HUNT` or process/docs-only exception).
-3. Run all required checks again.
+3. Run all required checks again (including open-PR list → MODE).
 4. Rebuild/confirm PR title and body.
 5. Write PR body to a temporary file.
 6. Push current branch.
-7. Create PR with `gh pr create`.
+7. If MODE is `CREATE_PR`: create with `gh pr create`.
+   If MODE is `UPDATE_PR`: update with `gh pr edit` (no `gh pr create`).
 8. Run **Post-PR Bugbot report** (below) unless noted escapes.
 9. Emit final output including dual-channel `BUGBOT_POST_PR`.
 
 ## Commands after explicit GO only
 
-After user says `GO`, run:
+After user says `GO`, run shared prep + push, then branch on MODE:
 
-1. Resolve `CURRENT_BRANCH` (e.g. `git branch --show-current`).
-2. **Write** the final PR body with the Write tool to a workspace path such as
-   `.tmp/pr_body.md` (do **not** use bash heredoc `cat <<'EOF'` — see
-   `opsx-execution-preflight.md` → Shell payload I/O).
-3. Push and create PR:
+```bash
+CURRENT_BRANCH="$(git branch --show-current)"
 
-```text
-git push -u origin <CURRENT_BRANCH>
+cat > /tmp/pr_body.md <<'EOF'
+<FINAL_PR_BODY>
+EOF
 
+git push -u origin "$CURRENT_BRANCH"
+
+```bash
 gh pr create \
   --base "<TARGET_BRANCH>" \
   --head "<CURRENT_BRANCH>" \
@@ -364,11 +400,22 @@ gh pr create \
   --body-file .tmp/pr_body.md
 ```
 
-Do not run `git push` or `gh pr create` before explicit `GO`.
+UPDATE (`MODE=UPDATE_PR` — exactly one open PR, base matches target):
 
-## Post-PR Bugbot report (mandatory after successful create)
+```bash
+gh pr edit <EXISTING_PR_NUMBER> \
+  --title "<PR_TITLE>" \
+  --body-file /tmp/pr_body.md
+```
 
-Runs **only** after a successful `gh pr create` that returned a PR URL/number.
+Do not run `git push`, `gh pr create`, or `gh pr edit` before explicit `GO`.
+
+## Post-PR Bugbot report (mandatory after successful create or update)
+
+Runs after a successful PR publish that yields a PR URL/number in either MODE:
+- `CREATE_PR` — after successful `gh pr create`;
+- `UPDATE_PR` — after successful `git push` + `gh pr edit` on the existing PR.
+
 Does **not** replace `/opsx-project-bug-hunt` (pre-PR primary). Does **not**
 auto-fix findings.
 
@@ -433,7 +480,7 @@ Base Branch: <PR target/base branch>
    - TIME_BUDGET: ≤60s total; at most **2** attempts; sleep ≤15s between
      attempts if first returns no comments;
    - Prefer: `gh api` pull review comments + issue comments / reviews for
-     the new PR number, filter `user.login == cursor[bot]` (or equivalent);
+     that PR number, filter `user.login == cursor[bot]` (or equivalent);
    - Map each finding to Severity | Location | Finding when parseable;
    - Status values:
      - `findings` — ≥1 comment/finding mapped (`findings_count` = N);
@@ -473,21 +520,23 @@ when `github_cursor_bot.status=pending` or `unavailable`, or when
 
 ## Output format before GO
 
-1. Target/base branch:
-2. Current/head branch:
-3. Commits to include:
-4. Changed files:
-5. User PR context:
-6. Diff/context conflicts:
-7. PR title:
-8. PR body:
-9. Tests:
-10. Risks:
-11. Waiting for GO:
+1. MODE: CREATE_PR | UPDATE_PR | STOP
+2. Existing PR (if UPDATE): number + URL
+3. Target/base branch:
+4. Current/head branch:
+5. Commits to include:
+6. Changed files:
+7. User PR context:
+8. Diff/context conflicts:
+9. PR title:
+10. PR body:
+11. Tests:
+12. Risks:
+13. Waiting for GO:
 
-## Output format after PR creation
+## Output format after PR create/update
 
-1. PR created:
+1. PR created: | PR updated:
 2. Target/base branch:
 3. Head branch:
 4. PR title:

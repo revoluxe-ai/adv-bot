@@ -1,0 +1,1070 @@
+{
+  "schema": "opsx-resolve-conflict/replay-evidence/v6",
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40",
+  "package_version": "0.40.0",
+  "built_at_utc": "2026-08-12T09:17:15Z",
+  "go_capability": false,
+  "execution_location": "native-temp staging copy of packaged runtime (not author source workspace)",
+  "path_normalization": {
+    "schema": "opsx-resolve-conflict/path-normalization/v2",
+    "verify_relation": "normalize(raw_bytes, ordered_mapping) == normalized_bytes",
+    "tokens": [
+      "<FIXTURE_REPO_0>",
+      "<FIXTURE_REPO_1>",
+      "<PACKAGE_STAGING>",
+      "<PYTHON>",
+      "<PYTHON_PREFIX>",
+      "<REPLAY_STAGING>"
+    ],
+    "note": "Raw and normalized artifacts are both shipped. Raw must already exclude author/user profile paths (generation STOP otherwise)."
+  },
+  "note": "R29 exact-match replay: state proves merge/rebase operation detection; scoped GO proves PACKAGE_GO_CAPABILITY_DISABLED at package_compatibility_gate. Nonzero exit alone is never PASS. Not production GO readiness.",
+  "builder": {
+    "path": "scripts/build_replay_evidence.py",
+    "sha256": "15c7fa7158e6a7ebaa658ce852dac7d16adf75414ad23c6f04c5e5d7678986fe"
+  },
+  "environment": {
+    "python_version": "3.11.0",
+    "platform": "Windows-10",
+    "git_version": "git version 2.45.1.windows.1"
+  },
+  "cases": [
+    {
+      "case_id": "merge_state_detection",
+      "command_kind": "state",
+      "operation": "merge",
+      "expectation": {
+        "schema": "opsx-resolve-conflict/replay-expectation/v1",
+        "case_id": "merge_state_detection",
+        "command_kind": "state",
+        "expected_exit_code": 0,
+        "expected_status": "OK",
+        "expected_stop_reason": null,
+        "expected_operation": "merge",
+        "expected_gate": "operation_state_detection",
+        "expected_state": {
+          "require_unmerged_nonempty": true,
+          "require_stage_oids": true,
+          "require_operation_head": true,
+          "refs_immutable": true,
+          "index_immutable": true,
+          "worktree_conflict_immutable": true,
+          "process_delta_empty": true,
+          "forbid_traceback": true,
+          "forbid_scope_file_required_as_pass": true
+        }
+      },
+      "passed": true,
+      "assertions": [
+        {
+          "name": "exit_code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scope_file_required_not_accepted_as_target",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "no_traceback",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "structured_json",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "status",
+          "expected": "OK",
+          "actual": "OK",
+          "passed": true
+        },
+        {
+          "name": "stop_reason",
+          "expected": null,
+          "actual": null,
+          "passed": true
+        },
+        {
+          "name": "operation",
+          "expected": "merge",
+          "actual": "merge",
+          "passed": true
+        },
+        {
+          "name": "reached_gate",
+          "expected": "operation_state_detection",
+          "actual": "operation_state_detection",
+          "passed": true
+        },
+        {
+          "name": "unmerged_nonempty",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "stage_oids_present",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "operation_head",
+          "expected": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+          "actual": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+          "passed": true
+        },
+        {
+          "name": "refs_immutable",
+          "expected": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
+          "actual": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
+          "passed": true
+        },
+        {
+          "name": "index_unmerged_immutable",
+          "expected": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "actual": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "index_cached_immutable",
+          "expected": "U\tconflict.py\n",
+          "actual": "U\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "conflict_worktree_immutable",
+          "expected": "687c3c2fcb820509496e0cf5b7278260fed790e8782da54a6dc0fe8990342f42",
+          "actual": "687c3c2fcb820509496e0cf5b7278260fed790e8782da54a6dc0fe8990342f42",
+          "passed": true
+        },
+        {
+          "name": "process_delta_empty",
+          "expected": [],
+          "actual": [],
+          "passed": true
+        }
+      ],
+      "expected": {
+        "exit_code": 0,
+        "status": "OK",
+        "stop_reason": null,
+        "operation": "merge",
+        "reached_gate": "operation_state_detection"
+      },
+      "actual": {
+        "exit_code": 0,
+        "status": "OK",
+        "stop_reason": null,
+        "operation": "merge",
+        "reached_gate": "operation_state_detection",
+        "structured_ok": true,
+        "traceback": false
+      },
+      "reached_gate": "operation_state_detection",
+      "parsed_structured_result": {
+        "ok": true,
+        "source": "stdout",
+        "value": {
+          "fingerprint": "f97934370b83d561f1ec64a9ee482d2b1834311496b4f1d9cfc5c38545ccada7",
+          "stage_matrix": {
+            "conflict.py": [
+              {
+                "actual_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+                "commit_oid": "d5c486368c09d9a3373e51a0ddecd2c927cd8ff8",
+                "expected_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+                "note": "verified",
+                "role": "merge_base",
+                "stage": 1,
+                "verified": true
+              },
+              {
+                "actual_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+                "commit_oid": "2135b91f772b7a2127371506be6579e526fef48a",
+                "expected_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+                "note": "verified",
+                "role": "current_HEAD",
+                "stage": 2,
+                "verified": true
+              },
+              {
+                "actual_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
+                "commit_oid": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+                "expected_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
+                "note": "verified",
+                "role": "incoming_MERGE_HEAD",
+                "stage": 3,
+                "verified": true
+              }
+            ]
+          },
+          "state": {
+            "branch": "master",
+            "fingerprint": "f97934370b83d561f1ec64a9ee482d2b1834311496b4f1d9cfc5c38545ccada7",
+            "git_dir": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REPLAY_STAGING\\fixtures\\merge\\repo\\.git",
+            "head": "2135b91f772b7a2127371506be6579e526fef48a",
+            "operation": "merge",
+            "operation_head": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+            "repository_identity": "f61ec248552dffa321c0b6f0c31defae4ca7fa6cc5dcc8bfea6a7109b9108cc2",
+            "sequencer_tree_hash": "1c0e14d42b36ce7e05aa2814af9dbd90aedc2e9f205b67415f221d9885b3d031",
+            "staged_paths": [],
+            "unmerged": [
+              {
+                "mode": "100644",
+                "oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+                "path": "conflict.py",
+                "stage": 1
+              },
+              {
+                "mode": "100644",
+                "oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+                "path": "conflict.py",
+                "stage": 2
+              },
+              {
+                "mode": "100644",
+                "oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
+                "path": "conflict.py",
+                "stage": 3
+              }
+            ],
+            "unstaged_paths": [],
+            "untracked_paths": [
+              ".cursor",
+              ".github",
+              "openspec"
+            ]
+          }
+        },
+        "error": null
+      },
+      "scope_manifest": null,
+      "fixture_meta": {
+        "operation": "merge",
+        "merge_returncode": "1",
+        "base": "d5c486368c09d9a3373e51a0ddecd2c927cd8ff8",
+        "feature": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+        "mainline": "2135b91f772b7a2127371506be6579e526fef48a",
+        "expected_operation_head": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+        "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
+      },
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "state",
+        "--repo",
+        "<FIXTURE_REPO_0>"
+      ],
+      "refs_immutable": true,
+      "no_push_continue_abort_in_argv": true,
+      "process_delta": [],
+      "stdout_sha256_raw": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
+    },
+    {
+      "case_id": "merge_go_package_capability_disabled",
+      "command_kind": "go",
+      "operation": "merge",
+      "expectation": {
+        "schema": "opsx-resolve-conflict/replay-expectation/v1",
+        "case_id": "merge_go_package_capability_disabled",
+        "command_kind": "go",
+        "expected_exit_code": 78,
+        "expected_status": "STOP",
+        "expected_stop_reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+        "expected_operation": null,
+        "expected_gate": "package_compatibility_gate",
+        "expected_state": {
+          "require_unmerged_nonempty": false,
+          "require_stage_oids": false,
+          "require_operation_head": false,
+          "refs_immutable": true,
+          "index_immutable": true,
+          "worktree_conflict_immutable": true,
+          "process_delta_empty": true,
+          "forbid_traceback": true,
+          "forbid_scope_file_required_as_pass": true,
+          "go_capability": false
+        }
+      },
+      "passed": true,
+      "assertions": [
+        {
+          "name": "exit_code",
+          "expected": 78,
+          "actual": 78,
+          "passed": true
+        },
+        {
+          "name": "scope_file_required_not_accepted_as_target",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "no_traceback",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "structured_json",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "stop_envelope_schema",
+          "expected": "opsx-resolve-conflict/cli-stop-envelope/v1",
+          "actual": "opsx-resolve-conflict/cli-stop-envelope/v1",
+          "passed": true
+        },
+        {
+          "name": "stop_envelope_status",
+          "expected": "STOP",
+          "actual": "STOP",
+          "passed": true
+        },
+        {
+          "name": "status",
+          "expected": "STOP",
+          "actual": "STOP",
+          "passed": true
+        },
+        {
+          "name": "stop_reason",
+          "expected": "PACKAGE_GO_CAPABILITY_DISABLED",
+          "actual": "PACKAGE_GO_CAPABILITY_DISABLED",
+          "passed": true
+        },
+        {
+          "name": "reached_gate",
+          "expected": "package_compatibility_gate",
+          "actual": "package_compatibility_gate",
+          "passed": true
+        },
+        {
+          "name": "refs_immutable",
+          "expected": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
+          "actual": "refs/heads/feature 28e076d5b964bf4940e7bc97e3b7a68b1e9be7de\nrefs/heads/master 2135b91f772b7a2127371506be6579e526fef48a\n",
+          "passed": true
+        },
+        {
+          "name": "index_unmerged_immutable",
+          "expected": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "actual": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "index_cached_immutable",
+          "expected": "U\tconflict.py\n",
+          "actual": "U\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "conflict_worktree_immutable",
+          "expected": "687c3c2fcb820509496e0cf5b7278260fed790e8782da54a6dc0fe8990342f42",
+          "actual": "687c3c2fcb820509496e0cf5b7278260fed790e8782da54a6dc0fe8990342f42",
+          "passed": true
+        },
+        {
+          "name": "process_delta_empty",
+          "expected": [],
+          "actual": [],
+          "passed": true
+        },
+        {
+          "name": "go_capability",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        }
+      ],
+      "expected": {
+        "exit_code": 78,
+        "status": "STOP",
+        "stop_reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+        "operation": null,
+        "reached_gate": "package_compatibility_gate"
+      },
+      "actual": {
+        "exit_code": 78,
+        "status": "STOP",
+        "stop_reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+        "operation": null,
+        "reached_gate": "package_compatibility_gate",
+        "structured_ok": true,
+        "traceback": false
+      },
+      "reached_gate": "package_compatibility_gate",
+      "parsed_structured_result": {
+        "ok": true,
+        "source": "stdout",
+        "value": {
+          "command": "go",
+          "details": {
+            "go_capability": false,
+            "status": "preview_only_no_go"
+          },
+          "package_version": "0.40.0",
+          "reached_gate": "package_compatibility_gate",
+          "reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+          "schema": "opsx-resolve-conflict/cli-stop-envelope/v1",
+          "schema_version": "1",
+          "status": "STOP"
+        },
+        "error": null
+      },
+      "scope_manifest": {
+        "frozen_at_state_fingerprint": "f97934370b83d561f1ec64a9ee482d2b1834311496b4f1d9cfc5c38545ccada7",
+        "items": [
+          {
+            "allowed_operation": "write",
+            "authority_sha256": "65dd59f88bc4945557e57dc679866f31cf27d6429b9254171c4e8547f57b19bb",
+            "authority_source": "runtime_conflict_inventory",
+            "expected_semantic_change": "resolve_conflict_markers",
+            "initial_stage_oids": {
+              "1": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+              "2": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+              "3": "403e7cd438cbb126e495a254b43991ecaba293d0"
+            },
+            "initial_worktree_sha256": "687c3c2fcb820509496e0cf5b7278260fed790e8782da54a6dc0fe8990342f42",
+            "path": "conflict.py",
+            "reason": "unmerged_conflict",
+            "required_checks": [
+              [
+                "syntax-parse",
+                "conflict.py"
+              ],
+              [
+                "git-diff-check",
+                "conflict.py"
+              ]
+            ],
+            "unit_id": "unit-conflict.py"
+          }
+        ],
+        "manifest_sha256": "795c0ebba2f4f7c2787e1622eb7acb3e6627ebb58bb3c91b419e8549e7dfa7e9",
+        "run_id": "replay-merge_go_package_capability_disabled",
+        "schema": "opsx-resolve-conflict/scope-manifest/v2"
+      },
+      "fixture_meta": {
+        "operation": "merge",
+        "merge_returncode": "1",
+        "base": "d5c486368c09d9a3373e51a0ddecd2c927cd8ff8",
+        "feature": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+        "mainline": "2135b91f772b7a2127371506be6579e526fef48a",
+        "expected_operation_head": "28e076d5b964bf4940e7bc97e3b7a68b1e9be7de",
+        "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
+      },
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "go",
+        "--repo",
+        "<FIXTURE_REPO_0>",
+        "--scope",
+        "<REPLAY_STAGING>\\fixtures\\merge\\state\\replay-merge_go_package_capability_disabled.scope.json"
+      ],
+      "refs_immutable": true,
+      "no_push_continue_abort_in_argv": true,
+      "process_delta": [],
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
+    },
+    {
+      "case_id": "rebase_state_detection",
+      "command_kind": "state",
+      "operation": "rebase",
+      "expectation": {
+        "schema": "opsx-resolve-conflict/replay-expectation/v1",
+        "case_id": "rebase_state_detection",
+        "command_kind": "state",
+        "expected_exit_code": 0,
+        "expected_status": "OK",
+        "expected_stop_reason": null,
+        "expected_operation": "rebase",
+        "expected_gate": "operation_state_detection",
+        "expected_state": {
+          "require_unmerged_nonempty": true,
+          "require_stage_oids": true,
+          "require_operation_head": true,
+          "refs_immutable": true,
+          "index_immutable": true,
+          "worktree_conflict_immutable": true,
+          "process_delta_empty": true,
+          "forbid_traceback": true,
+          "forbid_scope_file_required_as_pass": true
+        }
+      },
+      "passed": true,
+      "assertions": [
+        {
+          "name": "exit_code",
+          "expected": 0,
+          "actual": 0,
+          "passed": true
+        },
+        {
+          "name": "scope_file_required_not_accepted_as_target",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "no_traceback",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "structured_json",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "status",
+          "expected": "OK",
+          "actual": "OK",
+          "passed": true
+        },
+        {
+          "name": "stop_reason",
+          "expected": null,
+          "actual": null,
+          "passed": true
+        },
+        {
+          "name": "operation",
+          "expected": "rebase",
+          "actual": "rebase",
+          "passed": true
+        },
+        {
+          "name": "reached_gate",
+          "expected": "operation_state_detection",
+          "actual": "operation_state_detection",
+          "passed": true
+        },
+        {
+          "name": "unmerged_nonempty",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "stage_oids_present",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "operation_head",
+          "expected": "390acff10802fba26189e4325d0c0aa741793ffa",
+          "actual": "390acff10802fba26189e4325d0c0aa741793ffa",
+          "passed": true
+        },
+        {
+          "name": "refs_immutable",
+          "expected": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
+          "actual": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
+          "passed": true
+        },
+        {
+          "name": "index_unmerged_immutable",
+          "expected": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "actual": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "index_cached_immutable",
+          "expected": "U\tconflict.py\n",
+          "actual": "U\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "conflict_worktree_immutable",
+          "expected": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+          "actual": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+          "passed": true
+        },
+        {
+          "name": "process_delta_empty",
+          "expected": [],
+          "actual": [],
+          "passed": true
+        }
+      ],
+      "expected": {
+        "exit_code": 0,
+        "status": "OK",
+        "stop_reason": null,
+        "operation": "rebase",
+        "reached_gate": "operation_state_detection"
+      },
+      "actual": {
+        "exit_code": 0,
+        "status": "OK",
+        "stop_reason": null,
+        "operation": "rebase",
+        "reached_gate": "operation_state_detection",
+        "structured_ok": true,
+        "traceback": false
+      },
+      "reached_gate": "operation_state_detection",
+      "parsed_structured_result": {
+        "ok": true,
+        "source": "stdout",
+        "value": {
+          "fingerprint": "bdc99683b474cd5a28152ce7791c8996ab16f75a86cd357aba4f7088e207a3e6",
+          "stage_matrix": {
+            "conflict.py": [
+              {
+                "actual_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+                "commit_oid": "390acff10802fba26189e4325d0c0aa741793ffa^",
+                "expected_blob_oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+                "note": "verified",
+                "role": "parent_of_replayed_commit",
+                "stage": 1,
+                "verified": true
+              },
+              {
+                "actual_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+                "commit_oid": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
+                "expected_blob_oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+                "note": "verified",
+                "role": "accumulated_onto_plus_replayed_commits",
+                "stage": 2,
+                "verified": true
+              },
+              {
+                "actual_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
+                "commit_oid": "390acff10802fba26189e4325d0c0aa741793ffa",
+                "expected_blob_oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
+                "note": "verified",
+                "role": "current_replayed_commit",
+                "stage": 3,
+                "verified": true
+              }
+            ]
+          },
+          "state": {
+            "branch": "",
+            "fingerprint": "bdc99683b474cd5a28152ce7791c8996ab16f75a86cd357aba4f7088e207a3e6",
+            "git_dir": "C:\\Temp\\OPSX_RESOLVE_CONFLICT_COMMAND_001_R39_REPLAY_STAGING\\fixtures\\rebase\\repo\\.git",
+            "head": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
+            "operation": "rebase",
+            "operation_head": "390acff10802fba26189e4325d0c0aa741793ffa",
+            "repository_identity": "f3d9486e120f5d6385e093a90e0eebc4d4f5c4b6cb80c24213107548cd7b5930",
+            "sequencer_tree_hash": "206daffc9e78775d49123aad5b18a2854244925c64edb344b18b6622fc3f220e",
+            "staged_paths": [],
+            "unmerged": [
+              {
+                "mode": "100644",
+                "oid": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+                "path": "conflict.py",
+                "stage": 1
+              },
+              {
+                "mode": "100644",
+                "oid": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+                "path": "conflict.py",
+                "stage": 2
+              },
+              {
+                "mode": "100644",
+                "oid": "403e7cd438cbb126e495a254b43991ecaba293d0",
+                "path": "conflict.py",
+                "stage": 3
+              }
+            ],
+            "unstaged_paths": [],
+            "untracked_paths": [
+              ".cursor",
+              ".github",
+              "openspec"
+            ]
+          }
+        },
+        "error": null
+      },
+      "scope_manifest": null,
+      "fixture_meta": {
+        "operation": "rebase",
+        "rebase_returncode": "1",
+        "base": "7405307a59b0c7a7361272602a8f4d22e577da3c",
+        "feature": "390acff10802fba26189e4325d0c0aa741793ffa",
+        "mainline": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
+        "expected_operation_head": "390acff10802fba26189e4325d0c0aa741793ffa",
+        "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
+      },
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "state",
+        "--repo",
+        "<FIXTURE_REPO_1>"
+      ],
+      "refs_immutable": true,
+      "no_push_continue_abort_in_argv": true,
+      "process_delta": [],
+      "stdout_sha256_raw": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
+    },
+    {
+      "case_id": "rebase_go_package_capability_disabled",
+      "command_kind": "go",
+      "operation": "rebase",
+      "expectation": {
+        "schema": "opsx-resolve-conflict/replay-expectation/v1",
+        "case_id": "rebase_go_package_capability_disabled",
+        "command_kind": "go",
+        "expected_exit_code": 78,
+        "expected_status": "STOP",
+        "expected_stop_reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+        "expected_operation": null,
+        "expected_gate": "package_compatibility_gate",
+        "expected_state": {
+          "require_unmerged_nonempty": false,
+          "require_stage_oids": false,
+          "require_operation_head": false,
+          "refs_immutable": true,
+          "index_immutable": true,
+          "worktree_conflict_immutable": true,
+          "process_delta_empty": true,
+          "forbid_traceback": true,
+          "forbid_scope_file_required_as_pass": true,
+          "go_capability": false
+        }
+      },
+      "passed": true,
+      "assertions": [
+        {
+          "name": "exit_code",
+          "expected": 78,
+          "actual": 78,
+          "passed": true
+        },
+        {
+          "name": "scope_file_required_not_accepted_as_target",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "no_traceback",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        },
+        {
+          "name": "structured_json",
+          "expected": true,
+          "actual": true,
+          "passed": true
+        },
+        {
+          "name": "stop_envelope_schema",
+          "expected": "opsx-resolve-conflict/cli-stop-envelope/v1",
+          "actual": "opsx-resolve-conflict/cli-stop-envelope/v1",
+          "passed": true
+        },
+        {
+          "name": "stop_envelope_status",
+          "expected": "STOP",
+          "actual": "STOP",
+          "passed": true
+        },
+        {
+          "name": "status",
+          "expected": "STOP",
+          "actual": "STOP",
+          "passed": true
+        },
+        {
+          "name": "stop_reason",
+          "expected": "PACKAGE_GO_CAPABILITY_DISABLED",
+          "actual": "PACKAGE_GO_CAPABILITY_DISABLED",
+          "passed": true
+        },
+        {
+          "name": "reached_gate",
+          "expected": "package_compatibility_gate",
+          "actual": "package_compatibility_gate",
+          "passed": true
+        },
+        {
+          "name": "refs_immutable",
+          "expected": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
+          "actual": "refs/heads/feature 390acff10802fba26189e4325d0c0aa741793ffa\nrefs/heads/master a362cbc8e933b5e9745ed6e26f0a00ec154ad30a\n",
+          "passed": true
+        },
+        {
+          "name": "index_unmerged_immutable",
+          "expected": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "actual": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "index_cached_immutable",
+          "expected": "U\tconflict.py\n",
+          "actual": "U\tconflict.py\n",
+          "passed": true
+        },
+        {
+          "name": "conflict_worktree_immutable",
+          "expected": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+          "actual": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+          "passed": true
+        },
+        {
+          "name": "process_delta_empty",
+          "expected": [],
+          "actual": [],
+          "passed": true
+        },
+        {
+          "name": "go_capability",
+          "expected": false,
+          "actual": false,
+          "passed": true
+        }
+      ],
+      "expected": {
+        "exit_code": 78,
+        "status": "STOP",
+        "stop_reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+        "operation": null,
+        "reached_gate": "package_compatibility_gate"
+      },
+      "actual": {
+        "exit_code": 78,
+        "status": "STOP",
+        "stop_reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+        "operation": null,
+        "reached_gate": "package_compatibility_gate",
+        "structured_ok": true,
+        "traceback": false
+      },
+      "reached_gate": "package_compatibility_gate",
+      "parsed_structured_result": {
+        "ok": true,
+        "source": "stdout",
+        "value": {
+          "command": "go",
+          "details": {
+            "go_capability": false,
+            "status": "preview_only_no_go"
+          },
+          "package_version": "0.40.0",
+          "reached_gate": "package_compatibility_gate",
+          "reason": "PACKAGE_GO_CAPABILITY_DISABLED",
+          "schema": "opsx-resolve-conflict/cli-stop-envelope/v1",
+          "schema_version": "1",
+          "status": "STOP"
+        },
+        "error": null
+      },
+      "scope_manifest": {
+        "frozen_at_state_fingerprint": "bdc99683b474cd5a28152ce7791c8996ab16f75a86cd357aba4f7088e207a3e6",
+        "items": [
+          {
+            "allowed_operation": "write",
+            "authority_sha256": "65dd59f88bc4945557e57dc679866f31cf27d6429b9254171c4e8547f57b19bb",
+            "authority_source": "runtime_conflict_inventory",
+            "expected_semantic_change": "resolve_conflict_markers",
+            "initial_stage_oids": {
+              "1": "bbed484d6c87161d9b64e443c2f7c07384fd27b3",
+              "2": "f09af3c7f59ed308721a9286ff8e5056059ca77a",
+              "3": "403e7cd438cbb126e495a254b43991ecaba293d0"
+            },
+            "initial_worktree_sha256": "3ca2d329cc61f007878a42563d71de7316121a5e6f46215f874e6fface19e400",
+            "path": "conflict.py",
+            "reason": "unmerged_conflict",
+            "required_checks": [
+              [
+                "syntax-parse",
+                "conflict.py"
+              ],
+              [
+                "git-diff-check",
+                "conflict.py"
+              ]
+            ],
+            "unit_id": "unit-conflict.py"
+          }
+        ],
+        "manifest_sha256": "b91ce01672fefe494a801bf35dc5140cc2766b21a0a6f4be335df9aeb59ab1fb",
+        "run_id": "replay-rebase_go_package_capability_disabled",
+        "schema": "opsx-resolve-conflict/scope-manifest/v2"
+      },
+      "fixture_meta": {
+        "operation": "rebase",
+        "rebase_returncode": "1",
+        "base": "7405307a59b0c7a7361272602a8f4d22e577da3c",
+        "feature": "390acff10802fba26189e4325d0c0aa741793ffa",
+        "mainline": "a362cbc8e933b5e9745ed6e26f0a00ec154ad30a",
+        "expected_operation_head": "390acff10802fba26189e4325d0c0aa741793ffa",
+        "ls_files_unmerged": "100644 bbed484d6c87161d9b64e443c2f7c07384fd27b3 1\tconflict.py\n100644 f09af3c7f59ed308721a9286ff8e5056059ca77a 2\tconflict.py\n100644 403e7cd438cbb126e495a254b43991ecaba293d0 3\tconflict.py\n"
+      },
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "go",
+        "--repo",
+        "<FIXTURE_REPO_1>",
+        "--scope",
+        "<REPLAY_STAGING>\\fixtures\\rebase\\state\\replay-rebase_go_package_capability_disabled.scope.json"
+      ],
+      "refs_immutable": true,
+      "no_push_continue_abort_in_argv": true,
+      "process_delta": [],
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "execution_location": "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py"
+    }
+  ],
+  "command_ledger": [
+    {
+      "event": "COMMAND_START",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "state",
+        "--repo",
+        "<FIXTURE_REPO_0>"
+      ],
+      "cwd": "<FIXTURE_REPO>",
+      "execution_location": "package_staging_under_CTemp"
+    },
+    {
+      "event": "COMMAND_END",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "state",
+        "--repo",
+        "<FIXTURE_REPO_0>"
+      ],
+      "returncode": 0,
+      "stdout_sha256_raw": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "4507ad73fbc1cdee5c7ba2fa9b306e25af90d553128a7d4b12b31878e4c0b7db",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "event": "COMMAND_START",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "go",
+        "--repo",
+        "<FIXTURE_REPO_0>",
+        "--scope",
+        "<REPLAY_STAGING>\\fixtures\\merge\\state\\replay-merge_go_package_capability_disabled.scope.json"
+      ],
+      "cwd": "<FIXTURE_REPO>",
+      "execution_location": "package_staging_under_CTemp"
+    },
+    {
+      "event": "COMMAND_END",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "go",
+        "--repo",
+        "<FIXTURE_REPO_0>",
+        "--scope",
+        "<REPLAY_STAGING>\\fixtures\\merge\\state\\replay-merge_go_package_capability_disabled.scope.json"
+      ],
+      "returncode": 78,
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "event": "COMMAND_START",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "state",
+        "--repo",
+        "<FIXTURE_REPO_1>"
+      ],
+      "cwd": "<FIXTURE_REPO>",
+      "execution_location": "package_staging_under_CTemp"
+    },
+    {
+      "event": "COMMAND_END",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "state",
+        "--repo",
+        "<FIXTURE_REPO_1>"
+      ],
+      "returncode": 0,
+      "stdout_sha256_raw": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "fcaba0f9c9a7f2f28e3d6dffbac1151c971d06b77051cafae634f177e5cae979",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "event": "COMMAND_START",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "go",
+        "--repo",
+        "<FIXTURE_REPO_1>",
+        "--scope",
+        "<REPLAY_STAGING>\\fixtures\\rebase\\state\\replay-rebase_go_package_capability_disabled.scope.json"
+      ],
+      "cwd": "<FIXTURE_REPO>",
+      "execution_location": "package_staging_under_CTemp"
+    },
+    {
+      "event": "COMMAND_END",
+      "argv": [
+        "<PYTHON>",
+        "<PACKAGE_STAGING>/runtime/boot_opsx_conflict.py",
+        "go",
+        "--repo",
+        "<FIXTURE_REPO_1>",
+        "--scope",
+        "<REPLAY_STAGING>\\fixtures\\rebase\\state\\replay-rebase_go_package_capability_disabled.scope.json"
+      ],
+      "returncode": 78,
+      "stdout_sha256_raw": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_raw": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256_normalized": "8e73493b472d258c9dc0cdd435cf4811b3284e3910adf0b23cf4cc9c89db1590",
+      "stderr_sha256_normalized": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "acceptance_tests": [
+    "tests/test_r29_replay_terminal.py",
+    "tests/test_r25_evidence_portability.py",
+    "tests/test_git_execution_invariant.py"
+  ]
+}

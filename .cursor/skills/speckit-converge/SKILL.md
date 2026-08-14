@@ -24,9 +24,15 @@ You **MUST** consider the user input before proceeding (if not empty).
 - If it exists, read it and look for entries under the `hooks.before_converge` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
+- For each remaining hook, evaluate `condition` **in this agent session** (there is no separate HookExecutor runtime in Cursor skills). Do **not** skip a hook merely because `condition` is non-empty:
   - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
+  - If `condition` is non-empty, evaluate it using Spec Kit `HookExecutor` semantics and execute only when the result is true:
+    - `config.<dotted.path> is set` — true when that key exists and is non-null/non-empty in `.specify/extensions/<extension-id>/<extension-id>-config.yml` (and overlay `local-config.yml` if present)
+    - `config.<dotted.path> == 'value'` / `!= 'value'` — compare string forms of the config value
+    - `env.<VAR_NAME> is set` — true when the environment variable is present (name uppercased)
+    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare against `os.environ`
+  - If the condition cannot be parsed or evaluation fails, treat the hook as **not** executable (same fail-closed default as HookExecutor)
+  - Hooks whose condition evaluates to false are skipped; do not emit EXECUTE_COMMAND for them
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
   - **Optional hook** (`optional: true`):
@@ -243,9 +249,15 @@ After producing the result, check if `.specify/extensions.yml` exists in the pro
 - If it exists, read it and look for entries under the `hooks.after_converge` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
+- For each remaining hook, evaluate `condition` **in this agent session** (there is no separate HookExecutor runtime in Cursor skills). Do **not** skip a hook merely because `condition` is non-empty:
   - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
+  - If `condition` is non-empty, evaluate it using Spec Kit `HookExecutor` semantics and execute only when the result is true:
+    - `config.<dotted.path> is set` — true when that key exists and is non-null/non-empty in `.specify/extensions/<extension-id>/<extension-id>-config.yml` (and overlay `local-config.yml` if present)
+    - `config.<dotted.path> == 'value'` / `!= 'value'` — compare string forms of the config value
+    - `env.<VAR_NAME> is set` — true when the environment variable is present (name uppercased)
+    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare against `os.environ`
+  - If the condition cannot be parsed or evaluation fails, treat the hook as **not** executable (same fail-closed default as HookExecutor)
+  - Hooks whose condition evaluates to false are skipped; do not emit EXECUTE_COMMAND for them
 - Report the convergence outcome (`converged` or `tasks_appended`) in-session before listing
   any hooks, so users can decide whether to run optional follow-up commands.
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.

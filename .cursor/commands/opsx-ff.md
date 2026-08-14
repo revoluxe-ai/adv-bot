@@ -11,7 +11,7 @@ Fast-forward through artifact creation - generate everything needed to start imp
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_ff --strict`. Stop on non-zero exit and report the guard output.
 
-**Input**: The argument after `/opsx:ff` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx-ff` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` for any supplied exact change/decision paths; do not rediscover known artifacts via full-tree inventory.
 
@@ -169,11 +169,8 @@ semantics from similar names.
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
-- What's ready: "All artifacts created! Ready for planning review, then implementation."
-- Soft-recommend (PRIMARY): `/opsx-planning-review change=<name>`
-  (independent package coherence; READY markers alone insufficient —
-  `.cursor/pipeline/contracts/PLANNING_REVIEW.md`).
-- ALSO_OK: `/opsx:apply` after review PASS (or if Owner skips the soft gate).
+- What's ready: "All artifacts created! Ready for implementation."
+- Prompt: "Run `/opsx:apply` to start implementing."
 
 **Artifact Creation Guidelines**
 

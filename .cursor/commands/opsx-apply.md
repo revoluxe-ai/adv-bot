@@ -52,7 +52,7 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
   `.cursor/pipeline/contracts/VERIFY_PHASES.md` (`mode=impl` DoD, then later
   `mode=archive` archive GO)
 
-**Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Input**: Optionally specify a change name (e.g., `/opsx-apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -63,7 +63,7 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - Auto-select if only one active change exists
    - If ambiguous, run `openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/opsx:apply <other>`).
+   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-apply <other>`).
 
 2. **Check status to understand the schema**
    ```bash
@@ -87,7 +87,7 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - Dynamic instruction based on current state
 
    **Handle states:**
-   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx:continue`
+   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx-continue`
    - If `state: "all_done"`: congratulate, then follow **Post-apply next-step recommend** below (not archive readiness)
    - Otherwise: proceed to implementation
 

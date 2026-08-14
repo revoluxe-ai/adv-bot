@@ -89,6 +89,15 @@ ALLOWED_STATUS_TERMINAL_PAIRS: Dict[str, Set[Tuple[str, str]]] = {
         ("TIMEOUT", "TIMEOUT"),
         ("CANCELLED", "CANCELLED"),
     },
+    "FAMILY_LEARNING_WORKER": {
+        ("PASS", "PASS"),
+        ("PASS", "LEARNING_COMPLETE"),
+        ("BLOCKED", "LEARNING_BLOCKED"),
+        ("WAITING_OWNER", "OWNER_WAIT"),
+        ("FAIL", "FAIL"),
+        ("TIMEOUT", "TIMEOUT"),
+        ("CANCELLED", "CANCELLED"),
+    },
     "CLOSURE_OPERATOR": {
         ("PASS", "PASS"),
         ("PASS", "CLOSED"),
@@ -113,6 +122,7 @@ DEFAULT_TIMEOUTS = {
     "TASK_COMPLETION_WORKER": 600,
     "BOUNDED_HUNTER": 1800,
     "FAN_IN_ASSEMBLER": 600,
+    "FAMILY_LEARNING_WORKER": 600,
     "CLOSURE_OPERATOR": 300,
 }
 
@@ -127,6 +137,7 @@ MAX_ATTEMPTS = {
     "TASK_COMPLETION_WORKER": 2,
     "BOUNDED_HUNTER": 2,
     "FAN_IN_ASSEMBLER": 2,
+    "FAMILY_LEARNING_WORKER": 2,
     "CLOSURE_OPERATOR": 1,
 }
 

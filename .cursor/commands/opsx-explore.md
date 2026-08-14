@@ -197,10 +197,56 @@ Owner may refine the table in chat, then run `/opsx-bound-scope` so plan printou
 match the agreed split. Explore MUST NOT append WORKLOG or edit change artifacts
 for the park; that is bound-scope → update.
 
+## Valued Goals (useful-work)
+
+Include when any of:
+- the user asks for useful-work / «сделай полезное» / North Star / ценность целей;
+- `/opsx-supervisor` is in `TASK_MODE=USEFUL_WORK` and requests ranking;
+- the user asks to prioritize goal-like outcomes by value.
+
+This section ranks **goal-like** candidates for supervisor consume. Prefer Owner-explicit
+lists; else extract goal-like lines from `DOTO/WORKLOG.md` (always label
+`Worklog-derived`); else infer cautiously from repo context (label `Inferred`).
+
+**VALUE gate (mandatory when this section is emitted):**
+- Every ranked item must have `VALUE:` as **free prose** (plain language: why it
+  matters, how clear/unclear the payoff is). No required numeric scorecard.
+- If VALUE is missing, **propose** a draft VALUE, then rank. Owner may refine.
+- Do **not** treat WORKLOG as North Star source of truth — only as ranked
+  raw notes for useful-work.
+
+Also propose a rough `EFFORT_HINT` (free prose or S/M/L) and a suggested
+`NEXT_OPSX` for the top item (usually `/opsx-new` / `/opsx-ff` / `/opsx-update`
+/ bug path — not implement-from-explore).
+
+Format:
+
+```text
+VALUED_GOALS:
+TRUST: raw_notes_ranked_for_useful_work (not SoT)
+RANKED:
+1. ID_OR_SLUG: <stable slug or worklog line ref>
+   GOAL: <one line>
+   VALUE: <free prose — required>
+   VALUE_SOURCE: owner | explore_draft | worklog_field
+   EFFORT_HINT: <free prose or S/M/L>
+   SOURCE: owner | Worklog-derived | Inferred
+   NEXT_OPSX: </opsx-new|/opsx-ff|/opsx-update|/opsx-fix-bug|...>
+2. ...
+EMPTY_QUEUE: YES|NO
+HANDOFF: /opsx-supervisor TASK_MODE=USEFUL_WORK (Owner STOP|HARD_DEADLINE)
+DO_NOT:
+- invent a mandatory numeric value scale
+- write WORKLOG or mark goals done from explore
+- implement product code from this ranking
+```
+
 ## Next Action
 Что делать дальше. If `NOW_LATER` was emitted and the owner wants
 to commit the boundary, prefer pointing to `/opsx-bound-scope` (not a silent
 full-scope `/opsx-new` / `/opsx-ff` of everything).
+If `VALUED_GOALS` was emitted for useful-work, prefer pointing to
+`/opsx-supervisor` with `TASK_MODE=USEFUL_WORK` plus Owner `HARD_DEADLINE` or STOP.
 
 ### Bug-episode / bug-team handback (when case= or finding= in scope)
 
@@ -228,7 +274,7 @@ ALSO_OK (if still unsure; separate paste — never with first-intake RAW_REPORT)
    `ALSO_OK` lines until a real id exists. Never paste handback `case=`
    into the same message as free-form first-intake `RAW_REPORT`.
 
-**Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
+**Input**: The argument after `/opsx-explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
 - A change name: "add-dark-mode" (to explore in context of that change)
@@ -398,6 +444,8 @@ When things crystallize, you might offer a summary - but it's optional. Sometime
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
 - **Don't park to WORKLOG** - Deferred parks are `/opsx-bound-scope:GO` only; explore may only *suggest* DO_LATER
+- **Don't treat WORKLOG as North Star SoT** - Valued Goals ranking stays `raw_notes_ranked_for_useful_work`
+- **Don't skip VALUE** - When emitting `VALUED_GOALS`, every item needs free-prose `VALUE` (draft ok)
 - **Don't duplicate the splitter** - No `/opsx-update:split`; scope cut + park is `/opsx-bound-scope`
 - **Don't rewrite OWNER_INTENT** - When present, pass it through verbatim in
   `EXPLORE_HANDOFF`; put code/runtime/OpenSpec mappings under layered fields
