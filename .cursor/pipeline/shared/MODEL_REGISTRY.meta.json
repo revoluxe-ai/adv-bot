@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "synced_at": "2026-08-14T11:27:51+00:00",
+  "source": "cursor_api.GET.v1.models",
+  "model_count": 35,
+  "registry_path": ".cursor/pipeline/shared/MODEL_REGISTRY.json",
+  "schema_path": ".cursor/pipeline/shared/MODEL_REGISTRY.schema.json"
+}
