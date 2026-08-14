@@ -206,6 +206,80 @@ async def _load_user_cabinets_for_user_in_session(
     return result.scalars().all()
 
 
+async def persist_wb_token_in_session(
+    session: AsyncSession, wb_token: WBToken
+) -> None:
+    """Persist a new ``WBToken`` (caller already verified uniqueness).
+
+    WRITE child: parent opens ``sm(read_only=False)`` and passes session here.
+    """
+    session.add(wb_token)
+    await session.flush()
+    await session.commit()
+
+
+async def ensure_wb_user_cabinet_binding_in_session(
+    session: AsyncSession,
+    *,
+    wb_cabinet: WBCabinet,
+    user_id: int,
+    cabinet_name: str,
+) -> WBUserCabinet:
+    """Return existing user↔cabinet binding or create and commit a new one.
+
+    WRITE child for ``process_cabinet_api`` when shop already exists.
+    """
+    wb_user_cabinet = await _load_user_cabinet_for_user_in_session(
+        session, wb_cabinet.id, user_id
+    )
+    if wb_user_cabinet is not None:
+        return wb_user_cabinet
+    wb_user_cabinet = WBUserCabinet(
+        name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet
+    )
+    session.add(wb_user_cabinet)
+    await session.flush()
+    await session.commit()
+    return wb_user_cabinet
+
+
+async def create_wb_cabinet_and_user_binding_in_session(
+    session: AsyncSession,
+    *,
+    shop_id: str,
+    user_id: int,
+    cabinet_name: str,
+) -> tuple[WBCabinet, WBUserCabinet]:
+    """Create ``WBCabinet`` + ``WBUserCabinet`` binding and commit.
+
+    WRITE child for ``process_cabinet_api`` when shop is new.
+    """
+    new_wb_cabinet = WBCabinet()
+    new_wb_cabinet.shop_id = shop_id
+    new_wb_cabinet.active = True
+    new_wb_cabinet.default_max_cpm = settings.DEFAULT_MAX_CPM
+    session.add(new_wb_cabinet)
+    await session.flush()
+    wb_user_cabinet = WBUserCabinet()
+    wb_user_cabinet.name = cabinet_name
+    wb_user_cabinet.wb_cabinet_id = new_wb_cabinet.id
+    wb_user_cabinet.user_id = user_id
+    session.add(wb_user_cabinet)
+    await session.commit()
+    return new_wb_cabinet, wb_user_cabinet
+
+
+async def commit_new_wb_token_in_session(
+    session: AsyncSession, wb_token: WBToken
+) -> None:
+    """Insert ``WBToken`` and commit (IntegrityError handled by caller).
+
+    WRITE child for ``process_add_new_token``.
+    """
+    session.add(wb_token)
+    await session.commit()
+
+
 async def _load_adv_settings_for_wb_user_cabinet_in_session(
     session: AsyncSession, wb_user_cabinet_original_id: int
 ) -> list[AdvSetting]:
@@ -436,6 +510,12 @@ async def process_cabinet_api(
 ) -> None:
     """
     Юзер вводит токен, который проверяется на валидность.
+
+    Parent WRITE seam: ``sm(read_only=False)`` →
+    :func:`persist_wb_token_in_session` /
+    :func:`ensure_wb_user_cabinet_binding_in_session` /
+    :func:`create_wb_cabinet_and_user_binding_in_session`.
+
     Если токен не валиден, то юзеру отправляется сообщение об этом.
     Если токен валиден, то проверяется есть ли он у другого юзера
     Если токен есть у другого юзера, то юзеру отправляется сообщение об этом. return
@@ -569,9 +649,7 @@ async def process_cabinet_api(
                     chat_id, "Ошибка: этот токен используется другим пользователем."
                 )
                 return None
-        session.add(wb_token)
-        await session.flush()
-        await session.commit()
+        await persist_wb_token_in_session(session, wb_token)
         # Проверка существования кабинета по shop_id
         wb_cabinet = await _load_wb_cabinet_by_shop_id_in_session(session, shop_id)
         current_wb_cabinet: WBCabinet
@@ -579,19 +657,15 @@ async def process_cabinet_api(
             _ = await messages.CabinetExistsForUser(bot, chat_id)()
             if wb_cabinet.active is not True:
                 wb_cabinet.active = True
-            wb_user_cabinet = await _load_user_cabinet_for_user_in_session(
-                session, wb_cabinet.id, user_id
+            wb_user_cabinet = await ensure_wb_user_cabinet_binding_in_session(
+                session,
+                wb_cabinet=wb_cabinet,
+                user_id=user_id,
+                cabinet_name=cabinet_name,
             )
             adv_settings = await _load_adv_settings_for_wb_user_cabinet_in_session(
                 session, wb_cabinet.id
             )
-            if not wb_user_cabinet:
-                wb_user_cabinet = WBUserCabinet(
-                    name=cabinet_name, user_id=user_id, wb_cabinet=wb_cabinet
-                )
-                session.add(wb_user_cabinet)
-                await session.flush()
-                await session.commit()
             wb_user_cabinet_original_id = wb_user_cabinet.id
             adv_settings = list(adv_settings)
             await session.commit()
@@ -602,19 +676,14 @@ async def process_cabinet_api(
             return None
         else:
             # Если нет вб - кабинета, то Создаем новый кабинет и привязку к пользователю
-            new_wb_cabinet: WBCabinet = WBCabinet()
-            new_wb_cabinet.shop_id = shop_id
-            new_wb_cabinet.active = True
-            new_wb_cabinet.default_max_cpm = settings.DEFAULT_MAX_CPM
-            session.add(new_wb_cabinet)
-            await session.flush()  # получаем wb_cabinet.id
-            wb_user_cabinet = WBUserCabinet()
-            wb_user_cabinet.name = cabinet_name
-            wb_user_cabinet.wb_cabinet_id = new_wb_cabinet.id
-            wb_user_cabinet.user_id = user_id
-            session.add(wb_user_cabinet)
-            await session.commit()
-            current_wb_cabinet = new_wb_cabinet
+            current_wb_cabinet, wb_user_cabinet = (
+                await create_wb_cabinet_and_user_binding_in_session(
+                    session,
+                    shop_id=shop_id,
+                    user_id=user_id,
+                    cabinet_name=cabinet_name,
+                )
+            )
 
         _ = await messages.ShopAddedSuccess(bot, chat_id, cabinet_name)()
         access.wb_cabinet = current_wb_cabinet
@@ -688,8 +757,10 @@ async def add_app_token(
 async def process_add_new_token(
     message: Message, bot: aiogram.Bot, state: FSMContext, client_session: ClientSession
 ) -> None:
-    """
-    Обработчик добавления нов��го токена для существующего магазина.
+    """Обработчик добавления нового токена для существующего магазина.
+
+    Parent WRITE seam: ``sm(read_only=False)`` →
+    :func:`commit_new_wb_token_in_session`.
 
     После успешного добавления токена резолвит все старые уведомления
     для этого магазина (об истечении срока и деактивации).
@@ -858,9 +929,8 @@ async def process_add_new_token(
         # Сохранение токена. Пытаемся атомарно вставить — при гонке может быть
         # IntegrityError (уникальность токена на уровне БД). В этом случае
         # делаем rollback и корректно информируем пользователя.
-        session.add(wb_token)
         try:
-            await session.commit()
+            await commit_new_wb_token_in_session(session, wb_token)
         except IntegrityError:
             await session.rollback()
             # Получаем существующий токен, чтобы понять чей он
@@ -1194,7 +1264,7 @@ async def update_company_from_wb(
         except TimeoutError:
             _ = await bot.send_message(
                 chat_id,
-                f"Тайм-аут обновления кампаний, обрат��тесь в поддержку: {const.SUPPORT_LINK}",
+                f"Тайм-аут обновления кампаний, обратитесь в поддержку: {const.SUPPORT_LINK}",
             )
             return
 

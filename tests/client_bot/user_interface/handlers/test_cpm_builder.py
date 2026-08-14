@@ -394,6 +394,35 @@ async def test_change_target_position_is_blocked_when_auto_target_place_enabled(
     assert state.state_calls[-1] is None
 
 
+@pytest.mark.asyncio
+@pytest.mark.destructive_local
+async def test_off_auto_cpm_disables_bidder_and_reloads_menu(
+    async_session: AsyncSession,
+) -> None:
+    """WRITE parent→child seam: off_auto_cpm clears bidder_active and reloads UI."""
+    adv_id, _ = await _create_adv_with_keywords(
+        async_session, max_place=5, max_cpm=120, bidder_active=True
+    )
+    state = _FakeState()
+    bot = AsyncMock()
+    callback_data = SimpleNamespace(adv_original_id=adv_id)
+    cpm_page = AsyncMock()
+    mock_sm = _MockSessionMaker(async_session)
+
+    with patch(
+        "app.modules.wb_adv_updater.modules.bidder.tg_bot_handlers.on_off_controller.sm",
+        mock_sm,
+    ), patch(
+        "app.client_bot.user_interface.views.messages.CPMSetting",
+        MagicMock(return_value=cpm_page),
+    ):
+        await on_off_controller.off_auto_cpm(_callback(), callback_data, bot, state)
+
+    updated = await _get_adv(async_session, adv_id)
+    assert updated.bidder_active is False
+    cpm_page.assert_awaited_once_with(adv_id)
+
+
 def test_cpm_setting_keyboard_shows_edit_buttons_when_bidder_is_disabled() -> None:
     view = CPMSetting.__new__(CPMSetting)
     view.adv_setting = SimpleNamespace(

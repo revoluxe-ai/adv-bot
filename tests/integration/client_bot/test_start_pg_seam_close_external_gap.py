@@ -203,6 +203,47 @@ async def test_load_wb_user_cabinet_in_session_reads_persisted_cabinet(
     assert reread_name == "Cabinet C"
 
 
+async def test_load_wb_user_cabinet_for_owner_in_session_filters_by_telegram_id(
+    async_session,
+) -> None:
+    """Owner loader returns cabinet only when telegram_id matches persisted User."""
+    owner_telegram_id = 9_100_203
+    other_telegram_id = 9_100_204
+    owner = await _make_user(
+        async_session, telegram_id=owner_telegram_id, username="start-owner-ok"
+    )
+    await _make_user(
+        async_session, telegram_id=other_telegram_id, username="start-owner-other"
+    )
+    shop_id = f"shop-{uuid.uuid4().hex[:8]}"
+    cabinet = await _make_cabinet(async_session, shop_id=shop_id, active=True)
+    user_cabinet = await _make_user_cabinet(
+        async_session, user=owner, cabinet=cabinet, name="Owner Cabinet"
+    )
+    user_cabinet_pk = user_cabinet.id
+    await async_session.commit()
+
+    loaded = await start_module._load_wb_user_cabinet_for_owner_in_session(
+        async_session, user_cabinet_pk, owner_telegram_id
+    )
+    assert loaded is not None
+    assert loaded.id == user_cabinet_pk
+    assert loaded.name == "Owner Cabinet"
+    assert loaded.wb_cabinet.shop_id == shop_id
+
+    denied = await start_module._load_wb_user_cabinet_for_owner_in_session(
+        async_session, user_cabinet_pk, other_telegram_id
+    )
+    assert denied is None
+
+    # Capture PKs before expire: expired instance attrs trigger MissingGreenlet.
+    async_session.expire_all()
+    reread_name = await async_session.scalar(
+        select(WBUserCabinet.name).where(WBUserCabinet.id == user_cabinet_pk)
+    )
+    assert reread_name == "Owner Cabinet"
+
+
 async def test_load_adv_settings_for_wb_user_cabinet_in_session_reads_ordered_rows(
     async_session,
 ) -> None:
@@ -282,3 +323,268 @@ async def test_load_wb_user_cabinet_for_menu_in_session_reads_user_tokens_and_se
     reread_user_cabinet = reread.unique().scalar_one()
     assert reread_user_cabinet.user.wb_tokens[0].api_key == token_api_key
     assert reread_user_cabinet.wb_cabinet.adv_settings[0].name == adv_setting_name
+
+
+@pytest.mark.asyncio
+async def test_persist_wb_token_in_session_persists(async_session) -> None:
+    """WRITE child persists WBToken; re-select proves row."""
+    user = await _make_user(
+        async_session, telegram_id=9_100_201, username="persist-token-user"
+    )
+    shop_id = f"shop-{uuid.uuid4().hex[:8]}"
+    api_key = f"api-{uuid.uuid4().hex}"
+    token = WBToken(api_key=api_key, user_id=user.id, shop_id=shop_id, active=True)
+
+    await start_module.persist_wb_token_in_session(async_session, token)
+    async_session.expire_all()
+    reread = await async_session.scalar(
+        select(WBToken).where(WBToken.api_key == api_key, WBToken.shop_id == shop_id)
+    )
+    assert reread is not None
+    assert reread.user_id == user.id
+
+
+@pytest.mark.asyncio
+async def test_create_wb_cabinet_and_user_binding_in_session_persists(
+    async_session,
+) -> None:
+    """WRITE child creates cabinet + binding; re-select proves both."""
+    user = await _make_user(
+        async_session, telegram_id=9_100_202, username="create-cab-user"
+    )
+    shop_id = f"shop-{uuid.uuid4().hex[:8]}"
+
+    cabinet, user_cabinet = (
+        await start_module.create_wb_cabinet_and_user_binding_in_session(
+            async_session,
+            shop_id=shop_id,
+            user_id=user.id,
+            cabinet_name="New Cabinet",
+        )
+    )
+    async_session.expire_all()
+    reread_cab = await async_session.scalar(
+        select(WBCabinet).where(WBCabinet.id == cabinet.id)
+    )
+    reread_uc = await async_session.scalar(
+        select(WBUserCabinet).where(WBUserCabinet.id == user_cabinet.id)
+    )
+    assert reread_cab is not None
+    assert reread_cab.shop_id == shop_id
+    assert reread_cab.active is True
+    assert reread_uc is not None
+    assert reread_uc.user_id == user.id
+    assert reread_uc.name == "New Cabinet"
+
+
+@pytest.mark.asyncio
+async def test_ensure_wb_user_cabinet_binding_in_session_creates(
+    async_session,
+) -> None:
+    """WRITE child creates missing binding; re-select proves row."""
+    user = await _make_user(
+        async_session, telegram_id=9_100_203, username="ensure-bind-user"
+    )
+    cabinet = await _make_cabinet(
+        async_session, shop_id=f"shop-{uuid.uuid4().hex[:8]}", active=True
+    )
+    await async_session.commit()
+
+    binding = await start_module.ensure_wb_user_cabinet_binding_in_session(
+        async_session,
+        wb_cabinet=cabinet,
+        user_id=user.id,
+        cabinet_name="Bound Cabinet",
+    )
+    async_session.expire_all()
+    reread = await async_session.scalar(
+        select(WBUserCabinet).where(WBUserCabinet.id == binding.id)
+    )
+    assert reread is not None
+    assert reread.wb_cabinet_id == cabinet.id
+    assert reread.user_id == user.id
+
+
+@pytest.mark.asyncio
+async def test_commit_new_wb_token_in_session_persists(async_session) -> None:
+    """WRITE child for process_add_new_token persists token."""
+    user = await _make_user(
+        async_session, telegram_id=9_100_204, username="commit-token-user"
+    )
+    shop_id = f"shop-{uuid.uuid4().hex[:8]}"
+    api_key = f"api-{uuid.uuid4().hex}"
+    token = WBToken(api_key=api_key, user_id=user.id, shop_id=shop_id, active=True)
+
+    await start_module.commit_new_wb_token_in_session(async_session, token)
+    async_session.expire_all()
+    reread = await async_session.scalar(
+        select(WBToken).where(WBToken.api_key == api_key, WBToken.shop_id == shop_id)
+    )
+    assert reread is not None
+    assert reread.user_id == user.id
+
+
+@pytest.mark.asyncio
+async def test_process_cabinet_api_parent_live_sm_creates_cabinet_and_token(
+    async_session,
+) -> None:
+    """Parent ``process_cabinet_api`` persists token+cabinet via live sm.
+
+    Non-PG deps (token validator, Telegram messages, ShopChoice) are mocked
+    after the causal PG boundary. ``sm`` is already live via package conftest.
+    """
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    telegram_id = 9_100_301
+    user = await _make_user(
+        async_session, telegram_id=telegram_id, username="cabinet-api-parent"
+    )
+    await async_session.commit()
+    shop_id = f"shop-{uuid.uuid4().hex[:8]}"
+    api_key = f"tok-{uuid.uuid4().hex}abcdef"  # >= 24 chars
+
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_personal=True,
+        is_read_only=False,
+        is_expired=False,
+        can_be_used_for_free=True,
+        missing_required=set(),
+        shop_id=shop_id,
+    )
+    validator = MagicMock()
+    validator.validate = AsyncMock(return_value=validation_result)
+
+    message = SimpleNamespace(
+        text=api_key,
+        chat=SimpleNamespace(id=telegram_id),
+        from_user=SimpleNamespace(id=telegram_id),
+    )
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"cabinet_name": "Live Cab"})
+    client_session = MagicMock()
+
+    with (
+        patch.object(
+            start_module,
+            "TokenPermissionsValidator",
+            MagicMock(return_value=validator),
+        ),
+        patch.object(
+            start_module.messages,
+            "ShopUpdateInfo",
+            MagicMock(return_value=AsyncMock()),
+        ),
+        patch.object(
+            start_module.messages,
+            "ShopAddedSuccess",
+            MagicMock(return_value=AsyncMock()),
+        ),
+        patch.object(
+            start_module,
+            "ShopChoice",
+            MagicMock(return_value=AsyncMock()),
+        ),
+    ):
+        await start_module.process_cabinet_api(
+            message, bot, state, client_session
+        )
+
+    async_session.expire_all()
+    reread_token = await async_session.scalar(
+        select(WBToken).where(WBToken.api_key == api_key, WBToken.shop_id == shop_id)
+    )
+    reread_cab = await async_session.scalar(
+        select(WBCabinet).where(WBCabinet.shop_id == shop_id)
+    )
+    reread_uc = await async_session.scalar(
+        select(WBUserCabinet).where(
+            WBUserCabinet.user_id == user.id,
+            WBUserCabinet.name == "Live Cab",
+        )
+    )
+    assert reread_token is not None
+    assert reread_token.user_id == user.id
+    assert reread_cab is not None
+    assert reread_cab.active is True
+    assert reread_uc is not None
+    assert reread_uc.wb_cabinet_id == reread_cab.id
+
+
+@pytest.mark.asyncio
+async def test_process_add_new_token_parent_live_sm_persists_token(
+    async_session,
+) -> None:
+    """Parent ``process_add_new_token`` persists WBToken via live write sm."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    telegram_id = 9_100_302
+    user = await _make_user(
+        async_session, telegram_id=telegram_id, username="add-token-parent"
+    )
+    shop_id = f"shop-{uuid.uuid4().hex[:8]}"
+    cabinet = await _make_cabinet(async_session, shop_id=shop_id, active=True)
+    user_cabinet = await _make_user_cabinet(
+        async_session, user=user, cabinet=cabinet, name="Existing Cab"
+    )
+    await async_session.commit()
+    api_key = f"tok-{uuid.uuid4().hex}abcdef"
+
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_personal=True,
+        is_read_only=False,
+        is_expired=False,
+        can_be_used_for_free=True,
+        missing_required=set(),
+        shop_id=shop_id,
+    )
+    validator = MagicMock()
+    validator.validate = AsyncMock(return_value=validation_result)
+    notif = MagicMock()
+    notif.mark_notifications_resolved = AsyncMock(return_value=0)
+
+    message = SimpleNamespace(
+        text=api_key,
+        chat=SimpleNamespace(id=telegram_id),
+        from_user=SimpleNamespace(id=telegram_id),
+    )
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(
+        return_value={"wb_user_cabinet_original_id": user_cabinet.id}
+    )
+    state.clear = AsyncMock()
+    client_session = MagicMock()
+
+    with (
+        patch.object(
+            start_module,
+            "TokenPermissionsValidator",
+            MagicMock(return_value=validator),
+        ),
+        patch.object(
+            start_module,
+            "NotificationManager",
+            MagicMock(return_value=notif),
+        ),
+        patch.object(
+            start_module,
+            "ShopMenu",
+            MagicMock(return_value=AsyncMock()),
+        ),
+    ):
+        await start_module.process_add_new_token(
+            message, bot, state, client_session
+        )
+
+    async_session.expire_all()
+    reread = await async_session.scalar(
+        select(WBToken).where(WBToken.api_key == api_key, WBToken.shop_id == shop_id)
+    )
+    assert reread is not None
+    assert reread.user_id == user.id
+    state.clear.assert_awaited()

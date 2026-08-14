@@ -42,7 +42,7 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
     adv2.rec_system_mode = False
 
     manager._get_advs = AsyncMock(return_value=[adv1, adv2])
-    manager._WBShopDataManager__get_adv_id_to_search_adv_map = AsyncMock(return_value={})
+    manager._get_adv_id_to_search_adv_map = AsyncMock(return_value={})
     manager._traffic_clicks_manager.enrich = AsyncMock(return_value=None)
     manager._get_min_bids = AsyncMock(return_value=None)
 
@@ -97,7 +97,7 @@ async def test_get_complex_advs_returns_base_list_when_min_bids_cache_fails() ->
     adv.rec_system_mode = False
 
     manager._get_advs = AsyncMock(return_value=[adv])
-    manager._WBShopDataManager__get_adv_id_to_search_adv_map = AsyncMock(return_value={})
+    manager._get_adv_id_to_search_adv_map = AsyncMock(return_value={})
     manager._traffic_clicks_manager.enrich = AsyncMock(return_value=None)
     manager._get_min_bids = AsyncMock(side_effect=ConnectionError("redis mget failed"))
 

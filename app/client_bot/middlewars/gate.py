@@ -9,6 +9,7 @@ from typing import Any, cast
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
 from app.client_bot.admin_access import is_bot_admin
@@ -35,30 +36,46 @@ def _resolve_chat_id(event: Message | CallbackQuery) -> int | None:
     return None
 
 
-async def _resolve_user(event: Message | CallbackQuery, telegram_id: int) -> User:
-    """Load the current user, creating a minimal record when needed."""
-    async with _sm(read_only=False) as session:
-        stmt = select(User).options(load_only(User.passed_gate)).where(
-            User.user_telegram_id == telegram_id
-        )
-        result = await session.execute(stmt)
-        user = result.scalar_one_or_none()
-        if user is not None:
-            return user
+async def resolve_user_in_session(
+    session: AsyncSession,
+    event: Message | CallbackQuery,
+    telegram_id: int,
+) -> User:
+    """Load or create the gate user within an existing WRITE session.
 
-        chat_id = _resolve_chat_id(event)
-        user = await create_user(
-            session,
-            telegram_id,
-            username=event.from_user.username if event.from_user else None,
-            adv_updater_user_chat_id=chat_id,
-        )
-        logger.debug(
-            "GateMiddleware: created user=%s chat_id=%s",
-            telegram_id,
-            chat_id,
-        )
+    Caller opens ``sm(read_only=False)`` and passes the session here.
+    Creation delegates to :func:`create_user` with the injected session.
+    """
+    stmt = select(User).options(load_only(User.passed_gate)).where(
+        User.user_telegram_id == telegram_id
+    )
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+    if user is not None:
         return user
+
+    chat_id = _resolve_chat_id(event)
+    user = await create_user(
+        session,
+        telegram_id,
+        username=event.from_user.username if event.from_user else None,
+        adv_updater_user_chat_id=chat_id,
+    )
+    logger.debug(
+        "GateMiddleware: created user=%s chat_id=%s",
+        telegram_id,
+        chat_id,
+    )
+    return user
+
+
+async def _resolve_user(event: Message | CallbackQuery, telegram_id: int) -> User:
+    """Load the current user, creating a minimal record when needed.
+
+    Parent WRITE seam: ``sm(read_only=False)`` → :func:`resolve_user_in_session`.
+    """
+    async with _sm(read_only=False) as session:
+        return await resolve_user_in_session(session, event, telegram_id)
 
 
 async def _message_state_name(data: dict[str, Any]) -> str | None:

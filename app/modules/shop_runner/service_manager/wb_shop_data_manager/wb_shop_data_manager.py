@@ -132,14 +132,33 @@ class WBShopDataManager:
         return adv_settings_list
 
 
-    @staticmethod
-    async def __get_adv_id_to_search_adv_map(
+    async def _get_adv_id_to_search_adv_map(
+        self,
         search_id_ids: set[int],
     ) -> dict[int, AdvSetting]:
+        """PURE_READ parent: открывает ``sm(read_only=True)`` и делегирует child."""
+        async with sm(read_only=True) as session:
+            return await self.__get_adv_id_to_search_adv_map(session, search_id_ids)
+
+    @staticmethod
+    async def __get_adv_id_to_search_adv_map(
+        session: AsyncSession,
+        search_id_ids: set[int],
+    ) -> dict[int, AdvSetting]:
+        """Загрузить AdvSetting по ``adv_id`` через переданную read-only session.
+
+        Parent ``_get_adv_id_to_search_adv_map`` открывает ``sm(read_only=True)``.
+
+        Args:
+            session: SQLAlchemy AsyncSession (PURE_READ).
+            search_id_ids: множество ``adv_id`` поисковых РК.
+
+        Returns:
+            Словарь ``adv_id → AdvSetting``.
+        """
         stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(search_id_ids))
-        async with sm() as session:
-            result = await session.execute(stmt)
-            advs: Sequence[AdvSetting] = result.scalars().all()
+        result = await session.execute(stmt)
+        advs: Sequence[AdvSetting] = result.scalars().all()
         adv_dict: dict[int, AdvSetting] = {adv.adv_id: adv for adv in advs}
         return adv_dict
 
@@ -337,7 +356,7 @@ class WBShopDataManager:
             plan_fact_reader = self._plan_fact_reader
 
         if search_adv_ids:
-            search_adv_task = self.__get_adv_id_to_search_adv_map(search_adv_ids)
+            search_adv_task = self._get_adv_id_to_search_adv_map(search_adv_ids)
             if plan_fact_reader is not None:
                 search_adv_idv, summaries_by_adv_id = await asyncio.gather(
                     search_adv_task,

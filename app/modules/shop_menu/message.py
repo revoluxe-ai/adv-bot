@@ -312,6 +312,16 @@ class ShopMenu(TextWithKeyboard):
             self._token_status = None
             self._token_status_loaded = False
 
+    async def _load_tariff_details_in_session(
+        self, session: AsyncSession, shop_id: str
+    ) -> TariffDetails:
+        """Load tariff details via Pricer using caller-opened session.
+
+        Parent ``_load_all_data`` opens ``sm(read_only=True)`` and passes
+        the session here (PURE_READ handoff).
+        """
+        return await self._pricer.get_tariff_details(session, shop_id)
+
     async def _load_all_data(self) -> bool:
         """Оптимизированная загрузка всех данных в одной транзакции"""
         start_time = datetime.now()
@@ -367,8 +377,8 @@ class ShopMenu(TextWithKeyboard):
 
         # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
         shop_id = self._wb_cabinet.shop_id
-        async with sm() as session:
-            self._tariff_details = await self._pricer.get_tariff_details(
+        async with sm(read_only=True) as session:
+            self._tariff_details = await self._load_tariff_details_in_session(
                 session, shop_id
             )
         self._total_active_advs_count = (

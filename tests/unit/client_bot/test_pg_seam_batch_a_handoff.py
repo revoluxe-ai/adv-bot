@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -156,3 +156,25 @@ async def test_set_common_bid_manual_apply_parent_passes_session_to_child() -> N
 
     assert session_maker.calls == [True]
     child.assert_awaited_once_with(session, message, bot, state)
+
+
+async def test_reload_adv_setting_menu_parent_passes_session_to_child() -> None:
+    """_reload_adv_setting_menu opens ``sm(read_only=True)`` → load entities child."""
+    session = AsyncMock()
+    bot = AsyncMock()
+    cabinet = SimpleNamespace(id=10)
+    adv = SimpleNamespace(id=1)
+    child = AsyncMock(return_value=(cabinet, adv))
+    menu_page = AsyncMock()
+    session_maker = _MockSessionMaker(session)
+
+    with (
+        patch(f"{MODULE_COMMON_BID}.sm", session_maker),
+        patch(f"{MODULE_COMMON_BID}.load_adv_setting_menu_entities_in_session", child),
+        patch(f"{MODULE_COMMON_BID}.AdvSettingMenu", MagicMock(return_value=menu_page)),
+    ):
+        await set_common_bid_manual._reload_adv_setting_menu(bot, 111, 10, 1)
+
+    assert session_maker.calls == [True]
+    child.assert_awaited_once_with(session, 10, 1)
+    menu_page.assert_awaited_once()

@@ -77,6 +77,38 @@ class SearchBidApplyResult:
     errors: tuple[str, ...]
 
 
+async def load_adv_setting_menu_entities_in_session(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+    adv_setting_original_id: int,
+) -> tuple[WBUserCabinet | None, AdvSetting | None]:
+    """PURE_READ: cabinet + AdvSetting для reload меню через переданную session.
+
+    Parent ``_reload_adv_setting_menu`` открывает ``sm(read_only=True)`` и
+    передаёт session сюда. UI ``AdvSettingMenu`` вызывается снаружи.
+
+    Args:
+        session: SQLAlchemy AsyncSession (PURE_READ).
+        wb_user_cabinet_original_id: PK ``WBUserCabinet.id``.
+        adv_setting_original_id: PK ``AdvSetting.id``.
+
+    Returns:
+        Пара ``(wb_user_cabinet, adv_setting)``; любой элемент может быть ``None``.
+    """
+    wb_user_cabinet_result = await session.execute(
+        select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    )
+    wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
+
+    adv_result = await session.execute(
+        select(AdvSetting)
+        .options(joinedload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_setting_original_id)
+    )
+    adv_setting_reload = adv_result.scalar_one_or_none()
+    return wb_user_cabinet, adv_setting_reload
+
+
 async def _reload_adv_setting_menu(
     bot: Bot,
     chat_id: int,
@@ -85,17 +117,13 @@ async def _reload_adv_setting_menu(
 ) -> None:
     """Перезагрузить меню настроек кампании."""
     async with sm(read_only=True) as session:
-        wb_user_cabinet_result = await session.execute(
-            select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        wb_user_cabinet, adv_setting_reload = (
+            await load_adv_setting_menu_entities_in_session(
+                session,
+                wb_user_cabinet_original_id,
+                adv_setting_original_id,
+            )
         )
-        wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
-
-        adv_result = await session.execute(
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_setting_original_id)
-        )
-        adv_setting_reload = adv_result.scalar_one_or_none()
 
     if wb_user_cabinet and adv_setting_reload:
         _ = await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting_reload)()

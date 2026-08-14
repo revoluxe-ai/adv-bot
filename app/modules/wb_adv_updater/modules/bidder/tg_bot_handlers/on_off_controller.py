@@ -24,6 +24,36 @@ async def _load_adv_setting(session: AsyncSession, adv_original_id: int) -> AdvS
     return await session.get(AdvSetting, adv_original_id)
 
 
+async def off_auto_cpm_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Выключить ``bidder_active`` через переданную WRITE-session.
+
+    Parent ``off_auto_cpm`` открывает ``sm(read_only=False)`` и передаёт session
+    сюда. После commit UI-меню перезагружается снаружи.
+
+    Args:
+        session: SQLAlchemy AsyncSession (WRITE).
+        adv_original_id: PK ``AdvSetting.id``.
+
+    Returns:
+        Обновлённый ``AdvSetting``.
+
+    Raises:
+        RuntimeError: если кампания не найдена.
+    """
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    )
+    adv = result.scalar_one_or_none()
+    if adv is None:
+        raise RuntimeError("Не удалось найти кампанию для отключения авто-CPM.")
+    adv.bidder_active = False
+    await session.commit()
+    return adv
+
+
 @router.callback_query(callbacks.CPMSettingMenu.filter(F.action == "set_auto_cpm"))
 async def get_min_position(
     callback: types.CallbackQuery,
@@ -84,12 +114,7 @@ async def off_auto_cpm(
         raise RuntimeError("callback.message is None")
     adv_original_id = callback_data.adv_original_id
     async with sm(read_only=False) as session:
-        adv = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        )
-        adv = adv.scalar()
-        adv.bidder_active = False  # type: ignore[attr-defined]
-        await session.commit()
+        await off_auto_cpm_in_session(session, adv_original_id)
         import app.client_bot.user_interface.views.messages as ui_messages
 
         await ui_messages.CPMSetting(bot, callback.message.chat.id)(adv_original_id)

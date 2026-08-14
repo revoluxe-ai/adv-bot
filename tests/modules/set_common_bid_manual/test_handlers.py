@@ -511,6 +511,8 @@ async def test_set_common_bid_manual_apply_success() -> None:
     # Verify Redis updates
     redis_value_instance.set_bids.assert_called_once()
     redis_ts_instance.set.assert_called_once()
+    # Cluster timestamp must be stamped when any keyword bids were sent.
+    cluster_ts_instance.set.assert_awaited_once_with(adv_setting)
 
     # Verify menu reloaded
     mock_menu.assert_called_once_with(bot, 111, wb_user_cabinet, adv_setting)
@@ -649,6 +651,8 @@ async def test_set_common_bid_manual_apply_partial_keyword_update_reported() -> 
     assert "Общая ставка установлена: 100 ₽." in reply_text
     assert "По ключам обновлено: 1 из 2." in reply_text
     assert "сарафан" in reply_text
+    # Partial keyword success still stamps cluster bids timestamp.
+    cluster_ts_instance.set.assert_awaited_once_with(adv_setting)
 
 
 @pytest.mark.unit

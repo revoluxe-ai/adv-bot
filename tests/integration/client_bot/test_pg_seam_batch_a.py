@@ -379,3 +379,31 @@ async def test_set_common_bid_manual_apply_in_session_reads_campaigns(
     assert reread == expected_search_adv_id
     state.set_state.assert_awaited()
     message.answer.assert_awaited()
+
+
+async def test_load_adv_setting_menu_entities_in_session_reads_rows(
+    async_session: AsyncSession,
+) -> None:
+    """PURE_READ child returns WBUserCabinet + AdvSetting via injected session."""
+    main_adv, _search_adv, wb_user_cabinet = await _create_common_bid_fixture(
+        async_session
+    )
+    cabinet_pk = wb_user_cabinet.id
+    adv_pk = main_adv.id
+    await async_session.commit()
+
+    cabinet, adv = await set_common_bid_manual.load_adv_setting_menu_entities_in_session(
+        async_session,
+        cabinet_pk,
+        adv_pk,
+    )
+
+    assert cabinet is not None
+    assert adv is not None
+    assert cabinet.id == cabinet_pk
+    assert adv.id == adv_pk
+
+    reread_adv = await async_session.scalar(
+        select(AdvSetting.id).where(AdvSetting.id == adv_pk)
+    )
+    assert reread_adv == adv_pk
