@@ -600,11 +600,12 @@ def setup_test_database(request):
     _validate_pg_preflight()
 
     lifecycle = _resolve_test_infra_lifecycle(request)
-    _DOCKER_CLEANUP_STATE["compose_cmd"] = getattr(lifecycle, "_compose_cmd", None)
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
     try:
         lifecycle.ensure_resources(TestResourceNeeds(needs_pg=True))
         _TEST_DB_READY = bool(lifecycle.state.pg_ready)
-        _DOCKER_CLEANUP_STATE["compose_cmd"] = lifecycle._compose_cmd
+        if lifecycle.state.compose_started_by_pytest:
+            _DOCKER_CLEANUP_STATE["compose_cmd"] = lifecycle._compose_cmd
         print("[OK] Test database setup complete (session-scoped schema).")
         yield
     except BaseException as exc:  # noqa: BLE001
