@@ -1,5 +1,7 @@
 """Unit tests for mandatory phone collection middleware and handlers."""
 
+from __future__ import annotations
+
 import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -13,7 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.middlewars.phone_required import PhoneRequiredMiddleware
 from app.client_bot.user_interface.handlers.phone_collection import save_user_phone
+from app.client_bot.user_interface.views.phone_request import get_phone_request_text
 from app.utils.db.models import User
+from tests.helpers.telegram_message_asserts import (
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -43,6 +52,13 @@ def make_session_context(
     return session, session_cm
 
 
+def _extract_sent_text(send_message_mock: AsyncMock) -> str:
+    """Return sent message text for positional and keyword bot.send_message calls."""
+    args = send_message_mock.call_args.args
+    kwargs = send_message_mock.call_args.kwargs
+    return kwargs.get("text", args[1] if len(args) > 1 else "")
+
+
 @pytest.mark.asyncio
 async def test_phone_required_middleware_blocks_message_without_phone() -> None:
     """A passed-gate user without phone gets a reply keyboard instead of handler access."""
@@ -58,19 +74,22 @@ async def test_phone_required_middleware_blocks_message_without_phone() -> None:
     bot = AsyncMock()
     handler = AsyncMock()
 
-    with patch(
-        "app.client_bot.middlewars.phone_required._sm",
-        session_cm,
-    ), patch("app.client_bot.middlewars.phone_required.settings") as mock_settings:
+    with patch("app.client_bot.middlewars.phone_required._sm", session_cm), patch(
+        "app.client_bot.middlewars.phone_required.settings"
+    ) as mock_settings:
         mock_settings.invite_gate = True
-        middleware = PhoneRequiredMiddleware()
-        await middleware(handler, event, {"bot": bot})
+        await PhoneRequiredMiddleware()(handler, event, {"bot": bot})
 
     handler.assert_not_awaited()
     bot.send_message.assert_awaited_once()
-    _, kwargs = bot.send_message.call_args
-    keyboard = kwargs["reply_markup"]
-    assert keyboard.keyboard[0][0].request_contact is True
+    kwargs = bot.send_message.call_args.kwargs
+    text = _extract_sent_text(bot.send_message)
+    assert text == get_phone_request_text()
+    assert_message_within_telegram_limit(text)
+    assert_message_contains_required_phrases(text, ["телефон", "кнопкой ниже"])
+    assert_no_raw_technical_text(text)
+    assert_keyboard_has_buttons(kwargs["reply_markup"], ["Отправить номер телефона"])
+    assert kwargs["reply_markup"].keyboard[0][0].request_contact is True
 
 
 @pytest.mark.asyncio
@@ -88,13 +107,11 @@ async def test_phone_required_middleware_allows_user_with_phone() -> None:
     bot = AsyncMock()
     handler = AsyncMock()
 
-    with patch(
-        "app.client_bot.middlewars.phone_required._sm",
-        session_cm,
-    ), patch("app.client_bot.middlewars.phone_required.settings") as mock_settings:
+    with patch("app.client_bot.middlewars.phone_required._sm", session_cm), patch(
+        "app.client_bot.middlewars.phone_required.settings"
+    ) as mock_settings:
         mock_settings.invite_gate = True
-        middleware = PhoneRequiredMiddleware()
-        await middleware(handler, event, {"bot": bot})
+        await PhoneRequiredMiddleware()(handler, event, {"bot": bot})
 
     handler.assert_awaited_once_with(event, {"bot": bot})
     bot.send_message.assert_not_called()
@@ -115,13 +132,11 @@ async def test_phone_required_middleware_skips_user_without_access() -> None:
     bot = AsyncMock()
     handler = AsyncMock()
 
-    with patch(
-        "app.client_bot.middlewars.phone_required._sm",
-        session_cm,
-    ), patch("app.client_bot.middlewars.phone_required.settings") as mock_settings:
+    with patch("app.client_bot.middlewars.phone_required._sm", session_cm), patch(
+        "app.client_bot.middlewars.phone_required.settings"
+    ) as mock_settings:
         mock_settings.invite_gate = True
-        middleware = PhoneRequiredMiddleware()
-        await middleware(handler, event, {"bot": bot})
+        await PhoneRequiredMiddleware()(handler, event, {"bot": bot})
 
     handler.assert_awaited_once_with(event, {"bot": bot})
     bot.send_message.assert_not_called()
@@ -151,16 +166,17 @@ async def test_phone_required_middleware_blocks_callback_without_phone() -> None
     state = MagicMock(spec=FSMContext)
     state.update_data = AsyncMock()
 
-    with patch(
-        "app.client_bot.middlewars.phone_required._sm",
-        session_cm,
-    ), patch("app.client_bot.middlewars.phone_required.settings") as mock_settings:
+    with patch("app.client_bot.middlewars.phone_required._sm", session_cm), patch(
+        "app.client_bot.middlewars.phone_required.settings"
+    ) as mock_settings:
         mock_settings.invite_gate = True
-        middleware = PhoneRequiredMiddleware()
-        await middleware(handler, event, {"bot": bot, "state": state})
+        await PhoneRequiredMiddleware()(handler, event, {"bot": bot, "state": state})
 
     handler.assert_not_awaited()
     bot.send_message.assert_awaited_once()
+    kwargs = bot.send_message.call_args.kwargs
+    assert_message_within_telegram_limit(_extract_sent_text(bot.send_message))
+    assert_keyboard_has_buttons(kwargs["reply_markup"], ["Отправить номер телефона"])
     state.update_data.assert_awaited_once()
 
 
@@ -182,16 +198,13 @@ async def test_save_user_phone_saves_own_contact() -> None:
     state.update_data = AsyncMock()
     dispatcher = AsyncMock()
 
-    with patch(
-        "app.client_bot.user_interface.handlers.phone_collection._sm",
-        session_cm,
-    ):
+    with patch("app.client_bot.user_interface.handlers.phone_collection._sm", session_cm):
         await save_user_phone(message, bot, state, dispatcher)
 
     assert user.phone == "+79990001122"
     session.commit.assert_awaited_once()
     bot.send_message.assert_awaited_once()
-    _, kwargs = bot.send_message.call_args
+    kwargs = bot.send_message.call_args.kwargs
     assert kwargs["reply_markup"].remove_keyboard is True
     dispatcher.feed_update.assert_not_called()
 
@@ -210,10 +223,7 @@ async def test_save_user_phone_rejects_foreign_contact() -> None:
     state = MagicMock(spec=FSMContext)
     dispatcher = AsyncMock()
 
-    with patch(
-        "app.client_bot.user_interface.handlers.phone_collection._sm",
-        session_cm,
-    ):
+    with patch("app.client_bot.user_interface.handlers.phone_collection._sm", session_cm):
         await save_user_phone(message, bot, state, dispatcher)
 
     session.commit.assert_not_awaited()
@@ -236,21 +246,10 @@ async def test_save_user_phone_replays_pending_callback() -> None:
     state = MagicMock()
     pending_callback = {
         "id": "callback-id",
-        "from_user": {
-            "id": 777,
-            "is_bot": False,
-            "first_name": "Test",
-        },
+        "from_user": {"id": 777, "is_bot": False, "first_name": "Test"},
         "chat_instance": "chat-instance",
         "data": "adv:test",
-        "message": {
-            "message_id": 55,
-            "date": 0,
-            "chat": {
-                "id": 777,
-                "type": "private",
-            },
-        },
+        "message": {"message_id": 55, "date": 0, "chat": {"id": 777, "type": "private"}},
     }
     state.get_data = AsyncMock(
         return_value={"pending_phone_callback": json.dumps(pending_callback)}
@@ -258,10 +257,7 @@ async def test_save_user_phone_replays_pending_callback() -> None:
     state.update_data = AsyncMock()
     dispatcher = AsyncMock()
 
-    with patch(
-        "app.client_bot.user_interface.handlers.phone_collection._sm",
-        session_cm,
-    ), patch(
+    with patch("app.client_bot.user_interface.handlers.phone_collection._sm", session_cm), patch(
         "app.client_bot.user_interface.handlers.phone_collection.asyncio.sleep",
         new_callable=AsyncMock,
     ) as mock_sleep:
@@ -269,8 +265,12 @@ async def test_save_user_phone_replays_pending_callback() -> None:
 
     mock_sleep.assert_awaited_once_with(0.3)
     dispatcher.feed_update.assert_awaited_once()
-    _, replay_kwargs = dispatcher.feed_update.call_args
-    replay_update = replay_kwargs["update"] if "update" in replay_kwargs else dispatcher.feed_update.call_args.args[1]
+    replay_kwargs = dispatcher.feed_update.call_args.kwargs
+    replay_update = (
+        replay_kwargs["update"]
+        if "update" in replay_kwargs
+        else dispatcher.feed_update.call_args.args[1]
+    )
     assert replay_update.callback_query is not None
     assert replay_update.callback_query.data == "adv:test"
     state.update_data.assert_awaited_once_with(pending_phone_callback=None)

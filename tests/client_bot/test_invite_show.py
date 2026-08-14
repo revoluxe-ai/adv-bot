@@ -12,6 +12,12 @@ import pytest
 from app.client_bot.user_interface.handlers.invite_show import invite_show_handler
 from app.modules.partner_program.partner_stats import PartnerStats
 from app.utils.db.models import Invite, InviteStatus, User
+from tests.helpers.telegram_message_asserts import (
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 pytestmark = [pytest.mark.asyncio]
 
@@ -67,7 +73,6 @@ async def test_invite_show_active_not_expired_opens_partner_page() -> None:
     session = AsyncMock()
     session.execute = AsyncMock()
     session.commit = AsyncMock()
-
     call_count = [0]
 
     async def execute_side_effect(stmt):
@@ -108,18 +113,25 @@ async def test_invite_show_active_not_expired_opens_partner_page() -> None:
     args = callback.bot.send_message.call_args.args
     kwargs = callback.bot.send_message.call_args.kwargs
     text = kwargs.get("text", args[1] if len(args) > 1 else "")
-    assert "Инвайты / партнёрка" in text
-    assert "Ваш инвайт: SAME-CODE" in text
-    assert "Создано инвайтов: 3" in text
-    assert "Использовано: 2" in text
-    assert "Пришло пользователей: 2" in text
-    assert "Платных пользователей: 1" in text
-    assert "Оплаты приглашённых: 120 ₽" in text
-    assert "Ваши 15%: 18 ₽" in text
-    assert "Выплачено: 5 ₽" in text
-    assert "К выплате: 13 ₽" in text
+    assert_message_within_telegram_limit(text)
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "Инвайты / партнёрка",
+            "Ваш инвайт: SAME-CODE",
+            "Создано инвайтов: 3",
+            "Использовано: 2",
+            "Пришло пользователей: 2",
+            "Платных пользователей: 1",
+            "Оплаты приглашённых: 120 ₽",
+            "Ваши 15%: 18 ₽",
+            "Выплачено: 5 ₽",
+            "К выплате: 13 ₽",
+        ],
+    )
+    assert_no_raw_technical_text(text)
     keyboard = kwargs["reply_markup"]
-    assert keyboard.inline_keyboard[0][0].text == "Запросить выплату"
+    assert_keyboard_has_buttons(keyboard, ["Запросить выплату"])
     assert keyboard.inline_keyboard[0][0].url == "https://t.me/sky_manager_1"
 
 
@@ -136,7 +148,6 @@ async def test_invite_show_generates_new_invite_and_still_opens_partner_page() -
     session.execute = AsyncMock()
     session.commit = AsyncMock()
     session.add = MagicMock()
-
     call_count = [0]
 
     async def execute_side_effect(stmt):
@@ -179,6 +190,9 @@ async def test_invite_show_generates_new_invite_and_still_opens_partner_page() -
     args = callback.bot.send_message.call_args.args
     kwargs = callback.bot.send_message.call_args.kwargs
     text = kwargs.get("text", args[1] if len(args) > 1 else "")
-    assert "Инвайты / партнёрка" in text
-    assert "Ваш инвайт:" in text
-    assert "Создано инвайтов: 3" in text
+    assert_message_within_telegram_limit(text)
+    assert_message_contains_required_phrases(
+        text,
+        ["Инвайты / партнёрка", "Ваш инвайт:", "Создано инвайтов: 3"],
+    )
+    assert_no_raw_technical_text(text)

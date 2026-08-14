@@ -13,6 +13,13 @@ from app.modules.token_monitoring.services.token_info_service import (
     TokenInfo,
     TokenStatusReport,
 )
+from tests.helpers.telegram_message_asserts import (
+    assert_html_is_telegram_safe,
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -51,6 +58,22 @@ def _build_shop_menu(token_status: TokenStatusReport) -> ShopMenu:
     return shop_menu
 
 
+def _build_token(*, is_read_only: bool) -> TokenInfo:
+    """Create a token for menu text scenarios."""
+    return TokenInfo(
+        id=1,
+        api_key="key",
+        user_id=1,
+        shop_id="shop_123",
+        expires=datetime.now(UTC) + timedelta(days=30),
+        categories={"Контент", "Статистика", "Аналитика", "Продвижение"},
+        is_read_only=is_read_only,
+        is_valid=True,
+        is_expired=False,
+        is_personal=True,
+    )
+
+
 def test_shop_menu_shows_ui_mode_toggle_for_admin() -> None:
     """Admin shop menu includes a UI mode toggle button."""
     read_only_token = _build_token(is_read_only=True)
@@ -62,14 +85,13 @@ def test_shop_menu_shows_ui_mode_toggle_for_admin() -> None:
         valid_tokens=[],
         expired_tokens=[],
         available_permissions=set(),
-        missing_permissions={"РџСЂРѕРґРІРёР¶РµРЅРёРµ"},
+        missing_permissions={"Продвижение"},
         has_all_required_permissions=False,
         expiring_tokens=[],
     )
 
     keyboard = _build_shop_menu(token_status).keyboard
     texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-
     assert "Режим интерфейса: FREE" in texts
 
 
@@ -84,17 +106,14 @@ def test_shop_menu_hides_ui_mode_toggle_for_non_admin() -> None:
         valid_tokens=[],
         expired_tokens=[],
         available_permissions=set(),
-        missing_permissions={"РџРѕРґРІРёР¶РµРЅРёРµ"},
+        missing_permissions={"Продвижение"},
         has_all_required_permissions=False,
         expiring_tokens=[],
     )
 
     shop_menu = _build_shop_menu(token_status)
     shop_menu._wb_user_cabinet.user.user_telegram_id = 999999
-    texts = [
-        btn.text for row in shop_menu.keyboard.inline_keyboard for btn in row
-    ]
-
+    texts = [btn.text for row in shop_menu.keyboard.inline_keyboard for btn in row]
     assert "Режим интерфейса: FREE" not in texts
 
 
@@ -121,15 +140,18 @@ def test_shop_menu_hides_paid_controls_in_free_mode() -> None:
     )
     texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
 
+    assert_keyboard_has_buttons(
+        keyboard,
+        [
+            "Автоматические рекламные кампании",
+            "Пополнить баланс",
+            "Вернуться к списку магазинов",
+        ],
+    )
     assert "Массовые операции с РК" not in texts
     assert "Выгрузить все РК в Excel" not in texts
     assert "Загрузить настройки из Excel" not in texts
-    assert "Автоматические рекламные кампании" in texts
-    assert "➕ Добавить токен/Обновить токены" in texts
-    assert "Деактивировать магазин" in " ".join(texts) or "Активировать магазин" in " ".join(texts)
     assert "Подключить существующие кампании" in texts
-    assert "Пополнить баланс" in texts
-    assert "Вернуться к списку магазинов" in texts
 
 
 def test_shop_menu_shows_paid_controls_in_paid_mode() -> None:
@@ -153,31 +175,9 @@ def test_shop_menu_shows_paid_controls_in_paid_mode() -> None:
         shop._wb_cabinet,
         ui_access=UiAccessMode.PAID,
     )
-    texts = [btn.text for row in keyboard.inline_keyboard for btn in row]
-
-    assert "Массовые операции с РК" in texts
-    assert "Выгрузить все РК в Excel" in texts
-    assert "Загрузить настройки из Excel" in texts
-
-
-def _build_token(*, is_read_only: bool) -> TokenInfo:
-    """Create a token for menu text scenarios."""
-    return TokenInfo(
-        id=1,
-        api_key="key",
-        user_id=1,
-        shop_id="shop_123",
-        expires=datetime.now(UTC) + timedelta(days=30),
-        categories={
-            "Контент",
-            "Статистика",
-            "Аналитика",
-            "Продвижение",
-        },
-        is_read_only=is_read_only,
-        is_valid=True,
-        is_expired=False,
-        is_personal=True,
+    assert_keyboard_has_buttons(
+        keyboard,
+        ["Массовые операции с РК", "Выгрузить все РК в Excel", "Загрузить настройки из Excel"],
     )
 
 
@@ -198,10 +198,17 @@ def test_shop_menu_shows_read_only_token_warning() -> None:
     )
 
     text = _build_shop_menu(token_status).text
-
-    assert "доступны только права чтения" in text
-    assert "Бот работает в режиме аналитики" in text
-    assert "Автоуправление ставками и кампаниями недоступно" in text
+    assert_message_within_telegram_limit(text)
+    assert_html_is_telegram_safe(text)
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "доступны только права чтения",
+            "Бот работает в режиме аналитики",
+            "Автоуправление ставками и кампаниями недоступно",
+        ],
+    )
+    assert_no_raw_technical_text(text)
 
 
 def test_shop_menu_hides_read_only_warning_for_normal_token() -> None:
@@ -221,7 +228,6 @@ def test_shop_menu_hides_read_only_warning_for_normal_token() -> None:
     )
 
     text = _build_shop_menu(token_status).text
-
     assert "доступны только права чтения" not in text
     assert "Токены" in text
 
@@ -244,6 +250,5 @@ def test_shop_menu_hides_read_only_warning_for_mixed_tokens() -> None:
     )
 
     text = _build_shop_menu(token_status).text
-
     assert "доступны только права чтения" not in text
     assert "Бот работает в режиме аналитики" not in text

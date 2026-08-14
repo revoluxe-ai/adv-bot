@@ -19,6 +19,13 @@ from app.client_bot.user_interface.handlers.user_subscribe_on_channel import (
     check_subscribe,
 )
 from app.client_bot.user_interface.views import callbacks, keyboards
+from app.client_bot.user_interface.views.messages.messages import NeedSubscribe
+from tests.helpers.telegram_message_asserts import (
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -57,9 +64,7 @@ def _make_callback_event(telegram_id: int, data: str) -> MagicMock:
 
 @pytest.mark.parametrize("status", ["member", "administrator", "creator"])
 @pytest.mark.asyncio
-async def test_channel_subscription_middleware_allows_subscribed_statuses(
-    status: str,
-) -> None:
+async def test_channel_subscription_middleware_allows_subscribed_statuses(status: str) -> None:
     middleware = ChannelSubscriptionMiddleware()
     event = _make_message_event(111)
     handler = AsyncMock()
@@ -107,6 +112,12 @@ async def test_channel_subscription_middleware_blocks_unsubscribed_statuses(
 
     handler.assert_not_awaited()
     bot.send_message.assert_awaited_once()
+    kwargs = bot.send_message.call_args.kwargs
+    text = kwargs["text"]
+    assert_message_within_telegram_limit(text)
+    assert_message_contains_required_phrases(text, ["функций", "подписаны", "канал"])
+    assert_no_raw_technical_text(text)
+    assert_keyboard_has_buttons(kwargs["reply_markup"], ["Подписаться", "Проверить подписку"])
 
 
 @pytest.mark.asyncio
@@ -332,14 +343,16 @@ async def test_check_subscribe_handler_fail_open_on_telegram_error() -> None:
 
 def test_subscribe_keyboard_has_url_and_recheck_buttons() -> None:
     keyboard = keyboards.get_subscribe_keyboard()
-
-    assert keyboard.inline_keyboard[0][0].text == "Подписаться"
+    assert_keyboard_has_buttons(keyboard, ["Подписаться", "Проверить подписку"])
     assert keyboard.inline_keyboard[0][0].url == SUPPORT_CHANNEL_URL
-    assert keyboard.inline_keyboard[1][0].text == "Проверить подписку"
-    assert (
-        keyboard.inline_keyboard[1][0].callback_data
-        == callbacks.CheckSubscribe().pack()
-    )
+    assert keyboard.inline_keyboard[1][0].callback_data == callbacks.CheckSubscribe().pack()
+
+
+def test_need_subscribe_message_text_is_user_facing() -> None:
+    text = NeedSubscribe(bot=MagicMock(), chat_id=1).text
+    assert_message_within_telegram_limit(text)
+    assert_message_contains_required_phrases(text, ["функций", "подписаны", "канал"])
+    assert_no_raw_technical_text(text)
 
 
 def test_global_router_contains_channel_subscription_before_phone_required() -> None:
