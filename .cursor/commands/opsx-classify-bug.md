@@ -60,10 +60,12 @@ route durability (schema:
 
 JSONL append via Shell/Python MUST follow
 `.cursor/commands/opsx-execution-preflight.md` →
+**Shell payload I/O (anti-heredoc)** and
 **Windows Shell JSON / JSONL write safety** and ROUTE_TRACE **Write rules**
-(`encoding="utf-8"` + `ensure_ascii=True` for agent recipes; no
-`ensure_ascii=False` stdin; no unsafe console print; ASCII `->` in
-machine string fields). Prefer a `route_trace` helper when available.
+(no bash heredoc for multi-line JSON/Python; Write→path first; on heredoc
+failure switch Write→path once; `encoding="utf-8"` + `ensure_ascii=True` for
+agent recipes; no `ensure_ascii=False` stdin; no unsafe console print; ASCII
+`->` in machine string fields). Prefer a `route_trace` helper when available.
 
 Forbidden process writes: inventing findings, changing claim ownership,
 editing OpenSpec, editing tests, rewriting prior ROUTE-TRACE lines.
@@ -819,7 +821,8 @@ JSONL event to:
 ```
 
 Append encoding: follow ROUTE_TRACE **Write rules** and
-`opsx-execution-preflight.md` **Windows Shell JSON / JSONL write safety**.
+`opsx-execution-preflight.md` **Shell payload I/O (anti-heredoc)** +
+**Windows Shell JSON / JSONL write safety**.
 
 Mandatory identity/order fields on every event:
 
