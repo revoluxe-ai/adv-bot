@@ -137,6 +137,12 @@ class AdminPartnerPayout(StatesGroup):
     waiting_amount = State()
 
 
+class AdminPartnerList(StatesGroup):
+    """РђРґРјРёРЅ: СЌРєСЂР°РЅ СЃРїРёСЃРєР° РїР°СЂС‚РЅС‘СЂРѕРІ, РѕР¶РёРґР°РЅРёРµ С„РёР»СЊС‚СЂР°."""
+
+    waiting_filter = State()
+
+
 class AdvExcelRoundtrip(StatesGroup):
     """Ожидание .xlsx для импорта настроек РК."""
 

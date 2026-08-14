@@ -279,6 +279,8 @@ class PartnerAdminAction(CallbackData, prefix="partner_admin"):
 
     action: str
     partner_user_id: int | None = None
+    page: int | None = None
+    sort_key: str | None = None
 
 
 class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
