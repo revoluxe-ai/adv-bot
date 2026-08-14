@@ -165,7 +165,10 @@ class UserBonusPayment(BaseTable):
 class PartnerPayout(BaseTable):
     """Запись факта выплаты партнёру по партнёрской программе."""
 
-    __tablename__ = "partner_payout"
+    # BaseTable задаёт __tablename__ через @declared_attr; строковый override
+    # сохраняет физическое имя partner_payout (не partnerpayout).
+    # @declared_attr.directive несовместим с типом родителя (pyright).
+    __tablename__ = "partner_payout"  # pyright: ignore[reportAssignmentType]
 
     partner_user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id"), nullable=False

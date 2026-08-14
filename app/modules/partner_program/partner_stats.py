@@ -341,113 +341,123 @@ async def _get_partner_stats_in_session(
 
 
 async def get_partner_stats(partner_user_id: int) -> PartnerStats:
-    """Calculate statistics for a single partner user."""
-    async with _sm() as session:
+    """Calculate statistics for a single partner user.
+
+    Parent PURE_READ seam: ``sm(read_only=True)`` →
+    :func:`_get_partner_stats_in_session`.
+    """
+    async with _sm(read_only=True) as session:
         return await _get_partner_stats_in_session(session, partner_user_id)
 
 
-async def list_partner_stats() -> list[PartnerAdminStatsRow]:
-    """Calculate partner statistics rows for the admin list."""
-    async with _sm() as session:
-        invite_partner_ids = list(
-            (
-                await session.execute(
-                    select(Invite.issued_to_user_id).where(
-                        Invite.issued_to_user_id.is_not(None)
-                    )
+async def list_partner_stats_in_session(
+    session: AsyncSession,
+) -> list[PartnerAdminStatsRow]:
+    """Calculate partner admin rows within an existing PURE_READ session.
+
+    Caller opens ``sm(read_only=True)`` and passes the session here.
+    """
+    invite_partner_ids = list(
+        (
+            await session.execute(
+                select(Invite.issued_to_user_id).where(
+                    Invite.issued_to_user_id.is_not(None)
                 )
             )
-            .scalars()
-            .all()
         )
-        payout_partner_ids = list(
-            (await session.execute(select(PartnerPayout.partner_user_id))).scalars().all()
-        )
-        partner_ids = sorted(
-            {
-                int(partner_id)
-                for partner_id in invite_partner_ids + payout_partner_ids
-                if partner_id is not None
-            }
-        )
-        if not partner_ids:
-            return []
-
-        users = {
-            user.id: user
-            for user in (
-                await session.execute(select(User).where(User.id.in_(partner_ids)))
-            )
-            .scalars()
-            .all()
+        .scalars()
+        .all()
+    )
+    payout_partner_ids = list(
+        (await session.execute(select(PartnerPayout.partner_user_id))).scalars().all()
+    )
+    partner_ids = sorted(
+        {
+            int(partner_id)
+            for partner_id in invite_partner_ids + payout_partner_ids
+            if partner_id is not None
         }
+    )
+    if not partner_ids:
+        return []
 
-        invites = list(
+    users = {
+        user.id: user
+        for user in (
+            await session.execute(select(User).where(User.id.in_(partner_ids)))
+        )
+        .scalars()
+        .all()
+    }
+
+    invites = list(
+        (
+            await session.execute(
+                select(Invite).where(Invite.issued_to_user_id.in_(partner_ids))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    invited_user_ids = sorted(
+        {
+            int(invite.used_by_user_id)
+            for invite in invites
+            if invite.used_by_user_id is not None
+        }
+    )
+    user_balance_payments: list[UserBalancePayment] = []
+    wb_user_cabinets: list[WBUserCabinet] = []
+    wb_balance_payments: list[WBBalancePayment] = []
+    if invited_user_ids:
+        user_balance_payments = list(
             (
                 await session.execute(
-                    select(Invite).where(Invite.issued_to_user_id.in_(partner_ids))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        invited_user_ids = sorted(
-            {
-                int(invite.used_by_user_id)
-                for invite in invites
-                if invite.used_by_user_id is not None
-            }
-        )
-        user_balance_payments: list[UserBalancePayment] = []
-        wb_user_cabinets: list[WBUserCabinet] = []
-        wb_balance_payments: list[WBBalancePayment] = []
-        if invited_user_ids:
-            user_balance_payments = list(
-                (
-                    await session.execute(
-                        select(UserBalancePayment).where(
-                            UserBalancePayment.user_id.in_(invited_user_ids)
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            wb_user_cabinets = list(
-                (
-                    await session.execute(
-                        select(WBUserCabinet).where(WBUserCabinet.user_id.in_(invited_user_ids))
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            cabinet_ids = sorted(
-                {wb_user_cabinet.wb_cabinet_id for wb_user_cabinet in wb_user_cabinets}
-            )
-            if cabinet_ids:
-                wb_balance_payments = list(
-                    (
-                        await session.execute(
-                            select(WBBalancePayment).where(
-                                WBBalancePayment.wb_cabinet_id.in_(cabinet_ids)
-                            )
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-        partner_payouts = list(
-            (
-                await session.execute(
-                    select(PartnerPayout).where(
-                        PartnerPayout.partner_user_id.in_(partner_ids)
+                    select(UserBalancePayment).where(
+                        UserBalancePayment.user_id.in_(invited_user_ids)
                     )
                 )
             )
             .scalars()
             .all()
         )
+        wb_user_cabinets = list(
+            (
+                await session.execute(
+                    select(WBUserCabinet).where(
+                        WBUserCabinet.user_id.in_(invited_user_ids)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        cabinet_ids = sorted(
+            {wb_user_cabinet.wb_cabinet_id for wb_user_cabinet in wb_user_cabinets}
+        )
+        if cabinet_ids:
+            wb_balance_payments = list(
+                (
+                    await session.execute(
+                        select(WBBalancePayment).where(
+                            WBBalancePayment.wb_cabinet_id.in_(cabinet_ids)
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+    partner_payouts = list(
+        (
+            await session.execute(
+                select(PartnerPayout).where(
+                    PartnerPayout.partner_user_id.in_(partner_ids)
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
 
     rows: list[PartnerAdminStatsRow] = []
     for partner_id in partner_ids:
@@ -481,6 +491,55 @@ async def list_partner_stats() -> list[PartnerAdminStatsRow]:
     return rows
 
 
+async def list_partner_stats() -> list[PartnerAdminStatsRow]:
+    """Calculate partner statistics rows for the admin list.
+
+    Parent PURE_READ seam: ``sm(read_only=True)`` →
+    :func:`list_partner_stats_in_session`.
+    """
+    async with _sm(read_only=True) as session:
+        return await list_partner_stats_in_session(session)
+
+
+async def create_partner_payout_in_session(
+    session: AsyncSession,
+    *,
+    partner_user_id: int,
+    admin_user_id: int,
+    amount: MoneyValue,
+    comment: str | None = None,
+) -> PartnerPayout:
+    """Create a partner payout within an existing WRITE session.
+
+    Caller opens ``sm(read_only=False)`` and passes the session here.
+    Persists via flush/commit on the injected session.
+    """
+    normalized_amount = _normalize_payment_amount(amount)
+    partner_user = await session.get(User, partner_user_id)
+    if partner_user is None:
+        raise RuntimeError(f"Partner user {partner_user_id} was not found.")
+    admin_user = await session.get(User, admin_user_id)
+    if admin_user is None:
+        raise RuntimeError(f"Admin user {admin_user_id} was not found.")
+
+    stats = await _get_partner_stats_in_session(session, partner_user_id)
+    if normalized_amount > stats.available_to_payout:
+        raise ValueError(
+            "Payout amount exceeds the available partner payout balance."
+        )
+
+    payout = PartnerPayout(
+        partner_user_id=partner_user_id,
+        amount=float(normalized_amount),
+        created_by_admin_user_id=admin_user_id,
+        comment=comment,
+    )
+    session.add(payout)
+    await session.flush()
+    await session.commit()
+    return payout
+
+
 async def create_partner_payout(
     *,
     partner_user_id: int,
@@ -488,29 +547,16 @@ async def create_partner_payout(
     amount: MoneyValue,
     comment: str | None = None,
 ) -> PartnerPayout:
-    """Create a partner payout after validating the available amount."""
-    normalized_amount = _normalize_payment_amount(amount)
+    """Create a partner payout after validating the available amount.
+
+    Parent WRITE seam: ``sm(read_only=False)`` →
+    :func:`create_partner_payout_in_session`.
+    """
     async with _sm(read_only=False) as session:
-        partner_user = await session.get(User, partner_user_id)
-        if partner_user is None:
-            raise RuntimeError(f"Partner user {partner_user_id} was not found.")
-        admin_user = await session.get(User, admin_user_id)
-        if admin_user is None:
-            raise RuntimeError(f"Admin user {admin_user_id} was not found.")
-
-        stats = await _get_partner_stats_in_session(session, partner_user_id)
-        if normalized_amount > stats.available_to_payout:
-            raise ValueError(
-                "Payout amount exceeds the available partner payout balance."
-            )
-
-        payout = PartnerPayout(
+        return await create_partner_payout_in_session(
+            session,
             partner_user_id=partner_user_id,
-            amount=float(normalized_amount),
-            created_by_admin_user_id=admin_user_id,
+            admin_user_id=admin_user_id,
+            amount=amount,
             comment=comment,
         )
-        session.add(payout)
-        await session.flush()
-        await session.commit()
-        return payout
