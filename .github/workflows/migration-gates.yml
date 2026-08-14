@@ -82,8 +82,14 @@ jobs:
           eng = create_engine("postgresql://replay:replay@localhost:5432/replay_db")
           with eng.begin() as conn:
               conn.execute(text("CREATE TABLE IF NOT EXISTS advsetting (id SERIAL PRIMARY KEY)"))
+              conn.execute(text(
+                  "CREATE TABLE IF NOT EXISTS auto_shelf_bid_control_settings (id BIGSERIAL PRIMARY KEY)"
+              ))
+              conn.execute(text(
+                  "CREATE TABLE IF NOT EXISTS auto_shelf_bid_control_state (id BIGSERIAL PRIMARY KEY)"
+              ))
           eng.dispose()
-          print("stub advsetting ok")
+          print("stub advsetting+auto_shelf ok")
           PY
           PARENT=$(poetry run python - <<'PY'
           from alembic.config import Config
