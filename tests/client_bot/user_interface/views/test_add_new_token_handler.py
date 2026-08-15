@@ -231,6 +231,7 @@ class TestProcessAddNewToken:
             mock_validator = MagicMock()
             mock_result = MagicMock()
             mock_result.is_valid_jwt = True
+            mock_result.is_personal = True
             mock_result.is_read_only = False
             mock_result.is_expired = False
             mock_result.can_be_used_for_free = True
@@ -247,7 +248,7 @@ class TestProcessAddNewToken:
             ):
                 session_user = MagicMock()
                 user_result = MagicMock()
-                user_result.scalar.return_value = 1
+                user_result.scalar_one_or_none.return_value = 1
                 session_user.execute = AsyncMock(return_value=user_result)
 
                 session_wb_user_cabinet = MagicMock()
@@ -256,7 +257,9 @@ class TestProcessAddNewToken:
                 existing_wb_user_cabinet.wb_cabinet = MagicMock(spec=WBCabinet)
                 existing_wb_user_cabinet.wb_cabinet.shop_id = shop_id
                 wb_user_cabinet_result = MagicMock()
-                wb_user_cabinet_result.scalar.return_value = existing_wb_user_cabinet
+                wb_user_cabinet_result.scalar_one_or_none.return_value = (
+                    existing_wb_user_cabinet
+                )
                 session_wb_user_cabinet.execute = AsyncMock(
                     return_value=wb_user_cabinet_result
                 )
@@ -265,7 +268,7 @@ class TestProcessAddNewToken:
                 token_result = MagicMock()
                 existing_token = MagicMock(spec=WBToken)
                 existing_token.user_id = 1
-                token_result.scalar.return_value = existing_token
+                token_result.scalar_one_or_none.return_value = existing_token
                 session_token.execute = AsyncMock(return_value=token_result)
 
                 mock_sm.side_effect = [
@@ -347,17 +350,17 @@ class TestProcessAddNewToken:
                 ) as mock_shop_menu_ctor,
             ):
                 user_id_result = MagicMock()
-                user_id_result.scalar.return_value = 1
+                user_id_result.scalar_one_or_none.return_value = 1
 
                 token_check_result = MagicMock()
-                token_check_result.scalar.return_value = None
+                token_check_result.scalar_one_or_none.return_value = None
 
                 existing_wb_cabinet = MagicMock(spec=WBCabinet)
                 existing_wb_cabinet.id = 22
                 existing_wb_cabinet.active = True
                 existing_wb_cabinet.shop_id = shop_id
                 cabinet_result = MagicMock()
-                cabinet_result.scalar.return_value = existing_wb_cabinet
+                cabinet_result.scalar_one_or_none.return_value = existing_wb_cabinet
 
                 existing_wb_user_cabinet = MagicMock(spec=WBUserCabinet)
                 existing_wb_user_cabinet.id = 77
