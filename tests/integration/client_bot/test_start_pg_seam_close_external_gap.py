@@ -362,18 +362,22 @@ async def test_create_wb_cabinet_and_user_binding_in_session_persists(
             cabinet_name="New Cabinet",
         )
     )
+    cabinet_pk = cabinet.id
+    user_cabinet_pk = user_cabinet.id
+    user_pk = user.id
+    # Capture PKs before expire: expired instance attrs trigger MissingGreenlet.
     async_session.expire_all()
     reread_cab = await async_session.scalar(
-        select(WBCabinet).where(WBCabinet.id == cabinet.id)
+        select(WBCabinet).where(WBCabinet.id == cabinet_pk)
     )
     reread_uc = await async_session.scalar(
-        select(WBUserCabinet).where(WBUserCabinet.id == user_cabinet.id)
+        select(WBUserCabinet).where(WBUserCabinet.id == user_cabinet_pk)
     )
     assert reread_cab is not None
     assert reread_cab.shop_id == shop_id
     assert reread_cab.active is True
     assert reread_uc is not None
-    assert reread_uc.user_id == user.id
+    assert reread_uc.user_id == user_pk
     assert reread_uc.name == "New Cabinet"
 
 
@@ -396,13 +400,17 @@ async def test_ensure_wb_user_cabinet_binding_in_session_creates(
         user_id=user.id,
         cabinet_name="Bound Cabinet",
     )
+    binding_pk = binding.id
+    cabinet_pk = cabinet.id
+    user_pk = user.id
+    # Capture PKs before expire: expired instance attrs trigger MissingGreenlet.
     async_session.expire_all()
     reread = await async_session.scalar(
-        select(WBUserCabinet).where(WBUserCabinet.id == binding.id)
+        select(WBUserCabinet).where(WBUserCabinet.id == binding_pk)
     )
     assert reread is not None
-    assert reread.wb_cabinet_id == cabinet.id
-    assert reread.user_id == user.id
+    assert reread.wb_cabinet_id == cabinet_pk
+    assert reread.user_id == user_pk
 
 
 @pytest.mark.asyncio
