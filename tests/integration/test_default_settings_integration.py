@@ -318,8 +318,10 @@ async def test_apply_campaign_defaults_single_active_campaign(
     default_fields = [
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "auto_update_white_list",
         "auto_update_minus_phrases",
+        "auto_update_target_place",
+        "target_ctr_mode",
         "new_auto_min_ctr_mode", "reset_place"
     ]
 
@@ -389,8 +391,10 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     default_fields = [
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "auto_update_white_list",
         "auto_update_minus_phrases",
+        "auto_update_target_place",
+        "target_ctr_mode",
         "new_auto_min_ctr_mode", "reset_place"
     ]
 
@@ -596,9 +600,12 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
     default_fields = [
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place",
+        "auto_update_white_list",
         "auto_update_minus_phrases",
+        "auto_update_target_place",
+        "target_ctr_mode",
+        "new_auto_min_ctr_mode",
+        "reset_place"
     ]
 
     for key in default_fields:
