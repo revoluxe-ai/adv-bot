@@ -686,14 +686,76 @@ MISSING_STEADY_STATE_RECONCILE_SCENARIO   # Spec has Scenario; evidence missing/
    первого gap), item MUST заполнять `REQUIRED_ARTIFACTS`:
    `CONTRACT_CASES`, `FAKE_OR_STUB`, `SCENARIO_SEAM_TEST`,
    `STUB_CONTRACT_TEST`, `BOUNDARY_ADAPTER_TEST` (что применимо).
-4. `NEXT_ACTION` = `/opsx-test` **и** Owner должен иметь возможность
-   вставить весь packet в args следующего `/opsx-test` без реконструкции
-   из матрицы.
+4. `NEXT_ACTION` = `/opsx-test` (one line, no packet) **и** duplicate full
+   `SCENARIO_TEST_ONLY_PACKET` inside fenced `LOCAL_HOP_COPY_BLOCK` (see
+   «Executable next-hop handoff»); Owner copy-paste = fence, not matrix hunt.
 5. FAIL без такого pasteable TEST_ONLY packet при наличии TEST_ONLY gaps =
    **невалидный handoff** (self-review FAIL); исправь output до возврата.
 
-PG/CH `REFACTOR_AND_TEST` / `CERTIFY` gaps → соответствующие packets в
+PG/CH `REFACTOR_AND_TEST` gaps → соответствующие packets в
 `ROUTE_PACKETS` (не смешивать в TEST_ONLY).
+
+### Executable next-hop handoff (`LOCAL_HOP_COPY_BLOCK`)
+
+Authority: same contract as `/opsx-pipeline` NAVIGATE
+(`LOCAL_HOP_COPY_BLOCK`); this command **produces** the hop, pipeline only
+**recommends** it later.
+
+На `mode=audit` / `mode=certify` после structured output (и на `mode=plan`
+`STATUS=BLOCKED|GAP` с writer hop), когда `NEXT_ACTION` — pasteable
+`/opsx-*` (не `none`):
+
+1. `NEXT_ACTION` — **одна строка**: точная команда с заполненными args
+   (`change=`, `mode=`, `base=` …). **Без** packet body, **без**
+   `<paste…>` / «см. ROUTE_PACKETS».
+2. **Сразу после** structured fields emit exactly **one** fenced
+   `LOCAL_HOP_COPY_BLOCK` (plain text inside fence):
+
+```text
+Workspace: <abs workspace root>
+Change: <change-id>
+Current state: <STATUS>/<VERDICT> summary in one line>
+Command: <same as NEXT_ACTION — literal /opsx-…>
+<packet or APPLY_INPUT when consumer needs inline body — full text, no stubs>
+DO_NOT_DO_YET: <gates / premature hops>
+ALSO_OK: <sequenced follow-ups after this hop closes>
+```
+
+3. Outside the fence (except structured report above): **≤1** status line.
+   Forbidden: Web four-block form; packet only in `ROUTE_PACKETS` without
+   duplicate in fence when `NEXT_ACTION` is packet consumer.
+4. `ROUTE_PACKETS` остаётся в structured output **для машинного reuse**;
+   Owner copy-paste path = **fence**, не hunt по матрице.
+
+**Per blocking gap class — что класть в fence `Command:` + body:**
+
+| Earliest gap / `NEXT_COMMAND` | `NEXT_ACTION` (one line) | Fence body (mandatory) |
+|---|---|---|
+| TEST_ONLY (`MISSING_OR_WEAK_SCENARIO_TEST`, stub contract, steady-state evidence) | `/opsx-test` | Full `SCENARIO_TEST_ONLY_PACKET` from `ROUTE_PACKETS` (every blocking item) |
+| PG/CH `REFACTOR_AND_TEST` | `/opsx-close-external-gap` | Full `SCENARIO_REFACTOR_AND_TEST_PACKET` from `ROUTE_PACKETS` |
+| PG/CH `CERTIFY` / `NEEDS_PROVIDER_RECEIPT` | `/opsx-close-external-gap` (+ live auth per packet) | Full `CERTIFY_PACKET` from `ROUTE_PACKETS` |
+| Planning (`SPEC_*`, `PLANNING_LIFECYCLE_GAP`, `SEMANTIC_DRIFT`) | `/opsx-update <change-id>` or `/opsx-continue` / `/opsx-ff` | Gap ids + `SCENARIO_ID` list; no packet |
+| `UNRESOLVED_PRODUCT_SEMANTICS` | `/opsx-owner-contract-review change=<change-id>` | Fork summary from GAPS |
+| Arg gate / wrong command | fix args or name correct command | Literal corrected invocation only |
+| `mode=plan` ready | `/opsx-apply <change-id>` or `/opsx-planning-review <change-id>` | `PLAN_EVIDENCE_ID` + paths |
+| PASS (audit) → certify path | `/opsx-spec-scenario-coverage mode=certify change=<id>` | Receipt prerequisites if any |
+| PASS (certify) | `/opsx-verify mode=impl <change-id>` | `PASS_SCOPE`, snapshot |
+| Re-audit after test closure | `/opsx-spec-scenario-coverage mode=audit change=<id>` | Prior `GAP_ID` closed list |
+
+**`DO_NOT_DO_YET` defaults (tailor to verdict):**
+
+- FAIL/BLOCKED audit: `/opsx-verify mode=archive`, `mode=certify` until gaps
+  closed + re-audit PASS; do not paste packet consumer before producer ran.
+- TEST_ONLY closure: `/opsx-close-external-gap` unless PG/CH packet in
+  `ROUTE_PACKETS`.
+- Planning gaps: `/opsx-test` / apply until spec/design repaired.
+
+**`ALSO_OK` examples:** `/opsx-test-env UP` before destructive integration
+in `/opsx-test`; `/opsx-pipeline` for orientation (advisory).
+
+Invalid handoff (self-review FAIL): structured `NEXT_ACTION: /opsx-test`
+without fenced full `SCENARIO_TEST_ONLY_PACKET` when TEST_ONLY gaps exist;
+or fence with `<paste packet>` placeholders.
 
 ## Required output
 
@@ -722,10 +784,15 @@ UNRESOLVED_GAPS:
 
 FILES_CHANGED: scenario-coverage/plan.md | plan.receipt.json | none
 NEXT_ACTION:
+ALSO_OK:
+DO_NOT_DO_YET:
 ```
 
 Durable `PLAN_STATUS: ready|provisional` is valid for consumers **only** when
 `MATERIALIZATION_STATUS` is `COMMITTED` or `ALREADY_CURRENT`.
+
+When `NEXT_ACTION` is a pasteable `/opsx-*`, emit `LOCAL_HOP_COPY_BLOCK`
+(fenced) **after** this structured block (see «Executable next-hop handoff»).
 
 Для `mode=audit` / `mode=certify`:
 
@@ -794,15 +861,25 @@ EXECUTION_PREFLIGHT:
 FILES_CHANGED: none
 COMMIT_PUSH_PR_ARCHIVE_DEPLOY: not_performed
 NEXT_ACTION:
+ALSO_OK:
+DO_NOT_DO_YET:
 ```
 
 При FAIL / BLOCKED после успешного arg gate `NEXT_ACTION` должен быть один
 основной executable handoff по наиболее раннему blocking gap; остальные paths
-перечисли как `ALSO_OK`. Arg-gate BLOCKED → единственный NEXT = исправить
+перечисли в `ALSO_OK`. Arg-gate BLOCKED → единственный NEXT = исправить
 аргументы (или wrong-command target).
 
+Когда `NEXT_ACTION` — pasteable `/opsx-*`: structured `NEXT_ACTION` **без**
+packet body; полный copy-paste hop — **только** в fenced
+`LOCAL_HOP_COPY_BLOCK` после structured block (см. «Executable next-hop
+handoff»). Bare `NEXT_ACTION:` + `ROUTE_PACKETS` без fence = невалидный
+handoff.
+
 На FAIL с TEST_ONLY gaps: `ROUTE_PACKETS.TEST_ONLY_PACKET` MUST быть полным
-fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не «см. GAPS».
+fenced packet в structured output **и** duplicated inside
+`LOCAL_HOP_COPY_BLOCK` (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и
+не «см. GAPS».
 
 ## Safety
 
@@ -860,6 +937,9 @@ fenced packet (см. «FAIL → pasteable ROUTE_PACKETS»), не `none` и не 
 - Focus PASS is not reported as full change PASS.
 - No legacy compatibility rule weakened this command's strict verdict.
 - Output includes one clear next action without performing fixes.
+- FAIL/BLOCKED/plan-blocked with pasteable `NEXT_ACTION`: fenced
+  `LOCAL_HOP_COPY_BLOCK` present with full packet body (no `<paste…>` stubs).
+- `ALSO_OK` / `DO_NOT_DO_YET` populated when `NEXT_ACTION` is a command hop.
 - FAIL with TEST_ONLY gaps includes pasteable `ROUTE_PACKETS.TEST_ONLY_PACKET`
   covering every blocking stub thin end (not prose-only GAPS).
 - When reconcile-on-observe applies: steady-state / already-true Scenario is
