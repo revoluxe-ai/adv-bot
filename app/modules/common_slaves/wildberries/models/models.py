@@ -606,6 +606,16 @@ class AdvSetting(BaseTable):
     auto_update_white_list: Mapped[bool] = mapped_column(
         Boolean, nullable=True, default=False, server_default="false"
     )
+    auto_update_minus_phrases: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment=(
+            "Включает фоновое обновление минус-фраз на WB. "
+            "Отдельный флаг от auto_update_white_list."
+        ),
+    )
 
     auto_budget_watchdog_enabled: Mapped[bool] = mapped_column(
         Boolean,

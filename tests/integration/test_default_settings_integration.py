@@ -223,6 +223,9 @@ async def test_apply_campaign_defaults_single_active_campaign(
     # Для булевых полей инвертируем значение
     adv_setting.bidder_active = not initial_defaults.bidder_active
     adv_setting.auto_update_white_list = not initial_defaults.auto_update_white_list
+    adv_setting.auto_update_minus_phrases = (
+        not initial_defaults.auto_update_minus_phrases
+    )
     adv_setting.auto_update_target_place = not initial_defaults.auto_update_target_place
     adv_setting.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
@@ -316,6 +319,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "auto_update_minus_phrases",
         "new_auto_min_ctr_mode", "reset_place"
     ]
 
@@ -386,6 +390,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
         "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
+        "auto_update_minus_phrases",
         "new_auto_min_ctr_mode", "reset_place"
     ]
 
@@ -409,6 +414,9 @@ async def test_turn_adv_on_applies_defaults(
     # Для булевых полей инвертируем значение
     adv_setting_inactive.bidder_active = not initial_defaults.bidder_active
     adv_setting_inactive.auto_update_white_list = not initial_defaults.auto_update_white_list
+    adv_setting_inactive.auto_update_minus_phrases = (
+        not initial_defaults.auto_update_minus_phrases
+    )
     adv_setting_inactive.auto_update_target_place = not initial_defaults.auto_update_target_place
     adv_setting_inactive.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting_inactive.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
@@ -513,6 +521,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         # Для булевых полей инвертируем значение
         adv.bidder_active = not initial_defaults.bidder_active
         adv.auto_update_white_list = not initial_defaults.auto_update_white_list
+        adv.auto_update_minus_phrases = not initial_defaults.auto_update_minus_phrases
         adv.auto_update_target_place = not initial_defaults.auto_update_target_place
         adv.target_ctr_mode = not initial_defaults.target_ctr_mode
         adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
@@ -589,6 +598,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
         "new_auto_min_ctr_mode", "reset_place"
+        "auto_update_minus_phrases",
     ]
 
     for key in default_fields:

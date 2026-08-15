@@ -37,19 +37,19 @@ async def test_open_status_button_shows_landing_and_does_not_toggle_bot_active()
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AutoManagementLanding",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AutoManagementLanding",
             MagicMock(return_value=landing_call),
         ) as landing_ctor,
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
         ) as adv_menu_ctor,
     ):
         await open_auto_management_landing(_callback(), _callback_data(), bot)
@@ -68,15 +68,15 @@ async def test_how_it_works_handler_opens_details_screen() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AutoManagementHowItWorks",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AutoManagementHowItWorks",
             MagicMock(return_value=screen_call),
         ) as screen_ctor,
     ):
@@ -102,15 +102,15 @@ async def test_back_handler_returns_to_campaign_menu() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
             MagicMock(return_value=menu_call),
         ) as menu_ctor,
     ):
@@ -137,23 +137,23 @@ async def test_back_from_how_it_works_returns_to_landing() -> None:
 
     with (
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_wb_user_cabinet_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
             AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting._get_adv_setting_or_none",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting_or_none",
             AsyncMock(return_value=adv_setting),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AutoManagementLanding",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AutoManagementLanding",
             MagicMock(return_value=landing_call),
         ) as landing_ctor,
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AutoManagementHowItWorks",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AutoManagementHowItWorks",
             MagicMock(return_value=how_it_works_call),
         ) as how_ctor,
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.AdvSettingMenu",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
         ) as adv_menu_ctor,
     ):
         await open_auto_management_how_it_works(

@@ -53,6 +53,7 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     adv_setting.orders_source_for_auto_mode = defaults_v1.orders_source_for_auto_mode
     adv_setting.sales_predict_method = defaults_v1.sales_predict_method
     adv_setting.auto_update_white_list = defaults_v1.auto_update_white_list
+    adv_setting.auto_update_minus_phrases = defaults_v1.auto_update_minus_phrases
     adv_setting.auto_update_target_place = defaults_v1.auto_update_target_place
     adv_setting.auto_budget_watchdog_enabled = (
         defaults_v1.auto_budget_watchdog_enabled

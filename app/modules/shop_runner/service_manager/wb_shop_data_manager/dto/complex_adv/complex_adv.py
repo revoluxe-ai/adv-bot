@@ -265,6 +265,12 @@ class ComplexAdv:
     def auto_update_white_list(self) -> bool:
         return self._adv_setting.auto_update_white_list
 
+    @property
+    def auto_update_minus_phrases(self) -> bool:
+        """Флаг фонового обновления минус-фраз на WB.
+        Предполагается, что при создании новых РК будет попадать сюда False, если None - будет True
+        """
+        return bool(getattr(self._adv_setting, "auto_update_minus_phrases", True))
 
     @property
     def bidder_active(self) -> bool:

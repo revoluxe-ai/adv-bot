@@ -143,6 +143,25 @@ def get_adv_setting_keyboard(
         )
     )
 
+    minus_phrases_enabled = bool(
+        getattr(adv_setting, "auto_update_minus_phrases", False)
+    )
+    minus_phrases_button_text = (
+        "🟢 Обновление минус-фраз: включено"
+        if minus_phrases_enabled
+        else "🔴 Обновление минус-фраз: выключено"
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=minus_phrases_button_text,
+            callback_data=callbacks.MinusPhrasesSetting(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
+
     """План продаж"""
     from .buttoms import sales_plan_button
     _ = builder.row(
@@ -489,15 +508,6 @@ def get_adv_setting_keyboard(
                 callback_data=set_common_bid_callback,
             )
         )
-
-    button = InlineKeyboardButton(
-        text="Обновить минус-слова",
-        callback_data=callbacks.WBUpdate(
-            action="update_minus_keywords", adv_setting_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Сбросить белый список",

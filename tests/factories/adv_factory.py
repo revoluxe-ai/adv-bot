@@ -72,6 +72,7 @@ class AdvSettingFactory(SQLAlchemyModelFactory):
     wb_cabinet_id = None
 
     auto_update_white_list = True
+    auto_update_minus_phrases = True
     auto_update_target_place = True
     auto_update_exponent = True
     automatic_version = 2

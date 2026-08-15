@@ -877,7 +877,11 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
+        complex_advs = [
+            adv
+            for adv in complex_advs
+            if adv.bot_active and adv.auto_update_minus_phrases
+        ]
         # Spec card-ab-hold-mode §8: filter before MinusPhraseManager / WB write.
         complex_advs = filter_structural_act_candidates(complex_advs)
         handlers: list[Callable[[], Awaitable[Any]]] = [

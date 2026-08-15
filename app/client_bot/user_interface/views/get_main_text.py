@@ -3,7 +3,6 @@
 
 from app.client_bot import const
 
-from app.settings import settings
 
 def get_main_text(user_telegram_id: int,) -> str:
     """Return the appropriate main-menu text for the current onboarding mode."""

@@ -104,6 +104,7 @@ def _build_keyboard_adv() -> SimpleNamespace:
         updater_common_bid_in_search_adv_active_status=False,
         auto_budget_watchdog_enabled=False,
         bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+        auto_update_minus_phrases=False,
         auto_update_target_place=False,
         auto_add_only_relevant_phrase=False,
         orders_source_for_auto_mode=OrdersSourceForAutoMode.ADV_SUM,

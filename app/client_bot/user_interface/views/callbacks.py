@@ -124,6 +124,13 @@ class AutoManagementLanding(CallbackData, prefix="auto_mgmt_landing"):
     wb_user_cabinet_original_id: int
 
 
+class MinusPhrasesSetting(CallbackData, prefix="minus_phrases_setting"):
+    """Коллбеки экрана настройки фонового обновления минус-фраз."""
+    action: str
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
 class BotActive:
     action: bool
 
