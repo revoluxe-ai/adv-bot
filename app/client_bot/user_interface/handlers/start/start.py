@@ -117,6 +117,44 @@ def _build_token_success_added_message(shop_name: str) -> str:
     )
 
 
+async def __get_wb_user_cabinet(
+    *,
+    session: AsyncSession,
+    user_id: int,
+    shop_id: str):
+    stmt = (
+        select(WBUserCabinet)
+        .join(WBUserCabinet.wb_cabinet)
+        .where(
+            WBUserCabinet.user_id == user_id,
+            WBCabinet.shop_id == shop_id,
+        )
+    )
+    result_ = await session.execute(stmt)
+    wb_user_cabinet_ = result_.scalar_one()
+    return wb_user_cabinet_
+
+
+
+async def _open_existing_user_cabinet_by_shop_id(
+    *,
+    bot: aiogram.Bot,
+    chat_id: int,
+    state: FSMContext,
+    user_id: int,
+    shop_id: str,
+) -> bool:
+    """Open an existing user cabinet by shop_id when it is already linked to the user."""
+    async with sm(read_only=True) as session:
+        wb_user_cabinet = await __get_wb_user_cabinet(
+            session=session, user_id=user_id, shop_id=shop_id
+        )
+
+    await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet.id)
+    await ShopMenu(bot, chat_id, state, wb_user_cabinet.id)()
+    return True
+
+
 sm = get_async_session_maker
 
 router = Router()
@@ -683,6 +721,20 @@ async def process_cabinet_api(
                 # Token already saved for the same user — nothing to change.
                 _= await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
+                opened_existing_cabinet = await _open_existing_user_cabinet_by_shop_id(
+                    bot=bot,
+                    chat_id=chat_id,
+                    state=state,
+                    user_id=user_id,
+                    shop_id=shop_id,
+                )
+                if not opened_existing_cabinet:
+                    logger.warning(
+                        "Duplicate token for same user but no linked cabinet found: "
+                        "user_id=%s shop_id=%s",
+                        user_id,
+                        shop_id,
+                    )
                 return None
             else:
                 # Token belongs to another user — users must have unique tokens.
@@ -695,7 +747,18 @@ async def process_cabinet_api(
         wb_cabinet = await _load_wb_cabinet_by_shop_id_in_session(session, shop_id)
         current_wb_cabinet: WBCabinet
         if wb_cabinet is not None:
-            _ = await messages.CabinetExistsForUser(bot, chat_id)()
+            existing_wb_user_cabinet = await _load_user_cabinet_for_user_in_session(
+                session, wb_cabinet.id, user_id
+            )
+            if existing_wb_user_cabinet is not None:
+                _ = await messages.CabinetExistsForUser(bot, chat_id)()
+                await state.update_data(
+                    last_wb_user_cabinet_original_id=existing_wb_user_cabinet.id
+                )
+                await ShopMenu(
+                    bot, chat_id, state, int(existing_wb_user_cabinet.id)
+                )()
+                return None
             if wb_cabinet.active is not True:
                 wb_cabinet.active = True
             wb_user_cabinet = await ensure_wb_user_cabinet_binding_in_session(
@@ -959,6 +1022,20 @@ async def process_add_new_token(
                 # Token already saved for the same user — nothing to change.
                 _ = await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
+                opened_existing_cabinet = await _open_existing_user_cabinet_by_shop_id(
+                    bot=bot,
+                    chat_id=chat_id,
+                    state=state,
+                    user_id=user_id,
+                    shop_id=shop_id,
+                )
+                if not opened_existing_cabinet:
+                    logger.warning(
+                        "Duplicate add-token request for same user but no linked cabinet "
+                        "found: user_id=%s shop_id=%s",
+                        user_id,
+                        shop_id,
+                    )
                 return None
             else:
                 # Token belongs to another user — users must have unique tokens.
@@ -991,6 +1068,20 @@ async def process_add_new_token(
                 if normalized_existing_user_id == user_id:
                     _ = await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                     await state.clear()
+                    opened_existing_cabinet = await _open_existing_user_cabinet_by_shop_id(
+                        bot=bot,
+                        chat_id=chat_id,
+                        state=state,
+                        user_id=user_id,
+                        shop_id=shop_id,
+                    )
+                    if not opened_existing_cabinet:
+                        logger.warning(
+                            "Duplicate add-token IntegrityError for same user but no linked "
+                            "cabinet found: user_id=%s shop_id=%s",
+                            user_id,
+                            shop_id,
+                        )
                     return None
                 else:
                     _ = await bot.send_message(

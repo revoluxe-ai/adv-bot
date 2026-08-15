@@ -70,6 +70,30 @@ NEXT_ACTION: import package with Owner WRITE_BOUNDARY_EXCEPTION=.cursor/opsx-res
 
 When `GO` is absent: agent-assisted **read-only** conflict assistant for exactly one unmerged path (R40 path rule retained). May read Git stages / working tree conflict markers, cite evidence, list options, ask Owner questions. Must **not** edit, stage, or continue the sequencer.
 
+### Manual / agent-assisted resolution (package missing — HARD)
+
+On this target the companion package is **not** installed. Treat these as
+mandatory regardless of Owner phrasing such as «apply the recommendation»,
+«semantic merge», or «opt_* GO»:
+
+1. Exact token `GO` **without** packaged runtime → **only** the
+   `FAIL_CLOSED` envelope in **Hard gates** above. It does **not** authorize
+   agent product writes, staging, or a manual substitute for typed GO.
+2. If Owner edits manually after PREVIEW, scope is **exactly one** analyzed
+   unmerged path (`--path` / `CURRENT_CONFLICT.path`). Remove conflict
+   markers and merge semantics only inside that path.
+3. **Forbidden** during manual resolution:
+   - editing `tests/**` or any non-unmerged product path;
+   - patching staged or auto-merged files to green a failing suite;
+   - `git add`, `git rebase --continue`, commit, push;
+   - pytest/pyright repair loops initiated by the agent.
+4. Staged or auto-merged files from the replayed commit (including tests) are
+   **out of scope** unless they themselves are unmerged (`UU`).
+5. If tests fail after the conflicted path is resolved → report
+   `STOP_REASON=POST_RESOLUTION_TEST_FAILURE` and hand off to Owner
+   (`/opsx-test` or a separate fix workflow). **Never** edit tests to fit the
+   resolution.
+
 ---
 
 # /opsx-resolve-conflict
@@ -169,7 +193,9 @@ resolver and not a line-diff chooser). It is read-only:
 - path location alone never proves normative authority; draft/proposed/
   rejected/superseded decisions and change-local specs do not recommend;
 - never recommend `keep_ours`/`keep_theirs` from textual subset alone;
-- never edit, stage, continue, abort, skip, commit, or push.
+- never edit, stage, continue, abort, skip, commit, or push;
+- never edit tests or run a pytest repair loop; «Как проверить» lists Owner
+  verification hints only, not agent repair scope.
 
 Successful PREVIEW reports bind ``CURRENT_CONFLICT.path``,
 ``CONTEXT.paths_analyzed``, reasoning, evidence, and recommendation to the
@@ -406,6 +432,8 @@ Also forbidden:
 - arbitrary wrapper/script execution;
 - modification of tests to fit the selected implementation;
 - modification of non-conflicted files;
+- editing staged or auto-merged paths that are not themselves unmerged (`UU`),
+  including `tests/**`, to make post-resolution checks pass;
 - staging rollback through `git restore --staged`;
 - automatic cleanup or deletion of recovery evidence.
 
@@ -843,6 +871,10 @@ required tests
 
 Autonomous writes are limited to conflicted paths already in this manifest.
 
+Staged or auto-merged files from the replayed/merged commit remain **out of
+scope** unless they are themselves unmerged (`UU`). A failing test in such a
+file after resolving a different path is **not** authorization to edit it here.
+
 Do not modify:
 
 - non-conflicted production callers;
@@ -924,6 +956,27 @@ Reject evidence that:
 Tests run only in the validation snapshot. If faithful validation requires
 the original `.git`, network, credentials, PG/CH live service, or production
 access, STOP when that check is mandatory.
+
+### TEST_FAILURE_HANDLING (mandatory)
+
+Conflict resolution scope is **unmerged paths only**.
+
+On mandatory test or static-check failure after a scoped resolution:
+
+```text
+STATUS=STOP_FOR_OWNER
+STOP_REASON=POST_RESOLUTION_TEST_FAILURE
+```
+
+Rules:
+
+- **Never** modify `tests/**` (or any non-unmerged path) to green the suite.
+- **Never** start an agent pytest/pyright repair loop under this command.
+- Report failing check ids/argv to Owner; hand off to `/opsx-test` or a
+  separate Owner-authorized fix workflow.
+- Packaged GO: failure blocks staging/terminal success (see §16–§17).
+- PREVIEW / manual Owner path: failure is informational only; Owner owns
+  follow-up outside this command.
 
 ## 16. Current-step staging gate (no sequencer continue)
 
@@ -1076,8 +1129,8 @@ CONTEXT_EVIDENCE=
 CONTRACT_SIGNAL=
 OWNER_DECISION_REQUIRED=
 RECOMMENDATION=null|<option_id with evidence_refs>
-NEXT_ACTION=Owner verifies analysis, edits files manually, accepts responsibility
-DO_NOT_DO_YET=edit-by-runtime, stage, continue, abort, skip, commit, push, GO
+NEXT_ACTION=Owner verifies analysis, edits only the analyzed unmerged path manually, accepts responsibility
+DO_NOT_DO_YET=edit-by-runtime, edit-tests, pytest-repair-loop, fix-staged-non-conflicted-files, stage, continue, abort, skip, commit, push, GO
 ```
 
 ## 21. Success output
