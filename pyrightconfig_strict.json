@@ -44,6 +44,7 @@
     "app/modules/shop_runner/service_manager/services/auto_updater_v3",
     "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager",
     "app/client_bot/modules/default_settings/adv_setting_policy",
+    "app/client_bot/modules/default_settings",
     "app/client_bot/user_interface/services/keyword_decision_trace_loader.py",
     "app/client_bot/user_interface/views/keyword_decision_trace_ui.py",
     "app/modules/shop_runner/service_manager/keyword_v3_decision_trace_ui",
@@ -93,6 +94,7 @@
     "app/client_bot/user_interface/handlers/phone_collection.py",
     "app/client_bot/user_interface/handlers/start_registration_func.py",
     "app/client_bot/user_interface/message_templates/templates.py",
+    "app/client_bot/user_interface/message_templates/base.py",
     "app/client_bot/user_interface/views/phone_request.py",
     "app/utils/db/models.py",
     "app/client_bot/middlewars/channel_subscription.py",
@@ -104,6 +106,7 @@
     "app/client_bot/user_interface/utils/target_place_messages.py",
     "app/client_bot/user_interface/utils/token_permissions_text.py",
     "app/client_bot/user_interface/views/get_main_text.py",
+    "app/client_bot/user_interface/views/gate.py",
     "app/client_bot/user_interface/views/messages/strategy_display.py",
     "app/client_bot/user_interface/views/messages/v3_tick_report_informer.py",
     "app/modules/common_slaves/wildberries/models/enums",
@@ -111,6 +114,8 @@
     "app/utils/db/session_maker.py",
     "app/client_bot/dispatcher_factory.py",
     "app/client_bot/user_interface/handlers/invite_show.py",
+    "app/client_bot/user_interface/handlers/gate.py",
+    "app/client_bot/user_interface/handlers/invate_gate_message/__init__.py",
     "app/modules/partner_program"
   ],
   "exclude": [
