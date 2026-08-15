@@ -1,3 +1,11 @@
+"""Application settings facade over environment variables.
+
+This module centralizes runtime configuration access for the monolith and keeps
+backward-compatible env names where production manifests still rely on them.
+For sensitive values, secret-specific env aliases should take precedence over
+legacy shared names from ConfigMaps.
+"""
+
 import dotenv
 
 # TODO: Доделать рассылку по боту, сделать оффер и разослать
@@ -19,6 +27,17 @@ import os
 
 
 class Settings:
+    """Read typed application settings from environment variables."""
+
+    @staticmethod
+    def _get_first_non_empty_env(*names: str) -> str | None:
+        """Return the first non-empty env value from the provided names."""
+        for name in names:
+            value = os.environ.get(name)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return None
+
     @property
     def PARSING_KEYWORDS_DELAY_BETWEEN_TASKS(self) -> int:
         value = os.environ.get("PARSING_KEYWORDS_DELAY_BETWEEN_TASKS")
@@ -358,6 +377,7 @@ class Settings:
 
     @property
     def YOOKASSA_TOKEN(self) -> str:
+        """Payment provider token. Expected to be injected from a Kubernetes Secret."""
         value = os.environ.get("YOOKASSA_TOKEN")
         if value is None:
             raise ValueError("YOOKASSA_TOKEN environment variable is not set")
@@ -468,16 +488,38 @@ class Settings:
 
     @property
     def TELEGRAM_BOT_TOKEN(self) -> str:
-        value = os.environ.get("TELEGRAM_BOT_TOKEN")
+        """Main Telegram bot token for `client_bot_run.py`.
+
+        Priority:
+            1. `CLIENT_BOT_TOKEN` - dedicated secret for a specific bot deployment.
+            2. `TELEGRAM_BOT_TOKEN` - legacy shared env name.
+        """
+        value = self._get_first_non_empty_env(
+            "CLIENT_BOT_TOKEN",
+            "TELEGRAM_BOT_TOKEN",
+        )
         if not value:
-            raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
+            raise ValueError(
+                "Neither CLIENT_BOT_TOKEN nor TELEGRAM_BOT_TOKEN is set"
+            )
         return value
 
     @property
     def WEBHOOK_SECRET(self) -> str:
-        value = os.environ.get("WEBHOOK_SECRET")
+        """Webhook secret for the main Telegram bot.
+
+        Priority:
+            1. `CLIENT_BOT_WEBHOOK_SECRET` - dedicated secret for a specific bot deployment.
+            2. `WEBHOOK_SECRET` - legacy shared env name.
+        """
+        value = self._get_first_non_empty_env(
+            "CLIENT_BOT_WEBHOOK_SECRET",
+            "WEBHOOK_SECRET",
+        )
         if not value:
-            raise ValueError("WEBHOOK_SECRET environment variable is not set")
+            raise ValueError(
+                "Neither CLIENT_BOT_WEBHOOK_SECRET nor WEBHOOK_SECRET is set"
+            )
         return value
 
     @property
@@ -689,10 +731,20 @@ class Settings:
 
     @property
     def TG_TOKENS_FOR_SENDING(self) -> list[str]:
-        value: str | None = os.getenv("TG_TOKENS_FOR_SENDING")
+        """Telegram sender bot token pool for outbound notifications.
+
+        Can be injected directly under the legacy name or under a dedicated
+        secret-oriented alias.
+        """
+        value = self._get_first_non_empty_env(
+            "TG_TOKENS_FOR_SENDING",
+            "TG_SENDER_BOT_TOKENS",
+        )
         if value is None:
-            raise ValueError('not set TG_TOKENS_FOR_SENDING')
-        return [token.strip() for token in value.split(',') if token.strip() != '']
+            raise ValueError(
+                "Neither TG_TOKENS_FOR_SENDING nor TG_SENDER_BOT_TOKENS is set"
+            )
+        return [token.strip() for token in value.split(",") if token.strip() != ""]
 
 
     @property
