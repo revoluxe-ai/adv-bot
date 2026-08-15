@@ -2,7 +2,8 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, cast
 
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import exists, func, select, and_
@@ -13,6 +14,12 @@ from app.client_bot.notification_sender import get_notification_sender
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 
 from app.modules.billing.di import BillingContainer
+from app.modules.billing.leg_metering import (
+    compute_cabinet_billable_units,
+    record_anchor_latch_samples,
+    resolve_metering_anchors,
+)
+from app.modules.billing.models import AdvPayment, AdvPaymentLegType
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -22,7 +29,6 @@ from app.modules.common_slaves.wildberries.models import (
 )
 from app.utils.db.session_maker import get_async_session_maker as sm
 from app.utils.db.models import User
-from .models import AdvPayment
 from .redis_lock import RedisLock
 from .redis_manager import RedisManager
 from ..common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -102,7 +108,7 @@ async def _notify_days_until_block(cabinet_id: int, days_left: int) -> None:
         if chat_id is None:
             continue
         try:
-            await sender.send_message(int(chat_id), text)
+            _ = await sender.send_message(int(chat_id), text)
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Days until block notification failed for cabinet %s chat %s: %s",
@@ -174,6 +180,36 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
                 logger.warning("Emit grace_exceeded_failed failed: %s", emit_exc)
 
 
+async def _anchor_has_adv_payment_for_day(
+    session: AsyncSession, anchor_id: int, day: date
+) -> bool:
+    """Legacy-tolerant: любая AdvPayment за якорь и UTC-день блокирует повтор."""
+    count = await session.scalar(
+        select(func.count()).where(
+            and_(
+                AdvPayment.adv_setting_id == anchor_id,
+                AdvPayment.date == day,
+            )
+        )
+    )
+    return bool(count and count > 0)
+
+
+async def _adv_payment_type_exists(
+    session: AsyncSession, anchor_id: int, day: date, payment_type: str
+) -> bool:
+    count = await session.scalar(
+        select(func.count()).where(
+            and_(
+                AdvPayment.adv_setting_id == anchor_id,
+                AdvPayment.date == day,
+                AdvPayment.type == payment_type,
+            )
+        )
+    )
+    return bool(count and count > 0)
+
+
 async def _safe_commit(
     session: AsyncSession,
     result: dict[str, int | bool | str | float | None],
@@ -230,8 +266,10 @@ async def __process_single_cabinet(
         'price_for_day': float | None
       }
     Идемпотентность обеспечивается проверками в БД + Redis-флагом.
-    Порядок операций: проверка Redis -> лок -> транзакция БД -> commit -> Redis-флаг.
-    Redis-флаг – ускоритель, а не источник истины: при его сбое повтор безопасен.
+    Порядок: загрузка кабинета -> проверка списаний в БД -> latch sample ->
+    charge -> commit -> Redis-флаг только на терминальных путях (debit / already_processed_db).
+    Redis-флаг – ускоритель, а не источник истины: no_active/zero_price MUST NOT
+    выставлять billing:processed; stale флаг MUST NOT блокировать charge без debit в БД.
     """
     result: dict[str, int | bool | str | float | None] = {
         "cabinet_id": cabinet_id,
@@ -241,13 +279,6 @@ async def __process_single_cabinet(
         "campaigns": 0,
         "price_for_day": None,
     }
-
-    # # Быстрая проверка идемпотентности по Redis
-    if skip_by_redis:
-        redis_flagged = await redis_manager.get_billing_process_for_day(cabinet_id, current_dt)
-        if redis_flagged:
-            result["reason"] = "redis_flag_skip"
-            return result
 
     grace_exceeded_cabinet_id: int | None = None
     days_until_block_notify: tuple[int, int] | None = None  # (cabinet_id, days_left)
@@ -263,13 +294,8 @@ async def __process_single_cabinet(
         ]
         result["campaigns"] = len(cabinet_campaigns)
         if not cabinet_campaigns:
-            # Помечаем, чтобы не гонять лишний раз сегодня
+            # bot_active может включиться позже в тот же UTC-день — не ставим billing:processed
             await session.commit()
-            try:
-                await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
-            except Exception as exc:
-                logger.error(f"Ошибка отметки в Redis: {exc}")  # noqa: BLE001
-                pass
             result["reason"] = "no_active_campaigns"
             return result
 
@@ -314,27 +340,36 @@ async def __process_single_cabinet(
             result["reason"] = "already_processed_db"
             return result
 
+        cabinet_adv_settings: list[AdvSetting] = list(wb_cabinet.adv_settings)
+        leg_latch = redis_manager.leg_latch()
+        metering_anchors = resolve_metering_anchors(cabinet_adv_settings)
+        await record_anchor_latch_samples(metering_anchors, leg_latch, day)
+
         try:
-            price_for_shop_for_day = await pricer.get_price_for_day_for_shop(
-                session, wb_cabinet.shop_id
+            tariff_details = await pricer.get_tariff_details(
+                session,
+                wb_cabinet.shop_id,
+                leg_latch=leg_latch,
+                utc_date=day,
+                cabinet_adv_settings=cabinet_adv_settings,
             )
+            price_for_shop_for_day = tariff_details.total_per_day
         except Exception as exc:
             logger.error(
                 "Cabinet %s: ошибка получения цены: %s", cabinet_id, exc, exc_info=True
             )
             raise exc
 
+        _effective_count, _anchors, billables = await compute_cabinet_billable_units(
+            cabinet_adv_settings,
+            latch=leg_latch,
+            utc_date=day,
+        )
+        effective_count = _effective_count
+
         result["price_for_day"] = price_for_shop_for_day
         if price_for_shop_for_day <= 0:
-            try:
-                await redis_manager.set_billing_process_for_day(cabinet_id, current_dt)
-            except Exception as exc:
-                logger.warning(
-                    "Cabinet %s: zero price but Redis-флаг не установлен: %s",
-                    cabinet_id,
-                    exc,
-                )
-                pass
+            # Ноги могут активироваться позже в UTC-день — latch уже sampled, charge позже
             result["reason"] = "zero_price"
             return result
 
@@ -421,24 +456,46 @@ async def __process_single_cabinet(
             total_after = calculated_bonus + calculated_balance - price_for_shop_for_day
             if total_after >= 0:
                 wb_cabinet.balance_went_negative_at = None  # type: ignore[attr-defined]
-            price_per_campaign = price_for_shop_for_day / len(cabinet_campaigns)
-            for campaign in cabinet_campaigns:
-                exists_payment = await session.scalar(
-                    select(func.count()).where(
-                        and_(
-                            AdvPayment.adv_setting_id == campaign.id,
-                            AdvPayment.date == day,
+            if effective_count > 0:
+                for billable in billables:
+                    if await _anchor_has_adv_payment_for_day(
+                        session, billable.anchor_id, day
+                    ):
+                        continue
+                    if billable.auto_weight > 0 and not await _adv_payment_type_exists(
+                        session,
+                        billable.anchor_id,
+                        day,
+                        AdvPaymentLegType.AUTO_LEG.value,
+                    ):
+                        session.add(
+                            AdvPayment(
+                                date=day,
+                                adv_setting_id=billable.anchor_id,
+                                amount=price_for_shop_for_day
+                                * (billable.auto_weight / effective_count),
+                                type=AdvPaymentLegType.AUTO_LEG.value,
+                            )
                         )
-                    )
-                )
-                if not exists_payment:
-                    session.add(
-                        AdvPayment(
-                            date=day,
-                            adv_setting_id=campaign.id,
-                            amount=price_per_campaign,
+                    if (
+                        billable.has_search_slot
+                        and billable.search_weight > 0
+                        and not await _adv_payment_type_exists(
+                            session,
+                            billable.anchor_id,
+                            day,
+                            AdvPaymentLegType.SEARCH_LEG.value,
                         )
-                    )
+                    ):
+                        session.add(
+                            AdvPayment(
+                                date=day,
+                                adv_setting_id=billable.anchor_id,
+                                amount=price_for_shop_for_day
+                                * (billable.search_weight / effective_count),
+                                type=AdvPaymentLegType.SEARCH_LEG.value,
+                            )
+                        )
 
         # Фиксация БД (укороченный helper)
         if not await _safe_commit(session, result, cabinet_id):
@@ -563,7 +620,7 @@ async def _process_payment_for_advs(
         logger.debug("Нет активных кабинетов с кампаниями (read-only выборка)")
         return
     logger.debug(f"К обработке кабинетов: {len(cabinet_ids)}")
-    tasks_list = []
+    tasks_list: list[Any] = []
 
     for cabinet_id in cabinet_ids:
         task = _process_single_cabinet(
@@ -574,19 +631,21 @@ async def _process_payment_for_advs(
             skip_by_redis=skip_by_redis
         )
         tasks_list.append(task)
-    results = await asyncio.gather(*tasks_list, return_exceptions=True)
+    gathered = await asyncio.gather(*tasks_list, return_exceptions=True)
+    results = cast(list[Any], list(gathered))
     for res in results:
-        if isinstance(res, Exception):
+        if isinstance(res, BaseException):
             logger.error("Ошибка в обработке кабинета: %s", res, exc_info=True)
         elif isinstance(res, dict):
+            payload = cast(dict[str, Any], res)
             logger.info(
                 "Cabinet %s: processed=%s, payment_successful=%s, reason=%s, campaigns=%s, price_for_day=%s",
-                res.get("cabinet_id"),
-                res.get("processed"),
-                res.get("payment_successful"),
-                res.get("reason"),
-                res.get("campaigns"),
-                res.get("price_for_day"),
+                payload.get("cabinet_id"),
+                payload.get("processed"),
+                payload.get("payment_successful"),
+                payload.get("reason"),
+                payload.get("campaigns"),
+                payload.get("price_for_day"),
             )
         else:
             logger.error("Неожиданный результат обработки кабинета: %s", res)
