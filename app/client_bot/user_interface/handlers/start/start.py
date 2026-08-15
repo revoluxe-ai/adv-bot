@@ -38,6 +38,7 @@ from app.client_bot.user_interface.handlers.start_registration_func import (
 from app.client_bot.user_interface.views import callbacks, messages
 from app.client_bot.user_interface.views.gate import get_gate_keyboard, get_gate_message_text
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.user_interface.utils import format_required_wb_token_scopes
 from app.core.wb_api.exceptions import ApiForbiddenError
 from app.modules.common_slaves.wildberries import (
     models as wb_models,
@@ -75,6 +76,46 @@ from app.modules.token_monitoring.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_token_invalid_format_message() -> str:
+    """Вернуть подсказку при невалидном формате WB-токена."""
+    return (
+        "Токен не принят. Проверьте, что токен скопирован полностью и не содержит "
+        "лишних пробелов.\n\n"
+        "Если нужен безопасный первый вход, создайте токен только для чтения в кабинете WB."
+    )
+
+
+def _build_token_read_only_rejected_message() -> str:
+    """Вернуть подсказку, когда в add-token flow пришёл read-only токен."""
+    return (
+        "Обнаружен токен только для чтения. Такой токен подходит для просмотра аналитики, "
+        "магазинов и кампаний.\n"
+        "Бот не будет менять рекламу с таким токеном.\n"
+        "Для управления ставками нужен токен с возможностью изменений в кабинете.\n"
+        f"{format_required_wb_token_scopes()}"
+    )
+
+
+def _build_token_read_only_added_message() -> str:
+    """Вернуть уведомление после сохранения read-only токена."""
+    return (
+        'ВНИМАНИЕ! Добавлен токен с правами "Только для чтения".\n\n'
+        "Этот токен только для чтения подходит для просмотра аналитики, магазинов и кампаний.\n"
+        "Бот не будет менять рекламу с таким токеном.\n"
+        "Для управления ставками нужен токен с возможностью изменений в кабинете.\n"
+        f"{format_required_wb_token_scopes()}"
+    )
+
+
+def _build_token_success_added_message(shop_name: str) -> str:
+    """Вернуть сообщение об успешном добавлении WB-токена."""
+    return (
+        f"Токен успешно добавлен для магазина {shop_name}.\n\n"
+        "Теперь откройте «Мои магазины», выберите магазин и рекламную кампанию."
+    )
+
 
 sm = get_async_session_maker
 
@@ -545,11 +586,11 @@ async def process_cabinet_api(
     chat_id = message.chat.id
 
     # Предварительная простая валидация формата токена: отсекаем явно мусорные строки
-    token_text = text.strip()
+    token_text = text.strip() # есть очистка токен от лишних пробелов
     if len(token_text) < 24:  # эвристика: валидные токены заметно длиннее
         _= await bot.send_message(
             chat_id,
-            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
+            _build_token_invalid_format_message(),
         )
         return None
 
@@ -561,7 +602,7 @@ async def process_cabinet_api(
 
     if not validation_result.is_valid_jwt:
         logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
-        _= await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        _= await bot.send_message(chat_id, _build_token_invalid_format_message())
         return None
 
     if not validation_result.is_personal:
@@ -703,8 +744,8 @@ async def process_cabinet_api(
 
         if validation_result.is_read_only:
             _ = await bot.send_message(
-                chat_id, ("""ВНИМАНИЕ! Добавлен токен с правами "Только для чтения".\n\n"""
-                          """Данные права позволяют использовать бот только для аналитических функций.\n\n""")
+                chat_id,
+                _build_token_read_only_added_message(),
             )
             await asyncio.sleep(3)
 
@@ -785,7 +826,7 @@ async def process_add_new_token(
     if len(token_text) < 24:
         _ = await bot.send_message(
             chat_id,
-            "Токен слишком короткий или имеет неверный формат. Отправьте корректный токен.",
+            _build_token_invalid_format_message(),
         )
         return None
 
@@ -808,7 +849,7 @@ async def process_add_new_token(
 
     if not validation_result.is_valid_jwt:
         logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
-        _ = await bot.send_message(chat_id, "Токен не валиден, попробуйте еще раз:")
+        _ = await bot.send_message(chat_id, _build_token_invalid_format_message())
         return None
 
     if not validation_result.is_personal:
@@ -824,7 +865,7 @@ async def process_add_new_token(
         logger.info("Token is read-only for user %s", user_telegram_id)
         _ = await bot.send_message(
             chat_id,
-            "Этот токен предназначен только для чтения и не может быть использован для добавления. Пожалуйста, предоставьте токен с полными правами.",
+            _build_token_read_only_rejected_message(),
         )
         await state.set_state(states.AddNewToken.token)
         return None
@@ -1012,7 +1053,8 @@ async def process_add_new_token(
     _ = await bot.send_message(chat_id, "Токен проверяется...")
 
     _ = await bot.send_message(
-        chat_id, f"Токен успешно добавлен для магазина {wb_user_cabinet.name or ''}!"
+        chat_id,
+        _build_token_success_added_message(wb_user_cabinet.name or ""),
     )
 
     # Очистка состояния
