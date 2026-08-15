@@ -94,6 +94,17 @@ async def _get_adv_setting_or_none(
         return result.scalar_one_or_none()
 
 
+async def _get_adv_setting(adv_setting_original_id: int) -> AdvSetting:
+    """Загрузить AdvSetting по original_id или выбросить RuntimeError."""
+    adv_setting = await _get_adv_setting_or_none(adv_setting_original_id)
+    if adv_setting is None:
+        raise RuntimeError(
+            "AdvSetting not found for original_id="
+            f"{adv_setting_original_id}"
+        )
+    return adv_setting
+
+
 async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
     """Return True when the shop has only active read-only tokens for analytics."""
     token_status = await TokenInfoService().get_shop_token_status(shop_id)
