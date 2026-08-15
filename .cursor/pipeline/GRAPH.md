@@ -7,20 +7,18 @@
 - recommendation_strength: advisory
 - operator_may_deviate: true
 - not_authority_for: verify_go_nogo, archive, commit, command_contracts, forced_path
-- inventory_count: 55
+- inventory_count: 58
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: f8bd51fcc837f0164f12d1c83b3c6c957aaeab49
+- source_commit: f10e47efea32bb771da54f37099493b788db36f7
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-08-09T05:34:03Z INCREMENTAL: inventory 55; fingerprint
-  cb7ea54dea1568434d9b206f15b63012; add /opsx-test-env + local_test_env_*
-  states; soft chain antipattern → test-env UP → static FULL → test-env DOWN;
-  F14 closed (graph missing test-env); F13 open (companion lag); F12 still open.
-  Other newly inventoried commands (meta-*, supervisor, devops, …) remain
-  NOT_OPENED_BUDGET / unindexed beyond inventory count.
-  Prior: UPDATE GO 2026-07-30T12:17:37Z antipattern + bug-debt (F11).
+  UPDATE GO 2026-08-14T15:53:00Z INCREMENTAL: inventory 58 (reproduce());
+  fingerprint af626a84b261b3ccf2cb9a4a48f1a554; add explicit
+  ## Post-implementation verification chain section; refresh META fingerprint
+  (was 55/cb7ea54d); F13/F12 unchanged.
+  Prior: UPDATE GO 2026-08-09T05:34:03Z test-env + local_test_env_* (F14 closed).
 
 ## States
 
@@ -1412,6 +1410,71 @@ edits of the same process file; serialize shared contracts before consumers.
   operator_workaround: |
     /opsx-owner-contract-review change=<name> directly; then UPDATE GO
   do_not_pretend_fixed: false (closed by this materialization)
+
+## Post-implementation verification chain (impl → archive)
+
+Advisory ordering from `impl_done` through archive. Operator may deviate;
+command contracts own gates. Authority: `.cursor/pipeline/contracts/VERIFY_PHASES.md`.
+
+### Primary sequence (typical)
+
+| Step | Command | Role | Hard gate? |
+|------|---------|------|------------|
+| 0 | `/opsx-apply <change>` | implementation complete (`impl_done`) | apply GO |
+| 1 | `/opsx-verify mode=impl <change>` | PHASE_IMPL DoD (`✅ IMPL_OK` / `❌ IMPL_GAPS`) | IMPL_GAPS blocks chain |
+| 2a | `/opsx-pyright-strict-coverage base=<BASE>` | production `.py` ⊆ strict include | soft |
+| 2b | `/opsx-external-call-coverage base=<BASE>` | external surfaces ↔ tests | soft |
+| 2c | `/opsx-performance-review scope=base base=<BASE>` | performance verdict (when trigger) | soft conditional |
+| 2d | `/opsx-performance-fix` + re-audit | only on performance FAIL | soft |
+| 2e | `/opsx-antipattern-gate base=<BASE>` | diff-scoped antipattern scan | soft |
+| 2f | `/opsx-test-env UP` | laptop PG/CH/Redis before FULL/destructive | soft (env-class) |
+| 2g | `/opsx-static-check FULL` | orchestrated static checks | soft |
+| 2h | `/opsx-test-env DOWN` | tear down test compose after FULL PASS | advisory |
+| 2i | `/opsx-static-check FULL CACHE_OFF` | when prior FULL was cache-dev | soft WARN |
+| 3 | `/opsx-verify mode=archive <change>` | PHASE_ARCHIVE (`✅ GO` / `❌ NO_GO`) | **archive authority** |
+| 4 | `/opsx-archive <change>` | move change; promote decisions | needs archive verify GO |
+
+Short path: `IMPL_OK` + no production `.py` → skip 2a–2i → step 3 directly.
+
+### Product Acceptance (when `PRODUCT_ACCEPTANCE_REQUIRED=true`)
+
+Runs in parallel with / before archive verify; archive verify consumes PA status.
+
+| Command | When |
+|---------|------|
+| `/opsx-spec-scenario-coverage mode=plan change=<change>` | planning / hard when PA required |
+| `/opsx-spec-scenario-coverage mode=audit change=<change>` | lifecycle coverage audit |
+| `/opsx-test` | TEST_ONLY gaps from scenario audit |
+| `/opsx-close-external-gap` | PG/CH REFACTOR_AND_TEST or CERTIFY packets |
+| `/opsx-spec-scenario-coverage mode=certify change=<change>` | after authorized provider receipt |
+
+PA `FAIL` / `BLOCKED` → archive blocker `product_acceptance_not_pass` in step 3.
+
+### Recovery / branch commands (during chain)
+
+| Command | Trigger |
+|---------|---------|
+| `/opsx-apply <change>` | `IMPL_GAPS` or archive `NO_GO` (DoD regressed) |
+| `/opsx-update <change>` | spec/plan drift; `IMPL_GAPS` / `NO_GO` ALSO_OK |
+| `/opsx-fix-types` | typing failures from static-check / test-triage |
+| `/opsx-test-triage` | flaky/env-class test failures |
+| `/opsx-test` | external-call TEST_ONLY; scenario gaps |
+| `/opsx-bug-debt-board` | ALSO_OK anytime; `CLEAR` ≠ card-close |
+
+### Not archive verify (do not substitute)
+
+- `/opsx-test … verify` — bug-episode GREEN only
+- bare `/opsx-verify` — defaults `mode=archive` (WARN); prefer explicit mode
+- quality-chain PASS alone — does not authorize `/opsx-archive`
+- `✅ IMPL_OK` alone — never authorizes archive
+
+### Post-archive (soft, not verification)
+
+| Command | Role |
+|---------|------|
+| `/opsx-distribute-brief` | client/CS distribution pack |
+| `/opsx-sync` | delta specs → main specs (if not done earlier) |
+| `/opsx-commit` / `/opsx-create-pr` | distribution (may happen earlier) |
 
 ## Terminal / recovery
 
