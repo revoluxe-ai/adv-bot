@@ -495,6 +495,30 @@ async def open_minus_phrases_setting_screen(
     await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
+async def _update_and_get_adv_setting(session: AsyncSession,
+                                      new_status: bool,
+                                      adv_setting_original_id: int) -> AdvSetting:
+    stmt = (
+        update(AdvSetting)
+        .where(AdvSetting.id == adv_setting_original_id)
+        .values(auto_update_minus_phrases=new_status)
+        .returning(AdvSetting)
+    )
+
+    result = await session.execute(stmt)
+    adv_setting = result.scalar_one_or_none()
+
+    if adv_setting is None:
+        raise RuntimeError(
+            "AdvSetting not found for original_id="
+            f"{adv_setting_original_id}"
+        )
+
+    await session.commit()
+    return adv_setting
+
+
+
 @router.callback_query(callbacks.MinusPhrasesSetting.filter(F.action.in_(("on", "off"))))
 async def toggle_minus_phrases_setting(
     callback: types.CallbackQuery,
@@ -511,23 +535,11 @@ async def toggle_minus_phrases_setting(
         callback_data.wb_user_cabinet_original_id
     )
     async with sm(read_only=False) as session:
-        stmt = (
-            update(AdvSetting)
-            .where(AdvSetting.id == callback_data.adv_setting_original_id)
-            .values({"auto_update_minus_phrases": new_status})
+        adv_setting = await _update_and_get_adv_setting(
+            session,
+            new_status,
+            callback_data.adv_setting_original_id,
         )
-        result = await session.execute(stmt)
-        await session.commit()
-    rowcount = int(getattr(result, "rowcount", 0) or 0)
-    if rowcount == 0:
-        raise RuntimeError(
-            "AdvSetting not found for original_id="
-            f"{callback_data.adv_setting_original_id}"
-        )
-
-    adv_setting = await _get_adv_setting(
-        callback_data.adv_setting_original_id
-    )
 
     await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
 
