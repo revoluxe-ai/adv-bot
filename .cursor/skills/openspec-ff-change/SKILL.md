@@ -18,7 +18,10 @@ Fast-forward through artifact creation - generate everything needed to start imp
 `.cursor/commands/opsx-ff.md` and
 `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. For high-risk
 multi-target writes, do not declare apply readiness until artifacts explicitly
-materialize the target, allowed/forbidden adapters, evidence and paired tests.
+materialize an **SWT schema block** with exact field names
+`TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`, plus
+evidence and paired tests. Architecture Decision Allowed/Forbidden prose and
+Ownership tables alone are **not** MEANING_LOCK RESOLVED (`prose≠RESOLVED`).
 Unresolved choice returns `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; never guess.
 
 **Input**: The user's request should include a change name (kebab-case) OR a description of what they want to build.

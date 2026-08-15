@@ -20,10 +20,13 @@ Fast-forward through artifact creation - generate everything needed to start imp
 high-risk write and repository evidence exposes multiple plausible
 entities/legs/adapters, artifacts MUST durably name `TARGET_ENTITY_OR_LEG`,
 `ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and
-paired positive/negative tests. If evidence does not select one target, return
-`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`, ask the contract's single concrete
-Owner question, and do not declare the change apply-ready. Never infer product
-semantics from similar names.
+paired positive/negative tests in an **explicit SWT schema block** (exact
+field names). Architecture Decision `## Allowed` / `## Forbidden` prose and
+design Ownership tables **alone** are **not** MEANING_LOCK
+`RESOLVED` (`prose≠RESOLVED`) — do **not** declare apply-ready. If evidence
+does not select one target, return `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`,
+ask the contract's single concrete Owner question, and do not declare the
+change apply-ready. Never infer product semantics from similar names.
 
 **Steps**
 
@@ -126,7 +129,9 @@ semantics from similar names.
    Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` before
    apply-ready:
    - Decide and record `PRODUCT_ACCEPTANCE_REQUIRED`.
-   - When required: MEANING_LOCK must be durable.
+   - When required: MEANING_LOCK must be durable via explicit SWT schema
+     tokens (`TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` /
+     `FORBIDDEN_ADAPTERS`). Prose Allowed/Forbidden alone = missing.
    - **Derived Lifecycle (same rules as `/opsx-continue`):** for temporal/
      stateful Changes, design MUST include a durable Lifecycle section with
      `LIFECYCLE_STATUS: DERIVED` and per-step `SOURCE:` provenance, derived
