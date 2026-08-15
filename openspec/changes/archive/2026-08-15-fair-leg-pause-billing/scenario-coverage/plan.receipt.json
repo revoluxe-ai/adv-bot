@@ -1,0 +1,74 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "fair-leg-pause-billing",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "sceplan-e9920b7d8f4bcbdb",
+  "PLAN_CONTENT_HASH": "1ce4f0d01be3fdeb1ee245c24be55f4641c16cefb4599eaa0b403d493acdcc4b",
+  "PLAN_PATH": "openspec/changes/fair-leg-pause-billing/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/fair-leg-pause-billing/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 18,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1",
+      "L2",
+      "L3",
+      "L4",
+      "L5",
+      "L6"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/fair-leg-pause-billing/design.md",
+      "content_hash": "a87786ee0b7a944b439b7fffa4603c2cdf4c1f0ee247ccccd3a5f43568b8870d"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/fair-leg-pause-billing/specs/billing-fair-leg-pause/spec.md",
+        "content_hash": "4be3e9c2a57f21e48096f33ebaf5a921c0efe643a5b58decdebff1127671d383"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "design.md##Lifecycle (LIFECYCLE_STATUS: DERIVED L1-L6)",
+      "content_hash": "a87786ee0b7a944b439b7fffa4603c2cdf4c1f0ee247ccccd3a5f43568b8870d"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/fair-leg-pause-billing/owner-contract.md",
+      "content_hash": "86ed264f21f375a0b9d38911ee94d486c5417d6a69ac920e7414a2140907a291"
+    },
+    "TASKS_REVISION": {
+      "path": "openspec/changes/fair-leg-pause-billing/tasks.md",
+      "content_hash": "f0efa844f4c2ece06082584b0a5ad510c3181360a6b4a7720c6e4d2b65cd7118"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/fair-leg-pause-billing/design.md",
+      "content_hash": "a87786ee0b7a944b439b7fffa4603c2cdf4c1f0ee247ccccd3a5f43568b8870d"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/fair-leg-pause-billing/specs/billing-fair-leg-pause/spec.md",
+        "content_hash": "4be3e9c2a57f21e48096f33ebaf5a921c0efe643a5b58decdebff1127671d383"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "design.md##Lifecycle (LIFECYCLE_STATUS: DERIVED L1-L6)",
+      "content_hash": "a87786ee0b7a944b439b7fffa4603c2cdf4c1f0ee247ccccd3a5f43568b8870d"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/fair-leg-pause-billing/owner-contract.md",
+      "content_hash": "86ed264f21f375a0b9d38911ee94d486c5417d6a69ac920e7414a2140907a291"
+    },
+    "TASKS_REVISION": {
+      "path": "openspec/changes/fair-leg-pause-billing/tasks.md",
+      "content_hash": "f0efa844f4c2ece06082584b0a5ad510c3181360a6b4a7720c6e4d2b65cd7118"
+    }
+  },
+  "SUPERSEDES_PLAN_EVIDENCE_ID": "sceplan-ecca8f12df6ed78c",
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}
