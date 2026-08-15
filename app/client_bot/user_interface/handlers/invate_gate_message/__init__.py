@@ -1,14 +1,17 @@
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from app.client_bot.const import OFFERTA_URL, CHAT_FOR_INVITES
-from app.client_bot.user_interface.message_templates import Text, TextWithKeyboard
+import aiogram
+
+from app.client_bot.const import CHAT_FOR_INVITES
+from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views.callbacks import Gate
 
 
 class InviteGateMessage(TextWithKeyboard):
     parse_mode = ParseMode.HTML
-    def __init__(self, bot, chat_id):
+
+    def __init__(self, bot: aiogram.Bot, chat_id: int) -> None:
         self._user_id = chat_id
         super().__init__(bot, chat_id)
 

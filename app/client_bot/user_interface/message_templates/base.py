@@ -3,7 +3,6 @@ from typing import Any
 
 import aiogram
 from aiogram import Bot
-from aiogram.enums import ParseMode
 
 
 class Base(ABC):
