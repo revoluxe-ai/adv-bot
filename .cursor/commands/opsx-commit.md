@@ -417,7 +417,7 @@ paths/nodeids/diagnostics are known):
 |---|---|
 | typing / pyright / mypy errors | `/opsx-fix-types tool=<pyright-strict\|mypy> command="<exact failed command>" scope=<STAGED_HITS paths>` then paste the same `ERROR_SUMMARY` lines as raw diagnostic text in the fence (so `/opsx-fix-types` can triage without re-hunt). Bare `/opsx-fix-types` alone is **not** sufficient when diagnostics are known. |
 | `MISSING_FROM_INCLUDE` / `HIT_EXCLUDE` | `/opsx-pyright-strict-coverage` (list OUT paths in body above fence) |
-| unit/test FAIL | `/opsx-test-triage` (include failing path / nodeid when known; put failing nodeids in `ERROR_SUMMARY`) |
+| unit/test FAIL | `/opsx-test-triage` (include failing path / nodeid when known; put failing nodeids in `ERROR_SUMMARY`). **SUPERVISOR_ROUTING:** if Owner invokes `/opsx-supervisor` next, Supervisor MUST dispatch `/opsx-test-triage` first; `/opsx-bug-team` FORBIDDEN until triage verdict. |
 | `FAIL_CLOSED` (no related tests) | `/opsx-test-triage` + list uncovered production paths |
 | heal already done; finish commits | `/opsx-commit FAST_CHECK GO` or `/opsx-commit FULL_CHECK GO` (match this run’s mode) |
 | process surfaces only | `/opsx-admin-command-commit` |

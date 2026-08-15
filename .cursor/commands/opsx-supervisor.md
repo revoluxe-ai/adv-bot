@@ -59,6 +59,38 @@ GO_REQUIRED=NO
 Новая unrelated mission не может быть начата до terminal state текущей mission,
 если Owner явно не остановил или не заменил текущую миссию.
 
+## 1.1 Upstream handoff precedence (mandatory)
+
+Перед первым product writer/checker dispatch Supervisor **обязан** распарсить
+последний OPSX terminal block в текущем чате:
+
+```text
+COMMIT_STOP | PARTIAL | OWNER_RUN_COMMAND | NEXT_ACTION | WHY | ERROR_SUMMARY | nodeids
+```
+
+### HANDOFF_QUALITY gate
+
+| Quality | Criteria | Action |
+|---|---|---|
+| `UNAMBIGUOUS` | `OWNER_RUN_COMMAND` names one allowed command; `WHY` consistent; diagnostics present when required | First dispatch = that command |
+| `AMBIGUOUS` | generic recommendation, missing nodeids/diagnostics, vague NEXT_ACTION | Evidence gather (§13.0) — **do not guess** |
+| `CONTRADICTORY` | `WHY` vs `OWNER_RUN_COMMAND` disagree; multiple competing NEXT_ACTION | Evidence gather + reconcile; stricter verdict wins |
+| `SUSPECT_DEFECT` | handoff routes to denylisted command; wrong branch (e.g. bug-team on `test_fail`); repeated COMMIT_STOP with shifting WHY | `/opsx-admin-command-consult` → may route to `/opsx-meta-fix-command-defects` |
+
+Handoff is **first** evidence, not the **only** authority. Weak handoff may
+indicate a command-contract defect — gather process evidence before writer dispatch.
+
+### Commit-gate test_fail (hard rule)
+
+```text
+COMMIT_STOP + WHY=test_fail (+ pytest nodeids)
+  → FIRST dispatch: /opsx-test-triage
+  → FORBIDDEN first dispatch: /opsx-bug-team
+```
+
+`/opsx-bug-team` only after triage routes to bug lifecycle or Owner explicitly
+invoked bug-team with a materialized case.
+
 ---
 
 # 2. Supervisor boundary
@@ -1077,7 +1109,31 @@ MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
 
 # 13. Dynamic command routing
 
-На каждой новой существенной mission запроси через субагентов:
+## 13.0 Upstream handoff vs process evidence (mandatory)
+
+Decision ladder **before** first writer/checker dispatch:
+
+```text
+1. PARSE upstream handoff (§1.1)
+2. IF HANDOFF_QUALITY=UNAMBIGUOUS → dispatch per OWNER_RUN_COMMAND
+3. IF HANDOFF_QUALITY≠UNAMBIGUOUS → gather evidence (parallel when allowed):
+     a) /opsx-pipeline NAVIGATE — next hop on as-is GRAPH.md
+     b) /opsx-admin-command-consult — command ownership / relationships /
+        triage odd command output (NOT day-to-day graph navigation)
+     c) /opsx-admin-command-analyze-pipeline — only when consult routes to
+        pipeline redesign / human-usability analysis
+     d) /opsx-meta-fix-command-defects — only when consult → route_fix_defects
+        (READ_ONLY plan → AUTHORIZE_COMMAND_FIX)
+4. RECONCILE handoff + pipeline + consult; pick stricter verdict on conflict
+5. FORBIDDEN: guess route; default to /opsx-bug-team on test_fail
+```
+
+When handoff is `UNAMBIGUOUS`, bootstrap consult (below) is **optional** —
+handoff credit satisfies routing evidence for that hop.
+
+When handoff is weak, bootstrap consult is **required** before writer dispatch.
+
+На каждой новой существенной mission **без** unambiguous handoff запроси через субагентов:
 
 ```text
 /opsx-admin-command-consult
@@ -1341,6 +1397,10 @@ QUARANTINE=NO
 ```text
 /opsx-bug-team
 → MAY launch its contract-declared internal Task workers
+→ FORBIDDEN as Supervisor first dispatch when:
+    COMMIT_STOP + WHY=test_fail (use /opsx-test-triage first)
+    no triage verdict and no materialized bug case
+    handoff ambiguous and consult has not reconciled route (§13.0)
 
 /opsx-static-check
 → MAY launch its contract-declared internal checker workers
@@ -2054,14 +2114,19 @@ MATERIALIZED
 Базовый routing (authority всегда подтверждается через consult при сомнении):
 
 ```text
-pipeline uncertainty → /opsx-pipeline
-command authority → /opsx-admin-command-consult
+upstream handoff UNAMBIGUOUS → dispatch per OWNER_RUN_COMMAND (§1.1)
+upstream handoff weak → §13.0 evidence gather before writer dispatch
+commit gate test_fail → /opsx-test-triage (NOT /opsx-bug-team)
+pipeline position / next hop → /opsx-pipeline NAVIGATE
+command ownership / relationships / odd output → /opsx-admin-command-consult
+pipeline redesign / usability → /opsx-admin-command-analyze-pipeline
+confirmed command-contract defect → /opsx-meta-fix-command-defects
 project/domain → /opsx-explore
 bug debt → /opsx-bug-debt-board
 case hygiene → /opsx-materialize-bug-queue
 claim → /opsx-claim-next-bug
 classification → /opsx-classify-bug
-bug implementation/family → /opsx-bug-team
+bug implementation/family → /opsx-bug-team (after triage or materialized case)
 project bug discovery → /opsx-project-bug-hunt
 pyright coverage → /opsx-pyright-strict-coverage
 external boundary → /opsx-external-call-coverage

@@ -127,6 +127,26 @@ Stop conditions:
 11. Команда проверки:
 
 
+## Continuation from `/opsx-commit` or Supervisor (mandatory)
+
+When invoked after `COMMIT_STOP` / `PARTIAL` with `WHY=test_fail` or when
+Supervisor forwards an upstream handoff:
+
+1. Accept `ERROR_SUMMARY`, nodeids, and `STAGED_HITS` from the handoff as
+   **primary evidence** — do not re-run full pytest discovery if diagnostics
+   are already present.
+2. Classify per policy (`openspec/policies/test-triage.md`).
+3. Emit `[BEGIN NEXT PROMPT]` for the implementation agent:
+   - `CODE_BUG` / `TEST_OBSOLETE` / `BAD_TEST` → `/opsx-test` (scoped write)
+   - typing diagnostics in handoff → `/opsx-fix-types` (see Type-check routing)
+4. Do **not** route to `/opsx-bug-team` from triage unless triage explicitly
+   maps to bug-episode lifecycle (rare; see Orchestration RED mapping below).
+
+If handoff is ambiguous (missing nodeids, contradictory WHY), return
+classification `AMBIGUOUS` and recommend Owner run `/opsx-admin-command-consult`
+or `/opsx-pipeline NAVIGATE` before fix.
+
+
 ## Orchestration RED status mapping (light)
 
 When triage feeds a bug-episode RED path, map classes:
