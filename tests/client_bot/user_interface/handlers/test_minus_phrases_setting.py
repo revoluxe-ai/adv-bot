@@ -74,7 +74,6 @@ async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting",
             AsyncMock(return_value=adv),
-            create=True,
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.MinusPhrasesSettingScreen",
@@ -112,11 +111,6 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
             AsyncMock(return_value=SimpleNamespace(id=55)),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting",
-            AsyncMock(return_value=adv),
-            create=True,
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.MinusPhrasesSettingScreen",
@@ -164,7 +158,6 @@ async def test_back_from_minus_phrases_setting_returns_to_campaign_menu(
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting",
             AsyncMock(return_value=adv),
-            create=True,
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
