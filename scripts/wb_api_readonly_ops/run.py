@@ -64,6 +64,8 @@ from scripts.wb_api_readonly_ops.ceiling import RunCeiling
 from scripts.wb_api_readonly_ops.cli import parse_args, resolve_artifact_class
 from scripts.wb_api_readonly_ops.r04_003_constants import CONTRACT_ID_R04_003
 from scripts.wb_api_readonly_ops.r04_003_flow import run_r04_003_api_preflight
+from scripts.wb_api_readonly_ops.r04_003b_constants import CONTRACT_ID_R04_003B
+from scripts.wb_api_readonly_ops.r04_003b_flow import run_r04_003b_orders_preflight_fix
 from scripts.wb_api_readonly_ops.contract_constants import CONTRACT_ID
 from scripts.wb_api_readonly_ops.contract_flow import (
     run_contract_preflight_sync,
@@ -127,8 +129,8 @@ async def _async_main(argv: list[str] | None = None) -> int:
     # Contract primary RETURN path.
     if artifact_class == ArtifactClass.CONTRACT_PREFLIGHT:
         contract_id = str(args.contract) if args.contract else CONTRACT_ID
-        if contract_id == CONTRACT_ID_R04_003:
-            # COL-R04-003: live credentialed API preflight in Job runtime only.
+        if contract_id in (CONTRACT_ID_R04_003, CONTRACT_ID_R04_003B):
+            # COL-R04-003 / 003B: live credentialed API in Job runtime only.
             app_config = AppConfig.create()
             redis_config = app_config.infrastructure.redis
             redis_client_raw: Redis[str] = Redis(
@@ -150,6 +152,12 @@ async def _async_main(argv: list[str] | None = None) -> int:
                 access = await get_access_for_wb_cabinet(shop_id)
                 _ = access
                 hub = wb_manager_hub_factory.get_wb_manager_hub(shop_id)
+                if contract_id == CONTRACT_ID_R04_003B:
+                    return await run_r04_003b_orders_preflight_fix(
+                        shop_id=shop_id,
+                        output_dir=output_dir,
+                        wb_data_manager=hub.wb_data_manager,
+                    )
                 return await run_r04_003_api_preflight(
                     shop_id=shop_id,
                     output_dir=output_dir,

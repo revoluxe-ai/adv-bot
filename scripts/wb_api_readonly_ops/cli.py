@@ -16,6 +16,7 @@ from scripts.wb_api_readonly_ops.contract_constants import (
 )
 from scripts.wb_api_readonly_ops.r04_constants import CONTRACT_ID_R04
 from scripts.wb_api_readonly_ops.r04_003_constants import CONTRACT_ID_R04_003
+from scripts.wb_api_readonly_ops.r04_003b_constants import CONTRACT_ID_R04_003B
 from scripts.wb_api_readonly_ops.models import (
     ORDERS_PERIOD_DATE_FROM_DEFAULT,
     ArtifactClass,
@@ -51,10 +52,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--contract",
         default=None,
-        choices=[CONTRACT_ID, CONTRACT_ID_R04, CONTRACT_ID_R04_003],
+        choices=[
+            CONTRACT_ID,
+            CONTRACT_ID_R04,
+            CONTRACT_ID_R04_003,
+            CONTRACT_ID_R04_003B,
+        ],
         help=(
             f"Frozen contract id ({CONTRACT_ID}, {CONTRACT_ID_R04}, "
-            f"or {CONTRACT_ID_R04_003} live API preflight)"
+            f"{CONTRACT_ID_R04_003}, or {CONTRACT_ID_R04_003B} orders fix)"
         ),
     )
     parser.add_argument(
@@ -137,6 +143,11 @@ def resolve_artifact_class(args: argparse.Namespace) -> ArtifactClass | None:
     """
     if args.artifact_class:
         return ArtifactClass(args.artifact_class)
-    if args.contract in (CONTRACT_ID, CONTRACT_ID_R04, CONTRACT_ID_R04_003):
+    if args.contract in (
+        CONTRACT_ID,
+        CONTRACT_ID_R04,
+        CONTRACT_ID_R04_003,
+        CONTRACT_ID_R04_003B,
+    ):
         return ArtifactClass.CONTRACT_PREFLIGHT
     return None
