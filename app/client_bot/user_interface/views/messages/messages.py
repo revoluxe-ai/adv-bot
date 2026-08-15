@@ -27,6 +27,7 @@ from app.client_bot.user_interface.message_templates.templates import (
 from app.client_bot.user_interface.utils import (
     format_target_place_display,
     get_effective_keyword_target_place,
+    format_required_wb_token_scopes,
 )
 from app.client_bot.user_interface.views import callbacks, keyboards
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -452,10 +453,10 @@ class AddNewTokenGet(TextWithImage):
         return (
             f"""Пришлите новый ПЕРСОНАЛЬНЫЙ Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n"""
             """Создайте токен в кабинете WB.\n"""
-            """Для безопасного первого входа можно использовать read-only токен.\n"""
-            """С read-only токеном бот покажет аналитику, магазины и кампании, но не будет менять рекламу.\n"""
-            """Для ручного управления ставками нужен токен без галочки только для чтения.\n\n"""
-            """Во всех случаях нужны права: Контент, Статистика, Аналитика, Продвижение.\n"""
+            """Для безопасного первого входа можно использовать токен только для чтения.\n"""
+            """С токеном только для чтения бот покажет аналитику, магазины и кампании, но не будет менять рекламу.\n"""
+            """Для ручного управления ставками нужен токен с возможностью изменений в кабинете.\n"""
+            f"{format_required_wb_token_scopes()}\n"
         )
 
     @property

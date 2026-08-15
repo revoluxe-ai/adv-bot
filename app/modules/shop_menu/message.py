@@ -25,6 +25,7 @@ from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.ui_access import UiAccessMode, UiAccessResolver
 from app.client_bot.ui_mode import UiModeService
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
+from app.client_bot.user_interface.utils import format_required_wb_token_scopes
 from app.client_bot.user_interface.views.callbacks import (
     AddNewToken,
     ApplyDefaultsForShop,
@@ -622,11 +623,10 @@ class ShopMenu(TextWithKeyboard):
                     text += (
                         "\n⚠️ <b>У этого WB API токена доступны только права чтения.</b>\n\n"
                         "Бот работает в режиме аналитики: можно смотреть кампании, ключи, историю и статистику.\n\n"
-                        "Автоуправление ставками и кампаниями недоступно. \n"
-                        "Для управления кампаниями из Бота нужен Персональный токен без галочки Только для чтения \n"
-                        "с правами: Аналитика, Статистика, Контент, продвижение"
-
-
+                        "Автоуправление ставками и кампаниями недоступно.\n"
+                        "Для управления кампаниями из бота нужен токен с возможностью изменений в кабинете (без галочки"
+                        " Только для чтения).\n"
+                        f"{format_required_wb_token_scopes()}"
                     )
                 text += "\n🔑 <b>Токены:</b> ❌ <b>Требуется обновление</b>\n"
                 text += f"❌ <b>Отсутствуют права:</b> {', '.join(sorted(token_status.missing_permissions))}\n"
