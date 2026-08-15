@@ -16,9 +16,10 @@ CONTRACT_VERSION=OPSX_SUPERVISOR_ORCHESTRATION_V2
 
 1. принять задачу и создать mission record;
 2. построить task graph (DAG);
-3. **обязательно** проконсультироваться с `/opsx-explore`
-   (`READ_ONLY_ADVISORY`) как лучше выполнить Owner-задачу (§13.0)
-   до первого scoped-write / conditional dispatch;
+3. **до первого** scoped-write / conditional dispatch классифицировать
+   `ROUTING_SCENARIO` (§13.0) и проконсультироваться с **сценарным**
+   READ_ONLY advisor — **не** default'ить на `/opsx-explore` для
+   quality-chain / gate-recovery (тесты, static-check, triage);
 4. запускать разрешённые `/opsx-*` команды только через субагентов;
 5. соблюдать зависимости, parallel limits и resource locks;
 6. валидировать результаты отдельно от завершения worker;
@@ -1273,28 +1274,46 @@ Mode locks:
 /opsx-explore:
   READ_ONLY_ADVISORY
   OPENSPEC_ARTIFACT_WRITE=FORBIDDEN
+
+/opsx-admin-command-analyze-pipeline:
+  READ_ONLY
+  PIPELINE_ANALYSIS | IMPROVEMENT_PROPOSAL | REGRESSION_PIPELINE_REVIEW
+  NOT_OPERATOR_NAVIGATOR (as-is map → /opsx-pipeline)
 ```
 
 Первые два консультанта могут быть запущены параллельно в пределах
-`MAX_ACTIVE_SUBAGENTS=2`.
+`MAX_ACTIVE_SUBAGENTS=2`. Для `QUALITY_CHAIN_RECOVERY` prefer sequential:
+pipeline → consult (if needed) → analyze-pipeline (if still unclear).
 
-### 13.0 Mandatory `/opsx-explore` execution advice (hard gate)
+### 13.0 Execution routing advisory (scenario-based hard gate)
 
 Перед выбором и фиксацией execution plan и **до первого** dispatch
 команды из `TASK_ALLOWED_SCOPED_WRITE` или `CONDITIONAL_RESTRICTED`
-Supervisor **обязан** проконсультироваться с `/opsx-explore`
-(`READ_ONLY_ADVISORY`) о том, **как лучше выполнить** поставленную
-Owner-задачу.
+Supervisor **обязан** классифицировать `ROUTING_SCENARIO` и получить
+сценарный READ_ONLY routing advice — **не** default'ить на `/opsx-explore`
+для quality-chain / gate-recovery.
 
-**Исключение — `BUG_MISSION` sequential mode (§25):** когда mission уже
-привязана к durable case/findings и следующий hop задан verified
-`ROUTE_TRANSITION` envelope, `/opsx-explore` **не** является route
-authority и **не** выбирает `NEXT_COMMAND`. Explore-as-planner skip
-разрешён; optional domain consult не переопределяет envelope.
-`route_authority=worker_transition_envelope` (см.
-`contracts/bug-episode/SUPERVISOR_POLICY.md`).
+```text
+ROUTING_SCENARIO:
+  QUALITY_CHAIN_RECOVERY
+  DOMAIN_PRODUCT_SEMANTICS
+  USEFUL_WORK
+  BUG_MISSION
+  DEFAULT_FEATURE_WORK
+```
 
-Исключение из gate (bootstrap triad) — только консультационный контур:
+| `ROUTING_SCENARIO` | Когда (примеры) | Mandatory consult (порядок) | Explore / evolution |
+|---|---|---|---|
+| `QUALITY_CHAIN_RECOVERY` | static-check FAIL, pytest/triage FAIL, «исправь gates/тесты последовательно», antipattern→test-env→static-check chain | ① `/opsx-pipeline` (navigate от текущего gate state); ② если authority неясна → `/opsx-admin-command-consult`; ③ если recovery path всё ещё неясен → `/opsx-admin-command-analyze-pipeline` `MODE=IMPROVEMENT_PROPOSAL` (focused на reported failure) | **только** если failure = domain/spec semantics, не tooling |
+| `DOMAIN_PRODUCT_SEMANTICS` | North Star, evolution, spec ambiguity, «что значит в продукте» | `/opsx-explore` **или** `/opsx-evolution` (`READ_ONLY`) | pipeline при необходимости placement |
+| `USEFUL_WORK` | §3.3 valued-goals consume | `/opsx-explore` (`VALUED_GOALS`) | — |
+| `BUG_MISSION` | §25 durable case / envelope | **skip** — `route_authority=worker_transition_envelope` | optional domain consult **не** переопределяет envelope |
+| `DEFAULT_FEATURE_WORK` | new/ff/update/apply, feature implementation | `/opsx-pipeline` + `/opsx-admin-command-consult` (parallel ≤2) | `/opsx-explore` если domain gap после pipeline |
+
+**Исключение — `BUG_MISSION` (§25):** envelope — route authority; explore
+не выбирает `NEXT_COMMAND` (см. `contracts/bug-episode/SUPERVISOR_POLICY.md`).
+
+Bootstrap triad (консультационный контур, не заменяет §13.0 scenario gate):
 
 ```text
 /opsx-admin-command-consult
@@ -1302,59 +1321,62 @@ authority и **не** выбирает `NEXT_COMMAND`. Explore-as-planner skip
 /opsx-explore
 ```
 
-Обязательный ask к `/opsx-explore` (явный текст в subagent prompt):
+Ask templates (subagent prompt — **по сценарию**, не всегда explore):
 
 ```text
-HOW_BEST_TO_EXECUTE_THIS_TASK=
-  recommended OPSX route / order
-  keep vs defer
-  risks / blockers
-  project interpretation relevant to execution
+QUALITY_CHAIN_RECOVERY:
+  CURRENT_GATE_STATE: <static-check|triage|antipattern|…>
+  FAIL_SUMMARY: <paste from checker packet>
+  REQUEST: pasteable NEXT_ACTION sequence via pipeline / fix commands
+
+DOMAIN_PRODUCT_SEMANTICS:
+  HOW_BEST_TO_EXECUTE_THIS_TASK= + domain interpretation
+
+USEFUL_WORK:
+  VALUED_GOALS ranking (explore.valued_goals)
 ```
 
-Требуемый результат консультации:
+Требуемый результат (ledger / `CONSULTATIONS_EXECUTED`):
 
 ```text
-EXPLORE_EXECUTION_ADVICE_RECEIVED=YES
-```
-
-Зафиксировать в ledger / `CONSULTATIONS_EXECUTED`:
-
-```text
-EXPLORE_EXECUTION_ADVICE:
+EXECUTION_ROUTING_ADVICE_RECEIVED=YES
+ROUTING_SCENARIO: <one of above>
+ROUTING_ADVICE:
   RECOMMENDED_ROUTE:
   ORDER:
   KEEP_DEFER:
   RISKS:
+  SOURCE_COMMAND:
   SOURCE_WORKER_ID:
 ```
 
-Тихий skip запрещён. Если `/opsx-explore` недоступен, упал или вернул
-пустой/неисполнимый advice без usable execution recommendation:
+Для `QUALITY_CHAIN_RECOVERY` **`EXPLORE_EXECUTION_ADVICE_RECEIVED` не
+требуется**; достаточно routing от pipeline / consult / analyze-pipeline.
+
+Тихий skip запрещён. Если сценарный advisor недоступен, упал или не дал
+usable execution recommendation:
 
 ```text
-STATUS=BLOCKED_NEEDS_EXPLORE_ADVICE
+STATUS=BLOCKED_NEEDS_ROUTING_ADVICE
 DISPATCH_ALLOWED=NO
 ```
 
-Совет `/opsx-explore` остаётся advisory: не authority grant, не обход
-denylist, не commit/push/PR, не отмена mandatory gates. Authority при
-сомнении по command contract — через `/opsx-admin-command-consult`.
+Advisory routing **не** authority grant, не обход denylist, не commit/push/PR,
+не отмена mandatory gates. Authority по command contract — через
+`/opsx-admin-command-consult`.
 
 ```text
 ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
-EXPLORE_NEXT_COMMAND_ALONE_SETS_READY=FORBIDDEN
+ADVISORY_NEXT_COMMAND_ALONE_SETS_READY=FORBIDDEN
 ```
 
-`NEXT_COMMAND` / `RECOMMENDED_ROUTE` от explore, pipeline или admin-consult
-**не** переводят mission в `READY_FOR_OWNER_DIFF_REVIEW` и **не**
-заменяют §20 evidence checklist. Denylisted `NEXT_COMMAND` → §14.7
-reject path (continue allowed KEEP work or `NOT_READY_PROCESS_INCOMPLETE`),
-не false readiness.
+`NEXT_COMMAND` / `RECOMMENDED_ROUTE` от advisors **не** переводят mission в
+`READY_FOR_OWNER_DIFF_REVIEW` и **не** заменяют §20 evidence checklist.
+Denylisted `NEXT_COMMAND` → §14.7 reject path.
 
-`SCOPE_UNCHANGED=YES` / routine operational path **не** отменяет этот
-gate: execution-advice consultation обязательна на каждой новой
-существенной mission до первого scoped-write / conditional dispatch.
+`SCOPE_UNCHANGED=YES` **не** отменяет scenario gate: routing consultation
+обязательна на каждой новой существенной mission до первого scoped-write /
+conditional dispatch.
 
 Команда допускается только при:
 
@@ -1390,13 +1412,13 @@ AUTHORITY_CONFIRMED=YES
 TASK_MATCHES_SCOPE=YES
 REQUIRED_BOUNDARY_ALLOWED=YES
 DISPATCH_ALLOWED=YES
-EXPLORE_EXECUTION_ADVICE_RECEIVED=YES
+EXECUTION_ROUTING_ADVICE_RECEIVED=YES
 ```
 
 Для первого `TASK_ALLOWED_SCOPED_WRITE` / `CONDITIONAL_RESTRICTED`
-dispatch отсутствие `EXPLORE_EXECUTION_ADVICE_RECEIVED=YES` ⇒
+dispatch отсутствие `EXECUTION_ROUTING_ADVICE_RECEIVED=YES` ⇒
 `DISPATCH_ALLOWED=NO` (см. §13.0). Bootstrap triad исключён из этого
-требования.
+требования. `QUALITY_CHAIN_RECOVERY` **не** требует explore-only advice.
 
 Запрещено выбирать команду по похожему названию, опыту другого чата,
 содержимому supervisor report, удобству или предположению.
@@ -1410,13 +1432,14 @@ ROLE=PRIMARY_PROJECT_ADVISOR
 MODE=READ_ONLY_ADVISORY
 PROJECT_DEPUTY_OWNER
 MOST_EXPERIENCED_PROJECT_COMMAND
-MANDATORY_EXECUTION_ADVISOR_FOR_SUPERVISOR=YES
+MANDATORY_EXECUTION_ADVISOR_FOR_SUPERVISOR=NO
+DOMAIN_AND_USEFUL_WORK_ADVISOR=YES
 ```
 
-На supervisor mission `/opsx-explore` обязан быть запрошен не только для
-project/domain clarification, но и для ответа «как лучше выполнить
-поставленную задачу» (§13.0) до первого scoped-write / conditional
-dispatch.
+На supervisor mission `/opsx-explore` обязателен для `DOMAIN_PRODUCT_SEMANTICS`,
+`USEFUL_WORK` и optional domain gap в `DEFAULT_FEATURE_WORK` — **не**
+default advisor для `QUALITY_CHAIN_RECOVERY` (§13.0: pipeline → consult →
+analyze-pipeline).
 
 В `TASK_MODE=USEFUL_WORK` explore additionally ranks goal-like candidates
 (`VALUED_GOALS`, free-prose VALUE gate). Ranking is advisory input to the
@@ -1448,7 +1471,7 @@ SCOPE_UNCHANGED=YES
 MATERIAL_SEMANTICS_UNCHANGED=YES
 DENYLIST_PRESERVED=YES
 MANDATORY_GATE_NOT_BYPASSED=YES
-EXPLORE_EXECUTION_ADVICE_RECEIVED=YES
+EXECUTION_ROUTING_ADVICE_RECEIVED=YES
 ```
 
 Он не может разрешать denylist, commit/push/PR, создание/изменение команд,
@@ -1553,14 +1576,21 @@ Stale discovery record не подтверждает `FOUND_IN_CURRENT_REPOSITOR
 
 ```text
 /opsx-admin-command-consult
+/opsx-admin-command-analyze-pipeline
 /opsx-pipeline
 /opsx-explore
 ```
 
+`/opsx-admin-command-analyze-pipeline`: `READ_ONLY` only; modes
+`PIPELINE_ANALYSIS` | `IMPROVEMENT_PROPOSAL` | `REGRESSION_PIPELINE_REVIEW`;
+не substitute для `/opsx-pipeline` navigate-as-is.
+
 ## 14.2 TASK_ALLOWED_READ_ONLY
 
 ```text
+/opsx-admin-command-analyze-pipeline
 /opsx-bug-debt-board
+/opsx-evolution
 /opsx-external-call-coverage
 /opsx-fanout-bug-hunt
 /opsx-performance-review
@@ -1683,7 +1713,6 @@ contract. Recursive Supervisor dispatch запрещён.
 ## 14.7 ABSOLUTE DENYLIST
 
 ```text
-/opsx-admin-command-analyze-pipeline
 /opsx-meta-commit
 /opsx-admin-command-commit
 /opsx-admin-command-design-command
@@ -2573,9 +2602,9 @@ family fanout / handback → /opsx-bug-team only when envelope/HANDBACK says so
 
 Denylisted commands stay forbidden even if recommended.
 
-Default free-text (non-BUG_MISSION) missions still use DAG + §13.0 explore
-gate; they must not silently claim `MISSION_COMPLETE` from one worker PASS
-when a durable multi-finding case is in scope.
+Default free-text (non-BUG_MISSION) missions still use DAG + §13.0 scenario
+routing gate; they must not silently claim `MISSION_COMPLETE` from one
+worker PASS when a durable multi-finding case is in scope.
 
 Finding not closed on `CLAIMED` / `RED_CONFIRMED` / `GREEN_CONFIRMED` alone —
 see CLOSE_POLICY.
