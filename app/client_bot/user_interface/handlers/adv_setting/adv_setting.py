@@ -324,28 +324,9 @@ async def adv_handler(
         adv: AdvSetting | None = adv_result.scalar_one_or_none()
 
     if not adv:
-        await bot.send_message(
-            chat_id, "Кампания не найдена, попробуйте еще раз"
+        raise RuntimeError(
+            f"AdvSetting not found for original_id={adv_original_id}"
         )
-        stmt = (
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-            .order_by(AdvSetting.name)
-        )
-        async with sm() as session:
-            result = await session.execute(stmt)
-            adv_settings: list[AdvSetting] = list(result.scalars().all())
-
-        await messages.AdvCompanyChoicing(
-            bot,
-            chat_id,
-            wb_user_cabinet_original_id,
-            adv_settings,
-            state,
-        )()
-        return
 
     async with sm() as session:
         stmt = (
@@ -354,13 +335,12 @@ async def adv_handler(
             .options(selectinload(WBUserCabinet.wb_cabinet))
         )
         wb_user_cabinet_result = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet_result.scalar_one_or_none()
+        wb_user_cabinet = wb_user_cabinet_result.scalar_one()
 
     if not wb_user_cabinet:
-        await bot.send_message(
-            chat_id, "Кабинет не найден, попробуйте еще раз"
+        raise RuntimeError(
+            f"WBUserCabinet not found for original_id={wb_user_cabinet_original_id}"
         )
-        return
 
     nmids = adv.nmids or []
     nmid = nmids[0] if nmids else None
@@ -401,13 +381,19 @@ async def open_auto_management_landing(
         callback_data.wb_user_cabinet_original_id
     )
     if wb_user_cabinet is None:
-        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
-        return
+        raise RuntimeError(
+            "WBUserCabinet not found for original_id="
+            f"{callback_data.wb_user_cabinet_original_id}"
+        )
 
-    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
+    adv_setting = await _get_adv_setting_or_none(
+        callback_data.adv_setting_original_id
+    )
     if adv_setting is None:
-        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
-        return
+        raise RuntimeError(
+            "AdvSetting not found for original_id="
+            f"{callback_data.adv_setting_original_id}"
+        )
 
     await AutoManagementLanding(bot, chat_id, wb_user_cabinet, adv_setting)()
 
@@ -427,13 +413,19 @@ async def open_auto_management_how_it_works(
         callback_data.wb_user_cabinet_original_id
     )
     if wb_user_cabinet is None:
-        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
-        return
+        raise RuntimeError(
+            "WBUserCabinet not found for original_id="
+            f"{callback_data.wb_user_cabinet_original_id}"
+        )
 
-    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
+    adv_setting = await _get_adv_setting_or_none(
+        callback_data.adv_setting_original_id
+    )
     if adv_setting is None:
-        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
-        return
+        raise RuntimeError(
+            "AdvSetting not found for original_id="
+            f"{callback_data.adv_setting_original_id}"
+        )
 
     await AutoManagementHowItWorks(bot, chat_id, wb_user_cabinet, adv_setting)()
 
@@ -453,13 +445,19 @@ async def back_from_auto_management_landing(
         callback_data.wb_user_cabinet_original_id
     )
     if wb_user_cabinet is None:
-        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
-        return
+        raise RuntimeError(
+            "WBUserCabinet not found for original_id="
+            f"{callback_data.wb_user_cabinet_original_id}"
+        )
 
-    adv_setting = await _get_adv_setting_or_none(callback_data.adv_setting_original_id)
+    adv_setting = await _get_adv_setting_or_none(
+        callback_data.adv_setting_original_id
+    )
     if adv_setting is None:
-        await bot.send_message(chat_id, "Кампания не найдена, попробуйте еще раз")
-        return
+        raise RuntimeError(
+            "AdvSetting not found for original_id="
+            f"{callback_data.adv_setting_original_id}"
+        )
 
     await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
@@ -500,9 +498,6 @@ async def toggle_minus_phrases_setting(
     wb_user_cabinet = await _get_wb_user_cabinet_or_none(
         callback_data.wb_user_cabinet_original_id
     )
-    if wb_user_cabinet is None:
-        await bot.send_message(chat_id, "Кабинет не найден, попробуйте еще раз")
-        return
     async with sm(read_only=False) as session:
         stmt = (
             update(AdvSetting)
@@ -610,10 +605,9 @@ async def turn_adv_off(
         wb_user_cabinet = wb_user_cabinet.scalar()
 
     if not wb_user_cabinet:
-        await bot.send_message(
-            chat_id, "Кабинет не найден, попробуйте еще раз"
+        raise RuntimeError(
+            f"WBUserCabinet not found for original_id={wb_user_cabinet_original_id}"
         )
-        return
 
     async with sm(read_only=False) as session:
         result = await session.execute(
@@ -678,10 +672,10 @@ async def apply_campaign_defaults(
             wb_user_cabinet = wb_user_cabinet.scalar()
 
         if not wb_user_cabinet:
-            await bot.send_message(
-                chat_id, "Кабинет не найден, попробуйте еще раз"
+            raise RuntimeError(
+                "WBUserCabinet not found for original_id="
+                f"{wb_user_cabinet_original_id}"
             )
-            return
 
         await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
@@ -712,16 +706,19 @@ async def wb_update_minus_keywords(
         adv_setting: AdvSetting | None = result.scalar_one_or_none()
 
     if adv_setting is None:
-        await bot.send_message(chat_id, "Кампания не найдена.")
-        return
+        raise RuntimeError(
+            f"AdvSetting not found for original_id={adv_setting_original_id}"
+        )
     wb_cabinet = getattr(adv_setting, "wb_cabinet", None)
     if wb_cabinet is None:
-        await bot.send_message(chat_id, "У кампании не задан кабинет WB.")
-        return
+        raise RuntimeError(
+            f"WBCabinet missing for AdvSetting original_id={adv_setting_original_id}"
+        )
     shop_id = wb_cabinet.shop_id
     if not shop_id:
-        await bot.send_message(chat_id, "У кабинета не задан shop_id.")
-        return
+        raise RuntimeError(
+            f"WBCabinet shop_id missing for adv_setting_original_id={adv_setting_original_id}"
+        )
 
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
@@ -750,9 +747,9 @@ async def wb_update_minus_keywords(
                 None,
             )
             if complex_adv is None:
-                await bot.send_message(
-                    chat_id,
-                    "Кампания не найдена среди активных комплексов (нет поисковой РК или nmids).",
+                raise RuntimeError(
+                    "ComplexAdv not found for adv_setting_original_id="
+                    f"{adv_setting_original_id}"
                 )
             elif not complex_adv.bot_active:
                 await bot.send_message(
@@ -771,6 +768,8 @@ async def wb_update_minus_keywords(
                     chat_id,
                     user_message_after_ordinary_minus_update(applied=applied),
                 )
+    except RuntimeError:
+        raise
     except Exception:
         logger.exception("Ошибка обновления минус-слов для adv_setting_id=%s", adv_setting_original_id)
         await bot.send_message(

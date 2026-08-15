@@ -181,3 +181,50 @@ async def test_back_from_how_it_works_returns_to_landing() -> None:
     landing_call.assert_awaited_once()
     how_it_works_call.assert_awaited_once()
     adv_menu_ctor.assert_not_called()
+
+
+async def test_open_status_button_raises_runtime_error_when_cabinet_missing() -> None:
+    bot = AsyncMock()
+
+    with patch(
+        "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
+        AsyncMock(return_value=None),
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match="WBUserCabinet not found for original_id=55",
+        ):
+            await open_auto_management_landing(_callback(), _callback_data(), bot)
+
+    bot.send_message.assert_not_awaited()
+
+
+async def test_back_handler_raises_runtime_error_when_adv_missing() -> None:
+    bot = AsyncMock()
+    wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
+            AsyncMock(return_value=wb_user_cabinet),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting_or_none",
+            AsyncMock(return_value=None),
+        ),
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match="AdvSetting not found for original_id=77",
+        ):
+            await back_from_auto_management_landing(
+                _callback(),
+                callbacks.AutoManagementLanding(
+                    action="back",
+                    adv_setting_original_id=77,
+                    wb_user_cabinet_original_id=55,
+                ),
+                bot,
+            )
+
+    bot.send_message.assert_not_awaited()
