@@ -62,6 +62,8 @@ from scripts.wb_api_readonly_ops.archive import (
 )
 from scripts.wb_api_readonly_ops.ceiling import RunCeiling
 from scripts.wb_api_readonly_ops.cli import parse_args, resolve_artifact_class
+from scripts.wb_api_readonly_ops.r04_003_constants import CONTRACT_ID_R04_003
+from scripts.wb_api_readonly_ops.r04_003_flow import run_r04_003_api_preflight
 from scripts.wb_api_readonly_ops.contract_constants import CONTRACT_ID
 from scripts.wb_api_readonly_ops.contract_flow import (
     run_contract_preflight_sync,
@@ -122,9 +124,45 @@ async def _async_main(argv: list[str] | None = None) -> int:
             print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
             return 1
 
-    # Contract primary RETURN path (0 API by default; no Cursor→prod).
+    # Contract primary RETURN path.
     if artifact_class == ArtifactClass.CONTRACT_PREFLIGHT:
         contract_id = str(args.contract) if args.contract else CONTRACT_ID
+        if contract_id == CONTRACT_ID_R04_003:
+            # COL-R04-003: live credentialed API preflight in Job runtime only.
+            app_config = AppConfig.create()
+            redis_config = app_config.infrastructure.redis
+            redis_client_raw: Redis[str] = Redis(
+                host=redis_config.host,
+                port=redis_config.port,
+                db=redis_config.db,
+                password=redis_config.password,
+                decode_responses=True,
+            )
+            await redis_client_raw.ping()
+            redis_client_wrapper = RedisClient(redis_client=redis_client_raw)
+            httpx_client_handler = HttpxClientHandler()
+            await httpx_client_handler.init()
+            wb_manager_hub_factory = WBManagerHubFactory(
+                httpx_client_handler=httpx_client_handler,
+                redis_client_wrapper=redis_client_wrapper,
+            )
+            try:
+                access = await get_access_for_wb_cabinet(shop_id)
+                _ = access
+                hub = wb_manager_hub_factory.get_wb_manager_hub(shop_id)
+                return await run_r04_003_api_preflight(
+                    shop_id=shop_id,
+                    output_dir=output_dir,
+                    bound_alias=str(args.bound_alias),
+                    period_start=str(args.period_start),
+                    period_end=str(args.period_end),
+                    mode=mode,
+                    wb_data_manager=hub.wb_data_manager,
+                )
+            finally:
+                await httpx_client_handler.shutdown()
+                await redis_client_raw.close()
+
         return run_contract_preflight_sync(
             shop_id=shop_id,
             output_dir=output_dir,
