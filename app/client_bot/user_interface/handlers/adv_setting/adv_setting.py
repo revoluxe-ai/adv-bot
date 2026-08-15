@@ -328,7 +328,8 @@ async def adv_handler(
             f"AdvSetting not found for original_id={adv_original_id}"
         )
 
-    async with sm() as session:
+    # TODO: Перенести в отдельную функцию
+    async with sm(read_only=True) as session:
         stmt = (
             select(WBUserCabinet)
             .where(WBUserCabinet.id == wb_user_cabinet_original_id)

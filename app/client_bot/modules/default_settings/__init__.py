@@ -1,3 +1,5 @@
+"""Apply campaign defaults to freshly created or explicitly reset AdvSetting rows."""
+
 from app.client_bot.modules.default_settings.adv_setting_policy.common_mode_defaults_policy import (
     CommonModeDefaultsPolicy,
 )
