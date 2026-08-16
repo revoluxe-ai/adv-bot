@@ -28,10 +28,13 @@ the finding routes OCR+/opsx-new.
 **Semantic write-target authority:** Read and follow
 `.cursor/commands/opsx-update.md` and
 `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. For high-risk
-multi-target writes, revise artifacts until they durably name the target,
-allowed/forbidden adapters, evidence and paired tests. Chat-only Owner answers
-are insufficient; unresolved choice returns
-`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and must not be marked apply-ready.
+multi-target writes, revise artifacts until they contain an **explicit SWT
+schema block** with exact field names `TARGET_ENTITY_OR_LEG`,
+`ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`, plus evidence and paired tests.
+Architecture Decision Allowed/Forbidden prose alone is **not** RESOLVED
+(`prose≠RESOLVED`) and must not be marked apply-ready / coherent. Chat-only
+Owner answers are insufficient; unresolved choice returns
+`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`.
 
 **Product Acceptance / change spirit:** Follow
 `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When

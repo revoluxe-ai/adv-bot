@@ -58,7 +58,7 @@ def _make_auto_adv(
         name=f"auto_{adv_id}",
         wb_cabinet_id=wb_cabinet_id,
         bot_active=True,
-        active_status="any",
+        active_status="started",
         _search_adv_id=search_adv_id,  # noqa: SLF001
         automatic_version=automatic_version,
         auto_update_white_list=wl,
@@ -144,9 +144,9 @@ async def test_auto_mode_applies_without_active_search_campaigns(
 
     details = await Pricer().get_tariff_details(async_session, shop_id)
 
-    assert details.count == 0
+    assert details.count == 0.5
     assert details.mode == TariffMode.AUTO
-    assert details.total_per_month == 0.0
+    assert details.total_per_month == 0.5 * float(tariffs_for_auto_setting[1])
 
 
 async def test_auto_mode_triggered_by_individual_keyword_target_places(
@@ -205,8 +205,8 @@ async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
     await async_session.flush()
 
     details = await Pricer().get_tariff_details(async_session, shop_id)
-    assert details.count == 1
-    assert details.total_per_month > 0.0
+    assert details.count == 0.5
+    assert details.total_per_month == 0.5 * float(tariffs_for_auto_setting[1])
 
 
 async def test_auto_tariff_thresholds_apply_to_total_count(

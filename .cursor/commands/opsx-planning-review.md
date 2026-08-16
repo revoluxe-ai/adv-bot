@@ -127,8 +127,17 @@ Bounded contracts:
 .cursor/pipeline/contracts/DESIGN_GENERATION.md
 .cursor/pipeline/contracts/TASK_GENERATION.md
 .cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md
+.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md
 .cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md
 ```
+
+When `PRODUCT_ACCEPTANCE_REQUIRED=true` and SWT applicability holds
+(high-risk multi-target write): FAIL / `REPAIR_REQUIRED` if durable
+artifacts lack the **exact** SWT schema tokens `TARGET_ENTITY_OR_LEG`,
+`ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS` — even when decision
+Allowed/Forbidden prose or design Ownership tables look complete
+(`prose≠RESOLVED` / MEANING_LOCK). Handoff primary writer:
+`/opsx-update` (not scenario-coverage).
 
 Fixtures: `.cursor/commands/_fixtures/planning-review/`
 

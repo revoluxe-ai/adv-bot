@@ -23,6 +23,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_coverage_selector import (
     BidCoverage,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.exhausted_pause.decision import (
+    coverage_date_from_for_epoch,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -161,6 +164,8 @@ async def test_build_view_builds_coverage_layer_payload_without_actual_bid_price
             BidCoverage(bid_minor=37_500, impressions=0, valid_hours=0),
         ]
     )
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(return_value=None)
 
     provider = AutoShelfBidControlViewProvider(
         redis_client=MagicMock(),
@@ -171,7 +176,15 @@ async def test_build_view_builds_coverage_layer_payload_without_actual_bid_price
     provider._fetch_wb_min_bid_minor = AsyncMock(return_value=12_000)  # type: ignore[method-assign]
     selector_mock = MagicMock(return_value=37_500)
     monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.bid_coverage_selector.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
+    monkeypatch.setattr(
         "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.choose_next_test_bid_by_coverage_layers",
+        selector_mock,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager.choose_next_test_bid_by_coverage_layers",
         selector_mock,
     )
     monkeypatch.setattr(
@@ -195,21 +208,34 @@ async def test_build_view_builds_coverage_layer_payload_without_actual_bid_price
     assert missing_row.closed_layers == 0
     selected_row = next(row for row in view.coverage_bid_rows if row.bid_minor == 37_500)
     assert selected_row.is_selected_next_test is True
-    analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(
+    analytics.get_first_available_bid_bucket_start.assert_any_await(
         nmid=111,
         currency="RUB",
         price_minor=None,
         mode=None,
     )
-    analytics.get_bid_coverages.assert_awaited_once_with(
-        nmid=111,
-        date_from=first_bucket_start,
-        date_to=ANY,
-        currency="RUB",
-        price_minor=None,
-        mode=None,
-    )
-    selector_mock.assert_called_once()
+    assert analytics.get_first_available_bid_bucket_start.await_count == 2
+    coverage_calls = [
+        call.kwargs for call in analytics.get_bid_coverages.await_args_list
+    ]
+    assert len(coverage_calls) == 2
+    for coverage_call in coverage_calls:
+        expected_date_from = max(
+            first_bucket_start,
+            coverage_date_from_for_epoch(
+                now=coverage_call["date_to"],
+                epoch_start=None,
+            ),
+        )
+        assert coverage_call == {
+            "nmid": 111,
+            "date_from": expected_date_from,
+            "date_to": coverage_call["date_to"],
+            "currency": "RUB",
+            "price_minor": None,
+            "mode": None,
+        }
+    assert selector_mock.call_count == 2
 
 
 @pytest.mark.asyncio

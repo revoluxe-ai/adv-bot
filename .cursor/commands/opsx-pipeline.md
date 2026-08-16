@@ -32,6 +32,10 @@ Rules:
 - UPDATE / UPDATE GO own refresh of that single shared materialization.
 - Command contracts remain independently authoritative; the graph only
   **indexes** them for orientation.
+- Producer commands (`/opsx-spec-scenario-coverage`, `/opsx-external-call-coverage`,
+  `/opsx-verify`, …) emit `LOCAL_HOP_COPY_BLOCK` with runnable hops.
+  `/opsx-pipeline` NAVIGATE **reuses** packet bodies from chat when recommending
+  the same consumer — it does not replace producers with paste-advice prose.
 
 ## Soft recommendation (graph is not a gate)
 
@@ -164,7 +168,7 @@ Do not invent alternate graph locations or a second private navigator map.
    `RECOMMENDATION_STRENGTH: advisory`.
    **Executable-now rule:** `NEXT_ACTION` must be Owner-runnable as written.
    Forbidden in `NEXT_ACTION` (and in the primary `LOCAL_HOP_COPY_BLOCK`
-   Command line): angle-bracket packet stubs (`<paste…>`,
+   `Command:` line): angle-bracket packet stubs (`<paste…>`,
    `<paste that packet>`), empty packet bodies, or any content that is not
    already present in this turn’s chat evidence. If the true consumer hop
    needs a packet that does not yet exist → set `NEXT_ACTION` to the
@@ -175,15 +179,28 @@ Do not invent alternate graph locations or a second private navigator map.
 7. List `KNOWN_FLAWS` that apply at this node/edge from the graph.
 8. When `NEXT_ACTION` is a pasteable `/opsx-*` command (not `none`), emit
    exactly one `LOCAL_HOP_COPY_BLOCK` (see Output) after the structured
-   fields. Pattern mirrors `.cursor/pipeline/contracts/VERIFY_PHASES.md`
-   `LOCAL_HOP_COPY_BLOCK`: one fenced plain-text block with Workspace,
-   Current state, Command (exact filled args), `DO_NOT_DO_YET`, `ALSO_OK`.
+   fields. The fence is the **primary Owner copy-paste hop** — not prose
+   advice about where to paste. Pattern mirrors
+   `.cursor/pipeline/contracts/VERIFY_PHASES.md` `LOCAL_HOP_COPY_BLOCK`:
+   one fenced plain-text block with Workspace, Change, Current state,
+   `Command:` (exact filled args, **one line, no packet body**), then any
+   inline packet body when evidence exists, `DO_NOT_DO_YET`, `ALSO_OK`.
    Outside that fence: at most one status line. No Web four-block form.
-9. Packet-consuming follow-ups (`/opsx-close-external-gap`, etc.) belong
-   only in `ALSO_OK` / `DO_NOT_DO_YET` as **sequenced** prose, e.g.
-   `After <NEXT_ACTION> returns ROUTE_PACKETS / SCENARIO_*_PACKET, paste
-   that fence into /opsx-close-external-gap` — never as a current hop
-   with placeholder paste.
+9. **Chat-evidence lift (mandatory when packet exists):** If `NEXT_ACTION`
+   is a packet consumer (`/opsx-test`, `/opsx-close-external-gap`, …) and
+   a complete packet already appears in this conversation (prior command
+   output: `SCENARIO_TEST_ONLY_PACKET`, `TEST_ONLY_PACKET`,
+   `SCENARIO_REFACTOR_AND_TEST_PACKET`, `CERTIFY_PACKET`, or fenced
+   `LOCAL_HOP_COPY_BLOCK` from `/opsx-spec-scenario-coverage`,
+   `/opsx-external-call-coverage`, etc.), duplicate the **full packet text**
+   inside `LOCAL_HOP_COPY_BLOCK` immediately after `Command:` — do not tell
+   Owner to «paste from above», «see ROUTE_PACKETS», or «insert packet from
+   audit». Prose-only handoff when the packet is already in chat = invalid
+   NAVIGATE output (self-review FAIL).
+   When the packet does **not** yet exist: `NEXT_ACTION` = producer only;
+   sequenced consumer belongs in `ALSO_OK` / `DO_NOT_DO_YET` (e.g. after
+   audit returns packet → `/opsx-test`) — never as current hop with
+   placeholder paste.
 10. Never execute the recommended command in the same turn unless the user
     separately invoked that command.
 11. Never refuse advice or mark failure only because the operator plans to
@@ -324,39 +341,58 @@ BLOCKED_AMBIGUOUS_POSITION
 - `ON_GRAPH` — whether the current position matches a typical edge
 - `RECOMMENDATION_STRENGTH` — always `advisory` for NAVIGATE
 - `OWNER_DECISION_REQUIRED` — `none` or exact decision
-- `NEXT_ACTION` — one pasteable **recommended** command or `none`
-  (operator may ignore). Must be executable now — no packet placeholders.
-- `ALSO_OK` — optional advisory alternate or **sequenced** follow-up
-  (solo walk, explore, handback, “after NEXT returns packet X → paste into
+- `NEXT_ACTION` — one line: pasteable **recommended** command or `none`
+  (operator may ignore). Must be executable now — **no packet body** on
+  this line, no packet placeholders.
+- `ALSO_OK` — optional advisory alternate or **sequenced** follow-up only
+  when the packet for a consumer hop is **not** yet in chat evidence
+  (solo walk, explore, handback, “after producer returns packet X → run
   consumer”). Does **not** replace `NEXT_ACTION`. Never frame ignoring
   `NEXT_ACTION` for an `ALSO_OK` path as a violation. Never put a
-  packet-consumer here as if runnable with `<paste that packet>`.
+  packet-consumer in `ALSO_OK` as if runnable with `<paste that packet>` when
+  the packet is already in chat — lift it into `LOCAL_HOP_COPY_BLOCK` instead.
 - `DO_NOT_DO_YET` — actions that would bypass **command** gates or skip
-  UPDATE GO; never “do not leave the graph”; may list premature
-  packet-consumer hops before the producer runs
+  UPDATE GO; never “do not leave the graph”; list premature consumer hops
+  only when producer packet is still missing
 
 ### LOCAL_HOP_COPY_BLOCK (mandatory on NAVIGATE when NEXT_ACTION is a command)
 
 After the structured Output fields above, when `NEXT_ACTION` is a pasteable
 `/opsx-*` (not `none`), emit exactly **one** fenced copy-paste prompt.
-Bare `NEXT_ACTION:` does **not** replace this block.
+Bare `NEXT_ACTION:` does **not** replace this block. Owner runs **this
+fence** in a new chat — not a hunt through prior messages.
 
-Example shape (values filled from the run — do not leave packet stubs):
+**Shape (fill from run — no packet stubs):**
 
-````text
 ```text
 Workspace: <abs-path>
 Change: <change-name or none>
 Current state: <CURRENT_STATE>
-Command: <exact NEXT_ACTION /opsx-… with filled args>
+Command: <exact NEXT_ACTION — one /opsx-… line, filled args, no packet>
+<when packet in chat evidence: full SCENARIO_TEST_ONLY_PACKET | TEST_ONLY_PACKET | REFACTOR_AND_TEST | CERTIFY body here>
 DO_NOT_DO_YET: <gates / premature consumers>
 ALSO_OK: <sequenced alternate or none>
 ```
-````
 
-Outside the fence (except the structured report above): at most **one**
-status line. Forbidden: Web four-block form; inventing paste bodies for
-packets not yet in evidence.
+Rules:
+
+1. `Command:` = **only** the single-line invocation (e.g.
+   `/opsx-spec-scenario-coverage mode=audit change=fair-leg-pause-billing`
+   or `/opsx-test`).
+2. Packet consumers: if recommending `/opsx-test` and
+   `SCENARIO_TEST_ONLY_PACKET` exists in conversation → paste **entire**
+   packet under `Command:` (same for `/opsx-close-external-gap` + Scenario /
+   ECC packets). Aligns with producer commands that emit
+   `LOCAL_HOP_COPY_BLOCK` (`/opsx-spec-scenario-coverage`, `/opsx-verify` …).
+3. Simple hops (no packet): fence ends after `Command:` + `DO_NOT_DO_YET` /
+   `ALSO_OK`.
+4. Forbidden: «вставьте packet из audit», «см. ROUTE_PACKETS выше»,
+   `Command: /opsx-test (+ SCENARIO_TEST_ONLY_PACKET из прошлого audit)` as
+   substitute for full packet body.
+
+Outside the fence (except structured report above): at most **one** status
+line. Forbidden: Web four-block form; inventing packet bodies not in chat
+evidence.
 
 When at a bug-episode fork (see GRAPH soft `BUG_EPISODE_FORK` /
 `CLOSE_POLICY.md`): set `NEXT_ACTION` to the **PRIMARY** path for the
@@ -389,10 +425,14 @@ with `case=` IDs. Never recommend a silent return to bug-team.
 - Creating a second GO/NO_GO taxonomy for the whole lifecycle
 - Emitting `NEXT_ACTION` / primary fence with `<paste that packet>` or
   other stubs for packets not yet in chat evidence
+- Prose-only handoff when packet exists in chat («paste from audit»,
+  «see ROUTE_PACKETS») instead of full fence with packet body
 - Recommending `/opsx-close-external-gap` (or any packet consumer) as the
   current hop before the packet-producing command has returned
-  `ROUTE_PACKETS` / Scenario fences
+  `ROUTE_PACKETS` / Scenario fences **and** that packet is not already in chat
 - Omitting `LOCAL_HOP_COPY_BLOCK` on NAVIGATE when `NEXT_ACTION` is a command
+- `LOCAL_HOP_COPY_BLOCK` with only `Command:` when consumer needs packet that
+  is already in conversation evidence
 
 ## Self-review checklist
 
@@ -404,7 +444,9 @@ Before returning:
 - [ ] Exactly one `NEXT_ACTION`, marked advisory on NAVIGATE
 - [ ] `NEXT_ACTION` executable now (no packet placeholders)
 - [ ] `LOCAL_HOP_COPY_BLOCK` present when NAVIGATE `NEXT_ACTION` is a command
-- [ ] Packet consumers only as sequenced `ALSO_OK` / `DO_NOT_DO_YET`
+- [ ] Fence includes full packet body when consumer hop + packet in chat
+- [ ] Packet consumers only as sequenced `ALSO_OK` / `DO_NOT_DO_YET` when
+  producer packet not yet in evidence
 - [ ] `ALSO_OK` used for bug-episode forks (team vs solo) when relevant
 - [ ] Shared materialization used (no alternate durable map)
 - [ ] Graph not claimed as lifecycle authority or forced path

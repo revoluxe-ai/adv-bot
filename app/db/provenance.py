@@ -14,7 +14,7 @@ import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 DEFAULT_PLATFORM = "linux/amd64"
@@ -62,9 +62,10 @@ def _parse_platform(platform: str) -> tuple[str, str]:
 
 
 def _platform_matches(entry: dict[str, Any], os_name: str, arch: str) -> bool:
-    plat = entry.get("platform") or {}
-    if not isinstance(plat, dict):
+    plat_raw = entry.get("platform")
+    if not isinstance(plat_raw, dict):
         return False
+    plat: dict[str, Any] = cast(dict[str, Any], plat_raw)
     return str(plat.get("os")) == os_name and str(plat.get("architecture")) == arch
 
 
@@ -79,12 +80,13 @@ def resolve_platform_digest_from_index(
     if not isinstance(manifests, list) or not manifests:
         raise ProvenanceError("index has no manifests[]")
     matches: list[str] = []
-    for item in manifests:
+    for item in cast(list[Any], manifests):
         if not isinstance(item, dict):
             continue
-        if not _platform_matches(item, os_name, arch):
+        entry = cast(dict[str, Any], item)
+        if not _platform_matches(entry, os_name, arch):
             continue
-        dig = item.get("digest")
+        dig = entry.get("digest")
         if isinstance(dig, str) and dig.strip():
             matches.append(normalize_digest(dig))
     if not matches:
@@ -175,11 +177,12 @@ def fetch_oci_document(
         raise ProvenanceError(f"invalid manifest JSON: {exc}") from exc
     if not isinstance(doc, dict):
         raise ProvenanceError("manifest JSON must be an object")
+    typed_doc = cast(dict[str, Any], doc)
     digest_hdr = (resp_headers.get("docker-content-digest") or "").strip().lower()
     resolved = normalize_digest(digest_hdr) if digest_hdr else (
         normalize_digest(ref) if DIGEST_RE.match(ref.lower()) else ref
     )
-    return resolved, doc
+    return resolved, typed_doc
 
 
 def verify_release_platform_digest(

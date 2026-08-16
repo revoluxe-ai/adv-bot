@@ -52,6 +52,13 @@ architecture decisions belong here.
   - Scope: confirmed keyword set / target places / Auto participation / Auto
     bid as durable epoch SoT, separate from factual position; Auto bid freeze
     while ACTIVE.
+- [billing-fair-leg-metering-write-path](billing-fair-leg-metering-write-path/decision.md)
+  - Status: Accepted
+  - Scope: ownership of fair leg-pause billing metering (anchor by
+    `search_adv_id`, Auto/Search 0.5 slots, UTC-day latch, AdvPayment split);
+    TARGET_ENTITY_OR_LEG = auto-setting anchor + slot roles; ALLOWED billing
+    adapters; forbid shop-runner/pause managers writing latch/AdvPayment;
+    orthogonal to empty-keywords and shelf-exhausted pause write-paths.
 
 ## Change Requirements
 

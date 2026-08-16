@@ -25,12 +25,15 @@ You **MUST** consider the user input before proceeding (if not empty).
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
 - For each remaining hook, evaluate `condition` **in this agent session** (there is no separate HookExecutor runtime in Cursor skills). Do **not** skip a hook merely because `condition` is non-empty:
+  - Resolve the hook entry's `extension` field (string). This is the only valid `<extension-id>` for that hook's `config.*` clauses. Do not infer `extension-id` from condition text, command name, or filesystem scan.
+  - Resolve merged extension config using HookExecutor/ConfigManager semantics (later layers override earlier): (1) `extension.yml` → `config` → `defaults` in `.specify/extensions/{extension}/`, (2) project config `.specify/extensions/{extension}/{extension}-config.yml`, (3) overlay `local-config.yml` in that directory when present, (4) environment variables `SPECKIT_{EXTENSION}_*` where `{EXTENSION}` is the extension id with hyphens replaced by underscores then uppercased (e.g. `my-ext` → `SPECKIT_MY_EXT_*`; key path segments mapped per ConfigManager env rules).
+  - If `condition` contains any `config.` token and `extension` is missing, null, or empty → evaluate condition as **false** (hook not executable; fail-closed, same as HookExecutor).
   - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
   - If `condition` is non-empty, evaluate it using Spec Kit `HookExecutor` semantics and execute only when the result is true:
-    - `config.<dotted.path> is set` — true when that key exists and is non-null/non-empty in `.specify/extensions/<extension-id>/<extension-id>-config.yml` (and overlay `local-config.yml` if present)
-    - `config.<dotted.path> == 'value'` / `!= 'value'` — compare string forms of the config value
+    - `config.<dotted.path> is set` — true when every segment of the dotted path exists in the merged extension config above (HookExecutor `has_value` / ConfigManager `has_value`): absent path → false; present path → true, including explicit `null` and falsy scalars (`false`, `0`, `""`)
+    - `config.<dotted.path> == 'value'` / `!= 'value'` — normalize config values before compare (HookExecutor): YAML booleans → lowercase strings `true`/`false`; other scalars → string form; compare normalized value to the quoted RHS literal (strip quotes). Example: YAML boolean `true` matches `== 'true'`.
     - `env.<VAR_NAME> is set` — true when the environment variable is present (name uppercased)
-    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare against `os.environ`
+    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare against `os.environ` using the uppercased variable name (HookExecutor: same normalization as `is set`)
   - If the condition cannot be parsed or evaluation fails, treat the hook as **not** executable (same fail-closed default as HookExecutor)
   - Hooks whose condition evaluates to false are skipped; do not emit EXECUTE_COMMAND for them
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
@@ -250,12 +253,15 @@ After producing the result, check if `.specify/extensions.yml` exists in the pro
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
 - For each remaining hook, evaluate `condition` **in this agent session** (there is no separate HookExecutor runtime in Cursor skills). Do **not** skip a hook merely because `condition` is non-empty:
+  - Resolve the hook entry's `extension` field (string). This is the only valid `<extension-id>` for that hook's `config.*` clauses. Do not infer `extension-id` from condition text, command name, or filesystem scan.
+  - Resolve merged extension config using HookExecutor/ConfigManager semantics (later layers override earlier): (1) `extension.yml` → `config` → `defaults` in `.specify/extensions/{extension}/`, (2) project config `.specify/extensions/{extension}/{extension}-config.yml`, (3) overlay `local-config.yml` in that directory when present, (4) environment variables `SPECKIT_{EXTENSION}_*` where `{EXTENSION}` is the extension id with hyphens replaced by underscores then uppercased (e.g. `my-ext` → `SPECKIT_MY_EXT_*`; key path segments mapped per ConfigManager env rules).
+  - If `condition` contains any `config.` token and `extension` is missing, null, or empty → evaluate condition as **false** (hook not executable; fail-closed, same as HookExecutor).
   - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
   - If `condition` is non-empty, evaluate it using Spec Kit `HookExecutor` semantics and execute only when the result is true:
-    - `config.<dotted.path> is set` — true when that key exists and is non-null/non-empty in `.specify/extensions/<extension-id>/<extension-id>-config.yml` (and overlay `local-config.yml` if present)
-    - `config.<dotted.path> == 'value'` / `!= 'value'` — compare string forms of the config value
+    - `config.<dotted.path> is set` — true when every segment of the dotted path exists in the merged extension config above (HookExecutor `has_value` / ConfigManager `has_value`): absent path → false; present path → true, including explicit `null` and falsy scalars (`false`, `0`, `""`)
+    - `config.<dotted.path> == 'value'` / `!= 'value'` — normalize config values before compare (HookExecutor): YAML booleans → lowercase strings `true`/`false`; other scalars → string form; compare normalized value to the quoted RHS literal (strip quotes). Example: YAML boolean `true` matches `== 'true'`.
     - `env.<VAR_NAME> is set` — true when the environment variable is present (name uppercased)
-    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare against `os.environ`
+    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare against `os.environ` using the uppercased variable name (HookExecutor: same normalization as `is set`)
   - If the condition cannot be parsed or evaluation fails, treat the hook as **not** executable (same fail-closed default as HookExecutor)
   - Hooks whose condition evaluates to false are skipped; do not emit EXECUTE_COMMAND for them
 - Report the convergence outcome (`converged` or `tasks_appended`) in-session before listing

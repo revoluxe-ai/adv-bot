@@ -58,7 +58,11 @@ planning-review handoff is present.
 write and repository evidence exposes multiple plausible entities/legs/adapters,
 artifacts MUST durably name `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
 `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired
-positive/negative tests. Chat-only Owner answers are insufficient: materialize
+positive/negative tests in an **explicit SWT schema block** (exact field
+names). Architecture Decision `## Allowed` / `## Forbidden` prose and design
+Ownership tables **alone** are **not** MEANING_LOCK `RESOLVED`
+(`prose≠RESOLVED`) — do **not** mark the package coherent / apply-ready until
+the schema block exists. Chat-only Owner answers are insufficient: materialize
 them into planning artifacts before recommending `/opsx-apply`. If evidence does
 not select one target, return `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and ask the
 contract's single concrete Owner question. Never infer product semantics from
@@ -68,7 +72,7 @@ similar names. Competing legs MUST NOT be closed with SEMANTIC
 **Product Acceptance preflight:** Follow
 `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When revising planning,
 record/update `PRODUCT_ACCEPTANCE_REQUIRED`. If required, keep MEANING_LOCK
-durable. For temporal/stateful Changes with reviewed `owner-contract.md`:
+durable via the explicit SWT schema tokens above (prose alone = missing). For temporal/stateful Changes with reviewed `owner-contract.md`:
 write or refresh durable Derived Lifecycle in `design.md`
 (`LIFECYCLE_STATUS: DERIVED`, per-step SOURCE) from Owner Contract +
 decisions + repo facts — **do not** re-ask Owner `CONFIRM_LIFECYCLE` when

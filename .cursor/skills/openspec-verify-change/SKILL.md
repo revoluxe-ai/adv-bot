@@ -27,7 +27,13 @@ insufficient.
 `.cursor/commands/opsx-verify.md`, `openspec/policies/VERIFY_POLICY.md`, and
 `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. Unresolved high-risk
 multi-target writes are archive blocker `unresolved_semantic_write_target`
-(`NO_GO`). Forbidden sibling adapters and missing paired positive/negative
+(`NO_GO`). Durable RESOLVED requires **exact** SWT schema tokens
+(`TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` / `FORBIDDEN_ADAPTERS`);
+decision Allowed/Forbidden prose alone is **not** RESOLVED (`prose≠RESOLVED`).
+On that blocker emit `PRODUCT_ACCEPTANCE_FAIL_PILLAR=MEANING_LOCK` when
+applicable, human `prose≠RESOLVED; lift Allowed/Forbidden into SWT fields`,
+and primary `NEXT_ACTION: /opsx-update <change>` — **not** scenario
+re-certify. Forbidden sibling adapters and missing paired positive/negative
 proof also fail verify; green tests against an ambiguous target are insufficient.
 
 **Product Acceptance (kernel DONE, `mode=archive`):** Follow

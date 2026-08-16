@@ -2,11 +2,20 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum, auto
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.billing.leg_latch import LegLatchManager
+from app.modules.billing.tariff_preview_context import (
+    resolve_tariff_preview_latch_context,
+)
+from app.modules.billing.leg_metering import (
+    compute_cabinet_billable_units,
+    fetch_cabinet_adv_settings_for_metering,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from .tariffs import tariffs, tariffs_for_auto_setting
 from .tariffs_text import text
@@ -21,7 +30,7 @@ class TariffMode(StrEnum):
 @dataclass(slots=True)
 class TariffDetails:
     mode: TariffMode
-    count: int
+    count: float
     price_per_adv: float
     total_per_month: float
     total_per_day: float
@@ -29,7 +38,7 @@ class TariffDetails:
 
 @dataclass(slots=True)
 class TariffContext:
-    count: int
+    count: float
     has_auto: bool
 
 
@@ -42,13 +51,15 @@ class Pricer:
 
     def __init__(self) -> None:
         self._tariffs = tariffs
+        self._last_explicit_preview_latch: LegLatchManager | None = None
+        self._last_explicit_preview_utc_date: date | None = None
 
     @staticmethod
     async def get_active_complex_advs_count(
         session: AsyncSession, shop_id: str
     ) -> int:
         context = await Pricer.calculate_tariff_context(session, shop_id)
-        return context.count
+        return int(round(context.count))
 
     async def get_month_tariff_for_count_advs(
         self, session: AsyncSession, shop_id: str
@@ -58,16 +69,34 @@ class Pricer:
         Цена за месяц = цена_тарифа * количество_артикулов
         """
         details = await self.get_tariff_details(session, shop_id)
-        return int(details.total_per_month)
+        return int(round(details.total_per_month))
 
     @staticmethod
     def get_tariff_for_day(tariff_for_month: float) -> float:
         return round(tariff_for_month / 30, 2)
 
     async def get_price_for_day_for_shop(
-        self, session: AsyncSession, shop_id: str
+        self,
+        session: AsyncSession,
+        shop_id: str,
+        *,
+        leg_latch: LegLatchManager | None = None,
+        utc_date: date | None = None,
     ) -> float:
-        details = await self.get_tariff_details(session, shop_id)
+        if leg_latch is None and self._last_explicit_preview_latch is not None:
+            leg_latch = self._last_explicit_preview_latch
+        if utc_date is None and self._last_explicit_preview_utc_date is not None:
+            utc_date = self._last_explicit_preview_utc_date
+        leg_latch, utc_date = resolve_tariff_preview_latch_context(
+            leg_latch=leg_latch,
+            utc_date=utc_date,
+        )
+        details = await self.get_tariff_details(
+            session,
+            shop_id,
+            leg_latch=leg_latch,
+            utc_date=utc_date,
+        )
         return details.total_per_day
 
     async def get_price_for_day_if_enabling_auto_option(
@@ -79,8 +108,18 @@ class Pricer:
         override_white_list: bool = False,
         override_target_place: bool = False,
         override_individual_keywords: bool = False,
+        leg_latch: LegLatchManager | None = None,
+        utc_date: date | None = None,
     ) -> float:
         """Цена за день для магазина при условии включения указанных опций нового тарифа у кампании adv_setting_id."""
+        if leg_latch is None and self._last_explicit_preview_latch is not None:
+            leg_latch = self._last_explicit_preview_latch
+        if utc_date is None and self._last_explicit_preview_utc_date is not None:
+            utc_date = self._last_explicit_preview_utc_date
+        leg_latch, utc_date = resolve_tariff_preview_latch_context(
+            leg_latch=leg_latch,
+            utc_date=utc_date,
+        )
         details = await self.get_tariff_details(
             session,
             shop_id,
@@ -88,6 +127,8 @@ class Pricer:
             override_white_list=override_white_list,
             override_target_place=override_target_place,
             override_individual_keywords=override_individual_keywords,
+            leg_latch=leg_latch,
+            utc_date=utc_date,
         )
         return details.total_per_day
 
@@ -106,7 +147,7 @@ class Pricer:
         )
 
     def get_price_for_count_advs_in_cabinet_for_month(
-        self, count_advs: int, tariff_table: dict[int, int] | None = None
+        self, count_advs: int | float, tariff_table: dict[int, int] | None = None
     ) -> float:
         table = tariff_table or self._tariffs
         price_per_adv = self._get_price_per_adv(count_advs, table)
@@ -125,7 +166,13 @@ class Pricer:
         override_white_list: bool = False,
         override_target_place: bool = False,
         override_individual_keywords: bool = False,
+        leg_latch: LegLatchManager | None = None,
+        utc_date: date | None = None,
+        cabinet_adv_settings: Sequence[AdvSetting] | None = None,
     ) -> TariffDetails:
+        if leg_latch is not None and utc_date is not None:
+            self._last_explicit_preview_latch = leg_latch
+            self._last_explicit_preview_utc_date = utc_date
         context = await self.calculate_tariff_context(
             session,
             shop_id,
@@ -133,6 +180,9 @@ class Pricer:
             override_white_list=override_white_list,
             override_target_place=override_target_place,
             override_individual_keywords=override_individual_keywords,
+            leg_latch=leg_latch,
+            utc_date=utc_date,
+            cabinet_adv_settings=cabinet_adv_settings,
         )
         mode = TariffMode.AUTO if context.has_auto else TariffMode.OLD
         tariff_table = tariffs_for_auto_setting if mode == TariffMode.AUTO else self._tariffs
@@ -156,6 +206,9 @@ class Pricer:
         override_white_list: bool = False,
         override_target_place: bool = False,
         override_individual_keywords: bool = False,
+        leg_latch: LegLatchManager | None = None,
+        utc_date: date | None = None,
+        cabinet_adv_settings: Sequence[AdvSetting] | None = None,
     ) -> TariffContext:
         auto_advs = await Pricer.fetch_bot_active_advs(session, shop_id)
         if not auto_advs:
@@ -173,15 +226,21 @@ class Pricer:
             )
 
         has_auto = any(_active(adv) for adv in auto_advs)
-        active_auto_advs = await Pricer.fetch_tariff_auto_advs(
-            session, shop_id, auto_advs=auto_advs
+        if cabinet_adv_settings is None:
+            cabinet_adv_settings = await fetch_cabinet_adv_settings_for_metering(
+                session, shop_id
+            )
+        effective_count, _anchors, _billables = await compute_cabinet_billable_units(
+            cabinet_adv_settings,
+            latch=leg_latch,
+            utc_date=utc_date,
         )
-        count = len(active_auto_advs)
-        if has_auto and count == 0 and override_for_adv_id is not None:
+        count_value = effective_count
+        if has_auto and count_value == 0 and override_for_adv_id is not None:
             if any(adv.id == override_for_adv_id for adv in auto_advs):
-                count = 1
+                count_value = 1.0
 
-        return TariffContext(count=count, has_auto=has_auto)
+        return TariffContext(count=count_value, has_auto=has_auto)
 
     @staticmethod
     async def fetch_bot_active_advs(
@@ -244,7 +303,7 @@ class Pricer:
     ) -> bool:
         if override_white_list or override_target_place or override_individual_keywords:
             return True
-        auto_version = adv.automatic_version if adv.automatic_version is not None else 2
+        auto_version = adv.automatic_version
         white_list_active = bool(adv.auto_update_white_list)
         target_place_active = bool(adv.auto_update_target_place)
         individual_keywords_mode_active = bool(adv.individual_keywords_target_place_mode)
@@ -259,7 +318,7 @@ class Pricer:
         return False
 
     @staticmethod
-    def _get_price_per_adv(count_advs: int, tariff_table: dict[int, int]) -> float:
+    def _get_price_per_adv(count_advs: int | float, tariff_table: dict[int, int]) -> float:
         if count_advs <= 0:
             return 0.0
         for limit in sorted(tariff_table):

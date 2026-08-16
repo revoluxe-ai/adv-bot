@@ -12,16 +12,21 @@ Implement tasks from an OpenSpec change.
 **Semantic write-target preflight:** Follow
 `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. After context/decision
 read and **before any production edit**, re-check the semantic write target for
-high-risk multi-target mutations. `RESOLVED` requires planned symbols to be in
-`ALLOWED_ADAPTERS` and outside `FORBIDDEN_ADAPTERS`. Unresolved or chat-only
-Owner answers return `NO_GO` / `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and route
-to `/opsx-update` (or another planning writer) for durable materialization —
-never guess Auto vs Search or equivalent legs from similar names.
+high-risk multi-target mutations. `RESOLVED` requires an **explicit SWT schema
+block** with exact field names `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+`FORBIDDEN_ADAPTERS` **and** planned symbols in `ALLOWED_ADAPTERS` / outside
+`FORBIDDEN_ADAPTERS`. Architecture Decision Allowed/Forbidden prose and design
+Ownership tables **alone** are **not** RESOLVED (`prose≠RESOLVED`). Unresolved,
+prose-only, or chat-only Owner answers return `NO_GO` /
+`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` with primary
+`NEXT_ACTION: /opsx-update <change>` for durable materialization — never guess
+Auto vs Search or equivalent legs from similar names; never primary-hop to
+scenario re-certify for this gap.
 
 **Product Acceptance:** Follow
 `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When
 `PRODUCT_ACCEPTANCE_REQUIRED=true`, do not edit production code if MEANING_LOCK
-is missing/blocked. Author acceptance tests with `side_effect_proof` /
+is missing/blocked (schema tokens absent = missing). Author acceptance tests with `side_effect_proof` /
 `PA_SIDE_EFFECT_PROOF` for external mutations (this-run effect or forbidden
 sibling non-effect). Task checkboxes and soft tooling green are not DONE.
 
@@ -130,19 +135,25 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - If the change is not a high-risk multi-target write → `NOT_APPLICABLE` /
      proceed only when justified (single proven target).
    - If artifacts durably resolve `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
-     `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired tests →
-     `RESOLVED`; planned write symbols MUST be in `ALLOWED_ADAPTERS` and MUST
-     NOT be in `FORBIDDEN_ADAPTERS`.
-   - If multiple plausible targets remain, or resolution exists only in chat →
-     return `NO_GO` with `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`, ask the
-     contract's single Owner question, and route to `/opsx-update`. Do not edit
-     production code. Do not close competing legs with `NOT_APPLICABLE`.
+     `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired tests
+     via an **explicit SWT schema block** (exact field names) → `RESOLVED`;
+     planned write symbols MUST be in `ALLOWED_ADAPTERS` and MUST NOT be in
+     `FORBIDDEN_ADAPTERS`. Decision Allowed/Forbidden prose / Ownership
+     tables alone = **not** RESOLVED (`prose≠RESOLVED`).
+   - If multiple plausible targets remain, resolution exists only in chat, or
+     only prose ownership exists without schema tokens → return `NO_GO` with
+     `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` (or MEANING_LOCK missing), human
+     `prose≠RESOLVED; lift Allowed/Forbidden into SWT fields`, and primary
+     `NEXT_ACTION: /opsx-update <change>`. Do not edit production code. Do
+     not close competing legs with `NOT_APPLICABLE`. Do not primary-hop to
+     scenario re-certify for this gap.
 
 6b. **Product Acceptance preflight (before production edit)**
 
    Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`:
-   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and MEANING_LOCK is not durable →
-     `NO_GO`; route to `/opsx-update` / Owner semantic decision.
+   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and MEANING_LOCK is not durable
+     (schema tokens absent) → `NO_GO`; route to `/opsx-update` / Owner
+     semantic decision.
    - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and temporal behavior applies:
      - **Primary:** durable Derived Lifecycle
        (`LIFECYCLE_STATUS: DERIVED` in design, from reviewed Owner Contract)

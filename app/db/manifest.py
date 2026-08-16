@@ -12,6 +12,7 @@ import json
 import sys
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any, cast
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -52,7 +53,7 @@ def build_execution_manifest(
     python_version: str = "",
     alembic_version: str = "",
     sqlalchemy_version: str = "",
-) -> dict:
+) -> dict[str, Any]:
     """Строит versioned MIGRATION_EXECUTION_MANIFEST."""
     files: list[dict[str, str]] = []
     for path in sorted(VERSIONS_DIR.glob("*.py")):
@@ -75,7 +76,7 @@ def build_execution_manifest(
 
     cfg = Config(str(ALEMBIC_INI))
     script = ScriptDirectory.from_config(cfg)
-    revisions: list[dict] = []
+    revisions: list[dict[str, Any]] = []
     for rev in script.walk_revisions():
         revisions.append(
             {
@@ -86,7 +87,7 @@ def build_execution_manifest(
                 "file_sha256": _file_sha256(Path(rev.path)),
             }
         )
-    revisions.sort(key=lambda r: r["revision"])
+    revisions.sort(key=lambda r: str(r["revision"]))
     return {
         "manifest_format_version": 1,
         "release_image_digest": release_image_digest,
@@ -125,7 +126,7 @@ def ancestor_closure(revision_ids: Iterable[str]) -> set[str]:
         depends = _revision_dependencies(rev)
         if depends:
             if isinstance(depends, (list, tuple, set)):
-                stack.extend(str(x) for x in depends)
+                stack.extend(str(x) for x in cast(Iterable[Any], depends))
             else:
                 stack.append(str(depends))
     return seen
@@ -136,7 +137,7 @@ def source_history_hash(revision_ids: Iterable[str]) -> str:
     closure = sorted(ancestor_closure(revision_ids))
     cfg = Config(str(ALEMBIC_INI))
     script = ScriptDirectory.from_config(cfg)
-    items = []
+    items: list[dict[str, Any]] = []
     for rid in closure:
         rev = script.get_revision(rid)
         items.append(
@@ -152,7 +153,7 @@ def source_history_hash(revision_ids: Iterable[str]) -> str:
 
 def main() -> int:
     """CLI: печатает manifest JSON."""
-    manifest = build_execution_manifest()
+    manifest: dict[str, Any] = build_execution_manifest()
     heads = list(
         ScriptDirectory.from_config(Config(str(ALEMBIC_INI))).get_heads()
     )

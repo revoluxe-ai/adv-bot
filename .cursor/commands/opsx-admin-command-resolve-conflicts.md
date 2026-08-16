@@ -274,12 +274,23 @@ Then:
    attestation fields (`inventory_count`, `source_fingerprint`,
    `fingerprint_*`, `inventory_content_sha256`, or notes claiming a
    recomputed fingerprint), then **before** `git add`:
-   - run `graph_fingerprint.write_inventory` on META `inventory_path`
-     (default `.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json`);
-   - align META `inventory_count` / `source_fingerprint` /
-     `inventory_content_sha256` to the regenerated artifact and
-     `graph_fingerprint.reproduce()`;
-   - include the regenerated `INVENTORY.json` among in-scope paths to add.
+   - From repo root, put runtime on `sys.path` (same as META
+     `reproduction_command`):
+     ```bash
+     python -c "import sys; sys.path.insert(0,'.cursor/pipeline/bug-team/runtime'); from pathlib import Path; from graph_fingerprint import write_inventory, reproduce; inv_path=Path('.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json'); payload=write_inventory(inv_path); count, fp = reproduce(); assert count == payload['INVENTORY_COUNT'] and fp == payload['FINGERPRINT']"
+     ```
+     Substitute META `inventory_path` for the default
+     `.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json` when
+     non-default.
+   - Align META `inventory_count` / `source_fingerprint` /
+     `inventory_content_sha256` from `payload` and `(count, fp)` from
+     `reproduce()`.
+   - Include the regenerated `INVENTORY.json` among in-scope paths to add.
+   - Optional full META+GRAPH+INVENTORY refresh when this GO also rewrites
+     GRAPH/META attestation prose: run
+     `python .cursor/pipeline/bug-team/harness/update_graph_fingerprint.py`
+     after `sys.path.insert(0,'.cursor/pipeline/bug-team/runtime')` (see
+     harness `__main__` block).
    Do **not** claim `RESOLVED` while `inventory_path` disagrees with
    `reproduce()` or META attestation.
 3. `git add -- <in-scope-resolved-paths>` only (Class A only).
@@ -291,7 +302,8 @@ Then:
 7. Contract recheck (bounded): skim changed command handoff/ownership
    tokens for dual-authority or producer-without-consumer; **and** verify
    `inventory_path` count/fingerprint/`INVENTORY_CONTENT_SHA256` agree with
-   META attestation and `graph_fingerprint.reproduce()` when META/GRAPH
+   META attestation and `reproduce()` (via META `reproduction_command`
+   import path) when META/GRAPH
    attestation was in scope for this GO (or when those files are dirty).
    If broken → `CONTRACT_BROKEN_AFTER_MERGE` and `NEXT_ACTION` =
    `/opsx-meta-fix-command-defects`.
@@ -319,7 +331,8 @@ Never:
   product paths;
 - claim `RESOLVED` while unmerged paths remain;
 - claim `RESOLVED` while META/GRAPH fingerprint attestation disagrees with
-  `inventory_path` / `graph_fingerprint.reproduce()`;
+  `inventory_path` / `reproduce()` (via META `reproduction_command` import
+  path);
 - treat Class (B) as `BLOCKED_MIXED_SCOPE` or redirect Class (B) to
   `/opsx-commit`;
 - treat abort as success without `ABORT_* GO`;

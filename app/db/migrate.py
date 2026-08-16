@@ -13,6 +13,7 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, cast
 
 from alembic import command
 from alembic.config import Config
@@ -73,10 +74,10 @@ def _parse_expected_current_sets() -> list[frozenset[str]]:
     if not isinstance(data, list) or not data:
         raise RuntimeError("EXPECTED_CURRENT_REVISION_SETS must be a non-empty list of sets")
     sets: list[frozenset[str]] = []
-    for item in data:
+    for item in cast(list[Any], data):
         if not isinstance(item, list) or not item:
             raise RuntimeError("each current revision set must be a non-empty list")
-        sets.append(frozenset(str(x) for x in item))
+        sets.append(frozenset(str(x) for x in cast(list[Any], item)))
     return sets
 
 

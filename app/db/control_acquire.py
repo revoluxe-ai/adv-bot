@@ -25,7 +25,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
@@ -65,7 +65,7 @@ def _source_revision_set() -> list[str]:
     data = json.loads(raw)
     if not isinstance(data, list) or not data:
         raise ValueError("SOURCE_REVISION_SET must be a non-empty JSON array")
-    return [str(x) for x in data]
+    return [str(x) for x in cast(list[Any], data)]
 
 
 def _lease_expires_at() -> datetime:
@@ -169,7 +169,7 @@ def _acquire(
             result = json.loads(result)
         if not isinstance(result, dict):
             raise RuntimeError(f"unexpected acquire result type: {type(result)}")
-        return result
+        return cast(dict[str, Any], result)
 
 
 def main() -> int:

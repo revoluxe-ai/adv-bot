@@ -519,10 +519,24 @@ Compare implementation placement against accepted/proposed decisions.
 
 Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
 
+* Durable MEANING_LOCK / SWT requires an **explicit schema block** with the
+  exact field names `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+  `FORBIDDEN_ADAPTERS` (plus evidence / Owner source when the contract asks).
+  Architecture Decision `## Allowed` / `## Forbidden` prose and design
+  Ownership tables **alone** are **not** `SEMANTIC_WRITE_TARGET_STATUS=RESOLVED`
+  (`prose≠RESOLVED`).
 * If the change is a high-risk multi-target write and artifacts do not durably
-  resolve `TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` / `FORBIDDEN_ADAPTERS`
-  (or status is `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`) → archive blocker
+  resolve those exact fields (or status is
+  `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`) → archive blocker
   `unresolved_semantic_write_target` → overall `NO_GO`.
+* On that blocker (and on `mode=impl` when the same gap is found), **always**
+  emit:
+  - `PRODUCT_ACCEPTANCE_FAIL_PILLAR=MEANING_LOCK` (when PA required / applicable);
+  - human line: `prose≠RESOLVED; lift Allowed/Forbidden into SWT fields`;
+  - `NEXT_ACTION: /opsx-update <change>` (primary hop).
+  **FORBIDDEN** as primary hop for this blocker:
+  `/opsx-spec-scenario-coverage` re-audit / re-certify (that is LIFECYCLE, not
+  MEANING_LOCK).
 * If implementation uses a symbol in `FORBIDDEN_ADAPTERS` (or outside
   `ALLOWED_ADAPTERS`) → placement/behavior violation → `NO_GO`.
 * When paired proof is required: verify the allowed target side effect **and**
@@ -1053,6 +1067,10 @@ or:
 * Do not treat green tests as proof when the semantic write target is unresolved
   or implementation hits a forbidden sibling adapter.
 * Treat `unresolved_semantic_write_target` as a hard archive blocker.
+  On that blocker: emit `PRODUCT_ACCEPTANCE_FAIL_PILLAR=MEANING_LOCK` when
+  applicable, human `prose≠RESOLVED; lift Allowed/Forbidden into SWT fields`,
+  and primary `NEXT_ACTION: /opsx-update <change>` — never scenario
+  re-certify as the primary hop for MEANING_LOCK.
 * Treat `product_acceptance_not_pass` as a hard archive blocker when
   `PRODUCT_ACCEPTANCE_REQUIRED=true`. Soft tooling waive cannot clear PA.
 * Do not invent a `/opsx-product-acceptance` command; verify owns archive DONE.
