@@ -49,18 +49,19 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `3ad2d7d66aea88d3e872dce59ed28385acd15e59` |
-| Platform digest | `sha256:8ae72bdbdfaa801fe0c34ee3ade665237e1eb4f756760893cce53d294e783016` |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:3ad2d7d66aea88d3e872dce59ed28385acd15e59` |
-| App Deployments on this image | yes (CAS 2026-08-14; `free-bot` replicas=0) |
-| Last migrate Job | `app-db-migrate-3ad2d7d6-r2` → SUCCESS `f2a3…`→`e8f9…` |
-| Last CONTROL | `app-db-control-3ad2d7d6-r2` → `IDEMPOTENT_HIT` fencing_token=1 |
-| Last complete_release | `app-db-ctrlplane-3ad2d7d6-complete-r2` → lease released / COMPLETED |
-| Prepared fallback (prior LKG) | tag `4f2a84a086947bbf80174d354be495e6ba14ddd3` / digest `sha256:40b39f4f866f25bb3d8a3a0bc533a6662c7fe3495cc4534aeda7e4e6bc52668d` |
+| Image tag | `bb81f827f102b613a84f4f7a66d093668e1b2839` |
+| Platform digest | `sha256:cdd6864dba2ecaa3e13d1fade70902aad771527e76a4e2823841b463f739156a` |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:bb81f827f102b613a84f4f7a66d093668e1b2839` |
+| App Deployments on this image | yes (CAS 2026-08-16; `free-bot` replicas=0) |
+| Last CONTROL | `app-db-control-bb81f827-r2` → `DRY_RUN_OK` (CONTROL_DRY_RUN=1; no lease) |
+| Last migrate Job | `app-db-migrate-3ad2d7d6-r2` → SUCCESS `f2a3…`→`e8f9…` (unchanged; skip on bb81 release) |
+| Last complete_release | `app-db-ctrlplane-3ad2d7d6-complete-r2` (prior full release; skipped on dry-run CAS) |
+| Prepared fallback (prior LKG) | tag `3ad2d7d66aea88d3e872dce59ed28385acd15e59` / digest `sha256:8ae72bdbdfaa801fe0c34ee3ade665237e1eb4f756760893cce53d294e783016` |
 
 ## Open risks / follow-ups
 
 * **Authz repair DONE (2026-08-14):** `release_controller` LOGIN exists; `app-db-control` → `release_controller` with EXECUTE on all 8 release-control functions; `app_migrator` has **no** release-control EXECUTE.
+* **Authz baseline SELECT DONE (2026-08-16):** Job `app-db-authz-grant-baseline-select-0816` → `release_controller` has `USAGE` on schema `migration_control` + `SELECT` on `migration_control.baseline_registry` (needed for CONTROL_DRY_RUN=1).
 * Zalando status `UpdateFailed` after adding `release_controller` (operator sync unhappy). Role/grants/secret work; CR pins `patroni.pg_hba` `host all all all md5` because `ssl=off` + default `hostnossl reject` broke remote Jobs. Investigate UpdateFailed separately.
 * **prod-wb-gram PG routing (2026-08-14):** `POSTGRES_MASTER_HOST`/`REPLICA_HOST` → `postgres-db.prod-adv-bot.svc.cluster.local` (pooler disabled in CR); `POSTGRES_SSL_MODE=disable` (PG `ssl=off`). Cluster-only CM — not in git.
 * Orphan `postgres-db-pooler-external` LB (no pooler pods/endpoints) — cleanup optional.
@@ -83,3 +84,6 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-14 | Authz repair APPLY (kubectl) | CR user + ROLE/GRANT/REVOKE + Secret rewire + pg_hba host-md5; verify PASS; no migrate/CAS |
 | 2026-08-14 | GO resume safe_prod_release `3ad2d7d6…` CONTROL_DRY_RUN=0 | CONTROL IDEMPOTENT_HIT token=1 → mark_started → migrate SUCCESS → mark_succeeded → begin → CAS all entrypoints → complete_release OK; alembic `e8f9…`; LKG now `3ad2d7d6…` |
 | 2026-08-14 | GO CONFIG_PATCH prod-wb-gram PG hosts + SSL | pooler host → postgres-db direct; SSL require → disable; all entrypoints rolled out; run-update-active-shop-ids Running |
+| 2026-08-16 | CONTROL_DRY_RUN=1 `bb81f827-r1` | PRECONDITION_FAILED: permission denied baseline_registry; no CAS |
+| 2026-08-16 | GO authz_baseline_select | Job `app-db-authz-grant-baseline-select-0816` OK; SELECT+USAGE for release_controller; no CAS |
+| 2026-08-16 | GO safe_prod_release `bb81f827…` CONTROL_DRY_RUN=1 | CONTROL DRY_RUN_OK → migrate skip (e8f9) → CAS all entrypoints → LKG `bb81f827…` |
