@@ -29,6 +29,11 @@ architecture decisions belong here.
   - Scope: write-path — User creation belongs to message `/start` / write
     middleware (`sm(read_only=False)`); Callback Start is menu-return
     PURE_READ only and MUST NOT call `create_user`.
+- [alembic-forward-only-head-convergence](alembic-forward-only-head-convergence/decision.md)
+  - Status: Accepted
+  - Scope: migration topology — parallel Alembic heads MUST converge via
+    a forward-only merge revision without schema/data operations; published
+    history is immutable.
 
 ## Change Requirements
 
