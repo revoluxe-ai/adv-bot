@@ -1,0 +1,47 @@
+tests/unit/test_add_auto_update_minus_phrases_migration.py
+  s_49973f20748fa6::t_6d318ffa42bf1a 1,39-40,57-58,62
+tests/integration/migrations/test_auto_update_minus_phrases_backfill_live_pg.py
+  s_49973f20748fa6::t_32269fa4a44b35 30,34
+  s_49973f20748fa6::t_a4843c0dc5fe82 7,21-24
+  s_49973f20748fa6::t_48ec68ab6f3a24 1-6,8-20,25-29,31-33,35-62,64-68
+  s_49973f20748fa6::t_3b5616c8b858ff 63
+tests/unit/shop_runner/service_manager/test_complex_adv_minus_phrases_default.py
+  s_49973f20748fa6::t_3ee544a68bc437 1-38
+tests/migrations/test_migrate_wrapper_outcomes.py
+  s_49973f20748fa6::t_bc0c8dfafab13d 11-17,299-324
+tests/migrations/test_auto_update_minus_phrases_backfill.py
+  s_49973f20748fa6::t_12e5f46bdd3d97 47-53,56,63-64,116-134
+  s_49973f20748fa6::t_f504e1c04e71ad 1-4,6-7,9-46,54-55,57-62,65-84,86-96,98-108,111-112
+  s_49973f20748fa6::t_ab5aa8e05733e5 5,8,85,97
+  s_49973f20748fa6::t_db66ccd951f70f 109-110,113-115
+tests/unit/test_release_readiness.py
+  s_23a8747266ab0f::t_bea7a7fadc1ba2 137-181,183-196,198-223
+  s_49973f20748fa6::t_f6e5f7217e27d3 1-8,12-13,15,17,19,21,24-107
+  s_23a8747266ab0f::t_434e1e36b03405 10-11,14,20,22-23
+  s_49973f20748fa6::t_33de8bbf8d3517 9,18,108-136
+  s_23a8747266ab0f::t_cea0b46a121cde 16,182,197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "1ac5a053aaeb444f30524536de6a8d4223113a95",
+  "prompts": {},
+  "sessions": {
+    "s_23a8747266ab0f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "036904bf-55f5-405c-80d1-67ef5d07f811",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_49973f20748fa6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "efe95670-22f3-4877-bb25-f6e35aae334a",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
