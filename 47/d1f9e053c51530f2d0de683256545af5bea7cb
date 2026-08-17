@@ -1,0 +1,31 @@
+scripts/release_readiness.py
+  s_49973f20748fa6::t_8d0d3d68e76a91 65-83,139,245-275
+  s_23a8747266ab0f::t_1508d2622cb121 84-118,120-138
+  s_23a8747266ab0f::t_32b7efc43c854b 119
+  s_23a8747266ab0f::t_c76a8b1aad2cc0 279-384
+  s_49973f20748fa6::t_40353f2395f9c0 1-64,140-244,276-278,385-426
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "47d1f9e053c51530f2d0de683256545af5bea7cb",
+  "prompts": {},
+  "sessions": {
+    "s_23a8747266ab0f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "036904bf-55f5-405c-80d1-67ef5d07f811",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_49973f20748fa6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "efe95670-22f3-4877-bb25-f6e35aae334a",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
