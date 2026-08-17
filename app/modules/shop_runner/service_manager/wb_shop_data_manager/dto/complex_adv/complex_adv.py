@@ -267,10 +267,8 @@ class ComplexAdv:
 
     @property
     def auto_update_minus_phrases(self) -> bool:
-        """Флаг фонового обновления минус-фраз на WB.
-        Предполагается, что при создании новых РК будет попадать сюда False, если None - будет True
-        """
-        return bool(getattr(self._adv_setting, "auto_update_minus_phrases", True))
+        """Возвращает persisted-флаг без постоянного ``None → True`` fallback."""
+        return bool(getattr(self._adv_setting, "auto_update_minus_phrases", False))
 
     @property
     def bidder_active(self) -> bool:

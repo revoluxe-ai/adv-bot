@@ -19,6 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    """Добавляет колонку; data backfill и constraint выполняет approved Job."""
     op.add_column(
         "advsetting",
         sa.Column(
@@ -32,25 +33,8 @@ def upgrade() -> None:
             ),
         ),
     )
-    op.execute(
-        sa.text(
-            "UPDATE advsetting "
-            "SET auto_update_minus_phrases = true "
-            "WHERE auto_update_minus_phrases IS NULL"
-        )
-    )
-    op.alter_column(
-        "advsetting",
-        "auto_update_minus_phrases",
-        existing_type=sa.Boolean(),
-        nullable=False,
-        server_default=sa.text("false"),
-        existing_comment=(
-            "Включает фоновое обновление минус-фраз на WB. "
-            "Отдельный флаг от auto_update_white_list."
-        ),
-    )
 
 
 def downgrade() -> None:
+    """Удаляет колонку для локального forward-recovery сценария."""
     op.drop_column("advsetting", "auto_update_minus_phrases")
