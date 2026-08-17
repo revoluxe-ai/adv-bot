@@ -1,0 +1,24 @@
+openspec/changes/land-free-bot-rebase-into-stage/readiness/compatibility-baseline-evidence.md
+  s_49973f20748fa6::t_feae168b7571db 4
+openspec/changes/land-free-bot-rebase-into-stage/readiness/test-db-recovery-evidence.md
+  s_49973f20748fa6::t_d59ff57f3a7452 4
+openspec/changes/land-free-bot-rebase-into-stage/readiness/readiness-package.md
+  s_49973f20748fa6::t_373d5dd93057ea 8-10
+  s_49973f20748fa6::t_cda63259bf8ed3 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "4cfd61209a065c6105c5f12e44f7b1771fba69c4",
+  "prompts": {},
+  "sessions": {
+    "s_49973f20748fa6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "efe95670-22f3-4877-bb25-f6e35aae334a",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
