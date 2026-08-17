@@ -1,4 +1,4 @@
-"""Unit tests for the auto_update_minus_phrases Alembic migration."""
+"""Тесты spec stage-landing-readiness для schema-only migration."""
 
 from __future__ import annotations
 
@@ -32,17 +32,12 @@ class _FakeOp:
     def add_column(self, *args, **kwargs) -> None:
         self.calls.append(("add_column", args, kwargs))
 
-    def execute(self, *args, **kwargs) -> None:
-        self.calls.append(("execute", args, kwargs))
-
-    def alter_column(self, *args, **kwargs) -> None:
-        self.calls.append(("alter_column", args, kwargs))
-
     def drop_column(self, *args, **kwargs) -> None:
         self.calls.append(("drop_column", args, kwargs))
 
 
-def test_upgrade_sets_existing_rows_true_and_new_rows_false() -> None:
+def test_upgrade_adds_expand_column_and_defers_classifier_to_job() -> None:
+    """Spec stage-landing-readiness: backfill не должен быть broad Alembic DML."""
     module = _load_migration_module()
     fake_op = _FakeOp()
     module.op = fake_op
@@ -59,23 +54,12 @@ def test_upgrade_sets_existing_rows_true_and_new_rows_false() -> None:
     assert column.name == "auto_update_minus_phrases"
     assert isinstance(column.type, sa.Boolean)
     assert str(column.server_default.arg) == "false"
-
-    execute_call = fake_op.calls[1]
-    assert execute_call[0] == "execute"
-    execute_sql = str(execute_call[1][0]).lower()
-    assert "update advsetting" in execute_sql
-    assert "set auto_update_minus_phrases = true" in execute_sql
-    assert "where auto_update_minus_phrases is null" in execute_sql
-
-    alter_call = fake_op.calls[2]
-    assert alter_call[0] == "alter_column"
-    assert alter_call[1][0] == "advsetting"
-    assert alter_call[1][1] == "auto_update_minus_phrases"
-    assert alter_call[2]["nullable"] is False
-    assert str(alter_call[2]["server_default"].text) == "false"
+    assert column.nullable is True
+    assert fake_op.calls == [add_column_call]
 
 
 def test_downgrade_drops_column() -> None:
+    """Spec stage-landing-readiness: локальный recovery удаляет только колонку."""
     module = _load_migration_module()
     fake_op = _FakeOp()
     module.op = fake_op
