@@ -4,9 +4,10 @@ Change: `land-free-bot-rebase-into-stage`
 Status: `NO_GO` (local implementation evidence only)  
 Base ref: `origin/stage`  
 Base SHA: `d4b7fa385526a4f7831d6108c3cda82532dcfabd`  
-Candidate commit SHA: `a1291c7c00a846bd25f66be40954a7c2adf110c2`  
-Candidate state: working tree changes are present; final evidence must be
-rebound after the implementation is committed and the candidate SHA is fixed.
+Candidate commit SHA: `1ac5a053aaeb444f30524536de6a8d4223113a95`
+Candidate state: scoped landing files are committed at the final candidate;
+unrelated pre-existing worktree state remains excluded from this evidence
+package.
 
 ## Scope
 
