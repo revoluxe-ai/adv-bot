@@ -11,13 +11,14 @@
 - fingerprint_strength: names_only
 - fingerprint_algorithm: md5
 - fingerprint_input_mode: names_only_newline_joined
-- source_commit: 7fbce8b13701c946da00f05997f59ab1ca844c60
+- source_commit: 8917818ef
 - excluded_by_owner: opsx-propose.md (obsolescent; do not recommend)
 - evidence_note: |
-  UPDATE GO 2026-07-30T12:17:37Z: inventory 35; fingerprint
-  78bbacb3fcee9523e0bdf73df1a18a5d; added /opsx-antipattern-gate
-  and /opsx-bug-debt-board; soft chain pyright → ecc → optional
-  performance → antipattern → static-check; F11 closed; F12 open.
+  UPDATE GO 2026-08-18T15:01:00Z: inventory 35; fingerprint
+  78bbacb3fcee9523e0bdf73df1a18a5d; indexed WORKTREE/REF target
+  semantics for pyright, external-call, and antipattern audits; F13 closed.
+  Existing soft chain remains pyright → ecc → optional performance
+  → antipattern → static-check; F12 remains open.
   Prior: performance-review (2026-07-30T04:38:13Z); F10 closed.
 
 ## States
@@ -189,24 +190,24 @@
 - known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; bug-episode must not treat OpenSpec verify as card close; never silent team return; apply soft handoff may omit antipattern (F12 / NOT_OPENED_BUDGET)
 
 ### /opsx-pyright-strict-coverage
-- purpose: audit base..head production Python ⊆ pyrightconfig_strict.json include (not exclude)
+- purpose: audit base-to-WORKTREE or base-to-REF production Python ⊆ pyrightconfig_strict.json include (not exclude)
 - input_state: implementing | impl_done | product_dirty
 - output_state: coverage_pass | coverage_gaps | blocked_needs_base
-- artifacts_read: git diff base...head; pyrightconfig_strict.json
+- artifacts_read: base-to-target diff including staged/unstaged/untracked WORKTREE paths; pyrightconfig_strict.json
 - artifacts_written: none without GO; with GO only additive include[] entries
 - decision_owner: coverage auditor; include expansion only with owner GO
 - next_typical: /opsx-external-call-coverage | /opsx-antipattern-gate | /opsx-static-check | /opsx-fix-types (after static FAIL) | /opsx-verify | retry with GO
-- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; contract NEXT may lag antipattern insert (F12)
+- known_flaws: soft recommend after apply (not hard archive gate); tests/** out of policy; explicit `head=<ref>` is immutable while omitted `head=`/`head=working` audit WORKTREE; contract NEXT may lag antipattern insert (F12)
 
 ### /opsx-external-call-coverage
-- purpose: audit base..head production external-call surfaces (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests per testing-rules
+- purpose: audit base-to-WORKTREE or base-to-REF production external-call surfaces (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests per testing-rules
 - input_state: coverage_pass | impl_done | implementing | product_dirty | external_call_gaps | external_gap_closed
 - output_state: external_call_pass | external_call_gaps | focus_pass_incomplete_gate | blocked_needs_base
-- artifacts_read: git diff base...head; app/**; tests/**; testing-rules.mdc; optional EXTERNAL_CALL_COVERAGE_REPORT / change artifacts
+- artifacts_read: base-to-target diff including staged/unstaged/untracked WORKTREE paths; app/**; tests/**; testing-rules.mdc; optional EXTERNAL_CALL_COVERAGE_REPORT / change artifacts
 - artifacts_written: none (v1 read-only; chat report / optional pasted EXTERNAL_CALL_COVERAGE_REPORT)
 - decision_owner: coverage auditor for dispositions; archive remains /opsx-verify
 - next_typical: /opsx-performance-review (when trigger applies) | /opsx-antipattern-gate | /opsx-static-check | /opsx-test (TEST_ONLY) | /opsx-close-external-gap (PG/CH) | /opsx-verify | rerun with focus=
-- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration; NEXT rules beyond opened budget may lag antipattern (F12)
+- known_flaws: soft recommend (not hard archive gate alone); kind taxonomy inside one command (no per-dep audit front-doors); PG/CH require live integration; omitted `head=` no longer requires a commit for WORKTREE re-audit; NEXT rules beyond opened budget may lag antipattern (F12)
 
 ### /opsx-performance-review
 - purpose: READ_ONLY semantic performance verdict on scoped Python (N+1/async/queue/concurrency); sole issuer of PASS|PASS_WITH_RISK|FAIL|DATA_GAP; emits FIX_PACKET / optional measurement auth
@@ -229,14 +230,14 @@
 - known_flaws: fixer self-report ≠ PASS; no invented /opsx-performance-run; do not strip Queue/Semaphore/Lock/Redis NX/caps without proof
 
 ### /opsx-antipattern-gate
-- purpose: diff-scoped antipattern over-report (`base...head`); optional practice ledger via `accept|reject` + GO
+- purpose: base-to-WORKTREE or base-to-REF antipattern over-report; optional practice ledger via `accept|reject` + GO
 - input_state: external_call_pass | performance_pass | impl_done | product_dirty | antipattern_fail | antipattern_suspects
 - output_state: antipattern_pass | antipattern_suspects | antipattern_fail | antipattern_blocked
-- artifacts_read: git diff base...head; catalog; PRACTICE_LEDGER.jsonl; optional change context
+- artifacts_read: base-to-target diff including staged/unstaged/untracked WORKTREE paths; catalog; PRACTICE_LEDGER.jsonl; optional change context
 - artifacts_written: none on SCAN; with accept/reject+GO append-only `.cursor/antipattern-gate/PRACTICE_LEDGER.jsonl`
 - decision_owner: antipattern auditor; ledger write only with Owner GO
 - next_typical: /opsx-static-check (PASS|PASS_WITH_SUSPECTS) | FIX_EXIT / re-scan (FAIL) | /opsx-verify
-- known_flaws: soft gate (not hard archive); over-report intentional; MATCHES_ACCEPTED_PRACTICE ≠ testing-rules proof
+- known_flaws: soft gate (not hard archive); over-report intentional; omitted `head=`/`head=working` audits WORKTREE while `head=<ref>` is immutable; MATCHES_ACCEPTED_PRACTICE ≠ testing-rules proof
 
 ### /opsx-bug-debt-board
 - purpose: READ_ONLY cross-case bug debt inventory (INDEX + cases); pasteable recovery exits
@@ -892,6 +893,17 @@ command-contract classes (F6).
     follow GRAPH soft chain (antipattern before static); later
     /opsx-admin-command-fix-command-defects on lagging contracts
   do_not_pretend_fixed: true
+
+- id: F13 DIRTY_WORKTREE_AUDIT_TARGET
+  where: opsx-pyright-strict-coverage.md /
+  opsx-external-call-coverage.md / opsx-antipattern-gate.md
+  symptom: |
+    base...HEAD audits omitted staged, unstaged, and untracked worktree changes,
+    forcing an unnecessary commit before re-audit.
+  operator_workaround: |
+    current contracts default omitted head= to WORKTREE; use head=working for
+    explicit WORKTREE or head=<ref> for immutable ref auditing.
+  do_not_pretend_fixed: false (closed by process lesson commit 8917818ef)
 
 ## Terminal / recovery
 
