@@ -498,3 +498,25 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 Сделать более совершенный механизм отключения полок
 Почему-то 1096147565 Школьные брюки палаццо на резинке широкие трикотаж у ключа по ladder п1, а ставит 12
 Состояние: С (Стабильно) - такое в ключе, это не правильно, надо исправить
+
+## Deferred from change land-free-bot-rebase-into-stage (2026-08-18)
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Stage deployment и stage verification
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: После merge Owner самостоятельно выполняет stage schema/backfill/UI rollout, smoke и compatibility checks; receipts не входят в текущий merge-readiness DoD.
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Production migration и UI rollout
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: Production migration/UI rollout выполняются Owner через отдельный approved operational path после безопасного merge.
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Production smoke и paid/free compatibility monitoring
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: Post-deploy smoke, monitoring window и compatibility verification не являются обязанностью текущего merge change.
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Финальный production verdict и recovery evidence
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: Production completion verdict и recovery evidence фиксируются Owner после самостоятельного rollout.
