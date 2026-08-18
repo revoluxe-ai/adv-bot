@@ -1,0 +1,37 @@
+app/modules/common_slaves/wildberries/wb_db_manager.py
+  s_f2e353fe2e0389::t_e4935871d5c82a 69-70
+  s_f2e353fe2e0389::t_97d4c6c1093fb7 1-2,9
+  s_f2e353fe2e0389::t_23c4d77d2daf1d 31-46
+  s_f2e353fe2e0389::t_8bd737fc85f0ec 49-53
+  s_f2e353fe2e0389::t_39c2d095205b50 58-59
+app/client_bot/modules/default_settings/adv_setting_policy/field_policy.py
+  s_019e62ff696fe3::t_423a74723a730c 21
+app/modules/adv_creator/backend/main_manager.py
+  s_019e62ff696fe3::t_83660c3dcfdbbb 1,12,102,172,174,248,255-257,286,288,373,375,451,470,481,502-504,508-510
+app/modules/billing/billing.py
+  s_019e62ff696fe3::t_f0e3df8bb8ac97 6,433,569-571,582-584
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "182822459a6878bde45cfa294f3d90ebf13aec10",
+  "prompts": {},
+  "sessions": {
+    "s_019e62ff696fe3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5910b2f7-0b22-4958-911e-52deb94f8be2",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f2e353fe2e0389": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "67074bf6-7682-4e92-bf09-d5eea5b6bd14",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
