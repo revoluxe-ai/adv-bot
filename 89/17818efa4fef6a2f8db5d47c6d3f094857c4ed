@@ -1,0 +1,28 @@
+.cursor/commands/opsx-pyright-strict-coverage.md
+  s_3f873febd3acf8::t_91f5a113da2d31 2-3,8,44-45,53,75-77,109-132,151-154
+  s_3f873febd3acf8::t_9e7cb23d32114f 194-199
+.cursor/commands/opsx-antipattern-gate.md
+  s_3f873febd3acf8::t_6563a17b256c53 2-3,8,43-44,57,79-81,117-140,143,145-146
+  s_3f873febd3acf8::t_6595ac05f32c8b 152-156
+  s_3f873febd3acf8::t_f7d8da5c00a723 209-214
+.cursor/commands/opsx-external-call-coverage.md
+  s_3f873febd3acf8::t_18bd39f10b1e1b 160-166,171,173
+  s_3f873febd3acf8::t_f23fb36e4c416d 2-3,9,50-51,60,83-85,95-118,157-159
+  s_3f873febd3acf8::t_69f76a7ad3c2a0 592-597
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "8917818efa4fef6a2f8db5d47c6d3f094857c4ed",
+  "prompts": {},
+  "sessions": {
+    "s_3f873febd3acf8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e63c29e-efed-410c-aabb-28c1cdf5bb12",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
