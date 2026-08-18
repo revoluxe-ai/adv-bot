@@ -325,6 +325,7 @@ class WBShopDataManager:
         *,
         skip_plan_fact: bool = False,
         only_bot_active: bool,
+        session: AsyncSession | None = None,
     ) -> list[PreComplexAdv]:
         """Собрать PreComplexAdv из PG.
 
@@ -333,6 +334,8 @@ class WBShopDataManager:
                 для корутин, где факт подгружается отдельно, например
                 ``update_cluster_bids``.
             only_bot_active: Вернуть только AdvSetting.bot_active=True.
+            session: Необязательная read-only session parent-callable для
+                integration seam; при ``None`` используется штатный factory.
 
         Важно:
             Это точка, где должен быть синхронизирован auto common budget.
@@ -341,7 +344,14 @@ class WBShopDataManager:
             продолжит работать с устаревшим in-memory лимитом и общий бюджет
             не применится.
         """
-        adv_settings: list[AdvSetting] = await self._get_advs(only_bot_active)
+        if session is None:
+            adv_settings = await self._get_advs(only_bot_active)
+        else:
+            adv_settings = await self.__get_advs(
+                session,
+                self.shop_id,
+                only_bot_active,
+            )
 
         self._set_auto_commom_budget(adv_settings)
         search_adv_ids: set[int] = {

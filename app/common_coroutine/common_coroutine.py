@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from typing import Any, cast
 
 import dotenv
 
@@ -18,11 +19,11 @@ async def run_runtime() -> None:
     logger.debug("Starting common coroutine runtime")
     container = CommonCoroutineContainer()
     coroutine_manager: CommonCoroutineManager = container.coroutine_manager()
-    queue_managers = container.task_queue_managers()
+    queue_managers: list[Any] = cast(list[Any], container.task_queue_managers())
     stop_event = asyncio.Event()
 
     logger.debug(f"Initializing {len(queue_managers)} task queue(s)")
-    queue_tasks = [
+    queue_tasks: list[asyncio.Task[Any]] = [
         asyncio.create_task(
             queue_manager.run_queue(stop_event),
             name=f"task-queue-{index}",

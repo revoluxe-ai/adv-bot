@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from typing import Any
 
 import dotenv
 
@@ -25,7 +26,8 @@ logger = logging.getLogger(__name__)
 delay = 60 * 60 * 24  # 1 day
 
 
-async def send_message_to_user(bot, user_telegram_id: int):
+async def send_message_to_user(bot: Any, user_telegram_id: int) -> None:
+    """Отправить уведомление одному пользователю через Telegram-бота."""
     message = messages.NotAnyUsesAndNotMoneyOnBalance(bot, user_telegram_id)
     logger.debug(f"Отправляю сообщение для {user_telegram_id}")
     await message()
@@ -60,9 +62,12 @@ async def send_messages_to_users() -> None:
         logger.error(f"Error closing bot session: {e}")
 
 
-async def get_user_telegram_ids_for_condition(user_telegram_ids: list[int]):
+async def get_user_telegram_ids_for_condition(
+    user_telegram_ids: list[int],
+) -> list[int]:
+    """Оставить пользователей, давно не использовавших бота."""
     last_users_used = await redis_manager.get_last_users_use_time(user_telegram_ids)
-    condition_users_ids = []
+    condition_users_ids: list[int] = []
     now = time.time()
     for user_id, last_use_time in zip(user_telegram_ids, last_users_used, strict=False):
         if last_use_time:
@@ -72,7 +77,8 @@ async def get_user_telegram_ids_for_condition(user_telegram_ids: list[int]):
     return condition_users_ids
 
 
-async def get_all_user_telegram_ids_with_not_balance():
+async def get_all_user_telegram_ids_with_not_balance() -> list[int]:
+    """Получить Telegram ID пользователей без кабинета или положительного баланса."""
     stmt = (
         select(User.user_telegram_id)
         .outerjoin(User.wb_user_cabinets)
@@ -87,7 +93,7 @@ async def get_all_user_telegram_ids_with_not_balance():
         )
     )
 
-    async with sm() as session:
+    async with sm(read_only=True) as session:
         result = await session.execute(stmt)
         result = result.scalars().all()
-        return result
+        return [user_id for user_id in result if user_id is not None]
