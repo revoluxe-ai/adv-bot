@@ -1,0 +1,30 @@
+.cursor/commands/opsx-supervisor.md
+  s_e64dd1d4adc53d::t_fa620ff4413a51 121,148-153,156,646-647,770-783,829-832,1232-1238,1254,1267-1283
+  s_e64dd1d4adc53d::t_0d9ca1c2fcec1e 154-155,636-637
+  s_e64dd1d4adc53d::t_d479f68dd81a5f 2669
+  s_3f873febd3acf8::t_191bb43821bbd7 1284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5893eb4a682b8753a184a3740436ff862268867a",
+  "prompts": {},
+  "sessions": {
+    "s_3f873febd3acf8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e63c29e-efed-410c-aabb-28c1cdf5bb12",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_e64dd1d4adc53d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "407e71b3-813c-4d20-b7a2-795077c7062c",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
