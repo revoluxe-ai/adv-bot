@@ -5,6 +5,8 @@ description: Read-only audit of an OpenSpec change before archive
 Verify является read-only audit command после `/opsx-apply` и до `/opsx-archive`.
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
 
+Выход `mode=impl` / `mode=archive` — только DoD/audit verdict, не write-inventory и не file-attribution source. Write-scope reconciliation MUST использовать `git status` / `git diff` напрямую; не трактовать verify output как inventory dirty-tree.
+
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
 **OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:

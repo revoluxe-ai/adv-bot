@@ -10,6 +10,8 @@ Verify является read-only audit command после `/opsx-apply` и до
 
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
 
+Выход `mode=impl` / `mode=archive` — только DoD/audit verdict, не write-inventory и не file-attribution source. Write-scope reconciliation MUST использовать `git status` / `git diff` напрямую; не трактовать verify output как inventory dirty-tree.
+
 ## Verify phase (mandatory — thin switch)
 
 Перед аудитом прочитай и выполни
