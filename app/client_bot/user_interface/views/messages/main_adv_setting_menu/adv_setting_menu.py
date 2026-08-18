@@ -13,6 +13,7 @@ from aiogram.types import (
 )
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import utils
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
@@ -728,16 +729,24 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
     async def _resolve_emergency_mode_from_ch(
         self,
+        session: AsyncSession | None = None,
     ) -> tuple[bool, str | None, bool, str | None]:
         """Детект аварии и свежести статы по данным ClickHouse (как StatsFreshnessGuard), не по Redis.
         Returns: (emergency_active, emergency_reason, stats_fresh, stats_stale_reason)."""
         search_adv: AdvSetting | None = None
         if getattr(self.adv, "search_adv_id", None):
-            async with sm() as session:
+            if session is None:
+                async with sm(read_only=True) as read_session:
+                    result = await read_session.execute(
+                        select(AdvSetting).where(
+                            AdvSetting.adv_id == self.adv.search_adv_id
+                        )
+                    )
+            else:
                 result = await session.execute(
                     select(AdvSetting).where(AdvSetting.adv_id == self.adv.search_adv_id)
                 )
-                search_adv = result.scalar_one_or_none()
+            search_adv = result.scalar_one_or_none()
         complex_adv = ComplexAdv(self.adv, search_adv)
         state = await StatsFreshnessManager().evaluate(complex_adv)
         if state.is_stale_over_6h:

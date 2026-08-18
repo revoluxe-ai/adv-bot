@@ -1,7 +1,10 @@
+"""Обработчики выбора стратегии рекламной кампании и их PG-seam."""
+
 import logging
 
 from aiogram import Bot, F, Router, types
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
@@ -13,6 +16,50 @@ sm = get_async_session_maker
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+
+async def set_manual_strategy_in_session(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+    strategy_value: str,
+) -> Strategy:
+    """Изменить ручную стратегию в переданной write-сессии.
+
+    Parent-handler владеет жизненным циклом ``sm(read_only=False)`` и
+    транзакцией; этот child выполняет только загрузку и изменение ORM-сущности.
+
+    Args:
+        session: Активная PostgreSQL write-сессия.
+        adv_setting_original_id: Первичный ключ ``AdvSetting``.
+        strategy_value: Значение enum ``Strategy`` из callback payload.
+
+    Returns:
+        Применённая стратегия.
+
+    Raises:
+        LookupError: Если рекламная кампания не найдена.
+        RuntimeError: Если включён автоматический выбор стратегии.
+        ValueError: Если передано неизвестное значение стратегии.
+    """
+    adv_setting = await session.get(AdvSetting, adv_setting_original_id)
+    if adv_setting is None:
+        raise LookupError("РК не найдена.")
+
+    auto_update_strategy = (
+        getattr(adv_setting, "auto_update_strategy", True) is not False
+    )
+    if auto_update_strategy:
+        raise RuntimeError(
+            "Сначала отключите авто-выбор стратегии, затем выберите стратегию вручную."
+        )
+
+    try:
+        strategy = Strategy(strategy_value)
+    except ValueError as exc:
+        raise ValueError("Передана неизвестная стратегия.") from exc
+
+    adv_setting.strategy = strategy
+    return strategy
 
 
 async def _show_strategy_menu(bot: Bot, chat_id: int, adv_setting_original_id: int) -> None:
@@ -73,31 +120,23 @@ async def set_manual_strategy(
         await bot.send_message(callback.message.chat.id, "Не передана стратегия.")
         return
 
-    async with sm(read_only=False) as session:
-        adv_setting = await session.get(AdvSetting, adv_setting_original_id)
-        if adv_setting is None:
-            await bot.send_message(callback.message.chat.id, "РК не найдена.")
-            return
-
-        # None means auto-enabled (same as True); only False is manual
-        #TODO: Тут надо совместить текущую логику с дефолтом в CompexAdv
-        auto_update_strategy = getattr(adv_setting, "auto_update_strategy", True) is not False
-        if auto_update_strategy:
-            await bot.send_message(
-                callback.message.chat.id,
-                "Сначала отключите авто-выбор стратегии, затем выберите стратегию вручную.",
+    try:
+        async with sm(read_only=False) as session:
+            await set_manual_strategy_in_session(
+                session,
+                adv_setting_original_id,
+                strategy_value,
             )
-            return
-
-        try:
-            strategy = Strategy(strategy_value)
-        except ValueError:
-            await bot.send_message(callback.message.chat.id, "Передана неизвестная стратегия.")
-            return
-
-        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
-        adv_setting.strategy = strategy
-        await session.commit()
+            await session.commit()
+    except LookupError:
+        await bot.send_message(callback.message.chat.id, "РК не найдена.")
+        return
+    except RuntimeError as exc:
+        await bot.send_message(callback.message.chat.id, str(exc))
+        return
+    except ValueError as exc:
+        await bot.send_message(callback.message.chat.id, str(exc))
+        return
 
     await _show_strategy_menu(bot, callback.message.chat.id, adv_setting_original_id)
 

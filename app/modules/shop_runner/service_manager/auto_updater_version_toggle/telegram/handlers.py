@@ -1,11 +1,13 @@
 import logging
+from typing import Any, cast
 
 from aiogram import Bot, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.user_interface.views.callbacks import (
     AutoUpdaterVersionMenuBack,
@@ -49,7 +51,7 @@ _SUBMENU_TEXT = (
 
 
 async def _wb_user_cabinet_for_adv(
-    session,
+    session: AsyncSession,
     adv_setting: AdvSetting,
     telegram_user_id: int,
 ) -> WBUserCabinet | None:
@@ -244,7 +246,7 @@ async def toggle_auto_updater_version(
     label = _VERSION_LABEL.get(new_version, f"V{new_version}")
 
     submenu_msg = callback_query.message
-    if submenu_msg is None:
+    if not isinstance(submenu_msg, Message):
         return
     chat_id = submenu_msg.chat.id
 
@@ -261,7 +263,7 @@ async def toggle_auto_updater_version(
         try:
             await bot.edit_message_reply_markup(
                 chat_id=chat_id,
-                message_id=int(parent_msg_id),
+                message_id=int(cast(Any, parent_msg_id)),
                 reply_markup=parent_markup,
             )
         except TelegramBadRequest as exc:

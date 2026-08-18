@@ -5,7 +5,7 @@
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from aiogram import Bot, Router
 from aiogram.filters import StateFilter
@@ -47,6 +47,7 @@ from app.modules.shop_menu.message import ShopMenu
 logger = logging.getLogger(__name__)
 
 DONE_STATUS = "done"
+CampaignData = dict[str, Any]
 
 WB_WAIT_MESSAGE = "Идёт обращение к Wildberries, пожалуйста подождите."
 
@@ -75,7 +76,7 @@ def _wb_status_code_to_text(code: int) -> str:
 _CONNECTABLE_EXCLUDE_STATUSES = (7, 8, "done", "refused")
 
 
-def _is_connectable_candidate(item: dict) -> bool:
+def _is_connectable_candidate(item: CampaignData) -> bool:
     """Кампания подходит для подключения (не завершена и не отклонена)."""
     status = item.get("status")
     if status is None:
@@ -93,14 +94,14 @@ async def _get_adv_statuses_from_db(
         stmt = (
             select(
                 AdvSetting.adv_id,
-                AdvSetting._search_adv_id,
+                getattr(AdvSetting, "_search_adv_id"),
                 AdvSetting.active_status,
             )
             .where(
                 AdvSetting.wb_cabinet_id == wb_cabinet_id,
                 or_(
                     AdvSetting.adv_id.in_(adv_ids),
-                    AdvSetting._search_adv_id.in_(adv_ids),
+                    getattr(AdvSetting, "_search_adv_id").in_(adv_ids),
                 ),
             )
         )
@@ -124,8 +125,9 @@ async def _sync_adv_status_from_wb(
 
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            container_any: Any = cast(Any, container)
             factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
             pm = hub.wb_data_manager.promotion_manager
@@ -148,7 +150,7 @@ async def _sync_adv_status_from_wb(
                             AdvSetting.wb_cabinet_id == wb_cabinet_id,
                             or_(
                                 AdvSetting.adv_id == adv_id,
-                                AdvSetting._search_adv_id == adv_id,
+                                getattr(AdvSetting, "_search_adv_id") == adv_id,
                             ),
                         )
                         .values(active_status=db_status)
@@ -166,8 +168,9 @@ async def _ensure_card_ready(shop_id: str, nmid: int) -> bool:
     """
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            container_any: Any = cast(Any, container)
             factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
 
@@ -194,7 +197,7 @@ async def _get_matching_adv_setting_for_connect_existing(
                 load_only(
                     AdvSetting.id,
                     AdvSetting.adv_id,
-                    AdvSetting._search_adv_id,
+                    getattr(AdvSetting, "_search_adv_id"),
                     AdvSetting.name,
                 )
             )
@@ -237,7 +240,7 @@ router = Router()
 
 
 def _auction_choice_menu_keyboard(
-    auction_list: list[dict],
+    auction_list: list[CampaignData],
     wb_user_cabinet_original_id: int,
 ) -> InlineKeyboardMarkup:
     """Клавиатура: Ввести ID | Выбрать из списка (если есть) | Создать РК | Назад."""
@@ -285,7 +288,7 @@ def _auction_choice_menu_keyboard(
 
 
 def _auto_choice_menu_keyboard(
-    auto_list: list[dict],
+    auto_list: list[CampaignData],
     wb_user_cabinet_original_id: int,
 ) -> InlineKeyboardMarkup:
     """Клавиатура: Ввести ID | Выбрать из списка (если есть) | Создать РК | Назад."""
@@ -336,9 +339,9 @@ async def _send_auction_choice_menu(
     state: FSMContext,
 ) -> None:
     """Показать меню выбора способа для аукционной РК (шаг 1)."""
-    data = await state.get_data()
-    auction_list = data.get("auction_candidates") or []
-    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id") or 0
+    data: dict[str, Any] = await state.get_data()
+    auction_list: list[CampaignData] = data.get("auction_candidates") or []
+    wb_user_cabinet_original_id: int = data.get("wb_user_cabinet_original_id") or 0
     await state.set_state(ConnectExistingAdvsStates.confirm_type1)
     kb = _auction_choice_menu_keyboard(auction_list, wb_user_cabinet_original_id)
     await bot.send_message(
@@ -354,9 +357,9 @@ async def _send_auto_choice_menu(
     state: FSMContext,
 ) -> None:
     """Показать меню выбора способа для авто-РК (шаг 2)."""
-    data = await state.get_data()
-    auto_list = data.get("auto_candidates") or []
-    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id") or 0
+    data: dict[str, Any] = await state.get_data()
+    auto_list: list[CampaignData] = data.get("auto_candidates") or []
+    wb_user_cabinet_original_id: int = data.get("wb_user_cabinet_original_id") or 0
     await state.set_state(ConnectExistingAdvsStates.confirm_type2)
     kb = _auto_choice_menu_keyboard(auto_list, wb_user_cabinet_original_id)
     await bot.send_message(
@@ -370,10 +373,10 @@ async def _save_connect_existing_finish(
     bot: Bot,
     chat_id: int,
     state: FSMContext,
-    data: dict,
+    data: dict[str, Any],
     chosen_auction: int,
     chosen_auto: int,
-    auto_candidates: list[dict],
+    auto_candidates: list[CampaignData],
 ) -> None:
     """Сохранить выбранную пару аукцион+авто в AdvSetting и показать меню магазина."""
     nmid = data["nmid"]
@@ -383,8 +386,9 @@ async def _save_connect_existing_finish(
     if not card_name and shop_id:
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 card = await hub.wb_data_manager.products_manager.get_card_by_nmid(nmid)
@@ -403,7 +407,7 @@ async def _save_connect_existing_finish(
     auto_name_trunc = auto_name[:100]
     auction_name_trunc = auction_name[:100]
 
-    auction_candidates: list[dict] = data.get("auction_candidates") or []
+    auction_candidates: list[CampaignData] = data.get("auction_candidates") or []
     current_auction_name = next(
         (c["name"] for c in auction_candidates if c["id"] == chosen_auction),
         "",
@@ -418,8 +422,9 @@ async def _save_connect_existing_finish(
     if shop_id:
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 pm = hub.wb_data_manager.promotion_manager
@@ -487,7 +492,7 @@ async def _save_connect_existing_finish(
         )
 
     # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
-    await MainAdvManager._apply_default_settings_to_adv(chosen_auto)
+    await getattr(MainAdvManager, "_apply_default_settings_to_adv")(chosen_auto)
     wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
     await state.clear()
     await bot.send_message(
@@ -505,9 +510,9 @@ async def _save_connect_existing_finish(
 
 def _serialize_candidates(
     result: ConnectExistingCandidatesResult,
-) -> tuple[list[dict], list[dict]]:
+) -> tuple[list[CampaignData], list[CampaignData]]:
     """Serialize candidates for FSM state (id, name, status, status_text)."""
-    def _item_dict(c: Any) -> dict:
+    def _item_dict(c: Any) -> CampaignData:
         status_val = getattr(c.status, "value", c.status) if hasattr(c, "status") else None
         return {
             "id": c.id,
@@ -890,7 +895,7 @@ async def connect_existing_advs_nmid(
         )
         return
 
-    data = await state.get_data()
+    data: dict[str, Any] = await state.get_data()
     wb_user_cabinet_original_id: int = data["wb_user_cabinet_original_id"]
 
     async with sm(read_only=True) as session:
@@ -992,7 +997,7 @@ async def connect_existing_card_not_found_retry_full_list(
         return
 
     chat_id = callback.message.chat.id
-    data = await state.get_data()
+    data: dict[str, Any] = await state.get_data()
     nmid = data.get("nmid")
     shop_id = data.get("shop_id")
     wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
@@ -1014,8 +1019,9 @@ async def connect_existing_card_not_found_retry_full_list(
 
     try:
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+            container_any: Any = cast(Any, container)
             factory = (
-                container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
             )
             hub = factory.get_wb_manager_hub(shop_id)
             card = await hub.wb_data_manager.products_manager.get_card_by_nmid_via_full_list(nmid)
@@ -1073,9 +1079,9 @@ async def connect_existing_choose_auction(
     if callback.message is None:
         return
     chat_id = callback.message.chat.id
-    data = await state.get_data()
-    wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id") or 0
-    auction_list = data.get("auction_candidates") or []
+    data: dict[str, Any] = await state.get_data()
+    wb_user_cabinet_original_id: int = data.get("wb_user_cabinet_original_id") or 0
+    auction_list: list[CampaignData] = data.get("auction_candidates") or []
 
     if callback_data.action == "back":
         await state.clear()
@@ -1240,7 +1246,6 @@ async def connect_existing_confirm_type1(
     """Выбор аукционной РК из списка → показать меню способа для авто (шаг 2)."""
     if callback.message is None:
         return
-    data = await state.get_data()
     chosen_auction = (
         callback_data.adv_id if callback_data.adv_id else None
     )  # 0 = создать
@@ -1275,7 +1280,6 @@ async def connect_existing_confirm_type2(
         chosen_auction = data.get("chosen_auction_adv_id")
         nmid = data.get("nmid")
         shop_id = data.get("shop_id")
-        wb_user_cabinet_original_id = data.get("wb_user_cabinet_original_id")
         if chosen_auction is None:
             await bot.send_message(
                 callback.message.chat.id,
@@ -1324,7 +1328,7 @@ async def connect_existing_confirm_type2(
         )
         return
 
-    auto_candidates_list: list[dict] = data.get("auto_candidates") or []
+    auto_candidates_list: list[CampaignData] = data.get("auto_candidates") or []
     await _save_connect_existing_finish(
         bot,
         int(callback.message.chat.id),
@@ -1353,8 +1357,8 @@ async def connect_existing_choose_auto(
     if callback.message is None:
         return
     chat_id = callback.message.chat.id
-    data = await state.get_data()
-    auto_list = data.get("auto_candidates") or []
+    data: dict[str, Any] = await state.get_data()
+    auto_list: list[CampaignData] = data.get("auto_candidates") or []
 
     if callback_data.action == "back":
         await _send_auction_choice_menu(bot, chat_id, state)
@@ -1386,7 +1390,7 @@ async def connect_existing_choose_auto(
             await bot.send_message(chat_id, "Список кампаний пуст.")
             await _send_auto_choice_menu(bot, chat_id, state)
             return
-        rows = []
+        rows: list[list[InlineKeyboardButton]] = []
         for c in auto_list:
             label = f"{c.get('name', '') or c['id']} (ID {c['id']})"
             if len(label) > 40:
@@ -1603,7 +1607,7 @@ async def connect_existing_continue_despite_invalid(
     data = await state.get_data()
     nmid = data.get("nmid")
     shop_id = data.get("shop_id")
-    auto_candidates = data.get("auto_candidates") or []
+    auto_candidates: list[CampaignData] = data.get("auto_candidates") or []
     existing_auto_id_from_state = data.get("existing_auto_id")
     if nmid is None or shop_id is None:
         await bot.send_message(
