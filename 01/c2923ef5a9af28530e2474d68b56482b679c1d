@@ -1,0 +1,31 @@
+app/modules/shop_runner/service_manager/wb_shop_data_manager/wb_shop_data_manager.py
+  s_f2e353fe2e0389::t_46fde18d9a9fb2 328,337-338,347-354
+app/common_coroutine/common_coroutine.py
+  s_019e62ff696fe3::t_b2cd792761b71e 5,22,26
+app/modules/user_message_sender/message_for_not_pay_user_sender.py
+  s_019e62ff696fe3::t_080665123b0a02 6,29-30,65-68,70,80-81,96,99
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "01c2923ef5a9af28530e2474d68b56482b679c1d",
+  "prompts": {},
+  "sessions": {
+    "s_019e62ff696fe3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5910b2f7-0b22-4958-911e-52deb94f8be2",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f2e353fe2e0389": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "67074bf6-7682-4e92-bf09-d5eea5b6bd14",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
