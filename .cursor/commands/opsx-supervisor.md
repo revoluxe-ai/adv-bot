@@ -118,6 +118,7 @@ WORKER_AD_HOC_TOOL_USE=FORBIDDEN
 COMMAND_DECLARED_INTERNAL_TOOL_USE=CONDITIONAL_ALLOWED
 
 SUPERVISOR_GENERIC_SUBAGENT_LAUNCH=FORBIDDEN
+COMMAND_BOUND_PRIMARY_WORKER_DISPATCH=ALLOWED
 ORDINARY_WORKER_UNDECLARED_CHILD_AGENTS=FORBIDDEN
 COMMAND_DECLARED_INTERNAL_WORKERS=ALLOWED
 
@@ -143,6 +144,15 @@ Named OPSX-команда может использовать shell, Git или 
 * Supervisor-launched generic / undeclared repository workers без одной
   primary `/opsx-*` команды;
 * ordinary (non-orchestrator) workers, запускающие undeclared child agents.
+
+Обычный top-level `/opsx-*` worker может запускаться через поддерживаемый
+subagent/Task adapter только в `COMMAND_BOUND_PRIMARY_WORKER_DISPATCH` режиме:
+в dispatch должен быть указан ровно один найденный и policy-approved
+`/opsx-*` command, полный worker envelope и обязательный footer. Это не
+является generic launch и не требует наличия `.cursor/agents/**`. Если такой
+adapter недоступен, task блокируется до `RUNNING` с
+`BLOCKED_ENVIRONMENT`; если сама команда запрещена policy, применяется
+`BLOCKED_FORBIDDEN_ROUTE`. Generic fallback запрещён.
 
 Разрешены без quarantine, без предварительного Owner gate и без запрета
 production execution внутри их contracts:
@@ -623,7 +633,8 @@ READY -> RUNNING
   resource locks acquired
 
 READY -> BLOCKED
-  Owner gate, forbidden route, stale prerequisite or resource conflict
+  Owner gate, forbidden route, stale prerequisite, resource conflict, or
+  unavailable command-bound worker adapter
 
 READY -> CANCELLED
   mission stopping or dependency invalidated
@@ -632,7 +643,8 @@ RUNNING -> COMPLETED
   RESULT_VALIDATION=ACCEPTED
 
 RUNNING -> FAILED
-  invalid/error result not accepted
+  invalid/error result not accepted, including a terminal platform failure
+  (`stopped`, `aborted`, `interrupted`, `tool_error`, or empty envelope)
 
 RUNNING -> BLOCKED
   proven blocker cannot be resolved within task contract
@@ -755,6 +767,20 @@ MODEL_SELECTION_REASON:
 Для `/opsx-bug-team` и `/opsx-static-check` дополнительно §12.4
 (`OWNER_VISIBLE` + предпочтительно `run_in_background=true`).
 
+Для каждого top-level dispatch до запуска зафиксируй:
+
+```text
+COMMAND_BOUND_PRIMARY_WORKER_DISPATCH:
+  COMMAND_IS_OPSX:
+  EXACT_PRIMARY_COMMAND:
+  COMMAND_DISCOVERY_RECORD:
+  ADAPTER_AVAILABLE:
+  GENERIC_FALLBACK: FORBIDDEN
+```
+
+`ADAPTER_AVAILABLE=NO` не переводит task в `RUNNING` и не запускает
+неименованный generic subagent.
+
 В subagent prompt обязательно укажи footer:
 
 ```text
@@ -800,6 +826,10 @@ COMMAND:
 REPORTED_STATUS:
 REPORTED_SCOPE:
 REPORTED_SNAPSHOT:
+PLATFORM_TERMINAL_STATUS:
+STOP_SOURCE:
+STOP_REQUESTED:
+STOP_ACKNOWLEDGED:
 RESULT:
 
 CLAIMS:
@@ -1199,6 +1229,13 @@ DUPLICATE_RESTART=FORBIDDEN
 5. Разрешён максимум один restart.
 6. Старый и новый запуск не считаются независимыми evidence sources.
 
+Если платформа возвращает `stopped` после stop/cancel, это является
+acknowledgement: дальнейшее ожидание heartbeat или повторное ожидание
+`STOP_ACK_TIMEOUT` запрещено. Если acknowledgement не пришёл за
+`STOP_ACK_TIMEOUT`, ожидание прекращается, worker помечается
+`STOP_UNCONFIRMED`, а task/mission terminalizes по обычным правилам без
+бесконечного ожидания.
+
 ```text
 DUPLICATE_RESTART_BEFORE_CONFIRMED_HANG=NO
 MAX_RESTARTS_EXCEEDED=NO
@@ -1214,7 +1251,7 @@ MAX_RESTARTS_EXCEEDED=NO
 
 ## 12.2.1 Platform abort / interrupt / empty envelope
 
-Если top-level Task завершается как `aborted` | `interrupted` |
+Если top-level Task завершается как `stopped` | `aborted` | `interrupted` |
 `tool_error` | empty / missing envelope (Owner cancel tool, platform
 kill, mid-flight interrupt) **без** accepted result:
 
@@ -1226,6 +1263,24 @@ CLAIM_NEXT=FORBIDDEN
 NEW_FINDING=FORBIDDEN
 BLIND_REPLAY=FORBIDDEN
 ```
+
+Все перечисленные platform statuses являются terminal для текущей попытки.
+Supervisor обязан немедленно закрыть worker handle и прекратить heartbeat
+wait:
+
+```text
+TASK_STATUS=FAILED
+FAILURE_CLASS=EXECUTION_OUTCOME_UNKNOWN
+RECOVERY_CLASS=PAUSED
+ACTIVE_WORKER_CLEARED=YES
+```
+
+Если часы §12.0 уже превышены, допускается более строгий
+`TASK_STATUS=TIMEOUT` с той же recovery semantics. `RECOVERY_CLASS=PAUSED`
+является disposition, а не новым task state. `stopped`, полученный после
+явного stop/cancel, устанавливает `STOP_ACKNOWLEDGED=YES`; источник остановки
+фиксируется как `owner_cancel | supervisor_interrupt | timeout | hook |
+platform | unknown`.
 
 Если одновременно превышены часы §12.0 → `TIMEOUT` (строже) с тем же
 запретом blind replay.
@@ -2611,7 +2666,7 @@ Recovery outcomes: `ADVANCE` | `RETRY_ALLOWED` | `PAUSED` | `BLOCKED` |
 key; else pause. Writer may have run without committed envelope →
 `EXECUTION_OUTCOME_UNKNOWN` (no blind replay).
 
-Platform Task `aborted` | `interrupted` | `tool_error` | empty envelope
+Platform Task `stopped` | `aborted` | `interrupted` | `tool_error` | empty envelope
 on any primary hop (including `/opsx-bug-team`) → same
 `PAUSED` / `EXECUTION_OUTCOME_UNKNOWN` (or `TIMEOUT` if §12.0 clocks
 exceeded). Do not claim-next or start later findings. Pasteable resume
