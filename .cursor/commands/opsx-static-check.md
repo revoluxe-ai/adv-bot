@@ -160,16 +160,22 @@ run one deterministic non-xdist classifier (`poetry run pytest -m unit -x`)
 inside the same run. Record `UNIT_RECOVERY_PATH=xdist_retry|fallback_non_xdist`.
 Only fallback infra crash may remain `ERROR infra_suite_hard`.
 
-**SERIAL long-suite heartbeat (pytest-unit / similarly long Shell):** before
-starting the canonical unit Shell, emit interim
-`WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`. Prefer sliced
-waits (Shell `block_until_ms` in ~60–120s slices **or** background Shell +
+**SERIAL long-suite heartbeat (pytest-unit / pytest-integration /
+pytest-destructive / similarly long Shell):** before starting every
+potentially multi-minute canonical Shell, emit an interim
+`WORKER RUNNING: <check_id> (expect multi-minute)`. Prefer sliced waits
+(Shell `block_until_ms` in ~60–120s slices **or** background Shell +
 `AwaitShell` re-block) with a periodic progress line such as
-`WORKER RUNNING: pytest-unit (still in progress; ~Nm elapsed)` — **not** one
+`WORKER RUNNING: <check_id> (still in progress; ~Nm elapsed)` — **not** one
 opaque multi-tens-of-minutes silence. Progress lines remain interim-only;
 Final is still mandatory when the check (or STOP_RUN) closes. Live
 `pytest`/`run.sh` under SERIAL + Owner «зависло»/hang report is **not**
 launch-infra retry (pytest is running).
+
+For a nested Supervisor dispatch of an internal orchestrator, the parent
+control-plane must use a background dispatch and relay these heartbeats rather
+than waiting silently in one foreground tool call. A matching live
+`pytest`/`run.sh` is evidence of progress, not permission for a duplicate run.
 
 #### Opt-in: `PARALLEL_TASKS` (legacy Task fan-out)
 

@@ -750,6 +750,33 @@ FOLLOW_UP_REQUIRED:
 FORBIDDEN_ACTIONS_OBSERVED:
 ```
 
+## 7.1 Long-running internal orchestrators
+
+Для `/opsx-static-check` и `/opsx-bug-team`, если ожидаемая фаза может
+длиться более двух минут:
+
+```text
+LONG_RUNNING_ORCHESTRATOR=YES
+DISPATCH_RUN_MODE=BACKGROUND
+HEARTBEAT_INTERVAL=60-120s
+```
+
+Supervisor обязан:
+
+1. не блокировать control-plane на одном foreground dispatch;
+2. зафиксировать `WORKER RUNNING` с командой, фазой и elapsed time;
+3. принимать только финальный result envelope как completion;
+4. не запускать duplicate/retry, пока matching `pytest` / `run.sh` жив;
+5. при вопросе Owner «зависло?» сначала проверить heartbeat и живой процесс,
+   а не считать это автоматическим cancel;
+6. при Owner cancel или новой unrelated mission отправить stop, сохранить
+   partial evidence и перевести task в `ERROR=interrupted` / `CANCELLED`;
+7. не объявлять mission terminal, пока background worker не вернул envelope
+   либо не подтверждено `STOP_CONFIRMED`.
+
+`WORKER READY` и system notification о завершении background subagent не
+заменяют result validation и обязательный Final report named command.
+
 ---
 
 # 8. Worker result envelope

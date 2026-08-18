@@ -16,6 +16,26 @@ Packet COMMAND: `poetry run pytest -m destructive_local` (document ALLOW_* set).
 **Orchestrator gate:** MODE=FULL only. Start only if `pytest-integration`
 packet `STATUS=PASS`. Otherwise SKIPPED (including all FAST runs).
 
+## Long-suite heartbeat and interruption
+
+Before the canonical command emit:
+
+```text
+WORKER RUNNING: pytest-destructive (expect multi-minute)
+```
+
+While the live `pytest` / `run.sh` process is running, emit a progress
+heartbeat every 60–120 seconds:
+
+```text
+WORKER RUNNING: pytest-destructive (still in progress; ~Nm elapsed)
+```
+
+A live matching process is progress evidence, not a launch failure and not a
+reason for a duplicate retry. If Owner aborts the run or the Shell is
+interrupted, return `STATUS=ERROR` with `ERROR=interrupted` or `STOP_RUN` and
+preserve the partial packet; do not silently return a progress-only result.
+
 ## Rules
 
 - Never schedule in FAST.
