@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Any, Coroutine
 
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import exists, func, select, and_
@@ -429,7 +430,7 @@ async def __process_single_cabinet(
                     select(func.count()).where(
                         and_(
                             AdvPayment.adv_setting_id == campaign.id,
-                            AdvPayment.date == day,
+                            getattr(AdvPayment, "date") == day,
                         )
                     )
                 )
@@ -565,7 +566,9 @@ async def _process_payment_for_advs(
         logger.debug("Нет активных кабинетов с кампаниями (read-only выборка)")
         return
     logger.debug(f"К обработке кабинетов: {len(cabinet_ids)}")
-    tasks_list = []
+    tasks_list: list[
+        Coroutine[Any, Any, dict[str, int | bool | str | float | None]]
+    ] = []
 
     for cabinet_id in cabinet_ids:
         task = _process_single_cabinet(
@@ -576,7 +579,9 @@ async def _process_payment_for_advs(
             skip_by_redis=skip_by_redis
         )
         tasks_list.append(task)
-    results = await asyncio.gather(*tasks_list, return_exceptions=True)
+    results: list[
+        dict[str, int | bool | str | float | None] | BaseException
+    ] = await asyncio.gather(*tasks_list, return_exceptions=True)
     for res in results:
         if isinstance(res, Exception):
             logger.error("Ошибка в обработке кабинета: %s", res, exc_info=True)

@@ -18,7 +18,7 @@ DefaultValueFactory = Callable[[AdvSetting, WBCabinet], Any]
 class FieldPolicy:
     """Single declarative rule for one ``AdvSetting`` ORM field."""
 
-    field: InstrumentedAttribute
+    field: InstrumentedAttribute[Any]
     apply_if: DefaultPredicate
     value: DefaultValueFactory
     reason: str

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal, get_args
+from typing import TYPE_CHECKING, Any, Literal, cast, get_args
 
 from aiogram import Bot
 from aiohttp import ClientSession
@@ -9,7 +9,7 @@ from sqlalchemy.orm import load_only, selectinload
 
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
-from app.core.wb_api.data_classes.advs.other_classes import Balances
+from ...common_slaves.wildberries.data_classes.adv import Balances
 from app.client_bot.user_interface.services.auto_management_mode import (
     apply_new_campaign_free_defaults,
 )
@@ -99,7 +99,7 @@ class MainAdvManager:
 
     @staticmethod
     async def _perform_adv_setting_upsert(
-        session: AsyncSession, adv_data: dict
+        session: AsyncSession, adv_data: dict[str, Any]
     ) -> None:
         insert_stmt = insert(AdvSetting).values(adv_data)
         on_conflict_stmt = insert_stmt.on_conflict_do_update(
@@ -169,8 +169,9 @@ class MainAdvManager:
         balances = await self.wb_api.get_adv_balances()
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 _card_info, target_card = (
@@ -244,14 +245,16 @@ class MainAdvManager:
         # TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
         self,
         bot: Bot,
-        user_telegram_id,
+        user_telegram_id: int,
         nmid: int,
         hard_mode: bool,
     ) -> tuple[int, int] | None:
         assert self.access.wb_cabinet is not None
         wb_cabinet_id = self.access.wb_cabinet.id
         all_adv_ids = await self.get_all_adv_ids_for_nmid(wb_cabinet_id, nmid)
-        exist_adv_ids_rows = [(aid, None) for aid in all_adv_ids]
+        exist_adv_ids_rows: list[tuple[int, int | None]] = [
+            (aid, None) for aid in all_adv_ids
+        ]
         if not hard_mode and all_adv_ids:
             raise AdvExistsForNmidError(exist_adv_ids_rows)
 
@@ -280,8 +283,9 @@ class MainAdvManager:
         balances = await self.wb_api.get_adv_balances()
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 _card_info, target_card = (
@@ -366,8 +370,9 @@ class MainAdvManager:
         balances = await self.wb_api.get_adv_balances()
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 _card_info, target_card = (
@@ -443,7 +448,7 @@ class MainAdvManager:
                 .options(
                     load_only(
                         AdvSetting.adv_id,
-                        AdvSetting._search_adv_id,  # noqa E1101
+                        getattr(AdvSetting, "_search_adv_id"),
                         AdvSetting.name,
                     )
                 )
@@ -462,7 +467,7 @@ class MainAdvManager:
                             # Дополнительно можно вернуть этот блок, если нужно
                             and_(
                                 AdvSetting.nmids == [nmid],
-                                AdvSetting._search_adv_id is not None,  # noqa E1101
+                                getattr(AdvSetting, "_search_adv_id").is_not(None),
                             ),
                         ),
                         # TODOД не правильныый синтаксис условий in, ошибка попала в прод
@@ -473,7 +478,7 @@ class MainAdvManager:
 
             result = await session.scalars(stmt)
             adv_settings = result.all()
-            adv_ids_rows: list[tuple[int, int]] = []
+            adv_ids_rows: list[tuple[int, int | None]] = []
             if adv_settings:
                 for adv in adv_settings:
                     auto_adv_id = adv.adv_id
@@ -494,11 +499,15 @@ class MainAdvManager:
     ) -> tuple[int, str]:
         return select_balance_source_from_response(balances, min_required=min_required)
 
-    async def _upcast_target_placement(self, adv_id, /, search, recommendations):
+    async def _upcast_target_placement(
+        self, adv_id: int, /, search: bool, recommendations: bool
+    ) -> None:
         await self.wb_api.upcast_target_placement(adv_id, search, recommendations)
 
     @staticmethod
-    async def __turn_off_advs(bot, user_telegram_id, complex_adv_ids: set[int]):
+    async def __turn_off_advs(
+        bot: Bot, user_telegram_id: int, complex_adv_ids: set[int]
+    ) -> None:
         # TODO: Добавить логику остановки РК в кабинете WB через wb_api
 
         message = "Отключаю существующие для этого артикула кампании"
