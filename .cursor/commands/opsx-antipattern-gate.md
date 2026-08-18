@@ -1,11 +1,11 @@
 ---
-description: "Diff-scoped over-report scan of code/test/process antipatterns (base...head); optional practice ledger accept/reject."
-argument-hint: "base=<branch|ref> [head=<ref>] [focus=all|prod|tests|process] [change=<name>] [accept=CLASS|reject=CLASS GO]"
+description: "Committed or dirty-worktree over-report scan of code/test/process antipatterns; optional practice ledger accept/reject."
+argument-hint: "base=<branch|ref> [head=<ref>|working] [focus=all|prod|tests|process] [change=<name>] [accept=CLASS|reject=CLASS GO]"
 ---
 
 # /opsx-antipattern-gate
 
-Просканируй `base...head` на **классы антипаттернов** (code / tests / process
+Просканируй `base...target` на **классы антипаттернов** (code / tests / process
 smell). Default — **over-report**: лучше лишний `SUSPECT`, чем пропуск.
 
 Цель: нельзя спокойно идти в `/opsx-static-check` / `/opsx-verify`, не видя
@@ -40,7 +40,8 @@ $ARGUMENTS
 | Token | Effect |
 |-------|--------|
 | `base=<ref>` | обязательный comparison base |
-| `head=<ref>` | optional; default `HEAD` |
+| `head=<ref>` | optional immutable comparison target |
+| `head=working` | explicit dirty-worktree target |
 | `focus=all\|prod\|tests\|process` | optional; default `all` |
 | `change=<name>` | optional context |
 | `accept=<CLASS_ID>` | with `GO` — append ACCEPTED_IN_PROJECT to ledger |
@@ -53,6 +54,7 @@ $ARGUMENTS
 ```text
 /opsx-antipattern-gate base=stage
 /opsx-antipattern-gate base=origin/main head=HEAD focus=prod
+/opsx-antipattern-gate base=origin/main head=working focus=prod
 /opsx-antipattern-gate base=stage accept=AP_PROD_TEST_DOUBLE_SNIFF GO
 /opsx-antipattern-gate base=stage reject=AP_SOURCE_TOKEN_PROOF GO
 ```
@@ -74,6 +76,9 @@ $ARGUMENTS
 
 * Не менять репозиторий (кроме чтения).
 * Только отчёт + pasteable `NEXT_ACTION`.
+* Если `head=` не задан, target по умолчанию — текущий `WORKTREE`, а не
+  committed `HEAD`; staged, unstaged и релевантные untracked paths должны
+  попасть в audit.
 
 ### Practice write — `accept=` / `reject=` + `GO`
 
@@ -109,18 +114,46 @@ Ledger = triage memory (`TEMPORARY_SAFETY_NET`). Promotion into
 
 When unsure → emit `SUSPECT`, not silence.
 
+## Target resolution
+
+1. Resolve `base` to an immutable commit.
+2. Resolve target:
+   - explicit `head=<ref>` → immutable ref target;
+   - explicit `head=working` or omitted `head=` → current worktree target.
+3. For the worktree target use the base-to-working diff, not
+   `base...HEAD`; include staged and unstaged tracked changes, deletions, and
+   relevant untracked in-policy paths as added paths.
+4. Report:
+
+```text
+AUDIT_TARGET: WORKTREE | REF
+BASE_SHA: <sha>
+TARGET_REF: WORKTREE | <sha>
+WORKTREE_TRACKED_CHANGED: <n>
+WORKTREE_UNTRACKED_IN_POLICY: <n>
+WORKTREE_DELETED: <n>
+```
+
+5. A clean worktree target may be equivalent to `HEAD`, but the report must
+   still state `AUDIT_TARGET: WORKTREE`. No commit is required for a
+   read-only worktree re-audit.
+
 ## Scan algorithm
 
-1. Resolve `base` / `head` (`git rev-parse`). Fail → `BLOCKED`.
+1. Resolve `base` / `head` and the target (`git rev-parse`). Fail → `BLOCKED`.
 2. Read catalog + ledger (if ledger missing → treat as empty).
-3. `git diff --name-status <base>...<head>` (three-dot).
+3. Inventory the base-to-target changed paths, including relevant untracked
+   worktree paths.
 4. Filter paths by `focus=`:
    - `prod` → `app/**`, top-level production `*.py` (not tests)
    - `tests` → `tests/**`
    - `process` → `.cursor/commands/**`, `.cursor/pipeline/**`, `.cursor/rules/**`
    - `all` → union of above in-policy paths from the diff
-5. For each in-focus changed file: `git diff <base>...<head> -- <path>` +
-   bounded Grep/Read for class signals. Prefer added/changed hunks.
+5. For each in-focus changed file, use
+   `git diff <base>...<head> -- <path>` for `AUDIT_TARGET: REF` or
+   `git diff <base> -- <path>` for `AUDIT_TARGET: WORKTREE`; for untracked
+   paths, inspect the file as an added hunk. Use bounded Grep/Read for class
+   signals and prefer added/changed hunks.
 6. For every hit emit `LOC_LINK: path:line` (see
    `.cursor/rules/opsx-clickable-loc-link-contract.mdc`).
 7. Apply ledger:
@@ -173,6 +206,12 @@ STATUS: PASS | PASS_WITH_SUSPECTS | FAIL | BLOCKED
 
 BASE: <ref>
 HEAD: <ref>
+AUDIT_TARGET: WORKTREE | REF
+BASE_SHA: <sha>
+TARGET_REF: WORKTREE | <sha>
+WORKTREE_TRACKED_CHANGED: <n>
+WORKTREE_UNTRACKED_IN_POLICY: <n>
+WORKTREE_DELETED: <n>
 FOCUS: all | prod | tests | process
 CHANGE: <name|none>
 CATALOG: .cursor/antipattern-gate/catalog.md

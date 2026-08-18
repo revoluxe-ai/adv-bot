@@ -1,12 +1,12 @@
 ---
-description: "Audit base..head production changes for external-call surfaces (HTTP/WB/PG/CH/Redis/…) and map each to adequate tests per testing-rules. Read-only."
-argument-hint: "base=<branch|ref> [head=<ref>] [focus=all|http|wb|pg|ch|redis|other] [change=<name>]"
+description: "Audit committed or dirty-worktree production changes for external-call surfaces (HTTP/WB/PG/CH/Redis/…) and map each to adequate tests per testing-rules. Read-only."
+argument-hint: "base=<branch|ref> [head=<ref>|working] [focus=all|http|wb|pg|ch|redis|other] [change=<name>]"
 ---
 
 # /opsx-external-call-coverage
 
 Проверь, что все **in-policy** production surfaces с внешними вызовами из
-`base...head` имеют адекватное тестовое evidence по
+`base...target` имеют адекватное тестовое evidence по
 `.cursor/rules/testing-rules.mdc` (не слепо требовать `-m integration`).
 
 Цель: нельзя считать diff «готовым к verify/static», если новая/изменённая
@@ -47,7 +47,8 @@ $ARGUMENTS
 | Token | Effect |
 |-------|--------|
 | `base=<ref>` | обязательный comparison base (branch/tag/commit) |
-| `head=<ref>` | optional; default `HEAD` |
+| `head=<ref>` | optional immutable comparison target |
+| `head=working` | explicit dirty-worktree target |
 | `focus=all\|http\|wb\|pg\|ch\|redis\|other` | optional; default `all`. Узкий прогон для отладки; **полный gate** перед verify = `all` |
 | `change=<name>` | optional; читать change artifacts / приложить report context |
 | иное неизвестное | `STATUS=BLOCKED`, не менять файлы |
@@ -56,6 +57,7 @@ $ARGUMENTS
 
 - `/opsx-external-call-coverage base=main`
 - `/opsx-external-call-coverage base=origin/main head=HEAD`
+- `/opsx-external-call-coverage base=origin/main head=working`
 - `/opsx-external-call-coverage base=main focus=redis`
 - `/opsx-external-call-coverage base=main change=add-auth`
 
@@ -78,6 +80,9 @@ $ARGUMENTS
 
 * Не менять репозиторий.
 * Только отчёт + pasteable `NEXT_ACTION`.
+* Если `head=` не задан, target по умолчанию — текущий `WORKTREE`, а не
+  committed `HEAD`; staged, unstaged и релевантные untracked in-policy paths
+  должны попасть в audit.
 * Опционально (если `change=` и owner явно просит persist): можно
   предложить путь для durable report, но **не писать** без отдельного
   owner GO на persist (v1: chat report only).
@@ -86,6 +91,30 @@ $ARGUMENTS
 
 В v1 **нет** `GO` режима для автофиксов. Gaps → `/opsx-test` (TEST_ONLY) или
 `/opsx-close-external-gap` (REFACTOR_AND_TEST), затем rerun этого audit.
+
+## Target resolution
+
+1. Resolve `base` to an immutable commit.
+2. Resolve target:
+   - explicit `head=<ref>` → immutable ref target;
+   - explicit `head=working` or omitted `head=` → current worktree target.
+3. For the worktree target use the base-to-working diff, not
+   `base...HEAD`; include staged and unstaged tracked changes, deletions, and
+   relevant untracked in-policy files as added paths.
+4. Report:
+
+```text
+AUDIT_TARGET: WORKTREE | REF
+BASE_SHA: <sha>
+TARGET_REF: WORKTREE | <sha>
+WORKTREE_TRACKED_CHANGED: <n>
+WORKTREE_UNTRACKED_IN_POLICY: <n>
+WORKTREE_DELETED: <n>
+```
+
+5. A clean worktree target may be equivalent to `HEAD`, but the report must
+   still state `AUDIT_TARGET: WORKTREE`. No commit is required for a
+   read-only worktree re-audit.
 
 ## Policy scope (in / out)
 
@@ -125,17 +154,23 @@ Rename/copy: проверяй **новый** путь (destination).
 
 ## External surface detection (minimum)
 
-1. `git diff --name-status <base>...<head>` (three-dot).
-2. Для каждого in-policy path: `git diff <base>...<head> -- <path>` +
-   Grep/AST-oriented inspection changed functions/methods/classes.
-3. Считай surface, если изменённый callable (или его прямо достигнутый
+1. Resolve the target using **Target resolution** above.
+2. Inventory the base-to-target changed paths, including relevant untracked
+   worktree paths.
+3. Для `AUDIT_TARGET: REF` используй
+   `git diff <base>...<head> -- <path>`; для `AUDIT_TARGET: WORKTREE`
+   используй `git diff <base> -- <path>`. Для untracked path прочитай файл как
+   добавленный содержимый diff.
+4. Для каждого in-policy path выполни Grep/AST-oriented inspection changed
+   functions/methods/classes.
+5. Считай surface, если изменённый callable (или его прямо достигнутый
    helper в том же diff) вызывает / планирует вызов внешней границы:
    - client/session execute, request, publish, enqueue;
    - repository/adapter write/read к PG/CH/Redis/WB/HTTP;
    - явный side-effect boundary из domain (WB write, CH insert, …).
-4. Не инвентаризируй весь файл «на всякий случай» — только **touched**
+6. Не инвентаризируй весь файл «на всякий случай» — только **touched**
    callables и их очевидные callees в том же diff hunk set.
-5. Bounded I/O: следуй `.cursor/commands/opsx-execution-preflight.md` и
+7. Bounded I/O: следуй `.cursor/commands/opsx-execution-preflight.md` и
    `.cursor/commands/opsx-source-resolution.md` (Grep-first; parallel Read ≤ 2).
 
 При сомнении между KIND — выбери наиболее specific (`WB_WRITE` >
@@ -554,6 +589,12 @@ STATUS: PASS | FAIL | BLOCKED
 
 BASE: <ref>
 HEAD: <ref>
+AUDIT_TARGET: WORKTREE | REF
+BASE_SHA: <sha>
+TARGET_REF: WORKTREE | <sha>
+WORKTREE_TRACKED_CHANGED: <n>
+WORKTREE_UNTRACKED_IN_POLICY: <n>
+WORKTREE_DELETED: <n>
 FOCUS: all | http | wb | pg | ch | redis | other
 CHANGE: <name|none>
 POLICY: .cursor/rules/testing-rules.mdc

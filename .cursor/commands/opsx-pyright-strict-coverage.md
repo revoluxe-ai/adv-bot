@@ -1,11 +1,11 @@
 ---
-description: "Audit base..head production Python against pyrightconfig_strict.json include/exclude so changed code is actually covered by pyright-strict."
-argument-hint: "base=<branch|ref> [head=<ref>] [GO]"
+description: "Audit committed or dirty-worktree production Python against pyrightconfig_strict.json include/exclude so changed code is actually covered by pyright-strict."
+argument-hint: "base=<branch|ref> [head=<ref>|working] [GO]"
 ---
 
 # /opsx-pyright-strict-coverage
 
-Проверь, что весь **in-policy** production Python из `base...head` попал в
+Проверь, что весь **in-policy** production Python из `base...target` попал в
 `pyrightconfig_strict.json` `include` и не вырезан `exclude`.
 
 Цель: нельзя «пройти» `pyright-strict` / `/opsx-static-check`, если новый или
@@ -41,7 +41,8 @@ $ARGUMENTS
 | Token | Effect |
 |-------|--------|
 | `base=<ref>` | обязательный comparison base (branch/tag/commit) |
-| `head=<ref>` | optional; default `HEAD` |
+| `head=<ref>` | optional immutable comparison target |
+| `head=working` | explicit dirty-worktree target |
 | `GO` | разрешить additive update `include[]` по `MISSING_FROM_INCLUDE` |
 | иное неизвестное | `STATUS=BLOCKED`, не менять файлы |
 
@@ -49,6 +50,7 @@ $ARGUMENTS
 
 - `/opsx-pyright-strict-coverage base=main`
 - `/opsx-pyright-strict-coverage base=origin/main head=HEAD`
+- `/opsx-pyright-strict-coverage base=origin/main head=working`
 - `/opsx-pyright-strict-coverage base=main GO`
 
 ## Required input
@@ -70,6 +72,9 @@ $ARGUMENTS
 
 * Не менять репозиторий.
 * Только отчёт + pasteable `NEXT_ACTION`.
+* Если `head=` не задан, target по умолчанию — текущий `WORKTREE`, а не
+  committed `HEAD`; staged, unstaged и релевантные untracked in-policy paths
+  должны попасть в audit.
 
 ### `GO`
 
@@ -101,6 +106,30 @@ $ARGUMENTS
 
 Rename/copy: проверяй **новый** путь (destination).
 
+## Target resolution
+
+1. Resolve `base` to an immutable commit.
+2. Resolve target:
+   - explicit `head=<ref>` → immutable ref target;
+   - explicit `head=working` or omitted `head=` → current worktree target.
+3. For the worktree target use the base-to-working diff, not
+   `base...HEAD`; include staged and unstaged tracked changes, deletions, and
+   relevant untracked in-policy files as added paths.
+4. Report:
+
+```text
+AUDIT_TARGET: WORKTREE | REF
+BASE_SHA: <sha>
+TARGET_REF: WORKTREE | <sha>
+WORKTREE_TRACKED_CHANGED: <n>
+WORKTREE_UNTRACKED_IN_POLICY: <n>
+WORKTREE_DELETED: <n>
+```
+
+5. A clean worktree target may be equivalent to `HEAD`, but the report must
+   still state `AUDIT_TARGET: WORKTREE`. No commit is required for a
+   read-only worktree re-audit.
+
 ## Matching rules
 
 Нормализуй пути: relative to repo root, `/` separators, без ведущего `./`.
@@ -119,9 +148,10 @@ disposition `HIT_EXCLUDE`.
 
 ## Steps
 
-1. Разобрать `base` / `head` / `GO`.
-2. `git rev-parse` оба ref; при ошибке → `BLOCKED`.
-3. `git diff --name-status <base>...<head>` (three-dot).
+1. Разобрать `base` / `head` / `GO` and resolve the target.
+2. `git rev-parse` `base` and any explicit ref; при ошибке → `BLOCKED`.
+3. Inventory the base-to-target changed paths, including relevant untracked
+   worktree paths.
 4. Прочитать `pyrightconfig_strict.json` (`include`, `exclude`).
 5. Классифицировать каждый path:
    - skip non-in-policy;
@@ -161,6 +191,12 @@ STATUS: PASS | FAIL | BLOCKED
 
 BASE: <ref>
 HEAD: <ref>
+AUDIT_TARGET: WORKTREE | REF
+BASE_SHA: <sha>
+TARGET_REF: WORKTREE | <sha>
+WORKTREE_TRACKED_CHANGED: <n>
+WORKTREE_UNTRACKED_IN_POLICY: <n>
+WORKTREE_DELETED: <n>
 CONFIG: pyrightconfig_strict.json
 
 IN_POLICY_CHANGED: <n>
