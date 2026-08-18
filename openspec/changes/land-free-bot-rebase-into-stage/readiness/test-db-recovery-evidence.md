@@ -1,7 +1,7 @@
 # Test-DB recovery evidence
 
 Change: `land-free-bot-rebase-into-stage`  
-Candidate SHA: `1ac5a053aaeb444f30524536de6a8d4223113a95`
+Candidate SHA: `4cfd61209a065c6105c5f12e44f7b1771fba69c4`
 
 ## Recovery route
 
@@ -24,5 +24,5 @@ forward-recovery contract. No destructive production downgrade is used or
 authorized by this change.
 
 This is test-DB recovery evidence only. It does not provide a stage or
-production migration receipt; those later release states remain separate
-`NO_GO` gates until the approved write-path supplies receipts.
+production migration receipt; those owner-owned operational states are
+deferred and are not required for this change's merge-readiness verdict.

@@ -2,22 +2,22 @@
 
 ### Requirement: Branch landing readiness is scope-bounded
 
-Landing readiness MUST be calculated from one declared base reference, one
+Merge readiness MUST be calculated from one declared target-base reference, one
 candidate snapshot and one explicit set of in-scope changes. The evidence MUST
-record the base and candidate identities, and unrelated dirty worktree state
-MUST NOT change the verdict.
+record the target-base and candidate identities, and unrelated dirty worktree
+state MUST NOT change the verdict.
 
 #### Scenario: Candidate snapshot changes during verification
 
 - **GIVEN** readiness evidence was collected for a declared candidate snapshot
 - **WHEN** the candidate identity or in-scope change set changes
 - **THEN** the previous readiness verdict is invalidated
-- **THEN** verification MUST be repeated before landing is considered ready
+- **THEN** verification MUST be repeated before merge is considered ready
 
 #### Scenario: Unrelated dirty state is present
 
 - **GIVEN** unrelated changes exist outside the declared landing scope
-- **WHEN** the landing checks are evaluated
+- **WHEN** the merge checks are evaluated
 - **THEN** those changes are excluded from the evidence
 - **THEN** the readiness result identifies the excluded state without treating it
   as part of the candidate
@@ -32,7 +32,7 @@ alone MUST NOT be treated as proof that a migration was applied in a database.
 
 - **GIVEN** a migration is proven to have been applied outside the candidate
   branch
-- **WHEN** the landing route is selected
+- **WHEN** the merge route is selected
 - **THEN** the existing migration history is preserved
 - **THEN** any correction MUST use a new forward repair or compatibility step
 
@@ -40,7 +40,7 @@ alone MUST NOT be treated as proof that a migration was applied in a database.
 
 - **GIVEN** a migration is reachable from a remote feature branch
 - **AND** no database or deployment evidence proves its application
-- **WHEN** the landing route is selected
+- **WHEN** the merge route is selected
 - **THEN** the evidence records application as unproven
 - **THEN** rewriting the not-yet-landed candidate migration MAY be considered
   only after explicit provenance review
@@ -51,7 +51,7 @@ alone MUST NOT be treated as proof that a migration was applied in a database.
   unknown
 - **WHEN** readiness is evaluated
 - **THEN** the result MUST contain `EVIDENCE_GAP`
-- **THEN** landing readiness MUST be `NO_GO`
+- **THEN** merge readiness MUST be `NO_GO`
 
 ### Requirement: Migration route preserves forward-only history
 
@@ -187,54 +187,27 @@ snapshot.
 - **THEN** that result cannot satisfy the corresponding gate
 - **THEN** readiness remains `NO_GO` until the check is replayed
 
-### Requirement: Release states remain separate and production rollout is fail-closed
+### Requirement: Merge readiness does not claim owner-owned deployment
 
-Readiness, stage deployment, production migration/UI rollout and production
-verification MUST remain separate evidence states of one release process. A
-readiness `GO` MUST NOT claim that a later deployment or database application
-occurred. Production database actions MUST run only through the approved release
-write-path.
+Merge-readiness evidence MUST remain separate from image build, Harbor upload,
+deployment restart, pod startup, stage/prod smoke and post-deploy verification.
+A merge-readiness `GO` MUST authorize only the safe merge decision for the
+declared target branch; it MUST NOT claim that any later operational action
+occurred.
 
-#### Scenario: Stage readiness precedes stage deployment
+#### Scenario: Merge readiness is green
 
-- **GIVEN** all in-scope landing checks pass and no provenance gap remains
-- **WHEN** stage readiness is issued
-- **THEN** the evidence identifies stage deployment as the next separate state
-- **THEN** no production migration or UI rollout is claimed
+- **GIVEN** all in-scope graph, migration, compatibility, static and OpenSpec
+  checks pass for one candidate snapshot
+- **WHEN** merge readiness is issued
+- **THEN** the evidence identifies safe merge into the declared target branch
+- **THEN** image rollout and all deployment verification are identified as
+  owner-owned next steps outside this change
 
-#### Scenario: Production rollout has an approved receipt
+#### Scenario: Deployment evidence is absent
 
-- **GIVEN** the stage deployment and required compatibility checks are green
-- **AND** the approved production write-path produces migration and deployment
-  receipts
-- **WHEN** production rollout is evaluated
-- **THEN** each receipt is bound to the candidate snapshot and release identity
-- **THEN** production verification starts as a separate required gate
-
-#### Scenario: Production rollout evidence is missing
-
-- **GIVEN** stage readiness is green
-- **WHEN** production migration, UI deployment or receipt evidence is missing
-- **THEN** production release status is `NO_GO`
-- **THEN** the process does not represent the release as completed
-
-### Requirement: Production verification preserves existing client behavior
-
-Production verification MUST compare paid and free client baselines after
-rollout. It MUST cover automation flags, billing behavior, WB write activity and
-campaign lifecycle, and MUST fail closed on unexplained drift.
-
-#### Scenario: Production compatibility verification passes
-
-- **GIVEN** production migration and UI rollout have receipts
-- **WHEN** post-deploy compatibility verification completes
-- **THEN** paid and free behavior matches its corresponding baseline
-- **THEN** the release may advance to the final completion state
-
-#### Scenario: Production compatibility verification detects drift
-
-- **GIVEN** post-deploy verification detects unexplained automation, billing,
-  WB-write or lifecycle drift
-- **WHEN** the release verdict is calculated
-- **THEN** the verdict is `NO_GO`
-- **THEN** the affected cohort and forward recovery action are recorded
+- **GIVEN** merge-readiness checks are complete
+- **WHEN** image, Harbor, deployment, pod or post-deploy evidence is absent
+- **THEN** merge readiness is not downgraded solely for that absence
+- **THEN** the evidence MUST state that those operational receipts are deferred
+  and are not claimed by this change

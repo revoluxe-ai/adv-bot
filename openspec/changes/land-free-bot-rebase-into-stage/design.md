@@ -1,10 +1,9 @@
 ## Context
 
-Feature-ветка должна пройти полный release-путь: посадка на копию `stage`,
-stage deployment, production migration/UI rollout и post-deploy verification.
-Статическая проверка migration safety строит цепочку относительно merge-base со
-`stage`, включая staged и unstaged изменения, и запрещает в `upgrade()` вызовы
-`op.execute()` и `op.alter_column()`.
+Feature-ветка должна безопасно попасть в target-ветку, созданную от `stage`.
+Статическая проверка migration safety строит цепочку относительно merge-base с
+target base, включая staged и unstaged изменения, и запрещает в `upgrade()`
+вызовы `op.execute()` и `op.alter_column()`.
 
 Текущая feature migration смешивает schema transition, backfill существующих
 строк и усиление обязательности поля. Это отражает нужную бизнес-семантику не
@@ -33,15 +32,10 @@ Remote branch reachability уже является evidence существова
   revision и новой forward repair revision.
 - Проверить graph, data transition, повторный запуск и отсутствие влияния на
   paid/free product behavior вне текущего diff.
-- Доказать compatibility existing paid/free clients до выдачи readiness.
-- Провести stage deployment с обновлённым интерфейсом и проверить его до
-  production rollout.
-- Провести production migration/UI rollout через approved release path и
-  сохранить deployment/database receipts.
-- Выполнить post-deploy compatibility verification для существующих paid/free
-  клиентов.
-- Подготовить проверяемый release evidence package без неутверждённых
-  production DB actions.
+- Доказать local/test-DB compatibility existing paid/free clients до выдачи
+  merge-readiness.
+- Подготовить проверяемый merge-readiness evidence package без stage/prod
+  deployment actions.
 
 **Non-Goals:**
 
@@ -50,6 +44,8 @@ Remote branch reachability уже является evidence существова
 - Автоматический commit, push, merge или PR.
 - Production DB actions вне approved migration/deployment path.
 - Доказательство применения migration без database/deployment receipt.
+- Сборка image, загрузка image в Harbor, restart deployment и запуск pod.
+- Stage/prod smoke, post-deploy verification и production monitoring.
 - Изменение accepted архитектурного решения о forward-only convergence.
 - Ослабление safety-теста посредством blanket allowlist для опасных операций.
 - Новая продуктовая логика для free bot или paid automation core.
@@ -90,27 +86,26 @@ the local or related proposed decisions globally.
 
 - Alembic revisions для forward-only schema transition;
 - отдельный approved migration Job/write-path для production data/DDL rollout;
-- approved stage/production deployment path для последовательного rollout
-  schema и обновлённого интерфейса;
 - unit/integration tests для graph, safety и data invariants;
-- OpenSpec artifacts и release evidence для решения scope, receipts,
-  compatibility и rollback.
+- OpenSpec artifacts и merge-readiness evidence для решения scope,
+  provenance, compatibility и rollback.
 
 **Forbidden layers:**
 
 - application startup, runtime handlers и updater logic для schema writes;
 - topology-only merge revision для backfill или constraint transition;
 - `.cursor/commands/**` для исправления migration semantics;
-- production database из local landing verification;
+- production database и deployment из local landing verification;
 - production schema/data writes из application runtime или developer shell;
 - unrelated dirty worktree как часть branch landing verdict.
 
 **Rationale:**
 
 Такое размещение сохраняет границу между миграционной топологией и
-изменением данных, отделяет readiness от deployment и соответствует accepted
-forward-only decision. Production rollout остаётся `NO_GO`, пока migration
-Job/write-path и его application/control baselines не приняты и не проверены.
+изменением данных, отделяет merge-readiness от owner-owned deployment и
+соответствует accepted forward-only decision. Дальнейшая rollout-операция
+начинается только после безопасного merge и не является результатом этого
+change.
 
 ## Decisions
 
@@ -123,7 +118,7 @@ Landing checks работают на одном зафиксированном m
 До выбора migration route собирается provenance matrix:
 
 - revision reachable from remote branch;
-- revision reachable from stage/master;
+- revision reachable from target base;
 - evidence database application;
 - evidence release/deployment receipt.
 
@@ -191,12 +186,13 @@ Affected records определяются classifier-ом `bot_active` и тек
 используются backup/restore на test DB и forward compensating action для уже
 применённого rollout.
 
-### 6. Compatibility existing clients является отдельным gate
+### 6. Compatibility existing clients является отдельным local gate
 
 До и после test-DB rollout фиксируются baselines для representative paid/free
 client cohorts: effective automation flags, billing state, WB write activity и
 campaign lifecycle. Сравнение выполняется по тем же affected records и
-migration snapshot, что и data-transition preview.
+migration snapshot, что и data-transition preview. Это доказывает только
+локальную merge-readiness и не заменяет owner-owned post-merge verification.
 
 Текущий broad backfill `NULL → true` запрещён. Классифицированное изменение
 `bot_active=True → auto_update_minus_phrases=True` является explicit rollout
@@ -218,8 +214,8 @@ semantics и должно иметь accepted owner confirmation, affected-clien
   → [Mitigation] обязательный paid/free before/after compatibility baseline;
   любой недопустимый drift блокирует readiness.
 - [Risk] Rewrite revision после скрытого применения нарушит immutable history
-  → [Mitigation] требовать database/deployment receipt, а при доказанном
-  применении использовать только forward repair.
+  → [Mitigation] при противоречивой provenance выдавать `NO_GO`, а при
+  доказанном применении использовать только forward repair.
 - [Risk] Слишком широкий dirty worktree изменит stage-diff verdict
   → [Mitigation] frozen snapshot, path-scoped diff и повторная проверка SHA
   перед каждым итоговым gate.
@@ -227,11 +223,8 @@ semantics и должно иметь accepted owner confirmation, affected-clien
   online-unsafe migration → [Mitigation] не менять общий safety policy; при
   необходимости добавить отдельный доказуемый rollout path.
 - [Risk] Migration Job policy ещё Proposed globally → [Mitigation] owner
-  confirmation authorizes this change only; production rollout still requires
-  approved-path receipts and the global decision remains open.
-- [Risk] Stage и production deployment receipts относятся к разным snapshot
-  → [Mitigation] привязать каждый receipt, smoke result и compatibility
-  baseline к candidate SHA и release identifier.
+  confirmation authorizes this change only; reusable decision promotion remains
+  an archive concern.
 
 ## Migration Plan
 
@@ -249,16 +242,11 @@ semantics и должно иметь accepted owner confirmation, affected-clien
 6. Запустить focused graph contract, migration safety, data-transition и
    client-compatibility regression, targeted tests, required unit/static checks
    и OpenSpec validation на том же snapshot.
-7. Выполнить stage deployment: schema step, одноразовый backfill, UI rollout,
-   smoke и compatibility checks; сохранить stage receipts.
-8. Получить production deployment/write-path approval, затем выполнить
-   production migration и UI rollout; сохранить database/deployment receipts.
-9. Выполнить production smoke, paid/free compatibility verification,
-   monitoring window и forward recovery check; любой необъяснённый drift даёт
-   `NO_GO`.
-10. Сформировать release evidence package с base/candidate SHA, scope,
-    provenance matrix, preview, test DB/stage/prod results, receipts и
-    rollback/recovery evidence.
+7. Сформировать merge-readiness evidence package с base/candidate SHA, scope,
+   provenance matrix, preview, test-DB results и rollback/recovery evidence.
+8. Передать owner `GO` только для безопасного merge в target-ветку; сборка
+   image, Harbor upload, restart deployment, pod startup и stage/prod
+   verification выполняются owner после merge отдельным operational flow.
 
 Rollback до landing: удалить только подготовленные unlanded изменения или
 вернуть feature branch к последнему проверенному snapshot. После применения в
@@ -274,18 +262,15 @@ Owner confirmation for this change (2026-08-17) accepted:
 - new records default to `False`;
 - one-time idempotent backfill is owned by the approved migration Job;
 - Alembic `upgrade()` contains no `op.execute()` or `op.alter_column()`;
-- production rollout requires migration/deployment receipts and a compatibility
-  baseline; persistent `None → True` fallback is forbidden.
+- persistent `None → True` fallback is forbidden; image rollout and
+  post-merge verification are owner-owned and out of scope here.
 
 ## Open Questions
 
 - Как будет промотировано owner-confirmed change-local решение в reusable
   accepted decision при archive?
-- Какой конкретный database/deployment receipt будет считаться доказательством
-  применения revision?
-- Какой stage/prod deployment path владеет последовательностью schema step,
-  backfill, UI rollout и monitoring window?
-- Какие baseline и recovery evidence обязательны перед production GO?
+- Какой конкретный database receipt будет считаться доказательством применения
+  revision в отдельном owner-owned rollout?
 
 ## Review Checklist
 
@@ -296,7 +281,5 @@ Owner confirmation for this change (2026-08-17) accepted:
 - [x] owner-confirmed classifier and one-time Job placement are recorded
 - [x] provenance route evidence is attached
 - [x] existing client compatibility baseline model and final review are included
-- [x] readiness/deployment/database receipt model is separate and fail-closed
-- [ ] stage deployment receipt is attached
-- [ ] production migration/UI receipts are attached
-- [ ] production verification and recovery evidence are attached
+- [x] merge-readiness evidence is separate from owner-owned deployment
+- [x] stage/prod deployment tasks are explicitly out of scope

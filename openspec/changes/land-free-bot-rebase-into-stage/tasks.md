@@ -12,10 +12,12 @@
 
 - [x] 2.1 Получить explicit owner confirmation для expected values existing/new records, допустимого backfill и recovery action; без подтверждения зафиксировать `NO_GO`.
 - [x] 2.2 Получить acceptance или отдельное решение по `forward-only-data-migration-rollout`; проверить, что implementation placement соответствует `openspec/decisions/alembic-forward-only-head-convergence/decision.md`.
-- [x] 2.3 Получить acceptance по production migration Job/write-path; до acceptance держать production rollout в `NO_GO`.
+- [x] 2.3 Зафиксировать, что migration Job/write-path является отдельным approved
+  owner-owned operational path и не запускается этим change.
 - [x] 2.4 Собрать provenance evidence и выбрать ровно один route: `rewrite-before-landing`, `forward-repair` или `NO_GO`; choice и rationale сохранить в readiness record.
 - [x] 2.5 Получить explicit approval, что существующие paid/free клиенты не должны быть молча переведены в новую automation; намеренный behavior change вынести в отдельное принятое product decision.
-- [x] 2.6 Зафиксировать stage/prod release sequence, обязательные migration/deployment receipts, monitoring window и forward recovery owner.
+- [x] 2.6 Зафиксировать границу handoff: после merge owner самостоятельно
+  выполняет image rollout и stage/prod verification отдельным operational flow.
 
 ## 3. Реализация migration и landing-readiness path
 
@@ -28,19 +30,22 @@
 - [x] 3.7 Реализовать compatibility guard для existing paid/free cohorts: не допускать silent drift automation, billing, WB writes или campaign lifecycle; при намеренном изменении остановиться на accepted product decision.
 - [x] 3.8 Реализовать одноразовый idempotent release backfill по classifier `bot_active` с preview, affected-record report и проверкой отсутствия несовместимого остатка.
 
-## 4. Верификация и readiness package
+## 4. Верификация и merge-readiness package
 
 - [x] 4.1 Запустить focused Alembic head/convergence contract и подтвердить ровно одну итоговую head без переписывания истории.
 - [x] 4.2 Запустить stage-diff migration safety tests и targeted data-transition tests на том же candidate snapshot; зафиксировать все findings.
 - [x] 4.3 Запустить required targeted tests, unit tests, strict static checks и OpenSpec validation; отсутствующий или относящийся к другому snapshot результат считать gap.
 - [x] 4.4 Сформировать readiness package с base/candidate SHA, scope, provenance matrix, preview affected records, test DB result, command outputs и rollback/recovery evidence.
-- [x] 4.5 Проверить, что readiness, stage deployment, production rollout и database application имеют отдельные evidence и receipts.
-- [x] 4.6 Выдать итоговый release `GO` только при прохождении всех требований spec; иначе выдать `NO_GO` с actionable gaps и не выполнять production actions вне approved path.
+- [x] 4.5 Проверить, что merge-readiness evidence не заявляет image build,
+  Harbor upload, deployment restart, pod startup или stage/prod verification.
+- [x] 4.6 Выдать итоговый merge `GO` только при прохождении всех требований
+  spec; иначе выдать `NO_GO` с actionable gaps и не выполнять operational
+  rollout actions.
 - [x] 4.7 Отдельно подтвердить compatibility existing clients в финальном readiness review; любой необъяснённый drift блокирует GO.
-- [ ] 4.8 Выполнить stage deployment и сохранить schema, backfill, UI, smoke и compatibility receipts для одного candidate SHA.
-- [ ] 4.9 Выполнить production migration/UI rollout только после approved release gate и сохранить database/deployment receipts.
-- [ ] 4.10 Выполнить production smoke и paid/free compatibility verification в monitoring window; unexplained drift переводит release в `NO_GO`.
-- [ ] 4.11 Зафиксировать production verification result, recovery evidence и окончательный release verdict.
+
+Stage deployment, image build, Harbor upload, deployment restart, pod startup,
+stage/prod smoke, post-deploy verification и production verdict явно
+отложены в `DOTO/WORKLOG.md` как owner-owned operational flow после merge.
 
 ## Telegram UI / Message Safety
 

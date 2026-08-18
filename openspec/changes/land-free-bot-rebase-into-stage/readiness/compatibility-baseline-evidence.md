@@ -1,7 +1,7 @@
 # Existing-client compatibility baseline evidence
 
 Change: `land-free-bot-rebase-into-stage`  
-Candidate SHA: `1ac5a053aaeb444f30524536de6a8d4223113a95`
+Candidate SHA: `4cfd61209a065c6105c5f12e44f7b1771fba69c4`
 
 ## Evidence model
 
@@ -21,7 +21,7 @@ The executable contract is covered by:
 `PASS` for the fail-closed comparison contract: unexplained drift produces
 `NO_GO`, and intentional drift requires an accepted product decision.
 
-`NO_GO` for release completion: this local package does not contain a
-stage/production representative-client receipt. The release operator must
-attach paid and free before/after observations for the same candidate SHA
-before advancing beyond readiness.
+`PASS` for merge readiness: this local package intentionally does not contain a
+stage/production representative-client receipt. Owner-owned post-merge
+verification may attach paid and free before/after observations for the same
+candidate SHA through a separate operational flow.

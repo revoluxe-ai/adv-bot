@@ -1,39 +1,35 @@
 ## Why
 
-Текущая feature-ветка должна пройти единый проверяемый путь от посадки на
-копию `stage` до rollout обновлённого интерфейса и проверки в production.
-Migration safety gate падает, потому что переход данных и изменение
-обязательности поля сейчас смешаны, а фактическое применение migration и
-совместимость существующих клиентов не доказаны.
+Текущая feature-ветка должна безопасно попасть в target-ветку, созданную от
+`stage`, а затем быть готовой к передаче владельцу для merge target-ветки в
+`stage`. Migration safety gate падает, потому что переход данных и изменение
+обязательности поля сейчас смешаны, а provenance и совместимость существующих
+клиентов не доказаны.
 
-Нужен release-процесс с раздельными gate для stage, production migration,
-публикации интерфейса и post-deploy verification, чтобы не выдать зелёный
-результат при незавершённом или несовместимом rollout.
+Нужен fail-closed merge-readiness процесс: один base/candidate snapshot,
+проверенная migration topology, подтверждённая семантика перехода данных и
+понятный merge `GO`/`NO_GO`. Сборка образа, загрузка в Harbor, перезапуск
+deployment и проверка запущенных pod остаются отдельным operational flow
+владельца после merge.
 
 ## What Changes
 
-- Зафиксировать observable-критерии готовности feature-ветки к посадке на
-  копию `stage`.
+- Зафиксировать observable-критерии готовности feature-ветки к merge в
+  target-ветку, созданную от `stage`.
 - Разрешить конфликт между migration safety policy и семантикой перехода
   данных до начала implementation.
-- Провести stage deployment с обновлённым интерфейсом и обязательными smoke и
-  compatibility checks.
-- Провести production migration и UI rollout только через утверждённый
-  release path с отдельным receipt.
-- Проверить после production rollout automation flags, billing, WB writes и
-  campaign lifecycle существующих paid/free клиентов.
 - Зафиксировать одноразовый idempotent backfill: active paid records получают
   включённый флаг, остальные существующие и новые записи — выключенный.
 - Запретить постоянную трактовку `None` как включённой automation и broad
   backfill без classifier.
-- Привязать все evidence к одному candidate snapshot и разделить readiness,
-  deployment и database-application statuses.
+- Привязать merge-readiness evidence к одному base/candidate snapshot.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `stage-landing-readiness`: проверяемая подготовка feature-ветки к посадке на копию `stage` с migration safety и quality gates.
+- `stage-landing-readiness`: проверяемая подготовка feature-ветки к merge в
+  target-ветку от `stage` с migration safety и quality gates.
 
 ### Modified Capabilities
 
@@ -43,15 +39,12 @@ Migration safety gate падает, потому что переход данн�
 
 ### In Scope
 
-- текущий branch-to-base landing diff;
+- текущий branch-to-base landing diff для target-ветки от `stage`;
 - migration safety и семантика перехода данных/схемы, необходимая для landing;
 - локальная проверка migration на тестовой базе;
 - Alembic head/convergence checks;
 - targeted, unit, static и OpenSpec verification gates;
-- stage deployment и stage verification;
-- production migration/UI rollout через approved release path;
-- production migration receipt, smoke checks и compatibility verification;
-- evidence, необходимая перед каждым переходом release state.
+- merge-readiness evidence и итоговый `GO`/`NO_GO`.
 
 ### Out of Scope
 
@@ -60,36 +53,36 @@ Migration safety gate падает, потому что переход данн�
 - unrelated dirty/untracked files;
 - новые продуктовые возможности;
 - автоматический commit, push, merge или PR;
+- сборка image и загрузка image в Harbor;
+- restart entrypoint deployment и запуск pod;
+- stage/prod smoke и post-deploy verification;
 - production DB actions вне approved migration/deployment path;
 - постоянная runtime-нормализация legacy `NULL`.
 
 ## Current and Desired Behavior
 
-Сейчас landing может перейти к публикационному обсуждению при наличии remote
-feature branch, хотя migration safety test показывает конфликт между
-migration implementation и stage-diff policy. Production rollout и
-совместимость существующих клиентов остаются за пределами readiness package,
-а backfill может незаметно изменить automation behavior.
+Сейчас feature branch может обсуждаться для merge, хотя migration safety test
+показывает конфликт между migration implementation и branch-to-base policy.
+Backfill может незаметно изменить automation behavior, а dirty worktree может
+исказить merge evidence.
 
-После change release считается завершённым только после последовательного
-прохождения stage и production gates: migration semantics утверждены,
-compatibility baselines не показывают недопустимого drift, migration graph и
-safety checks проходят, stage и production deployment имеют receipts, а
-post-deploy verification подтверждает поведение существующих paid/free
-клиентов. Каждый статус остаётся отдельным evidence, а неподтверждённый
-переход даёт `NO_GO`.
+После change feature branch считается готовой к merge в target-ветку только
+после прохождения migration semantics, provenance, migration graph, safety,
+targeted/static/OpenSpec gates на одном snapshot. Merge-readiness остаётся
+отдельным `GO`/`NO_GO`; image rollout и дальнейшая проверка после попадания
+target-ветки в `stage` не являются результатом этого change.
 
 ## Impact
 
-- Изменение затрагивает OpenSpec planning, migration validation, branch landing
-  gates, release deployment и post-deploy verification.
+- Изменение затрагивает OpenSpec planning, migration validation и branch
+  landing gates.
 - Возможны изменения migration implementation, rollout Job и связанных
   regression tests после утверждения design.
 - Existing paid/free product behavior не должен измениться молча; намеренное
   изменение требует отдельного принятого решения, compatibility evidence и
   recovery plan.
-- Production deployment и database application становятся частью release
-  evidence, но не смешиваются с локальным readiness verdict.
+- Owner-owned CI/CD после merge не смешивается с локальным merge-readiness
+  verdict.
 
 ## Risks and Rollback
 
@@ -97,14 +90,9 @@ post-deploy verification подтверждает поведение сущес�
   кампаний.
 - Переписывание уже remote-published migration может нарушить forward-only
   policy.
-- Неполный migration receipt может создать иллюзию успешного production
-  rollout.
 - Слишком широкая проверка может захватить pre-existing dirty worktree и
   исказить verdict.
-- Неполная compatibility verification может пропустить drift paid/free
-  behavior.
 
-Rollback idea: остановить следующий release gate при любом `NO_GO`; до
-production применения вернуть feature branch к последнему проверенному
-snapshot. После production применения использовать только approved forward
-compensating action и recovery plan, без destructive downgrade.
+Rollback idea: остановить merge при любом `NO_GO`; вернуть target branch к
+последнему проверенному snapshot до передачи владельцу. Production recovery
+остаётся отдельной operational responsibility и не выполняется этим change.

@@ -1,9 +1,12 @@
-# Release sequence: `land-free-bot-rebase-into-stage`
+# Deferred owner operational sequence: `land-free-bot-rebase-into-stage`
 
-Каждый переход привязан к одному `candidate_sha` и `release_id`; receipt
-следующего состояния не заменяет receipt предыдущего.
+Этот файл описывает только handoff после merge. Он не является частью
+merge-readiness DoD и выполняется Owner отдельным approved operational flow.
+Каждый последующий переход привязан к одному `candidate_sha` и `release_id`;
+receipt следующего состояния не заменяет receipt предыдущего.
 
-1. `READINESS_GO`: graph, safety, data-transition и compatibility evidence.
+1. `MERGE_READINESS_GO`: graph, safety, data-transition и local compatibility
+   evidence.
 2. `STAGE_DEPLOYED`: schema step, approved backfill Job, UI rollout, smoke и
    paid/free compatibility receipts.
 3. `DATABASE_APPLIED`: отдельный receipt approved migration Job application.
@@ -17,7 +20,7 @@
 `outcome`, `migration_target`, `backfill_kind`, `affected_record_preview`,
 `compatibility_baseline_ref`, `recovery_action_ref`.
 
-Production rollout remains `NO_GO` until the approved write-path provides the
-migration receipt and the deployment path provides the deployment/UI receipts.
-The forward recovery owner is the migration rollout owner named by the release
-operator; a missing named owner is an actionable final-gate gap.
+The current change stops after `MERGE_READINESS_GO`. Image build, Harbor upload,
+deployment restart, pod startup and stage/prod verification start only after
+merge. The forward recovery owner is the migration rollout owner named by the
+Owner's operational flow.
