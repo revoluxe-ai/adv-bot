@@ -1026,13 +1026,50 @@ PRE_EXISTING_DIRTY_FILES
 UNRELATED_CHANGED_FILES
 ```
 
-Если writer сообщил неполный inventory либо обнаружен out-of-scope write:
+Каждый extra dirty path (есть в POST_WRITE_SNAPSHOT, нет в
+`FILES_REPORTED_CHANGED` writer-а) MUST быть ровно одним из:
+
+```text
+PRE_EXISTING_DIRTY
+  present before this hop (including TARGET_CHANGE app/** and
+  openspec/changes/<change>/** from a prior apply/update of the
+  same mission). Ledger only. Not Owner-gate. Continue in-scope
+  next hop.
+
+TASK_ATTRIBUTED
+  produced by this hop. Must fit EXPECTED_WRITE_BOUNDARY.
+
+UNRELATED
+  other worktree debt. Record OUT_OF_SCOPE_DEBT. Do not touch.
+  Continue in-scope work.
+```
+
+Incomplete `FILES_REPORTED_CHANGED` for **this hop** (writer omitted
+files it actually wrote):
 
 ```text
 WRITE_SCOPE_RECONCILED=NO
-DOWNSTREAM_DISPATCH=FORBIDDEN
-INDEPENDENT_WRITE_INVENTORY_REQUIRED=YES
+RETRY that writer once for complete inventory
+OR independent write inventory (read-only git status/diff
+  attribution vs expected write boundary)
+DOWNSTREAM_PRODUCT_WRITER=FORBIDDEN until attribution exists
 ```
+
+Do **not** treat incomplete inventory as `BLOCKED_OWNER_DECISION`.
+Do **not** use `/opsx-verify mode=impl` as write inventory: it is a
+DoD/archive checker and MUST NOT route inventory mismatch to
+`/opsx-apply`. Independent inventory uses hop snapshot fields only
+(status/diff attribution), without IMPL_GAPS→apply routing.
+
+`WRITE_SCOPE_RECONCILED=YES` when:
+
+- every this-hop write is in `FILES_REPORTED_CHANGED` and inside
+  `EXPECTED_WRITE_BOUNDARY`;
+- remaining dirty paths are classified PRE_EXISTING_DIRTY or UNRELATED.
+
+`TASK_ATTRIBUTED` write **outside** allowed boundary → then Owner-gate
+`SCOPE_EXPANSION_REQUIRED`. Same-change PRE_EXISTING_DIRTY is not
+scope expansion.
 
 Не выполнять автоматический rollback.
 
@@ -2171,6 +2208,11 @@ DESTRUCTIVE_OR_PRODUCTION_ACTION_REQUIRED
 MATERIAL_RISK_ACCEPTANCE_REQUIRED
 FORBIDDEN_ROUTE_REQUIRED
 ```
+
+`SCOPE_EXPANSION_REQUIRED` — только `TASK_ATTRIBUTED` write outside
+the hop's allowed boundary. Same-change `PRE_EXISTING_DIRTY` and
+`UNRELATED` dirty-tree debt are **not** Owner-gates (see §10.1).
+Incomplete writer inventory is a retry/inventory hop, not this list.
 
 Формат:
 
