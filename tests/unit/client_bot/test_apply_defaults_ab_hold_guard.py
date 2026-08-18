@@ -24,9 +24,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
-from app.client_bot.modules.default_settings.default_models.common_default import (
-    CampaignDefaultsV1,
-)
 from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
     apply_campaign_defaults,
     apply_defaults_for_shop,
@@ -34,6 +31,12 @@ from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
 from app.client_bot.user_interface.views.callbacks import (
     ApplyCampaignDefaults,
     ApplyDefaultsForShop,
+)
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import (
+    BidderCoroutineType,
+    BidderMode,
 )
 
 _HANDLER = "app.client_bot.user_interface.handlers.adv_setting.adv_setting"
@@ -84,6 +87,20 @@ def _off_adv() -> SimpleNamespace:
     )
 
 
+def _assert_common_defaults(adv: SimpleNamespace) -> None:
+    """Проверить только поля, принадлежащие common defaults policy."""
+    assert adv.bidder_mode == BidderMode.BY_POSITIONS
+    assert adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    assert adv.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC
+    assert adv.sales_predict_method == FactMethods.BY_CARTS
+    assert adv.auto_update_minus_phrases is False
+    assert adv.auto_budget_watchdog_enabled is True
+    assert adv.use_common_budget is True
+    assert adv.target_ctr_mode is False
+    assert adv.new_auto_min_ctr_mode is False
+    assert adv.reset_place is True
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("mode", ["active", "pending_setup"])
 def test_helper_noop_on_held_campaign(mode: str) -> None:
@@ -99,13 +116,10 @@ def test_helper_noop_on_held_campaign(mode: str) -> None:
 
 @pytest.mark.unit
 def test_helper_applies_defaults_on_off_campaign() -> None:
-    """15.1 paired positive: OFF → полный набор дефолтов применён."""
-    defaults = CampaignDefaultsV1()
+    """15.1 paired positive: OFF → common defaults policy применена."""
     adv = _off_adv()
     apply_defaults_to_adv_setting(adv, adv.wb_cabinet)  # type: ignore[arg-type]
-    assert adv.automatic_version == defaults.automatic_version  # 2
-    assert adv.auto_update_white_list == defaults.auto_update_white_list  # True
-    assert adv.auto_update_target_place == defaults.auto_update_target_place
+    _assert_common_defaults(adv)
     assert adv.card_ab_hold_mode == "off"
 
 
@@ -228,7 +242,7 @@ async def test_apply_campaign_defaults_applies_off_campaign() -> None:
             bot,
         )
 
-    assert adv.automatic_version == 2
+    _assert_common_defaults(adv)
     assert adv.card_ab_hold_mode == "off"
     assert "commit" in recorder
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
@@ -262,7 +276,7 @@ async def test_apply_defaults_for_shop_skips_held_applies_rest() -> None:
     assert held.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
     assert held.automatic_version == 3
     # non-held получил дефолты
-    assert off.automatic_version == 2
+    _assert_common_defaults(off)
     # honest counter: 1 применён, 1 пропущен
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
     assert "применены к 1" in sent

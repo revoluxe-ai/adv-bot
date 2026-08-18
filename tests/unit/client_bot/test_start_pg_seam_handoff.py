@@ -108,6 +108,7 @@ async def test_process_cabinet_api_hands_write_session_to_loaders() -> None:
     user_id_loader = AsyncMock(return_value=1)
     existing_token = SimpleNamespace(user_id=1)
     existing_token_loader = AsyncMock(return_value=existing_token)
+    open_existing_cabinet = AsyncMock(return_value=True)
     shop_id = "shop-101"
     validation_result = SimpleNamespace(
         is_valid_jwt=True,
@@ -141,6 +142,11 @@ async def test_process_cabinet_api_hands_write_session_to_loaders() -> None:
             "_load_existing_wb_token_in_session",
             existing_token_loader,
         ),
+        patch.object(
+            start_module,
+            "_open_existing_user_cabinet_by_shop_id",
+            open_existing_cabinet,
+        ),
         patch.object(start_module, "TokenPermissionsValidator", validator_ctor),
         patch.object(start_module.messages, "ShopUpdateInfo", MagicMock(return_value=AsyncMock())),
     ):
@@ -150,6 +156,13 @@ async def test_process_cabinet_api_hands_write_session_to_loaders() -> None:
     assert all(call.kwargs.get("read_only") is False for call in sm_mock.call_args_list)
     user_id_loader.assert_awaited_once_with(session, 606)
     existing_token_loader.assert_awaited_once_with(session, "x" * 32, shop_id)
+    open_existing_cabinet.assert_awaited_once_with(
+        bot=bot,
+        chat_id=505,
+        state=state,
+        user_id=1,
+        shop_id="shop-101",
+    )
     bot.send_message.assert_awaited_once_with(505, "Этот токен уже есть в системе.")
     state.clear.assert_awaited_once()
 

@@ -53,7 +53,6 @@ CH_SESSION_DDL_STATEMENTS: tuple[str, ...] = (
             clicks_state AggregateFunction(argMax, Int32, Float64),
             views_state AggregateFunction(argMax, Int32, Float64),
             spend_state AggregateFunction(argMax, Float64, Float64),
-            version Float64
         ) ENGINE = AggregatingMergeTree()
         PARTITION BY toYYYYMM(date)
         ORDER BY (adv_id, text, date)

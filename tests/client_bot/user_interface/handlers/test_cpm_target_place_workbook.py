@@ -364,6 +364,7 @@ async def test_download_target_place_template_caption_explains_excel_roundtrip()
     assert_no_raw_technical_text(caption)
 
 
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_download_target_place_template_is_blocked_when_auto_update_enabled(
     async_session: AsyncSession,

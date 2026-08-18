@@ -416,6 +416,7 @@ async def test_callback_start_registration_not_passed_gate_shows_gate() -> None:
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
     telegram_id = 71007
     chat_id = 71007
     callback = _make_callback(telegram_id, chat_id=chat_id)

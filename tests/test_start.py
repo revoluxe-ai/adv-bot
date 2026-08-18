@@ -11,6 +11,7 @@ from tests.factories.adv_factory import WBUserCabinetFactory
 
 
 @pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_get_wb_user_cabinet_success(async_session: AsyncSession):
     # Mock data

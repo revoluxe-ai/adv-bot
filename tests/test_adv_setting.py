@@ -8,6 +8,7 @@ from tests.factories import AdvSettingFactory
 
 
 @pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_update_and_get_adv_setting_success(async_session: AsyncSession):
     # Arrange
@@ -25,6 +26,7 @@ async def test_update_and_get_adv_setting_success(async_session: AsyncSession):
 
 
 @pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_update_and_get_adv_setting_not_found(async_session: AsyncSession):
     # Act & Assert
@@ -34,6 +36,7 @@ async def test_update_and_get_adv_setting_not_found(async_session: AsyncSession)
 
 
 @pytest.mark.integration
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_update_and_get_adv_setting_commit_failure(async_session: AsyncSession):
     # Arrange
