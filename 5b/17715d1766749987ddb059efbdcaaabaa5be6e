@@ -1,0 +1,22 @@
+.cursor/pipeline/META.md
+  s_3f873febd3acf8::t_f795eb52492a85 3,10-11,16-21
+.cursor/pipeline/GRAPH.md
+  s_3f873febd3acf8::t_890a1237e2371f 14,17-21,193,196,200,203,206,210,233,236,240
+  s_3f873febd3acf8::t_4cad8adc77fce8 897-907
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5b17715d1766749987ddb059efbdcaaabaa5be6e",
+  "prompts": {},
+  "sessions": {
+    "s_3f873febd3acf8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e63c29e-efed-410c-aabb-28c1cdf5bb12",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
