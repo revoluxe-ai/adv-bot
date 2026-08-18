@@ -1,0 +1,21 @@
+.cursor/commands/opsx-verify.md
+  s_f90334e1b4a6fd::t_485b00f792ae52 13-14
+.github/prompts/opsx-verify.prompt.md
+  s_f90334e1b4a6fd::t_2440e3d4ab8c6c 8-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "caaaf5b5faa8310d207572c2c24b565b0cf97133",
+  "prompts": {},
+  "sessions": {
+    "s_f90334e1b4a6fd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "383c5f8f-660c-4bc0-a768-f1d1070ee7cb",
+        "model": "grok-4.6"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
