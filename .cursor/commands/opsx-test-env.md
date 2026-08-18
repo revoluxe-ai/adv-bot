@@ -166,15 +166,29 @@ Follow `.cursor/rules/terminal.mdc`:
 - PowerShell-safe paths: `tests\docker-compose.test.yml`
 - Sequence with `;` not `&&`
 - Filter with `Select-String` / kubectl N/A here
-- Prefer:
+- Resolve Docker safely before invoking it:
+  1. Try `Get-Command docker.exe -CommandType Application` and accept only a
+     real executable whose resolved path ends in `.exe`.
+  2. If the plugin form is unavailable, try
+     `Get-Command docker-compose.exe -CommandType Application` once with the
+     same validation.
+  3. Store the validated path as `DOCKER_BIN` and invoke it with PowerShell's
+     call operator (`& $DOCKER_BIN ...`); never invoke bare `docker`,
+     `docker-compose`, or an extensionless/unknown command resolution.
+  4. If resolution returns an extensionless shim, alias, function, script, or
+     no executable, return `STATUS: UNAVAILABLE` with
+     `DOCKER_CAPABILITY: INVALID_RESOLUTION` and do not run compose.
+- For a validated Docker CLI with the Compose plugin, use:
 
 ```powershell
-docker compose -f tests\docker-compose.test.yml up -d
-docker compose -f tests\docker-compose.test.yml ps
-docker compose -f tests\docker-compose.test.yml down
+& $DOCKER_BIN compose -f tests\docker-compose.test.yml up -d
+& $DOCKER_BIN compose -f tests\docker-compose.test.yml ps
+& $DOCKER_BIN compose -f tests\docker-compose.test.yml down
 ```
 
-If `docker compose` unavailable, try `docker-compose` once; then `UNAVAILABLE`.
+For a validated legacy executable, omit the `compose` subcommand. If neither
+validated form works, return `STATUS: UNAVAILABLE`; never let Windows
+ShellExecute an unresolved path and open an “Open with” dialog.
 
 ## Probe procedure
 
@@ -205,11 +219,12 @@ DOWN success:
 1. Projectization gate.
 2. Confirm workspace root; `Test-Path tests\docker-compose.test.yml` (or equivalent).
 3. Resolve mode (`UP` default).
-4. Check Docker capability (`docker version` / `docker compose version`).
+4. Resolve and validate `DOCKER_BIN` using the executable-safe rules above.
+5. Check Docker/Compose capability through the validated `DOCKER_BIN` only.
 
 ### UP
 
-1. `docker compose -f tests\docker-compose.test.yml up -d`
+1. Invoke the selected plugin or legacy form through validated `DOCKER_BIN`.
 2. Wait bounded (healthcheck retries ~30–60s, not unbounded).
 3. Run probe procedure.
 4. Print destructive flag checklist status.
@@ -218,7 +233,7 @@ DOWN success:
 
 ### DOWN
 
-1. `docker compose -f tests\docker-compose.test.yml down`
+1. Invoke the selected plugin or legacy form through validated `DOCKER_BIN`.
 2. Probe PG/CH ports idle (best-effort).
 3. Remind: external Redis not stopped by this command.
 4. `NEXT_ACTION`: none required for infra; optional continue verify/archive if that was the plan.
@@ -257,6 +272,8 @@ Companions that should cite this (committed; apply via `/opsx-meta-fix-command-d
 ```text
 STATUS: OK | DEGRADED | BLOCKED | UNAVAILABLE | FAIL_CLOSED
 MODE: UP | DOWN | PROBE
+DOCKER_CAPABILITY: OK | MISSING | INVALID_RESOLUTION | UNKNOWN
+DOCKER_EXECUTABLE: <validated path> | not_resolved
 LOCAL_TEST_ENV_STATUS: UP | DOWN | DEGRADED | BLOCKED | UNKNOWN
 COMPOSE_FILE: tests/docker-compose.test.yml
 SERVICES:
@@ -285,7 +302,7 @@ DO_NOT_DO_YET:
 |-----------|--------|
 | No projectization | `FAIL_CLOSED` → `/opsx-projectize` |
 | Compose file missing | `FAIL_CLOSED` |
-| Docker unavailable | `UNAVAILABLE` |
+| Docker missing or invalid executable resolution | `UNAVAILABLE` |
 | UP but health never green | `BLOCKED` + logs tail (bounded) |
 | DOWN but containers linger | `DEGRADED` + exact `docker compose … down` retry |
 | Asked to mutate k8s/prod | refuse; point `/opsx-devops` only for cluster |
@@ -319,6 +336,7 @@ HANDOFF_CONTRACT:
 - [ ] Only `tests/docker-compose.test.yml` was used for mutate
 - [ ] Mode honored (`UP` default)
 - [ ] Redis described as external unless Owner enabled compose service
+- [ ] Docker executable resolved as a real `.exe`; no bare or extensionless invocation
 - [ ] No k8s/git/product edits
 - [ ] Explicit `NEXT_ACTION` and `DO_NOT_DO_YET`
 

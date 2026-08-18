@@ -1,3 +1,5 @@
+"""Интеграционные тесты обработчиков настроек кампании на disposable PG."""
+
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -312,7 +314,8 @@ async def test_wb_update_minus_keywords_raises_runtime_error_when_complex_adv_mi
             wb_manager_hub_factory_container=SimpleNamespace(
                 wb_manager_hub_factory=MagicMock(return_value=factory)
             )
-        )
+        ),
+        redis_client_wrapper=MagicMock(return_value=MagicMock()),
     )
     wb_shop_data_manager = SimpleNamespace(get_complex_advs=AsyncMock(return_value=[]))
     di_context = AsyncMock()
@@ -320,13 +323,16 @@ async def test_wb_update_minus_keywords_raises_runtime_error_when_complex_adv_mi
     di_context.__aexit__.return_value = None
 
     with (
-        patch("app.client_bot.user_interface.handlers.adv_setting.sm", mock_sm),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.DIManager.create",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            mock_sm,
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.DIManager.create",
             AsyncMock(return_value=di_context),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.WBShopDataManager",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.WBShopDataManager",
             MagicMock(return_value=wb_shop_data_manager),
         ),
     ):
@@ -367,7 +373,8 @@ async def test_wb_update_minus_keywords_keeps_soft_message_for_bot_inactive(
             wb_manager_hub_factory_container=SimpleNamespace(
                 wb_manager_hub_factory=MagicMock(return_value=factory)
             )
-        )
+        ),
+        redis_client_wrapper=MagicMock(return_value=MagicMock()),
     )
     wb_shop_data_manager = SimpleNamespace(
         get_complex_advs=AsyncMock(
@@ -384,13 +391,16 @@ async def test_wb_update_minus_keywords_keeps_soft_message_for_bot_inactive(
     di_context.__aexit__.return_value = None
 
     with (
-        patch("app.client_bot.user_interface.handlers.adv_setting.sm", mock_sm),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.DIManager.create",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            mock_sm,
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.DIManager.create",
             AsyncMock(return_value=di_context),
         ),
         patch(
-            "app.client_bot.user_interface.handlers.adv_setting.WBShopDataManager",
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.WBShopDataManager",
             MagicMock(return_value=wb_shop_data_manager),
         ),
     ):

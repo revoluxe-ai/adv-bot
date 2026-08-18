@@ -14,9 +14,9 @@ from sqlalchemy.pool import NullPool
 from app.db.migrate import MigrationOutcome, run_migration
 from tests.support.destructive_pg_dsn import require_validated_live_pg_dsn_or_skip
 
-pytestmark = [pytest.mark.integration, pytest.mark.destructive_local]
 
-
+@pytest.mark.integration
+@pytest.mark.destructive_local
 def test_run_migration_uses_live_pg_identity_lock_and_noop_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

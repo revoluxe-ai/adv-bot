@@ -12,9 +12,8 @@ from app.db.auto_update_minus_phrases_backfill import (
 )
 from tests.support.destructive_pg_dsn import require_validated_live_pg_dsn_or_skip
 
-pytestmark = pytest.mark.destructive_local
 
-
+@pytest.mark.destructive_local
 def test_live_backfill_classifies_paid_state_and_retries_idempotently() -> None:
     """Spec stage-landing-readiness: live PG доказывает classifier и retry."""
     db_url = require_validated_live_pg_dsn_or_skip()
