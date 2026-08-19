@@ -33,6 +33,13 @@ No production writes. No LLM route invention.
 | 16 | `16-top-level-timeout-defaults.md` | SUP-DEF-001 | empty clocks forbidden; §12.0 defaults mandatory |
 | 17 | `17-task-abort-execution-outcome-unknown.md` | SUP-DEF-002 | Task abort → PAUSED EXECUTION_OUTCOME_UNKNOWN |
 | 18 | `18-green-prose-without-path-rejected.md` | SUP-DEF-003 | prose GREEN without path → REJECTED |
+| 19 | `19-three-sequential-workers.md` | SUP-LIVE-001 | 3 workers success → TERMINAL_RESULT→ADVANCE→DISPATCH |
+| 20 | `20-completed-worker-not-running.md` | SUP-LIVE-002 | accepted worker MUST leave RUNNING |
+| 21 | `21-id-correlation-mismatch.md` | SUP-LIVE-003 | optional IDs absent OK; handle mismatch → PAUSED |
+| 22 | `22-reconciliation-no-graph-mutation.md` | SUP-LIVE-004 | unchanged fingerprint cannot reconcile/route loop |
+| 23 | `23-no-active-worker-dispatch-or-block.md` | SUP-LIVE-005 | unfinished + no active worker → dispatch or block |
+| 24 | `24-repeated-state-no-progress.md` | SUP-LIVE-006 | identical state → SUPERVISOR_NO_PROGRESS |
+| 25 | `25-manual-abort-after-progress.md` | SUP-LIVE-007 | abort ≠ explanation of prior NO_PROGRESS |
 
 ## Static matrix
 
@@ -52,3 +59,10 @@ No production writes. No LLM route invention.
 | top-level timeout defaults | 16 |
 | platform Task abort | 17 |
 | durable GREEN evidence gate | 18 |
+| sequential 3-worker progress | 19 |
+| completed worker not RUNNING | 20 |
+| handle correlation (optional IDs) | 21 |
+| reconcile loop guard | 22 |
+| no-active-worker dispatch-or-block | 23 |
+| SUPERVISOR_NO_PROGRESS | 24 |
+| abort vs prior no-progress | 25 |
