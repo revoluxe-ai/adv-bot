@@ -121,7 +121,13 @@ async def __get_wb_user_cabinet(
     *,
     session: AsyncSession,
     user_id: int,
-    shop_id: str):
+    shop_id: str,
+) -> WBUserCabinet:
+    """Загрузить привязку user↔cabinet по ``shop_id``.
+
+    Raises:
+        ValueError: Если строки ``WBUserCabinet`` для пары (user_id, shop_id) нет.
+    """
     stmt = (
         select(WBUserCabinet)
         .join(WBUserCabinet.wb_cabinet)
@@ -131,9 +137,17 @@ async def __get_wb_user_cabinet(
         )
     )
     result_ = await session.execute(stmt)
-    wb_user_cabinet_ = result_.scalar_one()
-    return wb_user_cabinet_
-
+    wb_user_cabinet = result_.scalar_one_or_none()
+    if wb_user_cabinet is None:
+        logger.warning(
+            "WBUserCabinet not found for user with existing token: user_id=%s shop_id=%s",
+            user_id,
+            shop_id,
+        )
+        raise ValueError(
+            f"WBUserCabinet not found for user_id={user_id} shop_id={shop_id!r}"
+        )
+    return wb_user_cabinet
 
 
 async def _open_existing_user_cabinet_by_shop_id(
@@ -143,8 +157,12 @@ async def _open_existing_user_cabinet_by_shop_id(
     state: FSMContext,
     user_id: int,
     shop_id: str,
-) -> bool:
-    """Open an existing user cabinet by shop_id when it is already linked to the user."""
+) -> None:
+    """Открыть существующий кабинет пользователя по ``shop_id``.
+
+    Raises:
+        ValueError: Если привязка user↔cabinet для ``shop_id`` не найдена.
+    """
     async with sm(read_only=True) as session:
         wb_user_cabinet = await __get_wb_user_cabinet(
             session=session, user_id=user_id, shop_id=shop_id
@@ -152,7 +170,6 @@ async def _open_existing_user_cabinet_by_shop_id(
 
     await state.update_data(last_wb_user_cabinet_original_id=wb_user_cabinet.id)
     await ShopMenu(bot, chat_id, state, wb_user_cabinet.id)()
-    return True
 
 
 sm = get_async_session_maker
@@ -379,9 +396,16 @@ async def callback_start_registration(
 ) -> None:
     """Вернуть в меню существующего User (menu-return); без ``create_user``.
 
-    PURE_READ: ``sm(read_only=True)``. Creation User остаётся на message
-    ``/start`` / write middleware. Missing User → gate при ``invite_gate``,
-    иначе early return без MainMenu.
+    PURE_READ: ``sm(read_only=True)``. Регистрация — только message ``/start``
+    (:func:`start_registration`), там ``create_user`` в WRITE-сессии.
+
+    Inline ``callbacks.Start`` — не onboarding: при отсутствии строки User в PG
+    показываем gate только если ``invite_gate`` (deferred / off by default);
+    иначе intentional early return (free-вход). Первый контакт —
+    кнопка START → message ``/start`` → User создаётся там.
+
+    Missing User без ``invite_gate`` — edge (PG wipe, tests, stale inline);
+    not prod onboarding. See invite-gate-deferred decision.
     """
 
     logger.debug(
@@ -418,6 +442,8 @@ async def callback_start_registration(
                     get_gate_message_text(),
                     reply_markup=get_gate_keyboard(),
                 )
+            # invite_gate deferred (default off): intentional no-op — not a bug.
+            # Callback Start does not create User; normal entry is message /start.
             return
 
         minimal = use_minimal_presentation_ui(user_id, user.passed_gate)
@@ -722,20 +748,13 @@ async def process_cabinet_api(
                 # Token already saved for the same user — nothing to change.
                 _= await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
-                opened_existing_cabinet = await _open_existing_user_cabinet_by_shop_id(
+                await _open_existing_user_cabinet_by_shop_id(
                     bot=bot,
                     chat_id=chat_id,
                     state=state,
                     user_id=user_id,
                     shop_id=shop_id,
                 )
-                if not opened_existing_cabinet:
-                    logger.warning(
-                        "Duplicate token for same user but no linked cabinet found: "
-                        "user_id=%s shop_id=%s",
-                        user_id,
-                        shop_id,
-                    )
                 return None
             else:
                 # Token belongs to another user — users must have unique tokens.
@@ -1023,20 +1042,13 @@ async def process_add_new_token(
                 # Token already saved for the same user — nothing to change.
                 _ = await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                 await state.clear()
-                opened_existing_cabinet = await _open_existing_user_cabinet_by_shop_id(
+                await _open_existing_user_cabinet_by_shop_id(
                     bot=bot,
                     chat_id=chat_id,
                     state=state,
                     user_id=user_id,
                     shop_id=shop_id,
                 )
-                if not opened_existing_cabinet:
-                    logger.warning(
-                        "Duplicate add-token request for same user but no linked cabinet "
-                        "found: user_id=%s shop_id=%s",
-                        user_id,
-                        shop_id,
-                    )
                 return None
             else:
                 # Token belongs to another user — users must have unique tokens.
@@ -1069,20 +1081,13 @@ async def process_add_new_token(
                 if normalized_existing_user_id == user_id:
                     _ = await bot.send_message(chat_id, "Этот токен уже есть в системе.")
                     await state.clear()
-                    opened_existing_cabinet = await _open_existing_user_cabinet_by_shop_id(
+                    await _open_existing_user_cabinet_by_shop_id(
                         bot=bot,
                         chat_id=chat_id,
                         state=state,
                         user_id=user_id,
                         shop_id=shop_id,
                     )
-                    if not opened_existing_cabinet:
-                        logger.warning(
-                            "Duplicate add-token IntegrityError for same user but no linked "
-                            "cabinet found: user_id=%s shop_id=%s",
-                            user_id,
-                            shop_id,
-                        )
                     return None
                 else:
                     _ = await bot.send_message(

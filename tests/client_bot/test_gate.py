@@ -228,8 +228,8 @@ async def test_gate_middleware_successful_payment_passes_through() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gate_middleware_presentation_only_passed_gate_allows_handler() -> None:
-    """In presentation_only mode, passed_gate user still gets full access."""
+async def test_gate_middleware_legacy_presentation_flag_passed_gate_allows_handler() -> None:
+    """Legacy PRESENTATION_ONLY=true does not change passed_gate bypass."""
     user = MagicMock(spec=User)
     user.passed_gate = True
     _, session_cm = make_session_context(user=user)
@@ -253,8 +253,8 @@ async def test_gate_middleware_presentation_only_passed_gate_allows_handler() ->
 
 
 @pytest.mark.asyncio
-async def test_gate_middleware_presentation_only_blocks_unknown_message() -> None:
-    """In presentation_only mode, arbitrary message should not reach handler."""
+async def test_gate_middleware_legacy_presentation_flag_blocks_unknown_message() -> None:
+    """Legacy PRESENTATION_ONLY=true still uses invite-gate block path."""
     user = MagicMock(spec=User)
     user.passed_gate = False
     _, session_cm = make_session_context(user=user)
@@ -283,8 +283,35 @@ async def test_gate_middleware_presentation_only_blocks_unknown_message() -> Non
 
 
 @pytest.mark.asyncio
-async def test_gate_middleware_presentation_only_allows_gate_invite_callback() -> None:
-    """In presentation_only mode, gate callback must open invite entry."""
+async def test_gate_middleware_allows_start_command_when_not_passed() -> None:
+    """Invite gate MUST whitelist /start so handler can show gate or free menu."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+    _, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=999050, is_bot=False, username="u")
+    event.chat = MagicMock(spec=Chat, id=999050)
+    event.text = "/start"
+    event.successful_payment = None
+    bot = AsyncMock()
+    data = {"bot": bot, "state": None}
+    handler = AsyncMock()
+
+    with patch("app.client_bot.middlewars.gate._sm", session_cm), patch(
+        "app.client_bot.middlewars.gate.settings"
+    ) as mock_settings:
+        mock_settings.presentation_only = False
+        mock_settings.invite_gate = True
+        await GateMiddleware()(handler, event, data)
+
+    handler.assert_awaited_once_with(event, data)
+    bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_gate_middleware_legacy_presentation_flag_allows_gate_invite_callback() -> None:
+    """Legacy PRESENTATION_ONLY=true still allows gate:* callbacks."""
     user = MagicMock(spec=User)
     user.passed_gate = False
     _, session_cm = make_session_context(user=user)
@@ -308,8 +335,8 @@ async def test_gate_middleware_presentation_only_allows_gate_invite_callback() -
 
 
 @pytest.mark.asyncio
-async def test_gate_middleware_presentation_only_allows_gate_invite_state_message() -> None:
-    """GateInvite:* state message must not be blocked."""
+async def test_gate_middleware_legacy_presentation_flag_allows_gate_invite_state_message() -> None:
+    """GateInvite:* state message must not be blocked (legacy flag irrelevant)."""
     user = MagicMock(spec=User)
     user.passed_gate = False
     _, session_cm = make_session_context(user=user)

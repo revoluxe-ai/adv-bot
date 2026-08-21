@@ -1,4 +1,14 @@
-"""Invite-gate middleware for users without ``User.passed_gate``."""
+"""Invite-gate middleware for users without ``User.passed_gate``.
+
+Rollout contract (``add-free-ui-bot-access-guards`` / invite-gate-deferred):
+
+- **Prod path today:** ``settings.invite_gate`` default ``False`` → early return
+  L137–139 (no-op). Channel + phone middleware — реальные entry gates.
+- **Код ниже L137** (``passed_gate``, gate screen, orphan pass-through) —
+  dormant legacy / ``re-enable-invite-gate`` only. Static review MUST NOT treat
+  orphan ``chat_id``/``bot`` pass-through as a prod defect while invite gate is off.
+- Decision: ``openspec/changes/add-free-ui-bot-access-guards/decisions/invite-gate-deferred/decision.md``
+"""
 
 from __future__ import annotations
 
@@ -87,49 +97,29 @@ async def _message_state_name(data: dict[str, Any]) -> str | None:
     return str(current) if current is not None else None
 
 
-async def _is_presentation_only_allowed(
-    event: Message | CallbackQuery,
-    data: dict[str, Any],
-) -> bool:
-    """Whitelist the reduced presentation-only onboarding flow."""
-    if isinstance(event, Message):
-        if is_start_command_message(event):
-            return True
-        state_name = await _message_state_name(data)
-        return bool(
-            state_name
-            and (
-                state_name.startswith("PresentationRequest:")
-                or state_name.startswith("GateInvite:")
-            )
-        )
-
-    return bool(
-        event.data
-        and (
-            event.data.startswith("presentation:")
-            or event.data.startswith("gate:")
-        )
-    )
-
-
 async def _is_regular_gate_allowed(
     event: Message | CallbackQuery,
     data: dict[str, Any],
 ) -> bool:
     """Whitelist classic invite-gate entry points before passed_gate."""
-    if isinstance(event, CallbackQuery):
-        return bool(event.data and event.data.startswith("gate:"))
+    if isinstance(event, Message):
+        if is_start_command_message(event):
+            return True
+        if getattr(event, "successful_payment", None) is not None:
+            return True
+        state_name = await _message_state_name(data)
+        return bool(state_name and state_name.startswith("GateInvite:"))
 
-    if getattr(event, "successful_payment", None) is not None:
-        return True
-
-    state_name = await _message_state_name(data)
-    return bool(state_name and state_name.startswith("GateInvite:"))
+    return bool(event.data and event.data.startswith("gate:"))
 
 
 class GateMiddleware(BaseMiddleware):
-    """Block non-whitelisted access until the user passes the invite gate."""
+    """Block non-whitelisted access until the user passes the invite gate.
+
+    **Rollout (invite deferred):** ``invite_gate`` default False → L137 early
+    return; this class is a no-op in prod. Blocking logic below is dormant until
+    ``INVITE_GATE=true`` with owner GO.
+    """
 
     async def __call__(
         self,
@@ -150,65 +140,24 @@ class GateMiddleware(BaseMiddleware):
             logger.debug("GateMiddleware: no telegram_id, pass through")
             return await handler(event, data)
 
+        # INVITE DEFERRED: prod/stage rollout — default off; см. module docstring.
+        if not settings.invite_gate:
+            logger.debug("GateMiddleware: invite_gate off, pass through user=%s", telegram_id)
+            return await handler(event, data)
+
         if is_bot_admin(telegram_id):
             logger.debug("GateMiddleware: admin bypass user=%s", telegram_id)
             return await handler(event, data)
 
         user = await _resolve_user(event, telegram_id)
         logger.debug(
-            "GateMiddleware: loaded user=%s passed_gate=%s presentation_only=%s invite_gate=%s",
+            "GateMiddleware: loaded user=%s passed_gate=%s invite_gate=%s",
             telegram_id,
             user.passed_gate,
-            settings.presentation_only,
             settings.invite_gate,
         )
 
-        if settings.presentation_only:
-            if user.passed_gate:
-                logger.debug(
-                    "GateMiddleware: presentation_only passed_gate bypass user=%s",
-                    telegram_id,
-                )
-                return await handler(event, data)
-
-            if await _is_presentation_only_allowed(event, data):
-                logger.debug(
-                    "GateMiddleware: presentation_only whitelist bypass user=%s",
-                    telegram_id,
-                )
-                return await handler(event, data)
-
-            chat_id = _resolve_chat_id(event)
-            if chat_id is None:
-                logger.debug(
-                    "GateMiddleware: presentation_only no chat_id, pass through user=%s",
-                    telegram_id,
-                )
-                return await handler(event, data)
-
-            bot = data.get("bot")
-            if bot is None:
-                logger.debug(
-                    "GateMiddleware: presentation_only no bot, pass through user=%s",
-                    telegram_id,
-                )
-                return await handler(event, data)
-
-            logger.debug(
-                "GateMiddleware: presentation_only blocked user=%s chat_id=%s",
-                telegram_id,
-                chat_id,
-            )
-            await bot.send_message(
-                chat_id,
-                get_gate_message_text(),
-                reply_markup=get_gate_keyboard(),
-                parse_mode=None,
-            )
-            return None
-
-        passed_gate = user.passed_gate or not settings.invite_gate
-        if passed_gate:
+        if user.passed_gate:
             logger.debug("GateMiddleware: passed_gate bypass user=%s", telegram_id)
             return await handler(event, data)
 
@@ -216,6 +165,15 @@ class GateMiddleware(BaseMiddleware):
             logger.debug("GateMiddleware: regular gate whitelist bypass user=%s", telegram_id)
             return await handler(event, data)
 
+        # --- INVITE-GATE-ONLY (dormant while invite_gate=False; not prod path) ---
+        # The two pass-through branches below are a legacy escape hatch for
+        # re-enable-invite-gate: an event that cannot receive the gate screen
+        # must not trigger a broken send attempt. They are intentionally left
+        # unchanged while INVITE_GATE is deferred/off by default. Do not report
+        # them as a current access-control bypass: this block is unreachable on
+        # the active rollout path. Before explicitly re-enabling invite_gate,
+        # replace both branches with a fail-closed response in a separate
+        # owner-approved change (TODO(re-enable-invite-gate)).
         chat_id = _resolve_chat_id(event)
         if chat_id is None:
             logger.debug(

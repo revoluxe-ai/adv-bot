@@ -49,7 +49,6 @@ from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.wb_adv_updater import data_manager
 from app.utils import redis_manager
-from app.utils.click_house.client import get_clickhouse_client
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -179,10 +178,10 @@ async def apply_keyword_ctr_boost_with_client(
         keyword_text,
         adv_ids,
     )
-    if keyword_setting.added_clicks:  # type: ignore[attr-defined]
-        clicks += keyword_setting.added_clicks  # type: ignore[attr-defined]
+    if keyword_setting.added_clicks:
+        clicks += keyword_setting.added_clicks
     if keyword_setting.added_views:  # type: ignore[attr-defined]
-        views += keyword_setting.added_views  # type: ignore[attr-defined]
+        views += cast(int, keyword_setting.added_views)
 
     new_ctr = min_ctr * (1 + boost_percent / 100)
     add_clicks = max([int(round(new_ctr * views - clicks)), 1])
@@ -207,28 +206,41 @@ async def setting_keywords_filter_by_query(
     await messages.FilterByQuery(bot, callback.message.chat.id)()
 
 
+async def _notify_adv_setting_not_found(bot: aiogram.Bot, chat_id: int) -> None:
+    """Сообщить пользователю, что РК по id не найдена."""
+    _ = await bot.send_message(chat_id, "Не удалось найти рекламную кампанию.")
+
+
 async def _load_adv_setting(
     session: AsyncSession,
     adv_original_id: int,
-) -> AdvSetting:
-    """Загрузить рекламную кампанию в переданной read-only PG-сессии."""
+) -> AdvSetting | None:
+    """Загрузить рекламную кампанию в переданной read-only PG-сессии.
+
+    Returns:
+        AdvSetting или ``None``, если строки с ``adv_original_id`` нет.
+    """
     stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
     result = await session.execute(stmt)
-    return result.scalar()
+    return result.scalar_one_or_none()
 
 
 async def _load_adv_setting_with_cabinet_in_session(
     session: AsyncSession,
     adv_original_id: int,
-) -> AdvSetting:
-    """Загрузить РК с кабинетом в переданной read-only PG-сессии."""
+) -> AdvSetting | None:
+    """Загрузить РК с кабинетом в переданной read-only PG-сессии.
+
+    Returns:
+        AdvSetting с ``wb_cabinet`` или ``None``, если РК нет.
+    """
     stmt = (
         select(AdvSetting)
         .options(selectinload(AdvSetting.wb_cabinet))
         .where(AdvSetting.id == adv_original_id)
     )
     result = await session.execute(stmt)
-    return result.scalar_one()
+    return result.scalar_one_or_none()
 
 
 async def _load_wb_user_cabinet_for_keyword_screen_in_session(
@@ -266,7 +278,7 @@ async def _load_user_in_session(
     result = await session.execute(
         select(User).where(User.user_telegram_id == telegram_user_id)
     )
-    return result.scalar()
+    return result.scalar_one_or_none()
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == "active_keywords"))
@@ -280,6 +292,10 @@ async def setting_keywords_active_keywords(
     adv_original_id = callback_data.adv_original_id
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.status == "good"]
     keyword_texts = [keyword.text for keyword in keywords]
@@ -288,7 +304,7 @@ async def setting_keywords_active_keywords(
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     if wb_user_cabinet_original_id is None:
         wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
@@ -327,6 +343,10 @@ async def setting_keywords_sort_by_ctr_desc(
     adv_original_id = callback_data.adv_original_id
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(
         adv_setting
     )
@@ -337,7 +357,7 @@ async def setting_keywords_sort_by_ctr_desc(
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
     assert callback.message is not None
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     if wb_user_cabinet_original_id is None:
         wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
@@ -378,6 +398,10 @@ async def setting_keywords_show_keywords_is_hard(
     adv_original_id = callback_data.adv_original_id
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 3]
     keyword_texts = [keyword.text for keyword in keywords]
@@ -386,7 +410,7 @@ async def setting_keywords_show_keywords_is_hard(
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     if wb_user_cabinet_original_id is None:
         wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
@@ -434,6 +458,10 @@ async def setting_keywords_white_list(
         page = 1
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [
         keyword
@@ -449,7 +477,7 @@ async def setting_keywords_white_list(
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     if wb_user_cabinet_original_id is None:
         wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
@@ -497,6 +525,10 @@ async def setting_keywords_white_list(
         page = 1
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 2]
     keywords.sort(key=lambda x: x.rating or 0, reverse=True)
@@ -506,7 +538,7 @@ async def setting_keywords_white_list(
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     if wb_user_cabinet_original_id is None:
         wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
@@ -573,6 +605,9 @@ async def setting_keywords_by_adv(
 
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        await _notify_adv_setting_not_found(bot, message.chat.id)
+        return
     adv_choice_last_page = state_data.get("adv_choice_last_page", 1)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     state_data = await state.get_data()
@@ -581,7 +616,9 @@ async def setting_keywords_by_adv(
         wb_user_cabinet = await _load_wb_user_cabinet_for_keyword_screen_in_session(
             session, message.from_user.id, adv_setting.wb_cabinet_id
         )
-    wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
+    if wb_user_cabinet is None:
+        raise RuntimeError("Не удалось найти кабинет пользователя для этой РК.")
+    wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
     main_photos = await data_manager.get_main_photos(nmids[:1])
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -619,6 +656,10 @@ async def keywords_daily_stats(
 
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, callback_data.adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
 
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         await KeywordsDailyStatsScreen(
@@ -645,12 +686,16 @@ async def setting_keywords_hide_keywords_is_hard(
     adv_original_id = callback_data.adv_original_id
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     await state.update_data(adv_choice_last_page=1)
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     if wb_user_cabinet_original_id is None:
         wb_user_cabinet_original_id = await get_wb_user_cabinet_id_or_none(
@@ -695,12 +740,16 @@ async def setting_keywords_hide_keywords_is_hard(
     adv_original_id = callback_data.adv_original_id
     async with _sm(read_only=True) as session:
         adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     await state.update_data(adv_choice_last_page=1)
     state_data = await state.get_data()
     wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
     main_photos = await data_manager.get_main_photos(nmids[:1])
     await redis_manager.set_check_last_24_hours(adv_original_id)
@@ -721,7 +770,7 @@ async def setting_keywords_hide_keywords_is_hard(
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == "by_adv")) # noqa
 async def setting_keywords_by_adv(
-    callback: callbacks.SettingKeywords,
+    callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
     state: FSMContext,
@@ -738,13 +787,17 @@ async def setting_keywords_by_adv(
         adv_setting = await _load_adv_setting_with_cabinet_in_session(
             session, adv_original_id
         )
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     page = callback_data.page
     await state.update_data(last_keyword_setting_page=page)
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get("adv_choice_last_page", 1)
-    user_id = cast(int, callback.from_user.id)
+    user_id = callback.from_user.id
     async with _sm(read_only=False) as session:
         wb_user_cabinet = await _load_wb_user_cabinet_for_keyword_screen_in_session(
             session, user_id, adv_setting.wb_cabinet_id
@@ -757,7 +810,9 @@ async def setting_keywords_by_adv(
             wb_user_cabinet.name = "Автодобавлен"
             session.add(wb_user_cabinet)
             await session.commit()
-    wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
+    if wb_user_cabinet is None:
+        raise RuntimeError("Не удалось найти кабинет пользователя для этой РК.")
+    wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
     if nmids:
         main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -765,7 +820,7 @@ async def setting_keywords_by_adv(
         await messages.NoMainPhotos(bot, callback.message.chat.id)(adv_setting)  # type: ignore[attr-defined]
         return
 
-    chat_id = callback.message.chat.id  # type: ignore[attr-defined]
+    chat_id = cast(types.Message, callback.message).chat.id
     await redis_manager.set_check_last_24_hours(adv_original_id)
     logger.debug("Обработка собщения")
     await messages.AdvKeywordsSetting(
@@ -809,7 +864,7 @@ async def setting_keyword(
     data = await state.get_data()
     page = data.get("last_keyword_setting_page", 1)
 
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     await messages.KeywordSettingMessage(
         bot, chat_id, keyword_setting_original_id, page,
         telegram_user_id=callback.from_user.id,
@@ -828,7 +883,9 @@ async def keyword_daily_history(
     await callback.answer()
     assert callback.message
 
-    async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
+    async with ChatActionSender.typing(
+        bot=bot, chat_id=cast(types.Message, callback.message).chat.id
+    ):
         await KeywordDailyHistoryScreen(
             bot=bot,
             chat_id=callback.message.chat.id,
@@ -852,9 +909,10 @@ async def change_keyword_hard_status(
     (peer: ``keyword_target_place_value``).
 
     Parent WRITE seam: ``_sm(read_only=False)`` →
-    ``change_keyword_hard_status_in_session``; CTR-boost path открывает
-    ``get_clickhouse_client()`` и передаёт client в
-    ``apply_keyword_ctr_boost_with_client``, затем commit.
+    ``change_keyword_hard_status_in_session``; legacy CTR-boost path отложен,
+    реальные UI hard_status остаются в диапазоне 0–4. Helper
+    ``apply_keyword_ctr_boost_with_client`` сохранён для возможного возврата
+    механики.
     """
     # TODO Показать ключи в в не индекса - не работает
     # TODO: Не работает кнопка Скрыть не релевантные фразы
@@ -871,7 +929,7 @@ async def change_keyword_hard_status(
             )
             if outcome.kind == "blocked":
                 await bot.send_message(
-                    callback.message.chat.id,
+                    cast(types.Message, callback.message).chat.id,
                     "Кампания в режиме A/B Hold — статус ключа "
                     "заморожен. Чтобы изменить статус, выключите A/B Hold "
                     "на экране режима.",
@@ -882,30 +940,32 @@ async def change_keyword_hard_status(
                 adv_setting = outcome.adv_setting
                 assert keyword_setting is not None
                 assert adv_setting is not None
-                adv_ids = set()
+                adv_ids: set[int] = set()
                 adv_ids.add(adv_setting.adv_id)
                 if search_adv_id := adv_setting.search_adv_id:
                     adv_ids.add(search_adv_id)
-                elif new_hard_status == -1:
-                    min_ctr = await data_manager.get_min_ctr(adv_setting)  # noqa
-                    async with get_clickhouse_client() as client:
-                        await apply_keyword_ctr_boost_with_client(
-                            client,
-                            keyword_setting=keyword_setting,
-                            keyword_text=keyword_setting.text,  # type: ignore[attr-defined]
-                            adv_ids=adv_ids,
-                            min_ctr=min_ctr,
-                        )
-
-                    await redis_manager.set_auto_block_status(
-                        keyword_setting_original_id, False
-                    )
+                # Отложенная старая CTR-boost механика; реальные UI hard_status
+                # остаются в диапазоне 0–4.
+                # elif new_hard_status == -1:
+                #     min_ctr = await data_manager.get_min_ctr(adv_setting)
+                #     async with get_clickhouse_client() as client:
+                #         await apply_keyword_ctr_boost_with_client(
+                #             client,
+                #             keyword_setting=keyword_setting,
+                #             keyword_text=keyword_setting.text,  # type: ignore[attr-defined]
+                #             adv_ids=adv_ids,
+                #             min_ctr=min_ctr,
+                #         )
+                #
+                #     await redis_manager.set_auto_block_status(
+                #         keyword_setting_original_id, False
+                #     )
 
                 await session.commit()
         data = await state.get_data()
         page = data.get("last_keyword_setting_page", 1)
 
-        chat_id = callback.message.chat.id
+        chat_id = cast(types.Message, callback.message).chat.id
         await messages.KeywordSettingMessage(
             bot, chat_id, keyword_setting_original_id, page,
             telegram_user_id=callback.from_user.id,
@@ -919,7 +979,7 @@ async def change_keyword_hard_status(
 async def setting_keywords_filter_by_query(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ):
-    text = message.text
+    text = message.text or ""
     if "/start" in text:
         await state.clear()
         await start_registration(message, bot, state)
@@ -932,12 +992,13 @@ async def setting_keywords_filter_by_query(
     if count_query < 0:
         count_query *= -1
     callback_data = await state.get_data()
-    adv_original_id = int(callback_data.get("last_adv_original_id"))
+    adv_original_id = int(cast(int, callback_data.get("last_adv_original_id")))
     await messages.LongTimeOperation(bot, message.chat.id)()
     async with _sm(read_only=False) as session:
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
+        adv_setting = await _load_adv_setting(session, adv_original_id)
+        if adv_setting is None:
+            await _notify_adv_setting_not_found(bot, message.chat.id)
+            return
         adv_setting.hide_small_query_keywords = count_query
         await session.commit()
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
@@ -965,7 +1026,9 @@ async def setting_keywords_filter_by_query(
         )
         wb_user_cabinet = await session.execute(stmt)
         wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
+    if wb_user_cabinet is None:
+        raise RuntimeError("Не удалось найти кабинет пользователя для этой РК.")
+    wb_user_cabinet_original_id = wb_user_cabinet.id
     nmids = adv_setting.nmids
     main_photos = await data_manager.get_main_photos(nmids[:1])
     chat_id = message.chat.id
@@ -1002,7 +1065,10 @@ async def reset_added_clicks(
         for keyword_setting in keyword_settings:
             keyword_setting.added_clicks = 0
         await session.commit()
-    await bot.send_message(callback.message.chat.id, "Добавленные клики сброшены")
+    await bot.send_message(
+        cast(types.Message, callback.message).chat.id,
+        "Добавленные клики сброшены",
+    )
     return
 
 
@@ -1035,7 +1101,7 @@ async def change_keyword_target_place_in_session(
             )
         return
     if keyword_setting.adv_setting and keyword_setting.adv_setting.auto_update_target_place:
-        _ = await state.set_state(state=None)
+        await state.set_state(state=None)
         if callback_query.message:
             _ = await bot.send_message(
                 callback_query.message.chat.id,
@@ -1063,7 +1129,7 @@ async def change_keyword_target_place_in_session(
     _ = await state.update_data(
         keyword_setting_for_target_place=keyword_setting_original_id
     )
-    _ = await state.set_state(states.KeywordTargetPlace.waiting_for_new_target_place)
+    await state.set_state(states.KeywordTargetPlace.waiting_for_new_target_place)
     if not callback_query.message:
         return
 
@@ -1111,8 +1177,9 @@ async def keyword_target_place_value_in_session(
             message.chat.id,
             "Не удалось определить ключ. Повторите выбор ключевого слова.",
         )
-        _ = await state.set_state()
+        await state.set_state()
         return
+    keyword_setting_original_id = cast(int, keyword_setting_original_id)
 
     text = message.text or ""
     try:
@@ -1139,7 +1206,7 @@ async def keyword_target_place_value_in_session(
             message.chat.id,
             "Не удалось найти ключ. Повторите выбор ключевого слова.",
         )
-        _ = await state.set_state()
+        await state.set_state()
         return
 
     adv_setting = keyword_setting.adv_setting
@@ -1150,7 +1217,7 @@ async def keyword_target_place_value_in_session(
         return
     if adv_setting.auto_update_target_place:
         _ = await state.update_data(keyword_setting_for_target_place=None)
-        _ = await state.set_state(state=None)
+        await state.set_state(state=None)
         _ = await bot.send_message(
             message.chat.id,
             get_auto_target_place_manual_change_locked_text(),
@@ -1164,7 +1231,7 @@ async def keyword_target_place_value_in_session(
             "на экране режима.",
         )
         _ = await state.update_data(keyword_setting_for_target_place=None)
-        _ = await state.set_state()
+        await state.set_state()
         return
     keyword_setting.target_place = target_place
     await session.commit()
@@ -1177,7 +1244,7 @@ async def keyword_target_place_value_in_session(
     _ = await messages.KeywordTargetPlaceUpdated(bot, message.chat.id, display_value)()
 
     page = data.get("last_keyword_setting_page", 1)
-    _ = await messages.KeywordSettingMessage(
+    await messages.KeywordSettingMessage(
         bot,
         message.chat.id,
         keyword_setting_original_id,
@@ -1186,7 +1253,7 @@ async def keyword_target_place_value_in_session(
     )()
 
     _ = await state.update_data(keyword_setting_for_target_place=None)
-    _ = await state.set_state()
+    await state.set_state()
 
 
 @router.message(StateFilter(states.KeywordTargetPlace.waiting_for_new_target_place))
@@ -1211,21 +1278,26 @@ async def show_only_on_out_index(
     if not page:
         page = 1
     async with _sm(read_only=True) as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
+        adv_setting = await _load_adv_setting(session, adv_original_id)
+    if adv_setting is None:
+        chat_id = cast(types.Message, callback.message).chat.id
+        await _notify_adv_setting_not_found(bot, chat_id)
+        return
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.position == 0]
-    keywords.sort(key=lambda x: x.predict_ctr, reverse=True)
+    keywords.sort(
+        key=lambda x: x.predict_ctr if x.predict_ctr is not None else 0.0,
+        reverse=True,
+    )
     keyword_texts = [keyword.text for keyword in keywords]
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=page)
     state_data = await state.get_data()
-    wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
+    wb_user_cabinet_original_id = cast(
+        int | None, state_data.get("last_wb_user_cabinet_original_id")
+    )
     nmids = adv_setting.nmids
-    chat_id = callback.message.chat.id
+    chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
 
     main_photos = await data_manager.get_main_photos(nmids[:1])  # type: ignore[attr-defined]

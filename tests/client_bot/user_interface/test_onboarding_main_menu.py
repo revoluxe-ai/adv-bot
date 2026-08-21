@@ -47,7 +47,7 @@ def test_main_menu_text_contains_key_phrases() -> None:
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 def test_get_main_menu_keyboard_regular_user_three_buttons(mock_settings) -> None:
-    """Regular user sees shops, balance, and invite buttons."""
+    """Regular user with invite_gate on sees shops, balance, and invite."""
     mock_settings.presentation_only = False
     mock_settings.invite_gate = True
     kb = get_main_menu_keyboard(999999, full_client_ui=True)
@@ -60,14 +60,15 @@ def test_get_main_menu_keyboard_regular_user_three_buttons(mock_settings) -> Non
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-def test_get_main_menu_keyboard_invite_visible_when_invite_gate_off(mock_settings) -> None:
-    """INVITE_GATE=false does not hide the invite button in the full menu."""
+def test_get_main_menu_keyboard_hides_invite_when_invite_gate_off(mock_settings) -> None:
+    """INVITE_GATE=false hides partner-invite button in the full menu."""
     mock_settings.presentation_only = False
     mock_settings.invite_gate = False
     kb = get_main_menu_keyboard(999999, full_client_ui=True)
-    assert_keyboard_has_buttons(kb, ["Показать инвайт"])
-    assert len(kb.inline_keyboard) == 3
-
+    assert_keyboard_has_buttons(kb, ["Мои магазины", "Мой баланс"])
+    texts = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "Показать инвайт" not in texts
+    assert len(kb.inline_keyboard) == 2
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 @patch("app.client_bot.admin_access.const.ADMINS", [123])
@@ -105,8 +106,14 @@ async def test_main_menu_calls_bot_send_message() -> None:
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-def test_get_main_menu_keyboard_presentation_only_shows_invite_entry(mock_settings) -> None:
-    """presentation_only minimal menu should open direct invite entry."""
+def test_get_main_menu_keyboard_legacy_minimal_branch_shows_invite_entry(
+    mock_settings,
+) -> None:
+    """Legacy helper: presentation_only + full_client_ui=False → invite-only kb.
+
+    Primary /start path no longer uses this branch
+    (``use_minimal_presentation_ui`` is always False).
+    """
     mock_settings.presentation_only = True
     kb = get_main_menu_keyboard(999999, full_client_ui=False)
     assert_keyboard_has_buttons(kb, ["Ввести инвайт"])

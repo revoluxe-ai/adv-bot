@@ -293,4 +293,5 @@ async def test_save_user_phone_replays_pending_callback() -> None:
     )
     assert replay_update.callback_query is not None
     assert replay_update.callback_query.data == "adv:test"
+    assert replay_update.update_id < 0
     state.update_data.assert_awaited_once_with(pending_phone_callback=None)

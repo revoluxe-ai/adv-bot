@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 from datetime import datetime
 from typing import Any
@@ -10,6 +11,17 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import CallbackQuery, Update
 
 _dispatcher: Dispatcher | None = None
+# Отрицательные id — synthetic replay; не пересекаются с live Telegram update_id (>0).
+_synthetic_update_id_counter = itertools.count(-1, -1)
+
+
+def allocate_synthetic_update_id() -> int:
+    """Выделить уникальный synthetic ``update_id`` для ``feed_update`` replay.
+
+    Telegram ``update_id`` монotonic positive; replay после gate использует
+    отрицательную монotonic-последовательность, чтобы не подставлять ``message_id``.
+    """
+    return next(_synthetic_update_id_counter)
 
 
 def _json_scalar(value: Any, default: Any) -> Any:
@@ -58,7 +70,6 @@ async def replay_serialized_callback(
     bot: Bot,
     serialized_callback: str,
     *,
-    update_id: int,
     dispatcher: Dispatcher | None = None,
 ) -> None:
     """Replay a previously serialized callback query through the dispatcher."""
@@ -66,7 +77,10 @@ async def replay_serialized_callback(
     if target_dispatcher is None:
         raise RuntimeError("Dispatcher is not registered for callback replay.")
     callback_query = CallbackQuery.model_validate(json.loads(serialized_callback))
-    replay_update = Update(update_id=update_id, callback_query=callback_query)
+    replay_update = Update(
+        update_id=allocate_synthetic_update_id(),
+        callback_query=callback_query,
+    )
     await target_dispatcher.feed_update(bot, replay_update)
 
 

@@ -840,12 +840,35 @@ class LongTimeOperation(Text):
 
 
 class NeedSubscribe(TextWithKeyboard):
+    """Экран для пользователя, чья подписка явно не подтверждена."""
+
     @property
     def text(self) -> str:
         return (
             "Для использования функций вы должны быть подписаны на канал службы поддержки.\n\n"
             "Подпишитесь на канал, затем нажмите «Проверить подписку». "
             "После проверки бот откроет доступ к функциям."
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_subscribe_keyboard()
+
+
+class SubscriptionCheckUnavailable(TextWithKeyboard):
+    """Экран временной ошибки проверки подписки.
+
+    Не утверждает, что пользователь не подписан: Telegram API мог быть
+    недоступен. Доступ при этом остаётся закрытым (fail-closed), а кнопка
+    повторной проверки сохраняет штатный recovery path.
+    """
+
+    @property
+    def text(self) -> str:
+        return (
+            "Сейчас не удалось проверить подписку на канал службы поддержки.\n\n"
+            "Доступ временно закрыт до успешной проверки. "
+            "Попробуйте повторить проверку через минуту."
         )
 
     @property

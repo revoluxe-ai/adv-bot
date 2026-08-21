@@ -73,6 +73,7 @@ class PhoneRequiredMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         access_granted = user.passed_gate or not settings.invite_gate
+        # invite deferred: default invite_gate=False → access_granted True (phone-only gate)
         logger.debug(
             "PhoneRequiredMiddleware: user=%s passed_gate=%s has_phone=%s access_granted=%s",
             telegram_id,

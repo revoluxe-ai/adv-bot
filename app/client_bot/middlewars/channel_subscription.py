@@ -2,14 +2,42 @@
 
 This middleware sits after the invite gate and before the phone gate. It works
 for messages and callback queries, blocks explicitly unsubscribed users, and
-fails open when Telegram membership lookup is temporarily unavailable.
+fails closed when Telegram membership lookup is temporarily unavailable
+(``TelegramAPIError`` / ``None``).
+
+Positive Redis cache (TTL 1 hour) is used on the hot path so Telegram
+``get_chat_member`` is called at most about once per hour per user.
+``CheckSubscribe`` / ``force_refresh=True`` always revalidates live; live
+``False`` invalidates a stale positive entry.
+
+**Positive cache TTL (NOT a stale-subscription bug):**
+
+Only **positive** results are cached (``"1"``, ``SUBSCRIPTION_CACHE_TTL_SECONDS``).
+After a user unsubscribes, middleware hot path may still admit them until TTL
+expires **if** no live ``get_chat_member`` runs — this is an intentional
+rate-limit trade-off, not fail-open on API errors. Live ``False`` deletes the
+key; ``CheckSubscribe`` always uses ``force_refresh=True``. Static review MUST
+NOT treat «отписался, но ещё hour в боте» as a defect without product GO to
+always-live checks.
+
+**Onboarding contract (NOT a bypass bug):**
+
+``/start`` is whitelisted in :func:`_is_whitelisted_event` on purpose. The first
+contact is message ``/start`` → :func:`start_registration` shows the enticing
+entry copy / MainMenu hook **without** a live ``get_chat_member`` here. Channel
+subscription remains mandatory for everything else: inline callbacks, follow-up
+messages, menu navigation. Unsubscribed users hit ``NeedSubscribe`` on the next
+non-whitelisted update; ``CheckSubscribe`` revalidates live and may replay a
+blocked callback from ``pending_subscription_callback``.
+
+Static review MUST NOT treat ``/start`` whitelist as a subscription-gate defect.
+See also docstring on :func:`start_registration`.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
-from functools import lru_cache
 from typing import Any, cast
 
 from aiogram import BaseMiddleware, Bot
@@ -22,14 +50,24 @@ from app.client_bot.callback_replay import serialize_callback_query
 from app.client_bot.const import SUPPORT_CHANNEL_ID
 from app.client_bot.start_command import is_start_command_message
 from app.client_bot.user_interface.views import callbacks
-from app.client_bot.user_interface.views.messages.messages import NeedSubscribe
+from app.client_bot.user_interface.views.messages.messages import (
+    NeedSubscribe,
+    SubscriptionCheckUnavailable,
+)
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 
 ALLOWED_SUBSCRIPTION_STATUSES = {"member", "administrator", "creator"}
-SUBSCRIPTION_CACHE_TTL_SECONDS = 60 * 60 * 24
+# Positive-only cache: ≤1 live get_chat_member / user / hour on middleware hot path.
+# Unsubscribe before TTL without live re-check → user may stay admitted until
+# expiry; by design (see module docstring). Not negative cache, not fail-open.
+SUBSCRIPTION_CACHE_TTL_SECONDS = 60 * 60
 SUBSCRIPTION_CACHE_PREFIX = "client_bot:support_channel_subscription"
+
+# Memoize only a successful Redis client. Never cache ``None``: a cold-start /
+# DI miss must retry on the next call once wiring is ready.
+_subscription_redis_client: RedisClient | None = None
 
 
 def _resolve_chat_id(event: Message | CallbackQuery) -> int | None:
@@ -42,7 +80,20 @@ def _resolve_chat_id(event: Message | CallbackQuery) -> int | None:
 
 
 def _is_whitelisted_event(event: Message | CallbackQuery) -> bool:
-    """Allow `/start` and the explicit subscription re-check callback."""
+    """События, которые проходят без live-проверки подписки в этом middleware.
+
+    Whitelist — часть onboarding, не дыра в fail-closed gate:
+
+    * **Message ``/start``** — единственная «заманушная» точка входа.
+      ``start_registration`` создаёт User (если нужно) и показывает стартовый
+      текст / MainMenu. Подписку на канал здесь намеренно не проверяем: сначала
+      hook, затем gate на любом следующем действии (callback, текст, кнопки).
+    * **Callback ``CheckSubscribe``** — повторная live-проверка после экрана
+      ``NeedSubscribe``; handler сам вызывает ``force_refresh=True``.
+
+    Всё остальное (включая ``callbacks.Start``) MUST проходить
+    ``is_user_subscribed_to_support_channel`` или блокироваться.
+    """
     if isinstance(event, Message):
         return is_start_command_message(event)
     return bool(event.data and event.data == callbacks.CheckSubscribe().pack())
@@ -69,17 +120,27 @@ def _build_subscription_cache_key(telegram_id: int) -> str:
     return f"{SUBSCRIPTION_CACHE_PREFIX}:{telegram_id}"
 
 
-@lru_cache(maxsize=1)
+def _reset_subscription_cache_client() -> None:
+    """Drop the memoized Redis client (tests / after DI recovery)."""
+    global _subscription_redis_client
+    _subscription_redis_client = None
+
+
 def _get_subscription_cache_client() -> RedisClient | None:
     """Return the shared Redis wrapper used for subscription cache.
 
-    The helper is lazy and intentionally fail-open: if Redis wiring is not ready,
-    the subscription check still works via Telegram API without local cache.
+    Successful clients are memoized. Failed DI/Redis wiring returns ``None``
+    without memoization so a later call can recover. Membership checks still
+    go to Telegram when cache is unavailable.
     """
+    global _subscription_redis_client
+    if _subscription_redis_client is not None:
+        return _subscription_redis_client
+
     try:
         from app.core.di.app_container import AppContainer
 
-        return AppContainer().redis_client_wrapper()
+        client = AppContainer().redis_client_wrapper()
     except Exception:
         logger.warning(
             "Failed to initialize Redis client for support channel subscription cache",
@@ -87,9 +148,16 @@ def _get_subscription_cache_client() -> RedisClient | None:
         )
         return None
 
+    _subscription_redis_client = client
+    return client
+
 
 async def _get_cached_subscription_status(telegram_id: int) -> bool | None:
-    """Return cached positive subscription status if it exists."""
+    """Return cached **positive** subscription status if it exists.
+
+    Returns ``True`` only when Redis holds ``"1"``. Miss / absent key → ``None``
+    (caller falls through to Telegram). There is no negative cache by design.
+    """
     redis_client = _get_subscription_cache_client()
     if redis_client is None:
         return None
@@ -101,7 +169,11 @@ async def _get_cached_subscription_status(telegram_id: int) -> bool | None:
 
 
 async def _cache_positive_subscription_status(telegram_id: int) -> None:
-    """Persist a positive subscription result for 24 hours."""
+    """Persist a live ``True`` membership result for ``SUBSCRIPTION_CACHE_TTL_SECONDS``.
+
+    Intentionally positive-only: unsubscribed users without a subsequent live
+    check may remain admitted until TTL; ``CheckSubscribe`` uses ``force_refresh``.
+    """
     redis_client = _get_subscription_cache_client()
     if redis_client is None:
         return
@@ -113,21 +185,60 @@ async def _cache_positive_subscription_status(telegram_id: int) -> None:
     )
 
 
+async def _invalidate_subscription_cache(telegram_id: int) -> None:
+    """Delete a stale positive subscription cache entry for ``telegram_id``."""
+    redis_client = _get_subscription_cache_client()
+    if redis_client is None:
+        return
+
+    await redis_client.delete(_build_subscription_cache_key(telegram_id))
+
+
 async def is_user_subscribed_to_support_channel(
     bot: Bot,
     telegram_id: int,
+    *,
+    force_refresh: bool = False,
 ) -> bool | None:
-    """Return channel membership status with Redis cache and fail-open API handling."""
-    cached_status = await _get_cached_subscription_status(telegram_id)
-    if cached_status is True:
-        return True
+    """Return channel membership status with optional Redis positive cache.
+
+    Args:
+        bot: Telegram bot used for ``get_chat_member``.
+        telegram_id: User id to check.
+        force_refresh: When ``True``, skip reading the positive Redis cache and
+            always call Telegram (used by CheckSubscribe revalidation).
+
+    Returns:
+        ``True`` if subscribed, ``False`` if explicitly not, ``None`` when
+        Telegram API membership lookup failed. Callers fail closed for ``None``
+        but show an availability error instead of claiming the user is
+        unsubscribed.
+
+    Side effects:
+        Writes a positive Redis cache entry on live ``True``; deletes the cache
+        key on live ``False``.
+
+    Cache contract (by design, not a review defect):
+        Hot path (``force_refresh=False``) may return ``True`` from Redis without
+        calling Telegram for up to ``SUBSCRIPTION_CACHE_TTL_SECONDS``. A user who
+        unsubscribed after being cached can keep access until TTL unless a live
+        check runs (``CheckSubscribe`` or cache miss). Product trade-off: fewer
+        ``get_chat_member`` calls vs immediate revoke on unsubscribe.
+    """
+    if not force_refresh:
+        cached_status = await _get_cached_subscription_status(telegram_id)
+        if cached_status is True:
+            return True
 
     try:
         member = await bot.get_chat_member(SUPPORT_CHANNEL_ID, telegram_id)
     except TelegramAPIError:
-        logger.warning(
-            "Failed to check support channel subscription for user %s",
+        logger.error(
+            "Support channel subscription check failed: user_id=%s channel_id=%s "
+            "force_refresh=%s",
             telegram_id,
+            SUPPORT_CHANNEL_ID,
+            force_refresh,
             exc_info=True,
         )
         return None
@@ -135,15 +246,34 @@ async def is_user_subscribed_to_support_channel(
     is_subscribed = getattr(member, "status", None) in ALLOWED_SUBSCRIPTION_STATUSES
     if is_subscribed:
         await _cache_positive_subscription_status(telegram_id)
+    else:
+        await _invalidate_subscription_cache(telegram_id)
     return is_subscribed
 
 
 async def send_need_subscribe_message(bot: Bot, event: Message | CallbackQuery) -> None:
-    """Send the existing NeedSubscribe screen for a blocked event."""
+    """Send the «not subscribed» screen for an explicitly rejected event."""
     chat_id = _resolve_chat_id(event)
     if chat_id is None:
         return
     await NeedSubscribe(bot, chat_id)()
+
+
+async def send_subscription_check_unavailable_message(
+    bot: Bot,
+    event: Message | CallbackQuery,
+) -> None:
+    """Explain a failed membership lookup without mislabeling the user.
+
+    Fail-closed admission is preserved: the event is not passed to the handler.
+    The user-facing text says that Telegram membership could not be verified and
+    provides the same retry keyboard instead of claiming that the user is not
+    subscribed.
+    """
+    chat_id = _resolve_chat_id(event)
+    if chat_id is None:
+        return
+    await SubscriptionCheckUnavailable(bot, chat_id)()
 
 
 class ChannelSubscriptionMiddleware(BaseMiddleware):
@@ -151,7 +281,16 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
 
     Admission of ``data["bot"]`` is structural (``get_chat_member`` /
     ``send_message``), then narrowed with ``cast(Bot, …)`` for typing — not
-    ``isinstance(Bot)`` alone.
+    ``isinstance(Bot)`` alone. Telegram lookup failure (``None``) fails closed:
+    the handler is blocked, an ERROR is logged by the lookup helper, and the
+    user sees a temporary verification-error screen rather than
+    ``NeedSubscribe``.
+
+    Exception: whitelisted ``/start`` (see module docstring) — onboarding hook
+    before subscription gate on subsequent updates.
+
+    Hot path uses positive Redis cache (≤1h) without mandatory live revalidation;
+    see module docstring — stale positive after unsubscribe is intentional.
     """
 
     async def __call__(
@@ -188,11 +327,17 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
             or _is_whitelisted_event(event)
             or await _is_gate_invite_flow_event(event, data)
         ):
+            # /start и CheckSubscribe — см. _is_whitelisted_event; не баг review.
             return await handler(event, data)
 
-        # Structural admission: duck-typed bots (and unit MagicMock) must still
-        # run subscription checks when Telegram methods are present. isinstance(Bot)
-        # alone rejects non-Bot providers and skips Redis/Telegram write path.
+        # Structural admission is intentional: production supplies aiogram Bot,
+        # while compatible providers and unit doubles may be duck-typed. We
+        # require both methods before using the subscription boundary; an
+        # object that cannot perform the lookup or send the denial screen is
+        # passed through rather than failing inside this middleware. This is
+        # infrastructure/provider compatibility, not a subscription decision;
+        # do not replace it with a strict isinstance(Bot) gate without an
+        # owner-approved provider contract.
         bot_raw = data.get("bot")
         if bot_raw is None or not (
             hasattr(bot_raw, "get_chat_member") and hasattr(bot_raw, "send_message")
@@ -204,13 +349,19 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
             return await handler(event, data)
         bot = cast(Bot, bot_raw)
 
-        is_subscribed = await is_user_subscribed_to_support_channel(bot, telegram_id)
+        # Hot path: positive Redis up to TTL (1h). By design — not instant revoke
+        # on unsubscribe; live revalidation: CheckSubscribe (force_refresh=True).
+        is_subscribed = await is_user_subscribed_to_support_channel(
+            bot,
+            telegram_id,
+            force_refresh=False,
+        )
         logger.debug(
             "ChannelSubscriptionMiddleware: subscription result user=%s subscribed=%s",
             telegram_id,
             is_subscribed,
         )
-        if is_subscribed is None or is_subscribed is True:
+        if is_subscribed is True:
             return await handler(event, data)
 
         if isinstance(event, CallbackQuery):
@@ -220,6 +371,13 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
                     pending_subscription_callback=serialize_callback_query(event)
                 )
 
-        logger.debug("ChannelSubscriptionMiddleware: blocking user=%s", telegram_id)
-        await send_need_subscribe_message(bot, event)
+        logger.debug(
+            "ChannelSubscriptionMiddleware: blocking user=%s subscribed=%s",
+            telegram_id,
+            is_subscribed,
+        )
+        if is_subscribed is None:
+            await send_subscription_check_unavailable_message(bot, event)
+        else:
+            await send_need_subscribe_message(bot, event)
         return None

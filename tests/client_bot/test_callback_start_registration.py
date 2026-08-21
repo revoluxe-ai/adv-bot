@@ -197,11 +197,12 @@ async def test_callback_start_registration_missing_user_invite_gate_off_no_creat
 
 
 @pytest.mark.asyncio
-async def test_callback_start_registration_presentation_only_minimal_menu() -> None:
-    """presentation_only + not passed_gate → MainMenu(full_client_ui=False), не gate."""
+async def test_callback_start_registration_presentation_only_still_shows_gate() -> None:
+    """Legacy PRESENTATION_ONLY=true + not passed_gate → gate, не minimal MainMenu."""
     bot = AsyncMock()
     state = MagicMock()
     state.clear = AsyncMock()
+    state.set_state = AsyncMock()
     telegram_id = 71003
     chat_id = 71003
     callback = _make_callback(telegram_id, chat_id=chat_id)
@@ -239,14 +240,12 @@ async def test_callback_start_registration_presentation_only_minimal_menu() -> N
         ),
         patch("app.client_bot.admin_access.settings", mock_settings),
     ):
-        menu_instance = AsyncMock()
-        mock_main_menu.return_value = menu_instance
         await callback_start_registration(callback, bot, state)
 
     mock_create_user.assert_not_awaited()
-    mock_main_menu.assert_called_once_with(bot, chat_id, full_client_ui=False)
-    menu_instance.assert_awaited_once()
-    bot.send_message.assert_not_awaited()
+    mock_main_menu.assert_not_called()
+    bot.send_message.assert_awaited_once()
+    state.set_state.assert_awaited_once()
 
 
 @pytest.mark.asyncio

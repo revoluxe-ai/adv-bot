@@ -304,6 +304,7 @@ async def test_turn_adv_off_applies_free_transition() -> None:
     wb_user_cabinet_result.scalar_one.return_value = wb_user_cabinet
     adv_result = MagicMock()
     adv_result.scalar_one.return_value = adv
+    adv_result.scalar_one_or_none.return_value = adv
     session.execute = AsyncMock(side_effect=[wb_user_cabinet_result, adv_result])
     adv_menu_call = AsyncMock()
     adv_menu_ctor = MagicMock(return_value=adv_menu_call)

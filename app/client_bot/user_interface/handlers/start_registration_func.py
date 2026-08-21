@@ -18,7 +18,17 @@ logger = logging.getLogger(__name__)
 
 
 async def start_registration(message: Message, bot: Bot, state: FSMContext) -> None:
-    """Стартовая регистрация/меню: создаёт User при отсутствии и отдаёт gate или MainMenu."""
+    """Стартовая регистрация: User + gate или MainMenu после message ``/start``.
+
+    **Channel subscription:** handler вызывается, когда ``/start`` прошёл whitelist
+    в ``ChannelSubscriptionMiddleware`` — live ``get_chat_member`` здесь не
+    делаем намеренно. Показываем «заманушный» стартовый экран; обязательная
+    подписка включается на следующих апдейтах (любой callback/сообщение кроме
+    whitelist). Это продуктовый контракт onboarding, не пропуск gate.
+
+    Invite gate (``settings.invite_gate``) и phone gate — отдельные middleware /
+    ветки ниже по цепочке.
+    """
     if message.from_user is None:
         raise ValueError("start_registration requires message.from_user")
     from_user = message.from_user
