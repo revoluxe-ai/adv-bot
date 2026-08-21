@@ -1,0 +1,29 @@
+scripts/wb_api_readonly_ops/collect/runner.py
+  s_de94f11c688d9e::t_65b5b06fa66af2 24-26
+  s_de94f11c688d9e::t_de3d0382c4cb7a 65-70
+  s_de94f11c688d9e::t_6b7fb370c4f446 115,129-133
+  s_de94f11c688d9e::t_65a3f437d50789 82-87
+  s_de94f11c688d9e::t_c413650a1adacc 106-111
+  s_de94f11c688d9e::t_d5914a1e5daa84 116
+  s_de94f11c688d9e::t_3234dc8d1883a2 232-239
+  s_de94f11c688d9e::t_341381135f2fe0 146-150
+scripts/wb_api_readonly_ops/collect/funnel.py
+  s_de94f11c688d9e::t_4e44acb930efb2 36-37,43-54
+  s_de94f11c688d9e::t_a3704ebdd6263b 77-78,85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "4e6198ab59a55778e4fa72788da62f13b332d12d",
+  "prompts": {},
+  "sessions": {
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
