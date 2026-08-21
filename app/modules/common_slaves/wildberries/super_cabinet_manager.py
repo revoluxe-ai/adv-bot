@@ -94,25 +94,14 @@ async def get_access_for_wb_cabinet(
             if token.shop_id == shop_id:
                 valited_tokens.append(token)
         if not valited_tokens:
-            # Keep historical side effect expected by unit tests and callers:
-            # when access is forbidden due to missing personal tokens, mark cabinet inactive.
-            wb_cabinet.active = False
-            await session.commit()
-            shop_id_for_deactivate = shop_id
+            return None
         else:
             access = WBCabinetAccess(
                 tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
             )
             return access
 
-    if shop_id_for_deactivate is not None:
-        await deactivate_cabinet_atomic_with_user_trackers(
-            shop_id_for_deactivate,
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
-        raise ApiForbiddenError(
-            f"Нет валидных токенов для кабинета с shop_id {shop_id_for_deactivate}"
-        )
+    
 
 
 async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
