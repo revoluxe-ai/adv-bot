@@ -1,0 +1,34 @@
+scripts/wb_api_readonly_ops/collect/normqueries.py
+  s_de94f11c688d9e::t_0e9dc5d7eeaf92 19-33
+  s_de94f11c688d9e::t_cdc0a5e8ae105a 98-113,115-116
+tests/unit/scripts/wb_api_readonly_ops/test_collect_core.py
+  s_de94f11c688d9e::t_dd82e0397e18be 300-346,348-353
+  s_de94f11c688d9e::t_dc1806479598da 347
+  s_de94f11c688d9e::t_521422300f611d 492-534
+  s_de94f11c688d9e::t_5b0de01731b5df 8
+  s_de94f11c688d9e::t_17a4c701e33a71 33-38
+  s_de94f11c688d9e::t_40461e7aa9edee 32
+  s_de94f11c688d9e::t_5a71dd30088d3c 7
+scripts/wb_api_readonly_ops/collect/funnel.py
+  s_de94f11c688d9e::t_d85b103badeef4 67-71,85
+scripts/wb_api_readonly_ops/collect/jsonable.py
+  s_de94f11c688d9e::t_9341a0bb3d844d 5-6,13-14
+scripts/wb_api_readonly_ops/collect/runner.py
+  s_de94f11c688d9e::t_1cb809e191cb47 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "75fd7cb989a4517203ba35c4484b29e9fe9056d3",
+  "prompts": {},
+  "sessions": {
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
