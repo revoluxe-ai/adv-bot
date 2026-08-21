@@ -219,7 +219,9 @@ Intentional **no-PR** publish path for scripts ops (triggers
    `git push -u origin HEAD` (equivalent: `git push -u origin scripts`).
 5. **Forbidden:** `--force` / `--force-with-lease`, push to other remotes or
    branch names, `git merge`, `git rebase`, `git reset`, commit from this mode.
-6. On success: report remote tip; remind Harbor/GHCR tags `:scripts` and sha;
+6. On success: report remote tip; remind GHCR publish tags `:scripts` and sha,
+   and the cluster Job pull ref
+   `harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<sha>`;
    `STATUS=PUSHED`; `NEXT_ACTION` wait for workflow then
    `/opsx-scripts PLAN_RUN` or `RUN GO` with `image=`.
 7. On push failure: `STATUS=BLOCKED`; no retry loop; leave remote as-is.
@@ -233,17 +235,28 @@ result. Do not return intermediate “push/wait/run again” instructions when
 the command can continue itself.
 
 1. Validate the RUN GO gate and restate one `SCRIPTS_RUN_PLAN`.
-2. Resolve image readiness:
-   - when the supplied immutable image is already pullable, use it;
+2. Resolve image readiness (Harbor proxy-cache only for cluster Jobs):
+   - default `IMAGE_REF`:
+     `harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<commit-sha>`;
+   - GHCR `ghcr.io/revoluxe-ai/adv-bot:<sha>` is CI publication only — **never**
+     use it in Job YAML and **never** create a GHCR pull secret;
+   - when `image=` is supplied, it must already be a Harbor proxy-cache ref
+     (or another cluster-pullable ref Owner explicitly scoped); do not silently
+     rewrite `ghcr.io/...` to Harbor or vice versa;
    - otherwise, on branch `scripts`, inspect local/remote tips and the matching
      `deploy_scripts.yml` run by head SHA;
    - if the remote lacks the current clean-enough tip, run the same allowlisted
      non-force `git push -u origin HEAD` authorized by this RUN GO;
-   - never require an additional `PUSH GO`.
+   - never require an additional `PUSH GO`;
+   - after GHA GHCR publish succeeds, treat Harbor proxy pull-through as ready;
+     if Job still hits `ErrImagePull`/`ImagePullBackOff` after the one allowed
+     image-race retry, stop with explicit image-readiness failure — no fallback
+     to direct GHCR.
 3. Monitor the matching GHA run to terminal state (default timeout **20 min**).
    Stay in this invocation; use bounded polling / `gh run watch`, not a
-   “wait and invoke me again” response. On success prefer the immutable Harbor
-   `:<pushed-commit-sha>` ref over mutable `:scripts`.
+   “wait and invoke me again” response. On success use the immutable Harbor
+   proxy ref `harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<pushed-commit-sha>`
+   (not mutable `:scripts`, not `ghcr.io/...`).
 4. Render the Job, run client dry-run, and create one uniquely named Job.
 5. Monitor Job/pod to terminal state (default timeout **30 min**), collecting
    concise status, events, logs, and container exit code.
@@ -252,10 +265,24 @@ the command can continue itself.
    `ImagePullBackOff` while its matching GHA build is still running, finish
    waiting for GHA, delete only this invocation's Job, and create it once more
    with the immutable SHA image. No retry for script/runtime/cluster errors.
-7. Discover declared/obvious output paths (script constants, plan metadata,
-   `SCRIPTS_RUN_PLAN.KNOWN_OUTPUTS`). After Job success, copy known files from
-   the pod with `kubectl cp` into `.tmp/opsx-scripts/<UTC_TS>/outputs/`;
-   report local paths and sizes.
+7. **Artifact retrieval (general, mandatory when outputs declared):**
+   - render Job with `__HOLD_SECONDS__=900` (15 min) unless Owner scoped shorter;
+   - default output dir: `.tmp/opsx-scripts/<UTC_TS>/outputs/`;
+   - after script success is visible in logs (`ops-script: success; holding`) or
+     container still `Running`, start `scripts/ops_script_job_cp.ps1` **in parallel
+     with hold** — do not wait for pod `Succeeded`;
+   - helper copies each declared file with **retry + exponential backoff**
+     (default 36 attempts / up to ~15 min); survives transient `TLS handshake
+     timeout` and single cp failures;
+   - when primary is declared: pass `-PrimaryFile` and optional
+     `-ExpectedPrimarySha256` from logs/report; gate requires local primary +
+     matching digest (sidecar or expected);
+   - `LOCAL_ARTIFACT_HANDOFF=PASS` **only** when all declared files exist locally
+     **and** primary sha256 gate passes;
+   - `EXTERNAL_HANDOFF_READY=YES` / `RUN_DONE` for contract runs **only** when
+     `LOCAL_ARTIFACT_HANDOFF=PASS`; container exit 0 alone is insufficient;
+   - if hold expires and `LOCAL_ARTIFACT_HANDOFF=FAIL` → `FAIL_ARTIFACT_CONTRACT`
+     (not `RUN_DONE`), even when in-pod artifacts existed.
    When the plan declares a **primary** contract/handoff artifact (see
    **Artifact contract** below), that primary (+ checksum sidecar if declared)
    is the success criterion — research/side dumps alone never suffice.
@@ -349,6 +376,8 @@ TEMPLATE_PATH: k8s/jobs/ops-script-runner.yaml
 COMMAND:
 ARGS:
 KNOWN_OUTPUTS:
+HOLD_SECONDS: 900
+ARTIFACT_CP_HELPER: scripts/ops_script_job_cp.ps1
 DRY_RUN_RESULT:
 GHA_TIMEOUT:
 JOB_TIMEOUT:
@@ -388,12 +417,16 @@ SIDE_ARTIFACT=<filename|NONE>
 EXTERNAL_HANDOFF_READY=YES|NO
 PREFLIGHT_ACCEPT_INPUT=YES|NO|N_A
 CONTRACT_ID=<id|NONE>
+LOCAL_ARTIFACT_HANDOFF=PASS|FAIL|N_A
+LOCAL_PRIMARY_PATH=<abs path|NONE>
+LOCAL_REPORT_PATH=<abs path|NONE>
 ```
 
 Rules:
 
-1. `EXTERNAL_HANDOFF_READY=YES` **only** if primary exists locally after copy
-   **and** `PRIMARY_SHA256` matches that file’s digest (when a sha is required).
+1. `EXTERNAL_HANDOFF_READY=YES` **only** if `LOCAL_ARTIFACT_HANDOFF=PASS` —
+   primary exists locally after retry cp **and** `PRIMARY_SHA256` matches that
+   file’s digest (when a sha is required).
 2. If primary was declared and only side/research output exists →
    `EXTERNAL_HANDOFF_READY=NO` and `STATUS=FAIL_ARTIFACT_CONTRACT`.
 3. Do not claim handoff/ready-for-consumer YES without (1).
@@ -441,6 +474,9 @@ SIDE_ARTIFACT:
 EXTERNAL_HANDOFF_READY:
 PREFLIGHT_ACCEPT_INPUT:
 CONTRACT_ID:
+LOCAL_ARTIFACT_HANDOFF:
+LOCAL_PRIMARY_PATH:
+LOCAL_REPORT_PATH:
 ```
 
 When process-surface command files change (rare here): commit via

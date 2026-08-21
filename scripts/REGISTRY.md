@@ -47,7 +47,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
 | Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-14T12:47:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:c1e1fa7c523cdcec81ea23aaf7d8b2dc8e08248a | Job ops-script-users-csv-20260814-123657 Complete exit=0; all_users.xlsx 129957B sha256 670f02cba87457967b0b26c50032d3a26cc51ca466743ebd9c5bac8ff60ddb15 |
-| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-21T10:54:00Z | 2026-08-15T01:47:42Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:8c2cef14be6ba159c9935f40db2770c364153579 | 34 targeted unit tests passed; --help import failed before argparse because TELEGRAM_WEB_PORT is unset; no WB API calls made |
+| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-21T10:54:00Z | 2026-08-21T13:50:07Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:4451a5645f9256c1978af1b64420b84a00a540eb | Job ops-script-wb-ro-r04-003b-20260821-134203 Complete exit=0; COL-R04-003B preflight OK; orders+sales GET 200; PRIMARY sha256 9430e081… |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
@@ -69,5 +69,7 @@ Tracked only as notes; not run via `ops-script-runner` unless Owner promotes:
 * Prepare: `/opsx-scripts-prepare`
 * Operate: `/opsx-scripts`
 * Display SoT: `.cursor/commands/opsx-human-label-display.md`
-* Workflow: `.github/workflows/deploy_scripts.yml` (branch `scripts`, tag `scripts`)
-* Job template: `k8s/jobs/ops-script-runner.yaml`
+* Workflow: `.github/workflows/deploy_scripts.yml` (branch `scripts`, tag `scripts`; CI push GHCR only)
+* Cluster Job image (Harbor proxy-cache pull-through): `harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<commit-sha>`
+* Job template: `k8s/jobs/ops-script-runner.yaml` (`__HOLD_SECONDS__` default 900)
+* Artifact cp helper: `scripts/ops_script_job_cp.ps1` (retry kubectl cp + sha256 gate)

@@ -2,6 +2,10 @@ name: Scripts branch image (no PR)
 
 # Build+push app image from branch `scripts` for ops Jobs.
 # Does not require a PR. Does not deploy master/stage.
+#
+# CI publishes immutable SHA + :scripts tags to GHCR only.
+# Cluster Jobs pull via Harbor proxy-cache (read-through), not direct GHCR:
+#   harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<commit-sha>
 on:
   push:
     branches: [scripts]
@@ -26,9 +30,9 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       LATEST_TAG: scripts
       GHCR_REGISTRY: ghcr.io
-      HARBOR_REGISTRY: harbor.skyline360.ru
-      HARBOR_PROJECT: git-registry-cache
-      HARBOR_REPOSITORY: revoluxe-ai/adv-bot
+      HARBOR_PROXY_REGISTRY: harbor.skyline360.ru
+      HARBOR_PROXY_PROJECT: git-registry-cache
+      HARBOR_PROXY_REPOSITORY: revoluxe-ai/adv-bot
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,64 +61,21 @@ jobs:
           echo "ghcr_sha=${GHCR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
           echo "ghcr_scripts=${GHCR_IMAGE}:${{ env.LATEST_TAG }}" >> "$GITHUB_OUTPUT"
 
-      - name: Push Docker image to Harbor (best-effort)
-        id: harbor_push
-        continue-on-error: true
-        env:
-          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-        run: |
-          set +e
-          set -u
-          HARBOR_IMAGE="${{ env.HARBOR_REGISTRY }}/${{ env.HARBOR_PROJECT }}/${{ env.HARBOR_REPOSITORY }}"
-          GHCR_IMAGE="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
-
-          if ! echo "$HARBOR_PASSWORD" | docker login "${{ env.HARBOR_REGISTRY }}" \
-            -u "$HARBOR_USERNAME" --password-stdin; then
-            echo "::error::Harbor login failed (GHCR push already succeeded)"
-            exit 1
-          fi
-
-          if ! docker pull "$GHCR_IMAGE"; then
-            echo "::error::Failed to pull ${GHCR_IMAGE} for Harbor retag"
-            exit 1
-          fi
-
-          docker tag "$GHCR_IMAGE" "${HARBOR_IMAGE}:${{ env.IMAGE_TAG }}"
-          docker tag "$GHCR_IMAGE" "${HARBOR_IMAGE}:${{ env.LATEST_TAG }}"
-
-          HARBOR_FAILED=0
-          if ! docker push "${HARBOR_IMAGE}:${{ env.IMAGE_TAG }}"; then
-            echo "::error::Harbor push failed for sha tag"
-            HARBOR_FAILED=1
-          fi
-          if ! docker push "${HARBOR_IMAGE}:${{ env.LATEST_TAG }}"; then
-            echo "::error::Harbor push failed for scripts tag"
-            HARBOR_FAILED=1
-          fi
-          if [ "$HARBOR_FAILED" -ne 0 ]; then
-            exit 1
-          fi
-
-          echo "harbor_sha=${HARBOR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
-          echo "harbor_scripts=${HARBOR_IMAGE}:${{ env.LATEST_TAG }}" >> "$GITHUB_OUTPUT"
-          exit 0
-
       - name: Publish image references
-        if: always()
+        if: always() && steps.ghcr_push.outcome == 'success'
         run: |
+          HARBOR_PROXY_IMAGE="${{ env.HARBOR_PROXY_REGISTRY }}/${{ env.HARBOR_PROXY_PROJECT }}/${{ env.HARBOR_PROXY_REPOSITORY }}"
           {
             echo "## Published images (scripts branch)"
             echo ""
-            echo "**GHCR (required):**"
+            echo "**GHCR (CI publication, required):**"
             echo "- ${{ steps.ghcr_push.outputs.ghcr_sha }}"
             echo "- ${{ steps.ghcr_push.outputs.ghcr_scripts }}"
             echo ""
-            if [ "${{ steps.harbor_push.outcome }}" = "success" ]; then
-              echo "**Harbor (best-effort, preferred for cluster Jobs):**"
-              echo "- ${{ steps.harbor_push.outputs.harbor_sha }}"
-              echo "- ${{ steps.harbor_push.outputs.harbor_scripts }}"
-            else
-              echo "**Harbor:** push skipped or failed (cluster RUN should pass image= pullable ref)"
-            fi
+            echo "**Harbor proxy-cache (cluster Job pull-through, not CI push):**"
+            echo "- ${HARBOR_PROXY_IMAGE}:${{ env.IMAGE_TAG }}"
+            echo "- ${HARBOR_PROXY_IMAGE}:${{ env.LATEST_TAG }}"
+            echo ""
+            echo "Harbor \`git-registry-cache\` is a proxy project; do not docker push there."
+            echo "Kubernetes Jobs use the Harbor refs above after GHCR publish succeeds."
           } >> "$GITHUB_STEP_SUMMARY"
