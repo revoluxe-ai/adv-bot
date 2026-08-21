@@ -1,0 +1,19 @@
+openspec/changes/paid-regression-bot-active-gates/specs/bot-active-act-gates/spec.md
+  s_9be26b213332dd::t_68a6854ad42f96 68-71,78,81-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d464ab1d3451ee95a61d08b49f0a19db3085339a",
+  "prompts": {},
+  "sessions": {
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
