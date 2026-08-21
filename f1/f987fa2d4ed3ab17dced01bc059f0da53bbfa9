@@ -1,0 +1,24 @@
+BUGBOT.md
+  s_e849113793b156::t_7e65003af8b29f 1-5,24-75,77-80
+  s_e849113793b156::t_c4388258aa260a 6-23
+  s_e849113793b156::t_1efb56e666950f 76,81-83
+docks/CALLBACK_ANSWER_POLICY.md
+  s_e849113793b156::t_6f3330f9665a8f 43-100
+  s_e849113793b156::t_135e64435cb3d3 33-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "f1f987fa2d4ed3ab17dced01bc059f0da53bbfa9",
+  "prompts": {},
+  "sessions": {
+    "s_e849113793b156": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2d99016d-e326-4295-891f-b069f8a8a51e",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
