@@ -1,0 +1,33 @@
+tests/unit/client_bot/test_pg_external_gap_handoffs.py
+  s_62530fd74f5e66::t_6c2831fb63b3f8 12,51-64,73-76,78-89,110-125,149-175,188-201
+  s_62530fd74f5e66::t_64d16873c33780 1-11,13-31,33-50,65-72,77,90-109,126-148,176-187,202-211,213-250
+  s_62530fd74f5e66::t_84960d2a1902e2 32
+  s_62530fd74f5e66::t_d1d12e1e710abb 212
+tests/modules/shop_runner/service_manager/test_stats_emergency_manager.py
+  s_3f873febd3acf8::t_7e4a0535c7bfc6 1-2,6,21-23,189-200
+  s_3f873febd3acf8::t_c6cff2286b3095 201-202
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "62bbd789ef6df7fd667e9e7408cef32ef0b264d6",
+  "prompts": {},
+  "sessions": {
+    "s_3f873febd3acf8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e63c29e-efed-410c-aabb-28c1cdf5bb12",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_62530fd74f5e66": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "52541c3a-70eb-4fb8-bf64-365a42c32193",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
