@@ -1,3 +1,5 @@
+"""Управление доступом к кабинетам Wildberries через персональные токены."""
+
 import logging
 import typing
 from dataclasses import dataclass
@@ -58,6 +60,15 @@ class WBCabinetAccess:
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: int | str,
 ) -> WBCabinetAccess:
+    """Собирает доступ к кабинету по его идентификатору или shop_id.
+
+    Args:
+        wb_cabinet_id_or_shop_id: Идентификатор кабинета или магазина.
+    Returns:
+        Доступ с валидными персональными токенами кабинета.
+    Raises:
+        WBCabinetNotFoundError: Если кабинет не найден.
+    """
 
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id
@@ -86,7 +97,7 @@ async def get_access_for_wb_cabinet(
         for token in wb_tokens:
             token.api_key = token.api_key.replace("\r", "").replace("\n", "").strip()
             if not token.check_valid():
-                logger.debug(f"Не валидный токен {token.api_key}")
+                logger.debug("Не валидный токен, пропускаем: token_id=%s", token.id)
                 continue
             if not token.is_personal:
                 logger.debug("Не персональный токен, пропускаем: token_id=%s", token.id)
@@ -105,12 +116,24 @@ async def get_access_for_wb_cabinet(
 
 
 async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
+    """Находит первый валидный персональный токен с доступом к API Wildberries.
+
+    Args:
+        client_session: HTTP-сессия для проверки прав токена.
+    Returns:
+        Доступ с найденным валидным персональным токеном.
+    Raises:
+        ApiForbiddenError: Если подходящий токен не найден или не имеет прав.
+    """
+
     stmt = select(WBToken)
     async with sm() as session:
         async for wb_token in await session.stream_scalars(stmt):
             wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
             if not wb_token.check_valid():
-                logger.debug(f"Не валидный токен {wb_token.api_key}")
+                logger.debug(
+                    "Не валидный токен, пропускаем: token_id=%s", wb_token.id
+                )
                 continue
             if not wb_token.is_personal:
                 logger.debug(
