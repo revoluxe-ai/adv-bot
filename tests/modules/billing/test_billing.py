@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.billing import billing
 from app.modules.billing.pricer import Pricer
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 
 pytestmark = pytest.mark.asyncio
 
@@ -33,11 +34,15 @@ def mock_redis_manager():
     return mgr
 
 
-@pytest.fixture
-def active_adv():
+def _paid_like_adv(*, adv_id: int = 1, bot_active: bool = True) -> MagicMock:
+    """Build a campaign that looks like explicit PAID auto-management before grace."""
     adv = MagicMock(spec=AdvSetting)
-    adv.id = 1
-    adv.bot_active = True
+    adv.id = adv_id
+    adv.bot_active = bot_active
+    adv.automatic_version = 3
+    adv.bidder_active = True
+    adv.bidder_for_auto = True
+    adv.white_list_mode = WhiteListMode.REPLACE_ON_TRIM
     adv.auto_update_white_list = True
     adv.auto_update_target_place = True
     adv.wb_cabinet_id = 100
@@ -45,14 +50,25 @@ def active_adv():
     return adv
 
 
+def _assert_free_mode_overlay(adv: MagicMock) -> None:
+    """Lock grace-exceeded → FREE transition via apply_free_mode_transition."""
+    assert adv.bot_active is False
+    assert adv.automatic_version == 2
+    assert adv.bidder_active is False
+    assert adv.bidder_for_auto is False
+    assert adv.auto_update_white_list is False
+    assert adv.auto_update_target_place is False
+    assert adv.white_list_mode == WhiteListMode.ABOVE_MIN_RATING
+
+
+@pytest.fixture
+def active_adv():
+    return _paid_like_adv(adv_id=1, bot_active=True)
+
+
 @pytest.fixture
 def inactive_adv():
-    adv = MagicMock(spec=AdvSetting)
-    adv.id = 2
-    adv.bot_active = False
-    adv.wb_cabinet_id = 100
-    adv.payments = []
-    return adv
+    return _paid_like_adv(adv_id=2, bot_active=False)
 
 
 def _make_cabinet(
@@ -129,20 +145,24 @@ async def test_process_single_cabinet_insufficient_funds_first_day_negative(
 
 
 async def test_process_single_cabinet_grace_exceeded_deactivates(
-    mock_session, mock_pricer, mock_redis_manager, active_adv
+    mock_session, mock_pricer, mock_redis_manager, active_adv, inactive_adv
 ):
-    """Недостаточно средств, balance_after_charge < -7*price — деактивируем кампании, не сбрасываем neg_at."""
+    """Grace exceeded: active paid campaigns switch to FREE overlay; neg_at kept.
+
+    Protects against regressing to a partial deactivate (only bot_active /
+    whitelist / target-place flags) without V3→V2 FREE conversion.
+    """
     from datetime import timezone
 
     neg_at = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
     cab = _make_cabinet(
         bonus=0.0,
         balance=-800.0,
-        advs=[active_adv],
+        advs=[active_adv, inactive_adv],
         balance_went_negative_at=neg_at,
     )
     mock_pricer.get_price_for_day_for_shop.return_value = 100.0
-    # balance_after_charge = -800 - 100 = -900 < -700 → deactivate
+    # balance_after_charge = -800 - 100 = -900 < -700 → FREE transition
 
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
@@ -157,7 +177,12 @@ async def test_process_single_cabinet_grace_exceeded_deactivates(
         )
     assert result["payment_successful"] is False
     assert result["reason"] == "deactivated"
-    assert active_adv.bot_active is False
+    _assert_free_mode_overlay(active_adv)
+    # Already-free / inactive campaigns are not re-touched by the grace path.
+    assert inactive_adv.bot_active is False
+    assert inactive_adv.automatic_version == 3
+    assert inactive_adv.bidder_active is True
+    assert inactive_adv.white_list_mode == WhiteListMode.REPLACE_ON_TRIM
     assert cab.balance_went_negative_at is not None  # не сбрасываем (фикс бага)
 
 
@@ -216,7 +241,7 @@ async def test_process_single_cabinet_negative_at_boundary_charges(
 async def test_process_single_cabinet_grace_exceeded_rerun_no_charge(
     mock_session, mock_pricer, mock_redis_manager, active_adv
 ):
-    """Повторный запуск после превышения лимита: снова деактивация, без списания, neg_at не сбрасывается."""
+    """Повторный grace: FREE overlay, без списания, neg_at не сбрасывается."""
     from datetime import timezone
 
     neg_at = datetime.datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
@@ -242,6 +267,7 @@ async def test_process_single_cabinet_grace_exceeded_rerun_no_charge(
         )
     assert result["payment_successful"] is False
     assert result["reason"] == "deactivated"
+    _assert_free_mode_overlay(active_adv)
     assert cab.balance_went_negative_at is not None
     # Не должно быть новых add (WBBalancePayment / AdvPayment за этот день)
     assert mock_session.add.call_count == add_count_before
