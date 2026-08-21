@@ -1,0 +1,38 @@
+scripts/ops_script_job_cp.ps1
+  s_de94f11c688d9e::t_ee1683f7184967 1-210
+k8s/jobs/ops-script-runner.yaml
+  s_de94f11c688d9e::t_791e1b5b6ece71 4-6,8-41
+  s_de94f11c688d9e::t_707de0ed40957d 7
+  s_de94f11c688d9e::t_6873e0403c9ede 1-3
+  s_de94f11c688d9e::t_67fc103aac6cb9 42-44
+  s_de94f11c688d9e::t_9d579c356858f9 45-58
+scripts/REGISTRY.md
+  s_de94f11c688d9e::t_60e3221e870977 74-75
+  s_de94f11c688d9e::t_9f5173859a84cd 50
+  s_de94f11c688d9e::t_881bb3b7e25737 72-73
+.cursor/commands/opsx-scripts.md
+  s_de94f11c688d9e::t_17af7078caa4ae 238-245,250-254,257-259
+  s_de94f11c688d9e::t_50278e7b3823e5 379-380
+  s_de94f11c688d9e::t_bff4c35d1cd0f0 477-479
+  s_de94f11c688d9e::t_325bdea01c45a9 420-422,427-429
+  s_de94f11c688d9e::t_7467dd091ed039 222-224
+  s_de94f11c688d9e::t_6e3fc1f92e63bc 268-285
+.github/workflows/deploy_scripts.yml
+  s_de94f11c688d9e::t_383fb9a49a9b5e 5-8,33-35,65,67,71,75-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "765a00bc83217497a72067c798cee0522880c534",
+  "prompts": {},
+  "sessions": {
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
