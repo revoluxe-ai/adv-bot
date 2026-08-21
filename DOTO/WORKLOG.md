@@ -433,3 +433,7 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.
 
 Окончательно выпилить opsx-admin-command-commit.md
+
+
+
+БАГ: Идут списания даже если бот не активен
