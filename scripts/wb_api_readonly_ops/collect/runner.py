@@ -21,8 +21,7 @@ from scripts.wb_api_readonly_ops.models import OverallStatus
 
 logger = logging.getLogger(__name__)
 
-# WB sales-funnel history: практический предел глубины (API отклоняет старые start day).
-FUNNEL_MAX_HISTORY_DAYS = 90
+# WB sales-funnel products/history: см. swagger — max last 7 days on this endpoint.
 
 MISSING_COLLECTOR_CAPABILITIES: list[str] = [
     "finance_realization",
@@ -31,6 +30,7 @@ MISSING_COLLECTOR_CAPABILITIES: list[str] = [
     "promotions",
     "adv_v0_config_norms_limits",
     "search_report_separate_family_if_permission_gap",
+    "funnel_historical_beyond_7_days_requires_separate_surface",
 ]
 
 
@@ -112,7 +112,6 @@ async def run_full_collect(
         campaign_rows = []
         overall = OverallStatus.PARTIAL
 
-    funnel_from = _cap_funnel_start(ads_from, ads_to)
     funnel_to = ads_to
     funnel_nmids = nmids or _nmids_from_orders(orders_rows, sales_rows)
     try:
@@ -121,7 +120,7 @@ async def run_full_collect(
             store=store,
             budget=budget,
             nmids=funnel_nmids,
-            date_from=funnel_from,
+            date_from=ads_from,
             date_to=funnel_to,
             nmid_batch_size=funnel_nmid_batch_size,
         )
@@ -229,11 +228,3 @@ def _resolve_ads_dates(
     if date_to < date_from:
         date_to = date_from
     return date_from, date_to
-
-
-def _cap_funnel_start(date_from: datetime.date, date_to: datetime.date) -> datetime.date:
-    """Ограничить funnel history пределом API (excess limit on days)."""
-    earliest_allowed = date_to - datetime.timedelta(days=FUNNEL_MAX_HISTORY_DAYS - 1)
-    if date_from < earliest_allowed:
-        return earliest_allowed
-    return date_from

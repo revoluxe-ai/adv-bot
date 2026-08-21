@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import zipfile
-from datetime import date, timedelta
+from datetime import date, timedelta, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -24,8 +24,8 @@ from scripts.wb_api_readonly_ops.collect.coverage import (
     CoverageEntry,
 )
 from scripts.wb_api_readonly_ops.collect.funnel import (
-    FUNNEL_MAX_DAYS_PER_REQUEST,
-    _iter_date_windows,
+    FUNNEL_API_MAX_HISTORY_DAYS,
+    _allowed_funnel_period,
     collect_funnel,
 )
 from scripts.wb_api_readonly_ops.collect.normqueries import build_normquery_batches
@@ -263,33 +263,83 @@ def test_fullstats_date_windowing_count() -> None:
 
 @pytest.mark.asyncio
 async def test_funnel_nmid_batching(tmp_path: Path) -> None:
+    """Все nmIDs обрабатываются batching'ом в одном 7-day window."""
     nmids = list(range(1, 45))
-    calls: list[list[int]] = []
     dm = MagicMock()
-
     dm.get_sales_funnel_products_history = AsyncMock(
         side_effect=lambda nmids, start, end: [{"nmId": nmids[0], "date": str(start)}]
     )
     store = RawStore(output_dir=tmp_path)
     budget = ApiCallBudget(max_seconds=60, max_api_calls=100)
+    date_to = date(2026, 8, 21)
     await collect_funnel(
         dm,
         store=store,
         budget=budget,
         nmids=nmids,
-        date_from=date(2026, 8, 20),
-        date_to=date(2026, 8, 21),
+        date_from=date(2010, 1, 1),
+        date_to=date_to,
         nmid_batch_size=20,
     )
-    calls = [call.kwargs["nmids"] for call in dm.get_sales_funnel_products_history.await_args_list]
+    calls = dm.get_sales_funnel_products_history.await_args_list
     assert len(calls) == 3
-    assert len(calls[0]) == 20
+    assert len(calls[0].kwargs["nmids"]) == 20
+    expected_start, expected_end = _allowed_funnel_period(date_to)
+    for call in calls:
+        assert call.kwargs["start"] == expected_start
+        assert call.kwargs["end"] == expected_end
 
 
-def test_funnel_historical_windowing() -> None:
-    windows = _iter_date_windows(date(2026, 8, 1), date(2026, 8, 20))
-    assert len(windows) == 3
-    assert (windows[0][1] - windows[0][0]).days <= FUNNEL_MAX_DAYS_PER_REQUEST - 1
+def test_funnel_allowed_period_respects_api_retention() -> None:
+    """startDate не старше API retention (7 days inclusive)."""
+    date_to = date(2026, 8, 21)
+    start, end = _allowed_funnel_period(date_to)
+    assert end == date_to
+    assert (end - start).days == FUNNEL_API_MAX_HISTORY_DAYS - 1
+    assert start == date(2026, 8, 15)
+
+
+@pytest.mark.asyncio
+async def test_funnel_never_requests_start_older_than_api_retention(
+    tmp_path: Path,
+) -> None:
+    """Collect funnel игнорирует date_from старше retention и не шлёт historical windows."""
+    nmids = list(range(1, 25))
+    dm = MagicMock()
+    captured: list[tuple[date, date]] = []
+
+    async def _mock(*, nmids: list[int], start: date, end: date) -> list[dict[str, int]]:
+        captured.append((start, end))
+        return [{"nmId": nmids[0]}]
+
+    dm.get_sales_funnel_products_history = _mock
+    store = RawStore(output_dir=tmp_path)
+    budget = ApiCallBudget(max_seconds=60, max_api_calls=100)
+    date_to = date(2026, 8, 21)
+    await collect_funnel(
+        dm,
+        store=store,
+        budget=budget,
+        nmids=nmids,
+        date_from=date(2020, 1, 1),
+        date_to=date_to,
+        nmid_batch_size=10,
+    )
+    expected_start, expected_end = _allowed_funnel_period(date_to)
+    assert len(captured) == 3
+    assert all(s == expected_start and e == expected_end for s, e in captured)
+    assert expected_start >= date_to - timedelta(days=FUNNEL_API_MAX_HISTORY_DAYS - 1)
+
+
+def test_fullstats_collect_uses_promotion_manager_adapter() -> None:
+    """ads fullstats MUST идти через PromotionManager.get_full_adv_stat (adapter stack)."""
+    import inspect
+    from scripts.wb_api_readonly_ops.collect import ads as ads_mod
+
+    src = inspect.getsource(ads_mod.collect_ads)
+    assert "get_full_adv_stat" in src
+    assert "httpx" not in src
+    assert "get_adv_v3_fullstats" not in src
 
 
 @pytest.mark.asyncio
