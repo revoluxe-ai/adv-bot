@@ -463,13 +463,13 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-commit
-- purpose: atomic local commits for product/code/OpenSpec/docs
+- purpose: atomic local Git packaging for product/code/OpenSpec/docs (no verification gate)
 - input_state: product_dirty
 - output_state: product_dirty | pr_ready
 - artifacts_read: git status/diff
 - artifacts_written: git commits (product scope)
 - decision_owner: committer
-- next_typical: /opsx-project-bug-hunt | /opsx-create-pr | /opsx-admin-command-commit (process only; admin off-graph)
+- next_typical: /opsx-static-check | /opsx-verify | /opsx-create-pr | /opsx-project-bug-hunt | /opsx-admin-command-commit (process only; admin off-graph)
 - known_flaws: none recorded
 
 ### /opsx-split-for-pr
@@ -483,14 +483,14 @@
 - known_flaws: NOT_OPENED_BUDGET detail
 
 ### /opsx-create-pr
-- purpose: open a pull request; product/runtime requires PROJECT_BUG_HUNT_RECEIPT unless OVERRIDE_SKIP_PROJECT_BUG_HUNT or docs/process-only
+- purpose: open a pull request (publication/review container; no verification gate; PR ≠ merge auth)
 - input_state: pr_ready
 - output_state: pr_ready
-- artifacts_read: commits/diff vs base; optional PROJECT_BUG_HUNT_RECEIPT
+- artifacts_read: commits/diff vs base
 - artifacts_written: remote PR (via gh)
 - decision_owner: PR author
-- next_typical: none | /opsx-project-bug-hunt (if receipt gate blocks)
-- known_flaws: receipt gate is command-owned (not soft graph advice)
+- next_typical: /opsx-verify | /opsx-static-check | /opsx-project-bug-hunt (soft ALSO_OK) | CI review
+- known_flaws: none recorded
 
 ### Explicitly excluded from graph
 - /opsx-propose — obsolescent; file may exist on disk; do not recommend (F5)
@@ -535,7 +535,8 @@ planning_revise --/opsx-update|/opsx-explore--> apply_ready|change_idea
 planning_revise --/opsx-bound-scope [after TЗ discussion in /opsx-explore]--> planning_revise|scope_bounded
 planning_revise --/opsx-bound-scope:GO [accepted split]--> scope_bounded
 scope_bounded --/opsx-update--> apply_ready|planning_revise
-product_dirty --/opsx-commit--> pr_ready
+product_dirty --/opsx-commit--> product_dirty|pr_ready
+impl_done|product_dirty|pr_ready --/opsx-static-check|/opsx-verify--> static_check_done|verify_pass|verify_fail
 pr_ready --/opsx-split-for-pr--> pr_ready
 pr_ready --/opsx-create-pr--> pr_ready
 
@@ -689,10 +690,11 @@ pasteable FIX_EXIT. `CLEAR` ≠ card-close. `/opsx-verify` / `/opsx-archive`
 are **not** residual close while debt open. Soft only — not FANIN/INDEX
 writer.
 
-### Pre-Bugbot primary hunt
+### Pre-Bugbot primary hunt (soft ALSO_OK — not a PR gate)
 
-Before `/opsx-create-pr` on product/runtime diffs: `/opsx-project-bug-hunt
-base=<PR-base> head=<branch>`. Bugbot PR section = residual only.
+`/opsx-project-bug-hunt base=<PR-base> head=<branch>` is recommended before
+merge/review on product/runtime diffs but **does not** block `/opsx-create-pr`.
+Bugbot PR section = residual only.
 If Bugbot still finds product/logic: fix path → `/opsx-learn-from-bug`
 `target=.cursor/commands/opsx-project-bug-hunt.md` checklist → re-hunt.
 Do **not** use `/opsx-bug-hunt` as the first pre-PR sweep (needs root+invariant).
@@ -922,8 +924,8 @@ command-contract classes (F6).
 - Durable route: `results/ROUTE-TRACE.jsonl` + LEDGER `## ROUTE_STATE`
 - Fan-in: `/opsx-materialize-bug-queue mode=fanin_assemble` → `results/FANIN.md` only
 - Class lesson: requires FANIN_READY; else LESSON_CANDIDATE_ONLY
-- Pre-PR product/runtime: `/opsx-project-bug-hunt` receipt before `/opsx-create-pr`
-  (or exact `OVERRIDE_SKIP_PROJECT_BUG_HUNT`); Bugbot = residual
+- Pre-merge/review product/runtime (soft): `/opsx-project-bug-hunt` — ALSO_OK
+  before merge; does **not** block `/opsx-create-pr`; Bugbot = residual
 - After apply with production `.py`: soft recommend
   `/opsx-pyright-strict-coverage base=<BASE>` then
   `/opsx-external-call-coverage base=<BASE>` then conditional
