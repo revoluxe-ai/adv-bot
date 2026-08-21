@@ -154,7 +154,10 @@ if (-not (Test-Path -LiteralPath $LocalOutputDir)) {
     New-Item -ItemType Directory -Path $LocalOutputDir -Force | Out-Null
 }
 
-$remoteDirNorm = $RemoteDir.TrimEnd('/')
+$remoteDirNorm = ($RemoteDir -replace '\\', '/').TrimEnd('/')
+if (-not $remoteDirNorm.StartsWith('/')) {
+    $remoteDirNorm = "/$remoteDirNorm"
+}
 $backoff = $InitialBackoffSec
 $lastPhase = ""
 $attempt = 0
@@ -172,15 +175,22 @@ while ($attempt -lt $MaxAttempts) {
     }
 
     if ($phase -eq "Running") {
-        foreach ($file in $Files) {
-            $localPath = Join-Path $LocalOutputDir $file
-            if (Test-Path -LiteralPath $localPath) {
-                continue
+        Push-Location -LiteralPath $LocalOutputDir
+        try {
+            foreach ($file in $Files) {
+                $localPath = Join-Path (Get-Location) $file
+                if (Test-Path -LiteralPath $localPath) {
+                    if ((Get-Item -LiteralPath $localPath).Length -gt 0) {
+                        continue
+                    }
+                }
+                $remotePath = "$remoteDirNorm/$file"
+                $src = "${Namespace}/${PodName}:${remotePath}"
+                Write-Host "ops_script_job_cp: cp ${src} -> ${localPath}"
+                & kubectl cp $src $file -c $Container 2>&1 | ForEach-Object { Write-Host $_ }
             }
-            $remotePath = "$remoteDirNorm/$file"
-            $src = "${PodName}:${remotePath}"
-            Write-Host "ops_script_job_cp: cp $src -> $localPath"
-            kubectl cp $src $localPath -n $Namespace -c $Container 2>&1 | ForEach-Object { Write-Host $_ }
+        } finally {
+            Pop-Location
         }
 
         if ((Test-AllLocalFilesPresent -Dir $LocalOutputDir -Names $Files) -and
