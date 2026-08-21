@@ -126,13 +126,19 @@ class Settings:
 
     @property
     def invite_gate(self) -> bool:
-        """По умолчанию True: гейт по инвайту включён, если в .env не задано иначе.
+        """Гейт по инвайту на входе (deferred / off by default).
 
-        Явно выключить: INVITE_GATE=false
+        **Current rollout:** False — ``GateMiddleware`` no-op; entry = channel +
+        phone. Do **not** set ``INVITE_GATE=true`` on stage/prod without owner GO
+        (see invite-gate-deferred decision).
+
+        Rollout vs legacy ``stage``: там default был True при пустом env —
+        намеренный flip, не регрессия. Re-enable later: explicit
+        ``INVITE_GATE=true`` only.
         """
         value = os.environ.get("INVITE_GATE")
         if value is None or not str(value).strip():
-            return True
+            return False
         value = str(value).strip().lower()
         if value == "false":
             return False
@@ -142,14 +148,15 @@ class Settings:
 
     @property
     def presentation_only(self) -> bool:
-        """Режим «только презентация»: минимальный UX, инвайт для заявки, без полного доступа к боту.
+        """Legacy-флаг урезанного onboarding (deferred; off by default).
 
-        По умолчанию True, если переменная не задана или пустая.
-        Полный клиентский бот: PRESENTATION_ONLY_MODE=false
+        Full free MainMenu — prod path. Minimal «только инвайт» keyboard только
+        при явном ``PRESENTATION_ONLY_MODE=true`` (legacy; не включать на rollout).
+        Pair with ``invite_gate`` only after invite-gate-deferred decision re-open.
         """
         value = os.environ.get("PRESENTATION_ONLY_MODE")
         if value is None or not str(value).strip():
-            return True
+            return False
         value = str(value).strip().lower()
         if value == "false":
             return False
@@ -723,9 +730,14 @@ class Settings:
 
     @property
     def DEFAULT_MAX_CPM(self) -> int:
+        """Default max CPM for new ``WBCabinet`` rows when env unset.
+
+        Rollout default **5000** (intentional vs legacy ``stage`` 10000 when env
+        empty). Override per deploy: ``DEFAULT_MAX_CPM`` in Secret/ConfigMap.
+        """
         value = os.getenv("DEFAULT_MAX_CPM")
         if not value:
-            return 10000
+            return 5000
         else:
             return int(value)
 
