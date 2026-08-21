@@ -1,0 +1,23 @@
+openspec/changes/land-free-bot-rebase-into-stage/decisions/forward-only-data-migration-rollout/decision.md
+  s_9be26b213332dd::t_89ff66dd8ffaff 79-81
+  s_9be26b213332dd::t_2cf5260ae0b978 48-49,52-53
+  s_9be26b213332dd::t_4400455445c652 50-51,54-56
+openspec/changes/land-free-bot-rebase-into-stage/readiness/test-db-recovery-evidence.md
+  s_9be26b213332dd::t_f1574f351af2a1 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "e3c2771db6e9c75bfc309fc3d925a587e7113378",
+  "prompts": {},
+  "sessions": {
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
