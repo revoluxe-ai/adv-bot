@@ -45,10 +45,15 @@ Readiness не заменяет отдельное deployment/database evidence.
 
 Legacy field backfills MUST use an explicit domain classifier rather than a
 runtime fallback. For `auto_update_minus_phrases`, the classifier for this
-rollout is `bot_active`: active records receive `true`, inactive records receive
-`false`, and new records receive `false` through declarative defaults. A
-persistent `None → true` interpretation is not a valid replacement for the
-data transition.
+rollout is `bot_active` and MUST apply **only to NULL** legacy rows: NULL +
+active → `true`, NULL + inactive → `false`. Already non-NULL values (including
+post-landing UI toggles) MUST NOT be rewritten. The Job MAY run whenever NULLs
+remain (fill-on-NULL); with no NULLs the UPDATE is a no-op. After NULLs are
+filled, the rollout sets DEFAULT `false` and NOT NULL. New records receive
+`false` through declarative defaults. A persistent runtime `None → true`
+interpretation is not a valid replacement for the data transition. Longer-term
+preferred end-state: keep NOT NULL in prod and remove this backfill Job path
+once NULL legacy is gone.
 
 Migration rollout MUST preserve the effective behavior of existing paid and
 free clients. A default or backfill that enables a previously disabled
@@ -71,9 +76,9 @@ default.
 
 - Делать idempotent или безопасно повторяемый backfill частью выделенной
   forward migration при наличии data-safety proof.
-- Применять для legacy records явный classifier, зафиксированный до rollout;
-  для текущего поля это `bot_active=True → true` и
-  `bot_active=False → false`.
+- Применять для legacy **NULL** records явный classifier, зафиксированный до
+  rollout; для текущего поля это `NULL ∧ bot_active=True → true` и
+  `NULL ∧ bot_active=False → false`; non-NULL не трогать при retry.
 - Оставлять новые записи с declarative default `false` и завершать переход
   без постоянного nullable/runtime compatibility fallback.
 - Собирать before/after baseline для существующих клиентских cohort и проверять,
