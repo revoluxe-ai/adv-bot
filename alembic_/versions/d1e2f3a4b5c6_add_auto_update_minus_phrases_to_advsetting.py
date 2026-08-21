@@ -19,14 +19,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Добавляет колонку; data backfill и constraint выполняет approved Job."""
+    """Существующие строки остаются NULL до Job.
+
+    Job с ``MIGRATION_BACKFILL_KIND=auto_update_minus_phrases_v1`` заполняет
+    только NULL по ``bot_active``, затем DEFAULT false + NOT NULL. Без
+    server_default на ADD: иначе PG зальёт legacy false и paid-active не
+    получат true. Пока NULL возможны — Job можно повторять; после NOT NULL
+    в проде backfill-path можно убрать.
+    """
     op.add_column(
         "advsetting",
         sa.Column(
             "auto_update_minus_phrases",
             sa.Boolean(),
             nullable=True,
-            server_default=sa.text("false"),
             comment=(
                 "Включает фоновое обновление минус-фраз на WB. "
                 "Отдельный флаг от auto_update_white_list."

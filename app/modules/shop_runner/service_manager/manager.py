@@ -865,7 +865,14 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(15, 60)
     async def update_minus_phrases_in_advs(self, only_bot_active: bool) -> None:
-        """Ordinary minus recalc; A/B Hold PENDING/ACTIVE исключены (decision §8)."""
+        """Фон автоминусов по ``auto_update_minus_phrases`` (free-пакет, default off).
+
+        Это отдельный free write-path: явный флаг
+        ``auto_update_minus_phrases`` является единственным продуктовым
+        допуском, поэтому ``bot_active=False`` не блокирует синхронизацию.
+        ``bot_active`` — gate платной автоматизации, а не автоминусов.
+        A/B Hold PENDING/ACTIVE исключены (decision §8).
+        """
         from .services.auto_updater_v3.card_ab_hold.scheduling import (
             filter_structural_act_candidates,
         )
@@ -878,10 +885,10 @@ class CoroutinesManager:
             load_extras=False,
             only_bot_active=only_bot_active,
         )
+        # Free package: автоминусы по флагу, без требования bot_active (paid).
+        # Default флага — false; пользователь включает явно. A/B Hold freeze ниже.
         complex_advs = [
-            adv
-            for adv in complex_advs
-            if adv.bot_active and adv.auto_update_minus_phrases
+            adv for adv in complex_advs if adv.auto_update_minus_phrases
         ]
         # Spec card-ab-hold-mode §8: filter before MinusPhraseManager / WB write.
         complex_advs = filter_structural_act_candidates(complex_advs)

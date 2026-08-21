@@ -67,7 +67,7 @@ class WBShop:
                 )
                 tg.create_task(coroutines_manager.refresh_stats_freshness_cache(only_bot_active=False)) # Здесь поставил загрузку всех
                 tg.create_task(coroutines_manager.adv_settings_auto_update(only_bot_active=True)) # платка
-                tg.create_task(coroutines_manager.update_minus_phrases_in_advs(only_bot_active=False)) # бесплатно
+                tg.create_task(coroutines_manager.update_minus_phrases_in_advs(only_bot_active=False)) # бесплатно (флаг; default off)
                 tg.create_task(coroutines_manager.update_cluster_bids(only_bot_active=True)) # платка
                 tg.create_task(coroutines_manager.cache_current_cluster_bids(only_bot_active=False)) # в бесплатку
                 tg.create_task(coroutines_manager.preload_min_bids_cache_miss(only_bot_active=False)) # в бесплатку

@@ -14,8 +14,8 @@ from tests.support.destructive_pg_dsn import require_validated_live_pg_dsn_or_sk
 
 
 @pytest.mark.destructive_local
-def test_live_backfill_classifies_paid_state_and_retries_idempotently() -> None:
-    """Spec stage-landing-readiness: live PG доказывает classifier и retry."""
+def test_live_backfill_classifies_nulls_only_and_retries_idempotently() -> None:
+    """Live PG: NULL→classifier; non-NULL (UI toggle) сохраняется; retry no-op."""
     db_url = require_validated_live_pg_dsn_or_skip()
     # TEST_DATABASE_URL may use asyncpg for the application fixtures; this test
     # exercises the synchronous Connection seam used by the migration Job.
@@ -29,7 +29,7 @@ def test_live_backfill_classifies_paid_state_and_retries_idempotently() -> None:
                     CREATE TEMP TABLE advsetting (
                         id SERIAL PRIMARY KEY,
                         bot_active BOOLEAN NOT NULL,
-                        auto_update_minus_phrases BOOLEAN DEFAULT false
+                        auto_update_minus_phrases BOOLEAN
                     ) ON COMMIT DROP
                     """
                 )
@@ -58,10 +58,12 @@ def test_live_backfill_classifies_paid_state_and_retries_idempotently() -> None:
 
         assert preview.total_records == 3
         assert preview.null_records == 2
-        assert preview.expected_enabled_records == 2
-        assert result.updated_records == 3
+        assert preview.expected_enabled_records == 1
+        assert preview.expected_disabled_records == 1
+        assert result.updated_records == 2
         assert result.incompatible_records == 0
         assert retry.updated_records == 0
-        assert rows == [(True, True), (False, False), (True, True)]
+        # Third row: explicit false при bot_active=true — UI toggle, не трогаем.
+        assert rows == [(True, True), (False, False), (True, False)]
     finally:
         engine.dispose()
