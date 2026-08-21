@@ -21,6 +21,9 @@ from scripts.wb_api_readonly_ops.models import OverallStatus
 
 logger = logging.getLogger(__name__)
 
+# WB sales-funnel history: практический предел глубины (API отклоняет старые start day).
+FUNNEL_MAX_HISTORY_DAYS = 90
+
 MISSING_COLLECTOR_CAPABILITIES: list[str] = [
     "finance_realization",
     "stocks",
@@ -59,7 +62,12 @@ async def run_full_collect(
             orders_date_from=orders_date_from,
         )
     except (ApiBudgetExhausted, ArtifactIntegrityError) as exc:
-        integrity_errors.append(str(exc))
+        integrity_errors.append(f"orders_sales: {exc}")
+        orders_rows, sales_rows = [], []
+        overall = OverallStatus.PARTIAL
+    except Exception as exc:  # noqa: BLE001 — best-effort collect must archive
+        logger.exception("orders_sales collect failed")
+        integrity_errors.append(f"orders_sales: {type(exc).__name__}: {exc}")
         orders_rows, sales_rows = [], []
         overall = OverallStatus.PARTIAL
 
@@ -71,7 +79,12 @@ async def run_full_collect(
             page_limit=cards_page_limit,
         )
     except (ApiBudgetExhausted, ArtifactIntegrityError) as exc:
-        integrity_errors.append(str(exc))
+        integrity_errors.append(f"cards: {exc}")
+        nmids = _nmids_from_orders(orders_rows, sales_rows)
+        overall = OverallStatus.PARTIAL
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("cards collect failed")
+        integrity_errors.append(f"cards: {type(exc).__name__}: {exc}")
         nmids = _nmids_from_orders(orders_rows, sales_rows)
         overall = OverallStatus.PARTIAL
 
@@ -90,11 +103,17 @@ async def run_full_collect(
             date_to=ads_to,
         )
     except (ApiBudgetExhausted, ArtifactIntegrityError) as exc:
-        integrity_errors.append(str(exc))
+        integrity_errors.append(f"ads: {exc}")
+        campaign_rows = []
+        overall = OverallStatus.PARTIAL
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("ads collect failed")
+        integrity_errors.append(f"ads: {type(exc).__name__}: {exc}")
         campaign_rows = []
         overall = OverallStatus.PARTIAL
 
-    funnel_from, funnel_to = ads_from, ads_to
+    funnel_from = _cap_funnel_start(ads_from, ads_to)
+    funnel_to = ads_to
     funnel_nmids = nmids or _nmids_from_orders(orders_rows, sales_rows)
     try:
         await collect_funnel(
@@ -107,7 +126,11 @@ async def run_full_collect(
             nmid_batch_size=funnel_nmid_batch_size,
         )
     except (ApiBudgetExhausted, ArtifactIntegrityError) as exc:
-        integrity_errors.append(str(exc))
+        integrity_errors.append(f"funnel: {exc}")
+        overall = OverallStatus.PARTIAL
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("funnel collect failed")
+        integrity_errors.append(f"funnel: {type(exc).__name__}: {exc}")
         overall = OverallStatus.PARTIAL
 
     try:
@@ -120,7 +143,11 @@ async def run_full_collect(
             date_to=ads_to,
         )
     except (ApiBudgetExhausted, ArtifactIntegrityError) as exc:
-        integrity_errors.append(str(exc))
+        integrity_errors.append(f"normqueries: {exc}")
+        overall = OverallStatus.PARTIAL
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("normqueries collect failed")
+        integrity_errors.append(f"normqueries: {type(exc).__name__}: {exc}")
         overall = OverallStatus.PARTIAL
 
     try:
@@ -202,3 +229,11 @@ def _resolve_ads_dates(
     if date_to < date_from:
         date_to = date_from
     return date_from, date_to
+
+
+def _cap_funnel_start(date_from: datetime.date, date_to: datetime.date) -> datetime.date:
+    """Ограничить funnel history пределом API (excess limit on days)."""
+    earliest_allowed = date_to - datetime.timedelta(days=FUNNEL_MAX_HISTORY_DAYS - 1)
+    if date_from < earliest_allowed:
+        return earliest_allowed
+    return date_from

@@ -33,16 +33,25 @@ async def collect_funnel(
     window_count = 0
     unique_nmids: set[int] = set()
 
+    errors: list[str] = []
+
     for window_start, window_end in _iter_date_windows(date_from, date_to):
         window_count += 1
         for batch in _chunks(nmids, nmid_batch_size):
             budget.consume()
             api_calls += 1
-            batch_rows = await dm.get_sales_funnel_products_history(
-                nmids=batch,
-                start=window_start,
-                end=window_end,
-            )
+            try:
+                batch_rows = await dm.get_sales_funnel_products_history(
+                    nmids=batch,
+                    start=window_start,
+                    end=window_end,
+                )
+            except Exception as exc:  # noqa: BLE001 — skip window/batch, continue
+                errors.append(
+                    f"{window_start}..{window_end} nmids={len(batch)}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                continue
             for item in batch_rows or []:
                 as_dict = jsonable(item)
                 if isinstance(as_dict, dict):
@@ -65,12 +74,15 @@ async def collect_funnel(
         pagination_used=window_count > 1 or len(nmids) > nmid_batch_size,
         completeness=(
             CompletenessStatus.FULL_AVAILABLE
+            if rows and not errors
+            else CompletenessStatus.PARTIAL
             if rows
             else CompletenessStatus.EMPTY
             if not nmids
             else CompletenessStatus.PARTIAL
         ),
     )
+    entry.errors = errors[:20]
     if nmids and len(unique_nmids) < len(set(nmids)):
         entry.notes.append(
             f"funnel_nmids_requested={len(set(nmids))} with_data={len(unique_nmids)}"
