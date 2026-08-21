@@ -1,0 +1,45 @@
+app/modules/billing/billing.py
+  s_62530fd74f5e66::t_ded1f33fce119f 77-97,115,135
+  s_3f873febd3acf8::t_c3965f265a6081 114,134,142,151,169,207
+app/modules/adv_creator/backend/main_manager.py
+  s_62530fd74f5e66::t_384fb111b29577 457
+  s_62530fd74f5e66::t_0497a023c4fb65 459-461
+  s_62530fd74f5e66::t_fea91da92b42d7 151-166,172-173
+  s_3f873febd3acf8::t_5d20d29d3846cb 171,458
+  s_62530fd74f5e66::t_f04909db057c5a 1-2
+  s_62530fd74f5e66::t_0b9534ece9e0b4 150,462-475,477-484,486-491,494-500
+  s_62530fd74f5e66::t_400de5a732f5a3 167
+app/modules/shop_runner/service_manager/services/auto_updater_version_migration.py
+  s_62530fd74f5e66::t_5df71776164072 9,23-38,51
+  s_3f873febd3acf8::t_edab6ad7df7204 50
+app/modules/shop_runner/service_manager/manager.py
+  s_3f873febd3acf8::t_3d554873889838 2059
+  s_62530fd74f5e66::t_13b00d9228d93a 2058,2060-2077,2080-2086,2090-2100
+  s_62530fd74f5e66::t_77d28a03faff45 21
+app/modules/shop_runner/service_manager/services/stats_freshness_manager.py
+  s_3f873febd3acf8::t_d8a5b887c065a0 21-32,34-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "7bad1bb73d0ae211966c0acc8e6a0670e1e2c3f7",
+  "prompts": {},
+  "sessions": {
+    "s_3f873febd3acf8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e63c29e-efed-410c-aabb-28c1cdf5bb12",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_62530fd74f5e66": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "52541c3a-70eb-4fb8-bf64-365a42c32193",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
