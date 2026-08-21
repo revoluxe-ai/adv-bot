@@ -1,0 +1,21 @@
+env.sample
+  s_312a23e5a51b6d::t_e9049ea1b7de5e 76-77
+  s_312a23e5a51b6d::t_58909d8d2f430e 57-72
+  s_312a23e5a51b6d::t_808c9d5f6b0e5c 78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "885042db69e7301556c97955bc927ccdc07050de",
+  "prompts": {},
+  "sessions": {
+    "s_312a23e5a51b6d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eb80e78e-a8be-411c-88ef-c91a71fd9170",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
