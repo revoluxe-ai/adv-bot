@@ -46,8 +46,8 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Test PG connection | scripts/test_pg_conn.py | UNKNOWN | NONE | NO | - | - | - | |
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | |
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
-| Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-04T02:35:30Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:7dcf1cc5bc85da2da95e220220e4748238d2c597 | Job Complete; all_users.xlsx 129991B copied; PYTHONPATH+/hold in template |
-| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-05T06:50:00Z | 2026-08-06T18:35:47Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:a532c3436a296755dd79b300e852c5c69734956b | Job ops-script-wb-ro-colr03009-20260806-183116 contract_preflight; PRIMARY COL-R03-009_RETURN.zip sha match; WEB_COLLECTOR_HANDOFF=YES; L0=NONE; GHA 31126054331 |
+| Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-14T12:47:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:c1e1fa7c523cdcec81ea23aaf7d8b2dc8e08248a | Job ops-script-users-csv-20260814-123657 Complete exit=0; all_users.xlsx 129957B sha256 670f02cba87457967b0b26c50032d3a26cc51ca466743ebd9c5bac8ff60ddb15 |
+| WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-21T10:54:00Z | 2026-08-15T01:47:42Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:8c2cef14be6ba159c9935f40db2770c364153579 | 34 targeted unit tests passed; --help import failed before argparse because TELEGRAM_WEB_PORT is unset; no WB API calls made |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
