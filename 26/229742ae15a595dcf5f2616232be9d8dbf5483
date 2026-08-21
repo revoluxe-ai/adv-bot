@@ -1,0 +1,54 @@
+openspec/changes/add-free-ui-bot-access-guards/specs/free-client-entry/spec.md
+  s_9be26b213332dd::t_dfcbfcb5b3d5fc 1-22,26-33,36,38-55
+  s_c71df1117b14e2::t_74af25b05f6db9 23-25,34-35,37
+openspec/changes/add-free-ui-bot-access-guards/design.md
+  s_9be26b213332dd::t_9db51d30ea16bd 1-11,17-30,35-58,64-67,71-72
+  s_c71df1117b14e2::t_e5bb6827412986 12-16
+  s_312a23e5a51b6d::t_dfe6d11d5f6f63 33-34
+  s_312a23e5a51b6d::t_9fe8d8a2a491d8 59
+  s_312a23e5a51b6d::t_3274c1f98f373e 31-32
+  s_312a23e5a51b6d::t_db842ac4840021 60-63,68-70
+openspec/changes/add-free-ui-bot-access-guards/decisions/invite-gate-deferred/decision.md
+  s_312a23e5a51b6d::t_42a3292f137425 1-63
+openspec/changes/add-free-ui-bot-access-guards/proposal.md
+  s_9be26b213332dd::t_89be754420dea7 1-36
+openspec/changes/add-free-ui-bot-access-guards/README.md
+  s_9be26b213332dd::t_f45854484011d0 3-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "26229742ae15a595dcf5f2616232be9d8dbf5483",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_312a23e5a51b6d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eb80e78e-a8be-411c-88ef-c91a71fd9170",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_c71df1117b14e2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c5310f31-9050-45df-92d9-4d7239a57e14",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
