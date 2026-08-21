@@ -25,6 +25,10 @@ from scripts.wb_api_readonly_ops.models import (
 
 DEFAULT_MAX_SECONDS = 180.0
 DEFAULT_MAX_CALLS = 40
+DEFAULT_COLLECT_MAX_SECONDS = 3600.0
+DEFAULT_COLLECT_MAX_API_CALLS = 10_000
+DEFAULT_FUNNEL_NMID_BATCH = 20
+DEFAULT_CARDS_PAGE_LIMIT = 100
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -120,7 +124,38 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-calls",
         type=int,
         default=DEFAULT_MAX_CALLS,
-        help="run ceiling family API calls (default 40)",
+        help="run ceiling family API calls (default 40; preflight orchestrator)",
+    )
+    parser.add_argument(
+        "--max-api-calls",
+        type=int,
+        default=DEFAULT_COLLECT_MAX_API_CALLS,
+        help=(
+            "collect mode: max WB API calls for pagination/batching "
+            f"(default {DEFAULT_COLLECT_MAX_API_CALLS})"
+        ),
+    )
+    parser.add_argument(
+        "--ads-date-from",
+        default=None,
+        help="collect mode: ads/fullstats/normquery start YYYY-MM-DD (default from orders)",
+    )
+    parser.add_argument(
+        "--ads-date-to",
+        default=None,
+        help="collect mode: ads/fullstats/normquery end YYYY-MM-DD (default today)",
+    )
+    parser.add_argument(
+        "--funnel-nmid-batch-size",
+        type=int,
+        default=DEFAULT_FUNNEL_NMID_BATCH,
+        help=f"collect mode: nmIDs per funnel request (default {DEFAULT_FUNNEL_NMID_BATCH})",
+    )
+    parser.add_argument(
+        "--cards-page-limit",
+        type=int,
+        default=DEFAULT_CARDS_PAGE_LIMIT,
+        help=f"collect mode: cards list page size (default {DEFAULT_CARDS_PAGE_LIMIT})",
     )
     parser.add_argument(
         "--output-dir",

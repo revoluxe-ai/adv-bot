@@ -78,6 +78,8 @@ from scripts.wb_api_readonly_ops.models import (
     OverallStatus,
     RunReport,
 )
+from scripts.wb_api_readonly_ops.cli import DEFAULT_COLLECT_MAX_SECONDS
+from scripts.wb_api_readonly_ops.collect.runner import run_full_collect
 from scripts.wb_api_readonly_ops.orchestrator import run_ops
 
 logger = logging.getLogger(__name__)
@@ -207,6 +209,37 @@ async def _async_main(argv: list[str] | None = None) -> int:
         _ = access
 
         hub = wb_manager_hub_factory.get_wb_manager_hub(shop_id)
+
+        if mode == Mode.COLLECT:
+            collect_seconds = float(args.max_seconds)
+            if collect_seconds == 180.0:
+                collect_seconds = DEFAULT_COLLECT_MAX_SECONDS
+            collect_report = await run_full_collect(
+                shop_id=shop_id,
+                wb_data_manager=hub.wb_data_manager,
+                output_dir=output_dir,
+                orders_date_from=str(args.orders_date_from),
+                max_seconds=collect_seconds,
+                max_api_calls=int(args.max_api_calls),
+                ads_date_from=args.ads_date_from,
+                ads_date_to=args.ads_date_to,
+                funnel_nmid_batch_size=int(args.funnel_nmid_batch_size),
+                cards_page_limit=int(args.cards_page_limit),
+            )
+            logger.info(
+                "wb_api_readonly_ops collect done shop_id=%s overall=%s sha256=%s",
+                shop_id,
+                collect_report.overall_status,
+                collect_report.archive_sha256,
+            )
+            print(json.dumps(collect_report.to_dict(), ensure_ascii=False, indent=2))
+            print(f"ARCHIVE_PATH={(output_dir / ARCHIVE_NAME).resolve()}")
+            print(f"ARCHIVE_SHA256={collect_report.archive_sha256}")
+            print("WEB_COLLECTOR_HANDOFF=NO")
+            if collect_report.overall_status == OverallStatus.FAILED.value:
+                return 1
+            return 0
+
         runners = HubFamilyRunners(hub.wb_data_manager).as_dict()
         ceiling = RunCeiling(
             max_seconds=float(args.max_seconds),
