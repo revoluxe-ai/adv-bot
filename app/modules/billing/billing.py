@@ -74,6 +74,27 @@ GRACE_EXCEEDED_MESSAGE = (
 )
 
 
+async def _load_cabinet_user_chats(
+    session: AsyncSession,
+    cabinet_id: int,
+) -> list[tuple[int, int | None]]:
+    """Загрузить Telegram ID пользователей кабинета в переданной PG-сессии."""
+    stmt = (
+        select(User.id, User.user_telegram_id)
+        .select_from(WBUserCabinet)
+        .join(User, User.id == WBUserCabinet.user_id)
+        .where(
+            WBUserCabinet.wb_cabinet_id == cabinet_id,
+            User.user_telegram_id.is_not(None),
+        )
+    )
+    result = await session.execute(stmt)
+    return [
+        (int(user_id), int(chat_id) if chat_id is not None else None)
+        for user_id, chat_id in result.all()
+    ]
+
+
 def _days_until_block_message(days_left: int) -> str:
     """Склонение: 1 день / 2-4 дня / 5-20 дней / 21 день / ..."""
     if days_left % 10 == 1 and days_left % 100 != 11:
@@ -90,18 +111,8 @@ async def _notify_days_until_block(cabinet_id: int, days_left: int) -> None:
         f"Ежедневное списание выполнено. До полной блокировки осталось {days_left} {word}."
     )
     sender = get_notification_sender()
-    async with sm() as session:
-        stmt = (
-            select(User.id, User.user_telegram_id)
-            .select_from(WBUserCabinet)
-            .join(User, User.id == WBUserCabinet.user_id)
-            .where(
-                WBUserCabinet.wb_cabinet_id == cabinet_id,
-                User.user_telegram_id.is_not(None),
-            )
-        )
-        result = await session.execute(stmt)
-        rows = result.all()
+    async with sm(read_only=True) as session:
+        rows = await _load_cabinet_user_chats(session, cabinet_id)
     for _user_id, chat_id in rows:
         if chat_id is None:
             continue
@@ -120,25 +131,15 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
     """Отправить уведомление пользователям кабинета об отключении из-за превышения лимита минуса."""
     event_manager = BillingEventManager()
     sender = get_notification_sender()
-    async with sm() as session:
-        stmt = (
-            select(User.id, User.user_telegram_id)
-            .select_from(WBUserCabinet)
-            .join(User, User.id == WBUserCabinet.user_id)
-            .where(
-                WBUserCabinet.wb_cabinet_id == cabinet_id,
-                User.user_telegram_id.is_not(None),
-            )
-        )
-        result = await session.execute(stmt)
-        rows = result.all()
+    async with sm(read_only=True) as session:
+        rows = await _load_cabinet_user_chats(session, cabinet_id)
     for user_id, chat_id in rows:
         if chat_id is None:
             continue
         try:
             success = await sender.send_message(int(chat_id), GRACE_EXCEEDED_MESSAGE)
             if success:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     await event_manager.emit_balance_grace_exceeded_sent(
                         user_id=user_id,
                         user_telegram_id=int(chat_id),
@@ -147,7 +148,7 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
                     )
                     await session.commit()
             else:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     await event_manager.emit_balance_grace_exceeded_failed(
                         user_id=user_id,
                         user_telegram_id=int(chat_id),
@@ -165,7 +166,7 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
                 exc_info=True,
             )
             try:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     await event_manager.emit_balance_grace_exceeded_failed(
                         user_id=user_id,
                         user_telegram_id=int(chat_id) if chat_id else None,
@@ -203,7 +204,7 @@ async def _process_single_cabinet(
     redis_manager: RedisManager,
     skip_by_redis: bool = True
 ) -> dict[str, int | bool | str | float | None]:
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         return await __process_single_cabinet(
             session=session,
             cabinet_id=cabinet_id,

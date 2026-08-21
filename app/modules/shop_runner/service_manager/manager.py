@@ -18,6 +18,7 @@ from typing import (
 from app.core.di.wb_manager_hub import WBManagerHubFactory, WBManagerHub
 from app.core.redis_manager_v2.redis_client import RedisClient
 from sqlalchemy import or_, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
@@ -2054,40 +2055,49 @@ class CoroutinesManager:
         self,
         strategy_updates: list[tuple[int, int, Strategy, Strategy, str]],
     ) -> None:
-        async with sm() as session:
-            for adv_setting_id, adv_id, from_strategy, to_strategy, reason in strategy_updates:
-                # Only update if auto_update_strategy is still on; otherwise user may have
-                # disabled it and set strategy manually in the bot UI (race with change_adv_strategy).
-                stmt = (
-                    update(AdvSetting)
-                    .where(AdvSetting.id == adv_setting_id)
-                    .where(
-                        or_(
-                            AdvSetting.auto_update_strategy.is_(True),
-                            AdvSetting.auto_update_strategy.is_(None),
-                        )
+        """Применить изменения стратегий через короткую master-сессию PG."""
+        async with sm(read_only=False) as session:
+            await self._apply_strategy_updates_in_session(session, strategy_updates)
+
+    async def _apply_strategy_updates_in_session(
+        self,
+        session: AsyncSession,
+        strategy_updates: list[tuple[int, int, Strategy, Strategy, str]],
+    ) -> None:
+        """Применить обновления стратегий в переданной PG-сессии."""
+        for adv_setting_id, adv_id, from_strategy, to_strategy, reason in strategy_updates:
+            # Only update if auto_update_strategy is still on; otherwise user may have
+            # disabled it and set strategy manually in the bot UI (race with change_adv_strategy).
+            stmt = (
+                update(AdvSetting)
+                .where(AdvSetting.id == adv_setting_id)
+                .where(
+                    or_(
+                        AdvSetting.auto_update_strategy.is_(True),
+                        AdvSetting.auto_update_strategy.is_(None),
                     )
-                    .values({"strategy": to_strategy})
                 )
-                result = await session.execute(stmt)
-                if getattr(result, "rowcount", -1) == 0:
-                    logger.debug(
-                        "Стратегия РК не обновлена (auto_update_strategy выключен), "
-                        "shop_id=%s, adv_setting_id=%s",
-                        self.shop_id,
-                        adv_setting_id,
-                    )
-                    continue
-                logger.info(
-                    "Изменена стратегия РК, shop_id=%s, adv_id=%s, adv_setting_id=%s, %s -> %s, reason=%s",
+                .values({"strategy": to_strategy})
+            )
+            result = await session.execute(stmt)
+            if getattr(result, "rowcount", -1) == 0:
+                logger.debug(
+                    "Стратегия РК не обновлена (auto_update_strategy выключен), "
+                    "shop_id=%s, adv_setting_id=%s",
                     self.shop_id,
-                    adv_id,
                     adv_setting_id,
-                    from_strategy,
-                    to_strategy,
-                    reason,
                 )
-            await session.commit()
+                continue
+            logger.info(
+                "Изменена стратегия РК, shop_id=%s, adv_id=%s, adv_setting_id=%s, %s -> %s, reason=%s",
+                self.shop_id,
+                adv_id,
+                adv_setting_id,
+                from_strategy,
+                to_strategy,
+                reason,
+            )
+        await session.commit()
 
 
 # TODO: Переделать граф зависимостей

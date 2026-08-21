@@ -1,3 +1,5 @@
+"""Backend-операции создания рекламных кампаний и их PG-доступ."""
+
 from typing import TYPE_CHECKING, Any, Literal, cast, get_args
 
 from aiogram import Bot
@@ -146,20 +148,30 @@ class MainAdvManager:
         return auto_adv_id
 
     @staticmethod
+    async def _get_all_adv_ids_for_nmid_in_session(
+        session: AsyncSession,
+        wb_cabinet_id: int,
+        nmid: int,
+    ) -> set[int]:
+        """Загрузить adv_id по артикулу в переданной read-only PG-сессии."""
+        stmt = select(AdvSetting.adv_id).where(
+            and_(
+                AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                AdvSetting.nmids == [nmid],
+                AdvSetting.active_status.not_in(["refused", "done"]),
+                AdvSetting.type.in_([8, 9]),
+            )
+        )
+        result = await session.execute(stmt)
+        return {row[0] for row in result.all()}
+
+    @staticmethod
     async def get_all_adv_ids_for_nmid(wb_cabinet_id: int, nmid: int) -> set[int]:
         """Возвращает adv_id всех РК по артикулу (включая авто-only без search_adv_id)."""
-        async with sm() as session:
-            stmt = select(AdvSetting.adv_id).where(
-                and_(
-                    AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                    AdvSetting.nmids == [nmid],
-                    AdvSetting.active_status.not_in(["refused", "done"]),
-                    AdvSetting.type.in_([8, 9]),
-                )
+        async with sm(read_only=True) as session:
+            return await MainAdvManager._get_all_adv_ids_for_nmid_in_session(
+                session, wb_cabinet_id, nmid
             )
-            result = await session.execute(stmt)
-            out = {row[0] for row in result.all()}
-        return out
 
     async def _create_complex_advs(self, nmid: int) -> tuple[int, int]:
         wb_cabinet = self.access.wb_cabinet
@@ -442,56 +454,50 @@ class MainAdvManager:
 
     @staticmethod
     async def get_adv_ids_rows_by_nmid(nmid: int) -> list[tuple[int, int | None]]:
-        async with sm() as session:
-            stmt = (
-                select(AdvSetting)
-                .options(
-                    load_only(
-                        AdvSetting.adv_id,
-                        getattr(AdvSetting, "_search_adv_id"),
-                        AdvSetting.name,
-                    )
-                )
-                .where(
-                    and_(
-                        AdvSetting.active_status.not_in(["refused", "done"]),
-                        or_(
-                            and_(
-                                AdvSetting.name.regexp_match(
-                                    r".*<!-\[\d+]-!>.*"
-                                ),  # Проверяем первый паттерн
-                                AdvSetting.name.regexp_match(
-                                    rf".*{nmid}.*"
-                                ),  # Проверяем второй паттерн
-                            ),
-                            # Дополнительно можно вернуть этот блок, если нужно
-                            and_(
-                                AdvSetting.nmids == [nmid],
-                                getattr(AdvSetting, "_search_adv_id").is_not(None),
-                            ),
-                        ),
-                        # TODOД не правильныый синтаксис условий in, ошибка попала в прод
-                        AdvSetting.type.in_([8, 9]),  # Без устаревших типов РК
-                    )
-                )
+        """Вернуть пары auto/search ID активных кампаний по артикулу."""
+        async with sm(read_only=True) as session:
+            return await MainAdvManager._get_adv_ids_rows_by_nmid_in_session(
+                session, nmid
             )
 
-            result = await session.scalars(stmt)
-            adv_settings = result.all()
-            adv_ids_rows: list[tuple[int, int | None]] = []
-            if adv_settings:
-                for adv in adv_settings:
-                    auto_adv_id = adv.adv_id
-                    if search_adv_id := adv.search_adv_id:
-                        adv_ids_rows.append(
-                            (
-                                auto_adv_id,
-                                search_adv_id,
-                            )
-                        )
-                return adv_ids_rows
-            else:
-                return []
+    @staticmethod
+    async def _get_adv_ids_rows_by_nmid_in_session(
+        session: AsyncSession,
+        nmid: int,
+    ) -> list[tuple[int, int | None]]:
+        """Найти пары ID РК в переданной read-only PG-сессии."""
+        stmt = (
+            select(AdvSetting)
+            .options(
+                load_only(
+                    AdvSetting.adv_id,
+                    getattr(AdvSetting, "_search_adv_id"),
+                    AdvSetting.name,
+                )
+            )
+            .where(
+                and_(
+                    AdvSetting.active_status.not_in(["refused", "done"]),
+                    or_(
+                        and_(
+                            AdvSetting.name.regexp_match(r".*<!-\[\d+]-!>.*"),
+                            AdvSetting.name.regexp_match(rf".*{nmid}.*"),
+                        ),
+                        and_(
+                            AdvSetting.nmids == [nmid],
+                            getattr(AdvSetting, "_search_adv_id").is_not(None),
+                        ),
+                    ),
+                    AdvSetting.type.in_([8, 9]),
+                )
+            )
+        )
+        result = await session.scalars(stmt)
+        return [
+            (adv.adv_id, adv.search_adv_id)
+            for adv in result.all()
+            if adv.search_adv_id
+        ]
 
     @staticmethod
     def _get_balance_type(
