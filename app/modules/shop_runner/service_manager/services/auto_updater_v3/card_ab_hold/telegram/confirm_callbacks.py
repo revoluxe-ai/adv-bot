@@ -189,8 +189,12 @@ class CahConfirmDisable(CallbackData, prefix="cah_ds"):
 
 
 class CahOpenCurrentStep(CallbackData, prefix="cah_os"):
-    """Кнопка «Открыть текущий шаг» на summary после Back."""
+    """Кнопка «Открыть текущий шаг» (S0 menu или summary после Back).
+
+    ``step`` обязателен в схеме CallbackData, но ``on_open_current_step`` его
+    не читает — redraw идёт по ``card_ab_hold_phase`` (см. ``_render_for_adv``).
+    """
 
     adv_setting_original_id: int
-    step: str
+    step: str  # payload only; not used by on_open_current_step handler
     revision: int

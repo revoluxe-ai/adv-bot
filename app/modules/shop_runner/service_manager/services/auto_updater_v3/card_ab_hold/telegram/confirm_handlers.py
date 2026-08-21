@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import inspect
 import logging
+import math
 from collections.abc import Awaitable, Callable
-from typing import Any, cast
+from typing import Any, TypeAlias, cast
 
 from aiogram import Router
 from aiogram.filters import StateFilter
@@ -27,7 +28,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
 
+from app.client_bot.user_interface.helpers.wb_user_cabinet import (
+    get_wb_user_cabinet_for_adv_and_telegram,
+)
 from app.modules.common_slaves.wildberries.models.models import AdvSetting
+from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
+    CalculatedKeyword,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_lifecycle import (
     CardAbHoldSyncStatus,
     DEFAULT_WARMUP_HOURS,
@@ -35,7 +42,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     propose_target_places_from_positions,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
-    clear_epoch_on_exit,
+    EpochWriteError,
+    clear_epoch_on_exit_in_session,
     confirm_auto_bid,
     confirm_auto_participation,
     confirm_keyword_set_and_start_warmup,
@@ -58,6 +66,10 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.redis_coordination import (
     CardAbHoldSetupBlockRedisCache,
     CardAbHoldSignalRedisCache,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.actor import (
+    MISSING_ACTOR_NOTICE,
+    callback_actor_id as _callback_actor_id,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_callbacks import (
     CahAutoBidConfirm,
@@ -188,7 +200,7 @@ def _parse_auto_bid_text(text: str | None) -> float | None:
         value = float(raw)
     except ValueError:
         return None
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         return None
     return value
 
@@ -326,17 +338,32 @@ async def _resolve_keyword_candidates(adv: AdvSetting) -> list[str]:
     return _keyword_candidates(adv)
 
 
-def _tp_rows_from_adv(
+FactualPositionsMap: TypeAlias = dict[str, float]
+"""Live W3 factual positions: keyword text → raw ``KeywordStat.position`` (float)."""
+
+KeywordsForKeyboardLoader: TypeAlias = Callable[
+    [AdvSetting],
+    Awaitable[list[CalculatedKeyword]],
+]
+"""Production keyboard/CH loader seam for ``_load_factual_positions``."""
+
+
+def _tp_rows_and_exclusions(
     adv: AdvSetting,
-    positions: dict[str, float],
-) -> list[tuple[str, int, int]]:
-    """Строки W3: keyword → (fact, target).
+    positions: FactualPositionsMap,
+) -> tuple[list[tuple[str, int, int]], list[tuple[str, str]]]:
+    """Построить valid W3 rows и причины исключения ключей.
 
     Fact — live read-model (передаётся снаружи), не durable epoch SoT.
     Target — confirmed TP эпохи, иначе proposed из ``positions``.
 
     Decision ``ab-hold-confirmed-epoch-parameters-sot`` §2: факт обновляется
     при каждом отображении и MUST NOT читаться из фантомного PG-поля на AdvSetting.
+
+    Production ``positions`` приходят из ``_load_factual_positions`` как
+    ``dict[str, float]`` (``KeywordStat.position`` always ``float``). Локальные
+    ``try/except`` при ``float(position)`` — только для unit/injectable seams с
+    duck-typed doubles; prod-path не полагается на ``None`` в значениях dict.
     """
     keywords = cast(
         list[str],
@@ -346,54 +373,178 @@ def _tp_rows_from_adv(
         dict[str, int],
         dict(getattr(adv, "card_ab_hold_confirmed_target_places_json", None) or {}),
     )
-    proposed = propose_target_places_from_positions(positions)
+    finite_positive_positions: dict[str, float] = {}
+    for keyword, position in positions.items():
+        try:
+            numeric_position = float(position)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(numeric_position) and numeric_position > 0:
+            finite_positive_positions[keyword] = numeric_position
+    proposed = propose_target_places_from_positions(finite_positive_positions)
     rows: list[tuple[str, int, int]] = []
+    exclusions: list[tuple[str, str]] = []
     for kw in keywords:
-        raw_fact = float(positions.get(kw, 0) or 0)
-        fact = int(raw_fact) if raw_fact > 0 else 0
-        target = int(confirmed_tp.get(kw, proposed.get(kw, fact)))
+        raw_position = positions.get(kw)
+        if raw_position is None:
+            exclusions.append((kw, "фактическая позиция недоступна"))
+            continue
+        try:
+            raw_fact = float(raw_position)
+        except (TypeError, ValueError):
+            exclusions.append((kw, "фактическая позиция недоступна"))
+            continue
+        if not math.isfinite(raw_fact):
+            exclusions.append((kw, "фактическая позиция недоступна"))
+            continue
+        if raw_fact <= 0:
+            exclusions.append((kw, "фактическая позиция неположительная"))
+            continue
+        fact = int(raw_fact)
+        raw_target = confirmed_tp.get(kw, proposed.get(kw, fact))
+        try:
+            target = int(raw_target)
+        except (TypeError, ValueError):
+            exclusions.append((kw, "предложенная цель недоступна"))
+            continue
+        if target <= 0:
+            exclusions.append((kw, "предложенная цель недоступна"))
+            continue
         rows.append((kw, fact, target))
+    return rows, exclusions
+
+
+def _tp_rows_from_adv(
+    adv: AdvSetting,
+    positions: FactualPositionsMap,
+) -> list[tuple[str, int, int]]:
+    """Строки W3 только для finite positive factual positions.
+
+    Args:
+        adv: кампания с текущим confirmed keyword-set.
+        positions: live factual-position read-model.
+
+    Returns:
+        Valid rows ``(keyword, factual_position, target_place)``. Ключи без
+        положительной позиции намеренно не попадают в результат и не могут
+        породить ``target_place=0``.
+    """
+    rows, _ = _tp_rows_and_exclusions(adv, positions)
     return rows
 
 
-KeywordsForKeyboardLoader = Callable[[AdvSetting], Awaitable[list[Any]]]
-"""Injectable loader for ``_load_factual_positions`` (default: keyboard CH/PG path)."""
+def _has_complete_factual_position_read(
+    adv: AdvSetting,
+    positions: FactualPositionsMap,
+) -> bool:
+    """Проверить, покрывает ли live-read весь durable keyword-set.
+
+    Наличие ключа, а не валидность его позиции, определяет полноту чтения:
+    полный authoritative read может содержать ``0`` или отрицательную
+    позицию, и тогда явное исключение ключа остаётся допустимым.
+    """
+    confirmed_keywords = set(
+        cast(
+            list[str],
+            getattr(adv, "card_ab_hold_confirmed_keywords_json", None) or [],
+        )
+    )
+    return confirmed_keywords.issubset(positions)
+
+
+_ACTOR_UNSET = object()
+"""Sentinel: ``_load_adv`` caller intentionally skips PG ownership re-check.
+
+Используется read-only redraw/pagination handlers и post-write re-read после
+успешного write-gate. См. блок «Telegram (TG) callback ownership» ниже."""
+
+# ---------------------------------------------------------------------------
+# Telegram (TG) callback ownership (card-ab-hold confirm-flow)
+# ---------------------------------------------------------------------------
+# Платформа UI — Telegram / TG (aiogram). Это не HTTP API по adv_setting_id.
+#
+# Write-path (PG/epoch mutations): handlers MUST вызывать
+# ``_load_adv(..., telegram_user_id=<actor>)`` — foreign actor → ``None``,
+# neutral notice, без durable write (``CAH-OWN-FOREIGN-CONFIRM`` / DISABLE).
+#
+# Read-path (pagination, refresh, back, open-current-step, post-write re-read):
+# handlers вызывают ``_load_adv(adv_id)`` без ``telegram_user_id`` →
+# ``_ACTOR_UNSET``. Это намеренно, не fail-open ownership bypass:
+#
+# - CallbackQuery в Telegram нельзя invoke удалённо, зная только adv_id.
+# - Callback приходит только после нажатия inline-кнопки на сообщении,
+#   видимом этому пользователю в этом чате (обычно private Owner ↔ bot).
+# - Пересланные сообщения с inline-клавиатурой не дают чужому пользователю
+#   replay callback с чужим ``adv_setting_original_id`` (TG не пересылает
+#   CallbackQuery; нет cross-user spy «угадал id → прочитал чужой confirm»).
+# - Upstream entry: ``AdvSettingMenu`` / ``CardAbHoldMenu`` открываются из
+#   cabinet-scoped navigation (``wb_user_cabinet``), не из произвольного id.
+#
+# Bugbot: отсутствие ``telegram_user_id`` на read-only handler — NOT a security
+# defect для текущего Telegram UX; не эскалировать без нового product spec
+# (например, group-chat campaign UI с другой моделью доступа).
+# ---------------------------------------------------------------------------
+
+
+def _raw_cluster_position_for_w3(kw: CalculatedKeyword) -> float:
+    """Сырая factual position для W3 (не ``CalculatedKeyword.position``).
+
+    Production keyboard path возвращает ``CalculatedKeyword`` с
+    ``KeywordStat.position: float`` (Pydantic, non-optional). Ключ без данных
+    в CH получает ``make_zero_keyword_stat`` → ``0.0``, не ``None``; ``NULL`` из
+    CH отсекается на ``KeywordStat.model_validate`` до этого read-path.
+
+    Намеренно читаем ``cluster_stat.position``, а не property ``position``:
+    property делает ``max(round(x), 1)`` и маскирует ``0``/invalid — W3 exclusions
+    должны видеть сырое значение (decision ``ab-hold-confirmed-epoch-parameters-sot``
+    §2).
+
+    ``0``, отрицательные и non-finite значения здесь не считаются ошибкой: их
+    обрабатывает ``_tp_rows_and_exclusions`` (exclusion copy, без crash).
+    """
+    return kw.cluster_stat.position
 
 
 async def _load_factual_positions(
     adv: AdvSetting,
     *,
     keywords_loader: KeywordsForKeyboardLoader | None = None,
-) -> dict[str, float]:
+) -> FactualPositionsMap:
     """Текущие наблюдаемые позиции ключей (Telegram UI read-model).
 
     Источник — тот же путь, что keyword-клавиатура бота
-    (``fetch_keywords_from_database`` / CH+PG), не Redis-only snapshot и не
-    колонка AdvSetting. Сырая ``cluster_stat.position`` (без floor-to-1),
-    чтобы proposed TP мог отфильтровать non-positive.
+    (``get_keywords_for_keyboard`` → ``fetch_keywords_from_database`` / CH+PG),
+    не Redis-only snapshot и не колонка AdvSetting.
+
+    Типобезопасный prod-contract:
+    - loader возвращает ``list[CalculatedKeyword]``;
+    - каждая позиция — ``float`` через ``_raw_cluster_position_for_w3``;
+    - ``None`` для ``cluster_stat.position`` в prod-path недостижим (см. docstring
+      helper'а); invalid numeric semantics — downstream в ``_tp_rows_and_exclusions``.
 
     Injectable ``keywords_loader`` (default ``get_keywords_for_keyboard``)
-    делает CH/PG boundary тестируемой без module-level patch: parent/tests
-    передают loader, production path остаётся без изменений при ``None``.
+    делает CH/PG boundary тестируемой без module-level patch: unit-тесты могут
+    подставить duck-typed loader, production path при ``None`` не меняется.
 
     Args:
         adv: кампания, для которой читаются позиции.
         keywords_loader: optional override keyboard/CH read-model loader.
 
     Returns:
-        Mapping ``keyword_text → raw cluster position``.
+        Mapping ``keyword_text → raw cluster position`` (``float``, может быть
+        ``0.0`` или non-finite — фильтрация на шаге W3 validator).
     """
     from app.client_bot.utils import get_keywords_for_keyboard
 
-    loader = (
+    loader: KeywordsForKeyboardLoader = (
         keywords_loader
         if keywords_loader is not None
         else get_keywords_for_keyboard
     )
-    keywords = await loader(adv)
-    out: dict[str, float] = {}
+    keywords: list[CalculatedKeyword] = await loader(adv)
+    out: FactualPositionsMap = {}
     for kw in keywords:
-        out[str(kw.text)] = float(kw.cluster_stat.position)
+        out[kw.text] = _raw_cluster_position_for_w3(kw)
     return out
 
 
@@ -595,11 +746,14 @@ async def _render_for_adv(
 
     if phase == CardAbHoldPhase.AWAITING_TP_CONFIRM:
         positions = await _load_factual_positions(adv)
-        rows = _tp_rows_from_adv(adv, positions)
+        rows, exclusions = _tp_rows_and_exclusions(adv, positions)
         page = int(draft.get("page") or 0)
         page_rows, norm_page, total_pages = paginate(rows, page)
         text = build_w3_propose_text(
-            rows=page_rows, page=norm_page, total_pages=total_pages
+            rows=page_rows,
+            page=norm_page,
+            total_pages=total_pages,
+            exclusions=exclusions,
         )
         kb = build_w3_propose_keyboard(
             adv_id=adv_id, rows=rows, revision=revision, page=norm_page
@@ -685,17 +839,96 @@ async def _load_adv_in_session(
     )
 
 
-async def _load_adv(adv_setting_original_id: int) -> AdvSetting | None:
-    """Загрузить AdvSetting через production ``sm(read_only=True)`` seam."""
+async def _load_adv(
+    adv_setting_original_id: int,
+    *,
+    telegram_user_id: int | None | object = _ACTOR_UNSET,
+) -> AdvSetting | None:
+    """Загрузить AdvSetting; опционально — cabinet ownership gate для write-path.
+
+    Два режима (см. module-level «Telegram callback ownership»):
+
+    1. **Write-gate** — caller передаёт ``telegram_user_id`` (int). Foreign /
+       missing actor → ``None`` (fail-closed до PG mutation).
+    2. **Read-redraw** — caller omits ``telegram_user_id`` (default
+       ``_ACTOR_UNSET``). Ownership не перепроверяется: redraw опирается на
+       Telegram visibility inline callback + upstream ``wb_user_cabinet`` menu
+       path. Это не «чтение по угаданному adv_id» извне Telegram.
+
+    Args:
+        adv_setting_original_id: ``AdvSetting.id`` из callback_data.
+        telegram_user_id: Telegram actor для write-gate; omit для read-redraw
+            и post-write re-read сразу после успешного write-gate в том же
+            handler.
+
+    Returns:
+        AdvSetting или ``None`` (row missing / foreign actor при write-gate).
+    """
     async with sm(read_only=True) as session:
-        return await _load_adv_in_session(session, adv_setting_original_id)
+        adv = await _load_adv_in_session(session, adv_setting_original_id)
+        if adv is None or telegram_user_id is _ACTOR_UNSET:
+            return adv
+        if isinstance(telegram_user_id, bool) or not isinstance(telegram_user_id, int):
+            return None
+        owner = await get_wb_user_cabinet_for_adv_and_telegram(
+            session, adv, telegram_user_id
+        )
+        if owner is None:
+            logger.info(
+                "[adv_setting_id=%s] foreign A/B Hold callback rejected",
+                adv_setting_original_id,
+            )
+            return None
+        return adv
+
+
+_UI_HIDDEN_NOTICE = "Доступно только при включённом боте"
+
+
+async def _load_adv_for_write(
+    query: CallbackQuery,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Write-path load с fail-closed actor + cabinet ownership gate.
+
+    Используется confirm write-handlers перед PG/epoch mutation. Missing/invalid
+    Telegram actor → ``MISSING_ACTOR_NOTICE``; foreign/missing row →
+    ``_UI_HIDDEN_NOTICE``.
+
+    Args:
+        query: CallbackQuery write-handler'а.
+        adv_setting_original_id: ``AdvSetting.id`` из callback_data.
+
+    Returns:
+        AdvSetting после ownership gate или ``None`` (user уже уведомлён).
+    """
+    actor_id = _callback_actor_id(query)
+    if actor_id is None:
+        await _notify_callback_user(query, MISSING_ACTOR_NOTICE)
+        return None
+    adv = await _load_adv(
+        adv_setting_original_id,
+        telegram_user_id=actor_id,
+    )
+    if adv is None or not is_card_ab_hold_ui_visible(adv):
+        await _notify_callback_user(query, _UI_HIDDEN_NOTICE)
+        return None
+    return adv
 
 
 async def _abort_epoch_mode_off_in_session(
     session: AsyncSession,
     adv_setting_id: int,
+    *,
+    commit: bool = True,
 ) -> AdvSetting | None:
     """Mode → OFF + clear allowed snapshot в переданной WRITE session.
+
+    Args:
+        session: injectable async write session.
+        adv_setting_id: ``AdvSetting.id``.
+        commit: выполнить ли commit немедленно. EXIT передаёт ``False``,
+            чтобы объединить mode/snapshot и epoch reset в одну транзакцию.
 
     Returns:
         Обновлённый AdvSetting или None.
@@ -709,15 +942,25 @@ async def _abort_epoch_mode_off_in_session(
         return None
     row.card_ab_hold_mode = CardAbHoldMode.OFF.value
     row.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
-    await session.commit()
+    if commit:
+        await session.commit()
     return row
 
 
 async def _abort_epoch_to_off(adv: AdvSetting) -> None:
     """Abort epoch attempt → OFF (§8, nothing durable to clear on fresh S1)."""
     async with sm(read_only=False) as session:
-        _ = await _abort_epoch_mode_off_in_session(session, int(adv.id))
-    await clear_epoch_on_exit(int(adv.id))
+        _ = await _abort_epoch_mode_off_in_session(
+            session,
+            int(adv.id),
+            commit=False,
+        )
+        await clear_epoch_on_exit_in_session(
+            session,
+            int(adv.id),
+            commit=False,
+        )
+        await session.commit()
     await CardAbHoldSignalRedisCache(adv).clear()
     await CardAbHoldSetupBlockRedisCache(adv).clear()
 
@@ -728,9 +971,8 @@ async def on_keyword_toggle(
     callback_data: CahKeywordToggle,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="keyword_toggle"
@@ -754,6 +996,7 @@ async def on_page_nav(
     callback_data: CahPageNav,
     state: FSMContext,
 ) -> None:
+    # Read-redraw: ownership via Telegram callback visibility (see module policy).
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -778,9 +1021,8 @@ async def on_keyword_set_confirm(
     callback_data: CahKeywordSetConfirm,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="keyword_set_confirm"
@@ -813,9 +1055,8 @@ async def on_warmup_preset(
     callback_data: CahWarmupDurationPreset,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="warmup_duration_preset"
@@ -837,9 +1078,8 @@ async def on_warmup_duration_confirm(
     callback_data: CahWarmupDurationConfirm,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="warmup_duration_confirm"
@@ -862,6 +1102,7 @@ async def on_warmup_refresh(
     callback_data: CahWarmupStatusRefresh,
     state: FSMContext,
 ) -> None:
+    # Read-redraw: ownership via Telegram callback visibility (see module policy).
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -880,9 +1121,8 @@ async def on_keyword_edit_open(
     callback_data: CahKeywordEditOpen,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     phase = normalize_card_ab_hold_phase(getattr(adv, "card_ab_hold_phase", None))
     if phase != CardAbHoldPhase.WARM_UP:
@@ -917,9 +1157,8 @@ async def on_tp_confirm_all(
     callback_data: CahTpConfirmAll,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="tp_confirm_all"
@@ -927,11 +1166,42 @@ async def on_tp_confirm_all(
         await _render_for_adv(query, adv, state)
         return
     positions = await _load_factual_positions(adv)
+    if not _has_complete_factual_position_read(adv, positions):
+        await _notify_callback_user(
+            query,
+            "Не удалось получить фактические позиции всех подтверждённых ключей. "
+            "Повторите попытку позже.",
+        )
+        await _render_for_adv(query, adv, state)
+        return
+    rows = _tp_rows_from_adv(adv, positions)
     tp_map = {
         kw: target
-        for kw, _fact, target in _tp_rows_from_adv(adv, positions)
+        for kw, _fact, target in rows
     }
-    await confirm_target_places(int(adv.id), tp_map)
+    if not tp_map:
+        await _notify_callback_user(
+            query,
+            "Нет валидных ключей для подтверждения: фактические позиции "
+            "отсутствуют или неположительны.",
+        )
+        await _render_for_adv(query, adv, state)
+        return
+    try:
+        await confirm_target_places(int(adv.id), tp_map)
+    except EpochWriteError:
+        logger.info(
+            "[adv_setting_id=%s] TP confirmation became stale before durable write",
+            adv.id,
+        )
+        await _notify_callback_user(
+            query,
+            "Состояние подтверждения изменилось. Экран обновлён.",
+        )
+        current_adv = await _load_adv(callback_data.adv_setting_original_id)
+        if current_adv is not None:
+            await _render_for_adv(query, current_adv, state)
+        return
     await set_w3_confirmed_visible(state, int(adv.id), True)
     await bump_revision(state, int(adv.id))
     await _notify_callback_user(query, "Целевые позиции зафиксированы")
@@ -947,6 +1217,7 @@ async def on_continue_to_auto(
     state: FSMContext,
 ) -> None:
     """W3-confirmed → A1/A2: скрыть read-only экран и показать следующий шаг (§7)."""
+    # Read-redraw (+ FSM only): Telegram callback visibility; no PG write.
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -968,9 +1239,8 @@ async def on_auto_participation_confirm(
     callback_data: CahAutoParticipationConfirm,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="auto_participation_confirm"
@@ -996,9 +1266,8 @@ async def on_auto_bid_confirm(
     callback_data: CahAutoBidConfirm,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="auto_bid_confirm"
@@ -1028,9 +1297,8 @@ async def on_auto_bid_edit(
     ``on_auto_bid_numeric_message``, confirm по-прежнему через
     ``CahAutoBidConfirm``.
     """
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="auto_bid_edit"
@@ -1107,6 +1375,7 @@ async def on_sync_refresh(
     callback_data: CahSyncStatusRefresh,
     state: FSMContext,
 ) -> None:
+    # Read-redraw: ownership via Telegram callback visibility (see module policy).
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -1125,6 +1394,7 @@ async def on_back(
     callback_data: CahConfirmBack,
     state: FSMContext,
 ) -> None:
+    # Read-redraw (+ FSM draft): Telegram callback visibility; no PG write.
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -1167,9 +1437,8 @@ async def on_cancel_open(
     callback_data: CahCancelOpen,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="cancel_open"
@@ -1192,9 +1461,8 @@ async def on_cancel_no(
     callback_data: CahCancelConfirmNo,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="cancel_confirm_no"
@@ -1213,9 +1481,8 @@ async def on_cancel_yes(
     callback_data: CahCancelConfirmYes,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="cancel_confirm_yes"
@@ -1241,6 +1508,13 @@ async def on_open_current_step(
     callback_data: CahOpenCurrentStep,
     state: FSMContext,
 ) -> None:
+    """Read-redraw мост S0/summary → confirm-flow (module TG policy).
+
+    ``callback_data.step`` не участвует в routing: экран выбирается только по
+    durable ``adv.card_ab_hold_phase`` + FSM draft в ``_render_for_adv``.
+    Поле ``step`` в payload — legacy/schema (S0-клавиатура кладёт ``S1``;
+    summary после Back — ``return_step``); stale-gate смотрит ``revision``.
+    """
     adv = await _load_adv(callback_data.adv_setting_original_id)
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -1262,9 +1536,8 @@ async def on_confirm_disable(
     callback_data: CahConfirmDisable,
     state: FSMContext,
 ) -> None:
-    adv = await _load_adv(callback_data.adv_setting_original_id)
-    if adv is None or not is_card_ab_hold_ui_visible(adv):
-        await _notify_callback_user(query, "Доступно только при включённом боте")
+    adv = await _load_adv_for_write(query, callback_data.adv_setting_original_id)
+    if adv is None:
         return
     if await _check_stale(
         query, adv, callback_data.revision, state, action_id="disable"

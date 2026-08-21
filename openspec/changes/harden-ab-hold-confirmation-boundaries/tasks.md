@@ -1,6 +1,6 @@
 ## 1. Baseline and test seams
 
-- [ ] 1.1 LEGACY_BASELINE: зафиксировать существующие entrypoints подтверждения, отключения и W3-рендеринга в targeted `card_ab_hold` тестах; старые assertions использовать только как характеристику до intentional change, не требовать сохранения устаревшего поведения после исправления.
+- [x] 1.1 LEGACY_BASELINE: зафиксировать существующие entrypoints подтверждения, отключения и W3-рендеринга в targeted `card_ab_hold` тестах; старые assertions использовать только как характеристику до intentional change, не требовать сохранения устаревшего поведения после исправления.
 - [x] 1.2 TARGET_REGRESSION: подготовить contract cases для связанного пользователя, чужого пользователя, положительной позиции, отсутствующей позиции, нулевой, отрицательной и non-finite позиции; каждый новый или изменённый тест снабдить русским docstring с указанием spec `card-ab-hold-mode`.
 
 ## 2. Callback actor gate
@@ -24,7 +24,7 @@
 - [x] 4.1 TARGET_REGRESSION: добавить paired tests для существующего epoch write-path под `SELECT ... FOR UPDATE`: положительный полный `tp_map` и UI-filtered subset проходят, а пустой, неположительный, нецелочисленный или содержащий чужой ключ payload отклоняется без PG update, commit или phase transition. Live PG write/rejection tests are authored and executed in `tests/integration/card_ab_hold/test_confirmation_boundaries_live.py` against the validated disposable test database.
 - [x] 4.2 Реализовать финальную проверку durable payload в существующем `confirm_target_places`/session writer до `UPDATE`/`COMMIT`: `tp_map` обязан быть непустым, содержать только положительные целочисленные target places и покрывать именно оставшийся подтверждаемый keyword-set.
 - [x] 4.3 TARGET_REGRESSION (S10, S11): доказать, что setup tick, activation retry и обычный drift factual position не пересчитывают и не перезаписывают уже подтверждённый target place текущей epoch.
-- [ ] 4.4 FINAL_ACCEPTANCE (S12, S13): доказать, что валидное подтверждение сохраняет WARM_UP, generation, durable PG/Redis lifecycle и существующий retry flow, а hardening не авторизует unrelated V3/shared-defaults/Excel/bid/budget/WB writers.
+- [x] 4.4 FINAL_ACCEPTANCE (S12, S13): доказать, что валидное подтверждение сохраняет WARM_UP, generation, durable PG/Redis lifecycle и существующий retry flow, а hardening не авторизует unrelated V3/shared-defaults/Excel/bid/budget/WB writers.
 
 ## 5. Telegram rejection and exclusion UX safety
 
@@ -34,7 +34,7 @@
 
 ## 6. Scenario-plan and final verification
 
-- [ ] 6.1 FINAL_ACCEPTANCE: закрыть материализованный scenario plan `SCPV1-2032f579212ef33b` всеми сценариями S01–S13 и сохранить evidence roles `TARGET_REGRESSION`/`FINAL_ACCEPTANCE`; не считать chat-only evidence заменой durable scenario receipt.
+- [x] 6.1 FINAL_ACCEPTANCE: закрыть материализованный scenario plan `SCPV1-2032f579212ef33b` всеми сценариями S01–S13 и сохранить evidence roles `TARGET_REGRESSION`/`FINAL_ACCEPTANCE`; не считать chat-only evidence заменой durable scenario receipt.
 - [x] 6.2 Запустить targeted unit/integration suites для `tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py`, actor/disable handlers, epoch write gates, Telegram payload limits и связанных scenario seams; проверить, что regression tests падают при удалении guarded conditions.
 - [x] 6.3 Выполнить `poetry run pyright-strict` и `git diff --check`; проверить документацию на всех новых/изменённых Python-модулях, публичных методах и тестовых helper-функциях, а также подтвердить отсутствие миграций и изменений WARM_UP/generation/PG/Redis lifecycle.
 

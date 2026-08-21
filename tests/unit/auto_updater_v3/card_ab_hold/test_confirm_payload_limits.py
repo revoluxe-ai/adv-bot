@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import pytest
 
+from app.client_bot import const
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_callbacks import (
     CahAutoBidConfirm,
     CahAutoParticipationConfirm,
     CahCancelConfirmYes,
     CahConfirmBack,
+    CahConfirmDisable,
     CahKeywordToggle,
     CahPageNav,
+    CahTpConfirmAll,
     CahWarmupDurationPreset,
     ConfirmStep,
 )
@@ -27,7 +30,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     build_w3_propose_text,
 )
 
-_TG_MESSAGE_TEXT_MAX = 4096
+_TG_MESSAGE_TEXT_MAX = const.MAX_MESSAGE_LENGTH
 _TG_CALLBACK_ANSWER_MAX = 200
 _TG_CALLBACK_DATA_BYTES_MAX = 64
 _WORST_CASE_ADV_ID = 2_147_483_647
@@ -99,6 +102,26 @@ def test_confirm_callback_data_bytes_worst_case(factory) -> None:
 
 
 @pytest.mark.unit
+def test_tp_and_disable_callback_data_bytes_worst_case() -> None:
+    """S03/S08: TP confirm и EXIT callbacks остаются в лимите UTF-8 bytes."""
+    callbacks = (
+        CahTpConfirmAll(
+            adv_setting_original_id=_WORST_CASE_ADV_ID,
+            step=ConfirmStep.W3_PROPOSE.value,
+            revision=999_999,
+            page=99,
+        ).pack(),
+        CahConfirmDisable(
+            adv_setting_original_id=_WORST_CASE_ADV_ID,
+            step=ConfirmStep.S3.value,
+            revision=999_999,
+        ).pack(),
+    )
+    for packed in callbacks:
+        assert 1 <= len(packed.encode("utf-8")) <= _TG_CALLBACK_DATA_BYTES_MAX
+
+
+@pytest.mark.unit
 def test_s1_screen_text_within_message_limit_worst_case() -> None:
     keywords = [_WORST_KEYWORD] * 10
     text = build_s1_text(
@@ -116,6 +139,47 @@ def test_w3_propose_screen_within_message_limit_worst_case() -> None:
     rows = [(_WORST_KEYWORD, 999, 888)] * 10
     text = build_w3_propose_text(rows=rows, page=0, total_pages=50)
     assert len(text) <= _TG_MESSAGE_TEXT_MAX
+
+
+@pytest.mark.unit
+def test_w3_exclusion_reasons_with_worst_case_unicode_stay_safe() -> None:
+    """S05/S06: dynamic Cyrillic/emoji exclusions fit and contain no placeholders."""
+    keyword = "ключ-🚀-" + "я" * 120
+    exclusions = [
+        (f"{keyword}-{index}", "фактическая позиция недоступна")
+        for index in range(20)
+    ]
+    text = build_w3_propose_text(
+        rows=[(keyword, 12, 12)],
+        page=0,
+        total_pages=1,
+        exclusions=exclusions,
+    )
+    assert len(text) <= _TG_MESSAGE_TEXT_MAX
+    assert "{" not in text
+    assert "}" not in text
+    assert "🚀" in text
+
+
+@pytest.mark.unit
+def test_w3_exclusions_are_bounded_for_arbitrary_volume() -> None:
+    """Доказать лимит Telegram для реалистичного большого списка исключений."""
+    exclusions = [
+        (
+            f"phrase-{index}-" + "я" * 100,
+            "фактическая позиция недоступна",
+        )
+        for index in range(100)
+    ]
+    text = build_w3_propose_text(
+        rows=[("valid-keyword", 12, 12)],
+        page=0,
+        total_pages=1,
+        exclusions=exclusions,
+    )
+
+    assert len(text) <= _TG_MESSAGE_TEXT_MAX
+    assert "phrase-0-" in text
 
 
 @pytest.mark.unit

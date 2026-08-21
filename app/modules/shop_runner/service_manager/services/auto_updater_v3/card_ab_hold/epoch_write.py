@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
+from collections.abc import Mapping
 from typing import Any, cast
 
 from sqlalchemy import select, update
@@ -53,6 +55,50 @@ def _select_adv_for_update(adv_setting_id: int):
 
 class EpochWriteError(ValueError):
     """Недопустимый переход epoch write-path."""
+
+
+def _validated_confirmed_keyword_subset(
+    adv: AdvSetting,
+    tp_map: Mapping[Any, object],
+) -> list[str]:
+    """Проверить durable TP payload и вернуть оставшийся keyword-set.
+
+    Args:
+        adv: строка ``AdvSetting`` после ``SELECT ... FOR UPDATE``.
+        tp_map: proposed/confirmed target places от Telegram flow.
+
+    Returns:
+        Подмножество исходного confirmed keyword-set в его исходном порядке.
+
+    Raises:
+        EpochWriteError: если payload пуст, содержит невалидную цель или
+            ключ вне текущего confirmed keyword-set.
+    """
+    if not tp_map:
+        raise EpochWriteError("confirm_target_places requires a non-empty tp_map")
+
+    current_keywords = list(
+        getattr(adv, "card_ab_hold_confirmed_keywords_json", None) or []
+    )
+    current_keyword_set = set(current_keywords)
+    payload_keys = set(tp_map)
+    if not payload_keys.issubset(current_keyword_set):
+        raise EpochWriteError(
+            "confirm_target_places payload contains a keyword outside "
+            "the confirmed keyword-set"
+        )
+    for keyword, target_place in tp_map.items():
+        if not isinstance(keyword, str) or not keyword:
+            raise EpochWriteError("confirm_target_places keyword must be non-empty text")
+        if isinstance(target_place, bool) or not isinstance(target_place, int):
+            raise EpochWriteError(
+                "confirm_target_places target place must be an integer"
+            )
+        if target_place <= 0:
+            raise EpochWriteError(
+                "confirm_target_places target place must be positive"
+            )
+    return [keyword for keyword in current_keywords if keyword in payload_keys]
 
 
 async def start_epoch_on_enable_in_session(
@@ -287,7 +333,7 @@ async def advance_warmup_to_tp_confirm(adv_setting_id: int) -> bool:
 async def confirm_target_places_in_session(
     session: AsyncSession,
     adv_setting_id: int,
-    tp_map: dict[str, int],
+    tp_map: Mapping[str, object],
 ) -> None:
     """Durable confirmed TP + phase advance в переданной session.
 
@@ -301,10 +347,12 @@ async def confirm_target_places_in_session(
         raise EpochWriteError(
             f"confirm_target_places requires AWAITING_TP_CONFIRM, got {phase}"
         )
+    confirmed_keywords = _validated_confirmed_keyword_subset(adv, tp_map)
     stmt_up = (
         update(AdvSetting)
         .where(AdvSetting.id == adv_setting_id)
         .values(
+            card_ab_hold_confirmed_keywords_json=confirmed_keywords,
             card_ab_hold_confirmed_target_places_json=dict(tp_map),
             card_ab_hold_phase=(
                 CardAbHoldPhase.AWAITING_AUTO_PARTICIPATION_CONFIRM.value
@@ -317,7 +365,7 @@ async def confirm_target_places_in_session(
 
 async def confirm_target_places(
     adv_setting_id: int,
-    tp_map: dict[str, int],
+    tp_map: Mapping[str, object],
 ) -> None:
     """Durable confirmed TP; phase → ``AWAITING_AUTO_PARTICIPATION_CONFIRM`` (§20).
 
@@ -370,6 +418,8 @@ async def confirm_auto_bid_in_session(
     Raises:
         EpochWriteError: если phase не ``AWAITING_AUTO_BID_CONFIRM``.
     """
+    if not math.isfinite(bid):
+        raise EpochWriteError("confirm_auto_bid bid must be finite")
     stmt = _select_adv_for_update(adv_setting_id)
     adv = (await session.execute(stmt)).scalar_one()
     adv_id = int(adv.adv_id)
@@ -598,8 +648,17 @@ async def activate_after_successful_sync(adv_setting_id: int) -> bool:
 async def clear_epoch_on_exit_in_session(
     session: AsyncSession,
     adv_setting_id: int,
+    *,
+    commit: bool = True,
 ) -> None:
-    """Сброс epoch-полей в переданной session (§22.5); mode — caller."""
+    """Сброс epoch-полей в переданной session (§22.5); mode — caller.
+
+    Args:
+        session: injectable async write session.
+        adv_setting_id: ``AdvSetting.id``.
+        commit: выполнить ли commit немедленно. ``False`` позволяет caller
+            объединить сброс с другими durable-полями в одной транзакции.
+    """
     clears = clear_epoch_fields_values()
     stmt = _select_adv_for_update(adv_setting_id)
     _ = (await session.execute(stmt)).scalar_one()
@@ -609,7 +668,8 @@ async def clear_epoch_on_exit_in_session(
         .values(**clears)
     )
     _ = await session.execute(stmt_up)
-    await session.commit()
+    if commit:
+        await session.commit()
 
 
 async def clear_epoch_on_exit(adv_setting_id: int) -> None:

@@ -385,19 +385,20 @@ def build_w3_propose_keyboard(
     )
     if nav:
         kb_rows.append(nav)
-    kb_rows.append(
-        [
-            InlineKeyboardButton(
-                text="Подтвердить целевые позиции",
-                callback_data=CahTpConfirmAll(
-                    adv_setting_original_id=adv_id,
-                    step=step.value,
-                    revision=revision,
-                    page=norm_page,
-                ).pack(),
-            )
-        ]
-    )
+    if rows:
+        kb_rows.append(
+            [
+                InlineKeyboardButton(
+                    text="Подтвердить целевые позиции",
+                    callback_data=CahTpConfirmAll(
+                        adv_setting_original_id=adv_id,
+                        step=step.value,
+                        revision=revision,
+                        page=norm_page,
+                    ).pack(),
+                )
+            ]
+        )
     kb_rows.append(
         _back_cancel_row(
             adv_id=adv_id, step=step, revision=revision, page=norm_page

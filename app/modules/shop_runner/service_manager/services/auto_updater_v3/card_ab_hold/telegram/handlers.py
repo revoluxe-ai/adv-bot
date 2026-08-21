@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import inspect
 import logging
+from typing import Any
 
 from aiogram import Router
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +51,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     CardAbHoldEnable,
     CardAbHoldLaunchAnyway,
     CardAbHoldMenu,
+)
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.confirm_draft import (
+    get_revision,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
     SUPPORT_LINK,
@@ -98,6 +103,14 @@ logger = logging.getLogger(__name__)
 
 card_ab_hold_router = Router(name="card_ab_hold")
 
+_GENERATION_PHASES = frozenset(
+    {
+        CardAbHoldPhase.PENDING_INTENT,
+        CardAbHoldPhase.WB_SYNC,
+        CardAbHoldPhase.READY_ACTIVE,
+    }
+)
+
 
 async def _notify_callback_user(query: CallbackQuery, text: str | None) -> None:
     """Краткое пояснение в чат после ACK middleware (не CallbackQuery.answer).
@@ -131,7 +144,10 @@ async def _notify_callback_user(query: CallbackQuery, text: str | None) -> None:
         await result
 
 
-# Soft MVP / decision §17 / tasks 23.9: informed consent on S0 (and reused on
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.actor import (
+    MISSING_ACTOR_NOTICE,
+    callback_actor_id as _callback_actor_id,
+)
 # status screens). Freeze-decide wording only — never «ослабим защиту».
 SOFT_POLICY_STATS_DISCLAIMER = (
     "Статистика иногда временно недоступна или устаревает. Чтобы ровный тест "
@@ -164,6 +180,7 @@ def _screen_keyboard(
     mode: CardAbHoldMode | str | None,
     *,
     phase: CardAbHoldPhase | str | None = None,
+    revision: int | None = None,
     emergency_educated: bool = False,
     emergency_latch: bool = False,
 ) -> InlineKeyboardMarkup:
@@ -174,7 +191,9 @@ def _screen_keyboard(
 
     При ``mode≠OFF`` и non-NULL epoch ``phase`` добавляется
     «Открыть текущий шаг» (``CahOpenCurrentStep``) — мост в confirm-flow
-    (ROOT-001 / UX §5). Legacy MVP-1 (``phase`` NULL) Open не получает.
+    (ROOT-001 / UX §5). Для callback используется переданный текущий
+    ``revision``; если seam не передан, сохраняется legacy default ``1``.
+    Legacy MVP-1 (``phase`` NULL) Open не получает.
 
     Emergency (``ab-hold-emergency-kill-switch``): только mode≠OFF;
     сначала education ACK, затем кнопка Emergency; при latch — support URL.
@@ -194,6 +213,10 @@ def _screen_keyboard(
     elif normalize_card_ab_hold_phase(phase) is not None:
         # UX §5 S0 mode≠OFF + epoch-managed: deep-link в текущую phase-screen.
         # revision=1 — default FSM revision (confirm_draft.get_revision).
+        # step=ConfirmStep.S1 — только заполнение схемы CallbackData; handler
+        # ``on_open_current_step`` игнорирует ``callback_data.step`` и рисует
+        # экран по durable ``card_ab_hold_phase`` через ``_render_for_adv``
+        # (W3/A2/S1/S1b/…). Hardcode S1 здесь не routing-bug.
         rows.append(
             [
                 InlineKeyboardButton(
@@ -201,7 +224,7 @@ def _screen_keyboard(
                     callback_data=CahOpenCurrentStep(
                         adv_setting_original_id=adv_id,
                         step=ConfirmStep.S1.value,
-                        revision=1,
+                        revision=1 if revision is None else int(revision),
                     ).pack(),
                 )
             ]
@@ -268,6 +291,7 @@ async def _edit_screen(
     mode: CardAbHoldMode | str | None,
     *,
     phase: CardAbHoldPhase | str | None = None,
+    revision: int | None = None,
     alert_if_unavailable: bool = True,
     emergency_educated: bool = False,
     emergency_latch: bool = False,
@@ -280,6 +304,8 @@ async def _edit_screen(
 
     Args:
         phase: durable ``card_ab_hold_phase`` для S0 confirm-bridge (UX §5).
+        revision: current FSM revision or durable generation for the S0
+            confirm-bridge callback. ``None`` preserves the direct-call seam.
         alert_if_unavailable: если False — не слать user-notice при skip
             (caller уже уведомил; иначе второй toast дублирует UX).
         emergency_educated: ACK образования Emergency.
@@ -308,16 +334,24 @@ async def _edit_screen(
             )
         return False
 
-    await msg.answer(
-        text,
-        reply_markup=_screen_keyboard(
+    if revision is None:
+        keyboard = _screen_keyboard(
             adv_id,
             mode,
             phase=phase,
             emergency_educated=emergency_educated,
             emergency_latch=emergency_latch,
-        ),
-    )
+        )
+    else:
+        keyboard = _screen_keyboard(
+            adv_id,
+            mode,
+            phase=phase,
+            revision=revision,
+            emergency_educated=emergency_educated,
+            emergency_latch=emergency_latch,
+        )
+    await msg.answer(text, reply_markup=keyboard)
     return True
 
 
@@ -342,6 +376,36 @@ async def _screen_status_text(
         degraded=bool(getattr(adv, "card_ab_hold_degraded", False)),
         block_kind=block.kind if block is not None else None,
     )
+
+
+async def _resolve_screen_revision(
+    adv: AdvSetting,
+    *,
+    state: FSMContext | None,
+) -> int | None:
+    """Разрешить токен S0 callback по тому же правилу, что и stale-checker.
+
+    Pre-generation confirm phases используют текущий revision FSM. Для
+    generation-managed phases и ACTIVE используется durable generation из
+    ``AdvSetting``. ``None`` оставляет совместимость с прямыми unit-test
+    вызовами без FSM state.
+
+    Args:
+        adv: актуальная кампания с durable phase/mode/generation.
+        state: FSM-контекст пользователя; может отсутствовать в legacy seam.
+
+    Returns:
+        Текущий revision/generation или ``None``, если разрешить его нельзя.
+    """
+    phase = normalize_card_ab_hold_phase(getattr(adv, "card_ab_hold_phase", None))
+    mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
+    if phase is None:
+        return None
+    if phase in _GENERATION_PHASES or mode == CardAbHoldMode.ACTIVE:
+        return int(getattr(adv, "card_ab_hold_generation", 0) or 0)
+    if state is not None:
+        return await get_revision(state, int(adv.id))
+    return None
 
 
 def _low_views_warning_keyboard(adv_id: int) -> InlineKeyboardMarkup:
@@ -385,9 +449,23 @@ async def _edit_low_views_warning(
 
 @card_ab_hold_router.callback_query(CardAbHoldMenu.filter())
 async def open_card_ab_hold_menu(
-    query: CallbackQuery, callback_data: CardAbHoldMenu
+    query: CallbackQuery,
+    callback_data: CardAbHoldMenu,
+    state: FSMContext | None = None,
 ) -> None:
-    """Открыть инструкцию A/B Hold (spec card-ab-hold-mode paid-only UI)."""
+    """Открыть инструкцию A/B Hold (spec card-ab-hold-mode paid-only UI).
+
+    Read-only S0 screen: cabinet ownership уже enforced upstream при открытии
+    ``AdvSettingMenu`` (``wb_user_cabinet`` navigation). TG inline callback
+    не пересылается/replay-ится чужому пользователю по adv_id — см. module
+    policy в ``confirm_handlers`` и ``.cursor/BUGBOT.md`` §13.
+
+    Args:
+        query: CallbackQuery открытия меню.
+        callback_data: callback с идентификатором кампании.
+        state: FSM-контекст для текущего S0 revision; optional для прямых
+            legacy-вызовов.
+    """
     async with sm(read_only=True) as session:
         adv = await load_adv_setting_for_ab_hold_menu(
             session, callback_data.adv_setting_original_id
@@ -397,18 +475,24 @@ async def open_card_ab_hold_menu(
             return
         mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
         status = await _screen_status_text(adv, mode)
+        screen_revision = await _resolve_screen_revision(adv, state=state)
+        screen_kwargs: dict[str, Any] = {
+            "phase": getattr(adv, "card_ab_hold_phase", None),
+            "emergency_educated": is_emergency_educated(
+                getattr(adv, "card_ab_hold_emergency_educated", False)
+            ),
+            "emergency_latch": is_ab_hold_emergency_latch_active(
+                getattr(adv, "card_ab_hold_emergency_latch", False)
+            ),
+        }
+        if screen_revision is not None:
+            screen_kwargs["revision"] = screen_revision
         await _edit_screen(
             query,
             f"{_INSTRUCTION}\n{status}",
             adv.id,
             mode,
-            phase=getattr(adv, "card_ab_hold_phase", None),
-            emergency_educated=is_emergency_educated(
-                getattr(adv, "card_ab_hold_emergency_educated", False)
-            ),
-            emergency_latch=is_ab_hold_emergency_latch_active(
-                getattr(adv, "card_ab_hold_emergency_latch", False)
-            ),
+            **screen_kwargs,
         )
 
 
@@ -453,8 +537,18 @@ async def load_adv_setting_after_enable(
 async def disable_card_ab_hold_in_session(
     session: AsyncSession,
     adv_setting_original_id: int,
+    *,
+    telegram_user_id: int | None = None,
 ) -> AdvSetting | None:
     """EXIT: mode OFF + clear snapshot/epoch fields в переданной WRITE session.
+
+    Args:
+        session: WRITE session, которая владеет PG mutation.
+        adv_setting_original_id: ``AdvSetting.id`` из callback.
+        telegram_user_id: actor для обязательной проверки ownership; ``None``
+            сохраняет низкоуровневый session seam для внутренних callers/tests.
+            При non-``None`` actor missing/``None`` ``wb_cabinet_id`` → reject
+            (fail-closed) до PG mutation.
 
     Returns:
         Обновлённый AdvSetting или None, если не найден / UI скрыт.
@@ -466,6 +560,23 @@ async def disable_card_ab_hold_in_session(
     )
     if adv is None or not is_card_ab_hold_ui_visible(adv):
         return None
+    if telegram_user_id is not None:
+        cabinet_id = getattr(adv, "wb_cabinet_id", None)
+        if cabinet_id is None:
+            logger.info(
+                "[adv_setting_id=%s] direct EXIT rejected: wb_cabinet_id missing",
+                adv_setting_original_id,
+            )
+            return None
+        wb_user_cabinet = await get_wb_user_cabinet_for_adv_and_telegram(
+            session, adv, telegram_user_id
+        )
+        if wb_user_cabinet is None:
+            logger.info(
+                "[adv_setting_id=%s] foreign direct EXIT rejected",
+                adv_setting_original_id,
+            )
+            return None
     adv.card_ab_hold_mode = CardAbHoldMode.OFF.value
     adv.card_ab_hold_allowed_phrases_snapshot = empty_allowed_snapshot()
     for field, value in clear_epoch_fields_values().items():
@@ -492,6 +603,7 @@ async def _handle_ab_hold_enable(
     adv_setting_original_id: int,
     *,
     skip_view_volume_gate: bool,
+    state: FSMContext | None = None,
 ) -> None:
     """Общий enable-путь ENTER для кнопок «Включить» и «Всё равно запустить».
 
@@ -505,6 +617,10 @@ async def _handle_ab_hold_enable(
     §10 / Enable idempotent — PENDING/ACTIVE → no demote, no ENTER rewrite;
     §12 — только V3. Immediate setup job out of MVP: UI показывает PENDING и poll
     LastAbort/ACTIVE.
+
+    Args:
+        state: FSM-контекст для передачи актуального S0 revision; ``None``
+            сохраняет прямой legacy-call seam.
     """
     async with sm(read_only=True) as session:
         adv = await load_adv_setting_for_enable_gates(
@@ -516,13 +632,19 @@ async def _handle_ab_hold_enable(
         if is_card_ab_hold_enable_noop(adv):
             mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
             await _notify_callback_user(query, card_ab_hold_enable_noop_answer(adv))
+            screen_revision = await _resolve_screen_revision(adv, state=state)
+            screen_kwargs: dict[str, Any] = {
+                "phase": getattr(adv, "card_ab_hold_phase", None),
+                "alert_if_unavailable": False,
+            }
+            if screen_revision is not None:
+                screen_kwargs["revision"] = screen_revision
             await _edit_screen(
                 query,
                 f"{_INSTRUCTION}\nСтатус: {mode.value}",
                 adv.id,
                 mode,
-                phase=getattr(adv, "card_ab_hold_phase", None),
-                alert_if_unavailable=False,
+                **screen_kwargs,
             )
             logger.info(
                 "[adv_id=%s] CardAbHold Enable no-op (already %s)",
@@ -640,35 +762,54 @@ async def _handle_ab_hold_enable(
         )
         logger.info("[adv_id=%s] CardAbHold ENTER → PENDING_SETUP", adv.adv_id)
         await _notify_callback_user(query, "Подготовка A/B Hold…")
+        screen_revision = await _resolve_screen_revision(adv, state=state)
+        screen_kwargs: dict[str, Any] = {
+            "phase": getattr(adv, "card_ab_hold_phase", None),
+            "emergency_educated": is_emergency_educated(
+                getattr(adv, "card_ab_hold_emergency_educated", False)
+            ),
+            "emergency_latch": is_ab_hold_emergency_latch_active(
+                getattr(adv, "card_ab_hold_emergency_latch", False)
+            ),
+            "alert_if_unavailable": False,
+        }
+        if screen_revision is not None:
+            screen_kwargs["revision"] = screen_revision
         await _edit_screen(
             query,
             f"{_INSTRUCTION}\n{status}",
             adv.id,
             normalize_card_ab_hold_mode(adv.card_ab_hold_mode),
-            phase=getattr(adv, "card_ab_hold_phase", None),
-            emergency_educated=is_emergency_educated(
-                getattr(adv, "card_ab_hold_emergency_educated", False)
-            ),
-            emergency_latch=is_ab_hold_emergency_latch_active(
-                getattr(adv, "card_ab_hold_emergency_latch", False)
-            ),
-            alert_if_unavailable=False,
+            **screen_kwargs,
         )
 
 
 @card_ab_hold_router.callback_query(CardAbHoldEnable.filter())
 async def enable_card_ab_hold(
-    query: CallbackQuery, callback_data: CardAbHoldEnable
+    query: CallbackQuery,
+    callback_data: CardAbHoldEnable,
+    state: FSMContext | None = None,
 ) -> None:
-    """Кнопка «Включить»: ENTER с полным набором gates, включая §2c объём (MV cover)."""
+    """Кнопка «Включить»: ENTER с полным набором gates, включая §2c объём.
+
+    Args:
+        query: CallbackQuery кнопки Enable.
+        callback_data: callback с идентификатором кампании.
+        state: FSM-контекст для передачи актуального S0 revision.
+    """
     await _handle_ab_hold_enable(
-        query, callback_data.adv_setting_original_id, skip_view_volume_gate=False
+        query,
+        callback_data.adv_setting_original_id,
+        skip_view_volume_gate=False,
+        state=state,
     )
 
 
 @card_ab_hold_router.callback_query(CardAbHoldLaunchAnyway.filter())
 async def launch_card_ab_hold_anyway(
-    query: CallbackQuery, callback_data: CardAbHoldLaunchAnyway
+    query: CallbackQuery,
+    callback_data: CardAbHoldLaunchAnyway,
+    state: FSMContext | None = None,
 ) -> None:
     """§2c «Всё равно запустить»: ENTER несмотря на низкий объём показов.
 
@@ -677,7 +818,10 @@ async def launch_card_ab_hold_anyway(
     на случай stale callback.
     """
     await _handle_ab_hold_enable(
-        query, callback_data.adv_setting_original_id, skip_view_volume_gate=True
+        query,
+        callback_data.adv_setting_original_id,
+        skip_view_volume_gate=True,
+        state=state,
     )
 
 
@@ -717,10 +861,21 @@ async def disable_card_ab_hold(
 
     Spec §8 / §22.5: без keyword restore; epoch phase/timer/intent/confirmed
     сбрасываются в той же PG-транзакции, что и mode→OFF.
+    Публичный callback без корректного Telegram actor отклоняется до открытия
+    WRITE session, чтобы ``None`` не включал bypass ownership-проверки.
     """
+    telegram_user_id = _callback_actor_id(query)
+    if telegram_user_id is None:
+        await _notify_callback_user(
+            query, MISSING_ACTOR_NOTICE
+        )
+        return
+
     async with sm(read_only=False) as session:
         adv = await disable_card_ab_hold_in_session(
-            session, callback_data.adv_setting_original_id
+            session,
+            callback_data.adv_setting_original_id,
+            telegram_user_id=telegram_user_id,
         )
         if adv is None:
             await _notify_callback_user(query, "Доступно только при включённом боте")
@@ -778,7 +933,10 @@ async def back_from_card_ab_hold(
     bot = msg.bot
     if bot is None:
         return
-    telegram_user_id = query.from_user.id
+    telegram_user_id = _callback_actor_id(query)
+    if telegram_user_id is None:
+        await bot.send_message(chat_id, MISSING_ACTOR_NOTICE)
+        return
     adv_setting_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=True) as session:
         adv = await load_adv_setting_for_back(session, adv_setting_original_id)

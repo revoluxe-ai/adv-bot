@@ -128,6 +128,8 @@ def disposable_ab_hold_schema(db_url: str) -> Iterator[str]:
 
 
 _PRE_EPOCH_DDL = """
+DROP TABLE IF EXISTS wbusercabinet CASCADE;
+DROP TABLE IF EXISTS "user" CASCADE;
 DROP TABLE IF EXISTS advsetting CASCADE;
 DROP TABLE IF EXISTS wbcabinet CASCADE;
 DROP TABLE IF EXISTS alembic_version CASCADE;
@@ -230,6 +232,22 @@ CREATE TABLE advsetting (
 
 INSERT INTO wbcabinet (id, shop_id, active, demo, balance, bonus, default_max_cpm)
 VALUES (1, 'live_pg_stub_shop', true, true, 0, 0, 400);
+CREATE TABLE "user" (
+    id INTEGER PRIMARY KEY,
+    user_telegram_id BIGINT UNIQUE,
+    username VARCHAR,
+    email VARCHAR,
+    password_hash VARCHAR,
+    adv_updater_user_chat_id BIGINT,
+    passed_gate BOOLEAN NOT NULL DEFAULT false
+);
+CREATE TABLE wbusercabinet (
+    id INTEGER PRIMARY KEY,
+    wb_cabinet_id INTEGER NOT NULL REFERENCES wbcabinet(id),
+    user_id INTEGER NOT NULL REFERENCES "user"(id),
+    name VARCHAR(255) NOT NULL,
+    UNIQUE (wb_cabinet_id, user_id)
+);
 CREATE TABLE alembic_version (
     version_num VARCHAR(32) NOT NULL PRIMARY KEY
 );
@@ -487,6 +505,68 @@ def insert_keyword_row(
     return keyword_id
 
 
+def insert_user_cabinet_relation(
+    db_url: str,
+    *,
+    user_id: int,
+    telegram_id: int,
+    cabinet_id: int = 1,
+    relation_id: int | None = None,
+) -> int:
+    """Создать disposable relation ``Telegram user → WB cabinet`` для gate tests.
+
+    Args:
+        db_url: validated disposable PostgreSQL DSN.
+        user_id: stable test ``user.id``.
+        telegram_id: identity, которую передаёт ``CallbackQuery.from_user.id``.
+        cabinet_id: existing disposable ``wbcabinet.id``.
+        relation_id: optional stable ``wbusercabinet.id``.
+
+    Returns:
+        ID созданной связи.
+    """
+    relation_pk = relation_id if relation_id is not None else user_id
+    engine = create_validated_sync_engine(db_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM wbusercabinet WHERE id = :relation_id"),
+            {"relation_id": relation_pk},
+        )
+        conn.execute(
+            text('DELETE FROM "user" WHERE id = :user_id'),
+            {"user_id": user_id},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO "user" (id, user_telegram_id, username)
+                VALUES (:user_id, :telegram_id, :username)
+                """
+            ),
+            {
+                "user_id": user_id,
+                "telegram_id": telegram_id,
+                "username": f"live-user-{user_id}",
+            },
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO wbusercabinet (id, wb_cabinet_id, user_id, name)
+                VALUES (:relation_id, :cabinet_id, :user_id, :name)
+                """
+            ),
+            {
+                "relation_id": relation_pk,
+                "cabinet_id": cabinet_id,
+                "user_id": user_id,
+                "name": f"live-cabinet-{cabinet_id}",
+            },
+        )
+    engine.dispose()
+    return relation_pk
+
+
 def fetch_adv_epoch_row(db_url: str, adv_setting_id: int) -> Any:
     """Re-read durable epoch columns from live PG."""
     engine = create_validated_sync_engine(db_url)
@@ -702,6 +782,9 @@ async def patched_async_session_maker(
         _ = read_only
         session = maker()
         try:
+            if _active_schema is None:
+                raise RuntimeError("disposable A/B Hold schema is not active")
+            await session.execute(text(f'SET search_path TO "{_active_schema}"'))
             yield session
         finally:
             await session.close()

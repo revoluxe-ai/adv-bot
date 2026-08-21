@@ -336,6 +336,7 @@ async def test_disable_clears_allowed_snapshot() -> None:
         id=42,
         adv_id=4242,
         bot_active=True,
+        wb_cabinet_id=7,
         card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
         card_ab_hold_allowed_phrases_snapshot=["good1", "good2"],
         card_ab_hold_phase=None,
@@ -349,9 +350,16 @@ async def test_disable_clears_allowed_snapshot() -> None:
     query = MagicMock()
     query.answer = AsyncMock()
     query.message = MagicMock(answer=AsyncMock())
+    query.from_user = SimpleNamespace(id=999)
+    ownership = AsyncMock(return_value=SimpleNamespace(id=11))
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(
+            handlers,
+            "get_wb_user_cabinet_for_adv_and_telegram",
+            new=ownership,
+        ),
         patch.object(
             handlers,
             "CardAbHoldSignalRedisCache",

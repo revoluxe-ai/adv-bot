@@ -57,17 +57,21 @@ def _call_screen_keyboard(
     mode: CardAbHoldMode | str,
     *,
     phase: CardAbHoldPhase | str | None = None,
+    revision: int | None = None,
 ) -> InlineKeyboardMarkup:
     """Вызвать ``_screen_keyboard`` с ``phase=`` когда seam уже есть.
 
     До GO production принимает только ``(adv_id, mode)`` — тогда epoch-баг
     проявляется на том же PENDING keyboard (нет Open). После GO с ``phase=``
-    тест передаёт phase явно.
+    тест передаёт phase явно. ``revision=`` передаётся только после появления
+    production seam, чтобы RED-тест проверял текущий hard-coded callback.
     """
     sig = inspect.signature(handlers._screen_keyboard)
     kwargs: dict[str, Any] = {}
     if "phase" in sig.parameters:
         kwargs["phase"] = phase
+    if revision is not None and "revision" in sig.parameters:
+        kwargs["revision"] = revision
     return handlers._screen_keyboard(adv_id, mode, **kwargs)
 
 
@@ -95,6 +99,28 @@ def test_s0_epoch_pending_keyboard_offers_open_current_step_bridge() -> None:
     assert CardAbHoldDisable.__prefix__ in prefixes
     assert CardAbHoldBack.__prefix__ in prefixes
     assert CardAbHoldEnable.__prefix__ not in prefixes
+
+
+@pytest.mark.unit
+def test_s0_open_current_step_carries_current_revision() -> None:
+    """S0 bridge MUST carry the current draft/epoch revision, not ``1``."""
+    current_revision = 7
+    markup = _call_screen_keyboard(
+        42,
+        CardAbHoldMode.PENDING_SETUP,
+        phase=CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM,
+        revision=current_revision,
+    )
+
+    open_button = next(
+        button
+        for row in markup.inline_keyboard
+        for button in row
+        if button.text == _OPEN_STEP_LABEL
+    )
+    callback = CahOpenCurrentStep.unpack(open_button.callback_data or "")
+
+    assert callback.revision == current_revision
 
 
 @pytest.mark.unit

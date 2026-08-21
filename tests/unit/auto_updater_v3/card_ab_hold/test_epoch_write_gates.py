@@ -12,7 +12,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     build_wb_sync_idempotency_key,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_write import (
+    EpochWriteError,
     can_activate_after_successful_sync,
+    confirm_target_places_in_session,
     create_pending_intent_for_generation,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
@@ -158,3 +160,65 @@ def test_activate_preconditions_match_mode_active_contract() -> None:
         card_ab_hold_sync_status=CardAbHoldSyncStatus.COMPLETE.value,
     )
     assert can_activate_after_successful_sync(pending) is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tp_map",
+    [
+        {},
+        {"alpha": 0},
+        {"alpha": -1},
+        {"alpha": True},
+        {"alpha": 1.5},
+        {"foreign": 5},
+    ],
+)
+async def test_confirm_target_places_rejects_invalid_payload_before_update(
+    tp_map: dict[str, object],
+) -> None:
+    """Writer отклоняет invalid TP payload до UPDATE/COMMIT.
+
+    Regression для spec ``card-ab-hold-mode``: durable boundary не принимает
+    zero, отрицательные, boolean или чужие ключи даже при прямом вызове.
+    """
+    adv = SimpleNamespace(
+        card_ab_hold_phase=CardAbHoldPhase.AWAITING_TP_CONFIRM.value,
+        card_ab_hold_confirmed_keywords_json=["alpha"],
+    )
+    result = MagicMock()
+    result.scalar_one.return_value = adv
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=result)
+    session.commit = AsyncMock()
+
+    with pytest.raises(EpochWriteError):
+        await confirm_target_places_in_session(session, 1, tp_map)
+
+    session.execute.assert_awaited_once()
+    session.commit.assert_not_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_confirm_target_places_persists_only_remaining_keyword_subset() -> None:
+    """Writer принимает positive subset и удаляет исключённый ключ из SoT.
+
+    Regression для spec ``card-ab-hold-mode``: после UI-фильтрации durable
+    confirmed keyword-set и target places покрывают только оставшийся набор.
+    """
+    adv = SimpleNamespace(
+        card_ab_hold_phase=CardAbHoldPhase.AWAITING_TP_CONFIRM.value,
+        card_ab_hold_confirmed_keywords_json=["alpha", "beta"],
+    )
+    result = MagicMock()
+    result.scalar_one.return_value = adv
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=result)
+    session.commit = AsyncMock()
+
+    await confirm_target_places_in_session(session, 1, {"alpha": 5})
+
+    assert session.execute.await_count == 2
+    session.commit.assert_awaited_once()

@@ -101,7 +101,11 @@ def test_setup_missing_opt_in_before_lifecycle() -> None:
 
 @pytest.mark.unit
 def test_setup_tunnel_env_before_lifecycle() -> None:
-    """DEV_TUNNELS_KUBECONFIG → fail before compose."""
+    """DEV_TUNNELS_KUBECONFIG → fail before compose.
+
+    Явно гасим ambient DEV_TUNNELS_ENABLED и прочие present-keys, иначе
+    validator сначала ругается на truthy-flag и match по KUBECONFIG флакает.
+    """
     request = _request_with_destructive_marker("setup_test_database")
     lifecycle = MagicMock()
     setup_fn = _unwrap_fixture_function(root_conftest.setup_test_database)
@@ -110,7 +114,11 @@ def test_setup_tunnel_env_before_lifecycle() -> None:
             "os.environ",
             {
                 "ALLOW_DESTRUCTIVE_TEST_DB": "1",
+                "DEV_TUNNELS_ENABLED": "false",
+                # Isolates from ambient / leaked suite pollution (TUNNEL_PRESENT_ENV_KEYS).
                 "DEV_TUNNELS_KUBECONFIG": "/tmp/kube",
+                "DEV_TUNNEL_PG_LOCAL_PORT": "",
+                "DEV_TUNNEL_CH_HTTP_PORT": "",
             },
             clear=False,
         ),

@@ -525,6 +525,7 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
         id=42,
         adv_id=4242,
         bot_active=True,
+        wb_cabinet_id=7,
         card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
         card_ab_hold_allowed_phrases_snapshot=["good1"],
     )
@@ -533,9 +534,15 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
     signal_clear = AsyncMock()
     block_clear = AsyncMock()
     enter_reset_clear = AsyncMock()
+    ownership = AsyncMock(return_value=SimpleNamespace(id=11))
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(
+            handlers,
+            "get_wb_user_cabinet_for_adv_and_telegram",
+            new=ownership,
+        ),
         patch.object(
             handlers,
             "CardAbHoldSignalRedisCache",

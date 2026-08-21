@@ -460,10 +460,12 @@ async def test_enable_handler_hands_off_read_sessions_to_load_helpers() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_confirm_handlers_load_and_abort_hand_off_session() -> None:
-    """confirm_handlers ``_load_adv`` / ``_abort_epoch_to_off`` → session children."""
+    """confirm_handlers hand off one write session to both EXIT children."""
     fake_session = MagicMock(name="confirm_session")
+    fake_session.commit = AsyncMock()
     load_child = AsyncMock(return_value=MagicMock(id=5))
     abort_child = AsyncMock(return_value=MagicMock(id=5))
+    clear_epoch_child = AsyncMock()
     sm_load = MagicMock(return_value=_session_cm(fake_session))
     sm_abort = MagicMock(return_value=_session_cm(fake_session))
 
@@ -483,7 +485,9 @@ async def test_confirm_handlers_load_and_abort_hand_off_session() -> None:
             confirm_handlers, "_abort_epoch_mode_off_in_session", abort_child
         ),
         patch.object(
-            confirm_handlers, "clear_epoch_on_exit", new_callable=AsyncMock
+            confirm_handlers,
+            "clear_epoch_on_exit_in_session",
+            clear_epoch_child,
         ),
         patch.object(
             confirm_handlers,
@@ -500,6 +504,11 @@ async def test_confirm_handlers_load_and_abort_hand_off_session() -> None:
     _assert_child_got_session(
         abort_child, fake_session, read_only=False, sm_mock=sm_abort
     )
+    clear_epoch_child.assert_awaited_once()
+    assert clear_epoch_child.await_args is not None
+    assert clear_epoch_child.await_args.args[0] is fake_session
+    assert clear_epoch_child.await_args.kwargs["commit"] is False
+    fake_session.commit.assert_awaited_once()
 
 
 @pytest.mark.unit

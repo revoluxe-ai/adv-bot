@@ -86,6 +86,7 @@ def _make_query() -> MagicMock:
     query.message = msg
     query.answer = AsyncMock()
     query.bot = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     return query
 
 

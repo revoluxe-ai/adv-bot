@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
+from app.client_bot import const
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.epoch_lifecycle import (
     DEFAULT_WARMUP_HOURS,
     is_warmup_elapsed,
@@ -22,6 +23,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 )
 
 STALE_TOAST = "Экран обновился — показываю актуальный шаг."
+_W3_EXCLUSION_SECTION_TITLE = "Исключены из подтверждения:"
+_W3_EXCLUSION_OMISSION_NOTICE = "Остальные исключения не показаны."
 
 
 def phase_label(phase: CardAbHoldPhase | str | None) -> str:
@@ -176,8 +179,20 @@ def build_w3_propose_text(
     rows: list[tuple[str, int, int]],
     page: int,
     total_pages: int,
+    exclusions: list[tuple[str, str]] | None = None,
 ) -> str:
-    """W3-propose — факт vs предложенная цель (storyboard §W3)."""
+    """W3-propose — факт vs цель и причины исключения ключей.
+
+    Args:
+        rows: ключи с finite positive factual position.
+        page: текущая страница валидного набора.
+        total_pages: общее число страниц валидного набора.
+        exclusions: ключи, исключённые до подтверждения, с user-facing reason.
+
+    Returns:
+        Текст в пределах лимита Telegram; если все причины исключения не
+        помещаются, сохраняется начало списка и добавляется уведомление.
+    """
     header = (
         f"Подтверждение целевых позиций (стр. {page + 1}/{total_pages})\n\n"
         "По каждому ключу показаны два отдельных значения: факт (текущая "
@@ -193,7 +208,59 @@ def build_w3_propose_text(
         lines.append(
             f"{keyword}\n  факт: {fact}   →   предложенная цель: {target}{match_note}"
         )
-    return header + "\n".join(lines)
+    body = "\n".join(lines)
+    if not rows:
+        body = "Нет валидных ключей для подтверждения."
+    if exclusions:
+        body = _append_w3_exclusions(
+            base_text=header + body,
+            exclusions=exclusions,
+        )
+        return body
+    return header + body
+
+
+def _append_w3_exclusions(
+    *,
+    base_text: str,
+    exclusions: list[tuple[str, str]],
+) -> str:
+    """Добавить причины исключений в доступный Telegram-бюджет.
+
+    Сначала проверяется полный список. При переполнении сохраняется
+    детерминированный префикс списка, включая первую помещающуюся запись, и
+    добавляется явное уведомление об остальных исключениях.
+    """
+    section_prefix = f"\n\n{_W3_EXCLUSION_SECTION_TITLE}\n"
+    exclusion_lines = [
+        f"• {keyword}: исключён — {reason}" for keyword, reason in exclusions
+    ]
+    full_text = base_text + section_prefix + "\n".join(exclusion_lines)
+    if len(full_text) <= const.MAX_MESSAGE_LENGTH:
+        return full_text
+
+    omission_suffix = f"\n{_W3_EXCLUSION_OMISSION_NOTICE}"
+    if len(base_text + section_prefix + omission_suffix) > const.MAX_MESSAGE_LENGTH:
+        return base_text
+
+    visible_lines: list[str] = []
+    for line in exclusion_lines:
+        candidate = (
+            base_text
+            + section_prefix
+            + "\n".join([*visible_lines, line])
+            + omission_suffix
+        )
+        if len(candidate) > const.MAX_MESSAGE_LENGTH:
+            break
+        visible_lines.append(line)
+
+    return (
+        base_text
+        + section_prefix
+        + "\n".join(visible_lines)
+        + omission_suffix
+    )
 
 
 def build_w3_confirmed_text(

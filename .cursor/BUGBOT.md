@@ -322,6 +322,9 @@ Do not report as a bug merely because:
   different;
 - the full repository was not refactored while the changed slice remains
   correct.
+- a **card_ab_hold confirm read-handler** omits ``telegram_user_id`` in
+  ``_load_adv`` for pagination/refresh/back redraw only — see §13 (TG inline
+  callback visibility; not a foreign-read security defect).
 
 For contract/gate findings, distinguish:
 
@@ -349,3 +352,36 @@ When several issues exist, prioritize findings that can cause:
 
 This priority list is not exhaustive and must not suppress other valid native
 Bugbot findings.
+
+## 13. Card A/B Hold — Telegram (TG) inline callbacks (read-path ownership)
+
+Module: ``app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/``.
+
+**Platform:** Telegram (TG, aiogram), private chat Owner ↔ bot.
+
+**Owner note (false-positive guard):** TG **не пересылает и не replay-ит**
+inline ``CallbackQuery`` другому пользователю. Callback приходит боту только
+когда **тот же** пользователь нажимает inline-кнопку на **сообщении, видимом
+ему в этом чате**. Одного ``adv_setting_original_id`` недостаточно, чтобы
+чужой Telegram-пользователь вызвал read-handler или «подсмотрел» confirm-screen.
+
+Therefore:
+
+- **Write-path** handlers MUST pass ``telegram_user_id`` into ``_load_adv``
+  (PG/epoch mutations; ``CAH-OWN-FOREIGN-*`` contract).
+- **Read-redraw** handlers (``on_page_nav``, ``on_warmup_refresh``,
+  ``on_sync_refresh``, ``on_back``, ``on_open_current_step``,
+  ``on_continue_to_auto``, post-write re-read in the same handler) intentionally
+  call ``_load_adv(adv_id)`` **without** ``telegram_user_id`` (``_ACTOR_UNSET``).
+  This is **not** an ownership bypass or info-disclosure bug under the current
+  Telegram entry path (``AdvSettingMenu`` → ``wb_user_cabinet`` →
+  ``CardAbHoldMenu``).
+
+**Do not report** as a confirmed security defect:
+
+- «Foreign user can read confirm flow because read handler skips ownership»
+  without a **new product spec** requiring a different surface (e.g. group-chat
+  campaign UI with shared inline messages).
+
+**Still report** if the change introduces a **new** path that exposes inline
+keyboards or handler entry outside cabinet-scoped Telegram navigation.
