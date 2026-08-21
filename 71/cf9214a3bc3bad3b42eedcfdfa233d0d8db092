@@ -1,0 +1,243 @@
+tests/client_bot/test_channel_subscription.py
+  s_e849113793b156::t_6d44b4224c7da6 401
+  s_e849113793b156::t_861712ee966c0f 62
+  s_e849113793b156::t_d9f07dde1ff611 423
+  s_f8c64d40c759c0::t_438108da7cac93 429-430,433,447,451
+  s_c71df1117b14e2::t_e301ba9a3649dd 478-483,496-497,501-502
+  s_e849113793b156::t_4b54f5adda2dfe 136
+  s_e849113793b156::t_6d84a5123a48e9 6,10,19
+  s_c71df1117b14e2::t_32a574802e854d 309
+  s_c71df1117b14e2::t_fcdcfe3095d523 339-340,344,347-349
+  s_e849113793b156::t_115ecc79db79c2 371
+  s_c71df1117b14e2::t_40a643f8ce214f 36,41-42
+  s_e849113793b156::t_ba3bf2b1057d21 197
+  s_e849113793b156::t_8e07e8456527b8 264,279-281,285-305
+  s_c71df1117b14e2::t_933086946d766d 85-86,103-104
+  s_c71df1117b14e2::t_efb83160286556 333-338,341-343,345-346,350-351
+  s_e849113793b156::t_0433b56187b20c 137
+  s_e849113793b156::t_3c0ea4f898ea3f 372
+  s_f8c64d40c759c0::t_a04065b1df489b 91-92,105-128,130-135,138,308
+  s_f8c64d40c759c0::t_c739318302bd06 263,269,277-278
+  s_e849113793b156::t_ee16beacdb1e23 129
+  s_e849113793b156::t_01de566a89a675 448
+  s_c71df1117b14e2::t_f4f7704199a4c4 39,45
+  s_e849113793b156::t_d5c56cf5225571 400
+  s_e849113793b156::t_f79d96a7b0c19c 449-450
+  s_e849113793b156::t_dd73dccf76b8bd 424
+  s_c71df1117b14e2::t_0a7df0a307e850 352-353
+  s_e849113793b156::t_3710fe2e6f65dd 306-307
+app/client_bot/user_interface/handlers/shop_choice_message.py
+  s_312a23e5a51b6d::t_47c7e4f11e7b06 101
+  s_312a23e5a51b6d::t_8a8218fa6d5332 1-7
+  s_9be26b213332dd::t_01c819424f4184 35-39,62-66
+  s_c71df1117b14e2::t_1ad9e5d9e880cd 212-217
+  s_c71df1117b14e2::t_40e286a43addd1 102-107
+app/client_bot/admin_access.py
+  s_9be26b213332dd::t_4b676d4ee6d355 18,25-27,29-30,34-35
+  s_312a23e5a51b6d::t_983584b2bf5ce8 20-24,28,31-32
+app/client_bot/callback_replay.py
+  s_65886eb73a794f::t_242c0001476b08 5,14-24
+  s_65886eb73a794f::t_b6835174dcefab 80-83
+app/client_bot/user_interface/views/messages/messages.py
+  s_e849113793b156::t_ec182fc5c60cb4 843-844,858-871,874
+  s_e849113793b156::t_194e8198217d14 872-873
+  s_e849113793b156::t_687621f1df8e47 875-877
+  s_e849113793b156::t_6e5642de8f4a9e 878
+tests/client_bot/user_interface/test_onboarding_main_menu.py
+  s_c71df1117b14e2::t_370021b9877e7f 50,63-64,68-71
+  s_9be26b213332dd::t_21f85da7aa4dd7 109-116
+tests/client_bot/test_gate.py
+  s_9be26b213332dd::t_b576d76ee3bcb3 231-232,256-257,286-314,338-339
+app/client_bot/echo_handler.py
+  h_267f51d775769b 11
+app/client_bot/callback_helpers.py
+  s_e849113793b156::t_d3ab45a7c36edc 5,7
+app/client_bot/user_interface/handlers/user_subscribe_on_channel.py
+  s_aa6bf452cb59f4::t_4407b5e032bc4b 1-4,9,35-38,43,47,49
+  s_e849113793b156::t_f9531f190537c6 5,41
+  s_e849113793b156::t_f7cc1fbaaf5686 6-8,42
+  s_e849113793b156::t_cb28e17a7dc0b6 20-21,39-40,65-68
+app/client_bot/user_interface/handlers/keyword_settings.py
+  s_7fc9eee7bfb3eb::t_10f2220e68ca91 773,790-793,800,1104,1132,1180,1182,1209,1220,1234,1247
+  s_65886eb73a794f::t_feaab1385f6394 1029-1031
+  s_7fc9eee7bfb3eb::t_9f56d2981d83b7 943,982
+  s_4e42c168a1dff8::t_007ff76957d152 181-182
+  s_4e42c168a1dff8::t_0ab8724f567990 1068-1070,1296-1297
+  s_65886eb73a794f::t_0a6c0911a881d4 813-815
+  s_4e42c168a1dff8::t_62c4b67dc64320 823,886-888,932
+  s_65886eb73a794f::t_7eaae836816482 619-621
+  s_b6b5d99a95de2f::t_355b2345a1537e 947-960
+  s_c71df1117b14e2::t_ac5f3311582195 295-298,608,610,659-662,689-692,1281-1285
+  s_4e42c168a1dff8::t_2f59b11504605e 307,346-349,360,401-404,413,461-464,480,528-531,541,698,743-746,752,867,968,1300
+  s_c71df1117b14e2::t_f38d7d51413edf 998-1001
+  s_4e42c168a1dff8::t_74af1d988de92f 995,1071,1288-1291,1298
+  s_c71df1117b14e2::t_de3aac89945a93 209-213,217-222,225,231-236
+  s_b6b5d99a95de2f::t_c9d1c918c9f222 912-915
+  s_c71df1117b14e2::t_c4d8bdd9c53d30 609
+  s_b6b5d99a95de2f::t_14ec206d8326b4 961-962
+  s_e849113793b156::t_c5eabec918e648 184,243,281,1256
+app/client_bot/start_command.py
+  s_9be26b213332dd::t_6d7cd302d6f3d8 23-25
+tests/unit/client_bot/test_check_subscribe_no_callback_answer.py
+  s_e849113793b156::t_b23a7018db9ae2 1-53
+app/client_bot/user_interface/handlers/start/start.py
+  s_312a23e5a51b6d::t_e9120acf6d1ea2 1045
+  s_312a23e5a51b6d::t_e1be5cabf2c901 751
+  s_312a23e5a51b6d::t_c400677668da19 1084
+  s_65886eb73a794f::t_3cda52575ff8bd 399-402,406
+  s_312a23e5a51b6d::t_2bca09b95d6deb 124-130,140-150,160-165
+  s_312a23e5a51b6d::t_cc910c7aba1442 445-446
+  s_312a23e5a51b6d::t_38b2c0db3a7c62 403-405,407-408
+app/client_bot/user_interface/handlers/start_registration_func.py
+  s_e849113793b156::t_9643e8353d37c9 22,31
+  s_e849113793b156::t_58d170fe09b406 21,23-30
+app/client_bot/middlewars/channel_subscription.py
+  s_e849113793b156::t_a067b4a9765288 62-64
+  s_e849113793b156::t_32d0b453f5540a 53-56,212-215,236-238,240-241,255,262-278,284-287,374-382
+  s_e849113793b156::t_02f83abab2f489 156-160
+  s_c71df1117b14e2::t_55139cc675deb4 65
+  s_e849113793b156::t_225b86c95a373b 333-340
+  s_e849113793b156::t_b08b3786630c52 12,23-34
+  s_e849113793b156::t_619fc52d490ff8 288-290
+  s_e849113793b156::t_9d16c5dcc16a5b 291-293
+  s_c71df1117b14e2::t_8f1cb7459af67c 68-70,123-128,132-134,136-139,143,151-152
+  s_c71df1117b14e2::t_2a70c106e7228e 6-11
+  s_e849113793b156::t_efe74b94997235 219-226
+  s_aa6bf452cb59f4::t_48f1205e894f1e 5,188-196,200-201,203-211,216-218,227-231,249-250,354-356,358,364
+  s_c71df1117b14e2::t_a8e9344417b36c 357
+  s_e849113793b156::t_3d1845cf2cb083 13-22
+  s_e849113793b156::t_8b5c8968f614a0 330
+  s_e849113793b156::t_f4bd4857e052a3 352-353
+  s_e849113793b156::t_44f825f3169c73 172-176
+  s_e849113793b156::t_88805f68155c77 83-96
+  s_c71df1117b14e2::t_f262d4b8eac41c 71
+  s_c71df1117b14e2::t_80c58142493132 153
+tests/client_bot/test_callback_start_registration.py
+  s_9be26b213332dd::t_11fdf1288e3fd2 200-201,205,246-248
+tests/unit/client_bot/handlers/test_keyword_settings_load_adv.py
+  s_c71df1117b14e2::t_143654a1f9590e 1-46
+app/client_bot/middlewars/phone_required.py
+  s_312a23e5a51b6d::t_18bbb39ef4a824 76
+tests/client_bot/test_phone_collection.py
+  s_65886eb73a794f::t_0adcda178d3d08 296
+tests/client_bot/user_interface/test_onboarding_shops_list_page.py
+  s_c71df1117b14e2::t_8959ec42addd64 44-47,62-65,69-74
+app/client_bot/global_router.py
+  s_c71df1117b14e2::t_8ddd1ee8d3a60e 24,29-30,32-33
+  s_312a23e5a51b6d::t_77ee94e6a21021 40
+  s_312a23e5a51b6d::t_906b880a4f2f65 25-26
+app/client_bot/middlewars/gate.py
+  s_312a23e5a51b6d::t_3d5fe37697dd09 168
+  s_e849113793b156::t_d4ee6ad0e16d97 169-176
+  s_9be26b213332dd::t_64bfabb7083726 100,104,108-109,111,113,117-118,122,154
+  s_c71df1117b14e2::t_e0e68c48c799ec 144-145,160
+  s_312a23e5a51b6d::t_d9de0b8bb9bce8 143
+  s_312a23e5a51b6d::t_069408a55b6f4e 119-121
+  s_312a23e5a51b6d::t_53d9d33584958a 1-11
+  s_c71df1117b14e2::t_62573755b9b162 146-147
+tests/client_bot/test_callback_replay.py
+  s_65886eb73a794f::t_2edfe6dbef2438 1-52
+tests/unit/client_bot/handlers/test_turn_adv_on_read_only_token.py
+  s_6d32f6295b80d5::t_1e8046e9db32f8 307
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "71cf9214a3bc3bad3b42eedcfdfa233d0d8db092",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_312a23e5a51b6d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eb80e78e-a8be-411c-88ef-c91a71fd9170",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_4e42c168a1dff8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3018e979-539c-46f3-b81a-6735eed5b539",
+        "model": "gpt-5.6-luna-medium"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_65886eb73a794f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7cc06e1f-affd-4253-8e6e-f0fcf4c77a94",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_6d32f6295b80d5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7d70affc-9f37-410a-8bba-88569746bbb4",
+        "model": "gpt-5.6-luna-medium"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_7fc9eee7bfb3eb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "69cbcffd-9a1f-4347-922d-53b192161c66",
+        "model": "gpt-5.6-luna-medium"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_aa6bf452cb59f4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9626a5d8-f4d4-47d0-a24f-21e367fff703",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_b6b5d99a95de2f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d558ac94-467b-4154-95b2-9e77c7d11f07",
+        "model": "gpt-5.6-luna-medium"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_c71df1117b14e2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c5310f31-9050-45df-92d9-4d7239a57e14",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_e849113793b156": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2d99016d-e326-4295-891f-b069f8a8a51e",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f8c64d40c759c0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a99cc754-0ae7-44de-a202-9e5c5ce70dfc",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
