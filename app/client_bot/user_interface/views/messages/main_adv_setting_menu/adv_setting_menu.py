@@ -114,12 +114,28 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         wb_user_cabinet: WBUserCabinet,
         adv: AdvSetting,
         redis_client: RedisClient = Provide["redis_client_wrapper"],
+        stats_freshness_manager: StatsFreshnessManager | None = None,
     ) -> None:
+        """Инициализировать меню с Redis- и ClickHouse-зависимостями.
+
+        Args:
+            bot: Telegram-бот для отрисовки меню.
+            chat_id: Идентификатор чата пользователя.
+            wb_user_cabinet: Кабинет WB, которому принадлежит кампания.
+            adv: Настройки рекламной кампании.
+            redis_client: Клиент Redis для кэшей меню.
+            stats_freshness_manager: Необязательный менеджер свежести статистики;
+                production использует стандартный ClickHouse reader, а тесты
+                могут передать изолированный reader/manager.
+        """
         super().__init__(bot, chat_id)
         self._bot = bot
         self._chat_id = chat_id
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
+        self._stats_freshness_manager = (
+            stats_freshness_manager or StatsFreshnessManager()
+        )
         self._redis_cluster_bids_timestamp_manager = RedisClusterBidsTimestampManager(
             redis_client
         )
@@ -748,7 +764,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 )
             search_adv = result.scalar_one_or_none()
         complex_adv = ComplexAdv(self.adv, search_adv)
-        state = await StatsFreshnessManager().evaluate(complex_adv)
+        manager = getattr(self, "_stats_freshness_manager", None)
+        if manager is None:
+            manager = StatsFreshnessManager()
+        state = await manager.evaluate(complex_adv)
         if state.is_stale_over_6h:
             return True, self._guard_reason_to_display(state.reason), False, None
         if not state.is_fresh:

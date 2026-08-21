@@ -1,5 +1,8 @@
+"""Telegram-сообщение выбора режима БС с передаваемой PG read-сессией."""
+
 from aiogram import Bot
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.ui_access import UiAccessMode
 from app.client_bot.user_interface.message_templates.templates import TextWithKeyboard
@@ -55,9 +58,20 @@ class WhiteListModeMenuMessage(TextWithKeyboard):
         return WhiteListModeKeyboards(self._adv, self._ui_access).build_keyboard()
 
     @staticmethod
+    async def _get_adv_in_session(
+        session: AsyncSession,
+        adv_id: int,
+    ) -> AdvSetting:
+        """Загрузить РК в переданной read-only PG-сессии."""
+        result = await session.execute(
+            select(AdvSetting).where(AdvSetting.adv_id == adv_id)
+        )
+        return result.scalar_one()
+
+    @staticmethod
     async def _get_adv(adv_id: int) -> AdvSetting:
-        async with get_async_session_maker() as session:
-            result = await session.execute(
-                select(AdvSetting).where(AdvSetting.adv_id == adv_id)
+        """Загрузить РК, создав короткую read-only PG-сессию."""
+        async with get_async_session_maker(read_only=True) as session:
+            return await WhiteListModeMenuMessage._get_adv_in_session(
+                session, adv_id
             )
-            return result.scalar_one()

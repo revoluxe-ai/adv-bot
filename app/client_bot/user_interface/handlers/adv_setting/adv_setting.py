@@ -1,10 +1,12 @@
+"""Обработчики UI настройки рекламных кампаний и их PG-сессии."""
+
 import logging
 import aiogram
-from typing import Any, Sequence, cast
+from typing import Any, cast
 from aiogram import Bot, F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
-from sqlalchemy import Result, update
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload
@@ -154,21 +156,12 @@ async def turn_adv_on_in_session(
     chat_id = callback.message.chat.id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     adv_original_id = callback_data.adv_original_id
-    stmt = (
-        select(WBUserCabinet)
-        .join(WBUserCabinet.wb_cabinet)
-        .options(selectinload(WBUserCabinet.wb_cabinet))
-        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    if adv_original_id is None:
+        raise ValueError("Не указан идентификатор рекламной кампании")
+    wb_user_cabinet = await _load_wb_user_cabinet_in_session(
+        session, wb_user_cabinet_original_id
     )
-    result_for_wb_user_cabinet = await session.execute(stmt)
-    wb_user_cabinet: WBUserCabinet = result_for_wb_user_cabinet.scalar_one()
-    stmt = (
-        select(AdvSetting)
-        .options(selectinload(AdvSetting.payments))
-        .where(AdvSetting.id == adv_original_id)
-    )
-    result_for_adv_setting = await session.execute(stmt)
-    adv: AdvSetting = result_for_adv_setting.scalar_one()
+    adv = await _load_adv_for_activation_in_session(session, adv_original_id)
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
         session, wb_cabinet.shop_id
@@ -210,12 +203,132 @@ async def turn_adv_on_in_session(
         )
     _ = await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     _ = await state.update_data(adv_original_id=adv.id)
-    stmt = select(WBUserCabinet).where(
-        WBUserCabinet.id == wb_user_cabinet_original_id
+    wb_user_cabinet = await _load_wb_user_cabinet_in_session(
+        session, wb_user_cabinet_original_id
     )
-    result: Result[tuple[WBUserCabinet]] = await session.execute(stmt)
-    wb_user_cabinet = result.scalar_one()
     _ = await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv)()
+
+
+async def _load_adv_settings_for_cabinet(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+) -> list[AdvSetting]:
+    """Загрузить рекламные кампании кабинета в переданной PG-сессии."""
+    stmt = (
+        select(AdvSetting)
+        .join(AdvSetting.wb_cabinet)
+        .join(WBCabinet.wb_user_cabinets)
+        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def _load_adv_settings_for_cabinet_for_update_in_session(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+) -> list[AdvSetting]:
+    """Загрузить РК кабинета в переданной WRITE-сессии."""
+    stmt = (
+        select(AdvSetting)
+        .join(AdvSetting.wb_cabinet)
+        .join(WBCabinet.wb_user_cabinets)
+        .options(selectinload(AdvSetting.wb_cabinet))
+        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def _load_active_adv_settings_for_cabinet_in_session(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+) -> list[AdvSetting]:
+    """Загрузить активные РК кабинета в переданной WRITE-сессии."""
+    stmt = (
+        select(AdvSetting)
+        .join(AdvSetting.wb_cabinet)
+        .join(WBCabinet.wb_user_cabinets)
+        .options(selectinload(AdvSetting.wb_cabinet))
+        .where(
+            WBUserCabinet.id == wb_user_cabinet_original_id,
+            AdvSetting.bot_active.is_(True),
+        )
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def _load_adv_setting_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить РК по ID в переданной read-only PG-сессии."""
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _load_adv_setting_with_cabinet_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Загрузить РК и кабинет в переданной WRITE-сессии."""
+    result = await session.execute(
+        select(AdvSetting)
+        .options(joinedload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_original_id)
+    )
+    return result.scalar_one()
+
+
+async def _load_adv_for_activation_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Загрузить РК и платежи в переданной WRITE-сессии запуска."""
+    result = await session.execute(
+        select(AdvSetting)
+        .options(selectinload(AdvSetting.payments))
+        .where(AdvSetting.id == adv_original_id)
+    )
+    return result.scalar_one()
+
+
+async def _load_wb_user_cabinet_in_session(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+) -> WBUserCabinet:
+    """Загрузить кабинет с данными WB в переданной PG-сессии."""
+    stmt = (
+        select(WBUserCabinet)
+        .join(WBUserCabinet.wb_cabinet)
+        .options(selectinload(WBUserCabinet.wb_cabinet))
+        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+
+async def _load_wb_user_cabinet_for_adv_in_session(
+    session: AsyncSession,
+    telegram_user_id: int,
+    adv_original_id: int,
+) -> WBUserCabinet:
+    """Найти кабинет пользователя для РК в переданной PG-сессии."""
+    stmt = (
+        select(WBUserCabinet)
+        .join(WBUserCabinet.user)
+        .join(WBUserCabinet.wb_cabinet)
+        .join(WBCabinet.adv_settings)
+        .where(
+            User.user_telegram_id == telegram_user_id,
+            AdvSetting.id == adv_original_id,
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter))
@@ -229,15 +342,10 @@ async def reset_filter(
     await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     await state.update_data(filter_advs=[])
 
-    async with sm() as session:
-        stmt = (
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    async with sm(read_only=True) as session:
+        adv_settings = await _load_adv_settings_for_cabinet(
+            session, wb_user_cabinet_original_id
         )
-        result = await session.execute(stmt)
-        adv_settings = list(result.scalars().all())
 
     page = 1
     message = callback.message
@@ -267,15 +375,10 @@ async def waiting_for_keywords_for_filter(
     await state.update_data(filter_advs=filter_advs)
     state_data = await state.get_data()
     wb_user_cabinet_original_id: int = state_data["last_wb_user_cabinet_original_id"]
-    async with sm() as session:
-        stmt = (
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    async with sm(read_only=True) as session:
+        adv_settings = await _load_adv_settings_for_cabinet(
+            session, wb_user_cabinet_original_id
         )
-        result = await session.execute(stmt)
-        adv_settings: list[AdvSetting] = list(result.scalars().all())
 
     page = 1
     check_data = await state.get_data()
@@ -304,15 +407,10 @@ async def choice_adv_paginator(
     page = callback_data.page
     check_data = await state.get_data()
     logger.debug("check_data: %s", check_data)
-    stmt = (
-        select(AdvSetting)
-        .join(AdvSetting.wb_cabinet)
-        .join(WBCabinet.wb_user_cabinets)
-        .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-    )
-    async with sm() as session:
-        result = await session.execute(stmt)
-        adv_settings = list(result.scalars().all())
+    async with sm(read_only=True) as session:
+        adv_settings = await _load_adv_settings_for_cabinet(
+            session, wb_user_cabinet_original_id
+        )
     await messages.AdvCompanyChoicing(
         bot, chat_id, wb_user_cabinet_original_id, adv_settings, state, page=page
     )()
@@ -335,46 +433,24 @@ async def adv_handler(
     await state.update_data(last_adv_original_id=adv_original_id)
     data = await state.get_data()
 
-    try:
-        wb_user_cabinet_original_id = data["last_wb_user_cabinet_original_id"]
-    except KeyError:
-        async with sm() as session:
-            stmt = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.user)
-                .join(WBUserCabinet.wb_cabinet)
-                .join(WBCabinet.adv_settings)
-                .filter(
-                    User.user_telegram_id
-                    == callback.from_user.id,  # Фильтрация по user_telegram_id
-                    AdvSetting.id
-                    == adv_original_id,  # Фильтрация по нужному AdvSetting
-                )
+    async with sm(read_only=True) as session:
+        if "last_wb_user_cabinet_original_id" in data:
+            wb_user_cabinet_original_id = data["last_wb_user_cabinet_original_id"]
+        else:
+            wb_user_cabinet = await _load_wb_user_cabinet_for_adv_in_session(
+                session, callback.from_user.id, adv_original_id
             )
-            result = await session.execute(stmt)
-            wb_user_cabinet = result.scalar_one()  # Извлекаем первую строку
-        wb_user_cabinet_original_id: int = wb_user_cabinet.id
+            wb_user_cabinet_original_id = wb_user_cabinet.id
 
-    async with sm() as session:
-        adv_result: Result[tuple[AdvSetting]] = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_original_id)
+        adv = await _load_adv_setting_in_session(session, adv_original_id)
+        wb_user_cabinet = await _load_wb_user_cabinet_in_session(
+            session, wb_user_cabinet_original_id
         )
-        adv: AdvSetting | None = adv_result.scalar_one_or_none()
 
     if not adv:
         raise RuntimeError(
             f"AdvSetting not found for original_id={adv_original_id}"
         )
-
-    # TODO: Перенести в отдельную функцию
-    async with sm(read_only=True) as session:
-        stmt = (
-            select(WBUserCabinet)
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-            .options(selectinload(WBUserCabinet.wb_cabinet))
-        )
-        wb_user_cabinet_result = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet_result.scalar_one()
 
     if not wb_user_cabinet:
         raise RuntimeError(
@@ -591,14 +667,9 @@ async def turn_adv_off_all(
     await bot.send_message(callback.message.chat.id, "Отключаю бота от всех кампаний")
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
-        advs = await session.execute(
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .options(selectinload(AdvSetting.wb_cabinet))
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        advs = await _load_adv_settings_for_cabinet_for_update_in_session(
+            session, wb_user_cabinet_original_id
         )
-        advs = advs.scalars().all()
         # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         for adv_ in advs:
             apply_free_mode_transition(adv_, adv_.wb_cabinet)
@@ -619,21 +690,22 @@ async def turn_adv_off(
 
     # data = await state.get_data()
     wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
-    async with sm() as session:
-        stmt = (
-            select(WBUserCabinet)
-            .join(WBUserCabinet.wb_cabinet)
-            .options(selectinload(WBUserCabinet.wb_cabinet))
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+    adv_original_id = callback_data.adv_original_id
+    if adv_original_id is None:
+        raise ValueError("Не указан идентификатор рекламной кампании")
+    async with sm(read_only=True) as session:
+        wb_user_cabinet = await _load_wb_user_cabinet_in_session(
+            session, wb_user_cabinet_original_id
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar_one()
 
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
+        adv_setting = await _load_adv_setting_in_session(
+            session, adv_original_id
         )
-        adv_setting: AdvSetting = result.scalar_one()
+        if adv_setting is None:
+            raise RuntimeError(
+                f"AdvSetting not found for original_id={adv_original_id}"
+            )
         # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         apply_free_mode_transition(adv_setting, wb_user_cabinet.wb_cabinet)
         await session.commit()
@@ -657,12 +729,9 @@ async def apply_campaign_defaults(
 
     adv_original_id = callback_data.adv_setting_original_id
     async with sm(read_only=False) as session:
-        result = await session.execute(
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_original_id)
+        adv_setting = await _load_adv_setting_with_cabinet_in_session(
+            session, adv_original_id
         )
-        adv_setting: AdvSetting = result.scalar_one()
 
         # spec card-ab-hold-mode «Shared defaults MUST NOT disable or mutate A/B
         # Hold on a held campaign» / decision §13: «Применить дефолты» — не
@@ -686,11 +755,10 @@ async def apply_campaign_defaults(
 
         # Обновить меню кампании
         wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
-        async with sm() as session_read:
-            wb_user_cabinet = await session_read.execute(
-                select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        async with sm(read_only=True) as session_read:
+            wb_user_cabinet = await _load_wb_user_cabinet_in_session(
+                session_read, wb_user_cabinet_original_id
             )
-            wb_user_cabinet = wb_user_cabinet.scalar()
 
         if not wb_user_cabinet:
             raise RuntimeError(
@@ -719,17 +787,10 @@ async def wb_update_minus_keywords(
     await bot.send_message(chat_id, "Обновляю минус-слова…")
 
     async with sm(read_only=True) as session:
-        result = await session.execute(
-            select(AdvSetting)
-            .options(joinedload(AdvSetting.wb_cabinet))
-            .where(AdvSetting.id == adv_setting_original_id)
+        adv_setting = await _load_adv_setting_with_cabinet_in_session(
+            session, adv_setting_original_id
         )
-        adv_setting: AdvSetting | None = result.scalar_one_or_none()
 
-    if adv_setting is None:
-        raise RuntimeError(
-            f"AdvSetting not found for original_id={adv_setting_original_id}"
-        )
     wb_cabinet = getattr(adv_setting, "wb_cabinet", None)
     if wb_cabinet is None:
         raise RuntimeError(
@@ -802,12 +863,10 @@ async def wb_update_minus_keywords(
     wb_user_cabinet_id = data.get("last_wb_user_cabinet_original_id")
     if wb_user_cabinet_id is not None:
         async with sm(read_only=True) as session:
-            result = await session.execute(
-                select(WBUserCabinet).where(WBUserCabinet.id == wb_user_cabinet_id)
+            wb_user_cabinet = await _load_wb_user_cabinet_in_session(
+                session, wb_user_cabinet_id
             )
-            wb_user_cabinet = result.scalar_one_or_none()
-        if wb_user_cabinet is not None:
-            await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
+        await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
 
 
 @router.callback_query(callbacks.ApplyDefaultsForShop.filter())
@@ -823,17 +882,9 @@ async def apply_defaults_for_shop(
     chat_id: int = callback.message.chat.id
 
     async with sm(read_only=False) as session:
-        # Получаем только активные кампании магазина через ORM
-        stmt = (
-            select(AdvSetting)
-            .join(AdvSetting.wb_cabinet)
-            .join(WBCabinet.wb_user_cabinets)
-            .options(selectinload(AdvSetting.wb_cabinet))
-            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-            .where(AdvSetting.bot_active.is_(True))
+        adv_settings = await _load_active_adv_settings_for_cabinet_in_session(
+            session, wb_user_cabinet_original_id
         )
-        result: Result[tuple[AdvSetting]] = await session.execute(stmt)
-        adv_settings: Sequence[AdvSetting] = result.scalars().all()
 
         # Применяем дефолты через ORM для каждой активной кампании.
         # spec card-ab-hold-mode / decision §13: held (PENDING_SETUP/ACTIVE)

@@ -1,3 +1,5 @@
+"""Обработчики настройки ключевых слов с явными PG session seams."""
+
 # TODO:  Тут большое число mypy ошибок
 
 
@@ -6,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
@@ -205,6 +207,68 @@ async def setting_keywords_filter_by_query(
     await messages.FilterByQuery(bot, callback.message.chat.id)()
 
 
+async def _load_adv_setting(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Загрузить рекламную кампанию в переданной read-only PG-сессии."""
+    stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    result = await session.execute(stmt)
+    return result.scalar()
+
+
+async def _load_adv_setting_with_cabinet_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Загрузить РК с кабинетом в переданной read-only PG-сессии."""
+    stmt = (
+        select(AdvSetting)
+        .options(selectinload(AdvSetting.wb_cabinet))
+        .where(AdvSetting.id == adv_original_id)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one()
+
+
+async def _load_wb_user_cabinet_for_keyword_screen_in_session(
+    session: AsyncSession,
+    telegram_user_id: int,
+    wb_cabinet_id: int,
+) -> WBUserCabinet | None:
+    """Найти пользовательский кабинет для экрана ключевых слов."""
+    stmt = (
+        select(WBUserCabinet)
+        .join(User, User.id == WBUserCabinet.user_id)
+        .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
+        .options(
+            selectinload(WBUserCabinet.user),
+            selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                WBCabinet.adv_settings
+            ),
+        )
+        .where(
+            and_(
+                User.user_telegram_id == telegram_user_id,
+                WBCabinet.id == wb_cabinet_id,
+            )
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def _load_user_in_session(
+    session: AsyncSession,
+    telegram_user_id: int,
+) -> User | None:
+    """Загрузить пользователя для admin fallback в переданной PG-сессии."""
+    result = await session.execute(
+        select(User).where(User.user_telegram_id == telegram_user_id)
+    )
+    return result.scalar()
+
+
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == "active_keywords"))
 async def setting_keywords_active_keywords(
     callback: CallbackQuery,
@@ -214,12 +278,8 @@ async def setting_keywords_active_keywords(
 ) -> None:
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.status == "good"]
     keyword_texts = [keyword.text for keyword in keywords]
@@ -265,12 +325,8 @@ async def setting_keywords_sort_by_ctr_desc(
 ) -> None:
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords: list[CalculatedKeyword] = await utils.get_keywords_for_keyboard(
         adv_setting
     )
@@ -320,12 +376,8 @@ async def setting_keywords_show_keywords_is_hard(
 ) -> None:
     await state.update_data(keywords_filter=None)
     adv_original_id = callback_data.adv_original_id
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 3]
     keyword_texts = [keyword.text for keyword in keywords]
@@ -380,12 +432,8 @@ async def setting_keywords_white_list(
     page = callback_data.page
     if not page:
         page = 1
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [
         keyword
@@ -447,12 +495,8 @@ async def setting_keywords_white_list(
     page = callback_data.page
     if not page:
         page = 1
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     keywords = [keyword for keyword in keywords if keyword.hard_status == 2]
     keywords.sort(key=lambda x: x.rating or 0, reverse=True)
@@ -527,34 +571,16 @@ async def setting_keywords_by_adv(
         )
         return
 
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()  # type: ignore[attr-defined]
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     adv_choice_last_page = state_data.get("adv_choice_last_page", 1)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     state_data = await state.get_data()
     state_data.update(adv_choice_last_page=1)
-    async with _sm() as session:
-        stmt = (
-            select(WBUserCabinet)
-            .join(User, User.id == WBUserCabinet.user_id)
-            .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
-            .options(
-                selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                    WBCabinet.adv_settings
-                ),
-            )
-            .where(
-                and_(
-                    User.user_telegram_id == message.from_user.id,
-                    WBCabinet.id == adv_setting.wb_cabinet_id,
-                )
-            )
+    async with _sm(read_only=True) as session:
+        wb_user_cabinet = await _load_wb_user_cabinet_for_keyword_screen_in_session(
+            session, message.from_user.id, adv_setting.wb_cabinet_id
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
     wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
     nmids = adv_setting.nmids
     main_photos = await data_manager.get_main_photos(nmids[:1])
@@ -591,10 +617,8 @@ async def keywords_daily_stats(
     await callback.answer()
     assert callback.message
 
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(AdvSetting.id == callback_data.adv_original_id)
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar_one()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, callback_data.adv_original_id)
 
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         await KeywordsDailyStatsScreen(
@@ -619,12 +643,8 @@ async def setting_keywords_hide_keywords_is_hard(
 ):
     await state.update_data(hide_keywords_is_not_relevant=True)
     adv_original_id = callback_data.adv_original_id
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     await state.update_data(adv_choice_last_page=1)
     state_data = await state.get_data()
@@ -673,12 +693,8 @@ async def setting_keywords_hide_keywords_is_hard(
 ):
     await state.update_data(hide_keywords_is_not_relevant=False)
     adv_original_id = callback_data.adv_original_id
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(
-            AdvSetting.id == adv_original_id,
-        )
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting(session, adv_original_id)
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     await state.update_data(adv_choice_last_page=1)
     state_data = await state.get_data()
@@ -718,47 +734,29 @@ async def setting_keywords_by_adv(
         last_adv_original_id=adv_original_id, last_adv_page=callback_data.page
     )
 
-    async with _sm() as session:
-        stmt = select(AdvSetting).where(AdvSetting.id == adv_original_id)
-        result = await session.execute(stmt)
-        adv_setting: AdvSetting = result.scalar()
+    async with _sm(read_only=True) as session:
+        adv_setting = await _load_adv_setting_with_cabinet_in_session(
+            session, adv_original_id
+        )
 
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     page = callback_data.page
     await state.update_data(last_keyword_setting_page=page)
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get("adv_choice_last_page", 1)
+    user_id = cast(int, callback.from_user.id)
     async with _sm(read_only=False) as session:
-        stmt = (
-            select(WBUserCabinet)
-            .join(User, User.id == WBUserCabinet.user_id)
-            .join(WBCabinet, WBCabinet.id == WBUserCabinet.wb_cabinet_id)
-            .options(
-                selectinload(WBUserCabinet.user),
-                selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                    WBCabinet.adv_settings
-                ),
-            )
-            .where(
-                and_(
-                    User.user_telegram_id == callback.from_user.id,  # type: ignore[attr-defined]
-                    WBCabinet.id == adv_setting.wb_cabinet_id,
-                )
-            )
+        wb_user_cabinet = await _load_wb_user_cabinet_for_keyword_screen_in_session(
+            session, user_id, adv_setting.wb_cabinet_id
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
-    user_id: int = callback.from_user.id  # type: ignore[attr-defined]
-    if wb_user_cabinet is None and user_id in const.ADMINS:
-        stmt = select(User).where(User.user_telegram_id == user_id)
-        admin_user = await session.execute(stmt)
-        admin_user = admin_user.scalar()
-        wb_user_cabinet = WBUserCabinet()
-        wb_user_cabinet.user = admin_user
-        wb_user_cabinet.wb_cabinet = adv_setting.wb_cabinet
-        wb_user_cabinet.name = "Автодобавлен"
-        session.add(wb_user_cabinet)
-        await session.commit()
+        if wb_user_cabinet is None and user_id in const.ADMINS:
+            admin_user = await _load_user_in_session(session, user_id)
+            wb_user_cabinet = WBUserCabinet()
+            wb_user_cabinet.user = admin_user
+            wb_user_cabinet.wb_cabinet = adv_setting.wb_cabinet
+            wb_user_cabinet.name = "Автодобавлен"
+            session.add(wb_user_cabinet)
+            await session.commit()
     wb_user_cabinet_original_id = wb_user_cabinet.id  # type: ignore[attr-defined]
     nmids = adv_setting.nmids
     if nmids:
@@ -947,7 +945,7 @@ async def setting_keywords_filter_by_query(
     await state.update_data(last_keyword_setting_page=page)
     state_data = await state.get_data()
     adv_choice_last_page = state_data.get("adv_choice_last_page", 1)
-    async with _sm() as session:
+    async with _sm(read_only=True) as session:
         stmt = (
             select(WBUserCabinet)
             .join(User, User.id == WBUserCabinet.user_id)
@@ -1212,7 +1210,7 @@ async def show_only_on_out_index(
     page = callback_data.page
     if not page:
         page = 1
-    async with _sm() as session:
+    async with _sm(read_only=True) as session:
         stmt = select(AdvSetting).where(
             AdvSetting.id == adv_original_id,
         )

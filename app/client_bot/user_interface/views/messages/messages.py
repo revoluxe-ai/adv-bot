@@ -1,3 +1,5 @@
+"""Рендереры сообщений Telegram и изолированные PG-seams чтения."""
+
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
@@ -14,6 +16,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
 from app.client_bot.const import DEFAULT_BIDDER_STEP
@@ -85,6 +88,45 @@ _MAX_TEMPLATE_PREVIEW_TEXT_LEN = 1400
 _TEMPLATE_EXPORT_HINT = (
     'Чтобы получить весь список, нажмите кнопку "Выгрузить фразы"'
 )
+
+
+async def _load_wb_cabinet_in_session(
+    session: AsyncSession,
+    wb_cabinet_original_id: int,
+) -> WBCabinet | None:
+    """Загрузить кабинет в переданной read-only PG-сессии."""
+    result = await session.execute(
+        select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
+    )
+    return result.scalar()
+
+
+async def _load_wb_cabinet_id_for_user_cabinet(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+) -> int | None:
+    """Получить ID кабинета по связанной записи пользователя."""
+    stmt = select(WBCabinet.id).where(
+        WBCabinet.wb_user_cabinets.any(
+            WBUserCabinet.id == int(wb_user_cabinet_original_id)
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar()
+
+
+async def _load_adv_setting_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Загрузить РК в переданной read-only PG-сессии."""
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    )
+    adv_setting = result.scalar()
+    if adv_setting is None:
+        raise RuntimeError(f"AdvSetting not found for original_id={adv_original_id}")
+    return adv_setting
 
 
 def _render_phrase_templates_preview(
@@ -191,12 +233,22 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         self._keywords_filter: list[str] = []  # Инициализируем фильтр ключевых слов
 
     @staticmethod
+    async def _get_wb_cabinet_in_session(
+        session: AsyncSession,
+        wb_cabinet_original_id: int,
+    ) -> WBCabinet | None:
+        """Загрузить кабинет в переданной read-only PG-сессии."""
+        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
+        result = await session.execute(stmt)
+        return result.scalar()
+
+    @staticmethod
     async def _get_wb_cabinet(wb_cabinet_original_id: int) -> WBCabinet | None:
-        async with sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
-            result = await session.execute(stmt)
-            wb_cabinet = result.scalar()
-            return wb_cabinet
+        """Загрузить кабинет, создав короткую read-only PG-сессию."""
+        async with sm(read_only=True) as session:
+            return await AdvCompanyChoicing._get_wb_cabinet_in_session(
+                session, wb_cabinet_original_id
+            )
 
     async def __call__(self) -> None:
         await self._state.set_state(
@@ -213,14 +265,10 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         adv_settings: list[AdvSetting] = active_advs + inactive_advs
         adv_settings_filtred: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings_filtred
-        stmt = select(WBCabinet.id).where(
-            WBCabinet.wb_user_cabinets.any(
-                WBUserCabinet.id == int(self._wb_user_cabinet_original_id)
+        async with sm(read_only=True) as session:
+            wb_cabinet_original_id = await _load_wb_cabinet_id_for_user_cabinet(
+                session, self._wb_user_cabinet_original_id
             )
-        )
-        async with sm() as session:
-            result = await session.execute(stmt)
-            wb_cabinet_original_id = result.scalar()
         await self._state.update_data(
             last_wb_cabinet_original_id=wb_cabinet_original_id,
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
@@ -537,13 +585,23 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @staticmethod
     async def _get_keyword_text_and_adv_id(keyword_original_id: int,) -> tuple[KeywordSetting, AdvSetting]:
-        # TODO: Поймали ошибку в рантайме
+        """Загрузить ключ и РК через короткую read-only PG-сессию."""
+        async with sm(read_only=True) as session:
+            return await KeywordSettingMessage._get_keyword_text_and_adv_id_in_session(
+                session, keyword_original_id
+            )
+
+    @staticmethod
+    async def _get_keyword_text_and_adv_id_in_session(
+        session: AsyncSession,
+        keyword_original_id: int,
+    ) -> tuple[KeywordSetting, AdvSetting]:
+        """Загрузить ключ и РК в переданной PG-сессии."""
         stmt = select(KeywordSetting, AdvSetting)\
         .join(KeywordSetting.adv_setting)\
         .where(KeywordSetting.id == keyword_original_id)
-        async with sm(read_only=True) as session:
-            result = await session.execute(stmt)
-            result_row = result.first()
+        result = await session.execute(stmt)
+        result_row = result.first()
         if not result_row:
             raise ValueError('Не найдены данные о ключе')
         keyword: KeywordSetting = result_row[0]
@@ -809,10 +867,10 @@ class ExpiredSubscription(TextWithKeyboard):
         super().__init__(bot, chat_id)
 
     async def __call__(self) -> None:
-        async with sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.id == self._wb_cabinet_original_id)
-            result = await session.execute(stmt)
-            self._wb_cabinet = result.scalar()
+        async with sm(read_only=True) as session:
+            self._wb_cabinet = await _load_wb_cabinet_in_session(
+                session, self._wb_cabinet_original_id
+            )
         return await super().__call__()
 
     @property
@@ -833,11 +891,8 @@ class ExpiredSubscription(TextWithKeyboard):
 
 class SettingMinViewsForPredictCTR(TextWithKeyboard):
     async def __call__(self, adv_original_id: int):
-        async with sm() as session:
-            result = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
-            adv: AdvSetting  = result.scalar()
+        async with sm(read_only=True) as session:
+            adv = await _load_adv_setting_in_session(session, adv_original_id)
         self._adv: AdvSetting = adv
         return await super().__call__()
 
@@ -990,12 +1045,8 @@ class CPMSetting(TextWithKeyboard):
         self._last_saved_bids: dict[int, int] = {}
 
     async def __call__(self, adv_setting_id: int) -> None:
-        async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-            result = await session.execute(stmt)
-            adv_setting = result.scalars().first()
-        if adv_setting is None:
-            raise RuntimeError(f"AdvSetting с id {adv_setting_id} не найден")
+        async with sm(read_only=True) as session:
+            adv_setting = await _load_adv_setting_in_session(session, adv_setting_id)
         self.adv_setting = adv_setting
         search_adv_id = adv_setting.search_adv_id
         nmids = adv_setting.nmids or []
@@ -1144,10 +1195,8 @@ class AutoCPMSettingGetMinPosition(Text):
     """Prompt asking for the desired target place for the bidder."""
 
     async def __call__(self, adv_setting_id: int):
-        async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-            result = await session.execute(stmt)
-            adv_setting = result.scalars().first()
+        async with sm(read_only=True) as session:
+            adv_setting = await _load_adv_setting_in_session(session, adv_setting_id)
         self.adv_setting = adv_setting
         await super().__call__()
 
@@ -1187,7 +1236,7 @@ class ManualCPMSetting(Text):
 class WaitingForBlackPhrases(TextWithKeyboard):
     async def __call__(self, adv_setting_id: int):
         self.adv_setting_id: int = adv_setting_id
-        async with sm() as session:
+        async with sm(read_only=True) as session:
             adv: AdvSetting | None = await session.get(
                 AdvSetting, self.adv_setting_id
             )  # Изменено
@@ -1271,7 +1320,7 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
 
     async def __call__(self, adv_setting_id: int) -> None:
         self.adv_setting_id: int = adv_setting_id
-        async with sm() as session:
+        async with sm(read_only=True) as session:
             adv: AdvSetting | None = await session.get(
                 AdvSetting, self.adv_setting_id
             )
@@ -1456,7 +1505,7 @@ async def process_cabinet_balance_topup(
     user_id: int, cabinet_id: int, amount: float
 ) -> WBBalancePayment:
     """Обработка запроса на пополнение баланса кабинета"""
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # Получаем пользователя для описания платежа
         user = await session.get(User, user_id)
         if not user:
@@ -1479,7 +1528,7 @@ async def confirm_cabinet_balance_topup(
     payment_id: int, cabinet_id: int
 ) -> tuple[WBBalancePayment, WBCabinet]:
     """Подтверждение платежа и обновление баланса кабинета"""
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # Получаем платеж
         payment: WBBalancePayment | None = await session.get(
             WBBalancePayment, payment_id
