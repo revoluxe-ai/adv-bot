@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import zipfile
-from datetime import date, timedelta, timedelta
+from dataclasses import dataclass
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -28,7 +29,13 @@ from scripts.wb_api_readonly_ops.collect.funnel import (
     _allowed_funnel_period,
     collect_funnel,
 )
-from scripts.wb_api_readonly_ops.collect.normqueries import build_normquery_batches
+from scripts.wb_api_readonly_ops.collect.jsonable import jsonable
+from scripts.wb_api_readonly_ops.collect.normqueries import (
+    NORMQUERY_API_MAX_RANGE_DAYS,
+    _allowed_normquery_period,
+    build_normquery_batches,
+    collect_normqueries,
+)
 from scripts.wb_api_readonly_ops.collect.orders_sales import (
     _paginate_supplier_rows,
     collect_orders_sales,
@@ -290,6 +297,60 @@ async def test_funnel_nmid_batching(tmp_path: Path) -> None:
         assert call.kwargs["end"] == expected_end
 
 
+def test_jsonable_serializes_slotted_dataclass() -> None:
+    """CommonSaleStatRow и другие slots dataclass должны попадать в JSONL как dict."""
+
+    @dataclass(frozen=True, slots=True)
+    class Row:
+        nmid: int
+        day: date
+        orders: int = 0
+
+    out = jsonable(Row(nmid=42, day=date(2026, 8, 21), orders=3))
+    assert out == {"nmid": 42, "day": "2026-08-21", "orders": 3}
+
+
+@pytest.mark.asyncio
+async def test_collect_funnel_stores_common_sale_stat_rows(tmp_path: Path) -> None:
+    """Funnel collect сохраняет rows из adapter stack (slotted dataclass)."""
+
+    @dataclass(frozen=True, slots=True)
+    class Row:
+        nmid: int
+        day: date
+        open_card: int = 1
+        add_to_cart: int = 0
+        orders: int = 2
+        orders_sum: float = 100.0
+        buy_outs: int = 1
+        buyouts_sum_rub: float = 80.0
+
+    dm = MagicMock()
+    dm.get_sales_funnel_products_history = AsyncMock(
+        return_value=[Row(nmid=101, day=date(2026, 8, 21))]
+    )
+    store = RawStore(output_dir=tmp_path)
+    budget = ApiCallBudget(max_seconds=60, max_api_calls=10)
+
+    rows = await collect_funnel(
+        dm,
+        store=store,
+        budget=budget,
+        nmids=[101],
+        date_from=date(2010, 1, 1),
+        date_to=date(2026, 8, 21),
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["nmid"] == 101
+    assert rows[0]["orders"] == 2
+    funnel_path = tmp_path / "raw" / "funnel" / "funnel.jsonl"
+    assert funnel_path.read_text(encoding="utf-8").strip()
+    entry = store.coverage[-1]
+    assert entry.unique_nmids == 1
+    assert entry.records_stored == 1
+
+
 def test_funnel_allowed_period_respects_api_retention() -> None:
     """startDate не старше API retention (7 days inclusive)."""
     date_to = date(2026, 8, 21)
@@ -426,6 +487,49 @@ def test_build_normquery_batches_from_campaign_configs() -> None:
     assert len(batches) == 2
     assert batches[0].adv_id == 10
     assert batches[0].nmid == 100
+
+
+def test_allowed_normquery_period_respects_api_max_range() -> None:
+    """POST /adv/v0/normquery/stats: диапазон не шире 30 календарных дней."""
+    date_to = date(2026, 8, 21)
+    start, end = _allowed_normquery_period(date(2010, 1, 1), date_to)
+    assert end == date_to
+    assert (end - start).days == NORMQUERY_API_MAX_RANGE_DAYS - 1
+    assert start == date(2026, 7, 23)
+
+    narrow_from = date(2026, 8, 10)
+    start2, end2 = _allowed_normquery_period(narrow_from, date_to)
+    assert start2 == narrow_from
+    assert end2 == date_to
+
+
+@pytest.mark.asyncio
+async def test_collect_normqueries_caps_date_range_before_adapter_call(
+    tmp_path: Path,
+) -> None:
+    """Collect normqueries не шлёт в API диапазон шире 30 дней."""
+    dm = MagicMock()
+    adapter = dm.promotion_manager._client.normquery_stats_adapter
+    adapter.get_adv_v0_normquery_stats = AsyncMock(return_value=[])
+    store = RawStore(output_dir=tmp_path)
+    budget = ApiCallBudget(max_seconds=60, max_api_calls=10)
+    rows = [{"id": 1, "nm_settings": [{"nm_id": 42}]}]
+    date_to = date(2026, 8, 21)
+
+    await collect_normqueries(
+        dm,
+        store=store,
+        budget=budget,
+        campaign_rows=rows,
+        date_from=date(2026, 2, 1),
+        date_to=date_to,
+    )
+
+    command = adapter.get_adv_v0_normquery_stats.await_args.args[0]
+    expected_from, expected_to = _allowed_normquery_period(date(2026, 2, 1), date_to)
+    assert command.date_from == expected_from
+    assert command.date_to == expected_to
+    assert (command.date_to - command.date_from).days <= NORMQUERY_API_MAX_RANGE_DAYS - 1
 
 
 @pytest.mark.asyncio

@@ -16,6 +16,21 @@ from scripts.wb_api_readonly_ops.collect.jsonable import jsonable
 from scripts.wb_api_readonly_ops.collect.raw_store import RawStore
 from scripts.wb_api_readonly_ops.mutation_guard import assert_read_only_op
 
+# POST /adv/v0/normquery/stats: «date range must not exceed 30 days» (WB camp-api).
+NORMQUERY_API_MAX_RANGE_DAYS = 30
+
+
+def _allowed_normquery_period(
+    date_from: datetime.date,
+    date_to: datetime.date,
+) -> tuple[datetime.date, datetime.date]:
+    """Сжать диапазон до допустимого API окна (max 30 календарных дней inclusive)."""
+    max_start = date_to - datetime.timedelta(days=NORMQUERY_API_MAX_RANGE_DAYS - 1)
+    effective_from = max(date_from, max_start)
+    if effective_from > date_to:
+        effective_from = date_to
+    return effective_from, date_to
+
 
 def build_normquery_batches(
     campaign_rows: list[dict[str, Any]],
@@ -80,9 +95,25 @@ async def collect_normqueries(
         store.write_jsonl("normqueries/normqueries.jsonl", [], entry=entry)
         return []
 
+    effective_from, effective_to = _allowed_normquery_period(date_from, date_to)
+    entry.window_count = 1
+    entry.min_date = effective_from.isoformat()
+    entry.max_date = effective_to.isoformat()
+    entry.notes.extend(
+        [
+            f"API_max_range_days={NORMQUERY_API_MAX_RANGE_DAYS}",
+            "historical_beyond_30d=normquery_historical_beyond_30_days_requires_separate_surface",
+        ]
+    )
+    if date_from < effective_from:
+        entry.notes.append(
+            f"requested_from={date_from} capped_to={effective_from} "
+            "(API max 30 days per request)"
+        )
+
     command = GetNormqueryStatsCommand(
-        date_from=date_from,
-        date_to=date_to,
+        date_from=effective_from,
+        date_to=effective_to,
         batchs=batches,
     )
     adapter = dm.promotion_manager._client.normquery_stats_adapter

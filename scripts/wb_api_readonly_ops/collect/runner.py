@@ -31,6 +31,7 @@ MISSING_COLLECTOR_CAPABILITIES: list[str] = [
     "adv_v0_config_norms_limits",
     "search_report_separate_family_if_permission_gap",
     "funnel_historical_beyond_7_days_requires_separate_surface",
+    "normquery_historical_beyond_30_days_requires_separate_surface",
 ]
 
 

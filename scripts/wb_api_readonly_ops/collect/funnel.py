@@ -64,7 +64,11 @@ async def collect_funnel(
             as_dict = jsonable(item)
             if isinstance(as_dict, dict):
                 rows.append(as_dict)
-                nmid_val = as_dict.get("nmId") or as_dict.get("nm_id")
+                nmid_val = (
+                    as_dict.get("nmid")
+                    or as_dict.get("nmId")
+                    or as_dict.get("nm_id")
+                )
                 if nmid_val is not None:
                     try:
                         unique_nmids.add(int(nmid_val))
@@ -78,7 +82,7 @@ async def collect_funnel(
         http_statuses=[200],
         api_calls=api_calls,
         window_count=window_count,
-        unique_nmids=len(unique_nmids) or (len(set(nmids)) if nmids else 0),
+        unique_nmids=len(unique_nmids),
         pagination_used=len(nmids) > nmid_batch_size,
         completeness=(
             CompletenessStatus.FULL_AVAILABLE

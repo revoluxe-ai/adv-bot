@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+import dataclasses
+from typing import cast
 
 
 def jsonable(value: object) -> object:
     """Привести ответ менеджера/adapter к JSON-safe структуре."""
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return jsonable(dataclasses.asdict(value))
     if hasattr(value, "model_dump"):
         try:
             return jsonable(value.model_dump(mode="json"))
