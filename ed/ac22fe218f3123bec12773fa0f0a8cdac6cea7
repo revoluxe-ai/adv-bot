@@ -1,0 +1,62 @@
+scripts/wb_api_readonly_ops/collect/normqueries.py
+  s_de94f11c688d9e::t_70b02a0344a555 1-106
+scripts/wb_api_readonly_ops/cli.py
+  s_de94f11c688d9e::t_6016bcadb14253 28-31
+  s_de94f11c688d9e::t_9ad910b953ea82 127-158
+scripts/wb_api_readonly_ops/collect/ads.py
+  s_de94f11c688d9e::t_98cd02cdeaf313 1-148
+scripts/wb_api_readonly_ops/collect/jsonable.py
+  s_de94f11c688d9e::t_4e7d54d0e6b783 1-35
+scripts/wb_api_readonly_ops/collect/runner.py
+  s_de94f11c688d9e::t_30f485be07c0f8 1-204
+scripts/wb_api_readonly_ops/collect/raw_store.py
+  s_de94f11c688d9e::t_9e3d5545dd9c86 1-92
+scripts/wb_api_readonly_ops/collect/__init__.py
+  s_de94f11c688d9e::t_57cd3283c3e140 1-9
+scripts/wb_api_readonly_ops/collect/cards.py
+  s_de94f11c688d9e::t_20747d517787ef 23-37
+  s_de94f11c688d9e::t_42c2121d89d422 78-80
+  s_de94f11c688d9e::t_19e820bb8ef911 81-85
+  s_de94f11c688d9e::t_0c8222d5c836cd 1-22,38-77,86-126
+scripts/wb_api_readonly_ops/collect/orders_sales.py
+  s_de94f11c688d9e::t_b53a3a31e156df 1-4,7,9-22,33-46,59-62,65-69,71,73,75,77,79,81,83-84,86-87,89-90,94,98-102,109-112,114-116,118-122,124-129,132-140
+  s_de94f11c688d9e::t_27c81e799b1ebb 5-6,8,23-32,47-58,63-64,70,72,74,76,78,80,82,85,88,91-93,95-97,103-108,113,117,123,130-131,141-146
+scripts/wb_api_readonly_ops/collect/coverage.py
+  s_de94f11c688d9e::t_2e4406eb44de81 1-115
+scripts/wb_api_readonly_ops/collect/pagination.py
+  s_de94f11c688d9e::t_4018eee69479e6 40-41
+  s_de94f11c688d9e::t_6af22711a6c0f6 1-39,42-74
+tests/unit/scripts/wb_api_readonly_ops/test_collect_core.py
+  s_de94f11c688d9e::t_e0aa3bb4204dcd 270-272
+  s_de94f11c688d9e::t_4c78fd223895f1 284
+  s_de94f11c688d9e::t_a7a3e110cbfa49 301-307,309,313
+  s_de94f11c688d9e::t_6052b8a6cbca7c 1-260,262-269,273-283,285-300,308,310-312,314-414
+  s_de94f11c688d9e::t_ea1240e80926b6 261
+scripts/wb_api_readonly_ops/collect/archive.py
+  s_de94f11c688d9e::t_3c7e35280a33f3 1-114
+scripts/wb_api_readonly_ops/collect/api_budget.py
+  s_de94f11c688d9e::t_b34edf67c02df3 1-38
+scripts/wb_api_readonly_ops/run.py
+  s_de94f11c688d9e::t_0fe33794748f15 212-242
+  s_de94f11c688d9e::t_c808053299640a 81-82
+scripts/wb_api_readonly_ops/collect/funnel.py
+  s_de94f11c688d9e::t_7732cf4a58c42a 1-99
+scripts/REGISTRY.md
+  s_de94f11c688d9e::t_51f7951b957475 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "edac22fe218f3123bec12773fa0f0a8cdac6cea7",
+  "prompts": {},
+  "sessions": {
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
