@@ -43,7 +43,7 @@ class PaidModeDefaultsPolicy(AdvSettingDefaultsPolicy):
             field=AdvSetting.auto_update_target_place,
             apply_if=lambda adv, wb_cabinet: True,
             value=lambda adv, wb_cabinet: True,
-            reason="Не включаем auto target-place автоматически без отдельного product-решения.",
+            reason="PAID mode: auto target-place включается как часть auto-management.",
         ),
         FieldPolicy(
             field=AdvSetting.bidder_for_auto,
