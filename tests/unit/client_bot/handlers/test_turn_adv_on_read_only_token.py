@@ -239,7 +239,7 @@ async def test_turn_adv_on_keeps_paid_enable_path_for_normal_token() -> None:
     assert adv.automatic_version == 3
     assert adv.white_list_mode == WhiteListMode.REPLACE_ON_TRIM
     assert adv.bidder_active is True
-    assert adv.auto_update_minus_phrases is False
+    assert adv.auto_update_minus_phrases is True
     session.commit.assert_awaited_once()
     apply_defaults_mock.assert_not_called()
     backfill_mock.assert_awaited_once_with(dry_run=False, adv_setting_id=55)

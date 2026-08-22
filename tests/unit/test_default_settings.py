@@ -58,10 +58,6 @@ def test_apply_common_campaign_defaults() -> None:
     )
     assert adv_setting.sales_predict_method == defaults_v1.sales_predict_method
     assert (
-        adv_setting.auto_update_minus_phrases
-        == defaults_v1.auto_update_minus_phrases
-    )
-    assert (
         adv_setting.auto_budget_watchdog_enabled
         == defaults_v1.auto_budget_watchdog_enabled
     )
@@ -120,3 +116,4 @@ def test_apply_common_campaign_defaults_does_not_change_mode_specific_fields() -
     assert adv_setting.auto_update_white_list is True
     assert adv_setting.auto_update_target_place is True
     assert adv_setting.bidder_for_auto is True
+    assert adv_setting.auto_update_minus_phrases is True

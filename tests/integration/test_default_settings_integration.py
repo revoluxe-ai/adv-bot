@@ -322,7 +322,6 @@ async def test_apply_campaign_defaults_single_active_campaign(
         "bidder_coroutine_type",
         "orders_source_for_auto_mode",
         "sales_predict_method",
-        "auto_update_minus_phrases",
         "auto_budget_watchdog_enabled",
         "use_common_budget",
         "target_ctr_mode",
@@ -344,6 +343,10 @@ async def test_apply_campaign_defaults_single_active_campaign(
     assert (
         updated_adv_setting.auto_update_target_place
         == adv_setting.auto_update_target_place
+    )
+    assert (
+        updated_adv_setting.auto_update_minus_phrases
+        == adv_setting.auto_update_minus_phrases
     )
 
 
@@ -410,7 +413,6 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
         "bidder_coroutine_type",
         "orders_source_for_auto_mode",
         "sales_predict_method",
-        "auto_update_minus_phrases",
         "auto_budget_watchdog_enabled",
         "use_common_budget",
         "target_ctr_mode",
@@ -440,6 +442,10 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     assert (
         updated_adv_setting.auto_update_target_place
         == initial_adv_setting_state["auto_update_target_place"]
+    )
+    assert (
+        updated_adv_setting.auto_update_minus_phrases
+        == initial_adv_setting_state["auto_update_minus_phrases"]
     )
 
 
@@ -558,10 +564,7 @@ async def test_turn_adv_on_applies_paid_start_defaults_only(
     assert updated_adv_setting.white_list_mode == WhiteListMode.REPLACE_ON_TRIM
     assert updated_adv_setting.bidder_active is True
     assert updated_adv_setting.auto_update_white_list is False
-    assert (
-        updated_adv_setting.auto_update_minus_phrases
-        == adv_setting_inactive.auto_update_minus_phrases
-    )
+    assert updated_adv_setting.auto_update_minus_phrases is True
     assert updated_adv_setting.auto_update_target_place is True
 
 
@@ -576,6 +579,7 @@ async def test_turn_adv_off_applies_free_transition_only(
     adv_setting.automatic_version = 3
     adv_setting.white_list_mode = WhiteListMode.REPLACE_ON_TRIM
     adv_setting.auto_update_white_list = True
+    adv_setting.auto_update_minus_phrases = True
     adv_setting.auto_update_target_place = True
     adv_setting.bidder_for_auto = True
     adv_setting.bidder_active = True
@@ -633,6 +637,7 @@ async def test_turn_adv_off_applies_free_transition_only(
     assert updated_adv_setting.bidder_active is False
     assert updated_adv_setting.max_place == 7
     assert updated_adv_setting.max_cpm == 4567
+    assert updated_adv_setting.auto_update_minus_phrases is False
 
 
 @pytest.mark.integration
@@ -728,7 +733,6 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         "bidder_coroutine_type",
         "orders_source_for_auto_mode",
         "sales_predict_method",
-        "auto_update_minus_phrases",
         "auto_budget_watchdog_enabled",
         "use_common_budget",
         "target_ctr_mode",
@@ -751,6 +755,10 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         updated_adv_active_1.auto_update_target_place
         == adv_active_1.auto_update_target_place
     )
+    assert (
+        updated_adv_active_1.auto_update_minus_phrases
+        == adv_active_1.auto_update_minus_phrases
+    )
 
     updated_adv_active_2 = await async_session.get(AdvSetting, adv_active_2.id)
     assert updated_adv_active_2 is not None
@@ -768,4 +776,8 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
     assert (
         updated_adv_active_2.auto_update_target_place
         == adv_active_2.auto_update_target_place
+    )
+    assert (
+        updated_adv_active_2.auto_update_minus_phrases
+        == adv_active_2.auto_update_minus_phrases
     )

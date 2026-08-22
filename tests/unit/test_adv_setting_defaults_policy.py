@@ -34,7 +34,6 @@ COMMON_EXPECTED_FIELDS = {
     "bidder_coroutine_type",
     "orders_source_for_auto_mode",
     "sales_predict_method",
-    "auto_update_minus_phrases",
     "auto_budget_watchdog_enabled",
     "use_common_budget",
     "target_ctr_mode",
@@ -51,6 +50,7 @@ MODE_SPECIFIC_EXPECTED_FIELDS = {
     "auto_update_white_list",
     "auto_update_target_place",
     "bidder_for_auto",
+    "auto_update_minus_phrases",
 }
 
 TRANSITION_CONTROL_FIELDS = {"bot_active"}
@@ -239,6 +239,7 @@ def test_new_campaign_free_defaults_apply_common_then_free(
     assert adv_setting.auto_update_white_list is False
     assert adv_setting.auto_update_target_place is False
     assert adv_setting.bidder_for_auto is False
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_common_plus_paid_defaults_apply_current_paid_start_behavior(
@@ -256,7 +257,7 @@ def test_common_plus_paid_defaults_apply_current_paid_start_behavior(
     assert adv_setting.auto_update_white_list is False
     assert adv_setting.auto_update_target_place is True
     assert adv_setting.bidder_for_auto is False
-    assert adv_setting.auto_update_minus_phrases is False
+    assert adv_setting.auto_update_minus_phrases is True
 
 
 def test_free_overlay_sets_only_free_mode_fields(
@@ -278,7 +279,7 @@ def test_free_overlay_sets_only_free_mode_fields(
 
     assert adv_setting.bidder_active is False
     assert adv_setting.max_cpm == 777
-    assert adv_setting.auto_update_minus_phrases is True
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_transition_wrappers_keep_backward_compatible_behavior(

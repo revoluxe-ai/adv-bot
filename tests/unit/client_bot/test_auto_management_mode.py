@@ -70,6 +70,23 @@ def test_paid_auto_management_transition_keeps_current_bidder_path(
     assert adv_setting.automatic_version == 3
     assert adv_setting.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
     assert adv_setting.bidder_for_auto is False
+    assert adv_setting.auto_update_minus_phrases is True
+
+
+def test_paid_auto_management_transition_enables_minus_phrases_from_false(
+    wb_cabinet: WBCabinet,
+) -> None:
+    """Paid-start MUST enable auto_update_minus_phrases (spec paid-minus-phrases-default)."""
+    adv_setting = AdvSetting(
+        bot_active=False,
+        automatic_version=2,
+        auto_update_minus_phrases=False,
+    )
+
+    apply_paid_auto_management_transition(adv_setting, wb_cabinet)
+
+    assert adv_setting.bot_active is True
+    assert adv_setting.auto_update_minus_phrases is True
 
 
 def test_apply_free_auto_management_mode_sets_only_free_mode_fields(
@@ -99,7 +116,7 @@ def test_apply_free_auto_management_mode_sets_only_free_mode_fields(
     assert adv_setting.bidder_active is False
     assert adv_setting.max_place == 11
     assert adv_setting.max_cpm == 3300
-    assert adv_setting.auto_update_minus_phrases is True
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_free_transition_does_not_use_bot_active_as_bidder_path_selector(

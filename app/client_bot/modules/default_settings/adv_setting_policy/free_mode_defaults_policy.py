@@ -56,4 +56,13 @@ class FreeModeDefaultsPolicy(AdvSettingDefaultsPolicy):
             value=lambda adv, wb_cabinet: False,
             reason="Автосброс ставки в Auto выключен во FREE.",
         ),
+        FieldPolicy(
+            field=AdvSetting.auto_update_minus_phrases,
+            apply_if=lambda adv, wb_cabinet: True,
+            value=lambda adv, wb_cabinet: False,
+            reason=(
+                "FREE mode: paid WB automation выключена; автоминусы только "
+                "через явный toggle вне paid overlay."
+            ),
+        ),
     )

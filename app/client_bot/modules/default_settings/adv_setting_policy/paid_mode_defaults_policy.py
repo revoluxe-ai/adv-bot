@@ -51,4 +51,13 @@ class PaidModeDefaultsPolicy(AdvSettingDefaultsPolicy):
             value=lambda adv, wb_cabinet: False,
             reason="Автосброс ставки в Auto не часть paid-start.",
         ),
+        FieldPolicy(
+            field=AdvSetting.auto_update_minus_phrases,
+            apply_if=lambda adv, wb_cabinet: True,
+            value=lambda adv, wb_cabinet: True,
+            reason=(
+                "PAID mode: paid-start включает автообновление минус-фраз "
+                "(spec paid-minus-phrases-default)."
+            ),
+        ),
     )

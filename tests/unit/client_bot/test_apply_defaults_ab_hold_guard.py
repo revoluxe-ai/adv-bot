@@ -93,7 +93,6 @@ def _assert_common_defaults(adv: SimpleNamespace) -> None:
     assert adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
     assert adv.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC
     assert adv.sales_predict_method == FactMethods.BY_CARTS
-    assert adv.auto_update_minus_phrases is False
     assert adv.auto_budget_watchdog_enabled is True
     assert adv.use_common_budget is True
     assert adv.target_ctr_mode is False
