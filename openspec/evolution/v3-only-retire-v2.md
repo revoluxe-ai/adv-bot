@@ -122,8 +122,11 @@ Evidence / completion: none yet.
 
 - Не удалять v2-пакет, пока V3 (или другие callers) импортируют из него.
 - Cutover MUST предполагать миграцию или явный allowlist оставшихся v2.
-- Не ломать `auto_updater_version` контракты биллинга/gates без отдельного
-  решения (см. paid-regression bot_active / v2 path specs).
+- Не ломать billing/gates при retire v2 без отдельного решения (см.
+  paid-regression bot_active specs).
+- ``AdvSetting.automatic_version`` — **LEGACY DB column** (scheduled DROP):
+  runtime/UI/billing MUST использовать ``bot_active``; колонку не мигрировать
+  bulk UPDATE и не дропать в том же change, что retire v2 toggle.
 - Pause-on-empty и Hold остаются на v3-path; retire v2 не переписывает их DoD.
 
 ## Non-Goals
