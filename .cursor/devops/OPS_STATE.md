@@ -49,14 +49,14 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `bb81f827f102b613a84f4f7a66d093668e1b2839` |
-| Platform digest | `sha256:cdd6864dba2ecaa3e13d1fade70902aad771527e76a4e2823841b463f739156a` |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:bb81f827f102b613a84f4f7a66d093668e1b2839` |
-| App Deployments on this image | yes (CAS 2026-08-16; `free-bot` replicas=0) |
-| Last CONTROL | `app-db-control-bb81f827-r2` → `DRY_RUN_OK` (CONTROL_DRY_RUN=1; no lease) |
-| Last migrate Job | `app-db-migrate-3ad2d7d6-r2` → SUCCESS `f2a3…`→`e8f9…` (unchanged; skip on bb81 release) |
+| Image tag | `be173f55d8d2c8df7170d209e1d50a73f3281b07` |
+| Platform digest | `sha256:83e41e08b70077dd377fea70c3b7be064294169c543c8070d02ecb6802e4dd61` |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:be173f55d8d2c8df7170d209e1d50a73f3281b07` |
+| App Deployments on this image | yes (phased CAS 2026-08-22; `free-bot` replicas=0) |
+| Last CONTROL | `app-db-control-be173f55-r1` → `DRY_RUN_OK` (CONTROL_DRY_RUN=1; no lease) |
+| Last migrate Job | `app-db-migrate-3ad2d7d6-r2` → SUCCESS `f2a3…`→`e8f9…` (unchanged; skip on be173 release) |
 | Last complete_release | `app-db-ctrlplane-3ad2d7d6-complete-r2` (prior full release; skipped on dry-run CAS) |
-| Prepared fallback (prior LKG) | tag `3ad2d7d66aea88d3e872dce59ed28385acd15e59` / digest `sha256:8ae72bdbdfaa801fe0c34ee3ade665237e1eb4f756760893cce53d294e783016` |
+| Prepared fallback (prior LKG) | tag `bb81f827f102b613a84f4f7a66d093668e1b2839` / digest `sha256:cdd6864dba2ecaa3e13d1fade70902aad771527e76a4e2823841b463f739156a` |
 
 ## Open risks / follow-ups
 
@@ -70,6 +70,7 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 * Next Expand release must update APPLICATION `source_history_hash` (Owner) before acquire with real graph hash.
 * Shop-runner operational noise (`NotFoundActiveAdvCompany`, keywords cache miss) is not schema regression.
 * **2026-08-22 v3 predeploy:** Q1 gate applied (`bot_active=FALSE` for 5 legacy rows). Orphan-cabinet admin `NoResultFound` — tech debt in `DOTO/WORKLOG.md` (not deploy blocker).
+* **2026-08-22 v3-only release DONE:** PR #438 → `be173f55…` phased CAS all entrypoints; migrate skip; shop-runner `replicas=1` (was already 1 pre-rollout).
 
 ## Action log (append-only summary)
 
@@ -89,3 +90,5 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-16 | GO authz_baseline_select | Job `app-db-authz-grant-baseline-select-0816` OK; SELECT+USAGE for release_controller; no CAS |
 | 2026-08-16 | GO safe_prod_release `bb81f827…` CONTROL_DRY_RUN=1 | CONTROL DRY_RUN_OK → migrate skip (e8f9) → CAS all entrypoints → LKG `bb81f827…` |
 | 2026-08-22 | Pre-v3-cutover gate: `advsetting.bot_active=FALSE` where `bot_active=TRUE AND automatic_version!=3` | UPDATE 5 rows (ids 1151716277–1151716280, 201852); Q1 verify 0 rows |
+| 2026-08-22 | PR #438 merge → stage CI `be173f55…`; CONTROL DRY_RUN_OK; canary CAS `run-update-active-shop-ids` | pod Running on `be173f55…`; migrate skip; остальные на `bb81f827…` |
+| 2026-08-22 | Phased CAS waves 2–7 all entrypoints → `be173f55…` | all Running 0 restarts; v3 shop-runner cycles OK; wb-sky-bot polling; LKG `be173f55…` |
