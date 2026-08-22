@@ -1418,8 +1418,12 @@ class CoroutinesManager:
         return None
 
     @while_coroutine_decorator(60 * 5, 60)
-    async def handle_stats_stale_emergency(self, only_bot_active: bool = False) -> None:
-        """Emergency mode: stale stats over 6 hours => keep one top key and min bid."""
+    async def handle_stats_stale_emergency(self, only_bot_active: bool = True) -> None:
+        """Paid ACT: stale stats over 6 hours => keep one top key and min bid.
+
+        Только для paid-РК (``bot_active=True``): аварийное сворачивание автоматики,
+        когда стата в CH не обновлялась >6ч. Free-РК не затрагиваются.
+        """
         complex_advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
             only_bot_active=only_bot_active,
@@ -1460,6 +1464,8 @@ class CoroutinesManager:
         return None
 
     async def _apply_stats_stale_emergency(self, complex_adv: ComplexAdv) -> None:
+        if not complex_adv.bot_active:
+            return None
         keywords = await complex_adv.get_keywords()
         candidates = [kw for kw in keywords if kw.hard_status in (1, 2)]
         if complex_adv.auto_add_only_relevant_phrase:

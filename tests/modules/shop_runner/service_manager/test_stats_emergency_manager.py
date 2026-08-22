@@ -201,6 +201,21 @@ async def test_stats_freshness_manager_uses_injected_clickhouse_reader() -> None
 
 
 @pytest.mark.asyncio
+async def test_apply_stats_stale_emergency_skips_free_model(fake_redis) -> None:
+    manager = _build_manager(fake_redis)
+    manager._set_min_search_bid_for_keyword = AsyncMock()  # type: ignore[method-assign]
+    complex_adv = SimpleNamespace(
+        bot_active=False,
+        get_keywords=AsyncMock(),
+    )
+
+    await manager._apply_stats_stale_emergency(complex_adv)  # type: ignore[arg-type]
+
+    complex_adv.get_keywords.assert_not_awaited()
+    manager._set_min_search_bid_for_keyword.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None:
     manager = _build_manager(fake_redis)
     manager._set_min_search_bid_for_keyword = AsyncMock()  # type: ignore[method-assign]
@@ -212,6 +227,7 @@ async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None
     ]
     complex_adv = SimpleNamespace(
         adv_id=777,
+        bot_active=True,
         auto_add_only_relevant_phrase=False,
         auto_updater_version=2,
         get_keywords=AsyncMock(return_value=keywords),
