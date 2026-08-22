@@ -1,0 +1,46 @@
+tests/unit/client_bot/test_auto_management_mode.py
+  s_3e2c9ac7c2c426::t_61cc156b651639 232,235-236,243-244,247
+tests/integration/test_default_settings_integration.py
+  s_3e2c9ac7c2c426::t_c0db16281d9965 586
+  s_3e2c9ac7c2c426::t_66227d682da268 642
+tests/unit/client_bot/test_auto_management_landing.py
+  s_3e2c9ac7c2c426::t_388a6d27eaa52a 77
+  s_3e2c9ac7c2c426::t_f134144c30317b 100
+tests/client_bot/user_interface/handlers/test_shop_mass_adv_ops_menu.py
+  s_3e2c9ac7c2c426::t_85c1cbc3592f6b 34
+  s_3e2c9ac7c2c426::t_cd15b7f7bc8ed2 74
+tests/client_bot/user_interface/test_onboarding_keyboards_callbacks.py
+  s_3e2c9ac7c2c426::t_c3826364cf23fb 163
+  s_3e2c9ac7c2c426::t_f5e6988ee36749 181
+  s_3e2c9ac7c2c426::t_a384fa0c5252c4 196
+app/client_bot/user_interface/views/keyboards.py
+  s_3e2c9ac7c2c426::t_b1dc06e703067a 936
+app/modules/shop_menu/message.py
+  s_3e2c9ac7c2c426::t_301628ae91e15c 216
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/auto_management_landing.py
+  s_3e2c9ac7c2c426::t_077afbed2b8390 60,62
+  s_3e2c9ac7c2c426::t_2eaa9bd99c1084 13-15
+tests/unit/client_bot/handlers/test_turn_adv_on_read_only_token.py
+  s_3e2c9ac7c2c426::t_51915db964a86f 319
+  s_3e2c9ac7c2c426::t_a420c9e27a47f2 352
+app/client_bot/user_interface/handlers/adv_setting/adv_setting.py
+  s_3e2c9ac7c2c426::t_35bf4749f620c3 671
+  s_3e2c9ac7c2c426::t_73120344f4f9a0 707
+  s_3e2c9ac7c2c426::t_f7e1ce4915e2cb 659-662
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "efd794cba571d631ba5e6345e7722b6fcadfa9ce",
+  "prompts": {},
+  "sessions": {
+    "s_3e2c9ac7c2c426": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b69551d5-3eaa-49b8-b80f-dbdeac8d5821",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
