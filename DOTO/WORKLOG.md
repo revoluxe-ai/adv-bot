@@ -520,3 +520,61 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
   source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
   reason: owner_park
   notes: Production completion verdict и recovery evidence фиксируются Owner после самостоятельного rollout.
+
+## TECH DEBT: billing grace exceeded × A/B Hold EXIT (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage`; обсуждение с Owner — не блокер merge, отложить.
+
+**Grace (что это):** льготный период billing при минусе баланса. До **7×** дневного тарифа кабинет может списываться в минус, `bot_active` остаётся `True`. Предупреждение: «осталось N дней до полной блокировки». При **grace exceeded** — жёсткая деактивация paid.
+
+**Сейчас** (`app/modules/billing/billing.py`, ~398–404):
+- На все `bot_active` кампании → `apply_free_mode_transition` (полный FREE overlay: V3→2, bidder/automation flags off).
+- Общее TG: `GRACE_EXCEEDED_MESSAGE` (баланс, без A/B Hold).
+- **Нет** owned EXIT A/B Hold (`disable_card_ab_hold_in_session`: mode OFF, clear snapshot/epoch/Redis).
+- **Нет** `auto_budget_watchdog_enabled = False` (в ручном `turn_adv_off` уже добавлено в handler).
+
+**Проблема:** на кампании в `PENDING_SETUP` / `ACTIVE` hold в PG может остаться `active`, snapshot не чищен — zombie state (pipeline не крутится из‑за `bot_active=False`, UI скрыт). При пополнении и повторном paid-on hold может «проснуться» в несогласованном состоянии.
+
+**Целевое поведение (Owner, 2026-08-22):**
+- Если при grace exceeded на РК включён A/B Hold → **сообщить**, что тест/режим прекращается (баланс).
+- **Сделать owned EXIT** (как кнопка «Выключить A/B Hold»): `card_ab_hold_mode → OFF`, clear allowed-set snapshot, epoch fields, Redis coordination.
+- Затем paid-off: `apply_free_mode_transition` + `auto_budget_watchdog_enabled = False` (как ручное «полностью отключить бот от управления РК»).
+
+**Сложность / блокеры:**
+- `disable_card_ab_hold_in_session` сейчас gated `is_card_ab_hold_ui_visible` → `bot_active=True`; для billing EXIT нужен **programmatic path** до/без UI gate или internal helper без visibility check.
+- Redis cleanup после EXIT сейчас в telegram handler (`CardAbHoldSignalRedisCache.clear` и др.) — billing должен вызывать тот же контур или shared helper.
+- Тесты billing (`test_process_single_cabinet_grace_exceeded_deactivates`) **защищают** полный FREE overlay — при held/non-held split или EXIT нужны новые кейсы.
+
+**Не путать с:** ручной `turn_adv_off` — Owner: «отключаем и пользователь сам разбирается»; zombie hold там принят. Billing — **автоматическое** массовое отключение без клика.
+
+**Связанные файлы:** `billing.py`, `card_ab_hold/telegram/handlers.py` (`disable_card_ab_hold_in_session`), `tests/modules/billing/test_billing.py`.
+
+**Приоритет:** medium; после free-bot rollout / при следующем billing или card-ab-hold touch.
+
+**Next:** отдельный change или задача в billing slice: EXIT helper + per-campaign notify + тесты held ACTIVE / PENDING_SETUP / OFF.
+
+## TECH DEBT: admin ui_mode при restore shop keyboard (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage`; Owner — tech debt, не блокер merge.
+
+**Проблема:** `close_shop_mass_adv_ops_menu` восстанавливает главную клавиатуру магазина через sync-хелпер `_resolve_shop_keyboard_access` (`start.py`). Для **bot admin** он **всегда** возвращает `UiAccessMode.PAID`, **без** Redis `ui_mode:user:{telegram_id}`.
+
+Каноничный путь (`ShopMenu`, `UiAccessResolver.resolve_shop_ui_access`) для админа читает Redis через `UiModeService.get_user_ui_mode`.
+
+**Сценарий (admin QA free-bot UX):**
+1. Админ переключает «Режим интерфейса: FREE» (toggle → Redis `free`).
+2. Shop menu открывается корректно — FREE, без «Массовые операции с РК».
+3. Админ в mass-ops (осталась PAID клавиатура / старый callback) → «Назад» → restore **PAID**: снова «Массовые операции с РК», toggle показывает PAID.
+
+Для **обычных пользователей** путь ок: `bot_active` в PG.
+
+**Фикс (маленький):** в `close_shop_mass_adv_ops_menu` резолвить access через `UiAccessResolver` + injectable `UiModeService` (как `ShopMenu`), убрать или переписать `_resolve_shop_keyboard_access` (сейчас sync + hardcoded PAID для admin).
+
+**Тест:** admin + Redis `free` → после «Назад» из mass-ops нет «Массовые операции с РК»; toggle «Режим интерфейса: FREE».
+
+**Связанные файлы:** `app/client_bot/user_interface/handlers/start/start.py`, `app/client_bot/ui_access.py`, `app/client_bot/ui_mode.py`, `tests/client_bot/user_interface/handlers/test_shop_mass_adv_ops_menu.py`.
+
+**Приоритет:** low (только admin QA); после free-bot rollout или при следующем touch shop-menu keyboard restore.
+
+**Next:** async resolve в handler или shared helper с Redis; не путать с docstring в `close_shop_mass_adv_ops_menu` (там устаревшая отсылка к hardcoded PAID).
+
