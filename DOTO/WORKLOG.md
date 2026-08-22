@@ -603,3 +603,41 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 
 **Next:** Owner decision restore vs cleanup; не путать с V3 decision trace / admin-only tooling на экране ключа.
 
+## TECH DEBT: partner program — stats & payouts (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage` (только `app/`/`tests/`); Owner — **не блокер merge**, soft-launch/MVP ок, утащить в техдолг.
+
+**Модуль:** `app/modules/partner_program/partner_stats.py`, admin-flow в `app/client_bot/user_interface/handlers/admin_panel.py`, UI партнёра в `invite_show.py`.
+
+**Вердикт:** не критические баги для релиза при ручных выплатах одним admin; **P1 до масштабирования реальных выплат** — только race на payout.
+
+- [ ] **P1 — TOCTOU при payout** (`partner_stats.py:~538`)
+  Два параллельных `create_partner_payout` могут оба пройти проверку `available_to_payout` и суммарно выплатить больше заработанного. До фикса: процесс «одна выплата за раз / один ответственный admin».
+  **Фикс:** одна WRITE-транзакция + `SELECT … FOR UPDATE` на partner row (или advisory lock) + пересчёт available внутри транзакции.
+
+- [ ] **P2 — хрупкая эвристика «реальной оплаты»** (`partner_stats.py:~99`)
+  `is_real_external_balance_payment` требует `"через telegram"` в `description`. Другой copy в billing → занижение `clients_paid_sum` / 15%. Не падает в runtime.
+  **Фикс:** явный `payment_source` в схеме или classifier в billing write-path.
+
+- [ ] **P2 — деньги в `float`** (`partner_stats.py:~546`, модель `PartnerPayout.amount`)
+  Расчёты в `Decimal`, persist в `Float` — накопление ошибок округления при суммировании `paid_out_amount`.
+  **Фикс:** `Numeric` в модели + миграция.
+
+- [ ] **P2 — `commit()` внутри `create_partner_payout_in_session`**
+  Нарушает `*_in_session` seam (caller должен владеть транзакцией); мешает атомарным multi-step admin flows.
+  **Фикс:** flush в helper, commit в parent wrapper.
+
+- [ ] **P3 — admin payout: нет catch `RuntimeError`** (`admin_panel.py:~782`)
+  Только `ValueError`; пропавший partner/admin между шагами FSM → необработанное исключение.
+  **Фикс:** catch + user-facing сообщение + сброс state.
+
+- [ ] **P3 — тяжёлый `list_partner_stats`** (`partner_stats.py:~366`)
+  На каждый рендер admin-листа — все invites + все payments приглашённых, пересчёт в Python. Ок при десятках партнёров; риск таймаута при росте базы.
+  **Фикс:** SQL-агрегации / пагинация на уровне БД.
+
+**Тесты:** `tests/unit/test_partner_stats.py` — 8/8 passed (логика расчёта покрыта; race и scale — нет).
+
+**Приоритет:** P1 перед несколькими admin'ами и реальными деньгами; остальное — волна 2.
+
+**Next:** ticket «Partner payouts hardening»; не смешивать с free-bot merge DoD.
+
