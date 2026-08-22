@@ -1,0 +1,98 @@
+app/modules/shop_runner/service_manager/manager.py
+  s_43451a00f05919::t_861ed41d067cf7 1764-1765
+  s_43451a00f05919::t_07c67dcd6c7ac8 626
+  s_43451a00f05919::t_736e33912a8baa 1759
+  s_43451a00f05919::t_0e384490abff8b 604-608,610
+  s_43451a00f05919::t_a4e5b518e1ece5 1371,1382
+app/client_bot/user_interface/services/adv_excel_roundtrip/schema.py
+  s_43451a00f05919::t_7c4be958b8ac9d 34
+  s_43451a00f05919::t_9495f1167a000d 33
+app/client_bot/user_interface/views/keyword_v3_profile_ui.py
+  s_43451a00f05919::t_9c3a89b9d1738d 407
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py
+  s_43451a00f05919::t_849fc67ae04b29 433-434,438-443
+app/client_bot/user_interface/services/keyword_decision_trace_loader.py
+  s_43451a00f05919::t_e6370b6b8185a0 70,129,154,159,185,201,230,247
+app/modules/common_slaves/wildberries/models/models.py
+  s_43451a00f05919::t_bf0a86b6c171ff 469-478
+app/modules/billing/pricer/pricer.py
+  s_43451a00f05919::t_76c1f6af5e442b 306-307,311-317
+app/client_bot/user_interface/handlers/keyword_settings.py
+  s_43451a00f05919::t_cfc280b8e5f193 133
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py
+  s_43451a00f05919::t_6ac7bc6d3db0bb 666,668
+app/modules/relevant_phrase_manager/relevant_phrase_manager.py
+  s_43451a00f05919::t_a01050c9ae7acb 87
+app/client_bot/user_interface/handlers/add_white_phrases.py
+  s_43451a00f05919::t_fd97ec01e3e43f 121
+  s_ab4d88191a0061::t_4671bfb54e2e66 151
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/ui_access.py
+  s_43451a00f05919::t_42774b0f362482 38,40-41
+  s_43451a00f05919::t_c6b446c04ee729 29,31-32,34
+app/modules/shop_runner/service_manager/services/v3_status_mode_backfill.py
+  s_43451a00f05919::t_86fa9131cdb80a 35,37,43-44
+app/modules/wb_adv_updater/calculated_keywords_manager/calculated_keywords_manager.py
+  s_43451a00f05919::t_24aa7047b38bf1 328
+app/modules/wb_adv_updater/wb_manager.py
+  s_43451a00f05919::t_49145f9a19c69d 366
+app/modules/shop_runner/service_manager/services/v3_status_mode_sync.py
+  s_43451a00f05919::t_88cf5eda06c799 140
+  s_43451a00f05919::t_956be57a6aafab 153
+  s_43451a00f05919::t_e9a5444a558d0f 25-27
+app/modules/shop_runner/service_manager/services/keywords_target_place_updater/keyword_target_place_updater.py
+  s_43451a00f05919::t_06d0a0d8ea918d 19
+app/modules/wb_adv_updater/data_manager.py
+  s_43451a00f05919::t_efb643a2a3b576 680,722,820,827
+app/client_bot/user_interface/handlers/adv_setting/utils/keyword_updater.py
+  s_43451a00f05919::t_4c6de1e9324711 89
+app/client_bot/user_interface/views/keyboards.py
+  s_43451a00f05919::t_7cc978445f275a 391,430,838
+app/client_bot/user_interface/views/messages/adv_keyword_messages/adv_keyword_messages.py
+  s_43451a00f05919::t_24e4af2507aae9 154
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py
+  s_43451a00f05919::t_8db4243e7ddec1 301,588
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/keyboard/keyboard.py
+  s_43451a00f05919::t_a68d6b1be7ac70 379
+app/client_bot/user_interface/views/messages/messages.py
+  s_43451a00f05919::t_59c2e35c737e87 569,665
+app/modules/keywords_manager/keywords_manager.py
+  s_43451a00f05919::t_906e1b22c17f23 101
+app/modules/shop_runner/service_manager/keyword_v3_decision_trace_ui/telegram/handlers.py
+  s_43451a00f05919::t_1671b3a61798bb 58
+app/modules/shop_runner/service_manager/services/delete_keywords_from_wl_by_mean_auto_ctr_manager/delete_keywords_from_wl_by_mean_auto_ctr_manager.py
+  s_43451a00f05919::t_c360442a86c063 37
+app/modules/shop_runner/service_manager/services/update_cluster_bids_manager/update_cluster_bids_manager.py
+  s_43451a00f05919::t_d36ca488048ef9 632,691,704
+app/modules/shop_runner/service_manager/services/update_cluster_bids_manager/v3_cluster_bid_safety_cap.py
+  s_43451a00f05919::t_475091a72adbf6 176
+app/modules/shop_runner/service_manager/services/white_list_trimmer.py
+  s_43451a00f05919::t_27c26905879f37 20,55,68
+app/modules/shop_runner/service_manager/v3_rollout_aggressiveness_toggle/telegram/handlers.py
+  s_43451a00f05919::t_7de90e1471c62e 81,168
+app/modules/v3_calibration_step_setting/telegram_handler.py
+  s_43451a00f05919::t_05718daf259ee0 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ba2d0f721eb4925d16f788b5ed4fc20a68cb5af1",
+  "prompts": {},
+  "sessions": {
+    "s_43451a00f05919": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8da8d1d8-a399-45b6-ba22-d78158cb475c",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ab4d88191a0061": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c94c9a61-bd62-4087-945f-3adb2686d77f",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
