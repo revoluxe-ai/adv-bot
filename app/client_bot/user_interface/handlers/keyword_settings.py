@@ -445,7 +445,7 @@ async def setting_keywords_show_keywords_is_hard(
 @router.callback_query(
     callbacks.SettingKeywords.filter(F.type == "phrase_for_adding_to_white_list")
 )
-async def setting_keywords_white_list(
+async def setting_keywords_phrases_for_white_list(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
@@ -572,7 +572,7 @@ async def setting_keywords_white_list(
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_keywords))
-async def setting_keywords_by_adv(
+async def handle_filter_keywords_by_adv_message(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ):
     text = message.text
@@ -675,7 +675,7 @@ async def keywords_daily_stats(
 @router.callback_query(
     callbacks.SettingKeywords.filter( F.type == "hide_keywords_is_not_relevant") # noqa
 )
-async def setting_keywords_hide_keywords_is_hard(
+async def setting_keywords_hide_not_relevant(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
@@ -729,7 +729,7 @@ async def setting_keywords_hide_keywords_is_hard(
 @router.callback_query(
     callbacks.SettingKeywords.filter(F.type == "show_keywords_is_not_relevant") # noqa
 )
-async def setting_keywords_hide_keywords_is_hard(
+async def setting_keywords_show_not_relevant(
     callback: CallbackQuery,
     callback_data: callbacks.SettingKeywords,
     bot: aiogram.Bot,
@@ -974,7 +974,7 @@ async def change_keyword_hard_status(
 
 
 @router.message(StateFilter(states.AdvSetting.waiting_for_filter_by_query))
-async def setting_keywords_filter_by_query(
+async def handle_filter_by_query_message(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ):
     text = message.text or ""

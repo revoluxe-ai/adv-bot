@@ -35,3 +35,13 @@ def test_sender_tokens_support_dedicated_alias(monkeypatch) -> None:
     settings = Settings()
 
     assert settings.TG_TOKENS_FOR_SENDING == ["one", "two", "three"]
+
+
+def test_sender_tokens_prefers_dedicated_alias(monkeypatch) -> None:
+    """Dedicated sender secret must override the legacy shared env."""
+    monkeypatch.setenv("TG_TOKENS_FOR_SENDING", "legacy-one,legacy-two")
+    monkeypatch.setenv("TG_SENDER_BOT_TOKENS", "dedicated-one,dedicated-two")
+
+    settings = Settings()
+
+    assert settings.TG_TOKENS_FOR_SENDING == ["dedicated-one", "dedicated-two"]

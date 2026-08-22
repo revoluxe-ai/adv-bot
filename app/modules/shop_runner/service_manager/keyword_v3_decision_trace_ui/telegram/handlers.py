@@ -35,12 +35,19 @@ logger = logging.getLogger(__name__)
 _ACCESS_DENIED = "Нет доступа"
 
 
-async def _require_admin(callback: CallbackQuery) -> bool:
+async def _notify_callback_user(bot: Bot, callback: CallbackQuery, text: str) -> None:
+    """Отправить текст пользователю без повторного ``CallbackQuery.answer``."""
+    if callback.message is None:
+        return
+    _ = await bot.send_message(callback.message.chat.id, text)
+
+
+async def _require_admin(bot: Bot, callback: CallbackQuery) -> bool:
     """Проверка admin/debug доступа для callback."""
     if not callback.from_user:
         return False
     if not is_bot_admin(callback.from_user.id):
-        await callback.answer(_ACCESS_DENIED, show_alert=True)
+        await _notify_callback_user(bot, callback, _ACCESS_DENIED)
         return False
     return True
 
@@ -70,12 +77,11 @@ async def open_keyword_v3_decision_trace(
     """Открыть экран последнего V3-решения по ключу."""
     if callback.message is None:
         return
-    if not await _require_admin(callback):
+    if not await _require_admin(bot, callback):
         return
     if not await _is_v3_keyword(callback_data.keyword_setting_original_id):
-        await callback.answer(NON_V3_DECISION_TRACE_MESSAGE, show_alert=True)
+        await _notify_callback_user(bot, callback, NON_V3_DECISION_TRACE_MESSAGE)
         return
-    await callback.answer()
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         await KeywordV3DecisionTraceScreen(
             bot=bot,
@@ -94,12 +100,11 @@ async def refresh_keyword_v3_decision_trace(
     """Перечитать Redis и отправить обновлённый экран."""
     if callback.message is None:
         return
-    if not await _require_admin(callback):
+    if not await _require_admin(bot, callback):
         return
     if not await _is_v3_keyword(callback_data.keyword_setting_original_id):
-        await callback.answer(NON_V3_DECISION_TRACE_MESSAGE, show_alert=True)
+        await _notify_callback_user(bot, callback, NON_V3_DECISION_TRACE_MESSAGE)
         return
-    await callback.answer()
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
         await KeywordV3DecisionTraceScreen(
             bot=bot,
@@ -118,9 +123,8 @@ async def back_from_keyword_v3_decision_trace(
     """Вернуться к карточке ключа."""
     if callback.message is None:
         return
-    if not await _require_admin(callback):
+    if not await _require_admin(bot, callback):
         return
-    await callback.answer()
     telegram_user_id = callback.from_user.id if callback.from_user else None
     await messages.KeywordSettingMessage(
         bot,

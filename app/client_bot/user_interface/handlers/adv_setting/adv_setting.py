@@ -51,13 +51,6 @@ from app.modules.token_monitoring.services.token_info_service import TokenInfoSe
 from app.modules.wb_adv_updater import data_manager as wb_data_manager
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.auto_management_landing import (
-    AutoManagementHowItWorks,
-    AutoManagementLanding,
-)
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.minus_phrases_setting import (
-    MinusPhrasesSettingScreen,
-)
 
 from .... import const
 from ... import states

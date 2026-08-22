@@ -745,16 +745,17 @@ class Settings:
     def TG_TOKENS_FOR_SENDING(self) -> list[str]:
         """Telegram sender bot token pool for outbound notifications.
 
-        Can be injected directly under the legacy name or under a dedicated
-        secret-oriented alias.
+        Priority:
+            1. ``TG_SENDER_BOT_TOKENS`` — dedicated secret-oriented alias.
+            2. ``TG_TOKENS_FOR_SENDING`` — legacy shared env name.
         """
         value = self._get_first_non_empty_env(
-            "TG_TOKENS_FOR_SENDING",
             "TG_SENDER_BOT_TOKENS",
+            "TG_TOKENS_FOR_SENDING",
         )
         if value is None:
             raise ValueError(
-                "Neither TG_TOKENS_FOR_SENDING nor TG_SENDER_BOT_TOKENS is set"
+                "Neither TG_SENDER_BOT_TOKENS nor TG_TOKENS_FOR_SENDING is set"
             )
         return [token.strip() for token in value.split(",") if token.strip() != ""]
 
