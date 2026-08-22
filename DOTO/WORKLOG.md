@@ -578,3 +578,28 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 
 **Next:** async resolve в handler или shared helper с Redis; не путать с docstring в `close_shop_mass_adv_ops_menu` (там устаревшая отсылка к hardcoded PAID).
 
+## TECH DEBT: CTR-boost / «Тестировать дальше» (needs_ctr_boost) (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage`; Owner — tech debt, разберём позже; не блокер merge.
+
+**Что это:** legacy механика «Тестировать дальше» — callback `ChangeKeywordHardStatus(new_hard_status=-1)`. Бот искусственно поднимает CTR ключа через CH-статистику (`added_clicks`), снимает auto-block в Redis, даёт ключу ещё один цикл оценки.
+
+**Сейчас** (`keyword_settings.py`, `change_keyword_hard_status`):
+- `change_keyword_hard_status_in_session` при `new_hard_status < 0` → `kind=needs_ctr_boost` (без commit).
+- Parent handler: CH path + `redis_manager.set_auto_block_status` **закомментированы**; только `session.commit()` и rerender — **silent no-op**.
+- TODO в handler: «Тестировать дальше — не работает!!!!».
+- Helper `apply_keyword_ctr_boost_with_client` **сохранён**; unit-тесты на child активны.
+- Handler integration-тесты **skip** (`CTR_BOOST_HANDLER_SKIP` в `test_ctr_boost_redis_auto_block.py`, `test_ch_handoff_keyword_ctr_boost.py`).
+
+**Live impact (низкий):** кнопка с `-1` **убрана** из `get_keyword_setting_keyboard` — UI шлёт только `hard_status` 0–4. Путь `-1` только legacy callback / ручной вызов. `BUTTONS_FUNCTIONALITY.md` ещё описывает «Тестировать дальше» — документация **устарела**.
+
+**Целевое поведение (когда разберём):**
+1. **Restore:** раскомментировать CH + Redis в handler; при необходимости вернуть кнопку в keyboard (BAD + не max position); убрать skip на handler-тестах.
+2. **Cleanup:** удалить ветку `needs_ctr_boost`, dead code и skip-тесты; обновить `BUTTONS_FUNCTIONALITY.md`; оставить или убрать `apply_keyword_ctr_boost_with_client` по решению.
+
+**Связанные файлы:** `app/client_bot/user_interface/handlers/keyword_settings.py`, `app/client_bot/user_interface/views/keyboards.py`, `BUTTONS_FUNCTIONALITY.md`, `tests/unit/client_bot/test_ctr_boost_redis_auto_block.py`, `tests/unit/client_bot/test_ch_handoff_keyword_ctr_boost.py`, `tests/unit/client_bot/test_keyword_ctr_boost_ch_seam.py`.
+
+**Приоритет:** low (отложено при V3); после free-bot rollout или при touch keyword-settings / V3 keyword UX.
+
+**Next:** Owner decision restore vs cleanup; не путать с V3 decision trace / admin-only tooling на экране ключа.
+
