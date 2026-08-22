@@ -120,6 +120,20 @@ def is_real_external_balance_payment(
     return any(marker in description for marker in _REAL_EXTERNAL_PAYMENT_INCLUDE_MARKERS)
 
 
+def _resolve_cabinet_payment_user_id(
+    owner_ids: set[int],
+) -> int | None:
+    """Pick the single invited user who receives credit for a cabinet top-up.
+
+    ``WBBalancePayment`` stores only ``wb_cabinet_id``, not payer ``user_id``.
+    When several invited users share one cabinet, the same payment must not
+    inflate partner totals — credit exactly one user (lowest internal id).
+    """
+    if not owner_ids:
+        return None
+    return min(owner_ids)
+
+
 def _build_user_payment_totals(
     *,
     invited_user_ids: set[int],
@@ -127,7 +141,7 @@ def _build_user_payment_totals(
     wb_balance_payments: list[WBBalancePayment],
     wb_user_cabinets: list[WBUserCabinet],
 ) -> dict[int, Decimal]:
-    """Aggregate real external payments per invited user."""
+    """Aggregate real external payments per invited user (user-scoped, no double count)."""
     totals: dict[int, Decimal] = {
         user_id: Decimal("0.00") for user_id in invited_user_ids
     }
@@ -139,22 +153,21 @@ def _build_user_payment_totals(
             continue
         totals[payment.user_id] += _to_decimal_money(payment.amount)
 
-    owners_by_cabinet_id: dict[int, set[int]] = defaultdict(set)
+    invited_owners_by_cabinet_id: dict[int, set[int]] = defaultdict(set)
     for wb_user_cabinet in wb_user_cabinets:
         if wb_user_cabinet.user_id in invited_user_ids:
-            owners_by_cabinet_id[wb_user_cabinet.wb_cabinet_id].add(
+            invited_owners_by_cabinet_id[wb_user_cabinet.wb_cabinet_id].add(
                 wb_user_cabinet.user_id
             )
 
     for payment in wb_balance_payments:
         if not is_real_external_balance_payment(payment):
             continue
-        owner_ids = owners_by_cabinet_id.get(payment.wb_cabinet_id, set())
-        if not owner_ids:
+        owner_ids = invited_owners_by_cabinet_id.get(payment.wb_cabinet_id, set())
+        owner_id = _resolve_cabinet_payment_user_id(owner_ids)
+        if owner_id is None:
             continue
-        amount = _to_decimal_money(payment.amount)
-        for owner_id in owner_ids:
-            totals[owner_id] += amount
+        totals[owner_id] += _to_decimal_money(payment.amount)
 
     return {
         user_id: total.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
