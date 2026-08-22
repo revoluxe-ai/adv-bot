@@ -437,3 +437,46 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
 
 
 БАГ: Идут списания даже если бот не активен
+
+## Tech debt — v3-only predeploy + admin orphan cabinets (2026-08-22)
+
+Parked по запросу Owner после prod gate `bot_active=FALSE` (Q1) и диагностики
+`NoResultFound` при входе админа по shop UUID.
+
+- [ ] [deferred-from:v3-only-retire-v2] Admin: graceful handling orphan `wbcabinet` без `wbusercabinet`
+  source: prod incident 2026-08-22; `get_shop_for_admin.py` → `ShopMenu._load_all_data` scalar_one
+  reason: out_of_current_mvp | owner_park
+  notes: |
+    При вводе shop UUID админом join `wbusercabinet` пуст → `wb_user_cabinet_original_id=None`
+    → `WHERE WBUserCabinet.id IS NULL` → `sqlalchemy.exc.NoResultFound`.
+    Затронутые prod shop_id (orphan cabinet, нет wbusercabinet):
+    `5b54d6f5-9e1f-493b-adef-70b5ebc0e749` (cabinet 2783),
+    `cd6d778c-a91b-4f76-9f99-5b59b7d824d9` (2785),
+    `cd808ed4-abcd-4a3b-8146-13da12e143a3` (2784),
+    `b1cb6d81-cde6-4de2-ba4e-ca9b65ec0b20` (2786).
+    Варианты: (A) код — понятное сообщение / admin path через `WBCabinet` напрямую;
+    (B) данные — создать `wbusercabinet` для test_indiv_bot кабинетов.
+    Entry: `/opsx-fix-bug` (product), не devops.
+
+- [ ] [deferred-from:v3-only-retire-v2] Prod data audit: orphan `wbcabinet` без `wbusercabinet`
+  source: `/opsx-devops` INVESTIGATE 2026-08-22
+  reason: owner_park
+  notes: |
+    SQL: `SELECT c.id, c.shop_id FROM wbcabinet c LEFT JOIN wbusercabinet u ON u.wb_cabinet_id=c.id WHERE u.id IS NULL`.
+    Решить: починить связи или пометить тестовые кабинеты; не блокирует v3 deploy после Q1 gate.
+
+- [ ] [deferred-from:v3-only-retire-v2] Spec/decision drift: `automatic_version` / V2 toggle → `bot_active` gate
+  source: Bugbot review v3-only cutover; `card-ab-hold-mode` spec + `card-ab-hold-write-path-ownership` decision
+  reason: out_of_current_mvp | owner_park
+  notes: Runtime уже на `is_v3_campaign(bot_active)`; артефакты ещё про `automatic_version`/toggle.
+    После merge: `/opsx-update` change `card-ab-hold-mode` или sync delta specs.
+
+- [ ] [deferred-from:v3-only-retire-v2] Удалить мёртвый пакет `setting_auto_updater_v2/` (INC-V2-DELETE-01)
+  source: `openspec/evolution/v3-only-retire-v2.md`
+  reason: oversized | owner_park
+  notes: Отдельный increment после cutover; на диске остаётся dead code, runtime не импортирует.
+
+- [ ] [deferred-from:v3-only-retire-v2] Cosmetic: дубли gate в `ui_access.py`; переименовать `test_adv_settings_auto_update_v2_contract.py`
+  source: Bugbot review 2026-08-22
+  reason: owner_park
+  notes: Не блокер merge; косметика после v3-only land.
