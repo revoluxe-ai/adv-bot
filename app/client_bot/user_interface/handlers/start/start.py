@@ -788,7 +788,7 @@ async def process_cabinet_api(
                 cabinet_name=cabinet_name,
             )
             adv_settings = await _load_adv_settings_for_wb_user_cabinet_in_session(
-                session, wb_cabinet.id
+                session, wb_user_cabinet.id
             )
             wb_user_cabinet_original_id = wb_user_cabinet.id
             adv_settings = list(adv_settings)

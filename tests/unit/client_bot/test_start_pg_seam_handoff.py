@@ -275,3 +275,90 @@ async def test_select_shop_hands_read_session_to_adv_loader() -> None:
     loader.assert_awaited_once_with(session, 222)
     sm_mock.assert_called_with(read_only=True)
     adv_call.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_process_cabinet_api_existing_shop_loads_advs_by_user_cabinet_id() -> None:
+    """Existing WBCabinet path must load advs by WBUserCabinet.id, not WBCabinet.id."""
+    session = MagicMock(name="cabinet_api_existing_shop_session")
+    session.commit = AsyncMock()
+    sm_mock = MagicMock(return_value=_SessionMakerMock(session))
+    wb_cabinet = SimpleNamespace(id=100, active=True)
+    wb_user_cabinet = SimpleNamespace(id=500)
+    user_id_loader = AsyncMock(return_value=1)
+    existing_token_loader = AsyncMock(return_value=None)
+    load_wb_cabinet = AsyncMock(return_value=wb_cabinet)
+    load_user_cabinet = AsyncMock(return_value=None)
+    ensure_binding = AsyncMock(return_value=wb_user_cabinet)
+    adv_loader = AsyncMock(return_value=[SimpleNamespace(name="adv-1")])
+    adv_call = AsyncMock()
+    adv_ctor = MagicMock(return_value=adv_call)
+    shop_id = "shop-existing"
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_personal=True,
+        is_read_only=False,
+        is_expired=False,
+        can_be_used_for_free=True,
+        missing_required=set(),
+        shop_id=shop_id,
+    )
+    validator = MagicMock()
+    validator.validate = AsyncMock(return_value=validation_result)
+
+    message = SimpleNamespace(
+        text="z" * 32,
+        chat=SimpleNamespace(id=707),
+        from_user=SimpleNamespace(id=808),
+    )
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"cabinet_name": "Cabinet"})
+    client_session = MagicMock()
+
+    with (
+        patch.object(start_module, "sm", sm_mock),
+        patch.object(start_module, "_load_user_id_in_session", user_id_loader),
+        patch.object(
+            start_module,
+            "_load_existing_wb_token_in_session",
+            existing_token_loader,
+        ),
+        patch.object(start_module, "persist_wb_token_in_session", AsyncMock()),
+        patch.object(
+            start_module,
+            "_load_wb_cabinet_by_shop_id_in_session",
+            load_wb_cabinet,
+        ),
+        patch.object(
+            start_module,
+            "_load_user_cabinet_for_user_in_session",
+            load_user_cabinet,
+        ),
+        patch.object(
+            start_module,
+            "ensure_wb_user_cabinet_binding_in_session",
+            ensure_binding,
+        ),
+        patch.object(
+            start_module,
+            "_load_adv_settings_for_wb_user_cabinet_in_session",
+            adv_loader,
+        ),
+        patch.object(
+            start_module,
+            "TokenPermissionsValidator",
+            MagicMock(return_value=validator),
+        ),
+        patch.object(
+            start_module.messages,
+            "ShopUpdateInfo",
+            MagicMock(return_value=AsyncMock()),
+        ),
+        patch.object(start_module.messages, "AdvCompanyChoicing", adv_ctor),
+    ):
+        await start_module.process_cabinet_api(message, bot, state, client_session)
+
+    adv_loader.assert_awaited_once_with(session, 500)
+    adv_ctor.assert_called_once_with(bot, 707, 500, [adv_loader.return_value[0]], state)
+    adv_call.assert_awaited_once()
