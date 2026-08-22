@@ -1,0 +1,35 @@
+.opsx/registry/provenance.ndjson
+  s_c33e48529148e9::t_10e08ac65d33c9 11
+.cursor/commands/opsx-meta-consult.md
+  s_c33e48529148e9::t_88b5d7c9365108 42
+  s_c33e48529148e9::t_8e3959ad6effa4 292
+.cursor/commands/opsx-meta-commit.md
+  s_c33e48529148e9::t_bfafc51391a50f 42
+  s_c33e48529148e9::t_8ef4d1ed27fb6d 607
+.opsx/project/manual_review.md
+  s_c33e48529148e9::t_c4b8da359daa04 3-5,7,18,27-37,51-53,57,62
+.cursor/commands/opsx-meta-design-command.md
+  s_c33e48529148e9::t_087b2aadd26b20 824
+  s_c33e48529148e9::t_a76152f6f8630f 42
+.opsx/project/quality-gates.md
+  s_c33e48529148e9::t_f8f971a3b5e2ab 1-32
+.cursor/commands/opsx-meta-fix-command-defects.md
+  s_c33e48529148e9::t_75bb37465a8426 42
+  s_c33e48529148e9::t_9082531de0d137 370
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "af045a8e05dca0a937a28ca7294a676bd18dbe88",
+  "prompts": {},
+  "sessions": {
+    "s_c33e48529148e9": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d13151a2-0a47-444e-a9bd-5503174ea41d",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
