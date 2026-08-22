@@ -105,7 +105,6 @@ class AdvSettingsSnapshotDTO(BaseModel):
     search_adv_id: int | None = None
     bot_active: bool = True
     active_status: str | None = None
-    auto_updater_version: int | None = None
     bidder_active: bool | None = None
 
 

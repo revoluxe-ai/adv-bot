@@ -84,7 +84,7 @@ class RelevantPhraseManager:
                     keyword_setting.relevant = False
                     _ = sync_keyword_setting_mode_for_v3(
                         keyword_setting,
-                        automatic_version=self._adv.automatic_version,
+                        bot_active=self._adv.bot_active,
                         hard_status_override=0,
                         adv_strategy=self._adv.strategy,
                     )

@@ -10,9 +10,6 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.calculated_keywords_redis_cache_manager.redis_manager import (
     RedisCalculatedKeywordsCacheManager,
@@ -70,7 +67,7 @@ class KeywordDecisionTraceViewData:
     nmid_display: str
     keyword_text: str
     display_status: KeywordStatus
-    automatic_version: int
+    bot_active: bool
     keyword_setting_id: int
 
     trace_presence: TracePresence
@@ -129,7 +126,7 @@ async def load_keyword_decision_trace_view(
             nmid_display="—",
             keyword_text="",
             display_status=KeywordStatus.BAD,
-            automatic_version=0,
+            bot_active=False,
             keyword_setting_id=keyword_setting_id,
             trace_presence=TracePresence.NO_SNAPSHOT,
             processing_outcome=ProcessingOutcome.UNKNOWN,
@@ -141,7 +138,6 @@ async def load_keyword_decision_trace_view(
         )
 
     adv_setting: AdvSetting = keyword_setting.adv_setting
-    auto_version = normalize_automatic_version_ui(adv_setting.automatic_version)
     nmids = [str(n) for n in list(adv_setting.nmids or [])]
     nmid_display = ", ".join(nmids) if nmids else "—"
 
@@ -155,12 +151,12 @@ async def load_keyword_decision_trace_view(
         calculated_keyword,
     )
 
-    if auto_version != 3:
+    if not adv_setting.bot_active:
         return KeywordDecisionTraceViewData(
             nmid_display=nmid_display,
             keyword_text=keyword_setting.text,
             display_status=display_status,
-            automatic_version=auto_version,
+            bot_active=False,
             keyword_setting_id=keyword_setting_id,
             trace_presence=TracePresence.NO_SNAPSHOT,
             processing_outcome=ProcessingOutcome.UNKNOWN,
@@ -186,7 +182,7 @@ async def load_keyword_decision_trace_view(
             nmid_display=nmid_display,
             keyword_text=keyword_setting.text,
             display_status=display_status,
-            automatic_version=auto_version,
+            bot_active=True,
             keyword_setting_id=keyword_setting_id,
             trace_presence=TracePresence.ENTRY_FOUND,
             processing_outcome=outcome,
@@ -202,7 +198,7 @@ async def load_keyword_decision_trace_view(
             nmid_display=nmid_display,
             keyword_text=keyword_setting.text,
             display_status=display_status,
-            automatic_version=auto_version,
+            bot_active=True,
             keyword_setting_id=keyword_setting_id,
             trace_presence=TracePresence.SNAPSHOT_NO_ENTRY,
             processing_outcome=ProcessingOutcome.UNKNOWN,
@@ -231,7 +227,7 @@ async def load_keyword_decision_trace_view(
             nmid_display=nmid_display,
             keyword_text=keyword_setting.text,
             display_status=display_status,
-            automatic_version=auto_version,
+            bot_active=True,
             keyword_setting_id=keyword_setting_id,
             trace_presence=TracePresence.NO_SNAPSHOT,
             processing_outcome=ProcessingOutcome.UNKNOWN,
@@ -248,7 +244,7 @@ async def load_keyword_decision_trace_view(
         nmid_display=nmid_display,
         keyword_text=keyword_setting.text,
         display_status=display_status,
-        automatic_version=auto_version,
+        bot_active=True,
         keyword_setting_id=keyword_setting_id,
         trace_presence=TracePresence.NO_SNAPSHOT,
         processing_outcome=ProcessingOutcome.UNKNOWN,

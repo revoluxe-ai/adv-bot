@@ -303,19 +303,18 @@ class Pricer:
     ) -> bool:
         if override_white_list or override_target_place or override_individual_keywords:
             return True
-        auto_version = adv.automatic_version
+        if not adv.bot_active:
+            return False
         white_list_active = bool(adv.auto_update_white_list)
         target_place_active = bool(adv.auto_update_target_place)
         individual_keywords_mode_active = bool(adv.individual_keywords_target_place_mode)
-        if auto_version in (1, 2, 3):
-            return any(
-                [
-                    white_list_active,
-                    target_place_active,
-                    individual_keywords_mode_active,
-                ]
-            )
-        return False
+        return any(
+            [
+                white_list_active,
+                target_place_active,
+                individual_keywords_mode_active,
+            ]
+        )
 
     @staticmethod
     def _get_price_per_adv(count_advs: int | float, tariff_table: dict[int, int]) -> float:

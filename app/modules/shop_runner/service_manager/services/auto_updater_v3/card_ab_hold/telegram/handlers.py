@@ -663,9 +663,9 @@ async def _handle_ab_hold_enable(
                 alert_if_unavailable=False,
             )
             logger.info(
-                "[adv_id=%s] CardAbHold Enable blocked: not V3 (automatic_version=%s)",
+                "[adv_id=%s] CardAbHold Enable blocked: bot inactive (bot_active=%s)",
                 adv.adv_id,
-                getattr(adv, "automatic_version", None),
+                adv.bot_active,
             )
             return
         if not has_positive_plan_max_cpo(adv):

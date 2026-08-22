@@ -24,7 +24,6 @@ from app.client_bot.user_interface.views.messages.strategy_display import (
 )
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from . import keyboard
-from .keyboard.automatic_version_ui import normalize_automatic_version_ui
 from app.core.redis_manager_v2.redis_client import RedisClient
 
 from app.modules.common_slaves.wildberries.models import (
@@ -299,7 +298,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         last_auto_setting_inform = LastAutoUpdateSettingInformer(self.adv)
         await last_auto_setting_inform.update_data()
         self._update_informer = last_auto_setting_inform
-        if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
+        if self.adv.bot_active:
             self._v3_last_action_str = await load_last_v3_action_display(self.adv)
         else:
             self._v3_last_action_str = None
@@ -586,7 +585,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             f"став класт: {self.last_cluster_bids_update.strftime('%d.%m.%Y %H:%M:%S') if self.last_cluster_bids_update else 'Н/д'}\n"
             f"общ.став аук: {self.last_common_bid_update_str}\n"
         )
-        if normalize_automatic_version_ui(self.adv.automatic_version) == 3:
+        if self.adv.bot_active:
             text += f"посл. V3: {self._v3_last_action_str or 'Нет данных'}\n"
         else:
             text += (

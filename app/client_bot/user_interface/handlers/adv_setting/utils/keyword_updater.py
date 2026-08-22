@@ -86,7 +86,7 @@ async def update_keywords(
         .join(AdvSetting.wb_cabinet)
         .join(WBCabinet.wb_user_cabinets)
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
-        .where(AdvSetting.automatic_version == 3)
+        .where(AdvSetting.bot_active.is_(True))
         .where(_non_frozen_adv_setting_filter())
     )
     skipped_count_stmt = (

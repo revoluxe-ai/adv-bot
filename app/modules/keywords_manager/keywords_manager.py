@@ -98,7 +98,7 @@ class KeywordsManager:
         )
         new_texts: set[str] = set(texts) - set(exists_keywords_text)
         adv_setting = complex_adv.adv_setting
-        is_v3 = is_v3_campaign(adv_setting.automatic_version)
+        is_v3 = is_v3_campaign(adv_setting.bot_active)
         flags_for = RelevantPhraseManager.build_initial_flags_evaluator(adv_setting)
         for text in new_texts:
             hard_status, relevant = flags_for(text)

@@ -466,6 +466,16 @@ class AdvSetting(BaseTable):
         uselist=True,
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    automatic_version: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        server_default=text("1"),
+        comment=(
+            "LEGACY (scheduled removal): версия auto-updater 1/2/3. "
+            "Не читать и не писать в runtime/billing/UI — SoT: bot_active. "
+            "Колонка сохранена в БД до отдельного DDL DROP."
+        ),
+    )
     nmids: Mapped[list[int]] = mapped_column(JSONB, default=[])
     black_phrases: Mapped[list[str]] = mapped_column(
         JSONB, default=list, nullable=False, server_default=text("'[]'")
@@ -730,9 +740,6 @@ class AdvSetting(BaseTable):
 
     # TODO: Навести порядок в боте, со стороны клиента
 
-    automatic_version: Mapped[int] = mapped_column(
-        Integer, nullable=True, default=1, server_default="1"
-    )
     aggressiveness: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

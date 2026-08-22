@@ -5,10 +5,6 @@ from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.client_bot.user_interface.views import callbacks
-from .automatic_version_ui import (
-    automatic_version_main_menu_button,
-    normalize_automatic_version_ui,
-)
 from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from .v3_calibration_step_ui import v3_calibration_step_main_button
 from .v3_tick_report_button import v3_tick_report_main_button
@@ -380,9 +376,7 @@ def get_adv_setting_keyboard(
     button = InlineKeyboardButton(text=text, callback_data=callback)
     _ = builder.row(button)
 
-    # Версии АвтоАпдейтера: отдельное сообщение с выбором V1/V2/V3 и «Назад»
-    _ = builder.row(automatic_version_main_menu_button(adv_setting))
-    if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+    if adv_setting.bot_active:
         _ = builder.row(v3_tick_report_main_button(adv_setting))
         _ = builder.row(v3_calibration_step_main_button(adv_setting))
         _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))

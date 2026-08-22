@@ -54,7 +54,6 @@ from app.modules.shop_runner.wb_statistic_manager.redis_cluster_stat_timestamp_m
 
 from app.settings import settings
 
-from .old_modules.setting_auto_updater_v2 import AdvControlSystem
 from .services.increment_fact_data_manager.increment_fact_data_manager import (
     IncrementFactDataManager,
 )
@@ -84,7 +83,6 @@ from app.modules.shop_runner.tasks_manager.tasks_manager import (
     run_tasks,
 )
 from ..wb_stat_manager.clickhouse_manager import full_wb_adv_stat
-from ...common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from ...wb_adv_updater import data_manager
 from .services.auto_adv_active_control import AutoAdvActiveControlService
 from .services.redis_campaign_activity_reason_manager import (
@@ -532,16 +530,9 @@ class CoroutinesManager:
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False
         )
-        from .services.auto_updater_version_migration import migrate_v1_auto_updaters_to_v2
-
-        _ = await migrate_v1_auto_updaters_to_v2(advs)
         advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
         advs = [adv for adv in advs if adv.search_adv_active_status]
-        advs_filtred, _ = await self._split_advs_by_stats_freshness(
-            advs, operation_name="adv_settings_auto_update"
-        )
-        control_system_v2 = AdvControlSystem(max_last_period=2)
         from .services.auto_updater_v3 import process_adv_v3
         from .services.auto_updater_v3.card_ab_hold.mode import (
             CardAbHoldMode,
@@ -606,39 +597,17 @@ class CoroutinesManager:
                 )
                 continue
 
-        for adv in advs_filtred:
-            ab_mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
-            # Spec card-ab-hold-mode / decision write-path: exclusion ordinary V3.
-            if ab_mode != CardAbHoldMode.OFF:
-                continue
-            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
-            if ver == 2:
-                handlers.append(
-                    functools.partial(control_system_v2.process_adv, adv)
-                )
-                continue
-
-
         for adv in advs:
             ab_mode = normalize_card_ab_hold_mode(adv.card_ab_hold_mode)
             if ab_mode != CardAbHoldMode.OFF:
                 continue
-            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
-            if ver == 3:
-                handlers.append(
-                    functools.partial(
-                        process_adv_v3,
-                        adv,
-                        wb_shop_data_manager=self._wb_shop_data_manager,
-                    )
+            handlers.append(
+                functools.partial(
+                    process_adv_v3,
+                    adv,
+                    wb_shop_data_manager=self._wb_shop_data_manager,
                 )
-        for adv in advs:
-            if normalize_card_ab_hold_mode(adv.card_ab_hold_mode) != CardAbHoldMode.OFF:
-                continue
-            if adv.auto_updater_version not in [2, 3]:
-                logger.error('Установлена не поддерживаемая версия автоапдейтера '
-                             'shop_id %s', self.shop_id)
-
+            )
 
         if not handlers:
             return None
@@ -654,64 +623,7 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 1)
     async def update_top_key_in_advs(self) -> None:
-        from .old_modules.setting_auto_updater.modules.first_key_updater import (
-            FirstKeyUpdaterError,
-            FirstKeyUpdater,
-        )
-
-        advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False
-        )
-        advs = [adv for adv in advs if adv.bot_active]
-        from .services.auto_updater_v3.card_ab_hold.scheduling import (
-            filter_structural_act_candidates,
-        )
-
-        advs_with_whitelist = [
-            adv
-            for adv in advs
-            if adv.auto_update_white_list
-            and not is_v3_campaign(adv.auto_updater_version)
-        ]
-        # Spec card-ab-hold-mode: filter before FirstKeyUpdater / WB write boundary.
-        advs_with_whitelist = filter_structural_act_candidates(advs_with_whitelist)
-
-        handlers: list[Callable[[], Awaitable[Any]]] = []
-        for adv in advs_with_whitelist:
-            adv_setting = adv.adv_setting
-            updater = FirstKeyUpdater(adv_setting)
-            handlers.append(
-                lambda complex_adv=adv, upd=updater: upd.top_key_auto_update(
-                    complex_adv
-                )
-            )
-
-        results = await run_tasks(
-            handlers,
-            max_workers=self._max_workers_for(len(handlers), cap=16),
-        )
-
-        from app.modules.shop_runner.required_data_miss import is_required_data_miss
-
-        for adv, result in zip(advs_with_whitelist, results):
-            if isinstance(result, Exception) and is_required_data_miss(result):
-                raise result
-            if isinstance(result, FirstKeyUpdaterError):
-                logger.error(
-                    "Ошибка обновления верхнего ключа для adv_id %s: %s",
-                    adv.adv_id,
-                    result,
-                    exc_info=True,
-                )
-                raise result
-            if isinstance(result, Exception):
-                logger.error(
-                    "Ошибка обновления верхнего ключа для adv_id %s: %s",
-                    adv.adv_id,
-                    result,
-                    exc_info=True,
-                )
-                raise result
+        """Legacy V2 FirstKeyUpdater path — retired; bot off has no auto-updater runtime."""
         return None
 
     @while_coroutine_decorator(15, 60)
@@ -724,12 +636,6 @@ class CoroutinesManager:
             adv
             for adv in complex_advs
             if adv.rec_system_promotion_mode_active
-            and (
-                2
-                if adv.auto_update_setting_version is None
-                else adv.auto_update_setting_version
-            )
-            in (2, 3)
             and adv.is_white_list_control_enabled
             and adv.bot_active
         ]
@@ -1462,7 +1368,7 @@ class CoroutinesManager:
                 stmt_demote = update(KeywordSetting).where(
                     KeywordSetting.id.in_(demote_ids)
                 )
-                if is_v3_campaign(complex_adv.auto_updater_version):
+                if is_v3_campaign(complex_adv.bot_active):
                     stmt_demote = stmt_demote.values(
                         hard_status=1,
                         strategy_mode=KeywordStrategyMode.OFF,
@@ -1473,7 +1379,7 @@ class CoroutinesManager:
             stmt_promote = update(KeywordSetting).where(
                 KeywordSetting.id == top_keyword_id
             )
-            if is_v3_campaign(complex_adv.auto_updater_version):
+            if is_v3_campaign(complex_adv.bot_active):
                 stmt_promote = stmt_promote.values(
                     hard_status=2,
                     strategy_mode=keyword_strategy_mode_for_adv_strategy(
@@ -1850,110 +1756,13 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def white_list_tail_trimmer(self):
-        """Срез хвоста БС для v2. V3 (``automatic_version == 3``): M1/trim в ``process_adv_v3``."""
-        complex_advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False
-        )
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        from .services.auto_updater_v3.card_ab_hold.scheduling import (
-            filter_structural_act_candidates,
-        )
-
-        complex_advs = [adv for adv in complex_advs if adv.auto_update_white_list]
-        # Spec card-ab-hold-mode: trim candidates filtered before WhiteListTrimmer.write.
-        complex_advs = filter_structural_act_candidates(complex_advs)
-        complex_advs = [
-            adv
-            for adv in complex_advs
-            if adv.white_list_mode
-            in (WhiteListMode.TAIL_TRIMMING, WhiteListMode.REPLACE_ON_TRIM)
-        ]
-        complex_advs, _ = await self._split_advs_by_stats_freshness(
-            complex_advs, operation_name="white_list_tail_trimmer"
-        )
-        if not complex_advs:
-            return None
-        from .services.white_list_trimmer import WhiteListTrimmer
-
-        trimmer = WhiteListTrimmer()
-        handlers: list[Callable[[], Awaitable[None]]] = []
-        non_v3_advs: list[ComplexAdv] = []
-        for adv in complex_advs:
-            ver = adv.auto_updater_version if adv.auto_updater_version is not None else 2
-            if ver == 3:
-                # V3: M1/trim — в adv_settings_auto_update → process_adv_v3 preamble
-                continue
-            non_v3_advs.append(adv)
-            handlers.append(functools.partial(trimmer.trim, adv))
-
-        if not handlers:
-            return None
-
-        results = await run_tasks(handlers=handlers, max_workers=16, tasks_manager=self._tasks_manager)
-
-        for adv, result in zip(non_v3_advs, results):
-            if isinstance(result, BaseException):
-                logger.exception("Ошибка срезания БС adv_id: %s:  %s", adv.adv_id,
-                                 result)
-
+        """Legacy v2 tail trimmer — no-op: bot_active РК обрабатываются в V3."""
         return None
 
 
     @while_coroutine_decorator(5 * 60, 60)
-    async def update_individual_keyword_target_places(self):
-        from .services.keywords_target_place_updater import KeywordTargetPlaceUpdater
-        from app.modules.predict_keywords_target_place import (build_predict_keywords_target_place,
-                                                               PredictKeywordsTargetPlace)
-        complex_advs = await self._wb_shop_data_manager.get_complex_advs(
-            load_extras=False
-        )
-        if not complex_advs:
-            return None
-        complex_advs = [adv for adv in complex_advs if adv.bot_active]
-        from .services.auto_updater_v3.card_ab_hold.scheduling import (
-            filter_structural_act_candidates,
-        )
-
-        complex_advs = [
-            adv
-            for adv in complex_advs
-            if adv.individual_keywords_target_place_mode
-        ]
-        # Spec card-ab-hold-mode: filter before KeywordTargetPlaceUpdater write path.
-        complex_advs = filter_structural_act_candidates(complex_advs)
-        from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
-            is_v3_campaign,
-        )
-
-        complex_advs = [
-            adv
-            for adv in complex_advs
-            if not is_v3_campaign(adv.auto_updater_version)
-        ]
-        if not complex_advs:
-            return None
-        wb_adv_dto: list[WBAdvDTO] = await self._wb_shop_data_manager.get_wb_advs_dto(
-            complex_advs
-        )
-
-        predict_keyword_target_place: PredictKeywordsTargetPlace = build_predict_keywords_target_place()
-
-        updater = KeywordTargetPlaceUpdater(predict_keyword_target_place)
-        handlers: list[Callable[[], Awaitable[None]]] = []
-        for adv in wb_adv_dto:
-            handler = functools.partial(updater.update_individual_keyword_target_places, adv)
-            handlers.append(handler)
-
-        results = await run_tasks(
-            handlers=handlers,
-            max_workers=16,
-            tasks_manager=self._tasks_manager,
-        )
-        for result, adv in zip(results,  wb_adv_dto):
-            if isinstance(result, BaseException):
-                logger.exception('Ошибка обновления keywords target places for adv_id:  %s',
-                                 adv.adv_id,)
-
+    async def update_individual_keyword_target_places(self) -> None:
+        """Legacy V2 KeywordTargetPlaceUpdater — no-op после v3-only (bot_active → V3)."""
         return None
 
     @while_coroutine_decorator(60, 1)

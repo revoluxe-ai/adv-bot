@@ -428,37 +428,24 @@ class ComplexAdv:
         return self._adv_setting.auto_update_exponent
 
     @property
-    def auto_updater_version(self) -> int | None:
-        return self._adv_setting.automatic_version
-
-    @property
     def is_part_auto_setting_active(self) -> bool:
         adv = self._adv_setting
+        if not adv.bot_active:
+            return False
         individual_keywords_mode_active = bool(
             adv.individual_keywords_target_place_mode
         )
-        ver = (
-            self.auto_updater_version
-            if self.auto_updater_version is not None
-            else 2
+        return any(
+            [
+                adv.auto_update_white_list,
+                adv.auto_update_target_place,
+                individual_keywords_mode_active,
+            ]
         )
-        if ver in (1, 2, 3):
-            return any(
-                [
-                    adv.auto_update_white_list,
-                    adv.auto_update_target_place,
-                    individual_keywords_mode_active,
-                ]
-            )
-        raise RuntimeError("Not Implemented for this version")
 
     @property
     def adv_setting(self) -> AdvSetting:
         return self._adv_setting
-
-    @property
-    def auto_update_setting_version(self) -> int | None:
-        return self._adv_setting.automatic_version
 
     def _filter_keywords(
         self, keywords: list[CalculatedKeyword]

@@ -12,9 +12,6 @@ from sqlalchemy import select, update
 
 from app.client_bot.user_interface.handlers.start import start_registration
 from app.client_bot.user_interface.views.callbacks import V3CalibrationStepChange
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_calibration_step_ui import (
     FSM_V3_CALIBRATION_STEP_ADV_SETTING_ID,
 )
@@ -41,7 +38,7 @@ async def change_v3_calibration_step(
             select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         )
         adv = adv_result.scalar_one_or_none()
-        if adv is None or normalize_automatic_version_ui(adv.automatic_version) != 3:
+        if adv is None or not adv.bot_active:
             if callback.message is not None:
                 await callback.message.answer(
                     "Доступно только при версии АвтоАпдейтера V3."

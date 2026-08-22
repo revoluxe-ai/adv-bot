@@ -118,7 +118,7 @@ async def reset_white_list_in_session(
         keyword_setting.hard_status = 1  # type: ignore
         _ = sync_keyword_setting_mode_for_v3(
             keyword_setting,
-            automatic_version=adv.automatic_version,
+            bot_active=adv.bot_active,
             hard_status_override=1,
             adv_strategy=adv.strategy,
         )
@@ -148,7 +148,7 @@ async def reset_non_relevant_phrases_in_session(
         KeywordSetting.adv_setting_id == adv_setting_id,
         KeywordSetting.hard_status == 0,
     )
-    if is_v3_campaign(adv.automatic_version):
+    if is_v3_campaign(adv.bot_active):
         stmt = stmt.values(
             hard_status=1,
             strategy_mode=KeywordStrategyMode.OFF,

@@ -34,7 +34,7 @@ async def delete_keywords_from_wl_by_mean_auto_ctr(complex_adv: "ComplexAdv") ->
         stmt = update(KeywordSetting).where(
             KeywordSetting.id.in_(keyword_ids_in_wh_least_mean_ctr)
         )
-        if is_v3_campaign(complex_adv.auto_updater_version):
+        if is_v3_campaign(complex_adv.bot_active):
             stmt = stmt.values(
                 hard_status=1,
                 strategy_mode=KeywordStrategyMode.OFF,

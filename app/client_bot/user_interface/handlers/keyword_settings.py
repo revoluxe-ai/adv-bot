@@ -130,7 +130,7 @@ async def change_keyword_hard_status_in_session(
     keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
     _ = sync_keyword_setting_mode_for_v3(
         keyword_setting,
-        automatic_version=adv_setting.automatic_version,
+        bot_active=adv_setting.bot_active,
         hard_status_override=new_hard_status,
         adv_strategy=adv_setting.strategy,
     )

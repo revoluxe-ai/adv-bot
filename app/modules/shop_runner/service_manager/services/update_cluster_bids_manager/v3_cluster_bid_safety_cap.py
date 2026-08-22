@@ -173,7 +173,7 @@ async def build_v3_matrix_cap_index(
     keywords_getter: Callable[[ComplexAdv], Awaitable[list[CalculatedKeyword]]],
 ) -> dict[CellKey, int]:
     """Построить индекс cap bid по ячейкам V3 (Search adv_id × nmid × cluster)."""
-    adv_by_auto_id = {adv.adv_id: adv for adv in advs if adv.auto_updater_version == 3}
+    adv_by_auto_id = {adv.adv_id: adv for adv in advs if adv.bot_active}
     cells_by_adv_id: dict[int, list[AdvIdItemCalculateData]] = {}
     for cell in map_datas:
         if not cell.v3_managed or cell.adv_id not in adv_by_auto_id:

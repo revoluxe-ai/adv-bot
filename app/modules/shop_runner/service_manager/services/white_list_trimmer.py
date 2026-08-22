@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class WhiteListTrimmer:
     async def  trim(self, complex_adv: ComplexAdv) -> None:
-        if is_v3_campaign(complex_adv.auto_updater_version):
+        if is_v3_campaign(complex_adv.bot_active):
             logger.debug(
                 "[adv_id=%s] white_list_trimmer skip for v3 campaign",
                 complex_adv.adv_id,
@@ -52,7 +52,7 @@ class WhiteListTrimmer:
         stmt_remove = update(KeywordSetting).where(
             KeywordSetting.id.in_(candidates_to_auto_ids)
         )
-        if is_v3_campaign(complex_adv.auto_updater_version):
+        if is_v3_campaign(complex_adv.bot_active):
             stmt_remove = stmt_remove.values(
                 hard_status=1,
                 strategy_mode=KeywordStrategyMode.OFF,
@@ -65,7 +65,7 @@ class WhiteListTrimmer:
                 stmt_add = update(KeywordSetting).where(
                     KeywordSetting.id.in_(replacement_ids)
                 )
-                if is_v3_campaign(complex_adv.auto_updater_version):
+                if is_v3_campaign(complex_adv.bot_active):
                     stmt_add = stmt_add.values(
                         hard_status=2,
                         strategy_mode=keyword_strategy_mode_for_adv_strategy(

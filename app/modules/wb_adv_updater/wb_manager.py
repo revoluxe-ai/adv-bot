@@ -363,7 +363,7 @@ async def common_keyword_stat_update(adv_setting: AdvSetting, wb_api):
                     keyword.hard_status = 0
                 _ = sync_keyword_setting_mode_for_v3(
                     keyword,
-                    automatic_version=adv_setting.automatic_version,
+                    bot_active=adv_setting.bot_active,
                     hard_status_override=int(keyword.hard_status),
                     adv_strategy=adv_setting.strategy,
                 )

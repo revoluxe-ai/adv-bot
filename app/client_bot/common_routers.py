@@ -22,9 +22,6 @@ from app.modules.shop_runner.auction_boost_mode_settings import (
 from app.modules.shop_runner.service_manager.old_modules.auto_updater_target_place.telegram import (
     auto_updater_target_place_setting_router,
 )
-from app.modules.shop_runner.service_manager.auto_updater_version_toggle import (
-    auto_updater_version_toggle_router,
-)
 from app.modules.shop_runner.service_manager.v3_rollout_aggressiveness_toggle import (
     v3_rollout_aggressiveness_toggle_router,
 )
@@ -123,7 +120,6 @@ if not settings.test_mode:
 # Router includes reorganized for new module
 common_router.include_routers(manual_update_phrase_position_router)
 common_router.include_routers(auto_updater_target_place_setting_router)
-common_router.include_routers(auto_updater_version_toggle_router)
 common_router.include_routers(v3_rollout_aggressiveness_toggle_router)
 common_router.include_routers(card_ab_hold_router)
 common_router.include_routers(card_ab_hold_confirm_router)

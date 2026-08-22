@@ -404,7 +404,7 @@ def format_keyword_v3_decision_trace_screen(
         nmid_display=nmid,
         keyword_text=keyword_text,
         display_status=display_status,
-        automatic_version=3,
+        bot_active=True,
         keyword_setting_id=keyword_setting_id,
         trace_presence=TracePresence.NO_SNAPSHOT,
         processing_outcome=ProcessingOutcome.UNKNOWN,

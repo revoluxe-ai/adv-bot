@@ -68,21 +68,6 @@ def should_allow_bidder_on_ab_hold(mode: CardAbHoldMode | str | None) -> bool:
     return True
 
 
-def is_switch_to_version_blocked_by_ab_hold(
-    *,
-    new_version: int,
-    mode: CardAbHoldMode | str | None,
-) -> bool:
-    """True: переключение auto-updater на V2 запрещено при активном A/B Hold.
-
-    Decision §12: пока mode PENDING_SETUP / ACTIVE, downgrade на V2 MUST быть
-    заблокирован (сначала EXIT → OFF). Переключение на V3 всегда разрешено.
-    """
-    if int(new_version) != 2:
-        return False
-    return is_ab_hold_structural_freeze(mode)
-
-
 def filter_structural_act_candidates(advs: Sequence[TAdv]) -> list[TAdv]:
     """Оставить только кампании, которым разрешён structural ACT write.
 
