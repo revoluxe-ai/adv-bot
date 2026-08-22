@@ -54,7 +54,7 @@ async def _create_adv(
     *,
     cabinet: WBCabinet,
     hold_mode: str | None = None,
-    automatic_version: int = 3,
+    bot_active: bool = True,
 ) -> AdvSetting:
     """Минимальный AdvSetting с опциональным A/B Hold mode."""
     adv = AdvSetting(
@@ -62,13 +62,12 @@ async def _create_adv(
         name="phrases-seam-test",
         wb_cabinet_id=cabinet.id,
         active_status="started",
-        bot_active=True,
+        bot_active=bot_active,
         plan_for_sales_for_day=1,
         target_price_for_order=100.0,
         max_price_for_order=150.0,
         max_cpm=1000,
         cpm=75,
-        automatic_version=automatic_version,
         card_ab_hold_mode=hold_mode,
     )
     async_session.add(adv)
@@ -400,13 +399,13 @@ async def test_update_keywords_skips_structural_freeze_and_rereads(
         async_session,
         cabinet=cabinet,
         hold_mode=CardAbHoldMode.OFF.value,
-        automatic_version=3,
+        bot_active=True,
     )
     held_adv = await _create_adv(
         async_session,
         cabinet=cabinet,
         hold_mode=CardAbHoldMode.ACTIVE.value,
-        automatic_version=3,
+        bot_active=True,
     )
     free_kw = KeywordSetting(
         text="free-black",

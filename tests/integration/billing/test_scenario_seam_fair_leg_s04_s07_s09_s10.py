@@ -100,7 +100,6 @@ def _make_auto_adv(
         bot_active=bot_active,
         active_status=active_status,
         _search_adv_id=search_adv_id,  # noqa: SLF001
-        automatic_version=2,
         auto_update_white_list=wl,
         auto_update_target_place=tp,
     )

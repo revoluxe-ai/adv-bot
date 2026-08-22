@@ -60,10 +60,9 @@ def test_strategy_mode_for_hard_status_write_v3(
 
 
 @pytest.mark.unit
-def test_is_v3_campaign_only_for_version_three() -> None:
-    assert is_v3_campaign(3) is True
-    assert is_v3_campaign(2) is False
-    assert is_v3_campaign(None) is False
+def test_is_v3_campaign_only_for_bot_active() -> None:
+    assert is_v3_campaign(True) is True
+    assert is_v3_campaign(False) is False
 
 
 @pytest.mark.unit
@@ -175,7 +174,7 @@ def test_sync_keyword_setting_mode_for_v3_updates_mode_for_v3_only() -> None:
     )
     changed = sync_keyword_setting_mode_for_v3(
         keyword_setting,
-        automatic_version=3,
+        bot_active=True,
         hard_status_override=1,
     )
     assert changed is True
@@ -187,7 +186,7 @@ def test_sync_keyword_setting_mode_for_v3_updates_mode_for_v3_only() -> None:
     )
     changed_non_v3 = sync_keyword_setting_mode_for_v3(
         keyword_setting_non_v3,
-        automatic_version=2,
+        bot_active=False,
         hard_status_override=1,
     )
     assert changed_non_v3 is False
@@ -202,7 +201,7 @@ def test_sync_white_list_uses_adv_strategy_max_conv() -> None:
     )
     changed = sync_keyword_setting_mode_for_v3(
         keyword_setting,
-        automatic_version=3,
+        bot_active=True,
         hard_status_override=2,
         adv_strategy=Strategy.MAX_CONV,
     )
@@ -219,7 +218,7 @@ def test_sync_black_list_does_not_access_adv_setting_relationship() -> None:
 
     changed = sync_keyword_setting_mode_for_v3(
         keyword_setting,
-        automatic_version=3,
+        bot_active=True,
         hard_status_override=0,
     )
 

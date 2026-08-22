@@ -72,12 +72,11 @@ def test_main_menu_replaces_direct_toggle_with_navigation_button() -> None:
     adv = SimpleNamespace(
         id=1,
         adv_id=10,
-        automatic_version=2,
+        bot_active=False,
         auto_add_only_relevant_phrase=False,
         individual_keywords_target_place_mode=False,
         use_incremental_stats=False,
         updater_common_bid_in_search_adv_active_status=False,
-        bot_active=False,
         auto_update_target_place=False,
         orders_source_for_auto_mode=None,
         sales_predict_method=None,

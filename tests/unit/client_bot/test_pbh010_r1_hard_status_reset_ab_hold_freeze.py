@@ -51,7 +51,7 @@ async def test_pbh010_r1_reset_white_list_blocked_on_ab_hold(hold_mode: str) -> 
     """PENDING_SETUP / ACTIVE → reset_white_list MUST NOT mutate hard_status."""
     adv = SimpleNamespace(
         id=10,
-        automatic_version=3,
+        bot_active=True,
         strategy=None,
         card_ab_hold_mode=hold_mode,
     )
@@ -106,7 +106,7 @@ async def test_pbh010_r1_reset_non_relevant_phrases_blocked_on_ab_hold(
     """PENDING_SETUP / ACTIVE → reset_non_relevant_phrases MUST NOT execute UPDATE."""
     adv = SimpleNamespace(
         id=10,
-        automatic_version=3,
+        bot_active=True,
         strategy=None,
         card_ab_hold_mode=hold_mode,
     )

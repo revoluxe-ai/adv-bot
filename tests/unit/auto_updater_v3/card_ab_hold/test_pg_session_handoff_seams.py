@@ -392,7 +392,6 @@ async def test_enable_handler_hands_off_read_sessions_to_load_helpers() -> None:
         id=9,
         adv_id=99,
         bot_active=True,
-        automatic_version=3,
         max_price_for_order=100.0,
         card_ab_hold_mode="off",
         card_ab_hold_degraded=False,

@@ -56,7 +56,7 @@ class AdvSettingFactory(SQLAlchemyModelFactory):
     auto_update_white_list = True
     auto_update_target_place = True
     auto_update_exponent = True
-    automatic_version = 2
+    bot_active = False
     aggressiveness = 3
     exponent_predict_ctr = factory.LazyFunction(lambda: round(fake.pyfloat(min_value=0.5, max_value=2.0), 3))
     auto_add_only_relevant_phrase = factory.LazyFunction(lambda: fake.boolean())

@@ -131,9 +131,6 @@ def test_manager_act_coroutines_reference_structural_filter() -> None:
     from app.modules.shop_runner.service_manager.manager import CoroutinesManager
 
     wired = (
-        "update_top_key_in_advs",
-        "white_list_tail_trimmer",
-        "update_individual_keyword_target_places",
         "handle_stats_stale_emergency",
         "update_minus_phrases_in_advs",
         "delete_keywords_from_wl_by_mean_auto_ctr",

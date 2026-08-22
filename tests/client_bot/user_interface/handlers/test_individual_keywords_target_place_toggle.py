@@ -69,7 +69,6 @@ async def _create_test_adv(
         bot_active=True,
         wb_cabinet=wb_cabinet,
         individual_keywords_target_place_mode=individual_mode,
-        automatic_version=1,
         auto_update_white_list=False,
         auto_update_target_place=False,
     )

@@ -90,7 +90,7 @@ def test_v3_sort_pay_for_order_none_at_tail() -> None:
 @pytest.mark.unit
 def test_create_pre_calculated_keywords_v3_forces_min_cpo_rating() -> None:
     adv = MagicMock()
-    adv.automatic_version = 3
+    adv.bot_active = True
     complex_adv = MagicMock()
     complex_adv.strategy = Strategy.MAX_CONV
     complex_adv.adv_setting = adv

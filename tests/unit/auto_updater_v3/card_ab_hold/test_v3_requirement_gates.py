@@ -1,10 +1,8 @@
-"""Gate-тесты A/B Hold V3-only + взаимоисключение с V2 (spec ``card-ab-hold-mode``, decision §12).
+"""Gate-тесты A/B Hold: enable только при ``bot_active`` (spec drift §12 → bot_active SoT).
 
 Проверяют:
-- enable A/B Hold только при ``automatic_version == 3`` (иначе OFF + причина);
-- запрет downgrade на V2, пока mode PENDING_SETUP / ACTIVE (сначала EXIT → OFF);
-- ``change_adv_strategy`` остаётся V2-scope: A/B Hold НЕ добавляет freeze-гард на этот путь
-  (полная развязка ``strategy_mode`` ← ``AdvSetting.strategy`` — отдельная задача вне change).
+- enable A/B Hold только при включённом боте (иначе OFF + причина);
+- ``change_adv_strategy`` остаётся V2-scope: A/B Hold НЕ добавляет freeze-гард на этот путь.
 """
 
 from __future__ import annotations
@@ -17,9 +15,6 @@ import pytest
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
 )
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.scheduling import (
-    is_switch_to_version_blocked_by_ab_hold,
-)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.ui_access import (
     can_enable_card_ab_hold_on_version,
     card_ab_hold_requires_v3_message,
@@ -28,62 +23,27 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
-    "automatic_version, expected",
-    [(3, True), (2, False), (1, False), (None, False)],
+    "bot_active, expected",
+    [(True, True), (False, False)],
 )
-def test_enable_version_gate_allows_only_v3(
-    automatic_version: int | None, expected: bool
+def test_enable_version_gate_allows_only_when_bot_active(
+    bot_active: bool, expected: bool
 ) -> None:
-    """14.1/14.3: enable A/B Hold разрешён только для V3 auto-updater."""
-    adv = SimpleNamespace(automatic_version=automatic_version)
+    """14.1/14.3: enable A/B Hold разрешён только при bot_active=True (V3 runtime)."""
+    adv = SimpleNamespace(bot_active=bot_active)
     assert can_enable_card_ab_hold_on_version(adv) is expected
 
 
 @pytest.mark.unit
-def test_enable_version_gate_message_mentions_v3() -> None:
-    """14.3: причина блокировки называет V3 (пользователь видит, что делать)."""
-    assert "V3" in card_ab_hold_requires_v3_message()
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "mode",
-    [CardAbHoldMode.PENDING_SETUP, CardAbHoldMode.ACTIVE, "pending_setup", "active"],
-)
-def test_downgrade_to_v2_blocked_during_ab_hold(
-    mode: CardAbHoldMode | str,
-) -> None:
-    """14.2/14.4: пока A/B Hold PENDING/ACTIVE — переключение на V2 запрещено."""
-    assert (
-        is_switch_to_version_blocked_by_ab_hold(new_version=2, mode=mode) is True
-    )
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize("mode", [CardAbHoldMode.OFF, "off", None])
-def test_downgrade_to_v2_allowed_when_off(mode: CardAbHoldMode | str | None) -> None:
-    """14.2 paired positive: при OFF downgrade на V2 разрешён."""
-    assert (
-        is_switch_to_version_blocked_by_ab_hold(new_version=2, mode=mode) is False
-    )
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    "mode",
-    [CardAbHoldMode.OFF, CardAbHoldMode.PENDING_SETUP, CardAbHoldMode.ACTIVE],
-)
-def test_switch_to_v3_never_blocked(mode: CardAbHoldMode) -> None:
-    """14.2: переход на V3 всегда разрешён (взаимоисключение только про V2)."""
-    assert (
-        is_switch_to_version_blocked_by_ab_hold(new_version=3, mode=mode) is False
-    )
+def test_enable_version_gate_message_mentions_bot_active() -> None:
+    """14.3: причина блокировки называет включение бота."""
+    assert "бот" in card_ab_hold_requires_v3_message().lower()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_enable_handler_runs_v3_gate_before_pending_and_enter_write() -> None:
-    """14.1/14.3: non-V3 Enable → mode OFF, start_epoch/set_signal не вызываются."""
+    """14.1/14.3: bot inactive Enable → mode OFF, start_epoch/set_signal не вызываются."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
         handlers,
     )
@@ -94,8 +54,7 @@ async def test_enable_handler_runs_v3_gate_before_pending_and_enter_write() -> N
     adv = SimpleNamespace(
         id=7,
         adv_id=77,
-        bot_active=True,
-        automatic_version=2,
+        bot_active=False,
         max_price_for_order=100.0,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,
@@ -133,54 +92,6 @@ async def test_enable_handler_runs_v3_gate_before_pending_and_enter_write() -> N
     start_epoch.assert_not_awaited()
     set_signal.assert_not_awaited()
     eval_stats.assert_not_awaited()
-
-
-@pytest.mark.unit
-@pytest.mark.asyncio
-async def test_version_toggle_blocks_v2_downgrade_before_automatic_version_write() -> None:
-    """14.2/14.4: ACTIVE Hold + toggle V2 → session.execute(update) не вызывается."""
-    from app.modules.shop_runner.service_manager.auto_updater_version_toggle.telegram import (
-        handlers as version_handlers,
-    )
-    from app.modules.shop_runner.service_manager.auto_updater_version_toggle.telegram.callbacks import (
-        AutoUpdaterVersionToggle,
-    )
-
-    adv = SimpleNamespace(
-        id=11,
-        automatic_version=3,
-        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
-    )
-    session = MagicMock()
-    result = MagicMock()
-    result.scalar_one_or_none = MagicMock(return_value=adv)
-    session.execute = AsyncMock(return_value=result)
-    session.commit = AsyncMock()
-    session_cm = MagicMock()
-    session_cm.__aenter__ = AsyncMock(return_value=session)
-    session_cm.__aexit__ = AsyncMock(return_value=None)
-    bot = MagicMock()
-    bot.send_message = AsyncMock()
-    query = MagicMock()
-    query.message = MagicMock()
-    query.message.chat = SimpleNamespace(id=100)
-    query.from_user = SimpleNamespace(id=1)
-    state = MagicMock()
-    state.get_data = AsyncMock(return_value={})
-
-    with patch.object(version_handlers, "sm", return_value=session_cm):
-        await version_handlers.toggle_auto_updater_version(
-            query,
-            AutoUpdaterVersionToggle(adv_setting_original_id=11, new_version=2),
-            bot,
-            state,
-        )
-
-    # Only the SELECT for adv_before — no UPDATE of automatic_version.
-    assert session.execute.await_count == 1
-    session.commit.assert_not_awaited()
-    bot.send_message.assert_awaited()
-    assert "A/B Hold" in bot.send_message.await_args.args[1]
 
 
 @pytest.mark.unit

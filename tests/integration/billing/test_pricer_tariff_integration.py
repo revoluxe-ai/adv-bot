@@ -49,7 +49,7 @@ def _make_auto_adv(
     adv_id: int,
     wb_cabinet_id: int,
     search_adv_id: int,
-    automatic_version: int,
+    bot_active: bool,
     wl: bool,
     tp: bool,
 ) -> AdvSetting:
@@ -57,10 +57,9 @@ def _make_auto_adv(
         adv_id=adv_id,
         name=f"auto_{adv_id}",
         wb_cabinet_id=wb_cabinet_id,
-        bot_active=True,
+        bot_active=bot_active,
         active_status="started",
         _search_adv_id=search_adv_id,  # noqa: SLF001
-        automatic_version=automatic_version,
         auto_update_white_list=wl,
         auto_update_target_place=tp,
     )
@@ -78,7 +77,7 @@ async def test_auto_mode_applies_new_tariffs_when_any_part_auto_enabled(
         adv_id=90002,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=2,
+        bot_active=False,
         wl=True,
         tp=False,
     )
@@ -106,7 +105,7 @@ async def test_old_mode_applies_old_tariffs_when_no_part_auto_enabled(
         adv_id=90102,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=2,
+        bot_active=False,
         wl=False,
         tp=False,
     )
@@ -134,7 +133,7 @@ async def test_auto_mode_applies_without_active_search_campaigns(
         adv_id=90402,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=None,
-        automatic_version=2,
+        bot_active=False,
         wl=True,
         tp=False,
     )
@@ -161,7 +160,7 @@ async def test_auto_mode_triggered_by_individual_keyword_target_places(
         adv_id=90602,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=1,
+        bot_active=False,
         wl=False,
         tp=False,
     )
@@ -196,7 +195,7 @@ async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
         adv_id=90202,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=1,
+        bot_active=False,
         wl=True,
         tp=True,
     )
@@ -226,7 +225,7 @@ async def test_auto_tariff_thresholds_apply_to_total_count(
             adv_id=90310 + i,
             wb_cabinet_id=wb_cabinet_id,
             search_adv_id=search.adv_id,
-            automatic_version=1,
+            bot_active=False,
             wl=True if i == 0 else False,  # достаточно одной, чтобы включить AUTO
             tp=False,
         )

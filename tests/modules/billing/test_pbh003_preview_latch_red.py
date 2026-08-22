@@ -66,7 +66,6 @@ async def test_preview_with_latch_higher_than_instant_after_same_day_pause(
         bot_active=False,
         active_status="paused",
         search_adv_id=None,
-        automatic_version=2,
         auto_update_white_list=True,
     )
     anchor = DummyAdv(
@@ -75,7 +74,6 @@ async def test_preview_with_latch_higher_than_instant_after_same_day_pause(
         bot_active=True,
         active_status="started",
         search_adv_id=200,
-        automatic_version=2,
         auto_update_white_list=True,
     )
     _patch_metering_advs(monkeypatch, [anchor, search])

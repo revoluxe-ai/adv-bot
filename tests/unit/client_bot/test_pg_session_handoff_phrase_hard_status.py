@@ -140,7 +140,7 @@ async def test_change_keyword_hard_status_in_session_blocks_under_hold() -> None
         hard_status=1,
         relevant=True,
         adv_setting=SimpleNamespace(
-            automatic_version=3,
+            bot_active=True,
             strategy=None,
             card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
         ),

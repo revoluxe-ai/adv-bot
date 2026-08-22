@@ -1,14 +1,12 @@
-"""Contract tests for AutoUpdater v2 entrypoint.
+"""Contract tests for ``adv_settings_auto_update`` (v3-only entrypoint).
 
-Call chain (CoroutinesManager.adv_settings_auto_update -> AdvControlSystem.process_adv):
+Call chain (``CoroutinesManager.adv_settings_auto_update`` → ``process_adv_v3``):
 
 1. ``settings.AUTO_SETTING_ACTIVE`` gate
 2. ``WBShopDataManager.get_complex_advs(load_extras=False)``
-3. Filters: ``ComplexAdv.bot_active``, ``ComplexAdv.is_part_auto_setting_active``,
-   ``ComplexAdv.search_adv_active_status``
-4. ``CoroutinesManager._split_advs_by_stats_freshness`` via
-   ``RedisStatsFreshnessStateCacheManager.mget_entries``
-5. ``AdvControlSystem(max_last_period=2).process_adv`` per adv (via ``run_tasks``)
+3. Filters: ``bot_active``, ``is_part_auto_setting_active``, ``search_adv_active_status``
+4. A/B Hold pipeline (``process_ab_setup`` / ``process_ab_hold``) + ordinary ``process_adv_v3``
+5. ``run_tasks`` per handler
 """
 
 from __future__ import annotations
@@ -50,14 +48,18 @@ def _search_adv_started() -> MagicMock:
     return s
 
 
-def _configure_adv_for_v2_pipeline(adv_setting_mock: MagicMock) -> None:
+def _configure_adv_for_auto_pipeline(adv_setting_mock: MagicMock) -> None:
+    """Минимальная конфигурация AdvSetting mock для adv_settings_auto_update."""
     adv_setting_mock.bot_active = True
     adv_setting_mock.auto_update_white_list = True
     adv_setting_mock.auto_update_target_place = True
     adv_setting_mock.auto_update_exponent = False
     adv_setting_mock.individual_keywords_target_place_mode = False
-    adv_setting_mock.automatic_version = 2
     adv_setting_mock.active_status = "started"
+    adv_setting_mock.card_ab_hold_mode = "off"
+
+
+_configure_adv_for_v2_pipeline = _configure_adv_for_auto_pipeline
 
 
 def _make_complex_adv(
@@ -362,7 +364,7 @@ async def test_adv_settings_auto_update_stats_freshness_invalid_payload_fail_ope
 
 
 @pytest.mark.asyncio
-async def test_adv_settings_auto_update_stats_freshness_stale_over_6h_skips_adv(
+async def test_adv_settings_auto_update_stats_freshness_stale_over_6h_still_runs_v3(
     monkeypatch,
     access_mock,
     adv_setting_mock,
@@ -405,11 +407,14 @@ async def test_adv_settings_auto_update_stats_freshness_stale_over_6h_skips_adv(
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
         await manager.adv_settings_auto_update.__wrapped__(manager)
 
-    run_tasks_mock.assert_not_called()
+    run_tasks_mock.assert_called_once()
+    handlers = run_tasks_mock.call_args.args[0]
+    assert len(handlers) == 1
+    assert callable(handlers[0])
 
 
 @pytest.mark.asyncio
-async def test_adv_settings_auto_update_stats_freshness_stale_skips_adv(
+async def test_adv_settings_auto_update_stats_freshness_stale_still_runs_v3(
     monkeypatch,
     access_mock,
     adv_setting_mock,
@@ -452,7 +457,9 @@ async def test_adv_settings_auto_update_stats_freshness_stale_skips_adv(
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
         await manager.adv_settings_auto_update.__wrapped__(manager)
 
-    run_tasks_mock.assert_not_called()
+    run_tasks_mock.assert_called_once()
+    handlers = run_tasks_mock.call_args.args[0]
+    assert len(handlers) == 1
 
 
 @pytest.mark.asyncio
@@ -480,7 +487,6 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
         ("auto_update_target_place", True),
         ("auto_update_exponent", False),
         ("individual_keywords_target_place_mode", False),
-        ("automatic_version", 2),
         ("plan_for_sales_for_day", 10),
         ("target_price_for_order", 100),
         ("max_price_for_order", 250),
@@ -520,64 +526,3 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
     handlers = run_tasks_mock.call_args.args[0]
     assert len(handlers) == 2
 
-
-@pytest.mark.asyncio
-async def test_adv_settings_auto_update_migrates_v1_to_v2_before_dispatch(
-    monkeypatch,
-    access_mock,
-    adv_setting_mock,
-    keywords_mocks,
-    client_session_mock,
-    fake_redis,
-):
-    monkeypatch.setenv("AUTO_SETTING_ACTIVE", "true")
-    access_mock.shop_id = "shop-contract"
-    _configure_adv_for_v2_pipeline(adv_setting_mock)
-    adv_setting_mock.automatic_version = 1
-    wb_api = WBApi(access_mock, client_session_mock)
-    adv = _make_complex_adv(wb_api, adv_setting_mock, keywords_mocks, search_adv=_search_adv_started())
-
-    execute_result = MagicMock()
-    execute_result.rowcount = 1
-    session = AsyncMock()
-    session.execute = AsyncMock(return_value=execute_result)
-    session.commit = AsyncMock()
-    session_cm = AsyncMock()
-    session_cm.__aenter__.return_value = session
-    session_cm.__aexit__.return_value = None
-
-    fresh = StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
-
-    async def _mget_entries(_shop_id: str, adv_ids: list[int]):
-        return [(aid, fresh, "hit", None) for aid in adv_ids]
-
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_complex_advs",
-            new=AsyncMock(return_value=[adv]),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_version_migration.sm",
-            return_value=session_cm,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.manager.run_tasks",
-            new=AsyncMock(return_value=[None]),
-        ) as run_tasks_mock,
-    ):
-        manager = CoroutinesManager(
-            wb_api,
-            RedisClient(redis_client=fake_redis),
-            tasks_manager=TasksManager(max_workers=1),
-            plan_fact_reader=MagicMock(spec=PlanFactReader),
-            wb_manager_hub=MagicMock(),
-        )
-        manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
-
-    assert adv.auto_updater_version == 2
-    session.execute.assert_awaited_once()
-    run_tasks_mock.assert_called_once()
-    handlers = run_tasks_mock.call_args.args[0]
-    assert len(handlers) == 1
-    assert callable(handlers[0])

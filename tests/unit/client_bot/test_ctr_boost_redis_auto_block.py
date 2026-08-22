@@ -41,7 +41,7 @@ async def test_ctr_boost_path_calls_set_auto_block_status() -> None:
         adv_id=10,
         search_adv_id=None,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
-        automatic_version=3,
+        bot_active=True,
         strategy=None,
     )
     keyword = SimpleNamespace(

@@ -22,7 +22,6 @@ def _full_active_setup() -> list[DummyAdv]:
         bot_active=False,
         active_status="started",
         search_adv_id=None,
-        automatic_version=None,
     )
     anchor = DummyAdv(
         id=1,
@@ -30,7 +29,6 @@ def _full_active_setup() -> list[DummyAdv]:
         bot_active=True,
         active_status="started",
         search_adv_id=200,
-        automatic_version=2,
         auto_update_white_list=True,
         auto_update_target_place=False,
     )

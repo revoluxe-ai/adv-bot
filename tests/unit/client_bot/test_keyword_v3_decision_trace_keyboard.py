@@ -16,11 +16,11 @@ def _keyword(*, ks_id: int = 10) -> KeywordSetting:
     return KeywordSetting(id=ks_id, text="test", hard_status=const.AUTO_MODE)
 
 
-def _adv(*, automatic_version: int = 3) -> AdvSetting:
+def _adv(*, bot_active: bool = True) -> AdvSetting:
     return AdvSetting(
         id=1,
         adv_id=100,
-        automatic_version=automatic_version,
+        bot_active=bot_active,
         nmids=[519358830],
     )
 
@@ -37,7 +37,7 @@ def _button_texts(markup) -> list[str]:
 def test_trace_button_visible_v3_admin_good() -> None:
     markup = get_keyword_setting_keyboard(
         _keyword(),
-        _adv(automatic_version=3),
+        _adv(bot_active=True),
         page=2,
         telegram_user_id=const.ADMINS[0],
         keyword_display_status=KeywordStatus.GOOD,
@@ -50,7 +50,7 @@ def test_trace_button_visible_v3_admin_good() -> None:
 def test_trace_button_visible_v3_admin_bad() -> None:
     markup = get_keyword_setting_keyboard(
         _keyword(),
-        _adv(automatic_version=3),
+        _adv(bot_active=True),
         page=1,
         telegram_user_id=const.ADMINS[0],
         keyword_display_status=KeywordStatus.BAD,
@@ -63,7 +63,7 @@ def test_trace_button_visible_v3_admin_bad() -> None:
 def test_trace_button_hidden_non_v3() -> None:
     markup = get_keyword_setting_keyboard(
         _keyword(),
-        _adv(automatic_version=2),
+        _adv(bot_active=False),
         page=1,
         telegram_user_id=const.ADMINS[0],
         keyword_display_status=KeywordStatus.GOOD,
@@ -76,7 +76,7 @@ def test_trace_button_hidden_non_v3() -> None:
 def test_trace_button_hidden_without_admin() -> None:
     markup = get_keyword_setting_keyboard(
         _keyword(),
-        _adv(automatic_version=3),
+        _adv(bot_active=True),
         page=1,
         telegram_user_id=999999999,
         keyword_display_status=KeywordStatus.GOOD,
@@ -89,7 +89,7 @@ def test_trace_button_hidden_without_admin() -> None:
 def test_trace_button_hidden_without_telegram_user_id() -> None:
     markup = get_keyword_setting_keyboard(
         _keyword(),
-        _adv(automatic_version=3),
+        _adv(bot_active=True),
         page=1,
         keyword_display_status=KeywordStatus.GOOD,
     )
@@ -101,7 +101,7 @@ def test_trace_button_hidden_without_telegram_user_id() -> None:
 def test_trace_button_hidden_without_display_status() -> None:
     markup = get_keyword_setting_keyboard(
         _keyword(),
-        _adv(automatic_version=3),
+        _adv(bot_active=True),
         page=1,
         telegram_user_id=const.ADMINS[0],
     )

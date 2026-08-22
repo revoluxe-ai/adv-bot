@@ -267,7 +267,7 @@ async def test_get_calculate_data_v3_excludes_off_strategy_keywords() -> None:
     adv = MagicMock()
     adv.auction_adv_id = 10
     adv.adv_id = 1
-    adv.auto_updater_version = 3
+    adv.bot_active = True
     adv.strategy = Strategy.MIN_CPO
     adv.nmids = [100]
     adv.individual_keywords_target_place_mode = False
@@ -328,7 +328,7 @@ async def test_get_calculate_data_v3_excludes_auto_with_non_off_mode() -> None:
     adv = MagicMock()
     adv.auction_adv_id = 10
     adv.adv_id = 1
-    adv.auto_updater_version = 3
+    adv.bot_active = True
     adv.strategy = Strategy.MIN_CPO
     adv.nmids = [100]
     adv.individual_keywords_target_place_mode = False
@@ -368,7 +368,7 @@ async def test_get_calculate_data_non_v3_includes_off_strategy_keywords() -> Non
     adv = MagicMock()
     adv.auction_adv_id = 10
     adv.adv_id = 1
-    adv.auto_updater_version = 2
+    adv.bot_active = False
     adv.nmids = [100]
     adv.individual_keywords_target_place_mode = False
     adv.target_place = 5

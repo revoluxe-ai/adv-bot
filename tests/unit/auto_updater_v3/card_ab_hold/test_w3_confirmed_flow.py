@@ -67,7 +67,6 @@ def _make_adv(*, phase: str) -> SimpleNamespace:
         id=42,
         adv_id=4242,
         bot_active=True,
-        automatic_version=3,
         card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
         card_ab_hold_phase=phase,
         card_ab_hold_confirmed_keywords_json=["alpha", "beta"],

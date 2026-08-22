@@ -40,7 +40,7 @@ def _keyword_setting(*, mode: str, hard_status: int = 1) -> SimpleNamespace:
         adv_setting=SimpleNamespace(
             adv_id=100,
             search_adv_id=None,
-            automatic_version=3,
+            bot_active=True,
             strategy=None,
             card_ab_hold_mode=mode,
         ),

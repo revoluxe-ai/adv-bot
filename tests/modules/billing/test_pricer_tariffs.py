@@ -18,7 +18,6 @@ class DummyAdv:
         bot_active: bool = True,
         active_status: str = "started",
         search_adv_id: int | None,
-        automatic_version: int | None,
         auto_update_white_list: bool | None = None,
         auto_update_target_place: bool | None = None,
         auto_update_exponent: bool | None = None,
@@ -29,7 +28,6 @@ class DummyAdv:
         self.bot_active = bot_active
         self.active_status = active_status
         self.search_adv_id = search_adv_id
-        self.automatic_version = automatic_version
         self.auto_update_white_list = auto_update_white_list
         self.auto_update_target_place = auto_update_target_place
         self.auto_update_exponent = auto_update_exponent
@@ -109,10 +107,10 @@ class TestPricerTariffs:
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
-            DummyAdv(id=1, adv_id=101, search_adv_id=10, automatic_version=1, auto_update_white_list=True),
-            DummyAdv(id=2, adv_id=102, search_adv_id=11, automatic_version=1, auto_update_white_list=False),
-            DummyAdv(id=3, adv_id=103, search_adv_id=None, automatic_version=1, auto_update_white_list=True),
-            DummyAdv(id=4, adv_id=104, search_adv_id=12, automatic_version=1, auto_update_white_list=True),
+            DummyAdv(id=1, adv_id=101, search_adv_id=10, bot_active=True, auto_update_white_list=True),
+            DummyAdv(id=2, adv_id=102, search_adv_id=11, bot_active=True, auto_update_white_list=False),
+            DummyAdv(id=3, adv_id=103, search_adv_id=None, bot_active=True, auto_update_white_list=True),
+            DummyAdv(id=4, adv_id=104, search_adv_id=12, bot_active=True, auto_update_white_list=True),
         ]
 
         _patch_metering_advs(monkeypatch, advs)
@@ -124,8 +122,8 @@ class TestPricerTariffs:
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
-            DummyAdv(id=1, adv_id=101, search_adv_id=10, automatic_version=1, auto_update_white_list=False, auto_update_target_place=False),
-            DummyAdv(id=2, adv_id=102, search_adv_id=11, automatic_version=2, auto_update_white_list=True, auto_update_target_place=False),
+            DummyAdv(id=1, adv_id=101, search_adv_id=10, bot_active=True, auto_update_white_list=False, auto_update_target_place=False),
+            DummyAdv(id=2, adv_id=102, search_adv_id=11, bot_active=True, auto_update_white_list=True, auto_update_target_place=False),
         ]
 
         _patch_metering_advs(monkeypatch, advs)
@@ -145,7 +143,7 @@ class TestPricerTariffs:
                 adv_id=101,
                 active_status="paused",
                 search_adv_id=10,
-                automatic_version=1,
+                bot_active=False,
                 auto_update_white_list=False,
                 auto_update_target_place=False,
             ),
@@ -154,7 +152,7 @@ class TestPricerTariffs:
                 adv_id=102,
                 active_status="paused",
                 search_adv_id=11,
-                automatic_version=2,
+                bot_active=False,
                 auto_update_white_list=False,
                 auto_update_target_place=False,
             ),
@@ -176,7 +174,7 @@ class TestPricerTariffs:
                 adv_id=101,
                 active_status="paused",
                 search_adv_id=10,
-                automatic_version=1,
+                bot_active=True,
                 auto_update_white_list=True,
                 auto_update_target_place=False,
             ),
@@ -198,7 +196,7 @@ class TestPricerTariffs:
                 adv_id=101,
                 active_status="paused",
                 search_adv_id=10,
-                automatic_version=2,
+                bot_active=False,
                 auto_update_white_list=False,
                 auto_update_target_place=False,
                 auto_update_exponent=True,

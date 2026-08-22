@@ -121,9 +121,8 @@ async def setup_adv_data(async_session: AsyncSession):
         wb_cabinet=wb_cabinet,
         wb_cabinet_id=wb_cabinet.id,
         bot_active=True,  # Активная кампания
-        bidder_active=False, # Недефолтное значение
-        automatic_version=1, # Недефолтное значение
-        auto_update_white_list=False, # Недефолтное значение
+        bidder_active=False,  # Недефолтное значение
+        auto_update_white_list=False,  # Недефолтное значение
     )
     async_session.add(adv_setting)
     await async_session.flush()
@@ -134,9 +133,8 @@ async def setup_adv_data(async_session: AsyncSession):
         wb_cabinet=wb_cabinet,
         wb_cabinet_id=wb_cabinet.id,
         bot_active=False,  # Неактивная кампания
-        bidder_active=False, # Недефолтное значение
-        automatic_version=1, # Недефолтное значение
-        auto_update_white_list=False, # Недефолтное значение
+        bidder_active=False,  # Недефолтное значение
+        auto_update_white_list=False,  # Недефолтное значение
     )
     async_session.add(adv_setting_inactive)
     await async_session.flush()
@@ -175,7 +173,6 @@ async def setup_multiple_advs_data(async_session: AsyncSession):
         wb_cabinet_id=wb_cabinet.id,
         bot_active=True,
         bidder_active=False,
-        automatic_version=1,
     )
     adv_active_2 = AdvSettingFactory.build(
         adv_id=2001,
@@ -184,7 +181,6 @@ async def setup_multiple_advs_data(async_session: AsyncSession):
         wb_cabinet_id=wb_cabinet.id,
         bot_active=True,
         bidder_active=False,
-        automatic_version=1,
     )
     # Неактивная кампания
     adv_inactive_1 = AdvSettingFactory.build(
@@ -193,8 +189,7 @@ async def setup_multiple_advs_data(async_session: AsyncSession):
         wb_cabinet=wb_cabinet,
         wb_cabinet_id=wb_cabinet.id,
         bot_active=False,
-        bidder_active=True, # Недефолтное значение, но не должно быть изменено
-        automatic_version=1,
+        bidder_active=True,  # Недефолтное значение, но не должно быть изменено
     )
     async_session.add_all([adv_active_1, adv_active_2, adv_inactive_1])
     await async_session.flush()
@@ -227,11 +222,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
     adv_setting.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
     adv_setting.reset_place = not initial_defaults.reset_place
-    # Для полей типа Enum выбираем другое валидное значение, если оно есть
-    if initial_defaults.automatic_version == 2:
-        adv_setting.automatic_version = 1
-    else:
-        adv_setting.automatic_version = 2
+    adv_setting.bot_active = True
 
     # bidder_coroutine_type
     if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
@@ -313,7 +304,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
     default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_active", "bidder_for_auto", "bidder_mode",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
         "new_auto_min_ctr_mode", "reset_place"
@@ -383,7 +374,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
 
     # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
     default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_active", "bidder_for_auto", "bidder_mode",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
         "new_auto_min_ctr_mode", "reset_place"
@@ -413,11 +404,7 @@ async def test_turn_adv_on_applies_defaults(
     adv_setting_inactive.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting_inactive.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
     adv_setting_inactive.reset_place = not initial_defaults.reset_place
-    # Для полей типа Enum выбираем другое валидное значение, если оно есть
-    if initial_defaults.automatic_version == 2:
-        adv_setting_inactive.automatic_version = 1
-    else:
-        adv_setting_inactive.automatic_version = 2
+    adv_setting_inactive.bot_active = False
 
     # bidder_coroutine_type
     if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
@@ -517,12 +504,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         adv.target_ctr_mode = not initial_defaults.target_ctr_mode
         adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
         adv.reset_place = not initial_defaults.reset_place
-
-        # Для полей типа Enum выбираем другое валидное значение, если оно есть
-        if initial_defaults.automatic_version == 2:
-            adv.automatic_version = 1
-        else:
-            adv.automatic_version = 2
+        adv.bot_active = True
 
         # bidder_coroutine_type
         if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
@@ -585,7 +567,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
 
     expected_defaults = CampaignDefaultsV1()
     default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
+        "bidder_active", "bidder_for_auto", "bidder_mode",
         "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
         "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
         "new_auto_min_ctr_mode", "reset_place"

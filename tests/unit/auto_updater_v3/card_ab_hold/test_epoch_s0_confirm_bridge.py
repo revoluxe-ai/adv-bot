@@ -181,7 +181,6 @@ async def test_epoch_enable_renders_s0_with_open_current_step_bridge() -> None:
         adv_id=99,
         wb_cabinet=SimpleNamespace(shop_id="1"),
         bot_active=True,
-        automatic_version=3,
         max_price_for_order=100.0,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,

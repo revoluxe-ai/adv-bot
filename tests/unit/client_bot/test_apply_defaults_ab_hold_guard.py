@@ -12,8 +12,8 @@ structural флаги сохраняются); disable — только owned pa
 - 15.2 handler-level: single refuse (без un-owned disable, без commit) + apply на
   OFF; shop-wide skip held (сохранены) + apply non-held + honest counter.
 
-Падали бы до фикса: helper безусловно форсил ``card_ab_hold_mode='off'`` +
-сбрасывал ``automatic_version``; handlers коммитили это как success.
+Падали бы до фикса: helper безусловно форсил ``card_ab_hold_mode='off'``;
+handlers коммитили это как success.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ def _held_adv(mode: str) -> SimpleNamespace:
         id=1,
         card_ab_hold_mode=mode,
         card_ab_hold_allowed_phrases_snapshot=["good1", "good2"],
-        automatic_version=3,
+        bot_active=True,
         auto_update_white_list=False,
         auto_update_target_place=False,
         bidder_active=False,
@@ -64,7 +64,7 @@ def _off_adv() -> SimpleNamespace:
         id=2,
         card_ab_hold_mode="off",
         card_ab_hold_allowed_phrases_snapshot=[],
-        automatic_version=3,
+        bot_active=True,
         bidder_active=False,
         bidder_for_auto=False,
         bidder_mode=None,
@@ -92,7 +92,7 @@ def test_helper_noop_on_held_campaign(mode: str) -> None:
     apply_defaults_to_adv_setting(adv, adv.wb_cabinet)  # type: ignore[arg-type]
     assert adv.card_ab_hold_mode == mode
     assert adv.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
-    assert adv.automatic_version == 3
+    assert adv.bot_active is True
     assert adv.auto_update_white_list is False
     assert adv.auto_update_target_place is False
 
@@ -103,7 +103,8 @@ def test_helper_applies_defaults_on_off_campaign() -> None:
     defaults = CampaignDefaultsV1()
     adv = _off_adv()
     apply_defaults_to_adv_setting(adv, adv.wb_cabinet)  # type: ignore[arg-type]
-    assert adv.automatic_version == defaults.automatic_version  # 2
+    # bot_active не входит в CampaignDefaultsV1 — apply_defaults не трогает его
+    assert adv.bot_active is True
     assert adv.auto_update_white_list == defaults.auto_update_white_list  # True
     assert adv.auto_update_target_place == defaults.auto_update_target_place
     assert adv.card_ab_hold_mode == "off"
@@ -199,7 +200,7 @@ async def test_apply_campaign_defaults_blocks_held_campaign() -> None:
 
     assert adv.card_ab_hold_mode == "active"
     assert adv.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
-    assert adv.automatic_version == 3
+    assert adv.bot_active is True
     assert "commit" not in recorder
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
     assert "A/B Hold" in sent
@@ -228,7 +229,7 @@ async def test_apply_campaign_defaults_applies_off_campaign() -> None:
             bot,
         )
 
-    assert adv.automatic_version == 2
+    assert adv.bot_active is True
     assert adv.card_ab_hold_mode == "off"
     assert "commit" in recorder
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
@@ -260,9 +261,9 @@ async def test_apply_defaults_for_shop_skips_held_applies_rest() -> None:
     # held сохранён — un-owned disable не выполнен
     assert held.card_ab_hold_mode == "active"
     assert held.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
-    assert held.automatic_version == 3
-    # non-held получил дефолты
-    assert off.automatic_version == 2
+    assert held.bot_active is True
+    # non-held получил дефолты (bot_active не меняется apply_defaults)
+    assert off.bot_active is True
     # honest counter: 1 применён, 1 пропущен
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
     assert "применены к 1" in sent

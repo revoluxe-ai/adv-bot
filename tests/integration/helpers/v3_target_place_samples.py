@@ -49,9 +49,8 @@ async def load_v3_keyword_samples(
             AdvSetting.nmids,
         )
         .join(AdvSetting, AdvSetting.id == KeywordSetting.adv_setting_id)
-        .where(AdvSetting.automatic_version == 3)
-        .where(AdvSetting.individual_keywords_target_place_mode.is_(True))
         .where(AdvSetting.bot_active.is_(True))
+        .where(AdvSetting.individual_keywords_target_place_mode.is_(True))
         .where(KeywordSetting.strategy_mode != KeywordStrategyMode.OFF)
         .limit(limit)
     )
@@ -106,7 +105,6 @@ async def _seed_v3_keyword_samples(session: AsyncSession) -> list[V3KeywordSampl
             bot_active=True,
             active_status="started",
             adv_id=890_000 + (uuid.uuid4().int % 10_000),
-            automatic_version=3,
         ),
     )
     adv.nmids = [nmid]

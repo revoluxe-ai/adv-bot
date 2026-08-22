@@ -43,7 +43,6 @@ def _make_off_adv() -> SimpleNamespace:
         id=42,
         adv_id=4242,
         bot_active=True,
-        automatic_version=3,
         max_price_for_order=100,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,

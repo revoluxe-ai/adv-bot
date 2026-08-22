@@ -122,7 +122,6 @@ def _post_epoch_enable_adv(*, max_pay_for_order: float = 100.0) -> SimpleNamespa
         id=901,
         adv_id=9901,
         bot_active=True,
-        automatic_version=3,
         max_price_for_order=max_pay_for_order,
         card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
         card_ab_hold_phase=CardAbHoldPhase.AWAITING_KEYWORD_CONFIRM.value,

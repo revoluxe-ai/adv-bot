@@ -18,7 +18,7 @@ def test_apply_defaults_to_adv_setting():
         bidder_active=False,
         bidder_for_auto=True,
         bidder_mode=BidderMode.BY_POSITIONS,
-        automatic_version=1,
+        bot_active=False,
         bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
         orders_source_for_auto_mode=OrdersSourceForAutoMode.ADV_SUM,
         sales_predict_method=FactMethods.DIRECT_SALES,
@@ -41,7 +41,8 @@ def test_apply_defaults_to_adv_setting():
     assert adv_setting.bidder_active == defaults_v1.bidder_active
     assert adv_setting.bidder_for_auto == defaults_v1.bidder_for_auto
     assert adv_setting.bidder_mode == defaults_v1.bidder_mode
-    assert adv_setting.automatic_version == defaults_v1.automatic_version
+    # bot_active не входит в CampaignDefaultsV1 — apply_defaults не трогает его
+    assert adv_setting.bot_active is False
     assert adv_setting.bidder_coroutine_type == defaults_v1.bidder_coroutine_type
     assert adv_setting.orders_source_for_auto_mode == defaults_v1.orders_source_for_auto_mode
     assert adv_setting.sales_predict_method == defaults_v1.sales_predict_method
