@@ -37,7 +37,11 @@ class _FakeOp:
 
 
 def test_upgrade_adds_expand_column_and_defers_classifier_to_job() -> None:
-    """Spec stage-landing-readiness: backfill не должен быть broad Alembic DML."""
+    """Schema-only ADD: nullable без server_default; backfill job — отдельно.
+
+    Без server_default на ADD PG не зальёт legacy false до job
+    ``MIGRATION_BACKFILL_KIND=auto_update_minus_phrases_v1`` (см. docstring миграции).
+  """
     module = _load_migration_module()
     fake_op = _FakeOp()
     module.op = fake_op
@@ -53,7 +57,7 @@ def test_upgrade_adds_expand_column_and_defers_classifier_to_job() -> None:
     column = add_column_call[1][1]
     assert column.name == "auto_update_minus_phrases"
     assert isinstance(column.type, sa.Boolean)
-    assert str(column.server_default.arg) == "false"
+    assert column.server_default is None
     assert column.nullable is True
     assert fake_op.calls == [add_column_call]
 
