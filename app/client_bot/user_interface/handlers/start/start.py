@@ -651,7 +651,7 @@ async def process_cabinet_api(
     chat_id = message.chat.id
 
     # Предварительная простая валидация формата токена: отсекаем явно мусорные строки
-    token_text = text.strip() # есть очистка токен от лишних пробелов
+    token_text = text.strip()
     if len(token_text) < 24:  # эвристика: валидные токены заметно длиннее
         _= await bot.send_message(
             chat_id,
@@ -661,7 +661,7 @@ async def process_cabinet_api(
 
     # Validate token using centralized validator
     validator = TokenPermissionsValidator(http_session=client_session)
-    validation_result = await validator.validate(text, mode="claims_plus_api")
+    validation_result = await validator.validate(token_text, mode="claims_plus_api")
     if validation_result is None:
         return None
 
@@ -717,7 +717,7 @@ async def process_cabinet_api(
             raise ValueError("User not found")
 
     # Create WBToken object for database storage
-    wb_token = wb_models.WBToken(api_key=text)
+    wb_token = wb_models.WBToken(api_key=token_text)
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
     access = WBCabinetAccess(tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None)
@@ -926,7 +926,7 @@ async def process_add_new_token(
 
     # Validate token using centralized validator
     validator = TokenPermissionsValidator(http_session=client_session)
-    validation_result = await validator.validate(text, mode="claims_plus_api")
+    validation_result = await validator.validate(token_text, mode="claims_plus_api")
     if validation_result is None:
         return None
 
@@ -1010,7 +1010,7 @@ async def process_add_new_token(
         return None
 
     # Create WBToken object for database storage
-    wb_token = wb_models.WBToken(api_key=text)
+    wb_token = wb_models.WBToken(api_key=token_text)
     wb_token.shop_id = shop_id
     wb_token.user_id = user_id
 
