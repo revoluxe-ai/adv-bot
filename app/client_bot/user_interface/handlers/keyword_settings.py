@@ -651,7 +651,6 @@ async def keywords_daily_stats(
     state: FSMContext,
 ) -> None:
     """Открывает отдельный экран с дневной статистикой по ключам."""
-    await callback.answer()
     assert callback.message
 
     async with _sm(read_only=True) as session:
@@ -880,7 +879,6 @@ async def keyword_daily_history(
     state: FSMContext,
 ) -> None:
     """Открывает дневную историю по одному ключевому запросу."""
-    await callback.answer()
     assert callback.message
 
     async with ChatActionSender.typing(
