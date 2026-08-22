@@ -163,10 +163,9 @@ async def turn_adv_on_in_session(
     )
     adv = await _load_adv_for_activation_in_session(session, adv_original_id)
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
-    tariff_for_month: int | float = await pricer.get_price_for_day_for_shop(
+    price_per_day: float = await pricer.get_price_for_day_for_shop(
         session, wb_cabinet.shop_id
     )
-    price_for_adv_for_day = pricer.get_tariff_for_day(int(tariff_for_month))
     balance, bonus = await balance_manager.get_cabinet_balance_and_bonuses(
         wb_cabinet.id
     )
@@ -180,7 +179,7 @@ async def turn_adv_on_in_session(
             bot, chat_id, state, wb_user_cabinet_original_id
         )()
         return
-    if not sum_balance >= price_for_adv_for_day:
+    if sum_balance < price_per_day:
         _ = await bot.send_message(chat_id, "Недостаточно средств")
         _ = await ShopMenu(
             bot, chat_id, state, wb_user_cabinet_original_id

@@ -146,10 +146,6 @@ async def test_turn_adv_on_blocks_read_only_token_activation() -> None:
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
             AsyncMock(return_value=100),
         ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
-            MagicMock(return_value=100),
-        ),
         patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu", shop_menu_ctor),
     ):
         await turn_adv_on(callback, state, callback_data, bot)
@@ -159,6 +155,38 @@ async def test_turn_adv_on_blocks_read_only_token_activation() -> None:
     token_service.get_shop_token_status.assert_awaited_once_with("shop_77")
     bot.send_message.assert_awaited_once()
     assert "только права чтения" in bot.send_message.await_args.args[1]
+    shop_menu_ctor.assert_called_once_with(bot, 202, state, 77)
+    shop_menu_call.assert_awaited_once()
+
+
+async def test_turn_adv_on_blocks_when_balance_below_daily_tariff() -> None:
+    """Баланс ниже дневного тарифа блокирует включение paid (без /30)."""
+    callback = _build_callback()
+    callback_data = _build_callback_data()
+    bot = AsyncMock()
+    state = AsyncMock()
+    session, _, adv = _build_session_objects()
+
+    shop_menu_call = AsyncMock()
+    shop_menu_ctor = MagicMock(return_value=shop_menu_call)
+
+    with (
+        patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm", _MockSessionMaker(session)),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.balance_manager.get_cabinet_balance_and_bonuses",
+            AsyncMock(return_value=(50, 0)),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
+            AsyncMock(return_value=100.0),
+        ),
+        patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu", shop_menu_ctor),
+    ):
+        await turn_adv_on(callback, state, callback_data, bot)
+
+    assert adv.bot_active is False
+    session.commit.assert_not_awaited()
+    bot.send_message.assert_awaited_once_with(202, "Недостаточно средств")
     shop_menu_ctor.assert_called_once_with(bot, 202, state, 77)
     shop_menu_call.assert_awaited_once()
 
@@ -191,10 +219,6 @@ async def test_turn_adv_on_keeps_paid_enable_path_for_normal_token() -> None:
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
             AsyncMock(return_value=100),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
-            MagicMock(return_value=100),
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
@@ -258,10 +282,6 @@ async def test_turn_adv_on_skips_v3_backfill_when_campaign_already_on_v3() -> No
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_price_for_day_for_shop",
             AsyncMock(return_value=100),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.pricer.get_tariff_for_day",
-            MagicMock(return_value=100),
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",

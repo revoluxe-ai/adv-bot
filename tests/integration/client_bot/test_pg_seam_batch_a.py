@@ -166,7 +166,6 @@ async def test_turn_adv_on_in_session_persists_bot_active(
             MagicMock(get_cabinet_balance_and_bonuses=AsyncMock(return_value=(1000, 0))),
         ),
         patch.object(adv_setting_handler.pricer, "get_price_for_day_for_shop", AsyncMock(return_value=100)),
-        patch.object(adv_setting_handler.pricer, "get_tariff_for_day", MagicMock(return_value=100)),
         patch.object(
             adv_setting_handler,
             "_shop_has_read_only_only_tokens",

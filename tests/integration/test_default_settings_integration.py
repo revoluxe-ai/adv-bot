@@ -522,7 +522,6 @@ async def test_turn_adv_on_applies_paid_start_defaults_only(
     # Mock Pricer.get_price_for_day_for_shop and balance_manager.get_cabinet_balance_and_bonuses
     with (
         patch("app.modules.billing.pricer.Pricer.get_price_for_day_for_shop", new_callable=AsyncMock) as mock_get_price,
-        patch("app.modules.billing.pricer.Pricer.get_tariff_for_day", return_value=100) as mock_get_tariff,
         patch("app.modules.balance_manager.get_cabinet_balance_and_bonuses", new_callable=AsyncMock) as mock_get_balance,
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.backfill_v3_hard_statuses_and_states_consistency",
