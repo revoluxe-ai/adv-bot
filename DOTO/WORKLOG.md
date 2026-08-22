@@ -480,3 +480,32 @@ Parked по запросу Owner после prod gate `bot_active=FALSE` (Q1) и
   source: Bugbot review 2026-08-22
   reason: owner_park
   notes: Не блокер merge; косметика после v3-only land.
+
+- [ ] [deferred-from:v3-only-retire-v2] Excel roundtrip v6→v7: comms + onboarding для пользователей
+  source: independent control review 2026-08-22; `adv_excel_roundtrip/schema.py` EXCEL_TEMPLATE_VERSION=7
+  reason: out_of_current_mvp | owner_park
+  notes: |
+    Breaking change: колонка `automatic_version` убрана; import жёстко требует v7.
+    Старые v6-файлы не импортируются — не runtime-баг, ops/UX.
+    До/после merge: help-текст / сообщение «пересохраните шаблон из бота»; проверить export уже v7.
+
+- [ ] [deferred-from:v3-only-retire-v2] Rename / clarify `is_v3_campaign(bot_active)` после v3-only
+  source: independent control review 2026-08-22; `v3_status_mode_sync.py`
+  reason: owner_park
+  notes: |
+    Семантика = `bot_active`; имя вводит в заблуждение. Call-site'ы сейчас корректны.
+    Cleanup: rename (e.g. `is_paid_auto_runtime`) + mechanical grep или docstring-only — отдельный мелкий PR.
+
+- [ ] [deferred-from:v3-only-retire-v2] Dead code: V2 else-ветки в emergency stale-stats
+  source: independent control review 2026-08-22; `manager.py` `_apply_stats_stale_emergency`
+  reason: owner_park
+  notes: |
+    `else` без `strategy_mode` недостижим: `handle_stats_stale_emergency` фильтрует `bot_active`.
+    Reduction-only: убрать ветвление, оставить только V3 sync path.
+
+- [ ] [deferred-from:v3-only-retire-v2] DDL: DROP legacy колонки `advsetting.automatic_version`
+  source: independent control review 2026-08-22; `models.py` LEGACY comment
+  reason: oversized | owner_park
+  notes: |
+    Runtime/UI/billing не читает и не пишет; колонка только в ORM до отдельной alembic-миграции.
+    После стабилизации v3-only на prod + audit «нет внешних writers».
