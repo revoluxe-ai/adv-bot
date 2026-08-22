@@ -15,6 +15,7 @@ from app.modules.common_slaves.wildberries.models.models import (
 )
 from app.modules.partner_program.partner_stats import (
     PartnerStats,
+    _resolve_cabinet_payment_user_id,
     calculate_partner_stats_from_records,
     create_partner_payout,
     is_real_external_balance_payment,
@@ -126,6 +127,40 @@ def test_is_real_external_balance_payment_filters_internal_and_admin_records() -
             description="Пополнение баланса через Telegram",
         )
     )
+
+
+def test_resolve_cabinet_payment_user_id_picks_single_owner_for_shared_cabinet() -> None:
+    """Shared cabinet must map to one invited user, not every linked owner."""
+    assert _resolve_cabinet_payment_user_id({10, 11}) == 10
+    assert _resolve_cabinet_payment_user_id({11}) == 11
+    assert _resolve_cabinet_payment_user_id(set()) is None
+
+
+def test_calculate_partner_stats_from_records_does_not_double_count_shared_cabinet() -> None:
+    """One cabinet top-up must not inflate partner totals for every linked user."""
+    partner_user_id = 1
+    invites = [
+        _invite(code="INV-1", issued_to_user_id=partner_user_id, used_by_user_id=10),
+        _invite(code="INV-2", issued_to_user_id=partner_user_id, used_by_user_id=11),
+    ]
+    wb_user_cabinets = [
+        _wb_user_cabinet(user_id=10, wb_cabinet_id=100, name="Shared"),
+        _wb_user_cabinet(user_id=11, wb_cabinet_id=100, name="Shared"),
+    ]
+    wb_balance_payments = [_wb_balance_payment(wb_cabinet_id=100, amount=100)]
+
+    stats = calculate_partner_stats_from_records(
+        partner_user_id=partner_user_id,
+        invites=invites,
+        user_balance_payments=[],
+        wb_balance_payments=wb_balance_payments,
+        wb_user_cabinets=wb_user_cabinets,
+        partner_payouts=[],
+    )
+
+    assert stats.clients_paid_sum == Decimal("100.00")
+    assert stats.earned_amount == Decimal("15.00")
+    assert stats.paid_users_count == 1
 
 
 def test_calculate_partner_stats_from_records_counts_invites_distinct_users_and_money() -> None:
