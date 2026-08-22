@@ -1,0 +1,33 @@
+app/modules/shop_runner/service_manager/keyword_v3_decision_trace_ui/telegram/handlers.py
+  s_3189e63191602f::t_2f215aabb263ba 38-45,50,80,83,103,106,126
+tests/unit/auto_updater_v3/test_keyword_v3_decision_trace_handlers_no_callback_answer.py
+  s_3189e63191602f::t_d5c6f28350cf83 1-52
+env.sample
+  s_3189e63191602f::t_f463c19845141d 87-88
+tests/unit/test_settings_secret_aliases.py
+  s_3189e63191602f::t_990d1fe70dabcb 38-47
+app/client_bot/user_interface/handlers/keyword_settings.py
+  s_3189e63191602f::t_d22d36dbe39e9a 448
+  s_3189e63191602f::t_c63ef1afe014a1 977
+  s_3189e63191602f::t_09134e50348104 575
+  s_3189e63191602f::t_91c56decf3b3f6 678
+  s_3189e63191602f::t_7f66340fe17a6e 732
+app/settings/settings_master.py
+  s_3189e63191602f::t_9a88c47f33e4e3 748-750,754,758
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "db4b174360a8e8199eeac6f697932d9374d10fe8",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
