@@ -2,6 +2,9 @@
 
 Доказывает injectable ``apply_keyword_ctr_boost_with_client``: parent открывает
 ``get_clickhouse_client()`` и передаёт client в child (не module-patch CH).
+
+``test_change_keyword_hard_status_ctr_hands_off_ch_client`` skip: handler CTR path
+отложен; unit-тесты ``apply_keyword_ctr_boost_with_client`` остаются активными.
 """
 
 from __future__ import annotations
@@ -18,6 +21,13 @@ from app.client_bot.user_interface.handlers.keyword_settings import (
 )
 
 _KS = "app.client_bot.user_interface.handlers.keyword_settings"
+
+CTR_BOOST_HANDLER_SKIP = pytest.mark.skip(
+    reason=(
+        "CTR-boost deferred: change_keyword_hard_status CH/Redis path disabled; "
+        "test kept for restore"
+    ),
+)
 
 
 def _session_cm(session: MagicMock) -> MagicMock:
@@ -38,6 +48,7 @@ def _client_cm(client: MagicMock) -> MagicMock:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+@CTR_BOOST_HANDLER_SKIP
 async def test_change_keyword_hard_status_ctr_hands_off_ch_client() -> None:
     """Parent CTR path → ``apply_keyword_ctr_boost_with_client(client, …)``."""
     fake_session = MagicMock(name="hs_write_session")
