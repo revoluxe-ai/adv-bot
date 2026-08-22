@@ -539,7 +539,8 @@ class ComplexAdv:
         return self._adv_setting.search_auto_budget_daily_limit
 
     @property
-    def auto_budget_watchdog_enabled(self) -> bool: # настройка отвечает за управление активностью РК в целом: от пополнения бюджета до активности
+    def auto_budget_watchdog_enabled(self) -> bool:
+        """Флаг автобюджета: free top-up и paid start/pause (см. auto_budget_watchdog)."""
         return bool(self._adv_setting.auto_budget_watchdog_enabled)
 
     @property

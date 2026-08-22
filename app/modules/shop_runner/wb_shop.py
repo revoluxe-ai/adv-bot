@@ -74,7 +74,10 @@ class WBShop:
                 tg.create_task(coroutines_manager.preload_min_bids_cache_old(only_bot_active=False)) # в бесплатку
                 tg.create_task(coroutines_manager.handle_stats_stale_emergency(only_bot_active=True)) # платка
                 tg.create_task(coroutines_manager.update_plan_fact_stats(only_bot_active=False)) # в бесплатку
-                tg.create_task(coroutines_manager.auto_budget_watchdog(only_bot_active=False)) # бесплатно
+                # Mixed: пополнение бюджета — free (все РК с флагом); start/pause — paid
+                # (gate bot_active внутри AutoAdvActiveControlService). См. docstring
+                # auto_budget_watchdog и openspec paid-regression design §Coroutine matrix.
+                tg.create_task(coroutines_manager.auto_budget_watchdog(only_bot_active=False))
                 tg.create_task(coroutines_manager.update_top_key_in_advs(only_bot_active=True)) # платка
                 tg.create_task(coroutines_manager.update_common_bid_in_search_adv(only_bot_active=True))  # платка
                 tg.create_task(coroutines_manager.increment_fact_data_stats(only_bot_active=False)) # бесплатно

@@ -167,9 +167,12 @@ class WbWalletOkCache:
 
 
 class AutoAdvActiveControlService:
-    """Управление активностью РК: пауза/запуск по бюджету и расписанию.
+    """Управление активностью РК: пауза/запуск по бюджету и расписанию (paid ACT).
 
-    Обрабатывает только кампании с bot_active и auto_budget_watchdog_enabled.
+    Пополнение бюджета — отдельный free-path в ``CoroutinesManager.auto_budget_watchdog``
+    (``ensure_budget``). Этот сервис **не** пополняет счёт кампании.
+
+    Обрабатывает только кампании с ``bot_active`` и ``auto_budget_watchdog_enabled``.
     Для них применяет лимиты бюджета и ограничения по времени (расписание/даты).
     """
 
@@ -218,7 +221,7 @@ class AutoAdvActiveControlService:
             adv
             for adv in advs
             if adv.bot_active
-            and adv.auto_budget_watchdog_enabled  # управление активностью РК: бюджет, пополнение, расписание
+            and adv.auto_budget_watchdog_enabled  # paid: start/pause (top-up — в watchdog)
             and not should_suppress_budget_and_activity_restart(
                 getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
             )

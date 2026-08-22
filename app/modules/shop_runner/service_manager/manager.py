@@ -921,13 +921,23 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def auto_budget_watchdog(self, only_bot_active: bool = False) -> None:
-        """Сначала автопополнение бюджетов (если есть кандидаты), затем запуск/пауза РК.
+        """Автобюджет: пополнение (free) и контроль активности (paid).
 
-        Раньше `auto_adv_active_control` крутился отдельной задачей с тем же интервалом,
+        Смешанная корутина (openspec paid-regression-bot-active-gates, Mixed):
+
+        - **Пополнение бюджета** (``ensure_budget`` / ``ensure_common_budget``):
+          free-пакет. Кандидаты — все РК с ``auto_budget_watchdog_enabled`` и лимитом;
+          ``bot_active`` **не** требуется. ``only_bot_active=False`` в ``WBShop.run()``
+          — намеренно.
+        - **Start/pause по бюджету и расписанию** (``_run_auto_adv_active_control``):
+          paid ACT. Внутри ``AutoAdvActiveControlService`` отсекаются РК без
+          ``bot_active=True``.
+
+        Раньше ``auto_adv_active_control`` крутился отдельной задачей с тем же интервалом,
         из‑за чего WB мог отвечать ``Low Budget`` на ``start`` до пополнения счёта кампании.
 
-        Контроль активности (`_run_auto_adv_active_control`) вызывается в `finally` и выполняется
-        каждый тик, даже если нет РК под автобюджет или список кампаний пуст.
+        Контроль активности вызывается в ``finally`` и выполняется каждый тик, даже если
+        нет РК под автобюджет или список кампаний пуст.
         """
         advs = await self._wb_shop_data_manager.get_complex_advs(
             load_extras=False,
@@ -940,6 +950,7 @@ class CoroutinesManager:
                 should_suppress_budget_and_activity_restart,
             )
 
+            # Free write-path: top-up без bot_active (см. docstring корутины).
             candidates: list[ComplexAdv] = [
                 adv
                 for adv in advs
@@ -1041,6 +1052,7 @@ class CoroutinesManager:
                     )
             return None
         finally:
+            # Paid ACT: start/pause — gate bot_active внутри ensure_campaigns_active.
             await self._run_auto_adv_active_control(advs)
             logger.info(
                 "heartbeat auto_budget_watchdog shop_id=%s advs=%s",
@@ -1049,6 +1061,7 @@ class CoroutinesManager:
             )
 
     async def _run_auto_adv_active_control(self, advs: list[ComplexAdv]) -> None:
+        """Запуск/пауза РК по бюджету и расписанию (paid-only внутри сервиса)."""
         wb_manager_hub = self._wb_manager_hub
         service = AutoAdvActiveControlService(
             wb_modifier=wb_manager_hub.wb_modifier,
