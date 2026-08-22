@@ -933,7 +933,7 @@ def get_shop_menu_keyboard(
     if is_active_adv:
         _ = builder.row(
             InlineKeyboardButton(
-                text="Отключить все кампании",
+                text="Полностью отключить бот от управления всех РК",
                 callback_data=callbacks.TurnBot(
                     action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
                 ).pack(),

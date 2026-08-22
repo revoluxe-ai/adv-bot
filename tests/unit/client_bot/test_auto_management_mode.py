@@ -229,16 +229,22 @@ def test_apply_free_mode_transition_sets_bot_active_false(
     adv_setting = AdvSetting(
         bot_active=True,
         bidder_active=True,
+        bidder_for_auto=True,
         auto_update_target_place=True,
         auto_update_white_list=True,
+        auto_update_minus_phrases=True,
+        automatic_version=3,
     )
 
     apply_free_mode_transition(adv_setting, wb_cabinet)
 
     assert adv_setting.bot_active is False
     assert adv_setting.bidder_active is False
+    assert adv_setting.bidder_for_auto is False
+    assert adv_setting.automatic_version == 2
     assert adv_setting.auto_update_target_place is False
     assert adv_setting.auto_update_white_list is False
+    assert adv_setting.auto_update_minus_phrases is False
 
 
 def test_backward_compatible_transition_wrappers_call_same_behavior(

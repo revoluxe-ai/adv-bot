@@ -10,6 +10,9 @@ from app.client_bot.user_interface.message_templates.templates import TextWithKe
 from app.client_bot.user_interface.views import callbacks
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
 
+_TURN_BOT_OFF_BUTTON_TEXT = "⏸ Полностью отключить бот от управления РК"
+_TURN_BOT_ON_BUTTON_TEXT = "✅ Включить автоуправление"
+
 
 class AutoManagementLanding(TextWithKeyboard):
     """Короткий landing-экран автоуправления рекламой по выбранной кампании."""
@@ -54,9 +57,9 @@ class AutoManagementLanding(TextWithKeyboard):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         toggle_text = (
-            "⏸ Выключить автоуправление"
+            _TURN_BOT_OFF_BUTTON_TEXT
             if self._adv_setting.bot_active
-            else "✅ Включить автоуправление"
+            else _TURN_BOT_ON_BUTTON_TEXT
         )
         toggle_action = "off" if self._adv_setting.bot_active else "on"
         return InlineKeyboardMarkup(

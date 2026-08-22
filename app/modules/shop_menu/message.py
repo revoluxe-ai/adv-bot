@@ -213,7 +213,7 @@ def build_shop_mass_adv_ops_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
-            text="Отключить все кампании",
+            text="Полностью отключить бот от управления всех РК",
             callback_data=TurnBot(
                 action="off_all",
                 wb_user_cabinet_original_id=wb_user_cabinet.id,

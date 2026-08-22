@@ -656,7 +656,10 @@ async def turn_adv_off_all(
 
     chat_id = callback.message.chat.id
 
-    await bot.send_message(callback.message.chat.id, "Отключаю бота от всех кампаний")
+    await bot.send_message(
+        callback.message.chat.id,
+        "Полностью отключаю бот от управления всех РК…",
+    )
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
         advs = await _load_adv_settings_for_cabinet_for_update_in_session(
@@ -665,6 +668,7 @@ async def turn_adv_off_all(
         # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         for adv_ in advs:
             apply_free_mode_transition(adv_, adv_.wb_cabinet)
+            adv_.auto_budget_watchdog_enabled = False
         await session.commit()
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()
     return
@@ -700,6 +704,7 @@ async def turn_adv_off(
             )
         # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         apply_free_mode_transition(adv_setting, wb_user_cabinet.wb_cabinet)
+        adv_setting.auto_budget_watchdog_enabled = False
         await session.commit()
 
     await AdvSettingMenu(

@@ -74,7 +74,7 @@ def test_landing_keyboard_for_disabled_campaign_contains_enable_balance_help_and
             "⬅️ Назад",
         ],
     )
-    assert "⏸ Выключить автоуправление" not in texts
+    assert "⏸ Полностью отключить бот от управления РК" not in texts
     assert keyboard.inline_keyboard[0][0].callback_data == callbacks.TurnBot(
         action="on",
         adv_original_id=77,
@@ -97,7 +97,7 @@ def test_landing_keyboard_for_enabled_campaign_contains_disable_button() -> None
     keyboard = landing.keyboard
     texts = extract_button_texts(keyboard)
 
-    assert "⏸ Выключить автоуправление" in texts
+    assert "⏸ Полностью отключить бот от управления РК" in texts
     assert "✅ Включить автоуправление" not in texts
     assert keyboard.inline_keyboard[0][0].callback_data == callbacks.TurnBot(
         action="off",

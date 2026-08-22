@@ -583,6 +583,7 @@ async def test_turn_adv_off_applies_free_transition_only(
     adv_setting.auto_update_target_place = True
     adv_setting.bidder_for_auto = True
     adv_setting.bidder_active = True
+    adv_setting.auto_budget_watchdog_enabled = True
     adv_setting.max_place = 7
     adv_setting.max_cpm = 4567
     await async_session.flush()
@@ -638,6 +639,7 @@ async def test_turn_adv_off_applies_free_transition_only(
     assert updated_adv_setting.max_place == 7
     assert updated_adv_setting.max_cpm == 4567
     assert updated_adv_setting.auto_update_minus_phrases is False
+    assert updated_adv_setting.auto_budget_watchdog_enabled is False
 
 
 @pytest.mark.integration

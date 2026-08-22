@@ -316,6 +316,7 @@ async def test_turn_adv_off_applies_free_transition() -> None:
     adv.auto_update_target_place = True
     adv.bidder_for_auto = True
     adv.bidder_active = True
+    adv.auto_budget_watchdog_enabled = True
     adv.max_place = 9
     adv.max_cpm = 1234
 
@@ -348,6 +349,7 @@ async def test_turn_adv_off_applies_free_transition() -> None:
     assert adv.auto_update_target_place is False
     assert adv.bidder_for_auto is False
     assert adv.bidder_active is False
+    assert adv.auto_budget_watchdog_enabled is False
     assert adv.max_place == 9
     assert adv.max_cpm == 1234
     session.commit.assert_awaited_once()

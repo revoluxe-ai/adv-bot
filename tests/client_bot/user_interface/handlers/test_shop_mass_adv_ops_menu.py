@@ -31,7 +31,7 @@ async def test_open_shop_mass_adv_ops_menu_edits_reply_markup() -> None:
     callback.message.edit_reply_markup.assert_awaited_once()
     reply_markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]
-    assert "Отключить все кампании" in texts
+    assert "Полностью отключить бот от управления всех РК" in texts
     assert "Применить дефолты всем кампаниям" in texts
     assert "Сбросить все НРФ во всех РК" in texts
     assert "Назад" in texts
@@ -71,4 +71,4 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
     reply_markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]
     assert "Массовые операции с РК" in texts
-    assert "Отключить все кампании" not in texts
+    assert "Полностью отключить бот от управления всех РК" not in texts
