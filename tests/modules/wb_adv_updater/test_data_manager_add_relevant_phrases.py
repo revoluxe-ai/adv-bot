@@ -13,7 +13,7 @@ from app.modules.wb_adv_updater import data_manager
 def adv_v3() -> MagicMock:
     adv = MagicMock(spec=AdvSetting)
     adv.id = 10
-    adv.automatic_version = 3
+    adv.bot_active = True
     return adv
 
 

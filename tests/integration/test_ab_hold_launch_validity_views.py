@@ -24,6 +24,8 @@ from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import (
     full_wb_adv_stat,
 )
 
+pytestmark = pytest.mark.integration
+
 
 class _DummyResult:
     def __init__(self, rows: list[tuple]) -> None:

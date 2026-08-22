@@ -11,6 +11,7 @@ from typing import Protocol, Sequence, TypeVar
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.mode import (
     CardAbHoldMode,
     is_ab_hold_structural_freeze,
+    is_epoch_managed_ab_hold,
     normalize_card_ab_hold_mode,
 )
 
@@ -35,6 +36,19 @@ def should_run_ab_hold(mode: CardAbHoldMode | str | None) -> bool:
     return normalize_card_ab_hold_mode(mode) == CardAbHoldMode.ACTIVE
 
 
+def should_run_ab_epoch(
+    mode: CardAbHoldMode | str | None,
+    phase: str | None,
+) -> bool:
+    """``PENDING_SETUP`` + non-NULL phase → epoch tick (§19–§22), не legacy setup.
+
+    Legacy MVP-1 (``phase IS NULL``) MUST продолжать ``process_ab_setup``.
+    """
+    if normalize_card_ab_hold_mode(mode) != CardAbHoldMode.PENDING_SETUP:
+        return False
+    return is_epoch_managed_ab_hold(phase=phase)
+
+
 def should_schedule_ordinary_updater(mode: CardAbHoldMode | str | None) -> bool:
     """Ordinary V2/V3 structural только при OFF."""
     return normalize_card_ab_hold_mode(mode) == CardAbHoldMode.OFF
@@ -52,21 +66,6 @@ def should_allow_bidder_on_ab_hold(mode: CardAbHoldMode | str | None) -> bool:
     """
     _ = mode
     return True
-
-
-def is_switch_to_version_blocked_by_ab_hold(
-    *,
-    new_version: int,
-    mode: CardAbHoldMode | str | None,
-) -> bool:
-    """True: переключение auto-updater на V2 запрещено при активном A/B Hold.
-
-    Decision §12: пока mode PENDING_SETUP / ACTIVE, downgrade на V2 MUST быть
-    заблокирован (сначала EXIT → OFF). Переключение на V3 всегда разрешено.
-    """
-    if int(new_version) != 2:
-        return False
-    return is_ab_hold_structural_freeze(mode)
 
 
 def filter_structural_act_candidates(advs: Sequence[TAdv]) -> list[TAdv]:

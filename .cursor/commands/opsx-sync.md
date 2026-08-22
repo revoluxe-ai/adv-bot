@@ -13,7 +13,9 @@ This is an **agent-driven** operation - you will read delta specs and directly e
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_sync --strict`. Stop on non-zero exit and report the guard output.
 
-**Input**: Optionally specify a change name after `/opsx:sync` (e.g., `/opsx:sync add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Input**: Optionally specify a change name after `/opsx-sync` (e.g., `/opsx-sync add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+
+**Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`. When the change name is known, use `openspec` CLI / `openspec/changes/<name>/` exact paths; do not rediscover the change via repo-wide file inventory; do not gate on unconditional `git status`.
 
 **Steps**
 

@@ -48,7 +48,6 @@ def apply_defaults_to_adv_setting(adv_setting: AdvSetting, wb_cabinet: WBCabinet
     adv_setting.bidder_active = defaults_v1.bidder_active
     adv_setting.bidder_for_auto = defaults_v1.bidder_for_auto
     adv_setting.bidder_mode = defaults_v1.bidder_mode
-    adv_setting.automatic_version = defaults_v1.automatic_version
     adv_setting.bidder_coroutine_type = defaults_v1.bidder_coroutine_type
     adv_setting.orders_source_for_auto_mode = defaults_v1.orders_source_for_auto_mode
     adv_setting.sales_predict_method = defaults_v1.sales_predict_method

@@ -6,6 +6,8 @@ from app.modules.auto_budget_manager.service import AutoBudgetService
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 
 
+
+pytestmark = pytest.mark.destructive_local
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_wb_shop_id_fetches_shop_id(async_session) -> None:

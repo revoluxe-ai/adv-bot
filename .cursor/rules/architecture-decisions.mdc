@@ -7,23 +7,42 @@ alwaysApply: true
 
 ## Контекст применения
 
-Правило действует для всех OpenSpec changes и `/opsx:*` workflow. Registry в
+Правило действует для всех OpenSpec changes и `/opsx-*` workflow. Registry в
 `openspec/decisions/` является постоянным source of truth для ownership,
 layering, write-path placement и domain invariants.
 
 ## Основные принципы
 
-1. Перед proposal/design/apply/verify/archive искать
-   `openspec/decisions/**/*.md`.
+1. Перед proposal/design/apply/verify/archive резолвить architecture decisions
+   **context-first** (см. `.cursor/commands/opsx-source-resolution.md` и
+   Read I/O budgets в `.cursor/commands/opsx-execution-preflight.md`):
+   - сначала exact paths из change context / `artifactPaths.decisions` /
+     user-supplied paths / `openspec/decisions/index.md` при необходимости;
+   - затем только declared / referenced decisions;
+   - `openspec/decisions/**/*.md` — только bounded fallback для remaining
+     gaps после context paths (типичный budget ≤ 3 targeted lookups unless
+     `EVIDENCE_GAP` is recorded), не полный рекурсивный dump всех
+     decision-файлов.
 2. Если задача затрагивает ownership, layering, write-path или domain invariant,
    найденные решения цитировать по path.
-3. Если relevant decision отсутствует, явно писать `Architecture Decision Missing`.
-4. Если корректный placement зависит от нового reusable architecture rule,
+3. Исчерпание fallback budget (≤ 3) при незакрытых gaps по ownership /
+   layering / write-path / domain invariant **не** означает «решения нет»:
+   записать `EVIDENCE_GAP` и остановить workflow с `NO_GO` без правок кода
+   (релевантное accepted decision могло остаться непрочитанным).
+4. `Architecture Decision Missing` — только когда lookup в пределах budget
+   (или после зафиксированного расширения `EVIDENCE_GAP`) заключает, что
+   релевантного decision нет; тогда явно писать
+   `Architecture Decision Missing` / `EVIDENCE_GAP` и pause / propose.
+   Sibling OPSX commands (verify / apply / propose / update) and their
+   skill/prompt mirrors MUST emit the exact token
+   `Architecture Decision Missing` for ADL absence; local synonyms
+   (e.g. `missing_required_decision`) are forbidden.
+5. Если корректный placement зависит от нового reusable architecture rule,
    создать proposed decision artifact в `openspec/changes/<change>/decisions/`
    до implementation-readiness, используя `rules.decisions`.
-5. Если code placement противоречит accepted decision, останавливать workflow с
+6. Если code placement противоречит accepted decision, останавливать workflow с
    `NO_GO`; passing tests не являются достаточным доказательством.
-6. При archive reusable proposed decisions промотятся из
+7. При archive reusable proposed decisions промотятся из
    `openspec/changes/<change>/decisions/` в `openspec/decisions/`; если
    промотить нечего, workflow явно пишет это.
 
@@ -34,7 +53,7 @@ layering, write-path placement и domain invariants.
 - `## Architecture Decision References`
 - `## Ownership & Placement`
 - checklist:
-  - existing decisions searched;
+  - context-first decision lookup performed (bounded fallback only if needed);
   - relevant decisions cited;
   - new decision proposed if missing;
   - implementation layer matches decision.

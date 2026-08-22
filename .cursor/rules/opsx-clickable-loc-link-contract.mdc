@@ -1,0 +1,28 @@
+---
+description: Cursor-clickable LOC_LINK contract for OPSX report commands
+globs:
+  - .cursor/commands/opsx-external-call-coverage.md
+  - .cursor/commands/opsx-close-external-gap.md
+  - .cursor/commands/opsx-bug-hunt.md
+  - .cursor/commands/opsx-project-bug-hunt.md
+  - .cursor/commands/opsx-performance-review.md
+  - .cursor/commands/opsx-performance-fix.md
+alwaysApply: false
+---
+
+# OPSX clickable LOC_LINK contract
+
+Use one cross-command location format for report items that reference code:
+
+`LOC_LINK: <repo-relative-path>:<line>`
+
+Mandatory rules:
+
+1. If an output item references production/test code location (finding, gap, packet item, seam, test node), that item MUST include `LOC_LINK`.
+2. `LOC_LINK` must be plain `path:line` text (Cursor-clickable). Do not use `file://` as the only format.
+3. Keep `PATH` (file-only) optional/additive; `PATH` alone is insufficient when code-location is known.
+4. Line source priority:
+   - boundary call / changed hunk line;
+   - symbol definition line (`def` / `class`) as fallback.
+5. If exact line is unknown after bounded lookup, emit fallback symbol line and add short note explaining fallback.
+6. Self-check sections of report commands must explicitly validate `LOC_LINK` presence for all relevant items.

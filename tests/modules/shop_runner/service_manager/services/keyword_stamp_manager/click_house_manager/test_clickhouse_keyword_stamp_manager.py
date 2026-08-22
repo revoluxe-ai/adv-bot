@@ -1,27 +1,35 @@
-"""Integration tests: require real ClickHouse (clickhouse_client fixture)."""
+"""Integration: keyword stamp CH manager on Guarded test DB (no CREATE DATABASE).
+
+Production inserts/queries use ``default_db.*``; tests rewrite to
+``test_adv_bot_clickhouse.*`` before the destructive guard. Database
+CREATE/DROP is forbidden — only qualified TABLE DDL/DML.
+"""
 
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
 
 import pytest
 from clickhouse_connect.driver import AsyncClient
 
 from app.core.mp.wb.dto import KeywordPosition
+import app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.click_house_manager as keyword_stamp_ch_module
 from app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager import (
     ClickHouseKeywordJamStatManager,
 )
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
 from tests.factories import KeywordStatFromJamFactory
+from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 
-pytestmark = pytest.mark.integration
+pytestmark = pytest.mark.destructive_local
 
 
 @pytest.mark.asyncio
-async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: AsyncClient) -> None:
-    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS default_db")
-
-    table_name = "default_db.keyword_position_from_api"
+async def test_update_positions_inserts_dat_into_clickhouse(
+    clickhouse_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CREATE/TRUNCATE TABLE → update_positions via rewrite → assert row count/fields."""
+    table_name = "test_adv_bot_clickhouse.keyword_position_from_api"
     _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table_name}")
     create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS {table_name}
@@ -43,16 +51,10 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
     num_positions = 3
     test_positions: list[KeywordPosition] = KeywordStatFromJamFactory.build_batch(num_positions)
 
-    with patch(
-        "app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.click_house_manager.get_clickhouse_client"
-    ) as get_clickhouse_client_mock:
-        cm = AsyncMock()
-        cm.__aenter__.return_value = clickhouse_client
-        cm.__aexit__.return_value = None
-
-        get_clickhouse_client_mock.return_value = cm
-
-        await ClickHouseKeywordJamStatManager.update_positions(test_positions)
+    patch_get_clickhouse_client(
+        monkeypatch, [keyword_stamp_ch_module], clickhouse_client
+    )
+    await ClickHouseKeywordJamStatManager.update_positions(test_positions)
     async with anti_ch_crash_semaphore:
         count_result = await clickhouse_client.query(f"SELECT COUNT(*) FROM {table_name}")
     assert count_result.result_rows[0][0] == num_positions
@@ -80,11 +82,13 @@ async def test_update_positions_inserts_dat_into_clickhouse(clickhouse_client: A
 
 
 @pytest.mark.asyncio
-async def test_get_last_positions_returns_total_orders(clickhouse_client: AsyncClient) -> None:
-    _ = await clickhouse_client.command("CREATE DATABASE IF NOT EXISTS default_db")
-
-    stamp_table = "default_db.keyword_stamp"
-    positions_table = "default_db.keyword_position_from_api"
+async def test_get_last_positions_returns_total_orders(
+    clickhouse_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Seed stamp/positions tables → get_last_positions via rewrite → assert aggregates."""
+    stamp_table = "test_adv_bot_clickhouse.keyword_stamp"
+    positions_table = "test_adv_bot_clickhouse.keyword_position_from_api"
 
     for table in (stamp_table, positions_table):
         _ = await clickhouse_client.command(f"DROP TABLE IF EXISTS {table}")
@@ -175,15 +179,10 @@ async def test_get_last_positions_returns_total_orders(clickhouse_client: AsyncC
 
     adv_setting = SimpleNamespace(nmids=[1], adv_id=100, type=8)
 
-    with patch(
-        "app.modules.shop_runner.service_manager.services.keyword_stamp_manager.click_house_manager.click_house_manager.get_clickhouse_client"
-    ) as get_clickhouse_client_mock:
-        cm = AsyncMock()
-        cm.__aenter__.return_value = clickhouse_client
-        cm.__aexit__.return_value = None
-        get_clickhouse_client_mock.return_value = cm
-
-        positions = await ClickHouseKeywordJamStatManager.get_last_positions(adv_setting)
+    patch_get_clickhouse_client(
+        monkeypatch, [keyword_stamp_ch_module], clickhouse_client
+    )
+    positions = await ClickHouseKeywordJamStatManager.get_last_positions(adv_setting)
 
     assert len(positions) == 2
     totals = {pos.keyword_text: pos.total_orders for pos in positions}

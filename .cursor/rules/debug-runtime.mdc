@@ -52,7 +52,6 @@ git branch --show-current
 - изменения БД, секретов, прав, grants
 - изменение PgBouncer / Postgres / ClickHouse / Redis **deployments** в k8s
 - ручной `kubectl port-forward`
-- ручной `.\scripts\dev-tunnels.ps1`
 - Redis port-forward в k8s
 - отдельные debug-скрипты вместо production entrypoint, если entrypoint подходит
 - retry / fail-open / fail-safe как «fix»

@@ -17,7 +17,7 @@ from app.modules.wb_adv_updater import data_manager
 def adv_v3_max() -> MagicMock:
     adv = MagicMock(spec=AdvSetting)
     adv.id = 10
-    adv.automatic_version = 3
+    adv.bot_active = True
     adv.strategy = Strategy.MAX_CONV
     return adv
 

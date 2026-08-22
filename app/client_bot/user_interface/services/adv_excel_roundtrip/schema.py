@@ -30,8 +30,8 @@ TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 # v3: добавлена EDIT-колонка для cap шагов калибратора V3 — ``keyword_calibration_max_step``.
 # v4: добавлены колонки биддера полок ``auto_shelf_bid_control``.
 # v5: EDIT-колонка ``substitute_fact_cpo_for_max`` (V3 Raise MAX).
-# v6: удалена EDIT-колонка ``card_ab_hold_mode`` (decision §9 / spec — Excel out of MVP).
-EXCEL_TEMPLATE_VERSION = 6
+# v7: ``automatic_version`` исключена из Excel (legacy DB-колонка; SoT — ``bot_active``).
+EXCEL_TEMPLATE_VERSION = 7
 
 # Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
 READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
@@ -87,7 +87,6 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "orders_source_for_auto_mode",
         "predict_ctr_mode",
         "sales_predict_method",
-        "automatic_version",
         "aggressiveness",
         "keyword_calibration_max_step",
         "white_list_mode",
@@ -269,7 +268,6 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "orders_source_for_auto_mode": "Источник заказов для авто-режима",
     "predict_ctr_mode": "Режим прогноза CTR",
     "sales_predict_method": "Метод прогноза продаж",
-    "automatic_version": "Версия автоматики",
     "aggressiveness": "V3: агрессивность раскрутки (1–3, вне полок)",
     "keyword_calibration_max_step": "V3: макс. шаг калибратора",
     "white_list_mode": "Режим белого списка",

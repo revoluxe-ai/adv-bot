@@ -26,6 +26,7 @@ _AUTO_SHELF_BID_CONTROL_ACTION_CODES: dict[str, str] = {
     "set_target_test_impressions": "tti",
     "set_target_test_observation_minutes": "tto",
     "set_min_bid_distance": "md",
+    "set_retest_interval_days": "rid",
     "strategy_menu": "sm",
     "set_strategy_plan_distance": "sp",
     "set_strategy_ctr": "sc",
@@ -525,23 +526,6 @@ class TargetPositionModeToggle(CallbackData, prefix="target_position_mode_toggle
 class SalesPredictMethodToggle(CallbackData, prefix="sales_predict_method_toggle"):
     new_method: FactMethods
     adv_setting_original_id: int
-
-
-class AutoUpdaterVersionToggle(CallbackData, prefix="auto_updater_version_toggle"):
-    new_version: int
-    adv_setting_original_id: int
-
-
-class AutoUpdaterVersionMenuOpen(CallbackData, prefix="auto_updater_ver_menu_open"):
-    """Открыть отдельное сообщение с выбором версии АвтоАпдейтера."""
-
-    adv_setting_original_id: int
-
-
-class AutoUpdaterVersionMenuBack(CallbackData, prefix="auto_updater_ver_menu_back"):
-    """Закрыть сообщение подменю версии (кнопка «Назад»)."""
-
-    pass
 
 
 class V3RolloutAggMenuOpen(CallbackData, prefix="v3_rollout_agg_menu_open"):

@@ -1,6 +1,6 @@
 ---
 name: openspec-propose
-description: Propose a new change with all artifacts generated in one step. Use when the user wants to quickly describe what they want to build and get a complete proposal with design, specs, and tasks ready for implementation.
+description: "OBSOLETE (GRAPH F5) — do not use; redirect to /opsx-new|/opsx-ff|/opsx-update. Kept on disk only."
 allowed-tools: Bash(openspec:*)
 license: MIT
 compatibility: Requires openspec CLI.
@@ -10,6 +10,24 @@ metadata:
   generatedBy: "1.6.0"
 ---
 
+# OBSOLETE — do not recommend (GRAPH F5)
+
+This skill is **obsolescent**. Do **not** create changes through it.
+
+**Redirect (mandatory on invoke):**
+
+| Situation | Use instead |
+|---|---|
+| New change (step-by-step) | `/opsx-new` then `/opsx-continue` |
+| New change (all artifacts at once) | `/opsx-ff` |
+| Existing change — revise planning | `/opsx-update` |
+
+On invoke: state the obsolescence, print the redirect table, and **stop** —
+do **not** run `openspec new change` or write artifacts via this skill.
+Body below is historical only.
+
+---
+
 Propose a new change - create the change and generate all artifacts in one step.
 
 I'll create a change with artifacts:
@@ -17,7 +35,7 @@ I'll create a change with artifacts:
 - design.md (how)
 - tasks.md (implementation steps)
 
-When ready to implement, run /opsx:apply
+When ready to implement, run /opsx-apply
 
 ---
 
@@ -55,7 +73,7 @@ When ready to implement, run /opsx:apply
 
 4. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Check `artifactPaths.decisions.existingOutputPaths` for already-proposed decisions in the change.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - If the requested change needs architecture placement but no relevant decision exists, output `Architecture Decision Missing`.
@@ -105,7 +123,7 @@ After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
 - What's ready: "All artifacts created! Ready for implementation."
-- Prompt: "Run `/opsx:apply` or ask me to implement to start working on the tasks."
+- Prompt: "Run `/opsx-apply` or ask me to implement to start working on the tasks."
 
 **Artifact Creation Guidelines**
 

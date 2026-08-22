@@ -47,11 +47,15 @@ def _stop_patches(patchers: list) -> None:
         p.stop()
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> None:
+    """state=None → no plan/fact Redis cache; no live CH via CPO loader."""
     complex_adv = MagicMock()
     complex_adv.adv_id = 1
     complex_adv.adv_setting = MagicMock()
+    complex_adv.shelf_promotion_active = False
+    complex_adv.individual_keywords_target_place_mode = False
 
     plan_fact = MagicMock()
     plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
@@ -59,44 +63,36 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_state_unknown() -> N
 
     bootstrap = MagicMock(return_value=[])
 
-    with (
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.load_v3_wb_context",
-            new=AsyncMock(return_value=(MagicMock(), {})),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.orchestrator.plan_campaign_no_data_bootstrap_safe",
-            bootstrap,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater.get_plan_data",
-            return_value=MagicMock(),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.AdvSettingAutoUpdater"
-        ) as updater_cls,
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.ChangePlanFact",
-            return_value=plan_fact,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.data_update_manager.manager.detect_campaign_state",
-            return_value=None,
-        ),
-    ):
-        updater_cls.return_value.get_fact_data = AsyncMock(return_value=MagicMock())
+    updater_cls = MagicMock()
+    updater_cls.return_value.get_fact_data = AsyncMock(return_value=MagicMock())
+    patchers = _start_patches(
+        {
+            f"{_DM}.load_v3_wb_context": AsyncMock(return_value=(MagicMock(), {})),
+            # Early-path CH: DataUpdateManager always loads CPO when dto+plan set.
+            f"{_V3_CPO}.load_campaign_orders_per_cart_7d": AsyncMock(return_value=None),
+            f"{_ORCH}.plan_campaign_no_data_bootstrap_safe": bootstrap,
+            f"{_DM}.AdvSettingAutoUpdater.get_plan_data": lambda *a, **k: MagicMock(),
+            f"{_DM}.AdvSettingAutoUpdater": updater_cls,
+            f"{_DM}.ChangePlanFact": lambda *a, **k: plan_fact,
+            f"{_DM}.detect_campaign_state": lambda *a, **k: None,
+            f"{_TL}.V3TickKeywordLedger.flush_to_db": AsyncMock(return_value=False),
+            f"{_ORCH}.persist_v3_tick_report": AsyncMock(),
+        }
+    )
+    try:
         complex_adv.get_keywords = AsyncMock(return_value=[])
-        complex_adv.shelf_promotion_active = False
-        complex_adv.individual_keywords_target_place_mode = False
         await process_adv_v3(
             complex_adv,
             wb_shop_data_manager=MagicMock(),
         )
+    finally:
+        _stop_patches(patchers)
 
     plan_fact.set_new_plan_fact.assert_not_awaited()
     bootstrap.assert_not_called()
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> None:
     """NORMAL + dto: snapshot plan/fact и views в конце каждого тика."""
@@ -162,6 +158,7 @@ async def test_process_adv_v3_caches_plan_fact_and_views_each_normal_tick() -> N
     views_cache.set_views.assert_awaited_once_with(777)
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     complex_adv = MagicMock()
@@ -206,6 +203,7 @@ async def test_process_adv_v3_does_not_cache_plan_fact_when_no_wb_dto() -> None:
     plan_fact.set_new_plan_fact.assert_not_awaited()
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_process_adv_v3_no_data_bootstrap_only_no_selector() -> None:
     """NO_DATA: bootstrap + ApplyManager; post-gate selector вызывается, NORMAL pipeline — нет."""

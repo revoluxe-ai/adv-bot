@@ -1,0 +1,61 @@
+utc_ts: 20260810-051741
+scope: default
+include_tmp: true
+discovery_opsx: true
+discovery_openspec: true
+delete_performed: false
+file_count: 1859
+approx_source_bytes: 13708235
+zip_bytes: 7540996
+archive_name: opsx-pack-20260810-051741.zip
+has_openspec_changes: true
+
+ROOT_COVERAGE:
+  - .cursor/commands: FULLY_INCLUDED
+  - .cursor/rules: FULLY_INCLUDED
+  - .cursor/skills: FULLY_INCLUDED
+  - .cursor/agents: SKIPPED (missing)
+  - .cursor/static-check: FULLY_INCLUDED
+  - .cursor/pipeline: FULLY_INCLUDED
+  - .cursor/antipattern-gate: FULLY_INCLUDED
+  - .cursor/devops: FULLY_INCLUDED
+  - .cursor/opsx-review-commands: FULLY_INCLUDED
+  - .agents: FULLY_INCLUDED
+  - .github/skills: FULLY_INCLUDED
+  - .github/prompts: FULLY_INCLUDED
+  - .github/copilot-instructions.md: FULLY_INCLUDED
+  - .github/git-commit-instructions.md: FULLY_INCLUDED
+  - AGENTS.md: FULLY_INCLUDED
+  - .opsx/adapters: FULLY_INCLUDED
+  - .opsx/import: FULLY_INCLUDED
+  - .opsx/lock.yaml: FULLY_INCLUDED
+  - .opsx/manifest.yaml: FULLY_INCLUDED
+  - .opsx/project: FULLY_INCLUDED
+  - .opsx/projectization.yaml: FULLY_INCLUDED
+  - .opsx/registry: FULLY_INCLUDED
+  - .opsx/shared: FULLY_INCLUDED
+  - .opsx/sources.yaml: FULLY_INCLUDED
+  - openspec/__init__.py: FULLY_INCLUDED
+  - openspec/changes: FULLY_INCLUDED
+  - openspec/config.yaml: FULLY_INCLUDED
+  - openspec/decisions: FULLY_INCLUDED
+  - openspec/evolution: FULLY_INCLUDED
+  - openspec/policies: FULLY_INCLUDED
+  - openspec/schemas: FULLY_INCLUDED
+  - openspec/specs: FULLY_INCLUDED
+  - openspec/tools: FULLY_INCLUDED
+  - .tmp: FULLY_INCLUDED
+  - opsx-export: SKIPPED (write-root nesting ban)
+  - .opsx/upstream: SKIPPED (missing)
+
+excluded_or_skipped:
+  - HARD_SKIP: opsx-export/** (write-root nesting ban)
+  - SKIP_PATTERNS: __pycache__/, *.pyc, .pytest_cache/, node_modules/, .cursor/settings.json, commands.zip
+
+skip_patterns:
+  - __pycache__/
+  - *.pyc
+  - .pytest_cache/
+  - node_modules/
+  - opsx-export/**
+  - .cursor/settings.json

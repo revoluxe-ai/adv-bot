@@ -629,7 +629,7 @@ class UpdateClusterBidsManager:
         with trace.phase("per_adv_filter_keywords"):
             keywords_good = [kw for kw in keywords if kw.status == KeywordStatus.GOOD]
         # V3: торги только у согласованных БС/фикс.фраз; авто+MIN_CPA и OFF отсекаются.
-        if adv.auto_updater_version == 3:
+        if adv.bot_active:
             adv_strategy = adv.strategy
             inconsistent = [
                 kw
@@ -688,7 +688,7 @@ class UpdateClusterBidsManager:
                 else:
                     target_position = adv.target_place
                     snap_to_min = False
-                v3_managed = adv.auto_updater_version == 3
+                v3_managed = adv.bot_active
                 map_data = AdvIdItemCalculateData(
                     search_adv_id=search_adv_id,
                     adv_id=adv.adv_id,
@@ -701,7 +701,7 @@ class UpdateClusterBidsManager:
                     current_cpm=current_cpm,
                     keyword_setting_original_id=kw.keyword_setting_original_id,
                     strategy_mode=(
-                        kw.strategy_mode if adv.auto_updater_version == 3 else None
+                        kw.strategy_mode if adv.bot_active else None
                     ),
                     v3_managed=v3_managed,
                     snap_to_min_bid_no_keyword_target=snap_to_min,

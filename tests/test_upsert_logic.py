@@ -1,3 +1,10 @@
+"""Destructive PG: upsert ``AdvSetting`` via ``MainAdvManager._create_complex_advs``.
+
+Baseline ``wbcabinet`` id=1 / ``shop_id=test_shop_id`` comes from
+``reset_postgres_test_data(restore_baseline=True)`` — do not INSERT it again
+(``wbcabinet_shop_id_key`` UniqueViolation).
+"""
+
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,16 +17,14 @@ from app.modules.adv_creator.backend.main_manager import MainAdvManager
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-pytestmark = pytest.mark.integration
-
-
-# access_mock и async_session теперь предоставляются через conftest.py
-
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.destructive_local,
+]
 
 
 @pytest.fixture(name="access_mock")
 def _access_mock():  # pyright: ignore[reportUnusedFunction]
+    """Access mock с shop_id, совпадающим с destructive PG baseline."""
     mock = MagicMock()
     mock.wb_cabinet = MagicMock(spec=WBCabinet)
     mock.wb_cabinet.shop_id = "test_shop_id"
@@ -27,10 +32,10 @@ def _access_mock():  # pyright: ignore[reportUnusedFunction]
 
 
 @pytest.mark.asyncio()
-
 async def test_create_complex_advs_upsert_logic(
     access_mock: Any, async_session: AsyncSession
 ):
+    """Insert then update same AdvSetting; reuse baseline WBCabinet (no re-INSERT)."""
     nmid = 518129892
     auto_adv_id_from_wb = 29918589
     search_adv_id_from_wb = 29918598
@@ -63,11 +68,6 @@ async def test_create_complex_advs_upsert_logic(
         WBAPI_mock_instance.create_search_adv = AsyncMock(
             return_value=search_adv_id_from_wb
         )
-
-        # Создаем мок для асинхронного контекстного менеджера сессии
-        mock_session_context_manager = AsyncMock()
-        mock_session_context_manager.__aenter__.return_value = async_session
-        mock_session_context_manager.__aexit__.return_value = None
 
         # Мокаем sm, чтобы он возвращал объект, имитирующий асинхронный контекстный менеджер
         def mock_get_async_session_maker(read_only: bool):
@@ -106,12 +106,13 @@ async def test_create_complex_advs_upsert_logic(
             new=mock_di_create,
         ):
             manager = MainAdvManager(access_mock, MagicMock())
-            # Seed WBCabinet in test DB so __create_complex_advs can select it by id.
-            wb_cabinet_db = WBCabinet(shop_id=access_mock.wb_cabinet.shop_id)
-            async_session.add(wb_cabinet_db)
-            await async_session.flush()
+            # Baseline from reset_postgres_test_data — не INSERT shop_id=test_shop_id.
+            wb_cabinet_db = await async_session.get(WBCabinet, 1)
+            assert wb_cabinet_db is not None, (
+                "expected baseline wbcabinet id=1 from reset_postgres_test_data"
+            )
+            assert wb_cabinet_db.shop_id == "test_shop_id"
             access_mock.wb_cabinet.id = wb_cabinet_db.id
-            await async_session.commit()
 
             # # 1. Первый запуск: кампания ещё не существует в БД
             await manager._create_complex_advs(nmid)  # type: ignore[attr-defined]

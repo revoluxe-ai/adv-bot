@@ -26,19 +26,19 @@ def can_enable_card_ab_hold(adv_setting: AdvSetting) -> bool:
 
 
 def can_enable_card_ab_hold_on_version(adv_setting: AdvSetting | object) -> bool:
-    """A/B Hold — только V3 auto-updater (decision §12 / spec V3-only).
+    """A/B Hold — только при включённом боте (V3 runtime).
 
-    Отдельный gate от ``can_enable_card_ab_hold`` (paid ``bot_active``): даёт
-    свою причину, если РК не на V3 (``automatic_version != 3``).
+    Отдельный gate от ``can_enable_card_ab_hold`` сохранён для совместимости
+    call-site'ов и отдельного UX-сообщения.
     """
-    return is_v3_campaign(getattr(adv_setting, "automatic_version", None))
+    return is_v3_campaign(bool(getattr(adv_setting, "bot_active", False)))
 
 
 def card_ab_hold_requires_v3_message() -> str:
-    """Причина блокировки enable, когда РК не на V3 (decision §12)."""
+    """Причина блокировки enable, когда бот выключен."""
     return (
-        "A/B Hold доступен только для V3 авто-апдейтера. "
-        "Переключите РК на V3 и повторите включение."
+        "A/B Hold доступен только при включённом боте. "
+        "Включите бота для РК и повторите."
     )
 
 

@@ -1,0 +1,198 @@
+# Invariant-Family Fanout Activation Report (V8–V10)
+
+## OWNER_DECISION
+
+```text
+OWNER_ACTIVATION_DECISION: ACTIVATE_INVARIANT_FAMILY_FANOUT
+COMMAND: /opsx-bug-team
+ACTIVATION_MODE: CONTROLLED_LIVE_UNCOMMITTED
+BUG_FAMILY_FANOUT_ENABLED: true
+COMMIT_AUTHORITY: OWNER_ONLY
+```
+
+Owner activated verified invariant-family fanout V8–V10 on top of current
+`/opsx-bug-team` ACTIVE_V1. This is **not** command-native v2 migration.
+
+## CONTROLLING_INDEPENDENT_VERDICT
+
+```text
+STATUS: OPSX_BUG_TEAM_INDEPENDENT_EXECUTION_IDENTITY_TARGETED_RERUN_COMPLETE
+TEST_VERDICT: INDEPENDENT_EXECUTION_IDENTITY_TARGETED_RERUN_PASS
+V8_V10_ACTIVATION_ALLOWED: YES
+BLOCKING_FINDINGS: NONE
+EVIDENCE_ROOT: .tmp/opsx-bug-team-harness/independent-execution-identity-targeted-rerun/20260728T221214Z
+VERDICT_HASH: 50004e00937a8a43c219f5b954d9ad9e35851c8f24782aab9e8f1342ce6764eb
+```
+
+Section PASS: RUNTIME_IDENTITY_CALL_PATH, REAL_FINALIZE_LIVE_HOP_IDENTITY_PROOF,
+REAL_FINALIZATION_NEGATIVE_PROBES, RETRY_SUPERSESSION_REAL_PATH,
+FAMILY_FANOUT_IDENTITY_GATE, IDENTITY_COPY_SWAP_RESISTANCE,
+CANONICAL_IDENTITY_COMPLETENESS, FORMER_V9_BLOCKERS=ALL_REMAIN_PASS,
+PBH_006_CONTROLLED_COMPATIBILITY, SHADOW_BOUNDARY,
+CANDIDATE_FILES_CHANGED_BY_TESTER=NONE.
+
+Regression suites in controlling evidence: V10 22/22, V9 33/33, V8 28/28,
+V7 26/26, V6 31/31, V5 39/39, V4 29/29, V3 34/34, V2 18/18.
+
+## CANDIDATE_HASH_FREEZE
+
+Pre-activation freeze recorded in
+`INVARIANT_FAMILY_FANOUT_ACTIVATION_RECEIPT.json` →
+`CANDIDATE_FILE_HASHES_PRE_ACTIVATION`.
+
+Independent evidence MATCH on:
+
+- `runtime/execution_identity.py`
+- `runtime/live_task_hop.py`
+- `runtime/orchestrator.py`
+- `runtime/family_fanout.py`
+- `.cursor/commands/opsx-bug-team.md` (pre-status-sync)
+
+Runtime implementation files were **not** modified during activation.
+Only the policy feature-gate `BUG_FAMILY_FANOUT_ENABLED` was flipped
+`false → true` (relation rules unchanged).
+
+## ACTIVATION_STATE_BEFORE
+
+```text
+RUNTIME_STATUS: ACTIVE (prior V7 control-model activation)
+OWNER_ACTIVATION: ISSUED
+PIPELINE_GENERATION: (unset / ACTIVE_V1 control-model)
+BUG_FAMILY_FANOUT_ENABLED: false
+BUG_FAMILY_FANOUT_STATUS: SHADOW
+V8_IMPLEMENTATION: SHADOW_CANDIDATE
+```
+
+## ACTIVATION_STATE_AFTER
+
+```text
+RUNTIME_STATUS: ACTIVE
+OWNER_ACTIVATION: ISSUED
+ACTIVATION_MODE: CONTROLLED_LIVE_UNCOMMITTED
+PIPELINE_GENERATION: ACTIVE_V1_WITH_INVARIANT_FANOUT_V10
+BUG_FAMILY_FANOUT_ENABLED: true
+BUG_FAMILY_FANOUT_STATUS: ACTIVE
+ACTIVATION_RECEIPT_PATH: .cursor/pipeline/bug-team/INVARIANT_FAMILY_FANOUT_ACTIVATION_RECEIPT.json
+```
+
+## FANOUT_POLICY_STATE
+
+```text
+POLICY: .cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json
+BUG_FAMILY_FANOUT_ENABLED: true
+V8_IMPLEMENTATION: ACTIVE
+CURRENT_ACTIVE_RUNTIME: ACTIVE_V1_WITH_INVARIANT_FANOUT_V10
+SAME_INVARIANT_AUTOMATIC_FANOUT: ENABLED
+MANUAL_SIBLING_RELAUNCH_REQUIRED: NO
+```
+
+## EXECUTION_IDENTITY_GATE
+
+```text
+STATUS: ACTIVE
+AUTHORITY: runtime/execution_identity.py via finalize_live_hop
+FAMILY_GATE: family_fanout.assert_family_worker_identity_gate
+PROTECTED_WORKERS: RELATION_CLASSIFIER, BRANCH_CLASSIFIER, RED_WORKER,
+  IMPLEMENTATION_WORKER, GREEN_WORKER, INTEGRATION_OPERATOR,
+  FAMILY_FAN_IN_ASSEMBLER, FAMILY_LEARNING_WORKER
+```
+
+Synthetic smoke: missing identity on INTEGRATION_OPERATOR →
+`BLOCKED_EXECUTION_IDENTITY_NOT_FINALIZED` (expected reject).
+
+## CONTROL_MODEL
+
+```text
+CONTROL_MODEL: USER_REVIEWS_UNCOMMITTED_WORKTREE
+LOCAL_WORKTREE_WRITES: ALLOWED_WITHIN_VALIDATED_WORKER_BOUNDARIES
+INTERMEDIATE_OWNER_PRODUCTION_GATE: NOT_REQUIRED
+INTERMEDIATE_OWNER_CLOSURE_GATE: NOT_REQUIRED
+FINAL_CONTROL: OWNER_REVIEWS_UNCOMMITTED_GIT_DIFF
+```
+
+## FORBIDDEN_OPERATIONS
+
+```text
+GIT_COMMIT: FORBIDDEN
+GIT_PUSH: FORBIDDEN
+DEPLOY: FORBIDDEN
+EXTERNAL_PRODUCTION_MUTATIONS: FORBIDDEN
+COMMIT_AUTHORITY: OWNER_ONLY
+```
+
+## KNOWN_PLATFORM_LIMITATIONS
+
+- Host supplies the real Cursor Task agent id to finalize_live_hop.
+- Runtime reconciles that id against dispatch, packets and checkpoint.
+- Cursor may serialize implementation tasks even when parallel execution
+  is eligible and dependency-free.
+- Platform serialization is recorded honestly and is not treated as a
+  pipeline failure.
+
+## GRAPH_UPDATE
+
+```text
+MODE: UPDATE GO
+GRAPH_FINGERPRINT_BEFORE: c4c8dba1b837ed6e01445d82dccae905
+GRAPH_FINGERPRINT_AFTER: 4a43ef4d581b5dde966bd4c340de6753
+GRAPH_CHANGED: YES
+GRAPH_PATH: .cursor/pipeline/GRAPH.md
+META_PATH: .cursor/pipeline/META.md
+```
+
+Graph now indexes ROOT GREEN → INVARIANT CAPTURE → BOUNDED HUNT →
+RELATION CLASSIFICATION → SAME_INVARIANT branch fanout → INTEGRATION →
+FAMILY GREEN → FAMILY FAN-IN → LEARNING → CLOSURE, plus NEW_ROOT_CAUSE /
+FALSE_POSITIVE / OUT_OF_SCOPE / INCONCLUSIVE outcomes.
+
+## VALIDATION_RESULTS
+
+```text
+ACTIVATION_JSON_VALID: PASS
+ACTIVATION_RECEIPT_VALID: PASS
+RECEIPT_HASH_VALID: PASS
+CANDIDATE_HASHES_VALID: PASS
+CONTROLLING_VERDICT_VALID: PASS
+BUG_FAMILY_FANOUT_ENABLED: true
+RUNTIME_STATUS: ACTIVE
+FANOUT_GATE_SMOKE: PASS (FAMILY_FANOUT_ACTIVE_ALLOWED)
+ORCH_READS_ACTIVE: PASS (ACTIVE_ALLOWED)
+IDENTITY_GATE_SMOKE: PASS (rejects without validated identity)
+FORBIDDEN_OPS: PASS
+OVERALL_ACTIVATION_VALIDATION: PASS
+```
+
+## FILES_CHANGED
+
+Created:
+
+- `.cursor/pipeline/bug-team/INVARIANT_FAMILY_FANOUT_ACTIVATION_RECEIPT.json`
+- `.cursor/pipeline/bug-team/INVARIANT_FAMILY_FANOUT_ACTIVATION_REPORT.md`
+
+Updated (activation / current-status / graph only):
+
+- `.cursor/pipeline/bug-team/ACTIVATION.json`
+- `.cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json` (feature-gate flip only)
+- `.cursor/pipeline/bug-team/CANDIDATE_STATUS.md`
+- `.cursor/pipeline/bug-team/REGISTRY.md`
+- `.cursor/pipeline/bug-team/README.md`
+- `.cursor/commands/opsx-bug-team.md`
+- `.cursor/pipeline/GRAPH.md`
+- `.cursor/pipeline/META.md`
+
+```text
+RUNTIME_IMPLEMENTATION_FILES_CHANGED: NONE
+PRODUCT_FILES_CHANGED: NONE
+REAL_BUG_CASES_CHANGED: NONE
+PBH_006_RESUMED: NO
+COMMIT_CREATED: NO
+```
+
+## NEXT_AUTHORIZED_ACTION
+
+```text
+/opsx-bug-team case=BUGCASE-PBH-006 mode=resume-family-fanout
+```
+
+Do **not** execute in the activation chat. Owner reviews this receipt/report,
+then runs the resume command in a separate session when ready.

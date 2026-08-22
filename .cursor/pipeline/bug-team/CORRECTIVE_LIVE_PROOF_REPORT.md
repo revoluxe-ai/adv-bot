@@ -1,0 +1,191 @@
+# Corrective Live Proof Report
+
+```json
+{
+  "RUN_ID": "20260728T044128Z",
+  "PROOF_ROOT": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z",
+  "EXECUTION_MODE": "REVIEW_PROOF_ONLY",
+  "REAL_BUG": false,
+  "PRODUCT_WRITES": "FORBIDDEN",
+  "WORKERS": {
+    "MATERIALIZER": {
+      "WORKER_ID": "MATERIALIZER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "455990c1-13f6-4faa-964b-a021820b9920",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_MATERIALIZER_proof-b24270f4.in.json",
+      "INPUT_PACKET_SHA256": "20dd72ffcd897ca09e739f01fa3a9c1eb8b8812c0fa497045d5f236c0ccfb874",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_MATERIALIZER_proof-b24270f4.out.json",
+      "OUTPUT_PACKET_SHA256": "c005a2f6565f88eed266fcb7799f309b613e422ae2fae460fd677b3194ef58f1",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "CLAIM_WORKER": {
+      "WORKER_ID": "CLAIM_WORKER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "e14fd7c4-cf6a-4027-9671-735e0fad4feb",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_CLAIM_WORKER_proof-95793b0b.in.json",
+      "INPUT_PACKET_SHA256": "5ad82311068c32e28a7b5027accdfb97f7e4fb83f4cdf12ef51d176f7202a7f5",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_CLAIM_WORKER_proof-95793b0b.out.json",
+      "OUTPUT_PACKET_SHA256": "6373c075d67f0566737eb8b819a9d101dd45b4222de3736a80be58c1f41ef93d",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "CLASSIFIER": {
+      "WORKER_ID": "CLASSIFIER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "66f56087-ef32-46ee-8d39-f41b55007b66",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_CLASSIFIER_proof-b12c1ffe.in.json",
+      "INPUT_PACKET_SHA256": "6dc37c10b05a9208e7b5ddb923b52b28f62659dd23b6f08700e4cf53e7d46f0e",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_CLASSIFIER_proof-b12c1ffe.out.json",
+      "OUTPUT_PACKET_SHA256": "654701aed8b8224464b17b9faab02f09815d73c45ee23513d755dba437548fbd",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "SPEC_UPDATE_WORKER": {
+      "WORKER_ID": "SPEC_UPDATE_WORKER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "013d73a3-ea6d-4458-8d95-2284f988651c",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_SPEC_UPDATE_WORKER_proof-d84ee51a.in.json",
+      "INPUT_PACKET_SHA256": "e28aa22b835d99640f1df06a74800d1684be0b5829a3591be2c6735406a50082",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_SPEC_UPDATE_WORKER_proof-d84ee51a.out.json",
+      "OUTPUT_PACKET_SHA256": "98e430f2dcdf50364fcf13dae8bf7b30424d04655c17bd08a2553c56194de27f",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "RED_TEST_WORKER": {
+      "WORKER_ID": "RED_TEST_WORKER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "0419c058-fec6-46fd-8534-791c590c1c10",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_RED_TEST_WORKER_proof-86724f18.in.json",
+      "INPUT_PACKET_SHA256": "d390bfee252d38a7855232e8984b69bf40b59ef2b7571c0baa15374c23c66f8c",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_RED_TEST_WORKER_proof-86724f18.out.json",
+      "OUTPUT_PACKET_SHA256": "7662e80086749d90f06ceb30003aa47bdafbf431dabb9f420b9573ba5049bcbf",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "IMPLEMENTATION_EXECUTOR": {
+      "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "ebc0e981-9a41-4cfc-9cc1-80906945bd70",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_IMPLEMENTATION_EXECUTOR_proof-cee782a8.in.json",
+      "INPUT_PACKET_SHA256": "a971a6c3e141400c8b763d7d816d0da99acab8c55fae1550c15e6853eda72e2d",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_IMPLEMENTATION_EXECUTOR_proof-cee782a8.out.json",
+      "OUTPUT_PACKET_SHA256": "571c9ba287d05c622e6997075a0c1127c0360eb7115406a394a85e28b675b1e1",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "GREEN_VERIFIER": {
+      "WORKER_ID": "GREEN_VERIFIER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "0e68bb01-f409-4dc4-98e0-7abe60fd2ff6",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_GREEN_VERIFIER_proof-77a83fec.in.json",
+      "INPUT_PACKET_SHA256": "527c295093b020850a61af7be5bd404f7c439a5e264c9adf478f0cc5eab9ead3",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_GREEN_VERIFIER_proof-77a83fec.out.json",
+      "OUTPUT_PACKET_SHA256": "ae14d5a3fbfe61ed23ec84a8b7bd1d95e6810d33de4eddcc5698627128e156a8",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "TASK_COMPLETION_WORKER": {
+      "WORKER_ID": "TASK_COMPLETION_WORKER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "a347cc4e-e47f-43c9-9c4b-aaac3d222be0",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_TASK_COMPLETION_WORKER_proof-82818ca1.in.json",
+      "INPUT_PACKET_SHA256": "92630beb1e2d5a562930d707027dac1fa4035ce208eae83c5ae16e14f233290c",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_TASK_COMPLETION_WORKER_proof-82818ca1.out.json",
+      "OUTPUT_PACKET_SHA256": "eb35e72d255781f1364fd7fd761b368ed63b2de638b93cc500cae0b276ad91fd",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "BOUNDED_HUNTER": {
+      "WORKER_ID": "BOUNDED_HUNTER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "b4bc4d5e-811b-4d41-91bf-64a7bd524ce7",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_BOUNDED_HUNTER_proof-be486d23.in.json",
+      "INPUT_PACKET_SHA256": "e29abaa34049174e01d9e5e26f0b71a1a7a513572286c9739605d4b76a8d5a7c",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_BOUNDED_HUNTER_proof-be486d23.out.json",
+      "OUTPUT_PACKET_SHA256": "f83f51258d962fdb288cb40a0235de61584515415d21a702576a4e3a31bbc2ed",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "FAN_IN_ASSEMBLER": {
+      "WORKER_ID": "FAN_IN_ASSEMBLER",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "43e46744-8ba0-4386-b1b5-85293d1a0802",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_FAN_IN_ASSEMBLER_proof-9b7a0100.in.json",
+      "INPUT_PACKET_SHA256": "8b20e8906dac02a3f43c7ff02d0ffbaf6cdd59f0807232b7b02015e3fe14d276",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_FAN_IN_ASSEMBLER_proof-9b7a0100.out.json",
+      "OUTPUT_PACKET_SHA256": "fb5ea4b642629e3b6f80b296b993d19bc60393aa1aba649bdaca4697a6d79af7",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    },
+    "CLOSURE_OPERATOR": {
+      "WORKER_ID": "CLOSURE_OPERATOR",
+      "PROOF_MODE": "REVIEW_PROOF_ONLY",
+      "CURSOR_AGENT_ID": "7c094613-aec8-4008-887d-1257ad4101b7",
+      "INPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_CLOSURE_OPERATOR_proof-f683d0d9.in.json",
+      "INPUT_PACKET_SHA256": "41e344d7bd01267b388d75893b9d185451d7d3b04079033cbb80187fc68d92b8",
+      "OUTPUT_PACKET_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\packets\\WEX_CLOSURE_OPERATOR_proof-f683d0d9.out.json",
+      "OUTPUT_PACKET_SHA256": "e5e1341aa5119e6eb1a8101b7bfe3fd2de992c9dc781ffbe6455135ff621fcbf",
+      "SCHEMA_RESULT": "PASS",
+      "WRITE_BOUNDARY_RESULT": "PASS",
+      "TRACE_EVENT_RESULT": "PASS",
+      "CHECKPOINT_RESULT": "PASS",
+      "TERMINAL_STATUS": "PASS"
+    }
+  },
+  "FANIN_ALLOWED_PROOF": "PASS",
+  "FANIN_FORBIDDEN_WRITE": "REJECTED_FROM_FILESYSTEM_DIFF",
+  "FANIN_VIOLATION_DETAIL": {
+    "RESULT": "VIOLATION",
+    "VIOLATIONS": [
+      "LEDGER.md"
+    ]
+  },
+  "DISPATCH_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\team\\DISPATCH.jsonl",
+  "TRACE_PATH": ".tmp\\opsx-bug-team-harness\\live-runtime-proof\\20260728T044128Z\\case\\results\\ROUTE-TRACE.jsonl",
+  "LIVE_WORKERS_PROVEN": [
+    "MATERIALIZER",
+    "CLAIM_WORKER",
+    "CLASSIFIER",
+    "SPEC_UPDATE_WORKER",
+    "RED_TEST_WORKER",
+    "IMPLEMENTATION_EXECUTOR",
+    "GREEN_VERIFIER",
+    "TASK_COMPLETION_WORKER",
+    "BOUNDED_HUNTER",
+    "FAN_IN_ASSEMBLER",
+    "CLOSURE_OPERATOR"
+  ],
+  "LIVE_WORKERS_NOT_PROVEN": []
+}
+```

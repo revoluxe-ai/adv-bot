@@ -2,7 +2,26 @@
 name: /opsx-propose
 id: opsx-propose
 category: Workflow
-description: Propose a new change - create it and generate all artifacts in one step
+description: "OBSOLETE (GRAPH F5) — do not recommend; redirect to /opsx-new|/opsx-ff|/opsx-update"
+---
+
+# OBSOLETE — do not recommend (GRAPH F5)
+
+`/opsx-propose` is **obsolescent**. The command file may remain on disk, but
+agents and humans MUST NOT use it as the start path.
+
+**Redirect (mandatory on invoke):**
+
+| Situation | Use instead |
+|---|---|
+| New change (step-by-step) | `/opsx-new` then `/opsx-continue` |
+| New change (all artifacts at once) | `/opsx-ff` |
+| Existing change — revise planning | `/opsx-update` |
+
+On invoke: state the obsolescence, print the redirect table, and **stop** —
+do **not** run `openspec new change`, do **not** write proposal/design/tasks
+via this command. Body below is historical only.
+
 ---
 
 Propose a new change - create the change and generate all artifacts in one step.
@@ -12,7 +31,7 @@ I'll create a change with artifacts:
 - design.md (how)
 - tasks.md (implementation steps)
 
-When ready to implement, run /opsx:apply
+When ready to implement, run /opsx-apply
 
 ---
 
@@ -20,9 +39,9 @@ When ready to implement, run /opsx:apply
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_propose --strict`. Stop on non-zero exit and report the guard output.
 
-**Architecture Decision Lookup:** Before generating proposal/design/tasks, search `openspec/decisions/**/*.md` and read relevant accepted decisions. Proposal and design artifacts must account for decisions found. If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Do not claim the change is apply-ready while architecture placement is unresolved without an accepted or proposed decision.
+**Architecture Decision Lookup:** Before generating proposal/design/tasks, resolve any user-supplied change/decision paths first. Otherwise search `openspec/decisions/**/*.md` under a bounded budget and follow `.cursor/commands/opsx-source-resolution.md`. Proposal and design artifacts must account for decisions found. If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Do not claim the change is apply-ready while architecture placement is unresolved without an accepted or proposed decision.
 
-**Input**: The argument after `/opsx:propose` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx-propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Steps**
 
@@ -52,10 +71,12 @@ When ready to implement, run /opsx:apply
 
 4. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve user-supplied / `artifactPaths.decisions` paths first; prefer exact paths over a full walk.
+   - Read `openspec/decisions/index.md` only if needed; further `openspec/decisions/` lookup only for remaining gaps (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Never dump the full tree.
+   - If the ≤ 3 fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without creating or editing artifacts. Budget exhaustion is not proof that no decision exists; do **not** emit `Architecture Decision Missing`.
    - Check `artifactPaths.decisions.existingOutputPaths` for already-proposed decisions in the change.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
-   - If the requested change needs architecture placement but no relevant decision exists, output `Architecture Decision Missing`.
+   - If the requested change needs architecture placement and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision, output `Architecture Decision Missing`.
    - Create or update a proposed `decisions/<slug>/decision.md` artifact before implementation-readiness when placement depends on a reusable architecture rule. Get `openspec instructions decisions --change "<name>" --json` first and follow its `rules.decisions`.
 
 5. **Create artifacts in sequence until apply-ready**
@@ -102,7 +123,7 @@ After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
 - What's ready: "All artifacts created! Ready for implementation."
-- Prompt: "Run `/opsx:apply` to start implementing."
+- Prompt: "Run `/opsx-apply` to start implementing."
 
 **Artifact Creation Guidelines**
 

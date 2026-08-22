@@ -6,11 +6,8 @@ Spec ``card-ab-hold-mode``: no EDIT column; leftover import ignored;
 
 from __future__ import annotations
 
-import inspect
-
 import pytest
 
-from app.client_bot.user_interface.services.adv_excel_roundtrip import import_apply
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EDITABLE_ADV_SETTING_COLUMNS,
     EXCEL_TEMPLATE_VERSION,
@@ -65,10 +62,10 @@ def test_excel_gate_always_denies_any_mode(requested_mode: str) -> None:
 
 
 @pytest.mark.unit
-def test_import_apply_does_not_wire_ab_hold_excel_apply() -> None:
-    """9.3/9.4 wiring: import_apply MUST NOT setattr card_ab_hold_mode."""
-    src = inspect.getsource(import_apply.apply_adv_excel_rows)
-    assert "setattr(adv, field, mode.value)" not in src
-    assert "can_apply_card_ab_hold_mode_via_excel" not in src
-    assert "evaluate_ab_hold_enable_stats" not in src
-    assert "card_ab_hold_mode" in src  # comment / docstring mention OK
+def test_import_apply_does_not_call_excel_ab_hold_gate_helpers() -> None:
+    """9.3/9.4: apply_adv_excel_rows не вызывает Excel A/B Hold gate helpers."""
+    from app.client_bot.user_interface.services.adv_excel_roundtrip import import_apply
+
+    code = import_apply.apply_adv_excel_rows.__code__
+    assert "can_apply_card_ab_hold_mode_via_excel" not in code.co_names
+    assert "evaluate_ab_hold_enable_stats" not in code.co_names

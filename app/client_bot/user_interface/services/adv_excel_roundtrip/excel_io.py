@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import io
-from typing import Any
+from typing import Any, Literal, cast
 
 import pandas as pd
 from openpyxl.styles import Font, PatternFill
@@ -26,14 +26,17 @@ EDIT_FILL = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="sol
 HEADER_RO_FONT = Font(bold=True, color="666666")
 HEADER_EDIT_FONT = Font(bold=True, color="006100")
 
+_NumericDvType = Literal["decimal"]
+_NumericDvOperator = Literal["greaterThanOrEqual", "greaterThan"]
+
 
 def write_adv_excel_workbook(headers: list[str], rows: list[dict[str, Any]]) -> bytes:
     """Строка 1 — легенда; строка 2 — заголовки; с строки 3 — данные."""
-    df = pd.DataFrame(rows, columns=headers)
+    df = pd.DataFrame(rows, columns=cast(Any, headers))
     buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+    with pd.ExcelWriter(cast(Any, buf), engine="openpyxl") as writer:
         sheet = "adv_campaigns"
-        df.to_excel(writer, sheet_name=sheet, index=False, startrow=1)
+        cast(Any, df).to_excel(writer, sheet_name=sheet, index=False, startrow=1)
         ws = writer.book[sheet]
         ws.cell(row=1, column=1, value=LEGEND_TEXT)
         ncols = len(headers)
@@ -54,6 +57,7 @@ def write_adv_excel_workbook(headers: list[str], rows: list[dict[str, Any]]) -> 
 
 
 def _style_headers(ws: Any, headers: list[str], header_row: int) -> None:
+    """Подсветка RO/EDIT заголовков."""
     for col_idx, name in enumerate(headers, start=1):
         cell = ws.cell(row=header_row, column=col_idx)
         kind, _field, _suf = parse_header(name)
@@ -68,6 +72,7 @@ def _style_headers(ws: Any, headers: list[str], header_row: int) -> None:
 def _apply_bool_validation(
     ws: Any, headers: list[str], data_start_row: int, data_row_count: int
 ) -> None:
+    """DataValidation list TRUE/FALSE для BOOL-колонок."""
     if data_row_count <= 0:
         return
     last_row = data_start_row + data_row_count - 1
@@ -82,12 +87,13 @@ def _apply_bool_validation(
             allow_blank=True,
         )
         ws.add_data_validation(dv)
-        dv.add(f"{col_letter}{data_start_row}:{col_letter}{last_row}")
+        cast(Any, dv).add(f"{col_letter}{data_start_row}:{col_letter}{last_row}")
 
 
 def _apply_enum_validation(
     wb: Any, ws: Any, headers: list[str], data_start_row: int, data_row_count: int
 ) -> None:
+    """DataValidation list по скрытому листу ``_validations`` для ENUM-колонок."""
     if data_row_count <= 0:
         return
     last_row = data_start_row + data_row_count - 1
@@ -118,17 +124,18 @@ def _apply_enum_validation(
         dv = DataValidation(type="list", formula1=formula, allow_blank=True)
         ws.add_data_validation(dv)
         col_letter = get_column_letter(data_col_idx)
-        dv.add(f"{col_letter}{data_start_row}:{col_letter}{last_row}")
+        cast(Any, dv).add(f"{col_letter}{data_start_row}:{col_letter}{last_row}")
         list_col_idx += 1
 
 
 def _apply_numeric_validation(
     ws: Any, headers: list[str], data_start_row: int, data_row_count: int
 ) -> None:
+    """Numeric DataValidation для известных EDIT decimal-полей."""
     if data_row_count <= 0:
         return
     last_row = data_start_row + data_row_count - 1
-    numeric_rules: dict[str, tuple[str, str, str | None]] = {
+    numeric_rules: dict[str, tuple[_NumericDvType, _NumericDvOperator, str | None]] = {
         "plan_for_sales_for_day": ("decimal", "greaterThanOrEqual", "1"),
         "target_price_for_order": ("decimal", "greaterThanOrEqual", "1"),
         "max_price_for_order": ("decimal", "greaterThanOrEqual", "1"),
@@ -151,13 +158,16 @@ def _apply_numeric_validation(
         )
         ws.add_data_validation(dv)
         col_letter = get_column_letter(col_idx)
-        dv.add(f"{col_letter}{data_start_row}:{col_letter}{last_row}")
+        cast(Any, dv).add(f"{col_letter}{data_start_row}:{col_letter}{last_row}")
 
 
 def read_adv_excel_upload(content: bytes) -> tuple[list[str], list[dict[str, Any]]]:
     """Читает файл, сохранённый write_adv_excel_workbook (header=1)."""
     bio = io.BytesIO(content)
-    df = pd.read_excel(bio, header=1, engine="openpyxl")
+    df = cast(Any, pd).read_excel(bio, header=1, engine="openpyxl")
     df.columns = [str(c).strip() for c in df.columns]
-    records = df.to_dict(orient="records")
+    raw_records = cast(list[dict[Any, Any]], df.to_dict(orient="records"))
+    records: list[dict[str, Any]] = [
+        {str(k): v for k, v in row.items()} for row in raw_records
+    ]
     return list(df.columns), records

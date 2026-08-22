@@ -127,13 +127,21 @@ The split plan MUST explicitly show the base branch for every child PR.
 
 ## Required read-only checks
 
-Run first:
+Follow `.cursor/commands/opsx-execution-preflight.md` and `.cursor/commands/opsx-source-resolution.md`.
+
+Git ops are **REQUIRED_FOR** split planning, but must be budgeted.
+
+```text
+TIME_BUDGET: local git 5–15s each; fetch 30s; on timeout → blocked_preflight_timeout
+SKIP_IF: never for core branch/diff facts; skip find inventories when change-id/plan path known
+```
+
+Run first (local before remote):
 
 ```bash
 git branch --show-current
 git status --short
 git remote -v
-git fetch --all --prune
 git rev-parse --verify origin/<TARGET_BRANCH>
 git diff --stat origin/<TARGET_BRANCH>...HEAD
 git diff --name-status origin/<TARGET_BRANCH>...HEAD
@@ -141,7 +149,17 @@ git log --oneline origin/<TARGET_BRANCH>..HEAD
 git log --oneline -12
 ```
 
-If repository has OpenSpec, also inspect:
+`git fetch --all --prune` only when remote refs are stale or `origin/<TARGET_BRANCH>` is missing locally (`REQUIRED_FOR` remote freshness).
+
+If repository has OpenSpec / Cursor / GitHub process artifacts and an exact change-id or plan path is **not** known, use bounded fallback (`SEARCH_BUDGET <= 3`) instead of full-tree inventory. Prefer:
+
+```text
+openspec/changes/<change-id>/...
+```
+
+when the change id is known.
+
+Do **not** default to unbounded:
 
 ```bash
 find openspec -maxdepth 4 -type f | sort
@@ -503,7 +521,10 @@ Stop immediately and ask the user if:
 - split requires force push;
 - tests fail before any split work;
 - a file cannot be assigned to one PR part;
-- plan artifact conflicts with existing worklog policy.
+- plan artifact conflicts with existing worklog policy;
+- working tree has unmerged paths or merge|rebase is in progress
+  → `NEXT_ACTION: /opsx-admin-command-resolve-conflicts` (process surfaces)
+  or stop for product-only conflicts; do not split while conflicted.
 
 ## Forbidden shortcuts
 

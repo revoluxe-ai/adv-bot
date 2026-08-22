@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -44,7 +43,6 @@ def _make_off_adv() -> SimpleNamespace:
         id=42,
         adv_id=4242,
         bot_active=True,
-        automatic_version=3,
         max_price_for_order=100,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,
@@ -67,8 +65,51 @@ def _make_session(adv: SimpleNamespace) -> tuple[MagicMock, MagicMock]:
 def _make_query() -> MagicMock:
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message = None
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     return query
+
+
+def _user_notice_text(query: MagicMock) -> str:
+    """Текст user-visible notice (message.answer / bot.send_message)."""
+    if query.message is not None and getattr(query.message, "answer", None):
+        if query.message.answer.await_count > 0:
+            args = query.message.answer.await_args.args
+            if args:
+                return str(args[0])
+    send = getattr(getattr(query, "bot", None), "send_message", None)
+    if send is not None and send.await_count > 0:
+        args = send.await_args.args
+        if len(args) >= 2:
+            return str(args[1])
+        if "text" in send.await_args.kwargs:
+            return str(send.await_args.kwargs["text"])
+    return ""
+
+
+def _make_enable_success_mocks(
+    adv: SimpleNamespace,
+    session_cm: MagicMock,
+) -> tuple[AsyncMock, MagicMock, SimpleNamespace]:
+    """Mocks для успешного ENTER: start_epoch_on_enable + refresh session."""
+    refreshed = SimpleNamespace(
+        **{
+            **adv.__dict__,
+            "card_ab_hold_mode": CardAbHoldMode.PENDING_SETUP.value,
+        }
+    )
+    refresh_session = MagicMock()
+    refresh_session.scalar = AsyncMock(return_value=refreshed)
+    refresh_cm = MagicMock()
+    refresh_cm.__aenter__ = AsyncMock(return_value=refresh_session)
+    refresh_cm.__aexit__ = AsyncMock(return_value=None)
+    start_epoch = AsyncMock(return_value=True)
+    sm_side_effect = MagicMock(side_effect=[session_cm, refresh_cm])
+    return start_epoch, sm_side_effect, refreshed
 
 
 @pytest.mark.unit
@@ -110,8 +151,8 @@ async def test_enable_low_views_warns_and_stays_off() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "Мало показов" in query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    assert "Мало показов" in _user_notice_text(query)
 
 
 @pytest.mark.unit
@@ -128,9 +169,13 @@ async def test_enable_sufficient_views_proceeds_to_pending() -> None:
             total_views=5000,
         )
     )
+    start_epoch, sm_side_effect, refreshed = _make_enable_success_mocks(
+        adv, session_cm
+    )
 
     with (
-        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "sm", sm_side_effect),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
         patch.object(
             handlers,
             "evaluate_ab_hold_enable_stats",
@@ -153,8 +198,8 @@ async def test_enable_sufficient_views_proceeds_to_pending() -> None:
         )
 
     view_eval.assert_awaited_once()
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
-    session.commit.assert_awaited()
+    start_epoch.assert_awaited_once()
+    assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
 
 
@@ -173,8 +218,13 @@ async def test_launch_anyway_proceeds_without_volume_check() -> None:
         )
     )
 
+    start_epoch, sm_side_effect, refreshed = _make_enable_success_mocks(
+        adv, session_cm
+    )
+
     with (
-        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "sm", sm_side_effect),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
         patch.object(
             handlers,
             "evaluate_ab_hold_enable_stats",
@@ -197,8 +247,8 @@ async def test_launch_anyway_proceeds_without_volume_check() -> None:
         )
 
     view_eval.assert_not_awaited()
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
-    session.commit.assert_awaited()
+    start_epoch.assert_awaited_once()
+    assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
 
 
@@ -241,8 +291,8 @@ async def test_enable_ch_error_shows_distinct_reason_and_stays_off() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    query.answer.assert_awaited()
-    alert = query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    alert = _user_notice_text(query)
     assert "недоступна" in alert
     assert "Мало показов" not in alert
 
@@ -271,25 +321,5 @@ async def test_cancel_keeps_off_and_no_enter() -> None:
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
     session.commit.assert_not_awaited()
     set_signal.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "отмен" in query.answer.await_args.args[0].lower()
-
-
-@pytest.mark.unit
-def test_view_volume_gate_runs_after_freshness_before_pending_write() -> None:
-    """13.5 wiring: объёмный gate — после freshness и до записи PENDING_SETUP."""
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    freshness_at = src.find("evaluate_ab_hold_enable_stats")
-    volume_at = src.find("evaluate_ab_hold_launch_view_volume")
-    pending_at = src.find("PENDING_SETUP.value")
-    assert -1 < freshness_at < volume_at < pending_at
-    assert "skip_view_volume_gate" in src
-
-
-@pytest.mark.unit
-def test_enable_uses_volume_gate_and_launch_anyway_skips_it() -> None:
-    """13.5 wiring: enable проверяет объём; launch-anyway его пропускает."""
-    enable_src = inspect.getsource(handlers.enable_card_ab_hold)
-    launch_src = inspect.getsource(handlers.launch_card_ab_hold_anyway)
-    assert "skip_view_volume_gate=False" in enable_src
-    assert "skip_view_volume_gate=True" in launch_src
+    query.answer.assert_not_awaited()
+    assert "отмен" in _user_notice_text(query).lower()

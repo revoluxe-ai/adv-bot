@@ -25,7 +25,7 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 async def _create_test_user(session: AsyncSession, user_telegram_id: int = 12345) -> User:

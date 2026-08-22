@@ -20,9 +20,6 @@ from app.client_bot.user_interface.views.callbacks import (
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     NON_V3_DECISION_TRACE_MESSAGE,
 )
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
 from app.modules.shop_runner.service_manager.keyword_v3_decision_trace_ui.telegram.messages import (
     KeywordV3DecisionTraceScreen,
@@ -58,7 +55,7 @@ async def _is_v3_keyword(keyword_setting_original_id: int) -> bool:
     if keyword_setting is None:
         return False
     adv: AdvSetting = keyword_setting.adv_setting
-    return normalize_automatic_version_ui(adv.automatic_version) == 3
+    return adv.bot_active
 
 
 @router.callback_query(KeywordV3DecisionTraceOpen.filter())

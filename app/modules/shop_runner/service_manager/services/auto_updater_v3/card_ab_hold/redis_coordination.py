@@ -24,8 +24,11 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 _SIGNAL_TTL_SEC = int(timedelta(minutes=15).total_seconds())
 _ABORT_TTL_SEC = int(timedelta(hours=1).total_seconds())
 _SETUP_BLOCK_TTL_SEC = int(timedelta(minutes=30).total_seconds())
+# One-shot ENTER common-bid reset marker переживает hold-эпизод до EXIT.
+_COMMON_BID_ENTER_RESET_TTL_SEC = int(timedelta(days=7).total_seconds())
 SETUP_LOCK_TTL_SEC = int(timedelta(minutes=5).total_seconds())
 SETUP_LOCK_KEY_PREFIX = "CardAbHoldSetupLock"
+_COMMON_BID_ENTER_RESET_DONE = "done"
 
 
 class CardAbHoldSignalKind(StrEnum):
@@ -192,6 +195,40 @@ class CardAbHoldSetupBlockRedisCache(
     async def clear(self) -> None:
         """Снять причину блока (успешный setup / EXIT)."""
         await self.client.delete(self._key)
+
+
+class CardAbHoldCommonBidEnterResetRedisCache(
+    AdvSettingRedisCache,
+    RedisCacheBase,
+    prefix="CardAbHoldCommonBidEnterReset",
+):
+    """Ключ ``CardAbHoldCommonBidEnterReset:{adv_id}`` — one-shot ENTER reset done.
+
+    Decision §19 / tasks §27: после успешного owned reset-to-min маркер ``done``
+    запрещает повторный reset mid-hold (Enable no-op / setup tick). EXIT MUST
+    ``clear()``, чтобы новый ENTER снова сбросил common bid.
+    """
+
+    async def is_done(self) -> bool:
+        """True, если ENTER reset для текущего hold-эпизода уже выполнен."""
+        raw = await self.client.get(self._key)
+        if not raw:
+            return False
+        if isinstance(raw, bytes):
+            raw = raw.decode()
+        return str(raw) == _COMMON_BID_ENTER_RESET_DONE
+
+    async def mark_done(self) -> None:
+        """Зафиксировать успешный (или no-op) ENTER common-bid reset."""
+        _ = await self.client.set(
+            self._key,
+            _COMMON_BID_ENTER_RESET_DONE,
+            ex=_COMMON_BID_ENTER_RESET_TTL_SEC,
+        )
+
+    async def clear(self) -> None:
+        """Снять маркер на EXIT — следующий ENTER снова делает reset."""
+        _ = await self.client.delete(self._key)
 
 
 def setup_lock_redis_key(adv_id: int) -> str:

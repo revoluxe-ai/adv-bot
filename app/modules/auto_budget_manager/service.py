@@ -146,6 +146,22 @@ class AutoBudgetService:
         бросает ``ValueError``; внешний обработчик ловит исключение и возвращает
         ``None`` (пополнение на этом тике пропускается, воркер не падает).
         """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+            should_suppress_budget_and_activity_restart,
+        )
+
+        if should_suppress_budget_and_activity_restart(
+            getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+        ):
+            # spec ab-hold-emergency-kill-switch: latch ACTIVE → no top-up
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
+                campaign_type=campaign_type,
+                adv_id=None,
+                spend_today=0.0,
+                reason="A/B Hold Emergency latch active — top-up suppressed",
+            )
+
         lock_key = self._lock_key(adv_setting_id, campaign_type)
         acquired = await self._acquire_lock(lock_key)
         if not acquired:
@@ -702,6 +718,22 @@ class AutoBudgetService:
         бросает ``ValueError``; внешний обработчик ловит исключение и возвращает
         ``None`` (пополнение на этом тике пропускается, воркер не падает).
         """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+            should_suppress_budget_and_activity_restart,
+        )
+
+        if should_suppress_budget_and_activity_restart(
+            getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+        ):
+            # spec ab-hold-emergency-kill-switch: latch ACTIVE → no common top-up
+            return AutoBudgetEnsureResult(
+                status=AutoBudgetEnsureStatus.ADV_NOT_READY,
+                campaign_type=AdvType.AUTO,
+                adv_id=None,
+                spend_today=0.0,
+                reason="A/B Hold Emergency latch active — common top-up suppressed",
+            )
+
         lock_key = self._lock_key_common(adv_setting_id)
         acquired = await self._acquire_lock(lock_key)
         if not acquired:

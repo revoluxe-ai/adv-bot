@@ -77,6 +77,10 @@ def _first_offer_id_from_nmid(
     return offer_id
 
 
+# Имя удерживается для unit-import; сам helper вызывается только из tests/.
+_UNIT_TEST_EXPORTS = (_first_offer_id_from_nmid,)
+
+
 async def _fact_snapshot(adv: AdvSetting) -> tuple[float | None, float | None]:
     """Факт: прогноз заказов/день и себестоимость заказа (как в PlanFact)."""
     if not adv.nmids:
@@ -191,7 +195,7 @@ async def build_adv_excel_export(
             column_header("RO", "excel_template_version"): EXCEL_TEMPLATE_VERSION,
             column_header("RO", "snapshot_at"): now,
             column_header("RO", "adv_setting_id"): adv.id,
-            column_header("RO", "adv_id"): adv.adv_id if adv.adv_id is not None else "",
+            column_header("RO", "adv_id"): adv.adv_id,
             column_header("RO", "search_adv_id"): adv.search_adv_id or "",
             column_header("RO", "nmid"): nmid if nmid is not None else "",
             column_header("RO", "offer_id"): offer_id,

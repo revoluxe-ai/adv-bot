@@ -13,19 +13,47 @@ class DummyAdv:
     def __init__(
         self,
         *,
+        id: int = 1,
+        adv_id: int = 100,
+        bot_active: bool = True,
+        active_status: str = "started",
         search_adv_id: int | None,
-        automatic_version: int | None,
         auto_update_white_list: bool | None = None,
         auto_update_target_place: bool | None = None,
         auto_update_exponent: bool | None = None,
         individual_keywords_target_place_mode: bool | None = None,
     ):
+        self.id = id
+        self.adv_id = adv_id
+        self.bot_active = bot_active
+        self.active_status = active_status
         self.search_adv_id = search_adv_id
-        self.automatic_version = automatic_version
         self.auto_update_white_list = auto_update_white_list
         self.auto_update_target_place = auto_update_target_place
         self.auto_update_exponent = auto_update_exponent
         self.individual_keywords_target_place_mode = individual_keywords_target_place_mode
+
+
+def _patch_metering_advs(
+    monkeypatch: pytest.MonkeyPatch, advs: Sequence[DummyAdv]
+) -> None:
+    async def _fake_fetch_bot_active_advs(
+        session: Any, shop_id: str
+    ) -> Sequence[DummyAdv]:
+        return [a for a in advs if a.bot_active]
+
+    async def _fake_fetch_cabinet_advs(
+        session: Any, shop_id: str
+    ) -> Sequence[DummyAdv]:
+        return list(advs)
+
+    monkeypatch.setattr(
+        Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
+    )
+    monkeypatch.setattr(
+        "app.modules.billing.pricer.pricer.fetch_cabinet_adv_settings_for_metering",
+        _fake_fetch_cabinet_advs,
+    )
 
 
 class TestPricerTariffs:
@@ -64,19 +92,10 @@ class TestPricerTariffs:
         monkeypatch.setattr(
             Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
         )
-        # search ids getter может быть переименован в публичный — поддержим оба варианта
-        if hasattr(Pricer, "fetch_active_search_adv_ids"):
-            monkeypatch.setattr(
-                Pricer,
-                "fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-        else:
-            monkeypatch.setattr(
-                Pricer,
-                "_fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
+        monkeypatch.setattr(
+            "app.modules.billing.pricer.pricer.fetch_cabinet_adv_settings_for_metering",
+            _fake_fetch_bot_active_advs,
+        )
 
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.OLD
@@ -88,102 +107,62 @@ class TestPricerTariffs:
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
-            DummyAdv(search_adv_id=10, automatic_version=1, auto_update_white_list=True),
-            DummyAdv(search_adv_id=11, automatic_version=1, auto_update_white_list=False),
-            DummyAdv(search_adv_id=None, automatic_version=1, auto_update_white_list=True),
-            DummyAdv(search_adv_id=12, automatic_version=1, auto_update_white_list=True),
+            DummyAdv(id=1, adv_id=101, search_adv_id=10, bot_active=True, auto_update_white_list=True),
+            DummyAdv(id=2, adv_id=102, search_adv_id=11, bot_active=True, auto_update_white_list=False),
+            DummyAdv(id=3, adv_id=103, search_adv_id=None, bot_active=True, auto_update_white_list=True),
+            DummyAdv(id=4, adv_id=104, search_adv_id=12, bot_active=True, auto_update_white_list=True),
         ]
 
-        async def _fake_fetch_bot_active_advs(
-            session: Any, shop_id: str
-        ) -> Sequence[DummyAdv]:
-            return advs
-
-        monkeypatch.setattr(
-            Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
-        )
+        _patch_metering_advs(monkeypatch, advs)
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
-        assert details.count == 4
+        assert details.count == 2.0
 
     @pytest.mark.asyncio
     async def test_mode_switches_to_auto_if_any_part_auto_enabled(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
-            DummyAdv(search_adv_id=10, automatic_version=1, auto_update_white_list=False, auto_update_target_place=False),
-            DummyAdv(search_adv_id=11, automatic_version=2, auto_update_white_list=True, auto_update_target_place=False),
+            DummyAdv(id=1, adv_id=101, search_adv_id=10, bot_active=True, auto_update_white_list=False, auto_update_target_place=False),
+            DummyAdv(id=2, adv_id=102, search_adv_id=11, bot_active=True, auto_update_white_list=True, auto_update_target_place=False),
         ]
 
-        async def _fake_fetch_bot_active_advs(
-            session: Any, shop_id: str
-        ) -> Sequence[DummyAdv]:
-            return advs
-
-        async def _fake_fetch_active_search_adv_ids(
-            session: Any, search_adv_ids: Sequence[int]
-        ) -> set[int]:
-            return {10, 11}
-
-        monkeypatch.setattr(
-            Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
-        )
-        if hasattr(Pricer, "fetch_active_search_adv_ids"):
-            monkeypatch.setattr(
-                Pricer,
-                "fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-        else:
-            monkeypatch.setattr(
-                Pricer,
-                "_fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-
+        _patch_metering_advs(monkeypatch, advs)
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.AUTO
-        # count=2 => берём цену по лимиту 3 (5000)
-        assert details.price_per_adv == float(tariffs_for_auto_setting[3])
-        assert details.total_per_month == 2 * tariffs_for_auto_setting[3]
+        assert details.count == 1.0
+        assert details.price_per_adv == float(tariffs_for_auto_setting[1])
+        assert details.total_per_month == float(tariffs_for_auto_setting[1])
 
     @pytest.mark.asyncio
     async def test_mode_stays_old_if_no_part_auto_enabled(
         self, monkeypatch: pytest.MonkeyPatch
     ):
         advs = [
-            DummyAdv(search_adv_id=10, automatic_version=1, auto_update_white_list=False, auto_update_target_place=False),
-            DummyAdv(search_adv_id=11, automatic_version=2, auto_update_white_list=False, auto_update_target_place=False),
+            DummyAdv(
+                id=1,
+                adv_id=101,
+                active_status="paused",
+                search_adv_id=10,
+                bot_active=False,
+                auto_update_white_list=False,
+                auto_update_target_place=False,
+            ),
+            DummyAdv(
+                id=2,
+                adv_id=102,
+                active_status="paused",
+                search_adv_id=11,
+                bot_active=False,
+                auto_update_white_list=False,
+                auto_update_target_place=False,
+            ),
         ]
 
-        async def _fake_fetch_bot_active_advs(
-            session: Any, shop_id: str
-        ) -> Sequence[DummyAdv]:
-            return advs
-
-        async def _fake_fetch_active_search_adv_ids(
-            session: Any, search_adv_ids: Sequence[int]
-        ) -> set[int]:
-            return {10, 11}
-
-        monkeypatch.setattr(
-            Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
-        )
-        if hasattr(Pricer, "fetch_active_search_adv_ids"):
-            monkeypatch.setattr(
-                Pricer,
-                "fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-        else:
-            monkeypatch.setattr(
-                Pricer,
-                "_fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-
+        _patch_metering_advs(monkeypatch, advs)
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.OLD
-        assert details.total_per_month == 2 * tariffs[2]
+        assert details.count == 0.0
+        assert details.total_per_month == 0.0
 
     @pytest.mark.asyncio
     async def test_mode_auto_when_auto_settings_configured_but_search_not_started(
@@ -191,25 +170,21 @@ class TestPricerTariffs:
     ):
         advs = [
             DummyAdv(
+                id=1,
+                adv_id=101,
+                active_status="paused",
                 search_adv_id=10,
-                automatic_version=1,
+                bot_active=True,
                 auto_update_white_list=True,
                 auto_update_target_place=False,
             ),
         ]
 
-        async def _fake_fetch_bot_active_advs(
-            session: Any, shop_id: str
-        ) -> Sequence[DummyAdv]:
-            return advs
-
-        monkeypatch.setattr(
-            Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
-        )
+        _patch_metering_advs(monkeypatch, advs)
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.AUTO
-        assert details.count == 1
-        assert details.total_per_month == details.price_per_adv
+        assert details.count == 0.0
+        assert details.total_per_month == 0.0
 
     @pytest.mark.asyncio
     async def test_exponent_does_not_switch_to_auto_mode(
@@ -217,40 +192,19 @@ class TestPricerTariffs:
     ):
         advs = [
             DummyAdv(
+                id=1,
+                adv_id=101,
+                active_status="paused",
                 search_adv_id=10,
-                automatic_version=2,
+                bot_active=False,
                 auto_update_white_list=False,
                 auto_update_target_place=False,
                 auto_update_exponent=True,
             ),
         ]
 
-        async def _fake_fetch_bot_active_advs(
-            session: Any, shop_id: str
-        ) -> Sequence[DummyAdv]:
-            return advs
-
-        async def _fake_fetch_active_search_adv_ids(
-            session: Any, search_adv_ids: Sequence[int]
-        ) -> set[int]:
-            return {10}
-
-        monkeypatch.setattr(
-            Pricer, "fetch_bot_active_advs", staticmethod(_fake_fetch_bot_active_advs)
-        )
-        if hasattr(Pricer, "fetch_active_search_adv_ids"):
-            monkeypatch.setattr(
-                Pricer,
-                "fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-        else:
-            monkeypatch.setattr(
-                Pricer,
-                "_fetch_active_search_adv_ids",
-                staticmethod(_fake_fetch_active_search_adv_ids),
-            )
-
+        _patch_metering_advs(monkeypatch, advs)
         details = await Pricer().get_tariff_details(session=None, shop_id="s")  # type: ignore[arg-type]
         assert details.mode == TariffMode.OLD
+        assert details.count == 0.0
 

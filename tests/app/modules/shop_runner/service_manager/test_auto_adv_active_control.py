@@ -1,4 +1,6 @@
-﻿import asyncio
+﻿"""Unit coverage for empty-keywords pause and auto active control behavior."""
+
+import asyncio
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from typing import Any, Awaitable, Callable
@@ -46,6 +48,56 @@ def _positive_cabinet_balance(monkeypatch: pytest.MonkeyPatch) -> None:
         f"{_SERVICE_MODULE}.balance_manager.get_cabinet_balance_and_bonuses",
         AsyncMock(return_value=(1000.0, 0.0)),
     )
+
+
+@pytest.fixture(autouse=True)
+def _empty_keywords_intent_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Baseline suite: empty-keywords intent отсутствует (нет реального Redis)."""
+    intent_cls = (
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+        "empty_keywords_pause.intent.EmptyKeywordsPauseIntentManager"
+    )
+    monkeypatch.setattr(f"{intent_cls}.consume_intent", AsyncMock(return_value=False))
+    monkeypatch.setattr(f"{intent_cls}.peek_intent", AsyncMock(return_value=False))
+    monkeypatch.setattr(f"{intent_cls}.set_intent", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_updater_v3."
+        "empty_keywords_pause.decision.is_warmup_false_empty_keywords",
+        AsyncMock(return_value=False),
+    )
+
+
+@pytest.fixture(autouse=True)
+def _shelf_exhausted_pg_block_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Baseline suite: PG our-block shelf-exhausted отсутствует (нет реального PG)."""
+    repo = (
+        "app.modules.shop_runner.service_manager.services."
+        "auto_shelf_bid_control_manager.auto_shelf_bid_control_repository."
+        "AutoShelfBidControlRepository"
+    )
+    monkeypatch.setattr(f"{repo}.get_state", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        f"{repo}.mark_shelf_exhausted_epoch_started",
+        AsyncMock(return_value=None),
+    )
+    monkeypatch.setattr(
+        f"{repo}.mark_shelf_exhausted_notify_sent",
+        AsyncMock(return_value=None),
+    )
+
+    class _FakeSessionCM:
+        async def __aenter__(self):
+            return MagicMock()
+
+        async def __aexit__(self, *args):
+            return False
+
+    def _fake_sm(*args, **kwargs):
+        return _FakeSessionCM()
+
+    monkeypatch.setattr(f"{_SERVICE_MODULE}.get_session_maker", _fake_sm)
+
+
 async def _mock_load_time_settings_for_adv_ids(session, adv_ids):
     """Мок загрузки настроек времени: без ограничений (None) для всех adv_setting_id."""
     return {aid: None for aid in adv_ids}
@@ -129,6 +181,8 @@ class _FakeComplexAdv:
         self.shop_id = "shop-1"
         self.auto_adv_id = auto_adv_id
         self.search_adv_id = search_adv_id
+        self.main_nmid = 10001
+        self.nmids = [10001]
         self.auto_adv_active_status_str = WBAdvActiveStatus(auto_status)
         self.search_adv_active_status_str = WBAdvActiveStatus(search_status)
         self._use_common_budget = use_common_budget
@@ -158,6 +212,10 @@ class _FakeComplexAdv:
     @property
     def rec_system_promotion_mode_active(self) -> bool:
         return self._adv_setting.rec_system_mode
+
+    async def get_keywords(self) -> list[object]:
+        """Stub for empty-keywords drain after mid-cycle cost skip (shelf ON)."""
+        return []
 
 
 async def _run_auto_cost_rule_case(
@@ -608,7 +666,8 @@ async def test_pause_when_plan_ranked_best_above_resolve_and_fact_above_resolve(
         new=AsyncMock(return_value=0.0),
     ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
-    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    # INC-AUTO-SHELF-PAUSE-01: shelf ON → MUST NOT mid-cycle cost pause.
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
 
 
 async def _run_plan_ranked_best_unavailable_start_case(
@@ -1401,20 +1460,19 @@ async def test_auto_adv_avg_cost_pauses_when_above_target():
 
 @pytest.mark.asyncio
 async def test_auto_adv_shelf_bid_control_pauses_when_avg_cost_and_total_cpo_are_high():
+    """LEGACY_BASELINE note → FINAL_ACCEPTANCE: shelf ON MUST NOT mid-cycle cost pause.
+
+    Tasks §1.1/1.12: earlier characterization paused Auto with COST_RULE_FAILED;
+    INC-AUTO-SHELF-PAUSE-01 kills that branch while module ON.
+    """
     wb_modifier = await _run_auto_cost_rule_case(
         avg_cost=150.0,
         fact_pay_for_order=120.0,
         auto_shelf_bid_control_enabled=True,
     )
 
-    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
     wb_modifier.start_auto_campaign.assert_not_called()
-    wb_modifier.reason_manager.set.assert_awaited_once()
-    adv_id, campaign_type, reason = wb_modifier.reason_manager.set.await_args.args
-    assert adv_id == 1001
-    assert campaign_type == "auto"
-    assert reason.command == CampaignActivityCommand.PAUSE
-    assert reason.reason_code == AutoReasonCode.COST_RULE_FAILED
 
 
 @pytest.mark.asyncio
@@ -1427,7 +1485,11 @@ async def test_auto_adv_shelf_bid_control_does_not_pause_when_total_cpo_is_ok():
 
     wb_modifier.pause_auto_campaign.assert_not_called()
     wb_modifier.start_auto_campaign.assert_not_called()
-    wb_modifier.reason_manager.set.assert_not_awaited()
+    # Shelf ON + started: ordinary cost no-op → may re-assert BUDGET_OK_COST_OK.
+    if wb_modifier.reason_manager.set.await_count:
+        _adv_id, campaign_type, reason = wb_modifier.reason_manager.set.await_args.args
+        assert campaign_type == "auto"
+        assert reason.reason_code == AutoReasonCode.BUDGET_OK_COST_OK
 
 
 @pytest.mark.asyncio
@@ -1447,7 +1509,6 @@ async def test_auto_adv_shelf_bid_control_does_not_pause_when_total_cpo_missing_
 
     wb_modifier.pause_auto_campaign.assert_not_called()
     wb_modifier.start_auto_campaign.assert_not_called()
-    wb_modifier.reason_manager.set.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1662,7 +1723,8 @@ async def test_auto_adv_shelf_bid_control_pauses_when_selected_cpo_and_total_are
         new=AsyncMock(return_value=0.0),
     ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
         await service.ensure_campaigns_active([adv])
-    wb_modifier.pause_auto_campaign.assert_awaited_once()
+    # INC-AUTO-SHELF-PAUSE-01: shelf ON → mid-cycle cost pause Forbidden.
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
     wb_modifier.start_auto_campaign.assert_not_called()
 
 

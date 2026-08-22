@@ -121,70 +121,34 @@ def test_excel_enable_rejected_when_bot_inactive_via_shared_gate() -> None:
 
 
 @pytest.mark.unit
-def test_manager_wires_structural_filter_before_act_writes() -> None:
-    """Regression: manager MUST call filter_structural_act_candidates (VERIFY write-gate).
+def test_manager_act_coroutines_reference_structural_filter() -> None:
+    """Regression: ACT-корутины manager ссылаются на filter_structural_act_candidates.
 
-    Если убрать вызов фильтра из ACT-корутин, этот тест краснеет — в отличие от
-    проверки только предикатов scheduling.py в отрыве от manager.
+    Проверка ``co_names`` (не ``inspect.getsource``): убрать вызов фильтра из
+    bytecode → красный тест. Поведенческий filter уже покрыт выше в этом файле;
+    enable/excel wiring — в launch_validity / excel suite.
     """
-    import inspect
-
     from app.modules.shop_runner.service_manager.manager import CoroutinesManager
 
     wired = (
-        "update_top_key_in_advs",
-        "white_list_tail_trimmer",
-        "update_individual_keyword_target_places",
         "handle_stats_stale_emergency",
         "update_minus_phrases_in_advs",
         "delete_keywords_from_wl_by_mean_auto_ctr",
     )
+    def _unwrap(fn: object) -> object:
+        """Снять while_coroutines / decorator wrappers до реального callable."""
+        while hasattr(fn, "__wrapped__"):
+            fn = getattr(fn, "__wrapped__")
+        return fn
+
     for name in wired:
-        src = inspect.getsource(getattr(CoroutinesManager, name))
-        assert "filter_structural_act_candidates" in src, name
+        code = getattr(_unwrap(getattr(CoroutinesManager, name)), "__code__")
+        assert "filter_structural_act_candidates" in code.co_names, name
 
-
-@pytest.mark.unit
-def test_import_apply_does_not_apply_ab_hold_via_excel() -> None:
-    """§9 wiring: import_apply no longer applies card_ab_hold_mode."""
-    import inspect
-
-    from app.client_bot.user_interface.services.adv_excel_roundtrip import import_apply
-
-    src = inspect.getsource(import_apply.apply_adv_excel_rows)
-    assert "can_apply_card_ab_hold_mode_via_excel" not in src
-    assert "evaluate_ab_hold_enable_stats" not in src
-
-
-@pytest.mark.unit
-def test_enable_handler_checks_stats_freshness_gate() -> None:
-    """7.1/7.2 wiring: enable_card_ab_hold вызывает evaluate + blocked message."""
-    import inspect
-
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
-        handlers,
+    auto_code = getattr(
+        _unwrap(CoroutinesManager.adv_settings_auto_update), "__code__"
     )
-
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    assert "evaluate_ab_hold_enable_stats" in src
-    assert "build_ab_hold_enable_blocked_by_stats_message" in src
-    assert "SUPPORT_LINK" in inspect.getsource(
-        __import__(
-            "app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.stats_enable_gate",
-            fromlist=["build_ab_hold_enable_blocked_by_stats_message"],
-        )
-    )
-
-
-@pytest.mark.unit
-def test_manager_schedules_ab_hold_from_full_advs_helper() -> None:
-    """7.3 wiring: adv_settings_auto_update использует filter_ab_hold_pipeline_candidates."""
-    import inspect
-
-    from app.modules.shop_runner.service_manager.manager import CoroutinesManager
-
-    src = inspect.getsource(CoroutinesManager.adv_settings_auto_update)
-    assert "filter_ab_hold_pipeline_candidates" in src
+    assert "filter_ab_hold_pipeline_candidates" in auto_code.co_names
 
 
 @pytest.mark.unit

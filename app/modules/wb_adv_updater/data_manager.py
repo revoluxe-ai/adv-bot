@@ -210,10 +210,15 @@ async def get_keyword_statistic_clickhouse(
     pass_days: int | None = 7,
 ) -> tuple[int, int, float]:
     """
-    Возвращает суммарную статистику по ключевому слову text из агрегатов `mv_clusters_daily_agg`:
+    Возвращает суммарную статистику по ключевому слову text из агрегатов
+    ``default_db.mv_clusters_daily_agg``:
     - total_clicks
     - total_views
     - total_spend
+
+    Имя БД MUST быть в тексте SQL (рабочий контур ``default_db``); session
+    ``client.database`` не заменяет квалификацию. Spec:
+    ``clickhouse-query-database-qualification``.
     """
 
     if not adv_ids:
@@ -227,6 +232,8 @@ async def get_keyword_statistic_clickhouse(
 
     adv_ids_str = ", ".join(map(str, adv_ids))
 
+    # Qualified MV: working-contour addressing requires ``default_db.`` in SQL
+    # text (spec: clickhouse-query-database-qualification).
     query = f"""
         WITH keyword_stats AS (
             SELECT
@@ -670,7 +677,7 @@ async def add_white_phrases(keywords: list[str], adv_setting_id: int) -> None:
             keyword_setting.hard_status = 2
             _ = sync_keyword_setting_mode_for_v3(
                 keyword_setting,
-                automatic_version=adv.automatic_version,
+                bot_active=adv.bot_active,
                 hard_status_override=2,
                 adv_strategy=adv.strategy,
             )
@@ -712,7 +719,7 @@ async def add_fixed_phrases(keywords: list[str], adv_setting_id: int) -> None:
             keyword_setting.relevant = True
             _ = sync_keyword_setting_mode_for_v3(
                 keyword_setting,
-                automatic_version=adv.automatic_version,
+                bot_active=adv.bot_active,
                 hard_status_override=ALWAYS_ON,
                 adv_strategy=adv.strategy,
             )
@@ -810,14 +817,14 @@ async def add_relevant_phrases(keywords: list[str], adv_setting_id: int) -> None
                 keyword_setting.hard_status = 1
                 _ = sync_keyword_setting_mode_for_v3(
                     keyword_setting,
-                    automatic_version=adv.automatic_version,
+                    bot_active=adv.bot_active,
                     hard_status_override=1,
                     adv_strategy=adv.strategy,
                 )
             elif created:
                 _ = sync_keyword_setting_mode_for_v3(
                     keyword_setting,
-                    automatic_version=adv.automatic_version,
+                    bot_active=adv.bot_active,
                     hard_status_override=1,
                     adv_strategy=adv.strategy,
                 )

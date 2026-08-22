@@ -16,12 +16,7 @@ class KeywordTargetPlaceUpdater:
         self._predict_keyword_target_place = predict_keyword_target_place
 
     async def update_individual_keyword_target_places(self, adv: WBAdvDTO):
-        ver = (
-            adv.complex_adv.auto_updater_version
-            if adv.complex_adv.auto_updater_version is not None
-            else 2
-        )
-        if ver == 3:
+        if adv.complex_adv.bot_active:
             logger.debug(
                 "V3 target_place handled in process_adv_v3, adv_id=%s",
                 adv.adv_id,

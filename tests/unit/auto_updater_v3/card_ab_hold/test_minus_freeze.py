@@ -44,6 +44,15 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import (
     KeywordStatus,
 )
 
+_PIPELINES = (
+    "app.modules.shop_runner.service_manager.services."
+    "auto_updater_v3.card_ab_hold.pipelines"
+)
+_SETUP_APPLY = (
+    "app.modules.shop_runner.service_manager.services."
+    "auto_updater_v3.card_ab_hold.setup_apply"
+)
+
 
 def _complex_adv(*, nmid: int = 101, auto_adv_id: int = 9) -> SimpleNamespace:
     """РК с одной auto-целью (meta unknown → не shelf-only, search=None)."""
@@ -237,59 +246,145 @@ def test_enter_status_active_degraded_does_not_claim_clean_hold() -> None:
 
 
 @pytest.mark.unit
-def test_manager_wires_minus_structural_filter() -> None:
-    """8.2/8.6 wiring: update_minus_phrases_in_advs фильтрует freeze modes."""
-    import inspect
+@pytest.mark.asyncio
+async def test_setup_pipeline_orders_capture_enforce_before_active() -> None:
+    """8.1/8.5: legacy ENTER path вызывает enforce до apply (не string-index).
 
-    from app.modules.shop_runner.service_manager.manager import CoroutinesManager
+    Epoch-managed ветка вызывает ``apply_ab_hold_setup_mutations`` раньше в
+    исходнике — поэтому порядок проверяем по call-order на legacy path
+    (phase IS NULL), а не через ``src.index``.
+    """
+    call_order: list[str] = []
+    keywords = [
+        SimpleNamespace(status=KeywordStatus.GOOD, text="good1"),
+        SimpleNamespace(status=KeywordStatus.BAD, text="bad1"),
+    ]
+    complex_adv = _setup_complex_adv()
+    complex_adv.get_keywords = AsyncMock(return_value=keywords)
 
-    src = inspect.getsource(CoroutinesManager.update_minus_phrases_in_advs)
-    assert "filter_structural_act_candidates" in src
+    lock_mgr = MagicMock()
+    lock_mgr.acquire = AsyncMock(return_value=True)
+    lock_mgr.release = AsyncMock(return_value=None)
+
+    async def _enforce(*_a: object, **_k: object) -> dict[str, object]:
+        call_order.append("enforce")
+        return {"targets": 1, "written": 0, "cap_exceeded": []}
+
+    async def _apply(*_a: object, **_k: object) -> tuple[int, int]:
+        call_order.append("apply")
+        return (1, 0)
+
+    mgr = MagicMock()
+    mgr.enforce_frozen_allowed_set = AsyncMock(side_effect=_enforce)
+    container = MagicMock()
+    container.minus_phrase_manager.return_value = mgr
+
+    with (
+        patch(
+            f"{_PIPELINES}.CardAbHoldSignalRedisCache",
+            MagicMock(return_value=SimpleNamespace(client=MagicMock())),
+        ),
+        patch(
+            f"{_PIPELINES}.CardAbHoldSetupBlockRedisCache",
+            MagicMock(
+                return_value=MagicMock(set_block=AsyncMock(), clear=AsyncMock())
+            ),
+        ),
+        patch(f"{_PIPELINES}.RedisLockManager", MagicMock(return_value=lock_mgr)),
+        patch(
+            f"{_PIPELINES}.MinusPhraseManagerContainer",
+            MagicMock(return_value=container),
+        ),
+        patch(
+            f"{_PIPELINES}.apply_ab_hold_setup_mutations",
+            AsyncMock(side_effect=_apply),
+        ),
+        patch(
+            f"{_PIPELINES}.ensure_search_common_bid_reset_on_enter",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            f"{_PIPELINES}.capture_allowed_phrase_set",
+            side_effect=lambda kws: (
+                call_order.append("capture")
+                or [kw.text for kw in kws if kw.status != KeywordStatus.BAD]
+            ),
+        ),
+    ):
+        await process_ab_setup(
+            complex_adv,  # type: ignore[arg-type]
+            wb_shop_data_manager=MagicMock(),
+            wb_manager_hub=MagicMock(),
+        )
+
+    assert call_order == ["capture", "enforce", "apply"]
+    assert complex_adv.adv_setting.card_ab_hold_mode == CardAbHoldMode.ACTIVE.value
 
 
 @pytest.mark.unit
-def test_setup_pipeline_orders_capture_enforce_before_active() -> None:
-    """8.1/8.5 wiring: process_ab_setup capture→enforce→mutations со snapshot."""
-    import inspect
-
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
-        pipelines,
-    )
-
-    src = inspect.getsource(pipelines.process_ab_setup)
-    assert "capture_allowed_phrase_set" in src
-    assert "enforce_frozen_allowed_set" in src
-    assert "allowed_phrases_snapshot" in src
-    assert src.index("capture_allowed_phrase_set") < src.index("enforce_frozen_allowed_set")
-    assert src.index("enforce_frozen_allowed_set") < src.index("apply_ab_hold_setup_mutations")
-
-
-@pytest.mark.unit
-def test_hold_pipeline_enforces_allowed_set() -> None:
-    """8.2/8.6 wiring: process_ab_hold вызывает enforce_frozen_allowed_set."""
-    import inspect
-
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold import (
-        pipelines,
-    )
-
-    src = inspect.getsource(pipelines.process_ab_hold)
-    assert "enforce_frozen_allowed_set" in src
-    assert "cap_exceeded" in src
-
-
-@pytest.mark.unit
-def test_disable_clears_allowed_snapshot() -> None:
-    """8.3/8.8 wiring: EXIT очищает card_ab_hold_allowed_phrases_snapshot."""
-    import inspect
-
+@pytest.mark.asyncio
+async def test_disable_clears_allowed_snapshot() -> None:
+    """8.3/8.8 EXIT clears ``card_ab_hold_allowed_phrases_snapshot`` via in_session."""
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram import (
         handlers,
     )
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.telegram.callbacks import (
+        CardAbHoldDisable,
+    )
 
-    src = inspect.getsource(handlers.disable_card_ab_hold)
-    assert "empty_allowed_snapshot" in src
-    assert "card_ab_hold_allowed_phrases_snapshot" in src
+    adv = SimpleNamespace(
+        id=42,
+        adv_id=4242,
+        bot_active=True,
+        wb_cabinet_id=7,
+        card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
+        card_ab_hold_allowed_phrases_snapshot=["good1", "good2"],
+        card_ab_hold_phase=None,
+    )
+    session = MagicMock()
+    session.scalar = AsyncMock(return_value=adv)
+    session.commit = AsyncMock()
+    session_cm = MagicMock()
+    session_cm.__aenter__ = AsyncMock(return_value=session)
+    session_cm.__aexit__ = AsyncMock(return_value=None)
+    query = MagicMock()
+    query.answer = AsyncMock()
+    query.message = MagicMock(answer=AsyncMock())
+    query.from_user = SimpleNamespace(id=999)
+    ownership = AsyncMock(return_value=SimpleNamespace(id=11))
+
+    with (
+        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(
+            handlers,
+            "get_wb_user_cabinet_for_adv_and_telegram",
+            new=ownership,
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldSignalRedisCache",
+            return_value=MagicMock(clear=AsyncMock()),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldCommonBidEnterResetRedisCache",
+            return_value=MagicMock(clear=AsyncMock()),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldSetupBlockRedisCache",
+            return_value=MagicMock(clear=AsyncMock()),
+        ),
+        patch.object(handlers, "_edit_screen", new_callable=AsyncMock),
+        patch.object(handlers, "is_card_ab_hold_ui_visible", return_value=True),
+    ):
+        await handlers.disable_card_ab_hold(
+            query, CardAbHoldDisable(adv_setting_original_id=42)
+        )
+
+    assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
+    assert adv.card_ab_hold_allowed_phrases_snapshot == []
+    session.commit.assert_awaited()
 
 
 @pytest.mark.unit
@@ -321,15 +416,6 @@ def test_status_label_reflects_degradation() -> None:
 
 
 # --- Write-boundary: honest degradation persisted to PG from hold tick ---
-
-_PIPELINES = (
-    "app.modules.shop_runner.service_manager.services."
-    "auto_updater_v3.card_ab_hold.pipelines"
-)
-_SETUP_APPLY = (
-    "app.modules.shop_runner.service_manager.services."
-    "auto_updater_v3.card_ab_hold.setup_apply"
-)
 
 
 class _RecordingSession:
@@ -472,6 +558,7 @@ def _setup_complex_adv() -> SimpleNamespace:
     """
     adv_setting = SimpleNamespace(
         id=555,
+        adv_id=9,  # AdvSettingRedisCache key (ENTER common-bid reset)
         nmids=[101],
         max_price_for_order=100,
         card_ab_hold_mode="pending_setup",
@@ -530,6 +617,11 @@ async def _run_setup_with_keywords(
             MagicMock(return_value=container),
         ),
         patch(f"{_PIPELINES}.apply_ab_hold_setup_mutations", apply_mock),
+        # Isolate setup body from §19 ENTER common-bid Redis/WB (not under test).
+        patch(
+            f"{_PIPELINES}.ensure_search_common_bid_reset_on_enter",
+            new_callable=AsyncMock,
+        ),
     ):
         await process_ab_setup(
             complex_adv,  # type: ignore[arg-type]

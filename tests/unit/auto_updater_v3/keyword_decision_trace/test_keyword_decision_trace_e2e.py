@@ -100,7 +100,7 @@ def test_keyword_decision_trace_e2e_unchanged_off_through_redis_to_formatter() -
         nmid_display="519358830",
         keyword_text=keyword_text,
         display_status=KeywordStatus.BAD,
-        automatic_version=3,
+        bot_active=True,
         keyword_setting_id=ks_id,
         trace_presence=TracePresence.ENTRY_FOUND,
         processing_outcome=ProcessingOutcome.PROCESSED_UNCHANGED,

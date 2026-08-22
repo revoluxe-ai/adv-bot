@@ -9,7 +9,7 @@ I'll create a change with artifacts:
 - design.md (how)
 - tasks.md (implementation steps)
 
-When ready to implement, run /opsx:apply
+When ready to implement, run /opsx-apply
 
 ---
 
@@ -17,7 +17,7 @@ When ready to implement, run /opsx:apply
 
 **Architecture Decision Lookup:** Before generating proposal/design/tasks, search `openspec/decisions/**/*.md` and read relevant accepted decisions. Proposal and design artifacts must account for decisions found. If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Do not claim the change is apply-ready while architecture placement is unresolved without an accepted or proposed decision.
 
-**Input**: The argument after `/opsx:propose` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx-propose` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Steps**
 
@@ -47,7 +47,7 @@ When ready to implement, run /opsx:apply
 
 4. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Check `artifactPaths.decisions.existingOutputPaths` for already-proposed decisions in the change.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - If the requested change needs architecture placement but no relevant decision exists, output `Architecture Decision Missing`.
@@ -97,7 +97,7 @@ After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
 - What's ready: "All artifacts created! Ready for implementation."
-- Prompt: "Run `/opsx:apply` to start implementing."
+- Prompt: "Run `/opsx-apply` to start implementing."
 
 **Artifact Creation Guidelines**
 

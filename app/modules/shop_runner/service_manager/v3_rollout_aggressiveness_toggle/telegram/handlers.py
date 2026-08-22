@@ -23,9 +23,6 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu import (
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard import (
     get_adv_setting_keyboard,
 )
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
     FSM_V3_ROLLOUT_MENU_ADV_SETTING_ID,
     FSM_V3_ROLLOUT_PARENT_MESSAGE_ID,
@@ -81,7 +78,7 @@ async def open_v3_rollout_menu(
             select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
         )
         adv = adv_result.scalar_one_or_none()
-        if adv is None or normalize_automatic_version_ui(adv.automatic_version) != 3:
+        if adv is None or not adv.bot_active:
             if callback_query.message is not None:
                 await bot.send_message(
                     callback_query.message.chat.id,
@@ -168,7 +165,7 @@ async def set_v3_rollout_level(
                     callback_query.message.chat.id, "Кампания не найдена."
                 )
             return
-        if normalize_automatic_version_ui(adv_before.automatic_version) != 3:
+        if not adv_before.bot_active:
             if callback_query.message is not None:
                 await bot.send_message(
                     callback_query.message.chat.id, "Только для V3."

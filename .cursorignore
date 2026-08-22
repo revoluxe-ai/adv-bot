@@ -13,3 +13,4 @@ stubs/
 *.sqlite
 *.tar.gz*
 *.b64
+.env

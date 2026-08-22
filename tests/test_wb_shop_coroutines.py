@@ -4,23 +4,21 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
+from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
-from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
-    PlanData,
-    FactData,
-)
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
+)
+from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (
+    StatsFreshnessState,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
 )
-from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
-    PlanFactReader,
-)
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
+import app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager as calculated_keywords_manager_module
 from app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager import (
     CalculatedKeywordsManager,
 )
@@ -30,6 +28,7 @@ from tests.factories.clickhouse_factory import (
     ClustersAdvStatsFactory,
     build_clusters_adv_stats_rows,
 )
+from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 
 
 @pytest.fixture
@@ -37,6 +36,13 @@ def client_session_mock():
     session = AsyncMock()
     session.close = MagicMock()
     return session
+
+
+def _search_adv_started() -> MagicMock:
+    search = MagicMock(spec=AdvSetting)
+    search.adv_id = 90001
+    search.active_status = "started"
+    return search
 
 
 @pytest.mark.parametrize(
@@ -53,15 +59,16 @@ async def test_adv_settings_auto_update(
     keywords_mocks,
     client_session_mock,
     fact_method,
-    get_async_session_mock,
     fake_redis,
-    di_containner_for_adv_auto_updater_v2,
+    monkeypatch,
 ):
+    """v3-only: ``adv_settings_auto_update`` dispatch'ит ``process_adv_v3`` через ``run_tasks``."""
+    monkeypatch.setenv("AUTO_SETTING_ACTIVE", "true")
     adv_setting_mock.auto_update_white_list = True
     adv_setting_mock.auto_update_target_place = True
     adv_setting_mock.auto_update_exponent = False
-    adv_setting_mock.automatic_version = 1
-    adv_setting_mock.auto_updater_version = 1
+    adv_setting_mock.bot_active = True
+    adv_setting_mock.card_ab_hold_mode = "off"
     adv_setting_mock.sales_predict_method = fact_method
     adv_setting_mock.rec_system_mode = False
     adv_setting_mock.max_place = 10
@@ -70,8 +77,7 @@ async def test_adv_settings_auto_update(
     adv_setting_mock.id = 1
     adv_setting_mock.bidder_for_auto = True
     adv_setting_mock.bidder_active = True
-    adv_setting_mock.bot_active = True
-    _ = di_containner_for_adv_auto_updater_v2
+    adv_setting_mock.active_status = "started"
 
     wb_api = WBApi(access_mock, client_session_mock)
 
@@ -81,99 +87,57 @@ async def test_adv_settings_auto_update(
     test_complex_adv_instance = ComplexAdv(
         shop_id=wb_api.shop_id,
         adv_setting=adv_setting_mock,
-        search_adv=None,
+        search_adv=_search_adv_started(),
         get_keywords_func=_get_keywords,
     )
 
-    data_manager_mock = MagicMock()
-    data_manager_mock.get_good_bad_phrases = AsyncMock(return_value=keywords_mocks)
-    plan_data = PlanData(orders=10, target_pay_for_order=100, max_pay_for_order=250)
+    fresh = StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
 
-    fact_data = FactData(
-        predict_orders=1, pay_for_order=100, original_orders=1, fact_method=fact_method
-    )
-
-    # Мок для ChangePlanFact
-    mock_change_plan_fact = MagicMock()
-    mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
-    mock_change_plan_fact.set_new_plan_fact = AsyncMock(return_value=None)
+    async def _mget_entries(_shop_id: str, adv_ids: list[int]):
+        return [(aid, fresh, "hit", None) for aid in adv_ids]
 
     with (
-        patch(
-            "app.utils.db.session_maker.get_async_session_maker",
-            new=get_async_session_mock,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.services.auto_updater_version_migration.sm",
-            new=get_async_session_mock,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager._WBShopDataManager__get_adv_id_to_search_adv_map",
-            new=AsyncMock(return_value={}), # Возвращаем пустой словарь AdvSetting
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.get_fact_data",
-            new=AsyncMock(return_value=fact_data),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.get_plan_data",
-            new=MagicMock(return_value=plan_data),
-        ),
         patch(
             "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_complex_advs",
             new=AsyncMock(return_value=[test_complex_adv_instance]),
         ),
         patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.setting_auto_updater.AdvSettingAutoUpdater.update",
-            new=AsyncMock(return_value=None),
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater."
-            "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager.delete_last_white_phrase",
-            new_callable=AsyncMock,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.modules.white_list_updater."
-            "auto_white_list_updater.auto_white_list_updater.WhiteListUpdateManager.delete_last_white_phrase"
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
-            return_value=mock_change_plan_fact,
-        ),
-        patch(
-            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.sm",
-            new=get_async_session_mock,
-        ),
+            "app.modules.shop_runner.service_manager.manager.run_tasks",
+            new=AsyncMock(return_value=[None]),
+        ) as run_tasks_mock,
     ):
         redis_client_wrapper = RedisClient(redis_client=fake_redis)
         plan_fact_reader = MagicMock(spec=PlanFactReader)
         plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
-
-        wb_manager_hub = MagicMock()
-        wb_manager_hub.wb_data_manager = MagicMock()
-        wb_manager_hub.wb_manager = MagicMock()
 
         manager = CoroutinesManager(
             wb_api,
             redis_client_wrapper,
             tasks_manager=TasksManager(max_workers=1),
             plan_fact_reader=plan_fact_reader,
-            wb_manager_hub=wb_manager_hub,
+            wb_manager_hub=MagicMock(),
         )
-        manager._update_advs_models = AsyncMock()
-        manager._adv_settings_list = [adv_setting_mock]
-        manager._adv_settings_dict = {adv_setting_mock.adv_id: adv_setting_mock}
-        # decorator while_coroutine_decorator запускает корутину в бесконечном цикле,
-        # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
-        # чтобы выполнить её один раз и не зависнуть.
-        await manager.adv_settings_auto_update.__wrapped__(manager) # noqa
+        manager._redis_stats_freshness_cache.mget_entries = AsyncMock(
+            side_effect=_mget_entries
+        )
+        await manager.adv_settings_auto_update.__wrapped__(manager)
+
+    run_tasks_mock.assert_called_once()
+    handlers = run_tasks_mock.call_args.args[0]
+    assert len(handlers) == 1
+    assert callable(handlers[0])
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client):
-    await clickhouse_client.command("TRUNCATE TABLE default_db.clusters_adv_stats")
-    await clickhouse_client.command("TRUNCATE TABLE default_db.adv_events_ticks")
+@pytest.mark.destructive_local
+async def test_get_keywords_stat_from_clickhouse_returns_data(
+    clickhouse_client,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Seed clusters_adv_stats → Act with rewritten default_db SQL → assert aggregates."""
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.clusters_adv_stats")
+    await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.adv_events_ticks")
     setup_redis_cache()
     nmid = 987_654_321
     base_date = date.today()
@@ -215,26 +179,20 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(clickhouse_client)
 
     rows = build_clusters_adv_stats_rows(records)
     await clickhouse_client.insert(
-        "default_db.clusters_adv_stats",
+        "test_adv_bot_clickhouse.clusters_adv_stats",
         rows,
         column_names=CLUSTERS_ADV_STATS_COLUMNS,
     )
 
-    # Мокируем get_clickhouse_client для использования тестового клиента
-    mock_context = AsyncMock()
-    mock_context.__aenter__.return_value = clickhouse_client
-    mock_context.__aexit__.return_value = None
-
-    with patch(
-        "app.modules.wb_adv_updater.calculated_keywords_manager.calculated_keywords_manager.get_clickhouse_client",
-        return_value=mock_context,
-    ):
-        manager = CalculatedKeywordsManager()
-        stats = await manager._get_keywords_stat_from_clickhouse(  # noqa
-            nmids=[nmid],
-            min_days=2,
-            min_views=0,
-        )
+    patch_get_clickhouse_client(
+        monkeypatch, [calculated_keywords_manager_module], clickhouse_client
+    )
+    manager = CalculatedKeywordsManager()
+    stats = await manager._get_keywords_stat_from_clickhouse(  # noqa
+        nmids=[nmid],
+        min_days=2,
+        min_views=0,
+    )
 
     assert len(stats) == 1
 

@@ -16,7 +16,6 @@ recoverable». Decision ``card-ab-hold-write-path-ownership`` §14:
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -97,7 +96,6 @@ def _make_off_adv(*, max_cpo: object) -> SimpleNamespace:
         id=42,
         adv_id=4242,
         bot_active=True,
-        automatic_version=3,
         max_price_for_order=max_cpo,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,
@@ -119,8 +117,50 @@ def _make_session(adv: SimpleNamespace) -> tuple[MagicMock, MagicMock]:
 def _make_query() -> MagicMock:
     query = MagicMock()
     query.answer = AsyncMock()
-    query.message = None
+    msg = MagicMock()
+    msg.answer = AsyncMock()
+    query.message = msg
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     return query
+
+
+def _user_notice_text(query: MagicMock) -> str:
+    """Текст user-visible notice (message.answer / bot.send_message)."""
+    if query.message is not None and getattr(query.message, "answer", None):
+        if query.message.answer.await_count > 0:
+            args = query.message.answer.await_args.args
+            if args:
+                return str(args[0])
+    send = getattr(getattr(query, "bot", None), "send_message", None)
+    if send is not None and send.await_count > 0:
+        args = send.await_args.args
+        if len(args) >= 2:
+            return str(args[1])
+        if "text" in send.await_args.kwargs:
+            return str(send.await_args.kwargs["text"])
+    return ""
+
+
+def _make_enable_success_mocks(
+    adv: SimpleNamespace,
+    session_cm: MagicMock,
+) -> tuple[AsyncMock, MagicMock, SimpleNamespace]:
+    refreshed = SimpleNamespace(
+        **{
+            **adv.__dict__,
+            "card_ab_hold_mode": CardAbHoldMode.PENDING_SETUP.value,
+        }
+    )
+    refresh_session = MagicMock()
+    refresh_session.scalar = AsyncMock(return_value=refreshed)
+    refresh_cm = MagicMock()
+    refresh_cm.__aenter__ = AsyncMock(return_value=refresh_session)
+    refresh_cm.__aexit__ = AsyncMock(return_value=None)
+    start_epoch = AsyncMock(return_value=True)
+    sm_side_effect = MagicMock(side_effect=[session_cm, refresh_cm])
+    return start_epoch, sm_side_effect, refreshed
 
 
 @pytest.mark.unit
@@ -164,8 +204,8 @@ async def test_enable_blocked_when_max_cpo_missing_or_non_positive(
     # max-CPO gate — до freshness и объёмного soft-gate (decision §14a).
     stats_eval.assert_not_awaited()
     volume_eval.assert_not_awaited()
-    query.answer.assert_awaited()
-    assert "max CPO" in query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    assert "max CPO" in _user_notice_text(query)
 
 
 @pytest.mark.unit
@@ -176,9 +216,13 @@ async def test_enable_positive_max_cpo_proceeds_to_pending() -> None:
     session, session_cm = _make_session(adv)
     query = _make_query()
     set_signal = AsyncMock()
+    start_epoch, sm_side_effect, refreshed = _make_enable_success_mocks(
+        adv, session_cm
+    )
 
     with (
-        patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(handlers, "sm", sm_side_effect),
+        patch.object(handlers, "start_epoch_on_enable", start_epoch),
         patch.object(
             handlers,
             "evaluate_ab_hold_enable_stats",
@@ -209,23 +253,9 @@ async def test_enable_positive_max_cpo_proceeds_to_pending() -> None:
             query, CardAbHoldEnable(adv_setting_original_id=42)
         )
 
-    assert adv.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
-    session.commit.assert_awaited()
+    start_epoch.assert_awaited_once()
+    assert refreshed.card_ab_hold_mode == CardAbHoldMode.PENDING_SETUP.value
     set_signal.assert_awaited_once()
-
-
-@pytest.mark.unit
-def test_max_cpo_gate_runs_before_freshness_volume_and_pending_write() -> None:
-    """16.1 wiring: max-CPO gate — до freshness, объёмного gate и записи PENDING."""
-    src = inspect.getsource(handlers._handle_ab_hold_enable)
-    gate_at = src.find("has_positive_plan_max_cpo")
-    freshness_at = src.find("evaluate_ab_hold_enable_stats")
-    volume_at = src.find("evaluate_ab_hold_launch_view_volume")
-    pending_at = src.find("PENDING_SETUP.value")
-    enter_at = src.find("set_signal")
-    assert gate_at != -1
-    assert gate_at < freshness_at < volume_at < pending_at
-    assert gate_at < enter_at
 
 
 @pytest.mark.unit
@@ -326,6 +356,7 @@ def test_block_reason_status_within_telegram_limit() -> None:
 def _setup_complex_adv(*, max_cpo: object) -> SimpleNamespace:
     adv_setting = SimpleNamespace(
         id=555,
+        adv_id=9,  # AdvSettingRedisCache key (ENTER common-bid reset)
         nmids=[101],
         max_price_for_order=max_cpo,
         card_ab_hold_mode="pending_setup",
@@ -381,6 +412,11 @@ async def _run_setup(
             MagicMock(return_value=container),
         ),
         patch(f"{_PIPELINES}.apply_ab_hold_setup_mutations", apply_mock),
+        # Isolate setup body from §19 ENTER common-bid Redis/WB (not under test).
+        patch(
+            f"{_PIPELINES}.ensure_search_common_bid_reset_on_enter",
+            new_callable=AsyncMock,
+        ),
     ):
         await process_ab_setup(
             complex_adv,  # type: ignore[arg-type]
@@ -477,13 +513,6 @@ async def test_screen_status_text_plain_for_non_pending() -> None:
     block_cls.assert_not_called()
 
 
-@pytest.mark.unit
-def test_menu_open_uses_screen_status_text() -> None:
-    """16.4 wiring: open_card_ab_hold_menu строит статус через _screen_status_text."""
-    src = inspect.getsource(handlers.open_card_ab_hold_menu)
-    assert "_screen_status_text" in src
-
-
 # --- 16.5: EXIT recovery from stuck PENDING + no owned auto-abort (MVP) ---
 
 
@@ -495,6 +524,7 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
         id=42,
         adv_id=4242,
         bot_active=True,
+        wb_cabinet_id=7,
         card_ab_hold_mode=CardAbHoldMode.PENDING_SETUP.value,
         card_ab_hold_allowed_phrases_snapshot=["good1"],
     )
@@ -502,9 +532,16 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
     query = _make_query()
     signal_clear = AsyncMock()
     block_clear = AsyncMock()
+    enter_reset_clear = AsyncMock()
+    ownership = AsyncMock(return_value=SimpleNamespace(id=11))
 
     with (
         patch.object(handlers, "sm", return_value=session_cm),
+        patch.object(
+            handlers,
+            "get_wb_user_cabinet_for_adv_and_telegram",
+            new=ownership,
+        ),
         patch.object(
             handlers,
             "CardAbHoldSignalRedisCache",
@@ -514,6 +551,11 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
             handlers,
             "CardAbHoldSetupBlockRedisCache",
             return_value=MagicMock(clear=block_clear),
+        ),
+        patch.object(
+            handlers,
+            "CardAbHoldCommonBidEnterResetRedisCache",
+            return_value=MagicMock(clear=enter_reset_clear),
         ),
     ):
         await handlers.disable_card_ab_hold(
@@ -526,6 +568,7 @@ async def test_exit_from_pending_recovers_to_off_and_clears_block() -> None:
     session.commit.assert_awaited()
     signal_clear.assert_awaited_once()
     block_clear.assert_awaited_once()
+    enter_reset_clear.assert_awaited_once()
 
 
 @pytest.mark.unit

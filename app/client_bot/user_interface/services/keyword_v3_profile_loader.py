@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
-from typing import cast
+from typing import TypedDict, cast
 
 from sqlalchemy import select
 
@@ -23,6 +22,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     build_keyword_v3_contexts,
     load_campaign_v3_contexts_from_database,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
+    resolve_keyword_v2_pay_for_order_cost,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_eligibility import (
     build_eligibility_map,
 )
@@ -32,10 +34,8 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3
     resolve_ladder_stage_display,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
+    KeywordV3DataDiagnostic,
     diagnose_keyword_v3_data,
-)
-from app.modules.shop_runner.service_manager.services.auto_updater_v3.keyword_v3_decision_data import (
-    resolve_keyword_v2_pay_for_order_cost,
 )
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.profile_utils import (
     profile_points_from_bid_positions,
@@ -162,21 +162,28 @@ def _keyword_profile_metrics(
     return conv_cart, float(conv_order)
 
 
+class _ProfileDiagnosticFields(TypedDict):
+    """Поля ``KeywordV3ProfileData``, общие для N-state / failure / full ladder."""
+
+    n_state: bool
+    no_ch_min_only: bool
+    diagnostic: KeywordV3DataDiagnostic
+    conv_views_to_cart: float | None
+    conv_views_to_orders: float | None
+    v2_pay_for_order: float | None
+    keyword_pay_for_order: float | None
+
+
 def _profile_fields_from_diagnostic(
     calculated_keyword: CalculatedKeyword,
-    diagnostic: object,
+    diagnostic: KeywordV3DataDiagnostic,
     *,
     conv_views_to_cart: float | None = None,
     conv_views_to_orders: float | None = None,
-    worst_costs: dict | None = None,
-) -> dict[str, object]:
+    worst_costs: dict[AggressionTargetMode, float] | None = None,
+) -> _ProfileDiagnosticFields:
     """Общие поля ``KeywordV3ProfileData`` из диагностики ключа."""
-    from app.modules.shop_runner.service_manager.services.auto_updater_v3.no_data_activation import (
-        KeywordV3DataDiagnostic,
-    )
-
     _ = worst_costs
-    assert isinstance(diagnostic, KeywordV3DataDiagnostic)
     return {
         "n_state": diagnostic.n_state,
         "no_ch_min_only": diagnostic.no_ch_min_only,
@@ -353,9 +360,7 @@ async def load_keyword_v3_profile_data(
         campaign_orders_per_cart_7d=campaign_orders_per_cart_7d,
     )
     ks_id = calculated_keyword.keyword_setting_original_id
-    elig = (
-        eligibility_map.get(int(ks_id)) if ks_id is not None else None
-    )
+    elig = eligibility_map.get(int(ks_id))
     ladder = resolve_ladder_stage_display(ctx, ladder_inputs, eligibility=elig)
     candidates = ladder_view_to_candidates(ladder)
     stage_sources = {
@@ -393,3 +398,9 @@ async def load_keyword_v3_profile_data(
         shelf_click_mode=shelf_click_mode,
         **fields,
     )
+
+
+# Публичные aliases для UI list enrich (без импорта private `_…` извне модуля).
+load_wb_cabinet = _load_wb_cabinet
+build_complex_adv = _build_complex_adv
+positions_size_for_adv = _positions_size_for_adv

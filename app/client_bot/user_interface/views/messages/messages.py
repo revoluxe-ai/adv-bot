@@ -58,9 +58,6 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.v3_keyword
 from app.client_bot.user_interface.views.above_target_min_bid_ui import (
     format_ms_rule_line,
 )
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
 
@@ -225,6 +222,8 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
             last_wb_user_cabinet_page=self._page,
         )
+        # DEPRECATED: set_worst_promo_position удалён; populate-path не восстанавливать
+        # без отдельного product scope. AdvSetting.worst_promo_position — legacy residual.
         # self._adv_settings = await data_manager.set_worst_promo_position(self._adv_settings)
 
         for adv in self._adv_settings:
@@ -567,7 +566,7 @@ class KeywordSettingMessage(TextWithKeyboard):
 
         self.spend = keyword.spend
 
-        if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+        if adv_setting.bot_active:
             try:
                 profile_data = await load_keyword_v3_profile_data(
                     adv_setting, calculated_keyword
@@ -663,7 +662,7 @@ class KeywordSettingMessage(TextWithKeyboard):
             rec_str = "да" if self._calculated_keyword.above_rec_conversion else "нет"
             text += f"Выше конв. рек.: {rec_str}\n"
 
-        if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
+        if self._adv_setting.bot_active:
             executor_line = format_keyword_v3_last_tick_executor_line(
                 keyword_setting_id=self._keyword_original_id,
                 keyword_changes=self._v3_keyword_changes,

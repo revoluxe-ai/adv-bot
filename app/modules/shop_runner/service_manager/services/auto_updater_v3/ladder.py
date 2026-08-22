@@ -5,10 +5,6 @@ from __future__ import annotations
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 
 
-def normalize_version(automatic_version: int | None) -> int:
-    return 2 if automatic_version is None else automatic_version
-
-
 def mode_level(mode: KeywordStrategyMode) -> int:
     return int(mode)
 

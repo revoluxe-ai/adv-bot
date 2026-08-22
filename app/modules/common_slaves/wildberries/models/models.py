@@ -1,10 +1,13 @@
-﻿from __future__ import annotations
+﻿"""ORM-модели Wildberries (кабинеты, токены, AdvSetting, KeywordSetting и связанные сущности)."""
+
+from __future__ import annotations
 import datetime
 import json
 import logging
 import re
 import typing
 from enum import Enum
+from typing import ClassVar
 
 import jwt
 from jwt import DecodeError
@@ -49,7 +52,9 @@ from .white_list_mode import WhiteListMode
 # Ensure billing models (AdvPayment) are imported and registered before mapper configuration
 try:
     # TODO: Надо разобраться что это за конструкцию такая, и постараться ее убрать без рейса исключения
-    from app.modules.billing import models as _billing_models  # noqa: F401
+    from app.modules.billing import models as _billing_models
+
+    _: object = _billing_models  # side-effect: register AdvPayment mapper
 except Exception:  # noqa
     # In minimal test contexts billing may be absent; relationship will fallback to string resolution
     pass
@@ -59,6 +64,11 @@ if typing.TYPE_CHECKING:
     from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 logger = logging.getLogger(__name__)
+
+
+def _sa_enum_values(enum_cls: type[Enum]) -> list[str]:
+    """values_callable для SAEnum: строковые `.value` членов Enum."""
+    return [str(item.value) for item in enum_cls]
 
 
 class PredictCTRMode(Enum):
@@ -104,8 +114,6 @@ class WBUserCabinet(BaseTable):
 class WBBalancePayment(BaseTable):
     """Модель для хранения информации о пополнениях баланса"""
 
-    __tablename__ = "wbbalancepayment"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     wb_cabinet_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("wbcabinet.id"), nullable=False
@@ -139,8 +147,6 @@ class WBBalancePayment(BaseTable):
 
 class WBBonusPayment(BaseTable):
     """Модель для хранения информации о бонусах"""
-
-    __tablename__ = "wbbonuspayment"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     wb_cabinet_id: Mapped[int] = mapped_column(
@@ -218,7 +224,7 @@ class WBToken(BaseTable):
             result = jwt.decode(self.api_key, options={"verify_signature": False})
             if not isinstance(result, dict):
                 raise NotValidTokenError
-            return  result
+            return typing.cast(dict[str, object], result)
         except Exception:
             raise NotValidTokenError
 
@@ -273,8 +279,11 @@ class WBToken(BaseTable):
             8: "Рекомендации",
             30: "Токен только на чтение",
         }
-        s = int(self.get_payload("s"))
-        categories = set()
+        s_raw = self.get_payload("s")
+        if s_raw is None:
+            raise NotValidTokenError
+        s = int(s_raw)
+        categories: set[str] = set()
         for bit_position, category_name in categories_map.items():
             if s & (1 << bit_position):
                 categories.add(category_name)
@@ -324,7 +333,7 @@ class AdvKeyword(BaseTable):
     positive = Column(Boolean)
     views = Column(Integer, default=0)
     clicks = Column(Integer, default=0)
-    spend = Column(Float, default=0)
+    spend: Mapped[float] = mapped_column(Float, default=0)
     add_to_db = Column(Boolean, default=False)
     keyword_setting_id = Column(
         Integer, ForeignKey("keywordsetting.id"), nullable=False
@@ -372,7 +381,7 @@ class WBCard(BaseTable):
             return {}
         data = json.loads(raw)
         if isinstance(data, dict):
-            return  data
+            return typing.cast(dict[str, object], data)
         return {}
 
     @property
@@ -387,10 +396,12 @@ class WBCard(BaseTable):
         raw = self.card_json.get("photos")
         if not isinstance(raw, list):
             return []
+        photos_raw = typing.cast(list[object], raw)
         urls: list[str] = []
-        for item in raw:
+        for item in photos_raw:
             if isinstance(item, dict):
-                val = item.get("big")
+                item_dict = typing.cast(dict[str, object], item)
+                val = item_dict.get("big")
                 if isinstance(val, str):
                     urls.append(val)
                 else:
@@ -413,9 +424,12 @@ class AdvSetting(BaseTable):
     class ActiveStatuses(Enum):
         DONE = "done"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)  # noqa
-        self._worst_promo_position = None
+    # DEPRECATED: populate-path отключён (set_worst_promo_position удалён / вызов
+    # закомментирован). Non-mapped runtime flag (ClassVar — не колонка SA2; zlpr).
+    # Must be bare ClassVar (not typing.ClassVar) under from __future__ import annotations.
+    # Instance override via worst_promo_position setter remains supported.
+    # Не удалять и не менять семантику без отдельного cleanup-scope.
+    _worst_promo_position: ClassVar[bool | None] = None
 
     def __repr__(self):
         return (
@@ -452,6 +466,16 @@ class AdvSetting(BaseTable):
         uselist=True,
     )
     bot_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    automatic_version: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        server_default=text("1"),
+        comment=(
+            "LEGACY (scheduled removal): версия auto-updater 1/2/3. "
+            "Не читать и не писать в runtime/billing/UI — SoT: bot_active. "
+            "Колонка сохранена в БД до отдельного DDL DROP."
+        ),
+    )
     nmids: Mapped[list[int]] = mapped_column(JSONB, default=[])
     black_phrases: Mapped[list[str]] = mapped_column(
         JSONB, default=list, nullable=False, server_default=text("'[]'")
@@ -470,7 +494,7 @@ class AdvSetting(BaseTable):
         uselist=True,
     )
     pass_days = Column(Integer, default=30)
-    boost = Column(Float, server_default=text("1"))
+    boost: Mapped[float] = mapped_column(Float, server_default=text("1"))
     type: Mapped[int] = mapped_column(Integer, nullable=True)
     wb_bid_type: Mapped[str | None] = mapped_column(
         String,
@@ -542,7 +566,7 @@ class AdvSetting(BaseTable):
         SAEnum(
             BidderCoroutineType,
             name="bidder_coroutine_type",
-            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            values_callable=_sa_enum_values,
             validate_strings=True,
         ),
         nullable=False,
@@ -586,7 +610,8 @@ class AdvSetting(BaseTable):
     )
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
-        Boolean, nullable=True, default=True, server_default="true"
+        Boolean, nullable=True, default=True, server_default="true",
+        comment="Включает управление ставкой для Авто (legacy bidder)",
     )
 
     auto_update_white_list: Mapped[bool] = mapped_column(
@@ -616,7 +641,7 @@ class AdvSetting(BaseTable):
         nullable=False,
         default=False,
         server_default="false",
-        comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
+    comment="Включает управление общей ставкой полок НОВЫЙ МОДУЛЬ (auto_shelf_bid_control)",
     )
 
     # Intentional default:
@@ -627,7 +652,7 @@ class AdvSetting(BaseTable):
         SAEnum(
             AutoShelfBidControlStrategy,
             name="auto_shelf_bid_control_strategy",
-            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            values_callable=_sa_enum_values,
             validate_strings=True,
         ),
         nullable=True,
@@ -715,9 +740,6 @@ class AdvSetting(BaseTable):
 
     # TODO: Навести порядок в боте, со стороны клиента
 
-    automatic_version: Mapped[int] = mapped_column(
-        Integer, nullable=True, default=1, server_default="1"
-    )
     aggressiveness: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -739,7 +761,7 @@ class AdvSetting(BaseTable):
         server_default=text("'off'"),
         comment="A/B Hold mode: off | pending_setup | active (spec card-ab-hold-mode)",
     )
-    card_ab_hold_allowed_phrases_snapshot: Mapped[list] = mapped_column(
+    card_ab_hold_allowed_phrases_snapshot: Mapped[list[str]] = mapped_column(
         JSONB,
         default=list,
         nullable=False,
@@ -759,6 +781,99 @@ class AdvSetting(BaseTable):
             "enforcement замороженного allowed-set не может гарантировать чистый hold "
             "(превышен WB minus cap / open-match). Durable SoT для честного UI-статуса; "
             "self-healing — снимается на тике, где cap не превышен."
+        ),
+    )
+    card_ab_hold_phase: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        default=None,
+        comment=(
+            "A/B Hold epoch phase (§18.5/§19.5): NULL=legacy MVP-1; non-NULL=epoch-managed "
+            "(awaiting_keyword_confirm|warm_up|…|ready_active)"
+        ),
+    )
+    card_ab_hold_warmup_started_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+        comment="A/B Hold WARM_UP timer start (timestamptz); NULL when not in WARM_UP",
+    )
+    card_ab_hold_warmup_duration_hours: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=24,
+        server_default=text("24"),
+        comment="A/B Hold WARM_UP duration hours (default/min 24; MUST NOT go below 24)",
+    )
+    card_ab_hold_generation: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        comment="A/B Hold epoch generation (monotonic; 0=no epoch intent yet)",
+    )
+    card_ab_hold_wb_sync_idempotency_key: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        default=None,
+        unique=True,
+        comment="A/B Hold WB sync idempotency key '{adv_id}:{generation}' (NULL until intent)",
+    )
+    card_ab_hold_pending_intent_json: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="A/B Hold durable PENDING intent snapshot (confirmed params + generation)",
+    )
+    card_ab_hold_sync_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="none",
+        server_default=text("'none'"),
+        comment="A/B Hold WB sync status: none|pending|partial|complete",
+    )
+    card_ab_hold_confirmed_keywords_json: Mapped[list[str] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed keyword set (epoch SoT)",
+    )
+    card_ab_hold_confirmed_target_places_json: Mapped[dict[str, object] | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed target places map keyword→TP (epoch SoT)",
+    )
+    card_ab_hold_confirmed_auto_participation: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed Auto participation (epoch SoT)",
+    )
+    card_ab_hold_confirmed_auto_bid: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+        default=None,
+        comment="A/B Hold confirmed Auto bid (epoch SoT)",
+    )
+    card_ab_hold_emergency_latch: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+        comment=(
+            "A/B Hold Emergency kill-switch latch (ab-hold-emergency-kill-switch): "
+            "True → no budget top-up / no activity restart; pause+block applied"
+        ),
+    )
+    card_ab_hold_emergency_educated: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
+        comment=(
+            "A/B Hold Emergency launch education ACK "
+            "(ab-hold-emergency-kill-switch Confirm/ACK)"
         ),
     )
 
@@ -864,6 +979,12 @@ class AdvSetting(BaseTable):
 
     @property
     def worst_promo_position(self) -> bool | None:
+        """DEPRECATED: флаг worst promo position; наполнения больше нет.
+
+        Populate-path (`data_manager.set_worst_promo_position`) удалён; вызов в
+        client_bot закомментирован. Getter/setter оставлены без смены поведения
+        для residual UI-read. Не использовать в новом коде.
+        """
         try:
             return self._worst_promo_position
         except Exception as e:
@@ -871,8 +992,13 @@ class AdvSetting(BaseTable):
             return None
 
     @worst_promo_position.setter
-    def worst_promo_position(self, value):
-        self._worst_promo_position = value
+    def worst_promo_position(self, value: bool | None) -> None:
+        """DEPRECATED: см. getter; семантика setter не меняется.
+
+        Instance shadow через ``object.__setattr__``: атрибут — ``ClassVar``
+        (SA2 non-mapped / zlpr), прямой ``self._… =`` запрещён Pyright.
+        """
+        object.__setattr__(self, "_worst_promo_position", value)
 
     auto_budget_topups: Mapped[list["WBAutoBudgetTopUp"]] = relationship(
         "WBAutoBudgetTopUp",
@@ -895,7 +1021,7 @@ class KeywordSetting(BaseTable):
     adv_setting: Mapped[AdvSetting] = relationship(
         "AdvSetting", back_populates="keyword_settings", uselist=False
     )
-    predict_ctr = Column(Float, nullable=True)
+    predict_ctr: Mapped[float | None] = mapped_column(Float, nullable=True)
     adv_keywords = relationship(
         "AdvKeyword",
         back_populates="keyword_setting",
@@ -925,7 +1051,7 @@ class KeywordSetting(BaseTable):
     def _validate_target_place(self, _key: str, value: int | None) -> int | None:
         if value is None:
             return None
-        if not isinstance(value, int) or value < 0:
+        if value < 0:
             raise ValueError(
                 "target_place must be None or a non-negative integer "
                 "(0 = минимальная ставка WB)"

@@ -1,0 +1,170 @@
+{
+  "schema": "opsx-resolve-conflict/skip-inventory/v1",
+  "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40",
+  "package_version": "0.40.0",
+  "passed": 420,
+  "skipped": 16,
+  "rows": [
+    {
+      "nodeid": "tests/test_hook_and_process_barrier.py::42",
+      "path": "tests/test_hook_and_process_barrier.py",
+      "lineno": "42",
+      "reason": "POSIX process-group replay",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_orchestrator_go.py::1087",
+      "path": "tests/test_orchestrator_go.py",
+      "lineno": "1087",
+      "reason": "POSIX executable mode semantics",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r25_evidence_portability.py::148",
+      "path": "tests/test_r25_evidence_portability.py",
+      "lineno": "148",
+      "reason": "foreign Windows rejection is a POSIX-host check",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r28_registry_pack.py::191",
+      "path": "tests/test_r28_registry_pack.py",
+      "lineno": "191",
+      "reason": "symlink unavailable: [WinError 1314] Клиент не обладает требуемыми правами: 'C:\\\\Temp\\\\pytest-of-vkita\\\\pytest-198\\\\test_symlink_pack_stops0\\\\pack-target' -> 'C:\\\\Temp\\\\pytest-of-vkita\\\\pytest-198\\\\test_symlink_pack_stops0\\\\.cursor\\\\static-check\\\\checks\\\\mypy'",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_attacker_owned_0444\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_writable_parent\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_component_symlink\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_final_symlink\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_non_regular_final\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_identity_drift_after_open\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_secure_walk_rejects\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::176",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "176",
+      "reason": "{\"test_id\": \"posix_valid_root_owned_path\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r30_trust_store.py::522",
+      "path": "tests/test_r30_trust_store.py",
+      "lineno": "522",
+      "reason": "{\"test_id\": \"windows_valid_system_path\", \"platform\": \"win32\", \"reason\": \"installer_trust_pubkey_not_present_on_host\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r31_trust_store_dacl.py::373",
+      "path": "tests/test_r31_trust_store_dacl.py",
+      "lineno": "373",
+      "reason": "{\"test_id\": \"windows_native_system_owned_dacl\", \"platform\": \"win32\", \"reason\": \"cannot_create_system_owned_object_without_new_privileges\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r31_trust_store_dacl.py::403",
+      "path": "tests/test_r31_trust_store_dacl.py",
+      "lineno": "403",
+      "reason": "{\"test_id\": \"posix_final_symlink_secure_ancestors\", \"platform\": \"win32\", \"reason\": \"posix_integration_unavailable_on_windows\"}",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    },
+    {
+      "nodeid": "tests/test_r35_preview_context.py::399",
+      "path": "tests/test_r35_preview_context.py",
+      "lineno": "399",
+      "reason": "symlink unavailable: [WinError 1314] Клиент не обладает требуемыми правами: 'C:\\\\Temp\\\\pytest-of-vkita\\\\pytest-198\\\\test_symlink_path_escape_stops0\\\\outside.txt' -> 'C:\\\\Temp\\\\pytest-of-vkita\\\\pytest-198\\\\test_symlink_path_escape_stops0\\\\sym\\\\escape.py'",
+      "platform": "win32",
+      "classification": "non_mandatory",
+      "mandatory": "false",
+      "basis": "platform-dependent fixture capability"
+    }
+  ],
+  "note": "Machine-readable skip inventory from pytest -ra. mandatory=true rows require review justification."
+}

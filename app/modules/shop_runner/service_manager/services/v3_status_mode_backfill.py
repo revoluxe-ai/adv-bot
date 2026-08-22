@@ -32,16 +32,16 @@ async def backfill_v3_status_mode_consistency(
     """
     async with sm(read_only=False) as session:
         stmt = (
-            select(KeywordSetting, AdvSetting.automatic_version, AdvSetting.strategy)
+            select(KeywordSetting, AdvSetting.bot_active, AdvSetting.strategy)
             .join(AdvSetting, AdvSetting.id == KeywordSetting.adv_setting_id)
-            .where(AdvSetting.automatic_version == 3)
+            .where(AdvSetting.bot_active.is_(True))
         )
         if adv_setting_id is not None:
             stmt = stmt.where(AdvSetting.id == int(adv_setting_id))
         rows = (await session.execute(stmt)).all()
         mismatched = 0
-        for keyword_setting, automatic_version, adv_strategy in rows:
-            if not is_v3_campaign(automatic_version):
+        for keyword_setting, bot_active, adv_strategy in rows:
+            if not is_v3_campaign(bot_active):
                 continue
             repaired_mode = repaired_strategy_mode_for_v3(
                 hard_status=int(keyword_setting.hard_status),

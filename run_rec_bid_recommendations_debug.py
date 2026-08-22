@@ -31,7 +31,6 @@ from typing import Any
 
 import dotenv
 
-from app.dev_local.k8s_tunnels import ensure_dev_tunnels
 from app.domain.rec_system_bid_math.plan_ranker import PlanContext
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_analytics_repository import (
     AutoShelfBidControlAnalyticsRepository,
@@ -88,13 +87,6 @@ def _plan_context_from_env(current_sales_forecast: float) -> PlanContext:
     )
 
 
-def _ensure_dev_tunnels() -> None:
-    """Опционально поднимает существующие dev port-forward-ы."""
-    if os.getenv("DEV_TUNNELS_ENABLED", "").strip().lower() != "true":
-        return
-    ensure_dev_tunnels(wait_ready=True)
-
-
 def _print_section(title: str) -> None:
     """Печатает визуальный разделитель."""
     print()
@@ -134,9 +126,11 @@ def _print_table(rows: list[dict[str, Any]], columns: list[str]) -> None:
 
 
 async def _run() -> int:
-    """Выполняет read-only dry-run и печатает полный ranking."""
-    _ensure_dev_tunnels()
+    """Выполняет read-only dry-run и печатает полный ranking.
 
+    Локальная БД — только через host/port из ``.env`` (spec local-dev-db-connectivity);
+    in-app kubectl port-forward LEGACY удалён.
+    """
     nmid = int(_required_env("REC_BID_DEBUG_NMID"))
     date_from = _parse_datetime(_required_env("REC_BID_DEBUG_DATE_FROM"))
     date_to = _parse_datetime(_required_env("REC_BID_DEBUG_DATE_TO"))

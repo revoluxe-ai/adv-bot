@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import inspect
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -52,7 +51,6 @@ def _make_adv() -> SimpleNamespace:
         id=42,
         adv_id=4242,
         bot_active=True,
-        automatic_version=3,
         card_ab_hold_mode=CardAbHoldMode.OFF.value,
         card_ab_hold_degraded=False,
     )
@@ -119,7 +117,7 @@ async def test_menu_open_sends_new_message_for_text_and_media_callbacks(
     msg.answer.assert_awaited_once()
     msg.edit_text.assert_not_awaited()
     msg.edit_caption.assert_not_awaited()
-    query.answer.assert_awaited_once_with()
+    query.answer.assert_not_awaited()
     session.commit.assert_not_awaited()
     assert adv.card_ab_hold_mode == CardAbHoldMode.OFF.value
 
@@ -166,6 +164,9 @@ async def test_menu_open_unsupported_message_type_alerts_and_keeps_state() -> No
     adv = _make_adv()
     session, session_cm = _make_session(adv)
     query = _make_query(object())
+    query.bot = MagicMock()
+    query.bot.send_message = AsyncMock()
+    query.from_user = SimpleNamespace(id=1)
     before_mode = adv.card_ab_hold_mode
 
     with (
@@ -178,10 +179,10 @@ async def test_menu_open_unsupported_message_type_alerts_and_keeps_state() -> No
             query, CardAbHoldMenu(adv_setting_original_id=adv.id)
         )
 
-    query.answer.assert_awaited_once()
-    alert_text = query.answer.await_args.args[0]
+    query.answer.assert_not_awaited()
+    query.bot.send_message.assert_awaited_once()
+    alert_text = query.bot.send_message.await_args.args[1]
     assert "неподдерживаемый тип" in alert_text.lower()
-    assert query.answer.await_args.kwargs.get("show_alert") is True
     assert adv.card_ab_hold_mode == before_mode
     session.commit.assert_not_awaited()
 
@@ -201,25 +202,4 @@ async def test_edit_screen_does_not_swallow_send_errors() -> None:
                 mode=CardAbHoldMode.OFF,
             )
     query.answer.assert_not_awaited()
-
-
-@pytest.mark.unit
-def test_enable_disable_handlers_and_business_gates_wiring_unchanged() -> None:
-    """Hotfix не меняет wiring enable/disable и набор бизнес-гейтов."""
-    enable_src = inspect.getsource(handlers.enable_card_ab_hold)
-    launch_anyway_src = inspect.getsource(handlers.launch_card_ab_hold_anyway)
-    handle_src = inspect.getsource(handlers._handle_ab_hold_enable)
-    disable_src = inspect.getsource(handlers.disable_card_ab_hold)
-
-    assert "_handle_ab_hold_enable" in enable_src
-    assert "skip_view_volume_gate=False" in enable_src
-    assert "_handle_ab_hold_enable" in launch_anyway_src
-    assert "skip_view_volume_gate=True" in launch_anyway_src
-
-    assert "evaluate_ab_hold_enable_stats" in handle_src
-    assert "evaluate_ab_hold_launch_view_volume" in handle_src
-    assert "can_enable_card_ab_hold_on_version" in handle_src
-    assert "has_positive_plan_max_cpo" in handle_src
-
-    assert "card_ab_hold_mode = CardAbHoldMode.OFF.value" in disable_src
 

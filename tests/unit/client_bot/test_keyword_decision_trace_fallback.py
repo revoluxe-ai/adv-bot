@@ -33,7 +33,7 @@ def _keyword_setting() -> MagicMock:
     ks.hard_status = 1
     adv = MagicMock()
     adv.adv_id = 99
-    adv.automatic_version = 3
+    adv.bot_active = True
     adv.nmids = [519358830]
     ks.adv_setting = adv
     return ks

@@ -13,9 +13,7 @@ from app.client_bot.user_interface.handlers.individual_keywords_target_place_tog
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-pytestmark = pytest.mark.integration
-
-
+pytestmark = pytest.mark.destructive_local
 def _make_callback(adv_id: int, new_status: bool) -> tuple[SimpleNamespace, SimpleNamespace]:
     callback_query = SimpleNamespace(
         message=SimpleNamespace(chat=SimpleNamespace(id=42))
@@ -71,7 +69,6 @@ async def _create_test_adv(
         bot_active=True,
         wb_cabinet=wb_cabinet,
         individual_keywords_target_place_mode=individual_mode,
-        automatic_version=1,
         auto_update_white_list=False,
         auto_update_target_place=False,
     )

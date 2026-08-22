@@ -1,6 +1,7 @@
 # TODO: переделать в новый стиль
 [tool.poetry.scripts]
 check-openspec = "openspec.tools.check_openspec:main"
+pyright-strict = "app.pyright_strict_entry:main"
 
 
 [tool.poetry]
@@ -142,6 +143,8 @@ seaborn = "0.13.2"
 six = "1.16.0"
 smart-open = "7.0.1"
 sqlalchemy = "^2.0.32"
+# Required in RELEASE image: migrate Job runs `python -m app.db.migrate`.
+alembic = "1.13.1"
 stack-data = "0.6.3"
 systemd-logging = "1.0.1"
 tabulate = "0.9.0"
@@ -174,7 +177,6 @@ aiohttp-socks = "0.8.4"
 [tool.poetry.group.dev.dependencies]
 pyright = "^1.1.400"
 pytest = "8.0.2"
-alembic = "1.13.1"
 pytest-asyncio = "0.21.0"
 poetry-types = "^0.6.0"
 openapi-python-client = "^0.17.0"

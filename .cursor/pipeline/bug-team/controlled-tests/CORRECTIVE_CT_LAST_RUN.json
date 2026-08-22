@@ -1,0 +1,94 @@
+{
+  "CT-01": {
+    "PASS": true,
+    "MSG": "ACTIVE_V1 normal invocation allowed; activation intact",
+    "LABEL": "CONTRACT_STATIC"
+  },
+  "CT-02": {
+    "PASS": true,
+    "MSG": "proof mode only under harness root",
+    "LABEL": "CONTRACT_STATIC"
+  },
+  "CT-03": {
+    "PASS": true,
+    "MSG": "direct worker packet without ORCH/ rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-04": {
+    "PASS": true,
+    "MSG": "dispatch record uses Cursor agent id field (live matrix fills)",
+    "LABEL": "CONTRACT_STATIC"
+  },
+  "CT-05": {
+    "PASS": true,
+    "MSG": "legacy finalize_after_task disabled (BF-ICT-002)",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-06": {
+    "PASS": true,
+    "MSG": "wrong CASE_ID rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-07": {
+    "PASS": true,
+    "MSG": "stale packet generation rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-08": {
+    "PASS": true,
+    "MSG": "dependency hash mismatch/missing rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-09": {
+    "PASS": true,
+    "MSG": "plain-text worker response rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-10": {
+    "PASS": true,
+    "MSG": "Owner GO bound to CASE/FINDING/RED hash",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-11": {
+    "PASS": true,
+    "MSG": "stale/replayed Owner GO rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-12": {
+    "PASS": [
+      "app/x.py"
+    ],
+    "MSG": "filesystem write outside boundary detected",
+    "LABEL": "FILESYSTEM_ENFORCEMENT"
+  },
+  "CT-13": {
+    "PASS": true,
+    "MSG": "FANIN allowed PASS; forbidden write REJECTED_FROM_FILESYSTEM_DIFF",
+    "LABEL": "FILESYSTEM_ENFORCEMENT"
+  },
+  "CT-14": {
+    "PASS": true,
+    "MSG": "route trace append monotonic",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-15": {
+    "PASS": true,
+    "MSG": "invalid reconciliation / dup / rewrite rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-16": {
+    "PASS": true,
+    "MSG": "timeout late output rejected",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-17": {
+    "PASS": true,
+    "MSG": "dependent wave blocked after TIMEOUT",
+    "LABEL": "SIMULATED_BACKEND"
+  },
+  "CT-18": {
+    "PASS": true,
+    "MSG": "graph fingerprint independently reproducible",
+    "LABEL": "CONTRACT_STATIC"
+  }
+}

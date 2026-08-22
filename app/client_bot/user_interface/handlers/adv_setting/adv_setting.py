@@ -628,16 +628,34 @@ async def reset_shop_non_relevant_phrases(
     bot: aiogram.Bot,
     state: FSMContext,
 ) -> None:
+    """Сбрасывает shop-wide NRF hard_status; held кампании пропускает updater.
+
+    ``update_keywords`` excludes ``is_ab_hold_structural_freeze`` campaigns
+    (FINDING-PBH-010-R1; peer apply_defaults skip). Telegram copy mirrors
+    ``apply_defaults_for_shop``: Hold-skip claim only when skipped_count > 0
+    (ROOT-001).
+    """
     if callback.message is None:
         raise ValueError("Нет сообщения")
     chat_id = callback.message.chat.id
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
-         from .utils import update_keywords
-         updated_count = await update_keywords(session, wb_user_cabinet_original_id)
+        from .utils import update_keywords
 
-    await bot.send_message(
-        chat_id,
-        f"Сброшено НРФ: {updated_count}. Возвращаю в меню магазина...",
-    )
+        update_result = await update_keywords(
+            session, wb_user_cabinet_original_id
+        )
+
+    updated_count = int(update_result)
+    # Plain int mocks / legacy returns → no skip signal (treat as 0).
+    skipped_count = int(getattr(update_result, "skipped_count", 0) or 0)
+
+    message_text = f"Сброшено НРФ: {updated_count}."
+    if skipped_count > 0:
+        message_text += (
+            f" Кампании в A/B Hold пропущены: {skipped_count}."
+            " Чтобы сбросить НРФ и для них, сначала выключите A/B Hold."
+        )
+    message_text += " Возвращаю в меню магазина..."
+    await bot.send_message(chat_id, message_text)
     await ShopMenu(bot, chat_id, state, wb_user_cabinet_original_id)()

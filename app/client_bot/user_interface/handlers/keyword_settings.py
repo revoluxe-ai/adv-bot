@@ -2,7 +2,11 @@
 
 
 # type: ignore
+from __future__ import annotations
+
 import logging
+from dataclasses import dataclass
+from typing import Any, Literal
 
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import CalculatedKeyword
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import KeywordStatus
@@ -13,6 +17,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy import and_
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
@@ -60,6 +65,129 @@ router = Router()
 
 
 _sm = get_async_session_maker
+
+
+@dataclass(frozen=True)
+class KeywordHardStatusChangeOutcome:
+    """Результат ``change_keyword_hard_status_in_session``.
+
+    Attributes:
+        kind: ``blocked`` (A/B Hold freeze), ``applied`` (hard_status≥0
+            закоммичен), ``needs_ctr_boost`` (``new_hard_status < 0`` —
+            caller продолжает CH/CTR и commit).
+        keyword_setting: загруженный KeywordSetting (если найден).
+        adv_setting: связанный AdvSetting (если найден).
+    """
+
+    kind: Literal["blocked", "applied", "needs_ctr_boost"]
+    keyword_setting: KeywordSetting | None = None
+    adv_setting: AdvSetting | None = None
+
+
+async def change_keyword_hard_status_in_session(
+    session: AsyncSession,
+    *,
+    keyword_setting_original_id: int,
+    new_hard_status: int,
+) -> KeywordHardStatusChangeOutcome:
+    """Freeze-gate + hard_status mutation в injectable WRITE session.
+
+    Parent ``change_keyword_hard_status`` открывает ``_sm(read_only=False)``
+    и передаёт session сюда. Под structural freeze mutation/commit Forbidden.
+
+    Для ``new_hard_status >= 0``: sync mode, commit, ``kind=applied``.
+    Для CTR-boost path (``new_hard_status < 0``): возвращает loaded entities
+    без commit — caller завершает CH-статистику и commit.
+
+    Args:
+        session: injectable async session (WRITE).
+        keyword_setting_original_id: PK ``KeywordSetting.id``.
+        new_hard_status: целевой hard_status (или отрицательный CTR-boost).
+
+    Returns:
+        ``KeywordHardStatusChangeOutcome`` с kind и опциональными entities.
+    """
+    result = await session.execute(
+        select(KeywordSetting)
+        .options(selectinload(KeywordSetting.adv_setting))
+        .where(KeywordSetting.id == keyword_setting_original_id)
+    )
+    keyword_setting: KeywordSetting | None = result.scalar()  # noqa
+    assert keyword_setting
+    adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
+    if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
+        return KeywordHardStatusChangeOutcome(
+            kind="blocked",
+            keyword_setting=keyword_setting,
+            adv_setting=adv_setting,
+        )
+    if new_hard_status < 0:
+        return KeywordHardStatusChangeOutcome(
+            kind="needs_ctr_boost",
+            keyword_setting=keyword_setting,
+            adv_setting=adv_setting,
+        )
+    keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
+    _ = sync_keyword_setting_mode_for_v3(
+        keyword_setting,
+        bot_active=adv_setting.bot_active,
+        hard_status_override=new_hard_status,
+        adv_strategy=adv_setting.strategy,
+    )
+    if new_hard_status == 2 or new_hard_status == const.ALWAYS_ON:
+        keyword_setting.relevant = True  # type: ignore[attr-defined]
+    elif new_hard_status == 0:
+        keyword_setting.relevant = False  # type: ignore[attr-defined]
+    await session.commit()
+    return KeywordHardStatusChangeOutcome(
+        kind="applied",
+        keyword_setting=keyword_setting,
+        adv_setting=adv_setting,
+    )
+
+
+async def apply_keyword_ctr_boost_with_client(
+    client: Any,
+    *,
+    keyword_setting: KeywordSetting,
+    keyword_text: str,
+    adv_ids: set[int],
+    min_ctr: float,
+    boost_percent: int = 10,
+) -> int:
+    """CH read + mutate ``added_clicks`` для CTR-boost path (hard_status=-1).
+
+    Parent ``change_keyword_hard_status`` открывает ``get_clickhouse_client()``
+    и передаёт client сюда. Не коммитит PG — caller делает ``session.commit``.
+
+    Args:
+        client: injectable ClickHouse client (prod or test fixture).
+        keyword_setting: ORM entity; ``added_clicks`` / ``added_views`` мутируются.
+        keyword_text: текст ключа для CH ``norm_query``.
+        adv_ids: множество ``adv_id`` для фильтра CH.
+        min_ctr: целевой минимальный CTR кампании.
+        boost_percent: процент надбавки к min_ctr (default 10).
+
+    Returns:
+        Число добавленных кликов (минимум 1 при необходимости boost).
+    """
+    clicks, views, _ = await data_manager.get_keyword_statistic_clickhouse(
+        client,
+        keyword_text,
+        adv_ids,
+    )
+    if keyword_setting.added_clicks:  # type: ignore[attr-defined]
+        clicks += keyword_setting.added_clicks  # type: ignore[attr-defined]
+    if keyword_setting.added_views:  # type: ignore[attr-defined]
+        views += keyword_setting.added_views  # type: ignore[attr-defined]
+
+    new_ctr = min_ctr * (1 + boost_percent / 100)
+    add_clicks = max([int(round(new_ctr * views - clicks)), 1])
+
+    if not keyword_setting.added_clicks:  # type: ignore[attr-defined]
+        keyword_setting.added_clicks = 0  # type: ignore[attr-defined]
+    keyword_setting.added_clicks += add_clicks  # type: ignore[attr-defined]
+    return int(add_clicks)
 
 
 @router.callback_query(callbacks.SettingKeywords.filter(F.type == "filter_by_query"))
@@ -718,6 +846,17 @@ async def change_keyword_hard_status(
     bot: aiogram.Bot,
     state: FSMContext,
 ):
+    """Меняет hard_status ключа; под A/B Hold structural freeze — отказ.
+
+    При ``PENDING_SETUP`` / ``ACTIVE`` (``is_ab_hold_structural_freeze``)
+    hard_status / ``sync_keyword_setting_mode_for_v3`` / commit не выполняются
+    (peer: ``keyword_target_place_value``).
+
+    Parent WRITE seam: ``_sm(read_only=False)`` →
+    ``change_keyword_hard_status_in_session``; CTR-boost path открывает
+    ``get_clickhouse_client()`` и передаёт client в
+    ``apply_keyword_ctr_boost_with_client``, затем commit.
+    """
     # TODO Показать ключи в в не индекса - не работает
     # TODO: Не работает кнопка Скрыть не релевантные фразы
     # TODO: Тестировать дальше - не работает!!!!
@@ -726,63 +865,44 @@ async def change_keyword_hard_status(
         new_hard_status = callback_data.new_hard_status
         keyword_setting_original_id = callback_data.keyword_setting_original_id
         async with _sm(read_only=False) as session:
-            keyword_setting = await session.execute(
-                select(KeywordSetting)
-                .options(selectinload(KeywordSetting.adv_setting))
-                .where(KeywordSetting.id == keyword_setting_original_id)
+            outcome = await change_keyword_hard_status_in_session(
+                session,
+                keyword_setting_original_id=keyword_setting_original_id,
+                new_hard_status=new_hard_status,
             )
-            keyword_setting: KeywordSetting | None = keyword_setting.scalar() # noqa
-            assert keyword_setting
-            adv_setting: AdvSetting = keyword_setting.adv_setting  # type: ignore[attr-defined]
-            if new_hard_status >= 0:
-                keyword_setting.hard_status = new_hard_status  # type: ignore[attr-defined]
-                _ = sync_keyword_setting_mode_for_v3(
-                    keyword_setting,
-                    automatic_version=adv_setting.automatic_version,
-                    hard_status_override=new_hard_status,
-                    adv_strategy=adv_setting.strategy,
+            if outcome.kind == "blocked":
+                await bot.send_message(
+                    callback.message.chat.id,
+                    "Кампания в режиме A/B Hold — статус ключа "
+                    "заморожен. Чтобы изменить статус, выключите A/B Hold "
+                    "на экране режима.",
                 )
-                if new_hard_status == 2 or new_hard_status == const.ALWAYS_ON:
-                    keyword_setting.relevant = True  # type: ignore[attr-defined]
-                elif new_hard_status == 0:
-                    keyword_setting.relevant = False  # type: ignore[attr-defined]
-            adv_ids = set()
-            adv_ids.add(adv_setting.adv_id)
-            if search_adv_id := adv_setting.search_adv_id:
-                adv_ids.add(search_adv_id)
-            elif new_hard_status == -1:
-                min_ctr = await data_manager.get_min_ctr(adv_setting) # noqa
-                async with get_clickhouse_client() as client:
-                    (
-                        clicks,
-                        views,
-                        _,
-                    ) = await data_manager.get_keyword_statistic_clickhouse(
-                        client, keyword_setting.text, adv_ids  # type: ignore[attr-defined]
+                return
+            if outcome.kind == "needs_ctr_boost":
+                keyword_setting = outcome.keyword_setting
+                adv_setting = outcome.adv_setting
+                assert keyword_setting is not None
+                assert adv_setting is not None
+                adv_ids = set()
+                adv_ids.add(adv_setting.adv_id)
+                if search_adv_id := adv_setting.search_adv_id:
+                    adv_ids.add(search_adv_id)
+                elif new_hard_status == -1:
+                    min_ctr = await data_manager.get_min_ctr(adv_setting)  # noqa
+                    async with get_clickhouse_client() as client:
+                        await apply_keyword_ctr_boost_with_client(
+                            client,
+                            keyword_setting=keyword_setting,
+                            keyword_text=keyword_setting.text,  # type: ignore[attr-defined]
+                            adv_ids=adv_ids,
+                            min_ctr=min_ctr,
+                        )
+
+                    await redis_manager.set_auto_block_status(
+                        keyword_setting_original_id, False
                     )
-                if keyword_setting.added_clicks:  # type: ignore[attr-defined]
-                    clicks += keyword_setting.added_clicks  # type: ignore[attr-defined]
-                if keyword_setting.added_views:  # type: ignore[attr-defined]
-                    views += keyword_setting.added_views  # type: ignore[attr-defined]
 
-                n = 10  # Процент увеличения CTR, который вы хотите достичь
-
-                # Расчет нового CTR
-                new_ctr = min_ctr * (1 + n / 100)
-
-                # Вычисление необходимого количества дополнительных кликов
-                add_clicks = max([int(round(new_ctr * views - clicks)), 1])
-
-                # Добавление кликов без изменения показов
-                if not keyword_setting.added_clicks:  # type: ignore[attr-defined]
-                    keyword_setting.added_clicks = 0  # type: ignore[attr-defined]
-                keyword_setting.added_clicks += add_clicks  # type: ignore[attr-defined]
-
-                await redis_manager.set_auto_block_status(
-                    keyword_setting_original_id, False
-                )
-
-            await session.commit()
+                await session.commit()
         data = await state.get_data()
         page = data.get("last_keyword_setting_page", 1)
 
@@ -946,6 +1066,13 @@ async def change_keyword_target_place(
 async def keyword_target_place_value(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
+    """Сохраняет целевую позицию ключа; missing AdvSetting / A/B Hold — отказ.
+
+    При ``KeywordSetting.adv_setting is None`` — ``Кампания не найдена.`` без
+    записи ``target_place`` / commit (FINDING-PBH-016; peer: add_white_phrases
+    missing-campaign stop). При ``is_ab_hold_structural_freeze`` — Hold freeze
+    без записи. Parent WRITE seam: ``_sm(read_only=False)``.
+    """
     data = await state.get_data()
     keyword_setting_original_id = data.get("keyword_setting_for_target_place")
     if not keyword_setting_original_id:
@@ -985,9 +1112,12 @@ async def keyword_target_place_value(
             await state.set_state()
             return
         adv_setting = keyword_setting.adv_setting
-        if adv_setting is not None and is_ab_hold_structural_freeze(
-            adv_setting.card_ab_hold_mode
-        ):
+        if adv_setting is None:
+            await bot.send_message(message.chat.id, "Кампания не найдена.")
+            await state.update_data(keyword_setting_for_target_place=None)
+            await state.set_state()
+            return
+        if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
             await bot.send_message(
                 message.chat.id,
                 "Кампания в режиме A/B Hold — целевая позиция ключа "

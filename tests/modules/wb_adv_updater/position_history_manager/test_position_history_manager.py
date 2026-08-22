@@ -12,7 +12,7 @@ from app.modules.wb_adv_updater.position_history_manager import (
 
 # DDL таблицы с правильным типом timestamp (DateTime вместо Float64)
 CLUSTERS_ADV_STATS_DDL = """
-CREATE TABLE IF NOT EXISTS default_db.clusters_adv_stats_test (
+CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.clusters_adv_stats_test (
     adv_id      UInt32,
     nmid        UInt64,
     wb_category LowCardinality(String),
@@ -34,15 +34,13 @@ ORDER BY (wb_category, nmid, norm_query, date, timestamp)
 SETTINGS index_granularity = 8192
 """
 
-pytestmark = pytest.mark.integration
-
-
+pytestmark = pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_get_position_history_returns_positions(clickhouse_client: AsyncClient) -> None:
     """Тест проверяет, что get_position_history возвращает корректный PositionHistory."""
     
     # Пересоздаём таблицу с правильной структурой (timestamp как DateTime)
-    await clickhouse_client.command("DROP TABLE IF EXISTS default_db.clusters_adv_stats")
+    await clickhouse_client.command("DROP TABLE IF EXISTS test_adv_bot_clickhouse.clusters_adv_stats")
     await clickhouse_client.command(CLUSTERS_ADV_STATS_DDL.replace("clusters_adv_stats_test", "clusters_adv_stats"))
     
     # Подготавливаем тестовые данные
@@ -72,7 +70,7 @@ async def test_get_position_history_returns_positions(clickhouse_client: AsyncCl
     
     # Вставляем данные в ClickHouse
     await clickhouse_client.insert(
-        "default_db.clusters_adv_stats",
+        "test_adv_bot_clickhouse.clusters_adv_stats",
         rows,
         column_names=columns,
     )
@@ -133,7 +131,7 @@ async def test_get_position_history_returns_empty_for_nonexistent_nmid(
     """Тест проверяет, что для несуществующего nmid возвращается пустой PositionHistory."""
     
     # Пересоздаём таблицу с правильной структурой
-    await clickhouse_client.command("DROP TABLE IF EXISTS default_db.clusters_adv_stats")
+    await clickhouse_client.command("DROP TABLE IF EXISTS test_adv_bot_clickhouse.clusters_adv_stats")
     await clickhouse_client.command(CLUSTERS_ADV_STATS_DDL.replace("clusters_adv_stats_test", "clusters_adv_stats"))
     
     nonexistent_nmid = 111111111

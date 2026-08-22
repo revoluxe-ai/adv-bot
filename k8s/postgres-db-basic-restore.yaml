@@ -23,11 +23,11 @@ spec:
     size: 30Gi
     storageClass: nvme.network-drives.csi.timeweb.cloud
   users:
-    advupdater:
-      - superuser
-      - createdb
+    advupdater: []
+    app_owner: []
+    app_migrator: []
   databases:
-    adv_updater: advupdater
+    adv_updater: app_owner
   postgresql:
     version: "17"
     parameters:

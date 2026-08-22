@@ -1,24 +1,37 @@
-import pytest
+"""Integration: Pricer tariff AUTO/OLD modes against live test PG.
 
+``wb_cabinet`` consumes baseline ``wbcabinet`` id=1 from
+``reset_postgres_test_data(restore_baseline=True)`` — do not INSERT id=1 again.
+"""
+
+from __future__ import annotations
+
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing.pricer.pricer import Pricer, TariffMode
 from app.modules.billing.pricer.tariffs import tariffs, tariffs_for_auto_setting
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
-from tests.factories.adv_factory import WBCabinetFactory
 
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 @pytest.fixture
 async def wb_cabinet(async_session: AsyncSession) -> WBCabinet:
-    """Создаёт WBCabinet с id=1 для использования в тестах через factory."""
-    wb_cabinet = WBCabinetFactory.build(id=1, shop_id="test_shop_id", active=True, balance=0.0, bonus=0.0, demo=True)
-    async_session.add(wb_cabinet)
-    await async_session.flush()
-    return wb_cabinet
+    """Baseline WBCabinet id=1 после destructive PG reset (без повторного INSERT).
+
+    ``async_engine`` → ``reset_postgres_test_data(restore_baseline=True)`` уже
+    сеет ``wbcabinet`` id=1 / ``shop_id=test_shop_id``. Повторный insert даёт
+    ``UniqueViolationError`` на ``wbcabinet_pkey``.
+    """
+    row = await async_session.get(WBCabinet, 1)
+    assert row is not None, (
+        "expected baseline wbcabinet id=1 from reset_postgres_test_data"
+    )
+    assert row.shop_id == "test_shop_id"
+    return row
 
 
 def _make_search_adv(*, adv_id: int, wb_cabinet_id: int) -> AdvSetting:
@@ -36,7 +49,7 @@ def _make_auto_adv(
     adv_id: int,
     wb_cabinet_id: int,
     search_adv_id: int,
-    automatic_version: int,
+    bot_active: bool,
     wl: bool,
     tp: bool,
 ) -> AdvSetting:
@@ -44,10 +57,9 @@ def _make_auto_adv(
         adv_id=adv_id,
         name=f"auto_{adv_id}",
         wb_cabinet_id=wb_cabinet_id,
-        bot_active=True,
-        active_status="any",
+        bot_active=bot_active,
+        active_status="started",
         _search_adv_id=search_adv_id,  # noqa: SLF001
-        automatic_version=automatic_version,
         auto_update_white_list=wl,
         auto_update_target_place=tp,
     )
@@ -65,7 +77,7 @@ async def test_auto_mode_applies_new_tariffs_when_any_part_auto_enabled(
         adv_id=90002,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=2,
+        bot_active=False,
         wl=True,
         tp=False,
     )
@@ -93,7 +105,7 @@ async def test_old_mode_applies_old_tariffs_when_no_part_auto_enabled(
         adv_id=90102,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=2,
+        bot_active=False,
         wl=False,
         tp=False,
     )
@@ -121,7 +133,7 @@ async def test_auto_mode_applies_without_active_search_campaigns(
         adv_id=90402,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=None,
-        automatic_version=2,
+        bot_active=False,
         wl=True,
         tp=False,
     )
@@ -131,9 +143,9 @@ async def test_auto_mode_applies_without_active_search_campaigns(
 
     details = await Pricer().get_tariff_details(async_session, shop_id)
 
-    assert details.count == 0
+    assert details.count == 0.5
     assert details.mode == TariffMode.AUTO
-    assert details.total_per_month == 0.0
+    assert details.total_per_month == 0.5 * float(tariffs_for_auto_setting[1])
 
 
 async def test_auto_mode_triggered_by_individual_keyword_target_places(
@@ -148,7 +160,7 @@ async def test_auto_mode_triggered_by_individual_keyword_target_places(
         adv_id=90602,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=1,
+        bot_active=False,
         wl=False,
         tp=False,
     )
@@ -183,7 +195,7 @@ async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
         adv_id=90202,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        automatic_version=1,
+        bot_active=False,
         wl=True,
         tp=True,
     )
@@ -192,8 +204,8 @@ async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
     await async_session.flush()
 
     details = await Pricer().get_tariff_details(async_session, shop_id)
-    assert details.count == 1
-    assert details.total_per_month > 0.0
+    assert details.count == 0.5
+    assert details.total_per_month == 0.5 * float(tariffs_for_auto_setting[1])
 
 
 async def test_auto_tariff_thresholds_apply_to_total_count(
@@ -213,7 +225,7 @@ async def test_auto_tariff_thresholds_apply_to_total_count(
             adv_id=90310 + i,
             wb_cabinet_id=wb_cabinet_id,
             search_adv_id=search.adv_id,
-            automatic_version=1,
+            bot_active=False,
             wl=True if i == 0 else False,  # достаточно одной, чтобы включить AUTO
             tp=False,
         )

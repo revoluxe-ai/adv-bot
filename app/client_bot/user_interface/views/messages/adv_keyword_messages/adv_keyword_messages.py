@@ -12,9 +12,6 @@ from app.client_bot.user_interface.message_templates import (
     TextWithKeyboardAndImage,
 )
 from app.client_bot.user_interface.views import keyboards
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.keyboard import (
-    normalize_automatic_version_ui,
-)
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
@@ -154,7 +151,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
                     clear_keywords.append(keyword)
             self._keywords = clear_keywords
 
-        if normalize_automatic_version_ui(self._adv_setting.automatic_version) == 3:
+        if self._adv_setting.bot_active:
             self._keywords = sort_keywords_by_pay_for_order(self._keywords)
             self._keywords = await enrich_keywords_v3_list_profiles(
                 self._adv_setting, self._keywords

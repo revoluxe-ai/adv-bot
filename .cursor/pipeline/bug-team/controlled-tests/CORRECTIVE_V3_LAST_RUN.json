@@ -1,0 +1,172 @@
+{
+  "V3-VAL-01": {
+    "PASS": true,
+    "MSG": "wrong terminal status rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-02": {
+    "PASS": true,
+    "MSG": "invalid status/terminal pair rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-03": {
+    "PASS": true,
+    "MSG": "missing dependency rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-04": {
+    "PASS": true,
+    "MSG": "dependency raw hash mismatch rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-05": {
+    "PASS": true,
+    "MSG": "dependency canonical hash mismatch rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-06": {
+    "PASS": true,
+    "MSG": "dependency manifest not supplied rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-07": {
+    "PASS": true,
+    "MSG": "valid packet passes transition gate",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-VAL-08": {
+    "PASS": true,
+    "MSG": "plain text output rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-01": {
+    "PASS": true,
+    "MSG": "executor prepare without receipt rejected (BLOCKED_OWNER_PRODUCTION_GO_REQUIRED)",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-02": {
+    "PASS": true,
+    "MSG": "worker-callable creation path rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-03": {
+    "PASS": true,
+    "MSG": "wrong authority token rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-04": {
+    "PASS": true,
+    "MSG": "wrong CASE_ID rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-05": {
+    "PASS": true,
+    "MSG": "wrong FINDING_ID rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-06": {
+    "PASS": true,
+    "MSG": "wrong RED hash rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-07": {
+    "PASS": true,
+    "MSG": "wrong execution route rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-08": {
+    "PASS": true,
+    "MSG": "expired receipt rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-09": {
+    "PASS": true,
+    "MSG": "consumed receipt replay rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-10": {
+    "PASS": true,
+    "MSG": "valid receipt permits exactly one executor prepare/dispatch intent",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-GATE-11": {
+    "PASS": true,
+    "MSG": "receipt reserved for WEX-A rejected for WEX-B",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-01": {
+    "PASS": true,
+    "MSG": "timed-out WEX late output rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-02": {
+    "PASS": true,
+    "MSG": "superseded non-timeout WEX output rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-03": {
+    "PASS": true,
+    "MSG": "previous/wrong attempt output rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-04": {
+    "PASS": true,
+    "MSG": "wrong packet generation rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-05": {
+    "PASS": true,
+    "MSG": "wrong checkpoint generation rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-06": {
+    "PASS": true,
+    "MSG": "wrong worker ID rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-07": {
+    "PASS": true,
+    "MSG": "duplicate accepted output rejected",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-08": {
+    "PASS": true,
+    "MSG": "current active output accepted",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-09": {
+    "PASS": true,
+    "MSG": "stale output cannot consume Owner receipt",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-STALE-10": {
+    "PASS": true,
+    "MSG": "stale output cannot append success transition",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-REG-NOT-ACTIVE": {
+    "PASS": true,
+    "MSG": "ACTIVE_V1 normal invocation allowed (post-activation)",
+    "LABEL": "CONTRACT_STATIC"
+  },
+  "V3-REG-FANIN": {
+    "PASS": true,
+    "MSG": "FANIN filesystem boundary",
+    "LABEL": "FILESYSTEM_ENFORCEMENT"
+  },
+  "V3-REG-TRACE": {
+    "PASS": true,
+    "MSG": "route trace monotonicity",
+    "LABEL": "RUNTIME_UNIT"
+  },
+  "V3-REG-FP": {
+    "PASS": true,
+    "MSG": "graph fingerprint reproduction",
+    "LABEL": "CONTRACT_STATIC"
+  },
+  "V3-REG-PREPARE-ALL": {
+    "PASS": true,
+    "MSG": "reusable prepare validation for remaining workers",
+    "LABEL": "RUNTIME_UNIT"
+  }
+}

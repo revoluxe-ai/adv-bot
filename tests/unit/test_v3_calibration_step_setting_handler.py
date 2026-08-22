@@ -62,7 +62,7 @@ class _FakeSessionCtx:
 async def test_v3_calibration_prompt_mentions_zero_to_fifty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adv = type("Adv", (), {"id": 1, "automatic_version": 3})()
+    adv = type("Adv", (), {"id": 1, "bot_active": True})()
     result = type("Result", (), {"scalar_one_or_none": lambda self: adv})()
     session = AsyncMock()
     session.execute = AsyncMock(return_value=result)

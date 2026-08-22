@@ -5,6 +5,8 @@ description: Read-only audit of an OpenSpec change before archive
 Verify является read-only audit command после `/opsx-apply` и до `/opsx-archive`.
 Никогда не меняй production code, planning artifacts, tasks, decisions или tests во время verify.
 
+Выход `mode=impl` / `mode=archive` — только DoD/audit verdict, не write-inventory и не file-attribution source. Write-scope reconciliation MUST использовать `git status` / `git diff` напрямую; не трактовать verify output как inventory dirty-tree.
+
 **Store selection:** Если пользователь называет store или работа находится в standalone OpenSpec store, сначала запусти `openspec store list --json`, выбери registered store id и передавай `--store <id>` в команды, которые читают specs/changes: `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`. Остальные команды не принимают этот флаг. Без store команды работают от ближайшего локального `openspec/` root.
 
 **OpenSpec config contract:** перед чтением `openspec/config.yaml` запусти из repository root:
@@ -25,7 +27,7 @@ python openspec/tools/check_config_contract.py
 - последняя строка: ровно `✅ GO` или `❌ NO_GO`
 - failed targeted tests, archive blockers, placement violations и task validation mismatch дают `NO_GO`
 
-**Input:** optionally specify a change name after `/opsx:verify` (example: `/opsx:verify add-auth`). Если имя не указано, infer только когда контекст однозначен; иначе запусти `openspec list --json` и попроси пользователя выбрать change.
+**Input:** optionally specify a change name after `/opsx-verify` (example: `/opsx-verify add-auth`). Если имя не указано, infer только когда контекст однозначен; иначе запусти `openspec list --json` и попроси пользователя выбрать change.
 
 ## Steps
 
@@ -35,7 +37,7 @@ python openspec/tools/check_config_contract.py
    - infer from conversation context only when unambiguous
    - если ambiguous, запусти `openspec list --json` и попроси выбрать
 
-   Всегда сообщи: `Проверяю change: <name>`. Для override: `/opsx:verify <other>`.
+   Всегда сообщи: `Проверяю change: <name>`. Для override: `/opsx-verify <other>`.
 
 2. **Load verify settings**
 
@@ -81,10 +83,10 @@ python openspec/tools/check_config_contract.py
 
 5. **Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Read proposed decisions from `contextFiles.decisions` or `artifactPaths.decisions.existingOutputPaths`, if any.
    - Output relevant decisions by path and status in `Архитектурное размещение`.
-   - If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, mark `missing_required_decision`.
+   - If the change touches ownership, layering, write paths, or domain invariants and no relevant decision exists, mark `Architecture Decision Missing`.
    - If proposed decisions exist, get `openspec instructions decisions --change "<name>" --json` and apply `rules.decisions`.
    - Compare implementation placement against accepted/proposed decisions.
    - Passing tests не являются proof, если placement нарушает accepted decision.

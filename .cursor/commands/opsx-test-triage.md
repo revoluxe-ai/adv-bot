@@ -18,12 +18,25 @@ Do not weaken assertions.
 
 First classify the failure and produce a copy-pasteable NEXT PROMPT.
 
+## Type-check routing
+
+If the failure packet is `pyright` / `pyright-strict` / `mypy` diagnostics (not a pytest assertion failure) — do **not** classify it with the pytest taxonomy below.
+
+Return immediately:
+
+```text
+NEXT_ACTION: /opsx-fix-types
+```
+
+Owner command: `.cursor/commands/opsx-fix-types.md`.
+
 ## Policy source
 
 Before triage, inspect and follow:
 
 - `openspec/policies/test-triage.md`
 
+Read that exact path directly (`.cursor/commands/opsx-source-resolution.md`). If failing test paths are provided, open those exact paths first; do not inventory all tests to rediscover them.
 If this policy file exists, treat it as the source of truth for test failure classification rules.
 
 If the command and policy conflict:
@@ -46,6 +59,9 @@ Classify the failure as exactly one:
 - SPEC_CHANGED_BUT_NOT_UPDATED: behavior changed but OpenSpec/spec/tasks were not updated.
 - BAD_TEST: test checks the wrong thing or does not catch the real regression.
 - FLAKY_OR_ENV: async/env/timing/db/redis/clickhouse/order problem.
+  Connection refused / missing laptop services on `5433`|`8124`|`6390` →
+  NEXT `/opsx-test-env UP` (pytest session `REDIS_PORT=6390`; not `/opsx-devops`).
+  Host `:6379` is out of test-compose scope.
 - AMBIGUOUS: not enough evidence.
 
 ## Required work
@@ -112,3 +128,17 @@ Stop conditions:
 [END NEXT PROMPT]
 
 11. Команда проверки:
+
+
+## Orchestration RED status mapping (light)
+
+When triage feeds a bug-episode RED path, map classes:
+
+| Triage class | Typical RED / next |
+|---|---|
+| CODE_BUG | continue RED authoring toward `RED_CONFIRMED` |
+| BAD_TEST / wrong assertion | `RED_WRONG_REASON` or rewrite test via `/opsx-test` |
+| FLAKY_OR_ENV / setup | `TEST_SETUP_DEFECT` / `BLOCKED`; if PG/CH/Redis ports → `/opsx-test-env UP` |
+| TEST_OBSOLETE | do not force production GO |
+
+Do **not** emit production GO from triage.

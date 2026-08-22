@@ -30,9 +30,6 @@ from app.modules.hide_zero_views_toggle import ChangeHideZeroViewsStatus
 from app.client_bot.user_interface.views.keyword_strategy_ui import (
     keyword_strategy_letter,
 )
-from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.automatic_version_ui import (
-    normalize_automatic_version_ui,
-)
 from app.client_bot.user_interface.views.keyword_v3_profile_ui import (
     keyword_v3_decision_trace_button_label,
 )
@@ -259,6 +256,7 @@ def get_advs_keyboard_with_paginator(
     for adv in adv_settings[start_index:end_index]:
         check_last_24_hours = adv.check_last_24_hours  # type: ignore[attr-defined]
         check_text = "✅" if check_last_24_hours else "❓"
+        # DEPRECATED residual read: AdvSetting.worst_promo_position (populate-path off).
         button_text = (
             f"{'(' + str(adv.worst_promo_position) + ')' if adv.worst_promo_position else ''}{check_text} {adv.name} (Бот включен)"
             if adv.bot_active
@@ -390,7 +388,7 @@ def get_keywords_setting_keyboard(
     start_index = (page - 1) * on_page
     end_index = start_index + on_page
 
-    if normalize_automatic_version_ui(adv_setting.automatic_version) != 3:
+    if not adv_setting.bot_active:
         keywords = sorting_keywords(keywords, sort_mode)
 
     bottoms: list[list[InlineKeyboardButton]] = []
@@ -429,7 +427,7 @@ def get_keywords_setting_keyboard(
         status_block = (
             f"{turn_on}{k_util.get_hard_status(keyword)}{k_util.get_dynamic_status(keyword)}"
         )
-        if normalize_automatic_version_ui(adv_setting.automatic_version) == 3:
+        if adv_setting.bot_active:
             mode_letter = keyword_strategy_letter(keyword)
             text += f"{status_block}[{mode_letter}] {keyword.text}"
         else:
@@ -837,7 +835,7 @@ def get_keyword_setting_keyboard(
     )
 
     if (
-        normalize_automatic_version_ui(adv_setting.automatic_version) == 3
+        adv_setting.bot_active
         and telegram_user_id is not None
         and is_bot_admin(telegram_user_id)
         and keyword_display_status is not None

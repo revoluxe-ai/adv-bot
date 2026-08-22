@@ -29,9 +29,7 @@ from tests.factories.complex_adv import (
     create_complex_adv_seed,
 )
 
-pytestmark = pytest.mark.integration
-
-
+pytestmark = pytest.mark.destructive_local
 async def _create_second_complex_adv_seed(
     session: AsyncSession, wb_cabinet_id: int
 ) -> ComplexAdvSeed:
@@ -49,7 +47,7 @@ async def _create_second_complex_adv_seed(
         auto_add_only_relevant_phrase=False,
         bidder_for_auto=True,
         bidder_active=True,
-        automatic_version=2,
+        bot_active=False,
     )
     adv_setting.cpm = 90
     adv_setting.max_cpm = 220

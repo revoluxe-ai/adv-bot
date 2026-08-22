@@ -259,14 +259,12 @@ class ComplexAdv:
 
     @property
     def auto_update_white_list(self) -> bool:
-        if self._adv_setting.auto_update_white_list is None:
-            return True
         return self._adv_setting.auto_update_white_list
 
 
     @property
     def bidder_active(self) -> bool:
-        return self._adv_setting.bidder_active
+        return bool(self._adv_setting.bidder_active)
 
     @property
     def bidder_coroutine_type(self) -> BidderCoroutineType:
@@ -289,7 +287,10 @@ class ComplexAdv:
 
     @property
     def hard_min_ctr(self) -> int | None:
-        return self._adv_setting.hard_min_ctr
+        raw = self._adv_setting.hard_min_ctr
+        if raw is None:
+            return None
+        return int(raw)
 
     @property
     def original_adv_setting_id(self) -> int:
@@ -380,12 +381,25 @@ class ComplexAdv:
         return str(raw)
 
     @property
+    def card_ab_hold_phase(self) -> str | None:
+        """Durable A/B Hold epoch phase; ``None`` = legacy MVP-1 (phase IS NULL).
+
+        Используется Auto bid freeze (FINDING-PBH-003): post-confirm phases
+        ``pending_intent`` / ``wb_sync`` / ``ready_active`` при ``pending_setup``.
+        """
+        raw = getattr(self._adv_setting, "card_ab_hold_phase", None)
+        if raw is None:
+            return None
+        text = str(raw).strip()
+        return text or None
+
+    @property
     def keyword_calibration_max_step(self) -> int:
         return int(self._adv_setting.keyword_calibration_max_step)
 
     @property
     def shop_id(self) -> str:
-        return self._shop_id
+        return self._shop_id or ""
 
     @property
     def search_adv(self) -> AdvSetting | None:
@@ -414,37 +428,24 @@ class ComplexAdv:
         return self._adv_setting.auto_update_exponent
 
     @property
-    def auto_updater_version(self) -> int | None:
-        return self._adv_setting.automatic_version
-
-    @property
     def is_part_auto_setting_active(self) -> bool:
         adv = self._adv_setting
+        if not adv.bot_active:
+            return False
         individual_keywords_mode_active = bool(
             adv.individual_keywords_target_place_mode
         )
-        ver = (
-            self.auto_updater_version
-            if self.auto_updater_version is not None
-            else 2
+        return any(
+            [
+                adv.auto_update_white_list,
+                adv.auto_update_target_place,
+                individual_keywords_mode_active,
+            ]
         )
-        if ver in (1, 2, 3):
-            return any(
-                [
-                    adv.auto_update_white_list,
-                    adv.auto_update_target_place,
-                    individual_keywords_mode_active,
-                ]
-            )
-        raise RuntimeError("Not Implemented for this version")
 
     @property
     def adv_setting(self) -> AdvSetting:
         return self._adv_setting
-
-    @property
-    def auto_update_setting_version(self) -> int | None:
-        return self._adv_setting.automatic_version
 
     def _filter_keywords(
         self, keywords: list[CalculatedKeyword]
@@ -493,7 +494,8 @@ class ComplexAdv:
 
     @property
     def target_place(self) -> int:
-        return self._adv_setting.max_place
+        place = self._adv_setting.max_place
+        return 0 if place is None else int(place)
 
     @property
     def exponent_predict_ctr(self) -> float:
@@ -546,11 +548,12 @@ class ComplexAdv:
 
     @property
     def is_bidder_for_search_adv_active(self) -> bool:
-        return self._adv_setting.bidder_active
+        return bool(self._adv_setting.bidder_active)
 
     @property
     def max_user_cpm(self) -> int:
-        return self._adv_setting.max_cpm
+        cpm = self._adv_setting.max_cpm
+        return 0 if cpm is None else int(cpm)
 
     @property
     def fact_pay_for_order(self) -> float | None:

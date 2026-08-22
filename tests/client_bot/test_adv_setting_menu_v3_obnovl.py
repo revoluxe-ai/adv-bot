@@ -17,14 +17,13 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 
 def _minimal_menu_for_text(
     *,
-    automatic_version: int,
+    bot_active: bool,
     v3_last_action_str: str | None,
 ) -> AdvSettingMenu:
     menu = AdvSettingMenu.__new__(AdvSettingMenu)
     menu.adv = SimpleNamespace(
-        automatic_version=automatic_version,
+        bot_active=bot_active,
         auto_budget_watchdog_enabled=False,
-        bot_active=False,
         adv_id=1,
         search_adv_id=None,
         name="Test",
@@ -83,7 +82,7 @@ def _extract_obnovl_block(menu: AdvSettingMenu) -> str:
 @pytest.mark.unit
 def test_obnovl_v3_shows_last_v3_not_bs() -> None:
     menu = _minimal_menu_for_text(
-        automatic_version=3,
+        bot_active=True,
         v3_last_action_str="UP «kw» MIN_CPA→OPTIMUM 18:32:06 26-05-2026",
     )
     block = _extract_obnovl_block(menu)
@@ -96,7 +95,7 @@ def test_obnovl_v3_shows_last_v3_not_bs() -> None:
 
 @pytest.mark.unit
 def test_obnovl_v2_shows_bs_not_v3() -> None:
-    menu = _minimal_menu_for_text(automatic_version=2, v3_last_action_str=None)
+    menu = _minimal_menu_for_text(bot_active=False, v3_last_action_str=None)
     block = _extract_obnovl_block(menu)
     assert "добавл в БС" in block
     assert "удал из БС" in block

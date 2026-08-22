@@ -16,6 +16,9 @@ from app.client_bot.notification_sender import (
 from app.modules.balance_manager.balance_service import get_cabinet_balance
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 from app.modules.billing.pricer.pricer import Pricer
+from app.modules.billing.tariff_preview_context import (
+    resolve_tariff_preview_latch_context,
+)
 from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     WBUserCabinet,
@@ -228,7 +231,15 @@ class BalanceReminderService:
 
                 avg_daily_spend = price_cache.get(shop_id)
                 if avg_daily_spend is None:
-                    avg_daily_spend = await self._pricer.get_price_for_day_for_shop(session, shop_id)
+                    leg_latch, utc_date = resolve_tariff_preview_latch_context(
+                        utc_date=today,
+                    )
+                    avg_daily_spend = await self._pricer.get_price_for_day_for_shop(
+                        session,
+                        shop_id,
+                        leg_latch=leg_latch,
+                        utc_date=utc_date,
+                    )
                     price_cache[shop_id] = avg_daily_spend
 
                 if avg_daily_spend <= 0:

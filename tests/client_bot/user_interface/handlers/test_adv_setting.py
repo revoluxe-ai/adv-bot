@@ -23,7 +23,7 @@ from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMo
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 
 class _MockSessionMaker:
@@ -69,15 +69,14 @@ async def _create_adv(
     *,
     wb_cabinet: WBCabinet,
     suffix: str,
-    automatic_version: int = 2,
+    bot_active: bool = False,
 ) -> AdvSetting:
     adv = AdvSetting(
         adv_id=100000 + abs(hash(suffix)) % 900000,
         name=f"adv_{suffix}",
         wb_cabinet_id=wb_cabinet.id,
         active_status="started",
-        bot_active=True,
-        automatic_version=automatic_version,
+        bot_active=bot_active,
     )
     session.add(adv)
     await session.flush()
@@ -124,19 +123,19 @@ async def test_update_keywords_returns_rowcount_and_updates_v3_modes(
         async_session,
         wb_cabinet=target_cabinet,
         suffix="updater_non_v3",
-        automatic_version=2,
+        bot_active=False,
     )
     v3_adv = await _create_adv(
         async_session,
         wb_cabinet=target_cabinet,
         suffix="updater_v3",
-        automatic_version=3,
+        bot_active=True,
     )
     other_adv = await _create_adv(
         async_session,
         wb_cabinet=other_cabinet,
         suffix="updater_other",
-        automatic_version=3,
+        bot_active=True,
     )
 
     non_v3_black = KeywordSetting(

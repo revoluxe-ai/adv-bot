@@ -15,8 +15,6 @@ from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 
-_V3_AUTOMATIC_VERSION = 3
-
 _HARD_STATUS_BLACK_LIST = 0
 _HARD_STATUS_AUTO_MODE = 1
 _HARD_STATUS_WHITE_LIST = 2
@@ -24,9 +22,9 @@ _HARD_STATUS_TURN_OFF = 3
 _HARD_STATUS_ALWAYS_ON = 4
 
 
-def is_v3_campaign(automatic_version: int | None) -> bool:
-    """True только для кампаний с ``automatic_version == 3``."""
-    return automatic_version == _V3_AUTOMATIC_VERSION
+def is_v3_campaign(bot_active: bool) -> bool:
+    """True для кампаний с включённым ботом (единственный auto-updater runtime — V3)."""
+    return bot_active
 
 
 def keyword_strategy_mode_for_adv_strategy(
@@ -139,7 +137,7 @@ def repaired_strategy_mode_for_v3(
 def sync_keyword_setting_mode_for_v3(
     keyword_setting: KeywordSetting,
     *,
-    automatic_version: int | None,
+    bot_active: bool,
     hard_status_override: int | None = None,
     adv_strategy: Strategy | str | None = None,
 ) -> bool:
@@ -152,7 +150,7 @@ def sync_keyword_setting_mode_for_v3(
     Returns:
         ``True``, если ``strategy_mode`` был изменен.
     """
-    if not is_v3_campaign(automatic_version):
+    if not is_v3_campaign(bot_active):
         return False
     hard_status = (
         int(hard_status_override)

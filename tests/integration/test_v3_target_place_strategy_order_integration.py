@@ -31,15 +31,15 @@ from tests.integration.helpers.v3_target_place_assertions import (
 from tests.integration.helpers.v3_target_place_samples import (
     ensure_v3_keyword_samples,
 )
+import app.modules.bids_for_positions_manager.clickhouse_manager.clickhouse_manager as bids_ch_module
+import app.modules.predict_keywords_target_place.clickhouse_manager.clickhouse_manager as predict_ch_module
 from tests.integration.test_predict_keywords_target_place_integration import (
     TEST_NMID,
     _ensure_predict_tables,
     _make_adv_mock,
 )
+from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 from tests.unit.auto_updater_v3.conftest import RK_ORDERS_PER_CART_TEST
-
-pytestmark = pytest.mark.integration
-
 
 def _synthetic_ladder_profile(keyword: str, ts: datetime) -> list[BidPosition]:
     """Профиль, где MAX→pos1, OPT→pos2, MIN→pos3 (разные и упорядочены).
@@ -227,6 +227,7 @@ async def test_v3_sync_keyword_target_places_applies_modes_from_profile(
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_v3_strategy_order_for_db_keyword_texts(v3_db_keyword_samples) -> None:
     """Для текстов ключей из Postgres резолвер + лестница V3 дают упорядоченную лестницу."""
     ts = datetime.now()
@@ -257,20 +258,29 @@ async def test_v3_strategy_order_for_db_keyword_texts(v3_db_keyword_samples) -> 
 
 
 @pytest.mark.asyncio
+@pytest.mark.destructive_local
 async def test_v3_get_keyword_bid_profiles_ch_integration_ordered(
     clickhouse_client,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """E2E CH: bid_profiles → target_place по режимам, лестница MAX<=OPT<=MIN."""
+    patch_get_clickhouse_client(monkeypatch, [bids_ch_module], clickhouse_client)
+    patch_get_clickhouse_client(
+        monkeypatch,
+        [predict_ch_module],
+        clickhouse_client,
+        attr="get_client",
+    )
     await _ensure_predict_tables(clickhouse_client)
     ts = datetime.now()
     norm_query = "kw_ch_ladder"
     async with anti_ch_crash_semaphore:
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.bid_decision_log")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.bid_decision_log")
         await clickhouse_client.command(
-            "TRUNCATE TABLE IF EXISTS default_db.clusters_adv_deltas_5m"
+            "TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.clusters_adv_deltas_5m"
         )
         await clickhouse_client.command(
-            "TRUNCATE TABLE IF EXISTS default_db.pos_priors_category"
+            "TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.pos_priors_category"
         )
 
         # bid/conv согласованы с _synthetic_ladder_profile (MAX=1, OPT=2, MIN=3)
@@ -280,7 +290,7 @@ async def test_v3_get_keyword_bid_profiles_ch_integration_ordered(
             (1, TEST_NMID, norm_query, "Electronics", 3.0, 3, 60, 6.0, 60.0, 3.0, 50, 5.0, 60.0, 3.0, 60.0, "cpm", ts, ts, 3),
         ]
         await clickhouse_client.insert(
-            "default_db.bid_decision_log",
+            "test_adv_bot_clickhouse.bid_decision_log",
             [list(r) for r in bids_rows],
             column_names=[
                 "adv_id", "nmid", "norm_query", "wb_category", "pos_final",
@@ -298,7 +308,7 @@ async def test_v3_get_keyword_bid_profiles_ch_integration_ordered(
                 ]
             )
         await clickhouse_client.insert(
-            "default_db.clusters_adv_deltas_5m",
+            "test_adv_bot_clickhouse.clusters_adv_deltas_5m",
             deltas,
             column_names=[
                 "adv_id", "nmid", "wb_category", "norm_query", "ts5",
@@ -312,7 +322,7 @@ async def test_v3_get_keyword_bid_profiles_ch_integration_ordered(
             ["Electronics", 3, 0.22, 30, ts],
         ]
         await clickhouse_client.insert(
-            "default_db.pos_priors_category",
+            "test_adv_bot_clickhouse.pos_priors_category",
             conv_priors,
             column_names=["wb_category", "pos_bin", "p_14d", "views_14d", "calculated_at"],
         )

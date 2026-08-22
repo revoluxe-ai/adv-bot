@@ -321,6 +321,34 @@ class AutoShelfBidControlTelegramService:
         await self._repository.update_settings(nmid=nmid, min_bid_distance_minor=parsed)
         return await self.build_view(adv_setting_original_id)
 
+    async def update_retest_interval_days(
+        self,
+        adv_setting_original_id: int,
+        value: str,
+    ) -> AutoShelfBidControlViewDTO:
+        """Сохранить календарный интервал перетеста (суток, default 7)."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        nmid = self._get_single_nmid_or_raise(adv)
+        parsed = self._parse_positive_int(
+            value,
+            "Интервал перетеста: целое число суток ≥ 1.",
+        )
+        await self._repository.get_or_create_default_settings(nmid=nmid)
+        await self._repository.update_settings(
+            nmid=nmid,
+            retest_interval_days=parsed,
+        )
+        return await self.build_view(adv_setting_original_id)
+
+    async def clear_shelf_exhausted_pause(
+        self,
+        adv_setting_original_id: int,
+    ) -> bool:
+        """Кнопка «Сбросить паузу»: clear только PG our-block (без forced start)."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        nmid = self._get_single_nmid_or_raise(adv)
+        return await self._repository.clear_shelf_exhausted_pause(nmid)
+
     async def set_strategy(
         self,
         adv_setting_original_id: int,

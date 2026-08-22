@@ -12,9 +12,44 @@ metadata:
 
 Revise a change's existing planning artifacts and keep them coherent. Never edit code.
 
+**Planning-review repair:** When a `PLANNING_REVIEW_HANDOFF` with
+`MODE: REPAIR_PLANNING_PACKAGE` is pasted, follow
+`.cursor/commands/opsx-update.md` **Planning-review repair front-door** and
+`.cursor/pipeline/contracts/PLANNING_REVIEW.md`: validate handoff → repair
+`FIRST_BAD_ARTIFACT` then affected downstream only → soft-recommend
+`/opsx-planning-review change=<id>` (not apply) after repair. Confirm-before-write
+still applies. Do not invent product decisions or edit Owner Contract unless
+the finding routes OCR+/opsx-new.
+
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Architecture Decision Lookup:** When revising artifacts, also check `openspec/decisions/**/*.md` and `artifactPaths.decisions.existingOutputPaths`. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
+
+**Semantic write-target authority:** Read and follow
+`.cursor/commands/opsx-update.md` and
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. For high-risk
+multi-target writes, revise artifacts until they contain an **explicit SWT
+schema block** with exact field names `TARGET_ENTITY_OR_LEG`,
+`ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`, plus evidence and paired tests.
+Architecture Decision Allowed/Forbidden prose alone is **not** RESOLVED
+(`prose≠RESOLVED`) and must not be marked apply-ready / coherent. Chat-only
+Owner answers are insufficient; unresolved choice returns
+`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`.
+
+**Product Acceptance / change spirit:** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When
+`PRODUCT_ACCEPTANCE_REQUIRED=true`, revise planning until durable
+`OWNER_LIFECYCLE_ECHO` (3–7 temporal steps) exists in design/decision/spec
+and Owner has issued `CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm).
+Chat-only lifecycle is insufficient; do not mark apply-ready without it.
+(Prefer Derived Lifecycle from reviewed owner-contract when that path applies —
+mirror `.cursor/commands/opsx-update.md`.)
+
+**Design Generation gate:** When revising `design.md`, follow
+`.cursor/pipeline/contracts/DESIGN_GENERATION.md` (identical to
+`/opsx-continue` / `/opsx-ff`). Run `DESIGN_READINESS`; resolve SoT/ownership/
+write/recovery or `DESIGN_STATUS: BLOCKED`; preserve MUST/MUST NOT; never
+defer architecture to apply. Do not mark design coherent while BLOCKED.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
@@ -49,12 +84,14 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
    The files to edit are `artifactPaths.<id>.existingOutputPaths` - the concrete files that exist on disk, already glob-expanded for glob artifacts (e.g. `specs/**/*.md`). Do NOT write to `resolvedOutputPath`: for a glob artifact it is still the glob pattern, not a real file.
 
 3. **Understand the request**
+   - If a `PLANNING_REVIEW_HANDOFF` (`MODE: REPAIR_PLANNING_PACKAGE`) is
+     pasted, follow the **Planning-review repair** front-door above.
    - If the user asked for a specific revision ("the design now uses X"), that is the starting edit.
    - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication.
 
 4. **Perform Architecture Decision Lookup**
 
-   - Search and read `openspec/decisions/**/*.md`.
+   - Resolve decision paths context-first (`artifactPaths.decisions` / user paths / index); further `openspec/decisions/` lookup only for remaining gaps (budget ? 3 unless `EVIDENCE_GAP`). Never dump the full tree.
    - Read existing proposed decisions from `artifactPaths.decisions.existingOutputPaths`, if any.
    - Output `Architecture Decisions Found` with relevant decision paths and statuses.
    - If the artifacts touch ownership, layering, write paths, or domain invariants with no relevant decision, output `Architecture Decision Missing`.
@@ -65,7 +102,7 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
    - Apply the requested edit. Then check every other existing artifact against it - in ANY direction: an edit to a later artifact may require revising an earlier one, not only the other way around. Build order is a useful reading order, not a constraint on which artifacts may be revised.
    - Note everything that is now inconsistent, missing, or contradictory.
    - If a revision introduces or changes reusable architecture ownership, update/create a proposed decision under `decisions/<slug>/decision.md` before treating the artifacts as coherent. Get `openspec instructions decisions --change "<name>" --json` first and follow `rules.decisions`.
-   - Revise only files that already exist (`existingOutputPaths`). Do NOT create change artifacts that don't exist yet, and do NOT invent new files under a glob artifact - note them and point the user to `/opsx:continue` to create them. Exception: proposed architecture decisions may be created under the change's `decisions/` artifact when required by Architecture Decision Lookup.
+   - Revise only files that already exist (`existingOutputPaths`). Do NOT create change artifacts that don't exist yet, and do NOT invent new files under a glob artifact - note them and point the user to `/opsx-continue` to create them. Exception: proposed architecture decisions may be created under the change's `decisions/` artifact when required by Architecture Decision Lookup.
    - If the change is already coherent, say so and make no edits.
 
 6. **Confirm and apply, one artifact at a time**
@@ -85,14 +122,22 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 After each invocation, show:
 - Which artifacts were revised (and which proposed revisions were rejected)
-- Anything deferred to `/opsx:continue` (not-yet-created artifacts or files)
+- Anything deferred to `/opsx-continue` (not-yet-created artifacts or files)
 - Where the change stands and the recommended next command
 
 **Guardrails**
-- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx:apply`.
+- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx-apply`.
+- Do not mark artifacts coherent while a high-risk multi-target write remains
+  unresolved (`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`); materialize Owner
+  semantic answers into artifacts before recommending apply.
+- Do not recommend apply-ready when `PRODUCT_ACCEPTANCE_REQUIRED=true` and
+  `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is missing.
+- When revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do not mark design
+  coherent if `DESIGN_STATUS: BLOCKED` or architecture is deferred to apply.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.
-- Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx:continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
+- Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx-continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
 - Confirm every edit with the user before writing.
-- If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx:new` (the "Update vs. Start Fresh" heuristic).
+- If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx-new` (the "Update vs. Start Fresh" heuristic).

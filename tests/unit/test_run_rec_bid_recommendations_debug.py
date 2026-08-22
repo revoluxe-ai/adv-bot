@@ -9,25 +9,10 @@ import run_rec_bid_recommendations_debug as entrypoint
 
 
 @pytest.mark.unit
-def test_run_ensures_dev_tunnels_before_first_env_read(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls: list[str] = []
-
-    def _ensure() -> None:
-        calls.append("ensure_dev_tunnels")
-
-    def _required_env(_name: str) -> str:
-        calls.append("required_env")
-        raise SystemExit("stop after first env read")
-
-    monkeypatch.setattr(entrypoint, "_ensure_dev_tunnels", _ensure)
-    monkeypatch.setattr(entrypoint, "_required_env", _required_env)
-
-    with pytest.raises(SystemExit, match="stop after first env read"):
-        entrypoint.asyncio.run(entrypoint._run())
-
-    assert calls == ["ensure_dev_tunnels", "required_env"]
+def test_run_has_no_in_app_tunnel_bootstrap() -> None:
+    """Spec local-dev-db-connectivity: entrypoint MUST NOT expose in-app tunnel API."""
+    assert not hasattr(entrypoint, "_ensure_dev_tunnels")
+    assert not hasattr(entrypoint, "ensure_dev_tunnels")
 
 
 @pytest.mark.unit
@@ -46,7 +31,6 @@ def test_run_uses_view_payload_from_service(
         "REC_BID_DEBUG_CURRENT_SALES_FORECAST_OVERRIDE": "90",
     }
 
-    monkeypatch.setattr(entrypoint, "_ensure_dev_tunnels", lambda: None)
     monkeypatch.setattr(entrypoint, "_required_env", lambda name: required[name])
     monkeypatch.setattr(entrypoint.os, "getenv", lambda name, default="": required.get(name, default))
 
@@ -184,7 +168,6 @@ def test_run_uses_optional_debug_mode_filter(
         "REC_BID_DEBUG_CLICK_TO_ORDER_CR_7D": "0.1",
         "REC_BID_DEBUG_CURRENT_SALES_FORECAST_OVERRIDE": "90",
     }
-    monkeypatch.setattr(entrypoint, "_ensure_dev_tunnels", lambda: None)
     monkeypatch.setattr(entrypoint, "_required_env", lambda name: required[name])
     monkeypatch.setattr(entrypoint.os, "getenv", lambda name, default="": required.get(name, default))
 

@@ -125,7 +125,6 @@ class PostgresSnapshotProviderLive:
                     search_adv_id=adv.search_adv_id,
                     bot_active=bool(adv.bot_active),
                     active_status=str(adv.active_status),
-                    auto_updater_version=getattr(adv, "auto_updater_version", None),
                     bidder_active=adv.bidder_active,
                 )
             )

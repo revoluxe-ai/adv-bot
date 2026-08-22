@@ -12,13 +12,37 @@ metadata:
 
 Implement tasks from an OpenSpec change.
 
-**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
+This skill is a concise adapter. It is **not** the authoritative apply contract.
 
-**Architecture Decision Lookup:** Before changing code, search and read `openspec/decisions/**/*.md` and any proposed decisions in the change `contextFiles.decisions` / `artifactPaths.decisions.existingOutputPaths`. Implementation must cite relevant decisions in progress or completion notes. If planned code placement contradicts an accepted decision, stop before editing code and return `NO_GO` with the conflicting decision path. If placement depends on a proposed decision, use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied before deciding whether code can proceed. Passing tests are not sufficient if placement violates a decision.
+**Before implementation, always read and follow:**
+
+1. `.cursor/commands/opsx-apply.md` — current apply workflow contract (including Architecture Decision Lookup and source-resolution/preflight semantics already present there)
+2. `.cursor/rules/testing-rules.mdc` — canonical general test-design/execution policy
+
+Do **not** treat `.cursor/rules/TESTING_RULES.mdc` as policy (deprecated migration pointer only).
+Do **not** treat `.cursor/skills/**` as authority over `.cursor/commands/**`.
+Do **not** duplicate the full testing policy or a conflicting local Architecture Decision Lookup here.
+
+**Authority split:**
+
+- `.cursor/commands/opsx-apply.md` → current apply workflow contract
+- `.cursor/rules/testing-rules.mdc` → general test-design/execution policy
+- `openspec/config.yaml` → `rules.tasks` → task-generation obligations
+- `/opsx-invariant` → `TEST_COVERAGE_PACKET` → change-specific test obligations
+- `/opsx-verify` → independent adequacy and archive verdict
+- `/opsx-pyright-strict-coverage` → post-apply recommend when production `.py` changed
+- `/opsx-external-call-coverage` → after pyright PASS; external-surface test coverage audit
+
+**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **Input**: Optionally specify a change name. If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
+
+0. **Read authoritative apply contract**
+
+   Read `.cursor/commands/opsx-apply.md` and follow its current steps, Architecture Decision Lookup, testing obligations, pause conditions, checkbox semantics, and completion routing.
+   Also read `.cursor/rules/testing-rules.mdc` before editing code or tests.
 
 1. **Select the change**
 
@@ -27,7 +51,7 @@ Implement tasks from an OpenSpec change.
    - Auto-select if only one active change exists
    - If ambiguous, run `openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/opsx:apply <other>`).
+   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-apply <other>`).
 
 2. **Check status to understand the schema**
    ```bash
@@ -45,48 +69,58 @@ Implement tasks from an OpenSpec change.
    ```
 
    This returns:
-   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema - could be proposal/specs/design/tasks or spec/tests/implementation/docs)
+   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema)
    - Progress (total, complete, remaining)
    - Task list with status
    - Dynamic instruction based on current state
 
    **Handle states:**
-   - If `state: "blocked"` (missing artifacts): show message, suggest using openspec-continue-change
-   - If `state: "all_done"`: congratulate, suggest archive
+   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx-continue` / openspec-continue-change
+   - If `state: "all_done"`: congratulate, then follow **Post-apply next-step recommend** in `.cursor/commands/opsx-apply.md` (not archive readiness)
    - Otherwise: proceed to implementation
 
 4. **Read context files**
 
-   Read every file path listed under `contextFiles` from the apply instructions output.
+   Read `contextFiles` paths under execution-preflight Read I/O budgets (prefer sequential; parallel max 2; section Read for large artifacts when only part is needed).
    The files depend on the schema being used:
    - **spec-driven**: proposal, specs, design, tasks, and optional decisions when present
    - Other schemas: follow the contextFiles from CLI output
 
-5. **Perform Architecture Decision Lookup**
+5. **Optional TEST_COVERAGE_PACKET**
 
-   - Search and read `openspec/decisions/**/*.md`.
-   - Read existing proposed decisions from `contextFiles.decisions` or `artifactPaths.decisions.existingOutputPaths`, if any.
-   - Output `Architecture Decisions Found` with relevant decision paths and statuses.
-   - If the change touches ownership, layering, write paths, or domain invariants with no relevant decision, output `Architecture Decision Missing` and pause unless the artifacts already include a proposed decision.
-   - If a proposed decision is required or present, get `openspec instructions decisions --change "<name>" --json` and apply `rules.decisions` before evaluating placement.
-   - Compare planned implementation placement against accepted/proposed decisions before editing code.
-   - If placement conflicts with an accepted decision, return `NO_GO` and do not edit code.
+   - Inspect current change artifacts/context for a `TEST_COVERAGE_PACKET` block.
+   - Absence of packet does **not** block legacy apply.
+   - Packet status alone does **not** block implementation.
+   - Do not invent mandatory scenarios without spec/decision/task/invariant/packet evidence.
+   - Do not declare final test adequacy or archive readiness; that belongs to `/opsx-verify`.
 
-6. **Show current progress**
+6. **Perform Architecture Decision Lookup**
+
+   Follow the Architecture Decision Lookup contract in `.cursor/commands/opsx-apply.md` exactly (context/`artifactPaths.decisions` first; source-resolution/preflight semantics; `NO_GO` on placement conflict). Do not use a conflicting local ADL copy.
+
+7. **Show current progress**
 
    Display:
    - Schema being used
    - Progress: "N/M tasks complete"
    - Remaining tasks overview
+   - Whether `TEST_COVERAGE_PACKET` was found (present / absent) and its status if present
    - Dynamic instruction from CLI
 
-7. **Implement tasks (loop until done or blocked)**
+8. **Implement tasks (loop until done or blocked)**
 
    For each pending task:
    - Show which task is being worked on
    - Make the code changes required
    - Keep changes minimal and focused
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
+   - Materialize mandatory test obligations with the owning task when required by task text, `rules.tasks`, `testing-rules.mdc`, and/or a present `TEST_COVERAGE_PACKET`
+   - When those obligations apply:
+     - do not create phantom model/DTO fields or impossible states;
+     - do not fully mock the causal boundary under test;
+     - materialize required allowed sibling and residual/repeated-invocation scenarios;
+     - run focused/targeted tests and adjacent tests when required
+   - Do **not** mark the task complete (`- [ ]` → `- [x]`) if its mandatory tests fail
+   - Mark task complete only after required implementation and mandatory focused tests succeed
    - Continue to next task
 
    **Pause if:**
@@ -95,12 +129,12 @@ Implement tasks from an OpenSpec change.
    - Error or blocker encountered → report and wait for guidance
    - User interrupts
 
-8. **On completion or pause, show status**
+9. **On completion or pause, show status**
 
    Display:
    - Tasks completed this session
    - Overall progress: "N/M tasks complete"
-   - If all done: suggest archive
+   - If all done: follow **Post-apply next-step recommend** in `.cursor/commands/opsx-apply.md` (do not claim archive readiness)
    - If paused: explain why and wait for guidance
 
 **Output During Implementation**
@@ -131,7 +165,17 @@ Working on task 4/7: <task description>
 - [x] Task 2
 ...
 
-All tasks complete! Ready to archive this change.
+Implementation tasks complete.
+
+If production Python changed (`app/**/*.py` or top-level production scripts):
+  Next: `/opsx-pyright-strict-coverage base=<BASE>`
+  Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
+  Then: `/opsx-static-check` (after external-call PASS, focus=all)
+  Then: `/opsx-verify <change-name>`
+Else:
+  Next: `/opsx-verify <change-name>`
+
+Do not claim archive readiness from apply alone.
 ```
 
 **Output On Pause (Issue Encountered)**
@@ -156,13 +200,21 @@ What would you like to do?
 
 **Guardrails**
 - Keep going through tasks until done or blocked
+- Always read `.cursor/commands/opsx-apply.md` before implementation
+- Always read `.cursor/rules/testing-rules.mdc` before implementation
 - Always read context files before starting (from the apply instructions output)
-- Always perform Architecture Decision Lookup before code edits
+- Follow Architecture Decision Lookup from `/opsx-apply`, not a local conflicting copy
 - Stop with `NO_GO` when planned placement conflicts with an accepted architecture decision
+- Read `TEST_COVERAGE_PACKET` when present; absence does not block legacy apply
+- Packet status alone does not block implementation and does not equal verify/archive verdict
+- Never mark `[x]` when mandatory tests for that task fail
+- Do not invent mandatory scenarios without evidence
+- Do not create phantom fields or impossible states; do not fully mock the causal boundary under test
+- Do not declare final adequacy or archive readiness
+- After completion / `all_done`, follow Post-apply next-step recommend in `/opsx-apply` (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage` when production `.py` changed, else `/opsx-verify <change-name>`)
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
-- Update task checkbox immediately after completing each task
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
 

@@ -22,7 +22,7 @@ services:
   test_clickhouse:
     image: clickhouse/clickhouse-server:latest
     environment:
-      CLICKHOUSE_DB: default_db
+      CLICKHOUSE_DB: test_adv_bot_clickhouse
       CLICKHOUSE_USER: CLICK_HOUSE_USER
       CLICKHOUSE_PASSWORD: password
       TZ: Europe/Moscow
@@ -41,14 +41,16 @@ services:
       - .\tests\clickhouse-config:/etc/clickhouse-server/users.d/
 
 
-#  test_redis:
-#    image: redis:7-alpine
-#    container_name: tests-test_redis
-#    ports:
-#      - "6390:6379"
-#    command: ["redis-server", "--save", "", "--appendonly", "no"]
-#    healthcheck:
-#      test: ["CMD", "redis-cli", "ping"]
-#      interval: 2s
-#      timeout: 1s
-#      retries: 20
+  # Host 6390 (not 6379) — avoids clash with root/dev Redis on :6379.
+  # Pytest against this compose MUST use REDIS_PORT=6390 (see /opsx-test-env).
+  test_redis:
+    image: redis:7-alpine
+    container_name: tests-test_redis
+    ports:
+      - "6390:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 20

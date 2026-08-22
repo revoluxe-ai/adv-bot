@@ -26,7 +26,6 @@ class CampaignDefaultsV1:
     bidder_mode: BidderMode = BidderMode.BY_POSITIONS
 
     # --- АКТУАЛЬНАЯ АВТОМАТИКА ---
-    automatic_version: int = 2
     bidder_coroutine_type: BidderCoroutineType = (
         BidderCoroutineType.UPDATE_CLUSTER_BIDS
     )

@@ -13,7 +13,7 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabin
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
-pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
+pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 MODULE = "app.client_bot.user_interface.handlers.connect_existing_advs"
 

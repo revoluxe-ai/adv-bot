@@ -1,0 +1,55 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "auto-shelf-exhausted-pause-retest",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "sceplan-0d02836f9141d9c2",
+  "PLAN_CONTENT_HASH": "cb47a8d2b189029654e48ebeaa4b13318eb2235d1c2dc030825dd5736692ae6c",
+  "PLAN_PATH": "openspec/changes/auto-shelf-exhausted-pause-retest/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/auto-shelf-exhausted-pause-retest/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 18,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1",
+      "L2",
+      "L3",
+      "L4",
+      "L5",
+      "L6",
+      "Orth"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/auto-shelf-exhausted-pause-retest/design.md",
+      "content_hash": "ca1fd3bd429019d5c3710234bcfb7379036fb6f933a53211b3056524f9ad2899"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/auto-shelf-exhausted-pause-retest/specs/auto-shelf-exhausted-pause/spec.md",
+        "content_hash": "521a356de8d306cdbcd64f0a5ed4fd4514ec72e6298b9e71da1c23f9a241366e"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "design.md##Lifecycle",
+      "content_hash": "ca1fd3bd429019d5c3710234bcfb7379036fb6f933a53211b3056524f9ad2899"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/auto-shelf-exhausted-pause-retest/owner-contract.md",
+      "content_hash": "2b8d664d901b826f85f8d40c1c9b1e280b4be1b098e898703dd6a5efe6c3501e"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "ca1fd3bd429019d5c3710234bcfb7379036fb6f933a53211b3056524f9ad2899",
+    "SPEC_REVISION": [
+      "521a356de8d306cdbcd64f0a5ed4fd4514ec72e6298b9e71da1c23f9a241366e"
+    ],
+    "LIFECYCLE_REVISION": "ca1fd3bd429019d5c3710234bcfb7379036fb6f933a53211b3056524f9ad2899",
+    "OWNER_CONTRACT_REVISION": "2b8d664d901b826f85f8d40c1c9b1e280b4be1b098e898703dd6a5efe6c3501e"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "REPAIR_NOTE": "P-001 PLANNING_REVIEW_HANDOFF 2026-08-11: refreshed after design Durable SoT READY"
+}

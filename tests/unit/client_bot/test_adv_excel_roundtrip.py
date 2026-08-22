@@ -137,7 +137,7 @@ def test_parse_edit_bool_v3_raise_max_cpo() -> None:
 
 @pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION == 6
+    assert EXCEL_TEMPLATE_VERSION == 7
 
 
 @pytest.mark.unit

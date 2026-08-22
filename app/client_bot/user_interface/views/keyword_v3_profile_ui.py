@@ -360,32 +360,6 @@ def keyword_v3_decision_trace_button_label(display_status: KeywordStatus) -> str
     return "🔎 Почему бот не включил?"
 
 
-def _display_status_label(display_status: KeywordStatus) -> str:
-    if display_status == KeywordStatus.GOOD:
-        return "good"
-    if display_status == KeywordStatus.BAD:
-        return "bad"
-    if display_status == KeywordStatus.VIEWS_IS_NOT_ENOUGH:
-        return "pause"
-    return display_status.value
-
-
-def _decision_fields_from_decisive(
-    decisive: V3KeywordStepRecord | str,
-) -> tuple[str, str, str | None]:
-    """Executor (RU title), решение и причина из решающего шага audit."""
-    parts = format_decisive_step_body(decisive)
-    if parts is None:
-        return "нет записанного решения", "нет изменений", None
-    _short, title, body = parts
-    if isinstance(decisive, V3KeywordStepRecord):
-        decision = DECISION_ACTION_LABEL.get(decisive.action, decisive.action)
-        tech = decisive.executor_name
-        executor_line = f"{title} ({tech})"
-        return executor_line, decision, body
-    return title, DECISION_ACTION_LABEL["TARGET_PLACE"], body
-
-
 def format_keyword_v3_decision_trace_screen(
     *,
     nmid: str,
@@ -430,7 +404,7 @@ def format_keyword_v3_decision_trace_screen(
         nmid_display=nmid,
         keyword_text=keyword_text,
         display_status=display_status,
-        automatic_version=3,
+        bot_active=True,
         keyword_setting_id=keyword_setting_id,
         trace_presence=TracePresence.NO_SNAPSHOT,
         processing_outcome=ProcessingOutcome.UNKNOWN,
@@ -552,6 +526,9 @@ def _rec_gate_mark_for_stage(
     """Марка полочного gate: ``П`` / ``Н`` / пусто."""
     if data.shelf_click_mode is None:
         return ""
+    from app.modules.shop_runner.service_manager.services.auto_updater_v3.rollout_aggressiveness import (
+        V3RolloutAggressiveness,
+    )
     from app.modules.shop_runner.service_manager.services.auto_updater_v3.transition_ranking import (
         SelectionPolicy,
     )
@@ -561,7 +538,7 @@ def _rec_gate_mark_for_stage(
 
     policy = SelectionPolicy.from_aggressiveness(
         click_mode=data.shelf_click_mode,
-        aggressiveness=3,
+        aggressiveness=V3RolloutAggressiveness.MAX,
     )
     return resolve_rec_gate_mark(
         cand,

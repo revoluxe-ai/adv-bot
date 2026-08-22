@@ -37,7 +37,7 @@ class KeywordDecisionTraceEntry(BaseModel):
 
     keyword_setting_id: int
     keyword_text: str
-    nmids: list[int] = Field(default_factory=list)
+    nmids: list[int] = Field(default_factory=list[int])
     nmid_display: str = ""
 
     processing_started: bool = True
@@ -50,7 +50,9 @@ class KeywordDecisionTraceEntry(BaseModel):
 
     data_tier: str | None = None
 
-    steps: list[KeywordDecisionTraceStep] = Field(default_factory=list)
+    steps: list[KeywordDecisionTraceStep] = Field(
+        default_factory=list[KeywordDecisionTraceStep]
+    )
 
     final_decision_ru: str
     decisive_executor: str | None = None
@@ -68,8 +70,10 @@ class KeywordDecisionTraceSnapshot(BaseModel):
     adv_id: int
     source: str = "v3_preamble_observer"
     operable_keywords: int
-    nmids: list[int] = Field(default_factory=list)
-    entries: list[KeywordDecisionTraceEntry] = Field(default_factory=list)
+    nmids: list[int] = Field(default_factory=list[int])
+    entries: list[KeywordDecisionTraceEntry] = Field(
+        default_factory=list[KeywordDecisionTraceEntry]
+    )
 
     def find_by_keyword_setting_id(
         self,

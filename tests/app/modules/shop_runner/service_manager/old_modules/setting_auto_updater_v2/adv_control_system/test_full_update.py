@@ -20,10 +20,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
 
-pytestmark = pytest.mark.integration
-
-
-
+pytestmark = pytest.mark.destructive_local
 @pytest.mark.parametrize("plan_data,fact_data,condition_func",
                     [
                         (PlanData(orders=15, target_pay_for_order=120,max_pay_for_order=300,), #  Мало продаж - большой расход

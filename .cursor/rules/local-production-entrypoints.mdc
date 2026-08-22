@@ -3,7 +3,6 @@ description: Локальный debug только через штатные ent
 globs:
   - new_wb_shop_update_run.py
   - app/modules/shop_runner/**
-  - app/dev_local/**
   - .vscode/launch.json
   - env.sample
 alwaysApply: false
@@ -29,13 +28,13 @@ alwaysApply: false
 ## PG / ClickHouse с локали
 
 - Подключение по **публичному IP** из `.env` (см. `k8s/network/local-dev-external-access.md`, `RUN_LOCAL=false`).
-- **Port-forward из приложения отключён** (нет автозапуска при импорте `settings`).
-- Опционально вручную: `DEV_TUNNELS_ENABLED=true` + `scripts/dev-tunnels.ps1` или `k8s_tunnels` — только с **GO**.
+- In-app / `scripts/dev-tunnels.ps1` kubectl port-forward **удалены**; канон — `.env` IP/NodePort.
+- `DEV_TUNNELS_ENABLED` — только fail-closed denylist для destructive tests (`false`/`unset`).
 
 При сбое подключения к БД:
 1. **STOP**
 2. Вернуть **первую meaningful ошибку** из лога/трейса
-3. Проверить хосты/порты/credentials в `.env`, не включать туннели без согласования
+3. Проверить хосты/порты/credentials в `.env`; не поднимать ручной port-forward без Owner GO
 
 ## Redis
 
@@ -49,7 +48,6 @@ Redis — локальный сервис (`docker-compose` / локальный
 ## Запрещено без GO
 
 - ручной `kubectl port-forward` (любой сервис)
-- `.\scripts\dev-tunnels.ps1`
 - Redis forward из k8s
 - patch Deployment/ConfigMap/Secret для «починить локальный запуск»
 - отдельный `debug_*.py` / one-off runner вместо `new_wb_shop_update_run.py`
@@ -57,4 +55,4 @@ Redis — локальный сервис (`docker-compose` / локальный
 
 ## При открытых файлах
 
-Правило подтягивается при работе с `new_wb_shop_update_run.py`, `app/modules/shop_runner/**`, `app/dev_local/**`, launch-конфигом. Сочетается с `debug-runtime.mdc`.
+Правило подтягивается при работе с `new_wb_shop_update_run.py`, `app/modules/shop_runner/**`, launch-конфигом. Сочетается с `debug-runtime.mdc`.

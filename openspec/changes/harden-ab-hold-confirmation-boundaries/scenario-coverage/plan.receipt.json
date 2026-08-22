@@ -1,0 +1,53 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "harden-ab-hold-confirmation-boundaries",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-2032f579212ef33b",
+  "PLAN_CONTENT_HASH": "65d03ab10f3797a6eb93f9eda2ea74eb1c0e87c522c9f4da988d510efca8e8e2",
+  "PLAN_PATH": "openspec/changes/harden-ab-hold-confirmation-boundaries/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/harden-ab-hold-confirmation-boundaries/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 13,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01,S02,S03,S12,S13",
+      "L2:S01,S02,S03,S10,S11,S12",
+      "L3:S04,S05,S06,S07,S08,S09,S11,S12",
+      "L4:S01,S08,S09,S12",
+      "L5:S02,S03,S08,S09,S10,S11,S12,S13",
+      "L6:S03,S10,S12"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/harden-ab-hold-confirmation-boundaries/design.md",
+      "content_hash": "14a485231da95d280bab16ac3e79d71c442a0449abe1f415700ba0678e41c216"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/harden-ab-hold-confirmation-boundaries/specs/card-ab-hold-mode/spec.md",
+        "content_hash": "c8d8434154330503a424b3643a8539d52eca4f08a3b69c9e1313af0d385d6aa4"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/harden-ab-hold-confirmation-boundaries/design.md#derived-lifecycle",
+      "content_hash": "14a485231da95d280bab16ac3e79d71c442a0449abe1f415700ba0678e41c216"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/harden-ab-hold-confirmation-boundaries/owner-contract.md",
+      "content_hash": "2810e901dfd3b693ace36906730ed90a2b777c81c1daa68e79e3fa841cd5eec1"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "14a485231da95d280bab16ac3e79d71c442a0449abe1f415700ba0678e41c216",
+    "SPEC_REVISION": [
+      "c8d8434154330503a424b3643a8539d52eca4f08a3b69c9e1313af0d385d6aa4"
+    ],
+    "LIFECYCLE_REVISION": "14a485231da95d280bab16ac3e79d71c442a0449abe1f415700ba0678e41c216",
+    "OWNER_CONTRACT_REVISION": "2810e901dfd3b693ace36906730ed90a2b777c81c1daa68e79e3fa841cd5eec1"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

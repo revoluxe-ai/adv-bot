@@ -1,15 +1,44 @@
-"""Интеграционные тесты для PredictKeywordsTargetPlace."""
+"""Интеграционные тесты для PredictKeywordsTargetPlace.
+
+Act opens production ``get_clickhouse_client`` with SQL on ``default_db.*``.
+Tests redirect conv + bids CH managers onto the fixture Guarded client and
+rewrite ``default_db.*`` → ``test_adv_bot_clickhouse.*`` before the guard.
+"""
 
 from datetime import datetime
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
+import app.modules.bids_for_positions_manager.clickhouse_manager.clickhouse_manager as bids_ch_module
+import app.modules.predict_keywords_target_place.clickhouse_manager.clickhouse_manager as predict_ch_module
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.predict_keywords_target_place import build_predict_keywords_target_place
 from app.utils.ch_semaphore import anti_ch_crash_semaphore
+from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 
+
+pytestmark = pytest.mark.destructive_local
 TEST_NMID = 999001
+
+
+@pytest.fixture
+def predict_ch_on_test_db(
+    clickhouse_client: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Redirect predict/bids CH clients onto fixture Guarded client + rewrite."""
+    patch_get_clickhouse_client(
+        monkeypatch, [bids_ch_module], clickhouse_client
+    )
+    # predict module aliases import as ``get_client``
+    patch_get_clickhouse_client(
+        monkeypatch,
+        [predict_ch_module],
+        clickhouse_client,
+        attr="get_client",
+    )
 
 
 def _make_adv_mock(
@@ -28,7 +57,7 @@ def _make_adv_mock(
 async def _ensure_predict_tables(clickhouse_client):
     """Создаёт таблицы, необходимые для predict_keywords_target_place."""
     await clickhouse_client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.bid_decision_log (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.bid_decision_log (
             adv_id Int32,
             nmid UInt64,
             norm_query String,
@@ -52,7 +81,7 @@ async def _ensure_predict_tables(clickhouse_client):
         ORDER BY (nmid, norm_query, pos_final_bucket, version)
     """)
     await clickhouse_client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.clusters_adv_deltas_5m (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.clusters_adv_deltas_5m (
             adv_id Int32,
             nmid UInt64,
             wb_category LowCardinality(String),
@@ -74,7 +103,7 @@ async def _ensure_predict_tables(clickhouse_client):
         ORDER BY (nmid, norm_query, ts5)
     """)
     await clickhouse_client.command("""
-        CREATE TABLE IF NOT EXISTS default_db.pos_priors_category (
+        CREATE TABLE IF NOT EXISTS test_adv_bot_clickhouse.pos_priors_category (
             wb_category LowCardinality(String),
             pos_bin UInt16,
             p_14d Float64,
@@ -87,13 +116,17 @@ async def _ensure_predict_tables(clickhouse_client):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_get_keywords_target_position_empty_data(clickhouse_client):
+async def test_get_keywords_target_position_empty_data(
+    clickhouse_client,
+    predict_ch_on_test_db,
+):
     """При пустых таблицах возвращается пустой словарь."""
+    del predict_ch_on_test_db
     await _ensure_predict_tables(clickhouse_client)
     async with anti_ch_crash_semaphore:
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.bid_decision_log")
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.clusters_adv_deltas_5m")
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.pos_priors_category")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.bid_decision_log")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.clusters_adv_deltas_5m")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.pos_priors_category")
 
     predictor = build_predict_keywords_target_place()
     adv = _make_adv_mock()
@@ -105,17 +138,21 @@ async def test_get_keywords_target_position_empty_data(clickhouse_client):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_get_keywords_target_position_with_bid_data_only(clickhouse_client):
+async def test_get_keywords_target_position_with_bid_data_only(
+    clickhouse_client,
+    predict_ch_on_test_db,
+):
     """Только bid_decision_log: get_bids возвращает данные, get_conv_cart — пусто → convs пусто."""
+    del predict_ch_on_test_db
     await _ensure_predict_tables(clickhouse_client)
     ts = datetime.now()
     async with anti_ch_crash_semaphore:
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.bid_decision_log")
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.clusters_adv_deltas_5m")
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.pos_priors_category")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.bid_decision_log")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.clusters_adv_deltas_5m")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.pos_priors_category")
 
         await clickhouse_client.insert(
-            "default_db.bid_decision_log",
+            "test_adv_bot_clickhouse.bid_decision_log",
             [
                 [
                     1,
@@ -172,17 +209,21 @@ async def test_get_keywords_target_position_with_bid_data_only(clickhouse_client
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_get_keywords_target_position_full_e2e(clickhouse_client):
+async def test_get_keywords_target_position_full_e2e(
+    clickhouse_client,
+    predict_ch_on_test_db,
+):
     """E2E: данные в bid_decision_log, clusters_adv_deltas_5m, pos_priors_category → ожидаемый результат."""
+    del predict_ch_on_test_db
     await _ensure_predict_tables(clickhouse_client)
     ts = datetime.now()
     async with anti_ch_crash_semaphore:
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.bid_decision_log")
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.clusters_adv_deltas_5m")
-        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS default_db.pos_priors_category")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.bid_decision_log")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.clusters_adv_deltas_5m")
+        await clickhouse_client.command("TRUNCATE TABLE IF EXISTS test_adv_bot_clickhouse.pos_priors_category")
 
         await clickhouse_client.insert(
-            "default_db.bid_decision_log",
+            "test_adv_bot_clickhouse.bid_decision_log",
             [
                 [
                     1,
@@ -251,7 +292,7 @@ async def test_get_keywords_target_position_full_e2e(clickhouse_client):
         )
 
         await clickhouse_client.insert(
-            "default_db.clusters_adv_deltas_5m",
+            "test_adv_bot_clickhouse.clusters_adv_deltas_5m",
             [
                 [
                     1,
@@ -311,7 +352,7 @@ async def test_get_keywords_target_position_full_e2e(clickhouse_client):
         )
 
         await clickhouse_client.insert(
-            "default_db.pos_priors_category",
+            "test_adv_bot_clickhouse.pos_priors_category",
             [
                 ["Electronics", 1, 0.1, 50, ts],
                 ["Electronics", 2, 0.12, 40, ts],

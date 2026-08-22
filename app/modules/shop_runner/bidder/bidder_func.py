@@ -266,6 +266,13 @@ async def run_bidder_process_for_adv(
         "module_resources.bidder_container.last_keyword_stamp_timestamp_cache"
     ],
 ) -> None:
+    """Legacy bidder: пишет CPM для Авто и/или Search по флагам AdvSetting.
+
+    При ``auto_shelf_bid_control_enabled`` (UI «Управление ставкой в полках»)
+    путь ``bidder_for_auto`` MUST NOT писать ставку Авто — ownership у
+    AutoShelfBidControlManager (spec auto-bid-module-coexistence / Mutual exclusion).
+    Search ``update_cpm(search_adv_id)`` этим gate не блокируется.
+    """
     advs: list[AuctionAdv] = await _update_and_get_advs_from_wb(adv_setting, wb_api)
     advs_from_wb_with_active_company: list[AuctionAdv] = [
         adv for adv in advs if adv.status_native == "started"
@@ -335,7 +342,11 @@ async def run_bidder_process_for_adv(
     nmid = adv_setting.nmids[0]
 
     if new_cpm != cpm_now:
-        if adv_setting.bidder_for_auto:
+        # Mutual exclusion (auto-bid-module-coexistence): shelves ON → ignore legacy Auto write.
+        shelf_bid_control_on = bool(
+            getattr(adv_setting, "auto_shelf_bid_control_enabled", False)
+        )
+        if adv_setting.bidder_for_auto and not shelf_bid_control_on:
             auto_adv_id = int(adv_setting.adv_id)
             assert auto_adv_id is not None
             await wb_api.update_cpm(

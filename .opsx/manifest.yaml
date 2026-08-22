@@ -1,0 +1,32 @@
+---
+ownership: PROJECT_LOCAL
+central_update_policy: NEVER_OVERWRITE
+---
+bootstrap_version: "0.6.0"
+slice_id: OPSX-WB-PROJECTIZE-01
+delivery_mode: project-local-wb-sky
+spec_kit_status: deferred
+openspec_status: product_tree_present
+target_model: wb-sky-poetry-python
+runtime_dependency_on_upstream: false
+required_adapters:
+  - opsx-lite
+  - poetry-python
+projectized_at: 20260812T214008Z
+projectized_by: opsx-projectize
+seed_note: "Projectize COMPLETE after bootstrap steps 1-4; product openspec preserved"
+required_gate_commands:
+  - opsx-explore
+  - opsx-new
+  - opsx-ff
+  - opsx-continue
+  - opsx-update
+  - opsx-bound-scope
+  - opsx-apply
+  - opsx-verify
+  - opsx-archive
+  - opsx-commit
+  - opsx-source-resolution
+  - opsx-execution-preflight
+  - opsx-pipeline
+  - opsx-projectize

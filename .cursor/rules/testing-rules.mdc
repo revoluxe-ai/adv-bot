@@ -1,53 +1,307 @@
 ---
-description: Тестирование проекта
-globs: 
+description: Canonical test-design and execution policy for WB Sky (Poetry gates, reality/mocking, write-gates, lifecycle)
+globs:
 alwaysApply: false
 ---
-Ты - опытный тестировщик. Твоя задача  - не писать код, а тестировать проект.
+
+# Тестирование проекта (canonical)
+
+Единственный canonical Cursor rule для test-design и test-execution в этом репозитории.
+
+Authority split (не дублировать полный policy в commands):
+
+- `.cursor/rules/testing-rules.mdc` — общий test-design / execution policy
+- `.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` — единые определения
+  `unit_component`, `scenario_seam`, `side_effect_proof` (`PA_SIDE_EFFECT_PROOF`),
+  `boundary_integration`, `stub_contract`, `destructive_local` и
+  load/measurement evidence
+- `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` — kernel DONE
+  (MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧ SIDE_EFFECT_PROOF); soft tooling
+  cannot create archive DONE
+- `openspec/config.yaml` → `rules.tasks` — обязательства при генерации tasks
+- `/opsx-invariant` → change-specific `TEST_COVERAGE_PACKET`
+- `/opsx-apply` — implementation + materialization обязательных tests
+- `/opsx-pyright-strict-coverage` — diff allowlist coverage для pyright-strict
+- `/opsx-external-call-coverage` — executable diff gate: external surfaces
+  (HTTP/WB/PG/CH/Redis/…) ↔ adequate tests; kind taxonomy внутри одной команды
+- `/opsx-close-external-gap` — REFACTOR_AND_TEST closure for PG/CH from
+  coverage packet (no `base=`); TEST_ONLY остаётся `/opsx-test`
+- `/opsx-verify` — независимая adequacy-проверка и archive verdict `GO` / `NO_GO`
+  (Product Acceptance when required)
+
+Устаревший файл `.cursor/rules/TESTING_RULES.mdc` — только migration pointer; не использовать как policy.
+
+## Роль
+
+Это правило применяется при написании, правке и запуске тестов, а также при `/opsx-apply`, `/opsx-test` и любой работе, где нужно доказать observable behavior.
+
+Оно **не** запрещает писать production code в writer-сессиях (`/opsx-apply` и аналоги).
+
+## Test evidence taxonomy
+
+Используй
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` как словарь evidence и
+execution classes.
+
+Не смешивай:
+
+- pytest marker/path (`unit`, `integration`);
+- evidence class (`unit_component`, `scenario_seam`, `side_effect_proof`,
+  `boundary_integration`, `stub_contract`);
+- execution class (`fast_local`, `destructive_local`, `authorized_live`).
+
+`destructive_local` не означает автоматически ни полный Scenario coverage, ни
+production-destructive действие. `scenario_seam` может находиться в
+`tests/unit/`, если реальная causal logic проходит до тонкого внешнего конца.
+PG/CH provider contract по-прежнему требует live test provider согласно
+Kind defaults ниже.
+
+Для Product Acceptance (когда required): acceptance scenarios с внешней
+mutation MUST нести `side_effect_proof` / `PA_SIDE_EFFECT_PROOF` — this-run
+external call или explicit forbidden sibling non-effect. Intent-only /
+durable-reason-only / OR-armed proxies без this-run mutation — **не**
+достаточны для archive DONE.
+
+Найденный или authored test без исполнения отмечай `EXECUTED=NO`; он не
+является green evidence. Любой coverage verdict должен явно писать, что тест
+доказывает и чего не доказывает.
+
+## Execution gates
+
 1. Все project commands запускай только через Poetry: `poetry run ...`
-2. Не запускай bare `ruff`, `black`, `pyright`, `pyright-strict`, `pytest`
-3. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
-4. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза; если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
-4a. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через `rg -n "<symbol>"` по всем call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.
-5. Не считай `ruff` и `black` обязательными quality gates, если задача явно не просит lint/format
-6. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
-7. На Windows PowerShell не используй bash-синтаксис вроде `|| true`, `&&`, `grep`, `sed`, `awk`
-8. Если я попрошу внести изменения в правила, редактируй текущее правило
+2. Не запускай bare `pytest`, `ruff`, `black`, `pyright`, `pyright-strict`
+3. Всегда запускай тесты из корня репозитория: `poetry run pytest ...`
+4. Не запускай тесты через `cd tests` + bare `pytest` или аналоги
+5. Default quality gates: targeted `poetry run pytest`, adjacent `poetry run pytest` when relevant, `poetry run pyright-strict`, `git diff --check`
+6. `ruff` и `black` не являются обязательными gates, если задача явно не просит lint/format
+7. Если добавлен новый Python module/file, сначала обнови список/набор файлов для `pyright-strict`, затем запускай `poetry run pyright-strict`
+8. На Windows PowerShell не используй bash-синтаксис: `||`, `&&`, `grep`, `sed`, `awk`, `true` как no-op
+9. **Destructive cache (default on, all entry points):** если invocation
+   собирает любой `@pytest.mark.destructive_local`, перед запуском вызови
+   shared planner
+   `.cursor/static-check/bin/destructive_cache_plan.py` (contract:
+   `.cursor/static-check/contracts/destructive-selective-cache.md`).
+   Default `CACHE_MODE=dev` — беги только `MUST_RUN`; `CACHE_HIT` skip.
+   Полный прогон destructive — только явный `CACHE_OFF` или `CACHE_FORCE`
+   (Owner text / command token). `CACHE_HIT` ≠ archive EXECUTED green.
+   `authorized_live` / `AUTHORIZE_ONE_LIVE_RUN` — вне этого cache.
+   **INTERIM:** если planner отсутствует или падает — `CACHE_DEGRADED`:
+   гоняй все selected destructive; запрещено invent deselect/skip /
+   «уже зелёные на ветке» без planner receipt.
 
-9. Production-safety protocol (обязателен для fallback/retry/error-handling/state transitions):
-   - Перед изменениями составь failure matrix:
-     - happy path
-     - recoverable failures (fallback/partial success)
-     - non-recoverable failures (must bubble up)
-     - idempotency на повторном запуске
-     - cross-iteration behavior (следующий тик/цикл)
-     - видимость логов при production LOG_LEVEL
-   - Обязательный минимальный набор тестов:
-     - unit-тесты парсера/экстрактора на edge-cases
-     - unit-тесты termination retry/fallback loop
-     - integration-style тест orchestration слоя, который использует результат fallback
-     - regression-тест, воспроизводящий найденный продовый баг
-     - idempotency-тест: второй запуск не должен повторять невалидные запросы
-   - Контракт между слоями:
-     - если нижний слой трансформирует payload (например, удаляет невалидные элементы),
-       верхний слой обязан использовать transformed/applied результат в последующих сравнениях
-       и решениях; сравнение только с исходным target запрещено.
-   - Blocking gate перед завершением задачи:
-     - нельзя завершать задачу без зелёных targeted `poetry run pytest` и regression-теста для инцидента.
-   - Логирование:
-     - recoverable ошибки не должны спамиться как hard ERROR в циклах;
-       нужен summary-лог по сущности (attempts, dropped items, applied items).
-   - В финальном отчёте обязательно укажи:
-     - какой продовый симптом предотвращён,
-     - какой тест упадёт при возврате бага,
-     - какие допущения зависят от runtime/prod конфигурации.
+## Targeted и adjacent coverage
 
-10. Async test isolation:
-   - Async tests MUST NOT вручную patch shared module-level dependencies around awaited code.
-   - Forbidden pattern: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore.
-   - Это особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags.
-   - Предпочитай самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client.
-   - Используй pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объясняй почему более узкий patch point невозможен.
-   - Write-gate regression tests MUST prove, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван.
-   - Regression tests MUST fail, если guarded condition удалена.
-   - Если gate имеет blocked и allowed behavior, добавь или потребуй paired positive case.
+1. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза.
+2. Если изменение затрагивает соседний контракт или workflow, дополнительно запускай adjacent `poetry run pytest <adjacent-path>`.
+3. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через поиск call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.
+
+## Failure matrix (fallback / retry / error-handling / state transitions)
+
+Перед изменениями в этих зонах составь failure matrix:
+
+- happy path
+- recoverable failures (fallback / partial success)
+- non-recoverable failures (must bubble up)
+- idempotency на повторном запуске
+- cross-iteration / next-tick behavior
+- видимость логов при production `LOG_LEVEL`
+
+Минимальный набор, когда применимо:
+
+- unit-тесты парсера/экстрактора на edge-cases
+- unit-тесты termination retry/fallback loop
+- orchestration-seam тест, который использует результат fallback
+- regression-тест, воспроизводящий найденный продовый баг
+- idempotency-тест: повторный запуск не должен повторять невалидные внешние эффекты
+
+Контракт между слоями: если нижний слой трансформирует payload, верхний слой обязан использовать transformed/applied результат; сравнение только с исходным target запрещено.
+
+Blocking gate перед завершением implementation-задачи: нельзя отмечать owning task выполненной без зелёных targeted tests (и regression-теста для инцидента, если он в scope).
+
+В финальном отчёте по такой задаче укажи:
+
+- какой продовый симптом предотвращён
+- какой тест упадёт при возврате бага
+- какие допущения зависят от runtime/prod конфигурации
+
+## Async test isolation
+
+- Async tests MUST NOT вручную patch shared module-level dependencies around awaited code.
+- Forbidden pattern: прямой `module.attr = fake` перед `await` с ручным `try/finally` restore.
+- Особенно запрещено для shared executors, `run_tasks`, manager module functions, runtime services, WB write adapters, settings и global flags.
+- Предпочитай самый узкий patch boundary: instance dependency, injected service, candidate selector, write adapter или external API client.
+- Используй pytest `monkeypatch` для module-level patching только когда это unavoidable, и явно объясняй почему более узкий patch point невозможен.
+
+## Write-gate и paired behavior
+
+- Write-gate regression tests MUST prove, что forbidden entity не доходит до candidate/handler/write boundary, а не только что final mock не был вызван (`assert_not_called()` / `count == 0` недостаточно сами по себе).
+- Regression tests MUST fail, если intended guard удалена.
+- Если gate имеет blocked и allowed behavior, добавь или потребуй paired positive case.
+
+## Reality constraints
+
+- Не создавай phantom model/DTO fields, которых нет в production schema.
+- Не создавай impossible state combinations.
+- Сохраняй production field types, identity semantics и ownership.
+- Не подменяй live source of truth удобным fixture field из неправильного storage/ownership layer.
+- Lightweight stubs и `SimpleNamespace` допустимы только если relevant production shape соблюдена.
+- Test name и green status сами по себе не доказывают coverage, production wiring или full spec conformity.
+- Passing tests не доказывают, что symbol runtime-reachable вне tests.
+
+## Mocking constraints
+
+- Causal boundary, поведение которой проверяется, нельзя полностью mock-ать.
+- Внешнюю destructive dependency (WB write, billing, destructive side effect) можно mock-ать **после** causal boundary, если orchestration path и input shape сохранены.
+- Нельзя заранее передавать в test результат, который должна вычислить проверяемая production boundary, и выдавать это за proof границы.
+- Нельзя stub-ать pipeline так, что real guard никогда не достигается.
+- Если production SQL или database/table qualification для PG/CH store call
+  изменились: тесты MUST упражнять этот SQL path (минимум — capturing fake
+  client/session на rewritten callable до live; для COVERED — живой
+  `clickhouse_client` / PG session). Patch всей rewritten function
+  (`SQL_REWRITE_MOCKED_AWAY`) не доказывает rewrite. См.
+  `/opsx-close-external-gap` (SQL rewrite proof) и
+  `/opsx-external-call-coverage` (`NOTE=SQL_REWRITE_MOCKED_AWAY`).
+
+## Minimum test level
+
+Выбирай минимальный уровень по boundary, достаточный доказать observable behavior, causal path и protected boundary:
+
+- `unit_component`
+- `orchestration_seam`
+- `runtime_entrypoint`
+- `boundary_adapter`
+- `integration`
+
+Full E2E не требуется автоматически.
+
+### Kind defaults for external stores
+
+| Kind | Durable read/write adapter | Достаточно / недостаточно |
+|------|----------------------------|---------------------------|
+| **PG** | `integration` на живом `async_session` (или test DB via production `sm` seam) **и** корректный session mode (ниже) | Unit + `AsyncMock` session — **не** proof; bare `sm()` / wrong polarity — **не** proof |
+| **CH** | `integration` на живом `clickhouse_client` | Mocked CH client alone — **не** proof; patch rewritten SQL producer — **не** proof (`SQL_REWRITE_MOCKED_AWAY`) |
+| Redis | fakeredis / boundary_adapter OK | |
+| WB / HTTP | orchestration_seam; mock **after** causal boundary OK | |
+
+#### PG session mode (`get_async_session_maker` / `sm`)
+
+`sm(read_only=…)` выбирает host: `True` → replica, `False` → master.
+**Каждый** вызов `sm(...)` MUST содержать явный `read_only=`. Bare `sm()`
+запрещён (даже если default был `False`).
+Live session **недостаточен**, если mode не совпадает с intent:
+
+| Intent | Required call | Forbidden |
+|--------|---------------|-----------|
+| **WRITE** (mutate / `commit` / `with_for_update` / durable UPDATE/INSERT/DELETE) | `sm(read_only=False)` | bare `sm()`; `read_only=True` |
+| **PURE_READ** (нет mutate/commit в том же session scope) | `sm(read_only=True)` | bare `sm()`; `read_only=False` |
+| **READ_AFTER_WRITE** / consistency-sensitive read | `sm(read_only=False)` | bare `sm()`; `read_only=True` |
+
+Запрещено / не proof: bare `sm()`; wrong polarity; COVERED только из‑за live
+fixture без проверки mode. Executable tokens:
+`PG_IMPLICIT_SESSION_MODE` (bare), `PG_WRONG_SESSION_MODE` (wrong polarity).
+
+Частая специфика PG/CH: чтобы написать норм integration, сначала нужен
+минимальный production seam (inject session/client). Это **не** `/opsx-test`
+alone:
+
+- Для **new/changed** PG/CH boundary-кода проектный default: предусматривать
+  injectable seam (session/client/provenance session) в callable, который
+  проверяется тестами. Паттерн «session/client создаётся только внутри функции»
+  считать external-call gap класса `REFACTOR_AND_TEST` (обычно
+  `UNTESTABLE_SEAM` с `NOTE=NO_INJECTABLE_SEAM`), а не закрывать unit-mock
+  доказательством.
+- Preferred seam pattern для PG/CH: lifecycle session/client держать в parent
+  orchestration callable и передавать dependency в child callable, где
+  выполняется store-работа. Child-only создание session/client без handoff
+  для changed boundary считать gap класса `REFACTOR_AND_TEST`
+  (`NOTE=NO_PARENT_SESSION_HANDOFF`) до рефактора.
+- TEST_ONLY → `/opsx-test`
+- REFACTOR_AND_TEST → `/opsx-close-external-gap` (вход = coverage packet, **без** `base=`)
+
+Для lifecycle / retry / state-machine / scheduler invariants проверяй residual и repeated invocation (next-tick, retry after durable status, partial completion), когда это применимо к protected behavior.
+
+## `TEST_COVERAGE_PACKET` (change-specific)
+
+- Packet создаёт `/opsx-invariant`; apply materializes обязательства; verify независимо проверяет adequacy.
+- Packet остаётся change-specific artifact; не превращай этот rule в второй packet contract.
+- Отсутствие packet не блокирует legacy apply.
+- Статус packet (`provisional` / `not_materialized` / `not_applicable`) сам по себе не блокирует implementation и не является archive verdict.
+- Не выдумывай mandatory scenarios без evidence из spec / decision / task / invariant / materialized packet.
+- Не меняй invariant ради удобства теста.
+- Final adequacy и archive readiness объявляет только `/opsx-verify`.
+
+## `/opsx-external-call-coverage` (diff-scoped executable gate)
+
+- Команда: `.cursor/commands/opsx-external-call-coverage.md`.
+- Вход: `base=` (обязателен); inventory `base...HEAD` external surfaces
+  (HTTP / WB_WRITE / PG / CH / REDIS / OTHER) внутри **одной** команды.
+- Этот rule остаётся design/execution policy; executable PASS/FAIL gate —
+  команда, не этот файл.
+- Не требуй `-m integration` для каждого surface: используй Minimum test level
+  + kind defaults (PG/CH → integration).
+- Не создавай отдельные kind-команды (`/opsx-ch-coverage` и т.п.); для
+  REFACTOR_AND_TEST → `/opsx-close-external-gap`.
+- `EXTERNAL_CALL_COVERAGE_REPORT` — additive для `/opsx-verify`; absence ≠
+  auto archive `NO_GO`.
+- Gaps: TEST_ONLY → `/opsx-test`; PG/CH / UNTESTABLE →
+  `/opsx-close-external-gap` (packet in, no `base=`); не чинить production
+  внутри coverage-команды.
+- Session-mock unit для PG/CH не закрывает external-call gap.
+- PG session mode (WRITE / PURE_READ / READ_AFTER_WRITE) — см. § Kind defaults;
+  executable check в `/opsx-external-call-coverage`, не в hunt как SoT.
+
+## CallbackQuery answer (Dispatcher pre-answer middleware)
+
+Когда на client_bot Dispatcher стоит `ImmediateCallbackAnswerUpdateMiddleware`
+(или эквивалентный outer pre-answer до handler):
+
+1. Не считай доказательством корректной ACK-политики assert вида
+   `query.answer.awaited` / `callback.answer.assert_awaited` в хендлерах под
+   этим middleware — такой assert часто **кодирует баг** (второй answer после
+   middleware ACK).
+2. Предпочтительный regression shape для этого класса: AST/source-инвариант,
+   что module хендлера **не** вызывает `CallbackQuery.answer` /
+   `query.answer` / `callback.answer` (разрешены `query.message.answer` /
+   `bot.send_message` и аналогичные chat sends).
+3. Пользовательские toast/alert после ACK — через `message.answer` /
+   `bot.send_message`, не через повторный `callback.answer`.
+4. Не ослабляй такой AST-инвариант ради зелёных соседних тестов; соседние
+   тесты обновляй под chat-notify канал.
+
+Product ACK policy живёт в `app/client_bot/callback_helpers.py` и
+`docks/CALLBACK_ANSWER_POLICY.md`; этот раздел — только **test-design**
+для предотвращения повторного double-answer класса.
+
+Class lesson evidence:
+`BUGCASE-CAH-DOUBLE-ANSWER-20260729T013308Z` (ROOT-001 + HC-001).
+
+## Устаревшее (запрещено переносить)
+
+Не требовать и не восстанавливать:
+
+- `tests/test_models.py`
+- `TestUser` / `TestWBToken` как обязательные mock models
+- fixture `test_async_db` как универсальный contract
+- blanket «всегда использовать mock models»
+- role restriction «не писать код, только тестировать»
+
+## Редактирование правил
+
+Если владелец просит изменить test policy, редактируй этот файл (canonical), а не `.cursor/rules/TESTING_RULES.mdc`.
+
+
+## Bug-episode RED-before-GO (soft note)
+
+When companions for `.cursor/pipeline/ORCHESTRATION_MVP.md` are in use
+(candidate/activated), product-bug production GO expects durable RED proof
+via `/opsx-test` (`case=`/`finding=`) or Owner `RED_NOT_APPLICABLE_APPROVED`
+together with `BUG_CONFIRMED` ∧ `FIX_NOW`. Do not weaken assertions to force
+green. Sole GREEN writer: `/opsx-test verify mode`.
+
+```text
+IMPLEMENTATION_STATUS: LIVE_ACTIVATED
+VALIDATION_STATUS: INDEPENDENT_TEST_PASS
+RUNTIME_ENFORCEMENT: ACTIVE
+LIVE_COMMAND_BEHAVIOR_CHANGED: YES
+GO_ACTIVATE: ISSUED
+```

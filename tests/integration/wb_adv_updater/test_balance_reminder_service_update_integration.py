@@ -17,6 +17,8 @@ from app.modules.wb_adv_updater.modules.balance_exp_informer.service import Bala
 from app.utils.db.models import User
 
 
+
+pytestmark = pytest.mark.destructive_local
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_balance_reminder_service_update_creates_sent_reminder_and_event(

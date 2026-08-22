@@ -12,7 +12,7 @@ metadata:
 
 Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
 
-**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and create a change proposal. You MAY create OpenSpec artifacts (proposals, designs, specs) if the user asks—that's capturing thinking, not implementing.
+**IMPORTANT: Explore mode is for thinking, not implementing.** You may read files, search code, and investigate the codebase, but you must NEVER write code or implement features. If the user asks you to implement something, remind them to exit explore mode first and start or revise a change via `/opsx-new` / `/opsx-ff` (new) or `/opsx-update` (existing). You MAY create OpenSpec artifacts (`proposal.md`, designs, specs) if the user asks—that's capturing thinking, not implementing. Never recommend obsolescent `/opsx-propose`.
 
 **This is a stance with a mandatory context pass.** Exploration stays read-only and adaptive, but this project requires config/WORKLOG loading and final evidence separation when you summarize findings.
 
@@ -44,18 +44,69 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 3. Parse `explore.worklog` from `openspec/policies/EXPLORE_POLICY.md`.
 4. If `explore.worklog.path` exists, read it before final output.
 5. Extract Worklog-derived candidate tasks, known bugs, affected file hints, validation hints, open questions, and prior agent findings.
-6. Inspect repository files and OpenSpec artifacts relevant to the requested task.
-7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
-8. Do not modify production code.
-9. Do not modify WORKLOG.
+6. If input contains `EVOLUTION_HANDOFF` / `OWNER_INTENT`: treat `OWNER_INTENT`
+   as the fixed semantic target — never replace it with code/OpenSpec framing.
+7. **OpenSpec context pass (required when `OWNER_INTENT` present):** targeted
+   only — current `openspec/specs/**` → Accepted `openspec/decisions/**`
+   (keep ADL budgets) → relevant `openspec/changes/archive/**` as history
+   only (no broad archive scan) → then current code/tests. Target from
+   OWNER_INTENT, capability/UI terms, related specs, known IDs, runtime entities.
+8. Conflict rules: current main spec > archive; contract vs repo → explicit
+   `CONTRACT_VS_REPO`; archive/OpenSpec MUST NOT rewrite `OWNER_INTENT`.
+9. Separate repository evidence from WORKLOG notes / assumptions / gaps.
+10. If Owner↔runtime mapping is ambiguous: emit `UNRESOLVED` /
+    `CANDIDATE_MAPPING` and clarify; do **not** rewrite `OWNER_INTENT`.
+11. Do not modify production code.
+12. Do not modify WORKLOG.
+
+**OWNER_INTENT authority (when present):**
+`explore(OWNER_INTENT, repository + OpenSpec context)` MUST NOT return a
+different `OWNER_INTENT` because code, specs, decisions, or archive support
+another reading.
 
 **Required final output format:**
 
+When input includes `OWNER_INTENT`, emit this pasteable block **before** the
+narrative sections. Copy `OWNER_INTENT` **verbatim**. Keep current contract,
+historical evidence, and repository evidence in separate fields.
+
+```text
+EXPLORE_HANDOFF
+OWNER_INTENT:
+<verbatim copy from EVOLUTION_HANDOFF / input — do not reinterpret>
+CURRENT_INCREMENT: <passthrough if present>
+IN_SCOPE:
+- <passthrough if present>
+OUT_OF_SCOPE:
+- <passthrough if present>
+CURRENT_CONTRACT:
+- <relevant openspec/specs/** facts — acting contract>
+ACCEPTED_DECISIONS:
+- <relevant Accepted decision paths/status; empty if none in budget>
+HISTORICAL_EVIDENCE:
+- <relevant archive change facts — history only, not SoT; empty if none>
+REPOSITORY_FINDINGS:
+- <confirmed current code/tests facts>
+RUNTIME_MAPPING:
+- <Owner/UI term → candidate code/runtime path>
+CONTRACT_VS_REPO:
+- <explicit drift/contradiction; or none>
+UNRESOLVED:
+- <ambiguities / contradictions; empty if none>
+CANDIDATE_MAPPING:
+- <optional alternate mappings that need Owner confirmation>
+```
+
+If `OWNER_INTENT` is absent, skip `EXPLORE_HANDOFF` (backward compatible).
+
 ## Short Decision
-Короткий вывод по исследованию.
+Короткий вывод по исследованию. When `OWNER_INTENT` is present, stay
+consistent with it; technical reframes go under layered evidence /
+mapping / unresolved / CONTRACT_VS_REPO.
 
 ## Repository Evidence
-Что подтверждено файлами репозитория.
+Что подтверждено текущими файлами репозитория (code/tests). Archive is not
+acting SoT.
 
 ## WORKLOG Findings
 Что найдено в `DOTO/WORKLOG.md`. Always include this section, even when there are no useful findings.
@@ -155,7 +206,7 @@ This tells you:
 
 Think freely. When insights crystallize, you might offer:
 
-- "This feels solid enough to start a change. Want me to create a proposal?"
+- "This feels solid enough to start a change. Want `/opsx-new` or `/opsx-ff`?"
 - Or keep exploring - no pressure to formalize
 
 ### When a change exists
@@ -187,7 +238,7 @@ If the user mentions a change or you detect one is relevant:
    - "That's a change-local design decision. Capture it in design.md?"
    - "That's a reusable architecture decision. Capture it in `openspec/decisions/`?"
    - "This is a new requirement. Add it to specs?"
-   - "This changes scope. Update the proposal?"
+   - "This changes scope. Capture it with `/opsx-update`?"
 
 4. **The user decides** - Offer and move on. Don't pressure. Don't auto-capture.
 
@@ -262,7 +313,7 @@ You: [reads codebase]
 
 **User is stuck mid-implementation:**
 ```
-User: /opsx:explore add-auth-system
+User: /opsx-explore add-auth-system
       The OAuth integration is more complex than expected
 
 You: [reads change artifacts]
@@ -312,7 +363,7 @@ You: That changes everything.
 
 There's no required ending. Discovery might:
 
-- **Flow into a proposal**: "Ready to start? I can create a change proposal."
+- **Flow into a change**: "Ready to start? Use `/opsx-new` / `/opsx-ff`, or `/opsx-update` if the change already exists."
 - **Result in artifact updates**: "Updated design.md with these decisions"
 - **Just provide clarity**: User has what they need, moves on
 - **Continue later**: "We can pick this up anytime"
@@ -329,7 +380,7 @@ When it feels like things are crystallizing, you might summarize:
 **Open questions**: [if any remain]
 
 **Next steps** (if ready):
-- Create a change proposal
+- Start via `/opsx-new` or `/opsx-ff` (or `/opsx-update` if change exists)
 - Keep exploring: just keep talking
 ```
 
@@ -344,6 +395,14 @@ But this summary is optional. Sometimes the thinking IS the value.
 - **Don't rush** - Discovery is thinking time, not task time
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
+- **Don't rewrite OWNER_INTENT** - When present, pass it through verbatim in
+  `EXPLORE_HANDOFF`; put code/runtime/OpenSpec mappings under layered fields
+- **Don't replace Owner meaning with a plausible code or archive story**
+  without explicit Owner correction
+- **Don't broad-scan archive**; don't treat archive as acting SoT (main spec wins)
+- **Don't silently resolve contract↔repo conflicts** — emit `CONTRACT_VS_REPO`
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
+- **Do check relevant current specs / Accepted decisions / targeted archive**
+  when `OWNER_INTENT` is present (then code/tests)
 - **Do question assumptions** - Including the user's and your own

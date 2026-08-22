@@ -4,6 +4,8 @@ from collections.abc import AsyncGenerator
 from unittest.mock import patch
 
 import pytest
+
+pytestmark = pytest.mark.destructive_local
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
 
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet

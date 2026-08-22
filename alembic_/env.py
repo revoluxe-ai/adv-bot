@@ -24,8 +24,8 @@ dotenv.load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
+# Job wrapper may pass DATABASE_URL; otherwise legacy POSTGRES_* settings.
 row = get_alchemy_row_for_migration()
-
 config.set_main_option("sqlalchemy.url", row)
 
 # Interpret the config file for Python logging.
@@ -75,10 +75,26 @@ def run_migrations_online() -> None:
     """
     Run migrations in 'online' mode.
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
+    If Config.attributes['connection'] is set (Job wrapper), reuse that
+    Connection and do not create a second Engine. Otherwise create NullPool
+    Engine from sqlalchemy.url.
     """
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            transaction_per_migration=True,
+        )
+        with context.begin_transaction():
+            # Job wrapper: mark PARTIAL only after Alembic starts applying
+            # migrations — not during env.py import/settings/configure.
+            on_begin = config.attributes.get("on_migrations_begin")
+            if callable(on_begin):
+                on_begin()
+            context.run_migrations()
+        return
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -86,9 +102,17 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        # Standalone alembic upgrade: one transaction for the whole run
+        # (default). transaction_per_migration is Job-wrapper only.
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+        )
 
         with context.begin_transaction():
+            on_begin = config.attributes.get("on_migrations_begin")
+            if callable(on_begin):
+                on_begin()
             context.run_migrations()
 
 

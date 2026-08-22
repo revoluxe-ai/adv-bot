@@ -151,8 +151,10 @@ class WbWalletOkCache:
     loading ensure at most one WB wallet fetch per cabinet per run.
     """
 
-    ok_by_cabinet: dict[int, bool] = field(default_factory=dict)
-    _locks_by_cabinet: dict[int, asyncio.Lock] = field(default_factory=dict)
+    ok_by_cabinet: dict[int, bool] = field(default_factory=dict[int, bool])
+    _locks_by_cabinet: dict[int, asyncio.Lock] = field(
+        default_factory=dict[int, asyncio.Lock]
+    )
     _locks_meta: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     async def lock_for(self, wb_cabinet_id: int) -> asyncio.Lock:
@@ -182,6 +184,7 @@ class AutoAdvActiveControlService:
             [ComplexAdv, Literal["auto", "search"]], Awaitable[None]
         ]
         | None = None,
+        shelf_bid_control_repository: Any | None = None,
     ) -> None:
         self._wb_modifier = wb_modifier
         self._tasks_manager = tasks_manager
@@ -189,6 +192,8 @@ class AutoAdvActiveControlService:
         self._auto_shelf_bid_control_view_provider = auto_shelf_bid_control_view_provider
         self._reason_manager = redis_campaign_activity_reason_manager
         self._budget_ensure_before_start_retry = budget_ensure_before_start_retry
+        # Injectable PG SoT reader for shelf-exhausted our-block (tests / wiring).
+        self._shelf_bid_control_repository = shelf_bid_control_repository
 
     async def ensure_campaigns_active(self, advs: Iterable[ComplexAdv]) -> None:
         """Привести активность РК в соответствие с бюджетом и расписанием.
@@ -198,13 +203,30 @@ class AutoAdvActiveControlService:
         из БД; при выходе за расписание/даты РК ставится на паузу. Ограничения
         по времени нигде больше не применяются — только в этом сервисе.
         """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (
+            should_suppress_budget_and_activity_restart,
+        )
+
+        # Emergency latch: ordinary schedule/budget restart Forbidden; вместо
+        # этого принудительная пауза обеих ног (spec kill switch).
+        latch_advs = [
+            adv
+            for adv in advs
+            if adv.bot_active
+            and should_suppress_budget_and_activity_restart(
+                getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+            )
+        ]
         complex_advs = [
             adv
             for adv in advs
             if adv.bot_active
             and adv.auto_budget_watchdog_enabled  # управление активностью РК: бюджет, пополнение, расписание
+            and not should_suppress_budget_and_activity_restart(
+                getattr(adv.adv_setting, "card_ab_hold_emergency_latch", False)
+            )
         ]
-        if not complex_advs:
+        if not complex_advs and not latch_advs:
             return None
 
         handlers: list[Callable[[], Awaitable[None]]] = []
@@ -213,7 +235,10 @@ class AutoAdvActiveControlService:
         start_of_day = datetime.combine(now_msk.date(), time.min, tzinfo=MSK_TZ)
         end_of_day = datetime.combine(now_msk.date(), time.max, tzinfo=MSK_TZ)
 
-        unique_adv_ids = list({adv.adv_setting.id for adv in complex_advs})
+        unique_adv_ids = list(
+            {adv.adv_setting.id for adv in complex_advs}
+            | {adv.adv_setting.id for adv in latch_advs}
+        )
         # Настройки времени применяются только для этих РК (с включённым контролем)
         time_settings_by_adv: dict[int, TimeSettingsDbState | None]
         async with get_session_maker(read_only=True) as session:
@@ -222,6 +247,10 @@ class AutoAdvActiveControlService:
             )
 
         wb_wallet_cache = WbWalletOkCache()
+        for adv in latch_advs:
+            handlers.append(
+                lambda complex_adv=adv: self._emergency_latch_force_pause(complex_adv)
+            )
         for adv in complex_advs:
             db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
@@ -264,6 +293,27 @@ class AutoAdvActiveControlService:
     def _max_workers_for(handler_count: int, cap: int) -> int:
         return max(1, min(handler_count, cap))
 
+    async def _emergency_latch_force_pause(self, adv: ComplexAdv) -> None:
+        """Принудительная пауза Search+Auto при активном Emergency latch.
+
+        Spec ``ab-hold-emergency-kill-switch``: latch ACTIVE → РК на паузе,
+        ordinary restart Forbidden. Docstring: write-path decision carve-out.
+        """
+        try:
+            if adv.adv_id:
+                await self._wb_modifier.pause_auto_campaign(adv)
+            if adv.search_adv_id:
+                await self._wb_modifier.pause_auction_campaign(adv)
+            logger.warning(
+                "[adv_setting_id=%s] Emergency latch force-pause done",
+                adv.adv_setting.id,
+            )
+        except Exception:
+            logger.exception(
+                "[adv_setting_id=%s] Emergency latch force-pause failed",
+                adv.adv_setting.id,
+            )
+
     @staticmethod
     async def _get_spend_for_adv(
         adv_id: int | None,
@@ -278,6 +328,212 @@ class AutoAdvActiveControlService:
             end_date,
         )
 
+    async def _maybe_pause_for_empty_keywords_intent(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+        search_status: WBAdvActiveStatus | None,
+    ) -> bool:
+        """Потребить/вооружить empty-keywords intent → Search pause + reason + notify.
+
+        Spec pause-on-empty-keywords / INC-PAUSE-02: TARGET_ENTITY_OR_LEG=SEARCH.
+        ALLOWED: ``pause_auction_campaign``; FORBIDDEN: ``pause_auto_campaign``.
+        Pause = следующий шаг после OFF (не concurrent с OFF).
+
+        Двухтиковое подтверждение пустоты (Owner
+        ``TWO_TICK_EMPTY_CONFIRMATION_BEFORE_PAUSE`` / ROOT-001):
+        1. Уже есть Redis intent (V3 apply после FORCE_OFF / тик-1 latch) и
+           набор всё ещё пуст → consume→pause Search **только если Search
+           STARTED**. Warmup ``__empty__`` не блокирует этот путь (prior
+           intent = settled confirmation).
+        2. No-prior-intent: активных ключей 0 и Search STARTED + **settled
+           empty** (не Redis warmup ``__empty__`` / transient false-empty) →
+           только ``set_intent`` (latch) и return False без consume/pause.
+           Pause — на следующем ``ensure``, если intent ещё есть и пустота
+           подтвердилась. ROOT-001 / tasks §7.2: warmup marker MUST NOT arm.
+
+        Перед pause перечитывает активные ключи из ``ComplexAdv.get_keywords``.
+        Если набор уже непустой (stale intent при TTL до 6h после recovery) —
+        intent потребляется без WB pause / EMPTY_KEYWORDS reason / notify, и
+        метод возвращает False, чтобы обычный activity-control продолжался.
+
+        Tick2 consume при Search **не** STARTED (budget/schedule pause между
+        тиками): intent потребляется, но MUST NOT ``_set_search_reason(
+        EMPTY_KEYWORDS)``, MUST NOT ``notify_empty_keywords_pause`` (resume
+        episode gate) и MUST NOT ``pause_auction_campaign`` — prior
+        schedule/budget reason сохраняется. Return True (как skip без
+        Search-ноги): activity-control не стартует Search при всё ещё
+        пустых ключах.
+
+        Returns:
+            True если intent был потреблён и pause/reason/notify (или skip
+            без Search / skip при Search не STARTED) выполнены; False если
+            arm не нужен / только latch на тике-1 / intent отброшен как
+            stale / warmup false-empty.
+        """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+            EmptyKeywordsPauseIntentManager,
+            count_active_keywords,
+            notify_empty_keywords_pause,
+            should_request_empty_keywords_pause_intent,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause.decision import (
+            is_warmup_false_empty_keywords,
+        )
+
+        intent_mgr = EmptyKeywordsPauseIntentManager()
+        keywords = await adv.get_keywords()
+        active_count = count_active_keywords(keywords)
+        has_intent = await intent_mgr.peek_intent(int(auto_adv_id))
+
+        if not has_intent:
+            # Тик-1 (нет prior intent): только latch confirmation, без pause.
+            # Redis ``__empty__`` warmup / Adv warmup seam → refuse (ROOT-001).
+            # Search PAUSE → не ставим intent (иначе блокируется recheck-start).
+            campaign_is_started = search_status == WBAdvActiveStatus.STARTED
+            warmup_false_empty = await is_warmup_false_empty_keywords(
+                adv=adv,
+                redis_client=intent_mgr.client,
+                adv_id=int(auto_adv_id),
+            )
+            if not should_request_empty_keywords_pause_intent(
+                active_count=active_count,
+                bot_active=bool(adv.bot_active),
+                bot_driven_off_completed=False,
+                campaign_is_started=campaign_is_started,
+                is_warmup_false_empty=warmup_false_empty,
+            ):
+                if warmup_false_empty and active_count == 0 and campaign_is_started:
+                    logger.info(
+                        "Search activity: skip empty-keywords arm — Redis __empty__ "
+                        "warmup / transient false-empty (not settled empty) "
+                        "auto_adv_id=%s shop_id=%s active_count=%s",
+                        auto_adv_id,
+                        adv.shop_id,
+                        active_count,
+                    )
+                return False
+            await intent_mgr.set_intent(int(auto_adv_id))
+            logger.info(
+                "Search activity: empty-keywords intent latched (tick1 confirmation) "
+                "without pause — await tick2 if still empty "
+                "auto_adv_id=%s shop_id=%s active_count=%s",
+                auto_adv_id,
+                adv.shop_id,
+                active_count,
+            )
+            # Owner two-tick: same-tick set_intent→consume→pause запрещён.
+            return False
+
+        if active_count > 0:
+            # Re-validate before consume→pause: keywords may recover while intent pending.
+            await intent_mgr.consume_intent(int(auto_adv_id))
+            logger.info(
+                "Search activity: empty-keywords intent discarded — active keywords "
+                "non-empty (stale intent) auto_adv_id=%s shop_id=%s active_count=%s",
+                auto_adv_id,
+                adv.shop_id,
+                active_count,
+            )
+            return False
+
+        if not await intent_mgr.consume_intent(int(auto_adv_id)):
+            return False
+
+        search_adv_id = adv.search_adv_id
+        if search_adv_id is None:
+            # Нет Search-ноги: consume + skip; MUST NOT fallback на Auto pause.
+            logger.info(
+                "Search activity: empty-keywords intent consumed but no Search leg "
+                "(skip pause, no Auto fallback) auto_adv_id=%s shop_id=%s",
+                auto_adv_id,
+                adv.shop_id,
+            )
+            return True
+
+        if search_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Search activity: pausing auction campaign (empty keywords) "
+                "search_adv_id=%s auto_adv_id=%s shop_id=%s",
+                search_adv_id,
+                auto_adv_id,
+                adv.shop_id,
+            )
+            await self._wb_modifier.pause_auction_campaign(adv)
+            await self._set_search_reason(
+                int(search_adv_id),
+                CampaignActivityCommand.PAUSE,
+                AuctionReasonCode.EMPTY_KEYWORDS,
+            )
+            campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+            await notify_empty_keywords_pause(
+                shop_id=str(adv.shop_id or ""),
+                adv_id=int(auto_adv_id),
+                campaign_name=campaign_name,
+                intent_manager=intent_mgr,
+            )
+            return True
+
+        # Search не STARTED: intent уже потреблён; не маскируем prior
+        # schedule/budget reason EMPTY_KEYWORDS и не arm'им resume gate.
+        logger.info(
+            "Search activity: empty-keywords intent consumed but Search not "
+            "STARTED (skip pause/reason/notify) search_adv_id=%s "
+            "auto_adv_id=%s shop_id=%s search_status=%s",
+            search_adv_id,
+            auto_adv_id,
+            adv.shop_id,
+            search_status,
+        )
+        return True
+
+    async def _drain_empty_keywords_intent_without_search(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+    ) -> None:
+        """Если Search-ноги нет — потребить intent без Auto pause (no fallback)."""
+        if adv.search_adv_id is not None:
+            return
+        await self._maybe_pause_for_empty_keywords_intent(
+            adv,
+            auto_adv_id,
+            search_status=None,
+        )
+
+    async def _maybe_notify_empty_keywords_resume_after_search_start(
+        self,
+        adv: ComplexAdv,
+        auto_adv_id: int,
+    ) -> None:
+        """Resume notify после Search start или уже-STARTED recheck.
+
+        Spec ``User notification on empty-keywords resume/re-enable``.
+        Вызывается и из PAUSE/READY → start, и из Search STARTED веток
+        (common-budget / search-limit), когда keywords восстановились после
+        delivered pause episode (HUNT-001).
+
+        Gate внутри ``notify_empty_keywords_resume`` — debounce-ключ pause
+        notify. Дополнительно требуем active keywords > 0, чтобы recheck
+        start при пустых ключах не слал «возобновлено».
+        """
+        from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+            EmptyKeywordsPauseIntentManager,
+            count_active_keywords,
+            notify_empty_keywords_resume,
+        )
+
+        keywords = await adv.get_keywords()
+        if count_active_keywords(keywords) <= 0:
+            return
+        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+        await notify_empty_keywords_resume(
+            shop_id=str(adv.shop_id or ""),
+            adv_id=int(auto_adv_id),
+            campaign_name=campaign_name,
+            intent_manager=EmptyKeywordsPauseIntentManager(),
+        )
+
     async def _set_auto_reason(
         self,
         adv_id: int,
@@ -290,6 +546,149 @@ class AutoAdvActiveControlService:
                 "auto",
                 CampaignActivityReason(command=command, reason_code=reason_code),
             )
+
+    async def _maybe_apply_shelf_exhausted_pause(
+        self,
+        adv: ComplexAdv,
+        *,
+        auto_adv_id: int,
+        auto_status: str,
+    ) -> bool:
+        """Если PG our-block активен — pause Auto / re-assert Redis; True = stop handler.
+
+        Paid Telegram notify on enter when ``shelf_exhausted_notify_sent_at`` is
+        None — including when Auto is already PAUSE/READY (budget/schedule/
+        balance may have paused first). STARTED: pause campaign + reason + notify.
+        Already not STARTED: re-assert Redis reason + notify if latch unset.
+        MUST NOT pause Search. Module stays ON. Dedupe via notify_sent_at.
+
+        Returns:
+            True если our-block активен и handler должен остановиться; иначе False.
+        """
+        if not bool(getattr(adv.adv_setting, "auto_shelf_bid_control_enabled", False)):
+            return False
+        nmids: list[int] = adv.nmids
+        if not nmids:
+            return False
+        nmid: int = nmids[0]
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+            AutoShelfBidControlRepository,
+        )
+
+        repo = self._shelf_bid_control_repository or AutoShelfBidControlRepository()
+        state = await repo.get_state(nmid)
+        if state is None or not bool(state.shelf_exhausted_pause_active):
+            return False
+
+        if auto_status == WBAdvActiveStatus.STARTED:
+            logger.info(
+                "Auto watchdog: pausing auto campaign (shelf exhausted no plan) "
+                "adv_id=%s shop_id=%s nmid=%s",
+                auto_adv_id,
+                adv.shop_id,
+                nmid,
+            )
+            await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                AutoReasonCode.SHELF_EXHAUSTED_NO_PLAN,
+            )
+            if state.shelf_exhausted_notify_sent_at is None:
+                await self._notify_shelf_exhausted_enter(
+                    adv,
+                    state_nmid=nmid,
+                    resolve_cpo_kind=state.shelf_exhausted_resolve_cpo_kind or "max",
+                    resolve_cpo_value=float(
+                        state.shelf_exhausted_resolve_cpo_value or 0.0
+                    ),
+                    due_at=state.shelf_exhausted_due_at,
+                    repository=repo,
+                )
+            return True
+
+        # Already paused / ready: re-assert Redis mirror from PG SoT.
+        # Enter notify must still fire when latch unset (ROOT-001).
+        await self._set_auto_reason(
+            auto_adv_id,
+            CampaignActivityCommand.PAUSE,
+            AutoReasonCode.SHELF_EXHAUSTED_NO_PLAN,
+        )
+        if state.shelf_exhausted_notify_sent_at is None:
+            await self._notify_shelf_exhausted_enter(
+                adv,
+                state_nmid=nmid,
+                resolve_cpo_kind=state.shelf_exhausted_resolve_cpo_kind or "max",
+                resolve_cpo_value=float(
+                    state.shelf_exhausted_resolve_cpo_value or 0.0
+                ),
+                due_at=state.shelf_exhausted_due_at,
+                repository=repo,
+            )
+        return True
+
+    async def _notify_shelf_exhausted_enter(
+        self,
+        adv: ComplexAdv,
+        *,
+        state_nmid: int,
+        resolve_cpo_kind: str,
+        resolve_cpo_value: float,
+        due_at: datetime | None,
+        repository: Any | None = None,
+    ) -> None:
+        """Paid notify once per enter; mark PG notify_sent_at."""
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+            AutoShelfBidControlRepository,
+        )
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.exhausted_pause.notify import (
+            notify_shelf_exhausted_pause,
+        )
+
+        campaign_name = str(getattr(adv.adv_setting, "name", "") or "")
+        shop_name = str(getattr(adv, "shop_name", None) or adv.shop_id or "")
+        delivered = await notify_shelf_exhausted_pause(
+            shop_id=str(adv.shop_id or ""),
+            adv_id=int(adv.auto_adv_id),
+            shop_name=shop_name,
+            campaign_name=campaign_name,
+            resolve_cpo_kind=resolve_cpo_kind,
+            resolve_cpo_value=resolve_cpo_value,
+            due_at=due_at,
+            adv_setting_original_id=int(adv.adv_setting.id),
+        )
+        if delivered:
+            repo = repository or self._shelf_bid_control_repository or AutoShelfBidControlRepository()
+            await repo.mark_shelf_exhausted_notify_sent(
+                state_nmid,
+                sent_at=datetime.now(timezone.utc),
+            )
+
+    async def _maybe_open_shelf_exhausted_epoch(self, adv: ComplexAdv) -> None:
+        """Открыть shelf-exhausted эпоху если ``epoch_pending``.
+
+        Вызывается после перехода Auto в STARTED **и** когда Auto уже
+        STARTED (clear мог выставить pending без start-transition). Без
+        ветки already-STARTED pending залипает и detect вечно no-op
+        (ROOT-001 / ASEP-EPOCH-PENDING-STUCK).
+        """
+        nmids: list[int] = adv.nmids
+        if not nmids:
+            return None
+        nmid: int = nmids[0]
+        from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_repository import (
+            AutoShelfBidControlRepository,
+        )
+
+        repo = self._shelf_bid_control_repository or AutoShelfBidControlRepository()
+        state = await repo.get_state(nmid)
+        if state is None or not bool(getattr(state, "shelf_exhausted_epoch_pending", False)):
+            return None
+        await repo.mark_shelf_exhausted_epoch_started(
+            nmid,
+            epoch_start=datetime.now(timezone.utc),
+        )
+        return None
 
     async def _set_search_reason(
         self,
@@ -406,8 +805,10 @@ class AutoAdvActiveControlService:
             return None
         try:
             if inspect.iscoroutinefunction(build_view):
-                return await build_view(int(adv.adv_setting.id))
-            return build_view(int(adv.adv_setting.id))
+                result = await build_view(int(adv.adv_setting.id))
+            else:
+                result = build_view(int(adv.adv_setting.id))
+            return cast(AutoShelfBidControlViewDTO | None, result)
         except Exception:
             logger.warning(
                 "Auto watchdog: build_view failed adv_id=%s shop_id=%s",
@@ -509,9 +910,25 @@ class AutoAdvActiveControlService:
         db_state: TimeSettingsDbState | None,
         wb_wallet_cache: WbWalletOkCache,
     ) -> None:
+        """Контроль Auto: budget/cost + terminal shelf-exhausted pause.
+
+        Terminal PG our-block (``_maybe_apply_shelf_exhausted_pause``) runs
+        **before** schedule/balance/budget early-returns so paid enter-notify
+        and Auto pause are not skipped while a higher-priority gate already
+        holds the campaign. Cost-data early-returns still call the same helper
+        before refusing ordinary cost-rule pause.
+        """
         auto_adv_id = adv.auto_adv_id
         auto_status = adv.auto_adv_active_status_str
         cost_log_suffix = " (common)" if adv.use_common_budget else ""
+
+        # INC-AUTO-SHELF-PAUSE-01 / PBH-007: shelf our-block before schedule/
+        # balance/budget/rec_system returns — otherwise enter notify is silent
+        # for the whole window those gates keep Auto paused.
+        if await self._maybe_apply_shelf_exhausted_pause(
+            adv, auto_adv_id=auto_adv_id, auto_status=auto_status
+        ):
+            return None
 
         # Расписание/даты из настроек времени; без настроек — показы разрешены
         time_allowed = (
@@ -679,6 +1096,12 @@ class AutoAdvActiveControlService:
                 auto_adv_id,
                 adv.shop_id,
             )
+            # ROOT-001 / INC-AUTO-SHELF-PAUSE-01: missing ordinary cost data must
+            # not skip terminal shelf-exhausted pause (PG our-block). Ordinary
+            # cost-rule pause remains blocked by this early-return.
+            await self._maybe_apply_shelf_exhausted_pause(
+                adv, auto_adv_id=auto_adv_id, auto_status=auto_status
+            )
             return None
         target_cost = resolve_target_cost(
             plan.orders if plan else None,
@@ -706,12 +1129,16 @@ class AutoAdvActiveControlService:
 
         # When target cost is missing or not comparable, do not pause by cost-rule.
         # Also do not record PAUSE here, because WB state may still be running.
+        # Terminal shelf-exhausted pause still runs (same invariant as above).
         if target_cost_value is None:
             logger.info(
                 "Auto watchdog: insufficient cost data%s adv_id=%s shop_id=%s",
                 cost_log_suffix,
                 auto_adv_id,
                 adv.shop_id,
+            )
+            await self._maybe_apply_shelf_exhausted_pause(
+                adv, auto_adv_id=auto_adv_id, auto_status=auto_status
             )
             return None
         fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
@@ -774,24 +1201,42 @@ class AutoAdvActiveControlService:
             else fact_pay_for_order_value
         )
         if cost_rule_failed and auto_status == WBAdvActiveStatus.STARTED:
-            logger.info(
-                "Auto watchdog: pausing auto campaign%s due to high cost "
-                "%.2f and total CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
-                cost_log_suffix,
-                cost_value_for_log,
-                fact_pay_for_order_value,
-                target_cost_value,
-                auto_adv_id,
-                adv.shop_id,
-            )
-            await self._wb_modifier.pause_auto_campaign(adv)
-            await self._set_auto_reason(
-                auto_adv_id,
-                CampaignActivityCommand.PAUSE,
-                AutoReasonCode.COST_RULE_FAILED,
-            )
-            return None
-        if cost_rule_failed and auto_status != WBAdvActiveStatus.STARTED:
+            if bool(adv.adv_setting.auto_shelf_bid_control_enabled):
+                # INC-AUTO-SHELF-PAUSE-01: mid-cycle ordinary cost pause Forbidden
+                # while shelf module ON (terminal path owns Auto pause).
+                logger.info(
+                    "Auto watchdog: skip mid-cycle cost pause (shelf module on)%s "
+                    "adv_id=%s shop_id=%s best_cpo=%s fact_cpo=%s target=%s",
+                    cost_log_suffix,
+                    auto_adv_id,
+                    adv.shop_id,
+                    best_cpo_value,
+                    fact_pay_for_order_value,
+                    target_cost_value,
+                )
+            else:
+                logger.info(
+                    "Auto watchdog: pausing auto campaign%s due to high cost "
+                    "%.2f and total CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
+                    cost_log_suffix,
+                    cost_value_for_log,
+                    fact_pay_for_order_value,
+                    target_cost_value,
+                    auto_adv_id,
+                    adv.shop_id,
+                )
+                await self._wb_modifier.pause_auto_campaign(adv)
+                await self._set_auto_reason(
+                    auto_adv_id,
+                    CampaignActivityCommand.PAUSE,
+                    AutoReasonCode.COST_RULE_FAILED,
+                )
+                return None
+        if (
+            cost_rule_failed
+            and auto_status != WBAdvActiveStatus.STARTED
+            and not bool(adv.adv_setting.auto_shelf_bid_control_enabled)
+        ):
             await self._set_auto_reason(
                 auto_adv_id,
                 CampaignActivityCommand.PAUSE,
@@ -801,22 +1246,27 @@ class AutoAdvActiveControlService:
 
         # Determine cost_rule_ok (used for resume/start) using same authoritative
         # source as pause decision to avoid resume mismatches.
-        if bool(adv.adv_setting.auto_shelf_bid_control_enabled) and (
-            self._auto_shelf_bid_control_view_provider is not None
-        ):
-            # If we have authoritative best_cpo_value, use it for resume decision.
-            if best_cpo_value is not None:
-                cost_rule_ok = best_cpo_value <= target_cost_value
-            else:
-                # degraded (missing/invalid best CPO, build_view error, no
-                # provider, or no callable build_view): allow start/resume,
-                # because there is no authoritative bidder input to block it.
-                cost_rule_ok = True
+        if bool(adv.adv_setting.auto_shelf_bid_control_enabled):
+            # Shelf ON: ordinary cost is not a start blocker; terminal our-block
+            # and other priority reasons gate start instead.
+            cost_rule_ok = True
         else:
             # avg_cost_value is guaranteed non-None here: the legacy pause-decision
             # branch above returns early when it is None.
             assert avg_cost_value is not None
             cost_rule_ok = avg_cost_value <= target_cost_value
+
+        # INC-AUTO-SHELF-PAUSE-01: execute / re-assert terminal shelf-exhausted.
+        shelf_block = await self._maybe_apply_shelf_exhausted_pause(
+            adv, auto_adv_id=auto_adv_id, auto_status=auto_status
+        )
+        if shelf_block:
+            return None
+
+        # INC-PAUSE-02: empty-keywords pause исполняет Search handler.
+        # Без Search-ноги — drain intent здесь (no Auto fallback), Auto идёт дальше.
+        await self._drain_empty_keywords_intent_without_search(adv, auto_adv_id)
+
         if (
             budget_ok
             and cost_rule_ok
@@ -834,12 +1284,16 @@ class AutoAdvActiveControlService:
                 CampaignActivityCommand.STARTED,
                 AutoReasonCode.BUDGET_OK_COST_OK,
             )
+            await self._maybe_open_shelf_exhausted_epoch(adv)
         elif budget_ok and cost_rule_ok and auto_status == WBAdvActiveStatus.STARTED:
             await self._set_auto_reason(
                 auto_adv_id,
                 CampaignActivityCommand.STARTED,
                 AutoReasonCode.BUDGET_OK_COST_OK,
             )
+            # Clear may set epoch_pending while Auto is already STARTED;
+            # there is no start-transition, so consume pending here too.
+            await self._maybe_open_shelf_exhausted_epoch(adv)
 
     async def _search_campaign_handler(
         self,
@@ -941,6 +1395,14 @@ class AutoAdvActiveControlService:
                     AuctionReasonCode.COMMON_SPEND_EXCEEDED,
                 )
                 return None
+            # Spec pause-on-empty-keywords: Search pause после schedule/budget gates.
+            auto_adv_id = adv.auto_adv_id
+            if await self._maybe_pause_for_empty_keywords_intent(
+                adv,
+                int(auto_adv_id),
+                search_status,
+            ):
+                return None
             if common_limit > 0 and combined_spend < common_limit and search_status in [
                 WBAdvActiveStatus.PAUSE,
                 WBAdvActiveStatus.READY_FOR_START,
@@ -956,15 +1418,26 @@ class AutoAdvActiveControlService:
                     CampaignActivityCommand.STARTED,
                     AuctionReasonCode.COMMON_OK,
                 )
+                await self._maybe_notify_empty_keywords_resume_after_search_start(
+                    adv,
+                    int(auto_adv_id),
+                )
             elif (
                 common_limit > 0
                 and combined_spend < common_limit
                 and search_status == WBAdvActiveStatus.STARTED
             ):
+                # HUNT-001: Search уже STARTED; keywords могли восстановиться
+                # после delivered pause — resume notify на том же helper, что
+                # и при PAUSE/READY → start.
                 await self._set_search_reason(
                     adv_id,
                     CampaignActivityCommand.STARTED,
                     AuctionReasonCode.COMMON_OK,
+                )
+                await self._maybe_notify_empty_keywords_resume_after_search_start(
+                    adv,
+                    int(auto_adv_id),
                 )
             return None
 
@@ -988,6 +1461,15 @@ class AutoAdvActiveControlService:
             )
             return
 
+        # Spec pause-on-empty-keywords / INC-PAUSE-02: Search pause после budget gates.
+        auto_adv_id = adv.auto_adv_id
+        if await self._maybe_pause_for_empty_keywords_intent(
+            adv,
+            int(auto_adv_id),
+            search_status,
+        ):
+            return None
+
         if search_limit > 0 and search_status in [WBAdvActiveStatus.PAUSE, WBAdvActiveStatus.READY_FOR_START]:
             logger.info(
                 "Auto budget watcher: starting auction campaign adv_id=%s shop_id=%s",
@@ -1000,11 +1482,22 @@ class AutoAdvActiveControlService:
                 CampaignActivityCommand.STARTED,
                 AuctionReasonCode.SEARCH_LIMIT_OK,
             )
+            await self._maybe_notify_empty_keywords_resume_after_search_start(
+                adv,
+                int(auto_adv_id),
+            )
         elif search_limit > 0 and search_status == WBAdvActiveStatus.STARTED:
+            # HUNT-001: Search уже STARTED; keywords могли восстановиться
+            # после delivered pause — resume notify на том же helper, что
+            # и при PAUSE/READY → start.
             await self._set_search_reason(
                 adv_id,
                 CampaignActivityCommand.STARTED,
                 AuctionReasonCode.SEARCH_LIMIT_OK,
+            )
+            await self._maybe_notify_empty_keywords_resume_after_search_start(
+                adv,
+                int(auto_adv_id),
             )
         elif search_limit == 0 and search_status == WBAdvActiveStatus.STARTED:
             logger.info(

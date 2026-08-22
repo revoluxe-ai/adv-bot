@@ -324,3 +324,188 @@ Disposition:
 * consider reuse of `mv_clusters_daily_agg.ts_state` only after proving semantic equivalence.
 
 Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
+
+
+
+
+Зашифровать свой комп
+Навести порядок ChatGPT
+Навести порядок в CODEX
+
+Сделать проект для создания который пишет python тесты на деградацию промтов.
+
+
+Разобраться с MAx - там есть клиенты, а я их игнорю!
+
+Идея: епе бнмра
+
+opsx-bug-team to commant native
+
+opsx-bug-team - тест развилки от bug-hunt
+
+тесты на команды и team
+
+
+## Deferred from change card-ab-hold-mode (2026-07-28)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:card-ab-hold-mode] Pre-start safety policy picker (hard|soft|self)
+  source: owner TZ (explore) + openspec/changes/card-ab-hold-mode/proposal.md (Out of scope / risk context)
+  reason: out_of_current_mvp | owner_park
+  notes: До старта эксперимента выбор — жёсткая (abort/reset при сбое статы), мягкая (freeze decide; возможен ограниченный перерасход), сам слежу (+ аварийная кнопка). Сейчас change не раздувать; future change e.g. ab-hold-safety-policy-modes.
+
+- [ ] [deferred-from:card-ab-hold-mode] Anti-drain emergency kill switch
+  source: owner TZ (explore); related OUT_OF_SCOPE_FOLLOW_ON emergency-stop in proposal.md (product anti-drain ≠ financial latch)
+  reason: out_of_current_mvp | owner_park
+  notes: Не просто EXIT из Hold — аварийное гашение трат (ключи/пауза/блок). Отдельная продуктовая идея; не смешивать с Forbidden §18 epoch spend cap / financial latch в текущем Hold.
+
+- [ ] [deferred-from:card-ab-hold-mode] Mid-sync stale UX options (wait|force-apply|EXIT)
+  source: owner TZ (explore)
+  reason: oversized | owner_park
+  notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
+
+
+## Bound confirmed card-ab-hold-mode (2026-07-30)
+
+Via `/opsx-bound-scope:GO` — no new deferred checklist rows (picker / anti-drain /
+mid-sync already parked 2026-07-28; skip_reappend).
+
+KEEP_MVP_BOUNDARY (owed now, handoff → `/opsx-update`):
+- Soft-only: freeze decide-class on stale, including epoch-managed setup FAIL→OFF
+  (close PBH-001 / ROOT-001 hole under §17); do not abort/reset epoch on stale alone;
+  PBH-005 apply-snapshot carve-out unchanged.
+- Soft-policy RU disclaimer at Enable and/or hold status (user monitors test;
+  wording must not say «ослабим защиту» if behavior is freeze-decide).
+- Pre-start hard|soft|self picker, anti-drain, mid-sync UX — remain out of DoD
+  until REENTER_CONFIRMED.
+
+
+## Deferred from change openspec-guard-size-recovery (2026-07-30)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of any current OpenSpec change
+until `/opsx-new` (or equivalent) + `/opsx-update` + `REENTER_CONFIRMED`.
+No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only park).
+
+- [ ] [deferred-from:openspec-guard-size-recovery] Guard size recovery / openspec compress tooling
+  source: /opsx-admin-command-design-command (OPTION_A recommended; OPTION_B optional) + explore 2026-07-30
+  reason: out_of_current_mvp | owner_park | needs_test_design
+  notes: Сложная команда; нужен способ тестировать. Сейчас НЕ implement.
+    OPTION_A: playbook при guard FAIL + ranked offenders в /opsx-update(+siblings) + guard --report-offenders.
+    OPTION_B: /opsx-admin-openspec-size-reduce (GO-gated), FORBIDDEN default write openspec/changes/**.
+    ≠ /opsx-bound-scope (scope drift ≠ char shrink).
+    Временно: baseline opsx_update bumped to 89948 (2026-07-30) — не вечный substitute for reduce.
+
+- [ ] [deferred-from:openspec-guard-size-recovery] Test strategy for guard reduce / recovery
+  source: owner (explore/design follow-up)
+  reason: oversized | owner_park
+  notes: Придумать harness: synthetic oversized fixture → FAIL → plan → GO reduce → GREEN;
+    запрет semantic loss на process contracts; не трогать product change specs.
+
+Анализ материализации решения багов для обучения системы супер-классам ошибок
+Внедрить практики, риски
+
+Сделать мета-команды по ремонту-доработке обучению команд, которые обслуживают другие команды
+
+сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
+
+сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
+
+## Deferred from change fix-bug-with-remove-ch-db-name-from-queries (2026-07-31)
+
+Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
+`/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] CH database from env → client.database
+  source: explore NOW_LATER + owner split (2026-07-31); openspec/changes/fix-bug-with-remove-ch-db-name-from-queries/proposal.md (Scope out)
+  reason: out_of_current_mvp | owner_park
+  notes: Host/user/password уже из env; database в client hardcoded. Полный env wiring — отдельно от фикса «DB в тексте CH query».
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] Mass CH SQL qualification / unqualify strategy
+  source: explore + owner park (2026-07-31)
+  reason: oversized | owner_park
+  notes: Не трогать все CH readers в этом change. После фикса текущего класса багов — отдельная волна + возможно ADL.
+
+- [ ] [deferred-from:fix-bug-with-remove-ch-db-name-from-queries] Reusable ADL: CH DB qualification policy
+  source: explore Architecture Decision Missing (2026-07-31)
+  reason: out_of_current_mvp
+  notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.
+
+Окончательно выпилить opsx-admin-command-commit.md
+
+
+
+БАГ: Идут списания даже если бот не активен
+
+## Tech debt — v3-only predeploy + admin orphan cabinets (2026-08-22)
+
+Parked по запросу Owner после prod gate `bot_active=FALSE` (Q1) и диагностики
+`NoResultFound` при входе админа по shop UUID.
+
+- [ ] [deferred-from:v3-only-retire-v2] Admin: graceful handling orphan `wbcabinet` без `wbusercabinet`
+  source: prod incident 2026-08-22; `get_shop_for_admin.py` → `ShopMenu._load_all_data` scalar_one
+  reason: out_of_current_mvp | owner_park
+  notes: |
+    При вводе shop UUID админом join `wbusercabinet` пуст → `wb_user_cabinet_original_id=None`
+    → `WHERE WBUserCabinet.id IS NULL` → `sqlalchemy.exc.NoResultFound`.
+    Затронутые prod shop_id (orphan cabinet, нет wbusercabinet):
+    `5b54d6f5-9e1f-493b-adef-70b5ebc0e749` (cabinet 2783),
+    `cd6d778c-a91b-4f76-9f99-5b59b7d824d9` (2785),
+    `cd808ed4-abcd-4a3b-8146-13da12e143a3` (2784),
+    `b1cb6d81-cde6-4de2-ba4e-ca9b65ec0b20` (2786).
+    Варианты: (A) код — понятное сообщение / admin path через `WBCabinet` напрямую;
+    (B) данные — создать `wbusercabinet` для test_indiv_bot кабинетов.
+    Entry: `/opsx-fix-bug` (product), не devops.
+
+- [ ] [deferred-from:v3-only-retire-v2] Prod data audit: orphan `wbcabinet` без `wbusercabinet`
+  source: `/opsx-devops` INVESTIGATE 2026-08-22
+  reason: owner_park
+  notes: |
+    SQL: `SELECT c.id, c.shop_id FROM wbcabinet c LEFT JOIN wbusercabinet u ON u.wb_cabinet_id=c.id WHERE u.id IS NULL`.
+    Решить: починить связи или пометить тестовые кабинеты; не блокирует v3 deploy после Q1 gate.
+
+- [ ] [deferred-from:v3-only-retire-v2] Spec/decision drift: `automatic_version` / V2 toggle → `bot_active` gate
+  source: Bugbot review v3-only cutover; `card-ab-hold-mode` spec + `card-ab-hold-write-path-ownership` decision
+  reason: out_of_current_mvp | owner_park
+  notes: Runtime уже на `is_v3_campaign(bot_active)`; артефакты ещё про `automatic_version`/toggle.
+    После merge: `/opsx-update` change `card-ab-hold-mode` или sync delta specs.
+
+- [ ] [deferred-from:v3-only-retire-v2] Удалить мёртвый пакет `setting_auto_updater_v2/` (INC-V2-DELETE-01)
+  source: `openspec/evolution/v3-only-retire-v2.md`
+  reason: oversized | owner_park
+  notes: Отдельный increment после cutover; на диске остаётся dead code, runtime не импортирует.
+
+- [ ] [deferred-from:v3-only-retire-v2] Cosmetic: дубли gate в `ui_access.py`; переименовать `test_adv_settings_auto_update_v2_contract.py`
+  source: Bugbot review 2026-08-22
+  reason: owner_park
+  notes: Не блокер merge; косметика после v3-only land.
+
+- [ ] [deferred-from:v3-only-retire-v2] Excel roundtrip v6→v7: comms + onboarding для пользователей
+  source: independent control review 2026-08-22; `adv_excel_roundtrip/schema.py` EXCEL_TEMPLATE_VERSION=7
+  reason: out_of_current_mvp | owner_park
+  notes: |
+    Breaking change: колонка `automatic_version` убрана; import жёстко требует v7.
+    Старые v6-файлы не импортируются — не runtime-баг, ops/UX.
+    До/после merge: help-текст / сообщение «пересохраните шаблон из бота»; проверить export уже v7.
+
+- [ ] [deferred-from:v3-only-retire-v2] Rename / clarify `is_v3_campaign(bot_active)` после v3-only
+  source: independent control review 2026-08-22; `v3_status_mode_sync.py`
+  reason: owner_park
+  notes: |
+    Семантика = `bot_active`; имя вводит в заблуждение. Call-site'ы сейчас корректны.
+    Cleanup: rename (e.g. `is_paid_auto_runtime`) + mechanical grep или docstring-only — отдельный мелкий PR.
+
+- [ ] [deferred-from:v3-only-retire-v2] Dead code: V2 else-ветки в emergency stale-stats
+  source: independent control review 2026-08-22; `manager.py` `_apply_stats_stale_emergency`
+  reason: owner_park
+  notes: |
+    `else` без `strategy_mode` недостижим: `handle_stats_stale_emergency` фильтрует `bot_active`.
+    Reduction-only: убрать ветвление, оставить только V3 sync path.
+
+- [ ] [deferred-from:v3-only-retire-v2] DDL: DROP legacy колонки `advsetting.automatic_version`
+  source: independent control review 2026-08-22; `models.py` LEGACY comment
+  reason: oversized | owner_park
+  notes: |
+    Runtime/UI/billing не читает и не пишет; колонка только в ORM до отдельной alembic-миграции.
+    После стабилизации v3-only на prod + audit «нет внешних writers».
