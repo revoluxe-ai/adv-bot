@@ -1,0 +1,25 @@
+.cursor/devops/OPS_STATE.md
+  s_392eaea2781081::t_8986ac348ace90 52-57,59
+  s_392eaea2781081::t_68302834189df0 73
+  s_392eaea2781081::t_167598904c0b9a 94
+  s_392eaea2781081::t_c65e0e0b9befa0 93
+.cursor/devops/LAST.json
+  s_392eaea2781081::t_5dfea3f2d296ea 17,20,33
+  s_392eaea2781081::t_1408a53e18fafd 3,12-16,34,46,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "9bf7855ad2315d1c488a099c86226f76a9ecc220",
+  "prompts": {},
+  "sessions": {
+    "s_392eaea2781081": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fd4321fe-041f-497e-a1b9-55a8627b2fad",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
