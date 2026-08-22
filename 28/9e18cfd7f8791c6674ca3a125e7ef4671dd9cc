@@ -1,0 +1,19 @@
+tests/unit/test_add_auto_update_minus_phrases_migration.py
+  s_3189e63191602f::t_d99abe923003c1 40-44,60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "289e18cfd7f8791c6674ca3a125e7ef4671dd9cc",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
