@@ -69,6 +69,7 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 * Harbor direct push from CI fails on proxy project; rely on pull-through.
 * Next Expand release must update APPLICATION `source_history_hash` (Owner) before acquire with real graph hash.
 * Shop-runner operational noise (`NotFoundActiveAdvCompany`, keywords cache miss) is not schema regression.
+* **2026-08-22 v3 predeploy:** Q1 gate applied (`bot_active=FALSE` for 5 legacy rows). Orphan-cabinet admin `NoResultFound` — tech debt in `DOTO/WORKLOG.md` (not deploy blocker).
 
 ## Action log (append-only summary)
 
@@ -87,3 +88,4 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-16 | CONTROL_DRY_RUN=1 `bb81f827-r1` | PRECONDITION_FAILED: permission denied baseline_registry; no CAS |
 | 2026-08-16 | GO authz_baseline_select | Job `app-db-authz-grant-baseline-select-0816` OK; SELECT+USAGE for release_controller; no CAS |
 | 2026-08-16 | GO safe_prod_release `bb81f827…` CONTROL_DRY_RUN=1 | CONTROL DRY_RUN_OK → migrate skip (e8f9) → CAS all entrypoints → LKG `bb81f827…` |
+| 2026-08-22 | Pre-v3-cutover gate: `advsetting.bot_active=FALSE` where `bot_active=TRUE AND automatic_version!=3` | UPDATE 5 rows (ids 1151716277–1151716280, 201852); Q1 verify 0 rows |
