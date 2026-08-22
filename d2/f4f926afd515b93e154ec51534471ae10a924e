@@ -1,0 +1,21 @@
+tests/unit/client_bot/test_start_pg_seam_handoff.py
+  s_3189e63191602f::t_0ab72bcdcbc576 278-364
+app/client_bot/user_interface/handlers/start/start.py
+  s_3189e63191602f::t_9674980924d710 791
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "d2f4f926afd515b93e154ec51534471ae10a924e",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
