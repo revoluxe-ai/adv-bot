@@ -81,3 +81,81 @@ if callback.message is not None:
 - **Positive Redis cache 1h** — by design: только `"1"`, ≤1 `get_chat_member`/час
   на hot path; после отписки без live-check доступ может держаться до TTL;
   `CheckSubscribe` всегда `force_refresh=True`. Не stale-subscription defect.
+
+---
+
+## FSM / callback ID без повторного ownership — не security bug
+
+**Severity: не баг (review noise) → Low только как hardening**
+
+### Суть (что часто пишут в ревью)
+
+- Handler берёт `last_wb_user_cabinet_original_id` / `wb_user_cabinet_original_id` /
+  `adv_setting_original_id` из **FSM** или **CallbackData** и грузит сущность
+  без явного `User.user_telegram_id == callback.from_user.id`.
+- Пример: `adv_handler` — если в FSM есть `last_wb_user_cabinet_original_id`,
+  ownership не перепроверяется; иначе вызывается
+  `_load_wb_user_cabinet_for_adv_in_session(..., telegram_user_id, ...)`.
+
+Формулировка в ревью: «атакующий подставит чужой id → IDOR».
+
+### Почему это **не** считается багом (Telegram threat model)
+
+| Утверждение ревью | Факт |
+|---|---|
+| «Подделать callback_data в Telegram» | **Нельзя.** При клике бот получает ровно те байты, что были зашиты в `InlineKeyboardButton` при отправке сообщения. |
+| «Записать чужой id в FSM удалённо» | **Нельзя.** FSM (Redis) привязан к `user_id` + `chat_id` этого пользователя; чужой state не доступен через Bot API. |
+| «Угадать id + вызвать handler» | **Нельзя** без кнопки с этим id: `CallbackQuery` приходит только от нажатия inline-кнопки, которую бот уже отправил **этому** чату. |
+
+Итого: классический remote IDOR «подставил чужой PK в callback» **не эксплуатируется**
+обычным клиентом Telegram. Это не P0/P1 security defect.
+
+### Когда это **станет** багом (эскалация)
+
+Поднимать severity, только если в diff есть **дополнительный** фактор:
+
+1. **Write-path** — `UPDATE`/`commit` по id из callback/FSM без owner check
+   (`toggle_*`, `turn_adv_on`, смена настроек чужой РК). Тогда impact реальный,
+   даже если id попал в callback легитимно у другого пользователя из-за бага UI.
+2. **Бот отдал кнопку с чужими id** этому пользователю — баг в построении клавиатуры
+   / утечка id в общий чат, не «дыра в Telegram».
+3. **Не callback entrypoint** — HTTP/admin/script, где id приходит из запроса без
+   auth (не относится к aiogram handler'ам).
+4. **Message handler** принимает сырой id из текста пользователя без проверки.
+
+Read-only открытие меню (`AdvSettingMenu`) по связке adv + cabinet без повторного
+join на `user_telegram_id` — максимум **defense in depth**, не security finding.
+
+### Допустимый слабый сценарий (не IDOR)
+
+- **Stale FSM** — в state остался старый `last_wb_user_cabinet_original_id`, пользователь
+  открыл другую РК; возможна несогласованность UI. Это баг UX/согласованности,
+  не «доступ к чужим данным», если `adv_original_id` всё равно пришёл из своей кнопки.
+
+### Hardening (опционально, не блокер merge)
+
+- Всегда резолвить cabinet через
+  `_load_wb_user_cabinet_for_owner_in_session` / `_load_wb_user_cabinet_for_adv_in_session`
+  с `callback.from_user.id`, FSM использовать только как hint после проверки.
+- Не помечать как **Bug** / **P1** в Bugbot без write-path или факторов эскалации выше.
+
+### Антипаттерн ревью
+
+```text
+# BAD (review)
+«FSM last_wb_user_cabinet_original_id без check → атакующий подделает callback → IDOR»
+```
+
+```text
+# OK (review)
+«Read-path: повторный owner join — hardening / stale FSM. Security: N/A unless write или
+бот выдал чужие id в клавиатуре.»
+```
+
+### Checklist для Bugbot
+
+- [ ] Entrypoint — только `CallbackQuery` от inline-кнопки бота? → подделка data **не** вектор.
+- [ ] Есть `commit` / WB write / смена настроек? → **да**, owner check обязателен — иначе баг.
+- [ ] Только открытие меню / read PG? → не эскалировать до security без факторов выше.
+- [ ] В diff клавиатура отдаёт id без фильтра по текущему user? → **да**, это баг UI/ACL.
+
