@@ -179,6 +179,10 @@ def run_preview(
                 "reason": cls.reason,
                 "cluster_paths": cluster.paths if cluster else [drill_down_path],
                 "cluster_evidence": cluster.evidence if cluster else [],
+                "cluster_member_lanes": cluster.member_lanes if cluster else {},
+                "cluster_authority_homogeneous": (
+                    cluster.authority_homogeneous if cluster else True
+                ),
             }
 
     return PipelineResult(
@@ -601,9 +605,27 @@ def result_to_report(result: PipelineResult) -> dict:
                 if c.resolution_class == ResolutionClass.OWNER_REQUIRED
             ),
         }
+        report["CLASSIFIED_PATHS"] = [
+            {
+                "path": c.path,
+                "lane": c.lane.value,
+                "cluster_id": c.cluster_id,
+                "resolution_class": c.resolution_class.value,
+                "resolution_kind": c.resolution_kind.value,
+                "reason": c.reason,
+            }
+            for c in result.classified
+        ]
     if result.clusters:
         report["CLUSTERS"] = [
-            {"id": c.cluster_id, "lane": c.lane.value, "paths": c.paths, "evidence": c.evidence}
+            {
+                "id": c.cluster_id,
+                "paths": c.paths,
+                "member_lanes": c.member_lanes,
+                "authority_homogeneous": c.authority_homogeneous,
+                "lane": c.lane.value if c.lane is not None else None,
+                "evidence": c.evidence,
+            }
             for c in result.clusters
         ]
     if result.owner_packets:

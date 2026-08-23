@@ -96,6 +96,11 @@ continues into a parent/common repository.
 
 Report field: ``REPO_ROOT`` = resolved worktree path.
 
+Clustering: semantic clusters may link paths across lanes for analysis, but
+``member_lanes`` per path comes from partition authority only. Mixed clusters
+have ``authority_homogeneous=false`` and no authoritative cluster ``lane``;
+GO and writes always use per-path lane.
+
 Provenance (machine-readable):
 
 ```text

@@ -135,11 +135,17 @@ class PartitionedPath:
 
 @dataclass
 class SemanticCluster:
-    """Cluster связанных изменений с evidence."""
+    """Cluster связанных изменений с evidence.
+
+    ``lane`` задан только при ``authority_homogeneous``; для mixed cluster
+    authority берётся из ``member_lanes`` per path, не из cluster lane.
+    """
 
     cluster_id: str
-    lane: AuthorityLane
     paths: list[str]
+    member_lanes: dict[str, str] = field(default_factory=dict)
+    authority_homogeneous: bool = True
+    lane: AuthorityLane | None = None
     evidence: list[str] = field(default_factory=list)
 
 

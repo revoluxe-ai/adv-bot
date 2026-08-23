@@ -512,3 +512,99 @@ def linked_worktree_merge_pair(tmp_path: Path) -> tuple[Path, Path]:
 
     _merge_with_conflicts(linked, main_branch)
     return repo, linked
+
+
+@pytest.fixture
+def billing_mixed_lane_cluster_repo(empty_repo: Path) -> Path:
+    """T1: product billing.py + test_billing.py in one semantic cluster."""
+
+    repo = empty_repo
+    main = _current_branch(repo)
+    billing_dir = repo / "app" / "modules" / "billing"
+    billing_dir.mkdir(parents=True)
+    test_dir = repo / "tests" / "modules" / "billing"
+    test_dir.mkdir(parents=True)
+    (billing_dir / "billing.py").write_text("def charge(): return 1\n", encoding="utf-8")
+    (test_dir / "test_billing.py").write_text(
+        "def test_charge(): assert charge() == 1\n", encoding="utf-8"
+    )
+    commit_all(repo, "billing base")
+
+    _git(repo, "checkout", "-b", "feature")
+    (billing_dir / "billing.py").write_text("def charge(): return 2\n", encoding="utf-8")
+    (test_dir / "test_billing.py").write_text(
+        "def test_charge(): assert charge() == 2\n", encoding="utf-8"
+    )
+    commit_all(repo, "feature billing")
+
+    _git(repo, "checkout", main)
+    (billing_dir / "billing.py").write_text("def charge(): return 3\n", encoding="utf-8")
+    (test_dir / "test_billing.py").write_text(
+        "def test_charge(): assert charge() == 3\n", encoding="utf-8"
+    )
+    commit_all(repo, "main billing")
+
+    _merge_with_conflicts(repo, "feature")
+    return repo
+
+
+@pytest.fixture
+def billing_mixed_lane_cluster_repo(empty_repo: Path) -> Path:
+    """T1/T2: product billing.py + test_billing.py in one semantic cluster."""
+
+    repo = empty_repo
+    main = _current_branch(repo)
+    billing_dir = repo / "app" / "modules" / "billing"
+    billing_dir.mkdir(parents=True)
+    test_dir = repo / "tests" / "modules" / "billing"
+    test_dir.mkdir(parents=True)
+    (billing_dir / "billing.py").write_text("def charge(): return 1\n", encoding="utf-8")
+    (test_dir / "test_billing.py").write_text(
+        "def test_charge(): assert charge() == 1\n", encoding="utf-8"
+    )
+    commit_all(repo, "billing base")
+
+    _git(repo, "checkout", "-b", "feature")
+    (billing_dir / "billing.py").write_text("def charge(): return 2\n", encoding="utf-8")
+    (test_dir / "test_billing.py").write_text(
+        "def test_charge(): assert charge() == 2\n", encoding="utf-8"
+    )
+    commit_all(repo, "feature billing")
+
+    _git(repo, "checkout", main)
+    (billing_dir / "billing.py").write_text("def charge(): return 3\n", encoding="utf-8")
+    (test_dir / "test_billing.py").write_text(
+        "def test_charge(): assert charge() == 3\n", encoding="utf-8"
+    )
+    commit_all(repo, "main billing")
+
+    _merge_with_conflicts(repo, "feature")
+    return repo
+
+
+@pytest.fixture
+def process_product_related_repo(empty_repo: Path) -> Path:
+    """T2: process command conflict alongside product path (mixed scope merge)."""
+
+    repo = empty_repo
+    main = _current_branch(repo)
+    cmd_dir = repo / ".cursor" / "commands"
+    cmd_dir.mkdir(parents=True, exist_ok=True)
+    (cmd_dir / "billing-cmd.md").write_text("billing cmd base\n", encoding="utf-8")
+    billing_dir = repo / "app" / "modules" / "billing"
+    billing_dir.mkdir(parents=True)
+    (billing_dir / "billing.py").write_text("def charge(): return 1\n", encoding="utf-8")
+    commit_all(repo, "process product base")
+
+    _git(repo, "checkout", "-b", "feature")
+    (cmd_dir / "billing-cmd.md").write_text("billing cmd feature\n", encoding="utf-8")
+    (billing_dir / "billing.py").write_text("def charge(): return 2\n", encoding="utf-8")
+    commit_all(repo, "feature process product")
+
+    _git(repo, "checkout", main)
+    (cmd_dir / "billing-cmd.md").write_text("billing cmd main\n", encoding="utf-8")
+    (billing_dir / "billing.py").write_text("def charge(): return 3\n", encoding="utf-8")
+    commit_all(repo, "main process product")
+
+    _merge_with_conflicts(repo, "feature")
+    return repo

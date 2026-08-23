@@ -226,23 +226,32 @@ def aggregate_owner_packets(
 
     packets: list[OwnerDecisionPacket] = []
     for cluster_id, items in by_cluster.items():
-        paths = [i.path for i in items]
-        intents = [i.reason for i in items]
-        options: list[dict[str, str]] = []
+        # Authority-compatible subgroups — mixed lane cluster не один Owner packet
+        by_lane: dict[str, list[ClassifiedConflict]] = {}
         for item in items:
-            for opt in item.owner_options:
-                options.append({"path": item.path, **opt})
-        packets.append(
-            OwnerDecisionPacket(
-                decision_id=hashlib.sha256(
-                    f"{cluster_id}:{','.join(paths)}".encode()
-                ).hexdigest()[:12],
-                cluster_id=cluster_id,
-                paths=paths,
-                conflicting_intents=intents,
-                authority_evidence=[f"class:{i.resolution_class.value}" for i in items],
-                options=options,
-                recommended_option=None,
+            by_lane.setdefault(item.lane.value, []).append(item)
+
+        for lane_key, lane_items in by_lane.items():
+            paths = [i.path for i in lane_items]
+            intents = [i.reason for i in lane_items]
+            options: list[dict[str, str]] = []
+            for item in lane_items:
+                for opt in item.owner_options:
+                    options.append({"path": item.path, **opt})
+            packets.append(
+                OwnerDecisionPacket(
+                    decision_id=hashlib.sha256(
+                        f"{cluster_id}:{lane_key}:{','.join(paths)}".encode()
+                    ).hexdigest()[:12],
+                    cluster_id=cluster_id,
+                    paths=paths,
+                    conflicting_intents=intents,
+                    authority_evidence=[
+                        f"class:{lane_item.resolution_class.value}"
+                        for lane_item in lane_items
+                    ] + [f"lane:{lane_key}"],
+                    options=options,
+                    recommended_option=None,
+                )
             )
-        )
     return packets
