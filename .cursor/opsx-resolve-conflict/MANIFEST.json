@@ -1,0 +1,25 @@
+{
+  "package_id": "OPSX_RESOLVE_CONFLICT_RUNTIME_V1",
+  "version": "1.0.0",
+  "command_version": "1.0.0",
+  "contract_schema_version": "opsx-resolve-conflict/v3",
+  "runtime_entry": "runtime/boot_opsx_conflict.py",
+  "schemas": [
+    "schemas/conflict-manifest.schema.json",
+    "schemas/resolution-ledger.schema.json"
+  ],
+  "modules": [
+    "runtime/opsx_conflict/__init__.py",
+    "runtime/opsx_conflict/models.py",
+    "runtime/opsx_conflict/git_capture.py",
+    "runtime/opsx_conflict/partition.py",
+    "runtime/opsx_conflict/cluster.py",
+    "runtime/opsx_conflict/classify.py",
+    "runtime/opsx_conflict/resolve_text.py",
+    "runtime/opsx_conflict/ledger.py",
+    "runtime/opsx_conflict/verify.py",
+    "runtime/opsx_conflict/process_policy.py",
+    "runtime/opsx_conflict/pipeline.py",
+    "runtime/opsx_conflict/__main__.py"
+  ]
+}

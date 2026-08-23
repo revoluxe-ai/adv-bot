@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConflictManifest",
+  "type": "object",
+  "required": ["operation", "unmerged_paths", "fingerprint"],
+  "properties": {
+    "operation": {
+      "type": "object",
+      "properties": {
+        "operation_type": { "type": "string" },
+        "head_oid": { "type": "string" },
+        "operation_head_oid": { "type": ["string", "null"] },
+        "base_oid": { "type": ["string", "null"] }
+      }
+    },
+    "unmerged_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "kind": { "type": "string" }
+        }
+      }
+    },
+    "auto_merged_paths": { "type": "array", "items": { "type": "string" } },
+    "fingerprint": { "type": "string" }
+  }
+}
