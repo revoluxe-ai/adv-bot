@@ -107,6 +107,11 @@ are reclassified to AUTO_SAFE/AI_SEMANTIC only when per-path evidence proves
 compatibility; residual contradictions stay OWNER_REQUIRED. Policy is not
 blanket keep_ours/keep_theirs and never expands write scope across lanes.
 
+PREVIEW accepts ``--policy-choice POLICY_ID=CHOICE``; choices are validated
+against current ``AUTHORITY_POLICY_PACKETS``, materialized, applied, and
+reflected in ``CLASSIFIED_PATHS`` (``applied_policy_id``). Invalid choices
+fail-closed with ``POLICY_CHOICE_INVALID``.
+
 Provenance (machine-readable):
 
 ```text

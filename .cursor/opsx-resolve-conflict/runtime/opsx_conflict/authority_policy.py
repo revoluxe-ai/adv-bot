@@ -328,13 +328,14 @@ def build_policy_from_owner_choice(
     covered_paths: list[str],
     cluster_ids: list[str | None],
     owner_decision_ref: str,
+    policy_id: str | None = None,
 ) -> AuthorityResolutionPolicy | None:
     """Materialize policy from Owner policy-level choice."""
 
     if choice == "new_synthesis":
         return None
 
-    policy_id = hashlib.sha256(
+    pid = policy_id or hashlib.sha256(
         f"{choice}:{lane.value}:{','.join(sorted(covered_paths))}".encode()
     ).hexdigest()[:16]
 
@@ -345,7 +346,7 @@ def build_policy_from_owner_choice(
         preserved.append("target_contract_authoritative")
 
     return AuthorityResolutionPolicy(
-        policy_id=policy_id,
+        policy_id=pid,
         lane=lane,
         covered_paths=sorted(covered_paths),
         covered_cluster_ids=[c for c in cluster_ids if c],
@@ -428,6 +429,56 @@ def aggregate_authority_policy_packets(
             )
         )
     return packets
+
+
+_SUPPORTED_POLICY_CHOICES = frozenset(
+    {"target_authoritative", "incoming_authoritative", "new_synthesis"}
+)
+
+
+def materialize_policies_from_choices(
+    policy_choices: dict[str, str],
+    policy_packets: list[AuthorityPolicyPacket],
+) -> tuple[list[AuthorityResolutionPolicy], str | None]:
+    """
+    Validate Owner policy choices against current PREVIEW packets.
+
+    Returns materialized policies or fail-closed stop_reason.
+    """
+
+    if not policy_choices:
+        return [], None
+
+    pkt_by_id = {p.policy_id: p for p in policy_packets}
+    resolved: dict[str, str] = {}
+    for pid, choice in policy_choices.items():
+        if not pid or "=" in pid or not choice:
+            return [], f"POLICY_CHOICE_INVALID:malformed:{pid!r}={choice!r}"
+        if pid in resolved and resolved[pid] != choice:
+            return [], f"POLICY_CHOICE_CONFLICT:duplicate:{pid}"
+        resolved[pid] = choice
+
+    policies: list[AuthorityResolutionPolicy] = []
+    for pid, choice in resolved.items():
+        if pid not in pkt_by_id:
+            return [], f"POLICY_CHOICE_INVALID:unknown_policy_id:{pid}"
+        if choice not in _SUPPORTED_POLICY_CHOICES:
+            return [], f"POLICY_CHOICE_INVALID:unsupported_choice:{pid}:{choice}"
+        pkt = pkt_by_id[pid]
+        if choice == "new_synthesis":
+            continue
+        built = build_policy_from_owner_choice(
+            choice=choice,
+            lane=AuthorityLane(pkt.lane),
+            covered_paths=pkt.covered_paths,
+            cluster_ids=[pkt.cluster_id],
+            owner_decision_ref=f"{pid}:{choice}",
+            policy_id=pid,
+        )
+        if built:
+            policies.append(built)
+
+    return policies, None
 
 
 def apply_policies_to_classified(

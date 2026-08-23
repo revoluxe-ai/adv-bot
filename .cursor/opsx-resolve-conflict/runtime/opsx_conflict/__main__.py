@@ -53,7 +53,11 @@ def main(argv: list[str] | None = None) -> int:
     bootstrap_revision = os.environ.get("OPSX_BOOTSTRAP_SOURCE_REVISION", "")
 
     if args.mode == "PREVIEW" or args.mode == "CAPTURE":
-        result = run_preview(repo_root, drill_down_path=args.path)
+        result = run_preview(
+            repo_root,
+            drill_down_path=args.path,
+            owner_policy_choices=policy_choices or None,
+        )
     else:
         result = run_go(
             repo_root,

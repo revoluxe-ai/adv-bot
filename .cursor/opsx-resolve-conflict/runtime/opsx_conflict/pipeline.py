@@ -12,15 +12,8 @@ from typing import Any
 from opsx_conflict.authority_policy import (
     aggregate_authority_policy_packets,
     apply_policies_to_classified,
-    build_policy_from_owner_choice,
     load_approved_policies,
-    save_approved_policies,
-)
-from opsx_conflict.authority_policy import (
-    aggregate_authority_policy_packets,
-    apply_policies_to_classified,
-    build_policy_from_owner_choice,
-    load_approved_policies,
+    materialize_policies_from_choices,
     save_approved_policies,
 )
 from opsx_conflict.classify import aggregate_owner_packets, classify_path
@@ -105,6 +98,7 @@ def run_preview(
     repo_root: Path,
     drill_down_path: str | None = None,
     approved_policies: list | None = None,
+    owner_policy_choices: dict[str, str] | None = None,
 ) -> PipelineResult:
     """PREVIEW / PLAN — whole-operation capture, partition, classify."""
 
@@ -167,8 +161,35 @@ def run_preview(
         )
 
     policies = list(approved_policies or [])
+    policy_choices = dict(owner_policy_choices or {})
+
+    if policy_choices and not policies:
+        preliminary_packets = aggregate_authority_policy_packets(
+            classified, partitions, clusters
+        )
+        new_policies, policy_err = materialize_policies_from_choices(
+            policy_choices, preliminary_packets
+        )
+        if policy_err:
+            return PipelineResult(
+                status="FAILED",
+                stage=PipelineStage.FAILED,
+                manifest=manifest,
+                partitions=partitions,
+                clusters=clusters,
+                classified=classified,
+                fingerprint=manifest.fingerprint,
+                stop_reason=policy_err,
+                runtime_source_revision=runtime_revision,
+                bootstrap_source_revision=bootstrap_revision,
+            )
+        policies.extend(new_policies)
+        if policies:
+            save_approved_policies(repo_root, manifest.fingerprint, policies)
+
     if not policies:
         policies = load_approved_policies(repo_root, manifest.fingerprint)
+
     if policies:
         classified = apply_policies_to_classified(
             classified, partitions, stage_texts, policies
@@ -177,9 +198,9 @@ def run_preview(
     policy_packets = aggregate_authority_policy_packets(
         classified, partitions, clusters
     )
-    policy_covered = {p for pkt in policy_packets for p in pkt.covered_paths}
+    pending_policy_paths = {p for pkt in policy_packets for p in pkt.covered_paths}
     owner_packets = aggregate_owner_packets(
-        classified, clusters, exclude_paths=policy_covered
+        classified, clusters, exclude_paths=pending_policy_paths
     )
     mixed = is_mixed_scope(partitions)
     owner_count = sum(
@@ -252,28 +273,30 @@ def run_go(
     policies = list(authority_policies or [])
     owner_policy_choices = owner_policy_choices or {}
 
-    # Materialize policies from Owner policy-level choices before reclassify
     if owner_policy_choices and not policies:
         probe = run_preview(repo_root)
-        for pkt in probe.authority_policy_packets:
-            choice = owner_policy_choices.get(pkt.policy_id)
-            if not choice:
-                continue
-            if choice == "new_synthesis":
-                continue
-            built = build_policy_from_owner_choice(
-                choice=choice,
-                lane=AuthorityLane(pkt.lane),
-                covered_paths=pkt.covered_paths,
-                cluster_ids=[pkt.cluster_id],
-                owner_decision_ref=f"{pkt.policy_id}:{choice}",
+        if probe.status == "FAILED" and probe.stop_reason:
+            return probe
+        new_policies, policy_err = materialize_policies_from_choices(
+            owner_policy_choices, probe.authority_policy_packets
+        )
+        if policy_err:
+            return PipelineResult(
+                status="FAILED",
+                stage=PipelineStage.FAILED,
+                manifest=probe.manifest,
+                fingerprint=probe.fingerprint,
+                stop_reason=policy_err,
             )
-            if built:
-                policies.append(built)
+        policies.extend(new_policies)
         if policies and probe.fingerprint:
             save_approved_policies(repo_root, probe.fingerprint, policies)
 
-    preview = run_preview(repo_root, approved_policies=policies or None)
+    preview = run_preview(
+        repo_root,
+        approved_policies=policies or None,
+        owner_policy_choices=owner_policy_choices if not policies else None,
+    )
     if preview.status == "STOP_FOR_OWNER":
         return preview
 
