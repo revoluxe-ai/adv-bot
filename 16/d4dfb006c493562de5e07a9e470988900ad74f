@@ -1,0 +1,65 @@
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/pipeline.py
+  s_f3ba9455123935::t_4ecf87f8faff5b 195-210
+  s_f3ba9455123935::t_2060186b9e8bf8 18
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/registry_verify.py
+  s_f3ba9455123935::t_93c541245bc927 1-90
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/semantic_authority.py
+  s_f3ba9455123935::t_b7f97cbc67fbb6 170-173
+.cursor/opsx-resolve-conflict/tests/test_v_hardening.py
+  s_f3ba9455123935::t_7e37dffcced7f6 244
+  s_f3ba9455123935::t_9603f931b1b0d5 67
+  s_f3ba9455123935::t_12d56d7361fd78 260-264
+  s_f3ba9455123935::t_f5c7df5ba9d2ff 1-15,17-18,26-66,68-73,75-77,79-134,136-146,150,186-243,245-259,265
+  s_f3ba9455123935::t_c317413b46c956 16,19-25
+  s_f3ba9455123935::t_5d6b653d1652fa 74
+  s_f3ba9455123935::t_beec940a5888d4 78
+  s_f3ba9455123935::t_b0e24bc3c87418 135,147,149,151-175,177-185
+  s_f3ba9455123935::t_02f1327ed7a3d2 148
+  s_f3ba9455123935::t_d0116eb6d3fea2 176
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/git_capture.py
+  s_f3ba9455123935::t_826c2ac3e527d0 178,204-233
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/authority_policy.py
+  s_f3ba9455123935::t_e472072cd8cafd 167,169
+  s_f3ba9455123935::t_49215eaeefd5c0 559-562
+  s_f3ba9455123935::t_1745786d1af2af 29-30,37-40
+  s_f3ba9455123935::t_a6446d96356e2a 164-165
+  s_f3ba9455123935::t_25fa1a6695ddcb 427,437-446,448,453-454,456,460,474-475,480
+  s_f3ba9455123935::t_d78c4889d2c8ef 142-163
+  s_f3ba9455123935::t_8d1d7d88bfaac9 297-300
+  s_f3ba9455123935::t_35c7ef2966892f 324-339
+  s_f3ba9455123935::t_3b4222c3e4a3f9 524
+  s_f3ba9455123935::t_8324e31c8a771d 41-43
+.cursor/opsx-resolve-conflict/tests/conftest.py
+  s_f3ba9455123935::t_8977a5e6d12faa 674,681,683-684,689
+  s_f3ba9455123935::t_c1ab0a07a9cf01 669-670,829-835
+  s_f3ba9455123935::t_846cf0e7b3ae37 685-688
+  s_f3ba9455123935::t_8b737dc6552e08 675-680,682
+  s_f3ba9455123935::t_06802041fab025 84-85,89-92,94-100,102
+  s_f3ba9455123935::t_cb69ece161b34c 667-668,671-673,690-768,770-773,775-828
+  s_f3ba9455123935::t_79e3c07e8df62f 769,774
+  s_f3ba9455123935::t_65b37ed8a73c3c 12
+  s_f3ba9455123935::t_f6e2a5df0f29ea 59-83,86-88,93,101,103-109
+.cursor/commands/opsx-resolve-conflict.md
+  s_f3ba9455123935::t_dfdf69d1fd6e17 115-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "16d4dfb006c493562de5e07a9e470988900ad74f",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
