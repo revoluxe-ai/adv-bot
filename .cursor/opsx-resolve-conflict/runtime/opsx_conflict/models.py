@@ -244,3 +244,7 @@ class PipelineResult:
     candidate_identity: str = ""
     verification_handoff: dict[str, Any] | None = None
     execution_state: dict[str, Any] | None = None
+    drill_down_path: str | None = None
+    path_detail: dict[str, Any] | None = None
+    runtime_source_revision: str = ""
+    bootstrap_source_revision: str = ""

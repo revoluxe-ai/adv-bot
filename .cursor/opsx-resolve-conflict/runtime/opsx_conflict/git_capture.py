@@ -31,13 +31,17 @@ def _run_git(repo_root: Path, *args: str) -> str:
         cwd=repo_root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
     if result.returncode != 0:
         raise GitCaptureError(
-            f"git {' '.join(args)} failed: {result.stderr.strip() or result.stdout}"
+            f"git {' '.join(args)} failed: {stderr or stdout}"
         )
-    return result.stdout.strip()
+    return stdout
 
 
 def _oid(repo_root: Path, ref: str) -> str | None:

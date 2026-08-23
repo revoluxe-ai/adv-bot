@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 from opsx_conflict.models import AuthorityLane, PartitionedPath, SemanticCluster
 
@@ -38,6 +39,36 @@ def _test_production_pair(path: str, all_paths: set[str]) -> list[str]:
     return cluster
 
 
+def _command_runtime_relations(path: str, all_paths: set[str]) -> list[str]:
+    """Evidence: command ↔ packaged runtime companions."""
+
+    norm = path.replace("\\", "/")
+    related: list[str] = []
+    if norm.startswith(".cursor/commands/") and norm.endswith(".md"):
+        stem = Path(norm).stem
+        for other in all_paths:
+            on = other.replace("\\", "/")
+            if "opsx-resolve-conflict" in on or stem.replace("opsx-", "") in on:
+                related.append(other)
+    if norm.startswith(".cursor/opsx-resolve-conflict/"):
+        for other in all_paths:
+            on = other.replace("\\", "/")
+            if on.startswith(".cursor/commands/") and "resolve-conflict" in on:
+                related.append(other)
+    return related
+
+
+def _spec_relations(path: str, all_paths: set[str]) -> list[str]:
+    norm = path.replace("\\", "/")
+    if not norm.startswith("openspec/"):
+        return []
+    prefix = norm.split("/", 2)[0] + "/" + norm.split("/", 2)[1] if norm.count("/") >= 2 else norm
+    return [
+        p for p in all_paths
+        if p != path and p.replace("\\", "/").startswith(prefix)
+    ]
+
+
 def build_clusters(partitions: list[PartitionedPath]) -> list[SemanticCluster]:
     """CLUSTER: связанные paths в bounded semantic units."""
 
@@ -67,6 +98,14 @@ def build_clusters(partitions: list[PartitionedPath]) -> list[SemanticCluster]:
                 if m in all_paths:
                     members.add(m)
                     evidence.append("test_production_relation")
+
+            for m in _command_runtime_relations(part.path, all_paths):
+                members.add(m)
+                evidence.append("command_runtime_relation")
+
+            for m in _spec_relations(part.path, all_paths):
+                members.add(m)
+                evidence.append("spec_proximity")
 
             paths_sorted = sorted(members)
             cid = _cluster_key(lane, paths_sorted)

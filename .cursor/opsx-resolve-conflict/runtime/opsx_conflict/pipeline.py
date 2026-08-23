@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -86,8 +87,14 @@ def _collect_stage_texts(repo_root: Path, partitions) -> dict[str, tuple[str | N
     return texts
 
 
-def run_preview(repo_root: Path) -> PipelineResult:
+def run_preview(
+    repo_root: Path,
+    drill_down_path: str | None = None,
+) -> PipelineResult:
     """PREVIEW / PLAN — whole-operation capture, partition, classify."""
+
+    runtime_revision = os.environ.get("OPSX_RESOLVER_RUNTIME_SOURCE_REVISION", "")
+    bootstrap_revision = os.environ.get("OPSX_BOOTSTRAP_SOURCE_REVISION", "")
 
     try:
         manifest = capture_operation(repo_root)
@@ -96,9 +103,24 @@ def run_preview(repo_root: Path) -> PipelineResult:
             status="STOP_FOR_OWNER",
             stage=PipelineStage.FAILED,
             stop_reason=exc.reason,
+            runtime_source_revision=runtime_revision,
+            bootstrap_source_revision=bootstrap_revision,
         )
 
     partitions = partition_manifest(manifest, repo_root)
+    unmerged_set = {p.path for p in partitions}
+
+    if drill_down_path and drill_down_path not in unmerged_set:
+        return PipelineResult(
+            status="STOP_FOR_OWNER",
+            stage=PipelineStage.FAILED,
+            manifest=manifest,
+            stop_reason=f"drill_down_path_not_unmerged:{drill_down_path}",
+            fingerprint=manifest.fingerprint,
+            runtime_source_revision=runtime_revision,
+            bootstrap_source_revision=bootstrap_revision,
+        )
+
     clusters = build_clusters(partitions)
     stage_texts = _collect_stage_texts(repo_root, partitions)
 
@@ -140,6 +162,25 @@ def run_preview(repo_root: Path) -> PipelineResult:
     if owner_count:
         stage = PipelineStage.PAUSED
 
+    path_detail: dict[str, Any] | None = None
+    if drill_down_path:
+        part = next((p for p in partitions if p.path == drill_down_path), None)
+        cls = next((c for c in classified if c.path == drill_down_path), None)
+        cluster = next((c for c in clusters if drill_down_path in c.paths), None)
+        if part and cls:
+            path_detail = {
+                "path": drill_down_path,
+                "lane": part.lane.value,
+                "inventory": part.inventory_class,
+                "conflict_kind": part.unmerged.kind.value,
+                "cluster_id": cls.cluster_id,
+                "resolution_class": cls.resolution_class.value,
+                "resolution_kind": cls.resolution_kind.value,
+                "reason": cls.reason,
+                "cluster_paths": cluster.paths if cluster else [drill_down_path],
+                "cluster_evidence": cluster.evidence if cluster else [],
+            }
+
     return PipelineResult(
         status=status,
         stage=stage,
@@ -150,6 +191,10 @@ def run_preview(repo_root: Path) -> PipelineResult:
         owner_packets=owner_packets,
         fingerprint=manifest.fingerprint,
         stop_reason="mixed_scope_partitioned" if mixed else None,
+        drill_down_path=drill_down_path,
+        path_detail=path_detail,
+        runtime_source_revision=runtime_revision,
+        bootstrap_source_revision=bootstrap_revision,
     )
 
 
@@ -506,6 +551,8 @@ def result_to_report(result: PipelineResult) -> dict:
         "STAGED_PATHS": result.staged_paths,
         "RUN_ID": result.run_id,
         "CANDIDATE_IDENTITY": result.candidate_identity,
+        "RUNTIME_SOURCE_REVISION": result.runtime_source_revision,
+        "BOOTSTRAP_SOURCE_REVISION": result.bootstrap_source_revision,
         "GO_CAPABILITY": True,
         "GIT_CONTINUE": "FORBIDDEN",
         "RESOLVED_CLAIMED": "YES" if result.status in (
@@ -514,6 +561,10 @@ def result_to_report(result: PipelineResult) -> dict:
         ) else "NO",
         "VERIFIED_CLAIMED": "YES" if result.status == "VERIFIED_READY_FOR_CONTINUE" else "NO",
     }
+    if result.drill_down_path:
+        report["DRILL_DOWN_PATH"] = result.drill_down_path
+    if result.path_detail:
+        report["PATH_DETAIL"] = result.path_detail
     if result.verification_handoff:
         report["VERIFICATION_HANDOFF"] = result.verification_handoff
     if result.execution_state:
