@@ -213,10 +213,13 @@ def classify_all(
 def aggregate_owner_packets(
     classified: list[ClassifiedConflict],
     clusters: list[SemanticCluster],
+    exclude_paths: set[str] | None = None,
 ) -> list[OwnerDecisionPacket]:
-    """OWNER aggregation — один packet на cluster/decision type."""
+    """OWNER aggregation — residual per-path gates, not policy-covered paths."""
 
     owner_items = [c for c in classified if c.resolution_class == ResolutionClass.OWNER_REQUIRED]
+    if exclude_paths:
+        owner_items = [c for c in owner_items if c.path not in exclude_paths]
     if not owner_items:
         return []
 

@@ -165,6 +165,8 @@ class ClassifiedConflict:
     side_a_intent_refs: list[str] = field(default_factory=list)
     side_b_intent_refs: list[str] = field(default_factory=list)
     preserved_invariants: list[str] = field(default_factory=list)
+    applied_policy_id: str | None = None
+    policy_compatibility_reason: str = ""
 
 
 @dataclass
@@ -191,6 +193,8 @@ class ResolutionLedgerEntry:
     preserved_invariants: list[str] = field(default_factory=list)
     reason_not_new_decision: str = ""
     verification_requirements: list[str] = field(default_factory=list)
+    policy_id: str | None = None
+    policy_compatibility_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -214,6 +218,8 @@ class ResolutionLedgerEntry:
             "preserved_invariants": self.preserved_invariants,
             "reason_not_new_decision": self.reason_not_new_decision,
             "verification_requirements": self.verification_requirements,
+            "policy_id": self.policy_id,
+            "policy_compatibility_reason": self.policy_compatibility_reason,
         }
 
 
@@ -243,6 +249,8 @@ class PipelineResult:
     classified: list[ClassifiedConflict] = field(default_factory=list)
     ledger: list[ResolutionLedgerEntry] = field(default_factory=list)
     owner_packets: list[OwnerDecisionPacket] = field(default_factory=list)
+    authority_policy_packets: list[Any] = field(default_factory=list)
+    approved_policies: list[Any] = field(default_factory=list)
     stop_reason: str | None = None
     fingerprint: str = ""
     staged_paths: list[str] = field(default_factory=list)

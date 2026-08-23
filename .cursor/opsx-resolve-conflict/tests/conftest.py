@@ -549,62 +549,66 @@ def billing_mixed_lane_cluster_repo(empty_repo: Path) -> Path:
 
 
 @pytest.fixture
-def billing_mixed_lane_cluster_repo(empty_repo: Path) -> Path:
-    """T1/T2: product billing.py + test_billing.py in one semantic cluster."""
+def process_authority_policy_repo(empty_repo: Path) -> Path:
+    """U: 8+ process conflicts + product path for authority policy synthesis."""
 
     repo = empty_repo
     main = _current_branch(repo)
-    billing_dir = repo / "app" / "modules" / "billing"
-    billing_dir.mkdir(parents=True)
-    test_dir = repo / "tests" / "modules" / "billing"
-    test_dir.mkdir(parents=True)
-    (billing_dir / "billing.py").write_text("def charge(): return 1\n", encoding="utf-8")
-    (test_dir / "test_billing.py").write_text(
-        "def test_charge(): assert charge() == 1\n", encoding="utf-8"
-    )
-    commit_all(repo, "billing base")
+    cmd = repo / ".cursor" / "commands"
+    cmd.mkdir(parents=True, exist_ok=True)
+    names = [
+        "opsx-alpha.md",
+        "opsx-beta.md",
+        "opsx-gamma.md",
+        "opsx-delta.md",
+        "opsx-epsilon.md",
+        "opsx-zeta.md",
+        "opsx-eta.md",
+        "opsx-theta.md",
+        "opsx-residual.md",
+    ]
+    for name in names:
+        (cmd / name).write_text(
+            f"# STATUS: DRAFT\n# OWNER: process\nbase {name}\n",
+            encoding="utf-8",
+        )
+    app = repo / "app"
+    app.mkdir(parents=True, exist_ok=True)
+    (app / "module.py").write_text("def foo(): return 1\n", encoding="utf-8")
+    commit_all(repo, "u base")
 
     _git(repo, "checkout", "-b", "feature")
-    (billing_dir / "billing.py").write_text("def charge(): return 2\n", encoding="utf-8")
-    (test_dir / "test_billing.py").write_text(
-        "def test_charge(): assert charge() == 2\n", encoding="utf-8"
+    for name in names[:-1]:
+        (cmd / name).write_text(
+            f"# STATUS: DRAFT\n# OWNER: process\nbase {name}\n"
+            f"# INCOMING_COMPAT: additive-{name}\n"
+            f"# OBSOLETE_CONTRACT: old-{name}\n",
+            encoding="utf-8",
+        )
+    (cmd / "opsx-residual.md").write_text(
+        "# STATUS: DRAFT\n# OWNER: process\nbase opsx-residual.md\n"
+        "# ARCHITECTURE_CHOICE: incoming-new-arch\n",
+        encoding="utf-8",
     )
-    commit_all(repo, "feature billing")
+    (app / "module.py").write_text("def foo(): return 2\n", encoding="utf-8")
+    commit_all(repo, "feature u")
 
     _git(repo, "checkout", main)
-    (billing_dir / "billing.py").write_text("def charge(): return 3\n", encoding="utf-8")
-    (test_dir / "test_billing.py").write_text(
-        "def test_charge(): assert charge() == 3\n", encoding="utf-8"
+    for name in names[:-1]:
+        (cmd / name).write_text(
+            f"# STATUS: APPROVED\n# OWNER: process\n"
+            f"# GATE: target-contract\nbase {name}\n"
+            f"# TARGET_CONTRACT: v2-{name}\n",
+            encoding="utf-8",
+        )
+    (cmd / "opsx-residual.md").write_text(
+        "# STATUS: APPROVED\n# OWNER: process\n"
+        "# GATE: target-contract\nbase opsx-residual.md\n"
+        "# ARCHITECTURE_CHOICE: target-stable-arch\n",
+        encoding="utf-8",
     )
-    commit_all(repo, "main billing")
-
-    _merge_with_conflicts(repo, "feature")
-    return repo
-
-
-@pytest.fixture
-def process_product_related_repo(empty_repo: Path) -> Path:
-    """T2: process command conflict alongside product path (mixed scope merge)."""
-
-    repo = empty_repo
-    main = _current_branch(repo)
-    cmd_dir = repo / ".cursor" / "commands"
-    cmd_dir.mkdir(parents=True, exist_ok=True)
-    (cmd_dir / "billing-cmd.md").write_text("billing cmd base\n", encoding="utf-8")
-    billing_dir = repo / "app" / "modules" / "billing"
-    billing_dir.mkdir(parents=True)
-    (billing_dir / "billing.py").write_text("def charge(): return 1\n", encoding="utf-8")
-    commit_all(repo, "process product base")
-
-    _git(repo, "checkout", "-b", "feature")
-    (cmd_dir / "billing-cmd.md").write_text("billing cmd feature\n", encoding="utf-8")
-    (billing_dir / "billing.py").write_text("def charge(): return 2\n", encoding="utf-8")
-    commit_all(repo, "feature process product")
-
-    _git(repo, "checkout", main)
-    (cmd_dir / "billing-cmd.md").write_text("billing cmd main\n", encoding="utf-8")
-    (billing_dir / "billing.py").write_text("def charge(): return 3\n", encoding="utf-8")
-    commit_all(repo, "main process product")
+    (app / "module.py").write_text("def foo(): return 3\n", encoding="utf-8")
+    commit_all(repo, "main u")
 
     _merge_with_conflicts(repo, "feature")
     return repo

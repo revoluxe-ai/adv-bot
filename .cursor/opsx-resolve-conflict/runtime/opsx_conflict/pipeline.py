@@ -9,6 +9,20 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from opsx_conflict.authority_policy import (
+    aggregate_authority_policy_packets,
+    apply_policies_to_classified,
+    build_policy_from_owner_choice,
+    load_approved_policies,
+    save_approved_policies,
+)
+from opsx_conflict.authority_policy import (
+    aggregate_authority_policy_packets,
+    apply_policies_to_classified,
+    build_policy_from_owner_choice,
+    load_approved_policies,
+    save_approved_policies,
+)
 from opsx_conflict.classify import aggregate_owner_packets, classify_path
 from opsx_conflict.cluster import build_clusters
 from opsx_conflict.execution_state import ExecutionRunState, load_execution_state, save_execution_state
@@ -90,6 +104,7 @@ def _collect_stage_texts(repo_root: Path, partitions) -> dict[str, tuple[str | N
 def run_preview(
     repo_root: Path,
     drill_down_path: str | None = None,
+    approved_policies: list | None = None,
 ) -> PipelineResult:
     """PREVIEW / PLAN — whole-operation capture, partition, classify."""
 
@@ -151,7 +166,21 @@ def run_preview(
             )
         )
 
-    owner_packets = aggregate_owner_packets(classified, clusters)
+    policies = list(approved_policies or [])
+    if not policies:
+        policies = load_approved_policies(repo_root, manifest.fingerprint)
+    if policies:
+        classified = apply_policies_to_classified(
+            classified, partitions, stage_texts, policies
+        )
+
+    policy_packets = aggregate_authority_policy_packets(
+        classified, partitions, clusters
+    )
+    policy_covered = {p for pkt in policy_packets for p in pkt.covered_paths}
+    owner_packets = aggregate_owner_packets(
+        classified, clusters, exclude_paths=policy_covered
+    )
     mixed = is_mixed_scope(partitions)
     owner_count = sum(
         1 for c in classified if c.resolution_class == ResolutionClass.OWNER_REQUIRED
@@ -159,7 +188,7 @@ def run_preview(
 
     status = "PREVIEW_READY"
     stage = PipelineStage.CLASSIFY
-    if owner_count:
+    if owner_count or policy_packets:
         stage = PipelineStage.PAUSED
 
     path_detail: dict[str, Any] | None = None
@@ -183,6 +212,8 @@ def run_preview(
                 "cluster_authority_homogeneous": (
                     cluster.authority_homogeneous if cluster else True
                 ),
+                "applied_policy_id": cls.applied_policy_id,
+                "policy_compatibility_reason": cls.policy_compatibility_reason,
             }
 
     return PipelineResult(
@@ -193,6 +224,8 @@ def run_preview(
         clusters=clusters,
         classified=classified,
         owner_packets=owner_packets,
+        authority_policy_packets=policy_packets,
+        approved_policies=policies,
         fingerprint=manifest.fingerprint,
         stop_reason="mixed_scope_partitioned" if mixed else None,
         drill_down_path=drill_down_path,
@@ -211,10 +244,36 @@ def run_go(
     write_fault_at_path: str | None = None,
     resume_run_id: str | None = None,
     verification_evidence: dict[str, Any] | None = None,
+    authority_policies: list | None = None,
+    owner_policy_choices: dict[str, str] | None = None,
 ) -> PipelineResult:
     """GO — resolve, stage candidate, terminal gate with verification handoff."""
 
-    preview = run_preview(repo_root)
+    policies = list(authority_policies or [])
+    owner_policy_choices = owner_policy_choices or {}
+
+    # Materialize policies from Owner policy-level choices before reclassify
+    if owner_policy_choices and not policies:
+        probe = run_preview(repo_root)
+        for pkt in probe.authority_policy_packets:
+            choice = owner_policy_choices.get(pkt.policy_id)
+            if not choice:
+                continue
+            if choice == "new_synthesis":
+                continue
+            built = build_policy_from_owner_choice(
+                choice=choice,
+                lane=AuthorityLane(pkt.lane),
+                covered_paths=pkt.covered_paths,
+                cluster_ids=[pkt.cluster_id],
+                owner_decision_ref=f"{pkt.policy_id}:{choice}",
+            )
+            if built:
+                policies.append(built)
+        if policies and probe.fingerprint:
+            save_approved_policies(repo_root, probe.fingerprint, policies)
+
+    preview = run_preview(repo_root, approved_policies=policies or None)
     if preview.status == "STOP_FOR_OWNER":
         return preview
 
@@ -364,7 +423,10 @@ def run_go(
         reason_not_new = ""
         ver_req: list[str] = []
 
-        if item.resolution_class == ResolutionClass.AI_SEMANTIC:
+        if (
+            item.resolution_class == ResolutionClass.AI_SEMANTIC
+            and not item.applied_policy_id
+        ):
             auth_eval = evaluate_ai_semantic_authority(
                 part, side_a, side_b, base, repo_root
             )
@@ -374,6 +436,12 @@ def run_go(
             preserved = auth_eval.preserved_invariants
             reason_not_new = auth_eval.reason_not_new_decision
             ver_req = auth_eval.verification_requirements
+        elif item.applied_policy_id:
+            reason_not_new = item.policy_compatibility_reason
+            ver_req = [
+                "resolution:bound:per_path",
+                "candidate:bound:post_resolution",
+            ]
 
         entry = ResolutionLedgerEntry(
             conflict_id=item.conflict_id,
@@ -394,8 +462,10 @@ def run_go(
             side_a_intent_refs=sa_intent,
             side_b_intent_refs=sb_intent,
             preserved_invariants=preserved,
-            reason_not_new_decision=reason_not_new,
+            reason_not_new_decision=reason_not_new or item.policy_compatibility_reason,
             verification_requirements=ver_req,
+            policy_id=item.applied_policy_id,
+            policy_compatibility_reason=item.policy_compatibility_reason,
         )
         ledger_entries.append(entry)
         resolved_paths.append(item.path)
@@ -613,6 +683,8 @@ def result_to_report(result: PipelineResult) -> dict:
                 "resolution_class": c.resolution_class.value,
                 "resolution_kind": c.resolution_kind.value,
                 "reason": c.reason,
+                "applied_policy_id": c.applied_policy_id,
+                "policy_compatibility_reason": c.policy_compatibility_reason,
             }
             for c in result.classified
         ]
@@ -627,6 +699,16 @@ def result_to_report(result: PipelineResult) -> dict:
                 "evidence": c.evidence,
             }
             for c in result.clusters
+        ]
+    if result.authority_policy_packets:
+        report["AUTHORITY_POLICY_PACKETS"] = [
+            p.to_dict() if hasattr(p, "to_dict") else p
+            for p in result.authority_policy_packets
+        ]
+    if result.approved_policies:
+        report["APPROVED_POLICIES"] = [
+            p.to_dict() if hasattr(p, "to_dict") else p
+            for p in result.approved_policies
         ]
     if result.owner_packets:
         report["OWNER_DECISION_PACKETS"] = [

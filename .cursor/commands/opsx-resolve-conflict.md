@@ -101,6 +101,12 @@ Clustering: semantic clusters may link paths across lanes for analysis, but
 have ``authority_homogeneous=false`` and no authoritative cluster ``lane``;
 GO and writes always use per-path lane.
 
+Authority policy: Owner may approve a bounded ``AUTHORITY_POLICY`` (e.g.
+TARGET contract authoritative) over compatible process paths. Covered paths
+are reclassified to AUTO_SAFE/AI_SEMANTIC only when per-path evidence proves
+compatibility; residual contradictions stay OWNER_REQUIRED. Policy is not
+blanket keep_ours/keep_theirs and never expands write scope across lanes.
+
 Provenance (machine-readable):
 
 ```text

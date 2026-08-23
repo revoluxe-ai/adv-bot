@@ -25,6 +25,13 @@ def main(argv: list[str] | None = None) -> int:
         metavar="PATH=CHOICE",
         help="Owner decision for path",
     )
+    parser.add_argument(
+        "--policy-choice",
+        action="append",
+        dest="policy_choices",
+        metavar="POLICY_ID=CHOICE",
+        help="Owner authority policy choice (target_authoritative|incoming_authoritative|new_synthesis)",
+    )
     parser.add_argument("--json", action="store_true", help="JSON output")
     args = parser.parse_args(argv)
 
@@ -35,6 +42,12 @@ def main(argv: list[str] | None = None) -> int:
             if "=" in item:
                 path, choice = item.split("=", 1)
                 owner_choices[path] = choice
+    policy_choices: dict[str, str] = {}
+    if args.policy_choices:
+        for item in args.policy_choices:
+            if "=" in item:
+                pid, choice = item.split("=", 1)
+                policy_choices[pid] = choice
 
     runtime_revision = os.environ.get("OPSX_RESOLVER_RUNTIME_SOURCE_REVISION", "")
     bootstrap_revision = os.environ.get("OPSX_BOOTSTRAP_SOURCE_REVISION", "")
@@ -46,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
             repo_root,
             frozen_fingerprint=args.fingerprint,
             owner_choices=owner_choices,
+            owner_policy_choices=policy_choices or None,
             lanes=args.lanes,
         )
         if not result.runtime_source_revision:

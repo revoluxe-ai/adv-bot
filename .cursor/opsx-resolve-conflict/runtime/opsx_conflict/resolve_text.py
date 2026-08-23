@@ -6,6 +6,7 @@ import hashlib
 import re
 from pathlib import Path
 
+from opsx_conflict.authority_policy import synthesize_under_target_authority
 from opsx_conflict.models import (
     ClassifiedConflict,
     ResolutionClass,
@@ -108,6 +109,12 @@ def resolve_text(
         return side_a or side_b, ResolutionKind.KEEP_SIDE_A
 
     if classified.resolution_class == ResolutionClass.AI_SEMANTIC:
+        if classified.applied_policy_id and classified.reason.startswith("policy_target"):
+            if side_a and side_b:
+                return (
+                    synthesize_under_target_authority(side_a, side_b),
+                    ResolutionKind.SYNTHESIS,
+                )
         if "<<<<<<<" in source:
             resolved = _remove_markers_take_union(source)
             return resolved, ResolutionKind.SYNTHESIS
