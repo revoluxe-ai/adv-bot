@@ -2,29 +2,40 @@
 component_id: opsx.commands.admin_command_resolve_conflicts
 component_version: 0.1.0
 ownership: TARGET_ONLY
-runtime_class: ACTIVE
-canonical_source_body: adapted_target_native
-required_adapters: ["opsx-lite", "poetry-python"]
-local_modification_note: "Inbound KEEP opsx-admin-command-resolve-conflicts OCCURRENCE=338101a410a60445; graph_fingerprint guard conditional on lite target; distinct from opsx-resolve-conflict; game/vue-npm fork skipped"
-local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-WB-ADMIN-RESOLVE-CONFLICTS-01
-newline_normalization: none
-donor_source_id: adv-bot/split-payment-for-adv-without-pay-for-adv-on-pauses
-donor_snapshot_head: db91149ae1d96d1fd85ceae7a405e65c09f0c29b
-donor_occurrence_id: 338101a410a60445
-donor_full_file_hash: e28912724744380639a5b7264ed16d4eac79dda54bd66d71e2b83b7c2722283f
-inbound_packet: .tmp/opsx-inbound/20260816T154500Z/DIFF_PACKET.md
-description: "Plan (READ_ONLY) or apply (GO) semantic git conflict resolution on OPSX allowlist surfaces; finish merge/rebase continue"
+runtime_class: REDIRECT
+canonical_source_body: compatibility_redirect
+local_modification_note: "Compatibility redirect to /opsx-resolve-conflict unified pipeline; process lane policy retained as adapter"
+description: "REDIRECT: use /opsx-resolve-conflict unified pipeline; process lane via --lane=process"
 argument-hint: "GO [optional topic] | ABORT_MERGE GO | ABORT_REBASE GO"
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
 **Contract:** `OPSX-WB-ADMIN-RESOLVE-CONFLICTS-01`  
-**Runtime class:** `ACTIVE`  
+**Runtime class:** `REDIRECT`  
 **Precedence:** This override wins for target paths, write boundary, and bans.
 
-### Purpose (target)
+### Purpose (target) — COMPATIBILITY REDIRECT
+
+**This command redirects to `/opsx-resolve-conflict`** (unified pipeline).
+Process-surface allowlist semantics are implemented as the `process` authority
+lane policy inside `.cursor/opsx-resolve-conflict/runtime/opsx_conflict/process_policy.py`.
+
+For conflict resolution use:
+
+```text
+/opsx-resolve-conflict PREVIEW
+/opsx-resolve-conflict GO --lane=process
+```
+
+Legacy `BLOCKED_MIXED_SCOPE` is **superseded** by authority partition.
+Mixed process + product conflicts partition into lanes; safe lanes proceed
+while Owner-required lanes pause.
+
+Sequencer continuation (`merge|rebase --continue`) remains Owner out-of-band
+after `STATUS: READY_FOR_CONTINUE` from unified pipeline.
+
+### Historical role (retained as policy reference)
 
 Exclusive owner of **git conflict resolution** on OPSX allowlist process surfaces
 in this WB Sky / Poetry Python repo. Plan without `GO`; apply + `git add` +

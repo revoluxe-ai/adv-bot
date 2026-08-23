@@ -1,11 +1,11 @@
 ---
 component_id: opsx.commands.resolve_conflict
-component_version: 0.40.0
+component_version: 1.0.0
 ownership: TARGET_ONLY
-runtime_class: ACTIVE_WITH_LIMITS
-canonical_source_body: none
+runtime_class: ACTIVE
+canonical_source_body: adapted_target_native
 required_adapters: ["opsx-lite", "poetry-python"]
-local_modification_note: "Imported 20260812T232951Z KEEP=opsx-resolve-conflict only; package NOT imported; GO fail-closed until package+trust+sandbox"
+local_modification_note: "Unified pipeline v1 installed; whole-operation capture; authority partition; companion runtime at .cursor/opsx-resolve-conflict/"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
 contract_id: OPSX-WB-RESOLVE-CONFLICT-01
 donor_occurrence_id: c0457cd10cccd552
@@ -15,84 +15,66 @@ donor_package_version: 0.40.0
 newline_normalization: none
 name: /opsx-resolve-conflict
 id: opsx-resolve-conflict
-package_version: 0.40.0
-contract_schema_version: opsx-resolve-conflict/v2
-status: preview_only_package_not_installed
+package_version: 1.0.0
+contract_schema_version: opsx-resolve-conflict/v3
+status: active_unified_pipeline
 author: Cursor
-supported_runner: Cursor Agent (markdown PREVIEW); packaged typed runtime UNAVAILABLE until companion package imported
+supported_runner: Cursor Agent + packaged typed runtime v1
 required_capabilities:
   - Git executable
-  - (GO only) packaged typed runtime under .cursor/opsx-resolve-conflict/
-  - (GO only) Poetry Wave A/B validation via attested sandbox
-  - (GO only) OPSX_CONFLICT_TRUST_DIGEST + OS sandbox runner
-description: "Fail-closed Git conflict resolution with applicable authority, race-safe writes, durable receipts, and mandatory Wave A/B validation."
-argument-hint: "[PREVIEW|GO] [change=<CHANGE_ID>] [store=<STORE_ID>] [--path=<PATH>]"
+  - Packaged typed runtime under .cursor/opsx-resolve-conflict/
+description: "Unified fail-closed Git conflict pipeline: whole-operation capture, authority partition, semantic clustering, bounded autonomous resolution, durable ledger, two-level verification."
+argument-hint: "[PREVIEW|GO|CAPTURE] [--lane=LANE] [--fingerprint=SHA] [--owner-choice=PATH=CHOICE]"
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
 **Contract:** `OPSX-WB-RESOLVE-CONFLICT-01`  
-**Runtime class:** `ACTIVE_WITH_LIMITS`  
+**Runtime class:** `ACTIVE`  
 **Precedence:** This override wins for target paths, write boundary, and capability gates on this WB Sky / Poetry host.
 
-### Target install state (this merge)
+### Target install state (unified pipeline v1)
 
-- Imported: `.cursor/commands/opsx-resolve-conflict.md` only
-- **Not** imported: `.cursor/opsx-resolve-conflict/**` companion package
-- Product writes / sequencer continue / push / rebase mutate: still owned by Git Owner out-of-band
+- Command: `.cursor/commands/opsx-resolve-conflict.md`
+- Runtime: `.cursor/opsx-resolve-conflict/runtime/opsx_conflict/**` (v1 simplified)
+- Entry: `python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py PREVIEW|GO|CAPTURE`
+- Primary public conflict capability; `/opsx-admin-command-resolve-conflicts` redirects here
 
-### Capability remap (do not invent adapters)
+### Pipeline stages (local — not global OPSX State)
+
+```text
+CAPTURE → PARTITION → CLASSIFY → RESOLVE → VERIFY_RESOLUTION → VERIFY_CANDIDATE → READY_FOR_CONTINUE | PAUSED | FAILED
+```
+
+### Capability remap
 
 | Capability | Target status |
 |---|---|
-| Packaged typed runtime (`.cursor/opsx-resolve-conflict/runtime/**`) | **UNAVAILABLE** |
-| `OPSX_CONFLICT_TRUST_DIGEST` / review sidecar | **UNAVAILABLE** |
-| Externally attested OS sandbox runner | **UNAVAILABLE** |
-| Poetry Wave A/B via package allowlist | **UNAVAILABLE** until package + `/opsx-adapt-project` |
-| Markdown PREVIEW (agent read-only analysis) | **ALLOWED** with limits below |
-| Autonomous `GO` writes/staging via typed runtime | **FAIL_CLOSED** |
+| Whole-operation capture + partition | **AVAILABLE** |
+| Mixed-scope partition (no `BLOCKED_MIXED_SCOPE` dead end) | **AVAILABLE** |
+| AUTO_SAFE / AI_SEMANTIC / OWNER_REQUIRED autonomy | **AVAILABLE** (bounded) |
+| Durable resolution ledger | **AVAILABLE** |
+| Typed runtime GO + stage | **AVAILABLE** |
+| Terminal `RESOLVED_PENDING_VERIFICATION` | **AVAILABLE** |
+| Terminal `VERIFIED_READY_FOR_CONTINUE` | **AVAILABLE** (requires verification evidence packet) |
+| `git merge|rebase --continue` | **FORBIDDEN** — Owner continues out-of-band |
+| OS-attested sandbox / Wave A/B mandatory FULL | **OPTIONAL** — via `/opsx-test` after candidate |
+| Push / abort / skip / reset | **FORBIDDEN** |
 
-### Hard gates on this target
+### Hard gates
 
-1. Exact token `GO` **without** installed companion package + trust digest + sandbox →
+1. GO writes only unmerged paths in authorized lanes; scope expansion STOP.
+2. Sequencer continuation is never implicit; `GIT_CONTINUE=FORBIDDEN`.
+3. Evidence before semantic resolution cannot certify post-resolution candidate.
+4. Drift vs frozen fingerprint → `STALE_EXECUTION` / `REPLAN_REQUIRED`.
 
-```text
-STATUS: FAIL_CLOSED
-REASON: PACKAGE_OR_EXECUTION_CAPABILITY_MISSING
-NEXT_ACTION: import package with Owner WRITE_BOUNDARY_EXCEPTION=.cursor/opsx-resolve-conflict/** then /opsx-adapt-project
+### Runtime invocation
+
+```bash
+python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py CAPTURE --json
+python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py PREVIEW --json
+python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py GO --fingerprint=<FP> --json
 ```
-
-2. Do **not** pretend typed runtime executed. Do **not** run arbitrary shell/scripts as a substitute for the package.
-3. Do **not** `git rebase/merge/cherry-pick --continue|--abort|--skip`, push, fetch, or invent product semantics while resolving.
-4. kubectl / production / secrets: **FAIL_CLOSED** (never in scope).
-
-### PREVIEW on this target (ALLOWED)
-
-When `GO` is absent: agent-assisted **read-only** conflict assistant for exactly one unmerged path (R40 path rule retained). May read Git stages / working tree conflict markers, cite evidence, list options, ask Owner questions. Must **not** edit, stage, or continue the sequencer.
-
-### Manual / agent-assisted resolution (package missing — HARD)
-
-On this target the companion package is **not** installed. Treat these as
-mandatory regardless of Owner phrasing such as «apply the recommendation»,
-«semantic merge», or «opt_* GO»:
-
-1. Exact token `GO` **without** packaged runtime → **only** the
-   `FAIL_CLOSED` envelope in **Hard gates** above. It does **not** authorize
-   agent product writes, staging, or a manual substitute for typed GO.
-2. If Owner edits manually after PREVIEW, scope is **exactly one** analyzed
-   unmerged path (`--path` / `CURRENT_CONFLICT.path`). Remove conflict
-   markers and merge semantics only inside that path.
-3. **Forbidden** during manual resolution:
-   - editing `tests/**` or any non-unmerged product path;
-   - patching staged or auto-merged files to green a failing suite;
-   - `git add`, `git rebase --continue`, commit, push;
-   - pytest/pyright repair loops initiated by the agent.
-4. Staged or auto-merged files from the replayed commit (including tests) are
-   **out of scope** unless they themselves are unmerged (`UU`).
-5. If tests fail after the conflicted path is resolved → report
-   `STOP_REASON=POST_RESOLUTION_TEST_FAILURE` and hand off to Owner
-   (`/opsx-test` or a separate fix workflow). **Never** edit tests to fit the
-   resolution.
 
 ---
 
