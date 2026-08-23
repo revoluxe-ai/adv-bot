@@ -175,6 +175,7 @@ def capture_operation(repo_root: Path) -> ConflictManifest:
     )
 
     unmerged: list[UnmergedPath] = []
+    seen_paths: set[str] = set()
     try:
         status_out = _run_git(repo_root, "status", "--porcelain", "-u")
     except GitCaptureError:
@@ -200,6 +201,36 @@ def capture_operation(repo_root: Path) -> ConflictManifest:
                 worktree_has_markers=_has_conflict_markers(worktree),
             )
         )
+        seen_paths.add(path)
+
+    try:
+        ls_unmerged = _run_git(repo_root, "ls-files", "-u")
+    except GitCaptureError:
+        ls_unmerged = ""
+    ls_paths: dict[str, set[int]] = {}
+    for line in ls_unmerged.splitlines():
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        stage = int(parts[2])
+        path = parts[3]
+        ls_paths.setdefault(path, set()).add(stage)
+    for path, stage_set in sorted(ls_paths.items()):
+        if path in seen_paths:
+            continue
+        if not stage_set.intersection({1, 2, 3}):
+            continue
+        worktree = repo_root / path
+        stages = [_stage_blob(repo_root, path, s) for s in (1, 2, 3)]
+        unmerged.append(
+            UnmergedPath(
+                path=path,
+                kind=ConflictKind.BOTH_MODIFIED,
+                stages=stages,
+                worktree_has_markers=_has_conflict_markers(worktree),
+            )
+        )
+        seen_paths.add(path)
 
     auto_merged: list[str] = []
     if op_head:

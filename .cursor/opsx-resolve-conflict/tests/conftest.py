@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 RUNTIME = Path(__file__).resolve().parents[1] / "runtime"
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
@@ -53,6 +54,57 @@ def _merge_with_conflicts(repo: Path, branch: str) -> None:
             output=result.stdout,
             stderr=result.stderr,
         )
+
+
+def _git_hash_object(repo: Path, content: str) -> str:
+    """Write blob and return oid."""
+
+    result = subprocess.run(
+        ["git", "hash-object", "-w", "--stdin"],
+        cwd=repo,
+        input=content,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
+    return (result.stdout or "").strip()
+
+
+def _register_unmerged_file(
+    repo: Path,
+    rel_path: str,
+    base: str,
+    ours: str,
+    theirs: str,
+    merge_label: str = "feature",
+) -> None:
+    """Register path in index as unmerged (stages 1/2/3) with conflict markers."""
+
+    norm = rel_path.replace("\\", "/")
+    _git(repo, "rm", "--cached", "-f", norm, check=False)
+    base_oid = _git_hash_object(repo, base)
+    ours_oid = _git_hash_object(repo, ours)
+    theirs_oid = _git_hash_object(repo, theirs)
+    index_info = (
+        f"100644 {base_oid} 1\t{norm}\n"
+        f"100644 {ours_oid} 2\t{norm}\n"
+        f"100644 {theirs_oid} 3\t{norm}\n"
+    )
+    subprocess.run(
+        ["git", "update-index", "--index-info"],
+        cwd=repo,
+        input=index_info,
+        text=True,
+        encoding="utf-8",
+        check=True,
+    )
+    worktree = repo / norm
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    worktree.write_text(
+        f"<<<<<<< HEAD\n{ours}=======\n{theirs}>>>>>>> {merge_label}\n",
+        encoding="utf-8",
+    )
 
 
 def _current_branch(repo: Path) -> str:
@@ -612,3 +664,172 @@ def process_authority_policy_repo(empty_repo: Path) -> Path:
 
     _merge_with_conflicts(repo, "feature")
     return repo
+
+
+def build_process_lane_residual_repo(repo: Path) -> Path:
+    """V fixture body — callable without pytest fixture wrapper."""
+
+    main = _current_branch(repo)
+
+    sources = repo / ".opsx" / "sources.yaml"
+    sources_data = yaml.safe_load(sources.read_text(encoding="utf-8")) or {}
+    allowlist = list(sources_data.get("allowlist") or [])
+    for entry in (".cursor/pipeline/**", ".cursor/rules/**"):
+        if entry not in allowlist:
+            allowlist.append(entry)
+    sources_data["allowlist"] = allowlist
+    sources.write_text(
+        yaml.dump(sources_data, default_flow_style=False, sort_keys=False),
+        encoding="utf-8",
+    )
+    (repo / ".gitattributes").write_text(
+        ".opsx/registry/*.ndjson merge=binary\n",
+        encoding="utf-8",
+    )
+
+    hop = repo / ".cursor" / "pipeline" / "bug-team" / "runtime"
+    hop.mkdir(parents=True)
+    (hop / "live_task_hop.py").write_text(
+        "# STATUS: APPROVED\n# OWNER: process\ndef hop(): return 1\n",
+        encoding="utf-8",
+    )
+    rules = repo / ".cursor" / "rules"
+    rules.mkdir(parents=True)
+    (rules / "testing-rules.mdc").write_text(
+        "# STATUS: APPROVED\n# GATE: rules\nrules base\n",
+        encoding="utf-8",
+    )
+    adapter = repo / ".opsx" / "adapters" / "poetry-python"
+    adapter.mkdir(parents=True)
+    (adapter / "README.md").write_text(
+        "# STATUS: APPROVED\n# OWNER: adapter\nadapter base\n",
+        encoding="utf-8",
+    )
+    project = repo / ".opsx" / "project"
+    project.mkdir(parents=True)
+    (project / "manual_review.md").write_text(
+        "# STATUS: APPROVED\n# GATE: review\nreview base\n",
+        encoding="utf-8",
+    )
+    shared = repo / ".opsx" / "shared"
+    shared.mkdir(parents=True)
+    (shared / "bootstrap-profile.md").write_text(
+        "# STATUS: APPROVED\n# OWNER: bootstrap\nprofile base\n",
+        encoding="utf-8",
+    )
+    registry = repo / ".opsx" / "registry"
+    registry.mkdir(parents=True)
+    (registry / "command_activation.ndjson").write_text(
+        '{"command":"opsx-alpha","STATUS":"APPROVED"}\n',
+        encoding="utf-8",
+    )
+    (registry / "provenance.ndjson").write_text(
+        '{"event":"boot","STATUS":"APPROVED"}\n',
+        encoding="utf-8",
+    )
+    arch = repo / ".cursor" / "commands"
+    arch.mkdir(parents=True)
+    (arch / "opsx-arch-residual.md").write_text(
+        "# STATUS: APPROVED\n# ARCHITECTURE_CHOICE: target-arch\narch base\n",
+        encoding="utf-8",
+    )
+    (repo / "conftest.py").write_text("def pytest_plugin(): pass\n", encoding="utf-8")
+    doto = repo / "DOTO"
+    doto.mkdir(parents=True)
+    (doto / "WORKLOG.md").write_text("worklog base\n", encoding="utf-8")
+    app = repo / "app"
+    app.mkdir(parents=True)
+    (app / "product.py").write_text("def prod(): return 1\n", encoding="utf-8")
+    del_path = repo / ".opsx" / "to_delete_process.txt"
+    del_path.write_text("on main\n", encoding="utf-8")
+    commit_all(repo, "v base")
+
+    _git(repo, "checkout", "-b", "feature")
+    (hop / "live_task_hop.py").write_text(
+        "# STATUS: DRAFT\n# OWNER: process\n# INCOMING_COMPAT: hop-add\ndef hop(): return 2\n",
+        encoding="utf-8",
+    )
+    (rules / "testing-rules.mdc").write_text(
+        "# STATUS: DRAFT\n# GATE: rules\nrules incoming\n# INCOMING_COMPAT: rules-add\n",
+        encoding="utf-8",
+    )
+    (adapter / "README.md").write_text(
+        "# STATUS: DRAFT\n# OWNER: adapter\nadapter incoming\n# INCOMING_COMPAT: ad-add\n",
+        encoding="utf-8",
+    )
+    (project / "manual_review.md").write_text(
+        "# STATUS: DRAFT\n# GATE: review\nreview incoming\n",
+        encoding="utf-8",
+    )
+    (shared / "bootstrap-profile.md").write_text(
+        "# STATUS: DRAFT\n# OWNER: bootstrap\nprofile incoming\n",
+        encoding="utf-8",
+    )
+    (registry / "command_activation.ndjson").write_text(
+        '{"command":"opsx-alpha","STATUS":"APPROVED"}\n'
+        '{"command":"opsx-beta","STATUS":"INCOMING"}\n',
+        encoding="utf-8",
+    )
+    (registry / "provenance.ndjson").write_text(
+        '{"event":"boot","STATUS":"APPROVED"}\n'
+        '{"event":"merge","STATUS":"INCOMING"}\n',
+        encoding="utf-8",
+    )
+    (arch / "opsx-arch-residual.md").write_text(
+        "# STATUS: DRAFT\n# ARCHITECTURE_CHOICE: incoming-new-arch\narch incoming\n",
+        encoding="utf-8",
+    )
+    (repo / "conftest.py").write_text("def pytest_plugin(): return 2\n", encoding="utf-8")
+    (doto / "WORKLOG.md").write_text("worklog incoming\n", encoding="utf-8")
+    (app / "product.py").write_text("def prod(): return 2\n", encoding="utf-8")
+    del_path.write_text("on feature branch\n", encoding="utf-8")
+    commit_all(repo, "feature v")
+
+    _git(repo, "checkout", main)
+    (hop / "live_task_hop.py").write_text(
+        "# STATUS: APPROVED\n# OWNER: process\n# TARGET_CONTRACT: hop-v2\ndef hop(): return 3\n",
+        encoding="utf-8",
+    )
+    (rules / "testing-rules.mdc").write_text(
+        "# STATUS: APPROVED\n# GATE: rules\nrules target\n# TARGET_CONTRACT: rules-v2\n",
+        encoding="utf-8",
+    )
+    (adapter / "README.md").write_text(
+        "# STATUS: APPROVED\n# OWNER: adapter\nadapter target\n",
+        encoding="utf-8",
+    )
+    (project / "manual_review.md").write_text(
+        "# STATUS: APPROVED\n# GATE: review\nreview target\n",
+        encoding="utf-8",
+    )
+    (shared / "bootstrap-profile.md").write_text(
+        "# STATUS: APPROVED\n# OWNER: bootstrap\nprofile target\n",
+        encoding="utf-8",
+    )
+    (registry / "command_activation.ndjson").write_text(
+        '{"command":"opsx-alpha","STATUS":"APPROVED"}\n',
+        encoding="utf-8",
+    )
+    (registry / "provenance.ndjson").write_text(
+        '{"event":"boot","STATUS":"APPROVED"}\n',
+        encoding="utf-8",
+    )
+    (arch / "opsx-arch-residual.md").write_text(
+        "# STATUS: APPROVED\n# ARCHITECTURE_CHOICE: target-arch\narch target\n",
+        encoding="utf-8",
+    )
+    (repo / "conftest.py").write_text("def pytest_plugin(): return 3\n", encoding="utf-8")
+    (doto / "WORKLOG.md").write_text("worklog target\n", encoding="utf-8")
+    (app / "product.py").write_text("def prod(): return 3\n", encoding="utf-8")
+    del_path.unlink()
+    commit_all(repo, "main v")
+
+    _merge_with_conflicts(repo, "feature")
+    return repo
+
+
+@pytest.fixture
+def process_lane_residual_repo(empty_repo: Path) -> Path:
+    """V: process lane residuals — singleton clusters, registry, hard stops."""
+
+    return build_process_lane_residual_repo(empty_repo)

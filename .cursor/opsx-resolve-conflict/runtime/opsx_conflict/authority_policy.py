@@ -26,9 +26,18 @@ from opsx_conflict.semantic_authority import (
     path_verification_available,
 )
 
+from opsx_conflict.registry_verify import verify_registry_ndjson_synthesis
+
 _POLICY_ELIGIBLE_REASONS = frozenset(
     {
         "authority_token_divergence",
+    }
+)
+
+_POLICY_HARD_STOP_REASONS = frozenset(
+    {
+        "delete_modify_requires_owner",
+        "allowlist_gap",
     }
 )
 
@@ -130,10 +139,34 @@ class PolicyEvalResult:
     compatibility_reason: str = ""
 
 
-def is_policy_eligible(item: ClassifiedConflict, part: PartitionedPath) -> bool:
-    """Path может войти в authority policy packet."""
+def is_policy_hard_stop(item: ClassifiedConflict) -> bool:
+    """Reasons that lane/cluster policy must never absorb."""
 
-    if part.lane != AuthorityLane.PROCESS or part.inventory_class != "A_IN_SCOPE":
+    return item.reason in _POLICY_HARD_STOP_REASONS
+
+
+def validate_policies_for_operation(
+    policies: list[AuthorityResolutionPolicy],
+    partitions: list[PartitionedPath],
+    unmerged_paths: set[str],
+) -> str | None:
+    """Fail-closed if stored/approved policy path set drifted."""
+
+    part_by_path = {p.path: p for p in partitions}
+    for policy in policies:
+        for path in policy.covered_paths:
+            if path not in unmerged_paths:
+                return f"POLICY_STALE:path_not_unmerged:{path}"
+            part = part_by_path.get(path)
+            if part is None or part.lane != policy.lane:
+                return f"POLICY_STALE:lane_mismatch:{path}"
+    return None
+
+
+def is_policy_eligible(item: ClassifiedConflict, part: PartitionedPath) -> bool:
+    """Path может войти в authority policy packet (не hard-stop)."""
+
+    if is_policy_hard_stop(item):
         return False
     if item.resolution_class != ResolutionClass.OWNER_REQUIRED:
         return False
@@ -261,7 +294,10 @@ def evaluate_under_target_policy(
         ver_req.append("resolution:python_syntax_ok")
     ver_req.append("candidate:bound:post_resolution")
 
-    if _is_trivial_textual(side_a, side_b):
+    norm_path = part.path.replace("\\", "/")
+    is_registry_ndjson = norm_path.endswith(".ndjson")
+
+    if _is_trivial_textual(side_a, side_b) and not is_registry_ndjson:
         return PolicyEvalResult(
             resolution_class=ResolutionClass.AUTO_SAFE,
             resolution_kind=ResolutionKind.UNION,
@@ -285,6 +321,22 @@ def evaluate_under_target_policy(
         )
 
     synthesized = synthesize_under_target_authority(side_a, side_b)
+    norm = part.path.replace("\\", "/")
+    if norm.endswith(".ndjson"):
+        reg_ok, reg_refs = verify_registry_ndjson_synthesis(
+            synthesized, side_a, part.path
+        )
+        if not reg_ok:
+            return PolicyEvalResult(
+                resolution_class=ResolutionClass.OWNER_REQUIRED,
+                resolution_kind=ResolutionKind.UNRESOLVED,
+                reason="policy_residual:registry_verification_failed",
+                allowed=False,
+                authority_refs=refs + reg_refs,
+                compatibility_reason="registry_ndjson_verification_failed",
+            )
+        ver_req = ver_req + reg_refs + ["resolution:registry_ndjson_bounded"]
+
     incoming_preserved = any(
         ln.strip()
         for ln in side_b.splitlines()
@@ -372,7 +424,7 @@ def aggregate_authority_policy_packets(
     partitions: list[PartitionedPath],
     clusters: list[SemanticCluster],
 ) -> list[AuthorityPolicyPacket]:
-    """Policy-level Owner questions for compatible process authority domains."""
+    """Policy-level Owner questions — process lane spans multiple clusters."""
 
     part_by_path = {p.path: p for p in partitions}
     eligible: list[ClassifiedConflict] = []
@@ -381,35 +433,31 @@ def aggregate_authority_policy_packets(
         if part and is_policy_eligible(item, part):
             eligible.append(item)
 
-    if len(eligible) < 2:
-        return []
-
-    by_cluster_lane: dict[tuple[str | None, str], list[ClassifiedConflict]] = {}
-    for item in eligible:
-        key = (item.cluster_id, item.lane.value)
-        by_cluster_lane.setdefault(key, []).append(item)
-
     packets: list[AuthorityPolicyPacket] = []
-    for cluster_id, lane_key in sorted(by_cluster_lane.keys(), key=lambda k: (k[1], k[0] or "")):
-        items = by_cluster_lane[(cluster_id, lane_key)]
-        if len(items) < 2:
-            continue
-        paths = sorted({i.path for i in items})
-        reasons = sorted({i.reason for i in items})
+
+    process_items = [
+        i for i in eligible if i.lane == AuthorityLane.PROCESS
+    ]
+    if len(process_items) >= 2:
+        paths = sorted({i.path for i in process_items})
+        cluster_ids = sorted(
+            {i.cluster_id for i in process_items if i.cluster_id}
+        )
+        reasons = sorted({i.reason for i in process_items})
         policy_id = hashlib.sha256(
-            f"policy_packet:{cluster_id}:{lane_key}:{','.join(paths)}".encode()
+            f"policy_packet:lane:process:{','.join(paths)}".encode()
         ).hexdigest()[:16]
         packets.append(
             AuthorityPolicyPacket(
                 policy_id=policy_id,
-                cluster_id=cluster_id,
-                lane=lane_key,
+                cluster_id=None,
+                lane=AuthorityLane.PROCESS.value,
                 covered_paths=paths,
-                question_type="process_authority_conflict",
+                question_type="process_lane_authority_conflict",
                 options=[
                     {
                         "id": "target_authoritative",
-                        "label": "TARGET contract authoritative",
+                        "label": "TARGET process contract authoritative",
                     },
                     {
                         "id": "incoming_authoritative",
@@ -423,11 +471,13 @@ def aggregate_authority_policy_packets(
                 authority_evidence=[
                     "lane:process",
                     "inventory:A_IN_SCOPE",
-                    f"owner_required_count:{len(items)}",
+                    f"owner_required_count:{len(process_items)}",
+                    f"cluster_span:{len(cluster_ids)}",
                 ],
                 conflicting_reasons=reasons,
             )
         )
+
     return packets
 
 
@@ -471,7 +521,7 @@ def materialize_policies_from_choices(
             choice=choice,
             lane=AuthorityLane(pkt.lane),
             covered_paths=pkt.covered_paths,
-            cluster_ids=[pkt.cluster_id],
+            cluster_ids=[pkt.cluster_id] if pkt.cluster_id else [],
             owner_decision_ref=f"{pid}:{choice}",
             policy_id=pid,
         )
@@ -503,6 +553,10 @@ def apply_policies_to_classified(
     for item in classified:
         policy = policy_by_path.get(item.path)
         if not policy or item.resolution_class != ResolutionClass.OWNER_REQUIRED:
+            updated.append(item)
+            continue
+
+        if is_policy_hard_stop(item):
             updated.append(item)
             continue
 

@@ -112,6 +112,19 @@ against current ``AUTHORITY_POLICY_PACKETS``, materialized, applied, and
 reflected in ``CLASSIFIED_PATHS`` (``applied_policy_id``). Invalid choices
 fail-closed with ``POLICY_CHOICE_INVALID``.
 
+Process-lane policy (V): one ``process_lane_authority_conflict`` packet may
+cover multiple process paths across different semantic clusters when each path
+is ``lane=process``, in trusted process inventory, shares compatible authority
+divergence (not hard-stop), and does not cross into product/project_config/
+spec_governance. Cluster membership remains grouping only; policy authority is
+per path. Hard stops never absorbed: ``delete_modify_requires_owner``,
+``allowlist_gap``, architecture/business contradictions under policy, stale
+policy fingerprint/path drift (``POLICY_STALE``). Registry ``.ndjson`` under
+``.opsx/registry/`` uses bounded synthesis verification (parseable lines,
+identity-key uniqueness, target keys preserved); trivial-union bypass is
+disabled for ``.ndjson``. ``git ls-files -u`` supplements porcelain discovery
+for unmerged index stages.
+
 Provenance (machine-readable):
 
 ```text

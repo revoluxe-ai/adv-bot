@@ -15,6 +15,7 @@ from opsx_conflict.authority_policy import (
     load_approved_policies,
     materialize_policies_from_choices,
     save_approved_policies,
+    validate_policies_for_operation,
 )
 from opsx_conflict.classify import aggregate_owner_packets, classify_path
 from opsx_conflict.cluster import build_clusters
@@ -191,6 +192,22 @@ def run_preview(
         policies = load_approved_policies(repo_root, manifest.fingerprint)
 
     if policies:
+        stale_err = validate_policies_for_operation(
+            policies, partitions, unmerged_set
+        )
+        if stale_err:
+            return PipelineResult(
+                status="FAILED",
+                stage=PipelineStage.FAILED,
+                manifest=manifest,
+                partitions=partitions,
+                clusters=clusters,
+                classified=classified,
+                fingerprint=manifest.fingerprint,
+                stop_reason=stale_err,
+                runtime_source_revision=runtime_revision,
+                bootstrap_source_revision=bootstrap_revision,
+            )
         classified = apply_policies_to_classified(
             classified, partitions, stage_texts, policies
         )

@@ -167,6 +167,9 @@ def evaluate_ai_semantic_authority(
 def path_verification_available(path: str) -> bool:
     """Bounded verification доступна для path type."""
 
-    if path.endswith((".py", ".md", ".yaml", ".yml", ".json", ".txt")):
+    norm = path.replace("\\", "/")
+    if norm.endswith(
+        (".py", ".md", ".mdc", ".yaml", ".yml", ".json", ".txt", ".ndjson")
+    ):
         return True
     return False
