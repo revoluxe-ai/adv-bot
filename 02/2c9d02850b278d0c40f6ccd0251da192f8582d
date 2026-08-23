@@ -1,0 +1,30 @@
+.opsx/registry/provenance.ndjson
+  s_f3ba9455123935::t_66c492fedb7124 12
+.cursor/commands/opsx-resolve-conflict.md
+  s_f3ba9455123935::t_76d121e3aea18a 33,36,38-41,43,46,49,51-57,60-77
+  s_f3ba9455123935::t_8a2051a759a1bd 58-59
+  s_f3ba9455123935::t_a6ee0c0d8911be 3,5-6,8,18-20,22,25-27
+.opsx/registry/command_activation.ndjson
+  s_f3ba9455123935::t_98116c7f72d70d 32
+  s_f3ba9455123935::t_b8eb3973242129 28
+.cursor/commands/opsx-admin-command-resolve-conflicts.md
+  s_f3ba9455123935::t_713f206cda5d22 18-38
+  s_f3ba9455123935::t_5b38c6757878ff 5-8
+  s_f3ba9455123935::t_2ddb7533c26cdd 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "022c9d02850b278d0c40f6ccd0251da192f8582d",
+  "prompts": {},
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
