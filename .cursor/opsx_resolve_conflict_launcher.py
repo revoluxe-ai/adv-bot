@@ -15,11 +15,37 @@ from pathlib import Path
 BOOTSTRAP_REL = ".opsx/tools/trusted_resolver_boot.py"
 
 
-def _find_repo_root(start: Path) -> Path:
-    for candidate in [start, *start.parents]:
-        if (candidate / ".git").is_dir():
-            return candidate
-    return start
+def _is_git_marker(candidate: Path) -> bool:
+    git_marker = candidate / ".git"
+    return git_marker.is_dir() or git_marker.is_file()
+
+
+def discover_worktree_root(start: Path) -> Path:
+    """Worktree root via git plumbing; stops at linked-worktree `.git` file."""
+
+    resolved_start = start.resolve()
+    for candidate in [resolved_start, *resolved_start.parents]:
+        if not _is_git_marker(candidate):
+            continue
+        result = subprocess.run(
+            ["git", "-C", str(candidate), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if result.returncode != 0 or not (result.stdout or "").strip():
+            raise RuntimeError(
+                f"REPO_ROOT_DISCOVERY_FAILED:git_top_level:{candidate}"
+            )
+        top = Path((result.stdout or "").strip()).resolve()
+        if not top.is_dir():
+            raise RuntimeError(
+                f"REPO_ROOT_DISCOVERY_FAILED:invalid_top_level:{top}"
+            )
+        return top
+    raise RuntimeError("REPO_ROOT_DISCOVERY_FAILED:not_in_git_worktree")
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -48,7 +74,7 @@ def _fail_closed(reason: str, as_json: bool) -> int:
     if as_json:
         print(json.dumps(payload, ensure_ascii=True))
     else:
-        print(f"STATUS: FAILED")
+        print("STATUS: FAILED")
         print(f"STOP_REASON: {reason}")
     return 2
 
@@ -111,7 +137,10 @@ def main() -> int:
             repo_arg = argv[idx + 1]
 
     start = Path(repo_arg).resolve() if repo_arg else Path.cwd()
-    repo_root = _find_repo_root(start)
+    try:
+        repo_root = discover_worktree_root(start)
+    except RuntimeError as exc:
+        return _fail_closed(str(exc), as_json)
 
     try:
         revision = _git(repo_root, "rev-parse", "HEAD")
@@ -120,6 +149,7 @@ def main() -> int:
         return _fail_closed(str(exc), as_json)
 
     os.environ["OPSX_BOOTSTRAP_SOURCE_REVISION"] = revision
+    os.environ["OPSX_RESOLVER_REPO_ROOT"] = str(repo_root)
     return subprocess.call(
         [sys.executable, str(boot_path), *argv],
         cwd=repo_root,

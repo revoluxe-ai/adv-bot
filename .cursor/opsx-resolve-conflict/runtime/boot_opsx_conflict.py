@@ -6,16 +6,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-
-def _find_repo_root(start: Path) -> Path:
-    for candidate in [start, *start.parents]:
-        if (candidate / ".git").is_dir():
-            return candidate
-    return start
+from opsx_conflict.git_repo_root import discover_worktree_root
 
 
 def main() -> int:
-    repo_root = _find_repo_root(Path.cwd())
+    try:
+        repo_root = discover_worktree_root(Path.cwd())
+    except RuntimeError:
+        return 2
+
     launcher = repo_root / ".cursor" / "opsx_resolve_conflict_launcher.py"
     if launcher.is_file():
         return subprocess.call(

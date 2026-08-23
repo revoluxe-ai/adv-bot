@@ -89,6 +89,13 @@ worktree .opsx/tools/** and .cursor/opsx-resolve-conflict/** = target conflict d
 committed HEAD bootstrap + runtime = executable trusted revision
 ```
 
+Root discovery: launcher resolves **current worktree root** via
+``git rev-parse --show-toplevel`` starting from invocation cwd (or ``--repo``).
+Linked worktrees with a ``.git`` **file** are valid boundaries; ascent never
+continues into a parent/common repository.
+
+Report field: ``REPO_ROOT`` = resolved worktree path.
+
 Provenance (machine-readable):
 
 ```text

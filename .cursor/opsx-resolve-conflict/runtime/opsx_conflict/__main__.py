@@ -59,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         result.bootstrap_source_revision = bootstrap_revision
 
     report = result_to_report(result)
+    report["REPO_ROOT"] = str(repo_root.resolve())
     if args.json or args.mode == "CAPTURE":
         print(json.dumps(report, ensure_ascii=True, indent=2))
     else:

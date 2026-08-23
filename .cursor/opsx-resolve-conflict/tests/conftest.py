@@ -61,7 +61,7 @@ def _current_branch(repo: Path) -> str:
 
 def init_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
-    repo.mkdir()
+    repo.mkdir(parents=True, exist_ok=True)
     _git(repo, "init")
     _git(repo, "config", "user.email", "test@test.com")
     _git(repo, "config", "user.name", "test")
@@ -144,12 +144,23 @@ def seed_resolver_runtime_without_bootstrap(repo: Path) -> str:
 def run_trusted_cli(repo: Path, mode: str, extra: list[str] | None = None) -> tuple[int, dict]:
     """Invoke stdlib launcher (HEAD bootstrap materialization) and parse JSON report."""
 
+    return run_launcher_cwd(repo, mode, extra)
+
+
+def run_launcher_cwd(
+    cwd: Path,
+    mode: str,
+    extra: list[str] | None = None,
+) -> tuple[int, dict]:
+    """Invoke launcher from cwd without explicit --repo."""
+
     launcher = WORKSPACE_ROOT / ".cursor" / "opsx_resolve_conflict_launcher.py"
-    cmd = [sys.executable, str(launcher), mode, "--repo", str(repo), "--json"]
+    cmd = [sys.executable, str(launcher), mode, "--json"]
     if extra:
         cmd.extend(extra)
     proc = subprocess.run(
         cmd,
+        cwd=cwd,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -453,3 +464,51 @@ def missing_bootstrap_repo(empty_repo: Path) -> Path:
     repo = empty_repo
     seed_resolver_runtime_without_bootstrap(repo)
     return repo
+
+
+@pytest.fixture
+def normal_resolver_repo(empty_repo: Path) -> Path:
+    """Repository with committed resolver launcher/runtime."""
+
+    seed_resolver_runtime(empty_repo)
+    return empty_repo
+
+
+@pytest.fixture
+def linked_worktree_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """S1: main repo + linked git worktree with resolver package."""
+
+    main = tmp_path / "main-repo"
+    repo = init_repo(main)
+    seed_sources_yaml(repo)
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    commit_all(repo, "init")
+    seed_resolver_runtime(repo)
+    linked = tmp_path / "linked-wt"
+    _git(repo, "worktree", "add", "-b", "wt-feature", str(linked))
+    return repo, linked
+
+
+@pytest.fixture
+def linked_worktree_merge_pair(tmp_path: Path) -> tuple[Path, Path]:
+    """S2: active merge inside linked worktree."""
+
+    main = tmp_path / "main-repo"
+    repo = init_repo(main)
+    seed_sources_yaml(repo)
+    (repo / ".opsx" / "merge_note.txt").write_text("base\n", encoding="utf-8")
+    commit_all(repo, "base")
+    seed_resolver_runtime(repo)
+    linked = tmp_path / "linked-wt"
+    _git(repo, "worktree", "add", "-b", "wt-feature", str(linked))
+    main_branch = _current_branch(repo)
+
+    (linked / ".opsx" / "merge_note.txt").write_text("linked version\n", encoding="utf-8")
+    commit_all(linked, "linked side")
+
+    _git(repo, "checkout", main_branch)
+    (repo / ".opsx" / "merge_note.txt").write_text("main version\n", encoding="utf-8")
+    commit_all(repo, "main side")
+
+    _merge_with_conflicts(linked, main_branch)
+    return repo, linked
