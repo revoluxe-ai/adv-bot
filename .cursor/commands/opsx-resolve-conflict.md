@@ -24,7 +24,7 @@ required_capabilities:
   - Git executable
   - Packaged typed runtime under .cursor/opsx-resolve-conflict/
 description: "Unified fail-closed Git conflict pipeline: whole-operation capture, authority partition, semantic clustering, bounded autonomous resolution, durable ledger, two-level verification."
-argument-hint: "[PREVIEW|GO|CAPTURE] [--lane=LANE] [--fingerprint=SHA] [--owner-choice=PATH=CHOICE]"
+argument-hint: "[PREVIEW|GO|CAPTURE] [--path=PATH] [--lane=LANE] [--fingerprint=SHA] [--owner-choice=PATH=CHOICE]"
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
@@ -37,7 +37,11 @@ argument-hint: "[PREVIEW|GO|CAPTURE] [--lane=LANE] [--fingerprint=SHA] [--owner-
 
 - Command: `.cursor/commands/opsx-resolve-conflict.md`
 - Runtime: `.cursor/opsx-resolve-conflict/runtime/opsx_conflict/**` (v1 simplified)
-- Entry: `python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py PREVIEW|GO|CAPTURE`
+- Entry: `python .cursor/opsx_resolve_conflict_launcher.py PREVIEW|GO|CAPTURE` (stdlib launcher — **no worktree bytes**)
+- Bootstrap cache: materialized from `git show HEAD:.opsx/tools/trusted_resolver_boot.py`
+- Runtime cache: materialized from `git show HEAD:.cursor/opsx-resolve-conflict/runtime/**`
+- Legacy: `python .opsx/tools/trusted_resolver_boot.py` (only via launcher materialization)
+- Legacy: `python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py` (delegates to launcher)
 - Primary public conflict capability; `/opsx-admin-command-resolve-conflicts` redirects here
 
 ### Pipeline stages (local — not global OPSX State)
@@ -70,10 +74,35 @@ CAPTURE → PARTITION → CLASSIFY → RESOLVE → VERIFY_RESOLUTION → VERIFY_
 
 ### Runtime invocation
 
+Trusted bootstrap: stdlib launcher at `.cursor/opsx_resolve_conflict_launcher.py`
+materializes bootstrap from `git show HEAD:.opsx/tools/trusted_resolver_boot.py` into
+``~/.opsx/resolve-conflict/trusted-bootstrap/<revision>/`` — never reads conflicted
+worktree copy.
+
+Trusted runtime: cached bootstrap materializes resolver from the **same** HEAD revision
+into ``~/.opsx/resolve-conflict/trusted-runtime/<revision>/``.
+
+Trust boundary:
+
+```text
+worktree .opsx/tools/** and .cursor/opsx-resolve-conflict/** = target conflict data
+committed HEAD bootstrap + runtime = executable trusted revision
+```
+
+Provenance (machine-readable):
+
+```text
+BOOTSTRAP_SOURCE_REVISION == RUNTIME_SOURCE_REVISION == git rev-parse HEAD
+```
+
+Mismatch or missing committed bootstrap/runtime →
+``EXECUTION_CAPABILITY_OR_COMPATIBILITY_MISSING`` (fail-closed, no worktree fallback).
+
 ```bash
-python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py CAPTURE --json
-python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py PREVIEW --json
-python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py GO --fingerprint=<FP> --json
+python .cursor/opsx_resolve_conflict_launcher.py CAPTURE --json
+python .cursor/opsx_resolve_conflict_launcher.py PREVIEW --json
+python .cursor/opsx_resolve_conflict_launcher.py PREVIEW --path=<optional-drill-down> --json
+python .cursor/opsx_resolve_conflict_launcher.py GO --fingerprint=<FP> --json
 ```
 
 ---
@@ -156,36 +185,24 @@ Parse exact tokens.
 
 Default when `GO` is absent or `PREVIEW` is present.
 
-PREVIEW is a **repository-context conflict assistant** (not an autonomous
-resolver and not a line-diff chooser). It is read-only:
+PREVIEW is a **whole-operation batch analyzer** (read-only):
 
-- analyze **exactly one** conflicted path per invocation (R40);
-- when ``--path`` is omitted and exactly one path is unmerged, analyze that path;
-- when ``--path`` is omitted and multiple paths are unmerged, STOP with
-  ``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`` (envelope lists sorted paths);
-- when ``--path`` is supplied, analyze only that unmerged path;
-- load stage 1/2/3 blobs via the sealed R34 exact Git operation grammar;
-- collect a bounded structured context packet (siblings, callers/usages,
-  tests, accepted decisions/specs) without shell/rg subprocesses;
-- separate FACTS from INTERPRETATIONS; attach evidence IDs;
-- list coherent resolution options and Owner questions;
-- recommend a side **only** when evidence has both a strong
-  `authority_class` **and** `authority_verified=true` (explicit accepted
-  status / canonical current-spec / verified contract / API invariant);
-- path location alone never proves normative authority; draft/proposed/
-  rejected/superseded decisions and change-local specs do not recommend;
-- never recommend `keep_ours`/`keep_theirs` from textual subset alone;
-- never edit, stage, continue, abort, skip, commit, or push;
-- never edit tests or run a pytest repair loop; «Как проверить» lists Owner
-  verification hints only, not agent repair scope.
+- default: capture and classify **all** unmerged paths in the active merge/rebase;
+- optional ``--path`` = drill-down detail for one path inside the same manifest;
+- never require Owner to pick a first path when multiple conflicts exist;
+- load stage 1/2/3 blobs via typed Git capture;
+- partition authority lanes, cluster semantically, classify AUTO_SAFE / AI_SEMANTIC / OWNER_REQUIRED;
+- never edit, stage, continue, abort, skip, commit, or push.
 
-Successful PREVIEW reports bind ``CURRENT_CONFLICT.path``,
-``CONTEXT.paths_analyzed``, reasoning, evidence, and recommendation to the
-selected path only. ``unmerged_paths_inventory`` / ``all_unmerged_paths`` are
-inventory, not analysis coverage.
+Forbidden stop for multi-path default PREVIEW:
 
-Human output leads with Russian behavioral explanation; Git OIDs/hashes are
-secondary evidence below.
+```text
+PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS
+```
+
+``unmerged_paths_inventory`` / ``PATH_INVENTORY`` list all paths; ``--path`` only adds ``PATH_DETAIL`` without shrinking capture scope.
+
+Human output leads with Russian behavioral explanation; Git OIDs/hashes are secondary evidence below.
 
 ### GO
 
