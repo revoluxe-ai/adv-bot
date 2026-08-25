@@ -1,0 +1,20 @@
+scripts/a1_sales_funnel_delta_collect.py
+  s_054c0826814088::t_d1c5a079da73c8 764-768
+  s_054c0826814088::t_24b84c4e55cdf2 905-907
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "b5820f0fbfb8588f7a77410de41964fd86b62cc4",
+  "prompts": {},
+  "sessions": {
+    "s_054c0826814088": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00d46f4f-20e0-4952-a6e4-a938880a88c0",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
