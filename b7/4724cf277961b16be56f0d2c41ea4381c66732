@@ -1,0 +1,22 @@
+tests/unit/auto_bid_module_coexistence/test_shelf_set_bid_stub_contract.py
+  s_361f168515fc7a::t_fb28c8586cf8d6 39-85
+  s_361f168515fc7a::t_0f9f91a146ad0e 10
+tests/modules/wb_adv_updater/test_pbh003_balance_exp_informer_latch_red.py
+  s_361f168515fc7a::t_51e8fa294c9655 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "b74724cf277961b16be56f0d2c41ea4381c66732",
+  "prompts": {},
+  "sessions": {
+    "s_361f168515fc7a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d7c3c0d2-78a6-4a69-9bf1-76bb70862a14",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
