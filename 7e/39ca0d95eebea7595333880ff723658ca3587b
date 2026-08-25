@@ -1,0 +1,20 @@
+app/modules/shop_menu/message.py
+  s_aa2e05f29819a3::t_5d917ec5237990 91
+  s_aa2e05f29819a3::t_324a200ebb0ba0 321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "7e39ca0d95eebea7595333880ff723658ca3587b",
+  "prompts": {},
+  "sessions": {
+    "s_aa2e05f29819a3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "36a344f9-59a6-4ba4-aca3-9584176b5556",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
