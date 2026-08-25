@@ -34,9 +34,12 @@ class _MockSessionMaker:
         return None
 
 
-def _build_callback(chat_id: int = 202) -> SimpleNamespace:
+def _build_callback(chat_id: int = 202, user_id: int = 1001) -> SimpleNamespace:
     """Build a callback object with chat context."""
-    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+    return SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)),
+        from_user=SimpleNamespace(id=user_id),
+    )
 
 
 def _build_callback_data(
@@ -86,7 +89,7 @@ def _build_token_status(*, is_read_only_only: bool) -> TokenStatusReport:
 def _build_session_objects() -> tuple[MagicMock, SimpleNamespace, SimpleNamespace]:
     """Create session and ORM-like objects consumed by the handler."""
     wb_cabinet = SimpleNamespace(id=31, shop_id="shop_77")
-    wb_user_cabinet = SimpleNamespace(id=77, wb_cabinet=wb_cabinet)
+    wb_user_cabinet = SimpleNamespace(id=77, wb_cabinet_id=31, wb_cabinet=wb_cabinet)
     adv = SimpleNamespace(
         id=55,
         bot_active=False,
@@ -100,9 +103,10 @@ def _build_session_objects() -> tuple[MagicMock, SimpleNamespace, SimpleNamespac
     )
 
     result_wb_user_cabinet = MagicMock()
-    result_wb_user_cabinet.scalar_one.return_value = wb_user_cabinet
+    result_wb_user_cabinet.scalar_one_or_none.return_value = wb_user_cabinet
+    result_wb_user_cabinet.unique.return_value = result_wb_user_cabinet
     result_adv = MagicMock()
-    result_adv.scalar_one.return_value = adv
+    result_adv.scalar_one_or_none.return_value = adv
 
     session = MagicMock()
     session.begin = MagicMock()
@@ -321,11 +325,12 @@ async def test_turn_adv_off_applies_free_transition() -> None:
     adv.max_cpm = 1234
 
     wb_user_cabinet_result = MagicMock()
-    wb_user_cabinet_result.scalar.return_value = wb_user_cabinet
-    wb_user_cabinet_result.scalar_one.return_value = wb_user_cabinet
+    wb_user_cabinet_result.scalar_one_or_none.return_value = wb_user_cabinet
+    wb_user_cabinet_result.unique.return_value = wb_user_cabinet_result
     adv_result = MagicMock()
-    adv_result.scalar_one.return_value = adv
     adv_result.scalar_one_or_none.return_value = adv
+    session = MagicMock()
+    session.commit = AsyncMock()
     session.execute = AsyncMock(side_effect=[wb_user_cabinet_result, adv_result])
     adv_menu_call = AsyncMock()
     adv_menu_ctor = MagicMock(return_value=adv_menu_call)

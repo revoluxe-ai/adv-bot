@@ -76,6 +76,16 @@ READ_ONLY_TOKEN_BOT_ACTIVE_MESSAGE = (
     "У этого токена только права чтения. Автоуправление недоступно. "
     "Вы можете пользоваться аналитикой или заменить токен на ключ с правами управления продвижением."
 )
+CABINET_ACCESS_DENIED_MESSAGE = (
+    "Кабинет не найден или недоступен. Вернитесь в меню магазина и повторите."
+)
+ADV_ACCESS_DENIED_MESSAGE = (
+    "Рекламная кампания не найдена или не принадлежит выбранному кабинету."
+)
+V3_BACKFILL_FAILURE_MESSAGE = (
+    "Не удалось включить автоуправление: ошибка синхронизации настроек кампании. "
+    "Попробуйте снова или обратитесь в поддержку -> "
+)
 
 
 async def _shop_has_read_only_only_tokens(shop_id: str) -> bool:
@@ -151,10 +161,29 @@ async def turn_adv_on_in_session(
     adv_original_id = callback_data.adv_original_id
     if adv_original_id is None:
         raise ValueError("Не указан идентификатор рекламной кампании")
-    wb_user_cabinet = await _load_wb_user_cabinet_in_session(
-        session, wb_user_cabinet_original_id
+    wb_user_cabinet = await _load_wb_user_cabinet_for_owner_in_session(
+        session,
+        wb_user_cabinet_original_id,
+        callback.from_user.id,
     )
-    adv = await _load_adv_for_activation_in_session(session, adv_original_id)
+    if wb_user_cabinet is None:
+        _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+        _ = await ShopMenu(
+            bot, chat_id, state, wb_user_cabinet_original_id
+        )()
+        return
+    adv = await _load_adv_for_owner_cabinet_in_session(
+        session,
+        adv_original_id=adv_original_id,
+        wb_user_cabinet=wb_user_cabinet,
+        with_payments=True,
+    )
+    if adv is None:
+        _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+        _ = await ShopMenu(
+            bot, chat_id, state, wb_user_cabinet_original_id
+        )()
+        return
     wb_cabinet: WBCabinet = wb_user_cabinet.wb_cabinet
     price_per_day: float = await pricer.get_price_for_day_for_shop(
         session, wb_cabinet.shop_id
@@ -189,10 +218,36 @@ async def turn_adv_on_in_session(
     apply_paid_auto_management_transition(adv, wb_cabinet)
     await session.commit()
     if switched_to_v3:
-        await backfill_v3_hard_statuses_and_states_consistency(
-            dry_run=False,
-            adv_setting_id=adv.id,
-        )
+        try:
+            await backfill_v3_hard_statuses_and_states_consistency(
+                dry_run=False,
+                adv_setting_id=adv.id,
+            )
+        except Exception:
+            logger.exception(
+                "v3 backfill failed after paid activation adv_id=%s",
+                adv.id,
+            )
+            async with sm(read_only=False) as compensate_session:
+                adv_to_revert = await _load_adv_for_owner_cabinet_in_session(
+                    compensate_session,
+                    adv_original_id=adv.id,
+                    wb_user_cabinet=wb_user_cabinet,
+                    with_payments=True,
+                )
+                if adv_to_revert is not None:
+                    apply_free_mode_transition(
+                        adv_to_revert, wb_user_cabinet.wb_cabinet
+                    )
+                    await compensate_session.commit()
+            _ = await bot.send_message(
+                chat_id,
+                f"{V3_BACKFILL_FAILURE_MESSAGE}{const.SUPPORT_LINK}",
+            )
+            _ = await ShopMenu(
+                bot, chat_id, state, wb_user_cabinet_original_id
+            )()
+            return
     _ = await state.update_data(wb_user_cabinet_original_id=wb_user_cabinet_original_id)
     _ = await state.update_data(adv_original_id=adv.id)
     wb_user_cabinet = await _load_wb_user_cabinet_in_session(
@@ -275,23 +330,10 @@ async def _load_adv_setting_with_cabinet_in_session(
     return result.scalar_one()
 
 
-async def _load_adv_for_activation_in_session(
-    session: AsyncSession,
-    adv_original_id: int,
-) -> AdvSetting:
-    """Загрузить РК и платежи в переданной WRITE-сессии запуска."""
-    result = await session.execute(
-        select(AdvSetting)
-        .options(selectinload(AdvSetting.payments))
-        .where(AdvSetting.id == adv_original_id)
-    )
-    return result.scalar_one()
-
-
 async def _load_wb_user_cabinet_in_session(
     session: AsyncSession,
     wb_user_cabinet_original_id: int,
-) -> WBUserCabinet:
+) -> WBUserCabinet | None:
     """Загрузить кабинет с данными WB в переданной PG-сессии."""
     stmt = (
         select(WBUserCabinet)
@@ -300,27 +342,71 @@ async def _load_wb_user_cabinet_in_session(
         .where(WBUserCabinet.id == wb_user_cabinet_original_id)
     )
     result = await session.execute(stmt)
-    return result.scalar_one()
+    return result.scalar_one_or_none()
+
+
+async def _load_wb_user_cabinet_for_owner_in_session(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+    user_telegram_id: int,
+) -> WBUserCabinet | None:
+    """Загрузить кабинет пользователя с проверкой владельца в PG-сессии."""
+    stmt = (
+        select(WBUserCabinet)
+        .join(WBUserCabinet.user)
+        .join(WBUserCabinet.wb_cabinet)
+        .options(selectinload(WBUserCabinet.wb_cabinet))
+        .where(
+            WBUserCabinet.id == wb_user_cabinet_original_id,
+            User.user_telegram_id == user_telegram_id,
+        )
+    )
+    result = await session.execute(stmt)
+    return result.unique().scalar_one_or_none()
+
+
+async def _load_adv_for_owner_cabinet_in_session(
+    session: AsyncSession,
+    *,
+    adv_original_id: int,
+    wb_user_cabinet: WBUserCabinet,
+    with_payments: bool = False,
+) -> AdvSetting | None:
+    """Загрузить РК только если она принадлежит кабинету пользователя."""
+    options: list[Any] = []
+    if with_payments:
+        options.append(selectinload(AdvSetting.payments))
+    stmt = (
+        select(AdvSetting)
+        .options(*options)
+        .where(
+            AdvSetting.id == adv_original_id,
+            AdvSetting.wb_cabinet_id == wb_user_cabinet.wb_cabinet_id,
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def _load_wb_user_cabinet_for_adv_in_session(
     session: AsyncSession,
     telegram_user_id: int,
     adv_original_id: int,
-) -> WBUserCabinet:
+) -> WBUserCabinet | None:
     """Найти кабинет пользователя для РК в переданной PG-сессии."""
     stmt = (
         select(WBUserCabinet)
         .join(WBUserCabinet.user)
         .join(WBUserCabinet.wb_cabinet)
         .join(WBCabinet.adv_settings)
+        .options(selectinload(WBUserCabinet.wb_cabinet))
         .where(
             User.user_telegram_id == telegram_user_id,
             AdvSetting.id == adv_original_id,
         )
     )
     result = await session.execute(stmt)
-    return result.scalar_one()
+    return result.unique().scalar_one_or_none()
 
 
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter))
@@ -423,31 +509,24 @@ async def adv_handler(
     await messages.LongTimeOperation(bot, callback.message.chat.id)()
     adv_original_id = callback_data.adv_original_id
     await state.update_data(last_adv_original_id=adv_original_id)
-    data = await state.get_data()
 
     async with sm(read_only=True) as session:
-        if "last_wb_user_cabinet_original_id" in data:
-            wb_user_cabinet_original_id = data["last_wb_user_cabinet_original_id"]
-        else:
-            wb_user_cabinet = await _load_wb_user_cabinet_for_adv_in_session(
-                session, callback.from_user.id, adv_original_id
-            )
-            wb_user_cabinet_original_id = wb_user_cabinet.id
-
+        wb_user_cabinet = await _load_wb_user_cabinet_for_adv_in_session(
+            session, callback.from_user.id, adv_original_id
+        )
         adv = await _load_adv_setting_in_session(session, adv_original_id)
-        wb_user_cabinet = await _load_wb_user_cabinet_in_session(
-            session, wb_user_cabinet_original_id
-        )
 
-    if not adv:
-        raise RuntimeError(
-            f"AdvSetting not found for original_id={adv_original_id}"
-        )
+    if wb_user_cabinet is None:
+        _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+        return
 
-    if not wb_user_cabinet:
-        raise RuntimeError(
-            f"WBUserCabinet not found for original_id={wb_user_cabinet_original_id}"
-        )
+    if adv is None:
+        _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+        return
+
+    if adv.wb_cabinet_id != wb_user_cabinet.wb_cabinet_id:
+        _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+        return
 
     nmids = adv.nmids or []
     nmid = nmids[0] if nmids else None
@@ -593,14 +672,27 @@ async def toggle_minus_phrases_setting(
     chat_id = callback.message.chat.id
     new_status = callback_data.action == "on"
 
-    wb_user_cabinet = await _get_wb_user_cabinet_or_none(
-        callback_data.wb_user_cabinet_original_id
-    )
     async with sm(read_only=False) as session:
+        wb_user_cabinet = await _load_wb_user_cabinet_for_owner_in_session(
+            session,
+            callback_data.wb_user_cabinet_original_id,
+            callback.from_user.id,
+        )
+        if wb_user_cabinet is None:
+            _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+            return
+        adv_setting = await _load_adv_for_owner_cabinet_in_session(
+            session,
+            adv_original_id=callback_data.adv_setting_original_id,
+            wb_user_cabinet=wb_user_cabinet,
+        )
+        if adv_setting is None:
+            _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+            return
         adv_setting = await update_and_get_adv_setting(
             session,
             new_status,
-            callback_data.adv_setting_original_id,
+            adv_setting.id,
         )
 
     await MinusPhrasesSettingScreen(bot, chat_id, wb_user_cabinet, adv_setting)()
@@ -689,19 +781,24 @@ async def turn_adv_off(
     adv_original_id = callback_data.adv_original_id
     if adv_original_id is None:
         raise ValueError("Не указан идентификатор рекламной кампании")
-    async with sm(read_only=True) as session:
-        wb_user_cabinet = await _load_wb_user_cabinet_in_session(
-            session, wb_user_cabinet_original_id
-        )
 
     async with sm(read_only=False) as session:
-        adv_setting = await _load_adv_setting_in_session(
-            session, adv_original_id
+        wb_user_cabinet = await _load_wb_user_cabinet_for_owner_in_session(
+            session,
+            wb_user_cabinet_original_id,
+            call.from_user.id,
+        )
+        if wb_user_cabinet is None:
+            _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+            return
+        adv_setting = await _load_adv_for_owner_cabinet_in_session(
+            session,
+            adv_original_id=adv_original_id,
+            wb_user_cabinet=wb_user_cabinet,
         )
         if adv_setting is None:
-            raise RuntimeError(
-                f"AdvSetting not found for original_id={adv_original_id}"
-            )
+            _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+            return
         # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         apply_free_mode_transition(adv_setting, wb_user_cabinet.wb_cabinet)
         adv_setting.auto_budget_watchdog_enabled = False
