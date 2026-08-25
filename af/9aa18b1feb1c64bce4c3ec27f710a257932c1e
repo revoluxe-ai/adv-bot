@@ -1,0 +1,51 @@
+openspec/changes/adv-bot-historical-state-extractor/tasks.md
+  s_df86e7658eaaba::t_084b7830c17a51 1-15
+scripts/adv_bot_historical_state_extractor.py
+  s_df86e7658eaaba::t_47d6a6b548dab1 1167,1172
+  s_df86e7658eaaba::t_d75f7f00d07176 1-5,7-22,24-29,31-34,65-315,742-1091,1093-1101,1103-1154,1156-1166,1168-1171,1173-1210,1212-1245,1247-1263,1270-1309,1320,1322-1335
+  s_df86e7658eaaba::t_5330dd3bf5dc4b 23,30,35-64
+  s_df86e7658eaaba::t_1a101dc5d00232 617-618
+  s_df86e7658eaaba::t_3dc8fe91039f52 1211
+  s_df86e7658eaaba::t_080392f1e6ebcc 727-730,735-736,738
+  s_df86e7658eaaba::t_da82b8f932a3a6 1092,1102
+  s_df86e7658eaaba::t_e62176daa8f85f 1264-1269
+  s_df86e7658eaaba::t_b65df412c9a333 1310-1319,1321
+  s_df86e7658eaaba::t_9a806438b4cbd9 1246
+  s_df86e7658eaaba::t_7929429a23c14d 316-484,497,510,519-521,523-531,535,537,550-551,581,587,658-726,731-734,737,739-741
+  s_df86e7658eaaba::t_936abc3b900ef1 1155
+  s_df86e7658eaaba::t_e0ff8404807e38 588
+  s_df86e7658eaaba::t_06742da7daecc0 485-496,498-509,511-518,522,532-534,536,538-549,552-580,582-586,589-616,619-657
+  s_df86e7658eaaba::t_8e348aa56ba8ee 6
+scripts/evidence/README.md
+  s_df86e7658eaaba::t_0b8e70b3e7d440 5-8,10-11,15-24,28,30-39,41-51
+  s_df86e7658eaaba::t_dd00b7febd1857 1-4,9,12-14,25-27,29,40
+scripts/evidence/prod_revision_timeline.jsonl
+  s_df86e7658eaaba::t_9f192959b9af1d 1-6
+openspec/changes/adv-bot-historical-state-extractor/specs/adv-bot-internal-history-extractor/spec.md
+  s_df86e7658eaaba::t_372de9ac75140f 1-46
+openspec/changes/adv-bot-historical-state-extractor/proposal.md
+  s_df86e7658eaaba::t_63dbb0ee87542a 1-35
+openspec/changes/adv-bot-historical-state-extractor/design.md
+  s_df86e7658eaaba::t_41eb1ea2d775e0 1-57
+tests/unit/scripts/test_adv_bot_historical_state_extractor.py
+  s_df86e7658eaaba::t_3615ded2ca0464 5,7-8,13-14,17,22-25,131,134-154,168-271,273,325,337-340,342-343,350-352,383-392
+  s_df86e7658eaaba::t_55c7a1748f9feb 1-4,6,9-12,15,19-21,26-27,97,99-130,132-133,155-167
+  s_df86e7658eaaba::t_571ee7d2e287e9 16,18,28-96,98,272,274-324,326,333-336,341,344-349,353-382
+  s_df86e7658eaaba::t_2f9b01258dfd35 327-332
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "af9aa18b1feb1c64bce4c3ec27f710a257932c1e",
+  "prompts": {},
+  "sessions": {
+    "s_df86e7658eaaba": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b8e42d96-6844-43e5-a6cd-02bc3bc8f7b2",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
