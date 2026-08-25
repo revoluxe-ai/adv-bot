@@ -1,0 +1,19 @@
+scripts/a1_baseline_v0_collect.py
+  s_054c0826814088::t_edfa2fc483fea7 578-600,604
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "8887d136985212e47cec034c73139aa1934e1590",
+  "prompts": {},
+  "sessions": {
+    "s_054c0826814088": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00d46f4f-20e0-4952-a6e4-a938880a88c0",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
