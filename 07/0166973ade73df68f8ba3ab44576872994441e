@@ -1,0 +1,21 @@
+tests/client_bot/user_interface/handlers/test_individual_keywords_target_place_toggle.py
+  s_a6729f9be7dad6::t_cf1a75a74753f3 167-176
+  s_a6729f9be7dad6::t_22296771dc3034 1-8,10-12,17,24,29-48
+  s_a6729f9be7dad6::t_1748ea5d75dc1b 133-142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "070166973ade73df68f8ba3ab44576872994441e",
+  "prompts": {},
+  "sessions": {
+    "s_a6729f9be7dad6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fa0ba990-f649-4a1a-8d79-615543641785",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
