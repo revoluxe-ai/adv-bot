@@ -124,6 +124,7 @@ async def test_load_tariff_details_in_session_delegates_to_pricer() -> None:
     session = AsyncMock(spec=AsyncSession)
     menu = object.__new__(shop_menu_mod.ShopMenu)
     menu._pricer = MagicMock()
+    menu._billing_redis_manager = None
     menu._pricer.get_tariff_details = AsyncMock(
         return_value=SimpleNamespace(count=0)
     )
@@ -132,7 +133,12 @@ async def test_load_tariff_details_in_session_delegates_to_pricer() -> None:
         menu, session, "shop-1"
     )
 
-    menu._pricer.get_tariff_details.assert_awaited_once_with(session, "shop-1")
+    menu._pricer.get_tariff_details.assert_awaited_once_with(
+        session,
+        "shop-1",
+        leg_latch=None,
+        utc_date=None,
+    )
     assert details.count == 0
 
 

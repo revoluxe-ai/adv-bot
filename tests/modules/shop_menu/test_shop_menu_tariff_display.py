@@ -104,8 +104,8 @@ class TestShopMenuTariffDisplay:
 
 
 @pytest.mark.asyncio
-async def test_load_tariff_preview_passes_leg_latch_and_utc_date() -> None:
-    """PBH-002: shop menu preview MUST use latch read, not instant weights only."""
+async def test_load_tariff_details_in_session_passes_leg_latch_and_utc_date() -> None:
+    """PBH-003: shop menu tariff load MUST use latch read, not instant weights only."""
     menu = ShopMenu(bot=None, chat_id=1, state=None, wb_user_cabinet_original_id=1)  # type: ignore[arg-type]
     m = cast(Any, menu)
     m._wb_cabinet = type("WBC", (), {"shop_id": "shop_latch"})()
@@ -140,14 +140,11 @@ async def test_load_tariff_preview_passes_leg_latch_and_utc_date() -> None:
     m._pricer.get_tariff_details = AsyncMock(side_effect=_fake_get_tariff_details)
 
     fixed_now = datetime(2025, 6, 15, 14, 30, tzinfo=timezone.utc)
-    with patch("app.modules.shop_menu.message.sm") as mock_sm, patch(
-        "app.modules.shop_menu.message.datetime"
-    ) as mock_datetime:
+    mock_session = AsyncMock()
+    with patch("app.modules.shop_menu.message.datetime") as mock_datetime:
         mock_datetime.now.return_value = fixed_now
-        mock_session = AsyncMock()
-        mock_sm.return_value.__aenter__.return_value = mock_session
 
-        await m._load_tariff_preview()
+        await m._load_tariff_details_in_session(mock_session, "shop_latch")
 
     assert captured["shop_id"] == "shop_latch"
     assert captured["leg_latch"] is mock_latch

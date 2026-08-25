@@ -319,9 +319,20 @@ class ShopMenu(TextWithKeyboard):
         """Load tariff details via Pricer using caller-opened session.
 
         Parent ``_load_all_data`` opens ``sm(read_only=True)`` and passes
-        the session here (PURE_READ handoff).
+        the session here (PURE_READ handoff). Threads ``leg_latch`` and
+        ``utc_date`` like billing charge / ``_load_tariff_preview`` (PBH-003).
         """
-        return await self._pricer.get_tariff_details(session, shop_id)
+        leg_latch = None
+        utc_date = None
+        if self._billing_redis_manager is not None:
+            leg_latch = self._billing_redis_manager.leg_latch()
+            utc_date = datetime.now(timezone.utc).date()
+        return await self._pricer.get_tariff_details(
+            session,
+            shop_id,
+            leg_latch=leg_latch,
+            utc_date=utc_date,
+        )
 
     async def _load_all_data(self) -> bool:
         """Оптимизированная загрузка всех данных в одной транзакции"""

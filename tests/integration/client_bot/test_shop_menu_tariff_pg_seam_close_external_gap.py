@@ -30,6 +30,7 @@ async def test_load_tariff_details_in_session_reads_persisted_shop(
 
     menu = object.__new__(ShopMenu)
     menu._pricer = Pricer()
+    menu._billing_redis_manager = None
 
     details = await ShopMenu._load_tariff_details_in_session(
         menu, async_session, cabinet.shop_id
