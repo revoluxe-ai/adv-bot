@@ -19,6 +19,7 @@ async def test_balance_exp_informer_passes_leg_latch_and_utc_date() -> None:
     service = BalanceReminderService(
         session_factory=MagicMock(),
         event_manager=MagicMock(),
+        notification_sender=MagicMock(),
     )
     captured: dict[str, object] = {}
     fixed_date = date(2025, 6, 15)
