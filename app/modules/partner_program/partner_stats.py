@@ -113,11 +113,16 @@ def is_real_external_balance_payment(
         return False
 
     description = _normalize_description(getattr(payment, "description", None))
-    if not description:
+    if description and any(
+        marker in description for marker in _REAL_EXTERNAL_PAYMENT_EXCLUDE_MARKERS
+    ):
         return False
-    if any(marker in description for marker in _REAL_EXTERNAL_PAYMENT_EXCLUDE_MARKERS):
-        return False
-    return any(marker in description for marker in _REAL_EXTERNAL_PAYMENT_INCLUDE_MARKERS)
+    if description:
+        return any(
+            marker in description for marker in _REAL_EXTERNAL_PAYMENT_INCLUDE_MARKERS
+        )
+    # Legacy rows may lack description; positive add operations count as external.
+    return True
 
 
 def _resolve_cabinet_payment_user_id(

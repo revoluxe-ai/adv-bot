@@ -104,6 +104,13 @@ def test_is_real_external_balance_payment_filters_internal_and_admin_records() -
     assert is_real_external_balance_payment(
         _wb_balance_payment(wb_cabinet_id=11, amount=250)
     )
+    assert is_real_external_balance_payment(
+        _user_balance_payment(
+            user_id=10,
+            amount=100,
+            description="",
+        )
+    )
     assert not is_real_external_balance_payment(
         _user_balance_payment(
             user_id=10,
