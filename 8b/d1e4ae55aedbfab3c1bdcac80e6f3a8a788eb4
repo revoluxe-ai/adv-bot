@@ -1,0 +1,21 @@
+.github/workflows/migration-gates.yml
+  s_f3ba9455123935::t_959817dc2119fa 78-114,116
+  s_f3ba9455123935::t_449eb52b1f1a66 131-133
+  s_f3ba9455123935::t_bebab005901f31 136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "8bd1e4ae55aedbfab3c1bdcac80e6f3a8a788eb4",
+  "prompts": {},
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
