@@ -575,14 +575,33 @@ def _orders_nm_daily(orders_raw: list[dict[str, Any]]) -> tuple[list[dict[str, A
     return list(by_day_nm.values()), list(store_by_day.values())
 
 
+def _parse_card_json(value: Any) -> dict[str, Any]:
+    """Нормализовать wbcard.json из PG CSV (str / dict / double-encoded JSON)."""
+    if isinstance(value, dict):
+        return value
+    if value is None or value == "":
+        return {}
+    if not isinstance(value, str):
+        return {}
+    try:
+        parsed: Any = json.loads(value)
+    except json.JSONDecodeError:
+        try:
+            parsed = ast.literal_eval(value)
+        except (ValueError, SyntaxError):
+            return {}
+    if isinstance(parsed, str):
+        try:
+            parsed = json.loads(parsed)
+        except json.JSONDecodeError:
+            return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
 def _product_context(wbcards: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for card in wbcards:
-        raw_json: dict[str, Any] = {}
-        try:
-            raw_json = json.loads(card.get("json") or "{}")
-        except json.JSONDecodeError:
-            pass
+        raw_json = _parse_card_json(card.get("json"))
         rows.append(
             {
                 "nmid": card.get("nmid"),
