@@ -378,8 +378,8 @@ class ShopMenu(TextWithKeyboard):
 
         # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
         shop_id = self._wb_cabinet.shop_id
-        async with sm() as session:
-            self._tariff_details = await self._pricer.get_tariff_details(
+        async with sm(read_only=True) as session:
+            self._tariff_details = await self._load_tariff_details_in_session(
                 session, shop_id
             )
         self._total_active_advs_count = (
@@ -403,7 +403,7 @@ class ShopMenu(TextWithKeyboard):
         if self._billing_redis_manager is not None:
             leg_latch = self._billing_redis_manager.leg_latch()
             utc_date = datetime.now(timezone.utc).date()
-        async with sm() as session:
+        async with sm(read_only=True) as session:
             self._tariff_details = await self._pricer.get_tariff_details(
                 session,
                 shop_id,
