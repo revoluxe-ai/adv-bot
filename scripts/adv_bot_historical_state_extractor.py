@@ -1302,6 +1302,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     """Entrypoint."""
     args = parse_args(argv)
+    bootstrap_cluster_infra()
     from_day = date.fromisoformat(args.from_date)
     to_day = date.fromisoformat(args.to_date)
     if to_day < from_day:

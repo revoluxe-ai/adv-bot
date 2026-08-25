@@ -383,6 +383,52 @@ def test_committed_ledger_exports_intervals(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_main_bootstraps_cluster_infra_before_shop_resolution() -> None:
+    from scripts.adv_bot_historical_state_extractor import main
+
+    call_order: list[str] = []
+
+    def _bootstrap() -> None:
+        call_order.append("bootstrap")
+
+    def _resolve(**_kwargs: object) -> ShopResolution:
+        call_order.append("resolve")
+        return ShopResolution(
+            requested_supplier_id="250129048",
+            requested_shop_id=None,
+            resolved_shop_id="shop-uuid",
+            shop_resolution_source="wbtoken.jwt_claim",
+            shop_resolution_status="RESOLVED",
+        )
+
+    with (
+        patch(
+            "scripts.adv_bot_historical_state_extractor.bootstrap_cluster_infra",
+            side_effect=_bootstrap,
+        ),
+        patch(
+            "scripts.adv_bot_historical_state_extractor.resolve_shop_identity",
+            side_effect=_resolve,
+        ),
+        patch(
+            "scripts.adv_bot_historical_state_extractor.run_collect",
+            return_value={"EXECUTION_STATUS": "COMPLETE"},
+        ),
+    ):
+        main(
+            [
+                "--supplier-id",
+                "250129048",
+                "--from",
+                "2026-08-06",
+                "--to",
+                "2026-08-18",
+            ]
+        )
+    assert call_order == ["bootstrap", "resolve"]
+
+
+@pytest.mark.unit
 def test_try_git_revision_timeline_no_git_binary(tmp_path: Path) -> None:
     with patch("scripts.adv_bot_historical_state_extractor.shutil.which", return_value=None):
         rows, errors = try_git_revision_timeline(
