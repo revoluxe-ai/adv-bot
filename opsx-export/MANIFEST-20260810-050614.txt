@@ -1,0 +1,59 @@
+utc_ts: 20260810-050614
+scope: default
+include_tmp: true
+include_active_changes: false
+include_archived_changes: false
+include_upstream_snapshot: false
+delete_performed: false
+file_count: 1797
+approx_source_bytes: 13084072
+zip_bytes: 7313599
+archive_name: opsx-pack-20260810-050614.zip
+
+roots_included:
+  - .cursor/commands
+  - .cursor/rules
+  - .cursor/skills
+  - .cursor/static-check
+  - .cursor/pipeline
+  - .cursor/antipattern-gate
+  - .cursor/devops
+  - .cursor/opsx-review-commands
+  - .agents
+  - .github/skills
+  - .github/prompts
+  - .github/copilot-instructions.md
+  - .github/git-commit-instructions.md
+  - AGENTS.md
+  - .opsx/adapters
+  - .opsx/registry
+  - .opsx/shared
+  - .opsx/project
+  - .opsx/import
+  - .opsx/manifest.yaml
+  - .opsx/projectization.yaml
+  - .opsx/lock.yaml
+  - .opsx/sources.yaml
+  - openspec/__init__.py
+  - openspec/config.yaml
+  - openspec/specs
+  - openspec/decisions
+  - openspec/evolution
+  - openspec/policies
+  - openspec/schemas
+  - openspec/tools
+  - .tmp
+
+excluded_or_skipped:
+  - MISSING: .cursor/agents
+  - HARD_SKIP: opsx-export/** (write-root nesting ban)
+  - SKIP_PATTERNS: __pycache__/, *.pyc, .pytest_cache/, node_modules/, .cursor/settings.json, commands.zip
+  - NOTE: legacy .tmp/opsx-export/** is not write-root; may still appear inside .tmp walk if present
+
+skip_patterns:
+  - __pycache__/
+  - *.pyc
+  - .pytest_cache/
+  - node_modules/
+  - opsx-export/**
+  - .cursor/settings.json

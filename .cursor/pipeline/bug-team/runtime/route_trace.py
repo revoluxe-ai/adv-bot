@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Append-only ROUTE-TRACE SCHEMA_VERSION 2 utility (BF-005)."""
+"""Append-only ROUTE-TRACE SCHEMA_VERSION 2 utility (BF-005).
+
+Also accepts legacy episode events that use EVENT_SEQUENCE instead of
+SEQUENCE when reading history (resume-family-fanout on mixed traces).
+"""
 
 from __future__ import annotations
 
@@ -15,6 +19,15 @@ class TraceIntegrityError(Exception):
     def __init__(self, code: str, detail: str = "") -> None:
         self.code = code
         super().__init__(f"{code}: {detail}" if detail else code)
+
+
+def _event_sequence(event: Dict[str, Any]) -> int:
+    """Return monotonic sequence from SCHEMA_VERSION 2 or episode EVENT_SEQUENCE."""
+    if "SEQUENCE" in event and event["SEQUENCE"] is not None:
+        return int(event["SEQUENCE"])
+    if "EVENT_SEQUENCE" in event and event["EVENT_SEQUENCE"] is not None:
+        return int(event["EVENT_SEQUENCE"])
+    raise TraceIntegrityError("MISSING_SEQUENCE", "SEQUENCE|EVENT_SEQUENCE")
 
 
 def _read_events(path: Path) -> List[Dict[str, Any]]:
@@ -33,7 +46,7 @@ def last_sequence(path: Path) -> int:
     events = _read_events(path)
     if not events:
         return 0
-    return int(events[-1]["SEQUENCE"])
+    return _event_sequence(events[-1])
 
 
 def validate_reconciliation(event: Dict[str, Any]) -> None:
@@ -60,7 +73,7 @@ def append_event(
     """Append exactly one JSONL event after integrity checks; flush+verify."""
     path.parent.mkdir(parents=True, exist_ok=True)
     existing = _read_events(path)
-    seqs = [int(e["SEQUENCE"]) for e in existing]
+    seqs = [_event_sequence(e) for e in existing]
     ids = [e["EVENT_ID"] for e in existing]
 
     if "SCHEMA_VERSION" not in event:

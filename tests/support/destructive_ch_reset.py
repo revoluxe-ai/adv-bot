@@ -56,6 +56,7 @@ CH_SESSION_DDL_STATEMENTS: tuple[str, ...] = (
         ) ENGINE = AggregatingMergeTree()
         PARTITION BY toYYYYMM(date)
         ORDER BY (adv_id, text, date)
+        SETTINGS allow_dimensions_outside_sorting_key = 1, index_granularity = 8192
     """,
     f"""
         CREATE TABLE IF NOT EXISTS {ALLOWED_CH_DATABASE}.clusters_adv_stats (

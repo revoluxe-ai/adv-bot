@@ -41,18 +41,111 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 3. Parse `explore.worklog` from `openspec/policies/EXPLORE_POLICY.md`.
 4. If `explore.worklog.path` exists, read it before final output.
 5. Extract Worklog-derived candidate tasks, known bugs, affected file hints, validation hints, open questions, and prior agent findings.
-6. Inspect repository files and OpenSpec artifacts relevant to the requested task.
-7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
-8. Do not modify production code.
-9. Do not modify WORKLOG (deferred parks are written only by `/opsx-bound-scope:GO`).
+6. If input contains `EVOLUTION_HANDOFF` / `OWNER_INTENT`: treat `OWNER_INTENT`
+    as the fixed semantic target of the research. Map Owner product/UI terms
+    onto runtime/code under separate findings — never as a replacement intent.
+7. **OpenSpec context pass (required when `OWNER_INTENT` is present;** also
+    preferred for explicit capability-sized research without a handoff):
+    targeted lookup only — **never** a broad dump of archive/specs/decisions.
+    Target from: `OWNER_INTENT`, capability names, UI/product terminology,
+    related current specs, known decision/change IDs, found runtime entities.
+    Order:
+    1. relevant **current** `openspec/specs/**` (acting contract);
+    2. relevant **Accepted** `openspec/decisions/**` (keep Architecture
+       Decision Lookup budgets / `Architecture Decision Missing` /
+       `EVIDENCE_GAP` rules above — do not invent unbounded decision reads);
+    3. relevant `openspec/changes/archive/**` only when they may explain
+       capability origin, old/new behavior, prior terminology, or current-
+       contract boundaries (**historical evidence**, not current SoT);
+    4. then compare that durable OpenSpec context to **current** code/tests.
+8. Inspect repository files (and remaining OpenSpec paths) relevant to the
+   requested task; separate repository evidence from WORKLOG notes,
+   assumptions, and missing information.
+9. Conflict / layering rules for OpenSpec context:
+   - `current main spec` **wins** over `archived change` on conflict;
+     archive explains history only;
+   - contract vs repository behavior → emit explicit drift/contradiction
+     (`CONTRACT_VS_REPO`); do **not** silently pick one side;
+   - archived / OpenSpec interpretation MUST NOT rewrite `OWNER_INTENT`.
+10. If Owner terminology ↔ runtime mapping is ambiguous or repository /
+    OpenSpec evidence suggests a different technical reading: emit
+    `UNRESOLVED` / `CANDIDATE_MAPPING` and ask one clarification; do **not**
+    rewrite `OWNER_INTENT`.
+11. Do not modify production code.
+12. Do not modify WORKLOG (deferred parks are written only by `/opsx-bound-scope:GO`).
+
+**OWNER_INTENT authority (when present):**
+
+```text
+explore(OWNER_INTENT, repository + OpenSpec context)
+  MUST NOT return a different OWNER_INTENT
+  only because code, specs, decisions, or archive support another reading.
+```
+
+`OWNER_INTENT` may change only after explicit Owner correction. Repository
+paths, code symbols, specs, archive history, and plausible alternate framings
+belong under layered evidence — not inside `OWNER_INTENT`.
+
+Conceptual explore context:
+
+```text
+OWNER_INTENT
++ CURRENT SPECS
++ ACCEPTED DECISIONS
++ RELEVANT HISTORY (archive)
++ CURRENT CODE/TESTS
+= EXPLORE CONTEXT
+```
 
 **Required final output format:**
 
+When input includes `OWNER_INTENT` (typically from `EVOLUTION_HANDOFF`), emit
+this pasteable block **before** the narrative sections. Copy `OWNER_INTENT`
+**verbatim** from the input handoff. Scope keys may be passthrough when
+present. Keep **current contract**, **historical evidence**, and **repository
+evidence** in separate fields — never fold them into `OWNER_INTENT`.
+
+```text
+EXPLORE_HANDOFF
+OWNER_INTENT:
+<verbatim copy from EVOLUTION_HANDOFF / input — do not reinterpret>
+CURRENT_INCREMENT: <passthrough if present>
+IN_SCOPE:
+- <passthrough if present>
+OUT_OF_SCOPE:
+- <passthrough if present>
+CURRENT_CONTRACT:
+- <relevant openspec/specs/** facts — acting contract>
+ACCEPTED_DECISIONS:
+- <relevant Accepted decision paths/status; empty if none in budget>
+HISTORICAL_EVIDENCE:
+- <relevant archive change facts — history only, not SoT; empty if none>
+REPOSITORY_FINDINGS:
+- <confirmed current code/tests facts>
+RUNTIME_MAPPING:
+- <Owner/UI term → candidate code/runtime path>
+CONTRACT_VS_REPO:
+- <explicit drift/contradiction between current contract and code/tests; or none>
+UNRESOLVED:
+- <ambiguities / contradictions; empty if none>
+CANDIDATE_MAPPING:
+- <optional alternate mappings that need Owner confirmation>
+```
+
+If `OWNER_INTENT` is absent, skip `EXPLORE_HANDOFF` and keep the narrative
+sections below (backward compatible). Still prefer the targeted OpenSpec
+context habit when the ask is clearly capability-sized.
+
 ## Short Decision
-Короткий вывод по исследованию.
+Короткий вывод по исследованию. When `OWNER_INTENT` is present, this summary
+MUST stay consistent with it; technical reframes belong under layered
+evidence / RUNTIME_MAPPING / UNRESOLVED / CONTRACT_VS_REPO, not as a new
+task meaning.
 
 ## Repository Evidence
-Что подтверждено файлами репозитория.
+Что подтверждено текущими файлами репозитория (code/tests). OpenSpec current
+contract and archive history belong in EXPLORE_HANDOFF layers / Short Decision
+context — do not present archive as acting SoT.
 
 ## WORKLOG Findings
 Что найдено в `DOTO/WORKLOG.md`. Always include this section, even when there are no useful findings.
@@ -104,10 +197,56 @@ Owner may refine the table in chat, then run `/opsx-bound-scope` so plan printou
 match the agreed split. Explore MUST NOT append WORKLOG or edit change artifacts
 for the park; that is bound-scope → update.
 
+## Valued Goals (useful-work)
+
+Include when any of:
+- the user asks for useful-work / «сделай полезное» / North Star / ценность целей;
+- `/opsx-supervisor` is in `TASK_MODE=USEFUL_WORK` and requests ranking;
+- the user asks to prioritize goal-like outcomes by value.
+
+This section ranks **goal-like** candidates for supervisor consume. Prefer Owner-explicit
+lists; else extract goal-like lines from `DOTO/WORKLOG.md` (always label
+`Worklog-derived`); else infer cautiously from repo context (label `Inferred`).
+
+**VALUE gate (mandatory when this section is emitted):**
+- Every ranked item must have `VALUE:` as **free prose** (plain language: why it
+  matters, how clear/unclear the payoff is). No required numeric scorecard.
+- If VALUE is missing, **propose** a draft VALUE, then rank. Owner may refine.
+- Do **not** treat WORKLOG as North Star source of truth — only as ranked
+  raw notes for useful-work.
+
+Also propose a rough `EFFORT_HINT` (free prose or S/M/L) and a suggested
+`NEXT_OPSX` for the top item (usually `/opsx-new` / `/opsx-ff` / `/opsx-update`
+/ bug path — not implement-from-explore).
+
+Format:
+
+```text
+VALUED_GOALS:
+TRUST: raw_notes_ranked_for_useful_work (not SoT)
+RANKED:
+1. ID_OR_SLUG: <stable slug or worklog line ref>
+   GOAL: <one line>
+   VALUE: <free prose — required>
+   VALUE_SOURCE: owner | explore_draft | worklog_field
+   EFFORT_HINT: <free prose or S/M/L>
+   SOURCE: owner | Worklog-derived | Inferred
+   NEXT_OPSX: </opsx-new|/opsx-ff|/opsx-update|/opsx-fix-bug|...>
+2. ...
+EMPTY_QUEUE: YES|NO
+HANDOFF: /opsx-supervisor TASK_MODE=USEFUL_WORK (Owner STOP|HARD_DEADLINE)
+DO_NOT:
+- invent a mandatory numeric value scale
+- write WORKLOG or mark goals done from explore
+- implement product code from this ranking
+```
+
 ## Next Action
 Что делать дальше. If `NOW_LATER` was emitted and the owner wants
 to commit the boundary, prefer pointing to `/opsx-bound-scope` (not a silent
 full-scope `/opsx-new` / `/opsx-ff` of everything).
+If `VALUED_GOALS` was emitted for useful-work, prefer pointing to
+`/opsx-supervisor` with `TASK_MODE=USEFUL_WORK` plus Owner `HARD_DEADLINE` or STOP.
 
 ### Bug-episode / bug-team handback (when case= or finding= in scope)
 
@@ -118,20 +257,24 @@ case:
 
 1. State the recommended choice clearly.
 2. **Do not** silently “return to bug-team” or auto-dispatch team hops.
-3. Emit **pasteable** lines with durable IDs:
+3. Emit **pasteable** lines **only after** a durable `BUGCASE-…` id is
+   known (INDEX / LEDGER). Substitute the real id into the lines — do
+   **not** emit angle-bracket templates like `case=<CASE_ID>` (CMD-IX-001).
 
 ```text
-NEXT_ACTION (Owner answers in team chat OR pastes):
-/opsx-bug-team case=<CASE_ID> mode=continue
+NEXT_ACTION (Owner answers in team chat OR pastes; real BUGCASE-… required):
+/opsx-bug-team case=CASE_ID mode=continue
 
-ALSO_OK (if still unsure):
-/opsx-explore case=<CASE_ID> finding=<FINDING_ID>
+ALSO_OK (if still unsure; separate paste — never with first-intake RAW_REPORT):
+/opsx-explore case=CASE_ID finding=FINDING_ID
 ```
 
 4. Prefer INDEX / LEDGER `CASE_ID` over chat memory. If IDs unknown → ask
-   once or point to `.tmp/opsx-bug-cases/INDEX.md`.
+   once or point to `.tmp/opsx-bug-cases/INDEX.md`; **omit** `case=` /
+   `ALSO_OK` lines until a real id exists. Never paste handback `case=`
+   into the same message as free-form first-intake `RAW_REPORT`.
 
-**Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
+**Input**: The argument after `/opsx-explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
 - A change name: "add-dark-mode" (to explore in context of that change)
@@ -301,8 +444,21 @@ When things crystallize, you might offer a summary - but it's optional. Sometime
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
 - **Don't park to WORKLOG** - Deferred parks are `/opsx-bound-scope:GO` only; explore may only *suggest* DO_LATER
+- **Don't treat WORKLOG as North Star SoT** - Valued Goals ranking stays `raw_notes_ranked_for_useful_work`
+- **Don't skip VALUE** - When emitting `VALUED_GOALS`, every item needs free-prose `VALUE` (draft ok)
 - **Don't duplicate the splitter** - No `/opsx-update:split`; scope cut + park is `/opsx-bound-scope`
+- **Don't rewrite OWNER_INTENT** - When present, pass it through verbatim in
+  `EXPLORE_HANDOFF`; put code/runtime/OpenSpec mappings under layered fields
+- **Don't replace Owner meaning with a plausible code or archive story** -
+  e.g. do not turn «управление ставкой» into «cost watchdog» inside
+  `OWNER_INTENT` without explicit Owner correction
+- **Don't broad-scan** `openspec/changes/archive/**` — targeted history only
+- **Don't treat archive as acting SoT** — current main spec wins on conflict;
+  archive explains history
+- **Don't silently resolve contract↔repo conflicts** — emit `CONTRACT_VS_REPO`
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
+- **Do check relevant current specs / Accepted decisions / targeted archive**
+  when `OWNER_INTENT` is present (then code/tests)
 - **Do question assumptions** - Including the user's and your own
 - **Do offer now/later explicitly** when implementation ideas multiply — better a clear question than a silent full-scope `/opsx-new` / `/opsx-ff`

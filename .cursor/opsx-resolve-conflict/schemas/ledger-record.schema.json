@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx-resolve-conflict/ledger-record.schema.json",
+  "title": "OPSX Resolve Conflict Ledger Record",
+  "type": "object",
+  "required": [
+    "schema",
+    "ts_ns",
+    "seq",
+    "event",
+    "payload",
+    "prev_hash",
+    "record_hash"
+  ],
+  "properties": {
+    "schema": {
+      "const": "opsx-resolve-conflict/v2"
+    },
+    "ts_ns": {
+      "type": "integer"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "prev_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "record_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

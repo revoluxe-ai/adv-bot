@@ -266,7 +266,11 @@ Detect:
 - artifact path drift;
 - different meanings under the same token;
 - required output that is never persisted;
-- persisted output that no command consumes.
+- persisted output that no command consumes;
+- advertised MODE / durable handoff consumer in description, intro, or
+  guardrails without early Mode detection + executable Steps before the
+  default path → class `ADVERTISED_MODE_WITHOUT_EXECUTABLE_BRANCH`
+  (exemplar: `/opsx-new` `REPAIR_EXISTING_OWNER_CONTRACT` gap).
 
 ---
 
@@ -354,6 +358,28 @@ Rules:
 
 Do not implement only the new file when companion updates are required.
 
+## Independent verifier / gate companion wire-up (mandatory)
+
+When the proposed command is an **independent READ_ONLY verifier or
+lifecycle gate** (exemplar: `/opsx-planning-review` +
+`.cursor/pipeline/contracts/PLANNING_REVIEW.md`):
+
+1. State **soft vs hard gate** explicitly (v1 soft recommend vs hard block).
+2. `REQUIRED_COMPANION_UPDATES` / `EXISTING_FILES_TO_UPDATE` MUST list at least:
+   - (a) handoff consumer on the repair writer (e.g. `/opsx-update`
+     `MODE: REPAIR_*` + handoff token) — **executable** early Mode
+     detection + Steps, not description/guardrail-only; when the writer is
+     dual-mode, skill/prompt mirrors must advertise the same Mode branch;
+   - (b) soft `NEXT_ACTION` on producers that previously jumped to apply
+     (e.g. `/opsx-continue` / `/opsx-ff` after tasks complete);
+   - (c) `GRAPH` state and/or transition edge for the hop;
+   - (d) soft preflight note on `/opsx-apply` when applicable.
+3. Do **not** claim `COMPATIBLE` when those companions are missing for this
+   command class — use `COMPATIBLE_WITH_REQUIRED_COMPANION_UPDATES` and
+   disclose the full checklist before GO. Apply companions only when the
+   approved packet lists them (same coherent change); never leave wire-up
+   undisclosed.
+
 ---
 
 # Phase 3 — Design proposal
@@ -424,6 +450,8 @@ COGNITIVE_LOAD_IMPACT:
 RISKS:
 
 REQUIRED_COMPANION_UPDATES:
+(for independent verifier/gate proposals: mandatory checklist items (a)–(d)
+ under Integration verdict → Independent verifier / gate companion wire-up)
 
 REGRESSION_CHECKS:
 ```
@@ -584,7 +612,7 @@ DO_NOT_DO_YET:
 
 When process-surface files changed (`.cursor/commands/**`, rules, skills, agents,
 static-check, mirrors, `AGENTS.md`),
-`NEXT_ACTION` MUST point to `/opsx-admin-command-commit` (not `/opsx-commit`).
+`NEXT_ACTION` MUST point to `/opsx-meta-commit` (not `/opsx-commit`).
 
 ---
 

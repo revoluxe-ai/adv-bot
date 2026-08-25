@@ -8,10 +8,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.billing import billing
 from app.modules.billing.pricer import Pricer
+from app.modules.billing.pricer.pricer import TariffDetails, TariffMode
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 
 pytestmark = pytest.mark.asyncio
+
+
+def _tariff_details(total_per_day: float, count: float = 1.0) -> TariffDetails:
+    return TariffDetails(
+        mode=TariffMode.AUTO,
+        count=count,
+        price_per_adv=100.0,
+        total_per_month=100.0,
+        total_per_day=total_per_day,
+    )
 
 
 @pytest.fixture
@@ -22,7 +33,7 @@ def mock_session():
 @pytest.fixture
 def mock_pricer():
     pr = AsyncMock(spec=Pricer)
-    pr.get_price_for_day_for_shop.return_value = 75.0
+    pr.get_tariff_details.return_value = _tariff_details(75.0)
     return pr
 
 
@@ -31,6 +42,10 @@ def mock_redis_manager():
     mgr = AsyncMock()
     mgr.get_billing_process_for_day.return_value = False
     mgr.set_billing_process_for_day.return_value = None
+    latch = AsyncMock()
+    latch.record_sample.return_value = 0.5
+    latch.get_billable_weight.return_value = 0.5
+    mgr.leg_latch = MagicMock(return_value=latch)
     return mgr
 
 
@@ -113,7 +128,7 @@ async def test_process_single_cabinet_bonus_success(
     assert result["processed"] is True
     # Был добавлен WBBonusPayment и AdvPayment => минимум 2 add вызова
     assert mock_session.add.call_count >= 2
-    mock_pricer.get_price_for_day_for_shop.assert_awaited_once()
+    mock_pricer.get_tariff_details.assert_awaited_once()
 
 
 async def test_process_single_cabinet_insufficient_funds_first_day_negative(
@@ -123,7 +138,7 @@ async def test_process_single_cabinet_insufficient_funds_first_day_negative(
     cab = _make_cabinet(
         bonus=0.0, balance=10.0, advs=[active_adv], balance_went_negative_at=None
     )
-    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    mock_pricer.get_tariff_details.return_value = _tariff_details(100.0)
 
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
@@ -162,7 +177,7 @@ async def test_process_single_cabinet_grace_exceeded_deactivates(
         balance_went_negative_at=neg_at,
     )
     mock_pricer.get_price_for_day_for_shop.return_value = 100.0
-    # balance_after_charge = -800 - 100 = -900 < -700 → FREE transition
+    # balance_after_charge = -800 - 100 = -900 < -700 → deactivate
 
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
@@ -193,7 +208,7 @@ async def test_process_single_cabinet_negative_within_limit_charges(
     cab = _make_cabinet(
         bonus=0.0, balance=-200.0, advs=[active_adv], balance_went_negative_at=None
     )
-    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    mock_pricer.get_tariff_details.return_value = _tariff_details(100.0)
     # balance_after_charge = -300, limit -700 → charge
 
     with patch.object(
@@ -219,7 +234,7 @@ async def test_process_single_cabinet_negative_at_boundary_charges(
     cab = _make_cabinet(
         bonus=0.0, balance=-600.0, advs=[active_adv], balance_went_negative_at=None
     )
-    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    mock_pricer.get_tariff_details.return_value = _tariff_details(100.0)
     # balance_after_charge = -700, limit -700 → still allowed (>= -700 in sense of not <)
 
     with patch.object(
@@ -251,7 +266,7 @@ async def test_process_single_cabinet_grace_exceeded_rerun_no_charge(
         advs=[active_adv],
         balance_went_negative_at=neg_at,
     )
-    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    mock_pricer.get_tariff_details.return_value = _tariff_details(100.0)
     add_count_before = mock_session.add.call_count
 
     with patch.object(
@@ -280,7 +295,7 @@ async def test_process_single_cabinet_negative_calls_notify_days_until_block(
     cab = _make_cabinet(
         bonus=0.0, balance=10.0, advs=[active_adv], balance_went_negative_at=None
     )
-    mock_pricer.get_price_for_day_for_shop.return_value = 100.0
+    mock_pricer.get_tariff_details.return_value = _tariff_details(100.0)
     # balance_after_charge = -90, max_allowed_negative = 700, room = 610, days_left = 6
 
     notify_mock = AsyncMock()
@@ -304,7 +319,7 @@ async def test_process_single_cabinet_zero_price(
     mock_session, mock_pricer, mock_redis_manager, active_adv
 ):
     cab = _make_cabinet(bonus=50.0, balance=50.0, advs=[active_adv])
-    mock_pricer.get_price_for_day_for_shop.return_value = 0.0
+    mock_pricer.get_tariff_details.return_value = _tariff_details(0.0, count=0.0)
     with patch.object(
         billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
     ):
@@ -320,20 +335,26 @@ async def test_process_single_cabinet_zero_price(
     assert result["payment_successful"] is False
 
 
-async def test_process_single_cabinet_already_flagged_in_redis(
+async def test_process_single_cabinet_stale_redis_flag_still_charges_when_db_clean(
     mock_session, mock_pricer, mock_redis_manager, active_adv
 ):
+    """Stale billing:processed must not block charge when DB has no debit today."""
     cab = _make_cabinet(bonus=200.0, balance=0.0, advs=[active_adv])
     mock_redis_manager.get_billing_process_for_day.return_value = True
-    result = await billing.__process_single_cabinet(
-        session=mock_session,
-        cabinet_id=cab.id,
-        current_dt=datetime.datetime(2024, 1, 4, 10, 0, 0),
-        pricer=mock_pricer,
-        redis_manager=mock_redis_manager,
-    )
-    assert result["reason"] == "redis_flag_skip"
-    mock_session.add.assert_not_called()
+    with patch.object(
+        billing, "_load_cabinet_with_relations", new=AsyncMock(return_value=cab)
+    ), patch.object(billing, "_safe_commit", new=AsyncMock(return_value=True)):
+        mock_session.scalar.return_value = 0
+        result = await billing.__process_single_cabinet(
+            session=mock_session,
+            cabinet_id=cab.id,
+            current_dt=datetime.datetime(2024, 1, 4, 10, 0, 0),
+            pricer=mock_pricer,
+            redis_manager=mock_redis_manager,
+        )
+    assert result["reason"] != "redis_flag_skip"
+    assert result["payment_successful"] is True
+    mock_session.add.assert_called()
 
 
 async def test__process_payment_for_advs_invokes_single(

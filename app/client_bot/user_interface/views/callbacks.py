@@ -26,6 +26,7 @@ _AUTO_SHELF_BID_CONTROL_ACTION_CODES: dict[str, str] = {
     "set_target_test_impressions": "tti",
     "set_target_test_observation_minutes": "tto",
     "set_min_bid_distance": "md",
+    "set_retest_interval_days": "rid",
     "strategy_menu": "sm",
     "set_strategy_plan_distance": "sp",
     "set_strategy_ctr": "sc",

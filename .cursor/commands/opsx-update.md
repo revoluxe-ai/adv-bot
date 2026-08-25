@@ -20,13 +20,88 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 
 `/opsx-update` MUST treat `[deferred-from:<CHANGE_ID>]` (and matching titles/notes for this change) as **out of current owed DoD** until the owner explicitly confirms re-entry. Silent re-inflation of a bounded change is forbidden.
 
+**Planning-review repair front-door:** When the user pastes or references a
+`PLANNING_REVIEW_HANDOFF` with `MODE: REPAIR_PLANNING_PACKAGE` (and/or
+`TARGET_WRITER: /opsx-update`), treat that handoff as the authoritative
+repair request for this invocation. Handoff field names and repair semantics
+are defined in `.cursor/pipeline/contracts/PLANNING_REVIEW.md` (producer:
+`/opsx-planning-review`). Confirm-before-write still applies.
+
+Algorithm:
+
+1. Validate handoff: `CHANGE_ID`, `FINDINGS`, `FIRST_BAD_ARTIFACT`,
+   `EXPECTED_SEMANTICS`, `DO_NOT_CHANGE`, `WRITE_BOUNDARY`.
+2. Repair `FIRST_BAD_ARTIFACT` first using `EXPECTED_SEMANTICS` / per-finding
+   `REPAIR_REQUIRED` — do not invent product decisions or expand scope.
+3. Then repair/regenerate only `AFFECTED_DOWNSTREAM` / stale derivatives;
+   do not modify unaffected upstream.
+4. Do **not** edit `owner-contract.md` unless the finding explicitly routes
+   Owner-contract repair via `/opsx-owner-contract-review` + `/opsx-new`
+   (out of this mode).
+5. Forbidden: production code, apply, new product decisions, scope expansion
+   beyond the handoff.
+6. After successful repair, soft-recommend
+   `/opsx-planning-review change=<id>` (not `/opsx-apply`) until that review
+   returns `STATUS: PASS`.
+
+Keep `UPDATE_HANDOFF` / coherence / bug-episode paths unchanged when no
+planning-review handoff is present.
+
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_update --strict`. Stop on non-zero exit and report the guard output.
 
 **Architecture Decision Lookup:** When revising artifacts, resolve `artifactPaths.decisions.existingOutputPaths` first, then only needed accepted decisions under `openspec/decisions/`. Follow `.cursor/commands/opsx-source-resolution.md`; do not rediscover the selected change by scanning all changes. Reconcile specs/design/tasks/decisions with relevant decisions. If a new fact changes architecture ownership, layering, write-path placement, or a reusable domain invariant, update or create a proposed `decisions/<slug>/decision.md` artifact under the change root using `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied.
 
-**Input**: Optionally specify a change name after `/opsx:update` (e.g., `/opsx:update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Semantic write-target preflight:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. When revising a high-risk
+write and repository evidence exposes multiple plausible entities/legs/adapters,
+artifacts MUST durably name `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+`FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired
+positive/negative tests in an **explicit SWT schema block** (exact field
+names). Architecture Decision `## Allowed` / `## Forbidden` prose and design
+Ownership tables **alone** are **not** MEANING_LOCK `RESOLVED`
+(`prose≠RESOLVED`) — do **not** mark the package coherent / apply-ready until
+the schema block exists. Chat-only Owner answers are insufficient: materialize
+them into planning artifacts before recommending `/opsx-apply`. If evidence does
+not select one target, return `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` and ask the
+contract's single concrete Owner question. Never infer product semantics from
+similar names. Competing legs MUST NOT be closed with SEMANTIC
+`NOT_APPLICABLE`.
+
+**Product Acceptance preflight:** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When revising planning,
+record/update `PRODUCT_ACCEPTANCE_REQUIRED`. If required, keep MEANING_LOCK
+durable via the explicit SWT schema tokens above (prose alone = missing). For temporal/stateful Changes with reviewed `owner-contract.md`:
+write or refresh durable Derived Lifecycle in `design.md`
+(`LIFECYCLE_STATUS: DERIVED`, per-step SOURCE) from Owner Contract +
+decisions + repo facts — **do not** re-ask Owner `CONFIRM_LIFECYCLE` when
+unambiguous. Unresolved material forks →
+`/opsx-owner-contract-review` (not a parallel confirm contour). Legacy
+Changes without owner-contract may still use `OWNER_LIFECYCLE_ECHO` +
+`CONFIRM_LIFECYCLE` (or `CORRECT` → rewrite → confirm). Keep lifecycle↔
+scenario coverage on the path (`/opsx-spec-scenario-coverage mode=plan`
+then later audit/certify). Soft tooling waivers never substitute for
+Product Acceptance. Chat-only lifecycle is not durable.
+
+**Design Generation gate (when revising `design.md`):** Follow
+`.cursor/pipeline/contracts/DESIGN_GENERATION.md` (same SoT as
+`/opsx-continue` / `/opsx-ff`). Before treating a revised `design.md` as
+coherent / complete:
+
+1. Run `DESIGN_READINESS` (SoT/ownership/write/recovery resolved or
+   `not_applicable`; normative conflicts none; no implementation-critical
+   Open Questions).
+2. Resolve technical architecture from repository evidence + decisions, or
+   stop with `DESIGN_STATUS: BLOCKED` /
+   `REASON: TECHNICAL_DESIGN_UNRESOLVED` (or `UPSTREAM_NORMATIVE_CONFLICT`).
+3. Preserve upstream `MUST` / `MUST NOT` / `MAY` (no `MUST→MAY` weakening).
+4. Forbidden: «выбрать в apply», «PG/Redis — apply-time», READY design with
+   architecture deferred to implementation.
+
+Lifecycle DERIVED does **not** waive this gate.
+
+**Input**: Optionally specify a change name after `/opsx-update` (e.g., `/opsx-update add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -101,6 +176,10 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
    - Consuming `UPDATE_HANDOFF` that only **removes/narrows** to KEEP MUST NOT treat deferred parks as re-entry; still print `DEFERRED_PARKS_FOR_CHANGE` as situational awareness.
 
 3. **Understand the request**
+   - If the user pasted or referenced a `PLANNING_REVIEW_HANDOFF` with
+     `MODE: REPAIR_PLANNING_PACKAGE`, treat that as the authoritative repair
+     request (see **Planning-review repair front-door** above). Do not mix
+     with bound-scope KEEP/DEFER unless the handoff explicitly allows.
    - If the user pasted or referenced an `/opsx-bound-scope` `UPDATE_HANDOFF`, treat that as the authoritative KEEP revision request for this invocation (apply KEEP / remove-or-narrow deferred units; do not re-park WORKLOG — bound-scope already did). Do not re-add DEFER units from that handoff.
    - If the user asked for a specific revision ("the design now uses X"), that is the starting edit — run it through the Deferred re-entry gate in 2b when it overlaps parks.
    - If they only said "update" / "make this coherent", treat it as a coherence review: read the existing artifacts and check them against each other for contradictions, gaps, and duplication. Coherence MUST NOT silently restore parked scope; if coherence “wants” a deferred unit back, use `DEFERRED_REENTRY_REQUIRED`.
@@ -121,7 +200,7 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
    - Apply the requested edit. Then check every other existing artifact against it - in ANY direction: an edit to a later artifact may require revising an earlier one, not only the other way around. Build order is a useful reading order, not a constraint on which artifacts may be revised.
    - Note everything that is now inconsistent, missing, or contradictory.
    - If a revision introduces or changes reusable architecture ownership, update/create a proposed decision under `decisions/<slug>/decision.md` before treating the artifacts as coherent. Get `openspec instructions decisions --change "<name>" --json` first and follow `rules.decisions`.
-   - Revise only files that already exist (`existingOutputPaths`). Do NOT create change artifacts that don't exist yet, and do NOT invent new files under a glob artifact - note them and point the user to `/opsx:continue` to create them. Exception: proposed architecture decisions may be created under the change's `decisions/` artifact when required by Architecture Decision Lookup.
+   - Revise only files that already exist (`existingOutputPaths`). Do NOT create change artifacts that don't exist yet, and do NOT invent new files under a glob artifact - note them and point the user to `/opsx-continue` to create them. Exception: proposed architecture decisions may be created under the change's `decisions/` artifact when required by Architecture Decision Lookup.
    - If the change is already coherent, say so and make no edits.
 
 6. **Confirm and apply, one artifact at a time**
@@ -142,7 +221,7 @@ Revise a change's existing planning artifacts and keep them coherent. Never edit
 After each invocation, show:
 - `DEFERRED_PARKS_FOR_CHANGE` / any `DEFERRED_REENTRY_REQUIRED` outcomes
 - Which artifacts were revised (and which proposed revisions were rejected)
-- Anything deferred to `/opsx:continue` (not-yet-created artifacts or files)
+- Anything deferred to `/opsx-continue` (not-yet-created artifacts or files)
 - WORKLOG annotations made on confirmed re-entry (if any)
 - Where the change stands and the recommended next command
 
@@ -432,7 +511,32 @@ POST_GREEN_OWNER:
 HANDBACK_COMMAND:
 NEXT_ACTION:
 ALSO_OK:
+
+ROUTE_TRANSITION:
+  (schema: .cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md)
+  FROM_STATE: AWAITING_SPEC_UPDATE | <prior>
+  RESULT: TASK_DELTA_CHANGED | TASK_DELTA_UNCHANGED
+  TO_STATE: AWAITING_APPLY_RED | AWAITING_FIX_BUG_RED
+  NEXT_COMMAND: /opsx-apply | /opsx-fix-bug
+  NEXT_ARGS: WITHOUT GO   # GO is Owner-later; RED still required
+  PRECONDITIONS:
+    GO_TOKEN: FORBIDDEN
+    RED_REQUIRED: yes
+  REQUIRED_EVIDENCE: TASK_DELTA_EVIDENCE_PATH
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
 ```
+
+Rules for `/opsx-update` as worker envelope:
+
+* `EXPECTED_EXECUTION_ROUTE` / `ACTUAL_EXECUTION_ROUTE` MUST NEVER be
+  `/opsx-update` (update is process step only).
+* `MISSION_COMPLETE: no` always on this worker.
+* `FINDING_TERMINAL: no` unless a separate terminal disposition is already
+  proven (update alone does not close a finding).
+* Blockers (`blocked_needs_classify_first` / `BLOCKED_ROUTE_MISMATCH`):
+  `RECOVERY_CLASS: BLOCKED | PAUSED`; no invented next route.
 
 Also keep the normal OpenSpec update summary (artifacts revised / rejected /
 deferred).
@@ -498,12 +602,26 @@ Never rewrite prior JSONL events. Snapshot LEDGER `## ROUTE_STATE` must
 align with the latest applicable event.
 
 **Guardrails**
-- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx:apply`.
+- Planning artifacts only - NEVER edit implementation code. If the revised plan implies code changes, stop and point to `/opsx-apply`.
+- Do not mark artifacts coherent while a high-risk multi-target write remains
+  unresolved (`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`); materialize Owner
+  semantic answers into artifacts before recommending apply.
+- Do not recommend apply-ready when `PRODUCT_ACCEPTANCE_REQUIRED=true` and
+  MEANING_LOCK is missing/blocked, **or** Derived Lifecycle is
+  missing/UNRESOLVED when temporal behavior applies under a reviewed Owner
+  Contract, **or** (legacy path only) `OWNER_LIFECYCLE_ECHO` /
+  `CONFIRM_LIFECYCLE` is missing; lifecycle plan is not optional under PA.
+  Do not demand a second `CONFIRM_LIFECYCLE` when `LIFECYCLE_STATUS: DERIVED`
+  uniquely follows from reviewed Owner Contract.
+- When revising `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`; do not mark design
+  coherent or recommend apply-ready if `DESIGN_STATUS: BLOCKED`, SoT/
+  ownership/write-path is deferred to apply, or MUST/MUST NOT was weakened.
 - Do not mark artifacts coherent if implementation placement conflicts with an accepted decision or if required architecture placement is unresolved.
 - Use the artifact ids and paths reported by `openspec status`; never branch on hardcoded artifact names.
 - Edit only the concrete files in `existingOutputPaths`; never write to a glob `resolvedOutputPath`.
-- Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx:continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
+- Do not advance the change artifact build frontier: no new change artifacts, no new files under glob artifacts - that is `/opsx-continue`'s job. Proposed decisions under the change's optional `decisions/` artifact are the only exception.
 - Confirm every edit with the user before writing.
 - Deferred parks: always surface `DEFERRED_PARKS_FOR_CHANGE` when WORKLOG exists; never silently restore `[deferred-from:<CHANGE_ID>]` into owed DoD; re-entry requires `REENTER_CONFIRMED`; the only allowed WORKLOG write from this command is annotating confirmed re-entry (`[re-entered:<CHANGE_ID>]`). Parking new deferrals remains `/opsx-bound-scope:GO` only.
-- If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx:new` (the "Update vs. Start Fresh" heuristic).
+- If the request changes the change's *intent* rather than refining it, recommend starting fresh with `/opsx-new` (the "Update vs. Start Fresh" heuristic).
 - Bug-episode: never write OpenSpec / TASK_DELTA without durable Route B receipt (`CLASSIFICATION` + `CHOSEN_ROUTE=ROUTE_B` + `EXPECTED_NEXT_COMMAND=/opsx-update` or `CURRENT_ROUTE_STATE=AWAITING_SPEC_UPDATE`); never store `/opsx-update` as `EXPECTED_EXECUTION_ROUTE` / `ACTUAL_EXECUTION_ROUTE`; never write legacy `TASK_DELTA_STATUS` / `CURRENT_ROUTE` in new artifacts.

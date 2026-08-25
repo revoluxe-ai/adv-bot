@@ -376,8 +376,17 @@ hunt
 fanout
 fan-in
 lesson_analysis
+supervisor_transition
 ```
 
+Optional nested object on events (see `ROUTE_TRANSITION.md`):
+
+```text
+ROUTE_TRANSITION: { ... }
+SUPERVISOR_EVENT fields when EVENT_TYPE=supervisor_transition
+```
+
+Do not create a second append-only history for supervisor; reuse this JSONL.
 ## TERMINAL_STATUS vocabulary
 
 ```text

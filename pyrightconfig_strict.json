@@ -145,6 +145,7 @@
     "app/modules/wb_adv_updater/word_to_vec_object.py",
     "app/modules/wb_adv_updater/wb_manager.py",
     "app/modules/wb_adv_updater/update_wb_adv_phrases_in_neo.py",
-    "app/utils/graphic_positions_creator/graphic_positions_creator.py"
+    "app/utils/graphic_positions_creator/graphic_positions_creator.py",
+    "app/utils/db/session_maker.py"
   ]
 }

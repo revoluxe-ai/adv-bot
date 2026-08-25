@@ -9,6 +9,34 @@ Implement tasks from an OpenSpec change.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
+**Semantic write-target preflight:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. After context/decision
+read and **before any production edit**, re-check the semantic write target for
+high-risk multi-target mutations. `RESOLVED` requires an **explicit SWT schema
+block** with exact field names `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+`FORBIDDEN_ADAPTERS` **and** planned symbols in `ALLOWED_ADAPTERS` / outside
+`FORBIDDEN_ADAPTERS`. Architecture Decision Allowed/Forbidden prose and design
+Ownership tables **alone** are **not** RESOLVED (`prose≠RESOLVED`). Unresolved,
+prose-only, or chat-only Owner answers return `NO_GO` /
+`BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` with primary
+`NEXT_ACTION: /opsx-update <change>` for durable materialization — never guess
+Auto vs Search or equivalent legs from similar names; never primary-hop to
+scenario re-certify for this gap.
+
+**Product Acceptance:** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. When
+`PRODUCT_ACCEPTANCE_REQUIRED=true`, do not edit production code if MEANING_LOCK
+is missing/blocked (schema tokens absent = missing). Author acceptance tests with `side_effect_proof` /
+`PA_SIDE_EFFECT_PROOF` for external mutations (this-run effect or forbidden
+sibling non-effect). Task checkboxes and soft tooling green are not DONE.
+
+**Planning-review soft preflight (v1, not a hard gate):** Prefer a recent
+`/opsx-planning-review change=<name>` with `STATUS: PASS` /
+`APPLY_PLANNING_GATE: PASS` before implementing. If the Owner has not just
+completed that review for this change, soft-recommend it once (READY markers
+alone are insufficient — `.cursor/pipeline/contracts/PLANNING_REVIEW.md`).
+Do **not** hard-block `/opsx-apply` when review was skipped.
+
 **Architecture Decision Lookup:** Before changing code, resolve decision paths from the selected change context/`artifactPaths.decisions` first. Prefer exact listed paths over a full `openspec/decisions/**` walk. Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-execution-preflight.md`: when the change name is known, do not rediscover it by scanning all changes; do not gate apply on unconditional `git status`—run git only when dirty-tree / branch identity is REQUIRED_FOR safe implementation. Search `openspec/decisions/**/*.md` only for remaining gaps after direct context paths are read (budget ≤ 3 targeted lookups unless `EVIDENCE_GAP` is recorded). Do **not** equate budget exhaustion with “no decision exists”: if ownership / layering / write-path / domain-invariant gaps remain unresolved after that budget (a relevant accepted decision may still be unread), record `EVIDENCE_GAP` and return `NO_GO` without editing code. Use `Architecture Decision Missing` only when lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes no relevant decision. Implementation must cite relevant decisions in progress or completion notes. If planned code placement contradicts an accepted decision, stop before editing code and return `NO_GO` with the conflicting decision path. If placement depends on a proposed decision, use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied before deciding whether code can proceed. Passing tests are not sufficient if placement violates a decision.
 
 **Canonical testing rule:** Before implementation, read `.cursor/rules/testing-rules.mdc` as the only general test-design/execution policy. Do not treat `.cursor/rules/TESTING_RULES.mdc` as policy (migration pointer only). Do not copy large test-policy blocks into this command; follow the authority split below.
@@ -25,9 +53,11 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
 - `/opsx-pyright-strict-coverage` — post-apply soft recommend when production `.py` changed
 - `/opsx-external-call-coverage` — after pyright-coverage PASS; soft recommend for external surfaces in diff
 - `/opsx-performance-review` — after external-call PASS when performance trigger applies (DB/query/queue/concurrency/pool/retry); soft recommend, not every-diff hard gate
-- `/opsx-verify` — independent adequacy and archive verdict
+- `/opsx-verify` — phased READ_ONLY audit via
+  `.cursor/pipeline/contracts/VERIFY_PHASES.md` (`mode=impl` DoD, then later
+  `mode=archive` archive GO)
 
-**Input**: Optionally specify a change name (e.g., `/opsx:apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Input**: Optionally specify a change name (e.g., `/opsx-apply add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -38,7 +68,7 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - Auto-select if only one active change exists
    - If ambiguous, run `openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/opsx:apply <other>`).
+   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-apply <other>`).
 
 2. **Check status to understand the schema**
    ```bash
@@ -62,7 +92,7 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - Dynamic instruction based on current state
 
    **Handle states:**
-   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx:continue`
+   - If `state: "blocked"` (missing artifacts): show message, suggest using `/opsx-continue`
    - If `state: "all_done"`: congratulate, then follow **Post-apply next-step recommend** below (not archive readiness)
    - Otherwise: proceed to implementation
 
@@ -99,6 +129,50 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
    - Compare planned implementation placement against accepted/proposed decisions before editing code.
    - If placement conflicts with an accepted decision, return `NO_GO` and do not edit code.
 
+6a. **Semantic write-target preflight (before production edit)**
+
+   Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`:
+   - If the change is not a high-risk multi-target write → `NOT_APPLICABLE` /
+     proceed only when justified (single proven target).
+   - If artifacts durably resolve `TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`,
+     `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and paired tests
+     via an **explicit SWT schema block** (exact field names) → `RESOLVED`;
+     planned write symbols MUST be in `ALLOWED_ADAPTERS` and MUST NOT be in
+     `FORBIDDEN_ADAPTERS`. Decision Allowed/Forbidden prose / Ownership
+     tables alone = **not** RESOLVED (`prose≠RESOLVED`).
+   - If multiple plausible targets remain, resolution exists only in chat, or
+     only prose ownership exists without schema tokens → return `NO_GO` with
+     `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` (or MEANING_LOCK missing), human
+     `prose≠RESOLVED; lift Allowed/Forbidden into SWT fields`, and primary
+     `NEXT_ACTION: /opsx-update <change>`. Do not edit production code. Do
+     not close competing legs with `NOT_APPLICABLE`. Do not primary-hop to
+     scenario re-certify for this gap.
+
+6b. **Product Acceptance preflight (before production edit)**
+
+   Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`:
+   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and MEANING_LOCK is not durable
+     (schema tokens absent) → `NO_GO`; route to `/opsx-update` / Owner
+     semantic decision.
+   - If `PRODUCT_ACCEPTANCE_REQUIRED=true` and temporal behavior applies:
+     - **Primary:** durable Derived Lifecycle
+       (`LIFECYCLE_STATUS: DERIVED` in design, from reviewed Owner Contract)
+       must be present (or unambiguously derivable without invention). Do
+       **not** `NO_GO` solely for absent `CONFIRM_LIFECYCLE` /
+       `OWNER_LIFECYCLE_ECHO` on this path.
+     - **Unresolved forks:** `LIFECYCLE_STATUS: UNRESOLVED` → `NO_GO`;
+       route to `/opsx-owner-contract-review`.
+     - **Legacy** (no reviewed owner-contract): missing/chat-only
+       `OWNER_LIFECYCLE_ECHO` or missing `CONFIRM_LIFECYCLE` → `NO_GO`;
+       route to `/opsx-update` (or `/opsx-ff`).
+     Do not implement against chat-only lifecycle.
+   - When implementing acceptance seams with external mutation, materialize
+     tests that satisfy SIDE_EFFECT_PROOF (`side_effect_proof` /
+     `PA_SIDE_EFFECT_PROOF` in TEST_EVIDENCE_TAXONOMY). Intent-only /
+     OR-armed proxies without this-run effect are insufficient for later
+     archive DONE.
+   - Do not treat apply completion alone as Product Acceptance PASS.
+
 7. **Show current progress**
 
    Display:
@@ -123,6 +197,13 @@ For PG/CH testability seams, default to parent→child handoff: open session/cli
      - do not create phantom model/DTO fields or impossible states;
      - do not fully mock the causal boundary under test;
      - materialize allowed sibling and residual/repeated-invocation scenarios when the packet/spec/task makes them mandatory;
+     - for Spec Scenario write/notify **thin ends** (WB pause/start, notify,
+       Telegram transport, etc.): prefer shared `ContractCase` + recording fake
+       in `tests/**` at the thin end (see
+       `.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md` /
+       `/opsx-spec-scenario-coverage`). Bare `MagicMock`/`AsyncMock` without
+       ContractCase is allowed only with explicit `TEST_DEBT` in task notes
+       listing stub symbols → `/opsx-test` (do not invent production APIs);
      - run focused/targeted tests for the changed slice (and adjacent tests when a neighboring contract/workflow is affected)
    - Do **not** mark the task complete (`- [ ]` → `- [x]`) if its mandatory tests fail
    - Mark task complete in the tasks file only after required implementation and mandatory focused tests for that task succeed: `- [ ]` → `- [x]`
@@ -167,9 +248,14 @@ this change to a durable case):
 
 **OpenSpec-only** (no bug case context):
 
-1. Если в этой сессии или в diff change есть **in-policy production Python**
+0. **PRIMARY** всегда сначала DoD-фаза (VERIFY_PHASES):
+   `/opsx-verify mode=impl <change-name>`
+   `✅ IMPL_OK` ≠ archive; `❌ IMPL_GAPS` → apply/update, не quality chain
+   как замена DoD.
+
+1. После `IMPL_OK`, если есть **in-policy production Python**
    (`app/**/*.py` или top-level production `*.py` в корне, не `tests/**`):
-   - Primary: `/opsx-pyright-strict-coverage base=<BASE>`
+   - Next: `/opsx-pyright-strict-coverage base=<BASE>`
    - Если `BASE` неизвестен — спроси один раз: «На какую base branch/ref
      сверять pyright-strict / external-call coverage?» Не выдумывай base.
    - After pyright-coverage `PASS`: recommend
@@ -187,19 +273,20 @@ this change to a durable case):
        `/opsx-antipattern-gate base=<BASE>`;
      - после antipattern-gate `PASS` | `PASS_WITH_SUSPECTS`
        (Owner may continue with suspects) → `/opsx-static-check`,
-       затем `/opsx-verify <change-name>`.
+       затем `/opsx-verify mode=archive <change-name>`.
    - Performance review **не** обязателен для каждого diff
      (docs/typing-only / нерелевантный tests-only → skip).
    - Antipattern-gate — soft over-report; не archive gate. `FAIL` →
      fix pasteable exit или `accept=`/`reject=` practice ledger, затем
      re-run `/opsx-antipattern-gate base=<BASE>`.
-2. Иначе (нет in-policy production `.py`):
-   - Primary: `/opsx-verify <change-name>`.
+2. После `IMPL_OK`, если нет in-policy production `.py`:
+   - Next: `/opsx-verify mode=archive <change-name>`.
    - Если в diff есть `tests/**` / process surfaces — soft recommend
-     `/opsx-antipattern-gate base=<BASE> focus=tests|process` before verify.
+     `/opsx-antipattern-gate base=<BASE> focus=tests|process` before archive verify.
 
 Не объявляй archive readiness из apply.
 Не объявляй bug-card closed из apply.
+`DO_NOT_DO_YET: /opsx-archive` until `mode=archive` ✅ GO.
 
 **Output During Implementation**
 
@@ -231,21 +318,25 @@ Working on task 4/7: <task description>
 
 Implementation tasks complete.
 
-If production Python changed (`app/**/*.py` or top-level production scripts):
-  Next: `/opsx-pyright-strict-coverage base=<BASE>`
+Always first:
+  Next: `/opsx-verify mode=impl <change-name>`
+If production Python changed (`app/**/*.py` or top-level production scripts)
+after IMPL_OK:
+  Then: `/opsx-pyright-strict-coverage base=<BASE>`
   Then: `/opsx-external-call-coverage base=<BASE>` (after pyright PASS)
   Then: `/opsx-performance-review scope=base base=<BASE>` when trigger applies
         (else skip)
   Then: `/opsx-antipattern-gate base=<BASE>` (after external-call PASS, and
         after performance PASS|PASS_WITH_RISK when review ran)
   Then: `/opsx-static-check` (after antipattern-gate PASS|PASS_WITH_SUSPECTS)
-  Then: `/opsx-verify <change-name>`
-Else:
-  Next: `/opsx-verify <change-name>`
+  Then: `/opsx-verify mode=archive <change-name>`
+Else after IMPL_OK:
+  Next: `/opsx-verify mode=archive <change-name>`
   Soft: `/opsx-antipattern-gate base=<BASE> focus=tests|process` when those
         paths changed
 
 Do not claim archive readiness from apply alone.
+DO_NOT_DO_YET: `/opsx-archive` until mode=archive ✅ GO.
 ```
 
 **Output On Pause (Issue Encountered)**
@@ -377,8 +468,14 @@ Never rewrite prior JSONL lines.
 - Read `TEST_COVERAGE_PACKET` when present in change artifacts/context; absence does not block legacy apply
 - Packet status alone does not block implementation and does not equal verify/archive verdict
 - Always perform Architecture Decision Lookup before code edits
+- Always perform Semantic write-target preflight before production edits
 - Stop with `NO_GO` when the decision-lookup fallback budget is exhausted while ownership / layering / write-path / domain-invariant gaps remain unresolved
 - Stop with `NO_GO` when planned placement conflicts with an accepted architecture decision
+- Stop with `NO_GO` / `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` when a high-risk
+  write has multiple plausible targets or when Owner resolution is chat-only;
+  route to `/opsx-update` for durable artifact materialization
+- Stop with `NO_GO` when planned write symbols are in `FORBIDDEN_ADAPTERS` or
+  outside `ALLOWED_ADAPTERS` after a resolved semantic target
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
@@ -386,11 +483,11 @@ Never rewrite prior JSONL lines.
 - After implementing tasks, treat any new production/exported symbol whose only callers are tests as dead surface: wire it into a runtime-reachable path or remove it before completion. Passing tests do not prove wiring.
 - Update task checkbox immediately after completing each task; never mark `[x]` when mandatory tests for that task fail
 - When a completed task closes a decision-delta, sync every status mirror in the same pass: the tasks.md checkbox, the decision.md review-checklist annotation, and the design.md checklist/status mirror if present. Do not leave a shipped delta marked "proposed / not yet applied".
-- Pause on errors, blockers, or unclear requirements - don't guess
+- Pause on errors, blockers, or unclear requirements - don't guess product write targets from similar names
 - Use contextFiles from CLI output, don't assume specific file names
 - Do not invent mandatory test scenarios without spec/decision/task/invariant/packet evidence
 - Do not change invariants for test convenience
-- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-pyright-strict-coverage` then `/opsx-external-call-coverage`, then conditional `/opsx-performance-review`, then `/opsx-static-check` when production `.py` changed, else `/opsx-verify <change-name>`)
+- Do not declare final adequacy or archive readiness; after completion follow **Post-apply next-step recommend** (`/opsx-verify mode=impl` first, then `/opsx-pyright-strict-coverage` → `/opsx-external-call-coverage` → conditional `/opsx-performance-review` → `/opsx-antipattern-gate` → `/opsx-static-check` → `/opsx-verify mode=archive` when production `.py` changed; else `mode=impl` then `mode=archive`)
 
 **Fluid Workflow Integration**
 

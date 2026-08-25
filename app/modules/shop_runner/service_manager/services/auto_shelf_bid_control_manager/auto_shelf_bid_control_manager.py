@@ -40,6 +40,7 @@ from .bid_units import (
     wb_min_cpm_rub_to_bid_minor,
 )
 from .auto_shelf_bid_control_repository import AutoShelfBidControlRepository
+from .exhausted_pause.decision import coverage_date_from_for_epoch
 from .settings_normalizer import repair_state_test_bid_minor
 from .auto_shelf_bid_setter import AutoShelfBidSetter
 from .dto.decision_snapshot_dto import (
@@ -55,6 +56,8 @@ from .auto_shelf_bid_control_decision_snapshot_builder import (
     build_decision_snapshot as _build_decision_snapshot,
     fetch_plan_distance_rec_result as _fetch_plan_distance_rec_result,
 )
+from .dto.optimization_metric import OptimizationMetric, resolve_optimization_metric
+from .qualified_tested_bids import collect_qualified_tested_bid_minors
 
 from app.settings import settings
 
@@ -215,6 +218,27 @@ class AutoShelfBidControlManager:
         elapsed = int((now - started_at).total_seconds() // 60)
         return max(0, elapsed)
 
+    @staticmethod
+    def _shelf_exhausted_epoch_start(state: object | None) -> datetime | None:
+        """Достать typed ``shelf_exhausted_epoch_start`` из state (или None)."""
+        if state is None:
+            return None
+        raw = getattr(state, "shelf_exhausted_epoch_start", None)
+        return raw if isinstance(raw, datetime) else None
+
+    @staticmethod
+    def _coverage_date_from(
+        *,
+        first_bucket_start: datetime,
+        date_to: datetime,
+        epoch_start: datetime | None,
+    ) -> datetime:
+        """``date_from`` для coverage: max(first_bucket, epoch window clamp)."""
+        return max(
+            first_bucket_start,
+            coverage_date_from_for_epoch(now=date_to, epoch_start=epoch_start),
+        )
+
     async def _closed_layers_for_bid_at(
         self,
         *,
@@ -224,6 +248,7 @@ class AutoShelfBidControlManager:
         date_to: datetime,
         target_test_impressions: int,
         target_test_observation_hours: int,
+        epoch_start: datetime | None = None,
     ) -> int:
         """Compute closed layers for one bid at a given point in time."""
         price_minor: int | None = None
@@ -238,7 +263,11 @@ class AutoShelfBidControlManager:
             return 0
         coverages = await self._analytics.get_bid_coverages(
             nmid=nmid,
-            date_from=first_bucket_start,
+            date_from=self._coverage_date_from(
+                first_bucket_start=first_bucket_start,
+                date_to=date_to,
+                epoch_start=epoch_start,
+            ),
             date_to=date_to,
             currency=currency,
             price_minor=price_minor,
@@ -267,6 +296,7 @@ class AutoShelfBidControlManager:
         target_test_observation_hours: int,
         min_bid_distance_minor: int,
         date_to: datetime,
+        epoch_start: datetime | None = None,
     ) -> tuple[list[BidCoverage], int, int, int | None]:
         """Load accumulated coverage and derive current layer diagnostics."""
         price_minor: int | None = None
@@ -283,7 +313,11 @@ class AutoShelfBidControlManager:
         else:
             coverages = await self._analytics.get_bid_coverages(
                 nmid=nmid,
-                date_from=first_bucket_start,
+                date_from=self._coverage_date_from(
+                    first_bucket_start=first_bucket_start,
+                    date_to=date_to,
+                    epoch_start=epoch_start,
+                ),
                 date_to=date_to,
                 currency=currency,
                 price_minor=price_minor,
@@ -661,6 +695,7 @@ class AutoShelfBidControlManager:
                 target_test_observation_hours=target_test_observation_hours,
                 min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
                 date_to=now,
+                epoch_start=self._shelf_exhausted_epoch_start(state),
             )
         _coverages, _current_layer, covered_anchor_count, next_test_bid = coverage_snapshot
         should_continue_test = (
@@ -1017,6 +1052,12 @@ class AutoShelfBidControlManager:
                 actual_bid_minor=actual_bid_minor,
                 snapshot=snapshot,
             )
+            await self._apply_shelf_exhausted_tick(
+                complex_adv=complex_adv,
+                settings_obj=settings_obj,
+                state=state,
+                snapshot=snapshot,
+            )
             return None
 
         snapshot = await self.build_decision_snapshot(
@@ -1045,6 +1086,71 @@ class AutoShelfBidControlManager:
             min_bid_minor=min_bid_minor,
             actual_bid_minor=actual_bid_minor,
             snapshot=snapshot,
+        )
+        await self._apply_shelf_exhausted_tick(
+            complex_adv=complex_adv,
+            settings_obj=settings_obj,
+            state=state,
+            snapshot=snapshot,
+        )
+        return None
+
+    async def _apply_shelf_exhausted_tick(
+        self,
+        *,
+        complex_adv: ComplexAdv,
+        settings_obj: AutoShelfBidControlSettings,
+        state: AutoShelfBidControlState,
+        snapshot: AutoShelfBidControlDecisionSnapshot,
+    ) -> None:
+        """Detect/latch/clear shelf-exhausted our-block (PG SoT; без WB pause).
+
+        Terminal plan-fit MUST see the real qualified-tested set (list, possibly
+        empty). Passing ``None`` would treat all ``plan_ranked`` rows as fit
+        candidates and can skip latch / false-clear our-block.
+        """
+        from .exhausted_pause.apply_tick import apply_shelf_exhausted_tick
+
+        # Перечитать state: mode handler мог сохранить cycle-поля.
+        fresh = await self._repository.get_state(int(state.nmid))
+        if fresh is None:
+            return None
+
+        # ORM SoT: current_cycle_started_at is Mapped[datetime] (non-Optional).
+        cycle_started_at = fresh.current_cycle_started_at
+        cycle_bid_stats = await self._analytics.get_bid_stats(
+            nmid=int(complex_adv.main_nmid),
+            from_ts=cycle_started_at,
+            currency=str(fresh.currency),
+        )
+        # Metric ownership mirrors snapshot builder (explicit strategy first).
+        strategy = complex_adv.auto_shelf_bid_control_strategy
+        if strategy == AutoShelfBidControlStrategy.CTR:
+            cycle_metric = OptimizationMetric.CTR
+        elif strategy in {
+            AutoShelfBidControlStrategy.CPC,
+            AutoShelfBidControlStrategy.CYCLE_METRIC,
+        }:
+            cycle_metric = OptimizationMetric.CPC
+        else:
+            cycle_metric = resolve_optimization_metric(
+                getattr(complex_adv, "fact_pay_for_order", None),
+                getattr(complex_adv, "resolve_cpo", None),
+            )
+        qualified_tested_bid_minors = collect_qualified_tested_bid_minors(
+            cycle_bid_stats,
+            target_test_impressions=int(settings_obj.target_test_impressions),
+            metric=cycle_metric,
+        )
+
+        await apply_shelf_exhausted_tick(
+            repository=self._repository,
+            complex_adv=complex_adv,
+            settings_obj=settings_obj,
+            state=fresh,
+            snapshot=snapshot,
+            now=self._now(),
+            qualified_tested_bid_minors=qualified_tested_bid_minors,
         )
         return None
 
@@ -1096,6 +1202,7 @@ class AutoShelfBidControlManager:
             date_to=test_started_at,
             target_test_impressions=int(settings_obj.target_test_impressions),
             target_test_observation_hours=target_test_observation_hours,
+            epoch_start=self._shelf_exhausted_epoch_start(state),
         )
         closed_layers_now = await self._closed_layers_for_bid_at(
             nmid=nmid,
@@ -1104,6 +1211,7 @@ class AutoShelfBidControlManager:
             date_to=now,
             target_test_impressions=int(settings_obj.target_test_impressions),
             target_test_observation_hours=target_test_observation_hours,
+            epoch_start=self._shelf_exhausted_epoch_start(state),
         )
         if closed_layers_now <= closed_layers_at_test_start:
             if not can_set_observation_waiting_reason(
@@ -1150,6 +1258,7 @@ class AutoShelfBidControlManager:
                     target_test_observation_hours=target_test_observation_hours,
                     min_bid_distance_minor=int(settings_obj.min_bid_distance_minor),
                     date_to=now,
+                    epoch_start=self._shelf_exhausted_epoch_start(state),
                 )
             )
             should_continue_test = (
@@ -1439,7 +1548,11 @@ class AutoShelfBidControlManager:
             else:
                 coverages = await self._analytics.get_bid_coverages(
                     nmid=nmid,
-                    date_from=first_bucket_start,
+                    date_from=self._coverage_date_from(
+                        first_bucket_start=first_bucket_start,
+                        date_to=now,
+                        epoch_start=self._shelf_exhausted_epoch_start(state),
+                    ),
                     date_to=now,
                     currency=state.currency,
                     price_minor=coverage_price_minor,

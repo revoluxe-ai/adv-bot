@@ -85,4 +85,31 @@ Run metadata contract (printed in Final SUMMARY):
    treat Task completion notifications as the report. Final is also mandatory
    on Owner `STOP_RUN` / Shell interrupt / abort mid-cascade: synthesize from
    packets already collected + in-flight ERROR + later SKIPPED — never leave
-   `INCOMPLETE_RUN` as the only outcome when abort is known.
+   `INCOMPLETE_RUN` as the only outcome when abort is known.1. **Normalize** findings from all packets (path, symbol/node, code, message,
+   severity, check_id).
+   - `TESTS` — pytest-unit, pytest-full
+   - same path + symbol, or
+   - same path + primary diagnostic code family, or
+   - `path` or test `node`
+   - `fix_target` — one line (file/symbol or test to repair; not an opsx command)
+     - TESTS bucket → `/opsx-test-triage`
+     - env/config group (if any) → `/opsx-test-env UP` (ports `5433`/`8124`/`6390`; session `REDIS_PORT=6390`; not `/opsx-devops`)
+   environment/config → collection → multi-tool typing → typing →
+   multi-seen pytest → other pytest → other.
+   - env/config → `/opsx-test-env UP` (then re-run FULL with `REDIS_PORT=6390`)
+   - else pytest → `/opsx-test-triage`
+   - PASS → continue (optional `/opsx-verify` hint only; never archive GO)
+   treat Task completion notifications as the report.
+10. **Destructive cache SUMMARY (mandatory when pytest-full ran or
+    destructive was in plan):** Final report SUMMARY MUST include exactly:
+    ```text
+    CACHE_MODE: <dev|off|force|n/a>
+    CACHE_DEGRADED: <yes|no|n/a>
+    destructive_cache: ran=N cached=M (CACHE_HIT ≠ archive EXECUTED green)
+    ```
+    If pytest-full PASS but these lines are missing while MODE=FULL → treat
+    Final report as **incomplete**; re-emit with lines (do not invent cached
+    skips). Prefer `CACHE_DEGRADED=yes` when planner missing.
+11. **NEXT_ACTION after FULL PASS + CACHE_MODE=dev + cached>0** (soft):
+    prefer paste `/opsx-static-check FULL CACHE_OFF` before archive verify;
+    otherwise `/opsx-verify mode=archive <change>` when in pre-archive chain.

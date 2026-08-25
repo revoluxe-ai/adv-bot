@@ -23,9 +23,18 @@ You **MUST** consider the user input before proceeding (if not empty).
 - If it exists, read it and look for entries under the `hooks.before_clarify` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
+- For each remaining hook, evaluate `condition` **in this agent session** (there is no separate HookExecutor runtime in Cursor skills). Do **not** skip a hook merely because `condition` is non-empty:
+  - Resolve the hook entry's `extension` field (string). This is the only valid `<extension-id>` for that hook's `config.*` clauses. Do not infer `extension-id` from condition text, command name, or filesystem scan.
+  - Resolve merged extension config using HookExecutor/ConfigManager semantics (later layers override earlier): (1) `extension.yml` → `config` → `defaults` in `.specify/extensions/{extension}/`, (2) project config `.specify/extensions/{extension}/{extension}-config.yml`, (3) overlay `local-config.yml` in that directory when present, (4) environment variables `SPECKIT_{EXT_ID}_*` where `{EXT_ID}` is the extension id with hyphens replaced by underscores then uppercased (e.g. `my-ext` → `SPECKIT_MY_EXT_*`): remainder after the prefix is split on `_`, lowercased, empty segments dropped, and builds nested config keys (e.g. `SPECKIT_JIRA_CONNECTION_URL` → `connection.url`); skip env vars whose remainder belongs to a longer sibling extension ID prefix collision (ConfigManager `_get_env_config`); when scalar and nested paths collide, the deeper nested path wins (order-independent).
+  - If `condition` contains any `config.` token and `extension` is missing, null, or empty → evaluate condition as **false** (hook not executable; fail-closed, same as HookExecutor).
   - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
+  - If `condition` is non-empty, evaluate it using Spec Kit `HookExecutor` semantics and execute only when the result is true:
+    - `config.<dotted.path> is set` — true when every segment of the dotted path exists in the merged extension config above (HookExecutor `has_value` / ConfigManager `has_value`): absent path → false; present path → true, including explicit `null` and falsy scalars (`false`, `0`, `""`)
+    - `config.<dotted.path> == 'value'` / `!= 'value'` — normalize config values before compare (HookExecutor): YAML booleans → lowercase strings `true`/`false`; other scalars → string form; compare normalized value to the quoted RHS literal (strip quotes). Example: YAML boolean `true` matches `== 'true'`.
+    - `env.<VAR_NAME> is set` — true when the environment variable is present (name uppercased)
+    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare the string value from `os.environ.get(<UPPERCASE_NAME>, "")` to the quoted RHS literal (strip quotes). Unlike `is set`, this is value equality, not presence: absent variable yields `""` for comparison
+  - If the condition cannot be parsed or evaluation fails, treat the hook as **not** executable (same fail-closed default as HookExecutor)
+  - Hooks whose condition evaluates to false are skipped; do not emit EXECUTE_COMMAND for them
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
   - **Optional hook** (`optional: true`):
@@ -240,9 +249,18 @@ Check if `.specify/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.after_clarify` key.
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue to the Completion Report.
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook `condition` expressions:
+- For each remaining hook, evaluate `condition` **in this agent session** (there is no separate HookExecutor runtime in Cursor skills). Do **not** skip a hook merely because `condition` is non-empty:
+  - Resolve the hook entry's `extension` field (string). This is the only valid `<extension-id>` for that hook's `config.*` clauses. Do not infer `extension-id` from condition text, command name, or filesystem scan.
+  - Resolve merged extension config using HookExecutor/ConfigManager semantics (later layers override earlier): (1) `extension.yml` → `config` → `defaults` in `.specify/extensions/{extension}/`, (2) project config `.specify/extensions/{extension}/{extension}-config.yml`, (3) overlay `local-config.yml` in that directory when present, (4) environment variables `SPECKIT_{EXT_ID}_*` where `{EXT_ID}` is the extension id with hyphens replaced by underscores then uppercased (e.g. `my-ext` → `SPECKIT_MY_EXT_*`): remainder after the prefix is split on `_`, lowercased, empty segments dropped, and builds nested config keys (e.g. `SPECKIT_JIRA_CONNECTION_URL` → `connection.url`); skip env vars whose remainder belongs to a longer sibling extension ID prefix collision (ConfigManager `_get_env_config`); when scalar and nested paths collide, the deeper nested path wins (order-independent).
+  - If `condition` contains any `config.` token and `extension` is missing, null, or empty → evaluate condition as **false** (hook not executable; fail-closed, same as HookExecutor).
   - If the hook has no `condition` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty `condition`, skip the hook and leave condition evaluation to the HookExecutor implementation
+  - If `condition` is non-empty, evaluate it using Spec Kit `HookExecutor` semantics and execute only when the result is true:
+    - `config.<dotted.path> is set` — true when every segment of the dotted path exists in the merged extension config above (HookExecutor `has_value` / ConfigManager `has_value`): absent path → false; present path → true, including explicit `null` and falsy scalars (`false`, `0`, `""`)
+    - `config.<dotted.path> == 'value'` / `!= 'value'` — normalize config values before compare (HookExecutor): YAML booleans → lowercase strings `true`/`false`; other scalars → string form; compare normalized value to the quoted RHS literal (strip quotes). Example: YAML boolean `true` matches `== 'true'`.
+    - `env.<VAR_NAME> is set` — true when the environment variable is present (name uppercased)
+    - `env.<VAR_NAME> == 'value'` / `!= 'value'` — compare the string value from `os.environ.get(<UPPERCASE_NAME>, "")` to the quoted RHS literal (strip quotes). Unlike `is set`, this is value equality, not presence: absent variable yields `""` for comparison
+  - If the condition cannot be parsed or evaluation fails, treat the hook as **not** executable (same fail-closed default as HookExecutor)
+  - Hooks whose condition evaluates to false are skipped; do not emit EXECUTE_COMMAND for them
 - When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.
 - For each executable hook, output the following based on its `optional` flag:
   - **Mandatory hook** (`optional: false`) — **You MUST emit `EXECUTE_COMMAND:` for each mandatory hook**:

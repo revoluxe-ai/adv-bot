@@ -600,7 +600,8 @@ class AdvSetting(BaseTable):
     )
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
-        Boolean, nullable=True, default=True, server_default="true"
+        Boolean, nullable=True, default=True, server_default="true",
+        comment="Включает управление ставкой для Авто (legacy bidder)",
     )
 
     auto_update_white_list: Mapped[bool] = mapped_column(
@@ -640,7 +641,7 @@ class AdvSetting(BaseTable):
         nullable=False,
         default=False,
         server_default="false",
-        comment="Включает управление общей ставкой полок (auto_shelf_bid_control)",
+    comment="Включает управление общей ставкой полок НОВЫЙ МОДУЛЬ (auto_shelf_bid_control)",
     )
 
     # Intentional default:

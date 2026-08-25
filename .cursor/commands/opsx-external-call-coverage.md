@@ -28,7 +28,7 @@ argument-hint: "base=<branch|ref> [head=<ref>|working] [focus=all|http|wb|pg|ch|
 
 * NOT allowlist pyright (→ `/opsx-pyright-strict-coverage`).
 * NOT запуск `pyright-strict` / static suite (→ `/opsx-static-check`).
-* NOT archive / adequacy verdict (→ `/opsx-verify`).
+* NOT archive / adequacy verdict (→ `/opsx-verify mode=archive`).
 * NOT authoring regression/tests (→ `/opsx-test`).
 * NOT production seam / DI refactor (→ `/opsx-apply` после owner GO).
 * NOT change-specific invariant packet (→ `/opsx-invariant` /
@@ -497,7 +497,7 @@ rate-limit/retry/backpressure, or recommended hot async; otherwise skip)
 ```
 
 ```text
-/opsx-verify <change-name-if-any>
+/opsx-verify mode=archive <change-name-if-any>
 ```
 
 * `PASS` + `focus≠all`:
@@ -704,7 +704,7 @@ COPY_PASTE_RUNBOOK:
 * `PASS` + `focus=all` → if performance trigger applies →
   `/opsx-performance-review scope=base base=<RESOLVED_BASE>`; else
   `/opsx-static-check`; after performance `PASS`|`PASS_WITH_RISK` (or skip)
-  → `/opsx-static-check`, затем `/opsx-verify <change-name>` если есть
+  → `/opsx-static-check`, затем `/opsx-verify mode=archive <change-name>` если есть
   активный change. Performance review не обязателен для каждого diff.
 * `PASS` + `focus≠all` →
   `/opsx-external-call-coverage base=<RESOLVED_BASE>` (full `focus=all`).
@@ -764,7 +764,7 @@ EXTERNAL_CALL_COVERAGE_REPORT:
 |------|-----|
 | `/opsx-apply` (recommend chain) | `/opsx-pyright-strict-coverage` then this |
 | `/opsx-pyright-strict-coverage` PASS | this with `base=` |
-| this PASS (`focus=all`) | conditional `/opsx-performance-review` → `/opsx-static-check` → `/opsx-verify` |
+| this PASS (`focus=all`) | conditional `/opsx-performance-review` → `/opsx-static-check` → `/opsx-verify mode=archive` |
 | this FAIL TEST_ONLY | `/opsx-test` → rerun |
 | this FAIL PG/CH / UNTESTABLE | `/opsx-close-external-gap` (paste report) → focus re-audit |
 | this report present | `/opsx-verify` additive consume |

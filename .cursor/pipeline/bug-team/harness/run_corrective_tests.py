@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from runtime import activation, fs_boundary, owner_go, packets, route_trace, timeout
-from runtime.graph_fingerprint import fingerprint, inventory_names, reproduce, write_inventory
+from runtime.graph_fingerprint import check_attested_inventory
 from runtime.orchestrator import OrchestratorRuntime
 
 Result = Tuple[bool, str, str]
@@ -409,15 +409,10 @@ def ct17() -> Result:
 
 
 def ct18() -> Result:
+    """Read-only attested INVENTORY vs live reproduce() (no rewrite masking)."""
     inv_path = Path(".cursor/pipeline/bug-team/controlled-tests/INVENTORY.json")
-    payload = write_inventory(inv_path)
-    count, fp = reproduce()
-    ok = (
-        payload["INVENTORY_COUNT"] == count
-        and payload["FINGERPRINT"] == fp
-        and payload["GRAPH_NODE_COUNT"] == len(inventory_names())
-    )
-    return ok, "graph fingerprint independently reproducible", "CONTRACT_STATIC"
+    ok, _detail = check_attested_inventory(inv_path)
+    return ok, "graph fingerprint attested coherence", "CONTRACT_STATIC"
 
 
 TESTS: List[Tuple[str, Callable[[], Result]]] = [

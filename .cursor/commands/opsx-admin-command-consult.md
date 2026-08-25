@@ -218,4 +218,25 @@ Before returning:
 - [ ] Authority boundaries respected (no graph/redesign/design/fix ownership steal)
 - [ ] Wrong-branch redirects used when not process
 - [ ] I/O budgets respected
-- [ ] Human can see what happened, why, and what to paste next
+- [ ] Human can see what happened, why, and what to paste next- Human asks how to prepare client/distribution materials after a completed
+  change → route to `/opsx-distribute-brief` (not redesign; not create-pr).
+- Known completed-change client/CS brief → `/opsx-distribute-brief`
+  `/opsx-meta-fix-command-defects`
+- Commit process surfaces → `/opsx-meta-commit`
+  (`/opsx-admin-command-commit` = obsolete alias/redirect only)
+- Unmerged / merge|rebase conflicts on process surfaces →
+  `/opsx-admin-command-resolve-conflicts`
+- Does **not** APPLY contract fixes (`/opsx-meta-fix-command-defects`).
+`meta-commit`, `resolve-conflicts`), not here.
+| `route_fix_defects` | Confirmed or likely contract defect | `/opsx-meta-fix-command-defects` |
+| `route_admin_commit` | Process files changed, need commit | `/opsx-meta-commit` |
+| `route_resolve_conflicts` | Unmerged paths / merge\|rebase on process surfaces | `/opsx-admin-command-resolve-conflicts` |
+When asked about process-surface **git conflicts** vs **commits**:
+| | `/opsx-admin-command-resolve-conflicts` | `/opsx-meta-commit` |
+| Role | Resolve unmerged process paths; finish merge/rebase continue | Semantic local commits on a **non-conflicted** process tree |
+| Writes | Only with `GO` (resolved files + continue/abort) | Only with `GO` (stage + commit) |
+| Refuse | Product-only / mixed-scope without split | Merge/rebase / unmerged paths (redirect to resolve) |
+`/opsx-admin-command-commit` is an obsolete thin redirect to `/opsx-meta-commit`
+(and conflicted-tree → resolve-conflicts); not a second commit SoT.
+Prevention (advisory): avoid editing the same process file on two long-lived
+branches; serialize shared contracts before consumers.

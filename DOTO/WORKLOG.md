@@ -640,4 +640,3 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 **Приоритет:** P1 перед несколькими admin'ами и реальными деньгами; остальное — волна 2.
 
 **Next:** ticket «Partner payouts hardening»; не смешивать с free-bot merge DoD.
-

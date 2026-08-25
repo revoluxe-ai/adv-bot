@@ -338,4 +338,214 @@ Before returning:
 - [ ] `absolute_archive_path` is absolute and clickable/copyable
 - [ ] Not confused with `/opsx-archive` or `/opsx-meta-import-command`
 - [ ] Allowlist not expanded into product/secrets
-- [ ] `.opsx` adapters/registry included on `scope=default` when present
+- [ ] `.opsx` adapters/registry included on `scope=default` when presentcomponent_version: 0.2.1
+local_modification_note: "Projectize 2026-08-07: remapped Vue/npm → poetry-python / WB Sky; opsx-lite only. 2026-08-10: EXP-01/02 write-root + full discovery + ROOT_COVERAGE; EXP-03 one export = opsx-export/<utc_ts>/{opsx-pack.zip, MANIFEST.txt} + absolute_export_dir_path."
+- Process: `.cursor/commands/**`, `.cursor/rules/**`, `.cursor/pipeline/**`,
+  `.cursor/devops/**`, … (explicit process allowlist; safety bound)
+- OpenSpec tree: entire `openspec/**` present on disk (auto-discovers new
+  top-level children, including `changes/**` and `changes/archive/**`)
+- Project-local OPSX: entire `.opsx/**` present on disk (auto-discovers new
+  top-level children, including `upstream/**` when present)
+- Runtime packets: `.tmp/**` (on `scope=default` / `scope=tmp` / `scope=all_safe`)
+- Export writes **only**: `opsx-export/<utc_ts>/` under repo-root `opsx-export/`
+  (one run = one dated folder; separate from `.tmp`)
+- Do not expand into `src/**`, `public/**`, `backend/` app code, `.env*`,
+  or secrets (process allowlist stays bounded; `.opsx/**` + `openspec/**`
+  are the only whole-tree discovery roots).
+- Do not copy `opsx-export/**` into the pack (write-root; nesting ban).
+Read `.opsx/projectization.yaml` before any write under `opsx-export/`.
+Side-lane **copy-only** utility: collect OPSX process surfaces + **entire**
+`.opsx/**` + **entire** `openspec/**` (+ `.tmp` on default) into a **new**
+dated folder `opsx-export/<utc_ts>/` containing exactly `opsx-pack.zip` +
+`MANIFEST.txt`, print the **absolute folder path** (primary handoff) plus zip/
+manifest paths and a **ROOT_COVERAGE** report, and leave every source tree
+untouched.
+`GO` is **optional**. Empty invoke (no args) runs the same COPY_ONLY pack.
+1. One command dump of **this repo’s** OPSX process + full project-local `.opsx`
+   + full OpenSpec tree (including active/archived changes and **new** top-level
+   folders under `.opsx/` / `openspec/` without updating a frozen subpath list)
+   plus local `.tmp` runtime packets (except the export write-root).
+4. Tell the Owner per **root folder** what was FULLY_INCLUDED vs SKIPPED.
+5. Keep runs isolated: **1 export = 1 dated folder** with exactly two files
+   (zip + manifest) so Owner can share that folder without mixing runs.
+- Need a shareable / offline / backup snapshot of local OPSX + OpenSpec
+  (+ `.tmp` packets on default scope).
+Empty `$ARGUMENTS` is valid and runs `scope=default` COPY_ONLY (no `GO` required).
+| `scope=default` | process allowlist + **entire** `.opsx/**` + **entire** `openspec/**` + `.tmp/**` (HARD skip `opsx-export/**`) |
+| `scope=process` | process surfaces only (`.cursor/**` allowlist + AGENTS mirrors; no `.tmp`) |
+| `scope=openspec` | entire `openspec/**` only (discovered top-level children) |
+| `scope=opsx` | entire `.opsx/**` only (discovered top-level children) |
+| `scope=tmp` | `.tmp/**` only (HARD skip `opsx-export/**`) |
+| `scope=bootstrap_profile` | only paths listed in `.opsx/shared/bootstrap-profile.md` (for central `bootstrap/profile/` publish; no `.tmp`) |
+| `scope=all_safe` | same as default (alias; still bounded — no product `src/`) |
+| `GO` | optional; same COPY_ONLY as empty invoke — never unlocks delete |
+| `include_active_changes` | **no-op on default/all_safe/openspec** (already included when path exists) |
+| `include_archived_changes` | **no-op on default/all_safe/openspec** (already included when path exists) |
+| `include_upstream_snapshot` | **no-op on default/all_safe/opsx** (already included when path exists) |
+| empty args / any scope flags | `COPY_ONLY` | **only** new files under `opsx-export/<utc_ts>/` |
+| `GO` | optional synonym | same — still COPY_ONLY; never delete |
+There is **no** delete gate. `GO` does not authorize deletion. Empty invoke
+does **not** mean read-only — it runs the pack.
+- `git clean`, `git reset --hard`, or overwrite an existing dated export dir;
+- write outside `opsx-export/<utc_ts>/` (except creating parent `opsx-export/`);
+- stage or commit the zip / manifest / export dir;
+- expand into `src/`, `public/`, `backend/` application code, `.env*`,
+- claim verify / archive / commit readiness from this utility;
+- claim `FULLY_INCLUDED` for a missing root path;
+- dump many runs as flat siblings under `opsx-export/` without a dated subdir.
+- ensure repo-root `opsx-export/` exists (create if missing);
+- create a **new** per-run directory `opsx-export/<utc_ts>/`
+  (`utc_ts` like `20260805-191530`); if it already exists → new `utc_ts` or
+  `BLOCKED_IO` (never overwrite);
+- inside that directory write exactly:
+  - `opsx-pack.zip` (default scopes; bootstrap: `opsx-bootstrap-profile.zip`)
+  - `MANIFEST.txt`
+  Isolation is the **folder** name; keep inner names simple for handoff;
+- on `scope=default` / `all_safe` / `opsx` / `openspec`: **discover** actual
+  top-level children under `.opsx/` and/or `openspec/` each run (new
+  structures included automatically);
+- copy files into zip without mutating sources;
+- emit Windows-style **absolute path to the export folder** as the primary
+  handoff (`absolute_export_dir_path`), plus absolute zip and manifest paths;
+- HARD skip `opsx-export/**` from pack contents (write-root; nesting ban);
+- emit `ROOT_COVERAGE` listing every considered root folder as
+  `FULLY_INCLUDED` or `SKIPPED` with reason;
+- if a requested include tree is missing → `SKIPPED (missing)` in
+  ROOT_COVERAGE / EXCLUDED, continue (do not fail the whole pack unless
+  **zero** include roots exist).
+## Default pack contents (`scope=default`)
+### Process surfaces (explicit allowlist — safety bound)
+.cursor/devops/**
+`__pycache__/`, `*.pyc`, `node_modules/`. Never include `.cursor/settings.json`.
+### Project-local OPSX — whole tree (auto-discover)
+.opsx/**
+Enumerate **actual** top-level children of `.opsx/` each run (dirs and files).
+New top-level names are included without editing this command. Includes
+`.opsx/upstream/**` when present. Root files such as `manifest.yaml`,
+`projectization.yaml`, `lock.yaml`, `sources.yaml` are included.
+### OpenSpec — whole tree (auto-discover)
+openspec/**
+Enumerate **actual** top-level children of `openspec/` each run. Includes
+`openspec/changes/**` (active) and `openspec/changes/archive/**` when present,
+plus any new top-level folder/file. Still skip junk patterns inside.
+### Runtime packets (`.tmp`) — on `scope=default` / `scope=tmp` / `scope=all_safe`
+.tmp/**
+HARD **exclude** (always, any scope that walks trees): `opsx-export/**` —
+this command’s write-root at repo root; never nest prior export zips into a
+new pack. `opsx-export/**` is **not** an include root; always
+`SKIPPED (write-root nesting ban)` in ROOT_COVERAGE.
+Optional note for legacy leftovers under `.tmp/opsx-export/**` is OK;
+that path is **not** this command’s write-root anymore.
+Skip under `.tmp` walks: `__pycache__/`, `*.pyc`, `.pytest_cache/`,
+`node_modules/`, and other obvious junk dirs.
+`scope=process` / `scope=openspec` / `scope=opsx` / `scope=bootstrap_profile`
+do **not** include `.tmp`. Use `scope=default` (or `scope=all_safe`) for the
+full pack, or `scope=tmp` for runtime packets only.
+(`BOOTSTRAP_PROFILE` + do not include hard excludes). Same per-run layout:
+`opsx-export/<utc_ts>/opsx-bootstrap-profile.zip` + `MANIFEST.txt`. Owner may
+place the result under central `bootstrap/profile/` for
+`/opsx-meta-bootstrap central=…` consumers.
+### Legacy include flags (no-op on full scopes)
+include_active_changes     → no-op when openspec tree is in scope (already included)
+include_archived_changes   → no-op when openspec tree is in scope (already included)
+include_upstream_snapshot  → no-op when .opsx tree is in scope (already included)
+Never include: secrets, product app trees, `opsx-export/**`,
+`openspec/changes/**/__pycache__`, binary Job artifacts under junk skips.
+## ROOT_COVERAGE (mandatory)
+After the pack, receipt + `MANIFEST.txt` (inside the dated export dir) MUST
+list root folders:
+**Must cover at least:**
+- each top-level child under `.opsx/` (when `.opsx` is in scope)
+- each top-level child under `openspec/` (when `openspec` is in scope)
+- each process allowlist root that was considered
+- `.tmp` (when in scope)
+- `opsx-export` (always listed as SKIPPED write-root)
+**Statuses:**
+| Status | Meaning |
+| `FULLY_INCLUDED` | root exists and was walked into the pack (junk skip patterns only) |
+| `SKIPPED` | not packed — reason required: `missing` \| `write-root nesting ban` \| `out of scope` \| `hard exclude` |
+Do not invent roots that were never considered. Do not mark missing paths
+`FULLY_INCLUDED`.
+Example shape:
+ROOT_COVERAGE:
+- .opsx/adapters: FULLY_INCLUDED
+- .opsx/upstream: SKIPPED (missing)
+- openspec/changes: FULLY_INCLUDED
+- openspec/specs: FULLY_INCLUDED
+- .tmp: FULLY_INCLUDED
+- opsx-export: SKIPPED (write-root nesting ban)
+- .cursor/agents: SKIPPED (missing)
+ENTRY_STATE: any (repo with include roots)
+COMMAND_ACTION: create opsx-export/<utc_ts>/{opsx-pack.zip, MANIFEST.txt}; emit absolute_export_dir_path + ROOT_COVERAGE
+NEXT_ALLOWED_STEP: human uses folder path; /opsx-meta-bootstrap central=<zip|dir> on empty peer; /opsx-meta-import-command on peer; consult/pipeline
+FAILURE_OR_RECOVERY_STEP: leave partial artifacts under opsx-export/<utc_ts>/; never delete sources; re-run (new ts)
+2. Parse `$ARGUMENTS` (may be empty). If delete/cleanup/rm intent →
+   `GO` is optional and ignored for extra power.
+3. Resolve `scope` (default=`default`). Legacy include_* flags are no-ops on
+   scopes that already walk full `.opsx` / `openspec` trees.
+4. Build include-root list:
+   - process allowlist roots (when scope includes process);
+   - discover top-level children of `.opsx/` (when scope includes opsx);
+   - discover top-level children of `openspec/` (when scope includes openspec);
+   - `.tmp` when scoped.
+   Verify at least one existing root. Always HARD skip `opsx-export/**`.
+5. Ensure repo-root `opsx-export/` exists. Compute `utc_ts`
+   (utc like `20260805-191530`). Create **new** dir `opsx-export/<utc_ts>/`
+   (`exist_ok=False`). If exists → new `utc_ts` or `BLOCKED_IO`.
+6. Copy trees into zip at `opsx-export/<utc_ts>/opsx-pack.zip` with stable
+   relative paths from repo root (bootstrap: `opsx-bootstrap-profile.zip` in
+   the same dir). Do not overwrite.
+7. Write `opsx-export/<utc_ts>/MANIFEST.txt` listing:
+   - utc_ts, scope, include_tmp, whether discovery mode was used,
+   - ROOT_COVERAGE (FULLY_INCLUDED / SKIPPED + reason),
+   - skip patterns (must list `opsx-export/**`),
+8. Compute absolute Windows paths:
+   - `absolute_export_dir_path` → `…\opsx-export\<utc_ts>\` (**primary**)
+   - `absolute_archive_path` → `…\opsx-pack.zip`
+   - `manifest_path` → `…\MANIFEST.txt`
+9. Return output contract including ROOT_COVERAGE and the folder path. Do
+   **not** stage, commit, push, or delete sources.
+- Never `rm -rf` staging of **sources**. Never delete prior dated export dirs.
+- Prefer leaving `opsx-pack.zip` + `MANIFEST.txt` both present in the new dir.
+- When walking any tree, do not follow/copy into `opsx-export/**`.
+- Discovery: `Path('.opsx').iterdir()` / `Path('openspec').iterdir()` — do not
+  require a frozen subpath list for those two roots.
+- Time-budget large `.tmp` / large `openspec/changes/archive` /
+  `.opsx/upstream` walks; on hang → `BLOCKED_IO`.
+- Legacy flat files already under `opsx-export/*.zip` from older runs are left
+  untouched (this command never deletes them).
+- include_tmp: true|false
+- discovery_opsx: true|false
+- discovery_openspec: true|false
+- absolute_export_dir_path:   # PRIMARY handoff — share this folder (2 files inside)
+- ROOT_COVERAGE:
+  - <root>: FULLY_INCLUDED | SKIPPED (<reason>)
+- excluded_or_skipped: [notes; must mention opsx-export/** nesting ban]
+| No include roots exist | `BLOCKED_NEEDS_INPUT` | confirm cwd / repo |
+- Owns: copy-only export pack contents via discovery + process allowlist +
+  absolute path receipt + ROOT_COVERAGE.
+- Deleting old `opsx-export/*` “to save space” from this command
+- Nesting prior `opsx-export/**` contents into a new pack
+- Writing under `.tmp/opsx-export/` again (legacy; write-root is repo-root
+  `opsx-export/`)
+- Flat multi-run dump under `opsx-export/` without `opsx-export/<utc_ts>/`
+- Omitting `absolute_export_dir_path` from the receipt
+- Committing dated packs into `.cursor/` or `opsx-export/` via process commit
+- Requiring `GO` before a default pack will run
+- Omitting `openspec/changes/**` or new `.opsx`/`openspec` top-level children
+  from default while claiming a full dump
+- Omitting ROOT_COVERAGE or marking missing roots FULLY_INCLUDED
+- Expanding discovery beyond `.opsx/**` + `openspec/**` into product trees
+- [ ] Empty invoke or `GO` both run COPY_ONLY (GO optional)
+- [ ] Writes only under new `opsx-export/<utc_ts>/`
+- [ ] That dir contains `opsx-pack.zip` (or bootstrap zip) + `MANIFEST.txt`
+- [ ] `absolute_export_dir_path` is absolute and is the primary handoff
+- [ ] `absolute_archive_path` and `manifest_path` are absolute
+- [ ] Not expanded into product/secrets / `.cursor/settings.json`
+- [ ] On default: entire `.opsx/**` + entire `openspec/**` discovered
+- [ ] On default: `openspec/changes` FULLY_INCLUDED when present
+- [ ] `.cursor/devops/**` included on `scope=default` / `scope=process` when present
+- [ ] `opsx-export/**` HARD skipped; ROOT_COVERAGE lists it SKIPPED
+- [ ] ROOT_COVERAGE present for considered root folders
+- [ ] On default/tmp: `.tmp/**` included when scoped; write-root is not under `.tmp`
+- [ ] `include_tmp` in receipt matches whether `.tmp` was walked

@@ -6,7 +6,7 @@ Continue working on a change by creating the next artifact.
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
-**Input**: Optionally specify a change name after `/opsx:continue` (e.g., `/opsx:continue add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Input**: Optionally specify a change name after `/opsx-continue` (e.g., `/opsx-continue add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
 
@@ -41,7 +41,9 @@ Continue working on a change by creating the next artifact.
    **If all artifacts are complete (`isComplete: true`)**:
    - Congratulate the user
    - Show final status including the schema used
-   - Suggest: "All artifacts created! You can now implement this change with `/opsx:apply` or archive it with `/opsx:archive`."
+   - Soft-recommend (PRIMARY): `/opsx-planning-review change=<name>`
+     before apply (READY markers alone insufficient).
+   - ALSO_OK: `/opsx:apply` after review PASS, or `/opsx:archive` when appropriate.
    - STOP
 
    ---
@@ -85,7 +87,7 @@ After each invocation, show:
 - Schema workflow being used
 - Current progress (N/M complete)
 - What artifacts are now unlocked
-- Prompt: "Run `/opsx:continue` to create the next artifact"
+- Prompt: "Run `/opsx-continue` to create the next artifact"
 
 **Artifact Creation Guidelines**
 
@@ -97,10 +99,49 @@ Common artifact patterns:
 - **proposal.md**: Ask user about the change if not clear. Fill in Why, What Changes, Capabilities, Impact.
   - The Capabilities section is critical - each capability listed will need a spec file.
 - **specs/<capability>/spec.md**: Create one spec per capability listed in the proposal's Capabilities section (use the capability name, not the change name).
-- **design.md**: Document technical decisions, architecture, and implementation approach.
-- **tasks.md**: Break down implementation into checkboxed tasks.
+- **design.md**: Document technical decisions, architecture, and implementation
+  approach **only after** `DESIGN_READINESS` passes. See **Design Generation**
+  below. Never defer SoT/ownership/write-path to apply; preserve MUST/MUST NOT.
+- **tasks.md**: Break down implementation into checkboxed tasks **only after**
+  `TASK_GENERATION_READINESS` passes. See **Task Generation** below.
+  `tasks.md` implements resolved design — MUST NOT complete unresolved
+  architecture/SoT/ownership/write-path/semantic choices.
 
 For other schemas, follow the `instruction` field from the CLI output.
+
+### Design Generation (design.md — shared with `/opsx-ff`)
+
+Follow `.cursor/pipeline/contracts/DESIGN_GENERATION.md` (SoT). Same rules as
+command `/opsx-continue` / `/opsx-ff`:
+
+- Build draft design, then run `DESIGN_READINESS` **after** draft
+  (post-generation `NORMATIVE_PRESERVATION_CHECK`). On
+  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` /
+  `NORMATIVE_MODALITY_DRIFT` → `DESIGN_STATUS: BLOCKED`, do not mark design
+  ready.
+- READY requires `NORMATIVE_MODALITY_PRESERVED: yes`.
+- Resolve technical SoT/ownership/write/recovery from evidence + decisions.
+  Forbidden: apply-time architecture / «выбрать в apply».
+- Preserve `MUST` / `MUST NOT` / `MAY` (no weakening).
+- Open Questions: harmless naming only after authority is fixed.
+- continue ≡ ff for identical upstream context.
+
+### Task Generation (tasks.md — shared with `/opsx-ff`)
+
+Follow `.cursor/pipeline/contracts/TASK_GENERATION.md` (SoT). Same rules as
+command `/opsx-continue` / `/opsx-ff`:
+
+- Build draft tasks, then run readiness **after** draft (post-generation
+  `NORMATIVE_PRESERVATION_CHECK`). On
+  `TECHNICAL_DESIGN_UNRESOLVED` / `UPSTREAM_NORMATIVE_CONFLICT` /
+  `NORMATIVE_MODALITY_DRIFT` / `CONDITIONAL_BRANCH_COLLAPSE` →
+  `TASKS_STATUS: BLOCKED`, `FILES_CHANGED: none`.
+- READY requires `NORMATIVE_MODALITY_PRESERVED: yes` and
+  `CONDITIONAL_BRANCHES_PRESERVED: yes`.
+- Evidence roles: `LEGACY_BASELINE` | `TARGET_REGRESSION` | `FINAL_ACCEPTANCE`.
+- Preserve `MUST` / `MUST NOT` / `MAY` (no weakening); preserve conditional
+  branches (no collapse to MAY); epoch only after actual start when applicable.
+- continue ≡ ff for identical upstream artifacts.
 
 **Guardrails**
 - Create ONE artifact per invocation
@@ -109,6 +150,11 @@ For other schemas, follow the `instruction` field from the CLI output.
 - If context is unclear, ask the user before creating
 - Verify the artifact file exists after writing before marking progress
 - Use the schema's artifact sequence, don't assume specific artifact names
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (draft → post-generation check; `NORMATIVE_MODALITY_PRESERVED` required)
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (draft → post-generation check; modality + conditional branches required)
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output

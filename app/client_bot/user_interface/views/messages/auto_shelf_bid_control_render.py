@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Sequence, TypeVar, cast
 
 from app.client_bot.user_interface.views.callbacks import (
     AutoShelfBidControlBidPoints,
@@ -52,9 +53,6 @@ def _format_cycle_timestamp(value: datetime | str | None) -> str:
     return format_timestamp_for_telegram(value)
 
 
-def _format_yes_no(value: bool) -> str:
-    return "да" if value else "нет"
-
 
 def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
     if not view.warnings:
@@ -64,7 +62,20 @@ def _warnings_to_text(view: AutoShelfBidControlViewDTO) -> str:
 
 def _as_dict(value: object) -> dict[str, object]:
     """Безопасно интерпретировать value как dict для read-only рендера."""
-    return value if isinstance(value, dict) else {}
+    if isinstance(value, dict):
+        return cast(dict[str, object], value)
+    return {}
+
+
+def _coerce_float(value: object) -> float:
+    """Преобразовать object в float для форматирования (без bool)."""
+    if isinstance(value, bool):
+        raise TypeError("bool is not a numeric bid metric")
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        return float(value)
+    raise TypeError(f"unsupported float source: {type(value)!r}")
 
 
 def _format_rec_bid_int(value: object) -> str:
@@ -78,7 +89,7 @@ def _format_rec_bid_int(value: object) -> str:
         elif isinstance(value, float):
             number = int(round(value))
         elif isinstance(value, str):
-            number = int(round(float(value)))
+            number = int(round(_coerce_float(value)))
         else:
             return "\u2014"
         return f"{number:,}".replace(",", " ")
@@ -90,7 +101,7 @@ def _format_rec_bid_rub(value: object) -> str:
     if value is None:
         return "\u2014"
     try:
-        amount = float(value)
+        amount = _coerce_float(value)
         if amount == float("inf"):
             return "\u221e \u20bd"
         return f"{amount:.2f} \u20bd"
@@ -109,7 +120,7 @@ def _format_rec_bid_minor(value: object) -> str:
         elif isinstance(value, float):
             minor = int(round(value))
         elif isinstance(value, str):
-            minor = int(round(float(value)))
+            minor = int(round(_coerce_float(value)))
         else:
             return "\u2014"
         if minor <= 0 or minor % 100 != 0:
@@ -119,75 +130,13 @@ def _format_rec_bid_minor(value: object) -> str:
         return "\u2014"
 
 
-def _format_rec_bid_percent(value: object) -> str:
-    if value is None:
-        return "\u2014"
-    try:
-        return f"{float(value) * 100:.2f}%"
-    except (TypeError, ValueError):
-        return "\u2014"
-
-
 def _format_rec_bid_number(value: object, *, precision: int) -> str:
     if value is None:
         return "\u2014"
     try:
-        return f"{float(value):.{precision}f}"
+        return f"{_coerce_float(value):.{precision}f}"
     except (TypeError, ValueError):
         return "\u2014"
-
-
-def _format_rec_bid_field_label(field: str) -> str:
-    if field == "cpo_rub":
-        return "CPO"
-    if field == "cpc":
-        return "CPC"
-    if field == "spend":
-        return "spend"
-    return field
-
-
-def _format_rec_bid_value(field: str, value: object) -> str:
-    """Format recommendation values for Telegram."""
-    if field == "bid":
-        return _format_rec_bid_minor(value)
-    if field in {"ctr", "confidence", "own_anchor"}:
-        return _format_rec_bid_percent(value)
-    if field in {"expected_order_cost_rub", "resolved_order_cost_rub", "cpo_rub", "cpc"}:
-        return _format_rec_bid_rub(value)
-    if field in {
-        "expected_daily_impressions",
-        "expected_daily_clicks",
-        "impressions",
-        "clicks",
-        "carts",
-        "orders",
-    }:
-        return _format_rec_bid_int(value)
-    if field == "expected_daily_orders":
-        return _format_rec_bid_number(value, precision=2)
-    if field == "spend":
-        return _format_rec_bid_rub(value)
-    if field == "sales_gap":
-        return _format_rec_bid_number(value, precision=2)
-    if field == "plan_distance_score":
-        return _format_rec_bid_number(value, precision=3)
-    if value is None:
-        return "\u2014"
-    return str(value)
-
-
-def _format_rec_bid_row(row: dict[str, object], fields: tuple[str, ...]) -> str:
-    """Format a compact recommendation row from requested fields."""
-    parts: list[str] = []
-    for field in fields:
-        value = row.get(field)
-        if value is None:
-            continue
-        parts.append(
-            f"{_format_rec_bid_field_label(field)}: {_format_rec_bid_value(field, value)}"
-        )
-    return " | ".join(parts) if parts else "-"
 
 
 def _format_plan_ranked_row(row: dict[str, object]) -> str:
@@ -212,38 +161,20 @@ def _format_plan_ranked_row(row: dict[str, object]) -> str:
         parts.append(f"CPO: {_format_rec_bid_rub(cpo_value)}")
     ctr_value = row.get("ctr")
     if ctr_value is not None:
-        parts.append(f"CTR: {_format_ctr(float(ctr_value))}")
+        parts.append(f"CTR: {_format_ctr(_coerce_float(ctr_value))}")
     return " | ".join(parts) if parts else "-"
-
-
-def _format_rec_bid_rows(
-    rows: object,
-    fields: tuple[str, ...],
-    *,
-    limit: int = 3,
-) -> str:
-    """Format top-N recommendation rows safely for Telegram."""
-    if not isinstance(rows, list) or not rows:
-        return "-"
-    formatted_rows = []
-    for item in rows[:limit]:
-        row = _as_dict(item)
-        formatted_rows.append(f"- {_format_rec_bid_row(row, fields)}")
-    return "\n".join(formatted_rows) if formatted_rows else "-"
 
 
 def _format_plan_ranked_rows(rows: object, *, limit: int = 3) -> str:
     """Format top-N plan-ranked rows with the same semantics as coverage rows."""
     if not isinstance(rows, list) or not rows:
         return "-"
+    typed_rows = cast(list[object], rows)
     formatted_rows: list[str] = []
-    for item in rows[:limit]:
+    for item in typed_rows[:limit]:
         formatted_rows.append(f"- {_format_plan_ranked_row(_as_dict(item))}")
     return "\n".join(formatted_rows) if formatted_rows else "-"
 
-
-def _format_rec_bid_best_bid(value: object) -> str:
-    return _format_rec_bid_minor(value)
 
 
 def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> str:
@@ -253,7 +184,6 @@ def _render_rec_bid_recommendation_block(view: AutoShelfBidControlViewDTO) -> st
         return ""
     recommendation_dict = _as_dict(recommendation)
     plan_ranked = recommendation_dict.get("plan_ranked")
-    expected_ranked = recommendation_dict.get("expected_ranked")
     plan_ranked_text = _format_plan_ranked_rows(plan_ranked)
 
     return (
@@ -387,14 +317,17 @@ def clamp_bid_point_page(page: int, total_pages: int) -> int:
     return page
 
 
+_TPoint = TypeVar("_TPoint")
+
+
 def slice_bid_points_page(
-    points: list[BidPointStatsDTO],
+    points: Sequence[_TPoint],
     page: int,
     page_size: int = TELEGRAM_BID_POINTS_VIEWER_PAGE_SIZE,
-) -> list[BidPointStatsDTO]:
+) -> list[_TPoint]:
     """Срез покрытых точек для страницы просмотрщика."""
     start = page * page_size
-    return points[start : start + page_size]
+    return list(points[start : start + page_size])
 
 
 def _bid_point_viewer_header(optimization_metric: OptimizationMetric) -> str:
@@ -429,6 +362,8 @@ def render_bid_point_viewer_message(
     chunk = slice_bid_points_page(points, safe_page, page_size)
     lines = [_format_coverage_layer_row(point, currency) for point in chunk]
     body = "\n".join(lines) if lines else "Нет ставок в dense universe."
+    # Metric-aware builder kept for unit tests; page title stays legacy constant.
+    _ = _bid_point_viewer_header(optimization_metric)
     header = "Покрытие ставок теста:"
     legend = (
         "✅ closed_layers > current_layer · "
@@ -498,11 +433,6 @@ def build_bid_point_viewer_keyboard(
     return builder.as_markup()
 
 
-def _format_optimization_metric(metric: OptimizationMetric) -> str:
-    """Отформатировать метрику оптимизации для отображения."""
-    return "CTR" if metric == OptimizationMetric.CTR else "CPC"
-
-
 def _format_main_waiting_reason(view: AutoShelfBidControlViewDTO) -> str:
     """Пояснить, сколько осталось до main observation gate."""
     elapsed = view.main_elapsed_minutes
@@ -559,7 +489,6 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     dry_run_text = "включён" if view.dry_run else "выключен"
     gate_text = "подтверждён" if view.bid_units_confirmed else "не подтверждён"
     enabled_text = "включено" if view.enabled else "выключено"
-    optimization_text = _format_optimization_metric(view.optimization_metric)
     rec_bid_recommendation_text = _render_rec_bid_recommendation_block(view)
     coverage_layer_text = _render_coverage_layer_block(view)
     rec_bid_block = (
@@ -598,178 +527,7 @@ def render_auto_shelf_bid_control_message(view: AutoShelfBidControlViewDTO) -> s
     )
 
 
-def _deprecated_build_auto_shelf_bid_control_keyboard(
-    view: AutoShelfBidControlViewDTO,
-    adv_setting_original_id: int,
-) -> InlineKeyboardMarkup:
-    """Собрать inline-клавиатуру основного экрана управления."""
-    builder = InlineKeyboardBuilder()
-    if view.enabled:
-        builder.button(
-            text="Выключить управление",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("disable"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-        builder.button(
-            text="Настройки",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("settings"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-        builder.button(
-            text="Обновить",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("refresh"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-        if view.has_state:
-            builder.button(
-                text="Покрытия цикла",
-                callback_data=AutoShelfBidControlBidPoints(
-                    adv_setting_original_id=adv_setting_original_id,
-                    index=0,
-                ).pack(),
-            )
-        builder.button(
-            text="Сбросить цикл",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("reset_cycle"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-        builder.button(
-            text="Вернуть main-ставку",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("force_main"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-    else:
-        builder.button(
-            text="Включить управление",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("enable"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-        builder.button(
-            text="Настройки",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("settings"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-        builder.button(
-            text="Обновить",
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action("refresh"),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-    builder.button(
-        text="Назад",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("back"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.adjust(1)
-    return builder.as_markup()
 
-
-def _deprecated_render_auto_shelf_bid_settings_message(
-    view: AutoShelfBidControlViewDTO,
-) -> str:
-    """Собрать экран редактирования настроек управления."""
-    enabled_text = "да" if view.enabled else "нет"
-    dry_run_text = "включён" if view.dry_run else "выключен"
-    return (
-        "⚙️ Настройки управления ставкой в полках\n\n"
-        f"Артикул: {view.nmid}\n\n"
-        f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}\n"
-        f"Максимальная ставка: {format_bid(view.max_bid_minor, view.currency)}\n"
-        f"Доля теста: {((view.test_share or 0) * 100):.2f}%\n"
-        f"Показов на тест: {view.target_test_impressions or '—'}\n"
-        f"Мин. минут теста: {view.target_test_observation_minutes or '—'}\n"
-        f"Шаг между тестовыми ставками: {format_bid(view.min_bid_distance_minor, view.currency)}\n"
-        f"Dry-run (глобально, AUTO_SHELF_BID_CONTROL_DRY_RUN): {dry_run_text}\n\n"
-        f"Управление включено: {enabled_text}"
-    )
-
-
-def _deprecated_build_auto_shelf_bid_settings_keyboard(
-    view: AutoShelfBidControlViewDTO,
-    adv_setting_original_id: int,
-) -> InlineKeyboardMarkup:
-    """Собрать inline-клавиатуру экрана настроек."""
-    builder = InlineKeyboardBuilder()
-    for strategy, action in (
-        (AutoShelfBidControlStrategy.PLAN_DISTANCE, "set_strategy_plan_distance"),
-        (AutoShelfBidControlStrategy.CTR, "set_strategy_ctr"),
-        (AutoShelfBidControlStrategy.CPC, "set_strategy_cpc"),
-    ):
-        label = _format_strategy_label(strategy)
-        if view.auto_shelf_bid_control_strategy == strategy:
-            label = f"✅ {label}"
-        builder.button(
-            text=label,
-            callback_data=AutoShelfBidControlMenu(
-                action=compact_auto_shelf_bid_control_action(action),
-                adv_setting_original_id=adv_setting_original_id,
-            ).pack(),
-        )
-    builder.button(
-        text="Изменить max ставку",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_max_bid"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить долю теста",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_test_share"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить показов на тест",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action(
-                "set_target_test_impressions"
-            ),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить минут теста",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action(
-                "set_target_test_observation_minutes"
-            ),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить шаг между ставками",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_min_bid_distance"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Назад к управлению ставкой",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("open"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.adjust(1)
-    return builder.as_markup()
 
 
 def render_auto_shelf_bid_strategy_message(view: AutoShelfBidControlViewDTO) -> str:
@@ -784,66 +542,6 @@ def render_auto_shelf_bid_strategy_message(view: AutoShelfBidControlViewDTO) -> 
         "- CPC"
     )
 
-
-def _deprecated_v2_build_auto_shelf_bid_settings_keyboard(
-    view: AutoShelfBidControlViewDTO,
-    adv_setting_original_id: int,
-) -> InlineKeyboardMarkup:
-    """Собрать inline-клавиатуру экрана настроек."""
-    builder = InlineKeyboardBuilder()
-    builder.button(
-        text=f"Режим main bid: {_format_strategy_label(view.auto_shelf_bid_control_strategy)}",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("strategy_menu"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить max ставку",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_max_bid"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить долю теста",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_test_share"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить показов на тест",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_target_test_impressions"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить минут теста",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action(
-                "set_target_test_observation_minutes"
-            ),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Изменить шаг между ставками",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("set_min_bid_distance"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.button(
-        text="Назад к управлению ставкой",
-        callback_data=AutoShelfBidControlMenu(
-            action=compact_auto_shelf_bid_control_action("open"),
-            adv_setting_original_id=adv_setting_original_id,
-        ).pack(),
-    )
-    builder.adjust(1)
-    return builder.as_markup()
 
 
 def build_auto_shelf_bid_strategy_keyboard(
@@ -987,6 +685,7 @@ def render_auto_shelf_bid_settings_message(view: AutoShelfBidControlViewDTO) -> 
         f"Показов на тест: {view.target_test_impressions or '—'}\n"
         f"Мин. минут теста: {view.target_test_observation_minutes or '—'}\n"
         f"Шаг между тестовыми ставками: {format_bid(view.min_bid_distance_minor, view.currency)}\n"
+        f"Интервал перетеста (суток): {view.retest_interval_days}\n"
         f"Dry-run (глобально, AUTO_SHELF_BID_CONTROL_DRY_RUN): {dry_run_text}\n\n"
         f"Управление включено: {enabled_text}"
     )
@@ -1032,6 +731,13 @@ def build_auto_shelf_bid_settings_keyboard(
         text="Изменить шаг между ставками",
         callback_data=AutoShelfBidControlMenu(
             action=compact_auto_shelf_bid_control_action("set_min_bid_distance"),
+            adv_setting_original_id=adv_setting_original_id,
+        ).pack(),
+    )
+    builder.button(
+        text="Изменить интервал перетеста (сут)",
+        callback_data=AutoShelfBidControlMenu(
+            action=compact_auto_shelf_bid_control_action("set_retest_interval_days"),
             adv_setting_original_id=adv_setting_original_id,
         ).pack(),
     )

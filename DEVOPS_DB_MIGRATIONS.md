@@ -2,6 +2,27 @@
 
 Безопасные PostgreSQL-миграции для `prod-adv-bot` (план r06–r10).
 
+## Command contract (`/opsx-devops`)
+
+Workflow/gates: Cursor command `/opsx-devops`  
+Durable memory (infra + past actions): `.cursor/devops/OPS_STATE.md` + `LAST.json`  
+Domain facts: `.cursor/rules/devops.mdc`
+
+| Mode | What happens |
+|------|----------------|
+| `PLAN_WRITE intent=safe_prod_release\|migrate_rollout\|image_cas` | Read OPS_STATE + this runbook; emit ordered CONTROL→Migrate→CAS plan (skip steps already done per memory) |
+| `GO …` (same intent) | Allowlisted Job apply + CAS `test`+`replace` only; then refresh OPS_STATE |
+| Other `/opsx-devops` intents | Unchanged (restart/scale/manifest); still no laptop alembic |
+
+Examples:
+
+```text
+/opsx-devops PLAN_WRITE intent=safe_prod_release ns=prod-adv-bot image=harbor…/adv-bot:<sha> digest=sha256:…
+/opsx-devops GO intent=safe_prod_release ns=prod-adv-bot image=harbor…/adv-bot:<sha> digest=sha256:…
+```
+
+`.tmp/opsx-devops/` = optional ephemeral receipt, **not** source of truth.
+
 ## Жёсткие правила
 
 - Не `alembic upgrade` с ноутбука на prod.

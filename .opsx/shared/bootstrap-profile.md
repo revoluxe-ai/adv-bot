@@ -203,4 +203,37 @@ SAVE reports feed human/central processing into `bootstrap/requirements.md`.
 | `GO`, DEFAULT seeded, COMPLETE | **No** for DEFAULT; **yes** only for extras | import extras if wanted |
 | `SAVE` → REPORT_SAVED | n/a | none (central later folds reports) |
 | `PROFILE_KEEP=core` only | Yes for non-CORE | bare `GO` again or import |
-| process dirty after `GO` | — | `/opsx-meta-commit` |
+| process dirty after `GO` | — | `/opsx-meta-commit` |Default Owner path `/opsx-meta-bootstrap GO` (= `PROFILE_KEEP=recommended`
+≡ `STEP=next`) advances **one** incomplete recommended step toward
+**working OPSX** (destination = CORE + `DEFAULT_INSTALL` across
+`1 bind → 2 meta → 3 lifecycle → 4 support`). Bare `GO` must **not**
+apply all four steps in one turn. One-shot full set:
+`/opsx-meta-bootstrap GO STEP=all` (or `PROFILE_KEEP=all`).
+After recommended steps complete, a separate `/opsx-meta-import-command`
+is **optional** — only for commands outside this profile (extras /
+later catalog picks).
+This is still **not** a silent whole-repo dump: bare `GO` applies the next
+disclosed recommended step only; `STEP=all` applies all incomplete
+recommended steps; `SAVE` writes reports only.
+| Token | Meaning | Bootstrap job (`recommended` destination) |
+| `OPSX_ABSENT` | No `.opsx/` | Reach CORE + DEFAULT_INSTALL + bind via repeated `GO` or one `STEP=all` |
+| `OPSX_PARTIAL` | Some surfaces; lock incomplete | Fill missing CORE/DEFAULT step-by-step; bind; preserve TARGET OVERRIDE |
+| `PROJECTIZATION_COMPLETE` | lock COMPLETE | Rebind; seed **missing** CORE/DEFAULT steps only; no wipe; no COMPLETE downgrade |
+| `PROFILE_KEEP=recommended` | ≡ `STEP=next` / bare `GO`: **one** incomplete recommended step toward CORE + DEFAULT_INSTALL (not big-bang) |
+| `PROFILE_KEEP=all` | ≡ `STEP=all`: all incomplete CORE + DEFAULT_INSTALL steps in one APPLY |
+| `PROFILE_KEEP=core` | CORE_REQUIRED gaps only (minimal bind / step 1) |
+Usable process plane after recommended steps complete (repeated bare `GO`
+or one `STEP=all`). Includes CORE paths by reference, plus:
+### Portable central bind (committed files)
+Never persist machine-absolute or user-home `central_root` into committed
+`.opsx/sources.yaml` / `.opsx/projectization.yaml` / `.opsx/MERGE_RECEIPT.md`.
+Prefer omit the key and bind via `central=` / `OPSX_CENTRAL_ROOT` /
+`default_relative`. Relative persist only when it matches `../opsx-central`.
+Receipts use `CENTRAL_RESOLVE:` + redacted `CENTRAL: <CENTRAL>` (and
+`<CENTRAL>/…` in Actions).
+Happy path: hand-copy `opsx-meta-bootstrap.md` → repeat
+`/opsx-meta-bootstrap GO` until steps 1–4 complete (or one
+`GO STEP=all`). Lesson path: `/opsx-meta-bootstrap SAVE` →
+| bare `GO`, more steps remain | n/a | `/opsx-meta-bootstrap GO` |
+| recommended steps done (repeated `GO` or `STEP=all`), lock incomplete | **No** for DEFAULT_INSTALL | `/opsx-projectize` |
+| recommended steps done, COMPLETE | **No** for DEFAULT; **yes** only for extras | import extras if wanted |

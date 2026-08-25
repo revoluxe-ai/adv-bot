@@ -24,7 +24,7 @@ argument-hint: "base=<branch|ref> [head=<ref>|working] [GO]"
 
 * NOT запуск `pyright-strict` (→ `/opsx-static-check`).
 * NOT разбор/фикс typing diagnostics (→ `/opsx-fix-types`).
-* NOT archive / adequacy verdict (→ `/opsx-verify`).
+* NOT archive / adequacy verdict (→ `/opsx-verify mode=archive`).
 * NOT ослабление `typeCheckingMode`, удаление `exclude`, suppressions.
 * NOT external-call / integration coverage (→ `/opsx-external-call-coverage`).
 * NOT performance review (→ `/opsx-performance-review`).
@@ -237,7 +237,7 @@ DO_NOT_DO_YET:
 * `PASS` →  
   `/opsx-external-call-coverage base=<BASE>`
   затем conditional `/opsx-performance-review` (when trigger) →
-  `/opsx-static-check` → `/opsx-verify <change-name>` если есть
+  `/opsx-static-check` → `/opsx-verify mode=archive <change-name>` если есть
   активный change.
 * После успешного `GO` write → сначала rerun allowlist audit; при PASS →
   `/opsx-external-call-coverage base=<BASE>`; после external-call PASS →
@@ -256,7 +256,7 @@ DO_NOT_DO_YET:
 | From | To |
 |------|-----|
 | `/opsx-apply` (recommend) | this command with `base=` |
-| this PASS | `/opsx-external-call-coverage` → conditional `/opsx-performance-review` → `/opsx-static-check` → `/opsx-verify` |
+| this PASS | `/opsx-external-call-coverage` → conditional `/opsx-performance-review` → `/opsx-static-check` → `/opsx-verify mode=archive` |
 | this FAIL + diagnostics later | `/opsx-fix-types` after static-check |
 
 ## Regression checks (self)

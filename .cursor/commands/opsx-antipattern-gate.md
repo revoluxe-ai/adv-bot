@@ -24,7 +24,7 @@ smell). Default — **over-report**: лучше лишний `SUSPECT`, чем �
 
 ## What this is NOT
 
-* NOT archive `GO` / `NO_GO` (→ `/opsx-verify`).
+* NOT archive `GO` / `NO_GO` (→ `/opsx-verify mode=archive`).
 * NOT запуск pyright/mypy/pytest (→ `/opsx-static-check`).
 * NOT external-call coverage (→ `/opsx-external-call-coverage`).
 * NOT bug residual / OPEN_CANDIDATE board (→ `/opsx-bug-debt-board` / INDEX).
@@ -263,7 +263,7 @@ After `PASS` | `PASS_WITH_SUSPECTS` (Owner may continue with suspects):
 
 ```text
 NEXT_ACTION: /opsx-static-check
-THEN: /opsx-verify <change>
+THEN: /opsx-verify mode=archive <change>
 ```
 
 ## Self-check

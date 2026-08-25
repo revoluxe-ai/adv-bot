@@ -10,4 +10,4 @@ Declared by `/opsx-projectize` for this repository.
 Do **not** seed or require `vue-npm`. Root `package.json` (if present) is not
 the product runtime for this tree.
 
-Refresh notes via `/opsx-adapt-project` after tooling changes.
+Refresh notes via `/opsx-adapt-project` after tooling changes.| `poetry-python` | Target stack — WB Sky / Poetry (`adv-bot`) |

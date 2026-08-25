@@ -169,3 +169,4 @@ class AutoShelfBidControlFSM(StatesGroup):
     waiting_for_target_test_impressions = State()
     waiting_for_target_test_observation_minutes = State()
     waiting_for_min_bid_distance = State()
+    waiting_for_retest_interval_days = State()

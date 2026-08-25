@@ -59,6 +59,9 @@ Classify the failure as exactly one:
 - SPEC_CHANGED_BUT_NOT_UPDATED: behavior changed but OpenSpec/spec/tasks were not updated.
 - BAD_TEST: test checks the wrong thing or does not catch the real regression.
 - FLAKY_OR_ENV: async/env/timing/db/redis/clickhouse/order problem.
+  Connection refused / missing laptop services on `5433`|`8124`|`6390` →
+  NEXT `/opsx-test-env UP` (pytest session `REDIS_PORT=6390`; not `/opsx-devops`).
+  Host `:6379` is out of test-compose scope.
 - AMBIGUOUS: not enough evidence.
 
 ## Required work
@@ -155,7 +158,7 @@ When triage feeds a bug-episode RED path, map classes:
 |---|---|
 | CODE_BUG | continue RED authoring toward `RED_CONFIRMED` |
 | BAD_TEST / wrong assertion | `RED_WRONG_REASON` or rewrite test via `/opsx-test` |
-| FLAKY_OR_ENV / setup | `TEST_SETUP_DEFECT` / `BLOCKED` |
+| FLAKY_OR_ENV / setup | `TEST_SETUP_DEFECT` / `BLOCKED`; if PG/CH/Redis ports → `/opsx-test-env UP` |
 | TEST_OBSOLETE | do not force production GO |
 
 Do **not** emit production GO from triage.

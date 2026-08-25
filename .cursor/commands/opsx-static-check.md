@@ -382,4 +382,55 @@ Budgets, dedupe, `fix_cmd` mapping, and single NEXT_ACTION rank: only in
 - Registry-driven waves? xdist only on full unit?
 - Final report printed by orchestrator (not progress-only / not only notification)?
   Progress strings («Wave A in flight», «waiting for packets») never terminal?
-- One NEXT_ACTION?
+- One NEXT_ACTION?description: "Единая read-only точка статических проверок: MODE=FULL|FAST; FULL defaults to destructive cache; parallel Task workers; сводный отчёт."
+argument-hint: "[FAST|FULL] [PREFLIGHT] [CACHE_OFF|CACHE_FORCE|CACHE_DEV]"
+| (нет CACHE_* на FULL) | `CACHE_MODE=dev` — selective `destructive_local` by fingerprint (default) |
+| `CACHE_OFF` | `CACHE_MODE=off` — run all destructive (archive / pre-PR) |
+| `CACHE_FORCE` | `CACHE_MODE=force` — run all destructive; rewrite local cache receipts |
+| `CACHE_DEV` | alias of default `CACHE_MODE=dev` (optional no-op) |
+`CACHE_*` на `FAST` → ignore (`CACHE_MODE=n/a`, no Wave B).
+Contract: `.cursor/static-check/contracts/destructive-selective-cache.md`.
+`CACHE_HIT` ≠ archive EXECUTED green — before archive/PR use `CACHE_OFF` or `CACHE_FORCE`.
+**INTERIM (planner missing):** if
+`.cursor/static-check/bin/destructive_cache_plan.py` is absent or broken →
+Wave B MUST run all destructive (`CACHE_DEGRADED=yes`); do **not** invent
+deselect/skip/nodeid filters. Token default stays `dev`; effective behavior
+is run-all until planner ships. Final report MUST print `CACHE_MODE` +
+`CACHE_DEGRADED` + `destructive_cache: ran=N cached=M`.
+- `/opsx-static-check` → FULL + cache **dev** (default), без preflight
+- `/opsx-static-check FAST` → FAST, без preflight, cache N/A
+- `/opsx-static-check FULL CACHE_OFF` → FULL, все destructive, без cache skip
+- `/opsx-static-check FULL CACHE_FORCE` → FULL, все destructive + rewrite cache
+- `/opsx-static-check FULL PREFLIGHT` → FULL + cache **dev** + preflight
+Когда run в pre-archive цепочке OpenSpec change: после PASS
+`NEXT_ACTION` MUST быть pasteable
+`/opsx-verify mode=archive <change-name>` (не bare `/opsx-verify`; не
+`mode=impl`). См. `.cursor/pipeline/contracts/VERIFY_PHASES.md`.
+- **READ_ONLY end-to-end:** не изменять production/tests/commands/contracts.
+  Единственное исключение при implement cache: локальный gitignored receipt
+  `.cursor/static-check/.cache/destructive-last-run.json` (не product SoT).
+- Запрещено «чинить» даже инфраструктуру check-команды: `.cursor/commands/opsx-static-check.md`, `.cursor/static-check/**` (кроме `.cache/`), skills/rules этой подсистемы, `bin/run.sh`, configs.
+- Не создавать durable artifacts кроме локального destructive cache receipt.
+  Notification «pytest-full FAIL» **≠** Final report. После закрытия последней
+CACHE_MODE: dev|off|force|n/a
+Если `PREFLIGHT` не задан → сразу fan-out.
+### 3. Fan-out (from registry waves)
+**Primary launch (mandatory):** Task tool with `subagent_type` = registry `task_type` (default `shell`).
+- Read prompt template from `.cursor/static-check/base/worker-prompt.md`.
+- Do **not** attempt custom project agent names (`opsx-sc-*` or any non-Task-enum id) — they are invalid for Task and must not be tried first.
+If registry `task_type` is unavailable in the live Task enum → one fallback to `generalPurpose` with the **same** prompt. Never invent undeclared tool wrappers.
+Progress:
+Wave B (`pytest-full`) starts **only if** `pytest-unit` packet `STATUS=PASS` (`registry require_status: PASS`).
+If unit is FAIL/BLOCKED/ERROR → mark `pytest-full: SKIPPED` and continue to synthesis.
+When the **last open check** of the run completes (Wave B packet, or Wave A
+when Wave B is SKIPPED / MODE=FAST): **immediately** synthesize and go to
+§5 — do not end the turn with only `WORKER READY`.
+STATUS: PASS | FAIL | BLOCKED
+- path: <path>
+- fix_target: <one line — file/symbol>
+- node: <pytest node id>
+- fix_target: <one line — test/fixture>
+- fix_cmd: /opsx-test-triage
+- Fan-out via Task `shell` (registry `task_type`) — no custom agent names?
+- Registry-driven waves?
+- Final report printed by orchestrator (not only worker notification)?

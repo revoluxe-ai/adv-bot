@@ -257,4 +257,47 @@ VALIDATION_STATUS: INDEPENDENT_TEST_PASS
 RUNTIME_ENFORCEMENT: ACTIVE
 LIVE_COMMAND_BEHAVIOR_CHANGED: YES
 GO_ACTIVATE: ISSUED
-```
+```- `.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` — единые определения
+  `unit_component`, `scenario_seam`, `side_effect_proof` (`PA_SIDE_EFFECT_PROOF`),
+  `boundary_integration`, `stub_contract`, `destructive_local` и
+  load/measurement evidence
+- `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` — kernel DONE
+  (MEANING_LOCK ∧ LIFECYCLE_COVERAGE ∧ SIDE_EFFECT_PROOF); soft tooling
+  cannot create archive DONE
+  (Product Acceptance when required)
+## Test evidence taxonomy
+Используй
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md` как словарь evidence и
+execution classes.
+Не смешивай:
+- pytest marker/path (`unit`, `integration`);
+- evidence class (`unit_component`, `scenario_seam`, `side_effect_proof`,
+  `boundary_integration`, `stub_contract`);
+- execution class (`fast_local`, `destructive_local`, `authorized_live`).
+`destructive_local` не означает автоматически ни полный Scenario coverage, ни
+production-destructive действие. `scenario_seam` может находиться в
+`tests/unit/`, если реальная causal logic проходит до тонкого внешнего конца.
+PG/CH provider contract по-прежнему требует live test provider согласно
+Kind defaults ниже.
+Для Product Acceptance (когда required): acceptance scenarios с внешней
+mutation MUST нести `side_effect_proof` / `PA_SIDE_EFFECT_PROOF` — this-run
+external call или explicit forbidden sibling non-effect. Intent-only /
+durable-reason-only / OR-armed proxies без this-run mutation — **не**
+достаточны для archive DONE.
+Найденный или authored test без исполнения отмечай `EXECUTED=NO`; он не
+является green evidence. Любой coverage verdict должен явно писать, что тест
+доказывает и чего не доказывает.
+9. **Destructive cache (default on, all entry points):** если invocation
+   собирает любой `@pytest.mark.destructive_local`, перед запуском вызови
+   shared planner
+   `.cursor/static-check/bin/destructive_cache_plan.py` (contract:
+   `.cursor/static-check/contracts/destructive-selective-cache.md`).
+   Default `CACHE_MODE=dev` — беги только `MUST_RUN`; `CACHE_HIT` skip.
+   Полный прогон destructive — только явный `CACHE_OFF` или `CACHE_FORCE`
+   (Owner text / command token). `CACHE_HIT` ≠ archive EXECUTED green.
+   `authorized_live` / `AUTHORIZE_ONE_LIVE_RUN` — вне этого cache.
+   **INTERIM:** если planner отсутствует или падает — `CACHE_DEGRADED`:
+   гоняй все selected destructive; запрещено invent deselect/skip /
+   «уже зелёные на ветке» без planner receipt.
+1. При тестировании изменений обязательно запускай targeted `poetry run pytest <path-or-node>` для проверяемого среза.
+3. При смене сигнатуры или публичного поведения shared-символа (функции/метода/класса) определяй adjacent через поиск call-sites (включая тесты), обнови их и прогони полный feature-suite `poetry run pytest -m unit <feature_dir>`, а не только новый/targeted тест.

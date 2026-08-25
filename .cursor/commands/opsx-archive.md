@@ -11,9 +11,43 @@ Archive a completed change in the experimental workflow.
 
 **Architecture Decision Lookup:** Before archiving, resolve proposed decision paths from `artifactPaths.decisions.existingOutputPaths` first, then read only needed accepted decisions. Prefer exact paths over a full `openspec/decisions/**` walk. Follow `.cursor/commands/opsx-source-resolution.md`. Use `openspec instructions decisions --change "<name>" --json` so `rules.decisions` are applied. Promote accepted proposed decisions from `openspec/changes/<change>/decisions/` into `openspec/decisions/` before moving the change into `changes/archive` when they are reusable architecture source of truth. If there is nothing reusable to promote, explicitly output `Reusable architecture promotions: none`. Do not archive when `design.md` contains a permanent architecture decision that has not been moved to `openspec/decisions/` or a proposed decision artifact.
 
-**Input**: Optionally specify a change name after `/opsx:archive` (e.g., `/opsx:archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
+**Semantic write-target hard stop:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. For a high-risk
+multi-target write, archive requires a durable explicit target
+(`TARGET_ENTITY_OR_LEG`, `ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`) in
+artifacts/decision. `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` or missing explicit
+destructive target is a **hard stop** — do not sync, promote decisions, or move
+the change. This is not an overridable warning.
+
+**Product Acceptance hard stop:** Follow
+`.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`. Archive requires
+`PRODUCT_ACCEPTANCE_STATUS=PASS` or `NOT_REQUIRED` from the archive verify.
+When `PRODUCT_ACCEPTANCE_REQUIRED=true`, `FAIL` / `BLOCKED` / missing PA is a
+**hard stop** — soft tooling waives do not clear it. Do not sync, promote, or
+move the change.
+
+**Verify-phase hard stop:** Follow
+`.cursor/pipeline/contracts/VERIFY_PHASES.md`. Archive requires a recent
+`/opsx-verify mode=archive` with final marker `✅ GO` for this change.
+`✅ IMPL_OK` / `mode=impl` alone **never** authorizes archive. If the latest
+verify in-session was `mode=impl` only, or only `IMPL_OK`/`IMPL_GAPS` markers
+are present without archive `✅ GO`:
+
+```text
+STATUS: BLOCKED_NEEDS_ARCHIVE_VERIFY
+NEXT_ACTION: /opsx-verify mode=archive <change-name>
+DO_NOT_DO_YET: sync / decision promote / archive move
+```
+
+**Input**: Optionally specify a change name after `/opsx-archive` (e.g., `/opsx-archive add-auth`). If omitted, check if it can be inferred from conversation context. If vague or ambiguous you MUST prompt for available changes.
 
 **Steps**
+
+0. **Archive-verify gate (before other steps that mutate planning home)**
+
+   Confirm in-session (or Owner-supplied) evidence of
+   `/opsx-verify mode=archive` → `✅ GO` for `<change>`. If missing → stop with
+   `BLOCKED_NEEDS_ARCHIVE_VERIFY` and the NEXT_ACTION above.
 
 1. **If no change name provided, prompt for selection**
 
@@ -24,7 +58,7 @@ Archive a completed change in the experimental workflow.
 
    **IMPORTANT**: Do NOT guess or auto-select a change. Always let the user choose.
 
-2. **Check artifact completion status**
+2. **Check planning compliance (mechanical — status JSON only)**
 
    Run `openspec status --change "<name>" --json` to check artifact completion.
 
@@ -33,27 +67,67 @@ Archive a completed change in the experimental workflow.
    - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context
    - `artifacts`: List of artifacts with their status (`done` or other)
 
-   The `decisions` artifact is optional. If `artifactPaths.decisions.existingOutputPaths` is empty and Architecture Decision Lookup does not require a proposed decision, do not count `decisions` as an incomplete artifact.
+   **Compliance axis (required non-task):** `proposal`, `design`, `specs`.
+   For each, require `artifacts[id].status == "done"`.
 
-   **If any non-optional artifacts are not `done`:**
-   - Display warning listing incomplete artifacts
-   - Prompt user for confirmation to continue
-   - Proceed if user confirms
+   The `decisions` artifact is optional. If `artifactPaths.decisions.existingOutputPaths` is empty and Architecture Decision Lookup does not require a proposed decision, do not count `decisions` as incomplete. If proposed decision files already exist under the change, require that artifact `done` (or treat missing acceptance as incomplete planning).
+
+   **Tasks are NOT on this axis.** Absence of `tasks.md` / `tasks` not `done` is **not** a planning compliance failure and must **not** block a full archive.
+
+   **If any of proposal | design | specs has status != `done`:**
+   - This is a planning defect (косяк), not soft confirmation territory
+   - Emit `ARCHIVE_BLOCKED_INCOMPLETE_PLANNING` (see Output)
+   - Stop. Do **not** `mv`. Do **not** accept `yes` / `ok` / `да` / free-form continue
+   - Do **not** accept `CONTINUE_ARCHIVE_INCOMPLETE` for missing proposal/design/specs
+   - Next: `/opsx-ff` | `/opsx-continue` | `/opsx-update` (разобраться), then re-run archive
+
+   **If proposal | design | specs are all `done`:** planning compliance OK → continue to step 3
 
 3. **Check task completion status**
 
-   Read the tasks file (typically `tasks.md`) to check for incomplete tasks.
+   Read the tasks file when `artifactPaths.tasks.existingOutputPaths` is non-empty.
 
-   Count tasks marked with `- [ ]` (incomplete) vs `- [x]` (complete).
+   **If no tasks file / empty `existingOutputPaths`:**
+   - Full archive path remains valid (spec-only / docs-capture allowed)
+   - Optional one-line note only: `Tasks: none (allowed)`
+   - Do **not** warn as incomplete; do **not** require a confirm token
 
-   **If incomplete tasks found:**
-   - Display warning showing count of incomplete tasks
-   - Prompt user for confirmation to continue
-   - Proceed if user confirms
+   **If tasks.md exists:** count `- [ ]` (incomplete) vs `- [x]` (complete).
 
-   **If no tasks file exists:** Proceed without task-related warning.
+   **If any `- [ ]` found:**
+   - Emit `ARCHIVE_WAITING_CONFIRM_OPEN_TASKS` (see Output)
+   - Stop until the user message contains the exact token `CONTINUE_ARCHIVE_INCOMPLETE`
+   - Refuse free-form `yes` / `ok` / `да` / `продолжай` without that token
+   - After the token: proceed (sync / ADL / mv); note open-task override in summary
 
-4. **Assess delta spec sync state**
+   **If all checkboxes are `[x]`:** proceed
+
+4. **Semantic write-target archive gate (hard stop)**
+
+   Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md` **before** sync,
+   decision promotion, or archive move:
+   - high-risk multi-target write without durable
+     `TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` / `FORBIDDEN_ADAPTERS` →
+     `NO_GO` / `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`; stop;
+   - do **not** treat this as a confirmable warning;
+   - route Owner to `/opsx-update` for durable materialization.
+
+4a. **Product Acceptance archive gate (hard stop)**
+
+   Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` **before** sync,
+   decision promotion, or archive move:
+   - require archive-verify evidence of `PRODUCT_ACCEPTANCE_STATUS=PASS` or
+     `NOT_REQUIRED`;
+   - if `PRODUCT_ACCEPTANCE_REQUIRED=true` and status is not PASS → stop with
+     `product_acceptance_not_pass` (include fail pillar when known);
+   - soft ECC/pyright/static Owner waives do **not** clear this gate;
+   - route MEANING → `/opsx-update`; LIFECYCLE missing/unconfirmed
+     `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` → `/opsx-update` (or
+     `/opsx-ff`); LIFECYCLE scenario report / unmapped rows →
+     `/opsx-spec-scenario-coverage`; SIDE_EFFECT → `/opsx-test` /
+     apply test materialization — then `/opsx-verify mode=archive`.
+
+5. **Assess delta spec sync state**
 
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
@@ -68,7 +142,7 @@ Archive a completed change in the experimental workflow.
 
    If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
 
-5. **Perform Architecture Decision Archive Gate**
+6. **Perform Architecture Decision Archive Gate**
 
    - Resolve proposed decision paths from `artifactPaths.decisions.existingOutputPaths` first.
    - Read only needed accepted decisions (index → exact paths; bounded fallback ≤ 3 targeted lookups if gaps remain unless `EVIDENCE_GAP` is recorded). Never dump `openspec/decisions/**`.
@@ -80,7 +154,7 @@ Archive a completed change in the experimental workflow.
    - If the design contains permanent ownership, layering, write-path, or domain-invariant decisions and lookup within budget (or after a recorded `EVIDENCE_GAP` expansion) concludes they are not captured in `openspec/decisions/` or a proposed decision artifact, output `Architecture Decision Missing`, return `NO_GO`, and do not archive.
    - If no proposed decision needs promotion, output `Reusable architecture promotions: none` and proceed.
 
-6. **Perform the archive**
+7. **Perform the archive**
 
    Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
@@ -97,14 +171,14 @@ Archive a completed change in the experimental workflow.
    mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
-7. **Display summary**
+8. **Display summary**
 
    Show archive completion summary including:
    - Change name
    - Schema that was used
    - Archive location
    - Spec sync status (synced / sync skipped / no delta specs)
-   - Note about any warnings (incomplete artifacts/tasks)
+   - Tasks line: `none (allowed)` | `N/N complete` | `overridden open tasks via CONTINUE_ARCHIVE_INCOMPLETE`
 
 **Output On Success**
 
@@ -115,8 +189,13 @@ Archive a completed change in the experimental workflow.
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs
+**Tasks:** none (allowed) | <n>/<n> complete
 
-All artifacts complete. All tasks complete.
+Planning compliance OK (proposal|design|specs done).
+
+### Soft next (optional — not an archive gate)
+If client/CS distribution materials are needed:
+`/opsx-distribute-brief change=<change-name>`
 ```
 
 **Output On Success (No Delta Specs)**
@@ -128,26 +207,64 @@ All artifacts complete. All tasks complete.
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
 **Specs:** No delta specs
+**Tasks:** none (allowed) | <n>/<n> complete
 
-All artifacts complete. All tasks complete.
+Planning compliance OK (proposal|design|specs done).
+
+### Soft next (optional — not an archive gate)
+If client/CS distribution materials are needed:
+`/opsx-distribute-brief change=<change-name>`
 ```
 
-**Output On Success With Warnings**
+**Output On Success (Sync Skipped / Open-Tasks Override)**
 
 ```
-## Archive Complete (with warnings)
+## Archive Complete (with notes)
 
 **Change:** <change-name>
 **Schema:** <schema-name>
 **Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
-**Specs:** Sync skipped (user chose to skip)
+**Specs:** Sync skipped (user chose to skip) | ✓ Synced | No delta specs
+**Tasks:** overridden open checkboxes via CONTINUE_ARCHIVE_INCOMPLETE | …
 
-**Warnings:**
-- Archived with 2 incomplete artifacts
-- Archived with 3 incomplete tasks
-- Delta spec sync was skipped (user chose to skip)
+Planning compliance OK (proposal|design|specs done). Missing tasks.md is never a warning.
 
-Review the archive if this was not intentional.
+### Soft next (optional — not an archive gate)
+If client/CS distribution materials are needed:
+`/opsx-distribute-brief change=<change-name>`
+```
+
+**Output On Blocked (Incomplete Planning)**
+
+```
+## Archive Blocked (incomplete planning)
+
+**Change:** <change-name>
+**Reason:** proposal|design|specs status != done (косяк — разобраться; not a soft confirm)
+**Incomplete:** <artifact id=status, …>
+**Tasks:** ignored for this gate (absence of tasks.md is allowed and is NOT listed here)
+
+Do not archive. Do not accept free-form confirm or CONTINUE_ARCHIVE_INCOMPLETE for this tier.
+
+**Next:**
+/opsx-ff
+# or /opsx-continue / /opsx-update — then re-run /opsx-archive <change-name>
+```
+
+**Output On Waiting (Open Task Checkboxes)**
+
+```
+## Archive Waiting Confirm (open tasks)
+
+**Change:** <change-name>
+**Open checkboxes:** <count> in tasks.md
+**Planning:** proposal|design|specs done
+
+To archive anyway, reply exactly:
+
+CONTINUE_ARCHIVE_INCOMPLETE
+
+(Free-form yes/ok/да is refused.)
 ```
 
 **Output On Error (Archive Exists)**
@@ -169,10 +286,16 @@ Target archive directory already exists.
 **Guardrails**
 - Always prompt for change selection if not provided
 - Do not archive if reusable architecture decisions remain only in design.md
+- Do not archive, sync, or promote decisions when a high-risk multi-target write
+  lacks a durable semantic write target (`unresolved_semantic_write_target` /
+  `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`) — hard stop, not a warning
 - Explicitly report `Reusable architecture promotions: none` when there is nothing to promote
-- Use artifact graph (openspec status --json) for completion checking
-- Don't block archive on warnings - just inform and confirm
+- Use artifact graph (openspec status --json) for completion checking — mechanical predicates only (no agent vibes)
+- Absence of tasks.md does **not** prevent a full archive; do not treat it as incomplete planning
+- Missing proposal|design|specs → HARD_BLOCK (`ARCHIVE_BLOCKED_INCOMPLETE_PLANNING`); no soft override token
+- Open `- [ ]` in an existing tasks.md → stop until exact `CONTINUE_ARCHIVE_INCOMPLETE`
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
 - If sync is requested, use the Skill tool to invoke `openspec-sync-specs` (agent-driven)
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting
+- Soft-suggest `/opsx-distribute-brief` after success when client/CS materials may be needed; never require it as an archive gate; never write the distribution brief from this command

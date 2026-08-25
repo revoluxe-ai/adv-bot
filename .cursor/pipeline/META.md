@@ -20,4 +20,14 @@ notes: |
   NOT_OPENED_BUDGET existing GRAPH entries. Fingerprint matches the approved
   names-only inventory.
   Prior: CLOSE_POLICY / BUG_EPISODE_FORK (2026-07-30T09:05:00Z);
-  performance-review (2026-07-30T04:38:13Z).
+  performance-review (2026-07-30T04:38:13Z).updated_at_utc: 2026-08-14T15:53:00Z
+source_fingerprint: af626a84b261b3ccf2cb9a4a48f1a554
+inventory_count: 58
+source_commit: f10e47efea32bb771da54f37099493b788db36f7
+approved_by_token: UPDATE GO (impl→archive verification chain section + fingerprint refresh)
+inventory_content_sha256: c282593ccfc8d4b6d50c2406a1269ee12cdab3306ae9e3c629f05cb069b1bdef
+  UPDATE GO 2026-08-14T15:53:00Z INCREMENTAL: inventory 58 fingerprint
+  af626a84b261b3ccf2cb9a4a48f1a554 (reproduce()); explicit
+  Post-implementation verification chain section in GRAPH.md; F13
+  TEST_ENV_COMPANION_LAG open; F12 companion lag open.
+  Prior: UPDATE GO 2026-08-09T05:34:03Z test-env (inventory 55/cb7ea54d).

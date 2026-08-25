@@ -6,7 +6,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Mapping
 
 from aiogram import Bot
@@ -36,7 +36,6 @@ from app.client_bot.user_interface.views.callbacks import (
     ExportShopAdvExcel,
     ImportShopAdvExcel,
     ToggleCabinetActive,
-    UiModeToggle,
 )
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
@@ -44,6 +43,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ConnectExistingAdvs,
     ShowShopsList,
     TurnBot,
+    UiModeToggle,
 )
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
@@ -332,7 +332,7 @@ class ShopMenu(TextWithKeyboard):
         )
 
         # Сохраняем ID в состояние
-        await self._state.update_data(
+        _ = await self._state.update_data(
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id
         )
         wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
@@ -368,7 +368,7 @@ class ShopMenu(TextWithKeyboard):
             await self.get_shop_token_status()
 
             # 7. Сохраняем данные в состояние
-            await self._state.update_data(
+            _ = await self._state.update_data(
                 last_wb_cabinet_original_id=self._wb_cabinet.id
             )
 
@@ -378,8 +378,8 @@ class ShopMenu(TextWithKeyboard):
 
         # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
         shop_id = self._wb_cabinet.shop_id
-        async with sm(read_only=True) as session:
-            self._tariff_details = await self._load_tariff_details_in_session(
+        async with sm() as session:
+            self._tariff_details = await self._pricer.get_tariff_details(
                 session, shop_id
             )
         self._total_active_advs_count = (
@@ -388,12 +388,28 @@ class ShopMenu(TextWithKeyboard):
         if self._billing_redis_manager:
             try:
                 self._last_charge_at = await self._billing_redis_manager.get_last_charge_at(
-                    shop_id
+                    self._wb_cabinet.shop_id
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Не удалось получить last_charge_at из Redis: %s", exc)
 
         return True
+
+    async def _load_tariff_preview(self) -> None:
+        """Превью тарифа: тот же leg_metering + latch read, что и billing charge."""
+        shop_id = self._wb_cabinet.shop_id
+        leg_latch = None
+        utc_date = None
+        if self._billing_redis_manager is not None:
+            leg_latch = self._billing_redis_manager.leg_latch()
+            utc_date = datetime.now(timezone.utc).date()
+        async with sm() as session:
+            self._tariff_details = await self._pricer.get_tariff_details(
+                session,
+                shop_id,
+                leg_latch=leg_latch,
+                utc_date=utc_date,
+            )
 
     async def _process_tokens(self):
         """Обработка токенов для магазина"""
@@ -434,7 +450,7 @@ class ShopMenu(TextWithKeyboard):
                 self.last_days_for_token = 30
                 return True
             else:
-                await self.bot.send_message(
+                _ = await self.bot.send_message(
                     self.chat_id,
                     "Не найдены токены для этого магазина. Пожалуйста, добавьте новый токен.",
                 )
@@ -459,7 +475,7 @@ class ShopMenu(TextWithKeyboard):
                 expiration_time = shops_tokens[0].expires
                 logger.debug(f"Установлен срок действия токена: {expiration_time}")
             except IndexError:
-                await self.bot.send_message(
+                _ = await self.bot.send_message(
                     self.chat_id,
                     "Не найдены действительные токены для этого магазина. Пожалуйста, добавьте новый токен.",
                 )
@@ -470,7 +486,7 @@ class ShopMenu(TextWithKeyboard):
             expiration_time < datetime.now()
             and not _is_admin_user(user.user_telegram_id)
         ):
-            await self.bot.send_message(
+            _ = await self.bot.send_message(
                 self.chat_id,
                 "Срок действия токена истек. Пожалуйста, обновите токен.\n"
                 "Для этого добавьте магазин под другим именем с новым токеном",
@@ -494,7 +510,7 @@ class ShopMenu(TextWithKeyboard):
         logger.debug(f"Вызов ShopMenu для кабинета {self._wb_user_cabinet_original_id}")
 
         # Единый метод загрузки всех данных вместо трех отдельных
-        await self._load_all_data()
+        _ = await self._load_all_data()
 
         # Проверка и обработка токенов только если это необходимо
         # Вызов метода _process_tokens закомментирован, так как из кода видно,

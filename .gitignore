@@ -80,6 +80,7 @@ app/modules/predict_ctr_service/model/model/model.json
 !k8s/prod-adv-bot/*.yaml
 model/model.json
 .mypy_cache/
+.cursor/static-check/.cache/
 .wb_profile/
 invates/
 invited_users.txt
@@ -87,3 +88,4 @@ clickhouse-data/
 k8s/xray-client/README.md
 k8s/xray-client/config.json
 .tmp/
+opsx-export/

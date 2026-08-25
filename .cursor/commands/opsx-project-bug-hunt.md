@@ -33,7 +33,7 @@ audit command.
   sibling hunt after a known root packet).
 * NOT a general style / formatting / drive-by refactor audit.
 * NOT process-contract Bugbot on `.cursor/commands/**` (F6 →
-  `/opsx-admin-command-fix-command-defects`).
+  `/opsx-meta-fix-command-defects`).
 * NOT `/opsx-verify`, `/opsx-static-check`, or `/opsx-fix-types`.
 * NOT a guarantee that Bugbot will always be empty — honesty: residual risk
   remains; the contract is **maximize catch + learn from misses**.
@@ -152,7 +152,7 @@ not invent ADLs.
 | Claim / fix (manual queue path) | `/opsx-claim-next-bug` → `/opsx-fix-bug` |
 | Residual external review | **Bugbot** (safety net) |
 | Miss reached Bugbot (product/logic) | `/opsx-learn-from-bug` → update **this** checklist |
-| Process-contract Bugbot (F6) | `/opsx-admin-command-fix-command-defects` |
+| Process-contract Bugbot (F6) | `/opsx-meta-fix-command-defects` |
 
 Never re-decide another command's GO/NO_GO. Never treat chat paraphrase as
 durable case map.
@@ -271,6 +271,10 @@ BUG_TEAM_HANDOFF (PRIMARY when ACTIVE):
   /opsx-bug-team
   (RAW_REPORT / structured finding block as free-form raw envelope;
   team materializes — no prerequisite materialize or fix-bug)
+- **First-intake paste fence (CMD-IX-002):** that paste MUST be RAW_REPORT-only —
+  no `case=` resume lines, no `ALSO_OK` `/opsx-explore` templates, no
+  angle-bracket `case=<CASE_ID>` placeholders (CMD-IX-001). Explore handbacks
+  only after a durable CASE_ID exists, in a separate message.
 
 ALTERNATE_INTAKE_HANDOFF (when team not ACTIVE, or owner escape hatch):
 - for each SEPARATE_ADJUDICATION_REQUIRED=true finding, pasteable either:

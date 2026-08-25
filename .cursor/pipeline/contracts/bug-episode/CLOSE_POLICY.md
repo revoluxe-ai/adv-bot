@@ -16,6 +16,13 @@ IMPLEMENTATION_STATUS: LIVE_ACTIVATED
 
 Closing finding ≠ closing class ≠ OpenSpec archive.
 
+Envelope terminal kinds (`CLOSED_GREEN`, `CLOSED_FALSE_POSITIVE`,
+`ROUTED_OUT_OF_SCOPE`, `CLOSED_WITH_ACCEPTED_DISPOSITION`) map to durable
+statuses via
+`.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md`
+§ FINDING_TERMINAL_KIND ↔ durable STATUS map. Do not invent a second map
+here.
+
 ## Durable intent fields (cross-chat)
 
 Write on LEDGER `## ROUTE_STATE` and echo on TASK-DELTA / finding when known:
@@ -90,8 +97,12 @@ When team needs Owner A/B/C (or policy):
 
 ```text
 OWNER_DECISION_REQUIRED: A | B | C | …
-OPTIONAL_IF_UNSURE: /opsx-explore case=<CASE_ID> finding=<FINDING_ID>
-THEN_RETURN (pasteable, not silent): /opsx-bug-team case=<CASE_ID> mode=…
+OPTIONAL_IF_UNSURE: /opsx-explore case=CASE_ID finding=FINDING_ID
+THEN_RETURN (pasteable, not silent): /opsx-bug-team case=CASE_ID mode=…
 ```
+
+Substitute durable `BUGCASE-…` / finding ids — never emit angle-bracket
+`case=<CASE_ID>` templates (CMD-IX-001). Omit until ids known. Do not paste
+into free-form first-intake `RAW_REPORT` (CMD-IX-002).
 
 Explore does not replace A/B/C; it clarifies before the answer.

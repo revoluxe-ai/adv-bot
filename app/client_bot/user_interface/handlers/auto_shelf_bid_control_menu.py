@@ -48,10 +48,16 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 router = Router()
 
 
-def _callback_message(callback: CallbackQuery) -> Message | None:
-    """Вернуть editable Message из callback, либо None для InaccessibleMessage."""
+def _tg_message(callback: CallbackQuery) -> Message | None:
+    """Вернуть Message из callback, исключая InaccessibleMessage."""
     message = callback.message
     return message if isinstance(message, Message) else None
+
+
+def _asb_exhausted_reset_filter(callback: CallbackQuery) -> bool:
+    """Фильтр callback сброса паузы shelf-exhausted."""
+    data = callback.data
+    return bool(data) and str(data).startswith("asb_exh_reset:")
 
 
 async def _show_bid_point_viewer(
@@ -83,11 +89,12 @@ async def _show_bid_point_viewer(
         safe_page,
         len(points),
     )
-    message = _callback_message(callback)
+    message = _tg_message(callback)
     if message is None:
         return True
     is_viewer_message = (
-        message.text is not None and BID_POINT_VIEWER_HEADER in message.text
+        message.text is not None
+        and BID_POINT_VIEWER_HEADER in message.text
     )
     if is_viewer_message:
         try:
@@ -110,8 +117,8 @@ async def _send_main_screen(
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_control_message(view)
     keyboard = build_auto_shelf_bid_control_keyboard(view, adv_setting_original_id)
-    message = _callback_message(callback)
-    if message is not None:
+    message = _tg_message(callback)
+    if message:
         await message.answer(text, reply_markup=keyboard)
 
 
@@ -124,8 +131,8 @@ async def _send_settings_screen(
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_settings_message(view)
     keyboard = build_auto_shelf_bid_settings_keyboard(view, adv_setting_original_id)
-    message = _callback_message(callback)
-    if message is not None:
+    message = _tg_message(callback)
+    if message:
         await message.answer(text, reply_markup=keyboard)
 
 
@@ -138,8 +145,8 @@ async def _send_strategy_screen(
     view = await service.build_view(adv_setting_original_id)
     text = render_auto_shelf_bid_strategy_message(view)
     keyboard = build_auto_shelf_bid_strategy_keyboard(view, adv_setting_original_id)
-    message = _callback_message(callback)
-    if message is not None:
+    message = _tg_message(callback)
+    if message:
         await message.answer(text, reply_markup=keyboard)
 
 
@@ -187,14 +194,15 @@ async def auto_shelf_bid_control_bid_points_router(
             adv_setting_original_id=callback_data.adv_setting_original_id,
             index=callback_data.index,
         )
-        message = _callback_message(callback)
-        if not shown and message is not None:
-            await message.answer(
-                "В покрытии ставок теста пока нет доступных строк."
-            )
+        if not shown:
+            message = _tg_message(callback)
+            if message:
+                await message.answer(
+                    "В покрытии ставок теста пока нет доступных строк."
+                )
     except AutoShelfBidControlTelegramError as exc:
-        message = _callback_message(callback)
-        if message is not None:
+        message = _tg_message(callback)
+        if message:
             await message.answer(exc.message)
 
 
@@ -245,8 +253,8 @@ async def auto_shelf_bid_control_menu_router(
             )
         elif action == "enable":
             _ = await service.enable(adv_setting_original_id)
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer("Управление включено.")
             await _send_main_screen(
                 callback,
@@ -255,8 +263,8 @@ async def auto_shelf_bid_control_menu_router(
             )
         elif action == "disable":
             _ = await service.disable(adv_setting_original_id)
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer("Управление выключено.")
             await _send_main_screen(
                 callback,
@@ -265,8 +273,8 @@ async def auto_shelf_bid_control_menu_router(
             )
         elif action == "reset_cycle":
             _ = await service.reset_cycle(adv_setting_original_id)
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer("Цикл сброшен.")
             await _send_main_screen(
                 callback,
@@ -275,8 +283,8 @@ async def auto_shelf_bid_control_menu_router(
             )
         elif action == "force_main":
             _ = await service.force_main(adv_setting_original_id)
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer("Режим main применён.")
             await _send_main_screen(
                 callback,
@@ -286,16 +294,16 @@ async def auto_shelf_bid_control_menu_router(
         elif action == "set_max_bid":
             await state.update_data(adv_setting_original_id=adv_setting_original_id)
             await state.set_state(states.AutoShelfBidControlFSM.waiting_for_max_bid)
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer(
                     "Введите максимальную ставку для полок, в рублях.\nНапример: 500"
                 )
         elif action == "set_test_share":
             await state.update_data(adv_setting_original_id=adv_setting_original_id)
             await state.set_state(states.AutoShelfBidControlFSM.waiting_for_test_share)
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer(
                     "Введите долю теста.\nМожно в процентах: 10\nИли долей: 0.1\n"
                     "Допустимо: больше 0 и не больше 49%."
@@ -305,8 +313,8 @@ async def auto_shelf_bid_control_menu_router(
             await state.set_state(
                 states.AutoShelfBidControlFSM.waiting_for_target_test_impressions
             )
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer(
                     "Введите количество показов на одну тестовую ставку.\nНапример: 500"
                 )
@@ -315,8 +323,8 @@ async def auto_shelf_bid_control_menu_router(
             await state.set_state(
                 states.AutoShelfBidControlFSM.waiting_for_target_test_observation_minutes
             )
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer(
                     "Введите минимальное время теста в минутах.\nПример: 60\nМинимум: 60 минут."
                 )
@@ -325,11 +333,22 @@ async def auto_shelf_bid_control_menu_router(
             await state.set_state(
                 states.AutoShelfBidControlFSM.waiting_for_min_bid_distance
             )
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer(
                     "Введите минимальный шаг между тестовыми ставками, в рублях.\n"
                     "Например: 1"
+                )
+        elif action == "set_retest_interval_days":
+            await state.update_data(adv_setting_original_id=adv_setting_original_id)
+            await state.set_state(
+                states.AutoShelfBidControlFSM.waiting_for_retest_interval_days
+            )
+            message = _tg_message(callback)
+            if message:
+                await message.answer(
+                    "Введите интервал перетеста в сутках (целое ≥ 1).\n"
+                    "По умолчанию: 7"
                 )
         elif action in {
             "set_strategy_plan_distance",
@@ -347,16 +366,16 @@ async def auto_shelf_bid_control_menu_router(
             keyboard = build_auto_shelf_bid_strategy_keyboard(
                 view, adv_setting_original_id
             )
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 try:
                     await message.edit_text(text, reply_markup=keyboard)
                 except TelegramBadRequest as exc:
                     if "message is not modified" not in str(exc).lower():
                         raise
         elif action == "back":
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message and callback.from_user:
                 await _reload_adv_setting_menu(
                     bot,
                     message.chat.id,
@@ -364,13 +383,13 @@ async def auto_shelf_bid_control_menu_router(
                     callback.from_user.id,
                 )
         else:
-            message = _callback_message(callback)
-            if message is not None:
+            message = _tg_message(callback)
+            if message:
                 await message.answer("Неизвестное действие.")
             return
     except AutoShelfBidControlTelegramError as exc:
-        message = _callback_message(callback)
-        if message is not None:
+        message = _tg_message(callback)
+        if message:
             await message.answer(exc.message)
 
 
@@ -479,3 +498,55 @@ async def auto_shelf_waiting_for_min_bid_distance(
         redis_client=redis_client,
         update_method="update_min_bid_distance",
     )
+
+
+@router.message(
+    StateFilter(states.AutoShelfBidControlFSM.waiting_for_retest_interval_days)
+)
+@inject
+async def auto_shelf_waiting_for_retest_interval_days(
+    message: Message,
+    state: FSMContext,
+    redis_client: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    await _handle_fsm_update(
+        message=message,
+        state=state,
+        redis_client=redis_client,
+        update_method="update_retest_interval_days",
+    )
+
+
+@router.callback_query(_asb_exhausted_reset_filter)
+@inject
+async def auto_shelf_exhausted_reset_pause(
+    callback: CallbackQuery,
+    redis_client: RedisClient = Provide["redis_client_wrapper"],
+) -> None:
+    """«Сбросить паузу»: clear only our PG block; no forced Auto start."""
+    raw = str(callback.data or "")
+    try:
+        adv_setting_original_id = int(raw.split(":", 1)[1])
+    except (IndexError, ValueError):
+        message = _tg_message(callback)
+        if message:
+            await message.answer("Некорректная кнопка сброса паузы.")
+        return None
+    service = AutoShelfBidControlTelegramService(redis_client=redis_client)
+    try:
+        cleared = await service.clear_shelf_exhausted_pause(adv_setting_original_id)
+    except AutoShelfBidControlTelegramError as exc:
+        message = _tg_message(callback)
+        if message:
+            await message.answer(exc.message)
+        return None
+    message = _tg_message(callback)
+    if message:
+        if cleared:
+            await message.answer(
+                "Снят только блок паузы «нет ставки под план». "
+                "Авто запустится, если нет других ограничений."
+            )
+        else:
+            await message.answer("Активного блока паузы полок не найдено.")
+    return None

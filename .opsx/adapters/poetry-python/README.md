@@ -30,4 +30,4 @@ Target stack adapter for this repository after `/opsx-projectize`.
 ## Refresh
 
 Use `/opsx-adapt-project` (read-only) or `:GO` to refresh adapter notes and
-capability-bound activation rows after tooling changes.
+capability-bound activation rows after tooling changes.| product | WB Sky (`adv-bot` Poetry package) |

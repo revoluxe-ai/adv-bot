@@ -340,4 +340,48 @@ HANDOFF_CONTRACT:
 - [ ] No k8s/git/product edits
 - [ ] Explicit `NEXT_ACTION` and `DO_NOT_DO_YET`
 
-# END CANONICAL SOURCE BODY
+# END CANONICAL SOURCE BODYlocal_modification_note: "v0.2: laptop test compose UP/DOWN owns PG+CH+Redis; test_redis host 6390 (not 6379)"
+- Do **not** publish host port `6379` from this compose (test Redis is `6390:6379` only).
+- When `/opsx-static-check`, `/opsx-test`, or `/opsx-test-triage` reports `FLAKY_OR_ENV` / connection refused on `5433` / `8124` / `6390`.
+SERVICES_IN_SCOPE: test_db, test_clickhouse, test_redis
+| `test_redis` | `6390` → `6379` | Redis for pytest (avoids clash with host/dev `:6379`) |
+**Redis:** owned by this compose as `test_redis`. Probe `127.0.0.1:6390` only.
+- Never bind host `6379` from `tests/docker-compose.test.yml`.
+- Host/dev Redis on `:6379` is **out of scope** (do not start/stop it).
+- If `test_redis` is down after UP → `DEGRADED` / `BLOCKED` and retry UP (not “enable commented service”).
+- Pytest / FULL session against this compose **MUST** use `REDIS_PORT=6390` (default app `6379` will miss test Redis).
+From `env.sample` + test-compose Redis port (names only; values must already be in Owner env for destructive runs):
+REDIS_PORT=6390
+Loud note: `REDIS_PORT=6379` is **not** the test-compose Redis. For `/opsx-static-check FULL` / destructive pytest after this UP, session must use `6390`.
+Forbid using non-localhost or non-test ports as “ready” (forbid claiming `:6379` as this command’s Redis).
+- Prefer:
+docker compose -f tests\docker-compose.test.yml up -d
+docker compose -f tests\docker-compose.test.yml ps
+docker compose -f tests\docker-compose.test.yml down
+If `docker compose` unavailable, try `docker-compose` once; then `UNAVAILABLE`.
+1. **Compose ps** — `test_db`, `test_clickhouse`, and `test_redis` running (or healthy).
+4. **Redis** — TCP or `PING` on `127.0.0.1:6390` (compose `test_redis`; never require host `:6379`).
+- PG + CH + Redis healthy → `LOCAL_TEST_ENV_STATUS: UP` / `local_test_env_ready`
+- PG + CH healthy, Redis down → `DEGRADED` (full suite likely FAIL) + NEXT `/opsx-test-env UP` (or Docker/port fix)
+- Compose project stopped; PG/CH/`test_redis` ports not serving → `LOCAL_TEST_ENV_STATUS: DOWN` / `local_test_env_stopped`
+- Host/dev Redis on `:6379` (if any) is **out of compose scope** — do not kill it unless Owner asked.
+4. Check Docker capability (`docker version` / `docker compose version`).
+1. `docker compose -f tests\docker-compose.test.yml up -d`
+1. `docker compose -f tests\docker-compose.test.yml down`
+2. Probe PG/CH/`test_redis` (6390) ports idle (best-effort).
+3. Remind: host/dev Redis on `:6379` (if any) was not started by this command and is not stopped by DOWN.
+  test_redis: UP|DOWN|UNKNOWN @ 6390
+HINTS:
+  REDIS_PORT=6390 for pytest when using compose Redis
+  never bind test_redis host to 6379
+- After successful UP: `/opsx-static-check FULL` (session `REDIS_PORT=6390`) or continue Supervisor soft chain
+- After DEGRADED (Redis): `/opsx-test-env UP` — ensure `test_redis` on **6390**; set `REDIS_PORT=6390`
+| Docker unavailable | `UNAVAILABLE` |
+3. If port conflict on **6390** (`test_redis`) — report; do **not** fall back to host `6379` for compose mapping.
+4. Redis gap on 6390 after UP — restart `test_redis`; confirm pytest `REDIS_PORT=6390`; `DEGRADED` until UP.
+5. Host Redis on `:6379` — out of compose scope; do not kill unless Owner asked.
+- Treating Redis `:6379` as required for UP when compose Redis is on **6390**.
+- Mapping `test_redis` host port to `6379` (clashes with Owner/dev Redis).
+- Running pytest against compose Redis without `REDIS_PORT=6390`.
+- [ ] Services include `test_redis` on **6390:6379**; host **6379** out of compose scope
+- [ ] Hints / checklist mention `REDIS_PORT=6390` for pytest

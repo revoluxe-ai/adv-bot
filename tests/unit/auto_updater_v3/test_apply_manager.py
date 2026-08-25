@@ -15,6 +15,9 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.apply_mana
     ApplyManager,
     V3ApplyInput,
 )
+from app.modules.shop_runner.service_manager.services.auto_updater_v3.empty_keywords_pause import (
+    EmptyKeywordsPauseIntentManager,
+)
 from app.modules.shop_runner.service_manager.services.auto_updater_v3.calibration_step_resolver import (
     CalibrationDirect,
 )
@@ -81,7 +84,9 @@ async def test_apply_runs_post_gate_flush_and_redis(fake_redis: FakeRedis) -> No
             "sync_target_places_if_needed",
             new=AsyncMock(return_value=False),
         ),
+        # Apply also HEXISTS via EmptyKeywordsPauseIntentManager (not only keywords cache).
         patch.object(RedisCalculatedKeywordsCacheManager, "_client", fake_redis),
+        patch.object(EmptyKeywordsPauseIntentManager, "_client", fake_redis),
     ):
         result = await ApplyManager().apply(
             V3ApplyInput(

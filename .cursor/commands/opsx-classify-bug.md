@@ -60,10 +60,12 @@ route durability (schema:
 
 JSONL append via Shell/Python MUST follow
 `.cursor/commands/opsx-execution-preflight.md` →
+**Shell payload I/O (anti-heredoc)** and
 **Windows Shell JSON / JSONL write safety** and ROUTE_TRACE **Write rules**
-(`encoding="utf-8"` + `ensure_ascii=True` for agent recipes; no
-`ensure_ascii=False` stdin; no unsafe console print; ASCII `->` in
-machine string fields). Prefer a `route_trace` helper when available.
+(no bash heredoc for multi-line JSON/Python; Write→path first; on heredoc
+failure switch Write→path once; `encoding="utf-8"` + `ensure_ascii=True` for
+agent recipes; no `ensure_ascii=False` stdin; no unsafe console print; ASCII
+`->` in machine string fields). Prefer a `route_trace` helper when available.
 
 Forbidden process writes: inventing findings, changing claim ownership,
 editing OpenSpec, editing tests, rewriting prior ROUTE-TRACE lines.
@@ -564,8 +566,58 @@ Route D (OUT_OF_SCOPE):
   CURRENT_ROUTE_STATE: ROUTE_TO_OTHER_PROCESS
 ```
 
-Also set process-command reconciliation seeds where applicable:
+Also emit machine `ROUTE_TRANSITION` (schema:
+`.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md`). Narrative
+stop conditions (e.g. «no GO until RED») MUST NOT invent a competing
+`NEXT_COMMAND`. Supervisor consumes the packet; if structured fields
+contradict mandatory preconditions → producer defect /
+`ROUTE_CONTRACT_CONFLICT` — do not leave GO vs RED ambiguous.
 
+```text
+Route A ROUTE_TRANSITION:
+  FROM_STATE: CLASSIFYING | <prior>
+  RESULT: IMPLEMENTATION_BUG
+  TO_STATE: AWAITING_FIX_BUG
+  NEXT_COMMAND: /opsx-fix-bug
+  NEXT_ARGS: case=… finding=… claim_token=…   # WITHOUT token GO
+  PRECONDITIONS:
+    GO_TOKEN: FORBIDDEN
+    CLAIM_REQUIRED: yes
+    RED_REQUIRED: not_applicable   # RED is a later hop after fix_now
+  REQUIRED_EVIDENCE: classification envelope
+  ON_SUCCESS_STATE: AWAITING_FIX_BUG
+  RECOVERY_CLASS: ADVANCE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+
+Route B ROUTE_TRANSITION:
+  NEXT_COMMAND: /opsx-update
+  PRECONDITIONS.GO_TOKEN: NOT_APPLICABLE
+  MISSION_COMPLETE: no
+  FINDING_TERMINAL: no
+  TO_STATE: AWAITING_SPEC_UPDATE
+
+Route C ROUTE_TRANSITION:
+  NEXT_COMMAND: CLOSED_NO_IMPLEMENTATION
+  FINDING_TERMINAL: yes
+  FINDING_TERMINAL_KIND: CLOSED_FALSE_POSITIVE
+  MISSION_COMPLETE: no
+  RECOVERY_CLASS: TERMINAL
+
+Route D ROUTE_TRANSITION:
+  NEXT_COMMAND: ROUTE_TO_OTHER_PROCESS
+  FINDING_TERMINAL: yes
+  FINDING_TERMINAL_KIND: ROUTED_OUT_OF_SCOPE
+  MISSION_COMPLETE: no
+  RECOVERY_CLASS: TERMINAL
+```
+
+State-name note: `AWAITING_FIX_BUG` (this command, adjudication WITHOUT GO)
+is distinct from ORCHESTRATION post-`TASK_DELTA` `AWAITING_FIX_BUG_RED`.
+Do not silently alias; RED hop is owned by later `/opsx-test` after
+`fix_now`, not by replacing classify `NEXT_COMMAND` with `/opsx-test`.
+
+Also set process-command reconciliation seeds where applicable:
 ```text
 ACTUAL_NEXT_COMMAND: PENDING | NOT_APPLICABLE
 NEXT_COMMAND_RECONCILIATION: PENDING | NOT_APPLICABLE
@@ -769,7 +821,8 @@ JSONL event to:
 ```
 
 Append encoding: follow ROUTE_TRACE **Write rules** and
-`opsx-execution-preflight.md` **Windows Shell JSON / JSONL write safety**.
+`opsx-execution-preflight.md` **Shell payload I/O (anti-heredoc)** +
+**Windows Shell JSON / JSONL write safety**.
 
 Mandatory identity/order fields on every event:
 

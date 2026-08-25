@@ -2126,4 +2126,11 @@ def _reject_finalize(
     )
     reject_path.parent.mkdir(parents=True, exist_ok=True)
     reject_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return result
+    return result            "MODEL_SELECTION_POLICY: auto",
+            # HEREDOC-SHELL-PAYLOAD-001 — cite opsx-execution-preflight § Shell payload I/O
+            "FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python/packet writes.",
+            "REQUIRED: Write tool (or write .py/.json to path) then run/read by path; "
+            "encoding=utf-8; ensure_ascii=True. On heredoc failure: do not retry "
+            "heredoc — switch Write->path once. Cite preflight Shell payload I/O "
+            "(anti-heredoc) + Windows Shell JSON/JSONL write safety.",
+        # model omitted — auto/inherit only

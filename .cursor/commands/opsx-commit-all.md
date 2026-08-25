@@ -344,4 +344,131 @@ ORIENTATION_HINT:
 - target: WB Sky / Poetry (`opsx-lite` + `poetry-python`)
 - donor: game/go-to-prod occurrence `ac2a8c0791763d3f` @ `5ddca9a94f6d87176c64f888511996009f59bedc`
 - companions (external): registry activation, `/opsx-meta` router, pipeline GRAPH
-  → `/opsx-meta-fix-command-defects` if desired; not required for MVP runtime
+  → `/opsx-meta-fix-command-defects` if desired; not required for MVP runtimelocal_modification_note: "Imported 2026-08-08 via /opsx-meta-import-command KEEP=opsx-commit-all; GAME→WB remap; vue-npm dropped; poetry-python; children /opsx-commit + /opsx-meta-commit"
+description: "Orchestrate /opsx-commit + /opsx-meta-commit: parallel plan Tasks (mini→auto), then serial child-GO; one SUMMARY."
+argument-hint: "[ALL] [FAST_CHECK|FULL_CHECK] [INCLUDE_FULL_DIRTY_TREE] [MODEL=<slug>|MODEL=auto] GO [optional context]"
+| `MODEL=<slug>` | Force child Task model (`auto` = host Auto / omit model) |
+| `MODEL=auto` | Explicit Auto fallback (same as FALLBACK_CHILD_MODEL) |
+Strip `MODEL=*` from forwarded child args (orchestrator-only token). All other
+non-`MODEL=*` tokens that belong to the child argument contracts are forwarded
+**identically** to both lanes (same string), except `GO` handling below.
+PLAN_ARGS: $ARGUMENTS with exact token GO removed and MODEL=* stripped
+## Child model (mini default, auto fallback)
+DEFAULT_CHILD_MODEL: gpt-5.4-mini-high
+FALLBACK_CHILD_MODEL: auto
+Resolution order:
+1. If `MODEL=<slug>` present (including `MODEL=auto`) → use that as
+   `RESOLVED_CHILD_MODEL`.
+2. Else try Task `model` = `DEFAULT_CHILD_MODEL` (`gpt-5.4-mini-high`).
+3. If mini is **not** in the live Task allowlist, or the Task launch fails
+   with a model-unavailable / invalid-model error → **one** retry with
+   `FALLBACK_CHILD_MODEL: auto`:
+   - omit the Task `model` parameter, or pass host-equivalent Auto / `inherit`
+     if the live API requires an explicit token;
+   - report `CHILD_MODEL_FALLBACK: auto` in SUMMARY.
+4. Do **not** silently upgrade to an explicit premium / high-tier slug.
+5. Owner `MODEL=<invalid>` that is neither allowlisted nor `auto` →
+   `FAIL_CLOSED` / `BLOCKED_INVALID_MODEL` (no invent).
+## Child Task clocks (mandatory — hang prevention)
+Empty clocks on any child Task launch are a **contract violation**.
+Unbounded sync wait is forbidden (mirror supervisor §12.0 ordinary-writer /
+heavy-writer classes).
+### PLAN Task defaults (each of TASK_A / TASK_B)
+TIMEOUT_SECONDS=1800
+HEARTBEAT_INTERVAL_SECONDS=120
+NO_PROGRESS_TIMEOUT_SECONDS=600
+STOP_ACK_TIMEOUT_SECONDS=60
+### EXECUTE Task defaults (each serial GO child)
+TIMEOUT_SECONDS=3600
+HEARTBEAT_INTERVAL_SECONDS=180
+NO_PROGRESS_TIMEOUT_SECONDS=900
+STOP_ACK_TIMEOUT_SECONDS=120
+Only **stricter** (smaller) values are allowed without Owner timebox.
+Map into Task launch metadata / prompt footer as `TIMEOUT` /
+`HEARTBEAT_INTERVAL` / `NO_PROGRESS_TIMEOUT` / `STOP_ACK_TIMEOUT`.
+### Task wait discipline (HARD — false-hang prevention)
+Platform Task completion arrives as a **Task completion notification**, not
+via shell tools. Parent MUST NOT invent a busy-wait that never wakes.
+FORBIDDEN_WHILE_WAITING_ON_TASK_CHILDREN:
+- AwaitShell (does not receive Task completion notifications)
+- Shell sleep / sleep loops
+- polling subagent transcript files as a wait strategy
+- any in-turn busy-wait after background Task launch
+AWAIT_SHELL_TIMEOUT_IS_NOT_CHILD_HANG=YES
+SILENCE_PLUS_SHELL_SLEEP_IS_NOT_HANG_PROOF=YES
+**Background mode** (`run_in_background=true`):
+1. Launch child Task(s) with clocks filled.
+2. Print `OWNER_VISIBLE_DISPATCH` including that progress resumes **only**
+   on platform Task completion notification.
+3. **End the parent turn immediately** — no further tool calls that wait.
+4. On completion notification: resume that lane immediately; do not re-PLAN
+   blindly; do not treat prior silence as hang.
+**Sync mode** (`run_in_background=false`): allowed with clocks filled; result
+returns in-turn. Prefer sync for **serial EXECUTE** when `PARENT_HAS_GO=yes`
+so the parent can chain without notification dependency.
+Parallel PLAN fan-out may still use background; after both plan
+notifications land, start EXECUTE per §2 (prefer sync).
+### OWNER_VISIBLE_DISPATCH (before every child launch)
+In the same parent turn, before launching a PLAN fan-out or an EXECUTE
+Task, print:
+OWNER_VISIBLE_DISPATCH:
+  COMMAND: /opsx-commit | /opsx-meta-commit
+  LANE: LANE_PRODUCT | LANE_PROCESS
+  PHASE: PLAN | EXECUTE
+  EXPECTED_WALL_CLOCK_SECONDS:   # from clocks above
+  NO_PROGRESS_TIMEOUT_SECONDS:
+  INTERRUPT_POLICY: interrupt=true on timeout/hang when platform allows
+  WAIT_MODE: background_end_turn | sync_in_turn
+  SILENCE_NOTE: silence until NO_PROGRESS is not proof of hang; after
+                NO_PROGRESS parent must TIMEOUT/PAUSED that lane;
+                AwaitShell/shell-sleep is FORBIDDEN and is not hang proof;
+                background mode resumes only on Task completion notification
+### Platform abort / interrupt / empty envelope
+If a child Task ends as `aborted` | `interrupted` | `tool_error` | empty /
+missing envelope **without** an accepted plan or commit report:
+LANE_STATUS: PAUSED | PARTIAL
+DISPOSITION: EXECUTION_OUTCOME_UNKNOWN
+ADVANCE: FORBIDDEN for that lane
+BLIND_REPLAY: FORBIDDEN
+Parent SUMMARY must include a pasteable resume of the **same** primary
+(`/opsx-commit-all` with same tokens, or the failed child alone) with
+`ATTEMPT+1` only when idempotent; else Owner reconcile. Do not treat the
+lane as planned/committed.
+Print `OWNER_VISIBLE_DISPATCH` for both plan lanes (may be one combined
+block). Then launch **two** Task subagents in the **same** parent turn
+(parallel) with PLAN clocks filled:
+  MODEL: RESOLVED_CHILD_MODEL (mini → auto fallback rules)
+  TIMEOUT / HEARTBEAT / NO_PROGRESS / STOP_ACK: PLAN defaults
+    - Obey opsx-execution-preflight TIME_BUDGET; on timeout return
+      blocked_preflight_timeout — do not hang
+  TIMEOUT / HEARTBEAT / NO_PROGRESS / STOP_ACK: PLAN defaults
+    (including preflight budgets / blocked_preflight_timeout)
+1. If an execute Task is already running → serialize: do not launch a second
+   execute; resume only when the running execute’s Task completion
+   notification (or sync return) arrives. Never AwaitShell / sleep-poll.
+2. Print `OWNER_VISIBLE_DISPATCH` for that lane’s EXECUTE
+   (`WAIT_MODE=sync_in_turn` preferred).
+3. Launch exactly one execute Task for that ready lane with `EXEC_ARGS`
+   and EXECUTE clocks filled. **Prefer `run_in_background=false` (sync)**
+   so the result returns in-turn. If background: end turn immediately;
+   continue on Task completion notification only.
+4. Prompt MUST:
+   - Obey opsx-execution-preflight TIME_BUDGET; return
+     `blocked_preflight_timeout` rather than hang
+5. When that execute finishes, start the next ready lane’s execute (if any).
+the second waits (notification- or sync-serialized — never shell-wait).
+If both plans are ready before either execute starts, prefer order:
+`LANE_PROCESS` then `LANE_PRODUCT` (stable default).
+`GO` was present), even when a lane skipped or failed. Include any
+`EXECUTION_OUTCOME_UNKNOWN` / pasteable resume lines for interrupted lanes.
+| Plan Task errors / times out (clocks exceeded) | `BLOCKED` or `PARTIAL` | Do not execute that lane; continue other lane plan/execute rules |
+| Plan/Execute `aborted` / `interrupted` / empty envelope | `PARTIAL` / `PAUSED` | `EXECUTION_OUTCOME_UNKNOWN`; no ADVANCE that lane; pasteable resume |
+- Re-run `/opsx-commit-all` with same tokens (after `EXECUTION_OUTCOME_UNKNOWN`,
+  only with explicit Owner resume / ATTEMPT+1 — no blind replay), or
+- On confirmed hang: interrupt child when platform allows; wait at most
+  `STOP_ACK_TIMEOUT` via platform interrupt ack — **not** AwaitShell /
+  shell sleep; then TIMEOUT/PAUSED that lane per clocks above.
+CHILD_MODEL: gpt-5.4-mini-high | auto | <override>
+CHILD_MODEL_FALLBACK: none | auto
+- Silent premium model upgrade (auto fallback only; never invent premium slugs)
+- child_model: `gpt-5.4-mini-high` default; fallback `auto` (omit/inherit)

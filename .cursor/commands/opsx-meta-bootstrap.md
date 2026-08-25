@@ -384,4 +384,25 @@ FAIL_CLOSED
 .opsx/shared/evidence-contract.md
 ```
 
-Authoritative when present: `.opsx/shared/bootstrap-profile.md`.
+Authoritative when present: `.opsx/shared/bootstrap-profile.md`.contract_id: OPSX-WB-META-BOOTSTRAP-01
+**Contract:** `OPSX-WB-META-BOOTSTRAP-01`  
+CONTRACT_ID: OPSX-WB-META-BOOTSTRAP-01
+### Portable central bind (committed files)
+Hard rule for any write into committed process files
+(`.opsx/sources.yaml`, `.opsx/projectization.yaml`, `.opsx/MERGE_RECEIPT.md`):
+1. **Never** persist machine-absolute or user-home `central_root`
+   (e.g. `C:/Users/…`, `/home/…`, `/Users/…`) — username leak + non-portable.
+2. Prefer **omit** `central_root` and bind via `central=` / `OPSX_CENTRAL_ROOT` /
+   `default_relative`.
+3. Persist a relative `central_root` only when it matches the portable default
+   (`../opsx-central`) for that workspace layout.
+4. Chat/`CENTRAL:` output may show the resolved absolute path for this machine.
+5. `MERGE_RECEIPT.md` records `CENTRAL_RESOLVE:` + redacted `CENTRAL: <CENTRAL>`
+   (and `<CENTRAL>/…` in Actions); never raw home paths.
+6. Apply KEEP for that step only; bind `sources.yaml` when step 1 touches it
+   (portable central bind only — never write machine-absolute `central_root`);
+   seed projectization `REQUIRED` if absent; never set/downgrade COMPLETE;
+   never add machine-absolute `central_root` to projectization.
+7. Registry stubs as needed; `MERGE_RECEIPT.md` with redacted `<CENTRAL>` token.
+7. Do not persist machine-absolute / user-home `central_root` into committed
+   process files (see Portable central bind).

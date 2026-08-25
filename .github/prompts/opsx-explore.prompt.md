@@ -36,18 +36,69 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 3. Parse `explore.worklog` from `openspec/policies/EXPLORE_POLICY.md`.
 4. If `explore.worklog.path` exists, read it before final output.
 5. Extract Worklog-derived candidate tasks, known bugs, affected file hints, validation hints, open questions, and prior agent findings.
-6. Inspect repository files and OpenSpec artifacts relevant to the requested task.
-7. Separate repository evidence from WORKLOG notes, assumptions, and missing information.
-8. Do not modify production code.
-9. Do not modify WORKLOG.
+6. If input contains `EVOLUTION_HANDOFF` / `OWNER_INTENT`: treat `OWNER_INTENT`
+   as the fixed semantic target — never replace it with code/OpenSpec framing.
+7. **OpenSpec context pass (required when `OWNER_INTENT` present):** targeted
+   only — current `openspec/specs/**` → Accepted `openspec/decisions/**`
+   (keep ADL budgets) → relevant `openspec/changes/archive/**` as history
+   only (no broad archive scan) → then current code/tests. Target from
+   OWNER_INTENT, capability/UI terms, related specs, known IDs, runtime entities.
+8. Conflict rules: current main spec > archive; contract vs repo → explicit
+   `CONTRACT_VS_REPO`; archive/OpenSpec MUST NOT rewrite `OWNER_INTENT`.
+9. Separate repository evidence from WORKLOG notes / assumptions / gaps.
+10. If Owner↔runtime mapping is ambiguous: emit `UNRESOLVED` /
+    `CANDIDATE_MAPPING` and clarify; do **not** rewrite `OWNER_INTENT`.
+11. Do not modify production code.
+12. Do not modify WORKLOG.
+
+**OWNER_INTENT authority (when present):**
+`explore(OWNER_INTENT, repository + OpenSpec context)` MUST NOT return a
+different `OWNER_INTENT` because code, specs, decisions, or archive support
+another reading.
 
 **Required final output format:**
 
+When input includes `OWNER_INTENT`, emit this pasteable block **before** the
+narrative sections. Copy `OWNER_INTENT` **verbatim**. Keep current contract,
+historical evidence, and repository evidence in separate fields.
+
+```text
+EXPLORE_HANDOFF
+OWNER_INTENT:
+<verbatim copy from EVOLUTION_HANDOFF / input — do not reinterpret>
+CURRENT_INCREMENT: <passthrough if present>
+IN_SCOPE:
+- <passthrough if present>
+OUT_OF_SCOPE:
+- <passthrough if present>
+CURRENT_CONTRACT:
+- <relevant openspec/specs/** facts — acting contract>
+ACCEPTED_DECISIONS:
+- <relevant Accepted decision paths/status; empty if none in budget>
+HISTORICAL_EVIDENCE:
+- <relevant archive change facts — history only, not SoT; empty if none>
+REPOSITORY_FINDINGS:
+- <confirmed current code/tests facts>
+RUNTIME_MAPPING:
+- <Owner/UI term → candidate code/runtime path>
+CONTRACT_VS_REPO:
+- <explicit drift/contradiction; or none>
+UNRESOLVED:
+- <ambiguities / contradictions; empty if none>
+CANDIDATE_MAPPING:
+- <optional alternate mappings that need Owner confirmation>
+```
+
+If `OWNER_INTENT` is absent, skip `EXPLORE_HANDOFF` (backward compatible).
+
 ## Short Decision
-Короткий вывод по исследованию.
+Короткий вывод по исследованию. When `OWNER_INTENT` is present, stay
+consistent with it; technical reframes go under layered evidence /
+mapping / unresolved / CONTRACT_VS_REPO.
 
 ## Repository Evidence
-Что подтверждено файлами репозитория.
+Что подтверждено текущими файлами репозитория (code/tests). Archive is not
+acting SoT.
 
 ## WORKLOG Findings
 Что найдено в `DOTO/WORKLOG.md`. Always include this section, even when there are no useful findings.
@@ -67,7 +118,7 @@ Every WORKLOG-derived statement must be labelled `Worklog-derived` and checked a
 ## Next Action
 Что делать дальше.
 
-**Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
+**Input**: The argument after `/opsx-explore` is whatever the user wants to think about. Could be:
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
 - A change name: "add-dark-mode" (to explore in context of that change)
@@ -225,6 +276,14 @@ When things crystallize, you might offer a summary - but it's optional. Sometime
 - **Don't rush** - Discovery is thinking time, not task time
 - **Don't force structure** - Let patterns emerge naturally
 - **Don't auto-capture** - Offer to save insights, don't just do it
+- **Don't rewrite OWNER_INTENT** - When present, pass it through verbatim in
+  `EXPLORE_HANDOFF`; put code/runtime/OpenSpec mappings under layered fields
+- **Don't replace Owner meaning with a plausible code or archive story**
+  without explicit Owner correction
+- **Don't broad-scan archive**; don't treat archive as acting SoT (main spec wins)
+- **Don't silently resolve contract↔repo conflicts** — emit `CONTRACT_VS_REPO`
 - **Do visualize** - A good diagram is worth many paragraphs
 - **Do explore the codebase** - Ground discussions in reality
+- **Do check relevant current specs / Accepted decisions / targeted archive**
+  when `OWNER_INTENT` is present (then code/tests)
 - **Do question assumptions** - Including the user's and your own

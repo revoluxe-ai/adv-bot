@@ -14,6 +14,20 @@ spec:
     advupdater: []
     app_owner: []
     app_migrator: []
+    # Release-control principal for app-db-control Jobs (migration_control EXECUTE only).
+    release_controller: []
+  # ssl is off → must allow host (non-SSL) md5. Default Spilo hostnossl-reject
+  # breaks app Jobs (CONTROL/Migrate) from the cluster network.
+  patroni:
+    pg_hba:
+      - local all all trust
+      - hostssl all +zalandos 127.0.0.1/32 pam
+      - host all all 127.0.0.1/32 md5
+      - hostssl all +zalandos ::1/128 pam
+      - host all all ::1/128 md5
+      - local replication standby trust
+      - hostssl replication standby all md5
+      - host all all all md5
   databases:
     # Object/DB owner after cutover (app_owner). Runtime uses advupdater DML grants.
     adv_updater: app_owner

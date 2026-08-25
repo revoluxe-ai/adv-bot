@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Float, Integer, String, func, text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    Integer,
+    String,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from app.utils.db.base import Base
@@ -31,6 +41,10 @@ class AutoShelfBidControlSettings(Base):
         CheckConstraint(
             "test_share > 0 AND test_share <= 0.49",
             name="ck_asbcs_test_share_range",
+        ),
+        CheckConstraint(
+            "retest_interval_days >= 1",
+            name="ck_asbcs_retest_interval_days_min_1",
         ),
     )
 
@@ -59,6 +73,16 @@ class AutoShelfBidControlSettings(Base):
         server_default=text('60')
     )
     test_share: Mapped[float] = mapped_column(Float, default=0.1, nullable=False)
+    retest_interval_days: Mapped[int] = mapped_column(
+        Integer,
+        default=7,
+        nullable=False,
+        server_default=text("7"),
+        comment=(
+            "Календарный интервал суток до clear our-block shelf-exhausted "
+            "(product default 7; INC-AUTO-SHELF-PAUSE-01)."
+        ),
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -99,6 +123,14 @@ class AutoShelfBidControlSettings(Base):
             raise ValueError("test_share must satisfy 0 < test_share <= 0.49")
         return casted
 
+    @validates("retest_interval_days")
+    def _validate_retest_interval_days(self, _: str, value: int) -> int:
+        """Интервал перетеста — не меньше одних суток."""
+        casted = int(value)
+        if casted < 1:
+            raise ValueError("retest_interval_days must be >= 1")
+        return casted
+
 
 class AutoShelfBidControlState(Base):
     """Текущее состояние цикла управления ставкой для одного nmid."""
@@ -108,6 +140,11 @@ class AutoShelfBidControlState(Base):
         CheckConstraint(
             "current_mode IN ('main', 'test')",
             name="ck_asbcs_state_current_mode_allowed",
+        ),
+        CheckConstraint(
+            "shelf_exhausted_resolve_cpo_kind IS NULL OR "
+            "shelf_exhausted_resolve_cpo_kind IN ('target', 'max')",
+            name="ck_asbcs_state_shelf_exhausted_resolve_cpo_kind",
         ),
     )
 
@@ -134,6 +171,52 @@ class AutoShelfBidControlState(Base):
         nullable=True,
     )
     last_reason: Mapped[str | None] = mapped_column(String, nullable=True)
+    # INC-AUTO-SHELF-PAUSE-01: canonical our-block / epoch / recorded resolve CPO.
+    shelf_exhausted_pause_active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default=text("false"),
+        comment="Our-block: shelf-exhausted pause SoT (PG canonical).",
+    )
+    shelf_exhausted_paused_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    shelf_exhausted_due_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Календарный due clear our-block.",
+    )
+    shelf_exhausted_epoch_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Старт эпохи покрытия; пишется при реальном Auto start.",
+    )
+    shelf_exhausted_resolve_cpo_kind: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+        comment="target|max — какой resolve CPO зафиксировали при latch.",
+    )
+    shelf_exhausted_resolve_cpo_value: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True,
+    )
+    shelf_exhausted_notify_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Дедуп paid notify при enter pause.",
+    )
+    shelf_exhausted_epoch_pending: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default=text("false"),
+        comment=(
+            "True после clear our-block: следующая реальная Auto start "
+            "открывает новую эпоху покрытия."
+        ),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -151,4 +234,13 @@ class AutoShelfBidControlState(Base):
         """Допускать только main/test для mode-контракта."""
         if value not in {"main", "test"}:
             raise ValueError("current_mode must be 'main' or 'test'")
+        return value
+
+    @validates("shelf_exhausted_resolve_cpo_kind")
+    def _validate_resolve_cpo_kind(self, _: str, value: str | None) -> str | None:
+        """Допускать только target|max|None для recorded resolve kind."""
+        if value is None:
+            return None
+        if value not in {"target", "max"}:
+            raise ValueError("shelf_exhausted_resolve_cpo_kind must be 'target' or 'max'")
         return value

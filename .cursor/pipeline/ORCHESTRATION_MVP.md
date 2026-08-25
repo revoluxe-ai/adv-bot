@@ -55,7 +55,7 @@ contract and the activated companion command texts.
 
 - typing-only packets (`/opsx-fix-types`, static-check);
 - process / command-contract defects
-  (`/opsx-admin-command-fix-command-defects`,
+  (`/opsx-meta-fix-command-defects`,
   `/opsx-admin-command-promote-process-lesson`);
 - OpenSpec change apply/verify/archive lifecycle (except optional later GRAPH
   navigation edges);
@@ -94,6 +94,13 @@ CLASSIFICATION: IMPLEMENTATION_BUG
 → /opsx-fix-bug GO  (production only; test freeze by default)
 → /opsx-test verify → GREEN_CONFIRMED
 ```
+
+Classify seed state for the first hop: `CURRENT_ROUTE_STATE=AWAITING_FIX_BUG`
+with machine `ROUTE_TRANSITION.PRECONDITIONS.GO_TOKEN=FORBIDDEN` (see
+`contracts/bug-episode/ROUTE_TRANSITION.md`). That is **not** the same
+token as post-`TASK_DELTA` `AWAITING_FIX_BUG_RED`. Supervisor must consume
+the structured transition; prose «no GO until RED» does not replace
+`NEXT_COMMAND=/opsx-fix-bug` with `/opsx-test`.
 
 ### Route B — specification defect or gap
 

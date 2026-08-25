@@ -11,9 +11,22 @@ Fast-forward through artifact creation - generate everything needed to start imp
 
 **OpenSpec guard:** Before this command writes artifacts, run `poetry run python tools/openspec/openspec_guard.py --scenario opsx_ff --strict`. Stop on non-zero exit and report the guard output.
 
-**Input**: The argument after `/opsx:ff` is the change name (kebab-case), OR a description of what the user wants to build.
+**Input**: The argument after `/opsx-ff` is the change name (kebab-case), OR a description of what the user wants to build.
 
 **Source resolution:** Follow `.cursor/commands/opsx-source-resolution.md` for any supplied exact change/decision paths; do not rediscover known artifacts via full-tree inventory.
+
+**Semantic write-target preflight:** Follow
+`.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`. When the change plans a
+high-risk write and repository evidence exposes multiple plausible
+entities/legs/adapters, artifacts MUST durably name `TARGET_ENTITY_OR_LEG`,
+`ALLOWED_ADAPTERS`, `FORBIDDEN_ADAPTERS`, evidence, Owner decision source, and
+paired positive/negative tests in an **explicit SWT schema block** (exact
+field names). Architecture Decision `## Allowed` / `## Forbidden` prose and
+design Ownership tables **alone** are **not** MEANING_LOCK
+`RESOLVED` (`prose≠RESOLVED`) — do **not** declare apply-ready. If evidence
+does not select one target, return `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`,
+ask the contract's single concrete Owner question, and do not declare the
+change apply-ready. Never infer product semantics from similar names.
 
 **Steps**
 
@@ -60,6 +73,34 @@ Fast-forward through artifact creation - generate everything needed to start imp
         - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
+      - **If the artifact is `design`:** follow
+        `.cursor/pipeline/contracts/DESIGN_GENERATION.md` first. Build draft
+        design, then run full `DESIGN_READINESS` (including post-generation
+        `NORMATIVE_PRESERVATION_CHECK`). Resolve technical
+        SoT/ownership/write/recovery from evidence (or
+        `DESIGN_STATUS: BLOCKED` / `TECHNICAL_DESIGN_UNRESOLVED` /
+        `UPSTREAM_NORMATIVE_CONFLICT` / `NORMATIVE_MODALITY_DRIFT`).
+        Preserve MUST/MUST NOT/MAY. Never defer architecture to apply.
+        On BLOCKED stop the loop without declaring design complete
+        (`FILES_CHANGED: none`). On READY
+        (`NORMATIVE_MODALITY_PRESERVED: yes`), create design with the same
+        Derived Lifecycle rules as `/opsx-continue`.
+      - **If the artifact is `tasks`:** follow
+        `.cursor/pipeline/contracts/TASK_GENERATION.md` first. Build draft
+        tasks, then run full `TASK_GENERATION_READINESS` (including
+        post-generation `NORMATIVE_PRESERVATION_CHECK`). When scenario
+        coverage is required, `SCENARIO_REQUIREMENTS_CONSUMED: yes` needs a
+        CURRENT durable `scenario-coverage/plan.receipt.json` (never chat-only);
+        missing/stale → `BLOCKED` /
+        `SCENARIO_PLAN_EVIDENCE_MISSING|STALE|INTEGRITY_FAIL` and
+        `NEXT: /opsx-spec-scenario-coverage mode=plan`. On
+        `TASKS_STATUS: BLOCKED` stop the loop without writing `tasks.md`
+        (`FILES_CHANGED: none`); return the unresolved item / drift +
+        artifact to fix. Do not auto-ask Owner for technical design gaps.
+        On `READY` (`NORMATIVE_MODALITY_PRESERVED: yes` and
+        `CONDITIONAL_BRANCHES_PRESERVED: yes`), create tasks with evidence
+        roles and preserved normative modality (same rules as
+        `/opsx-continue`).
       - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "✓ Created <artifact-id>"
@@ -73,7 +114,57 @@ Fast-forward through artifact creation - generate everything needed to start imp
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+5. **Confirm semantic write target**
+
+   Before declaring apply readiness, evaluate the shared semantic-target
+   contract against completed artifacts:
+   - `NOT_APPLICABLE` — continue only when justified (single proven target);
+     competing legs/adapters MUST NOT use `NOT_APPLICABLE`;
+   - `RESOLVED` — confirm all required fields are materialized;
+   - `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION` — stop and route the durable
+     answer back through planning; chat-only selection is insufficient.
+
+6. **Product Acceptance (kernel DONE path)**
+
+   Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md` before
+   apply-ready:
+   - Decide and record `PRODUCT_ACCEPTANCE_REQUIRED`.
+   - When required: MEANING_LOCK must be durable via explicit SWT schema
+     tokens (`TARGET_ENTITY_OR_LEG` / `ALLOWED_ADAPTERS` /
+     `FORBIDDEN_ADAPTERS`). Prose Allowed/Forbidden alone = missing.
+   - **Derived Lifecycle (same rules as `/opsx-continue`):** for temporal/
+     stateful Changes, design MUST include a durable Lifecycle section with
+     `LIFECYCLE_STATUS: DERIVED` and per-step `SOURCE:` provenance, derived
+     from reviewed `owner-contract.md` + decisions + repo facts + prior
+     planning artifacts. Do **not** invent semantics. Step count is not
+     fixed to 3–7. Also apply `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+     (`DESIGN_READINESS`) before declaring design complete — never defer
+     SoT/ownership/write-path to apply; preserve MUST/MUST NOT/MAY.
+   - When Lifecycle is uniquely determined by reviewed Owner Contract →
+     **do not** require a second Owner `CONFIRM_LIFECYCLE`. Authority remains
+     the reviewed Owner Contract.
+   - If a material transition is A|B with no Owner resolution → stop with
+     `LIFECYCLE_STATUS: UNRESOLVED` and
+     `NEXT_ACTION: /opsx-owner-contract-review change=<name>` (not a parallel
+     confirm contour inside ff).
+   - **Legacy fallback only:** Changes without reviewed `owner-contract.md`
+     may still use durable `OWNER_LIFECYCLE_ECHO` + Owner `CONFIRM_LIFECYCLE`
+     (or `CORRECT` → rewrite → confirm).
+   - Schedule `/opsx-spec-scenario-coverage mode=plan` (lifecycle↔scenario
+     coverage; not optional under PA); that command MUST materialize durable
+     `scenario-coverage/plan.md` + `plan.receipt.json`. Chat-only plan is
+     not a valid gate input for tasks / planning-review. Note
+     SIDE_EFFECT_PROOF obligations.
+   - Do not declare apply-ready if PA required and MEANING_LOCK is missing
+     or blocked, **or** (for reviewed-contract Changes) Derived Lifecycle is
+     missing/UNRESOLVED when temporal behavior applies, **or** (legacy path
+     only) `OWNER_LIFECYCLE_ECHO` / `CONFIRM_LIFECYCLE` is missing.
+     Chat-only lifecycle is not durable.
+   - Invariant vs continue: same Owner Contract + same repository state →
+     semantically equivalent lifecycle/design/spec whether built via
+     sequential `/opsx-continue` or `/opsx-ff` (advancement mode differs only).
+
+7. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -92,6 +183,27 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- When creating `design.md`: apply the same Design Generation rules as
+  `/opsx-continue` via `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (`DESIGN_READINESS` after draft + post-generation check; resolve or BLOCK
+  technical architecture — never apply-time SoT/ownership/write-path;
+  MUST/MUST NOT modality preservation with
+  `NORMATIVE_MODALITY_PRESERVED: yes` required for READY; Open Questions only
+  for harmless naming; continue≡ff equivalence).
+  For temporal/stateful behavior: also apply Derived Lifecycle
+  (`LIFECYCLE_STATUS: DERIVED`, per-step SOURCE, no invented transitions,
+  UNRESOLVED → owner-contract-review). Specs MUST cover material lifecycle
+  transitions (or explicit not-needed proof).
+  On BLOCKED do not declare design complete.
+- When creating `tasks.md`: apply the same Task Generation rules as
+  `/opsx-continue` via `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (`TASK_GENERATION_READINESS` after draft + post-generation check,
+  no implementer architecture choices,
+  `LEGACY_BASELINE` / `TARGET_REGRESSION` / `FINAL_ACCEPTANCE`,
+  MUST/MUST NOT modality + conditional-branch preservation,
+  epoch coupling when applicable, continue≡ff equivalence;
+  durable CURRENT scenario-plan receipt required when scenarios apply).
+  On BLOCKED do not write `tasks.md`.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
@@ -102,3 +214,14 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- Before writing/completing `design.md`: follow
+  `.cursor/pipeline/contracts/DESIGN_GENERATION.md`
+  (draft → post-generation `NORMATIVE_PRESERVATION_CHECK`;
+  `NORMATIVE_MODALITY_PRESERVED: yes` required for READY); on BLOCKED do not
+  declare design complete (never defer architecture to apply; preserve
+  MUST/MUST NOT)
+- Before writing `tasks.md`: follow `.cursor/pipeline/contracts/TASK_GENERATION.md`
+  (draft → post-generation `NORMATIVE_PRESERVATION_CHECK`;
+  `NORMATIVE_MODALITY_PRESERVED` + `CONDITIONAL_BRANCHES_PRESERVED` required
+  for READY); on BLOCKED leave `FILES_CHANGED: none`
+  (do not create tasks that complete design)

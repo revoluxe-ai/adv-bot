@@ -1324,5 +1324,41 @@ valid signature is always STOP. Signature errors are typed
 Ambient path+digest alone is **not** a trust root. `MANIFEST.json` /
 `host_frozen_contracts` detect host drift only and **cannot** mint producer
 trust. Without OS pubkey + valid signature: always
-`STOP_AUTHORITY_UNPROVEN` / `BLOCKER_AUTHORITY_PRODUCER_MISSING`.
-
+`STOP_AUTHORITY_UNPROVEN` / `BLOCKER_AUTHORITY_PRODUCER_MISSING`.package_version: 0.40.0
+contract_schema_version: opsx-resolve-conflict/v2
+status: candidate_for_independent_review
+supported_runner: Cursor Agent with Python 3.11+ and packaged typed runtime
+  - direct Python process execution without shell interpolation
+  - filesystem write access limited by frozen scope manifest
+  - Poetry executable for mandatory Wave A/B validation
+  - externally attested OS sandbox runner
+  - durable user-state directory outside repository
+  - process-group cancellation
+description: "Fail-closed Git conflict resolution with applicable authority, race-safe writes, durable receipts, and mandatory Wave A/B validation."
+argument-hint: "[PREVIEW|GO] [change=<CHANGE_ID>] [store=<STORE_ID>]"
+PREVIEW is a **repository-context conflict assistant** (not an autonomous
+resolver and not a line-diff chooser). It is read-only:
+- analyze **exactly one** conflicted path per invocation (R40);
+- when ``--path`` is omitted and exactly one path is unmerged, analyze that path;
+- when ``--path`` is omitted and multiple paths are unmerged, STOP with
+  ``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`` (envelope lists sorted paths);
+- when ``--path`` is supplied, analyze only that unmerged path;
+- load stage 1/2/3 blobs via the sealed R34 exact Git operation grammar;
+- collect a bounded structured context packet (siblings, callers/usages,
+  tests, accepted decisions/specs) without shell/rg subprocesses;
+- separate FACTS from INTERPRETATIONS; attach evidence IDs;
+- list coherent resolution options and Owner questions;
+- recommend a side **only** when evidence has both a strong
+  `authority_class` **and** `authority_verified=true` (explicit accepted
+  status / canonical current-spec / verified contract / API invariant);
+- path location alone never proves normative authority; draft/proposed/
+  rejected/superseded decisions and change-local specs do not recommend;
+- never recommend `keep_ours`/`keep_theirs` from textual subset alone;
+Successful PREVIEW reports bind ``CURRENT_CONFLICT.path``,
+``CONTEXT.paths_analyzed``, reasoning, evidence, and recommendation to the
+selected path only. ``unmerged_paths_inventory`` / ``all_unmerged_paths`` are
+inventory, not analysis coverage.
+Human output leads with Russian behavioral explanation; Git OIDs/hashes are
+secondary evidence below.
+NEXT_ACTION=Owner verifies analysis, edits files manually, accepts responsibility
+DO_NOT_DO_YET=edit-by-runtime, stage, continue, abort, skip, commit, push, GO

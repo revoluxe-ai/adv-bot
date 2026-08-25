@@ -196,12 +196,19 @@ $ARGUMENTS
 | FREE_FORM_MULTILINE | `/opsx-bug-team` + multiline body |
 | CURRENT_CONTEXT | `/opsx-bug-team` with empty args → current user message/context |
 | EXPLICIT_SIGNAL | `/opsx-bug-team signal="..."` (optional) |
-| CASE_RESUME | `/opsx-bug-team case=<CASE_ID>` |
+| CASE_RESUME | `/opsx-bug-team case=BUGCASE-…` (durable id only) |
 
 ```text
-case=<CASE_ID> + new bug text  → BLOCKED_AMBIGUOUS_INVOCATION
+durable case=BUGCASE-… + new bug text  → BLOCKED_AMBIGUOUS_INVOCATION
+placeholder case=<CASE_ID> / case=CASE_ID     → ignored (treat as absent;
+  free-form / signal proceeds)  # CMD-IX-001
 empty args + no extractable signal → BLOCKED_INTAKE_REQUIRED
 ```
+
+**First-intake paste fence (CMD-IX-002):** free-form / `RAW_REPORT` first
+intake MUST NOT include `case=` resume lines or `ALSO_OK` `/opsx-explore`
+handbacks in the same message. Those belong only after a durable
+`CASE_ID` exists (separate paste / CASE_RESUME).
 
 Do **not** require the user to supply CASE_ID / FINDING_ID /
 BUG_CLASSIFICATION / structured evidence packets up front.
@@ -255,9 +262,11 @@ Rules:
   `TASK_DISPATCH.md` **Append recipe** (prefer `live_task_hop`; ad-hoc
   Shell/Python MUST follow
   `.cursor/commands/opsx-execution-preflight.md` →
+  **Shell payload I/O (anti-heredoc)** and
   **Windows Shell JSON / JSONL write safety** —
-  `encoding="utf-8"` + `ensure_ascii=True`; no `ensure_ascii=False` stdin
-  recipes; no unsafe console print of the line);
+  no bash heredoc for multi-line JSON/Python; Write→path first; on heredoc
+  failure switch Write→path once; `encoding="utf-8"` + `ensure_ascii=True`;
+  no `ensure_ascii=False` stdin recipes; no unsafe console print of the line);
 - never invent missing worker output.
 
 ## Waves
@@ -311,10 +320,15 @@ auto-continue into the next wave without these lines:
 ```text
 OWNER_DECISION_REQUIRED: A | B | C | <exact choices>
 OPTIONAL_IF_UNSURE:
-/opsx-explore case=<CASE_ID> finding=<FINDING_ID>
+/opsx-explore case=CASE_ID finding=FINDING_ID
 THEN_RETURN (pasteable — never silent):
-/opsx-bug-team case=<CASE_ID> mode=continue
+/opsx-bug-team case=CASE_ID mode=continue
 ```
+
+Substitute durable `BUGCASE-…` / finding ids from INDEX/LEDGER — do **not**
+emit angle-bracket `case=<CASE_ID>` templates (CMD-IX-001). Omit these
+lines until ids are known. Never paste them into first-intake `RAW_REPORT`
+(CMD-IX-002).
 
 Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
 Explore clarifies; it does **not** replace A/B/C. After Owner answers in
@@ -424,3 +438,4 @@ If `ACTIVATION.json` were reverted to `RUNTIME_STATUS: NOT_ACTIVE`:
 
 Current workspace state is `RUNTIME_STATUS: ACTIVE` with
 `BUG_FAMILY_FANOUT_ENABLED: true`.
+

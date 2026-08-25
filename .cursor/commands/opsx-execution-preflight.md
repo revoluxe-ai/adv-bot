@@ -12,6 +12,53 @@ Any OPSX command that references it MUST follow it for git/status/diff/find/rg/t
 Companion contract: `.cursor/commands/opsx-source-resolution.md` (artifact resolution).
 This contract covers **execution cost / hang risk**, not path rediscovery.
 
+## TOPIC_INTENT / Owner-message re-anchor (mandatory)
+
+**Defect class:** sticky prior-turn topic hijacks a new Owner ask
+(`PF-TOPIC-INTENT-REANCHOR-001`; pattern donor:
+`opsx-admin-command-analyze-pipeline.md` /
+`CMD-ANALYZE-PIPELINE-TOPIC-STICKY-001`).
+
+Authority cited (enforce, do not invent a parallel DONE gate):
+
+```text
+.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md  (MEANING_LOCK)
+.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md
+```
+
+Any OPSX command that references this preflight contract MUST, **before**
+interpreting Owner text, choosing a branch (product vs process/learning),
+or running transcript/history search as the primary frame:
+
+1. Resolve exactly one topic from the **current** user message first.
+   Prior turns are hints only; they MUST NOT become the default topic.
+
+```text
+TOPIC_INTENT: PRODUCT_BRIEF | PROCESS_PIPELINE | AMBIGUOUS
+```
+
+   Commands MAY use an equivalent local enum that preserves
+   **current-message-first** (same sticky-topic ban).
+
+2. Forbidden: treat «обучение» / learning / promote / `DEFERRED` from an
+   earlier turn as the topic of a new ask that never names those.
+
+3. If `AMBIGUOUS` (e.g. bare «задача», «найди чаты где я объяснял») → ask
+   **one** narrow disambiguation question and stop; do not answer from the
+   sticky prior topic yet.
+
+4. For product-touching work: when the current message does not name
+   learning/promote/process, prefer durable product SoT
+   (`openspec/evolution/**` / active STAR when applicable) over the last-chat
+   learning / promote / `DEFERRED` thread.
+
+5. Emit `TOPIC_INTENT:` (and, when product-touching and a STAR is known,
+   a one-line `ACTIVE_PRODUCT_INTENT` echo from that durable path) in the
+   **first** status block of the run.
+
+This section does **not** authorize creating a new `/opsx-*` command file;
+consumers extend behavior by following this shared contract.
+
 ## Goal
 
 Prevent hangs on unconditional preflight shells when those results are not required for the current command decision.
@@ -34,6 +81,20 @@ FAILURE_BEHAVIOR:
 ```
 
 If `REQUIRED_FOR` is empty or not needed for the current decision, **skip** the operation.
+
+### REQUIRED_GATE_INPUT materialization (pointer)
+
+When a command output is a later independent gate input (not merely chat
+narration), prefer durable evidence over chat history as SoT. Canonical
+cross-cutting rule:
+
+```text
+.cursor/pipeline/GRAPH.md → ## Process invariants
+  → REQUIRED_GATE_INPUT must materialize
+```
+
+Do not invent a second competing rule here. Do not materialize every
+transient preflight/shell result under that invariant.
 
 ## Default time budgets
 
@@ -81,6 +142,31 @@ Reserved high-risk gate-pair section-Reads inside `/opsx-review-commands`
 (checklist / two-pass FULL) still count toward that command’s mode Read cap
 and still obey parallel `Read` ≤ **2** — they are prioritization, not a
 budget exemption.
+
+## Shell payload I/O (anti-heredoc)
+
+Fourth failure class (after unbounded search, unconditional git, mass Reads):
+**fragile multi-line Shell payloads via bash heredoc**.
+
+Hard rules for every OPSX command that runs Shell:
+
+1. **Forbidden for multi-line / nested-quote payloads** (JSON, Python, scripts,
+   multi-paragraph commit/PR bodies, nested quotes):
+   - bash heredoc: `cat <<EOF`, `cat <<'EOF'`, `$(cat <<'EOF' ...)`
+   - embedding the full body as one quoted Shell argument when quotes or
+     truncation regularly break the run
+2. **Required pattern:** write the payload with the **Write** tool (or an
+   equivalent file write) to a workspace path, then invoke by path:
+   - `python path\to\script.py`
+   - `git commit -F path\to\COMMIT_MSG.txt`
+   - `gh pr create ... --body-file path\to\pr_body.md`
+3. Single-line Shell args with no nested quotes remain OK.
+4. Do not teach bash-heredoc recipes in command bodies for those payloads;
+   prefer Write → path / `--body-file` / `-F`.
+5. If a Shell heredoc truncates or fails quoting → stop retrying heredoc;
+   switch to Write→path once and continue (do not loop).
+
+Defect class id (for learn/promote): `HEREDOC-SHELL-PAYLOAD-001`.
 
 ## Failure / timeout behavior
 
@@ -133,7 +219,7 @@ Default:
 * never run git status as step 0 before reading known case/finding.
 
 ### C. Git-mutating / PR / split / commit workflows
-Examples: `/opsx-commit`, `/opsx-admin-command-commit`, `/opsx-create-pr`, `/opsx-split-for-pr`.
+Examples: `/opsx-commit`, `/opsx-meta-commit`, `/opsx-create-pr`, `/opsx-split-for-pr`.
 
 Default:
 

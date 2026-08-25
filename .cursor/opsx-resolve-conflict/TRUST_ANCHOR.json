@@ -1,0 +1,11 @@
+{
+  "author": "Cursor",
+  "note": "Hash-bound trust aggregate; outer archive SHA256SUMS is review root.",
+  "open_blockers": [
+    "BLOCKER_AUTHORITY_PRODUCER_MISSING",
+    "BLOCKER_OS_SANDBOX_RUNNER_MISSING"
+  ],
+  "package_digest": "892bcb805a23eb0e3e66e510f7a65b76947e7ee59f5f4515f036e550e0472b95",
+  "package_version": "0.40.0",
+  "schema": "opsx-resolve-conflict/trust-anchor/v1"
+}

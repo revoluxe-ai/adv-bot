@@ -34,6 +34,9 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
     resolve_expected_bid_minor,
     snapshot_can_count_progress,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.exhausted_pause.decision import (
+    coverage_date_from_for_epoch,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -127,7 +130,10 @@ def _configure_plan_distance_test_transition(
     manager._build_coverage_snapshot = AsyncMock(
         return_value=([], 0, covered_anchor_count, next_test_bid)
     )  # type: ignore[method-assign]
+    # nmid must match complex_adv.main_nmid; shelf-exhausted fields must be
+    # real bools/None so MagicMock truthiness does not fake an active our-block.
     state = MagicMock(
+        nmid=775965323,
         current_test_bid_minor=current_test_bid_minor,
         current_mode="test",
         current_cycle_started_at=datetime.now(UTC) - timedelta(hours=2),
@@ -137,6 +143,8 @@ def _configure_plan_distance_test_transition(
         current_main_bid_minor=12_000,
         currency="RUB",
         last_reason=None,
+        shelf_exhausted_pause_active=False,
+        shelf_exhausted_due_at=None,
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
@@ -148,6 +156,7 @@ def _configure_plan_distance_test_transition(
     complex_adv = MagicMock(
         main_nmid=775965323,
         auto_adv_id=222,
+        auto_shelf_bid_control_enabled=True,
         auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
         fact_pay_for_order=None,
         resolve_cpo=None,
@@ -304,11 +313,15 @@ def _build_reconcile_fixture(
     repository.update_state_reason = AsyncMock()
     wb_bid_setter = MagicMock()
     wb_bid_setter.set_bid = AsyncMock()
+    # update() → _apply_shelf_exhausted_tick awaits get_bid_stats when
+    # current_cycle_started_at is set; MagicMock is not awaitable.
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
     manager = AutoShelfBidControlManager(
         bid_cache_manager=MagicMock(),
         wb_bid_setter=wb_bid_setter,
         repository=repository,
-        analytics_repository=MagicMock(),
+        analytics_repository=analytics,
     )
     manager._get_actual_bid = AsyncMock(return_value=actual_bid_minor)  # type: ignore[method-assign]
     manager._resolve_min_bid_minor = MagicMock(return_value=12_000)  # type: ignore[method-assign]
@@ -316,7 +329,11 @@ def _build_reconcile_fixture(
     manager._handle_test_mode = AsyncMock()  # type: ignore[method-assign]
     manager._handle_main_mode = AsyncMock()  # type: ignore[method-assign]
     now = datetime(2026, 6, 13, 12, 0, 0, tzinfo=UTC)
+    # nmid must match complex_adv.main_nmid; shelf-exhausted fields must be
+    # explicit so update() → _apply_shelf_exhausted_tick does not see MagicMock
+    # truthiness or missing attrs as an active our-block.
     state = SimpleNamespace(
+        nmid=30369094,
         current_mode=current_mode,
         current_test_bid_minor=current_test_bid_minor,
         current_main_bid_minor=current_main_bid_minor,
@@ -326,6 +343,9 @@ def _build_reconcile_fixture(
         main_started_at=datetime(2026, 6, 12, 14, 0, 0, tzinfo=UTC),
         currency="RUB",
         last_reason=None,
+        shelf_exhausted_pause_active=False,
+        shelf_exhausted_due_at=None,
+        shelf_exhausted_epoch_start=None,
     )
     settings_obj = SimpleNamespace(
         target_test_impressions=10,
@@ -337,6 +357,7 @@ def _build_reconcile_fixture(
     complex_adv = SimpleNamespace(
         main_nmid=30369094,
         auto_adv_id=35018182,
+        auto_shelf_bid_control_enabled=True,
         auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.CYCLE_METRIC,
         fact_pay_for_order=None,
         resolve_cpo=None,
@@ -2657,15 +2678,17 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
         "get_rec_bid_recommendations",
         AsyncMock(return_value={"best_plan_bid": None, "plan_ranked": []}),
     )
+    first_bucket_start = datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
     state = MagicMock(
         current_test_bid_minor=60_000,
         current_mode="main",
-        current_cycle_started_at=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
+        current_cycle_started_at=first_bucket_start,
         test_started_at=datetime.now(UTC) - timedelta(hours=12),
         main_started_at=datetime.now(UTC) - timedelta(hours=10),
         current_main_bid_minor=20_500,
         currency="RUB",
         last_reason=None,
+        shelf_exhausted_epoch_start=None,
     )
     settings_obj = MagicMock(
         target_test_impressions=10,
@@ -2707,7 +2730,7 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
     assert state.current_mode == "test"
     assert state.current_test_bid_minor == 33_000
     assert state.test_started_at is not None
-    assert state.current_cycle_started_at == datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC)
+    assert state.current_cycle_started_at == first_bucket_start
     assert state.last_reason == ControlReason.TEST_COMPLETED_SWITCH_TO_TEST
     analytics.get_first_available_bid_bucket_start.assert_awaited_once_with(
         nmid=111,
@@ -2715,10 +2738,18 @@ async def test_handle_main_mode_plan_distance_uses_next_test_bid_when_available(
         price_minor=None,
         mode=None,
     )
+    coverages_kwargs = analytics.get_bid_coverages.await_args.kwargs
+    date_to = coverages_kwargs["date_to"]
+    # ASEP: date_from = max(first_bucket, coverage_date_from_for_epoch(...));
+    # epoch absent → now-7d floor (OpenSpec window clamp).
+    expected_date_from = max(
+        first_bucket_start,
+        coverage_date_from_for_epoch(now=date_to, epoch_start=None),
+    )
     analytics.get_bid_coverages.assert_awaited_once_with(
         nmid=111,
-        date_from=datetime(2026, 6, 10, 0, 0, 0, tzinfo=UTC),
-        date_to=ANY,
+        date_from=expected_date_from,
+        date_to=date_to,
         currency="RUB",
         price_minor=None,
         mode=None,
