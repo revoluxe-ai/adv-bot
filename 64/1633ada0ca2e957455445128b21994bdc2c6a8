@@ -1,0 +1,25 @@
+.cursor/opsx-resolve-conflict/scripts/merge_owner_batch.py
+  s_f3ba9455123935::t_b1211993e34459 1-106
+.cursor/opsx-resolve-conflict/scripts/merge_owner_batch2.py
+  s_f3ba9455123935::t_808b1007bb4d72 1-135
+.cursor/opsx-resolve-conflict/scripts/merge_process_synthesis.py
+  s_f3ba9455123935::t_0a0d371a6b8a98 1-60
+.cursor/opsx-resolve-conflict/scripts/finalize_merge_handoff.py
+  s_f3ba9455123935::t_e4d77441126bfd 1-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "641633ada0ca2e957455445128b21994bdc2c6a8",
+  "prompts": {},
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
