@@ -120,8 +120,11 @@ def _build_subscription_cache_key(telegram_id: int) -> str:
     return f"{SUBSCRIPTION_CACHE_PREFIX}:{telegram_id}"
 
 
-def _reset_subscription_cache_client() -> None:
-    """Drop the memoized Redis client (tests / after DI recovery)."""
+def _reset_subscription_cache_client() -> None:  # pyright: ignore[reportUnusedFunction]
+    """Drop the memoized Redis client (tests / after DI recovery).
+
+    Test seam: ``tests/client_bot/test_channel_subscription.py``.
+    """
     global _subscription_redis_client
     _subscription_redis_client = None
 

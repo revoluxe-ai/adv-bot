@@ -587,6 +587,8 @@ async def handle_filter_keywords_by_adv_message(
         await state.clear()
         await start_registration(message, bot, state)
         return
+    if message.from_user is None:
+        return
     filter_keywords = text.splitlines()
     filter_keywords = [
         keyword.strip().lower() for keyword in filter_keywords if keyword
@@ -660,7 +662,9 @@ async def keywords_daily_stats(
         await _notify_adv_setting_not_found(bot, chat_id)
         return
 
-    async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
+    async with ChatActionSender.typing(
+        bot=bot, chat_id=cast(types.Message, callback.message).chat.id
+    ):
         await KeywordsDailyStatsScreen(
             bot=bot,
             chat_id=callback.message.chat.id,
@@ -746,7 +750,10 @@ async def setting_keywords_show_not_relevant(
     keywords = await utils.get_keywords_for_keyboard(adv_setting)
     await state.update_data(adv_choice_last_page=1)
     state_data = await state.get_data()
-    wb_user_cabinet_original_id = state_data.get("last_wb_user_cabinet_original_id")
+    wb_user_cabinet_original_id_raw = state_data.get("last_wb_user_cabinet_original_id")
+    if not isinstance(wb_user_cabinet_original_id_raw, int):
+        raise RuntimeError("Не удалось восстановить кабинет пользователя из состояния.")
+    wb_user_cabinet_original_id = wb_user_cabinet_original_id_raw
     nmids = adv_setting.nmids
     chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
@@ -916,7 +923,9 @@ async def change_keyword_hard_status(
     # TODO: Не работает кнопка Скрыть не релевантные фразы
     # TODO: Тестировать дальше - не работает!!!!
     # TODO: Подумать над ограничением фраз
-    async with ChatActionSender.typing(bot=bot, chat_id=callback.message.chat.id):
+    async with ChatActionSender.typing(
+        bot=bot, chat_id=cast(types.Message, callback.message).chat.id
+    ):
         new_hard_status = callback_data.new_hard_status
         keyword_setting_original_id = callback_data.keyword_setting_original_id
         async with _sm(read_only=False) as session:
@@ -989,6 +998,8 @@ async def handle_filter_by_query_message(
         return
     if count_query < 0:
         count_query *= -1
+    if message.from_user is None:
+        return
     callback_data = await state.get_data()
     adv_original_id = int(cast(int, callback_data.get("last_adv_original_id")))
     await messages.LongTimeOperation(bot, message.chat.id)()
@@ -1022,8 +1033,8 @@ async def handle_filter_by_query_message(
                 )
             )
         )
-        wb_user_cabinet = await session.execute(stmt)
-        wb_user_cabinet = wb_user_cabinet.scalar_one_or_none()
+        exec_result = await session.execute(stmt)
+        wb_user_cabinet = exec_result.scalar_one_or_none()
     if wb_user_cabinet is None:
         raise RuntimeError("Не удалось найти кабинет пользователя для этой РК.")
     wb_user_cabinet_original_id = wb_user_cabinet.id
@@ -1208,7 +1219,7 @@ async def keyword_target_place_value_in_session(
         return
 
     adv_setting = keyword_setting.adv_setting
-    if adv_setting is None:
+    if adv_setting is None:  # pyright: ignore[reportUnnecessaryComparison]
         _ = await bot.send_message(message.chat.id, "Кампания не найдена.")
         _ = await state.update_data(keyword_setting_for_target_place=None)
         _ = await state.set_state()
@@ -1241,6 +1252,8 @@ async def keyword_target_place_value_in_session(
     )
     _ = await messages.KeywordTargetPlaceUpdated(bot, message.chat.id, display_value)()
 
+    if message.from_user is None:
+        return
     page = data.get("last_keyword_setting_page", 1)
     await messages.KeywordSettingMessage(
         bot,
@@ -1291,9 +1304,10 @@ async def show_only_on_out_index(
     await state.update_data(keywords_filter=keyword_texts)
     await state.update_data(adv_choice_last_page=page)
     state_data = await state.get_data()
-    wb_user_cabinet_original_id = cast(
-        int | None, state_data.get("last_wb_user_cabinet_original_id")
-    )
+    wb_user_cabinet_original_id_raw = state_data.get("last_wb_user_cabinet_original_id")
+    if not isinstance(wb_user_cabinet_original_id_raw, int):
+        raise RuntimeError("Не удалось восстановить кабинет пользователя из состояния.")
+    wb_user_cabinet_original_id = wb_user_cabinet_original_id_raw
     nmids = adv_setting.nmids
     chat_id = cast(types.Message, callback.message).chat.id
     adv_choice_last_page = 1
