@@ -761,7 +761,11 @@ def _coverage_quality_md(
     return "\n".join(lines) + "\n"
 
 
-async def run_collect(output_dir: Path) -> dict[str, Any]:
+async def run_collect(
+    output_dir: Path,
+    wb_cabinet_id: int,
+    nmids: list[int],
+) -> dict[str, Any]:
     """Выполнить delta-collect и упаковать ZIP."""
     output_dir.mkdir(parents=True, exist_ok=True)
     raw_dir = output_dir / "raw"
@@ -769,8 +773,6 @@ async def run_collect(output_dir: Path) -> dict[str, Any]:
     sql_dir = output_dir / "sql"
     sql_dir.mkdir(parents=True, exist_ok=True)
 
-    _bootstrap_cluster_infra()
-    wb_cabinet_id, nmids = _load_nmids_from_pg(output_dir)
     coverage: dict[str, Any] = {
         "timezone": TZ,
         "nmids_requested": len(nmids),
@@ -900,7 +902,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     out = Path(args.output_dir).resolve()
-    result = asyncio.run(run_collect(out))
+    _bootstrap_cluster_infra()
+    wb_cabinet_id, nmids = _load_nmids_from_pg(out)
+    result = asyncio.run(run_collect(out, wb_cabinet_id, nmids))
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
