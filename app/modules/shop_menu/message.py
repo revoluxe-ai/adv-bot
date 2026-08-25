@@ -88,8 +88,7 @@ def build_shop_main_keyboard(
     wb_cabinet: WBCabinet,
     ui_access: UiAccessMode = UiAccessMode.FREE,
 ) -> InlineKeyboardMarkup:
-
-    """Собрать главную inline-клавиатуру магазина.
+    """Собрать главную inline-клавиатуру магазина для FREE/PAID режима UI.
 
     Админский toggle режима UI добавляется только при валидном
     telegram id админа. Отсутствие ``wb_user_cabinet.user`` (или ``None``)
@@ -103,7 +102,6 @@ def build_shop_main_keyboard(
     Returns:
         InlineKeyboardMarkup главной клавиатуры магазина.
     """
-    """Build the shop menu keyboard for the effective free/paid access mode."""
     wb_cabinet_original_id = wb_cabinet.id
     builder = InlineKeyboardBuilder()
 
@@ -320,7 +318,7 @@ class ShopMenu(TextWithKeyboard):
 
         Parent ``_load_all_data`` opens ``sm(read_only=True)`` and passes
         the session here (PURE_READ handoff). Threads ``leg_latch`` and
-        ``utc_date`` like billing charge / ``_load_tariff_preview`` (PBH-003).
+        ``utc_date`` like billing charge (PBH-003 latch parity).
         """
         leg_latch = None
         utc_date = None
@@ -405,22 +403,6 @@ class ShopMenu(TextWithKeyboard):
                 logger.debug("Не удалось получить last_charge_at из Redis: %s", exc)
 
         return True
-
-    async def _load_tariff_preview(self) -> None:
-        """Превью тарифа: тот же leg_metering + latch read, что и billing charge."""
-        shop_id = self._wb_cabinet.shop_id
-        leg_latch = None
-        utc_date = None
-        if self._billing_redis_manager is not None:
-            leg_latch = self._billing_redis_manager.leg_latch()
-            utc_date = datetime.now(timezone.utc).date()
-        async with sm(read_only=True) as session:
-            self._tariff_details = await self._pricer.get_tariff_details(
-                session,
-                shop_id,
-                leg_latch=leg_latch,
-                utc_date=utc_date,
-            )
 
     async def _process_tokens(self):
         """Обработка токенов для магазина"""
