@@ -19,8 +19,11 @@ from app.client_bot.ui_access import UiAccessMode
 from app.client_bot.user_interface.handlers.white_list_mode_toggle import (
     toggle_white_list_mode_in_session,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
+from app.utils.db.models import User
+
+_WHITE_LIST_OWNER_TELEGRAM_ID = 9_200_003
 
 pytestmark = [
     pytest.mark.integration,
@@ -43,6 +46,20 @@ async def test_toggle_white_list_mode_in_session_persists_and_rereads(
     )
     async_session.add(cabinet)
     await async_session.flush()
+    user = User(
+        user_telegram_id=_WHITE_LIST_OWNER_TELEGRAM_ID,
+        username="white_list_owner",
+        passed_gate=True,
+    )
+    async_session.add(user)
+    await async_session.flush()
+    wb_user_cabinet = WBUserCabinet(
+        user_id=user.id,
+        wb_cabinet_id=cabinet.id,
+        name="white-list-shop",
+    )
+    async_session.add(wb_user_cabinet)
+    await async_session.flush()
     adv = AdvSetting(
         adv_id=991001,
         name="white-list-seam",
@@ -60,7 +77,8 @@ async def test_toggle_white_list_mode_in_session_persists_and_rereads(
     original_adv_id = adv.id
 
     callback = SimpleNamespace(
-        message=SimpleNamespace(chat=SimpleNamespace(id=991001))
+        message=SimpleNamespace(chat=SimpleNamespace(id=991001)),
+        from_user=SimpleNamespace(id=_WHITE_LIST_OWNER_TELEGRAM_ID),
     )
     callback_data = SimpleNamespace(
         new_mode=WhiteListMode.ACTIVE_ONLY_WHITE_LIST.name,

@@ -64,12 +64,19 @@ async def test_apply_workbook_parent_passes_session_write() -> None:
         ),
         patch.object(
             workbook,
+            "_verify_adv_owner_in_session",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            workbook,
             "apply_target_place_rows_in_session",
             new_callable=AsyncMock,
             return_value=summary,
         ) as apply_mock,
     ):
-        result = await workbook.apply_target_place_workbook(55, b"bytes")
+        result = await workbook.apply_target_place_workbook(
+            55, b"bytes", telegram_user_id=9001
+        )
 
     assert result is summary
     apply_mock.assert_awaited_once()
@@ -77,3 +84,4 @@ async def test_apply_workbook_parent_passes_session_write() -> None:
     assert args is not None
     assert args.args[0] is session
     assert args.args[1] == 55
+    assert args.kwargs["telegram_user_id"] == 9001

@@ -15,6 +15,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
+from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
+    ADV_ACCESS_DENIED_MESSAGE,
+    CABINET_ACCESS_DENIED_MESSAGE,
+    load_adv_for_owner_cabinet_in_session,
+    load_wb_user_cabinet_for_adv_in_session,
+)
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -28,6 +34,14 @@ _LEGEND_TEXT = (
 _HEADER_FILL = PatternFill(start_color="D9EAF7", end_color="D9EAF7", fill_type="solid")
 _HEADER_FONT = Font(bold=True)
 _HEADERS = ["keyword_id", "keyword", "current_target_place", "target_place"]
+
+
+class TargetPlaceAccessDeniedError(Exception):
+    """Отказ в записи target_place: кампания недоступна пользователю."""
+
+    def __init__(self, denial_message: str) -> None:
+        self.denial_message = denial_message
+        super().__init__(denial_message)
 
 
 @dataclass(slots=True)
@@ -96,11 +110,33 @@ async def load_keywords_for_target_place_workbook_in_session(
     return list(result.scalars().all())
 
 
+async def _verify_adv_owner_in_session(
+    session: AsyncSession,
+    telegram_user_id: int,
+    adv_original_id: int,
+) -> None:
+    """Проверить, что РК принадлежит Telegram-пользователю, иначе raise."""
+    wb_user_cabinet = await load_wb_user_cabinet_for_adv_in_session(
+        session, telegram_user_id, adv_original_id
+    )
+    if wb_user_cabinet is None:
+        raise TargetPlaceAccessDeniedError(CABINET_ACCESS_DENIED_MESSAGE)
+    adv = await load_adv_for_owner_cabinet_in_session(
+        session,
+        adv_original_id=adv_original_id,
+        wb_user_cabinet=wb_user_cabinet,
+    )
+    if adv is None:
+        raise TargetPlaceAccessDeniedError(ADV_ACCESS_DENIED_MESSAGE)
+
+
 async def apply_target_place_rows_in_session(
     session: AsyncSession,
     adv_original_id: int,
     rows: list[dict[str, Any]],
     summary: TargetPlaceImportSummary,
+    *,
+    telegram_user_id: int,
 ) -> TargetPlaceImportSummary:
     """Apply workbook rows to keywords and commit (WRITE).
 
@@ -109,10 +145,15 @@ async def apply_target_place_rows_in_session(
         adv_original_id: campaign AdvSetting primary key.
         rows: parsed workbook records.
         summary: mutable import summary accumulator.
+        telegram_user_id: Telegram id владельца кабинета с РК.
 
     Returns:
         The same summary instance after mutation/commit.
+
+    Raises:
+        TargetPlaceAccessDeniedError: если РК не принадлежит пользователю.
     """
+    await _verify_adv_owner_in_session(session, telegram_user_id, adv_original_id)
     result = await session.execute(
         select(KeywordSetting).where(KeywordSetting.adv_setting_id == adv_original_id)
     )
@@ -232,13 +273,26 @@ def read_target_place_workbook(content: bytes) -> list[dict[str, Any]]:
 
 
 async def apply_target_place_workbook(
-    adv_original_id: int, content: bytes
+    adv_original_id: int, content: bytes, *, telegram_user_id: int
 ) -> TargetPlaceImportSummary:
-    """Apply target_place values from workbook to keywords of one campaign."""
+    """Apply target_place values from workbook to keywords of one campaign.
+
+    Args:
+        adv_original_id: campaign AdvSetting primary key.
+        content: xlsx bytes from Telegram upload.
+        telegram_user_id: Telegram id владельца кабинета с РК.
+
+    Raises:
+        TargetPlaceAccessDeniedError: если РК не принадлежит пользователю.
+    """
     rows = read_target_place_workbook(content)
     summary = TargetPlaceImportSummary(processed_rows=len(rows))
     async with _sm(read_only=False) as session:
         summary = await apply_target_place_rows_in_session(
-            session, adv_original_id, rows, summary
+            session,
+            adv_original_id,
+            rows,
+            summary,
+            telegram_user_id=telegram_user_id,
         )
     return summary

@@ -1,7 +1,9 @@
 """Integration tests for CPM bidder setup flow."""
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from types import SimpleNamespace
+from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,9 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.user_interface import states
 from app.client_bot.user_interface.handlers import cpm_builder
+from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
+    ADV_ACCESS_DENIED_MESSAGE,
+    CABINET_ACCESS_DENIED_MESSAGE,
+)
 from app.client_bot.user_interface.views.messages.messages import CPMSetting
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import (
+    AdvSetting,
+    KeywordSetting,
+    WBUserCabinet,
+)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.utils.db.models import User
 from tests.helpers.telegram_message_asserts import (
     assert_html_is_telegram_safe,
     assert_keyboard_has_buttons,
@@ -26,6 +37,9 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.asyncio,
 ]
+
+_DEFAULT_OWNER_TELEGRAM_ID = 42
+_UNSET = object()
 
 
 class _MockSessionMaker:
@@ -61,10 +75,13 @@ def _callback(chat_id: int = 100) -> SimpleNamespace:
     return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
 
 
-def _message(text: str, chat_id: int = 100) -> SimpleNamespace:
+def _message(
+    text: str, chat_id: int = 100, user_id: int = _DEFAULT_OWNER_TELEGRAM_ID
+) -> SimpleNamespace:
     return SimpleNamespace(
         text=text,
         chat=SimpleNamespace(id=chat_id),
+        from_user=SimpleNamespace(id=user_id),
         answer=AsyncMock(),
     )
 
@@ -78,7 +95,15 @@ async def _create_adv_with_keywords(
     bot_active: bool = False,
     auto_update_target_place: bool = False,
     keyword_places: list[int | None] | None = None,
+    owner_telegram_id: int = _DEFAULT_OWNER_TELEGRAM_ID,
 ) -> tuple[int, list[KeywordSetting]]:
+    user = User(
+        user_telegram_id=owner_telegram_id,
+        username=f"cpm_owner_{owner_telegram_id}",
+        passed_gate=True,
+    )
+    session.add(user)
+    await session.flush()
     wb_cabinet = WBCabinet(
         shop_id=f"shop_{datetime.now().timestamp()}",
         active=True,
@@ -98,7 +123,12 @@ async def _create_adv_with_keywords(
         max_cpm=max_cpm,
         auto_update_target_place=auto_update_target_place,
     )
-    session.add_all([wb_cabinet, adv])
+    wb_user_cabinet = WBUserCabinet(
+        user_id=user.id,
+        wb_cabinet=wb_cabinet,
+        name="cpm_test_shop",
+    )
+    session.add_all([wb_cabinet, wb_user_cabinet, adv])
     await session.flush()
     adv_id = adv.id
     keywords = [
@@ -486,3 +516,103 @@ def test_cpm_setting_keyboard_hides_target_place_tools_when_auto_update_enabled(
     assert "Изменить целевую позицию" not in button_texts
     assert "Скачать шаблон целевых позиций" not in button_texts
     assert "Загрузить целевые позиции из файла" not in button_texts
+
+
+@contextmanager
+def _patch_owner_validation(
+    *,
+    wb_user_cabinet: SimpleNamespace | None | object = _UNSET,
+    adv_setting: SimpleNamespace | None | object = _UNSET,
+) -> Iterator[None]:
+    """Patch owner-validated cabinet/adv loaders for CPM handler unit tests."""
+    cabinet = SimpleNamespace(id=77, wb_cabinet_id=31) if wb_user_cabinet is _UNSET else wb_user_cabinet
+    resolved_adv = (
+        SimpleNamespace(
+            id=1,
+            max_cpm=200,
+            max_place=5,
+            auto_update_target_place=False,
+            bidder_active=False,
+        )
+        if adv_setting is _UNSET
+        else adv_setting
+    )
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.cpm_builder"
+            ".load_wb_user_cabinet_for_adv_in_session",
+            AsyncMock(return_value=cabinet),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.cpm_builder"
+            ".load_adv_for_owner_cabinet_in_session",
+            AsyncMock(return_value=resolved_adv),
+        ),
+    ):
+        yield
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_manual_cpm_rejects_foreign_cabinet() -> None:
+    """WRITE path must not persist manual CPM for foreign cabinet."""
+    state = _FakeState({"last_adv_original_id": 99})
+    bot = AsyncMock()
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    mock_sm = _MockSessionMaker(session)
+    message = _message("555")
+
+    with (
+        patch("app.client_bot.user_interface.handlers.cpm_builder.sm", mock_sm),
+        _patch_owner_validation(wb_user_cabinet=None),
+    ):
+        await cpm_builder.set_manual_cpm_message(message, bot, state)
+
+    session.commit.assert_not_awaited()
+    message.answer.assert_awaited_once_with(CABINET_ACCESS_DENIED_MESSAGE)
+    assert state.state_calls[-1] is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_manual_cpm_rejects_foreign_adv() -> None:
+    """WRITE path must not persist manual CPM for foreign campaign."""
+    state = _FakeState({"last_adv_original_id": 99})
+    bot = AsyncMock()
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    mock_sm = _MockSessionMaker(session)
+    message = _message("555")
+
+    with (
+        patch("app.client_bot.user_interface.handlers.cpm_builder.sm", mock_sm),
+        _patch_owner_validation(adv_setting=None),
+    ):
+        await cpm_builder.set_manual_cpm_message(message, bot, state)
+
+    session.commit.assert_not_awaited()
+    message.answer.assert_awaited_once_with(ADV_ACCESS_DENIED_MESSAGE)
+    assert state.state_calls[-1] is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_max_position_message_rejects_foreign_adv() -> None:
+    """WRITE path must not update target place for foreign campaign."""
+    state = _FakeState({"last_adv_original_id": 99})
+    bot = AsyncMock()
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    mock_sm = _MockSessionMaker(session)
+    message = _message("13")
+
+    with (
+        patch("app.client_bot.user_interface.handlers.cpm_builder.sm", mock_sm),
+        _patch_owner_validation(adv_setting=None),
+    ):
+        await cpm_builder.set_max_position_message(message, bot, state)
+
+    session.commit.assert_not_awaited()
+    message.answer.assert_awaited_once_with(ADV_ACCESS_DENIED_MESSAGE)
+    assert state.state_calls[-1] is None

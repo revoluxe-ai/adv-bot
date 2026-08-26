@@ -11,9 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.client_bot.user_interface.services.cpm_target_place_workbook import (
+    TargetPlaceAccessDeniedError,
     TargetPlaceImportSummary,
     apply_target_place_workbook,
     build_target_place_workbook,
+)
+from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
+    ADV_ACCESS_DENIED_MESSAGE,
+    CABINET_ACCESS_DENIED_MESSAGE,
+    load_adv_for_owner_cabinet_in_session,
+    load_wb_user_cabinet_for_adv_in_session,
 )
 from app.client_bot.user_interface.utils import (
     get_auto_target_place_manual_change_locked_text,
@@ -67,6 +74,27 @@ async def _load_adv_setting(
     return await session.get(AdvSetting, adv_original_id)
 
 
+async def _load_adv_for_telegram_owner_in_session(
+    session: AsyncSession,
+    telegram_user_id: int,
+    adv_original_id: int,
+) -> tuple[AdvSetting | None, str | None]:
+    """Загрузить РК с проверкой владельца; вернуть (adv, denial_message)."""
+    wb_user_cabinet = await load_wb_user_cabinet_for_adv_in_session(
+        session, telegram_user_id, adv_original_id
+    )
+    if wb_user_cabinet is None:
+        return None, CABINET_ACCESS_DENIED_MESSAGE
+    adv = await load_adv_for_owner_cabinet_in_session(
+        session,
+        adv_original_id=adv_original_id,
+        wb_user_cabinet=wb_user_cabinet,
+    )
+    if adv is None:
+        return None, ADV_ACCESS_DENIED_MESSAGE
+    return adv, None
+
+
 @router.callback_query(
     callbacks.CPMSettingMenu.filter(F.action == "to_cpm_setting_page")  # noqa
 )
@@ -99,14 +127,21 @@ async def get_max_cpm(
     if min_position < 1:
         await message.answer("Введите целое положительное число от 1 и выше")
         return
+    if message.from_user is None:
+        return
 
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
+    telegram_user_id = message.from_user.id
     async with sm(read_only=False) as session:
-        adv = await _load_adv_setting(session, adv_original_id)
-        if adv is None:
+        adv, denial = await _load_adv_for_telegram_owner_in_session(
+            session, telegram_user_id, adv_original_id
+        )
+        if denial is not None:
             await state.set_state(state=None)
-            raise RuntimeError('Не удалось найти РК')
+            await message.answer(denial)
+            return
+        assert adv is not None
         if adv.auto_update_target_place:
             await state.set_state(state=None)
             await message.answer(get_auto_target_place_manual_change_locked_text())
@@ -146,13 +181,20 @@ async def set_max_cpm(
     if max_cpm < 1:
         await message.answer("Введите целое положительное число от 1 и выше")
         return
+    if message.from_user is None:
+        return
 
     adv_original_id = data["last_adv_original_id"]
+    telegram_user_id = message.from_user.id
     async with sm(read_only=False) as session:
-        adv = await _load_adv_setting(session, adv_original_id)
-        if adv is None:
+        adv, denial = await _load_adv_for_telegram_owner_in_session(
+            session, telegram_user_id, adv_original_id
+        )
+        if denial is not None:
             await state.set_state(state=None)
-            raise RuntimeError('Не удалось найти РК')
+            await message.answer(denial)
+            return
+        assert adv is not None
         min_position = data.get("min_position")
         if min_position is not None:
             adv.max_place = min_position
@@ -196,14 +238,21 @@ async def set_manual_cpm_message(
     if manual_cpm < 1:
         await message.answer("Введите целое положительное число от 1 и выше")
         return
+    if message.from_user is None:
+        return
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
+    telegram_user_id = message.from_user.id
 
     async with sm(read_only=False) as session:
-        adv = await _load_adv_setting(session, adv_original_id)
-        if adv is None:
+        adv, denial = await _load_adv_for_telegram_owner_in_session(
+            session, telegram_user_id, adv_original_id
+        )
+        if denial is not None:
             await state.set_state(state=None)
-            raise RuntimeError("Не удалось найти кампанию для настройки.")
+            await message.answer(denial)
+            return
+        assert adv is not None
 
         adv.max_cpm = manual_cpm
         await session.commit()
@@ -264,13 +313,20 @@ async def set_max_position_message(
     if max_position < 1:
         await message.answer("Введите целое положительное число от 1 и выше")
         return
+    if message.from_user is None:
+        return
     state_data = await state.get_data()
     adv_original_id = state_data["last_adv_original_id"]
+    telegram_user_id = message.from_user.id
     async with sm(read_only=False) as session:
-        adv = await _load_adv_setting(session, adv_original_id)
-        if adv is None:
+        adv, denial = await _load_adv_for_telegram_owner_in_session(
+            session, telegram_user_id, adv_original_id
+        )
+        if denial is not None:
             await state.set_state(state=None)
-            raise RuntimeError("Не удалось найти кампанию для настройки.")
+            await message.answer(denial)
+            return
+        assert adv is not None
 
         if adv.auto_update_target_place:
             await state.set_state(state=None)
@@ -373,7 +429,7 @@ async def upload_target_places_template_file(
     message: types.Message, bot: aiogram.Bot, state: FSMContext
 ) -> None:
     """Apply uploaded workbook to keyword target places of the current campaign."""
-    if message.document is None:
+    if message.from_user is None or message.document is None:
         return
     file_name = message.document.file_name or ""
     if file_name and not file_name.lower().endswith(".xlsx"):
@@ -404,7 +460,15 @@ async def upload_target_places_template_file(
     payload = io.BytesIO()
     await bot.download(message.document, payload)
     try:
-        summary = await apply_target_place_workbook(adv_original_id, payload.getvalue())
+        summary = await apply_target_place_workbook(
+            int(adv_original_id),
+            payload.getvalue(),
+            telegram_user_id=message.from_user.id,
+        )
+    except TargetPlaceAccessDeniedError as exc:
+        await state.set_state(state=None)
+        await message.answer(exc.denial_message)
+        return
     except ValueError as exc:
         await message.answer(f"Не удалось обработать файл: {exc}")
         return

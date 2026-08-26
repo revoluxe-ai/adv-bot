@@ -22,8 +22,13 @@ from app.client_bot.user_interface.services.cpm_target_place_workbook import (
     read_target_place_workbook,
     write_target_place_workbook_rows,
 )
-from app.modules.common_slaves.wildberries.models import AdvSetting, KeywordSetting
+from app.modules.common_slaves.wildberries.models import (
+    AdvSetting,
+    KeywordSetting,
+    WBUserCabinet,
+)
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.utils.db.models import User
 from tests.helpers.telegram_message_asserts import (
     assert_caption_within_telegram_limit,
     assert_html_is_telegram_safe,
@@ -36,6 +41,8 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.asyncio,
 ]
+
+_WORKBOOK_OWNER_TELEGRAM_ID = 42_001
 
 
 class _MockSessionMaker:
@@ -74,7 +81,15 @@ async def _create_adv_with_keywords(
     session: AsyncSession,
     *,
     auto_update_target_place: bool = False,
+    owner_telegram_id: int = _WORKBOOK_OWNER_TELEGRAM_ID,
 ) -> tuple[AdvSetting, list[KeywordSetting], AdvSetting]:
+    user = User(
+        user_telegram_id=owner_telegram_id,
+        username=f"workbook_owner_{owner_telegram_id}",
+        passed_gate=True,
+    )
+    session.add(user)
+    await session.flush()
     cabinet = WBCabinet(
         shop_id=f"shop_{datetime.now().timestamp()}",
         active=True,
@@ -104,7 +119,12 @@ async def _create_adv_with_keywords(
         max_place=15,
         max_cpm=777,
     )
-    session.add_all([cabinet, adv, other_adv])
+    wb_user_cabinet = WBUserCabinet(
+        user_id=user.id,
+        wb_cabinet=cabinet,
+        name="workbook_test_shop",
+    )
+    session.add_all([cabinet, wb_user_cabinet, adv, other_adv])
     await session.flush()
     keywords = [
         KeywordSetting(
@@ -223,7 +243,9 @@ async def test_import_workbook_updates_only_valid_rows_and_keeps_adv_flags(
         "app.client_bot.user_interface.services.cpm_target_place_workbook._sm",
         mock_sm,
     ):
-        summary = await apply_target_place_workbook(adv_id, content)
+        summary = await apply_target_place_workbook(
+            adv_id, content, telegram_user_id=_WORKBOOK_OWNER_TELEGRAM_ID
+        )
 
     assert summary.processed_rows == 4
     assert summary.updated_rows == 1
@@ -288,6 +310,7 @@ async def test_upload_target_places_file_processes_document_and_sends_summary() 
     message = SimpleNamespace(
         document=SimpleNamespace(file_name="target_places.xlsx"),
         chat=SimpleNamespace(id=88),
+        from_user=SimpleNamespace(id=_WORKBOOK_OWNER_TELEGRAM_ID),
         answer=AsyncMock(),
     )
     summary = TargetPlaceImportSummary(
@@ -403,6 +426,7 @@ async def test_upload_target_places_file_is_blocked_when_auto_update_enabled(
     message = SimpleNamespace(
         document=SimpleNamespace(file_name="target_places.xlsx"),
         chat=SimpleNamespace(id=88),
+        from_user=SimpleNamespace(id=_WORKBOOK_OWNER_TELEGRAM_ID),
         answer=AsyncMock(),
     )
     mock_sm = _MockSessionMaker(async_session)

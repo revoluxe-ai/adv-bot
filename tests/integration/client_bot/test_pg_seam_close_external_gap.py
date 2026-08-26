@@ -33,6 +33,7 @@ from app.modules.common_slaves.wildberries.models import (
     AdvSetting,
     KeywordSetting,
     WBCabinet,
+    WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.super_cabinet_manager import (
     find_common_access_token_in_session,
@@ -45,6 +46,7 @@ from app.modules.common_slaves.wildberries.models import WBToken
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
 _FIXED_EXP = 1_900_000_000
+_CPM_SEAM_OWNER_TELEGRAM_ID = 9_100_003
 
 
 def _build_token(*, acc: int, for_field: str | None, t: bool) -> str:
@@ -111,7 +113,16 @@ async def test_save_user_phone_in_session_persists_and_rereads(
 
 async def _create_adv_with_keywords(
     async_session: AsyncSession,
+    *,
+    telegram_user_id: int = _CPM_SEAM_OWNER_TELEGRAM_ID,
 ) -> tuple[AdvSetting, list[KeywordSetting]]:
+    user = User(
+        user_telegram_id=telegram_user_id,
+        username=f"cpm_seam_owner_{telegram_user_id}",
+        passed_gate=True,
+    )
+    async_session.add(user)
+    await async_session.flush()
     cabinet = WBCabinet(
         shop_id=f"cpm_seam_{uuid.uuid4().hex}",
         active=True,
@@ -122,6 +133,13 @@ async def _create_adv_with_keywords(
         expiration_alarm_days_pass=None,
     )
     async_session.add(cabinet)
+    await async_session.flush()
+    wb_user_cabinet = WBUserCabinet(
+        user_id=user.id,
+        wb_cabinet_id=cabinet.id,
+        name="cpm-seam-owner",
+    )
+    async_session.add(wb_user_cabinet)
     await async_session.flush()
     adv = AdvSetting(
         adv_id=555_001,
@@ -184,7 +202,11 @@ async def test_apply_target_place_rows_in_session_persists(
         }
     ]
     summary = await apply_target_place_rows_in_session(
-        async_session, adv_pk, rows, summary
+        async_session,
+        adv_pk,
+        rows,
+        summary,
+        telegram_user_id=_CPM_SEAM_OWNER_TELEGRAM_ID,
     )
     assert summary.updated_rows == 1
 

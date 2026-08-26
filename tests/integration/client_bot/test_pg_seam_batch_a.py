@@ -151,6 +151,7 @@ async def test_turn_adv_on_in_session_persists_bot_active(
 
     callback = SimpleNamespace(
         message=SimpleNamespace(chat=SimpleNamespace(id=202)),
+        from_user=SimpleNamespace(id=9_200_001),
     )
     callback_data = SimpleNamespace(
         wb_user_cabinet_original_id=wb_user_cabinet_pk,

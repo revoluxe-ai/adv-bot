@@ -15,8 +15,11 @@ from app.client_bot.user_interface.handlers.adv_setting import (
     toggle_minus_phrases_setting,
 )
 from app.client_bot.user_interface.views import callbacks
-from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models import AdvSetting, WBUserCabinet
+from app.utils.db.models import User
 from tests.factories import AdvSettingFactory, WBCabinetFactory
+
+_MINUS_PHRASES_OWNER_TELEGRAM_ID = 9_200_002
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
@@ -35,12 +38,32 @@ class _MockSessionMaker:
         pass
 
 
-def _callback(chat_id: int = 404) -> SimpleNamespace:
-    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+def _callback(
+    chat_id: int = 404,
+    telegram_user_id: int = _MINUS_PHRASES_OWNER_TELEGRAM_ID,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)),
+        from_user=SimpleNamespace(id=telegram_user_id),
+    )
 
 
-async def _create_adv() -> AdvSetting:
+async def _create_adv_with_owner(
+    async_session: AsyncSession,
+) -> tuple[AdvSetting, WBUserCabinet]:
     wb_cabinet = WBCabinetFactory.build(shop_id="shop-minus-setting", active=True, demo=False)
+    user = User(
+        user_telegram_id=_MINUS_PHRASES_OWNER_TELEGRAM_ID,
+        username="minus_phrases_owner",
+        passed_gate=True,
+    )
+    async_session.add(user)
+    await async_session.flush()
+    wb_user_cabinet = WBUserCabinet(
+        user_id=user.id,
+        wb_cabinet=wb_cabinet,
+        name="minus-setting-shop",
+    )
     adv = AdvSettingFactory.build(
         id=4040,
         adv_id=987654321,
@@ -54,22 +77,23 @@ async def _create_adv() -> AdvSetting:
         auto_update_target_place=True,
         auto_update_minus_phrases=False,
     )
-
-    return adv
+    async_session.add_all([wb_cabinet, wb_user_cabinet, adv])
+    await async_session.flush()
+    return adv, wb_user_cabinet
 
 
 @pytest.mark.asyncio
 async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
     async_session: AsyncSession,
 ) -> None:
-    adv = await _create_adv()
+    adv, wb_user_cabinet = await _create_adv_with_owner(async_session)
     bot = AsyncMock()
     screen_call = AsyncMock()
 
     with (
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
-            AsyncMock(return_value=SimpleNamespace(id=55)),
+            AsyncMock(return_value=wb_user_cabinet),
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_adv_setting",
@@ -85,7 +109,7 @@ async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
             callbacks.MinusPhrasesSetting(
                 action="open",
                 adv_setting_original_id=adv.id,
-                wb_user_cabinet_original_id=55,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
             ),
             bot,
         )
@@ -98,10 +122,7 @@ async def test_open_minus_phrases_setting_screen_renders_dedicated_view(
 async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
     async_session: AsyncSession,
 ) -> None:
-    adv = await _create_adv()
-    async_session.add(adv.wb_cabinet)
-    async_session.add(adv)
-    await async_session.flush()
+    adv, wb_user_cabinet = await _create_adv_with_owner(async_session)
     adv_id = adv.id
     bot = AsyncMock()
     screen_call = AsyncMock()
@@ -110,10 +131,6 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
             _MockSessionMaker(async_session),
-        ),
-        patch(
-            "app.client_bot.user_interface.handlers.adv_setting.adv_setting._get_wb_user_cabinet_or_none",
-            AsyncMock(return_value=SimpleNamespace(id=55)),
         ),
         patch(
             "app.client_bot.user_interface.handlers.adv_setting.adv_setting.MinusPhrasesSettingScreen",
@@ -125,7 +142,7 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
             callbacks.MinusPhrasesSetting(
                 action="on",
                 adv_setting_original_id=adv.id,
-                wb_user_cabinet_original_id=55,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
             ),
             bot,
         )
@@ -148,10 +165,9 @@ async def test_toggle_minus_phrases_setting_changes_only_dedicated_flag(
 async def test_back_from_minus_phrases_setting_returns_to_campaign_menu(
     async_session: AsyncSession,
 ) -> None:
-    adv = await _create_adv()
+    adv, wb_user_cabinet = await _create_adv_with_owner(async_session)
     bot = AsyncMock()
     menu_call = AsyncMock()
-    wb_user_cabinet = SimpleNamespace(id=55, wb_cabinet_id=155)
 
     with (
         patch(
@@ -172,7 +188,7 @@ async def test_back_from_minus_phrases_setting_returns_to_campaign_menu(
             callbacks.MinusPhrasesSetting(
                 action="back",
                 adv_setting_original_id=adv.id,
-                wb_user_cabinet_original_id=55,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
             ),
             bot,
         )
