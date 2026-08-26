@@ -1,3 +1,5 @@
+"""Рендереры сообщений Telegram и изолированные PG-seams чтения."""
+
 # mypy: ignore-errors
 # TODO: Глушу ошибки, их тут дофига, но надо разобраться потом
 import logging
@@ -14,6 +16,7 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import const
 from app.client_bot.const import DEFAULT_BIDDER_STEP
@@ -27,6 +30,7 @@ from app.client_bot.user_interface.message_templates.templates import (
 from app.client_bot.user_interface.utils import (
     format_target_place_display,
     get_effective_keyword_target_place,
+    format_required_wb_token_scopes,
 )
 from app.client_bot.user_interface.views import callbacks, keyboards
 from app.core.redis_manager_v2.redis_client import RedisClient
@@ -84,6 +88,45 @@ _MAX_TEMPLATE_PREVIEW_TEXT_LEN = 1400
 _TEMPLATE_EXPORT_HINT = (
     'Чтобы получить весь список, нажмите кнопку "Выгрузить фразы"'
 )
+
+
+async def _load_wb_cabinet_in_session(
+    session: AsyncSession,
+    wb_cabinet_original_id: int,
+) -> WBCabinet | None:
+    """Загрузить кабинет в переданной read-only PG-сессии."""
+    result = await session.execute(
+        select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
+    )
+    return result.scalar()
+
+
+async def _load_wb_cabinet_id_for_user_cabinet(
+    session: AsyncSession,
+    wb_user_cabinet_original_id: int,
+) -> int | None:
+    """Получить ID кабинета по связанной записи пользователя."""
+    stmt = select(WBCabinet.id).where(
+        WBCabinet.wb_user_cabinets.any(
+            WBUserCabinet.id == int(wb_user_cabinet_original_id)
+        )
+    )
+    result = await session.execute(stmt)
+    return result.scalar()
+
+
+async def _load_adv_setting_in_session(
+    session: AsyncSession,
+    adv_original_id: int,
+) -> AdvSetting:
+    """Загрузить РК в переданной read-only PG-сессии."""
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_original_id)
+    )
+    adv_setting = result.scalar()
+    if adv_setting is None:
+        raise RuntimeError(f"AdvSetting not found for original_id={adv_original_id}")
+    return adv_setting
 
 
 def _render_phrase_templates_preview(
@@ -190,12 +233,22 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         self._keywords_filter: list[str] = []  # Инициализируем фильтр ключевых слов
 
     @staticmethod
+    async def _get_wb_cabinet_in_session(
+        session: AsyncSession,
+        wb_cabinet_original_id: int,
+    ) -> WBCabinet | None:
+        """Загрузить кабинет в переданной read-only PG-сессии."""
+        stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
+        result = await session.execute(stmt)
+        return result.scalar()
+
+    @staticmethod
     async def _get_wb_cabinet(wb_cabinet_original_id: int) -> WBCabinet | None:
-        async with sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_original_id)
-            result = await session.execute(stmt)
-            wb_cabinet = result.scalar()
-            return wb_cabinet
+        """Загрузить кабинет, создав короткую read-only PG-сессию."""
+        async with sm(read_only=True) as session:
+            return await AdvCompanyChoicing._get_wb_cabinet_in_session(
+                session, wb_cabinet_original_id
+            )
 
     async def __call__(self) -> None:
         await self._state.set_state(
@@ -212,14 +265,10 @@ class AdvCompanyChoicing(TextWithKeyboardPagination):
         adv_settings: list[AdvSetting] = active_advs + inactive_advs
         adv_settings_filtred: list[AdvSetting] = await self._filter_advs(adv_settings)
         self._adv_settings = adv_settings_filtred
-        stmt = select(WBCabinet.id).where(
-            WBCabinet.wb_user_cabinets.any(
-                WBUserCabinet.id == int(self._wb_user_cabinet_original_id)
+        async with sm(read_only=True) as session:
+            wb_cabinet_original_id = await _load_wb_cabinet_id_for_user_cabinet(
+                session, self._wb_user_cabinet_original_id
             )
-        )
-        async with sm() as session:
-            result = await session.execute(stmt)
-            wb_cabinet_original_id = result.scalar()
         await self._state.update_data(
             last_wb_cabinet_original_id=wb_cabinet_original_id,
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id,
@@ -450,9 +499,12 @@ class AddNewTokenGet(TextWithImage):
     @property
     def text(self) -> str:
         return (
-            f"""Пришлите новый Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n"""
-            """Для работы бота нужны права Контент, Статистика,  Аналитика, Продвижение. Галочку 'Только для чтения'"""
-            """ НЕ ставить!!!"""
+            f"""Пришлите новый ПЕРСОНАЛЬНЫЙ Api ключ дла магазина (кабинета) {self.__cabinet_name}.\n"""
+            """Создайте токен в кабинете WB.\n"""
+            """Для безопасного первого входа можно использовать токен только для чтения.\n"""
+            """С токеном только для чтения бот покажет аналитику, магазины и кампании, но не будет менять рекламу.\n"""
+            """Для ручного управления ставками нужен токен с возможностью изменений в кабинете.\n"""
+            f"{format_required_wb_token_scopes()}\n"
         )
 
     @property
@@ -533,13 +585,23 @@ class KeywordSettingMessage(TextWithKeyboard):
 
     @staticmethod
     async def _get_keyword_text_and_adv_id(keyword_original_id: int,) -> tuple[KeywordSetting, AdvSetting]:
-        # TODO: Поймали ошибку в рантайме
+        """Загрузить ключ и РК через короткую read-only PG-сессию."""
+        async with sm(read_only=True) as session:
+            return await KeywordSettingMessage._get_keyword_text_and_adv_id_in_session(
+                session, keyword_original_id
+            )
+
+    @staticmethod
+    async def _get_keyword_text_and_adv_id_in_session(
+        session: AsyncSession,
+        keyword_original_id: int,
+    ) -> tuple[KeywordSetting, AdvSetting]:
+        """Загрузить ключ и РК в переданной PG-сессии."""
         stmt = select(KeywordSetting, AdvSetting)\
         .join(KeywordSetting.adv_setting)\
         .where(KeywordSetting.id == keyword_original_id)
-        async with sm(read_only=True) as session:
-            result = await session.execute(stmt)
-            result_row = result.first()
+        result = await session.execute(stmt)
+        result_row = result.first()
         if not result_row:
             raise ValueError('Не найдены данные о ключе')
         keyword: KeywordSetting = result_row[0]
@@ -712,6 +774,8 @@ class KeywordSettingMessage(TextWithKeyboard):
 
 
 class KeywordTargetPlacePrompt(Text):
+    """Prompt for changing a keyword target place manually."""
+
     def __init__(self, bot: Bot, chat_id: int, current_value: str, adv_default: str):
         super().__init__(bot, chat_id)
         self._current_value = current_value
@@ -720,12 +784,15 @@ class KeywordTargetPlacePrompt(Text):
     @property
     def text(self) -> str:
         return (
-            f"Текущая целевая позиция: {self._current_value}. "
+            f"Текущая целевая позиция: {self._current_value}.\n"
+            "Целевая позиция — место, которое вы хотите удерживать по ключу.\n"
             f"Введите новое целое число (0 — использовать позицию кампании {self._adv_default})."
         )
 
 
 class KeywordTargetPlaceUpdated(Text):
+    """Confirmation after a manual keyword target place change."""
+
     def __init__(self, bot: Bot, chat_id: int, new_value: str):
         super().__init__(bot, chat_id)
         self._new_value = new_value
@@ -773,9 +840,36 @@ class LongTimeOperation(Text):
 
 
 class NeedSubscribe(TextWithKeyboard):
+    """Экран для пользователя, чья подписка явно не подтверждена."""
+
     @property
     def text(self) -> str:
-        return "Для использования функций вы должны быть подписаны на канал службы поддержки"
+        return (
+            "Для использования функций вы должны быть подписаны на канал службы поддержки.\n\n"
+            "Подпишитесь на канал, затем нажмите «Проверить подписку». "
+            "После проверки бот откроет доступ к функциям."
+        )
+
+    @property
+    def keyboard(self) -> InlineKeyboardMarkup:
+        return keyboards.get_subscribe_keyboard()
+
+
+class SubscriptionCheckUnavailable(TextWithKeyboard):
+    """Экран временной ошибки проверки подписки.
+
+    Не утверждает, что пользователь не подписан: Telegram API мог быть
+    недоступен. Доступ при этом остаётся закрытым (fail-closed), а кнопка
+    повторной проверки сохраняет штатный recovery path.
+    """
+
+    @property
+    def text(self) -> str:
+        return (
+            "Сейчас не удалось проверить подписку на канал службы поддержки.\n\n"
+            "Доступ временно закрыт до успешной проверки. "
+            "Попробуйте повторить проверку через минуту."
+        )
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
@@ -796,10 +890,10 @@ class ExpiredSubscription(TextWithKeyboard):
         super().__init__(bot, chat_id)
 
     async def __call__(self) -> None:
-        async with sm() as session:
-            stmt = select(WBCabinet).where(WBCabinet.id == self._wb_cabinet_original_id)
-            result = await session.execute(stmt)
-            self._wb_cabinet = result.scalar()
+        async with sm(read_only=True) as session:
+            self._wb_cabinet = await _load_wb_cabinet_in_session(
+                session, self._wb_cabinet_original_id
+            )
         return await super().__call__()
 
     @property
@@ -820,11 +914,8 @@ class ExpiredSubscription(TextWithKeyboard):
 
 class SettingMinViewsForPredictCTR(TextWithKeyboard):
     async def __call__(self, adv_original_id: int):
-        async with sm() as session:
-            result = await session.execute(
-                select(AdvSetting).where(AdvSetting.id == adv_original_id)
-            )
-            adv: AdvSetting  = result.scalar()
+        async with sm(read_only=True) as session:
+            adv = await _load_adv_setting_in_session(session, adv_original_id)
         self._adv: AdvSetting = adv
         return await super().__call__()
 
@@ -963,6 +1054,8 @@ class FixedPhrasesAdded(TextWithKeyboard):
 
 
 class CPMSetting(TextWithKeyboard):
+    """Bidder settings screen for manual CPM and target place tools."""
+
     @inject
     def __init__(
         self,
@@ -975,12 +1068,8 @@ class CPMSetting(TextWithKeyboard):
         self._last_saved_bids: dict[int, int] = {}
 
     async def __call__(self, adv_setting_id: int) -> None:
-        async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-            result = await session.execute(stmt)
-            adv_setting = result.scalars().first()
-        if adv_setting is None:
-            raise RuntimeError(f"AdvSetting с id {adv_setting_id} не найден")
+        async with sm(read_only=True) as session:
+            adv_setting = await _load_adv_setting_in_session(session, adv_setting_id)
         self.adv_setting = adv_setting
         search_adv_id = adv_setting.search_adv_id
         nmids = adv_setting.nmids or []
@@ -994,7 +1083,12 @@ class CPMSetting(TextWithKeyboard):
     @property
     def text(self) -> str:
         mode = "Ручной" if not self.adv_setting.bidder_active else "Автоматический"
-        text = f"Режим управления ставкой: {mode}\n\n"
+        text = (
+            f"Режим управления ставкой: {mode}\n\n"
+            "Целевая позиция — место, которое вы хотите удерживать по ключу.\n"
+            "Max CPM — верхний предел ставки. Бот не должен ставить выше этого значения.\n"
+            "Это Бесплатный инструмент.\n\n"
+        )
         if self.adv_setting.bidder_active:
             max_place = (
                 str(self.adv_setting.max_place)
@@ -1084,11 +1178,29 @@ class CPMSetting(TextWithKeyboard):
 
         builder.row(bottom)
 
-        if self.adv_setting.bidder_active:
+        if not self.adv_setting.auto_update_target_place:
             bottom = InlineKeyboardButton(
                 text="Изменить целевую позицию",
                 callback_data=callbacks.CPMSettingMenu(
                     action="set_max_position", adv_original_id=self.adv_setting.id
+                ).pack(),
+            )
+            builder.row(bottom)
+
+            bottom = InlineKeyboardButton(
+                text="Скачать шаблон целевых позиций",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="download_target_places_template",
+                    adv_original_id=self.adv_setting.id,
+                ).pack(),
+            )
+            builder.row(bottom)
+
+            bottom = InlineKeyboardButton(
+                text="Загрузить целевые позиции из файла",
+                callback_data=callbacks.CPMSettingMenu(
+                    action="upload_target_places_template",
+                    adv_original_id=self.adv_setting.id,
                 ).pack(),
             )
             builder.row(bottom)
@@ -1103,38 +1215,51 @@ class CPMSetting(TextWithKeyboard):
 
 
 class AutoCPMSettingGetMinPosition(Text):
+    """Prompt asking for the desired target place for the bidder."""
+
     async def __call__(self, adv_setting_id: int):
-        async with sm() as session:
-            stmt = select(AdvSetting).where(AdvSetting.id == adv_setting_id)
-            result = await session.execute(stmt)
-            adv_setting = result.scalars().first()
+        async with sm(read_only=True) as session:
+            adv_setting = await _load_adv_setting_in_session(session, adv_setting_id)
         self.adv_setting = adv_setting
         await super().__call__()
 
     @property
     def text(self):
-        text = """
-Введите позицию, которую вы хотите занимать в топе:
-        """
-        return text
+        return (
+            "Введите целевую позицию, которую вы хотите занимать\n"
+            "целевая позиция — место, которое вы хотите удерживать по ключу.\n"
+            "Это Бесплатный инструмент."
+        )
 
 
 class AutoCPMSettingGetMaxCPM(Text):
+    """Prompt asking for the manual upper CPM limit."""
+
     @property
     def text(self) -> str:
-        return """Укажите максимальную ставку:"""
+        return (
+            "Укажите Max CPM.\n"
+            "Max CPM — верхний предел ставки. Бот не должен ставить выше этого значения.\n"
+            "Это Бесплатный инструмент."
+        )
 
 
 class ManualCPMSetting(Text):
+    """Prompt asking for a manual Max CPM value."""
+
     @property
     def text(self) -> str:
-        return  """Укажите ставку (целое число от 100):"""
+        return (
+            "Укажите Max CPM (целое число от 100).\n"
+            "Max CPM — верхний предел ставки. Бот не должен ставить выше этого значения.\n"
+            "Это Бесплатный инструмент. "
+        )
 
 
 class WaitingForBlackPhrases(TextWithKeyboard):
     async def __call__(self, adv_setting_id: int):
         self.adv_setting_id: int = adv_setting_id
-        async with sm() as session:
+        async with sm(read_only=True) as session:
             adv: AdvSetting | None = await session.get(
                 AdvSetting, self.adv_setting_id
             )  # Изменено
@@ -1218,7 +1343,7 @@ class WaitingForRelevantPhraseTemplates(TextWithKeyboard):
 
     async def __call__(self, adv_setting_id: int) -> None:
         self.adv_setting_id: int = adv_setting_id
-        async with sm() as session:
+        async with sm(read_only=True) as session:
             adv: AdvSetting | None = await session.get(
                 AdvSetting, self.adv_setting_id
             )
@@ -1403,7 +1528,7 @@ async def process_cabinet_balance_topup(
     user_id: int, cabinet_id: int, amount: float
 ) -> WBBalancePayment:
     """Обработка запроса на пополнение баланса кабинета"""
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # Получаем пользователя для описания платежа
         user = await session.get(User, user_id)
         if not user:
@@ -1426,7 +1551,7 @@ async def confirm_cabinet_balance_topup(
     payment_id: int, cabinet_id: int
 ) -> tuple[WBBalancePayment, WBCabinet]:
     """Подтверждение платежа и обновление баланса кабинета"""
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         # Получаем платеж
         payment: WBBalancePayment | None = await session.get(
             WBBalancePayment, payment_id

@@ -159,8 +159,12 @@ async def test_parallel_preload_miss_blocks_old_until_miss_finishes(
         )
         mgr._min_bids_old_refresh_permitted.clear()
 
-        old_coro = _unwrap(mgr.preload_min_bids_cache_old)(mgr)
-        miss_coro = _unwrap(mgr.preload_min_bids_cache_miss)(mgr)
+        old_coro = _unwrap(mgr.preload_min_bids_cache_old)(
+            mgr, only_bot_active=False
+        )
+        miss_coro = _unwrap(mgr.preload_min_bids_cache_miss)(
+            mgr, only_bot_active=False
+        )
 
         t_old = asyncio.create_task(old_coro)
         for _ in range(5):
@@ -209,6 +213,6 @@ async def test_preload_min_bids_cache_old_no_wb_when_auto_setting_off(
             tasks_manager=TasksManager(max_workers=1),
             wb_manager_hub=hub,
         )
-        await _unwrap(mgr.preload_min_bids_cache_old)(mgr)
+        await _unwrap(mgr.preload_min_bids_cache_old)(mgr, only_bot_active=False)
 
     hub.wb_data_manager.get_min_bids_for_command.assert_not_called()

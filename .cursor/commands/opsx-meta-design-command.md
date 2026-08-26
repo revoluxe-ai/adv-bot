@@ -369,11 +369,7 @@ Detect:
 - artifact path drift;
 - different meanings under the same token;
 - required output that is never persisted;
-- persisted output that no command consumes;
-- advertised MODE / durable handoff consumer in description, intro, or
-  guardrails without early Mode detection + executable Steps before the
-  default path → class `ADVERTISED_MODE_WITHOUT_EXECUTABLE_BRANCH`
-  (exemplar: `/opsx-new` `REPAIR_EXISTING_OWNER_CONTRACT` gap).
+- persisted output that no command consumes.
 
 ---
 
@@ -465,27 +461,6 @@ Rules:
 
 Never edit committed companion files from this command.
 
-## Independent verifier / gate companion wire-up (mandatory)
-
-When the proposed command is an **independent READ_ONLY verifier or
-lifecycle gate** (exemplar: `/opsx-planning-review` +
-`.cursor/pipeline/contracts/PLANNING_REVIEW.md`):
-
-1. State **soft vs hard gate** explicitly (v1 soft recommend vs hard block).
-2. `REQUIRED_EXTERNAL_FIXES` MUST list at least:
-   - (a) handoff consumer on the repair writer (e.g. `/opsx-update`
-     `MODE: REPAIR_*` + handoff token) — **executable** early Mode
-     detection + Steps, not description/guardrail-only; when the writer is
-     dual-mode, skill/prompt mirrors must advertise the same Mode branch;
-   - (b) soft `NEXT_ACTION` on producers that previously jumped to apply
-     (e.g. `/opsx-continue` / `/opsx-ff` after tasks complete);
-   - (c) `GRAPH` state and/or transition edge for the hop;
-   - (d) soft preflight note on `/opsx-apply` when applicable.
-3. Do **not** claim `COMPATIBLE` when those companions are missing for this
-   command class — use `COMPATIBLE_WITH_REQUIRED_COMPANION_UPDATES` and hand
-   off to `/opsx-meta-fix-command-defects`. Companions are never applied
-   in this command's Phase 4.
-
 ---
 
 # Phase 3 — Design proposal
@@ -557,8 +532,6 @@ RISKS:
 
 REQUIRED_EXTERNAL_FIXES:
 (committed paths / IMPROVE work → /opsx-meta-fix-command-defects; not applied here)
-(for independent verifier/gate proposals: mandatory checklist items (a)–(d)
- under Integration verdict → Independent verifier / gate companion wire-up)
 
 REGRESSION_CHECKS:
 ```
@@ -808,7 +781,6 @@ OWNERSHIP_CONFLICTS:
 NEW_BYPASS_PATHS:
 
 REQUIRED_EXTERNAL_FIXES:
-(include independent verifier/gate checklist (a)–(d) when applicable)
 
 DESIGN_OPTIONS:
 
@@ -839,10 +811,6 @@ Before returning any proposal, confirm:
 - Required external/committed fixes are listed for handoff, not applied here.
 - No authority duplication was introduced.
 - No safety gate was bypassed.
-- If proposing a sole front-door plus an obsolete thin redirect: every
-  safety stop / `BLOCKED_*` / `DO_NOT_DO_YET` on the alias MUST also appear
-  on the live front-door (GRAPH or nav prose alone is insufficient; agents
-  follow the SoT command body).
 - Human next action is explicit.
 - Writes remain blocked until GO; GO touches only own uncommitted paths.
 # END CANONICAL SOURCE BODY
@@ -864,4 +832,33 @@ Before returning any proposal, confirm:
   (`.opsx/shared/command-discovery.md`). Stale negative search →
   `BLOCKED_NEEDS_FRESH_INDEX` → `/opsx-meta-update-index`. Central reuse →
   `ADOPTION_PACKET` → `/opsx-meta-import-command` (do not merge here).
-- orientation: emit `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`
+- orientation: emit `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`- persisted output that no command consumes;
+- advertised MODE / durable handoff consumer in description, intro, or
+  guardrails without early Mode detection + executable Steps before the
+  default path → class `ADVERTISED_MODE_WITHOUT_EXECUTABLE_BRANCH`
+  (exemplar: `/opsx-new` `REPAIR_EXISTING_OWNER_CONTRACT` gap).
+## Independent verifier / gate companion wire-up (mandatory)
+When the proposed command is an **independent READ_ONLY verifier or
+lifecycle gate** (exemplar: `/opsx-planning-review` +
+`.cursor/pipeline/contracts/PLANNING_REVIEW.md`):
+1. State **soft vs hard gate** explicitly (v1 soft recommend vs hard block).
+2. `REQUIRED_EXTERNAL_FIXES` MUST list at least:
+   - (a) handoff consumer on the repair writer (e.g. `/opsx-update`
+     `MODE: REPAIR_*` + handoff token) — **executable** early Mode
+     detection + Steps, not description/guardrail-only; when the writer is
+     dual-mode, skill/prompt mirrors must advertise the same Mode branch;
+   - (b) soft `NEXT_ACTION` on producers that previously jumped to apply
+     (e.g. `/opsx-continue` / `/opsx-ff` after tasks complete);
+   - (c) `GRAPH` state and/or transition edge for the hop;
+   - (d) soft preflight note on `/opsx-apply` when applicable.
+3. Do **not** claim `COMPATIBLE` when those companions are missing for this
+   command class — use `COMPATIBLE_WITH_REQUIRED_COMPANION_UPDATES` and hand
+   off to `/opsx-meta-fix-command-defects`. Companions are never applied
+   in this command's Phase 4.
+(for independent verifier/gate proposals: mandatory checklist items (a)–(d)
+ under Integration verdict → Independent verifier / gate companion wire-up)
+(include independent verifier/gate checklist (a)–(d) when applicable)
+- If proposing a sole front-door plus an obsolete thin redirect: every
+  safety stop / `BLOCKED_*` / `DO_NOT_DO_YET` on the alias MUST also appear
+  on the live front-door (GRAPH or nav prose alone is insufficient; agents
+  follow the SoT command body).

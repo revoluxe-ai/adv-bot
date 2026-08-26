@@ -7,7 +7,7 @@ Target stack adapter for this repository after `/opsx-projectize`.
 | Field | Value |
 |---|---|
 | adapter_id | `poetry-python` |
-| product | WB Sky (`adv-bot` Poetry package) |
+| product | WB Sky (`implement-free-bot-rebase` / adv-bot family) |
 | runtime | Python 3.11 + Poetry |
 | process plane | `opsx-lite` (required) |
 
@@ -30,4 +30,4 @@ Target stack adapter for this repository after `/opsx-projectize`.
 ## Refresh
 
 Use `/opsx-adapt-project` (read-only) or `:GO` to refresh adapter notes and
-capability-bound activation rows after tooling changes.
+capability-bound activation rows after tooling changes.| product | WB Sky (`adv-bot` Poetry package) |

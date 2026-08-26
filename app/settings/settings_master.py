@@ -1,3 +1,11 @@
+"""Application settings facade over environment variables.
+
+This module centralizes runtime configuration access for the monolith and keeps
+backward-compatible env names where production manifests still rely on them.
+For sensitive values, secret-specific env aliases should take precedence over
+legacy shared names from ConfigMaps.
+"""
+
 import dotenv
 
 # TODO: Доделать рассылку по боту, сделать оффер и разослать
@@ -19,6 +27,17 @@ import os
 
 
 class Settings:
+    """Read typed application settings from environment variables."""
+
+    @staticmethod
+    def _get_first_non_empty_env(*names: str) -> str | None:
+        """Return the first non-empty env value from the provided names."""
+        for name in names:
+            value = os.environ.get(name)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return None
+
     @property
     def PARSING_KEYWORDS_DELAY_BETWEEN_TASKS(self) -> int:
         value = os.environ.get("PARSING_KEYWORDS_DELAY_BETWEEN_TASKS")
@@ -107,13 +126,19 @@ class Settings:
 
     @property
     def invite_gate(self) -> bool:
-        """По умолчанию True: гейт по инвайту включён, если в .env не задано иначе.
+        """Гейт по инвайту на входе (deferred / off by default).
 
-        Явно выключить: INVITE_GATE=false
+        **Current rollout:** False — ``GateMiddleware`` no-op; entry = channel +
+        phone. Do **not** set ``INVITE_GATE=true`` on stage/prod without owner GO
+        (see invite-gate-deferred decision).
+
+        Rollout vs legacy ``stage``: там default был True при пустом env —
+        намеренный flip, не регрессия. Re-enable later: explicit
+        ``INVITE_GATE=true`` only.
         """
         value = os.environ.get("INVITE_GATE")
         if value is None or not str(value).strip():
-            return True
+            return False
         value = str(value).strip().lower()
         if value == "false":
             return False
@@ -123,14 +148,15 @@ class Settings:
 
     @property
     def presentation_only(self) -> bool:
-        """Режим «только презентация»: минимальный UX, инвайт для заявки, без полного доступа к боту.
+        """Legacy-флаг урезанного onboarding (deferred; off by default).
 
-        По умолчанию True, если переменная не задана или пустая.
-        Полный клиентский бот: PRESENTATION_ONLY_MODE=false
+        Full free MainMenu — prod path. Minimal «только инвайт» keyboard только
+        при явном ``PRESENTATION_ONLY_MODE=true`` (legacy; не включать на rollout).
+        Pair with ``invite_gate`` only after invite-gate-deferred decision re-open.
         """
         value = os.environ.get("PRESENTATION_ONLY_MODE")
         if value is None or not str(value).strip():
-            return True
+            return False
         value = str(value).strip().lower()
         if value == "false":
             return False
@@ -358,6 +384,7 @@ class Settings:
 
     @property
     def YOOKASSA_TOKEN(self) -> str:
+        """Payment provider token. Expected to be injected from a Kubernetes Secret."""
         value = os.environ.get("YOOKASSA_TOKEN")
         if value is None:
             raise ValueError("YOOKASSA_TOKEN environment variable is not set")
@@ -468,16 +495,38 @@ class Settings:
 
     @property
     def TELEGRAM_BOT_TOKEN(self) -> str:
-        value = os.environ.get("TELEGRAM_BOT_TOKEN")
+        """Main Telegram bot token for `client_bot_run.py`.
+
+        Priority:
+            1. `CLIENT_BOT_TOKEN` - dedicated secret for a specific bot deployment.
+            2. `TELEGRAM_BOT_TOKEN` - legacy shared env name.
+        """
+        value = self._get_first_non_empty_env(
+            "CLIENT_BOT_TOKEN",
+            "TELEGRAM_BOT_TOKEN",
+        )
         if not value:
-            raise ValueError("TELEGRAM_BOT_TOKEN environment variable is not set")
+            raise ValueError(
+                "Neither CLIENT_BOT_TOKEN nor TELEGRAM_BOT_TOKEN is set"
+            )
         return value
 
     @property
     def WEBHOOK_SECRET(self) -> str:
-        value = os.environ.get("WEBHOOK_SECRET")
+        """Webhook secret for the main Telegram bot.
+
+        Priority:
+            1. `CLIENT_BOT_WEBHOOK_SECRET` - dedicated secret for a specific bot deployment.
+            2. `WEBHOOK_SECRET` - legacy shared env name.
+        """
+        value = self._get_first_non_empty_env(
+            "CLIENT_BOT_WEBHOOK_SECRET",
+            "WEBHOOK_SECRET",
+        )
         if not value:
-            raise ValueError("WEBHOOK_SECRET environment variable is not set")
+            raise ValueError(
+                "Neither CLIENT_BOT_WEBHOOK_SECRET nor WEBHOOK_SECRET is set"
+            )
         return value
 
     @property
@@ -681,6 +730,11 @@ class Settings:
 
     @property
     def DEFAULT_MAX_CPM(self) -> int:
+        """Default max CPM for new ``WBCabinet`` rows when env unset.
+
+        Rollout default **5000** (intentional vs legacy ``stage`` 10000 when env
+        empty). Override per deploy: ``DEFAULT_MAX_CPM`` in Secret/ConfigMap.
+        """
         value = os.getenv("DEFAULT_MAX_CPM")
         if not value:
             return 5000
@@ -689,10 +743,21 @@ class Settings:
 
     @property
     def TG_TOKENS_FOR_SENDING(self) -> list[str]:
-        value: str | None = os.getenv("TG_TOKENS_FOR_SENDING")
+        """Telegram sender bot token pool for outbound notifications.
+
+        Priority:
+            1. ``TG_SENDER_BOT_TOKENS`` — dedicated secret-oriented alias.
+            2. ``TG_TOKENS_FOR_SENDING`` — legacy shared env name.
+        """
+        value = self._get_first_non_empty_env(
+            "TG_SENDER_BOT_TOKENS",
+            "TG_TOKENS_FOR_SENDING",
+        )
         if value is None:
-            raise ValueError('not set TG_TOKENS_FOR_SENDING')
-        return [token.strip() for token in value.split(',') if token.strip() != '']
+            raise ValueError(
+                "Neither TG_SENDER_BOT_TOKENS nor TG_TOKENS_FOR_SENDING is set"
+            )
+        return [token.strip() for token in value.split(",") if token.strip() != ""]
 
 
     @property

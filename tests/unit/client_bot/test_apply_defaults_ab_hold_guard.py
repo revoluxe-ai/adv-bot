@@ -24,9 +24,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
-from app.client_bot.modules.default_settings.default_models.common_default import (
-    CampaignDefaultsV1,
-)
 from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
     apply_campaign_defaults,
     apply_defaults_for_shop,
@@ -34,6 +31,12 @@ from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
 from app.client_bot.user_interface.views.callbacks import (
     ApplyCampaignDefaults,
     ApplyDefaultsForShop,
+)
+from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAutoMode
+from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
+from app.modules.common_slaves.wildberries.models.models import (
+    BidderCoroutineType,
+    BidderMode,
 )
 
 _HANDLER = "app.client_bot.user_interface.handlers.adv_setting.adv_setting"
@@ -84,6 +87,19 @@ def _off_adv() -> SimpleNamespace:
     )
 
 
+def _assert_common_defaults(adv: SimpleNamespace) -> None:
+    """Проверить только поля, принадлежащие common defaults policy."""
+    assert adv.bidder_mode == BidderMode.BY_POSITIONS
+    assert adv.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS
+    assert adv.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC
+    assert adv.sales_predict_method == FactMethods.BY_CARTS
+    assert adv.auto_budget_watchdog_enabled is True
+    assert adv.use_common_budget is True
+    assert adv.target_ctr_mode is False
+    assert adv.new_auto_min_ctr_mode is False
+    assert adv.reset_place is True
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("mode", ["active", "pending_setup"])
 def test_helper_noop_on_held_campaign(mode: str) -> None:
@@ -99,13 +115,10 @@ def test_helper_noop_on_held_campaign(mode: str) -> None:
 
 @pytest.mark.unit
 def test_helper_applies_defaults_on_off_campaign() -> None:
-    """15.1 paired positive: OFF → полный набор дефолтов применён."""
-    defaults = CampaignDefaultsV1()
+    """15.1 paired positive: OFF → common defaults policy применена."""
     adv = _off_adv()
     apply_defaults_to_adv_setting(adv, adv.wb_cabinet)  # type: ignore[arg-type]
-    assert adv.automatic_version == defaults.automatic_version  # 2
-    assert adv.auto_update_white_list == defaults.auto_update_white_list  # True
-    assert adv.auto_update_target_place == defaults.auto_update_target_place
+    _assert_common_defaults(adv)
     assert adv.card_ab_hold_mode == "off"
 
 
@@ -130,7 +143,12 @@ class _Result:
         return self._adv
 
     def scalar_one_or_none(self) -> object | None:
-        return self._adv
+        if self._adv is not None:
+            return self._adv
+        return self._wbc
+
+    def unique(self) -> "_Result":
+        return self
 
     def scalar(self) -> object | None:
         return self._wbc
@@ -143,13 +161,28 @@ class _Result:
 class _Session:
     """Async-сессия, записывающая execute/commit (без реальной БД)."""
 
-    def __init__(self, result: _Result, recorder: list[str]) -> None:
-        self._result = result
+    def __init__(
+        self,
+        *,
+        adv: object | None = None,
+        wb_user_cabinet: object | None = None,
+        advs: list[object] | None = None,
+        recorder: list[str],
+    ) -> None:
+        self._adv = adv
+        self._wbc = wb_user_cabinet
+        self._advs = advs
         self._recorder = recorder
+        self._execute_count = 0
 
     async def execute(self, _stmt: object) -> _Result:
         self._recorder.append("execute")
-        return self._result
+        self._execute_count += 1
+        if self._advs is not None:
+            return _Result(advs=self._advs)
+        if self._execute_count == 1:
+            return _Result(wb_user_cabinet=self._wbc)
+        return _Result(adv=self._adv)
 
     async def commit(self) -> None:
         self._recorder.append("commit")
@@ -161,18 +194,32 @@ class _Session:
         return False
 
 
-def _session_maker(result: _Result, recorder: list[str]):
+def _session_maker(
+    *,
+    adv: object | None = None,
+    wb_user_cabinet: object | None = None,
+    advs: list[object] | None = None,
+    recorder: list[str],
+):
     """Фабрика, совместимая с ``sm`` / ``sm(read_only=...)``."""
 
     def _sm(*_a: object, **_kw: object) -> _Session:
-        return _Session(result, recorder)
+        return _Session(
+            adv=adv,
+            wb_user_cabinet=wb_user_cabinet,
+            advs=advs,
+            recorder=recorder,
+        )
 
     return _sm
 
 
-def _callback(chat_id: int = 100) -> SimpleNamespace:
-    """Минимальный CallbackQuery: только ``message.chat.id``."""
-    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+def _callback(chat_id: int = 100, user_id: int = 9001) -> SimpleNamespace:
+    """Минимальный CallbackQuery: chat id и telegram user id."""
+    return SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)),
+        from_user=SimpleNamespace(id=user_id),
+    )
 
 
 @pytest.mark.unit
@@ -180,13 +227,15 @@ def _callback(chat_id: int = 100) -> SimpleNamespace:
 async def test_apply_campaign_defaults_blocks_held_campaign() -> None:
     """15.2: single handler на held → нет un-owned disable, нет commit, mode сохранён."""
     adv = _held_adv("active")
-    wb_user_cabinet = SimpleNamespace(id=2)
+    wb_user_cabinet = SimpleNamespace(id=2, wb_cabinet_id=31, wb_cabinet=adv.wb_cabinet)
     recorder: list[str] = []
-    result = _Result(adv=adv, wb_user_cabinet=wb_user_cabinet)
     bot = AsyncMock()
 
     with (
-        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(
+            f"{_HANDLER}.sm",
+            _session_maker(adv=adv, wb_user_cabinet=wb_user_cabinet, recorder=recorder),
+        ),
         patch(f"{_HANDLER}.AdvSettingMenu", MagicMock(return_value=AsyncMock())),
     ):
         await apply_campaign_defaults(
@@ -211,13 +260,15 @@ async def test_apply_campaign_defaults_blocks_held_campaign() -> None:
 async def test_apply_campaign_defaults_applies_off_campaign() -> None:
     """15.2 paired positive: single handler на OFF → дефолты применены + commit."""
     adv = _off_adv()
-    wb_user_cabinet = SimpleNamespace(id=2)
+    wb_user_cabinet = SimpleNamespace(id=2, wb_cabinet_id=31, wb_cabinet=adv.wb_cabinet)
     recorder: list[str] = []
-    result = _Result(adv=adv, wb_user_cabinet=wb_user_cabinet)
     bot = AsyncMock()
 
     with (
-        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(
+            f"{_HANDLER}.sm",
+            _session_maker(adv=adv, wb_user_cabinet=wb_user_cabinet, recorder=recorder),
+        ),
         patch(f"{_HANDLER}.AdvSettingMenu", MagicMock(return_value=AsyncMock())),
     ):
         await apply_campaign_defaults(
@@ -228,7 +279,7 @@ async def test_apply_campaign_defaults_applies_off_campaign() -> None:
             bot,
         )
 
-    assert adv.automatic_version == 2
+    _assert_common_defaults(adv)
     assert adv.card_ab_hold_mode == "off"
     assert "commit" in recorder
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
@@ -242,12 +293,14 @@ async def test_apply_defaults_for_shop_skips_held_applies_rest() -> None:
     held = _held_adv("active")
     off = _off_adv()
     recorder: list[str] = []
-    result = _Result(advs=[held, off])
     bot = AsyncMock()
     state = MagicMock()
 
     with (
-        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(
+            f"{_HANDLER}.sm",
+            _session_maker(advs=[held, off], recorder=recorder),
+        ),
         patch(f"{_HANDLER}.ShopMenu", MagicMock(return_value=AsyncMock())),
     ):
         await apply_defaults_for_shop(
@@ -262,7 +315,7 @@ async def test_apply_defaults_for_shop_skips_held_applies_rest() -> None:
     assert held.card_ab_hold_allowed_phrases_snapshot == ["good1", "good2"]
     assert held.automatic_version == 3
     # non-held получил дефолты
-    assert off.automatic_version == 2
+    _assert_common_defaults(off)
     # honest counter: 1 применён, 1 пропущен
     sent = " ".join(str(c.args[1]) for c in bot.send_message.call_args_list)
     assert "применены к 1" in sent

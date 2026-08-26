@@ -1,5 +1,4 @@
-INBOX
- Переключить всех на корзины - они опять появились
+Переключить всех на корзины - они опять появились
  CH: иногда 500 на тяжёлых запросах
  отписать WB на форум о проблеме с корзинами
  Метрики оплаты: sent → click → paid
@@ -95,9 +94,6 @@ INBOX
 Добавить показы в статистику карточки
 Добавить тексты в линтеры
 Поменять тесты ставки в Авто Время из PG на CH
-
-TODAY (WIP<=2)
-
 TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Зачем: prod-логов недостаточно, чтобы понять где пропадает NewBid(560) в update_cluster_bids для exact кейса.
 - Exact case: shop_id=db28efff-f7a9-52f8-8342-f1a58f7d8ed3, adv_id=32824944, search_adv_id=29734515, nmid=10749810, ks_id=17783715, key="антивозрастной матирующий крем".
@@ -105,22 +101,62 @@ TEMP DEBUG: DEBUG_CLUSTER_BID_TRACE (ветка fix-clusters-bidder)
 - Batch per-shop: CoroutinesManager → ClusterBidsManagerContainer(shop_id) → WBManager(shop_id); trace shop_id = wb_manager._shop_id, не advs[0].
 - После root cause: выключить env на prod, удалить cluster_bid_trace.py + trace calls + test_cluster_bid_trace.py (или оставить guard под флагом, если решим оставить навсегда).
 
+ UI message test infra:
+ - централизовать HTML escaping для всех HTML-экранов
+ - убрать оставшиеся локальные лимиты 4096/1024
+ - постепенно покрыть все message builders documentation regression tests
+ - вынести user-facing copy из handlers в view/message layer
+ - добавить warning-linter для сырых технических строк
+ - ввести pattern "? Что это?" для сложных экранов
 - централизовать в v3 экзекуторах получение фраз
 - сделать в v3 экзекуторах нормальную только релеватные фразы фильтрацию
 
+- сделать модуль заметок для РК и магазина с кнопкой выполения, потом развить в таск менеджерж
+- Перенести план-факт в настройки РК
 
-NEXT
+AUTO-MANAGEMENT SAFE START follow-up
+- Отдельное меню Белого списка для paid auto-management landing.
+- Кнопка "Подгрузить ключи в БС из кабинета": получить текущие минус-фразы из кабинета, взять статистику, вычесть текущие минуса из статистики и предложить результат для добавления в БС.
+- Кнопка "Загрузить минус-фразы из БС в нерелевантные фразы".
+- Перед любой записью нужен preview: пагинация, список ключей, крестик удаления возле каждого ключа, просмотр подробностей ключа, кнопки "Продолжить" и "Отменить".
+- Не делать это перед первым запуском free bot, если не блокирует safe start.
 
- P1: события оплаты + ежедневный отчёт
+WHITE LIST MODE follow-up
+- white_list_mode сейчас смешивает два смысла: free/manual режим активации ключей и paid replacement strategy.
+- active key не всегда равен ключу в БС.
+- FREE должен поддерживать безопасные режимы:
+  1. свободная активация по порогу БС;
+  2. только ключи из БС.
+- REPLACE_ON_TRIM нельзя показывать и применять во FREE.
+- Позже нужно разнести:
+  1. режим manual/free activation;
+  2. paid replacement strategy;
+  3. флаг запуска white-list automation.
 
- P2: Safe mode
+DEFAULT SETTINGS REFACTOR follow-up
+- Давно пора навести порядок в default settings: дефолты давно не обслуживались, из-за этого сложно понимать и настраивать поведение РК.
+- Сейчас в дефолтах смешаны разные смыслы:
+  - создание/подключение новой РК;
+  - FREE mode;
+  - PAID activation;
+  - paid auto-management defaults;
+  - legacy-настройки bidder/БС/target_place.
+- Нужно разделить три явных слоя:
+  1. creation defaults — что получает новая/подключённая РК;
+  2. free transition — что применяется при выключении paid/автоуправления;
+  3. paid transition — что применяется при включении paid/автоуправления.
+- Запретить broad defaults там, где нужен узкий режимный переход.
+- Покрыть тестами ключевые поля:
+  bot_active, automatic_version, white_list_mode, bidder_active, bidder_for_auto, auto_update_target_place, auto_update_white_list, auto_update_minus_phrases.
+- Не делать перед первым запуском free bot, если не блокирует запуск.
 
- Safe mode при балансе 0 (идея)
-
-DONE
- P0: CH лимит параллелизма + кэш результата
- WB: у части магазинов нет корзин по API → переключил на заказы
- P0: сообщение пользователям про корзины + тикет WB
+DEFAULT ACTION MODE OVERLAY follow-up
+- Сделать отдельную ревизию кнопок "Применить дефолтные настройки" и "Применить дефолты всем кампаниям".
+- Целевое поведение:
+  - если РК в PAID: сначала common defaults, потом paid overlay;
+  - если РК в FREE: сначала common defaults, потом free overlay.
+- Покрыть тестами, что default action не переводит РК в неправильный режим.
+- В текущем slice helper-слои уже подготовлены; отдельную ревизию кнопок не смешивать с запуском free bot без необходимости.
 
 проверить
 
@@ -325,26 +361,11 @@ Disposition:
 
 Provenance: discovered while reviewing `card-ab-hold-mode`; root cause predates the change.
 
-
-
-
-Зашифровать свой комп
-Навести порядок ChatGPT
-Навести порядок в CODEX
-
-Сделать проект для создания который пишет python тесты на деградацию промтов.
-
-
-Разобраться с MAx - там есть клиенты, а я их игнорю!
-
-Идея: епе бнмра
-
 opsx-bug-team to commant native
 
 opsx-bug-team - тест развилки от bug-hunt
 
 тесты на команды и team
-
 
 ## Deferred from change card-ab-hold-mode (2026-07-28)
 
@@ -366,7 +387,6 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   reason: oversized | owner_park
   notes: Не обязательный MVP. Форс apply snapshot / честное ожидание — возможны позже внутри soft; сейчас не owed DoD.
 
-
 ## Bound confirmed card-ab-hold-mode (2026-07-30)
 
 Via `/opsx-bound-scope:GO` — no new deferred checklist rows (picker / anti-drain /
@@ -380,7 +400,6 @@ KEEP_MVP_BOUNDARY (owed now, handoff → `/opsx-update`):
   wording must not say «ослабим защиту» if behavior is freeze-decide).
 - Pre-start hard|soft|self picker, anti-drain, mid-sync UX — remain out of DoD
   until REENTER_CONFIRMED.
-
 
 ## Deferred from change openspec-guard-size-recovery (2026-07-30)
 
@@ -408,7 +427,6 @@ No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only par
 
 Сделать мета-команды по ремонту-доработке обучению команд, которые обслуживают другие команды
 
-сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
 
 сжать и вернуть лимиты [openspec_guard.yaml](https://github.com/revoluxe-ai/adv-bot/blob/dcc432e9297566c380de9888c4955f37bff54a00/tools/openspec/openspec_guard.yaml#L57)
 
@@ -432,4 +450,243 @@ Parked via `/opsx-bound-scope:GO` — not owed DoD of current change until
   reason: out_of_current_mvp
   notes: Env vs hardcoded default_db vs unqualified+client.database — registry later; сейчас change-local MUST qualify in CH SQL.
 
-Окончательно выпилить opsx-admin-command-commit.md
+## Deferred from change drop-unused-neo4j-config (2026-08-01)
+
+Raw notes from `/opsx-bound-scope:GO`. Not current change DoD. Return via `/opsx-update` + `REENTER_CONFIRMED`.
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Зачистка docs/docker/monitoring Neo4j
+  source: openspec/changes/drop-unused-neo4j-config/proposal.md (Out of scope); design Non-Goals
+  reason: out_of_current_mvp
+  notes: FACT_SHEET, k8s/monitoring/NEO4J_*, dockers/neo4j — не блокируют AppConfig
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Удалить commented ML/graph Neo4j-код и entry scripts
+  source: proposal Out of scope; design Non-Goals
+  reason: oversized | out_of_current_mvp
+  notes: graph_vector_updater / hard_ml / run_update_cards_data_in_neo4j — уже не runtime
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Починить или удалить image_master2._neo4j методы
+  source: design Non-Goals
+  reason: out_of_current_mvp
+  notes: __init__ не создаёт _neo4j; не hot path shop-runner
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Cluster teardown live Neo4j (если ещё в cluster)
+  source: proposal Out of scope; explore Unconfirmed
+  reason: owner_park | infra
+  notes: отдельный infra GO; не часть appconfig change
+
+- [ ] [deferred-from:drop-unused-neo4j-config] Прочие unit-кластеры после Neo4j (TG_TOKENS, shelf, calculated_keywords)
+  source: proposal Out of scope
+  reason: out_of_current_mvp
+  notes: отдельные triage; не смешивать с drop Neo4j config
+
+внедрить нагрузочные тесты
+
+внедрить graphlens-mcp , чтобы меньше жечь токены
+разобрать все ветки-все стеши!
+Сделать уведомление пользователей об изменении настроек
+Внедрить: делаю обзон, пояснение по боту, затем вредряю справочную информацию в бот в сообщения
+Вынести режим управления ставками BidderMode (единая, по позициям в отдельнео меню-настройку)
+BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
+Сделать объясняловку для этих режимов OrdersSourceForAutoMode
+Внедрить готовые решения для тестов на базе обезличенных данных
+Внедрить систему отчетов по ошибкам перед клиентами
+Фиксировать ошибки по магазинам из Бекенда
+Сделать смещение в учете конверсии заказы в корзины по времени, достаточном для внесения дополнительных заказов. А также функционал учета внешего трафика (самовыкупам) в том числе через Excel
+На странице списка РК написать инструкцию, что можно искать по артикулам РК
+Сделать каталог старых РК для того, чтобы в них вставлять новые артикулы и обхолдить ограничения для набора ключей
+Проблема: сломался updater, а я и не знал, итог: проблемы в РК, надо решить проблему
+Сделать более совершенный механизм отключения полок
+Почему-то 1096147565 Школьные брюки палаццо на резинке широкие трикотаж у ключа по ladder п1, а ставит 12
+Состояние: С (Стабильно) - такое в ключе, это не правильно, надо исправить
+
+## Deferred from change land-free-bot-rebase-into-stage (2026-08-18)
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Stage deployment и stage verification
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: После merge Owner самостоятельно выполняет stage schema/backfill/UI rollout, smoke и compatibility checks; receipts не входят в текущий merge-readiness DoD.
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Production migration и UI rollout
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: Production migration/UI rollout выполняются Owner через отдельный approved operational path после безопасного merge.
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Production smoke и paid/free compatibility monitoring
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: Post-deploy smoke, monitoring window и compatibility verification не являются обязанностью текущего merge change.
+
+- [ ] [deferred-from:land-free-bot-rebase-into-stage] Финальный production verdict и recovery evidence
+  source: openspec/changes/land-free-bot-rebase-into-stage/tasks.md
+  reason: owner_park
+  notes: Production completion verdict и recovery evidence фиксируются Owner после самостоятельного rollout.
+
+## TECH DEBT: billing grace exceeded × A/B Hold EXIT (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage`; обсуждение с Owner — не блокер merge, отложить.
+
+**Grace (что это):** льготный период billing при минусе баланса. До **7×** дневного тарифа кабинет может списываться в минус, `bot_active` остаётся `True`. Предупреждение: «осталось N дней до полной блокировки». При **grace exceeded** — жёсткая деактивация paid.
+
+**Сейчас** (`app/modules/billing/billing.py`, ~398–404):
+- На все `bot_active` кампании → `apply_free_mode_transition` (полный FREE overlay: V3→2, bidder/automation flags off).
+- Общее TG: `GRACE_EXCEEDED_MESSAGE` (баланс, без A/B Hold).
+- **Нет** owned EXIT A/B Hold (`disable_card_ab_hold_in_session`: mode OFF, clear snapshot/epoch/Redis).
+- **Нет** `auto_budget_watchdog_enabled = False` (в ручном `turn_adv_off` уже добавлено в handler).
+
+**Проблема:** на кампании в `PENDING_SETUP` / `ACTIVE` hold в PG может остаться `active`, snapshot не чищен — zombie state (pipeline не крутится из‑за `bot_active=False`, UI скрыт). При пополнении и повторном paid-on hold может «проснуться» в несогласованном состоянии.
+
+**Целевое поведение (Owner, 2026-08-22):**
+- Если при grace exceeded на РК включён A/B Hold → **сообщить**, что тест/режим прекращается (баланс).
+- **Сделать owned EXIT** (как кнопка «Выключить A/B Hold»): `card_ab_hold_mode → OFF`, clear allowed-set snapshot, epoch fields, Redis coordination.
+- Затем paid-off: `apply_free_mode_transition` + `auto_budget_watchdog_enabled = False` (как ручное «полностью отключить бот от управления РК»).
+
+**Сложность / блокеры:**
+- `disable_card_ab_hold_in_session` сейчас gated `is_card_ab_hold_ui_visible` → `bot_active=True`; для billing EXIT нужен **programmatic path** до/без UI gate или internal helper без visibility check.
+- Redis cleanup после EXIT сейчас в telegram handler (`CardAbHoldSignalRedisCache.clear` и др.) — billing должен вызывать тот же контур или shared helper.
+- Тесты billing (`test_process_single_cabinet_grace_exceeded_deactivates`) **защищают** полный FREE overlay — при held/non-held split или EXIT нужны новые кейсы.
+
+**Не путать с:** ручной `turn_adv_off` — Owner: «отключаем и пользователь сам разбирается»; zombie hold там принят. Billing — **автоматическое** массовое отключение без клика.
+
+**Связанные файлы:** `billing.py`, `card_ab_hold/telegram/handlers.py` (`disable_card_ab_hold_in_session`), `tests/modules/billing/test_billing.py`.
+
+**Приоритет:** medium; после free-bot rollout / при следующем billing или card-ab-hold touch.
+
+**Next:** отдельный change или задача в billing slice: EXIT helper + per-campaign notify + тесты held ACTIVE / PENDING_SETUP / OFF.
+
+## TECH DEBT: admin ui_mode при restore shop keyboard (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage`; Owner — tech debt, не блокер merge.
+
+**Проблема:** `close_shop_mass_adv_ops_menu` восстанавливает главную клавиатуру магазина через sync-хелпер `_resolve_shop_keyboard_access` (`start.py`). Для **bot admin** он **всегда** возвращает `UiAccessMode.PAID`, **без** Redis `ui_mode:user:{telegram_id}`.
+
+Каноничный путь (`ShopMenu`, `UiAccessResolver.resolve_shop_ui_access`) для админа читает Redis через `UiModeService.get_user_ui_mode`.
+
+**Сценарий (admin QA free-bot UX):**
+1. Админ переключает «Режим интерфейса: FREE» (toggle → Redis `free`).
+2. Shop menu открывается корректно — FREE, без «Массовые операции с РК».
+3. Админ в mass-ops (осталась PAID клавиатура / старый callback) → «Назад» → restore **PAID**: снова «Массовые операции с РК», toggle показывает PAID.
+
+Для **обычных пользователей** путь ок: `bot_active` в PG.
+
+**Фикс (маленький):** в `close_shop_mass_adv_ops_menu` резолвить access через `UiAccessResolver` + injectable `UiModeService` (как `ShopMenu`), убрать или переписать `_resolve_shop_keyboard_access` (сейчас sync + hardcoded PAID для admin).
+
+**Тест:** admin + Redis `free` → после «Назад» из mass-ops нет «Массовые операции с РК»; toggle «Режим интерфейса: FREE».
+
+**Связанные файлы:** `app/client_bot/user_interface/handlers/start/start.py`, `app/client_bot/ui_access.py`, `app/client_bot/ui_mode.py`, `tests/client_bot/user_interface/handlers/test_shop_mass_adv_ops_menu.py`.
+
+**Приоритет:** low (только admin QA); после free-bot rollout или при следующем touch shop-menu keyboard restore.
+
+**Next:** async resolve в handler или shared helper с Redis; не путать с docstring в `close_shop_mass_adv_ops_menu` (там устаревшая отсылка к hardcoded PAID).
+
+## TECH DEBT: CTR-boost / «Тестировать дальше» (needs_ctr_boost) (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage`; Owner — tech debt, разберём позже; не блокер merge.
+
+**Что это:** legacy механика «Тестировать дальше» — callback `ChangeKeywordHardStatus(new_hard_status=-1)`. Бот искусственно поднимает CTR ключа через CH-статистику (`added_clicks`), снимает auto-block в Redis, даёт ключу ещё один цикл оценки.
+
+**Сейчас** (`keyword_settings.py`, `change_keyword_hard_status`):
+- `change_keyword_hard_status_in_session` при `new_hard_status < 0` → `kind=needs_ctr_boost` (без commit).
+- Parent handler: CH path + `redis_manager.set_auto_block_status` **закомментированы**; только `session.commit()` и rerender — **silent no-op**.
+- TODO в handler: «Тестировать дальше — не работает!!!!».
+- Helper `apply_keyword_ctr_boost_with_client` **сохранён**; unit-тесты на child активны.
+- Handler integration-тесты **skip** (`CTR_BOOST_HANDLER_SKIP` в `test_ctr_boost_redis_auto_block.py`, `test_ch_handoff_keyword_ctr_boost.py`).
+
+**Live impact (низкий):** кнопка с `-1` **убрана** из `get_keyword_setting_keyboard` — UI шлёт только `hard_status` 0–4. Путь `-1` только legacy callback / ручной вызов. `BUTTONS_FUNCTIONALITY.md` ещё описывает «Тестировать дальше» — документация **устарела**.
+
+**Целевое поведение (когда разберём):**
+1. **Restore:** раскомментировать CH + Redis в handler; при необходимости вернуть кнопку в keyboard (BAD + не max position); убрать skip на handler-тестах.
+2. **Cleanup:** удалить ветку `needs_ctr_boost`, dead code и skip-тесты; обновить `BUTTONS_FUNCTIONALITY.md`; оставить или убрать `apply_keyword_ctr_boost_with_client` по решению.
+
+**Связанные файлы:** `app/client_bot/user_interface/handlers/keyword_settings.py`, `app/client_bot/user_interface/views/keyboards.py`, `BUTTONS_FUNCTIONALITY.md`, `tests/unit/client_bot/test_ctr_boost_redis_auto_block.py`, `tests/unit/client_bot/test_ch_handoff_keyword_ctr_boost.py`, `tests/unit/client_bot/test_keyword_ctr_boost_ch_seam.py`.
+
+**Приоритет:** low (отложено при V3); после free-bot rollout или при touch keyword-settings / V3 keyword UX.
+
+**Next:** Owner decision restore vs cleanup; не путать с V3 decision trace / admin-only tooling на экране ключа.
+
+## TECH DEBT: partner program — stats & payouts (2026-08-22)
+
+Контекст: Bugbot/review free-bot rebase vs `stage` (только `app/`/`tests/`); Owner — **не блокер merge**, soft-launch/MVP ок, утащить в техдолг.
+
+**Модуль:** `app/modules/partner_program/partner_stats.py`, admin-flow в `app/client_bot/user_interface/handlers/admin_panel.py`, UI партнёра в `invite_show.py`.
+
+**Вердикт:** не критические баги для релиза при ручных выплатах одним admin; **P1 до масштабирования реальных выплат** — только race на payout.
+
+- [ ] **P1 — TOCTOU при payout** (`partner_stats.py:~538`)
+  Два параллельных `create_partner_payout` могут оба пройти проверку `available_to_payout` и суммарно выплатить больше заработанного. До фикса: процесс «одна выплата за раз / один ответственный admin».
+  **Фикс:** одна WRITE-транзакция + `SELECT … FOR UPDATE` на partner row (или advisory lock) + пересчёт available внутри транзакции.
+
+- [ ] **P2 — хрупкая эвристика «реальной оплаты»** (`partner_stats.py:~99`)
+  `is_real_external_balance_payment` требует `"через telegram"` в `description`. Другой copy в billing → занижение `clients_paid_sum` / 15%. Не падает в runtime.
+  **Фикс:** явный `payment_source` в схеме или classifier в billing write-path.
+
+- [ ] **P2 — деньги в `float`** (`partner_stats.py:~546`, модель `PartnerPayout.amount`)
+  Расчёты в `Decimal`, persist в `Float` — накопление ошибок округления при суммировании `paid_out_amount`.
+  **Фикс:** `Numeric` в модели + миграция.
+
+- [ ] **P2 — `commit()` внутри `create_partner_payout_in_session`**
+  Нарушает `*_in_session` seam (caller должен владеть транзакцией); мешает атомарным multi-step admin flows.
+  **Фикс:** flush в helper, commit в parent wrapper.
+
+- [ ] **P3 — admin payout: нет catch `RuntimeError`** (`admin_panel.py:~782`)
+  Только `ValueError`; пропавший partner/admin между шагами FSM → необработанное исключение.
+  **Фикс:** catch + user-facing сообщение + сброс state.
+
+- [ ] **P3 — тяжёлый `list_partner_stats`** (`partner_stats.py:~366`)
+  На каждый рендер admin-листа — все invites + все payments приглашённых, пересчёт в Python. Ок при десятках партнёров; риск таймаута при росте базы.
+  **Фикс:** SQL-агрегации / пагинация на уровне БД.
+
+**Тесты:** `tests/unit/test_partner_stats.py` — 8/8 passed (логика расчёта покрыта; race и scale — нет).
+
+**Приоритет:** P1 перед несколькими admin'ами и реальными деньгами; остальное — волна 2.
+
+**Next:** ticket «Partner payouts hardening»; не смешивать с free-bot merge DoD.
+
+## TECH DEBT: client_bot owner-check gaps on callback paths (2026-08-26)
+
+Контекст: `/review-security` vs `stage` (direct, без subagents) + Owner (2026-08-26): **не блокер merge** — унести **все** findings в техдолг.
+
+**Threat model (Owner):** бот в private chat; Telegram callback **нельзя переслать** как рабочую кнопку чужому. Классический IDOR «переслал inline-кнопку» не применим. Остаточный вектор — forge `callback_data` неофициальным клиентом; **вне текущего DoD** → defense-in-depth later.
+
+**Что уже hardened в этой ветке (не долг):** многие `adv_setting` WRITE, CPM message writes, workbook **import**, white_list toggle, Excel import/export ownership, phone `contact.user_id == from_user.id`, admin-only partner payouts, secret env aliases.
+
+### WRITE без owner-check (defense-in-depth)
+
+- [ ] **P2 — `strategy_setting` WRITE** (`app/client_bot/user_interface/handlers/strategy_setting.py:~95`)
+  `toggle_auto_update_strategy` / `set_manual_strategy` / legacy `StrategySetting` мутируют `AdvSetting` по callback id без `from_user` ownership.
+  **Фикс:** `load_wb_user_cabinet_for_adv_in_session` + `load_adv_for_owner_cabinet_in_session` до commit.
+
+- [ ] **P2 — `set_common_bid_manual` WRITE** (`app/client_bot/user_interface/handlers/set_common_bid_manual.py:~222`)
+  Start/apply грузят `AdvSetting` по id из callback/FSM и пишут ставки в WB без привязки к `from_user`.
+  **Фикс:** owner-check на start и apply до WB write; deny без мутации.
+
+- [ ] **P2 — `change_keyword_hard_status` WRITE** (`app/client_bot/user_interface/handlers/keyword_settings.py:~112`)
+  `change_keyword_hard_status_in_session` меняет `KeywordSetting.hard_status` по id; parent не передаёт `telegram_user_id`.
+  **Фикс:** owner/cabinet check до mutation; deny без commit.
+
+- [ ] **P2 — `on_off_controller` WRITE** (`app/modules/wb_adv_updater/modules/bidder/tg_bot_handlers/on_off_controller.py`)
+  `set_auto_cpm` / `off_auto_cpm` переключают `bidder_active` по `adv_original_id` без owner (sibling `cpm_builder` уже с check).
+  **Фикс:** тот же owner helper, что CPM/workbook; deny → user message, без commit.
+
+### READ / UI без owner-check
+
+- [ ] **P3 — keyword daily history READ** (`keyword_daily_history_message.py` / `KeywordDailyHistoryScreen`)
+  Статистика ключа по id без owner.
+  **Фикс:** owner-check перед load/render.
+
+- [ ] **P3 — adv catalog READ** (`adv_setting.py` `reset_filter` / `choice_adv_paginator`)
+  Список РК по `wb_user_cabinet_original_id` без owner filter.
+  **Фикс:** `_load_wb_user_cabinet_for_owner_in_session` до listing.
+
+- [ ] **P3 — CPM menu open / workbook export** (`cpm_builder.to_page_for_cpm_setting`, `download_target_places_template`)
+  UI/export по `adv_original_id` без owner; WRITE/import уже deny.
+  **Фикс:** owner-check на open/export, зеркально import.
+
+### Middleware fail-open
+
+- [ ] **P3 — `PhoneRequiredMiddleware` fail-open** (`phone_required.py:~113`)
+  Если `data["bot"]` отсутствует — pass-through без запроса телефона.
+  **Фикс:** fail-closed (drop update / log error), не admit.
+
+**Приоритет:** low/defense-in-depth после free-bot rollout; поднять, если бот в группах/общих чатах или threat model включит неофициальные клиенты.
+
+**Next:** при touch strategy / common-bid / keyword hard_status / CPM / catalog — закрыть owner-check в том же PR; не смешивать с merge DoD vs `stage`.

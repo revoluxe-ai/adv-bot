@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "opsx/MODEL_REGISTRY.schema.json",
+  "title": "OPSX Cursor model registry snapshot",
+  "description": "Materialized model catalog for exact MODEL= validation in orchestrator commands.",
+  "type": "object",
+  "required": ["schema_version", "synced_at", "source", "pseudo_models", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "synced_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "string",
+      "description": "Provenance label, e.g. cursor_sdk.models.list"
+    },
+    "pseudo_models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug", "kind", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "slug": { "type": "string" },
+          "kind": { "const": "pseudo" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug"],
+        "additionalProperties": true,
+        "properties": {
+          "slug": { "type": "string" },
+          "display_name": { "type": "string" },
+          "variant_group": { "type": "string" },
+          "is_fast_variant": { "type": "boolean" },
+          "parameters": { "type": "object" },
+          "preset_variants": { "type": "array" }
+        }
+      }
+    }
+  }
+}

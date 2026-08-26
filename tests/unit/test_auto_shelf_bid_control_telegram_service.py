@@ -28,6 +28,12 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 
 pytestmark = pytest.mark.unit
 
+BOT_ACTIVE_PAYWALL_MESSAGE = (
+    "Управление ставкой в полках доступно только после включения автоуправления кампанией.\n\n"
+    "Бесплатно можно смотреть аналитику и рекламные данные.\n"
+    "Чтобы бот сам тестировал и выставлял ставки в полках — подключите автоуправление."
+)
+
 
 def _adv(nmids: list[int]) -> SimpleNamespace:
     return SimpleNamespace(
@@ -104,6 +110,12 @@ def _enabled_main_adv() -> SimpleNamespace:
     adv.max_price_for_order = 1000.0
     adv.plan_for_sales_for_day = 10
     adv.target_price_for_order = 500.0
+    return adv
+
+
+def _inactive_adv() -> SimpleNamespace:
+    adv = _enabled_main_adv()
+    adv.bot_active = False
     return adv
 
 
@@ -263,6 +275,36 @@ async def test_disable_sets_flag_false() -> None:
     await service.disable(1)
 
     repository.set_enabled.assert_awaited_once_with(1, False)
+
+
+@pytest.mark.asyncio
+async def test_enable_paywalls_when_bot_inactive() -> None:
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=_inactive_adv())
+    repository.get_or_create_default_settings = AsyncMock()
+    repository.set_enabled = AsyncMock()
+    service = _service(repository, MagicMock())
+
+    with pytest.raises(AutoShelfBidControlTelegramError) as exc_info:
+        await service.enable(1)
+
+    assert exc_info.value.message == BOT_ACTIVE_PAYWALL_MESSAGE
+    repository.get_or_create_default_settings.assert_not_awaited()
+    repository.set_enabled.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_max_bid_paywalls_when_bot_inactive() -> None:
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=_inactive_adv())
+    repository.update_settings = AsyncMock()
+    service = _service(repository, MagicMock())
+
+    with pytest.raises(AutoShelfBidControlTelegramError) as exc_info:
+        await service.update_max_bid(1, "500")
+
+    assert exc_info.value.message == BOT_ACTIVE_PAYWALL_MESSAGE
+    repository.update_settings.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -584,6 +626,24 @@ async def test_telegram_open_main_mode_no_typeerror_when_refresh_skipped_no_desi
 
     assert result == MainBidRefreshResult.NO_CHANGE
     manager_instance.build_decision_snapshot.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_telegram_open_read_only_skips_main_bid_refresh_sync() -> None:
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=_inactive_adv())
+    repository.get_state = AsyncMock()
+    view_provider = MagicMock()
+    service = _service(repository, view_provider)
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_telegram_service.AutoShelfBidControlManager"
+    ) as manager_cls:
+        result = await service.apply_main_bid_refresh_if_needed(1)
+
+    assert result == MainBidRefreshResult.SKIPPED_DISABLED
+    repository.get_state.assert_not_awaited()
+    manager_cls.assert_not_called()
 
 
 @pytest.mark.asyncio

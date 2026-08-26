@@ -1,7 +1,9 @@
+"""Unit coverage for stats-freshness orchestration and cache behavior."""
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,6 +17,9 @@ from app.modules.shop_runner.service_manager.services.stats_freshness_cache_mana
 )
 from app.modules.shop_runner.service_manager.services.stats_freshness_guard import (
     StatsFreshnessState,
+)
+from app.modules.shop_runner.service_manager.services.stats_freshness_manager import (
+    StatsFreshnessManager,
 )
 from app.modules.shop_runner.tasks_manager.tasks_manager import TasksManager
 
@@ -163,7 +168,7 @@ async def test_refresh_stats_freshness_cache_writes_redis(fake_redis) -> None:
         "app.modules.shop_runner.service_manager.manager.StatsFreshnessManager"
     ) as mgr_cls:
         mgr_cls.return_value.evaluate = AsyncMock(side_effect=_evaluate)
-        await manager.refresh_stats_freshness_cache.__wrapped__(manager)
+        await manager.refresh_stats_freshness_cache.__wrapped__(manager, only_bot_active=False)
 
     cache = RedisStatsFreshnessStateCacheManager(RedisClient(redis_client=fake_redis))
     loaded = await cache.mget_entries(manager.shop_id, [10, 20])
@@ -182,6 +187,35 @@ async def test_refresh_stats_freshness_cache_writes_redis(fake_redis) -> None:
 
 
 @pytest.mark.asyncio
+async def test_stats_freshness_manager_uses_injected_clickhouse_reader() -> None:
+    """The freshness manager must route evaluation through its injected reader."""
+    reader = MagicMock()
+    now = datetime.now(timezone.utc)
+    reader.get_all_updated_ats = AsyncMock(return_value=(now, now, now))
+    manager = StatsFreshnessManager(reader=reader)
+
+    state = await manager.evaluate(SimpleNamespace(original_adv_setting_id=101))
+
+    assert state == StatsFreshnessState(is_fresh=True, is_stale_over_6h=False)
+    reader.get_all_updated_ats.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_apply_stats_stale_emergency_skips_free_model(fake_redis) -> None:
+    manager = _build_manager(fake_redis)
+    manager._set_min_search_bid_for_keyword = AsyncMock()  # type: ignore[method-assign]
+    complex_adv = SimpleNamespace(
+        bot_active=False,
+        get_keywords=AsyncMock(),
+    )
+
+    await manager._apply_stats_stale_emergency(complex_adv)  # type: ignore[arg-type]
+
+    complex_adv.get_keywords.assert_not_awaited()
+    manager._set_min_search_bid_for_keyword.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None:
     manager = _build_manager(fake_redis)
     manager._set_min_search_bid_for_keyword = AsyncMock()  # type: ignore[method-assign]
@@ -193,6 +227,7 @@ async def test_apply_stats_stale_emergency_keeps_top_keyword(fake_redis) -> None
     ]
     complex_adv = SimpleNamespace(
         adv_id=777,
+        bot_active=True,
         auto_add_only_relevant_phrase=False,
         auto_updater_version=2,
         get_keywords=AsyncMock(return_value=keywords),

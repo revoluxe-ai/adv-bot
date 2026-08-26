@@ -5,6 +5,10 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}"
     ],
+    "python.analysis.typeCheckingMode": "strict",
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.useLibraryCodeForTypes": true,
     "debugpy.debugJustMyCode": false,
     "files.exclude": {
         "**/__pycache__": true,
@@ -26,5 +30,9 @@
     "cursorpyright.analysis.extraPaths": [
         "${workspaceFolder}"
     ],
+    "cursorpyright.analysis.typeCheckingMode": "strict",
+    "cursorpyright.analysis.diagnosticMode": "workspace",
+    "cursorpyright.analysis.autoSearchPaths": true,
+    "cursorpyright.analysis.useLibraryCodeForTypes": true,
     "todo-tree.tree.scanMode": "workspace only"
 }

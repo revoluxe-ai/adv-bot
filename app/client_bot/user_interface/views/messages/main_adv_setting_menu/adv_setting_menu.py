@@ -13,12 +13,15 @@ from aiogram.types import (
 )
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot import utils
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
 from app.client_bot.user_interface.message_templates.templates import (
     TextWithKeyboardAndImage,
 )
+from app.client_bot.ui_access import UiAccessMode, UiAccessResolver
+from app.client_bot.ui_mode import UiModeService
 from app.client_bot.user_interface.views.messages.strategy_display import (
     format_adv_strategy,
 )
@@ -111,12 +114,28 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         wb_user_cabinet: WBUserCabinet,
         adv: AdvSetting,
         redis_client: RedisClient = Provide["redis_client_wrapper"],
+        stats_freshness_manager: StatsFreshnessManager | None = None,
     ) -> None:
+        """Инициализировать меню с Redis- и ClickHouse-зависимостями.
+
+        Args:
+            bot: Telegram-бот для отрисовки меню.
+            chat_id: Идентификатор чата пользователя.
+            wb_user_cabinet: Кабинет WB, которому принадлежит кампания.
+            adv: Настройки рекламной кампании.
+            redis_client: Клиент Redis для кэшей меню.
+            stats_freshness_manager: Необязательный менеджер свежести статистики;
+                production использует стандартный ClickHouse reader, а тесты
+                могут передать изолированный reader/manager.
+        """
         super().__init__(bot, chat_id)
         self._bot = bot
         self._chat_id = chat_id
         self.adv = adv
         self.wb_user_cabinet = wb_user_cabinet
+        self._stats_freshness_manager = (
+            stats_freshness_manager or StatsFreshnessManager()
+        )
         self._redis_cluster_bids_timestamp_manager = RedisClusterBidsTimestampManager(
             redis_client
         )
@@ -153,7 +172,12 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._stats_stale_reason: str | None = None
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._v3_last_action_str: str | None = None
-
+        self._ui_access: UiAccessMode = UiAccessMode.FREE
+        self._ui_access_resolver: UiAccessResolver | None = None
+        if isinstance(redis_client, RedisClient): # pyright: ignore
+            self._ui_access_resolver = UiAccessResolver(
+                UiModeService(redis_client=redis_client)
+            )
 
     @staticmethod
     def _format_status_for_display(status: str | None) -> str:
@@ -195,6 +219,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             return status
 
     async def __call__(self) -> Message:
+        self._ui_access = await self._resolve_ui_access()
         auction_adv_id: int | None = self.adv.search_adv_id
         if auction_adv_id:
              status_auction = await self._get_status_auction(auction_adv_id)
@@ -367,6 +392,14 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         return await super().__call__()
 
+    async def _resolve_ui_access(self) -> UiAccessMode:
+        """Resolve effective freemium access for campaign menu rendering."""
+        if self._ui_access_resolver is None:
+            return UiAccessMode.FREE
+        return await self._ui_access_resolver.resolve_adv_ui_access(
+            int(self.chat_id), self.adv
+        )
+
     @property
     def text(self) -> str:
         # Determine predict CTR mode display text
@@ -385,6 +418,13 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             if self._stats_stale_reason:
                 text += f"{self._stats_stale_reason}\n"
         text += "\n"
+        text += (
+            "Это меню рекламной кампании.\n"
+            "Во free-режиме можно смотреть данные и выполнять ручные действия: "
+            "ставки, целевые позиции, Excel.\n"
+            "автоуправление рекламой и автоматическая оптимизация "
+            "подключаются отдельно.\n\n"
+        )
 
         watchdog_enabled = getattr(self.adv, "auto_budget_watchdog_enabled", False)
         if not watchdog_enabled:
@@ -676,7 +716,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboard.get_adv_setting_keyboard(
-            self.wb_user_cabinet, self.adv, self.in_favorites_user
+            self.wb_user_cabinet,
+            self.adv,
+            self.in_favorites_user,
+            ui_access=self._ui_access,
         )
 
     @staticmethod
@@ -702,18 +745,29 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
     async def _resolve_emergency_mode_from_ch(
         self,
+        session: AsyncSession | None = None,
     ) -> tuple[bool, str | None, bool, str | None]:
         """Детект аварии и свежести статы по данным ClickHouse (как StatsFreshnessGuard), не по Redis.
         Returns: (emergency_active, emergency_reason, stats_fresh, stats_stale_reason)."""
         search_adv: AdvSetting | None = None
         if getattr(self.adv, "search_adv_id", None):
-            async with sm() as session:
+            if session is None:
+                async with sm(read_only=True) as read_session:
+                    result = await read_session.execute(
+                        select(AdvSetting).where(
+                            AdvSetting.adv_id == self.adv.search_adv_id
+                        )
+                    )
+            else:
                 result = await session.execute(
                     select(AdvSetting).where(AdvSetting.adv_id == self.adv.search_adv_id)
                 )
-                search_adv = result.scalar_one_or_none()
+            search_adv = result.scalar_one_or_none()
         complex_adv = ComplexAdv(self.adv, search_adv)
-        state = await StatsFreshnessManager().evaluate(complex_adv)
+        manager = getattr(self, "_stats_freshness_manager", None)
+        if manager is None:
+            manager = StatsFreshnessManager()
+        state = await manager.evaluate(complex_adv)
         if state.is_stale_over_6h:
             return True, self._guard_reason_to_display(state.reason), False, None
         if not state.is_fresh:

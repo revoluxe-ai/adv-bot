@@ -491,7 +491,7 @@ If the request touches ORM/query behavior:
 
 ## Verification
 
-Run the most focused pytest command first.
+Run the most focused pytest command first (no xdist — worker overhead on tiny suites).
 
 Example:
 
@@ -499,13 +499,20 @@ Example:
 poetry run pytest tests/path/to/test_file.py::test_specific_case -vv
 ```
 
-If useful, also provide a broader command:
+If useful, also provide a broader path command (still without `-n`):
 
 ```bash
 poetry run pytest tests/path/to/test_file.py -vv
 ```
 
+Only when the request requires the **full** unit marker suite (no path filter):
+
+```bash
+poetry run pytest -m unit -n 8 --dist=worksteal
+```
+
 Do not run unrelated slow suites unless required by the request.
+Do not apply `-n` / `--dist` to focused/adjacent/`--lf` runs by default.
 
 
 ## Bug-regression mode (RED)

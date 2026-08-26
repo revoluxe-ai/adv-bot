@@ -1,5 +1,6 @@
 import pytest
 
+from app.client_bot.const import TELEGRAM_TEXT_MESSAGE_LIMIT
 from app.client_bot.telegram_message_split import split_telegram_plain_text
 
 
@@ -9,7 +10,7 @@ def test_empty() -> None:
 
 def test_short_unchanged() -> None:
     s = "hello"
-    assert split_telegram_plain_text(s, 4096) == [s]
+    assert split_telegram_plain_text(s, TELEGRAM_TEXT_MESSAGE_LIMIT) == [s]
 
 
 def test_max_chars_invalid() -> None:

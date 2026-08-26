@@ -1,21 +1,146 @@
 ---
+component_id: opsx.commands.resolve_conflict
+component_version: 1.0.0
+ownership: TARGET_ONLY
+runtime_class: ACTIVE
+canonical_source_body: adapted_target_native
+required_adapters: ["opsx-lite", "poetry-python"]
+local_modification_note: "Unified pipeline v1 installed; whole-operation capture; authority partition; companion runtime at .cursor/opsx-resolve-conflict/"
+local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
+contract_id: OPSX-WB-RESOLVE-CONFLICT-01
+donor_occurrence_id: c0457cd10cccd552
+donor_source_id: adv-bot/implement-resolve-conflict-command
+donor_command_hash: 381ca5567ef2884e170458cf4156afbd71e7ad894b77cdaf91921b3cb5c91ef5
+donor_package_version: 0.40.0
+newline_normalization: none
 name: /opsx-resolve-conflict
 id: opsx-resolve-conflict
-package_version: 0.40.0
-contract_schema_version: opsx-resolve-conflict/v2
-status: candidate_for_independent_review
+package_version: 1.0.0
+contract_schema_version: opsx-resolve-conflict/v3
+status: active_unified_pipeline
 author: Cursor
-supported_runner: Cursor Agent with Python 3.11+ and packaged typed runtime
+supported_runner: Cursor Agent + packaged typed runtime v1
 required_capabilities:
-  - direct Python process execution without shell interpolation
-  - filesystem write access limited by frozen scope manifest
   - Git executable
-  - Poetry executable for mandatory Wave A/B validation
-  - externally attested OS sandbox runner
-  - durable user-state directory outside repository
-  - process-group cancellation
-description: "Fail-closed Git conflict resolution with applicable authority, race-safe writes, durable receipts, and mandatory Wave A/B validation."
-argument-hint: "[PREVIEW|GO] [change=<CHANGE_ID>] [store=<STORE_ID>]"
+  - Packaged typed runtime under .cursor/opsx-resolve-conflict/
+description: "Unified fail-closed Git conflict pipeline: whole-operation capture, authority partition, semantic clustering, bounded autonomous resolution, durable ledger, two-level verification."
+argument-hint: "[PREVIEW|GO|CAPTURE] [--path=PATH] [--lane=LANE] [--fingerprint=SHA] [--owner-choice=PATH=CHOICE]"
+---
+
+# TARGET OVERRIDE — HIGHEST PRIORITY
+
+**Contract:** `OPSX-WB-RESOLVE-CONFLICT-01`  
+**Runtime class:** `ACTIVE`  
+**Precedence:** This override wins for target paths, write boundary, and capability gates on this WB Sky / Poetry host.
+
+### Target install state (unified pipeline v1)
+
+- Command: `.cursor/commands/opsx-resolve-conflict.md`
+- Runtime: `.cursor/opsx-resolve-conflict/runtime/opsx_conflict/**` (v1 simplified)
+- Entry: `python .cursor/opsx_resolve_conflict_launcher.py PREVIEW|GO|CAPTURE` (stdlib launcher — **no worktree bytes**)
+- Bootstrap cache: materialized from `git show HEAD:.opsx/tools/trusted_resolver_boot.py`
+- Runtime cache: materialized from `git show HEAD:.cursor/opsx-resolve-conflict/runtime/**`
+- Legacy: `python .opsx/tools/trusted_resolver_boot.py` (only via launcher materialization)
+- Legacy: `python .cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py` (delegates to launcher)
+- Primary public conflict capability; `/opsx-admin-command-resolve-conflicts` redirects here
+
+### Pipeline stages (local — not global OPSX State)
+
+```text
+CAPTURE → PARTITION → CLASSIFY → RESOLVE → VERIFY_RESOLUTION → VERIFY_CANDIDATE → READY_FOR_CONTINUE | PAUSED | FAILED
+```
+
+### Capability remap
+
+| Capability | Target status |
+|---|---|
+| Whole-operation capture + partition | **AVAILABLE** |
+| Mixed-scope partition (no `BLOCKED_MIXED_SCOPE` dead end) | **AVAILABLE** |
+| AUTO_SAFE / AI_SEMANTIC / OWNER_REQUIRED autonomy | **AVAILABLE** (bounded) |
+| Durable resolution ledger | **AVAILABLE** |
+| Typed runtime GO + stage | **AVAILABLE** |
+| Terminal `RESOLVED_PENDING_VERIFICATION` | **AVAILABLE** |
+| Terminal `VERIFIED_READY_FOR_CONTINUE` | **AVAILABLE** (requires verification evidence packet) |
+| `git merge|rebase --continue` | **FORBIDDEN** — Owner continues out-of-band |
+| OS-attested sandbox / Wave A/B mandatory FULL | **OPTIONAL** — via `/opsx-test` after candidate |
+| Push / abort / skip / reset | **FORBIDDEN** |
+
+### Hard gates
+
+1. GO writes only unmerged paths in authorized lanes; scope expansion STOP.
+2. Sequencer continuation is never implicit; `GIT_CONTINUE=FORBIDDEN`.
+3. Evidence before semantic resolution cannot certify post-resolution candidate.
+4. Drift vs frozen fingerprint → `STALE_EXECUTION` / `REPLAN_REQUIRED`.
+
+### Runtime invocation
+
+Trusted bootstrap: stdlib launcher at `.cursor/opsx_resolve_conflict_launcher.py`
+materializes bootstrap from `git show HEAD:.opsx/tools/trusted_resolver_boot.py` into
+``~/.opsx/resolve-conflict/trusted-bootstrap/<revision>/`` — never reads conflicted
+worktree copy.
+
+Trusted runtime: cached bootstrap materializes resolver from the **same** HEAD revision
+into ``~/.opsx/resolve-conflict/trusted-runtime/<revision>/``.
+
+Trust boundary:
+
+```text
+worktree .opsx/tools/** and .cursor/opsx-resolve-conflict/** = target conflict data
+committed HEAD bootstrap + runtime = executable trusted revision
+```
+
+Root discovery: launcher resolves **current worktree root** via
+``git rev-parse --show-toplevel`` starting from invocation cwd (or ``--repo``).
+Linked worktrees with a ``.git`` **file** are valid boundaries; ascent never
+continues into a parent/common repository.
+
+Report field: ``REPO_ROOT`` = resolved worktree path.
+
+Clustering: semantic clusters may link paths across lanes for analysis, but
+``member_lanes`` per path comes from partition authority only. Mixed clusters
+have ``authority_homogeneous=false`` and no authoritative cluster ``lane``;
+GO and writes always use per-path lane.
+
+Authority policy: Owner may approve a bounded ``AUTHORITY_POLICY`` (e.g.
+TARGET contract authoritative) over compatible process paths. Covered paths
+are reclassified to AUTO_SAFE/AI_SEMANTIC only when per-path evidence proves
+compatibility; residual contradictions stay OWNER_REQUIRED. Policy is not
+blanket keep_ours/keep_theirs and never expands write scope across lanes.
+
+PREVIEW accepts ``--policy-choice POLICY_ID=CHOICE``; choices are validated
+against current ``AUTHORITY_POLICY_PACKETS``, materialized, applied, and
+reflected in ``CLASSIFIED_PATHS`` (``applied_policy_id``). Invalid choices
+fail-closed with ``POLICY_CHOICE_INVALID``.
+
+Process-lane policy (V): one ``process_lane_authority_conflict`` packet may
+cover multiple process paths across different semantic clusters when each path
+is ``lane=process``, in trusted process inventory, shares compatible authority
+divergence (not hard-stop), and does not cross into product/project_config/
+spec_governance. Cluster membership remains grouping only; policy authority is
+per path. Hard stops never absorbed: ``delete_modify_requires_owner``,
+``allowlist_gap``, architecture/business contradictions under policy, stale
+policy fingerprint/path drift (``POLICY_STALE``). Registry ``.ndjson`` under
+``.opsx/registry/`` uses bounded synthesis verification (parseable lines,
+identity-key uniqueness, target keys preserved); trivial-union bypass is
+disabled for ``.ndjson``. ``git ls-files -u`` supplements porcelain discovery
+for unmerged index stages.
+
+Provenance (machine-readable):
+
+```text
+BOOTSTRAP_SOURCE_REVISION == RUNTIME_SOURCE_REVISION == git rev-parse HEAD
+```
+
+Mismatch or missing committed bootstrap/runtime →
+``EXECUTION_CAPABILITY_OR_COMPATIBILITY_MISSING`` (fail-closed, no worktree fallback).
+
+```bash
+python .cursor/opsx_resolve_conflict_launcher.py CAPTURE --json
+python .cursor/opsx_resolve_conflict_launcher.py PREVIEW --json
+python .cursor/opsx_resolve_conflict_launcher.py PREVIEW --path=<optional-drill-down> --json
+python .cursor/opsx_resolve_conflict_launcher.py GO --fingerprint=<FP> --json
+```
+
 ---
 
 # /opsx-resolve-conflict
@@ -96,34 +221,24 @@ Parse exact tokens.
 
 Default when `GO` is absent or `PREVIEW` is present.
 
-PREVIEW is a **repository-context conflict assistant** (not an autonomous
-resolver and not a line-diff chooser). It is read-only:
+PREVIEW is a **whole-operation batch analyzer** (read-only):
 
-- analyze **exactly one** conflicted path per invocation (R40);
-- when ``--path`` is omitted and exactly one path is unmerged, analyze that path;
-- when ``--path`` is omitted and multiple paths are unmerged, STOP with
-  ``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`` (envelope lists sorted paths);
-- when ``--path`` is supplied, analyze only that unmerged path;
-- load stage 1/2/3 blobs via the sealed R34 exact Git operation grammar;
-- collect a bounded structured context packet (siblings, callers/usages,
-  tests, accepted decisions/specs) without shell/rg subprocesses;
-- separate FACTS from INTERPRETATIONS; attach evidence IDs;
-- list coherent resolution options and Owner questions;
-- recommend a side **only** when evidence has both a strong
-  `authority_class` **and** `authority_verified=true` (explicit accepted
-  status / canonical current-spec / verified contract / API invariant);
-- path location alone never proves normative authority; draft/proposed/
-  rejected/superseded decisions and change-local specs do not recommend;
-- never recommend `keep_ours`/`keep_theirs` from textual subset alone;
+- default: capture and classify **all** unmerged paths in the active merge/rebase;
+- optional ``--path`` = drill-down detail for one path inside the same manifest;
+- never require Owner to pick a first path when multiple conflicts exist;
+- load stage 1/2/3 blobs via typed Git capture;
+- partition authority lanes, cluster semantically, classify AUTO_SAFE / AI_SEMANTIC / OWNER_REQUIRED;
 - never edit, stage, continue, abort, skip, commit, or push.
 
-Successful PREVIEW reports bind ``CURRENT_CONFLICT.path``,
-``CONTEXT.paths_analyzed``, reasoning, evidence, and recommendation to the
-selected path only. ``unmerged_paths_inventory`` / ``all_unmerged_paths`` are
-inventory, not analysis coverage.
+Forbidden stop for multi-path default PREVIEW:
 
-Human output leads with Russian behavioral explanation; Git OIDs/hashes are
-secondary evidence below.
+```text
+PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS
+```
+
+``unmerged_paths_inventory`` / ``PATH_INVENTORY`` list all paths; ``--path`` only adds ``PATH_DETAIL`` without shrinking capture scope.
+
+Human output leads with Russian behavioral explanation; Git OIDs/hashes are secondary evidence below.
 
 ### GO
 
@@ -352,6 +467,8 @@ Also forbidden:
 - arbitrary wrapper/script execution;
 - modification of tests to fit the selected implementation;
 - modification of non-conflicted files;
+- editing staged or auto-merged paths that are not themselves unmerged (`UU`),
+  including `tests/**`, to make post-resolution checks pass;
 - staging rollback through `git restore --staged`;
 - automatic cleanup or deletion of recovery evidence.
 
@@ -789,6 +906,10 @@ required tests
 
 Autonomous writes are limited to conflicted paths already in this manifest.
 
+Staged or auto-merged files from the replayed/merged commit remain **out of
+scope** unless they are themselves unmerged (`UU`). A failing test in such a
+file after resolving a different path is **not** authorization to edit it here.
+
 Do not modify:
 
 - non-conflicted production callers;
@@ -870,6 +991,27 @@ Reject evidence that:
 Tests run only in the validation snapshot. If faithful validation requires
 the original `.git`, network, credentials, PG/CH live service, or production
 access, STOP when that check is mandatory.
+
+### TEST_FAILURE_HANDLING (mandatory)
+
+Conflict resolution scope is **unmerged paths only**.
+
+On mandatory test or static-check failure after a scoped resolution:
+
+```text
+STATUS=STOP_FOR_OWNER
+STOP_REASON=POST_RESOLUTION_TEST_FAILURE
+```
+
+Rules:
+
+- **Never** modify `tests/**` (or any non-unmerged path) to green the suite.
+- **Never** start an agent pytest/pyright repair loop under this command.
+- Report failing check ids/argv to Owner; hand off to `/opsx-test` or a
+  separate Owner-authorized fix workflow.
+- Packaged GO: failure blocks staging/terminal success (see §16–§17).
+- PREVIEW / manual Owner path: failure is informational only; Owner owns
+  follow-up outside this command.
 
 ## 16. Current-step staging gate (no sequencer continue)
 
@@ -1022,8 +1164,8 @@ CONTEXT_EVIDENCE=
 CONTRACT_SIGNAL=
 OWNER_DECISION_REQUIRED=
 RECOMMENDATION=null|<option_id with evidence_refs>
-NEXT_ACTION=Owner verifies analysis, edits files manually, accepts responsibility
-DO_NOT_DO_YET=edit-by-runtime, stage, continue, abort, skip, commit, push, GO
+NEXT_ACTION=Owner verifies analysis, edits only the analyzed unmerged path manually, accepts responsibility
+DO_NOT_DO_YET=edit-by-runtime, edit-tests, pytest-repair-loop, fix-staged-non-conflicted-files, stage, continue, abort, skip, commit, push, GO
 ```
 
 ## 21. Success output
@@ -1182,5 +1324,41 @@ valid signature is always STOP. Signature errors are typed
 Ambient path+digest alone is **not** a trust root. `MANIFEST.json` /
 `host_frozen_contracts` detect host drift only and **cannot** mint producer
 trust. Without OS pubkey + valid signature: always
-`STOP_AUTHORITY_UNPROVEN` / `BLOCKER_AUTHORITY_PRODUCER_MISSING`.
-
+`STOP_AUTHORITY_UNPROVEN` / `BLOCKER_AUTHORITY_PRODUCER_MISSING`.package_version: 0.40.0
+contract_schema_version: opsx-resolve-conflict/v2
+status: candidate_for_independent_review
+supported_runner: Cursor Agent with Python 3.11+ and packaged typed runtime
+  - direct Python process execution without shell interpolation
+  - filesystem write access limited by frozen scope manifest
+  - Poetry executable for mandatory Wave A/B validation
+  - externally attested OS sandbox runner
+  - durable user-state directory outside repository
+  - process-group cancellation
+description: "Fail-closed Git conflict resolution with applicable authority, race-safe writes, durable receipts, and mandatory Wave A/B validation."
+argument-hint: "[PREVIEW|GO] [change=<CHANGE_ID>] [store=<STORE_ID>]"
+PREVIEW is a **repository-context conflict assistant** (not an autonomous
+resolver and not a line-diff chooser). It is read-only:
+- analyze **exactly one** conflicted path per invocation (R40);
+- when ``--path`` is omitted and exactly one path is unmerged, analyze that path;
+- when ``--path`` is omitted and multiple paths are unmerged, STOP with
+  ``PREVIEW_PATH_REQUIRED_MULTIPLE_CONFLICTS`` (envelope lists sorted paths);
+- when ``--path`` is supplied, analyze only that unmerged path;
+- load stage 1/2/3 blobs via the sealed R34 exact Git operation grammar;
+- collect a bounded structured context packet (siblings, callers/usages,
+  tests, accepted decisions/specs) without shell/rg subprocesses;
+- separate FACTS from INTERPRETATIONS; attach evidence IDs;
+- list coherent resolution options and Owner questions;
+- recommend a side **only** when evidence has both a strong
+  `authority_class` **and** `authority_verified=true` (explicit accepted
+  status / canonical current-spec / verified contract / API invariant);
+- path location alone never proves normative authority; draft/proposed/
+  rejected/superseded decisions and change-local specs do not recommend;
+- never recommend `keep_ours`/`keep_theirs` from textual subset alone;
+Successful PREVIEW reports bind ``CURRENT_CONFLICT.path``,
+``CONTEXT.paths_analyzed``, reasoning, evidence, and recommendation to the
+selected path only. ``unmerged_paths_inventory`` / ``all_unmerged_paths`` are
+inventory, not analysis coverage.
+Human output leads with Russian behavioral explanation; Git OIDs/hashes are
+secondary evidence below.
+NEXT_ACTION=Owner verifies analysis, edits files manually, accepts responsibility
+DO_NOT_DO_YET=edit-by-runtime, stage, continue, abort, skip, commit, push, GO

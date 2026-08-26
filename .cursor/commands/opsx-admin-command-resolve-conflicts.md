@@ -1,9 +1,82 @@
 ---
-name: /opsx-admin-command-resolve-conflicts
-id: opsx-admin-command-resolve-conflicts
-category: Workflow
-description: "Plan (READ_ONLY) or apply (GO) semantic git conflict resolution on OPSX allowlist surfaces; finish merge/rebase continue"
+component_id: opsx.commands.admin_command_resolve_conflicts
+component_version: 0.1.0
+ownership: TARGET_ONLY
+runtime_class: REDIRECT
+canonical_source_body: compatibility_redirect
+local_modification_note: "Compatibility redirect to /opsx-resolve-conflict unified pipeline; process lane policy retained as adapter"
+description: "REDIRECT: use /opsx-resolve-conflict unified pipeline; process lane via --lane=process"
 argument-hint: "GO [optional topic] | ABORT_MERGE GO | ABORT_REBASE GO"
+---
+
+# TARGET OVERRIDE — HIGHEST PRIORITY
+
+**Contract:** `OPSX-WB-ADMIN-RESOLVE-CONFLICTS-01`  
+**Runtime class:** `REDIRECT`  
+**Precedence:** This override wins for target paths, write boundary, and bans.
+
+### Purpose (target) — COMPATIBILITY REDIRECT
+
+**This command redirects to `/opsx-resolve-conflict`** (unified pipeline).
+Process-surface allowlist semantics are implemented as the `process` authority
+lane policy inside `.cursor/opsx-resolve-conflict/runtime/opsx_conflict/process_policy.py`.
+
+For conflict resolution use:
+
+```text
+/opsx-resolve-conflict PREVIEW
+/opsx-resolve-conflict GO --lane=process
+```
+
+Legacy `BLOCKED_MIXED_SCOPE` is **superseded** by authority partition.
+Mixed process + product conflicts partition into lanes; safe lanes proceed
+while Owner-required lanes pause.
+
+Sequencer continuation (`merge|rebase --continue`) remains Owner out-of-band
+after `STATUS: READY_FOR_CONTINUE` from unified pipeline.
+
+### Historical role (retained as policy reference)
+
+Exclusive owner of **git conflict resolution** on OPSX allowlist process surfaces
+in this WB Sky / Poetry Python repo. Plan without `GO`; apply + `git add` +
+merge|rebase `--continue` only with exact `GO`.
+
+### Distinct from `/opsx-resolve-conflict`
+
+| Command | Role |
+|---|---|
+| `/opsx-admin-command-resolve-conflicts` | Allowlist conflict inventory, semantic merge, finish sequencer |
+| `/opsx-resolve-conflict` | Heavy fail-closed runtime resolver; GO blocked without package; no sequencer continue |
+
+### Target remaps
+
+- Unclear admin routing → `/opsx-meta-consult` (not donor `opsx-admin-command-consult`).
+- Python `graph_fingerprint` / `INVENTORY.json` guard: **conditional** — run only
+  when META `inventory_path`, attestation fields, and `graph_fingerprint` runtime
+  all exist; lite target without runtime → skip guard; do not FAIL_CLOSED on
+  absent Python harness unless GO rewrote attestation without runtime.
+- Poetry/python runtime for fingerprint guard when present:
+  `poetry run python -c "..."` or `python -c "..."` from repo root.
+
+### Hard target bans
+
+- No push / force-push / `reset --hard` / `clean -fd`.
+- No product / hard_exclude path resolution.
+- No game/Vue/`vue-npm` / `npm run build` assumptions from donor forks.
+- No kubectl / production / secrets.
+- Do not install dependencies / modify `package.json`, Poetry lock, or `pyproject.toml`.
+
+### Projectization gate
+
+Read `.opsx/projectization.yaml` before any run.
+If `status` != `COMPLETE` or `normal_commands_enabled` is false:
+
+```text
+STATUS: FAIL_CLOSED
+REASON: OPSX_PROJECTIZATION_REQUIRED
+NEXT_COMMAND: /opsx-projectize
+```
+
 ---
 
 # /opsx-admin-command-resolve-conflicts
@@ -75,7 +148,7 @@ $ARGUMENTS
 - Contract defect after a clean merge → `/opsx-meta-fix-command-defects`.
 - Day-to-day navigation → `/opsx-pipeline`.
 - Unclear which admin command applies (no conflict evidence) →
-  `/opsx-admin-command-consult`.
+  `/opsx-meta-consult`.
 
 ## In-scope surfaces (exclusive write/resolve)
 
@@ -269,30 +342,22 @@ Then:
 
 1. Write resolved content for each planned Class (A) path (no conflict
    markers left).
-2. **Pipeline fingerprint ↔ inventory guard (mandatory when triggered):**
-   If this GO touched `.cursor/pipeline/META.md` and/or GRAPH inventory
-   attestation fields (`inventory_count`, `source_fingerprint`,
-   `fingerprint_*`, `inventory_content_sha256`, or notes claiming a
-   recomputed fingerprint), then **before** `git add`:
-   - From repo root, put runtime on `sys.path` (same as META
-     `reproduction_command`):
-     ```bash
-     python -c "import sys; sys.path.insert(0,'.cursor/pipeline/bug-team/runtime'); from pathlib import Path; from graph_fingerprint import write_inventory, reproduce; inv_path=Path('.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json'); payload=write_inventory(inv_path); count, fp = reproduce(); assert count == payload['INVENTORY_COUNT'] and fp == payload['FINGERPRINT']"
-     ```
-     Substitute META `inventory_path` for the default
-     `.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json` when
-     non-default.
-   - Align META `inventory_count` / `source_fingerprint` /
-     `inventory_content_sha256` from `payload` and `(count, fp)` from
-     `reproduce()`.
-   - Include the regenerated `INVENTORY.json` among in-scope paths to add.
-   - Optional full META+GRAPH+INVENTORY refresh when this GO also rewrites
-     GRAPH/META attestation prose: run
-     `python .cursor/pipeline/bug-team/harness/update_graph_fingerprint.py`
-     after `sys.path.insert(0,'.cursor/pipeline/bug-team/runtime')` (see
-     harness `__main__` block).
-   Do **not** claim `RESOLVED` while `inventory_path` disagrees with
+2. **Pipeline fingerprint ↔ inventory guard (conditional — target lite):**
+   Trigger only when this GO touched `.cursor/pipeline/META.md` and/or GRAPH
+   attestation fields (`inventory_count`, `source_fingerprint`, `fingerprint_*`,
+   `inventory_content_sha256`, or notes claiming a recomputed fingerprint).
+
+   **Runtime present** (META `reproduction_command` import path exists on disk):
+   before `git add`, run donor guard — put runtime on `sys.path`, run
+   `write_inventory` / `reproduce()`, align META attestation, optionally
+   `update_graph_fingerprint.py`; include regenerated `INVENTORY.json` in paths
+   to add. Do **not** claim `RESOLVED` while `inventory_path` disagrees with
    `reproduce()` or META attestation.
+
+   **Runtime absent** (WB lite — no `graph_fingerprint` module): if GO did
+   not touch META/GRAPH attestation → skip this step. If GO rewrote attestation
+   without runtime → `CONTRACT_BROKEN_AFTER_MERGE`;
+   `NEXT_ACTION: /opsx-meta-fix-command-defects`.
 3. `git add -- <in-scope-resolved-paths>` only (Class A only).
 4. Re-check `git status --short`: no `U` paths remain.
 5. If merge in progress → `git merge --continue` (non-interactive; if the
@@ -300,13 +365,11 @@ Then:
    conflict resolution — do not invent product behavior claims).
 6. If rebase in progress → `git rebase --continue` under the same rules.
 7. Contract recheck (bounded): skim changed command handoff/ownership
-   tokens for dual-authority or producer-without-consumer; **and** verify
-   `inventory_path` count/fingerprint/`INVENTORY_CONTENT_SHA256` agree with
-   META attestation and `reproduce()` (via META `reproduction_command`
-   import path) when META/GRAPH
-   attestation was in scope for this GO (or when those files are dirty).
-   If broken → `CONTRACT_BROKEN_AFTER_MERGE` and `NEXT_ACTION` =
-   `/opsx-meta-fix-command-defects`.
+   tokens for dual-authority or producer-without-consumer; when
+   `graph_fingerprint` runtime exists, verify `inventory_path` /
+   `INVENTORY_CONTENT_SHA256` agree with META attestation and `reproduce()`.
+   If broken (or attestation rewritten without runtime) →
+   `CONTRACT_BROKEN_AFTER_MERGE`; `NEXT_ACTION: /opsx-meta-fix-command-defects`.
 8. If tree still has ordinary (non-conflict) process dirt →
    `NEXT_ACTION: /opsx-meta-commit`.
 9. Never `git push`, `rebase` onto remote as a new op, `reset --hard`,
@@ -331,8 +394,8 @@ Never:
   product paths;
 - claim `RESOLVED` while unmerged paths remain;
 - claim `RESOLVED` while META/GRAPH fingerprint attestation disagrees with
-  `inventory_path` / `reproduce()` (via META `reproduction_command` import
-  path);
+  `inventory_path` / `reproduce()` when runtime exists, or while attestation
+  was rewritten without available runtime;
 - treat Class (B) as `BLOCKED_MIXED_SCOPE` or redirect Class (B) to
   `/opsx-commit`;
 - treat abort as success without `ABORT_* GO`;
@@ -401,7 +464,7 @@ Class (B) paths.
 
 | Condition | Behavior |
 |---|---|
-| No conflicts / not in merge|rebase | `PLAN_READY` or short no-op; redirect commit if dirty |
+| No conflicts / not in merge\|rebase | `PLAN_READY` or short no-op; redirect commit if dirty |
 | Missing Owner choices (and no Class B UU) | `BLOCKED_OWNER`; no writes |
 | Class (B) UU present (alone or with Class A) | `ALLOWLIST_GAP` only (never `PLAN_READY`); Class (A) drafts allowed in body; `FINISH_OP: none`; no resolve/add of Class B; hand off allowlist fix (not `GO`) |
 | Class (C) + Class (A) unmerged together | `BLOCKED_MIXED_SCOPE`; no allowlist apply until product UU cleared |
@@ -418,4 +481,39 @@ Class (B) paths.
 - [ ] No push / force-push / hard reset / clean -fd
 - [ ] Unmerged paths cleared before claiming `RESOLVED`
 - [ ] NEXT_ACTION pasteable and single
-- [ ] admin-commit / fix-defects / create-pr not stolen
+- [ ] admin-commit / fix-defects / create-pr not stolenname: /opsx-admin-command-resolve-conflicts
+id: opsx-admin-command-resolve-conflicts
+category: Workflow
+description: "Plan (READ_ONLY) or apply (GO) semantic git conflict resolution on OPSX allowlist surfaces; finish merge/rebase continue"
+  `/opsx-admin-command-consult`.
+2. **Pipeline fingerprint ↔ inventory guard (mandatory when triggered):**
+   If this GO touched `.cursor/pipeline/META.md` and/or GRAPH inventory
+   attestation fields (`inventory_count`, `source_fingerprint`,
+   `fingerprint_*`, `inventory_content_sha256`, or notes claiming a
+   recomputed fingerprint), then **before** `git add`:
+   - From repo root, put runtime on `sys.path` (same as META
+     `reproduction_command`):
+     python -c "import sys; sys.path.insert(0,'.cursor/pipeline/bug-team/runtime'); from pathlib import Path; from graph_fingerprint import write_inventory, reproduce; inv_path=Path('.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json'); payload=write_inventory(inv_path); count, fp = reproduce(); assert count == payload['INVENTORY_COUNT'] and fp == payload['FINGERPRINT']"
+     Substitute META `inventory_path` for the default
+     `.cursor/pipeline/bug-team/controlled-tests/INVENTORY.json` when
+     non-default.
+   - Align META `inventory_count` / `source_fingerprint` /
+     `inventory_content_sha256` from `payload` and `(count, fp)` from
+     `reproduce()`.
+   - Include the regenerated `INVENTORY.json` among in-scope paths to add.
+   - Optional full META+GRAPH+INVENTORY refresh when this GO also rewrites
+     GRAPH/META attestation prose: run
+     `python .cursor/pipeline/bug-team/harness/update_graph_fingerprint.py`
+     after `sys.path.insert(0,'.cursor/pipeline/bug-team/runtime')` (see
+     harness `__main__` block).
+   Do **not** claim `RESOLVED` while `inventory_path` disagrees with
+   tokens for dual-authority or producer-without-consumer; **and** verify
+   `inventory_path` count/fingerprint/`INVENTORY_CONTENT_SHA256` agree with
+   META attestation and `reproduce()` (via META `reproduction_command`
+   import path) when META/GRAPH
+   attestation was in scope for this GO (or when those files are dirty).
+   If broken → `CONTRACT_BROKEN_AFTER_MERGE` and `NEXT_ACTION` =
+   `/opsx-meta-fix-command-defects`.
+  `inventory_path` / `reproduce()` (via META `reproduction_command` import
+  path);
+| No conflicts / not in merge|rebase | `PLAN_READY` or short no-op; redirect commit if dirty |

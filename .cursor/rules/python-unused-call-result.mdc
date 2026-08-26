@@ -1,0 +1,76 @@
+---
+description: Неиспользуемый результат вызова — `_ =` только для non-None return
+globs: ["**/*.py", "app/**/*.py", "tests/**/*.py", "scripts/**/*.py"]
+alwaysApply: true
+---
+# Неиспользуемый результат вызова (`_ =`)
+
+## Контекст применения
+
+Python-код проекта (`app/`, `tests/`, scripts). Механический gate:
+pyright `reportUnusedCallResult` (см. `pyrightconfig.json`). Согласовано с
+mypy `[func-returns-value]`.
+
+## Основной принцип
+
+Если функция или метод **возвращает значение** (typed return ≠ `None`), а
+вызывающий код его **намеренно не использует**, результат нужно явно
+отбросить:
+
+```python
+_ = await bot.send_message(chat_id, "ok")  # -> Message
+_ = await message.answer("ok")  # -> Message
+```
+
+Не оставлять «голый» вызов с отбрасываемым non-None return:
+
+```python
+# плохо — reportUnusedCallResult
+await bot.send_message(chat_id, "ok")
+message.answer("ok")
+```
+
+Если значение нужно — присваивать осмысленному имени и использовать его.
+`_ =` только для осознанного discard side-effect / fire-and-forget API,
+когда у вызова есть возвращаемое значение.
+
+## `-> None` / «only ever returns None»
+
+Если callee typed как `-> None` (или mypy считает, что функция only ever
+returns None), **не** пишите `_ =`:
+
+```python
+# хорошо — bare call / await
+await state.set_state(None)
+await messages.AdvCompanyChoicing(...)()
+await _reload_adv_setting_menu(...)
+```
+
+```python
+# плохо — mypy [func-returns-value]
+_ = await state.set_state(None)
+_ = await messages.AdvCompanyChoicing(...)()
+```
+
+Не делать blanket `_ = await …` на все side-effect вызовы «на всякий случай».
+
+## Dual-tool matrix
+
+| Ситуация | Fix |
+|---|---|
+| pyright `reportUnusedCallResult` (non-None return unused) | `_ = <call>` или использовать return |
+| mypy `[func-returns-value]` на `_ = await f()` / `_ = f()` где `f` → None | убрать `_ =`, оставить bare call |
+| return критичен для корректности | читать return, не discard |
+
+## Связь с gate
+
+- `pyrightconfig.json`: `"reportUnusedCallResult": "error"`.
+- При type-fix следовать matrix выше (см. `/opsx-fix-types`).
+- Не ослаблять `reportUnusedCallResult` и не снимать правило `_ =` для
+  non-None returns.
+
+## Ограничения
+
+- Не подменять `_ =` игнором ошибок (`try/except` / `# type: ignore`) без причины.
+- Не путать с неиспользуемыми локальными переменными (`F841`) — это отдельное правило.
+- Не менять смысл API: если return критичен для корректности, его нужно читать, а не глушить через `_`.

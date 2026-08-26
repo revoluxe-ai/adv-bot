@@ -231,6 +231,6 @@ async def test_change_adv_strategy_keeps_active_hold_campaigns() -> None:
         raw = CoroutinesManager.change_adv_strategy
         fn = getattr(raw, "__wrapped__", None)
         assert fn is not None
-        await fn(mgr)
+        await fn(mgr, only_bot_active=True)
 
     assert resolved == [1, 2]

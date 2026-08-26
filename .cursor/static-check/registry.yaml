@@ -1,40 +1,101 @@
 # Static-check registry — source of truth for /opsx-static-check
 # Add a check: create checks/<id>/*, then a row here.
-# Launch: Task tool with task_type (Cursor Task enum). Never use custom agent names.
+# Launch: see default_launch below. Never use custom agent names.
+#
+# Pytest cascade (hard stop: FAIL|BLOCKED|ERROR → later pytest waves SKIPPED):
+#   targeted → unit → integration → (FULL only) destructive_local
+# FAST never schedules pytest-destructive. Do not run bare `poetry run pytest`.
 
 version: 1
+
+# Default launch eliminates Cursor Task mid-flight turn ends («Wave A in flight»).
+# Owner may opt into nested Task fan-out with exact token PARALLEL_TASKS.
+default_launch: SERIAL_ORCHESTRATOR
+# SERIAL_ORCHESTRATOR: orchestrator Shell runs every check via run.sh in cascade
+#   order (no nested Task). task_type below is ignored except as documentation
+#   of preferred worker class when PARALLEL_TASKS is set.
+# PARALLEL_TASKS: honor task_type + wave parallel flags (legacy fan-out).
+
+# Optional resume profile for retries:
+# FROM_WAVE=U allows skipping Wave A only when the caller provides
+# A_REUSE_FINGERPRINT=<id> and orchestration evidence confirms
+# pyright-strict+mypy+pytest-targeted PASS for the same fingerprint.
+resume_profiles:
+  FROM_WAVE_U:
+    start_wave: U
+    requires:
+      - A_REUSE_FINGERPRINT
+      - prior_wave_A_pass_for_same_fingerprint
+    skipped_checks:
+      - pyright-strict
+      - mypy
+      - pytest-targeted
 
 modes:
   FAST:
     waves:
       - id: A
-        parallel: true
-        checks: [pyright-strict, mypy, pytest-unit]
-  FULL:
-    waves:
-      - id: A
-        parallel: true
-        checks: [pyright-strict, mypy, pytest-unit]
-      - id: B
+        parallel: false
+        checks: [pyright-strict, mypy, pytest-targeted]
+        note: "SERIAL default: sequential orchestrator Shell. PARALLEL_TASKS may set parallel=true."
+      - id: U
+        parallel: false
+        after: [pytest-targeted]
+        require_status: PASS
+        checks: [pytest-unit]
+        note: "Start pytest-unit only if pytest-targeted STATUS=PASS. Never parallel with targeted. Hygiene + xdist INFRA retry + non-xdist fallback classifier per pytest-unit pack."
+      - id: I
         parallel: false
         after: [pytest-unit]
         require_status: PASS
-        checks: [pytest-full]
-        note: "Start pytest-full only if pytest-unit STATUS=PASS. Never parallel with unit."
+        checks: [pytest-integration]
+        note: "Start pytest-integration only if pytest-unit STATUS=PASS."
+  FULL:
+    waves:
+      - id: A
+        parallel: false
+        checks: [pyright-strict, mypy, pytest-targeted]
+        note: "SERIAL default: sequential orchestrator Shell. PARALLEL_TASKS may set parallel=true."
+      - id: U
+        parallel: false
+        after: [pytest-targeted]
+        require_status: PASS
+        checks: [pytest-unit]
+        note: "Start pytest-unit only if pytest-targeted STATUS=PASS. Never parallel with targeted. Hygiene + xdist INFRA retry + non-xdist fallback classifier per pytest-unit pack."
+      - id: I
+        parallel: false
+        after: [pytest-unit]
+        require_status: PASS
+        checks: [pytest-integration]
+        note: "Start pytest-integration only if pytest-unit STATUS=PASS."
+      - id: D
+        parallel: false
+        after: [pytest-integration]
+        require_status: PASS
+        checks: [pytest-destructive]
+        note: "FULL only. Start pytest-destructive only if pytest-integration STATUS=PASS. Requires ALLOW_* + docker-compose.test.yml."
 
 checks:
+  # task_type used ONLY when Owner passes PARALLEL_TASKS.
+  # Under default SERIAL_ORCHESTRATOR all checks are orchestrator Shell.
   pyright-strict:
     task_type: shell
     pack: .cursor/static-check/checks/pyright-strict
   mypy:
     task_type: shell
     pack: .cursor/static-check/checks/mypy
+  pytest-targeted:
+    task_type: shell
+    pack: .cursor/static-check/checks/pytest-targeted
   pytest-unit:
-    task_type: shell
+    task_type: orchestrator
     pack: .cursor/static-check/checks/pytest-unit
-  pytest-full:
-    task_type: shell
-    pack: .cursor/static-check/checks/pytest-full
+  pytest-integration:
+    task_type: generalPurpose
+    pack: .cursor/static-check/checks/pytest-integration
+  pytest-destructive:
+    task_type: generalPurpose
+    pack: .cursor/static-check/checks/pytest-destructive
 
 shared_load:
   - .cursor/static-check/base/worker-rules.md

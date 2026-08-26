@@ -255,7 +255,7 @@ async def test_coroutines_manager_adv_settings_auto_update_calls_each_fresh_adv(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     assert process_mock.await_count == 2
 
@@ -356,7 +356,7 @@ async def test_adv_settings_auto_update_stats_freshness_gate_skips_stale_hit(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     assert process_mock.await_count == 1
     called = process_mock.call_args[0][0]
@@ -445,6 +445,6 @@ async def test_adv_settings_auto_update_stats_freshness_gate_fail_open_on_miss_o
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     assert process_mock.await_count == 2

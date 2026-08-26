@@ -1,19 +1,51 @@
+"""Destructive PG-тесты toggle individual_keywords_target_place_mode.
+
+Enable-path вызывает latch-backed Pricer; изолируем leg_latch от
+process-global ``get_redis_client()`` singleton (order-dependent event loop).
+"""
+
+from __future__ import annotations
+
 import uuid
-from datetime import datetime, timedelta
+from collections.abc import Iterator
+from contextlib import contextmanager
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.user_interface.handlers.individual_keywords_target_place_toggle import (
     toggle_individual_keywords_target_place,
 )
+from app.modules.billing.leg_latch import LegLatchManager
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 pytestmark = pytest.mark.destructive_local
+
+
+@contextmanager
+def _isolated_leg_latch_patch() -> Iterator[LegLatchManager]:
+    """Подменить latch-backed preview на FakeRedis вместо live singleton."""
+    latch = LegLatchManager(FakeRedis())
+    fixed_utc = datetime.now(timezone.utc).date()
+
+    def _resolve(
+        *,
+        leg_latch: LegLatchManager | None = None,
+        utc_date: date | None = None,
+    ) -> tuple[LegLatchManager, date]:
+        return latch, utc_date or fixed_utc
+
+    with patch(
+        "app.modules.billing.pricer.pricer.resolve_tariff_preview_latch_context",
+        side_effect=_resolve,
+    ):
+        yield latch
 def _make_callback(adv_id: int, new_status: bool) -> tuple[SimpleNamespace, SimpleNamespace]:
     callback_query = SimpleNamespace(
         message=SimpleNamespace(chat=SimpleNamespace(id=42))
@@ -98,12 +130,16 @@ async def test_toggle_requires_balance(async_session: AsyncSession):
     async def _fake_balance(_cabinet_id: int) -> tuple[float, float]:
         return (0.0, 0.0)
 
-    with patch(
-        "app.client_bot.user_interface.handlers.individual_keywords_target_place_toggle.sm",
-        mock_sm,
-    ), patch(
-        "app.modules.billing.paid_option_check.balance_manager.get_cabinet_balance_and_bonuses",
-        _fake_balance,
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.individual_keywords_target_place_toggle.sm",
+            mock_sm,
+        ),
+        patch(
+            "app.modules.billing.paid_option_check.balance_manager.get_cabinet_balance_and_bonuses",
+            _fake_balance,
+        ),
+        _isolated_leg_latch_patch(),
     ):
         await toggle_individual_keywords_target_place(callback_query, callback_data, bot)
 
@@ -128,12 +164,16 @@ async def test_toggle_enables_when_balance_sufficient(async_session: AsyncSessio
     async def _fake_balance(_cabinet_id: int) -> tuple[float, float]:
         return (10000.0, 0.0)
 
-    with patch(
-        "app.client_bot.user_interface.handlers.individual_keywords_target_place_toggle.sm",
-        mock_sm,
-    ), patch(
-        "app.modules.billing.paid_option_check.balance_manager.get_cabinet_balance_and_bonuses",
-        _fake_balance,
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.individual_keywords_target_place_toggle.sm",
+            mock_sm,
+        ),
+        patch(
+            "app.modules.billing.paid_option_check.balance_manager.get_cabinet_balance_and_bonuses",
+            _fake_balance,
+        ),
+        _isolated_leg_latch_patch(),
     ):
         await toggle_individual_keywords_target_place(callback_query, callback_data, bot)
 

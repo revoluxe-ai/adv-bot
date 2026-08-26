@@ -5,7 +5,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.enums import (
+    KeywordStrategyMode,
+    campaign_strategy_to_keyword_strategy_mode,
+)
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import (
     is_v3_campaign,
@@ -23,6 +26,7 @@ from app.modules.shop_runner.service_manager.services.v3_status_mode_sync import
     ("adv_strategy", "expected"),
     [
         (Strategy.MIN_CPO, KeywordStrategyMode.MIN_CPA),
+        (Strategy.OPTIMUM, KeywordStrategyMode.OPTIMUM),
         (Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
         (None, KeywordStrategyMode.MIN_CPA),
     ],
@@ -36,13 +40,32 @@ def test_keyword_strategy_mode_for_adv_strategy(
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
+    ("adv_strategy", "expected"),
+    [
+        (Strategy.MIN_CPO, KeywordStrategyMode.MIN_CPA),
+        (Strategy.OPTIMUM, KeywordStrategyMode.OPTIMUM),
+        (Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
+        (None, KeywordStrategyMode.MIN_CPA),
+    ],
+)
+def test_campaign_strategy_to_keyword_strategy_mode(
+    adv_strategy: Strategy | None,
+    expected: KeywordStrategyMode,
+) -> None:
+    assert campaign_strategy_to_keyword_strategy_mode(adv_strategy) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
     ("hard_status", "adv_strategy", "expected"),
     [
         (0, None, KeywordStrategyMode.OFF),
         (1, Strategy.MAX_CONV, KeywordStrategyMode.OFF),
         (2, Strategy.MIN_CPO, KeywordStrategyMode.MIN_CPA),
+        (2, Strategy.OPTIMUM, KeywordStrategyMode.OPTIMUM),
         (2, Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
         (3, None, KeywordStrategyMode.OFF),
+        (4, Strategy.OPTIMUM, KeywordStrategyMode.OPTIMUM),
         (4, Strategy.MAX_CONV, KeywordStrategyMode.MAX_CONVERSION),
     ],
 )
@@ -78,6 +101,7 @@ def test_is_v3_campaign_only_for_version_three() -> None:
         (2, KeywordStrategyMode.MAX_CONVERSION, None, True),
         (2, KeywordStrategyMode.OFF, None, False),
         (4, KeywordStrategyMode.MIN_CPA, Strategy.MIN_CPO, True),
+        (4, KeywordStrategyMode.OPTIMUM, Strategy.OPTIMUM, True),
         (4, KeywordStrategyMode.MAX_CONVERSION, Strategy.MAX_CONV, True),
         (4, KeywordStrategyMode.MIN_CPA, Strategy.MAX_CONV, False),
         (4, KeywordStrategyMode.OPTIMUM, Strategy.MAX_CONV, False),
@@ -131,6 +155,18 @@ def test_repaired_strategy_mode_for_v3_fixes_fixed_to_max_conv() -> None:
             adv_strategy=Strategy.MAX_CONV,
         )
         == KeywordStrategyMode.MAX_CONVERSION
+    )
+
+
+@pytest.mark.unit
+def test_repaired_strategy_mode_for_v3_fixes_fixed_to_optimum() -> None:
+    assert (
+        repaired_strategy_mode_for_v3(
+            hard_status=4,
+            strategy_mode=KeywordStrategyMode.MIN_CPA,
+            adv_strategy=Strategy.OPTIMUM,
+        )
+        == KeywordStrategyMode.OPTIMUM
     )
 
 
@@ -208,6 +244,22 @@ def test_sync_white_list_uses_adv_strategy_max_conv() -> None:
     )
     assert changed is True
     assert keyword_setting.strategy_mode == KeywordStrategyMode.MAX_CONVERSION
+
+
+@pytest.mark.unit
+def test_sync_fixed_uses_adv_strategy_optimum() -> None:
+    keyword_setting = SimpleNamespace(
+        hard_status=4,
+        strategy_mode=KeywordStrategyMode.OFF,
+    )
+    changed = sync_keyword_setting_mode_for_v3(
+        keyword_setting,
+        automatic_version=3,
+        hard_status_override=4,
+        adv_strategy=Strategy.OPTIMUM,
+    )
+    assert changed is True
+    assert keyword_setting.strategy_mode == KeywordStrategyMode.OPTIMUM
 
 
 @pytest.mark.unit

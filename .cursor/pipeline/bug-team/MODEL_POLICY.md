@@ -1,16 +1,19 @@
-# Model selection policy (Candidate)
+# Model selection policy
+
+Authority: `.cursor/pipeline/shared/MODEL_DISPATCH.md`
 
 ```text
-MODEL_SELECTION_POLICY: auto
+MODEL_SELECTION_POLICY: inherit
 IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
-RUNTIME_STATUS: NOT_ACTIVE
+RUNTIME_STATUS: ACTIVE
 ```
 
 ## Rules
 
-1. Cursor Task / subagents: **model inherit only** — never pass explicit
-   model IDs (Claude, GPT, Sonnet, etc.).
-2. Cursor CLI sessions created by the orchestrator: Cursor Auto / default
+1. Cursor Task / subagents: **`model: inherit`** explicitly — never omit
+   `model`, never `auto`, never explicit API slugs under interim Owner policy.
+2. Cursor CLI sessions created by the orchestrator: inherit parent chat model
    only — never `--model`, never API key overrides for this pipeline.
-3. An Auto-routed effective backend name is not a policy violation.
-4. Do not pin a vendor model in registry entries or checkpoints.
+3. Do not pin a vendor model slug in registry entries or checkpoints.
+4. Owner `MODEL=<slug>` override — deferred; when enabled, slug must match
+   `MODEL_REGISTRY.json`.

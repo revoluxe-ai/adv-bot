@@ -18,7 +18,6 @@ from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard
     automatic_version_main_menu_button,
     build_automatic_version_submenu_markup,
     normalize_automatic_version_ui,
-    show_if,
 )
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard.v3_rollout_aggressiveness_ui import (
     V3RolloutAggMenuOpen,
@@ -113,3 +112,56 @@ def test_v3_rollout_submenu_three_levels_and_back() -> None:
     adv.aggressiveness = 3
     markup = build_v3_rollout_submenu_markup(adv)
     assert len(markup.inline_keyboard) == 4
+
+
+_AUTOMATIC_VERSION_UI_REL = (
+    "app/client_bot/user_interface/views/messages/main_adv_setting_menu/"
+    "keyboard/automatic_version_ui.py"
+)
+
+
+@pytest.mark.unit
+def test_git_index_exports_show_relevant_phrase_toggle_for_keyboard() -> None:
+    """INDEX producer must export the name imported by keyboard.py.
+
+    Incomplete rename leaves INDEX with only ``show_if`` while ``keyboard.py``
+    imports ``show_relevant_phrase_toggle`` → collection ImportError. Working
+    tree may already contain a local candidate fix; this test loads the git
+    index blob into a temp module without mutating ``app/**``.
+    """
+    import importlib.util
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    blob = subprocess.check_output(
+        ["git", "show", f":{_AUTOMATIC_VERSION_UI_REL}"],
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "automatic_version_ui.py"
+        path.write_bytes(blob)
+        spec = importlib.util.spec_from_file_location(
+            "_avu_git_index_blob_red",
+            path,
+        )
+        assert spec is not None and spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        assert hasattr(mod, "show_relevant_phrase_toggle"), (
+            "git index automatic_version_ui.py missing "
+            "show_relevant_phrase_toggle (keyboard import will fail)"
+        )
+        assert mod.show_if is mod.show_relevant_phrase_toggle
+        assert mod.show_relevant_phrase_toggle(2) is True
+
+
+@pytest.mark.unit
+def test_live_module_exports_show_relevant_phrase_toggle_alias() -> None:
+    """Live module must expose rename + ``show_if`` alias for existing callers."""
+    from app.client_bot.user_interface.views.messages.main_adv_setting_menu.keyboard import (
+        automatic_version_ui as m,
+    )
+
+    assert hasattr(m, "show_relevant_phrase_toggle")
+    assert m.show_if is m.show_relevant_phrase_toggle
+    assert m.show_relevant_phrase_toggle(3) is True

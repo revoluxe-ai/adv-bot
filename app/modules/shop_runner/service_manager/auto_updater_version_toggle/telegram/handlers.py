@@ -1,11 +1,15 @@
+"""Telegram-обработчики выбора версии AutoUpdater и PG-меню кампании."""
+
 import logging
+from typing import Any, cast
 
 from aiogram import Bot, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, InlineKeyboardMarkup
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.user_interface.views.callbacks import (
     AutoUpdaterVersionMenuBack,
@@ -29,7 +33,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
     is_switch_to_version_blocked_by_ab_hold,
 )
 from app.modules.shop_runner.service_manager.services.v3_status_mode_backfill import (
-    backfill_v3_status_mode_consistency,
+    backfill_v3_hard_statuses_and_states_consistency,
 )
 from app.modules.wb_adv_updater import data_manager
 from app.utils.db.models import User
@@ -49,7 +53,7 @@ _SUBMENU_TEXT = (
 
 
 async def _wb_user_cabinet_for_adv(
-    session,
+    session: AsyncSession,
     adv_setting: AdvSetting,
     telegram_user_id: int,
 ) -> WBUserCabinet | None:
@@ -64,6 +68,17 @@ async def _wb_user_cabinet_for_adv(
     return result.scalar_one_or_none()
 
 
+async def _load_adv_for_toggle_in_session(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить РК в переданной WRITE-сессии перед переключением версии."""
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def _clear_version_menu_fsm(state: FSMContext) -> None:
     await state.update_data(
         {
@@ -71,6 +86,17 @@ async def _clear_version_menu_fsm(state: FSMContext) -> None:
             FSM_ADV_AUTO_VER_MENU_ADV_SETTING_ID: None,
         }
     )
+
+
+async def _load_adv_for_version_menu(
+    session: AsyncSession,
+    adv_setting_original_id: int,
+) -> AdvSetting | None:
+    """Загрузить РК для меню версий в переданной read-only PG-сессии."""
+    result = await session.execute(
+        select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    )
+    return result.scalar_one_or_none()
 
 
 @router.callback_query(AutoUpdaterVersionMenuOpen.filter())
@@ -81,11 +107,8 @@ async def open_auto_updater_version_menu(
     state: FSMContext,
 ) -> None:
     adv_setting_original_id = callback_data.adv_setting_original_id
-    async with sm() as session:
-        adv_result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
-        )
-        adv = adv_result.scalar_one_or_none()
+    async with sm(read_only=True) as session:
+        adv = await _load_adv_for_version_menu(session, adv_setting_original_id)
         markup = (
             build_automatic_version_submenu_markup(adv) if adv is not None else None
         )
@@ -129,11 +152,10 @@ async def close_auto_updater_version_menu(
         return
 
     telegram_user_id = callback_query.from_user.id
-    async with sm() as session:
-        adv_result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == int(adv_setting_original_id))
+    async with sm(read_only=True) as session:
+        adv = await _load_adv_for_version_menu(
+            session, int(adv_setting_original_id)
         )
-        adv = adv_result.scalar_one_or_none()
         if adv is None:
             return
         wb_uc = await _wb_user_cabinet_for_adv(session, adv, telegram_user_id)
@@ -165,11 +187,10 @@ async def toggle_auto_updater_version(
             )
         return
 
-    async with sm() as session:
-        adv_result = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    async with sm(read_only=False) as session:
+        adv_before = await _load_adv_for_toggle_in_session(
+            session, adv_setting_original_id
         )
-        adv_before = adv_result.scalar_one_or_none()
 
         if adv_before is None:
             if callback_query.message is not None:
@@ -194,6 +215,7 @@ async def toggle_auto_updater_version(
         if new_version == current_norm:
             return
 
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
         stmt = (
             update(AdvSetting)
             .where(AdvSetting.id == adv_setting_original_id)
@@ -203,7 +225,8 @@ async def toggle_auto_updater_version(
         await session.commit()
 
     if new_version == 3:
-        repaired = await backfill_v3_status_mode_consistency(
+        # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+        repaired = await backfill_v3_hard_statuses_and_states_consistency(
             dry_run=False,
             adv_setting_id=adv_setting_original_id,
         )
@@ -220,11 +243,14 @@ async def toggle_auto_updater_version(
 
     submenu_markup: InlineKeyboardMarkup | None = None
     parent_markup: InlineKeyboardMarkup | None = None
-    async with sm() as session:
-        adv_reload = await session.execute(
-            select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
+    async with sm(read_only=False) as session:
+        adv_after = await _load_adv_for_toggle_in_session(
+            session, adv_setting_original_id
         )
-        adv_after = adv_reload.scalar_one()
+        if adv_after is None:
+            raise RuntimeError(
+                f"AdvSetting not found for original_id={adv_setting_original_id}"
+            )
         wb_uc = await _wb_user_cabinet_for_adv(
             session, adv_after, callback_query.from_user.id
         )
@@ -242,7 +268,7 @@ async def toggle_auto_updater_version(
     label = _VERSION_LABEL.get(new_version, f"V{new_version}")
 
     submenu_msg = callback_query.message
-    if submenu_msg is None:
+    if not isinstance(submenu_msg, Message):
         return
     chat_id = submenu_msg.chat.id
 
@@ -259,7 +285,7 @@ async def toggle_auto_updater_version(
         try:
             await bot.edit_message_reply_markup(
                 chat_id=chat_id,
-                message_id=int(parent_msg_id),
+                message_id=int(cast(Any, parent_msg_id)),
                 reply_markup=parent_markup,
             )
         except TelegramBadRequest as exc:

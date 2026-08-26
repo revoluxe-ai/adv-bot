@@ -20,6 +20,7 @@ from app.client_bot.user_interface.handlers.adv_setting import (
     apply_campaign_defaults,  # Хэндлер для одной кампании
     apply_defaults_for_shop,  # Хэндлер для всех кампаний магазина
     turn_adv_on,  # Хэндлер для включения одной кампании
+    turn_adv_off,
 )
 from app.client_bot.user_interface.views.callbacks import (
     ApplyCampaignDefaults,
@@ -34,6 +35,7 @@ from app.modules.common_slaves.wildberries.models.models import (
     WBUserCabinet,
 )
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
+from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.utils.db.models import User
 
 # Фабрики для UserCabinet / AdvSetting; кабинет берём из baseline (не WBCabinetFactory)
@@ -223,6 +225,9 @@ async def test_apply_campaign_defaults_single_active_campaign(
     # Для булевых полей инвертируем значение
     adv_setting.bidder_active = not initial_defaults.bidder_active
     adv_setting.auto_update_white_list = not initial_defaults.auto_update_white_list
+    adv_setting.auto_update_minus_phrases = (
+        not initial_defaults.auto_update_minus_phrases
+    )
     adv_setting.auto_update_target_place = not initial_defaults.auto_update_target_place
     adv_setting.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
@@ -311,17 +316,38 @@ async def test_apply_campaign_defaults_single_active_campaign(
 
     expected_defaults = CampaignDefaultsV1()
 
-    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
+    # Common defaults не должны менять mode-specific поля.
     default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place"
+        "bidder_mode",
+        "bidder_coroutine_type",
+        "orders_source_for_auto_mode",
+        "sales_predict_method",
+        "auto_budget_watchdog_enabled",
+        "use_common_budget",
+        "target_ctr_mode",
+        "new_auto_min_ctr_mode",
+        "reset_place",
     ]
 
     for key in default_fields:
         assert hasattr(updated_adv_setting, key), f"AdvSetting missing attribute {key}"
         assert getattr(updated_adv_setting, key) == getattr(expected_defaults, key), f"Mismatch for {key}"
+
+    assert updated_adv_setting.bidder_for_auto == adv_setting.bidder_for_auto
+    assert updated_adv_setting.bidder_active == adv_setting.bidder_active
+    assert updated_adv_setting.automatic_version == adv_setting.automatic_version
+    assert (
+        updated_adv_setting.auto_update_white_list
+        == adv_setting.auto_update_white_list
+    )
+    assert (
+        updated_adv_setting.auto_update_target_place
+        == adv_setting.auto_update_target_place
+    )
+    assert (
+        updated_adv_setting.auto_update_minus_phrases
+        == adv_setting.auto_update_minus_phrases
+    )
 
 
 @pytest.mark.integration
@@ -381,20 +407,50 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
 
     defaults_v1 = CampaignDefaultsV1()
 
-    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
+    # Common defaults не должны менять mode-specific поля.
     default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place"
+        "bidder_mode",
+        "bidder_coroutine_type",
+        "orders_source_for_auto_mode",
+        "sales_predict_method",
+        "auto_budget_watchdog_enabled",
+        "use_common_budget",
+        "target_ctr_mode",
+        "new_auto_min_ctr_mode",
+        "reset_place",
     ]
 
     for key in default_fields:
         assert getattr(updated_adv_setting, key) == getattr(defaults_v1, key), f"Mismatch for {key} (expected default)"
 
+    assert (
+        updated_adv_setting.bidder_for_auto
+        == initial_adv_setting_state["bidder_for_auto"]
+    )
+    assert (
+        updated_adv_setting.bidder_active
+        == initial_adv_setting_state["bidder_active"]
+    )
+    assert (
+        updated_adv_setting.automatic_version
+        == initial_adv_setting_state["automatic_version"]
+    )
+    assert (
+        updated_adv_setting.auto_update_white_list
+        == initial_adv_setting_state["auto_update_white_list"]
+    )
+    assert (
+        updated_adv_setting.auto_update_target_place
+        == initial_adv_setting_state["auto_update_target_place"]
+    )
+    assert (
+        updated_adv_setting.auto_update_minus_phrases
+        == initial_adv_setting_state["auto_update_minus_phrases"]
+    )
+
 
 @pytest.mark.integration
-async def test_turn_adv_on_applies_defaults(
+async def test_turn_adv_on_applies_paid_start_defaults_only(
     mock_bot, mock_state, async_session: AsyncSession, setup_adv_data
 ):
     adv_setting_inactive = setup_adv_data["adv_setting_inactive"]
@@ -409,10 +465,14 @@ async def test_turn_adv_on_applies_defaults(
     # Для булевых полей инвертируем значение
     adv_setting_inactive.bidder_active = not initial_defaults.bidder_active
     adv_setting_inactive.auto_update_white_list = not initial_defaults.auto_update_white_list
+    adv_setting_inactive.auto_update_minus_phrases = (
+        not initial_defaults.auto_update_minus_phrases
+    )
     adv_setting_inactive.auto_update_target_place = not initial_defaults.auto_update_target_place
     adv_setting_inactive.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting_inactive.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
     adv_setting_inactive.reset_place = not initial_defaults.reset_place
+    adv_setting_inactive.white_list_mode = WhiteListMode.ABOVE_MIN_RATING
     # Для полей типа Enum выбираем другое валидное значение, если оно есть
     if initial_defaults.automatic_version == 2:
         adv_setting_inactive.automatic_version = 1
@@ -468,8 +528,11 @@ async def test_turn_adv_on_applies_defaults(
     # Mock Pricer.get_price_for_day_for_shop and balance_manager.get_cabinet_balance_and_bonuses
     with (
         patch("app.modules.billing.pricer.Pricer.get_price_for_day_for_shop", new_callable=AsyncMock) as mock_get_price,
-        patch("app.modules.billing.pricer.Pricer.get_tariff_for_day", return_value=100) as mock_get_tariff,
         patch("app.modules.balance_manager.get_cabinet_balance_and_bonuses", new_callable=AsyncMock) as mock_get_balance,
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.backfill_v3_hard_statuses_and_states_consistency",
+            new_callable=AsyncMock,
+        ) as backfill_mock,
     ):
         mock_get_price.return_value = 100
         mock_get_balance.return_value = (1000, 0) # Достаточно средств
@@ -487,14 +550,96 @@ async def test_turn_adv_on_applies_defaults(
         ):
             await turn_adv_on(callback_query, mock_state, callback_data, mock_bot)
 
-    # Проверяем только bot_active, дефолты НЕ должны применяться
-    expected_bidder_active = adv_setting_inactive.bidder_active
+    backfill_mock.assert_awaited_once_with(
+        dry_run=False,
+        adv_setting_id=adv_setting_inactive.id,
+    )
+
+    # Проверяем узкие paid-start defaults, broad defaults НЕ должны применяться
     updated_adv_setting = await async_session.get(AdvSetting, adv_setting_inactive.id)
     assert updated_adv_setting is not None
 
     assert updated_adv_setting.bot_active
-    # Остальные настройки (например, bidder_active) не должны сбрасываться к дефолтам
-    assert updated_adv_setting.bidder_active == expected_bidder_active
+    assert updated_adv_setting.automatic_version == 3
+    assert updated_adv_setting.white_list_mode == WhiteListMode.REPLACE_ON_TRIM
+    assert updated_adv_setting.bidder_active is True
+    assert updated_adv_setting.auto_update_white_list is False
+    assert updated_adv_setting.auto_update_minus_phrases is True
+    assert updated_adv_setting.auto_update_target_place is True
+
+
+@pytest.mark.integration
+async def test_turn_adv_off_applies_free_transition_only(
+    mock_bot, async_session: AsyncSession, setup_adv_data
+):
+    adv_setting = setup_adv_data["adv_setting"]
+    wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
+
+    adv_setting.bot_active = True
+    adv_setting.automatic_version = 3
+    adv_setting.white_list_mode = WhiteListMode.REPLACE_ON_TRIM
+    adv_setting.auto_update_white_list = True
+    adv_setting.auto_update_minus_phrases = True
+    adv_setting.auto_update_target_place = True
+    adv_setting.bidder_for_auto = True
+    adv_setting.bidder_active = True
+    adv_setting.auto_budget_watchdog_enabled = True
+    adv_setting.max_place = 7
+    adv_setting.max_cpm = 4567
+    await async_session.flush()
+
+    callback_data = TurnBot(
+        action="off",
+        adv_original_id=adv_setting.id,
+        wb_user_cabinet_original_id=wb_user_cabinet.id,
+    )
+    telegram_user = TelegramUser(
+        id=wb_user_cabinet.user.user_telegram_id,
+        is_bot=False,
+        first_name="Test",
+    )
+    chat = Chat(id=wb_user_cabinet.user.user_telegram_id, type="private")
+    message = Message(
+        message_id=1,
+        date=1234567890,
+        chat=chat,
+        from_user=telegram_user,
+    )
+    callback_query = CallbackQuery(
+        id="125_off",
+        from_user=telegram_user,
+        chat_instance="some_id_turn_off",
+        data=callback_data.pack(),
+        message=message,
+    )
+
+    mock_menu_instance = AsyncMock()
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            MockSessionMaker(async_session),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            return_value=mock_menu_instance,
+        ),
+    ):
+        await turn_adv_off(callback_query, callback_data, mock_bot)
+
+    updated_adv_setting = await async_session.get(AdvSetting, adv_setting.id)
+    assert updated_adv_setting is not None
+
+    assert updated_adv_setting.bot_active is False
+    assert updated_adv_setting.automatic_version == 2
+    assert updated_adv_setting.white_list_mode == WhiteListMode.ABOVE_MIN_RATING
+    assert updated_adv_setting.auto_update_white_list is False
+    assert updated_adv_setting.auto_update_target_place is False
+    assert updated_adv_setting.bidder_for_auto is False
+    assert updated_adv_setting.bidder_active is False
+    assert updated_adv_setting.max_place == 7
+    assert updated_adv_setting.max_cpm == 4567
+    assert updated_adv_setting.auto_update_minus_phrases is False
+    assert updated_adv_setting.auto_budget_watchdog_enabled is False
 
 
 @pytest.mark.integration
@@ -513,6 +658,7 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
         # Для булевых полей инвертируем значение
         adv.bidder_active = not initial_defaults.bidder_active
         adv.auto_update_white_list = not initial_defaults.auto_update_white_list
+        adv.auto_update_minus_phrases = not initial_defaults.auto_update_minus_phrases
         adv.auto_update_target_place = not initial_defaults.auto_update_target_place
         adv.target_ctr_mode = not initial_defaults.target_ctr_mode
         adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
@@ -585,18 +731,55 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
 
     expected_defaults = CampaignDefaultsV1()
     default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode", "automatic_version",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place"
+        "bidder_mode",
+        "bidder_coroutine_type",
+        "orders_source_for_auto_mode",
+        "sales_predict_method",
+        "auto_budget_watchdog_enabled",
+        "use_common_budget",
+        "target_ctr_mode",
+        "new_auto_min_ctr_mode",
+        "reset_place",
     ]
 
     for key in default_fields:
         assert hasattr(updated_adv_active_1, key), f"AdvSetting missing attribute {key}"
         assert getattr(updated_adv_active_1, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_1"
 
+    assert updated_adv_active_1.bidder_for_auto == adv_active_1.bidder_for_auto
+    assert updated_adv_active_1.bidder_active == adv_active_1.bidder_active
+    assert updated_adv_active_1.automatic_version == adv_active_1.automatic_version
+    assert (
+        updated_adv_active_1.auto_update_white_list
+        == adv_active_1.auto_update_white_list
+    )
+    assert (
+        updated_adv_active_1.auto_update_target_place
+        == adv_active_1.auto_update_target_place
+    )
+    assert (
+        updated_adv_active_1.auto_update_minus_phrases
+        == adv_active_1.auto_update_minus_phrases
+    )
+
     updated_adv_active_2 = await async_session.get(AdvSetting, adv_active_2.id)
     assert updated_adv_active_2 is not None
     for key in default_fields:
         assert hasattr(updated_adv_active_2, key), f"AdvSetting missing attribute {key}"
         assert getattr(updated_adv_active_2, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_2"
+
+    assert updated_adv_active_2.bidder_for_auto == adv_active_2.bidder_for_auto
+    assert updated_adv_active_2.bidder_active == adv_active_2.bidder_active
+    assert updated_adv_active_2.automatic_version == adv_active_2.automatic_version
+    assert (
+        updated_adv_active_2.auto_update_white_list
+        == adv_active_2.auto_update_white_list
+    )
+    assert (
+        updated_adv_active_2.auto_update_target_place
+        == adv_active_2.auto_update_target_place
+    )
+    assert (
+        updated_adv_active_2.auto_update_minus_phrases
+        == adv_active_2.auto_update_minus_phrases
+    )

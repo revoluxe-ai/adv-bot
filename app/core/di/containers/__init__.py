@@ -1,5 +1,4 @@
-"""DI containers module."""
+"""DI containers package.
 
-# __all__ = ["Neo4jContainer"]
-
-# from .neo4j_container import Neo4jContainer
+Neo4jContainer удалён из runtime surface (change drop-unused-neo4j-config).
+"""

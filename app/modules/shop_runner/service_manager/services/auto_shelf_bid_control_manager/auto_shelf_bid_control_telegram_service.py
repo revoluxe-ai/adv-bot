@@ -35,7 +35,10 @@ from .auto_shelf_bid_control_manager import (
     MainBidRefreshResult,
 )
 from .auto_shelf_bid_control_view_provider import AutoShelfBidControlViewProvider
-from .auto_shelf_bid_setter import AutoShelfBidSetter
+from .auto_shelf_bid_setter import (
+    AutoShelfBidControlWriteBlockedError,
+    AutoShelfBidSetter,
+)
 from .bid_units import format_bid_minor_for_telegram, rubles_to_bid_minor
 from .dto import AutoShelfBidControlViewDTO
 
@@ -96,6 +99,13 @@ _BID_UNITS_GATE_ERROR = (
 )
 
 
+_BOT_ACTIVE_PAYWALL_MESSAGE = (
+    "Управление ставкой в полках доступно только после включения автоуправления кампанией.\n\n"
+    "Бесплатно можно смотреть аналитику и рекламные данные.\n"
+    "Чтобы бот сам тестировал и выставлял ставки в полках — подключите автоуправление."
+)
+
+
 class AutoShelfBidControlTelegramService:
     """Инкапсулирует действия Telegram UI без изменения core-алгоритма."""
 
@@ -117,6 +127,18 @@ class AutoShelfBidControlTelegramService:
         """Построить текущее состояние экрана управления."""
         return await self._view_provider.build_view(adv_setting_original_id)
 
+    async def ensure_write_allowed(self, adv_setting_original_id: int) -> AdvSetting:
+        """Проверить, что кампанию можно менять через write-action."""
+        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        self._ensure_bot_active_or_raise(adv)
+        return adv
+
+    @staticmethod
+    def _ensure_bot_active_or_raise(adv: AdvSetting) -> None:
+        """Запретить write-action для кампаний в read-only/free режиме."""
+        if not bool(getattr(adv, "bot_active", True)):
+            raise AutoShelfBidControlTelegramError(_BOT_ACTIVE_PAYWALL_MESSAGE)
+
     async def apply_main_bid_refresh_if_needed(
         self,
         adv_setting_original_id: int,
@@ -129,6 +151,8 @@ class AutoShelfBidControlTelegramService:
         # (`cycle_metric -> cpc`), so Telegram must normalize the same way
         # before building the lightweight complex_adv_like object.
         adv = await self._get_adv_or_raise(adv_setting_original_id)
+        if not bool(getattr(adv, "bot_active", True)):
+            return MainBidRefreshResult.SKIPPED_DISABLED
         nmid = self._get_single_nmid_or_raise(adv)
         state = await self._repository.get_state(nmid)
         if state is None:
@@ -202,7 +226,7 @@ class AutoShelfBidControlTelegramService:
 
     async def enable(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Включить управление ставкой; при отсутствии settings создать default."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         await self._repository.get_or_create_default_settings(nmid=nmid)
         view_before = await self.build_view(adv_setting_original_id)
@@ -219,7 +243,7 @@ class AutoShelfBidControlTelegramService:
 
     async def disable(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Выключить управление ставкой, сохранив settings/state."""
-        await self._get_adv_or_raise(adv_setting_original_id)
+        await self.ensure_write_allowed(adv_setting_original_id)
         await self._repository.set_enabled(adv_setting_original_id, False)
         return await self.build_view(adv_setting_original_id)
 
@@ -229,7 +253,7 @@ class AutoShelfBidControlTelegramService:
         value: str,
     ) -> AutoShelfBidControlViewDTO:
         """Сохранить новое max_bid_minor без сброса цикла."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         parsed_rub = self._parse_positive_int(
             value,
@@ -258,7 +282,7 @@ class AutoShelfBidControlTelegramService:
         value: str,
     ) -> AutoShelfBidControlViewDTO:
         """Сохранить долю теста (поддержка `10` и `0.1`)."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         parsed = self._parse_test_share(value)
         await self._repository.get_or_create_default_settings(nmid=nmid)
@@ -271,7 +295,7 @@ class AutoShelfBidControlTelegramService:
         value: str,
     ) -> AutoShelfBidControlViewDTO:
         """Сохранить target_test_impressions без сброса state."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         parsed = self._parse_positive_int(
             value,
@@ -287,7 +311,7 @@ class AutoShelfBidControlTelegramService:
         value: str,
     ) -> AutoShelfBidControlViewDTO:
         """Сохранить минимальное время теста, не меньше 60 минут."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         parsed = self._parse_positive_int(
             value,
@@ -310,7 +334,7 @@ class AutoShelfBidControlTelegramService:
         value: str,
     ) -> AutoShelfBidControlViewDTO:
         """Сохранить min_bid_distance_minor без сброса state."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         parsed_rub = self._parse_positive_int(
             value,
@@ -377,7 +401,7 @@ class AutoShelfBidControlTelegramService:
 
     async def reset_cycle(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Сбросить цикл в mode=test и выставить middle bid через setter."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         settings_obj = await self._repository.get_or_create_default_settings(nmid=nmid)
         view = await self.build_view(adv_setting_original_id)
@@ -427,7 +451,7 @@ class AutoShelfBidControlTelegramService:
 
     async def force_main(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
         """Принудительно перевести state в mode=main и выставить main bid."""
-        adv = await self._get_adv_or_raise(adv_setting_original_id)
+        adv = await self.ensure_write_allowed(adv_setting_original_id)
         nmid = self._get_single_nmid_or_raise(adv)
         state = await self._repository.get_state(nmid)
         if state is None:
@@ -521,7 +545,14 @@ class AutoShelfBidControlTelegramService:
             type(
                 "_TelegramComplexAdv",
                 (),
-                {"auto_adv_id": int(adv.adv_id), "nmids": [int(nmid)]},
+                {
+                    "auto_adv_id": int(adv.adv_id),
+                    "nmids": [int(nmid)],
+                    "bot_active": bool(getattr(adv, "bot_active", True)),
+                    "auto_shelf_bid_control_enabled": bool(
+                        getattr(adv, "auto_shelf_bid_control_enabled", False)
+                    ),
+                },
             )(),
         )
         async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
@@ -534,8 +565,13 @@ class AutoShelfBidControlTelegramService:
                 cast(WBModifier, hub.wb_modifier),
                 bid_cache_manager=self._bid_cache,
             )
-            await setter.set_bid(
-                complex_adv_like,
-                bid_minor=int(bid_minor),
-                currency=currency,
-            )
+            try:
+                await setter.set_bid(
+                    complex_adv_like,
+                    bid_minor=int(bid_minor),
+                    currency=currency,
+                )
+            except AutoShelfBidControlWriteBlockedError as exc:
+                raise AutoShelfBidControlTelegramError(
+                    _BOT_ACTIVE_PAYWALL_MESSAGE
+                ) from exc

@@ -152,7 +152,7 @@ async def test_auto_budget_watchdog_passes_unfiltered_advs_to_active_control() -
             stale_filter,
         ),
     ):
-        await fn(mgr)
+        await fn(mgr, only_bot_active=True)
 
     control.assert_awaited_once_with(pool)
     stale_filter.assert_not_called()
@@ -184,7 +184,7 @@ async def test_auto_reset_bid_applies_stale_mutation_filter() -> None:
         raw = CoroutinesManager.auto_reset_bid_for_auto_adv
         fn = getattr(raw, "__wrapped__", None)
         assert fn is not None
-        await fn(mgr)
+        await fn(mgr, only_bot_active=True)
 
     filter_mock.assert_called_once()
     assert filter_mock.call_args.args[0] == pool

@@ -185,51 +185,12 @@ Do **not** reproduce the failure mode of bulk parallel Reads.
    `blocked_preflight_timeout` for that path; continue other listed files only
    if independent.
 
-## Speckit hook parity sweep (mandatory when in scope)
-
-When the defect or evidence touches `**/speckit-*/SKILL.md` and Spec Kit
-`HookExecutor` / hook `condition` / `extension` binding semantics:
-
-**Trigger:** any cited path under `speckit-*/SKILL.md` plus hook-related
-tokens (`HookExecutor`, `condition`, `extension`, `EXECUTE_COMMAND`,
-`compare string forms`).
-
-**Canonical reference:** `.agents/skills/speckit-analyze/SKILL.md` (or an
-already-compliant sibling named in the packet).
-
-**Budget:** grep/spot-check **only** `**/speckit-*/SKILL.md` under `.agents/`
-and `.cursor/` — never a full command-set dump.
-
-### READ_ONLY (plan expansion)
-
-Before returning `FIX_PLAN_READY`, run bounded grep:
-
-1. `compare string forms` under `**/speckit-*/SKILL.md` — every hit is a
-   stale hook block;
-2. files missing `Resolve the hook entry's \`extension\` field` among the same
-   paths when the defect is HookExecutor-related.
-
-Every hit MUST appear in `FILES:` for both `.agents` and `.cursor` mirrors.
-Do not close the plan on a single cited skill when sibling hits remain.
-
-### APPLY (verification)
-
-After patching all listed `FILES:`:
-
-1. Re-run the same bounded greps;
-2. If any stale hit remains → `STATUS: PARTIAL` (not
-   `READY_FOR_COMMAND_DIFF_REVIEW`); list remaining paths in output;
-3. Each patched file must update **all** hook sections in that file
-   (`before_*` and `after_*` keys).
-
 ## Steps
 
 ### READ_ONLY
 
 1. Resolve evidence source (optional args → chat packet → free-form note).
 2. Parse or draft `DEFECTS_TO_FIX` + `FILES` + `PROPOSED_BEHAVIOR`.
-   When in scope, apply **Speckit hook parity sweep** (READ_ONLY) to expand
-   `FILES` before step 4.
 3. Optionally spot-check listed files (narrow Grep/Read) to validate the plan;
    do not write.
 4. Return `FIX_PLAN_READY` (or blocked status) +
@@ -246,12 +207,10 @@ After patching all listed `FILES:`:
      - Grep/Read narrowly;
      - patch to match proposed behavior;
      - skip if already compliant (record `already_fixed`).
-3. When in scope, run **Speckit hook parity sweep** (APPLY verification);
-   stale sibling hits ⇒ `PARTIAL`, not `READY_FOR_COMMAND_DIFF_REVIEW`.
-4. After all listed files: quick self-check that no new unbounded
+3. After all listed files: quick self-check that no new unbounded
    “read all / search all decisions” instruction was introduced.
-5. Do **not** stage, commit, push, or invoke any commit command.
-6. Enter **Post-APPLY diff review gate** (mandatory) and stop.
+4. Do **not** stage, commit, push, or invoke any commit command.
+5. Enter **Post-APPLY diff review gate** (mandatory) and stop.
 
 ## Post-APPLY diff review gate (mandatory)
 
@@ -396,8 +355,6 @@ Before returning:
 - no bulk preload of the command set;
 - decision lookup changes stay context-first / bounded fallback;
 - I/O stayed within execution-preflight Read budgets;
-- when Speckit hook parity was in scope: no stale `compare string forms` /
-  missing `extension` binding remains under `**/speckit-*/SKILL.md`;
 - APPLY ends at `READY_FOR_COMMAND_DIFF_REVIEW` with no stage/commit/push and
   no commit-command handoff;
 - when owner asked for copy-paste/exact commands in READ_ONLY:
@@ -418,4 +375,37 @@ Before returning:
   negative → `BLOCKED_NEEDS_FRESH_INDEX`. Valid central fix → hand off to
   `/opsx-meta-import-command`. Do not merge command bodies in this command.
 - orientation: emit `ORIENTATION_HINT` with `NEXT_META: /opsx-meta`
-- process lesson handoff: `/opsx-meta-promote-process-lesson`
+- process lesson handoff: `/opsx-meta-promote-process-lesson`## Speckit hook parity sweep (mandatory when in scope)
+When the defect or evidence touches `**/speckit-*/SKILL.md` and Spec Kit
+`HookExecutor` / hook `condition` / `extension` binding semantics:
+**Trigger:** any cited path under `speckit-*/SKILL.md` plus hook-related
+tokens (`HookExecutor`, `condition`, `extension`, `EXECUTE_COMMAND`,
+`compare string forms`).
+**Canonical reference:** `.agents/skills/speckit-analyze/SKILL.md` (or an
+already-compliant sibling named in the packet).
+**Budget:** grep/spot-check **only** `**/speckit-*/SKILL.md` under `.agents/`
+and `.cursor/` — never a full command-set dump.
+### READ_ONLY (plan expansion)
+Before returning `FIX_PLAN_READY`, run bounded grep:
+1. `compare string forms` under `**/speckit-*/SKILL.md` — every hit is a
+   stale hook block;
+2. files missing `Resolve the hook entry's \`extension\` field` among the same
+   paths when the defect is HookExecutor-related.
+Every hit MUST appear in `FILES:` for both `.agents` and `.cursor` mirrors.
+Do not close the plan on a single cited skill when sibling hits remain.
+### APPLY (verification)
+After patching all listed `FILES:`:
+1. Re-run the same bounded greps;
+2. If any stale hit remains → `STATUS: PARTIAL` (not
+   `READY_FOR_COMMAND_DIFF_REVIEW`); list remaining paths in output;
+3. Each patched file must update **all** hook sections in that file
+   (`before_*` and `after_*` keys).
+   When in scope, apply **Speckit hook parity sweep** (READ_ONLY) to expand
+   `FILES` before step 4.
+3. When in scope, run **Speckit hook parity sweep** (APPLY verification);
+   stale sibling hits ⇒ `PARTIAL`, not `READY_FOR_COMMAND_DIFF_REVIEW`.
+4. After all listed files: quick self-check that no new unbounded
+5. Do **not** stage, commit, push, or invoke any commit command.
+6. Enter **Post-APPLY diff review gate** (mandatory) and stop.
+- when Speckit hook parity was in scope: no stale `compare string forms` /
+  missing `extension` binding remains under `**/speckit-*/SKILL.md`;

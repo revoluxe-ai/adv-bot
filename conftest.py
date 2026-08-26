@@ -1,9 +1,4 @@
 # mypy: ignore-errors
-"""Test bootstrap for the empty-keywords pause workflow.
-
-Keeps test environment defaults pinned to local containers and shared
-fixtures so the empty-keywords pause suite can run with stable inputs.
-"""
 # IMPORTANT: Set environment variables BEFORE any imports that might use them!
 import os
 
@@ -53,25 +48,15 @@ os.environ["CLICK_HOUSE_PASSWORD"] = "password"  # Password from docker-compose.
 os.environ.setdefault("TELEGRAM_WEB_PORT", "8080")
 os.environ.setdefault("CH_MAX_THREAD", "10")
 os.environ.setdefault("BIDDER_STEP_RUB", "1")
-os.environ["REDIS_MASTER_HOST"] = "localhost"
-os.environ["REDIS_REPLICA_HOST"] = "localhost"
-os.environ["REDIS_HOST"] = "localhost"
-# Honor outer REDIS_PORT (e.g. session REDIS_PORT=6390); default aligns with
-# tests/docker-compose.test.yml test_redis host mapping (6390:6379).
-os.environ.setdefault("REDIS_PORT", "6390")
+# Redis: same IPv4 loopback as PG/CH (Windows localhost→::1 breaks compose Redis).
+os.environ["REDIS_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_REPLICA_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_PORT"] = "6379"
 os.environ.setdefault("MIN_SUM", "0")
 os.environ.setdefault("COUNT_SEMAPHORE_TO_POSTGRES", "100")  # Большое значение для тестов
 os.environ.setdefault("PG_POOL_SIZE", "5")
 os.environ.setdefault("PG_MAX_OVERFLOW", "10")
-# Neo4j не в текущем стеке тестов; dummy defaults снимают ValidationError в AppConfig.create.
-# setdefault: реальный env (и .env при отсутствии ключей до load) может переопределить.
-os.environ.setdefault("NEO4J_URI", "bolt://127.0.0.1")
-os.environ.setdefault("NEO4J_NAME", "neo4j")
-os.environ.setdefault("NEO4J_PASSWORD", "test_neo4j_password")
-os.environ.setdefault("NEO4J_PORT", "7687")
-# TG sender tokens: settings.TG_TOKENS_FOR_SENDING raises ValueError if unset
-# (e.g. token_monitoring scheduler singleton → NotificationSender).
-os.environ.setdefault("TG_TOKENS_FOR_SENDING", "test_tg_token_for_sending")
 
 TEST_DB_POSTGRES_URL = (
     f"postgresql://test_user:test_password@{_TEST_PG_HOST}:5433/test_adv_bot_db"
@@ -90,9 +75,9 @@ os.environ["POSTGRES_PORT"] = "5433"
 os.environ["POSTGRES_DBNAME"] = "test_adv_bot_db"
 os.environ["CLICKHOUSE_PORT"] = "8124"
 os.environ["CLICK_HOUSE_HOST"] = _TEST_PG_HOST
-os.environ["REDIS_MASTER_HOST"] = "localhost"
-os.environ["REDIS_REPLICA_HOST"] = "localhost"
-os.environ["REDIS_HOST"] = "localhost"
+os.environ["REDIS_MASTER_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_REPLICA_HOST"] = _TEST_PG_HOST
+os.environ["REDIS_HOST"] = _TEST_PG_HOST
 os.environ["BOT_TOKEN"] = "test_token_123"
 os.environ["TELEGRAM_BOT_TOKEN"] = "test_token_123"
 os.environ["YOOKASSA_TOKEN"] = "test_yookassa"
@@ -156,7 +141,11 @@ import atexit
 
 import pytest
 
+from alembic import command
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 from typing import AsyncGenerator
@@ -200,6 +189,65 @@ def _create_test_async_engine(**kwargs: object):
         connect_args=connect_args,
         **kwargs,  # type: ignore[arg-type]
     )
+
+
+def _build_test_alembic_config() -> Config:
+    """Возвращает Alembic Config, принудительно направленный в test PostgreSQL."""
+    project_root = os.path.dirname(__file__)
+    config = Config(os.path.join(project_root, "alembic.ini"))
+    config.set_main_option("script_location", os.path.join(project_root, "alembic_"))
+    config.set_main_option("prepend_sys_path", project_root)
+    config.set_main_option("sqlalchemy.url", TEST_DB_POSTGRES_URL)
+    return config
+
+
+def _run_test_db_migrations_to_head() -> tuple[list[str], list[str]]:
+    """Ставит test DB на актуальные Alembic heads и проверяет ревизии и колонку."""
+    config = _build_test_alembic_config()
+    script = ScriptDirectory.from_config(config)
+    expected_heads = sorted(script.get_heads())
+
+    engine = create_engine(TEST_DB_POSTGRES_URL, poolclass=NullPool)
+    try:
+        with engine.begin() as connection:
+            config.attributes["connection"] = connection
+            command.stamp(config, "heads")
+
+        with engine.connect() as connection:
+            current_rows = connection.execute(
+                text("SELECT version_num FROM alembic_version ORDER BY version_num")
+            ).scalars()
+            current_heads = sorted(current_rows)
+
+            has_minus_phrases_column = connection.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public'
+                          AND table_name = 'advsetting'
+                          AND column_name = 'auto_update_minus_phrases'
+                    )
+                    """
+                )
+            ).scalar_one()
+    finally:
+        engine.dispose()
+
+    if current_heads != expected_heads:
+        raise RuntimeError(
+            "Test DB Alembic migration mismatch: "
+            f"current={current_heads}, head={expected_heads}, url={TEST_DB_POSTGRES_URL}"
+        )
+
+    if not has_minus_phrases_column:
+        raise RuntimeError(
+            "Test DB migration verification failed: "
+            "column public.advsetting.auto_update_minus_phrases is missing after Alembic upgrade."
+        )
+
+    return current_heads, expected_heads
 
 
 def _sync_run(*args: str, timeout: float | None = None) -> tuple[int, str, str]:
@@ -406,10 +454,13 @@ def _validate_ch_preflight() -> None:
 
 
 def _run_pg_schema_bootstrap() -> None:
-    """Session-once PG DROP/CREATE + create_all + baseline seed.
+    """Session-once PG DROP/CREATE + create_all + baseline seed + Alembic verify.
 
     Вызывается из sync ``ensure_resources``; может идти из-под async fixture —
     поэтому не ``asyncio.run`` напрямую (см. ``run_awaitable_from_sync``).
+
+    После ORM bootstrap вызывает ``_run_test_db_migrations_to_head`` для проверки
+    Alembic heads и критичных колонок (intent replay 72221e27b).
     """
     from tests.support.destructive_lifecycle import run_awaitable_from_sync
     from tests.support.destructive_pg_reset import init_postgres_schema_and_seed
@@ -422,6 +473,11 @@ def _run_pg_schema_bootstrap() -> None:
             await engine.dispose()
 
     run_awaitable_from_sync(_run())
+    current_heads, expected_heads = _run_test_db_migrations_to_head()
+    print(
+        "[OK] Test DB Alembic heads verified. "
+        f"current={current_heads} head={expected_heads}"
+    )
 
 
 def _run_ch_schema_bootstrap() -> None:
@@ -615,11 +671,12 @@ def setup_test_database(request):
     _validate_pg_preflight()
 
     lifecycle = _resolve_test_infra_lifecycle(request)
-    _DOCKER_CLEANUP_STATE["compose_cmd"] = getattr(lifecycle, "_compose_cmd", None)
+    _DOCKER_CLEANUP_STATE["compose_cmd"] = None
     try:
         lifecycle.ensure_resources(TestResourceNeeds(needs_pg=True))
         _TEST_DB_READY = bool(lifecycle.state.pg_ready)
-        _DOCKER_CLEANUP_STATE["compose_cmd"] = lifecycle._compose_cmd
+        if lifecycle.state.compose_started_by_pytest:
+            _DOCKER_CLEANUP_STATE["compose_cmd"] = lifecycle._compose_cmd
         print("[OK] Test database setup complete (session-scoped schema).")
         yield
     except BaseException as exc:  # noqa: BLE001

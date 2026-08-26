@@ -3,6 +3,7 @@ __all__ = (
     "Payment",
     "UserBalancePayment",
     "UserBonusPayment",
+    "PartnerPayout",
     "PassedGateReason",
     "InviteStatus",
     "Invite",
@@ -55,6 +56,7 @@ class User(BaseTable):
         BIGINT, nullable=True, unique=True
     )
     username: Mapped[str] = mapped_column(String, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String, nullable=True)
     # Web registration (phase 1: nullable; phase 2 may tighten to NOT NULL/UNIQUE)
     email: Mapped[str | None] = mapped_column(String, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -78,6 +80,18 @@ class User(BaseTable):
         uselist=True,
         foreign_keys="UserBonusPayment.user_id",
     )
+    partner_payouts_received: Mapped[list["PartnerPayout"]] = relationship(
+        "PartnerPayout",
+        back_populates="partner_user",
+        uselist=True,
+        foreign_keys="PartnerPayout.partner_user_id",
+    )
+    partner_payouts_created: Mapped[list["PartnerPayout"]] = relationship(
+        "PartnerPayout",
+        back_populates="created_by_admin_user",
+        uselist=True,
+        foreign_keys="PartnerPayout.created_by_admin_user_id",
+    )
     passed_gate: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false"), nullable=False
     )
@@ -95,8 +109,6 @@ class User(BaseTable):
 
 class UserBalancePayment(BaseTable):
     """Запись о пополнении/списании личного баланса пользователя."""
-
-    __tablename__ = "userbalancepayment"
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id"), nullable=False
@@ -120,8 +132,6 @@ class UserBalancePayment(BaseTable):
 
 class UserBonusPayment(BaseTable):
     """Запись о начислении/списании бонусов пользователя."""
-
-    __tablename__ = "userbonuspayment"
 
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("user.id"), nullable=False
@@ -149,6 +159,47 @@ class UserBonusPayment(BaseTable):
         Index("idx_user_bonus_payment_date", "transaction_date_time"),
         Index("idx_user_bonus_payment_admin", "admin_user_id"),
         Index("idx_user_bonus_payment_operation", "operation_type"),
+    )
+
+
+class PartnerPayout(BaseTable):
+    """Запись факта выплаты партнёру по партнёрской программе."""
+
+    # BaseTable задаёт __tablename__ через @declared_attr; строковый override
+    # сохраняет физическое имя partner_payout (не partnerpayout).
+    # @declared_attr.directive несовместим с типом родителя (pyright).
+    __tablename__ = "partner_payout"  # pyright: ignore[reportAssignmentType]
+
+    partner_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user.id"), nullable=False
+    )
+    partner_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="partner_payouts_received",
+        foreign_keys=[partner_user_id],
+    )
+
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=False, server_default=text("now()")
+    )
+    created_by_admin_user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("user.id"), nullable=False
+    )
+    created_by_admin_user: Mapped["User"] = relationship(
+        "User",
+        back_populates="partner_payouts_created",
+        foreign_keys=[created_by_admin_user_id],
+    )
+    comment: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    __table_args__ = (
+        Index("idx_partner_payout_partner_user_id", "partner_user_id"),
+        Index(
+            "idx_partner_payout_created_by_admin_user_id",
+            "created_by_admin_user_id",
+        ),
+        Index("idx_partner_payout_created_at", "created_at"),
     )
 
 

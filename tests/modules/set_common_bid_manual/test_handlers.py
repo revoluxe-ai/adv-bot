@@ -1,6 +1,7 @@
 """Unit tests for set_common_bid_manual handlers."""
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -64,6 +65,9 @@ def _make_adv_setting(
     adv.plan_for_sales_for_day = None
     adv.target_price_for_order = None
     adv.max_price_for_order = None
+    adv.wb_bid_type = None
+    adv.wb_placement_search = None
+    adv.wb_placement_recommendations = None
     return adv
 
 
@@ -85,7 +89,7 @@ async def test_set_common_bid_manual_start_success() -> None:
     state.set_state = AsyncMock()
 
     adv_setting = _make_adv_setting(adv_setting_id=1, search_adv_id=999)
-    search_adv_setting = _make_adv_setting(adv_setting_id=999)
+    search_adv_setting = _make_adv_setting(adv_setting_id=999, adv_id=999)
 
     callback_data = callbacks.SetCommonBidManual(
         adv_setting_original_id=1,
@@ -156,7 +160,7 @@ async def test_set_common_bid_manual_start_empty_search_min_bids() -> None:
     state.set_state = AsyncMock()
 
     adv_setting = _make_adv_setting(adv_setting_id=1, search_adv_id=999)
-    search_adv_setting = _make_adv_setting(adv_setting_id=999)
+    search_adv_setting = _make_adv_setting(adv_setting_id=999, adv_id=999)
 
     callback_data = callbacks.SetCommonBidManual(
         adv_setting_original_id=1,
@@ -240,6 +244,51 @@ async def test_set_common_bid_manual_start_no_search_adv() -> None:
         111,
         "У этой кампании нет поисковой (аукционной) РК.",
     )
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_common_bid_manual_start_blocks_non_search_campaign() -> None:
+    """Known non-search campaign meta should block the manual search bid tool."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock(spec=FSMContext)
+    state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
+
+    adv_setting = _make_adv_setting(adv_setting_id=1, search_adv_id=999)
+    search_adv_setting = _make_adv_setting(adv_setting_id=999, adv_id=999)
+    search_adv_setting.wb_bid_type = "manual"
+    search_adv_setting.wb_placement_search = False
+    search_adv_setting.wb_placement_recommendations = True
+
+    callback_data = callbacks.SetCommonBidManual(
+        adv_setting_original_id=1,
+        wb_user_cabinet_original_id=10,
+    )
+    callback = _make_callback(callback_data, chat_id=111)
+
+    with patch(f"{MODULE}.sm") as mock_sm:
+        session_mock = MagicMock()
+        session_mock.__aenter__ = AsyncMock(return_value=session_mock)
+        session_mock.__aexit__ = AsyncMock(return_value=None)
+        mock_sm.return_value = session_mock
+
+        result_mock_1 = MagicMock()
+        result_mock_1.scalar_one_or_none.return_value = adv_setting
+        result_mock_2 = MagicMock()
+        result_mock_2.scalar_one_or_none.return_value = search_adv_setting
+        session_mock.execute = AsyncMock(side_effect=[result_mock_1, result_mock_2])
+
+        await set_common_bid_manual.set_common_bid_manual_start(
+            callback, callback_data, bot, state
+        )
+
+    bot.send_message.assert_called_once_with(
+        111, "Эта кнопка доступна только для Поисковых РК."
+    )
+    state.update_data.assert_not_called()
+    state.set_state.assert_not_called()
 
 
 @pytest.mark.unit
@@ -361,7 +410,7 @@ async def test_set_common_bid_manual_apply_partial_state_reload_menu() -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_set_common_bid_manual_apply_success() -> None:
-    """Test successful bid update: update WB, save to Redis, reload menu."""
+    """Test successful bid update: common bid + all search keyword bids."""
     bot = MagicMock()
     bot.send_message = AsyncMock()
     state = MagicMock(spec=FSMContext)
@@ -377,7 +426,7 @@ async def test_set_common_bid_manual_apply_success() -> None:
     message = _make_message(chat_id=111, text="100")
 
     adv_setting = _make_adv_setting(adv_setting_id=1, search_adv_id=999)
-    search_adv_setting = _make_adv_setting(adv_setting_id=999)
+    search_adv_setting = _make_adv_setting(adv_setting_id=999, adv_id=999)
     wb_user_cabinet = _make_wb_user_cabinet(cabinet_id=10)
 
     with patch(f"{MODULE}.sm") as mock_sm:
@@ -405,6 +454,13 @@ async def test_set_common_bid_manual_apply_success() -> None:
             factory = MagicMock()
             hub = MagicMock()
             hub.wb_modifier.update_search_adv_common_cpm = AsyncMock()
+            hub.wb_modifier.set_normquery_bids = AsyncMock()
+            hub.wb_data_manager.get_current_bids_for_advs = AsyncMock(
+                return_value=[
+                    SimpleNamespace(advert_id=999, nm_id=12345, norm_query="купить платье"),
+                    SimpleNamespace(advert_id=999, nm_id=67890, norm_query="сарафан"),
+                ]
+            )
             hub.redis_client_wrapper = MagicMock()
 
             factory.get_wb_manager_hub.return_value = hub
@@ -423,28 +479,40 @@ async def test_set_common_bid_manual_apply_success() -> None:
                     redis_ts_instance.set = AsyncMock()
                     mock_redis_ts.return_value = redis_ts_instance
 
-                    with patch(f"{MODULE}.AdvSettingMenu") as mock_menu:
-                        # AdvSettingMenu() returns instance, instance() is async
-                        menu_instance = AsyncMock()
-                        mock_menu.return_value = menu_instance
+                    with patch(f"{MODULE}.RedisClusterBidsTimestampManager") as mock_cluster_ts:
+                        cluster_ts_instance = MagicMock()
+                        cluster_ts_instance.set = AsyncMock()
+                        mock_cluster_ts.return_value = cluster_ts_instance
 
-                        await set_common_bid_manual.set_common_bid_manual_apply(
-                            message, bot, state
-                        )
+                        with patch(f"{MODULE}.AdvSettingMenu") as mock_menu:
+                            # AdvSettingMenu() returns instance, instance() is async
+                            menu_instance = AsyncMock()
+                            mock_menu.return_value = menu_instance
 
-    # Verify success message
-    message.answer.assert_called_once()
-    assert "Общая ставка изменена на 100 р." in message.answer.call_args[0][0]
+                            await set_common_bid_manual.set_common_bid_manual_apply(
+                                message, bot, state
+                            )
+
+    # Verify progress + success messages
+    assert message.answer.await_count == 2
+    progress_text = message.answer.await_args_list[0].args[0]
+    success_text = message.answer.await_args_list[1].args[0]
+    assert "Отправляю новую ставку в WB" in progress_text
+    assert "Общая ставка поисковой РК установлена: 100 ₽" in success_text
+    assert "Такая же ставка поставлена всем ключам кампании" in success_text
 
     # Verify state cleared
     state.set_state.assert_called_once_with(None)
 
     # Verify WB update called
     hub.wb_modifier.update_search_adv_common_cpm.assert_called_once()
+    assert hub.wb_modifier.set_normquery_bids.await_count == 2
 
     # Verify Redis updates
     redis_value_instance.set_bids.assert_called_once()
     redis_ts_instance.set.assert_called_once()
+    # Cluster timestamp must be stamped when any keyword bids were sent.
+    cluster_ts_instance.set.assert_awaited_once_with(adv_setting)
 
     # Verify menu reloaded
     mock_menu.assert_called_once_with(bot, 111, wb_user_cabinet, adv_setting)
@@ -473,6 +541,118 @@ async def test_set_common_bid_manual_apply_invalid_input() -> None:
     message.answer.assert_called_once()
     assert "Введите целое число" in message.answer.call_args[0][0]
     assert "50 р." in message.answer.call_args[0][0]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_common_bid_manual_apply_invalid_input_does_not_call_wb_write() -> None:
+    """Invalid input must stop before any WB write paths are called."""
+    bot = MagicMock()
+    state = MagicMock(spec=FSMContext)
+    state.get_data = AsyncMock(
+        return_value={
+            "adv_setting_original_id": 1,
+            "wb_user_cabinet_original_id": 10,
+            "min_bid_search": 50,
+        }
+    )
+    message = _make_message(chat_id=111, text="abc")
+
+    with patch(f"{MODULE}.DIManager.create") as mock_di:
+        await set_common_bid_manual.set_common_bid_manual_apply(message, bot, state)
+
+    mock_di.assert_not_called()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_set_common_bid_manual_apply_partial_keyword_update_reported() -> None:
+    """Partial normquery failures should return a partial success report."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock(spec=FSMContext)
+    state.get_data = AsyncMock(
+        return_value={
+            "adv_setting_original_id": 1,
+            "wb_user_cabinet_original_id": 10,
+            "min_bid_search": 50,
+        }
+    )
+    state.set_state = AsyncMock()
+
+    message = _make_message(chat_id=111, text="100")
+
+    adv_setting = _make_adv_setting(adv_setting_id=1, search_adv_id=999)
+    search_adv_setting = _make_adv_setting(adv_setting_id=999, adv_id=999)
+    wb_user_cabinet = _make_wb_user_cabinet(cabinet_id=10)
+
+    with patch(f"{MODULE}.sm") as mock_sm:
+        session_mock = MagicMock()
+        session_mock.__aenter__ = AsyncMock(return_value=session_mock)
+        session_mock.__aexit__ = AsyncMock(return_value=None)
+        mock_sm.return_value = session_mock
+
+        result_adv_1 = MagicMock()
+        result_adv_1.scalar_one_or_none.return_value = adv_setting
+        result_search = MagicMock()
+        result_search.scalar_one_or_none.return_value = search_adv_setting
+        result_cabinet = MagicMock()
+        result_cabinet.scalar_one_or_none.return_value = wb_user_cabinet
+        result_adv_2 = MagicMock()
+        result_adv_2.scalar_one_or_none.return_value = adv_setting
+        session_mock.execute = AsyncMock(
+            side_effect=[result_adv_1, result_search, result_cabinet, result_adv_2]
+        )
+
+        with patch(f"{MODULE}.DIManager.create") as mock_di:
+            container = MagicMock()
+            factory = MagicMock()
+            hub = MagicMock()
+            hub.wb_modifier.update_search_adv_common_cpm = AsyncMock()
+            hub.wb_modifier.set_normquery_bids = AsyncMock(
+                side_effect=[None, RuntimeError("wb cluster error")]
+            )
+            hub.wb_data_manager.get_current_bids_for_advs = AsyncMock(
+                return_value=[
+                    SimpleNamespace(advert_id=999, nm_id=12345, norm_query="купить платье"),
+                    SimpleNamespace(advert_id=999, nm_id=67890, norm_query="сарафан"),
+                ]
+            )
+            hub.redis_client_wrapper = MagicMock()
+            factory.get_wb_manager_hub.return_value = hub
+            container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory.return_value = factory
+            mock_di.return_value.__aenter__ = AsyncMock(return_value=container)
+            mock_di.return_value.__aexit__ = AsyncMock(return_value=None)
+
+            with patch(f"{MODULE}.RedisCommonBidValueManager") as mock_redis_value:
+                with patch(f"{MODULE}.RedisCommonBidTimestampManager") as mock_redis_ts:
+                    redis_value_instance = MagicMock()
+                    redis_value_instance.set_bids = AsyncMock()
+                    mock_redis_value.return_value = redis_value_instance
+
+                    redis_ts_instance = MagicMock()
+                    redis_ts_instance.set = AsyncMock()
+                    mock_redis_ts.return_value = redis_ts_instance
+
+                    with patch(f"{MODULE}.RedisClusterBidsTimestampManager") as mock_cluster_ts:
+                        cluster_ts_instance = MagicMock()
+                        cluster_ts_instance.set = AsyncMock()
+                        mock_cluster_ts.return_value = cluster_ts_instance
+
+                        with patch(f"{MODULE}.AdvSettingMenu") as mock_menu:
+                            menu_instance = AsyncMock()
+                            mock_menu.return_value = menu_instance
+
+                            await set_common_bid_manual.set_common_bid_manual_apply(
+                                message, bot, state
+                            )
+
+    reply_text = message.answer.call_args[0][0]
+    assert "Общая ставка установлена: 100 ₽." in reply_text
+    assert "По ключам обновлено: 1 из 2." in reply_text
+    assert "сарафан" in reply_text
+    # Partial keyword success still stamps cluster bids timestamp.
+    cluster_ts_instance.set.assert_awaited_once_with(adv_setting)
 
 
 @pytest.mark.unit

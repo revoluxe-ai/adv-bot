@@ -46,7 +46,7 @@ Tool: Task
 arguments:
   description: "opsx-bug-team/<WORKER_ID>"   # short UI title
   subagent_type: <TASK_SUBAGENT_TYPE from REGISTRY>
-  # model: OMIT — inherit / auto only
+  model: inherit
   run_in_background: false | true   # true only for long workers with heartbeat
   prompt: |
     WORKER_ID: <WORKER_ID>
@@ -63,7 +63,7 @@ arguments:
     MAX_ATTEMPTS: <n>
     CHECKPOINT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/CHECKPOINT.md
     HEARTBEAT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/heartbeats/<WEX>.json
-    MODEL_SELECTION_POLICY: auto
+    MODEL_SELECTION_POLICY: inherit
     FORBIDDEN: do not perform other workers' duties
     FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python/packet writes
     REQUIRED: write OUTPUT_PACKET only within WRITE_BOUNDARY;
@@ -75,7 +75,7 @@ arguments:
               cite preflight Shell payload I/O (anti-heredoc) + Windows Shell JSON/JSONL write safety
 ```
 
-`model` must never be set. Prefer registry `TASK_SUBAGENT_TYPE`.
+`model` must always be `inherit` (explicit). Prefer registry `TASK_SUBAGENT_TYPE`.
 
 Worker packet / JSONL writes MUST follow
 `.cursor/commands/opsx-execution-preflight.md` →

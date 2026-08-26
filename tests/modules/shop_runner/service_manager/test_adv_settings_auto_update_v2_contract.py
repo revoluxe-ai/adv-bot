@@ -19,6 +19,7 @@ import pytest
 
 from app.core.redis_manager_v2.redis_client import RedisClient
 from app.modules.common_slaves.wildberries.models import AdvSetting
+from app.modules.common_slaves.wildberries.models.models import BidderCoroutineType
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.shop_runner.service_manager import CoroutinesManager
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
@@ -60,6 +61,20 @@ def _configure_adv_for_v2_pipeline(adv_setting_mock: MagicMock) -> None:
     adv_setting_mock.active_status = "started"
 
 
+def _bidder_adv(
+    *,
+    adv_id: int,
+    bidder_coroutine_type: BidderCoroutineType,
+) -> MagicMock:
+    adv = MagicMock()
+    adv.adv_id = adv_id
+    adv.auto_adv_id = adv_id
+    adv.bot_active = True
+    adv.bidder_active = True
+    adv.bidder_coroutine_type = bidder_coroutine_type
+    return adv
+
+
 def _make_complex_adv(
     wb_api: WBApi,
     adv_setting_mock: MagicMock,
@@ -83,6 +98,106 @@ def test_max_workers_for_caps_and_minimum():
     assert CoroutinesManager._max_workers_for(1, cap=16) == 1
     assert CoroutinesManager._max_workers_for(10, cap=16) == 10
     assert CoroutinesManager._max_workers_for(100, cap=16) == 16
+
+
+@pytest.mark.asyncio
+async def test_update_cpm_bid_is_the_old_bidder_path(
+    access_mock,
+    client_session_mock,
+    fake_redis,
+) -> None:
+    access_mock.shop_id = "shop-old-bidder"
+    wb_api = WBApi(access_mock, client_session_mock)
+    old_adv = _bidder_adv(
+        adv_id=1,
+        bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+    )
+    new_adv = _bidder_adv(
+        adv_id=2,
+        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+    )
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_complex_advs",
+            new=AsyncMock(return_value=[old_adv, new_adv]),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.manager.run_tasks",
+            new=AsyncMock(return_value=[None]),
+        ) as run_tasks_mock,
+    ):
+        manager = CoroutinesManager(
+            wb_api,
+            RedisClient(redis_client=fake_redis),
+            tasks_manager=TasksManager(max_workers=1),
+            plan_fact_reader=MagicMock(spec=PlanFactReader),
+            wb_manager_hub=MagicMock(),
+        )
+        manager._split_advs_by_stats_freshness = AsyncMock(
+            return_value=([old_adv], [])
+        )
+
+        await manager.update_cpm_bid.__wrapped__(manager)
+
+    manager._split_advs_by_stats_freshness.assert_awaited_once_with(
+        [old_adv], operation_name="update_cpm_bid"
+    )
+    run_tasks_mock.assert_called_once()
+    handlers = run_tasks_mock.call_args.args[0]
+    assert len(handlers) == 1
+
+
+@pytest.mark.asyncio
+async def test_update_cluster_bids_is_paid_cluster_path(
+    monkeypatch,
+    access_mock,
+    client_session_mock,
+    fake_redis,
+) -> None:
+    access_mock.shop_id = "shop-cluster-bidder"
+    wb_api = WBApi(access_mock, client_session_mock)
+    old_adv = _bidder_adv(
+        adv_id=1,
+        bidder_coroutine_type=BidderCoroutineType.OLD_UPDATE_CPM_BIDDER,
+    )
+    new_adv = _bidder_adv(
+        adv_id=2,
+        bidder_coroutine_type=BidderCoroutineType.UPDATE_CLUSTER_BIDS,
+    )
+    update_cluster_bids_manager = MagicMock()
+    update_cluster_bids_manager.update_cluster_bids = AsyncMock()
+    container = MagicMock()
+    container.update_cluster_bids_manager.return_value = update_cluster_bids_manager
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager.get_complex_advs",
+            new=AsyncMock(return_value=[old_adv, new_adv]),
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.di.ClusterBidsManagerContainer",
+            return_value=container,
+        ),
+    ):
+        manager = CoroutinesManager(
+            wb_api,
+            RedisClient(redis_client=fake_redis),
+            tasks_manager=TasksManager(max_workers=1),
+            plan_fact_reader=MagicMock(spec=PlanFactReader),
+            wb_manager_hub=MagicMock(redis_client_wrapper=MagicMock()),
+        )
+        manager._split_advs_by_stats_freshness = AsyncMock(
+            return_value=([new_adv], [])
+        )
+
+        await manager.update_cluster_bids.__wrapped__(manager, only_bot_active=True)
+
+    # Guard-map: paid auto/cluster path only; search/manual bidder is covered elsewhere.
+    manager._split_advs_by_stats_freshness.assert_awaited_once_with(
+        [old_adv, new_adv], operation_name="update_cluster_bids"
+    )
+    update_cluster_bids_manager.update_cluster_bids.assert_awaited_once_with([new_adv])
 
 
 @pytest.mark.asyncio
@@ -118,7 +233,7 @@ async def test_adv_settings_auto_update_returns_early_when_auto_setting_disabled
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
     manager._redis_stats_freshness_cache.mget_entries.assert_not_called()
@@ -152,7 +267,7 @@ async def test_adv_settings_auto_update_skips_when_no_complex_advs(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -191,7 +306,7 @@ async def test_adv_settings_auto_update_filters_bot_inactive(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -232,7 +347,7 @@ async def test_adv_settings_auto_update_filters_when_part_auto_setting_inactive(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -272,7 +387,7 @@ async def test_adv_settings_auto_update_filters_when_search_adv_not_started(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -314,7 +429,7 @@ async def test_adv_settings_auto_update_stats_freshness_hit_miss_fail_open(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
     assert run_tasks_mock.call_args.kwargs["return_exceptions"] is False
@@ -356,7 +471,7 @@ async def test_adv_settings_auto_update_stats_freshness_invalid_payload_fail_ope
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
 
@@ -403,7 +518,7 @@ async def test_adv_settings_auto_update_stats_freshness_stale_over_6h_skips_adv(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -450,7 +565,7 @@ async def test_adv_settings_auto_update_stats_freshness_stale_skips_adv(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_not_called()
 
@@ -511,7 +626,7 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
     kwargs = run_tasks_mock.call_args.kwargs
@@ -573,7 +688,7 @@ async def test_adv_settings_auto_update_migrates_v1_to_v2_before_dispatch(
             wb_manager_hub=MagicMock(),
         )
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     assert adv.auto_updater_version == 2
     session.execute.assert_awaited_once()

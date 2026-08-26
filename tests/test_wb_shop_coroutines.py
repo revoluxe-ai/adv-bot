@@ -109,7 +109,7 @@ async def test_adv_settings_auto_update(
             new=get_async_session_mock,
         ),
         patch(
-            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager._WBShopDataManager__get_adv_id_to_search_adv_map",
+            "app.modules.shop_runner.service_manager.wb_shop_data_manager.wb_shop_data_manager.WBShopDataManager._get_adv_id_to_search_adv_map",
             new=AsyncMock(return_value={}), # Возвращаем пустой словарь AdvSetting
         ),
         patch(
@@ -167,7 +167,7 @@ async def test_adv_settings_auto_update(
         # decorator while_coroutine_decorator запускает корутину в бесконечном цикле,
         # поэтому в тестах мы вызываем оригинальную функцию через __wrapped__,
         # чтобы выполнить её один раз и не зависнуть.
-        await manager.adv_settings_auto_update.__wrapped__(manager) # noqa
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)  # noqa
 
 
 @pytest.mark.integration

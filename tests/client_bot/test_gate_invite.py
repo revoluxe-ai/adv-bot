@@ -104,7 +104,7 @@ async def test_gate_invite_wrong_code_user_stays_blocked(
     mock_bot: AsyncMock,
     mock_state: MagicMock,
 ):
-    """Неверный код → user.passed_gate остаётся false."""
+    """Неверный код → user.passed_gate остаётся false и пользователю заново показывается invite-screen."""
     user = _make_user(telegram_id=2002, passed_gate=False)
     session = AsyncMock()
     session.execute = AsyncMock()
@@ -139,10 +139,20 @@ async def test_gate_invite_wrong_code_user_stays_blocked(
         await gate_invite_process_code(message, mock_bot, mock_state)
 
     assert user.passed_gate is False
-    mock_bot.send_message.assert_called()
-    call_args = mock_bot.send_message.call_args
-    text = call_args.kwargs.get("text", call_args[0][1] if call_args[0] else "")
-    assert "Неверный" in text
+    assert mock_bot.send_message.await_count == 2
+
+    first_call = mock_bot.send_message.await_args_list[0]
+    first_text = first_call.kwargs.get(
+        "text", first_call.args[1] if len(first_call.args) > 1 else ""
+    )
+    assert "Неверный" in first_text
+
+    second_call = mock_bot.send_message.await_args_list[1]
+    second_text = second_call.kwargs.get(
+        "text", second_call.args[1] if len(second_call.args) > 1 else ""
+    )
+    assert "Ввести инвайт" in second_text
+    assert "инвайт-код" in second_text
 
 
 async def test_gate_invite_expired_becomes_expired_user_stays_blocked(

@@ -1,4 +1,4 @@
-import datetime
+"""Unit: детекция типа WB JWT (BASE/TEST/PERSONAL/SERVICE/UNKNOWN)."""
 
 import jwt
 import pytest
@@ -7,13 +7,18 @@ from app.modules.common_slaves.wildberries.models.models import WBToken, WBToken
 
 pytestmark = pytest.mark.unit
 
+# Фиксированный exp: иначе JWT (и node id parametrize) меняются каждую секунду
+# и pytest-xdist падает с «Different tests were collected between gwN».
+_FIXED_EXP = 1_900_000_000
+
 
 def _build_token(*, acc: int, for_field: str | None, t: bool) -> str:
+    """Собрать детерминированный JWT для collection-safe parametrize."""
     payload: dict[str, object] = {
         "id": "test",
         "s": 102,
         "sid": "shop_test",
-        "exp": int((datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=30)).timestamp()),
+        "exp": _FIXED_EXP,
         "acc": acc,
         "t": t,
     }
@@ -31,6 +36,7 @@ def _build_token(*, acc: int, for_field: str | None, t: bool) -> str:
         (_build_token(acc=4, for_field="asid:123", t=False), WBTokenType.SERVICE),
         (_build_token(acc=3, for_field=None, t=False), WBTokenType.UNKNOWN),
     ],
+    ids=["base", "test", "personal", "service", "unknown"],
 )
 def test_detect_wb_token_type(token: str, expected_type: WBTokenType) -> None:
     wb_token = WBToken(api_key=token)
