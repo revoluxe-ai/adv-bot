@@ -87,8 +87,11 @@ async def _create_adv(
     return adv
 
 
-def _make_callback(chat_id: int = 777) -> SimpleNamespace:
-    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+def _make_callback(chat_id: int = 777, user_id: int = 500005) -> SimpleNamespace:
+    return SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)),
+        from_user=SimpleNamespace(id=user_id),
+    )
 
 
 async def _get_keyword_statuses(
@@ -301,7 +304,7 @@ async def test_wb_update_minus_keywords_raises_runtime_error_when_complex_adv_mi
     bot = AsyncMock()
     state = MagicMock()
     state.get_data = AsyncMock(return_value={})
-    callback = _make_callback(chat_id=9993)
+    callback = _make_callback(chat_id=9993, user_id=500005)
     callback_data = callbacks.WBUpdate(
         action="update_minus_keywords",
         adv_setting_original_id=adv.id,
@@ -360,7 +363,7 @@ async def test_wb_update_minus_keywords_keeps_soft_message_for_bot_inactive(
     bot = AsyncMock()
     state = MagicMock()
     state.get_data = AsyncMock(return_value={})
-    callback = _make_callback(chat_id=9994)
+    callback = _make_callback(chat_id=9994, user_id=500006)
     callback_data = callbacks.WBUpdate(
         action="update_minus_keywords",
         adv_setting_original_id=adv.id,

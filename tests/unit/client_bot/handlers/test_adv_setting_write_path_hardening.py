@@ -11,12 +11,15 @@ import pytest
 from app.client_bot.user_interface.handlers.adv_setting import (
     adv_handler,
     turn_adv_off,
+    turn_adv_off_all,
     turn_adv_on,
 )
 from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
     ADV_ACCESS_DENIED_MESSAGE,
     CABINET_ACCESS_DENIED_MESSAGE,
     V3_BACKFILL_FAILURE_MESSAGE,
+    apply_campaign_defaults,
+    wb_update_minus_keywords,
 )
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.token_monitoring.services.token_info_service import (
@@ -61,6 +64,21 @@ def _build_turn_callback_data(
         wb_user_cabinet_original_id=wb_user_cabinet_original_id,
         adv_original_id=adv_original_id,
     )
+
+
+def _build_apply_defaults_callback_data(
+    wb_user_cabinet_original_id: int = 77, adv_setting_original_id: int = 55
+) -> SimpleNamespace:
+    """Build callback data for apply_campaign_defaults handler."""
+    return SimpleNamespace(
+        wb_user_cabinet_original_id=wb_user_cabinet_original_id,
+        adv_setting_original_id=adv_setting_original_id,
+    )
+
+
+def _build_minus_update_callback_data(adv_setting_original_id: int = 55) -> SimpleNamespace:
+    """Build callback data for wb_update_minus_keywords handler."""
+    return SimpleNamespace(adv_setting_original_id=adv_setting_original_id)
 
 
 def _build_adv_callback_data(adv_original_id: int = 55) -> SimpleNamespace:
@@ -217,6 +235,38 @@ async def test_turn_adv_on_rejects_foreign_cabinet() -> None:
     shop_menu_ctor.assert_called_once()
 
 
+async def test_turn_adv_off_all_rejects_foreign_cabinet() -> None:
+    """Bulk turn-off must not mutate campaigns for cabinets not owned by user."""
+    callback = _build_callback()
+    callback_data = _build_turn_callback_data()
+    bot = AsyncMock()
+    state = AsyncMock()
+    owner_result = MagicMock()
+    owner_result.scalar_one_or_none.return_value = None
+    owner_result.unique.return_value = owner_result
+    session = MagicMock()
+    session.commit = AsyncMock()
+    session.execute = AsyncMock(return_value=owner_result)
+    shop_menu_call = AsyncMock()
+    shop_menu_ctor = MagicMock(return_value=shop_menu_call)
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            _MockSessionMaker(session),
+        ),
+        patch("app.client_bot.user_interface.handlers.adv_setting.adv_setting.ShopMenu", shop_menu_ctor),
+    ):
+        await turn_adv_off_all(callback, state, callback_data, bot)
+
+    session.commit.assert_not_awaited()
+    assert any(
+        CABINET_ACCESS_DENIED_MESSAGE in str(call.args[1])
+        for call in bot.send_message.await_args_list
+    )
+    shop_menu_ctor.assert_not_called()
+
+
 async def test_turn_adv_off_rejects_foreign_adv() -> None:
     """Turn-off must not mutate campaigns outside owner cabinet."""
     callback = _build_callback()
@@ -241,6 +291,103 @@ async def test_turn_adv_off_rejects_foreign_adv() -> None:
 
     session.commit.assert_not_awaited()
     bot.send_message.assert_awaited_once_with(303, ADV_ACCESS_DENIED_MESSAGE)
+
+
+async def test_apply_campaign_defaults_rejects_foreign_cabinet() -> None:
+    """Apply defaults must not mutate campaigns for cabinets not owned by user."""
+    callback = _build_callback()
+    callback_data = _build_apply_defaults_callback_data()
+    bot = AsyncMock()
+    owner_result = MagicMock()
+    owner_result.scalar_one_or_none.return_value = None
+    owner_result.unique.return_value = owner_result
+    session = MagicMock()
+    session.commit = AsyncMock()
+    session.execute = AsyncMock(return_value=owner_result)
+    adv_menu_ctor = MagicMock(return_value=AsyncMock())
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            _MockSessionMaker(session),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            adv_menu_ctor,
+        ),
+    ):
+        await apply_campaign_defaults(callback, callback_data, bot)
+
+    session.commit.assert_not_awaited()
+    bot.send_message.assert_awaited_once_with(303, CABINET_ACCESS_DENIED_MESSAGE)
+    adv_menu_ctor.assert_not_called()
+
+
+async def test_wb_update_minus_keywords_rejects_foreign_adv() -> None:
+    """Manual minus refresh must not invoke WB write for unowned campaigns."""
+    callback = _build_callback()
+    callback_data = _build_minus_update_callback_data()
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={})
+    owner_result = MagicMock()
+    owner_result.scalar_one_or_none.return_value = None
+    owner_result.unique.return_value = owner_result
+    session = MagicMock()
+    session.execute = AsyncMock(return_value=owner_result)
+    di_create = AsyncMock()
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            _MockSessionMaker(session),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.DIManager.create",
+            di_create,
+        ),
+    ):
+        await wb_update_minus_keywords(callback, callback_data, bot, state)
+
+    di_create.assert_not_awaited()
+    assert any(
+        CABINET_ACCESS_DENIED_MESSAGE in str(call.args[1])
+        for call in bot.send_message.await_args_list
+    )
+
+
+async def test_apply_campaign_defaults_rejects_foreign_adv() -> None:
+    """Apply defaults must not mutate campaigns outside owner cabinet."""
+    callback = _build_callback()
+    callback_data = _build_apply_defaults_callback_data()
+    bot = AsyncMock()
+    wb_cabinet = SimpleNamespace(id=31, shop_id="shop_77")
+    wb_user_cabinet = SimpleNamespace(id=77, wb_cabinet_id=31, wb_cabinet=wb_cabinet)
+    owner_result = MagicMock()
+    owner_result.scalar_one_or_none.return_value = wb_user_cabinet
+    owner_result.unique.return_value = owner_result
+    adv_result = MagicMock()
+    adv_result.scalar_one_or_none.return_value = None
+    session = MagicMock()
+    session.commit = AsyncMock()
+    session.execute = AsyncMock(side_effect=[owner_result, adv_result])
+    adv_menu_ctor = MagicMock(return_value=AsyncMock())
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            _MockSessionMaker(session),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.AdvSettingMenu",
+            adv_menu_ctor,
+        ),
+    ):
+        await apply_campaign_defaults(callback, callback_data, bot)
+
+    session.commit.assert_not_awaited()
+    bot.send_message.assert_awaited_once_with(303, ADV_ACCESS_DENIED_MESSAGE)
+    adv_menu_ctor.assert_not_called()
 
 
 async def test_adv_handler_uses_owner_validated_cabinet_not_stale_fsm() -> None:

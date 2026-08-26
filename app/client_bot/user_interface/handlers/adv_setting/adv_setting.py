@@ -9,7 +9,7 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload
 
 from app.core.di.wb_manager_hub import WBManagerHub, WBManagerHubFactory
 from app.modules import balance_manager
@@ -315,19 +315,6 @@ async def _load_adv_setting_in_session(
         select(AdvSetting).where(AdvSetting.id == adv_original_id)
     )
     return result.scalar_one_or_none()
-
-
-async def _load_adv_setting_with_cabinet_in_session(
-    session: AsyncSession,
-    adv_original_id: int,
-) -> AdvSetting:
-    """Загрузить РК и кабинет в переданной WRITE-сессии."""
-    result = await session.execute(
-        select(AdvSetting)
-        .options(joinedload(AdvSetting.wb_cabinet))
-        .where(AdvSetting.id == adv_original_id)
-    )
-    return result.scalar_one()
 
 
 async def _load_wb_user_cabinet_in_session(
@@ -754,6 +741,14 @@ async def turn_adv_off_all(
     )
     wb_user_cabinet_original_id = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
+        wb_user_cabinet = await _load_wb_user_cabinet_for_owner_in_session(
+            session,
+            wb_user_cabinet_original_id,
+            callback.from_user.id,
+        )
+        if wb_user_cabinet is None:
+            _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+            return
         advs = await _load_adv_settings_for_cabinet_for_update_in_session(
             session, wb_user_cabinet_original_id
         )
@@ -822,10 +817,24 @@ async def apply_campaign_defaults(
     chat_id = callback.message.chat.id
 
     adv_original_id = callback_data.adv_setting_original_id
+    wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
     async with sm(read_only=False) as session:
-        adv_setting = await _load_adv_setting_with_cabinet_in_session(
-            session, adv_original_id
+        wb_user_cabinet = await _load_wb_user_cabinet_for_owner_in_session(
+            session,
+            wb_user_cabinet_original_id,
+            callback.from_user.id,
         )
+        if wb_user_cabinet is None:
+            _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+            return
+        adv_setting = await _load_adv_for_owner_cabinet_in_session(
+            session,
+            adv_original_id=adv_original_id,
+            wb_user_cabinet=wb_user_cabinet,
+        )
+        if adv_setting is None:
+            _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+            return
 
         # spec card-ab-hold-mode «Shared defaults MUST NOT disable or mutate A/B
         # Hold on a held campaign» / decision §13: «Применить дефолты» — не
@@ -833,31 +842,20 @@ async def apply_campaign_defaults(
         # un-owned disable: mode→off + stale snapshot + сброс V3/structural).
         # Отключение A/B Hold — только owned Telegram EXIT на экране режима.
         if is_ab_hold_structural_freeze(adv_setting.card_ab_hold_mode):
-            await bot.send_message(
+            _ = await bot.send_message(
                 chat_id,
                 "Кампания в режиме A/B Hold — дефолтные настройки не применены. "
                 "Сначала выключите A/B Hold на экране режима, затем повторите.",
             )
         else:
             # Применяем дефолты через ORM
-            apply_common_defaults_settings_for_adv(adv_setting, adv_setting.wb_cabinet)
+            apply_common_defaults_settings_for_adv(
+                adv_setting, wb_user_cabinet.wb_cabinet
+            )
             await session.commit()
 
-            await bot.send_message(
+            _ = await bot.send_message(
                 chat_id, "Дефолтные настройки применены успешно!"
-            )
-
-        # Обновить меню кампании
-        wb_user_cabinet_original_id: int = callback_data.wb_user_cabinet_original_id
-        async with sm(read_only=True) as session_read:
-            wb_user_cabinet = await _load_wb_user_cabinet_in_session(
-                session_read, wb_user_cabinet_original_id
-            )
-
-        if not wb_user_cabinet:
-            raise RuntimeError(
-                "WBUserCabinet not found for original_id="
-                f"{wb_user_cabinet_original_id}"
             )
 
         await AdvSettingMenu(bot, chat_id, wb_user_cabinet, adv_setting)()
@@ -881,15 +879,22 @@ async def wb_update_minus_keywords(
     await bot.send_message(chat_id, "Обновляю минус-слова…")
 
     async with sm(read_only=True) as session:
-        adv_setting = await _load_adv_setting_with_cabinet_in_session(
-            session, adv_setting_original_id
+        wb_user_cabinet = await _load_wb_user_cabinet_for_adv_in_session(
+            session, callback.from_user.id, adv_setting_original_id
         )
+        if wb_user_cabinet is None:
+            _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+            return
+        adv_setting = await _load_adv_for_owner_cabinet_in_session(
+            session,
+            adv_original_id=adv_setting_original_id,
+            wb_user_cabinet=wb_user_cabinet,
+        )
+        if adv_setting is None:
+            _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+            return
 
-    wb_cabinet = getattr(adv_setting, "wb_cabinet", None)
-    if wb_cabinet is None:
-        raise RuntimeError(
-            f"WBCabinet missing for AdvSetting original_id={adv_setting_original_id}"
-        )
+    wb_cabinet = wb_user_cabinet.wb_cabinet
     shop_id = wb_cabinet.shop_id
     if not shop_id:
         raise RuntimeError(

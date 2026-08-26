@@ -143,7 +143,12 @@ class _Result:
         return self._adv
 
     def scalar_one_or_none(self) -> object | None:
-        return self._adv
+        if self._adv is not None:
+            return self._adv
+        return self._wbc
+
+    def unique(self) -> "_Result":
+        return self
 
     def scalar(self) -> object | None:
         return self._wbc
@@ -156,13 +161,28 @@ class _Result:
 class _Session:
     """Async-сессия, записывающая execute/commit (без реальной БД)."""
 
-    def __init__(self, result: _Result, recorder: list[str]) -> None:
-        self._result = result
+    def __init__(
+        self,
+        *,
+        adv: object | None = None,
+        wb_user_cabinet: object | None = None,
+        advs: list[object] | None = None,
+        recorder: list[str],
+    ) -> None:
+        self._adv = adv
+        self._wbc = wb_user_cabinet
+        self._advs = advs
         self._recorder = recorder
+        self._execute_count = 0
 
     async def execute(self, _stmt: object) -> _Result:
         self._recorder.append("execute")
-        return self._result
+        self._execute_count += 1
+        if self._advs is not None:
+            return _Result(advs=self._advs)
+        if self._execute_count == 1:
+            return _Result(wb_user_cabinet=self._wbc)
+        return _Result(adv=self._adv)
 
     async def commit(self) -> None:
         self._recorder.append("commit")
@@ -174,18 +194,32 @@ class _Session:
         return False
 
 
-def _session_maker(result: _Result, recorder: list[str]):
+def _session_maker(
+    *,
+    adv: object | None = None,
+    wb_user_cabinet: object | None = None,
+    advs: list[object] | None = None,
+    recorder: list[str],
+):
     """Фабрика, совместимая с ``sm`` / ``sm(read_only=...)``."""
 
     def _sm(*_a: object, **_kw: object) -> _Session:
-        return _Session(result, recorder)
+        return _Session(
+            adv=adv,
+            wb_user_cabinet=wb_user_cabinet,
+            advs=advs,
+            recorder=recorder,
+        )
 
     return _sm
 
 
-def _callback(chat_id: int = 100) -> SimpleNamespace:
-    """Минимальный CallbackQuery: только ``message.chat.id``."""
-    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+def _callback(chat_id: int = 100, user_id: int = 9001) -> SimpleNamespace:
+    """Минимальный CallbackQuery: chat id и telegram user id."""
+    return SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)),
+        from_user=SimpleNamespace(id=user_id),
+    )
 
 
 @pytest.mark.unit
@@ -193,13 +227,15 @@ def _callback(chat_id: int = 100) -> SimpleNamespace:
 async def test_apply_campaign_defaults_blocks_held_campaign() -> None:
     """15.2: single handler на held → нет un-owned disable, нет commit, mode сохранён."""
     adv = _held_adv("active")
-    wb_user_cabinet = SimpleNamespace(id=2)
+    wb_user_cabinet = SimpleNamespace(id=2, wb_cabinet_id=31, wb_cabinet=adv.wb_cabinet)
     recorder: list[str] = []
-    result = _Result(adv=adv, wb_user_cabinet=wb_user_cabinet)
     bot = AsyncMock()
 
     with (
-        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(
+            f"{_HANDLER}.sm",
+            _session_maker(adv=adv, wb_user_cabinet=wb_user_cabinet, recorder=recorder),
+        ),
         patch(f"{_HANDLER}.AdvSettingMenu", MagicMock(return_value=AsyncMock())),
     ):
         await apply_campaign_defaults(
@@ -224,13 +260,15 @@ async def test_apply_campaign_defaults_blocks_held_campaign() -> None:
 async def test_apply_campaign_defaults_applies_off_campaign() -> None:
     """15.2 paired positive: single handler на OFF → дефолты применены + commit."""
     adv = _off_adv()
-    wb_user_cabinet = SimpleNamespace(id=2)
+    wb_user_cabinet = SimpleNamespace(id=2, wb_cabinet_id=31, wb_cabinet=adv.wb_cabinet)
     recorder: list[str] = []
-    result = _Result(adv=adv, wb_user_cabinet=wb_user_cabinet)
     bot = AsyncMock()
 
     with (
-        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(
+            f"{_HANDLER}.sm",
+            _session_maker(adv=adv, wb_user_cabinet=wb_user_cabinet, recorder=recorder),
+        ),
         patch(f"{_HANDLER}.AdvSettingMenu", MagicMock(return_value=AsyncMock())),
     ):
         await apply_campaign_defaults(
@@ -255,12 +293,14 @@ async def test_apply_defaults_for_shop_skips_held_applies_rest() -> None:
     held = _held_adv("active")
     off = _off_adv()
     recorder: list[str] = []
-    result = _Result(advs=[held, off])
     bot = AsyncMock()
     state = MagicMock()
 
     with (
-        patch(f"{_HANDLER}.sm", _session_maker(result, recorder)),
+        patch(
+            f"{_HANDLER}.sm",
+            _session_maker(advs=[held, off], recorder=recorder),
+        ),
         patch(f"{_HANDLER}.ShopMenu", MagicMock(return_value=AsyncMock())),
     ):
         await apply_defaults_for_shop(
