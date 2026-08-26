@@ -640,3 +640,27 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 **Приоритет:** P1 перед несколькими admin'ами и реальными деньгами; остальное — волна 2.
 
 **Next:** ticket «Partner payouts hardening»; не смешивать с free-bot merge DoD.
+
+## TECH DEBT: client_bot owner-check gaps on callback WRITE/export (2026-08-26)
+
+Контекст: Bugbot/review `implement-free-bot-rebase` vs `stage` (direct, без subagents). Owner (2026-08-26): **не блокер merge** — унести в техдолг.
+
+**Threat model (Owner):** бот в private chat; Telegram callback **нельзя переслать** как рабочую кнопку чужому. Классический IDOR «переслал inline-кнопку» не применим. Остаточный вектор — forge `callback_data` неофициальным клиентом на своём сообщении; вне текущего DoD.
+
+**Что уже hardened в этой ветке (не трогать как долг):** CPM message writes / workbook **import** / white_list toggle — owner/cabinet check есть.
+
+- [ ] **P2 — `on_off_controller` без owner-check** (`app/modules/wb_adv_updater/modules/bidder/tg_bot_handlers/on_off_controller.py`)
+  `set_auto_cpm` (`get_min_position`) и `off_auto_cpm` переключают `bidder_active` по `adv_original_id` без проверки Telegram-владельца кабинета. Sibling-пути в `cpm_builder` уже с owner-check.
+  **Фикс:** тот же helper, что CPM/workbook — `load_wb_user_cabinet_for_adv_in_session` + `load_adv_for_owner_cabinet_in_session`; deny → user message, без commit.
+
+- [ ] **P2 — `set_common_bid_manual` без owner-check** (`app/client_bot/user_interface/handlers/set_common_bid_manual.py`)
+  Start/apply грузят `AdvSetting` по id из callback/FSM и пишут ставки в WB без привязки к `from_user`.
+  **Фикс:** owner-check на start и apply до WB write; deny без мутации.
+
+- [ ] **P3 — download target-places workbook без owner-check** (`cpm_builder.download_target_places_template` → `build_target_place_workbook`)
+  Export ключей/позиций по `adv_original_id` без owner; import уже deny для чужого кабинета (асимметрия).
+  **Фикс:** owner-check в export (или `telegram_user_id` в `build_target_place_workbook`), зеркально import.
+
+**Приоритет:** low/defense-in-depth после free-bot rollout; поднять, если бот начнёт жить в группах/общих чатах или threat model включит неофициальные клиенты.
+
+**Next:** при touch CPM / common-bid / workbook — закрыть owner-check в том же PR; не смешивать с merge DoD vs `stage`.
