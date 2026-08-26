@@ -138,6 +138,68 @@ async def test_phone_required_middleware_allows_user_with_phone() -> None:
 
 
 @pytest.mark.asyncio
+async def test_phone_required_middleware_blocks_without_phone_when_invite_gate_off() -> None:
+    """Production default (invite_gate off) still requires phone for registered users."""
+    user = MagicMock(spec=User)
+    user.passed_gate = False
+    user.phone = None
+    _, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=Message)
+    event.from_user = MagicMock(id=334, username="u")
+    event.chat = MagicMock(spec=Chat, id=334)
+    event.contact = None
+    bot = AsyncMock()
+    handler = AsyncMock()
+
+    with patch("app.client_bot.middlewars.phone_required._sm", session_cm), patch(
+        "app.client_bot.middlewars.phone_required.settings"
+    ) as mock_settings:
+        mock_settings.invite_gate = False
+        await PhoneRequiredMiddleware()(handler, event, {"bot": bot})
+
+    handler.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+    kwargs = bot.send_message.call_args.kwargs
+    text = _extract_sent_text(bot.send_message)
+    assert text == get_phone_request_text()
+    assert_keyboard_has_buttons(kwargs["reply_markup"], ["Отправить номер телефона"])
+
+
+@pytest.mark.asyncio
+async def test_phone_required_middleware_blocks_callback_without_phone_invite_gate_off() -> None:
+    """Callbacks without phone are blocked when invite_gate is off (free-bot rollout)."""
+    user = MagicMock(spec=User)
+    user.passed_gate = True
+    user.phone = None
+    _, session_cm = make_session_context(user=user)
+
+    event = MagicMock(spec=CallbackQuery)
+    event.from_user = MagicMock(id=445, username="u", is_bot=False, first_name="User")
+    event.id = "callback-id"
+    event.chat_instance = "chat-instance"
+    event.data = "adv:test"
+    event.message = MagicMock(spec=Message)
+    event.message.message_id = 56
+    event.message.date = datetime.fromtimestamp(0, tz=timezone.utc)
+    event.message.chat = MagicMock(spec=Chat, id=445, type="private")
+    bot = AsyncMock()
+    handler = AsyncMock()
+    state = MagicMock(spec=FSMContext)
+    state.update_data = AsyncMock()
+
+    with patch("app.client_bot.middlewars.phone_required._sm", session_cm), patch(
+        "app.client_bot.middlewars.phone_required.settings"
+    ) as mock_settings:
+        mock_settings.invite_gate = False
+        await PhoneRequiredMiddleware()(handler, event, {"bot": bot, "state": state})
+
+    handler.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+    state.update_data.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_phone_required_middleware_skips_user_without_access() -> None:
     """A user without passed gate is ignored by the phone middleware."""
     user = MagicMock(spec=User)

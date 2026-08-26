@@ -72,18 +72,27 @@ class PhoneRequiredMiddleware(BaseMiddleware):
             logger.debug("PhoneRequiredMiddleware: user not found, pass through user=%s", telegram_id)
             return await handler(event, data)
 
-        access_granted = user.passed_gate or not settings.invite_gate
-        # invite deferred: default invite_gate=False → access_granted True (phone-only gate)
+        if user.phone:
+            logger.debug(
+                "PhoneRequiredMiddleware: pass through (has phone) user=%s",
+                telegram_id,
+            )
+            return await handler(event, data)
+
+        # invite_gate on: phone only after invite gate; off (prod default): phone-only gate
+        if settings.invite_gate and not user.passed_gate:
+            logger.debug(
+                "PhoneRequiredMiddleware: skip (invite gate not passed) user=%s",
+                telegram_id,
+            )
+            return await handler(event, data)
+
         logger.debug(
-            "PhoneRequiredMiddleware: user=%s passed_gate=%s has_phone=%s access_granted=%s",
+            "PhoneRequiredMiddleware: phone required user=%s passed_gate=%s invite_gate=%s",
             telegram_id,
             user.passed_gate,
-            bool(user.phone),
-            access_granted,
+            settings.invite_gate,
         )
-        if access_granted is False or user.phone:
-            logger.debug("PhoneRequiredMiddleware: pass through user=%s", telegram_id)
-            return await handler(event, data)
 
         if isinstance(event, Message) and getattr(event, "contact", None) is not None:
             logger.debug("PhoneRequiredMiddleware: contact message bypass user=%s", telegram_id)
