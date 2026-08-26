@@ -641,26 +641,52 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 
 **Next:** ticket «Partner payouts hardening»; не смешивать с free-bot merge DoD.
 
-## TECH DEBT: client_bot owner-check gaps on callback WRITE/export (2026-08-26)
+## TECH DEBT: client_bot owner-check gaps on callback paths (2026-08-26)
 
-Контекст: Bugbot/review `implement-free-bot-rebase` vs `stage` (direct, без subagents). Owner (2026-08-26): **не блокер merge** — унести в техдолг.
+Контекст: `/review-security` vs `stage` (direct, без subagents) + Owner (2026-08-26): **не блокер merge** — унести **все** findings в техдолг.
 
-**Threat model (Owner):** бот в private chat; Telegram callback **нельзя переслать** как рабочую кнопку чужому. Классический IDOR «переслал inline-кнопку» не применим. Остаточный вектор — forge `callback_data` неофициальным клиентом на своём сообщении; вне текущего DoD.
+**Threat model (Owner):** бот в private chat; Telegram callback **нельзя переслать** как рабочую кнопку чужому. Классический IDOR «переслал inline-кнопку» не применим. Остаточный вектор — forge `callback_data` неофициальным клиентом; **вне текущего DoD** → defense-in-depth later.
 
-**Что уже hardened в этой ветке (не трогать как долг):** CPM message writes / workbook **import** / white_list toggle — owner/cabinet check есть.
+**Что уже hardened в этой ветке (не долг):** многие `adv_setting` WRITE, CPM message writes, workbook **import**, white_list toggle, Excel import/export ownership, phone `contact.user_id == from_user.id`, admin-only partner payouts, secret env aliases.
 
-- [ ] **P2 — `on_off_controller` без owner-check** (`app/modules/wb_adv_updater/modules/bidder/tg_bot_handlers/on_off_controller.py`)
-  `set_auto_cpm` (`get_min_position`) и `off_auto_cpm` переключают `bidder_active` по `adv_original_id` без проверки Telegram-владельца кабинета. Sibling-пути в `cpm_builder` уже с owner-check.
-  **Фикс:** тот же helper, что CPM/workbook — `load_wb_user_cabinet_for_adv_in_session` + `load_adv_for_owner_cabinet_in_session`; deny → user message, без commit.
+### WRITE без owner-check (defense-in-depth)
 
-- [ ] **P2 — `set_common_bid_manual` без owner-check** (`app/client_bot/user_interface/handlers/set_common_bid_manual.py`)
+- [ ] **P2 — `strategy_setting` WRITE** (`app/client_bot/user_interface/handlers/strategy_setting.py:~95`)
+  `toggle_auto_update_strategy` / `set_manual_strategy` / legacy `StrategySetting` мутируют `AdvSetting` по callback id без `from_user` ownership.
+  **Фикс:** `load_wb_user_cabinet_for_adv_in_session` + `load_adv_for_owner_cabinet_in_session` до commit.
+
+- [ ] **P2 — `set_common_bid_manual` WRITE** (`app/client_bot/user_interface/handlers/set_common_bid_manual.py:~222`)
   Start/apply грузят `AdvSetting` по id из callback/FSM и пишут ставки в WB без привязки к `from_user`.
   **Фикс:** owner-check на start и apply до WB write; deny без мутации.
 
-- [ ] **P3 — download target-places workbook без owner-check** (`cpm_builder.download_target_places_template` → `build_target_place_workbook`)
-  Export ключей/позиций по `adv_original_id` без owner; import уже deny для чужого кабинета (асимметрия).
-  **Фикс:** owner-check в export (или `telegram_user_id` в `build_target_place_workbook`), зеркально import.
+- [ ] **P2 — `change_keyword_hard_status` WRITE** (`app/client_bot/user_interface/handlers/keyword_settings.py:~112`)
+  `change_keyword_hard_status_in_session` меняет `KeywordSetting.hard_status` по id; parent не передаёт `telegram_user_id`.
+  **Фикс:** owner/cabinet check до mutation; deny без commit.
 
-**Приоритет:** low/defense-in-depth после free-bot rollout; поднять, если бот начнёт жить в группах/общих чатах или threat model включит неофициальные клиенты.
+- [ ] **P2 — `on_off_controller` WRITE** (`app/modules/wb_adv_updater/modules/bidder/tg_bot_handlers/on_off_controller.py`)
+  `set_auto_cpm` / `off_auto_cpm` переключают `bidder_active` по `adv_original_id` без owner (sibling `cpm_builder` уже с check).
+  **Фикс:** тот же owner helper, что CPM/workbook; deny → user message, без commit.
 
-**Next:** при touch CPM / common-bid / workbook — закрыть owner-check в том же PR; не смешивать с merge DoD vs `stage`.
+### READ / UI без owner-check
+
+- [ ] **P3 — keyword daily history READ** (`keyword_daily_history_message.py` / `KeywordDailyHistoryScreen`)
+  Статистика ключа по id без owner.
+  **Фикс:** owner-check перед load/render.
+
+- [ ] **P3 — adv catalog READ** (`adv_setting.py` `reset_filter` / `choice_adv_paginator`)
+  Список РК по `wb_user_cabinet_original_id` без owner filter.
+  **Фикс:** `_load_wb_user_cabinet_for_owner_in_session` до listing.
+
+- [ ] **P3 — CPM menu open / workbook export** (`cpm_builder.to_page_for_cpm_setting`, `download_target_places_template`)
+  UI/export по `adv_original_id` без owner; WRITE/import уже deny.
+  **Фикс:** owner-check на open/export, зеркально import.
+
+### Middleware fail-open
+
+- [ ] **P3 — `PhoneRequiredMiddleware` fail-open** (`phone_required.py:~113`)
+  Если `data["bot"]` отсутствует — pass-through без запроса телефона.
+  **Фикс:** fail-closed (drop update / log error), не admit.
+
+**Приоритет:** low/defense-in-depth после free-bot rollout; поднять, если бот в группах/общих чатах или threat model включит неофициальные клиенты.
+
+**Next:** при touch strategy / common-bid / keyword hard_status / CPM / catalog — закрыть owner-check в том же PR; не смешивать с merge DoD vs `stage`.
