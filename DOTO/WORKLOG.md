@@ -690,3 +690,41 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - выпилить из бота
 **Приоритет:** low/defense-in-depth после free-bot rollout; поднять, если бот в группах/общих чатах или threat model включит неофициальные клиенты.
 
 **Next:** при touch strategy / common-bid / keyword hard_status / CPM / catalog — закрыть owner-check в том же PR; не смешивать с merge DoD vs `stage`.
+
+## BUG (critical, prod): `adv-bot-updater` OOMKilled — рост памяти в child `snapshot_data_updater` (2026-08-26)
+
+Контекст: `/opsx-devops` контрольная проверка прода `prod-adv-bot`; image `be173f55…` (PR #438, с ~2026-08-22); OPS_STATE stale (`bb81f827…`).
+
+**Симптом:** pod `adv-bot-updater` периодически `OOMKilled` (exit 137), kube рестартит контейнер. **20 рестартов** за ~4d 7h на текущем pod; средний цикл **~5 ч** (последний: 12:16 → 17:12, ~4ч 56м). Лимит **1536Mi**, перед kill RSS **~1378–1413Mi**; рост **~9 Mi/мин** у лимита.
+
+**Архитектура:** `updater.py` — parent supervisor + **3× `multiprocessing.Process`** в одном cgroup:
+1. `run_main_coroutines` — billing;
+2. `run_runtime` — common coroutine (keyword deltas, bids, priors);
+3. `snapshot_data_updater.run` — live snapshot (`SNAPSHOT_UPDATER_USE_LIVE=1`).
+
+**Evidence (RSS внутри pod, 2026-08-26 ~21:44 UTC+3):**
+- child pid ~54: **~952 Mi** и растёт (~+2.6 Mi / 2 min на замере);
+- child ~372 Mi — `run_runtime`;
+- child ~283 Mi — billing / respawned child;
+- parent ~287 Mi.
+
+Логи child-процессов в aggregated `kubectl logs` почти пустые (только startup); supervisor не логирует RSS child.
+
+**Root cause (кандидат, product RCA):** не shop-runner (отдельный pod). Доминирует **live `snapshot_data_updater`**: `collect_shop()` большие batch DTO (PG+CH+warmup), `RedisAdvDataSnapshotStore.save()` держит previous+new JSON, global tick на все active shops, overlap shop-tasks (tick 300s, PG timeout 360s) → монотонный рост RSS ~5h, типичная картина leak/retention. Доп. фактор: **3 full Python runtime в 1536Mi** — лимит маргинальный даже без leak.
+
+**Impact:**
+- **Не P0:** `wb-sky-bot`, `run-shop-update-worker`, PG/Redis/CH — отдельные pod'ы, Running; self-heal после OOM (~1–2 min).
+- **Деградация:** billing hourly loop, snapshot refresh, CH background (deltas/priors) — пауза на каждый OOM; stale snapshot → больше cache miss в shop-runner; риск пропуска/сдвига billing run.
+- **Тренд:** при росте shops/adv интервал OOM может сократиться.
+
+**Не путать с:** v3-only shop-runner warnings; schema regression (`alembic_head` `e8f9a0b1c2d3`).
+
+**Связанные файлы:** `updater.py`, `app/snapshot_data_updater/` (`updater.py`, `collector.py`, `cache/redis_adv_data_snapshot_store.py`), `app/modules/wb_adv_updater/runner.py`, `app/common_coroutine/`.
+
+**Приоритет:** **critical** (prod recurring OOM, billing/snapshot path); fix — product RCA + patch; bridge — memory bump только через `/opsx-devops PLAN_WRITE|GO`, не bare `set resources`.
+
+**Next:**
+1. `/opsx-fix-bug` — RSS probe в parent + tracemalloc в snapshot child; fix retention / concurrent shop cap / split deployment.
+2. Проверить billing logs: пропуски hourly run за 24h после OOM.
+3. Обновить OPS_STATE после подтверждения release posture `be173f55`.
+4. Bridge (если нужен до fix): `/opsx-devops PLAN_WRITE intent=CONFIG_PATCH ns=prod-adv-bot resource=deploy/adv-bot-updater symptom=OOM bridge 1536Mi→2560Mi`.
