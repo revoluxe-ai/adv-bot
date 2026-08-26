@@ -79,6 +79,23 @@ def _resolve_chat_id(event: Message | CallbackQuery) -> int | None:
     return None
 
 
+def _resolve_send_chat_id(event: Message | CallbackQuery) -> int | None:
+    """Resolve destination chat for subscribe / unavailable screens.
+
+    Uses :func:`_resolve_chat_id` when the event carries a message chat.
+    For ``CallbackQuery`` without ``message.chat`` (e.g. inline from an old or
+    deleted message), falls back to ``from_user.id`` so the user still receives
+    the gate screen in a private chat — same contract as
+    ``PhoneRequiredMiddleware``.
+    """
+    chat_id = _resolve_chat_id(event)
+    if chat_id is not None:
+        return chat_id
+    if isinstance(event, CallbackQuery) and event.from_user:
+        return event.from_user.id
+    return None
+
+
 def _is_whitelisted_event(event: Message | CallbackQuery) -> bool:
     """События, которые проходят без live-проверки подписки в этом middleware.
 
@@ -256,7 +273,7 @@ async def is_user_subscribed_to_support_channel(
 
 async def send_need_subscribe_message(bot: Bot, event: Message | CallbackQuery) -> None:
     """Send the «not subscribed» screen for an explicitly rejected event."""
-    chat_id = _resolve_chat_id(event)
+    chat_id = _resolve_send_chat_id(event)
     if chat_id is None:
         return
     await NeedSubscribe(bot, chat_id)()
@@ -273,7 +290,7 @@ async def send_subscription_check_unavailable_message(
     provides the same retry keyboard instead of claiming that the user is not
     subscribed.
     """
-    chat_id = _resolve_chat_id(event)
+    chat_id = _resolve_send_chat_id(event)
     if chat_id is None:
         return
     await SubscriptionCheckUnavailable(bot, chat_id)()

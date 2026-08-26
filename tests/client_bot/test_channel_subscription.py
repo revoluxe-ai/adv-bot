@@ -67,6 +67,16 @@ def _make_callback_event(telegram_id: int, data: str) -> MagicMock:
     return event
 
 
+def _make_orphan_callback_event(telegram_id: int, data: str) -> MagicMock:
+    """CallbackQuery without message/chat (e.g. inline from deleted message)."""
+    event = MagicMock(spec=CallbackQuery)
+    event.from_user = MagicMock(id=telegram_id, username="u")
+    event.data = data
+    event.message = None
+    event.answer = AsyncMock()
+    return event
+
+
 @pytest.mark.parametrize("status", ["member", "administrator", "creator"])
 @pytest.mark.asyncio
 async def test_channel_subscription_middleware_allows_subscribed_statuses(status: str) -> None:
@@ -190,6 +200,48 @@ async def test_channel_subscription_middleware_stores_pending_callback_when_bloc
     state.update_data.assert_awaited_once()
     saved_payload = state.update_data.await_args.kwargs["pending_subscription_callback"]
     assert '"data": "adv:test"' in saved_payload
+
+
+@pytest.mark.asyncio
+async def test_channel_subscription_middleware_blocks_orphan_callback_with_need_subscribe() -> None:
+    """Orphan CallbackQuery (no message/chat) still gets NeedSubscribe via user id."""
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_orphan_callback_event(224, "adv:test")
+    handler = AsyncMock()
+    bot = MagicMock()
+    bot.get_chat_member = AsyncMock(return_value=MagicMock(status="left"))
+    bot.send_message = AsyncMock()
+    state = AsyncMock(spec=FSMContext)
+    state.update_data = AsyncMock()
+
+    await middleware(handler, event, {"bot": bot, "state": state})
+
+    handler.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+    assert bot.send_message.call_args.kwargs["chat_id"] == 224
+    state.update_data.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_channel_subscription_middleware_orphan_callback_fail_closed_on_telegram_error() -> None:
+    """Orphan CallbackQuery with lookup failure still gets unavailable screen."""
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_orphan_callback_event(225, "adv:test")
+    handler = AsyncMock()
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+
+    with patch(
+        "app.client_bot.middlewars.channel_subscription.is_user_subscribed_to_support_channel",
+        new=AsyncMock(return_value=None),
+    ):
+        await middleware(handler, event, {"bot": bot})
+
+    handler.assert_not_awaited()
+    bot.send_message.assert_awaited_once()
+    assert bot.send_message.call_args.kwargs["chat_id"] == 225
+    text = bot.send_message.call_args.kwargs["text"]
+    assert "не удалось проверить" in text
 
 
 @pytest.mark.asyncio
