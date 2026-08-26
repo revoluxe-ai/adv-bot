@@ -1,0 +1,19 @@
+DOTO/WORKLOG.md
+  s_a630372a033bf7::t_723b698699a518 644,646,648,650,652,654-658,662-688,690,692
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "cef5c02012095e09167153c28757771111095ab1",
+  "prompts": {},
+  "sessions": {
+    "s_a630372a033bf7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2686c329-e2ff-48ca-9cd1-ee934c803f55",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
