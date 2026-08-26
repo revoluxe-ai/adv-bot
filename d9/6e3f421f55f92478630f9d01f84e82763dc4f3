@@ -1,0 +1,69 @@
+tests/unit/client_bot/test_apply_defaults_ab_hold_guard.py
+  s_367d2dc207e027::t_fd984d570515c6 164-174,176,180-185,197-203,207-212,217-222
+  s_367d2dc207e027::t_0003f4e1dfca51 300-303
+  s_367d2dc207e027::t_069015093f4fe6 263,268-271
+  s_367d2dc207e027::t_6f779c0393c758 150-151
+  s_367d2dc207e027::t_87b86699d03381 146-148
+  s_367d2dc207e027::t_bf825475884720 230,235-238
+  s_367d2dc207e027::t_5bf7db112313f7 149
+tests/unit/client_bot/handlers/test_adv_setting_write_path_hardening.py
+  s_dd372485667394::t_78a2bd9d93b337 326-358
+  s_367d2dc207e027::t_f386284bbdc088 296-325,359-390
+  s_367d2dc207e027::t_fac67082a2ead5 21
+  s_ae5987a8ccebd6::t_687cfac54b4983 14
+  s_dd372485667394::t_02aae4aa4946de 22
+  s_ae5987a8ccebd6::t_8e2da8adcddecc 238-267
+  s_dd372485667394::t_c0b9dfa0bf1469 79-83
+  s_367d2dc207e027::t_76876cb8dd6a65 69-78
+  s_ae5987a8ccebd6::t_6771bf5c23e632 268-269
+  s_367d2dc207e027::t_fc22331d77a880 391-392
+app/client_bot/user_interface/handlers/adv_setting/adv_setting.py
+  s_367d2dc207e027::t_b60d503c72346e 820,822-825,827-837,845,852-854,857
+  s_b38c517d913da6::t_271ca740cac477 12
+  s_dd372485667394::t_e87beae9e9ea6e 882-883,885-891,893-897
+  s_ae5987a8ccebd6::t_f04e7920178336 744-751
+tests/client_bot/user_interface/handlers/test_adv_setting.py
+  s_dd372485667394::t_74b69bedb513e9 366
+  s_dd372485667394::t_eee8d7dea3471f 307
+  s_dd372485667394::t_1101f154759dc8 90-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "d96e3f421f55f92478630f9d01f84e82763dc4f3",
+  "prompts": {},
+  "sessions": {
+    "s_367d2dc207e027": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "aae61207-434c-4f76-90b7-eb15c6aa67fd",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ae5987a8ccebd6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "176c9e41-6e02-47b7-bab6-be4fa0cfc7b6",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_b38c517d913da6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9d8d93e4-d03a-48df-8998-215744ec9e22",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_dd372485667394": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e0115fd6-6bdd-499d-839c-8dbacffc68d8",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
