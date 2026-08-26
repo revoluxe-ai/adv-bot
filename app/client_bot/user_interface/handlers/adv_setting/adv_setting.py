@@ -396,6 +396,11 @@ async def _load_wb_user_cabinet_for_adv_in_session(
     return result.unique().scalar_one_or_none()
 
 
+# Публичные алиасы для cross-handler owner-validation (pyright reportPrivateUsage).
+load_adv_for_owner_cabinet_in_session = _load_adv_for_owner_cabinet_in_session
+load_wb_user_cabinet_for_adv_in_session = _load_wb_user_cabinet_for_adv_in_session
+
+
 @router.callback_query(callbacks.ChoiceAdvPaginator.filter(F.reset_filter))
 async def reset_filter(
     callback: types.CallbackQuery,

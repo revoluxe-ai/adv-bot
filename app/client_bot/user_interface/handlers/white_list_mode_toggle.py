@@ -1,10 +1,16 @@
 from aiogram import Bot, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
-from sqlalchemy import select, update
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.client_bot.ui_access import UiAccessMode
+from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
+    ADV_ACCESS_DENIED_MESSAGE,
+    CABINET_ACCESS_DENIED_MESSAGE,
+    load_adv_for_owner_cabinet_in_session,
+    load_wb_user_cabinet_for_adv_in_session,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.white_list_mode import WhiteListMode
 from app.modules.white_list_mode_settings.telegram.main_callback import WhiteListModeToggle
@@ -39,15 +45,34 @@ async def toggle_white_list_mode_in_session(
     Side effects:
         Изменяет ``AdvSetting.white_list_mode`` и фиксирует транзакцию в PG.
     """
+    if callback_query.message is None:
+        raise ValueError("Нет сообщения")
+
     new_mode = WhiteListMode[callback_data.new_mode]
     adv_setting_original_id = callback_data.adv_setting_original_id
-    stmt_select = select(AdvSetting).where(AdvSetting.id == adv_setting_original_id)
-    result = await session.execute(stmt_select)
-    adv_setting = result.scalar_one()
+    chat_id = callback_query.message.chat.id
+    telegram_user_id = callback_query.from_user.id
+
+    wb_user_cabinet = await load_wb_user_cabinet_for_adv_in_session(
+        session,
+        telegram_user_id,
+        adv_setting_original_id,
+    )
+    if wb_user_cabinet is None:
+        _ = await bot.send_message(chat_id, CABINET_ACCESS_DENIED_MESSAGE)
+        return
+
+    adv_setting = await load_adv_for_owner_cabinet_in_session(
+        session,
+        adv_original_id=adv_setting_original_id,
+        wb_user_cabinet=wb_user_cabinet,
+    )
+    if adv_setting is None:
+        _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+        return
+
     ui_access = _resolve_white_list_mode_ui_access(adv_setting)
     if ui_access == UiAccessMode.FREE and new_mode not in FREE_WHITE_LIST_MODES:
-        assert callback_query.message
-        chat_id = callback_query.message.chat.id
         _ = await bot.send_message(
             chat_id,
             "Этот режим белого списка доступен только в платном автоуправлении.",
@@ -69,11 +94,15 @@ async def toggle_white_list_mode_in_session(
     await session.execute(stmt_update)
     await session.commit()
 
-    result = await session.execute(stmt_select)
-    adv_setting = result.scalar_one()
+    adv_setting = await load_adv_for_owner_cabinet_in_session(
+        session,
+        adv_original_id=adv_setting_original_id,
+        wb_user_cabinet=wb_user_cabinet,
+    )
+    if adv_setting is None:
+        _ = await bot.send_message(chat_id, ADV_ACCESS_DENIED_MESSAGE)
+        return
 
-    assert callback_query.message
-    chat_id = callback_query.message.chat.id
     _ = await bot.send_message(
         chat_id,
         f"Выбран режим {new_mode.name.replace('_', ' ').title()}.",
