@@ -103,6 +103,7 @@ def is_real_external_balance_payment(
 
     Current schema has no explicit payment source, so the logic is centralized
     here and can later be replaced with a strict source/provider flag.
+    Empty or whitespace-only descriptions are not counted as external.
     """
     amount = _to_decimal_money(getattr(payment, "amount", None))
     if amount <= 0:
@@ -121,8 +122,7 @@ def is_real_external_balance_payment(
         return any(
             marker in description for marker in _REAL_EXTERNAL_PAYMENT_INCLUDE_MARKERS
         )
-    # Legacy rows may lack description; positive add operations count as external.
-    return True
+    return False
 
 
 def _resolve_cabinet_payment_user_id(
@@ -530,7 +530,7 @@ async def create_partner_payout_in_session(
     """Create a partner payout within an existing WRITE session.
 
     Caller opens ``sm(read_only=False)`` and passes the session here.
-    Persists via flush/commit on the injected session.
+    Persists via flush on the injected session; caller owns commit.
     """
     normalized_amount = _normalize_payment_amount(amount)
     partner_user = await session.get(User, partner_user_id)
@@ -554,7 +554,6 @@ async def create_partner_payout_in_session(
     )
     session.add(payout)
     await session.flush()
-    await session.commit()
     return payout
 
 
@@ -571,10 +570,12 @@ async def create_partner_payout(
     :func:`create_partner_payout_in_session`.
     """
     async with _sm(read_only=False) as session:
-        return await create_partner_payout_in_session(
+        payout = await create_partner_payout_in_session(
             session,
             partner_user_id=partner_user_id,
             admin_user_id=admin_user_id,
             amount=amount,
             comment=comment,
         )
+        await session.commit()
+        return payout

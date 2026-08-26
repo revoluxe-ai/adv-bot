@@ -18,6 +18,7 @@ from app.modules.partner_program.partner_stats import (
     _resolve_cabinet_payment_user_id,
     calculate_partner_stats_from_records,
     create_partner_payout,
+    create_partner_payout_in_session,
     is_real_external_balance_payment,
 )
 from app.utils.db.models import Invite, InviteStatus, PartnerPayout, User, UserBalancePayment
@@ -104,11 +105,18 @@ def test_is_real_external_balance_payment_filters_internal_and_admin_records() -
     assert is_real_external_balance_payment(
         _wb_balance_payment(wb_cabinet_id=11, amount=250)
     )
-    assert is_real_external_balance_payment(
+    assert not is_real_external_balance_payment(
         _user_balance_payment(
             user_id=10,
             amount=100,
             description="",
+        )
+    )
+    assert not is_real_external_balance_payment(
+        _wb_balance_payment(
+            wb_cabinet_id=11,
+            amount=250,
+            description="   ",
         )
     )
     assert not is_real_external_balance_payment(
@@ -259,6 +267,45 @@ class _FakeSession:
 
     def add(self, obj: PartnerPayout) -> None:
         self.added.append(obj)
+
+
+@pytest.mark.asyncio
+async def test_create_partner_payout_in_session_flushes_without_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WRITE seam must not commit; caller owns transaction boundary."""
+    partner_user = User(id=1, username="partner")  # type: ignore[call-arg]
+    admin_user = User(id=2, username="admin")  # type: ignore[call-arg]
+    session = _FakeSession(partner_user=partner_user, admin_user=admin_user)
+    monkeypatch.setattr(
+        "app.modules.partner_program.partner_stats._get_partner_stats_in_session",
+        AsyncMock(
+            return_value=PartnerStats(
+                partner_user_id=1,
+                invite_count=0,
+                used_invite_count=0,
+                invited_users_count=0,
+                paid_users_count=0,
+                clients_paid_sum=Decimal("100.00"),
+                earned_amount=Decimal("15.00"),
+                paid_out_amount=Decimal("5.00"),
+                available_to_payout=Decimal("10.00"),
+            )
+        ),
+    )
+
+    payout = await create_partner_payout_in_session(
+        session,
+        partner_user_id=1,
+        admin_user_id=2,
+        amount="10.00",
+        comment="June payout",
+    )
+
+    assert payout.partner_user_id == 1
+    assert len(session.added) == 1
+    session.flush.assert_awaited_once()
+    session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
