@@ -1,0 +1,44 @@
+app/client_bot/user_interface/handlers/white_list_mode_toggle.py
+  s_b38c517d913da6::t_cef601f2cf91ca 65,97
+  s_b38c517d913da6::t_8425afe71fd6da 11-12
+  s_9ef2fc7bc0a20d::t_49b579be5a3592 48-50,53-55,57-64,66-73
+  s_9ef2fc7bc0a20d::t_9b7680fce762aa 98-104
+  s_9ef2fc7bc0a20d::t_045f19dac816f7 4,8-10,13
+  s_b38c517d913da6::t_35108d9c78e8e3 56
+tests/unit/client_bot/handlers/test_white_list_mode_toggle.py
+  s_9ef2fc7bc0a20d::t_3229d06035b620 285-336
+  s_b38c517d913da6::t_98a339b36924a7 93
+  s_9ef2fc7bc0a20d::t_c84e9186e3125d 77-79,84-85,88-89
+  s_9ef2fc7bc0a20d::t_a1079caae75745 1,5,7,13-16,19
+  s_9ef2fc7bc0a20d::t_0e282fec932cff 112-118,164-169,175,209-215
+  s_9ef2fc7bc0a20d::t_4ac1960ca51675 72-76,80-83,86-87,90-92,94-97,99-102
+  s_b38c517d913da6::t_93bf7fa79c2d4e 98
+  s_9ef2fc7bc0a20d::t_c0fe5287cd800b 119-126,170-174,176-178,216-223
+  s_9ef2fc7bc0a20d::t_abc7e30005e0f1 103-104
+app/client_bot/user_interface/handlers/adv_setting/adv_setting.py
+  s_b38c517d913da6::t_f02c3e80b84d93 399-403
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "43bd7aa279d15fbc8c42d3e89cb787d72580302c",
+  "prompts": {},
+  "sessions": {
+    "s_9ef2fc7bc0a20d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ed0ed679-1f27-4f61-b4e0-e40e98a1d26d",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_b38c517d913da6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9d8d93e4-d03a-48df-8998-215744ec9e22",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
