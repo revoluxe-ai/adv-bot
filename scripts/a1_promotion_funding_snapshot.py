@@ -83,21 +83,23 @@ def _load_adv_settings(root: Path) -> tuple[int, list[dict[str, str]]]:
     return wb_cabinet_id, rows
 
 
+def _api_model_dict(obj: Any) -> dict[str, Any]:
+    """Сериализовать WB generated client model через to_dict (без Unset)."""
+    if obj is None:
+        return {}
+    if hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    if isinstance(obj, dict):
+        return obj
+    return {}
+
+
 def _cashbacks_to_list(raw: Any) -> list[dict[str, Any]]:
     if not raw:
         return []
     items: list[dict[str, Any]] = []
     for item in raw:
-        if hasattr(item, "to_dict"):
-            d = item.to_dict()
-        elif isinstance(item, dict):
-            d = item
-        else:
-            d = {
-                "sum": getattr(item, "sum_", getattr(item, "sum", None)),
-                "percent": getattr(item, "percent", None),
-                "expiration_date": getattr(item, "expiration_date", None),
-            }
+        d = _api_model_dict(item)
         items.append(
             {
                 "sum": d.get("sum", d.get("sum_")),
@@ -119,11 +121,12 @@ async def _collect_wb_funding() -> dict[str, Any]:
         finance = pm._client.finance_adapter
 
         balance_resp = await finance.get_campaign_balance()
+        balance_data = _api_model_dict(balance_resp)
         central = {
-            "balance": getattr(balance_resp, "balance", None),
-            "net": getattr(balance_resp, "net", None),
-            "bonus": getattr(balance_resp, "bonus", None),
-            "cashbacks": _cashbacks_to_list(getattr(balance_resp, "cashbacks", None)),
+            "balance": balance_data.get("balance"),
+            "net": balance_data.get("net"),
+            "bonus": balance_data.get("bonus"),
+            "cashbacks": _cashbacks_to_list(balance_data.get("cashbacks")),
             "labels": {
                 "balance": "Счёт WB Продвижение",
                 "net": "Баланс WB Продвижение / взаимозачёт",
@@ -155,14 +158,15 @@ async def _collect_wb_funding() -> dict[str, Any]:
         for adv_id in sorted(active_ids):
             try:
                 b = await finance.get_campaign_budget(adv_id)
+                budget_data = _api_model_dict(b)
                 budgets.append(
                     {
                         "adv_id": adv_id,
                         "name": campaign_meta.get(adv_id, {}).get("name"),
                         "status": campaign_meta.get(adv_id, {}).get("status"),
-                        "cash": getattr(b, "cash", None) if b else None,
-                        "netting": getattr(b, "netting", None) if b else None,
-                        "total": getattr(b, "total", None) if b else None,
+                        "cash": budget_data.get("cash"),
+                        "netting": budget_data.get("netting"),
+                        "total": budget_data.get("total"),
                     }
                 )
             except Exception as exc:  # noqa: BLE001
