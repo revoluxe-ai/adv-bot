@@ -1,0 +1,37 @@
+.cursor/opsx-resolve-conflict/tests/test_owner_authority_precedence.py
+  s_713fb289ec0ab4::t_ee8d1227a14681 1-120,126-153,159-181,183-190,196-256,262-286
+  s_713fb289ec0ab4::t_7f283fb8785168 121-125,154-158,257-261
+  s_713fb289ec0ab4::t_e554bb4d360ebc 182
+  s_713fb289ec0ab4::t_2aafcf7bf29e88 191-195
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/resolve_text.py
+  s_713fb289ec0ab4::t_6ab3d89c672ed5 20-42
+  s_713fb289ec0ab4::t_a6277ca738e59a 114-121
+.cursor/opsx-resolve-conflict/tests/test_synthesis_validation.py
+  s_713fb289ec0ab4::t_58f0232805ae01 15
+  s_713fb289ec0ab4::t_4d4b16fc04adae 129-130,141
+  s_713fb289ec0ab4::t_a1c507e6904cb5 135,137-140
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/verify.py
+  s_713fb289ec0ab4::t_5a2c8c2e54373a 59,65-66
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/pipeline.py
+  s_713fb289ec0ab4::t_1e0890838d8c34 467-468,471-474
+  s_713fb289ec0ab4::t_31e42d00c39017 629
+  s_713fb289ec0ab4::t_8b418b875e6977 405
+  s_713fb289ec0ab4::t_1ce3fbee47de00 542-544
+  s_713fb289ec0ab4::t_8869ded723c6ed 584
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "2bb18893200a82e1c75615a33dbd4e779766a776",
+  "prompts": {},
+  "sessions": {
+    "s_713fb289ec0ab4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4102e8e1-7f1b-4eb7-ba5f-3462ba5c9f50",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
