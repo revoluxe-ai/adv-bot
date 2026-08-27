@@ -56,12 +56,14 @@ def verify_resolution_unit(
     repo_root: Path,
     path: str,
     classified: ClassifiedConflict,
+    resolution_kind: str | None = None,
 ) -> tuple[bool, list[str]]:
     """A. RESOLUTION_VERIFICATION для одного path/cluster."""
 
     refs: list[str] = []
     target = repo_root / path
-    if classified.resolution_kind.value == "DELETE":
+    effective_kind = resolution_kind or classified.resolution_kind.value
+    if effective_kind == "DELETE":
         if target.exists():
             return False, ["delete_expected_missing_file"]
         refs.append("resolution:delete_verified")

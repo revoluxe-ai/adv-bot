@@ -17,6 +17,29 @@ _MARKER_START = re.compile(r"^<<<<<<<.*$", re.MULTILINE)
 _MARKER_MID = re.compile(r"^=======.*$", re.MULTILINE)
 _MARKER_END = re.compile(r"^>>>>>>>.*$", re.MULTILINE)
 
+_VALID_OWNER_CHOICES = frozenset({"side_a", "side_b", "delete", "keep"})
+
+
+def _resolve_explicit_owner_choice(
+    owner_choice: str,
+    side_a: str | None,
+    side_b: str | None,
+    worktree: str | None,
+) -> tuple[str | None, ResolutionKind]:
+    """Явное Owner-решение по пути; приоритет над классификатором и синтезом."""
+
+    if owner_choice == "side_a" and side_a is not None:
+        return side_a, ResolutionKind.KEEP_SIDE_A
+    if owner_choice == "side_b" and side_b is not None:
+        return side_b, ResolutionKind.KEEP_SIDE_B
+    if owner_choice == "keep":
+        content = worktree if worktree is not None else (side_a or side_b)
+        if content is not None:
+            return content, ResolutionKind.KEEP_SIDE_A
+    if owner_choice == "delete":
+        return None, ResolutionKind.DELETE
+    return None, ResolutionKind.UNRESOLVED
+
 
 def _remove_markers_take_union(text: str) -> str:
     """Mechanical union: both sides без markers."""
@@ -88,15 +111,14 @@ def resolve_text(
 ) -> tuple[str | None, ResolutionKind]:
     """RESOLVE: produce candidate text for path."""
 
-    if classified.resolution_class == ResolutionClass.OWNER_REQUIRED:
-        if owner_choice == "side_a" and side_a:
-            return side_a, ResolutionKind.KEEP_SIDE_A
-        if owner_choice == "side_b" and side_b:
-            return side_b, ResolutionKind.KEEP_SIDE_B
-        if owner_choice == "keep" and (worktree or side_a or side_b):
-            return worktree or side_a or side_b, ResolutionKind.KEEP_SIDE_A
-        if owner_choice == "delete":
-            return None, ResolutionKind.DELETE
+    if owner_choice is not None:
+        if owner_choice not in _VALID_OWNER_CHOICES:
+            return None, ResolutionKind.UNRESOLVED
+        explicit = _resolve_explicit_owner_choice(
+            owner_choice, side_a, side_b, worktree
+        )
+        if explicit[1] != ResolutionKind.UNRESOLVED:
+            return explicit
         return None, ResolutionKind.UNRESOLVED
 
     source = worktree or ""

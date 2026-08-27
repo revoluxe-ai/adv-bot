@@ -12,6 +12,7 @@ RUNTIME = Path(__file__).resolve().parents[1] / "runtime"
 if str(RUNTIME) not in sys.path:
     sys.path.insert(0, str(RUNTIME))
 
+from opsx_conflict.git_capture import read_stage_content
 from opsx_conflict.models import ResolutionClass
 from opsx_conflict.pipeline import run_go, run_preview
 from opsx_conflict.resolve_text import _synthesis_union
@@ -125,15 +126,16 @@ def test_w_invalid_synthesis_rejected_before_mutation(bad_python_synthesis_repo:
         "VERIFIED_READY_FOR_CONTINUE",
     )
 
+    side_a = read_stage_content(repo, BAD_MODULE_PATH, 2)
+    assert side_a is not None
     resumed = run_go(
         repo,
         resume_run_id=result.run_id,
         lanes=["process"],
+        owner_choices={BAD_MODULE_PATH: "side_a"},
     )
-    assert resumed.status == "PAUSED"
-    resumed_bad = next(c for c in resumed.classified if c.path == BAD_MODULE_PATH)
-    assert resumed_bad.resolution_class == ResolutionClass.OWNER_REQUIRED
-    assert resumed.execution_state is not None
-    assert MANIFEST_PATH in resumed.execution_state.get("completed_paths", [])
-    assert BAD_MODULE_PATH in resumed.execution_state.get("owner_escalated_paths", {})
-    assert (repo / BAD_MODULE_PATH).read_text(encoding="utf-8") == pre_worktree
+    assert BAD_MODULE_PATH in resumed.execution_state.get("completed_paths", [])
+    assert BAD_MODULE_PATH not in resumed.execution_state.get(
+        "owner_escalated_paths", {}
+    )
+    assert (repo / BAD_MODULE_PATH).read_text(encoding="utf-8") == side_a

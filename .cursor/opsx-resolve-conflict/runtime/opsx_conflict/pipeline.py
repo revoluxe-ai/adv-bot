@@ -402,6 +402,7 @@ def run_go(
         )
         or (c.resolution_class == ResolutionClass.OWNER_REQUIRED
             and c.path in owner_choices)
+        or c.path in owner_choices
     ]
 
     exec_state = ExecutionRunState(
@@ -463,10 +464,14 @@ def run_go(
             continue
 
         if item.path in exec_state.owner_escalated_paths:
-            continue
+            if item.path not in owner_choices:
+                continue
 
         if not _lane_may_autonomous_write(part.lane, item.path, repo_root):
-            if item.resolution_class != ResolutionClass.OWNER_REQUIRED:
+            if (
+                item.resolution_class != ResolutionClass.OWNER_REQUIRED
+                and item.path not in owner_choices
+            ):
                 continue
 
         if write_fault_at_path and item.path == write_fault_at_path:
@@ -534,7 +539,9 @@ def run_go(
 
         wt_hash = write_resolved_file(repo_root, item.path, resolved_text)
         exec_state.path_post_write[item.path] = path_identity(repo_root, item.path)
-        ok, verify_refs = verify_resolution_unit(repo_root, item.path, item)
+        ok, verify_refs = verify_resolution_unit(
+            repo_root, item.path, item, resolution_kind=kind.value
+        )
         if not ok:
             restore_worktree_path(repo_root, item.path, worktree)
             exec_state.path_post_write.pop(item.path, None)
@@ -574,6 +581,7 @@ def run_go(
         if (
             item.resolution_class == ResolutionClass.AI_SEMANTIC
             and not item.applied_policy_id
+            and kind == ResolutionKind.SYNTHESIS
         ):
             auth_eval = evaluate_ai_semantic_authority(
                 part, side_a, side_b, base, repo_root
@@ -618,6 +626,7 @@ def run_go(
         ledger_entries.append(entry)
         resolved_paths.append(item.path)
         exec_state.completed_paths.append(item.path)
+        exec_state.owner_escalated_paths.pop(item.path, None)
         exec_state.pending_paths = [
             p for p in exec_state.pending_paths if p != item.path
         ]
