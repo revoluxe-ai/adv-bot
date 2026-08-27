@@ -20,6 +20,38 @@ _DEF_RE = re.compile(r"^def\s+(\w+)", re.MULTILINE)
 _CALL_RE = re.compile(r"\b(\w+)\s*\(")
 
 
+def validate_synthesis_candidate(
+    path: str,
+    content: str | None,
+    *,
+    allow_delete: bool = False,
+) -> tuple[bool, list[str]]:
+    """Pre-write validation для synthesized candidate (off-index, до mutation).
+
+    Для ``.py`` включает ``compile``-level syntax check. Не мутирует worktree/index.
+  """
+
+    if content is None:
+        if allow_delete:
+            return True, ["validation:delete_candidate_ok"]
+        return False, ["validation:missing_content"]
+
+    for line in content.splitlines():
+        if _MARKER_RE.match(line.strip()):
+            return False, ["validation:conflict_markers_present"]
+
+    refs: list[str] = [f"validation:no_markers:{path}"]
+    if path.endswith(".py"):
+        try:
+            compile(content, path, "exec")
+            refs.append("validation:python_syntax_ok")
+        except SyntaxError as exc:
+            return False, [f"validation:python_syntax_error:{exc.msg}"]
+
+    refs.append(f"validation:structural_ok:{path}")
+    return True, refs
+
+
 def verify_resolution_unit(
     repo_root: Path,
     path: str,

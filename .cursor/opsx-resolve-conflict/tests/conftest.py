@@ -357,6 +357,69 @@ def combined_qr_repo(empty_repo: Path) -> Path:
 
 
 @pytest.fixture
+def bad_python_synthesis_repo(empty_repo: Path) -> Path:
+    """W: prior AUTO_SAFE path + AI_SEMANTIC triple-quote synthesis → invalid Python.
+
+    ``bad_module.py`` worktree без markers → ``resolve_text`` использует
+  ``_synthesis_union(side_a, side_b)``, который ломает module-level docstring.
+    """
+
+    repo = empty_repo
+    main = _current_branch(repo)
+
+    module_body_a = (
+        '"""OPSX runtime module.\n\n'
+        "Line A only.\n"
+        "Extra A1.\n"
+        "Extra A2.\n"
+        "Extra A3.\n"
+        '"""\n\n'
+        '__version__ = "1.0.0"\n'
+        'helper_a = "from-a"\n'
+    )
+    module_body_b = (
+        '"""OPSX runtime module.\n\n'
+        "Line B only.\n"
+        "Extra B1.\n"
+        "Extra B2.\n"
+        "Extra B3.\n"
+        '"""\n\n'
+        '__version__ = "1.0.0"\n'
+        'helper_b = "from-b"\n'
+    )
+
+    _git(repo, "checkout", "-b", "feature")
+    (repo / ".opsx" / "00_manifest_stub.json").write_text(
+        '{"shared": true, "a": 1}\n',
+        encoding="utf-8",
+    )
+    (repo / ".opsx" / "bad_module.py").write_text(module_body_b, encoding="utf-8")
+    commit_all(repo, "feature w")
+
+    _git(repo, "checkout", main)
+    (repo / ".opsx" / "00_manifest_stub.json").write_text(
+        '{"shared": true, "b": 2}\n',
+        encoding="utf-8",
+    )
+    (repo / ".opsx" / "bad_module.py").write_text(module_body_a, encoding="utf-8")
+    commit_all(repo, "main w")
+
+    _merge_with_conflicts(repo, "feature")
+    (repo / ".opsx" / "00_manifest_stub.json").write_text(
+        '{"shared": true\n'
+        "<<<<<<< HEAD\n"
+        '"b": 2}\n'
+        "=======\n"
+        '"a": 1}\n'
+        ">>>>>>> feature\n",
+        encoding="utf-8",
+    )
+    # Index остаётся unmerged; worktree без markers → side_a/side_b synthesis path.
+    (repo / ".opsx" / "bad_module.py").write_text(module_body_a, encoding="utf-8")
+    return repo
+
+
+@pytest.fixture
 def auto_safe_repo(empty_repo: Path) -> Path:
     repo = empty_repo
     main = _current_branch(repo)

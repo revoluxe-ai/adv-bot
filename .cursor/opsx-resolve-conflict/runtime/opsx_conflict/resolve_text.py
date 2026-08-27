@@ -136,3 +136,19 @@ def write_resolved_file(repo_root: Path, path: str, content: str | None) -> str 
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8", newline="\n")
     return hashlib.sha256(content.encode()).hexdigest()
+
+
+def restore_worktree_path(
+    repo_root: Path,
+    path: str,
+    prior_content: str | None,
+) -> None:
+    """Восстановить worktree path до pre-resolution содержимого (recovery)."""
+
+    target = repo_root / path
+    if prior_content is None:
+        if target.exists():
+            target.unlink()
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(prior_content, encoding="utf-8", newline="\n")

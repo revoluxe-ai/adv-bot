@@ -44,10 +44,15 @@ from opsx_conflict.path_cas import (
     verify_resume_cas,
 )
 from opsx_conflict.process_policy import process_lane_may_write
-from opsx_conflict.resolve_text import resolve_text, write_resolved_file
+from opsx_conflict.resolve_text import (
+    resolve_text,
+    restore_worktree_path,
+    write_resolved_file,
+)
 from opsx_conflict.semantic_authority import evaluate_ai_semantic_authority
 from opsx_conflict.verify import (
     detect_logical_conflict_in_cluster,
+    validate_synthesis_candidate,
     verify_candidate,
     verify_resolution_unit,
 )
@@ -83,6 +88,55 @@ def _lane_may_autonomous_write(lane: AuthorityLane, path: str, repo_root: Path) 
         AuthorityLane.SPEC_GOVERNANCE,
         AuthorityLane.PRODUCT,
     )
+
+
+def _escalate_classified_to_owner(
+    classified: list[ClassifiedConflict],
+    path: str,
+    validation_reason: str,
+) -> list[ClassifiedConflict]:
+    """Downgrade path to OWNER_REQUIRED after failed synthesis validation."""
+
+    escalated: list[ClassifiedConflict] = []
+    for item in classified:
+        if item.path != path:
+            escalated.append(item)
+            continue
+        escalated.append(
+            ClassifiedConflict(
+                conflict_id=item.conflict_id,
+                cluster_id=item.cluster_id,
+                path=item.path,
+                lane=item.lane,
+                resolution_class=ResolutionClass.OWNER_REQUIRED,
+                resolution_kind=ResolutionKind.UNRESOLVED,
+                reason=f"synthesis_validation_escalation:{validation_reason}",
+                owner_options=[
+                    {"id": "side_a", "label": "Keep side A"},
+                    {"id": "side_b", "label": "Keep side B"},
+                    {"id": "synthesis", "label": "Manual synthesis"},
+                ],
+                semantic_authority_refs=item.semantic_authority_refs,
+                side_a_intent_refs=item.side_a_intent_refs,
+                side_b_intent_refs=item.side_b_intent_refs,
+                preserved_invariants=item.preserved_invariants,
+                applied_policy_id=item.applied_policy_id,
+                policy_compatibility_reason=item.policy_compatibility_reason,
+            )
+        )
+    return escalated
+
+
+def _apply_owner_escalations(
+    classified: list[ClassifiedConflict],
+    escalated: dict[str, str],
+) -> list[ClassifiedConflict]:
+    """Overlay durable OWNER_REQUIRED escalations from execution state."""
+
+    result = classified
+    for path, reason in escalated.items():
+        result = _escalate_classified_to_owner(result, path, reason)
+    return result
 
 
 def _collect_stage_texts(repo_root: Path, partitions) -> dict[str, tuple[str | None, str | None, str | None]]:
@@ -386,8 +440,12 @@ def run_go(
     prior_evidence: dict[str, str] = {}
     stage_texts = _collect_stage_texts(repo_root, preview.partitions)
     op_id = _operation_identity_str(manifest)
+    active_classified = _apply_owner_escalations(
+        preview.classified,
+        exec_state.owner_escalated_paths,
+    )
 
-    for item in preview.classified:
+    for item in active_classified:
         if item.path in exec_state.completed_paths:
             continue
 
@@ -402,6 +460,9 @@ def run_go(
             ResolutionClass.AUTO_SAFE,
             ResolutionClass.AI_SEMANTIC,
         ):
+            continue
+
+        if item.path in exec_state.owner_escalated_paths:
             continue
 
         if not _lane_may_autonomous_write(part.lane, item.path, repo_root):
@@ -439,20 +500,67 @@ def run_go(
         if kind == ResolutionKind.UNRESOLVED:
             continue
 
+        valid, val_refs = validate_synthesis_candidate(
+            item.path,
+            resolved_text,
+            allow_delete=kind == ResolutionKind.DELETE,
+        )
+        if not valid:
+            reason = val_refs[0] if val_refs else "validation_failed"
+            exec_state.failed_path = item.path
+            exec_state.status = "PAUSED_OWNER_REQUIRED"
+            exec_state.owner_escalated_paths[item.path] = reason
+            save_execution_state(repo_root, exec_state)
+            escalated = _escalate_classified_to_owner(
+                active_classified,
+                item.path,
+                reason,
+            )
+            return PipelineResult(
+                status="PAUSED",
+                stage=PipelineStage.PAUSED,
+                manifest=manifest,
+                partitions=preview.partitions,
+                clusters=preview.clusters,
+                classified=escalated,
+                ledger=ledger_entries,
+                owner_packets=aggregate_owner_packets(escalated, preview.clusters),
+                staged_paths=staged_paths,
+                fingerprint=current_fp,
+                run_id=run_id,
+                stop_reason=f"synthesis_validation_failed:{item.path}:{reason}",
+                execution_state=exec_state.to_dict(),
+            )
+
         wt_hash = write_resolved_file(repo_root, item.path, resolved_text)
         exec_state.path_post_write[item.path] = path_identity(repo_root, item.path)
         ok, verify_refs = verify_resolution_unit(repo_root, item.path, item)
         if not ok:
+            restore_worktree_path(repo_root, item.path, worktree)
+            exec_state.path_post_write.pop(item.path, None)
             exec_state.failed_path = item.path
-            exec_state.status = "FAILED_PARTIAL"
+            exec_state.status = "PAUSED_OWNER_REQUIRED"
+            verify_reason = verify_refs[0] if verify_refs else "verification_failed"
+            exec_state.owner_escalated_paths[item.path] = verify_reason
             save_execution_state(repo_root, exec_state)
+            escalated = _escalate_classified_to_owner(
+                active_classified,
+                item.path,
+                verify_reason,
+            )
             return PipelineResult(
-                status="FAILED",
-                stage=PipelineStage.FAILED,
+                status="PAUSED",
+                stage=PipelineStage.PAUSED,
                 manifest=manifest,
-                stop_reason=f"resolution_verification_failed:{verify_refs}",
+                partitions=preview.partitions,
+                clusters=preview.clusters,
+                classified=escalated,
+                ledger=ledger_entries,
+                owner_packets=aggregate_owner_packets(escalated, preview.clusters),
+                staged_paths=staged_paths,
                 fingerprint=current_fp,
                 run_id=run_id,
+                stop_reason=f"synthesis_validation_failed:{item.path}:{verify_reason}",
                 execution_state=exec_state.to_dict(),
             )
 
@@ -561,25 +669,28 @@ def run_go(
 
     remaining_owner = [
         c
-        for c in preview.classified
+        for c in active_classified
         if c.resolution_class == ResolutionClass.OWNER_REQUIRED
         and c.path not in owner_choices
     ]
 
     if remaining_owner:
+        exec_state.status = "PAUSED_OWNER_REQUIRED"
+        save_execution_state(repo_root, exec_state)
         return PipelineResult(
             status="PAUSED",
             stage=PipelineStage.PAUSED,
             manifest=manifest,
             partitions=preview.partitions,
             clusters=preview.clusters,
-            classified=preview.classified,
+            classified=active_classified,
             ledger=ledger_entries,
-            owner_packets=aggregate_owner_packets(preview.classified, preview.clusters),
+            owner_packets=aggregate_owner_packets(active_classified, preview.clusters),
             staged_paths=staged_paths,
             fingerprint=current_fp,
             run_id=run_id,
             stop_reason="owner_decisions_pending",
+            execution_state=exec_state.to_dict(),
         )
 
     if not cand_ok:

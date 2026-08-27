@@ -27,6 +27,7 @@ class ExecutionRunState:
     ledger_role: str = "RECOVERY_CACHE"
     path_pre_write: dict[str, str] = field(default_factory=dict)
     path_post_write: dict[str, str] = field(default_factory=dict)
+    owner_escalated_paths: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +41,7 @@ class ExecutionRunState:
             "ledger_role": self.ledger_role,
             "path_pre_write": self.path_pre_write,
             "path_post_write": self.path_post_write,
+            "owner_escalated_paths": self.owner_escalated_paths,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -74,4 +76,5 @@ def load_execution_state(repo_root: Path, run_id: str) -> ExecutionRunState | No
         status=data.get("status", "IN_PROGRESS"),
         path_pre_write=dict(data.get("path_pre_write") or {}),
         path_post_write=dict(data.get("path_post_write") or {}),
+        owner_escalated_paths=dict(data.get("owner_escalated_paths") or {}),
     )
