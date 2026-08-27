@@ -259,11 +259,13 @@ def _estimate_gaps(
     return gaps
 
 
-async def run_snapshot(output_dir: Path) -> dict[str, Any]:
+async def run_snapshot(
+    output_dir: Path,
+    wb_cabinet_id: int,
+    settings_rows: list[dict[str, str]],
+) -> dict[str, Any]:
     """Собрать funding snapshot и сохранить JSON."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    _bootstrap_cluster_infra()
-    wb_cabinet_id, settings_rows = _load_adv_settings(output_dir)
     wb_data = await _collect_wb_funding()
     auto_topup = _build_auto_topup_state(settings_rows)
     budgets = wb_data["campaign_budgets"]
@@ -308,7 +310,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     out = Path(args.output_dir).resolve()
-    result = asyncio.run(run_snapshot(out))
+    _bootstrap_cluster_infra()
+    wb_cabinet_id, settings_rows = _load_adv_settings(out)
+    result = asyncio.run(run_snapshot(out, wb_cabinet_id, settings_rows))
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
