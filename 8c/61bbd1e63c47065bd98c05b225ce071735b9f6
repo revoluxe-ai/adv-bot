@@ -1,0 +1,20 @@
+scripts/a1_promotion_funding_snapshot.py
+  s_054c0826814088::t_f4638ab73b5f71 262-266
+  s_054c0826814088::t_271acf5dadffc8 313-315
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "8c61bbd1e63c47065bd98c05b225ce071735b9f6",
+  "prompts": {},
+  "sessions": {
+    "s_054c0826814088": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00d46f4f-20e0-4952-a6e4-a938880a88c0",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
