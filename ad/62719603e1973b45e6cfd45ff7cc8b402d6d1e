@@ -1,0 +1,25 @@
+scripts/a1_current_state_reconciliation.py
+  s_054c0826814088::t_731483a9c08897 689
+  s_054c0826814088::t_00d0976576d9b9 349-361,363-364
+  s_054c0826814088::t_f5963d0f68e73d 147-148
+  s_054c0826814088::t_e33a579193872e 1-146,149-348,362,365-561,565-597,603-646,652-688,690-736
+  s_054c0826814088::t_73632ecb532f53 598-602
+  s_054c0826814088::t_50132000031ef4 562-564
+  s_054c0826814088::t_b33ca496a38654 647-651
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "ad62719603e1973b45e6cfd45ff7cc8b402d6d1e",
+  "prompts": {},
+  "sessions": {
+    "s_054c0826814088": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00d46f4f-20e0-4952-a6e4-a938880a88c0",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
