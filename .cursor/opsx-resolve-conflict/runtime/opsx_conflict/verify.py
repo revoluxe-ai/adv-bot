@@ -7,6 +7,7 @@ import re
 import subprocess
 from pathlib import Path
 
+from opsx_conflict.conflict_markers import has_unresolved_merge_markers
 from opsx_conflict.git_capture import read_stage_content
 from opsx_conflict.models import (
     ClassifiedConflict,
@@ -15,7 +16,6 @@ from opsx_conflict.models import (
     ResolutionLedgerEntry,
 )
 
-_MARKER_RE = re.compile(r"^(<<<<<<<|=======|>>>>>>>)")
 _DEF_RE = re.compile(r"^def\s+(\w+)", re.MULTILINE)
 _CALL_RE = re.compile(r"\b(\w+)\s*\(")
 
@@ -36,9 +36,8 @@ def validate_synthesis_candidate(
             return True, ["validation:delete_candidate_ok"]
         return False, ["validation:missing_content"]
 
-    for line in content.splitlines():
-        if _MARKER_RE.match(line.strip()):
-            return False, ["validation:conflict_markers_present"]
+    if has_unresolved_merge_markers(content):
+        return False, ["validation:conflict_markers_present"]
 
     refs: list[str] = [f"validation:no_markers:{path}"]
     if path.endswith(".py"):
@@ -73,9 +72,8 @@ def verify_resolution_unit(
         return False, ["missing_resolved_file"]
 
     text = target.read_text(encoding="utf-8", errors="replace")
-    for line in text.splitlines():
-        if _MARKER_RE.match(line.strip()):
-            return False, ["conflict_markers_remain"]
+    if has_unresolved_merge_markers(text):
+        return False, ["conflict_markers_remain"]
 
     refs.append(f"resolution:no_markers:{path}")
     if path.endswith(".py"):
@@ -224,7 +222,9 @@ def detect_logical_conflict_in_cluster(
         for cluster_path in paths:
             if cluster_path.endswith(".py"):
                 cp = repo_root / cluster_path
-                if cp.is_file() and "<<<<<<<" in cp.read_text(encoding="utf-8", errors="replace"):
+                if cp.is_file() and has_unresolved_merge_markers(
+                    cp.read_text(encoding="utf-8", errors="replace")
+                ):
                     if am in auto_merged:
                         return True, f"logical:marker_in_related:{cluster_path}"
     return False, ""

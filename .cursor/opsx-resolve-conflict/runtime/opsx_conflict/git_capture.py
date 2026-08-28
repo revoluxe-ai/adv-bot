@@ -7,6 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from opsx_conflict.conflict_markers import has_unresolved_merge_markers
 from opsx_conflict.models import (
     ConflictKind,
     ConflictManifest,
@@ -89,7 +90,7 @@ def _has_conflict_markers(path: Path) -> bool:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return False
-    return "<<<<<<<" in text or ">>>>>>>" in text
+    return has_unresolved_merge_markers(text)
 
 
 def _stage_blob(repo_root: Path, path: str, stage: int) -> StageBlob:

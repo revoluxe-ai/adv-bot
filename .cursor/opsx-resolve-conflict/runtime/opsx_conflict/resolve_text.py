@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from opsx_conflict.authority_policy import synthesize_under_target_authority
+from opsx_conflict.conflict_markers import has_unresolved_merge_markers
 from opsx_conflict.models import (
     ClassifiedConflict,
     ResolutionClass,
@@ -123,7 +124,7 @@ def resolve_text(
 
     source = worktree or ""
     if classified.resolution_class == ResolutionClass.AUTO_SAFE:
-        if "<<<<<<<" in source:
+        if has_unresolved_merge_markers(source):
             resolved = _remove_markers_take_union(source)
             return resolved, ResolutionKind.UNION
         if side_a and side_b:
@@ -137,7 +138,7 @@ def resolve_text(
                     synthesize_under_target_authority(side_a, side_b),
                     ResolutionKind.SYNTHESIS,
                 )
-        if "<<<<<<<" in source:
+        if has_unresolved_merge_markers(source):
             resolved = _remove_markers_take_union(source)
             return resolved, ResolutionKind.SYNTHESIS
         if side_a and side_b:
