@@ -1,0 +1,19 @@
+tests/unit/test_file_handler_buffered_input_file.py
+  s_226dbd5a792f4e::t_7dde745b14bdf2 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "2077dd7511e9b57d36f177d3bb443b00fa954927",
+  "prompts": {},
+  "sessions": {
+    "s_226dbd5a792f4e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "29008248-bb41-4d16-93c4-2475fbbcb33f",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
