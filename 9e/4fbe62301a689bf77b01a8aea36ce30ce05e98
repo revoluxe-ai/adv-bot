@@ -1,0 +1,19 @@
+scripts/a1_current_state_reconciliation.py
+  s_054c0826814088::t_0c44c5358ccf14 123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "9e4fbe62301a689bf77b01a8aea36ce30ce05e98",
+  "prompts": {},
+  "sessions": {
+    "s_054c0826814088": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00d46f4f-20e0-4952-a6e4-a938880a88c0",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
