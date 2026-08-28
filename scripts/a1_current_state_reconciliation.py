@@ -576,15 +576,17 @@ def _write_reconciliation_md(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-async def run_reconciliation(output_dir: Path) -> dict[str, Any]:
+async def run_reconciliation(
+    output_dir: Path,
+    pg_rows: list[dict[str, str]],
+    wbcards: list[dict[str, str]],
+) -> dict[str, Any]:
     """Собрать reconciliation package."""
     output_dir.mkdir(parents=True, exist_ok=True)
     sql_dir = output_dir / "sql"
     sql_dir.mkdir(parents=True, exist_ok=True)
     checked_at = datetime.now(timezone.utc).isoformat()
 
-    pg_rows = _load_pg_advsettings(output_dir, sql_dir)
-    wbcards = _load_pg_wbcards(output_dir, sql_dir)
     pg_by_adv = _pg_by_adv_id(pg_rows)
 
     collect_report = await _run_collect(output_dir)
@@ -727,7 +729,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     out = Path(args.output_dir).resolve()
     _bootstrap_cluster_infra()
-    result = asyncio.run(run_reconciliation(out))
+    sql_dir = out / "sql"
+    sql_dir.mkdir(parents=True, exist_ok=True)
+    pg_rows = _load_pg_advsettings(out, sql_dir)
+    wbcards = _load_pg_wbcards(out, sql_dir)
+    result = asyncio.run(run_reconciliation(out, pg_rows, wbcards))
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
