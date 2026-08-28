@@ -120,7 +120,7 @@ def _load_pg_advsettings(root: Path, sql_dir: Path) -> list[dict[str, str]]:
     staging = root / "staging"
     staging.mkdir(parents=True, exist_ok=True)
     path = staging / "advsetting_all.csv"
-    cols = ", ".join(SETTING_FIELDS)
+    cols = ", ".join(f"a.{c}" for c in SETTING_FIELDS)
     st = evidence.run_pg_query(
         _pg_database(),
         (
