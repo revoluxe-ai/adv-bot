@@ -1,0 +1,22 @@
+scripts/a1_funding_balance_reconciliation.py
+  s_054c0826814088::t_dea68c3536b56e 1-13,15-250,252,254-307,309-418
+  s_054c0826814088::t_9636b0e17bb26a 308
+  s_054c0826814088::t_5b09588078518f 14
+  s_054c0826814088::t_0fbb124902fbbf 251,253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "6b4e2ae323b32718b463a3656549f2bb27825b13",
+  "prompts": {},
+  "sessions": {
+    "s_054c0826814088": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00d46f4f-20e0-4952-a6e4-a938880a88c0",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
