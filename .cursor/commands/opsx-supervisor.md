@@ -16,17 +16,14 @@ CONTRACT_VERSION=OPSX_SUPERVISOR_ORCHESTRATION_V2
 
 1. принять задачу и создать mission record;
 2. построить task graph (DAG);
-3. **до первого** scoped-write / conditional dispatch классифицировать
-   `ROUTING_SCENARIO` (§13.0) и проконсультироваться с **сценарным**
-   READ_ONLY advisor — **не** default'ить на `/opsx-explore` для
-   quality-chain / gate-recovery (тесты, static-check, triage);
-4. запускать разрешённые `/opsx-*` команды только через субагентов;
-5. соблюдать зависимости, parallel limits и resource locks;
-6. валидировать результаты отдельно от завершения worker;
-7. разрешать conflicts, hangs, retries и cancellation;
-8. применять Owner-approved command policy и Auto-first model routing;
-9. довести mission до terminal state либо корректно остановиться;
-10. выдать Owner один итоговый отчёт с terminalization proof.
+3. запускать разрешённые `/opsx-*` команды только через субагентов;
+4. соблюдать зависимости, parallel limits и resource locks;
+5. валидировать результаты отдельно от завершения worker;
+6. разрешать conflicts, hangs, retries и cancellation;
+7. применять Owner-approved command policy и inherit-only model routing
+   (`.cursor/pipeline/shared/MODEL_DISPATCH.md`);
+8. довести mission до terminal state либо корректно остановиться;
+9. выдать Owner один итоговый отчёт с terminalization proof.
 
 Ты являешься только control-plane агентом.
 
@@ -61,6 +58,38 @@ GO_REQUIRED=NO
 
 Новая unrelated mission не может быть начата до terminal state текущей mission,
 если Owner явно не остановил или не заменил текущую миссию.
+
+## 1.1 Upstream handoff precedence (mandatory)
+
+Перед первым product writer/checker dispatch Supervisor **обязан** распарсить
+последний OPSX terminal block в текущем чате:
+
+```text
+COMMIT_STOP | PARTIAL | OWNER_RUN_COMMAND | NEXT_ACTION | WHY | ERROR_SUMMARY | nodeids
+```
+
+### HANDOFF_QUALITY gate
+
+| Quality | Criteria | Action |
+|---|---|---|
+| `UNAMBIGUOUS` | `OWNER_RUN_COMMAND` names one allowed command; `WHY` consistent; diagnostics present when required | First dispatch = that command |
+| `AMBIGUOUS` | generic recommendation, missing nodeids/diagnostics, vague NEXT_ACTION | Evidence gather (§13.0) — **do not guess** |
+| `CONTRADICTORY` | `WHY` vs `OWNER_RUN_COMMAND` disagree; multiple competing NEXT_ACTION | Evidence gather + reconcile; stricter verdict wins |
+| `SUSPECT_DEFECT` | handoff routes to denylisted command; wrong branch (e.g. bug-team on `test_fail`); repeated COMMIT_STOP with shifting WHY | `/opsx-admin-command-consult` → may route to `/opsx-meta-fix-command-defects` |
+
+Handoff is **first** evidence, not the **only** authority. Weak handoff may
+indicate a command-contract defect — gather process evidence before writer dispatch.
+
+### Commit-gate test_fail (hard rule)
+
+```text
+COMMIT_STOP + WHY=test_fail (+ pytest nodeids)
+  → FIRST dispatch: /opsx-test-triage
+  → FORBIDDEN first dispatch: /opsx-bug-team
+```
+
+`/opsx-bug-team` only after triage routes to bug lifecycle or Owner explicitly
+invoked bug-team with a materialized case.
 
 ---
 
@@ -266,13 +295,7 @@ REFACTOR
 TEST_GAP_CLOSURE
 PROCESS_REVIEW
 PR_READINESS
-USEFUL_WORK
 ```
-
-`USEFUL_WORK` — режим «сделай полезное»: rank/consume goal-like items
-(WORKLOG-derived / Owner list) with free-prose VALUE via `/opsx-explore`, then
-sequential units inside **one** mission until STOP, timebox, empty queue, or
-budget exhaustion. See §3.3.
 
 Для code-changing задач:
 
@@ -357,56 +380,6 @@ STOPPING
 ```
 
 Новая работа после terminal state требует новой mission.
-
-## 3.3 USEFUL_WORK — valued-goal consume (Option B)
-
-Когда Owner просит «сделай полезное» / useful-work / крутить цели по ценности
-до STOP, фиксируй:
-
-```text
-TASK_MODE=USEFUL_WORK
-HARD_DEADLINE: <required unless Owner explicitly waives with STOP-only policy>
-VALUED_GOAL_SOURCE: owner_list | worklog_ranked | mixed
-```
-
-Обязательный первый substantive dispatch (READ_ONLY):
-
-```text
-/opsx-explore
-```
-
-Explore must emit `VALUED_GOALS` per `openspec/policies/EXPLORE_POLICY.md`
-(`explore.valued_goals`) and `.cursor/commands/opsx-explore.md`:
-free-prose `VALUE` on every ranked item (draft allowed); WORKLOG stays
-`raw_notes` / not North Star SoT.
-
-Consume loop **inside the same mission** (do not start a second concurrent
-mission):
-
-1. Take the next open ranked item as the only active unit `IN_SCOPE`.
-2. Dispatch normal `/opsx-*` writers/checkers for that unit only
-   (typically `/opsx-new` / `/opsx-ff` / `/opsx-update` / bug path from
-   `NEXT_OPSX`) — no repository tools on the supervisor itself.
-3. On unit terminal (or Owner defer), advance to the next ranked item if:
-   - queue non-empty;
-   - `MISSION_STATUS` still allows work;
-   - before `NO_NEW_WORK_AFTER` / within `GLOBAL_EXECUTION_BUDGET`;
-   - Owner has not issued STOP.
-4. Stop when: empty queue | Owner STOP | `TIMEBOX_STOPPED` | budget exhausted |
-   `BLOCKED_*` that Owner must resolve.
-
-Запрещено в `USEFUL_WORK`:
-
-* обходить verify / commit / archive / Owner diff-review gates;
-* трактовать WORKLOG как source of truth North Star;
-* расширять unit до «починить весь repository»;
-* запускать новый unit после `NO_NEW_WORK_AFTER`;
-* писать product code напрямую с control-plane.
-
-Если `VALUED_GOALS.EMPTY_QUEUE=YES` после explore → terminal
-`ANALYSIS_COMPLETE` (нечего consume) с явным `NEXT_ACTION` для Owner
-(добавить цели в WORKLOG / уточнить список / сменить режим).
-
 
 После `STOPPING`:
 
@@ -739,21 +712,15 @@ EXPECTED_SNAPSHOT:
 TIMEOUT:
 HEARTBEAT_INTERVAL:
 NO_PROGRESS_TIMEOUT:
-STOP_ACK_TIMEOUT:
 AUTONOMY_DEADLINE:
 
-MODEL_MODE:
-REQUESTED_MODEL:
-MODEL_SELECTION_REASON:
+MODEL_MODE: INHERIT
+REQUESTED_MODEL: inherit
+MODEL_SELECTION_REASON: OPSX_MODEL_DISPATCH_INHERIT_V1
 ```
 
-Каждый top-level Task dispatch **обязан** заполнить `TIMEOUT` /
-`HEARTBEAT_INTERVAL` / `NO_PROGRESS_TIMEOUT` / `STOP_ACK_TIMEOUT`
-числовыми defaults из §12.0 (или более строгими). Пустые часы
-запрещены — unbounded wait = contract violation.
-
-Для `/opsx-bug-team` и `/opsx-static-check` дополнительно §12.4
-(`OWNER_VISIBLE` + предпочтительно `run_in_background=true`).
+Task tool: **always** pass `model: inherit` (explicit — never omit, never
+`auto`). See `.cursor/pipeline/shared/MODEL_DISPATCH.md`.
 
 В subagent prompt обязательно укажи footer:
 
@@ -782,6 +749,33 @@ TESTS_EXECUTED:
 FOLLOW_UP_REQUIRED:
 FORBIDDEN_ACTIONS_OBSERVED:
 ```
+
+## 7.1 Long-running internal orchestrators
+
+Для `/opsx-static-check` и `/opsx-bug-team`, если ожидаемая фаза может
+длиться более двух минут:
+
+```text
+LONG_RUNNING_ORCHESTRATOR=YES
+DISPATCH_RUN_MODE=BACKGROUND
+HEARTBEAT_INTERVAL=60-120s
+```
+
+Supervisor обязан:
+
+1. не блокировать control-plane на одном foreground dispatch;
+2. зафиксировать `WORKER RUNNING` с командой, фазой и elapsed time;
+3. принимать только финальный result envelope как completion;
+4. не запускать duplicate/retry, пока matching `pytest` / `run.sh` жив;
+5. при вопросе Owner «зависло?» сначала проверить heartbeat и живой процесс,
+   а не считать это автоматическим cancel;
+6. при Owner cancel или новой unrelated mission отправить stop, сохранить
+   partial evidence и перевести task в `ERROR=interrupted` / `CANCELLED`;
+7. не объявлять mission terminal, пока background worker не вернул envelope
+   либо не подтверждено `STOP_CONFIRMED`.
+
+`WORKER READY` и system notification о завершении background subagent не
+заменяют result validation и обязательный Final report named command.
 
 ---
 
@@ -900,33 +894,6 @@ TASK_STATUS=FAILED
 FAILURE_CLASS=CONTRACT_VIOLATION
 RESULT_VALIDATION=REJECTED_RETRYABLE
 ```
-
-### 9.1 Durable evidence gate (bug-episode RED / GREEN / CLOSE)
-
-Supervisor **не** читает repository files. Для transitions, у которых
-`ROUTE_TRANSITION` / PRECONDITIONS требуют RED, GREEN или CLOSE evidence,
-`RESULT_VALIDATION=ACCEPTED` только если envelope содержит **все**:
-
-```text
-REQUIRED_EVIDENCE_PATH_PRESENT=YES
-  (non-empty RED_EVIDENCE_PATH | GREEN_EVIDENCE_PATH |
-   OWNER-CLOSURE / close evidence path as applicable)
-STATUS_MATCHES_PATH_KIND=YES
-  (e.g. STATUS: GREEN_CONFIRMED with GREEN_EVIDENCE_PATH)
-DURABLE_FILE_WRITTEN=YES
-  (worker attestation that the path was written this hop)
-```
-
-Prose-only `GREEN_CONFIRMED` / `CLOSED_*` / ROUTE-TRACE claim **без**
-path + `DURABLE_FILE_WRITTEN=YES` →
-
-```text
-RESULT_VALIDATION=REJECTED_RETRYABLE
-FAILURE_CLASS=EVIDENCE_INCOMPLETE
-```
-
-После исчерпания retry → `PAUSED` (не `ADVANCE`, не claim-next).
-Orphan ROUTE-TRACE без durable artifact не является accepted evidence.
 
 Ошибочный report не переводит task в `COMPLETED`.
 
@@ -1125,40 +1092,6 @@ MAX_REVIEW_ROUNDS_PER_SURFACE=2
 
 # 12. Heartbeat, hang and retries
 
-## 12.0 Mandatory numeric defaults (top-level Task)
-
-Каждый Supervisor Task dispatch заполняет часы **до** launch.
-Пустые / omitted values запрещены.
-
-Ordinary writer / checker / consultant (single primary `/opsx-*`,
-не internal orchestrator):
-
-```text
-TIMEOUT_SECONDS=1800
-HEARTBEAT_INTERVAL_SECONDS=120
-NO_PROGRESS_TIMEOUT_SECONDS=600
-STOP_ACK_TIMEOUT_SECONDS=60
-```
-
-Internal orchestrators (`/opsx-bug-team`, `/opsx-static-check`):
-
-```text
-TIMEOUT_SECONDS=3600
-HEARTBEAT_INTERVAL_SECONDS=180
-NO_PROGRESS_TIMEOUT_SECONDS=900
-STOP_ACK_TIMEOUT_SECONDS=120
-```
-
-Допускается только **более строгий** (меньший) timeout, не больший без
-Owner timebox / explicit mission clock. Map fields:
-
-```text
-TIMEOUT ← TIMEOUT_SECONDS
-HEARTBEAT_INTERVAL ← HEARTBEAT_INTERVAL_SECONDS
-NO_PROGRESS_TIMEOUT ← NO_PROGRESS_TIMEOUT_SECONDS
-STOP_ACK_TIMEOUT ← STOP_ACK_TIMEOUT_SECONDS
-```
-
 ## 12.1 Heartbeat
 
 ```text
@@ -1192,8 +1125,7 @@ DUPLICATE_RESTART=FORBIDDEN
 После hang:
 
 1. Task → `TIMEOUT`.
-2. Worker получает stop/cancel (`interrupt=true` на running Task, если
-   платформа поддерживает).
+2. Worker получает stop/cancel.
 3. Supervisor ждёт acknowledgement только до `STOP_ACK_TIMEOUT`.
 4. Partial evidence сохраняется как unaccepted.
 5. Разрешён максимум один restart.
@@ -1211,32 +1143,6 @@ MAX_RESTARTS_EXCEEDED=NO
 * result содержит partial execution;
 * top-level task не становится `COMPLETED`, если completion criteria не выполнены;
 * после остановки top-level не остаётся активных children.
-
-## 12.2.1 Platform abort / interrupt / empty envelope
-
-Если top-level Task завершается как `aborted` | `interrupted` |
-`tool_error` | empty / missing envelope (Owner cancel tool, platform
-kill, mid-flight interrupt) **без** accepted result:
-
-```text
-RECOVERY_CLASS=PAUSED
-DISPOSITION=EXECUTION_OUTCOME_UNKNOWN
-ADVANCE=FORBIDDEN
-CLAIM_NEXT=FORBIDDEN
-NEW_FINDING=FORBIDDEN
-BLIND_REPLAY=FORBIDDEN
-```
-
-Если одновременно превышены часы §12.0 → `TIMEOUT` (строже) с тем же
-запретом blind replay.
-
-Owner report обязан содержать pasteable resume **той же** primary
-команды + `ATTEMPT+1` только при `RETRY_ALLOWED=yes` и idempotency key;
-иначе pasteable reconcile / Owner decision. Нельзя молча продолжать
-mission как будто hop успешен.
-
-Writer/orchestrator side effects возможны → no duplicate production GO
-без durable reconcile (см. SUPERVISOR_POLICY `EXECUTION_OUTCOME_UNKNOWN`).
 
 ## 12.3 Budgets
 
@@ -1263,34 +1169,35 @@ RETRY_BUDGET_EXHAUSTED=YES
 MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
 ```
 
-## 12.4 Long internal orchestrator (Owner-visible)
-
-Перед top-level dispatch `/opsx-bug-team` или `/opsx-static-check`
-Supervisor **обязан** показать Owner (в том же turn, до/при launch):
-
-```text
-OWNER_VISIBLE_DISPATCH:
-  COMMAND:
-  CASE_ID:
-  EXPECTED_WALL_CLOCK_SECONDS:   # from §12.0 TIMEOUT or stricter
-  NO_PROGRESS_TIMEOUT_SECONDS:
-  INTERRUPT_POLICY: interrupt=true on timeout/hang when platform allows
-  SILENCE_NOTE: silence until NO_PROGRESS is not proof of hang; after
-                NO_PROGRESS Supervisor must TIMEOUT/PAUSED per §12.2
-```
-
-Предпочтительно `run_in_background=true` для этих orchestrators, когда
-платформа позволяет heartbeat / completion notification; иначе sync
-Task **с** часами §12.0 (unbounded sync wait запрещён).
-
-На timeout / abort → тот же turn заканчивается pasteable resume
-(§12.2.1), не silent wait.
-
 ---
 
 # 13. Dynamic command routing
 
-На каждой новой существенной mission запроси через субагентов:
+## 13.0 Upstream handoff vs process evidence (mandatory)
+
+Decision ladder **before** first writer/checker dispatch:
+
+```text
+1. PARSE upstream handoff (§1.1)
+2. IF HANDOFF_QUALITY=UNAMBIGUOUS → dispatch per OWNER_RUN_COMMAND
+3. IF HANDOFF_QUALITY≠UNAMBIGUOUS → gather evidence (parallel when allowed):
+     a) /opsx-pipeline NAVIGATE — next hop on as-is GRAPH.md
+     b) /opsx-admin-command-consult — command ownership / relationships /
+        triage odd command output (NOT day-to-day graph navigation)
+     c) /opsx-admin-command-analyze-pipeline — only when consult routes to
+        pipeline redesign / human-usability analysis
+     d) /opsx-meta-fix-command-defects — only when consult → route_fix_defects
+        (READ_ONLY plan → AUTHORIZE_COMMAND_FIX)
+4. RECONCILE handoff + pipeline + consult; pick stricter verdict on conflict
+5. FORBIDDEN: guess route; default to /opsx-bug-team on test_fail
+```
+
+When handoff is `UNAMBIGUOUS`, bootstrap consult (below) is **optional** —
+handoff credit satisfies routing evidence for that hop.
+
+When handoff is weak, bootstrap consult is **required** before writer dispatch.
+
+На каждой новой существенной mission **без** unambiguous handoff запроси через субагентов:
 
 ```text
 /opsx-admin-command-consult
@@ -1311,109 +1218,10 @@ Mode locks:
 /opsx-explore:
   READ_ONLY_ADVISORY
   OPENSPEC_ARTIFACT_WRITE=FORBIDDEN
-
-/opsx-admin-command-analyze-pipeline:
-  READ_ONLY
-  PIPELINE_ANALYSIS | IMPROVEMENT_PROPOSAL | REGRESSION_PIPELINE_REVIEW
-  NOT_OPERATOR_NAVIGATOR (as-is map → /opsx-pipeline)
 ```
 
 Первые два консультанта могут быть запущены параллельно в пределах
-`MAX_ACTIVE_SUBAGENTS=2`. Для `QUALITY_CHAIN_RECOVERY` prefer sequential:
-pipeline → consult (if needed) → analyze-pipeline (if still unclear).
-
-### 13.0 Execution routing advisory (scenario-based hard gate)
-
-Перед выбором и фиксацией execution plan и **до первого** dispatch
-команды из `TASK_ALLOWED_SCOPED_WRITE` или `CONDITIONAL_RESTRICTED`
-Supervisor **обязан** классифицировать `ROUTING_SCENARIO` и получить
-сценарный READ_ONLY routing advice — **не** default'ить на `/opsx-explore`
-для quality-chain / gate-recovery.
-
-```text
-ROUTING_SCENARIO:
-  QUALITY_CHAIN_RECOVERY
-  DOMAIN_PRODUCT_SEMANTICS
-  USEFUL_WORK
-  BUG_MISSION
-  DEFAULT_FEATURE_WORK
-```
-
-| `ROUTING_SCENARIO` | Когда (примеры) | Mandatory consult (порядок) | Explore / evolution |
-|---|---|---|---|
-| `QUALITY_CHAIN_RECOVERY` | static-check FAIL, pytest/triage FAIL, «исправь gates/тесты последовательно», antipattern→test-env→static-check chain | ① `/opsx-pipeline` (navigate от текущего gate state); ② если authority неясна → `/opsx-admin-command-consult`; ③ если recovery path всё ещё неясен → `/opsx-admin-command-analyze-pipeline` `MODE=IMPROVEMENT_PROPOSAL` (focused на reported failure) | **только** если failure = domain/spec semantics, не tooling |
-| `DOMAIN_PRODUCT_SEMANTICS` | North Star, evolution, spec ambiguity, «что значит в продукте» | `/opsx-explore` **или** `/opsx-evolution` (`READ_ONLY`) | pipeline при необходимости placement |
-| `USEFUL_WORK` | §3.3 valued-goals consume | `/opsx-explore` (`VALUED_GOALS`) | — |
-| `BUG_MISSION` | §25 durable case / envelope | **skip** — `route_authority=worker_transition_envelope` | optional domain consult **не** переопределяет envelope |
-| `DEFAULT_FEATURE_WORK` | new/ff/update/apply, feature implementation | `/opsx-pipeline` + `/opsx-admin-command-consult` (parallel ≤2) | `/opsx-explore` если domain gap после pipeline |
-
-**Исключение — `BUG_MISSION` (§25):** envelope — route authority; explore
-не выбирает `NEXT_COMMAND` (см. `contracts/bug-episode/SUPERVISOR_POLICY.md`).
-
-Bootstrap triad (консультационный контур, не заменяет §13.0 scenario gate):
-
-```text
-/opsx-admin-command-consult
-/opsx-pipeline
-/opsx-explore
-```
-
-Ask templates (subagent prompt — **по сценарию**, не всегда explore):
-
-```text
-QUALITY_CHAIN_RECOVERY:
-  CURRENT_GATE_STATE: <static-check|triage|antipattern|…>
-  FAIL_SUMMARY: <paste from checker packet>
-  REQUEST: pasteable NEXT_ACTION sequence via pipeline / fix commands
-
-DOMAIN_PRODUCT_SEMANTICS:
-  HOW_BEST_TO_EXECUTE_THIS_TASK= + domain interpretation
-
-USEFUL_WORK:
-  VALUED_GOALS ranking (explore.valued_goals)
-```
-
-Требуемый результат (ledger / `CONSULTATIONS_EXECUTED`):
-
-```text
-EXECUTION_ROUTING_ADVICE_RECEIVED=YES
-ROUTING_SCENARIO: <one of above>
-ROUTING_ADVICE:
-  RECOMMENDED_ROUTE:
-  ORDER:
-  KEEP_DEFER:
-  RISKS:
-  SOURCE_COMMAND:
-  SOURCE_WORKER_ID:
-```
-
-Для `QUALITY_CHAIN_RECOVERY` **`EXPLORE_EXECUTION_ADVICE_RECEIVED` не
-требуется**; достаточно routing от pipeline / consult / analyze-pipeline.
-
-Тихий skip запрещён. Если сценарный advisor недоступен, упал или не дал
-usable execution recommendation:
-
-```text
-STATUS=BLOCKED_NEEDS_ROUTING_ADVICE
-DISPATCH_ALLOWED=NO
-```
-
-Advisory routing **не** authority grant, не обход denylist, не commit/push/PR,
-не отмена mandatory gates. Authority по command contract — через
-`/opsx-admin-command-consult`.
-
-```text
-ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
-ADVISORY_NEXT_COMMAND_ALONE_SETS_READY=FORBIDDEN
-```
-
-`NEXT_COMMAND` / `RECOMMENDED_ROUTE` от advisors **не** переводят mission в
-`READY_FOR_OWNER_DIFF_REVIEW` и **не** заменяют §20 evidence checklist.
-Denylisted `NEXT_COMMAND` → §14.7 reject path.
-
-`SCOPE_UNCHANGED=YES` **не** отменяет scenario gate: routing consultation
-обязательна на каждой новой существенной mission до первого scoped-write /
-conditional dispatch.
+`MAX_ACTIVE_SUBAGENTS=2`.
 
 Команда допускается только при:
 
@@ -1449,13 +1257,7 @@ AUTHORITY_CONFIRMED=YES
 TASK_MATCHES_SCOPE=YES
 REQUIRED_BOUNDARY_ALLOWED=YES
 DISPATCH_ALLOWED=YES
-EXECUTION_ROUTING_ADVICE_RECEIVED=YES
 ```
-
-Для первого `TASK_ALLOWED_SCOPED_WRITE` / `CONDITIONAL_RESTRICTED`
-dispatch отсутствие `EXECUTION_ROUTING_ADVICE_RECEIVED=YES` ⇒
-`DISPATCH_ALLOWED=NO` (см. §13.0). Bootstrap triad исключён из этого
-требования. `QUALITY_CHAIN_RECOVERY` **не** требует explore-only advice.
 
 Запрещено выбирать команду по похожему названию, опыту другого чата,
 содержимому supervisor report, удобству или предположению.
@@ -1469,19 +1271,7 @@ ROLE=PRIMARY_PROJECT_ADVISOR
 MODE=READ_ONLY_ADVISORY
 PROJECT_DEPUTY_OWNER
 MOST_EXPERIENCED_PROJECT_COMMAND
-MANDATORY_EXECUTION_ADVISOR_FOR_SUPERVISOR=NO
-DOMAIN_AND_USEFUL_WORK_ADVISOR=YES
 ```
-
-На supervisor mission `/opsx-explore` обязателен для `DOMAIN_PRODUCT_SEMANTICS`,
-`USEFUL_WORK` и optional domain gap в `DEFAULT_FEATURE_WORK` — **не**
-default advisor для `QUALITY_CHAIN_RECOVERY` (§13.0: pipeline → consult →
-analyze-pipeline).
-
-В `TASK_MODE=USEFUL_WORK` explore additionally ranks goal-like candidates
-(`VALUED_GOALS`, free-prose VALUE gate). Ranking is advisory input to the
-supervisor consume loop; explore does not implement, does not write WORKLOG,
-and does not become a second lifecycle authority.
 
 Автоматическое назначение `EVIDENCE_WEIGHT=PRIMARY` только по имени
 команды **запрещено**.
@@ -1493,7 +1283,6 @@ EXECUTED_CHECKER_EVIDENCE=PRIMARY
 DIRECT_COMMAND_ARTIFACT=PRIMARY
 PROJECT_INTERPRETATION=ADVISORY
 ROUTING_RECOMMENDATION=ADVISORY
-EXECUTION_ADVICE=ADVISORY
 UNEXECUTED_INFERENCE=LOW_CONFIDENCE
 ```
 
@@ -1508,18 +1297,10 @@ SCOPE_UNCHANGED=YES
 MATERIAL_SEMANTICS_UNCHANGED=YES
 DENYLIST_PRESERVED=YES
 MANDATORY_GATE_NOT_BYPASSED=YES
-EXECUTION_ROUTING_ADVICE_RECEIVED=YES
 ```
 
 Он не может разрешать denylist, commit/push/PR, создание/изменение команд,
 material semantic choice Owner или отмену непереопределяемых запретов.
-
-```text
-ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
-```
-
-Explore advice alone never satisfies §20 `READY_FOR_OWNER_DIFF_REVIEW`
-gates (`REQUIRED_TESTS_EXECUTED`, independent review, final diff review).
 
 ## 13.2 Claims and evidence schema
 
@@ -1613,21 +1394,14 @@ Stale discovery record не подтверждает `FOUND_IN_CURRENT_REPOSITOR
 
 ```text
 /opsx-admin-command-consult
-/opsx-admin-command-analyze-pipeline
 /opsx-pipeline
 /opsx-explore
 ```
 
-`/opsx-admin-command-analyze-pipeline`: `READ_ONLY` only; modes
-`PIPELINE_ANALYSIS` | `IMPROVEMENT_PROPOSAL` | `REGRESSION_PIPELINE_REVIEW`;
-не substitute для `/opsx-pipeline` navigate-as-is.
-
 ## 14.2 TASK_ALLOWED_READ_ONLY
 
 ```text
-/opsx-admin-command-analyze-pipeline
 /opsx-bug-debt-board
-/opsx-evolution
 /opsx-external-call-coverage
 /opsx-fanout-bug-hunt
 /opsx-performance-review
@@ -1654,7 +1428,6 @@ Stale discovery record не подтверждает `FOUND_IN_CURRENT_REPOSITOR
 /opsx-pyright-strict-coverage
 /opsx-sync
 /opsx-test
-/opsx-test-env
 /opsx-update
 ```
 
@@ -1688,6 +1461,10 @@ QUARANTINE=NO
 ```text
 /opsx-bug-team
 → MAY launch its contract-declared internal Task workers
+→ FORBIDDEN as Supervisor first dispatch when:
+    COMMIT_STOP + WHY=test_fail (use /opsx-test-triage first)
+    no triage verdict and no materialized bug case
+    handoff ambiguous and consult has not reconciled route (§13.0)
 
 /opsx-static-check
 → MAY launch its contract-declared internal checker workers
@@ -1750,12 +1527,11 @@ contract. Recursive Supervisor dispatch запрещён.
 ## 14.7 ABSOLUTE DENYLIST
 
 ```text
-/opsx-meta-commit
+/opsx-admin-command-analyze-pipeline
 /opsx-admin-command-commit
 /opsx-admin-command-design-command
-/opsx-meta-fix-command-defects
+/opsx-admin-command-fix-command-defects
 /opsx-admin-command-promote-process-lesson
-/opsx-admin-command-resolve-conflicts
 /opsx-archive
 /opsx-commit
 /opsx-create-pr
@@ -1791,30 +1567,7 @@ RECOMMENDATION_STATUS=REJECTED_BY_SUPERVISOR_POLICY
 DISPATCH_CREATED=NO
 COMMAND_RELIABILITY=UNCHANGED_BY_RECOMMENDATION_ALONE
 REPORT_ENTRY_REQUIRED=YES
-ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
-READY_FOR_OWNER_DIFF_REVIEW=FORBIDDEN
 ```
-
-После reject **не** останавливать mission как будто route уже выполнен.
-Обязательный выбор:
-
-1. **Continue allowed KEEP** — dispatch разрешённые surrogate hops из
-   advice (`/opsx-test`, coverage, triage, …) пока acceptance / green-proof
-   не закрыты accepted evidence; **или**
-2. **Publication-only leftover** — если единственный остаточный шаг Owner —
-   denylisted publication (`/opsx-commit`, `/opsx-meta-commit`, PR, …) и
-   allowed residual work отсутствует:
-
-```text
-MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
-  (или BLOCKED_FORBIDDEN_ROUTE, если forbidden route — единственный путь)
-ONE_NEXT_ACTION=OWNER_DECISION_REQUIRED
-```
-
-Допускается optional `OWNER_SIDE_HOP` (pasteable Owner-side текст) в теле
-отчёта. Запрещено: выдавать `READY_FOR_OWNER_DIFF_REVIEW`,
-`ONE_NEXT_ACTION=REVIEW_THE_REPORTED_DIFF`, или изобретать токены вроде
-`OWNER_RUN_COMMIT_*` как будто §20 readiness выполнена.
 
 Не деградировать command reliability только за факт advisory-рекомендации
 запрещённой команды.
@@ -1836,55 +1589,39 @@ OR REPEATED_ROUTE_AFTER_EXPLICIT_RESTRICTION=YES
 
 # 15. Model routing
 
-Default для обычного top-level dispatch:
+Authority: `.cursor/pipeline/shared/MODEL_DISPATCH.md`
+Registry: `.cursor/pipeline/shared/MODEL_REGISTRY.json`
+
+Default для **всех** Supervisor Task dispatches (interim Owner policy):
 
 ```text
-MODEL_MODE=AUTO
-REQUESTED_MODEL=AUTO
-EXPLICIT_PREMIUM_MODEL=NO
-MAX_MODE=NO
+MODEL_MODE=INHERIT
+REQUESTED_MODEL=inherit
+MODEL_SELECTION_REASON=OPSX_MODEL_DISPATCH_INHERIT_V1
+Task.model=inherit          # explicit — mandatory
 ```
 
-Если actual model не раскрыта:
+Запрещено (policy violation):
 
 ```text
-ACTUAL_MODEL_REPORTED=UNKNOWN_PLATFORM_SELECTED
-```
-
-Это не считается ошибкой.
-
-Explicit model допустима только если:
-
-```text
-MODEL_CLASS=OWNER_APPROVED_LOW_COST
-TASK_ELIGIBLE_FOR_LOW_COST_MODEL=YES
-MODEL_AVAILABLE_IN_CURRENT_RUNTIME=YES
-MODEL_SELECTION_REASON=<present>
-MODEL_MODE=EXPLICIT_LOW_COST
-MODEL_POLICY_COMPLIANT=YES
-```
-
-Явное имя модели без Owner-approved classification отклоняется.
-
-Запрещено:
-
-```text
+omit Task.model               # silent platform Auto
+Task.model=auto | MODEL=auto
+DEFAULT_CHILD_MODEL mini/fast fallback
 EXPLICIT_PREMIUM_MODEL
 MAX_MODE
 ```
 
-Для `/opsx-bug-team` и `/opsx-static-check`, если child model не раскрыта:
+Owner `MODEL=<slug>` override — **deferred**; when enabled, slug must match
+`MODEL_REGISTRY.json` exactly (sync via `/opsx-meta-sync-models`).
+
+Для `/opsx-bug-team` и `/opsx-static-check`:
 
 ```text
-CHILD_MODEL_POLICY=UNKNOWN_NOT_ENFORCEABLE
-POLICY_VIOLATION=NO
-OBSERVABILITY_GAP=YES
+CHILD_MODEL_POLICY=INHERIT_EXPLICIT
+POLICY_VIOLATION=YES when model omitted or auto/premium slug detected
 ```
 
-Явно обнаруженный premium или MAX route — policy violation.
-
-Supervisor / Task subagents: model inherit / Auto only. Не передавай
-explicit premium model IDs в Task.
+Явно обнаруженный premium, MAX, или `auto` route — policy violation.
 
 ---
 
@@ -2106,10 +1843,7 @@ STOP_UNCONFIRMED_WORKERS_REPORTED=YES
 
 но каждый такой worker должен быть перечислен в final report.
 
-Для `READY_FOR_OWNER_DIFF_REVIEW` дополнительно **все** поля ниже
-должны быть `YES` с `CLAIMS_TRACEABLE` evidence
-(`EXECUTED_CHECKER_EVIDENCE` или `DIRECT_COMMAND_ARTIFACT` — **не**
-advisory explore / pipeline prose alone):
+Для `READY_FOR_OWNER_DIFF_REVIEW` дополнительно:
 
 ```text
 FINAL_SNAPSHOT_CURRENT=YES
@@ -2119,19 +1853,6 @@ REQUIRED_TESTS_EXECUTED=YES
 FINAL_DIFF_REVIEW_ACCEPTED=YES
 PUBLICATION_ACTIONS_ABSENT=YES
 ```
-
-Hard gate:
-
-```text
-ANY_§20_READY_FIELD_MISSING_OR_ADVISORY_ONLY=YES
-→ READY_FOR_OWNER_DIFF_REVIEW=FORBIDDEN
-→ stay ACTIVE (dispatch allowed KEEP green-proof) OR
-  MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
-```
-
-Если acceptance criteria требуют green-proof и нет accepted executed
-`/opsx-test` (или equivalent checker) evidence → readiness запрещена
-даже при «Owner should commit next» advice.
 
 Также command evidence должно подтверждать:
 
@@ -2155,9 +1876,7 @@ STOP_UNCONFIRMED_WORKERS_REPORTED=NO
 Тогда mission получает blocked, cancelled или timebox status через
 terminalization controller.
 
-Если все functional gates пройдены, но процесс incomplete
-(включая: только denylisted publication остаётся; §20 checklist
-незакрыт; green-proof не executed):
+Если все functional gates пройдены, но процесс incomplete:
 
 ```text
 MISSION_STATUS=NOT_READY_PROCESS_INCOMPLETE
@@ -2202,7 +1921,6 @@ Supervisor не может:
 
 ```text
 SPEC_OR_PRODUCT_SEMANTICS_AMBIGUOUS
-BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION
 SCOPE_EXPANSION_REQUIRED
 DESTRUCTIVE_OR_PRODUCTION_ACTION_REQUIRED
 MATERIAL_RISK_ACCEPTANCE_REQUIRED
@@ -2224,62 +1942,6 @@ OPTIONS:
 RECOMMENDATION:
 CONSEQUENCES:
 ```
-
-### 21.1 Semantic write-target Owner propagation (mandatory)
-
-Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
-
-Если любой child worker (ff / update / apply / verify / archive / consultant)
-возвращает `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`:
-
-```text
-SUPERVISOR_STATUS: BLOCKED_OWNER_DECISION
-CHILD_STATUS: BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION
-DOWNSTREAM_DISPATCH: FORBIDDEN
-QUESTION_PROPAGATION: VERBATIM_REQUIRED
-GENERIC_SUMMARY_ONLY: FORBIDDEN
-ALTERNATE_WORKER_GUESS: FORBIDDEN
-OWNER_RESPONSE_DESTINATION: PLANNING_ARTIFACT_WRITER
-CHAT_ONLY_RESUME_APPLY: FORBIDDEN
-ONE_NEXT_ACTION: OWNER_DECISION_REQUIRED
-```
-
-Обязательные правила:
-
-* донести Owner **дословно** поля `BUSINESS_TERM`, `RUNTIME_CANDIDATES`,
-  `TARGET_EVIDENCE`, `QUESTION`, `OPTIONS`, `RECOMMENDATION`, `CONSEQUENCES`
-  из worker envelope — не сводить к generic `OWNER_DECISION_REQUIRED` и не
-  оставлять вопрос только внутри `OPEN_BLOCKERS`;
-* остановить все зависимые write / verify / archive / apply downstream tasks;
-* не dispatch-ить alternate writer для угадывания Auto/Search (или аналога);
-* независимые read-only DAG tasks могут завершиться, но mission не становится
-  successful, пока semantic gate открыт;
-* после ответа Owner сначала routing в `/opsx-update` (или другой planning
-  writer) для durable materialization target / allowed / forbidden adapters;
-* запрещено продолжать `/opsx-apply` на chat-only ответе.
-
-### 21.2 Product Acceptance (kernel DONE) — no soft bypass
-
-Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`.
-
-```text
-SOFT_WAIVE_CLEARS_PRODUCT_ACCEPTANCE: FORBIDDEN
-SOFT_PASS_CREATES_DONE: FORBIDDEN
-```
-
-Rules:
-
-* Owner waive of soft tooling (pyright / ECC / perf / antipattern / static /
-  env) MUST NOT dispatch `/opsx-verify mode=archive` or `/opsx-archive` while
-  `PRODUCT_ACCEPTANCE_REQUIRED=true` and `PRODUCT_ACCEPTANCE_STATUS` is not
-  `PASS`.
-* On PA FAIL / BLOCKED, route by pillar — do **not** “continue soft chain”:
-  - `MEANING_LOCK` → Owner semantic decision + `/opsx-update` (durable);
-  - `LIFECYCLE_COVERAGE` → `/opsx-spec-scenario-coverage` plan/audit/certify;
-  - `SIDE_EFFECT_PROOF` → `/opsx-test` / apply test materialization with
-    `side_effect_proof` / `PA_SIDE_EFFECT_PROOF`.
-* Mission SUCCESS / archive path requires PA PASS or NOT_REQUIRED.
-* Do not invent `/opsx-product-acceptance`; verify remains sole archive GO.
 
 Если задача неразрешима без forbidden route:
 
@@ -2499,157 +2161,58 @@ unauthorized writes, reliability changes, forbidden routes.
 
 ---
 
-# 25. BUG_MISSION — sequential multi-finding orchestration
+# 25. Bug lifecycle and routing templates
 
-Authority schemas (do not duplicate route semantics here):
+Bug не считается закрытым на `CLAIMED` / `RED_CONFIRMED` / `GREEN_CONFIRMED`.
+
+Ожидаемый путь через разрешённые команды:
 
 ```text
-.cursor/pipeline/ORCHESTRATION_MVP.md          # Routes A–D, RED-before-GO
-.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md
-.cursor/pipeline/contracts/bug-episode/SUPERVISOR_POLICY.md
-.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md
-.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md
+MATERIALIZED
+→ CLAIMED
+→ CLASSIFIED
+→ RED_CONFIRMED
+→ IMPLEMENTED
+→ GREEN_CONFIRMED
+→ BOUNDED_HUNT
+→ FAMILY_FANOUT
+→ FANIN_READY
+→ TERMINAL_CASE_STATE
 ```
 
-## 25.1 Mode activation
-
-Activate `BUG_MISSION` when Owner task is a durable bug case / multi-finding
-queue (explicit `case=` / mission packet / materialized findings), not a
-free-form product change DAG.
-
-Default v1 policy:
+Базовый routing (authority всегда подтверждается через consult при сомнении):
 
 ```text
-SUPERVISOR_POLICY
-execution_strategy: sequential
-route_authority: worker_transition_envelope
-max_active_findings: 1
-on_blocked: stop
-on_paused: stop
-on_needs_owner: stop
-on_worker_failure: stop
-require_claim: yes
-require_evidence_for_transition: yes
-require_terminal_evidence_for_close: yes
-mission_completion: queue_exhausted_and_all_terminal
-```
-
-Forbidden supervisor options: `route_a_next=…`, `skip_test_for_simple_bug`,
-scenario→command workflow tables.
-
-## 25.2 Core invariant
-
-```text
-NEXT_TRANSITION
-=
-transition(durable_current_state, verified_worker_ROUTE_TRANSITION)
-```
-
-Supervisor MUST NOT classify findings, invent `CHOSEN_ROUTE`, edit
-production/spec, treat worker `PASS` as mission success, bypass RED/GREEN
-gates, or continue after ambiguous/contradictory envelopes.
-
-```text
-SUPERVISOR = deterministic state-transition executor
-SUPERVISOR ≠ LLM workflow planner
-```
-
-## 25.3 Sequential loop
-
-```text
-MAX_ACTIVE_FINDINGS: 1
-ACTIVE_FINDING_ID = zero or one
-
-load durable mission/case state via worker envelopes
-  (DIRECT_REPOSITORY_ACCESS remains FORBIDDEN)
-
-while true:
-  if blocking recovery pending → return PAUSED/BLOCKED
-
-  if no ACTIVE_FINDING:
-    candidate = NEXT_ELIGIBLE_FINDING
-      (order: /opsx-claim-next-bug — CLAIM_PRIORITY → ledger → FINDING_ID)
-    if none:
-      verify all-terminal + no orphan claim + no pending recovery
-      → MISSION_COMPLETE: yes
-    claim/select candidate → set ACTIVE_FINDING
-
-  transition = resolve_allowed_transition(ACTIVE_FINDING + envelope)
-  if ambiguous vs PRECONDITIONS/route contract:
-    → PAUSED / ROUTE_CONTRACT_CONFLICT (no guessed next)
-
-  dispatch exactly one primary /opsx-* command
-  validate envelope (ROUTE_TRANSITION.md checklist)
-  reduce durable finding state
-
-  if BLOCKED|PAUSED|NEEDS_OWNER|ENVELOPE_INTEGRITY_FAIL|EXECUTION_OUTCOME_UNKNOWN:
-    stop_mission (do not start later findings)
-
-  if FINDING_TERMINAL with required evidence:
-    finalize finding; clear ACTIVE_FINDING; continue
-```
-
-Worker `TERMINAL_STATUS: PASS` + `MISSION_COMPLETE: no` means command
-succeeded only — mission stays ACTIVE.
-
-Finding terminal only when contract says e.g.
-`CLOSED_GREEN` | `CLOSED_FALSE_POSITIVE` | `ROUTED_OUT_OF_SCOPE` |
-`CLOSED_WITH_ACCEPTED_DISPOSITION` (or durable equivalents).
-
-## 25.4 Envelope validation + recovery
-
-Minimum identity checks before ADVANCE: `MISSION_ID`/`TASK_ID`, `COMMAND`,
-`CASE_ID`, `FINDING_ID==ACTIVE_FINDING_ID`, claim, route fields, evidence
-refs. Mismatch → `PAUSED` / `ENVELOPE_INTEGRITY_FAIL`.
-
-For RED / GREEN / CLOSE hops also apply §9.1 durable evidence gate
-(`DURABLE_FILE_WRITTEN=YES` + path). Prose-only GREEN/CLOSE → reject,
-not ADVANCE.
-
-Recovery outcomes: `ADVANCE` | `RETRY_ALLOWED` | `PAUSED` | `BLOCKED` |
-`NEEDS_OWNER` | `TERMINAL`. No implicit continue. Retry needs idempotency
-key; else pause. Writer may have run without committed envelope →
-`EXECUTION_OUTCOME_UNKNOWN` (no blind replay).
-
-Platform Task `aborted` | `interrupted` | `tool_error` | empty envelope
-on any primary hop (including `/opsx-bug-team`) → same
-`PAUSED` / `EXECUTION_OUTCOME_UNKNOWN` (or `TIMEOUT` if §12.0 clocks
-exceeded). Do not claim-next or start later findings. Pasteable resume
-required (§12.2.1).
-
-Resume: reconstruct from durable case + last verified transition; chat
-history not required.
-
-Prefer `EVENT_TYPE=supervisor_transition` on existing ROUTE-TRACE.
-
-## 25.5 Soft capability map (NOT route authority)
-
-Bug lifecycle **semantics** come only from ORCHESTRATION_MVP + worker
-`ROUTE_TRANSITION`. The list below is capability discovery only — never
-overrides envelope `NEXT_COMMAND`.
-
-```text
-pipeline uncertainty → /opsx-pipeline
-command authority → /opsx-admin-command-consult
-domain consult (optional; not planner in BUG_MISSION) → /opsx-explore
+upstream handoff UNAMBIGUOUS → dispatch per OWNER_RUN_COMMAND (§1.1)
+upstream handoff weak → §13.0 evidence gather before writer dispatch
+commit gate test_fail → /opsx-test-triage (NOT /opsx-bug-team)
+pipeline position / next hop → /opsx-pipeline NAVIGATE
+command ownership / relationships / odd output → /opsx-admin-command-consult
+pipeline redesign / usability → /opsx-admin-command-analyze-pipeline
+confirmed command-contract defect → /opsx-meta-fix-command-defects
+project/domain → /opsx-explore
 bug debt → /opsx-bug-debt-board
 case hygiene → /opsx-materialize-bug-queue
-claim / next eligible → /opsx-claim-next-bug
+claim → /opsx-claim-next-bug
 classification → /opsx-classify-bug
-Route A adjudication / GO → /opsx-fix-bug (per envelope; WITHOUT GO until allowed)
-RED / GREEN → /opsx-test (per envelope)
-Route B planning → /opsx-update (per envelope)
-family fanout / handback → /opsx-bug-team only when envelope/HANDBACK says so
+bug implementation/family → /opsx-bug-team (after triage or materialized case)
+project bug discovery → /opsx-project-bug-hunt
+pyright coverage → /opsx-pyright-strict-coverage
+external boundary → /opsx-external-call-coverage
+external gap → /opsx-close-external-gap
+performance → /opsx-performance-review
+antipatterns → /opsx-antipattern-gate
+static/tests → /opsx-static-check
+test failure classification → /opsx-test-triage
+final verification → /opsx-verify
 ```
 
-Denylisted commands stay forbidden even if recommended.
+Любая denylisted команда остаётся запрещённой, даже если появляется в
+routing recommendation.
 
-Default free-text (non-BUG_MISSION) missions still use DAG + §13.0 scenario
-routing gate; they must not silently claim `MISSION_COMPLETE` from one
-worker PASS when a durable multi-finding case is in scope.
-
-Finding not closed on `CLAIMED` / `RED_CONFIRMED` / `GREEN_CONFIRMED` alone —
-see CLOSE_POLICY.
+Code-changing work представляется task graph phases (intake → debt/discovery →
+implementation → focused gates → static/full → closure), но исполняется через
+DAG dependencies, а не как слепой linear router.
 
 ---
 
@@ -2751,11 +2314,6 @@ ONE_NEXT_ACTION:
 
 Верни ровно одно следующее действие Owner.
 
-`ONE_NEXT_ACTION` **обязан** быть ровно одним токеном из карты ниже.
-Изобретение токенов (`OWNER_RUN_COMMIT_*`, `OWNER_RUN_*`, и т.п.)
-**запрещено**. Optional pasteable Owner-side hop → поле `OWNER_SIDE_HOP`
-в теле отчёта, **не** замена `ONE_NEXT_ACTION`.
-
 ```text
 READY_FOR_OWNER_DIFF_REVIEW → ONE_NEXT_ACTION=REVIEW_THE_REPORTED_DIFF
 TIMEBOX_STOPPED → ONE_NEXT_ACTION=OWNER_REVIEW_TIMEBOX_RESULT
@@ -2765,11 +2323,6 @@ BLOCKED_FORBIDDEN_ROUTE / BLOCKED_OWNER_DECISION / BLOCKED_POLICY_VIOLATION
 ANALYSIS_COMPLETE → ONE_NEXT_ACTION=NONE
 NOT_READY_PROCESS_INCOMPLETE → ONE_NEXT_ACTION=OWNER_DECISION_REQUIRED
 ```
-
-Publication-only leftover (denylist commit/meta-commit) ⇒
-`NOT_READY_PROCESS_INCOMPLETE` + `OWNER_DECISION_REQUIRED`, never
-`READY_FOR_OWNER_DIFF_REVIEW` / `REVIEW_THE_REPORTED_DIFF` from advisory
-alone.
 
 ---
 
@@ -2835,11 +2388,432 @@ OPSX SUPERVISOR
   → ограничивает параллелизм и locks
   → обрабатывает hang / retry / conflict / cancel / timebox
   → применяет Owner-approved command policy
-  → использует Auto-first model routing
+  → использует inherit-only model routing (MODEL_DISPATCH.md)
   → допускает /opsx-bug-team и /opsx-static-check как internal
     orchestrators с contract-declared INTERNAL_TASK_FANOUT=ALLOWED
   → запрещает SELF_DISPATCH / recursive supervisor
   → доказывает terminalization (NO_ACTIVE_WORKERS +
     STOP_UNCONFIRMED_WORKERS_REPORTED)
   → выдаёт terminal Owner report
-```
+```3. **до первого** scoped-write / conditional dispatch классифицировать
+   `ROUTING_SCENARIO` (§13.0) и проконсультироваться с **сценарным**
+   READ_ONLY advisor — **не** default'ить на `/opsx-explore` для
+   quality-chain / gate-recovery (тесты, static-check, triage);
+4. запускать разрешённые `/opsx-*` команды только через субагентов;
+5. соблюдать зависимости, parallel limits и resource locks;
+6. валидировать результаты отдельно от завершения worker;
+7. разрешать conflicts, hangs, retries и cancellation;
+8. применять Owner-approved command policy и Auto-first model routing;
+9. довести mission до terminal state либо корректно остановиться;
+10. выдать Owner один итоговый отчёт с terminalization proof.
+USEFUL_WORK
+`USEFUL_WORK` — режим «сделай полезное»: rank/consume goal-like items
+(WORKLOG-derived / Owner list) with free-prose VALUE via `/opsx-explore`, then
+sequential units inside **one** mission until STOP, timebox, empty queue, or
+budget exhaustion. See §3.3.
+## 3.3 USEFUL_WORK — valued-goal consume (Option B)
+Когда Owner просит «сделай полезное» / useful-work / крутить цели по ценности
+до STOP, фиксируй:
+TASK_MODE=USEFUL_WORK
+HARD_DEADLINE: <required unless Owner explicitly waives with STOP-only policy>
+VALUED_GOAL_SOURCE: owner_list | worklog_ranked | mixed
+Обязательный первый substantive dispatch (READ_ONLY):
+Explore must emit `VALUED_GOALS` per `openspec/policies/EXPLORE_POLICY.md`
+(`explore.valued_goals`) and `.cursor/commands/opsx-explore.md`:
+free-prose `VALUE` on every ranked item (draft allowed); WORKLOG stays
+`raw_notes` / not North Star SoT.
+Consume loop **inside the same mission** (do not start a second concurrent
+mission):
+1. Take the next open ranked item as the only active unit `IN_SCOPE`.
+2. Dispatch normal `/opsx-*` writers/checkers for that unit only
+   (typically `/opsx-new` / `/opsx-ff` / `/opsx-update` / bug path from
+   `NEXT_OPSX`) — no repository tools on the supervisor itself.
+3. On unit terminal (or Owner defer), advance to the next ranked item if:
+   - queue non-empty;
+   - `MISSION_STATUS` still allows work;
+   - before `NO_NEW_WORK_AFTER` / within `GLOBAL_EXECUTION_BUDGET`;
+   - Owner has not issued STOP.
+4. Stop when: empty queue | Owner STOP | `TIMEBOX_STOPPED` | budget exhausted |
+   `BLOCKED_*` that Owner must resolve.
+Запрещено в `USEFUL_WORK`:
+* обходить verify / commit / archive / Owner diff-review gates;
+* трактовать WORKLOG как source of truth North Star;
+* расширять unit до «починить весь repository»;
+* запускать новый unit после `NO_NEW_WORK_AFTER`;
+* писать product code напрямую с control-plane.
+Если `VALUED_GOALS.EMPTY_QUEUE=YES` после explore → terminal
+`ANALYSIS_COMPLETE` (нечего consume) с явным `NEXT_ACTION` для Owner
+(добавить цели в WORKLOG / уточнить список / сменить режим).
+STOP_ACK_TIMEOUT:
+MODEL_MODE:
+REQUESTED_MODEL:
+MODEL_SELECTION_REASON:
+Каждый top-level Task dispatch **обязан** заполнить `TIMEOUT` /
+`HEARTBEAT_INTERVAL` / `NO_PROGRESS_TIMEOUT` / `STOP_ACK_TIMEOUT`
+числовыми defaults из §12.0 (или более строгими). Пустые часы
+запрещены — unbounded wait = contract violation.
+Для `/opsx-bug-team` и `/opsx-static-check` дополнительно §12.4
+(`OWNER_VISIBLE` + предпочтительно `run_in_background=true`).
+### 9.1 Durable evidence gate (bug-episode RED / GREEN / CLOSE)
+Supervisor **не** читает repository files. Для transitions, у которых
+`ROUTE_TRANSITION` / PRECONDITIONS требуют RED, GREEN или CLOSE evidence,
+`RESULT_VALIDATION=ACCEPTED` только если envelope содержит **все**:
+REQUIRED_EVIDENCE_PATH_PRESENT=YES
+  (non-empty RED_EVIDENCE_PATH | GREEN_EVIDENCE_PATH |
+   OWNER-CLOSURE / close evidence path as applicable)
+STATUS_MATCHES_PATH_KIND=YES
+  (e.g. STATUS: GREEN_CONFIRMED with GREEN_EVIDENCE_PATH)
+DURABLE_FILE_WRITTEN=YES
+  (worker attestation that the path was written this hop)
+Prose-only `GREEN_CONFIRMED` / `CLOSED_*` / ROUTE-TRACE claim **без**
+path + `DURABLE_FILE_WRITTEN=YES` →
+FAILURE_CLASS=EVIDENCE_INCOMPLETE
+После исчерпания retry → `PAUSED` (не `ADVANCE`, не claim-next).
+Orphan ROUTE-TRACE без durable artifact не является accepted evidence.
+## 12.0 Mandatory numeric defaults (top-level Task)
+Каждый Supervisor Task dispatch заполняет часы **до** launch.
+Пустые / omitted values запрещены.
+Ordinary writer / checker / consultant (single primary `/opsx-*`,
+не internal orchestrator):
+TIMEOUT_SECONDS=1800
+HEARTBEAT_INTERVAL_SECONDS=120
+NO_PROGRESS_TIMEOUT_SECONDS=600
+STOP_ACK_TIMEOUT_SECONDS=60
+Internal orchestrators (`/opsx-bug-team`, `/opsx-static-check`):
+TIMEOUT_SECONDS=3600
+HEARTBEAT_INTERVAL_SECONDS=180
+NO_PROGRESS_TIMEOUT_SECONDS=900
+STOP_ACK_TIMEOUT_SECONDS=120
+Допускается только **более строгий** (меньший) timeout, не больший без
+Owner timebox / explicit mission clock. Map fields:
+TIMEOUT ← TIMEOUT_SECONDS
+HEARTBEAT_INTERVAL ← HEARTBEAT_INTERVAL_SECONDS
+NO_PROGRESS_TIMEOUT ← NO_PROGRESS_TIMEOUT_SECONDS
+STOP_ACK_TIMEOUT ← STOP_ACK_TIMEOUT_SECONDS
+2. Worker получает stop/cancel (`interrupt=true` на running Task, если
+   платформа поддерживает).
+## 12.2.1 Platform abort / interrupt / empty envelope
+Если top-level Task завершается как `aborted` | `interrupted` |
+`tool_error` | empty / missing envelope (Owner cancel tool, platform
+kill, mid-flight interrupt) **без** accepted result:
+RECOVERY_CLASS=PAUSED
+DISPOSITION=EXECUTION_OUTCOME_UNKNOWN
+ADVANCE=FORBIDDEN
+CLAIM_NEXT=FORBIDDEN
+NEW_FINDING=FORBIDDEN
+BLIND_REPLAY=FORBIDDEN
+Если одновременно превышены часы §12.0 → `TIMEOUT` (строже) с тем же
+запретом blind replay.
+Owner report обязан содержать pasteable resume **той же** primary
+команды + `ATTEMPT+1` только при `RETRY_ALLOWED=yes` и idempotency key;
+иначе pasteable reconcile / Owner decision. Нельзя молча продолжать
+mission как будто hop успешен.
+Writer/orchestrator side effects возможны → no duplicate production GO
+без durable reconcile (см. SUPERVISOR_POLICY `EXECUTION_OUTCOME_UNKNOWN`).
+## 12.4 Long internal orchestrator (Owner-visible)
+Перед top-level dispatch `/opsx-bug-team` или `/opsx-static-check`
+Supervisor **обязан** показать Owner (в том же turn, до/при launch):
+OWNER_VISIBLE_DISPATCH:
+  CASE_ID:
+  EXPECTED_WALL_CLOCK_SECONDS:   # from §12.0 TIMEOUT or stricter
+  NO_PROGRESS_TIMEOUT_SECONDS:
+  INTERRUPT_POLICY: interrupt=true on timeout/hang when platform allows
+  SILENCE_NOTE: silence until NO_PROGRESS is not proof of hang; after
+                NO_PROGRESS Supervisor must TIMEOUT/PAUSED per §12.2
+Предпочтительно `run_in_background=true` для этих orchestrators, когда
+платформа позволяет heartbeat / completion notification; иначе sync
+Task **с** часами §12.0 (unbounded sync wait запрещён).
+На timeout / abort → тот же turn заканчивается pasteable resume
+(§12.2.1), не silent wait.
+На каждой новой существенной mission запроси через субагентов:
+/opsx-admin-command-analyze-pipeline:
+  PIPELINE_ANALYSIS | IMPROVEMENT_PROPOSAL | REGRESSION_PIPELINE_REVIEW
+  NOT_OPERATOR_NAVIGATOR (as-is map → /opsx-pipeline)
+`MAX_ACTIVE_SUBAGENTS=2`. Для `QUALITY_CHAIN_RECOVERY` prefer sequential:
+pipeline → consult (if needed) → analyze-pipeline (if still unclear).
+### 13.0 Execution routing advisory (scenario-based hard gate)
+Перед выбором и фиксацией execution plan и **до первого** dispatch
+команды из `TASK_ALLOWED_SCOPED_WRITE` или `CONDITIONAL_RESTRICTED`
+Supervisor **обязан** классифицировать `ROUTING_SCENARIO` и получить
+сценарный READ_ONLY routing advice — **не** default'ить на `/opsx-explore`
+для quality-chain / gate-recovery.
+ROUTING_SCENARIO:
+  QUALITY_CHAIN_RECOVERY
+  DOMAIN_PRODUCT_SEMANTICS
+  USEFUL_WORK
+  BUG_MISSION
+  DEFAULT_FEATURE_WORK
+| `ROUTING_SCENARIO` | Когда (примеры) | Mandatory consult (порядок) | Explore / evolution |
+|---|---|---|---|
+| `QUALITY_CHAIN_RECOVERY` | static-check FAIL, pytest/triage FAIL, «исправь gates/тесты последовательно», antipattern→test-env→static-check chain | ① `/opsx-pipeline` (navigate от текущего gate state); ② если authority неясна → `/opsx-admin-command-consult`; ③ если recovery path всё ещё неясен → `/opsx-admin-command-analyze-pipeline` `MODE=IMPROVEMENT_PROPOSAL` (focused на reported failure) | **только** если failure = domain/spec semantics, не tooling |
+| `DOMAIN_PRODUCT_SEMANTICS` | North Star, evolution, spec ambiguity, «что значит в продукте» | `/opsx-explore` **или** `/opsx-evolution` (`READ_ONLY`) | pipeline при необходимости placement |
+| `USEFUL_WORK` | §3.3 valued-goals consume | `/opsx-explore` (`VALUED_GOALS`) | — |
+| `BUG_MISSION` | §25 durable case / envelope | **skip** — `route_authority=worker_transition_envelope` | optional domain consult **не** переопределяет envelope |
+| `DEFAULT_FEATURE_WORK` | new/ff/update/apply, feature implementation | `/opsx-pipeline` + `/opsx-admin-command-consult` (parallel ≤2) | `/opsx-explore` если domain gap после pipeline |
+**Исключение — `BUG_MISSION` (§25):** envelope — route authority; explore
+не выбирает `NEXT_COMMAND` (см. `contracts/bug-episode/SUPERVISOR_POLICY.md`).
+Bootstrap triad (консультационный контур, не заменяет §13.0 scenario gate):
+Ask templates (subagent prompt — **по сценарию**, не всегда explore):
+QUALITY_CHAIN_RECOVERY:
+  CURRENT_GATE_STATE: <static-check|triage|antipattern|…>
+  FAIL_SUMMARY: <paste from checker packet>
+  REQUEST: pasteable NEXT_ACTION sequence via pipeline / fix commands
+DOMAIN_PRODUCT_SEMANTICS:
+  HOW_BEST_TO_EXECUTE_THIS_TASK= + domain interpretation
+USEFUL_WORK:
+  VALUED_GOALS ranking (explore.valued_goals)
+Требуемый результат (ledger / `CONSULTATIONS_EXECUTED`):
+EXECUTION_ROUTING_ADVICE_RECEIVED=YES
+ROUTING_SCENARIO: <one of above>
+ROUTING_ADVICE:
+  RECOMMENDED_ROUTE:
+  ORDER:
+  KEEP_DEFER:
+  RISKS:
+Для `QUALITY_CHAIN_RECOVERY` **`EXPLORE_EXECUTION_ADVICE_RECEIVED` не
+требуется**; достаточно routing от pipeline / consult / analyze-pipeline.
+Тихий skip запрещён. Если сценарный advisor недоступен, упал или не дал
+usable execution recommendation:
+STATUS=BLOCKED_NEEDS_ROUTING_ADVICE
+Advisory routing **не** authority grant, не обход denylist, не commit/push/PR,
+не отмена mandatory gates. Authority по command contract — через
+`/opsx-admin-command-consult`.
+ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
+ADVISORY_NEXT_COMMAND_ALONE_SETS_READY=FORBIDDEN
+`NEXT_COMMAND` / `RECOMMENDED_ROUTE` от advisors **не** переводят mission в
+`READY_FOR_OWNER_DIFF_REVIEW` и **не** заменяют §20 evidence checklist.
+Denylisted `NEXT_COMMAND` → §14.7 reject path.
+`SCOPE_UNCHANGED=YES` **не** отменяет scenario gate: routing consultation
+обязательна на каждой новой существенной mission до первого scoped-write /
+conditional dispatch.
+EXECUTION_ROUTING_ADVICE_RECEIVED=YES
+Для первого `TASK_ALLOWED_SCOPED_WRITE` / `CONDITIONAL_RESTRICTED`
+dispatch отсутствие `EXECUTION_ROUTING_ADVICE_RECEIVED=YES` ⇒
+`DISPATCH_ALLOWED=NO` (см. §13.0). Bootstrap triad исключён из этого
+требования. `QUALITY_CHAIN_RECOVERY` **не** требует explore-only advice.
+MANDATORY_EXECUTION_ADVISOR_FOR_SUPERVISOR=NO
+DOMAIN_AND_USEFUL_WORK_ADVISOR=YES
+На supervisor mission `/opsx-explore` обязателен для `DOMAIN_PRODUCT_SEMANTICS`,
+`USEFUL_WORK` и optional domain gap в `DEFAULT_FEATURE_WORK` — **не**
+default advisor для `QUALITY_CHAIN_RECOVERY` (§13.0: pipeline → consult →
+analyze-pipeline).
+В `TASK_MODE=USEFUL_WORK` explore additionally ranks goal-like candidates
+(`VALUED_GOALS`, free-prose VALUE gate). Ranking is advisory input to the
+supervisor consume loop; explore does not implement, does not write WORKLOG,
+and does not become a second lifecycle authority.
+EXECUTION_ADVICE=ADVISORY
+EXECUTION_ROUTING_ADVICE_RECEIVED=YES
+ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
+Explore advice alone never satisfies §20 `READY_FOR_OWNER_DIFF_REVIEW`
+gates (`REQUIRED_TESTS_EXECUTED`, independent review, final diff review).
+`/opsx-admin-command-analyze-pipeline`: `READ_ONLY` only; modes
+`PIPELINE_ANALYSIS` | `IMPROVEMENT_PROPOSAL` | `REGRESSION_PIPELINE_REVIEW`;
+не substitute для `/opsx-pipeline` navigate-as-is.
+/opsx-evolution
+/opsx-test-env
+/opsx-meta-commit
+/opsx-meta-fix-command-defects
+/opsx-admin-command-resolve-conflicts
+ADVISORY_ROUTE_IS_NOT_TERMINAL_AUTHORITY=YES
+После reject **не** останавливать mission как будто route уже выполнен.
+Обязательный выбор:
+1. **Continue allowed KEEP** — dispatch разрешённые surrogate hops из
+   advice (`/opsx-test`, coverage, triage, …) пока acceptance / green-proof
+   не закрыты accepted evidence; **или**
+2. **Publication-only leftover** — если единственный остаточный шаг Owner —
+   denylisted publication (`/opsx-commit`, `/opsx-meta-commit`, PR, …) и
+   allowed residual work отсутствует:
+  (или BLOCKED_FORBIDDEN_ROUTE, если forbidden route — единственный путь)
+Допускается optional `OWNER_SIDE_HOP` (pasteable Owner-side текст) в теле
+отчёта. Запрещено: выдавать `READY_FOR_OWNER_DIFF_REVIEW`,
+`ONE_NEXT_ACTION=REVIEW_THE_REPORTED_DIFF`, или изобретать токены вроде
+`OWNER_RUN_COMMIT_*` как будто §20 readiness выполнена.
+Default для обычного top-level dispatch:
+MODEL_MODE=AUTO
+REQUESTED_MODEL=AUTO
+EXPLICIT_PREMIUM_MODEL=NO
+MAX_MODE=NO
+Если actual model не раскрыта:
+ACTUAL_MODEL_REPORTED=UNKNOWN_PLATFORM_SELECTED
+Это не считается ошибкой.
+Explicit model допустима только если:
+MODEL_CLASS=OWNER_APPROVED_LOW_COST
+TASK_ELIGIBLE_FOR_LOW_COST_MODEL=YES
+MODEL_AVAILABLE_IN_CURRENT_RUNTIME=YES
+MODEL_SELECTION_REASON=<present>
+MODEL_MODE=EXPLICIT_LOW_COST
+MODEL_POLICY_COMPLIANT=YES
+Явное имя модели без Owner-approved classification отклоняется.
+Для `/opsx-bug-team` и `/opsx-static-check`, если child model не раскрыта:
+CHILD_MODEL_POLICY=UNKNOWN_NOT_ENFORCEABLE
+POLICY_VIOLATION=NO
+OBSERVABILITY_GAP=YES
+Явно обнаруженный premium или MAX route — policy violation.
+Supervisor / Task subagents: model inherit / Auto only. Не передавай
+explicit premium model IDs в Task.
+Для `READY_FOR_OWNER_DIFF_REVIEW` дополнительно **все** поля ниже
+должны быть `YES` с `CLAIMS_TRACEABLE` evidence
+(`EXECUTED_CHECKER_EVIDENCE` или `DIRECT_COMMAND_ARTIFACT` — **не**
+advisory explore / pipeline prose alone):
+Hard gate:
+ANY_§20_READY_FIELD_MISSING_OR_ADVISORY_ONLY=YES
+→ READY_FOR_OWNER_DIFF_REVIEW=FORBIDDEN
+→ stay ACTIVE (dispatch allowed KEEP green-proof) OR
+Если acceptance criteria требуют green-proof и нет accepted executed
+`/opsx-test` (или equivalent checker) evidence → readiness запрещена
+даже при «Owner should commit next» advice.
+Если все functional gates пройдены, но процесс incomplete
+(включая: только denylisted publication остаётся; §20 checklist
+незакрыт; green-proof не executed):
+BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION
+### 21.1 Semantic write-target Owner propagation (mandatory)
+Follow `.cursor/pipeline/contracts/SEMANTIC_WRITE_TARGET.md`.
+Если любой child worker (ff / update / apply / verify / archive / consultant)
+возвращает `BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION`:
+SUPERVISOR_STATUS: BLOCKED_OWNER_DECISION
+CHILD_STATUS: BLOCKED_NEEDS_OWNER_SEMANTIC_DECISION
+DOWNSTREAM_DISPATCH: FORBIDDEN
+QUESTION_PROPAGATION: VERBATIM_REQUIRED
+GENERIC_SUMMARY_ONLY: FORBIDDEN
+ALTERNATE_WORKER_GUESS: FORBIDDEN
+OWNER_RESPONSE_DESTINATION: PLANNING_ARTIFACT_WRITER
+CHAT_ONLY_RESUME_APPLY: FORBIDDEN
+ONE_NEXT_ACTION: OWNER_DECISION_REQUIRED
+Обязательные правила:
+* донести Owner **дословно** поля `BUSINESS_TERM`, `RUNTIME_CANDIDATES`,
+  `TARGET_EVIDENCE`, `QUESTION`, `OPTIONS`, `RECOMMENDATION`, `CONSEQUENCES`
+  из worker envelope — не сводить к generic `OWNER_DECISION_REQUIRED` и не
+  оставлять вопрос только внутри `OPEN_BLOCKERS`;
+* остановить все зависимые write / verify / archive / apply downstream tasks;
+* не dispatch-ить alternate writer для угадывания Auto/Search (или аналога);
+* независимые read-only DAG tasks могут завершиться, но mission не становится
+  successful, пока semantic gate открыт;
+* после ответа Owner сначала routing в `/opsx-update` (или другой planning
+  writer) для durable materialization target / allowed / forbidden adapters;
+* запрещено продолжать `/opsx-apply` на chat-only ответе.
+### 21.2 Product Acceptance (kernel DONE) — no soft bypass
+Follow `.cursor/pipeline/contracts/PRODUCT_ACCEPTANCE.md`.
+SOFT_WAIVE_CLEARS_PRODUCT_ACCEPTANCE: FORBIDDEN
+SOFT_PASS_CREATES_DONE: FORBIDDEN
+Rules:
+* Owner waive of soft tooling (pyright / ECC / perf / antipattern / static /
+  env) MUST NOT dispatch `/opsx-verify mode=archive` or `/opsx-archive` while
+  `PRODUCT_ACCEPTANCE_REQUIRED=true` and `PRODUCT_ACCEPTANCE_STATUS` is not
+  `PASS`.
+* On PA FAIL / BLOCKED, route by pillar — do **not** “continue soft chain”:
+  - `MEANING_LOCK` → Owner semantic decision + `/opsx-update` (durable);
+  - `LIFECYCLE_COVERAGE` → `/opsx-spec-scenario-coverage` plan/audit/certify;
+  - `SIDE_EFFECT_PROOF` → `/opsx-test` / apply test materialization with
+    `side_effect_proof` / `PA_SIDE_EFFECT_PROOF`.
+* Mission SUCCESS / archive path requires PA PASS or NOT_REQUIRED.
+* Do not invent `/opsx-product-acceptance`; verify remains sole archive GO.
+# 25. BUG_MISSION — sequential multi-finding orchestration
+Authority schemas (do not duplicate route semantics here):
+.cursor/pipeline/ORCHESTRATION_MVP.md          # Routes A–D, RED-before-GO
+.cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md
+.cursor/pipeline/contracts/bug-episode/SUPERVISOR_POLICY.md
+.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md
+.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md
+## 25.1 Mode activation
+Activate `BUG_MISSION` when Owner task is a durable bug case / multi-finding
+queue (explicit `case=` / mission packet / materialized findings), not a
+free-form product change DAG.
+Default v1 policy:
+SUPERVISOR_POLICY
+execution_strategy: sequential
+route_authority: worker_transition_envelope
+max_active_findings: 1
+on_blocked: stop
+on_paused: stop
+on_needs_owner: stop
+on_worker_failure: stop
+require_claim: yes
+require_evidence_for_transition: yes
+require_terminal_evidence_for_close: yes
+mission_completion: queue_exhausted_and_all_terminal
+Forbidden supervisor options: `route_a_next=…`, `skip_test_for_simple_bug`,
+scenario→command workflow tables.
+## 25.2 Core invariant
+NEXT_TRANSITION
+=
+transition(durable_current_state, verified_worker_ROUTE_TRANSITION)
+Supervisor MUST NOT classify findings, invent `CHOSEN_ROUTE`, edit
+production/spec, treat worker `PASS` as mission success, bypass RED/GREEN
+gates, or continue after ambiguous/contradictory envelopes.
+SUPERVISOR = deterministic state-transition executor
+SUPERVISOR ≠ LLM workflow planner
+## 25.3 Sequential loop
+MAX_ACTIVE_FINDINGS: 1
+ACTIVE_FINDING_ID = zero or one
+load durable mission/case state via worker envelopes
+  (DIRECT_REPOSITORY_ACCESS remains FORBIDDEN)
+while true:
+  if blocking recovery pending → return PAUSED/BLOCKED
+  if no ACTIVE_FINDING:
+    candidate = NEXT_ELIGIBLE_FINDING
+      (order: /opsx-claim-next-bug — CLAIM_PRIORITY → ledger → FINDING_ID)
+    if none:
+      verify all-terminal + no orphan claim + no pending recovery
+      → MISSION_COMPLETE: yes
+    claim/select candidate → set ACTIVE_FINDING
+  transition = resolve_allowed_transition(ACTIVE_FINDING + envelope)
+  if ambiguous vs PRECONDITIONS/route contract:
+    → PAUSED / ROUTE_CONTRACT_CONFLICT (no guessed next)
+  dispatch exactly one primary /opsx-* command
+  validate envelope (ROUTE_TRANSITION.md checklist)
+  reduce durable finding state
+  if BLOCKED|PAUSED|NEEDS_OWNER|ENVELOPE_INTEGRITY_FAIL|EXECUTION_OUTCOME_UNKNOWN:
+    stop_mission (do not start later findings)
+  if FINDING_TERMINAL with required evidence:
+    finalize finding; clear ACTIVE_FINDING; continue
+Worker `TERMINAL_STATUS: PASS` + `MISSION_COMPLETE: no` means command
+succeeded only — mission stays ACTIVE.
+Finding terminal only when contract says e.g.
+`CLOSED_GREEN` | `CLOSED_FALSE_POSITIVE` | `ROUTED_OUT_OF_SCOPE` |
+`CLOSED_WITH_ACCEPTED_DISPOSITION` (or durable equivalents).
+## 25.4 Envelope validation + recovery
+Minimum identity checks before ADVANCE: `MISSION_ID`/`TASK_ID`, `COMMAND`,
+`CASE_ID`, `FINDING_ID==ACTIVE_FINDING_ID`, claim, route fields, evidence
+refs. Mismatch → `PAUSED` / `ENVELOPE_INTEGRITY_FAIL`.
+For RED / GREEN / CLOSE hops also apply §9.1 durable evidence gate
+(`DURABLE_FILE_WRITTEN=YES` + path). Prose-only GREEN/CLOSE → reject,
+not ADVANCE.
+Recovery outcomes: `ADVANCE` | `RETRY_ALLOWED` | `PAUSED` | `BLOCKED` |
+`NEEDS_OWNER` | `TERMINAL`. No implicit continue. Retry needs idempotency
+key; else pause. Writer may have run without committed envelope →
+`EXECUTION_OUTCOME_UNKNOWN` (no blind replay).
+Platform Task `aborted` | `interrupted` | `tool_error` | empty envelope
+on any primary hop (including `/opsx-bug-team`) → same
+`PAUSED` / `EXECUTION_OUTCOME_UNKNOWN` (or `TIMEOUT` if §12.0 clocks
+exceeded). Do not claim-next or start later findings. Pasteable resume
+required (§12.2.1).
+Resume: reconstruct from durable case + last verified transition; chat
+history not required.
+Prefer `EVENT_TYPE=supervisor_transition` on existing ROUTE-TRACE.
+## 25.5 Soft capability map (NOT route authority)
+Bug lifecycle **semantics** come only from ORCHESTRATION_MVP + worker
+`ROUTE_TRANSITION`. The list below is capability discovery only — never
+overrides envelope `NEXT_COMMAND`.
+pipeline uncertainty → /opsx-pipeline
+command authority → /opsx-admin-command-consult
+domain consult (optional; not planner in BUG_MISSION) → /opsx-explore
+claim / next eligible → /opsx-claim-next-bug
+Route A adjudication / GO → /opsx-fix-bug (per envelope; WITHOUT GO until allowed)
+RED / GREEN → /opsx-test (per envelope)
+Route B planning → /opsx-update (per envelope)
+family fanout / handback → /opsx-bug-team only when envelope/HANDBACK says so
+Denylisted commands stay forbidden even if recommended.
+Default free-text (non-BUG_MISSION) missions still use DAG + §13.0 scenario
+routing gate; they must not silently claim `MISSION_COMPLETE` from one
+worker PASS when a durable multi-finding case is in scope.
+Finding not closed on `CLAIMED` / `RED_CONFIRMED` / `GREEN_CONFIRMED` alone —
+see CLOSE_POLICY.
+`ONE_NEXT_ACTION` **обязан** быть ровно одним токеном из карты ниже.
+Изобретение токенов (`OWNER_RUN_COMMIT_*`, `OWNER_RUN_*`, и т.п.)
+**запрещено**. Optional pasteable Owner-side hop → поле `OWNER_SIDE_HOP`
+в теле отчёта, **не** замена `ONE_NEXT_ACTION`.
+Publication-only leftover (denylist commit/meta-commit) ⇒
+`NOT_READY_PROCESS_INCOMPLETE` + `OWNER_DECISION_REQUIRED`, never
+`READY_FOR_OWNER_DIFF_REVIEW` / `REVIEW_THE_REPORTED_DIFF` from advisory
+alone.
+  → использует Auto-first model routing

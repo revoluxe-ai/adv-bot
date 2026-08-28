@@ -1,12 +1,15 @@
+"""Сохранение рекламных кампаний и карточек WB в PostgreSQL."""
+
 import json
 from collections.abc import Sequence
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.client_bot.modules.default_settings import (
-    apply_defaults_to_adv_setting,
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_new_campaign_free_defaults,
 )
 from app.core.wb_api.data_classes.advs.auction_adv import AuctionAdv
 from app.modules.common_slaves.wildberries.data_classes.card_from_wb import CardFromWB
@@ -25,21 +28,35 @@ _sm = get_async_session_maker
 
 
 async def update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
-    part = 10
-    # Разбиваем список advs на части по 10 элементов
-    for i in range(0, len(advs), part):
-        advs_part = advs[i : i + part]
-        await _update_advs_in_db(advs_part, wb_cabinet_id)
+    """Записать рекламные кампании WB одной write-транзакцией.
+
+    Parent открывает PostgreSQL session и передаёт её child-seam.
+
+    Args:
+        advs: Рекламные кампании, полученные от WB API.
+        wb_cabinet_id: Первичный ключ кабинета WB.
+    """
+    async with _sm(read_only=False) as session:
+        for start in range(0, len(advs), 10):
+            await _update_advs_in_session(
+                session,
+                advs[start : start + 10],
+                wb_cabinet_id,
+            )
+        await session.commit()
 
 
-async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None:
+async def _update_advs_in_session(
+    session: AsyncSession,
+    advs: list[AuctionAdv],
+    wb_cabinet_id: int,
+) -> None:
     """TODO Была ошибка, когда пытаемся добавить две одинаковых РК. Вообще, такого быть не должно
     но есть, если юзеры не правильно прописывают в названии артикул Аукциона
     """
     stmt = select(WBCabinet).where(WBCabinet.id == wb_cabinet_id)
-    async with _sm(read_only=False) as session:
-        result = await session.execute(stmt)
-        wb_cabinet: WBCabinet = result.scalar_one()
+    result = await session.execute(stmt)
+    wb_cabinet: WBCabinet = result.scalar_one()
 
 
     advs_to_process: list[AuctionAdv] = []
@@ -49,8 +66,8 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
             advs_to_process.append(adv)
             seen_adv_ids.add(adv.advertId)
 
-    async with _sm(read_only=False) as session:
-        # Получаем существующие записи по adv_id
+    # Получаем существующие записи по adv_id.
+    if advs_to_process:
         adv_ids = [adv.advertId for adv in advs_to_process]
         existing_stmt = select(AdvSetting).where(AdvSetting.adv_id.in_(adv_ids))
         existing_result = await session.execute(existing_stmt)
@@ -84,14 +101,12 @@ async def _update_advs_in_db(advs: list[AuctionAdv], wb_cabinet_id: int) -> None
                     cpm=adv.cpm,
                 )
                 # Применяем дефолты через ORM
-                apply_defaults_to_adv_setting(adv_setting, wb_cabinet)
+                # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+                apply_new_campaign_free_defaults(adv_setting, wb_cabinet)
                 apply_wb_campaign_meta_from_legacy_adv_data(
                     adv_setting, adv.data
                 )
                 session.add(adv_setting)
-
-        await session.commit()
-
 
 async def update_cards_in_db(cards: list[CardFromWB], wb_cabinet: WBCabinet) -> None:
     if not cards:

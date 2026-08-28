@@ -16,7 +16,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 logger = logging.getLogger(__name__)
 
 
-async def backfill_v3_status_mode_consistency(
+async def backfill_v3_hard_statuses_and_states_consistency(
     *,
     dry_run: bool = True,
     adv_setting_id: int | None = None,
@@ -30,6 +30,7 @@ async def backfill_v3_status_mode_consistency(
     Returns:
         Количество найденных несогласованных ключей.
     """
+    # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
     async with sm(read_only=False) as session:
         stmt = (
             select(KeywordSetting, AdvSetting.bot_active, AdvSetting.strategy)

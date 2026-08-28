@@ -195,6 +195,7 @@ CREATE TABLE advsetting (
     cpm INTEGER,
     bidder_for_auto BOOLEAN,
     auto_update_white_list BOOLEAN,
+    auto_update_minus_phrases BOOLEAN DEFAULT false,
     auto_budget_watchdog_enabled BOOLEAN,
     auto_update_target_place BOOLEAN,
     auto_update_exponent BOOLEAN,

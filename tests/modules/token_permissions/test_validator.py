@@ -52,7 +52,8 @@ class TestTokenPermissionsValidator:
         assert not result.is_read_only
         assert not result.is_expired
         assert result.shop_id is not None
-        assert result.can_be_used
+        assert result.can_be_used_for_free
+        assert result.can_be_used_for_pay
         assert result.error_message is None
         assert len(result.missing_required) == 0
 
@@ -75,16 +76,18 @@ class TestTokenPermissionsValidator:
         assert result.is_valid_jwt
         assert not result.is_read_only
         assert not result.is_expired
-        assert result.can_be_used
+        assert result.can_be_used_for_free
+        assert result.can_be_used_for_pay
         assert result.error_message is None
         assert len(result.missing_required) == 0
 
-        # Check that API probes were successful for all except Statistics
+        # claims_plus_api probes all required rights, including Статистика
         assert result.permissions["Контент"].api_probe_success is True
         assert result.permissions["Аналитика"].api_probe_success is True
         assert result.permissions["Продвижение"].api_probe_success is True
-        # Statistics should not have API probe
-        assert result.permissions["Статистика"].api_probe_success is None
+
+        # Statistics is now probed in claims_plus_api mode
+        assert result.permissions["Статистика"].api_probe_success is True
 
     @pytest.mark.asyncio
     async def test_valid_token_claims_plus_api_mode_failure(self):
@@ -100,7 +103,8 @@ class TestTokenPermissionsValidator:
         assert not result.is_expired
 
         # Token should NOT be usable because API probes returned False (403)
-        assert not result.can_be_used
+        assert not result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert result.error_message is not None
         assert len(result.missing_required) > 0
 
@@ -126,7 +130,8 @@ class TestTokenPermissionsValidator:
         assert not result.is_expired
 
         # Token SHOULD be usable - network errors don't invalidate JWT claims
-        assert result.can_be_used
+        assert result.can_be_used_for_free
+        assert result.can_be_used_for_pay
         assert result.error_message is None
         assert len(result.missing_required) == 0
 
@@ -163,7 +168,8 @@ class TestTokenPermissionsValidator:
         assert not result.is_expired
 
         # Token SHOULD be usable - API format changes don't invalidate JWT claims
-        assert result.can_be_used
+        assert result.can_be_used_for_free
+        assert result.can_be_used_for_pay
         assert result.error_message is None
         assert len(result.missing_required) == 0
 
@@ -180,7 +186,8 @@ class TestTokenPermissionsValidator:
 
         assert not result.is_valid_jwt
         assert result.shop_id is None
-        assert not result.can_be_used
+        assert not result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert result.error_message == "Токен не валиден"
         assert result.permissions == {}
         assert result.is_read_only is False
@@ -194,12 +201,17 @@ class TestTokenPermissionsValidator:
 
         assert result.is_valid_jwt
         assert not result.is_personal
-        assert not result.can_be_used
+        assert not result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert result.error_message == "Токен не персональный"
 
     @pytest.mark.asyncio
     async def test_read_only_token(self):
-        """Test validation with read-only token."""
+        """Read-only token remains usable for analytics registration path.
+
+        ``can_be_used`` no longer hard-fails on read-only (start UX warns after add).
+        ``error_message`` still surfaces the read-only notice for callers that check it.
+        """
         validator = TokenPermissionsValidator()
 
         # Mock WBToken to return read_only = True
@@ -218,7 +230,8 @@ class TestTokenPermissionsValidator:
 
         assert result.is_valid_jwt
         assert result.is_read_only
-        assert not result.can_be_used
+        assert result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert result.error_message == "Токен только для чтения"
 
     @pytest.mark.asyncio
@@ -242,7 +255,8 @@ class TestTokenPermissionsValidator:
 
         assert result.is_valid_jwt
         assert result.is_expired
-        assert not result.can_be_used
+        assert not result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert result.error_message == "Токен истёк"
 
     @pytest.mark.asyncio
@@ -266,7 +280,8 @@ class TestTokenPermissionsValidator:
             result = await validator.validate("test_token", mode="claims_only")
 
         assert result.is_valid_jwt
-        assert not result.can_be_used
+        assert not result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert "Продвижение" in result.missing_required
         assert "Продвижение" in result.error_message
 
@@ -396,7 +411,7 @@ class TestTokenPermissionsValidator:
         with patch.object(validator, "_probe_api", new=AsyncMock(return_value=True)):
             result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
 
-        assert result.can_be_used
+        assert result.can_be_used_for_pay
 
     @pytest.mark.asyncio
     async def test_session_reuse_across_multiple_probes(self):
@@ -421,14 +436,15 @@ class TestTokenPermissionsValidator:
         with patch("app.modules.token_permissions.validator.ClientSession", return_value=mock_session) as mock_session_class:
             result = await validator.validate(VALID_TOKEN, mode="claims_plus_api")
 
-        # Verify session was created only once despite 3 API probes
+        # Verify session was created only once despite 4 API probes
         assert mock_session_class.call_count == 1
         # Verify session was closed exactly once
         assert mock_session.close.call_count == 1
-        # Verify all three probes succeeded
+        # Verify all required probes succeeded (including Статистика)
         assert result.permissions["Контент"].api_probe_success is True
         assert result.permissions["Аналитика"].api_probe_success is True
         assert result.permissions["Продвижение"].api_probe_success is True
+        assert result.permissions["Статистика"].api_probe_success is True
 
     def test_permission_status_is_available_with_api_probe(self):
         """Test PermissionStatus.is_available with API probe result."""
@@ -483,7 +499,8 @@ class TestTokenPermissionsValidator:
             permissions=permissions,
         )
 
-        assert result.can_be_used
+        assert result.can_be_used_for_free
+        assert result.can_be_used_for_pay
         assert len(result.missing_required) == 0
         assert result.error_message is None
 
@@ -506,7 +523,8 @@ class TestTokenPermissionsValidator:
             permissions=permissions,
         )
 
-        assert not result.can_be_used
+        assert not result.can_be_used_for_free
+        assert not result.can_be_used_for_pay
         assert "Аналитика" in result.missing_required
         assert "Продвижение" in result.missing_required
         assert "Аналитика" in result.error_message

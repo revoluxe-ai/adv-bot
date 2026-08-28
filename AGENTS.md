@@ -20,6 +20,7 @@
 ## Coding Style & Naming Conventions
 - Python 3.11; follow Black formatting (line length 88) and Ruff lint rules.
 - Type checking is strict; prefer explicit types for public APIs.
+- If a call returns a value (typed return ≠ `None`) and the caller intentionally ignores it, assign `_ = ...` (do not leave a bare call). For `-> None` / only-ever-returns-None callees, use a bare call/`await` (no `_ =`) — mypy `[func-returns-value]`. Prefer using the return when it matters. Enforced by pyright `reportUnusedCallResult`. See `.cursor/rules/python-unused-call-result.mdc`.
 - Tests and scripts use snake_case; classes use CapWords.
 - Avoid modifying generated client code under excluded paths in `pyproject.toml`.
 
@@ -34,8 +35,8 @@
 - File naming: `test_*.py`, `*_test.py`, or `tests.py`; functions `test_*`, classes `Test*`.
 - Every test is exactly one type: **unit** or **integration**. Unit = no real DB/Redis/ClickHouse (mocks only). Integration = uses real or test DB/Redis/ClickHouse or multi-component flow.
 - Markers are assigned by path (`tests/unit/` → unit, `tests/integration/` → integration) or default to unit; override with `@pytest.mark.unit` or `@pytest.mark.integration`.
-- Run by type: `poetry run pytest -m unit`, `poetry run pytest -m integration`. Optional markers: `slow`, `sandbox` (use with `-m`, e.g. `-m "integration and not slow"`).
-- Unit run does not start Docker or DB; the first delay is from loading the app/conftest. For quick feedback run a subset, e.g. `pytest -m unit tests/app/modules/auto_budget_manager/ -v` or `pytest -m unit -x` (stop on first failure).
+- Full unit suite: `poetry run pytest -m unit -n 8 --dist=worksteal` (pytest-xdist; preferred on this repo). Integration: `poetry run pytest -m integration`. Optional markers: `slow`, `sandbox` (use with `-m`, e.g. `-m "integration and not slow"`).
+- Unit run does not start Docker or DB; the first delay is from loading the app/conftest. For quick feedback run a subset without xdist, e.g. `poetry run pytest -m unit tests/app/modules/auto_budget_manager/ -v` or `poetry run pytest -m unit -x` (stop on first failure).
 
 ## Commit & Pull Request Guidelines
 - Commit history follows Conventional Commits (e.g., `feat: add …`, `fix: …`, `refactor: …`).

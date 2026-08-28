@@ -183,32 +183,62 @@ def detect_logical_conflict_in_cluster(
             defs.update(_DEF_RE.findall(p.read_text(encoding="utf-8", errors="replace")))
         producer_defs[cluster_path] = defs
 
-    related_files: list[str] = list(auto_merged)
+    related_files: list[str] = []
+    # Same-directory relatedness only (siblings). Do not scan the whole merge
+    # auto-merged set — that produces cross-domain false positives.
     cluster_dirs: set[str] = set()
     for cluster_path in paths:
         if "/" in cluster_path:
             cluster_dirs.add(cluster_path.rsplit("/", 1)[0])
+    for am in auto_merged:
+        am_dir = am.rsplit("/", 1)[0] if "/" in am else ""
+        if am_dir in cluster_dirs:
+            related_files.append(am)
     for d in cluster_dirs:
         dir_path = repo_root / d
         if dir_path.is_dir():
             for f in dir_path.glob("*.py"):
                 rel = f.relative_to(repo_root).as_posix()
-                if rel not in paths:
+                if rel not in paths and rel not in related_files:
                     related_files.append(rel)
 
     for am in related_files:
         if not am.endswith(".py"):
             continue
+        # Cluster members are producers under check, not external consumers.
+        if am in paths:
+            continue
         p = repo_root / am
         if not p.is_file():
             continue
         consumer_text = p.read_text(encoding="utf-8", errors="replace")
-        calls = set(_CALL_RE.findall(consumer_text))
+        # Strip string/bytes literals so fixture/demo source embedded in tests
+        # does not look like live producer API calls.
+        code_only = re.sub(
+            r'("""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'|"[^"\\]*(?:\\.[^"\\]*)*"|'
+            r"\'[^\'\\]*(?:\\.[^\'\\]*)*\'|b\"[^\"\\]*(?:\\.[^\"\\]*)*\"|"
+            r"b\'[^\'\\]*(?:\\.[^\'\\]*)*\')",
+            '""',
+            consumer_text,
+        )
+        calls = set(_CALL_RE.findall(code_only))
+        # Local defs in the consumer are not producer API dependencies.
+        local_defs = set(_DEF_RE.findall(consumer_text))
+        calls -= local_defs
         # filter common keywords
         keywords = {"if", "for", "while", "def", "return", "print", "len", "str", "int"}
         calls -= keywords
 
+        # Skip test modules for the loose api-name heuristic: fixture helpers
+        # (WBApi, *_api_*) are not producer contracts of sibling conflict files.
+        if am.startswith("tests/") or "/tests/" in am:
+            continue
+        am_dir = am.rsplit("/", 1)[0] if "/" in am else ""
         for cluster_path, defs in producer_defs.items():
+            prod_dir = cluster_path.rsplit("/", 1)[0] if "/" in cluster_path else ""
+            # Only same-directory producer/consumer pairs.
+            if am_dir != prod_dir:
+                continue
             for call in calls:
                 if call in defs:
                     continue

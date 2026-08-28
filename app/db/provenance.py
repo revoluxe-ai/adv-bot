@@ -62,10 +62,10 @@ def _parse_platform(platform: str) -> tuple[str, str]:
 
 
 def _platform_matches(entry: dict[str, Any], os_name: str, arch: str) -> bool:
-    plat_raw = entry.get("platform")
-    if not isinstance(plat_raw, dict):
+    plat_obj = entry.get("platform")
+    if not isinstance(plat_obj, dict):
         return False
-    plat: dict[str, Any] = cast(dict[str, Any], plat_raw)
+    plat = cast(dict[str, Any], plat_obj)
     return str(plat.get("os")) == os_name and str(plat.get("architecture")) == arch
 
 
@@ -76,17 +76,15 @@ def resolve_platform_digest_from_index(
 ) -> str:
     """Из OCI/Docker image index выбирает digest манифеста целевой platform."""
     os_name, arch = _parse_platform(platform)
-    manifests = index_doc.get("manifests")
-    if not isinstance(manifests, list) or not manifests:
+    manifests_obj = index_doc.get("manifests")
+    if not isinstance(manifests_obj, list) or not manifests_obj:
         raise ProvenanceError("index has no manifests[]")
+    manifests = cast(list[dict[str, Any]], manifests_obj)
     matches: list[str] = []
-    for item in cast(list[Any], manifests):
-        if not isinstance(item, dict):
+    for item in manifests:
+        if not _platform_matches(item, os_name, arch):
             continue
-        entry = cast(dict[str, Any], item)
-        if not _platform_matches(entry, os_name, arch):
-            continue
-        dig = entry.get("digest")
+        dig = item.get("digest")
         if isinstance(dig, str) and dig.strip():
             matches.append(normalize_digest(dig))
     if not matches:
@@ -172,17 +170,17 @@ def fetch_oci_document(
         headers["Authorization"] = _basic_auth_header(username, password)
     resp_headers, body = getter(url, headers)
     try:
-        doc = json.loads(body.decode("utf-8"))
+        doc_obj = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ProvenanceError(f"invalid manifest JSON: {exc}") from exc
-    if not isinstance(doc, dict):
+    if not isinstance(doc_obj, dict):
         raise ProvenanceError("manifest JSON must be an object")
-    typed_doc = cast(dict[str, Any], doc)
+    doc = cast(dict[str, Any], doc_obj)
     digest_hdr = (resp_headers.get("docker-content-digest") or "").strip().lower()
     resolved = normalize_digest(digest_hdr) if digest_hdr else (
         normalize_digest(ref) if DIGEST_RE.match(ref.lower()) else ref
     )
-    return resolved, typed_doc
+    return resolved, doc
 
 
 def verify_release_platform_digest(

@@ -1,8 +1,61 @@
 ---
+component_id: opsx.commands.owner_contract_review
+component_version: 0.1.0
+ownership: TARGET_ONLY
+runtime_class: ACTIVE
+canonical_source_body: adapted_target_native
+required_adapters: ["opsx-lite", "poetry-python"]
+local_modification_note: "Inbound KEEP opsx-owner-contract-review from catalog OCCURRENCE=879dc2514cb7352d (adv-bot/split-payment); WB/poetry-python target-native; game/vue-npm fork skipped"
+local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
+contract_id: OPSX-WB-OWNER-CONTRACT-REVIEW-01
+newline_normalization: none
+donor_source_id: adv-bot/split-payment-for-adv-without-pay-for-adv-on-pauses
+donor_snapshot_head: db91149ae1d96d1fd85ceae7a405e65c09f0c29b
+donor_occurrence_id: 879dc2514cb7352d
+donor_full_file_hash: fd3ba1be2dc684aa230f3be67ef445845b7b93243b5e98fcf12c0db36c58a6e4
+inbound_packet: .tmp/opsx-inbound/20260816T153600Z/DIFF_PACKET.md
 description: "READ_ONLY interactive semantic review of owner-contract.md: gather context, ask real Owner choices, emit OWNER_REVIEW_HANDOFF for /opsx-new, re-review. Never writes."
 argument-hint: "change=<name> | path=<owner-contract.md> [paste EVOLUTION_HANDOFF / EXPLORE_HANDOFF / OWNER_REVIEW_HANDOFF] [Owner answers]"
 ---
 
+# TARGET OVERRIDE — HIGHEST PRIORITY
+
+**Contract:** `OPSX-WB-OWNER-CONTRACT-REVIEW-01`  
+**Runtime class:** `ACTIVE`  
+**Precedence:** This override wins for target paths, write boundary, and bans.
+
+### Target authority paths
+
+- Changes (read): `openspec/changes/**` (especially `owner-contract.md`)
+- Decisions (read): `openspec/decisions/**`
+- Specs (read): `openspec/specs/**`
+- Adapter (read): `.opsx/adapters/poetry-python/README.md`
+- Quality gates (read): `.opsx/project/quality-gates.md`
+- Activation/provenance (read): `.opsx/registry/**`
+- Fixtures (read): `.cursor/commands/_fixtures/owner-contract-review/**`
+
+### Hard target bans
+
+- Do not install dependencies / modify `package.json`, Poetry lock, or `pyproject.toml`.
+- Do not access production / Kubernetes / secrets.
+- Do not push, open PR, rebase, force, or deploy.
+- Do not write `owner-contract.md`, proposal, design, specs, tasks, or product code.
+- Do not activate game/Vue/`vue-npm` / `npm run build` assumptions from donor forks.
+- For `CONTRACT_VS_REALITY`, use bounded Poetry/pytest/code reads only — not npm build gates.
+- Never report READ_ONLY review as implementation or archive GO.
+
+### Projectization gate
+
+Read `.opsx/projectization.yaml` before any run.
+If `status` != `COMPLETE` or `normal_commands_enabled` is false:
+
+```text
+STATUS: FAIL_CLOSED
+REASON: OPSX_PROJECTIZATION_REQUIRED
+NEXT_COMMAND: /opsx-projectize
+```
+
+---
 # /opsx-owner-contract-review
 
 Независимый **READ_ONLY** semantic review `owner-contract.md` после

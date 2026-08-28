@@ -1,5 +1,5 @@
 ---
-description: Invariants for /opsx-static-check Task workers and packs
+description: Invariants for /opsx-static-check workers and packs
 globs:
   - .cursor/static-check/**/*
   - .cursor/commands/opsx-static-check.md
@@ -9,13 +9,69 @@ alwaysApply: false
 
 # opsx-static-check infra invariants
 
-1. Workers launch via Cursor Task enum (`registry.task_type`, primary `shell`). Never try custom `opsx-sc-*` agent names as Task `subagent_type`.
-2. Check details live only in `.cursor/static-check/checks/<id>/`.
-3. Composition of MODE/waves lives only in `.cursor/static-check/registry.yaml`.
-4. Workers/orchestrator are READ_ONLY; no autofix; no archive `GO`/`NO_GO`; **no self-repair** of check infra during a check run.
-5. Do not reintroduce a second SoT (`opsx-static-check-workers/` or fat agent copies).
-6. Canonical human cmds via runner: `bash .cursor/static-check/bin/run.sh -- …`.
-7. Preflight is **optional** (`PREFLIGHT` token only); default off.
-8. Wave B (`pytest-full`) only if `pytest-unit` STATUS=PASS.
-9. Prompt body comes from `.cursor/static-check/base/worker-prompt.md` + pack LOAD list.
-10. Orchestrator **WAIT contract**: incomplete until Final report; never stop the chat after fan-out / partial WORKER READY; resume on each Task notification until all wave packets are in.
+1. **Default launch `SERIAL_ORCHESTRATOR`:** parent orchestrator runs every
+   check via Shell + `run.sh` in cascade order. **No nested Task** unless Owner
+   passes exact token `PARALLEL_TASKS`. See `registry.yaml` `default_launch`.
+2. Under `PARALLEL_TASKS` only, honor registry `task_type`:
+   - `shell` — short checks (pyright / mypy / pytest-targeted)
+   - `orchestrator` — **pytest-unit only** (no nested Task; orchestrator Shell
+     + stale-pytest hygiene + optional INFRA recovery)
+   - `generalPurpose` — other long suite waves (integration / destructive)
+   Never try custom `opsx-sc-*` agent names as Task `subagent_type`.
+3. Check details live only in `.cursor/static-check/checks/<id>/`.
+4. Composition of MODE/waves lives only in `.cursor/static-check/registry.yaml`.
+5. Workers/orchestrator are READ_ONLY; no autofix; no archive `GO`/`NO_GO`; **no self-repair** of check infra during a check run.
+6. Do not reintroduce a second SoT (`opsx-static-check-workers/` or fat agent copies).
+7. Canonical human cmds via runner: `bash .cursor/static-check/bin/run.sh -- …`.
+8. Preflight is **optional** (`PREFLIGHT` token only); default off. Stale-pytest
+   hygiene before Wave U is **mandatory** whenever pytest-unit runs (separate
+   from optional file PREFLIGHT).
+9. Optional retry profile `FROM_WAVE=U` is allowed only with
+   `A_REUSE_FINGERPRINT=<id>` and accepted evidence in the same conversation
+   that Wave A (`pyright-strict`, `mypy`, `pytest-targeted`) is PASS for that
+   exact fingerprint. Otherwise run full cascade.
+10. Pytest cascade: `pytest-targeted` → `pytest-unit` → `pytest-integration` →
+   (FULL only) `pytest-destructive`. Each later pytest wave only if prior
+   STATUS=PASS. Never bare `poetry run pytest` / retired `pytest-full`. Never
+   deselect dirty paths from suite waves. Never schedule destructive in FAST.
+   **xdist (`-n` / `--dist`) only on full unit suite** — never on targeted /
+   integration / destructive.
+11. Prompt body for Task workers (`PARALLEL_TASKS`) comes from
+    `.cursor/static-check/base/worker-prompt.md` + pack LOAD list.
+12. Orchestrator **completion contract**: incomplete until Final report
+    (`STATUS: PASS|FAIL|BLOCKED|ERROR` + `CHECKS`). Progress-only strings
+    («Wave A in flight», «waiting for packets», «cascade continues») are
+    **forbidden as terminal**; treat as `INCOMPLETE_RUN` for envelopes.
+    Under `PARALLEL_TASKS`: never stop after fan-out / partial WORKER READY;
+    resume on each Task notification **or** silent-stall signal until packets
+    are in, then Final. Under SERIAL: long suites may emit `WORKER RUNNING`
+    heartbeats / sliced waits **inside** the turn; still must Final when
+    cascade completes **or** on STOP_RUN / Shell interrupt / Owner abort.
+13. **Launch-infra retry (`PARALLEL_TASKS` Task checks only):** empty/missing
+    worker packet, Agent Looping, Task abort without packet, **or silent stall**
+    → interrupt open Task if needed → exactly one Task `generalPurpose` retry
+    (same prompt). Not a pytest FAIL. Never more than one Task retry per
+    CHECK_ID. Exclude live pytest (PG lock) and full `STOP_RUN`. Does **not**
+    apply to pytest-unit (`orchestrator`) or default SERIAL path. Owner
+    «зависло» while SERIAL `pytest`/`run.sh` is alive is **not** launch-infra.
+14. **Orchestrator-direct (`PARALLEL_TASKS` only):** after Task launch-infra
+    budget exhausted and the check never started → one orchestrator Shell
+    `run.sh` + synthesize packet. Not a second Task retry. Then ERROR if that
+    also fails. Unused under default SERIAL (already parent Shell).
+15. **pytest-unit INFRA recovery ladder:** `INTERNALERROR` / «no active
+    workers» / exit 2|3 **without** failed node ids → `ERROR infra_suite`
+    (not product FAIL) → hygiene + one xdist Shell re-run; if infra repeats,
+    run one non-xdist fallback classifier (`poetry run pytest -m unit -x`) in
+    the same run and classify PASS/FAIL/`ERROR infra_suite_hard`.
+    Record `UNIT_RECOVERY_PATH=xdist_retry|fallback_non_xdist`.
+    Do not first-route to manual kill+full-rerun loops; do not sole-route to
+    `/opsx-test-triage` for worker-death without failed nodes.
+16. **SERIAL long-suite heartbeat:** before pytest-unit (xdist) Shell, emit
+    `WORKER RUNNING: pytest-unit (xdist; expect multi-minute)`. Prefer sliced
+    / `AwaitShell` re-block with periodic still-in-progress lines — forbid
+    one opaque multi-tens-of-minutes silent wait as the only UX.
+17. **STOP_RUN / interrupt Final (mandatory):** Owner `STOP_RUN`, Shell tool
+    interrupted mid-check, or Owner abort while a SERIAL check is in-flight →
+    no retry; in-flight check `ERROR` (`interrupted`/`STOP_RUN`); later pytest
+    waves `SKIPPED`; fan-in known packets; print Final **same turn**. Never
+    terminal mid-cascade silence.

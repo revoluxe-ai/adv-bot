@@ -8,7 +8,13 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.db.migrate import MigrationOutcome, main, run_migration
+from app.db.auto_update_minus_phrases_backfill import BackfillPreview, BackfillResult
+from app.db.migrate import (
+    MigrationOutcome,
+    _run_requested_backfill,
+    main,
+    run_migration,
+)
 
 
 @pytest.fixture
@@ -290,3 +296,29 @@ def test_post_upgrade_cleanup_error_still_success(env_ok: None) -> None:
             result = run_migration(engine=engine)
     assert result.outcome == MigrationOutcome.SUCCESS
     assert "cleanup warning" in result.detail
+
+
+def test_requested_backfill_is_explicit_and_receipted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec stage-landing-readiness: только явный Job kind запускает backfill."""
+    preview = BackfillPreview(5, 2, 2, 3, 2, 3)
+    result = BackfillResult(preview, updated_records=2, incompatible_records=0)
+    monkeypatch.setenv("MIGRATION_BACKFILL_KIND", "auto_update_minus_phrases_v1")
+    with patch(
+        "app.db.migrate.apply_auto_update_minus_phrases_backfill",
+        return_value=result,
+    ):
+        payload = _run_requested_backfill(MagicMock())
+
+    assert payload is not None
+    assert payload["updated_records"] == 2
+    assert payload["expected_enabled_records"] == 2
+
+
+def test_unknown_backfill_kind_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Spec stage-landing-readiness: неизвестный DML path даёт fail-closed."""
+    monkeypatch.setenv("MIGRATION_BACKFILL_KIND", "unexpected")
+
+    with pytest.raises(RuntimeError, match="unknown MIGRATION_BACKFILL_KIND"):
+        _run_requested_backfill(MagicMock())

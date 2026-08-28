@@ -21,23 +21,25 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 
 pytestmark = pytest.mark.unit
 
+BOT_ACTIVE_PAYWALL_MESSAGE = (
+    "Управление ставкой в полках доступно только после включения автоуправления кампанией.\n\n"
+    "Бесплатно можно смотреть аналитику и рекламные данные.\n"
+    "Чтобы бот сам тестировал и выставлял ставки в полках — подключите автоуправление."
+)
+
 
 @dataclass
 class FakeMessage:
-    """Message double for handlers that narrow via ``isinstance(..., Message)``.
-
-    Production ``_tg_message`` uses the ``Message`` symbol imported in the
-    handler module. Autouse fixture below patches that symbol to this class
-    so unit doubles pass the same narrow without constructing aiogram models.
-    """
-
     text: str
     answers: list[str] = field(default_factory=list)
-    edit_text: AsyncMock = field(default_factory=AsyncMock)
-    chat: SimpleNamespace = field(default_factory=lambda: SimpleNamespace(id=1))
+    edits: list[tuple[str, object]] = field(default_factory=list)
 
     async def answer(self, text: str, **_: object) -> None:
         self.answers.append(text)
+
+    async def edit_text(self, text: str, reply_markup: object = None, **_: object) -> None:
+        self.edits.append((text, reply_markup))
+        self.text = text
 
 
 @pytest.fixture(autouse=True)
@@ -117,6 +119,7 @@ def _view() -> AutoShelfBidControlViewDTO:
 async def test_send_main_screen_applies_refresh_before_build_view(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     calls: list[str] = []
     service = type("FakeService", (), {})()
     service.apply_main_bid_refresh_if_needed = AsyncMock(
@@ -153,6 +156,40 @@ async def test_send_main_screen_applies_refresh_before_build_view(
     assert calls[0] == "apply"
     assert calls[1] == "build"
     assert calls[2] == "answer:rendered"
+
+
+@pytest.mark.asyncio
+async def test_menu_write_action_shows_paywall_when_bot_inactive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(handler, "Message", FakeMessage)
+    callback_message = FakeMessage(text="main")
+    callback = SimpleNamespace(
+        message=callback_message,
+        from_user=SimpleNamespace(id=1),
+    )
+    state = AsyncMock()
+
+    class FakeService:
+        async def ensure_write_allowed(self, *_: object) -> None:
+            raise AutoShelfBidControlTelegramError(BOT_ACTIVE_PAYWALL_MESSAGE)
+
+    monkeypatch.setattr(handler, "AutoShelfBidControlTelegramService", lambda **_: FakeService())
+
+    await handler.auto_shelf_bid_control_menu_router(
+        callback=callback,  # pyright: ignore[reportArgumentType]
+        callback_data=callbacks.AutoShelfBidControlMenu(
+            adv_setting_original_id=1,
+            action=callbacks.compact_auto_shelf_bid_control_action("set_max_bid"),
+        ),
+        state=state,  # pyright: ignore[reportArgumentType]
+        bot=AsyncMock(),  # pyright: ignore[reportArgumentType]
+        redis_client=object(),  # pyright: ignore[reportArgumentType]
+    )
+
+    assert callback_message.answers == [BOT_ACTIVE_PAYWALL_MESSAGE]
+    state.update_data.assert_not_awaited()
+    state.set_state.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -212,6 +249,7 @@ async def test_bid_points_empty_sends_message_not_callback_answer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Без покрытий — текст в чат; callback.answer не трогаем (есть middleware)."""
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     chat_message = FakeMessage(text="main")
     callback = AsyncMock()
     callback.message = chat_message
@@ -271,6 +309,7 @@ def test_auto_shelf_bid_control_action_normalization_accepts_compact_and_legacy_
 async def test_send_strategy_screen_uses_strategy_renderer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(handler, "Message", FakeMessage)
     service = type("FakeService", (), {})()
     service.build_view = AsyncMock(return_value=_view())
     callback_message = FakeMessage(text="settings")
@@ -341,7 +380,8 @@ async def test_strategy_switch_updates_strategy_message(
         redis_client=object(),  # pyright: ignore[reportArgumentType]
     )
 
-    callback_message.edit_text.assert_awaited_once()
+    assert len(callback_message.edits) == 1
+    assert callback_message.edits[0][0] == "strategy-updated"
 
 
 @pytest.mark.asyncio

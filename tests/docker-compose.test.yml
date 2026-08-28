@@ -41,13 +41,12 @@ services:
       - .\tests\clickhouse-config:/etc/clickhouse-server/users.d/
 
 
-  # Host 6390 (not 6379) — avoids clash with root/dev Redis on :6379.
-  # Pytest against this compose MUST use REDIS_PORT=6390 (see /opsx-test-env).
+  # test_redis: host :6379 for /opsx-test-env v0.1 probe + env.sample REDIS_PORT
   test_redis:
     image: redis:7-alpine
     container_name: tests-test_redis
     ports:
-      - "6390:6379"
+      - "6379:6379"
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

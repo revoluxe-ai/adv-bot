@@ -1,3 +1,5 @@
+"""Smoke test for billing module wiring without leaking global logging state."""
+
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -7,7 +9,16 @@ from app.core.di import DIManager
 
 from app.modules.billing import process_payment_for_advs
 
-logging.disable()
+
+@pytest.fixture(autouse=True)
+def _suppress_billing_logs() -> None:
+    """Temporarily silence logs for this module and restore the previous global threshold."""
+    previous_disable_level = logging.root.manager.disable
+    logging.disable()
+    try:
+        yield
+    finally:
+        logging.disable(previous_disable_level)
 
 
 @pytest.mark.asyncio

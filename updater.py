@@ -34,10 +34,10 @@ AsyncEntry = Callable[[], Coroutine[Any, Any, None]]
 # Явная аннотация типов для списка корутин
 run_own_process_list: list[AsyncEntry] = [
     # #  TODO: Закомментировал эти корутины и отправил в прод, что привлело к ошибке
-    run_main_coroutines,
+    run_main_coroutines, # здесь вроде только payment корутина
     # # # TODO: привести все процессы к единому интерфейсу
-    run_runtime,
-    snapshot_data_updater.run,
+    run_runtime, # тут вроде запуск воркеров, очереди
+    snapshot_data_updater.run, # здесь кеш сделать для всего
 ]
 
 

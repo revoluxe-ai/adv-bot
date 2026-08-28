@@ -38,9 +38,9 @@ async def test_apply_default_settings_to_adv_calls_defaults_and_commit(mocker):
     session_mock.execute = AsyncMock(return_value=result_mock)
     session_mock.commit = AsyncMock()
 
-    # Патчим session maker и apply_defaults_to_adv_setting по месту использования.
+    # Патчим session maker и apply_new_campaign_free_defaults по месту использования.
     apply_defaults_mock = mocker.patch(
-        "app.modules.adv_creator.backend.main_manager.apply_defaults_to_adv_setting"
+        "app.modules.adv_creator.backend.main_manager.apply_new_campaign_free_defaults"
     )
     mocker.patch(
         "app.modules.adv_creator.backend.main_manager.sm",
@@ -54,4 +54,3 @@ async def test_apply_default_settings_to_adv_calls_defaults_and_commit(mocker):
 
     apply_defaults_mock.assert_called_once_with(adv_setting_mock, wb_cabinet_mock)
     session_mock.commit.assert_awaited_once()
-

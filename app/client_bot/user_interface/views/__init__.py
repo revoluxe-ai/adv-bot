@@ -1,1 +1,1 @@
-
+"""Client bot view package."""

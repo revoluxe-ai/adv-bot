@@ -13,7 +13,7 @@ import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, cast
+from typing import cast
 
 from alembic import command
 from alembic.config import Config
@@ -22,6 +22,11 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.pool import NullPool
+
+from app.db.auto_update_minus_phrases_backfill import (
+    BACKFILL_KIND,
+    apply_auto_update_minus_phrases_backfill,
+)
 
 MIGRATION_LOCK_ID = 731_984_123
 
@@ -45,17 +50,20 @@ class MigrationResult:
     detail: str
     database_heads: tuple[str, ...]
     target: str
+    backfill: dict[str, int] | None = None
 
 
 def _emit(result: MigrationResult) -> None:
     """Печатает машиночитаемый JSON-исход в stdout."""
-    payload = {
+    payload: dict[str, object] = {
         "outcome": result.outcome.value,
         "detail": result.detail,
         "database_heads": list(result.database_heads),
         "target": result.target,
         "release_id": os.environ.get("RELEASE_ID", ""),
     }
+    if result.backfill is not None:
+        payload["backfill"] = result.backfill
     print(json.dumps(payload, ensure_ascii=False), flush=True)
 
 
@@ -70,14 +78,16 @@ def _parse_expected_current_sets() -> list[frozenset[str]]:
     raw = os.environ.get("EXPECTED_CURRENT_REVISION_SETS", "").strip()
     if not raw:
         raise RuntimeError("EXPECTED_CURRENT_REVISION_SETS JSON is required")
-    data = json.loads(raw)
-    if not isinstance(data, list) or not data:
+    data_obj = json.loads(raw)
+    if not isinstance(data_obj, list) or not data_obj:
         raise RuntimeError("EXPECTED_CURRENT_REVISION_SETS must be a non-empty list of sets")
+    data = cast(list[object], data_obj)
     sets: list[frozenset[str]] = []
-    for item in cast(list[Any], data):
+    for item in data:
         if not isinstance(item, list) or not item:
             raise RuntimeError("each current revision set must be a non-empty list")
-        sets.append(frozenset(str(x) for x in cast(list[Any], item)))
+        values = cast(list[object], item)
+        sets.append(frozenset(str(x) for x in values))
     return sets
 
 
@@ -202,6 +212,44 @@ def _maybe_reset_role(connection: Connection) -> None:
     connection.execute(text("RESET ROLE"))
 
 
+def _run_requested_backfill(connection: Connection) -> dict[str, int] | None:
+    """Запускает только явно выбранный migration-Job backfill.
+
+    ``MIGRATION_BACKFILL_KIND`` намеренно должен быть пустым для обычных
+    Alembic rollout. Это защищает остальные migration Jobs от случайного DML.
+
+    Args:
+        connection: То же write-соединение, которым владеет Job.
+
+    Returns:
+        Машиночитаемый preview/result payload или ``None`` без backfill.
+
+    Raises:
+        RuntimeError: Для неизвестного типа или несовместимого остатка.
+    """
+    requested = os.environ.get("MIGRATION_BACKFILL_KIND", "").strip()
+    if not requested:
+        return None
+    if requested != BACKFILL_KIND:
+        raise RuntimeError(f"unknown MIGRATION_BACKFILL_KIND: {requested!r}")
+    result = apply_auto_update_minus_phrases_backfill(connection)
+    if result.incompatible_records:
+        raise RuntimeError(
+            "auto_update_minus_phrases backfill left "
+            f"{result.incompatible_records} incompatible records"
+        )
+    return {
+        "total_records": result.preview.total_records,
+        "null_records": result.preview.null_records,
+        "active_records": result.preview.active_records,
+        "inactive_records": result.preview.inactive_records,
+        "expected_enabled_records": result.preview.expected_enabled_records,
+        "expected_disabled_records": result.preview.expected_disabled_records,
+        "updated_records": result.updated_records,
+        "incompatible_records": result.incompatible_records,
+    }
+
+
 def run_migration(engine: Engine | None = None) -> MigrationResult:
     """Выполняет guarded Alembic upgrade на одном Connection."""
     url = _require_database_url()
@@ -224,6 +272,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
     connection: Connection | None = None
     upgrade_started = False
     migrations_finished = False
+    backfill_payload: dict[str, int] | None = None
     try:
         connection = engine.connect()
         _run_identity_checks(connection)
@@ -252,6 +301,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
         target_set = frozenset({target})
         if current == target_set:
             if receipt_state in {"MIGRATED", "SUCCEEDED", "NOOP", "COMPLETED"}:
+                backfill_payload = _run_requested_backfill(connection)
                 _release_lock(connection)
                 connection.commit()
                 return MigrationResult(
@@ -259,8 +309,10 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
                     "heads already at target with receipt",
                     tuple(sorted(current)),
                     target,
+                    backfill_payload,
                 )
             # first no-op for this release
+            backfill_payload = _run_requested_backfill(connection)
             _release_lock(connection)
             connection.commit()
             return MigrationResult(
@@ -268,6 +320,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
                 "heads already at target; created logical no-op path",
                 tuple(sorted(current)),
                 target,
+                backfill_payload,
             )
 
         _maybe_set_role(connection)
@@ -286,6 +339,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
         # Alembic returned — revision DDL finished (or no-op upgrade path).
         migrations_finished = True
 
+        backfill_payload = _run_requested_backfill(connection)
         after = _db_heads(connection)
         if after != target_set:
             try:
@@ -320,6 +374,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
             f"upgrade completed{cleanup_note}",
             tuple(sorted(after)),
             target,
+            backfill_payload,
         )
     except Exception as exc:  # noqa: BLE001 — map to outcome codes
         if migrations_finished:
@@ -352,6 +407,7 @@ def run_migration(engine: Engine | None = None) -> MigrationResult:
                     ),
                     heads,
                     target,
+                    backfill_payload,
                 )
             return MigrationResult(
                 MigrationOutcome.PARTIAL_OR_UNKNOWN,

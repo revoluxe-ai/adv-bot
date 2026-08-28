@@ -65,17 +65,21 @@ When bot active is disabled, the system MUST NOT set or change shelf campaign bi
 
 ### Requirement: Inactive bot blocks additional paid ACT writes
 
-When bot active is disabled, the system MUST NOT execute other paid automation WB writes: cluster bid updates, minus phrase updates, and CPM bidder updates, when their respective automation is enabled.
+When bot active is disabled, the system MUST NOT execute other paid automation
+WB writes: cluster bid updates and CPM bidder updates, when their respective
+automation is enabled. Auto minus-phrase updates are part of the free package
+and are gated by `auto_update_minus_phrases` (default off), not by bot active.
 
 #### Scenario: Cluster bids skip when inactive
 
 - **WHEN** cluster bid update runs for a campaign with bot active disabled and bidder active
 - **THEN** no cluster bid mutation is sent to Wildberries
 
-#### Scenario: Minus phrases skip when inactive
+#### Scenario: Free campaign with minus flag still syncs minus phrases
 
 - **WHEN** minus phrase update runs for a campaign with bot active disabled
-- **THEN** no minus phrase mutation is sent to Wildberries
+- **AND** `auto_update_minus_phrases` is enabled
+- **THEN** minus phrase mutation MAY be sent to Wildberries (free package)
 
 ### Requirement: Gate tests use enabled flags to detect leaks
 

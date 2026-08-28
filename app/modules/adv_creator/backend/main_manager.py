@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Literal, get_args
+"""Backend-операции создания рекламных кампаний и их PG-доступ."""
+
+from typing import TYPE_CHECKING, Any, Literal, cast, get_args
 
 from aiogram import Bot
 from aiohttp import ClientSession
@@ -9,8 +11,10 @@ from sqlalchemy.orm import load_only, selectinload
 
 from app.core.di.app_container import AppContainer
 from app.core.di.di_manager import DIManager
-from app.core.wb_api.data_classes.advs.other_classes import Balances
-from app.client_bot.modules.default_settings import apply_defaults_to_adv_setting
+from ...common_slaves.wildberries.data_classes.adv import Balances
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_new_campaign_free_defaults,
+)
 from app.core.wb_api.mixins.excs import CardNotFoundInWB
 
 from ...common_slaves.wildberries.models.wb_cabinet import WBCabinet
@@ -83,7 +87,8 @@ class MainAdvManager:
                 .with_for_update()
             )
             adv_setting: AdvSetting = (await session.execute(stmt)).scalar_one()
-            apply_defaults_to_adv_setting(adv_setting, adv_setting.wb_cabinet)
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
+            apply_new_campaign_free_defaults(adv_setting, adv_setting.wb_cabinet)
             await session.commit()
 
     @staticmethod
@@ -96,7 +101,7 @@ class MainAdvManager:
 
     @staticmethod
     async def _perform_adv_setting_upsert(
-        session: AsyncSession, adv_data: dict
+        session: AsyncSession, adv_data: dict[str, Any]
     ) -> None:
         insert_stmt = insert(AdvSetting).values(adv_data)
         on_conflict_stmt = insert_stmt.on_conflict_do_update(
@@ -143,20 +148,30 @@ class MainAdvManager:
         return auto_adv_id
 
     @staticmethod
+    async def _get_all_adv_ids_for_nmid_in_session(
+        session: AsyncSession,
+        wb_cabinet_id: int,
+        nmid: int,
+    ) -> set[int]:
+        """Загрузить adv_id по артикулу в переданной read-only PG-сессии."""
+        stmt = select(AdvSetting.adv_id).where(
+            and_(
+                AdvSetting.wb_cabinet_id == wb_cabinet_id,
+                AdvSetting.nmids == [nmid],
+                AdvSetting.active_status.not_in(["refused", "done"]),
+                AdvSetting.type.in_([8, 9]),
+            )
+        )
+        result = await session.execute(stmt)
+        return {row[0] for row in result.all()}
+
+    @staticmethod
     async def get_all_adv_ids_for_nmid(wb_cabinet_id: int, nmid: int) -> set[int]:
         """Возвращает adv_id всех РК по артикулу (включая авто-only без search_adv_id)."""
-        async with sm() as session:
-            stmt = select(AdvSetting.adv_id).where(
-                and_(
-                    AdvSetting.wb_cabinet_id == wb_cabinet_id,
-                    AdvSetting.nmids == [nmid],
-                    AdvSetting.active_status.not_in(["refused", "done"]),
-                    AdvSetting.type.in_([8, 9]),
-                )
+        async with sm(read_only=True) as session:
+            return await MainAdvManager._get_all_adv_ids_for_nmid_in_session(
+                session, wb_cabinet_id, nmid
             )
-            result = await session.execute(stmt)
-            out = {row[0] for row in result.all()}
-        return out
 
     async def _create_complex_advs(self, nmid: int) -> tuple[int, int]:
         wb_cabinet = self.access.wb_cabinet
@@ -166,8 +181,9 @@ class MainAdvManager:
         balances = await self.wb_api.get_adv_balances()
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 _card_info, target_card = (
@@ -211,6 +227,7 @@ class MainAdvManager:
             )
 
             # Подготавливаем данные для upsert
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv_data = {
                 "adv_id": auto_adv_id,
                 "_search_adv_id": search_adv_id,  # Исправлено на _search_adv_id
@@ -221,7 +238,7 @@ class MainAdvManager:
                 "bidder_active": False,
                 "wb_cabinet_id": wb_cabinet.id,
                 "parsing_active": False,
-                "bot_active": True,
+                "bot_active": False,
                 "auto_adv_target_status": False,
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,
@@ -240,14 +257,16 @@ class MainAdvManager:
         # TODO: Бот не видит, что РК завершены и не дает создать новую РК по тому же артикулу
         self,
         bot: Bot,
-        user_telegram_id,
+        user_telegram_id: int,
         nmid: int,
         hard_mode: bool,
     ) -> tuple[int, int] | None:
         assert self.access.wb_cabinet is not None
         wb_cabinet_id = self.access.wb_cabinet.id
         all_adv_ids = await self.get_all_adv_ids_for_nmid(wb_cabinet_id, nmid)
-        exist_adv_ids_rows = [(aid, None) for aid in all_adv_ids]
+        exist_adv_ids_rows: list[tuple[int, int | None]] = [
+            (aid, None) for aid in all_adv_ids
+        ]
         if not hard_mode and all_adv_ids:
             raise AdvExistsForNmidError(exist_adv_ids_rows)
 
@@ -276,8 +295,9 @@ class MainAdvManager:
         balances = await self.wb_api.get_adv_balances()
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 _card_info, target_card = (
@@ -319,6 +339,7 @@ class MainAdvManager:
             wb_cabinet_from_db = await self._get_wb_cabinet_from_session(
                 session, wb_cabinet_id
             )
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv_data = {
                 "adv_id": existing_auto_adv_id,
                 "_search_adv_id": search_adv_id,
@@ -329,7 +350,7 @@ class MainAdvManager:
                 "bidder_active": False,
                 "wb_cabinet_id": wb_cabinet_from_db.id,
                 "parsing_active": False,
-                "bot_active": True,
+                "bot_active": False,
                 "auto_adv_target_status": False,
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,
@@ -361,8 +382,9 @@ class MainAdvManager:
         balances = await self.wb_api.get_adv_balances()
         try:
             async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
+                container_any: Any = cast(Any, container)
                 factory = (
-                    container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
+                    container_any.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()
                 )
                 hub = factory.get_wb_manager_hub(shop_id)
                 _card_info, target_card = (
@@ -404,6 +426,7 @@ class MainAdvManager:
             wb_cabinet_from_db = await self._get_wb_cabinet_from_session(
                 session, wb_cabinet_id
             )
+            # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
             adv_data = {
                 "adv_id": auto_adv_id,
                 "_search_adv_id": existing_search_adv_id,
@@ -414,7 +437,7 @@ class MainAdvManager:
                 "bidder_active": False,
                 "wb_cabinet_id": wb_cabinet_from_db.id,
                 "parsing_active": False,
-                "bot_active": True,
+                "bot_active": False,
                 "auto_adv_target_status": False,
                 "auto_update_white_list": False,
                 "auto_update_target_place": False,
@@ -431,56 +454,50 @@ class MainAdvManager:
 
     @staticmethod
     async def get_adv_ids_rows_by_nmid(nmid: int) -> list[tuple[int, int | None]]:
-        async with sm() as session:
-            stmt = (
-                select(AdvSetting)
-                .options(
-                    load_only(
-                        AdvSetting.adv_id,
-                        AdvSetting._search_adv_id,  # noqa E1101
-                        AdvSetting.name,
-                    )
-                )
-                .where(
-                    and_(
-                        AdvSetting.active_status.not_in(["refused", "done"]),
-                        or_(
-                            and_(
-                                AdvSetting.name.regexp_match(
-                                    r".*<!-\[\d+]-!>.*"
-                                ),  # Проверяем первый паттерн
-                                AdvSetting.name.regexp_match(
-                                    rf".*{nmid}.*"
-                                ),  # Проверяем второй паттерн
-                            ),
-                            # Дополнительно можно вернуть этот блок, если нужно
-                            and_(
-                                AdvSetting.nmids == [nmid],
-                                AdvSetting._search_adv_id is not None,  # noqa E1101
-                            ),
-                        ),
-                        # TODOД не правильныый синтаксис условий in, ошибка попала в прод
-                        AdvSetting.type.in_([8, 9]),  # Без устаревших типов РК
-                    )
-                )
+        """Вернуть пары auto/search ID активных кампаний по артикулу."""
+        async with sm(read_only=True) as session:
+            return await MainAdvManager._get_adv_ids_rows_by_nmid_in_session(
+                session, nmid
             )
 
-            result = await session.scalars(stmt)
-            adv_settings = result.all()
-            adv_ids_rows: list[tuple[int, int]] = []
-            if adv_settings:
-                for adv in adv_settings:
-                    auto_adv_id = adv.adv_id
-                    if search_adv_id := adv.search_adv_id:
-                        adv_ids_rows.append(
-                            (
-                                auto_adv_id,
-                                search_adv_id,
-                            )
-                        )
-                return adv_ids_rows
-            else:
-                return []
+    @staticmethod
+    async def _get_adv_ids_rows_by_nmid_in_session(
+        session: AsyncSession,
+        nmid: int,
+    ) -> list[tuple[int, int | None]]:
+        """Найти пары ID РК в переданной read-only PG-сессии."""
+        stmt = (
+            select(AdvSetting)
+            .options(
+                load_only(
+                    AdvSetting.adv_id,
+                    getattr(AdvSetting, "_search_adv_id"),
+                    AdvSetting.name,
+                )
+            )
+            .where(
+                and_(
+                    AdvSetting.active_status.not_in(["refused", "done"]),
+                    or_(
+                        and_(
+                            AdvSetting.name.regexp_match(r".*<!-\[\d+]-!>.*"),
+                            AdvSetting.name.regexp_match(rf".*{nmid}.*"),
+                        ),
+                        and_(
+                            AdvSetting.nmids == [nmid],
+                            getattr(AdvSetting, "_search_adv_id").is_not(None),
+                        ),
+                    ),
+                    AdvSetting.type.in_([8, 9]),
+                )
+            )
+        )
+        result = await session.scalars(stmt)
+        return [
+            (adv.adv_id, adv.search_adv_id)
+            for adv in result.all()
+            if adv.search_adv_id
+        ]
 
     @staticmethod
     def _get_balance_type(
@@ -488,11 +505,15 @@ class MainAdvManager:
     ) -> tuple[int, str]:
         return select_balance_source_from_response(balances, min_required=min_required)
 
-    async def _upcast_target_placement(self, adv_id, /, search, recommendations):
+    async def _upcast_target_placement(
+        self, adv_id: int, /, search: bool, recommendations: bool
+    ) -> None:
         await self.wb_api.upcast_target_placement(adv_id, search, recommendations)
 
     @staticmethod
-    async def __turn_off_advs(bot, user_telegram_id, complex_adv_ids: set[int]):
+    async def __turn_off_advs(
+        bot: Bot, user_telegram_id: int, complex_adv_ids: set[int]
+    ) -> None:
         # TODO: Добавить логику остановки РК в кабинете WB через wb_api
 
         message = "Отключаю существующие для этого артикула кампании"

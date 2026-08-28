@@ -20,7 +20,9 @@ def is_start_command_text(text: str | None) -> bool:
 
 def is_start_command_message(message: Message) -> bool:
     """True, если /start в text или caption сообщения."""
-    raw = message.text if message.text is not None else message.caption
+    raw = getattr(message, "text", None)
+    if raw is None:
+        raw = getattr(message, "caption", None)
     if not isinstance(raw, str):
         return False
     return is_start_command_text(raw)

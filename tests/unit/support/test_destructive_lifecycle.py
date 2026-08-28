@@ -27,6 +27,28 @@ from tests.support.destructive_lifecycle import (
 from tests.support.destructive_pg_dsn import DestructiveTestDatabaseError
 
 
+def _make_sync_mock(*, external_healthy: bool = False):
+    """Mock sync_run: external_healthy=True → stack exists before pytest up."""
+
+    state = {"up_done": external_healthy}
+
+    def _sync(*args: object, **_kwargs: object) -> tuple[int, str, str]:
+        if "up" in args and "-d" in args:
+            state["up_done"] = True
+            return 0, "", ""
+        if "ps" in args and "-q" in args:
+            if not state["up_done"]:
+                return 0, "", ""
+            return 0, "cid-1\n", ""
+        if args[:2] == ("docker", "inspect"):
+            return 0, "running healthy", ""
+        if "down" in args:
+            return 0, "", ""
+        return 0, "", ""
+
+    return _sync
+
+
 def _lifecycle(
     *,
     sync_run=None,
@@ -51,22 +73,11 @@ def _lifecycle(
             f"DOCKER_STAGE={kwargs.get('stage')}; exit_code={kwargs.get('exit_code')}"
         )
 
-    def _happy_sync(*args, **_kwargs):
-        if "ps" in args and "-q" in args:
-            return 0, "cid-1\n", ""
-        if args[:2] == ("docker", "inspect"):
-            return 0, "running healthy", ""
-        if "up" in args:
-            return 0, "", ""
-        if "down" in args:
-            return 0, "", ""
-        return 0, "", ""
-
     state = TestInfraSessionState(reuse_mode=reuse_mode)
     return TestInfraLifecycle(
         state=state,
         compose_file="tests/docker-compose.test.yml",
-        sync_run=sync_run or MagicMock(side_effect=_happy_sync),
+        sync_run=sync_run or MagicMock(side_effect=_make_sync_mock()),
         docker_preflight=docker_preflight or MagicMock(return_value=["docker", "compose"]),
         validate_pg=validate_pg or MagicMock(),
         validate_ch=validate_ch or MagicMock(),
@@ -114,17 +125,7 @@ def test_session_resource_union() -> None:
 def test_lifecycle_cardinality_for_n_pg_tests() -> None:
     """N PG ensures → compose/pg bootstrap once; data reset N times."""
     init_pg = MagicMock()
-    sync_run = MagicMock(
-        side_effect=lambda *a, **k: (
-            (0, "cid\n", "")
-            if "ps" in a
-            else (
-                (0, "running healthy", "")
-                if a[:2] == ("docker", "inspect")
-                else (0, "", "")
-            )
-        )
-    )
+    sync_run = MagicMock(side_effect=_make_sync_mock())
     lc = _lifecycle(sync_run=sync_run, init_pg=init_pg)
     n = 5
     for _ in range(n):
@@ -298,10 +299,17 @@ def test_retry_budget_exhaustion() -> None:
 @pytest.mark.unit
 def test_teardown_preserves_primary_failure() -> None:
     """Teardown cleanup error не заменяет primary failure."""
+    sync_state = {"up_done": False}
+
     def _sync(*args, **_kwargs):
+        if "up" in args and "-d" in args:
+            sync_state["up_done"] = True
+            return 0, "", ""
         if "down" in args:
             return 9, "", "cleanup TOKEN=secret"
-        if "ps" in args:
+        if "ps" in args and "-q" in args:
+            if not sync_state["up_done"]:
+                return 0, "", ""
             return 0, "cid\n", ""
         if args[:2] == ("docker", "inspect"):
             return 0, "running healthy", ""
@@ -323,10 +331,17 @@ def test_teardown_preserves_primary_failure() -> None:
 @pytest.mark.unit
 def test_teardown_raises_cleanup_when_no_primary() -> None:
     """Без primary cleanup error обязан подняться."""
+    sync_state = {"up_done": False}
+
     def _sync(*args, **_kwargs):
+        if "up" in args and "-d" in args:
+            sync_state["up_done"] = True
+            return 0, "", ""
         if "down" in args:
             return 2, "", "cleanup failed"
-        if "ps" in args:
+        if "ps" in args and "-q" in args:
+            if not sync_state["up_done"]:
+                return 0, "", ""
             return 0, "cid\n", ""
         if args[:2] == ("docker", "inspect"):
             return 0, "running healthy", ""
@@ -344,22 +359,45 @@ def test_teardown_raises_cleanup_when_no_primary() -> None:
 @pytest.mark.unit
 def test_reuse_mode_skips_compose_down() -> None:
     """TEST_INFRA_REUSE: pytest не останавливает containers."""
-    sync_run = MagicMock(
-        side_effect=lambda *a, **k: (
-            (0, "cid\n", "")
-            if "ps" in a
-            else (
-                (0, "running healthy", "")
-                if a[:2] == ("docker", "inspect")
-                else (0, "", "")
-            )
-        )
-    )
+    sync_run = MagicMock(side_effect=_make_sync_mock())
     lc = _lifecycle(sync_run=sync_run, reuse_mode=True)
     lc.ensure_resources(TestResourceNeeds(needs_pg=True))
     lc.teardown()
     down_calls = [c for c in sync_run.call_args_list if "down" in c.args]
     assert down_calls == []
+    assert lc.state.compose_down_count == 0
+
+
+@pytest.mark.unit
+def test_teardown_skips_compose_down_when_external_stack_already_healthy() -> None:
+    """FP-001: /opsx-test-env external stack must survive pytest session teardown.
+
+    When compose services are already healthy before ``ensure_resources``,
+    lifecycle reuses them (``up -d`` without force-recreate) but must not
+    claim pytest ownership — session teardown must not run ``compose down -v``.
+    """
+    down_calls: list[tuple[object, ...]] = []
+
+    def _sync(*args: object, **_kwargs: object) -> tuple[int, str, str]:
+        if "down" in args:
+            down_calls.append(args)
+            return 0, "", ""
+        if "ps" in args and "-q" in args:
+            return 0, "external-cid\n", ""
+        if args[:2] == ("docker", "inspect"):
+            return 0, "running healthy", ""
+        if "up" in args:
+            return 0, "", ""
+        return 0, "", ""
+
+    lc = _lifecycle(sync_run=MagicMock(side_effect=_sync))
+    lc.ensure_resources(TestResourceNeeds(needs_pg=True))
+    assert lc.state.compose_up_count == 1
+    assert lc.state.compose_started_by_pytest is False
+    lc.teardown()
+    assert down_calls == [], (
+        "must not compose down externally-owned /opsx-test-env stack"
+    )
     assert lc.state.compose_down_count == 0
 
 

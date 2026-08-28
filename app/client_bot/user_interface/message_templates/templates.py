@@ -3,7 +3,7 @@ import logging
 from abc import abstractmethod
 from collections.abc import Callable
 from functools import wraps
-from typing import TypeVar, Any, cast
+from typing import Any, cast
 
 import aiogram
 from aiogram import types
@@ -11,47 +11,42 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, Message
 
 from app import file_handler
-from app.client_bot.message_manager import LastMessage as ActualLastMessage
+from app.client_bot.const import TELEGRAM_CAPTION_LIMIT
 
 from .base import Base
 
 logger = logging.getLogger(__name__)
-MAX_TELEGRAM_CAPTION_LEN = 1024
 _CAPTION_OVERFLOW_SUFFIX = "\n..."
 
 
-T = TypeVar("T", bound=Message)
-
-
 def manage_file_id(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Подставляет Telegram file_id/InputFile перед send_photo и сохраняет новый id."""
+
     @wraps(func)
-    async def wrapper(self: Any, *args: Any, **kwargs: Any) -> T | None:
+    async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Message | None:
         logger.debug("Вызов обертки manage_file_id")
-        # Получение и изменение file_id перед вызовом основной функции
         old_image = self.image
+        source_bytes: io.BytesIO | None = (
+            old_image if isinstance(old_image, io.BytesIO) else None
+        )
         if old_image:
             logger.debug("Получение изображения")
-            image: io.BytesIO | str | types.InputFile = (
-                await file_handler.get_telegram_image(old_image, self.bot)
-            )
-
-            if isinstance(image, io.BytesIO):
-                new_image = BufferedInputFile(image.getvalue(), filename="wbgram.png")
-                self.image = new_image
+            request: str | BufferedInputFile
+            if isinstance(old_image, io.BytesIO):
+                request = BufferedInputFile(
+                    old_image.getvalue(), filename="wbgram.png"
+                )
             else:
-                self.image = image
-        else:
-            image: io.BytesIO | str | types.InputFile | None = None
+                request = old_image
+            self.image = await file_handler.get_telegram_image(request, self.bot)
 
-        # Вызов основной функции
-        message: T = await func(self, *args, **kwargs)
-
-        # Обработка результата выполнения основной функции для сохранения image_id
-        image_id = message.photo[-1].file_id # type: ignore[index]
-        if isinstance(image, io.BytesIO):
+        message = await func(self, *args, **kwargs)
+        if message is None or message.photo is None:
+            return message
+        image_id: str = message.photo[-1].file_id
+        if source_bytes is not None:
             bot: aiogram.Bot = self.bot
-            bot_id = bot.id
-            await file_handler.save_telegram_file(image, image_id, bot_id)
+            await file_handler.save_telegram_file(source_bytes, image_id, bot.id)
         return message
 
     return wrapper
@@ -68,18 +63,32 @@ class TextWithKeyboard(Base):
     def keyboard(self) -> InlineKeyboardMarkup:
         pass
 
-    async def __call__(self, *args, **kwargs) -> None:
+    async def __call__(self, *args: Any, **kwargs: Any) -> None:
         await super().__call__()
         text = self.text
         parse_mode = getattr(self, "parse_mode", None)
         if parse_mode == "Markdown":
             text = text.replace("_", r"\_")
+        logger.debug(
+            "TextWithKeyboard: sending class=%s chat_id=%s parse_mode=%s text_len=%s keyboard_rows=%s text_preview=%r",
+            self.__class__.__name__,
+            self.chat_id,
+            parse_mode,
+            len(text),
+            len(self.keyboard.inline_keyboard),
+            text[:80],
+        )
         _ = await self.bot.send_message(
             chat_id=self.chat_id,
             text=text,
             reply_markup=self.keyboard,
             parse_mode=parse_mode,
             disable_web_page_preview=True,
+        )
+        logger.debug(
+            "TextWithKeyboard: sent class=%s chat_id=%s",
+            self.__class__.__name__,
+            self.chat_id,
         )
         return None
 
@@ -98,10 +107,14 @@ class TextWithImage(Base):
     @manage_file_id
     async def __call__(self) -> Message:
         parse_mode = getattr(self, "parse_mode", None)
-
+        photo = self.image
+        if photo is None:
+            raise ValueError("TextWithImage.image is required for send_photo")
+        if isinstance(photo, io.BytesIO):
+            photo = BufferedInputFile(photo.getvalue(), filename="wbgram.png")
         last_message = await self.bot.send_photo(
             chat_id=self.chat_id,
-            photo=self.image,
+            photo=photo,
             caption=self.text,
             parse_mode=parse_mode,
         )
@@ -114,7 +127,7 @@ class Text(Base):
     def text(self) -> str:
         pass
 
-    async def __call__(self, *args, **kwargs) -> Any:
+    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
         # Отправка нового сообщения без попытки редактирования существующего
         last_message = await self.bot.send_message(
             chat_id=self.chat_id,
@@ -194,7 +207,7 @@ class TextWithKeyboardAndImage(Base):
             )
             caption, overflow = self._split_caption(
                 full_caption,
-                limit=MAX_TELEGRAM_CAPTION_LEN - 64,
+                limit=TELEGRAM_CAPTION_LIMIT - 64,
             )
             message = await self.bot.send_photo(
                 chat_id=self.chat_id,
@@ -216,7 +229,7 @@ class TextWithKeyboardAndImage(Base):
     @staticmethod
     def _split_caption(
         caption: str,
-        limit: int = MAX_TELEGRAM_CAPTION_LEN,
+        limit: int = TELEGRAM_CAPTION_LIMIT,
     ) -> tuple[str, str]:
         if len(caption) <= limit:
             return caption, ""
