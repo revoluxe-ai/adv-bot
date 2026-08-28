@@ -88,7 +88,7 @@ def build_execution_manifest(
             }
         )
     revisions.sort(key=lambda r: str(r["revision"]))
-    return {
+    manifest: dict[str, Any] = {
         "manifest_format_version": 1,
         "release_image_digest": release_image_digest,
         "python_version": python_version,
@@ -98,6 +98,7 @@ def build_execution_manifest(
         "revisions": revisions,
         "target_bundle_hash": _hash_obj({"files": files, "revisions": revisions}),
     }
+    return manifest
 
 
 def _hash_obj(obj: object) -> str:
@@ -120,13 +121,13 @@ def ancestor_closure(revision_ids: Iterable[str]) -> set[str]:
         down = rev.down_revision
         if down is not None:
             if isinstance(down, (list, tuple, set)):
-                stack.extend(str(x) for x in down)
+                stack.extend(str(x) for x in cast(Iterable[object], down))
             else:
                 stack.append(str(down))
         depends = _revision_dependencies(rev)
         if depends:
             if isinstance(depends, (list, tuple, set)):
-                stack.extend(str(x) for x in cast(Iterable[Any], depends))
+                stack.extend(str(x) for x in cast(Iterable[object], depends))
             else:
                 stack.append(str(depends))
     return seen
@@ -148,12 +149,13 @@ def source_history_hash(revision_ids: Iterable[str]) -> str:
                 "file_sha256": _file_sha256(Path(rev.path)),
             }
         )
-    return _hash_obj({"manifest_format_version": 1, "closure": items})
+    payload: dict[str, Any] = {"manifest_format_version": 1, "closure": items}
+    return _hash_obj(payload)
 
 
 def main() -> int:
     """CLI: печатает manifest JSON."""
-    manifest: dict[str, Any] = build_execution_manifest()
+    manifest = build_execution_manifest()
     heads = list(
         ScriptDirectory.from_config(Config(str(ALEMBIC_INI))).get_heads()
     )

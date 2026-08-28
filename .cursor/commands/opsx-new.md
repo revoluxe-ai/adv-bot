@@ -1,9 +1,62 @@
 ---
+component_id: opsx.commands.new
+component_version: 0.1.0
+ownership: TARGET_ONLY
+runtime_class: ACTIVE
+canonical_source_body: adapted_target_native
+required_adapters: ["opsx-lite", "poetry-python"]
+local_modification_note: "Inbound KEEP opsx-new UPDATED_COMMAND from catalog OCCURRENCE=ba52fae55cd2632e (adv-bot/split-payment); CREATE+REPAIR owner-contract modes; WB/poetry-python target-native; game/vue-npm fork skipped"
+local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
+contract_id: OPSX-WB-NEW-01
+newline_normalization: none
+donor_source_id: adv-bot/split-payment-for-adv-without-pay-for-adv-on-pauses
+donor_snapshot_head: db91149ae1d96d1fd85ceae7a405e65c09f0c29b
+donor_occurrence_id: ba52fae55cd2632e
+donor_full_file_hash: e265586f3064ca000168f5e7762eb8b080a810894d40a363ae7c0fbe4a9d048b
+inbound_packet: .tmp/opsx-inbound/20260816T154000Z/DIFF_PACKET.md
 name: /opsx-new
 id: opsx-new
 category: Workflow
 description: Start a new change (CREATE) or repair existing owner-contract.md from OWNER_REVIEW_HANDOFF (REPAIR)
 ---
+
+# TARGET OVERRIDE — HIGHEST PRIORITY
+
+**Contract:** `OPSX-WB-NEW-01`  
+**Runtime class:** `ACTIVE`  
+**Precedence:** This override wins for target paths, write boundary, and bans.
+
+### Target authority paths
+
+- Changes (write in REPAIR): `openspec/changes/<CHANGE_ID>/owner-contract.md` only
+- Changes (write in CREATE): `<changeRoot>/owner-contract.md` after scaffold
+- Review handoff (read): `/opsx-owner-contract-review` `OWNER_REVIEW_HANDOFF`
+- Adapter (read): `.opsx/adapters/poetry-python/README.md`
+- Fixtures (read): `.cursor/commands/_fixtures/opsx-new-owner-contract-repair/**`
+
+### Hard target bans
+
+- Do not install dependencies / modify `package.json`, Poetry lock, or `pyproject.toml`.
+- Do not access production / Kubernetes / secrets.
+- Do not push, open PR, rebase, force, or deploy.
+- Do not activate game/Vue/`vue-npm` / `npm run build` assumptions from donor forks.
+- REPAIR: do not write proposal, design, specs, tasks, decisions, or product code.
+- CREATE: do not register `owner-contract.md` in schema or advance beyond first-artifact template without Owner direction.
+- Never emit independent `/opsx-owner-contract-review` PASS from `/opsx-new`.
+
+### Projectization gate
+
+Read `.opsx/projectization.yaml` before any run.
+If `status` != `COMPLETE` or `normal_commands_enabled` is false:
+
+```text
+STATUS: FAIL_CLOSED
+REASON: OPSX_PROJECTIZATION_REQUIRED
+NEXT_COMMAND: /opsx-projectize
+```
+
+---
+# /opsx-new
 
 Start a new change using the experimental artifact-driven approach, **or**
 repair an existing Change's `owner-contract.md` from a valid

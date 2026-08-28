@@ -1,12 +1,19 @@
+"""Главное меню и список магазинов.
+
+Invite/partner UX deferred: ``settings.invite_gate`` default False — кнопки
+«Показать инвайт» / minimal presentation keyboard не показываются на текущем
+rollout (см. invite-gate-deferred decision).
+"""
+
 from aiogram import Bot
 from aiogram.enums import ParseMode
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from app.client_bot import const
 from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.callbacks import Action
+from app.client_bot.user_interface.views.callbacks import Gate
 from app.client_bot.user_interface.views.get_main_text import get_main_text
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
 from app.modules.common_slaves.wildberries.models import WBUserCabinet
@@ -25,7 +32,11 @@ SHOPS_PER_PAGE = 20
 
 
 class MainMenu(TextWithKeyboard):
-    """Главная страница после Start: минимальный UI только для новых без гейта при presentation_only."""
+    """Главная после /start: free-меню (магазины/баланс/инвайт).
+
+    Минимальный presentation-only keyboard оставлен только при явном
+    ``PRESENTATION_ONLY_MODE=true`` и ``full_client_ui=False`` (legacy).
+    """
 
     parse_mode = ParseMode.HTML
 
@@ -36,7 +47,7 @@ class MainMenu(TextWithKeyboard):
 
     @property
     def text(self) -> str:
-        return get_main_text(self.user_telegram_id, full_client_ui=self._full_client_ui)
+        return get_main_text(self.user_telegram_id)
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
@@ -48,8 +59,12 @@ class MainMenu(TextWithKeyboard):
 def get_main_menu_keyboard(
     user_telegram_id: int, *, full_client_ui: bool = False
 ) -> InlineKeyboardMarkup:
-    """Клавиатура главной: минимальный режим только если presentation_only и не full_client_ui."""
-    keyboard_buttons = []
+    """Клавиатура главной: full free UI по умолчанию.
+
+    Legacy minimal («только Ввести инвайт») — только если
+    ``presentation_only`` и не ``full_client_ui``.
+    """
+    keyboard_buttons: list[list[InlineKeyboardButton]] = []
 
     if settings.presentation_only and not full_client_ui:
         if is_bot_admin(user_telegram_id):
@@ -58,11 +73,11 @@ def get_main_menu_keyboard(
                 callback_data=AdminPanel(action="menu").pack(),
             )
             keyboard_buttons.append([admin_button])
-        presentation_button = InlineKeyboardButton(
-            text="Запросить презентацию",
-            callback_data=callbacks.RequestPresentation(action="request").pack(),
+        invite_button = InlineKeyboardButton(
+            text="Ввести инвайт",
+            callback_data=Gate(action="invite_enter").pack(),
         )
-        keyboard_buttons.append([presentation_button])
+        keyboard_buttons.append([invite_button])
         return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
     if is_bot_admin(user_telegram_id):
@@ -83,13 +98,13 @@ def get_main_menu_keyboard(
         callback_data=callbacks.UserBalanceMenu().pack(),
     )
     keyboard_buttons.append([user_balance_button])
-    # Полное меню видят только прошедшие гейт / админы — инвайт для приглашений показываем
-    # всегда; INVITE_GATE в middleware относится к входу, не к этой кнопке.
-    invite_show_button = InlineKeyboardButton(
-        text="Показать инвайт",
-        callback_data=callbacks.InviteShow().pack(),
-    )
-    keyboard_buttons.append([invite_show_button])
+    # INVITE DEFERRED: partner-invite UX only when invite_gate re-enabled explicitly.
+    if settings.invite_gate:
+        invite_show_button = InlineKeyboardButton(
+            text="Показать инвайт",
+            callback_data=callbacks.InviteShow().pack(),
+        )
+        keyboard_buttons.append([invite_show_button])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
 
@@ -134,7 +149,7 @@ def get_shops_list_keyboard(
     page: int = 1,
 ) -> InlineKeyboardMarkup:
     """Клавиатура страницы «Мои магазины»: Добавить магазин, список, пагинация, Назад."""
-    keyboard_buttons = []
+    keyboard_buttons: list[list[InlineKeyboardButton]] = []
 
     add_shop_button = InlineKeyboardButton(
         text="➕Добавить магазин", callback_data=callbacks.ShopNew().pack()
@@ -194,12 +209,12 @@ def get_shops_list_keyboard(
         callback_data=callbacks.UserBalanceMenu().pack(),
     )
     keyboard_buttons.append([balance_row])
-    # Список магазинов доступен после гейта — кнопка инвайта всегда, без INVITE_GATE.
-    invite_show_button = InlineKeyboardButton(
-        text="Показать инвайт",
-        callback_data=callbacks.InviteShow().pack(),
-    )
-    keyboard_buttons.append([invite_show_button])
+    if settings.invite_gate:
+        invite_show_button = InlineKeyboardButton(
+            text="Показать инвайт",
+            callback_data=callbacks.InviteShow().pack(),
+        )
+        keyboard_buttons.append([invite_show_button])
 
     back_button = InlineKeyboardButton(
         text="Назад",

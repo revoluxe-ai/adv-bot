@@ -7,13 +7,13 @@ canonical_source_body: none
 required_adapters: ["opsx-lite"]
 local_modification_note: "v0.6: bare GO = next small STEP only (bind→meta→lifecycle→support); STEP=all opt-in; Owner 2026-08-07"
 local_override_policy: TARGET_OVERRIDE_HIGHEST_PRIORITY
-contract_id: OPSX-WB-META-BOOTSTRAP-01
+contract_id: OPSX-GAME-META-BOOTSTRAP-01
 newline_normalization: none
 ---
 
 # TARGET OVERRIDE — HIGHEST PRIORITY
 
-**Contract:** `OPSX-WB-META-BOOTSTRAP-01`  
+**Contract:** `OPSX-GAME-META-BOOTSTRAP-01`  
 **Runtime class:** `ACTIVE`  
 **Precedence:** This override wins for target paths, write boundary, and bans.
 
@@ -88,7 +88,7 @@ Lessons to central (no local seed):
 ```text
 IMPLEMENTATION_STATUS: IMPLEMENTED
 RUNTIME_STATUS: ACTIVE
-CONTRACT_ID: OPSX-WB-META-BOOTSTRAP-01
+CONTRACT_ID: OPSX-GAME-META-BOOTSTRAP-01
 PRODUCT_WRITER: NO
 STACK_ADAPTER: none (opsx-lite process only)
 UPSTREAM_OVERWRITE_DEFAULT: NO
@@ -182,21 +182,6 @@ First hit wins; record in `CENTRAL:` / `CENTRAL_RESOLVE:`:
 4. Repo-relative `../opsx-central` (+ `bootstrap/profile` / `sources/*/*`)
 5. Else unresolved (`CENTRAL_RESOLVE: failed`)
 
-### Portable central bind (committed files)
-
-Hard rule for any write into committed process files
-(`.opsx/sources.yaml`, `.opsx/projectization.yaml`, `.opsx/MERGE_RECEIPT.md`):
-
-1. **Never** persist machine-absolute or user-home `central_root`
-   (e.g. `C:/Users/…`, `/home/…`, `/Users/…`) — username leak + non-portable.
-2. Prefer **omit** `central_root` and bind via `central=` / `OPSX_CENTRAL_ROOT` /
-   `default_relative`.
-3. Persist a relative `central_root` only when it matches the portable default
-   (`../opsx-central`) for that workspace layout.
-4. Chat/`CENTRAL:` output may show the resolved absolute path for this machine.
-5. `MERGE_RECEIPT.md` records `CENTRAL_RESOLVE:` + redacted `CENTRAL: <CENTRAL>`
-   (and `<CENTRAL>/…` in Actions); never raw home paths.
-
 ## Requirements load (every mode, first)
 
 1. If central resolved, try:
@@ -245,11 +230,9 @@ Hard rule for any write into committed process files
 3. Requirements load; same-turn plan unless `packet=`.
 4. Select step set (above). Bare `GO` ≠ all steps.
 5. CORE gate when applying step 1: import-command must be in KEEP if central has it.
-6. Apply KEEP for that step only; bind `sources.yaml` when step 1 touches it
-   (portable central bind only — never write machine-absolute `central_root`);
-   seed projectization `REQUIRED` if absent; never set/downgrade COMPLETE;
-   never add machine-absolute `central_root` to projectization.
-7. Registry stubs as needed; `MERGE_RECEIPT.md` with redacted `<CENTRAL>` token.
+6. Apply KEEP for that step only; bind `sources.yaml` when step 1 touches it;
+   seed projectization `REQUIRED` if absent; never set/downgrade COMPLETE.
+7. Registry stubs as needed; `MERGE_RECEIPT.md`.
 8. Emit `SEED_APPLIED` / `BIND_APPLIED` with `APPLY_STEP` and remaining steps.
 9. NEXT:
    - later steps incomplete → `/opsx-meta-bootstrap GO`
@@ -277,8 +260,6 @@ Hard rule for any write into committed process files
 4. No upstream/product/env writes.
 5. Partial failure → stop; report applied vs skipped.
 6. Do not chain projectize/import/snapshot/index/commit.
-7. Do not persist machine-absolute / user-home `central_root` into committed
-   process files (see Portable central bind).
 
 ## Output contract (every run)
 
@@ -403,4 +384,25 @@ FAIL_CLOSED
 .opsx/shared/evidence-contract.md
 ```
 
-Authoritative when present: `.opsx/shared/bootstrap-profile.md`.
+Authoritative when present: `.opsx/shared/bootstrap-profile.md`.contract_id: OPSX-WB-META-BOOTSTRAP-01
+**Contract:** `OPSX-WB-META-BOOTSTRAP-01`  
+CONTRACT_ID: OPSX-WB-META-BOOTSTRAP-01
+### Portable central bind (committed files)
+Hard rule for any write into committed process files
+(`.opsx/sources.yaml`, `.opsx/projectization.yaml`, `.opsx/MERGE_RECEIPT.md`):
+1. **Never** persist machine-absolute or user-home `central_root`
+   (e.g. `C:/Users/…`, `/home/…`, `/Users/…`) — username leak + non-portable.
+2. Prefer **omit** `central_root` and bind via `central=` / `OPSX_CENTRAL_ROOT` /
+   `default_relative`.
+3. Persist a relative `central_root` only when it matches the portable default
+   (`../opsx-central`) for that workspace layout.
+4. Chat/`CENTRAL:` output may show the resolved absolute path for this machine.
+5. `MERGE_RECEIPT.md` records `CENTRAL_RESOLVE:` + redacted `CENTRAL: <CENTRAL>`
+   (and `<CENTRAL>/…` in Actions); never raw home paths.
+6. Apply KEEP for that step only; bind `sources.yaml` when step 1 touches it
+   (portable central bind only — never write machine-absolute `central_root`);
+   seed projectization `REQUIRED` if absent; never set/downgrade COMPLETE;
+   never add machine-absolute `central_root` to projectization.
+7. Registry stubs as needed; `MERGE_RECEIPT.md` with redacted `<CENTRAL>` token.
+7. Do not persist machine-absolute / user-home `central_root` into committed
+   process files (see Portable central bind).

@@ -3,6 +3,9 @@
 EXTERNAL_CALL_COVERAGE gap (REDIS / TEST_ONLY):
 ``change_keyword_hard_status`` CTR branch must call
 ``redis_manager.set_auto_block_status`` after CH boost mutates added_clicks.
+
+Handler integration tests ниже skip: CTR-boost path в ``keyword_settings`` отложен
+(см. комментарий у ``change_keyword_hard_status``); тесты сохранены для restore.
 """
 
 from __future__ import annotations
@@ -21,6 +24,13 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_ho
 
 _HANDLER = "app.client_bot.user_interface.handlers.keyword_settings"
 
+CTR_BOOST_HANDLER_SKIP = pytest.mark.skip(
+    reason=(
+        "CTR-boost deferred: change_keyword_hard_status CH/Redis path disabled; "
+        "test kept for restore"
+    ),
+)
+
 
 def _session_with_keyword(keyword: SimpleNamespace) -> AsyncMock:
     """AsyncSession mock returning ``keyword`` from ``session.execute``."""
@@ -34,6 +44,7 @@ def _session_with_keyword(keyword: SimpleNamespace) -> AsyncMock:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+@CTR_BOOST_HANDLER_SKIP
 async def test_ctr_boost_path_calls_set_auto_block_status() -> None:
     """hard_status=-1 CTR path → Redis set_auto_block_status(False) once."""
     adv = SimpleNamespace(

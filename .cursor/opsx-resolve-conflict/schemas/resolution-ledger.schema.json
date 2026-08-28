@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ResolutionLedgerEntry",
+  "type": "object",
+  "required": [
+    "conflict_id",
+    "path",
+    "operation_identity",
+    "resolution_class",
+    "resolution_kind",
+    "reason"
+  ],
+  "properties": {
+    "schema": { "const": "opsx-resolve-conflict/resolution-ledger/v1" },
+    "conflict_id": { "type": "string" },
+    "cluster_id": { "type": ["string", "null"] },
+    "path": { "type": "string" },
+    "operation_identity": { "type": "string" },
+    "base_oid": { "type": ["string", "null"] },
+    "side_a_oid": { "type": ["string", "null"] },
+    "side_b_oid": { "type": ["string", "null"] },
+    "authority_refs": { "type": "array", "items": { "type": "string" } },
+    "lane": { "type": "string" },
+    "resolution_class": {
+      "enum": ["AUTO_SAFE", "AI_SEMANTIC", "OWNER_REQUIRED"]
+    },
+    "resolution_kind": { "type": "string" },
+    "reason": { "type": "string" },
+    "result_blob_or_tree_identity": { "type": ["string", "null"] },
+    "result_worktree_sha256": { "type": ["string", "null"] },
+    "verification_refs": { "type": "array", "items": { "type": "string" } },
+    "side_a_intent_refs": { "type": "array", "items": { "type": "string" } },
+    "side_b_intent_refs": { "type": "array", "items": { "type": "string" } },
+    "preserved_invariants": { "type": "array", "items": { "type": "string" } },
+    "reason_not_new_decision": { "type": "string" },
+    "verification_requirements": { "type": "array", "items": { "type": "string" } }
+  }
+}

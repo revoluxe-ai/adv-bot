@@ -1,3 +1,5 @@
+"""Интеграционные тесты обработчиков настроек кампании на disposable PG."""
+
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.client_bot import const
 from app.client_bot.user_interface.handlers.adv_setting import (
     reset_shop_non_relevant_phrases,
+    wb_update_minus_keywords,
 )
 from app.client_bot.user_interface.handlers.adv_setting.utils.keyword_updater import (
     update_keywords,
@@ -83,8 +86,11 @@ async def _create_adv(
     return adv
 
 
-def _make_callback(chat_id: int = 777) -> SimpleNamespace:
-    return SimpleNamespace(message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)))
+def _make_callback(chat_id: int = 777, user_id: int = 500005) -> SimpleNamespace:
+    return SimpleNamespace(
+        message=SimpleNamespace(chat=SimpleNamespace(id=chat_id)),
+        from_user=SimpleNamespace(id=user_id),
+    )
 
 
 async def _get_keyword_statuses(
@@ -283,3 +289,134 @@ async def test_reset_shop_non_relevant_phrases_handles_empty_case(async_session:
     assert statuses[keywords[0].id] == const.AUTO_MODE
     assert statuses[keywords[1].id] == const.BLACK_LIST
     assert "Сброшено НРФ: 0" in bot.send_message.await_args.args[1]
+
+
+async def test_wb_update_minus_keywords_raises_runtime_error_when_complex_adv_missing(
+    async_session: AsyncSession,
+) -> None:
+    target_uc, target_cabinet = await _create_user_and_shop(
+        async_session, user_telegram_id=500005, shop_suffix="minus_missing"
+    )
+    adv = await _create_adv(async_session, wb_cabinet=target_cabinet, suffix="minus_missing")
+    await async_session.commit()
+
+    bot = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+    callback = _make_callback(chat_id=9993, user_id=500005)
+    callback_data = callbacks.WBUpdate(
+        action="update_minus_keywords",
+        adv_setting_original_id=adv.id,
+    )
+    mock_sm = _MockSessionMaker(async_session)
+    hub = SimpleNamespace(wb_data_manager=MagicMock(), wb_manager=MagicMock())
+    factory = SimpleNamespace(get_wb_manager_hub=MagicMock(return_value=hub))
+    container = SimpleNamespace(
+        module_resources=SimpleNamespace(
+            wb_manager_hub_factory_container=SimpleNamespace(
+                wb_manager_hub_factory=MagicMock(return_value=factory)
+            )
+        ),
+        redis_client_wrapper=MagicMock(return_value=MagicMock()),
+    )
+    wb_shop_data_manager = SimpleNamespace(get_complex_advs=AsyncMock(return_value=[]))
+    di_context = AsyncMock()
+    di_context.__aenter__.return_value = container
+    di_context.__aexit__.return_value = None
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            mock_sm,
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.DIManager.create",
+            AsyncMock(return_value=di_context),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.WBShopDataManager",
+            MagicMock(return_value=wb_shop_data_manager),
+        ),
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match=f"ComplexAdv not found for adv_setting_original_id={adv.id}",
+        ):
+            await wb_update_minus_keywords(
+                callback=callback,
+                callback_data=callback_data,
+                bot=bot,
+                state=state,
+            )
+
+
+async def test_wb_update_minus_keywords_keeps_soft_message_for_bot_inactive(
+    async_session: AsyncSession,
+) -> None:
+    target_uc, target_cabinet = await _create_user_and_shop(
+        async_session, user_telegram_id=500006, shop_suffix="minus_inactive"
+    )
+    adv = await _create_adv(async_session, wb_cabinet=target_cabinet, suffix="minus_inactive")
+    await async_session.commit()
+
+    bot = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+    callback = _make_callback(chat_id=9994, user_id=500006)
+    callback_data = callbacks.WBUpdate(
+        action="update_minus_keywords",
+        adv_setting_original_id=adv.id,
+    )
+    mock_sm = _MockSessionMaker(async_session)
+    hub = SimpleNamespace(wb_data_manager=MagicMock(), wb_manager=MagicMock())
+    factory = SimpleNamespace(get_wb_manager_hub=MagicMock(return_value=hub))
+    container = SimpleNamespace(
+        module_resources=SimpleNamespace(
+            wb_manager_hub_factory_container=SimpleNamespace(
+                wb_manager_hub_factory=MagicMock(return_value=factory)
+            )
+        ),
+        redis_client_wrapper=MagicMock(return_value=MagicMock()),
+    )
+    wb_shop_data_manager = SimpleNamespace(
+        get_complex_advs=AsyncMock(
+            return_value=[
+                SimpleNamespace(
+                    adv_setting_original_id=adv.id,
+                    bot_active=False,
+                )
+            ]
+        )
+    )
+    di_context = AsyncMock()
+    di_context.__aenter__.return_value = container
+    di_context.__aexit__.return_value = None
+
+    with (
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.sm",
+            mock_sm,
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.DIManager.create",
+            AsyncMock(return_value=di_context),
+        ),
+        patch(
+            "app.client_bot.user_interface.handlers.adv_setting.adv_setting.WBShopDataManager",
+            MagicMock(return_value=wb_shop_data_manager),
+        ),
+    ):
+        await wb_update_minus_keywords(
+            callback=callback,
+            callback_data=callback_data,
+            bot=bot,
+            state=state,
+        )
+
+    sent_texts = [call.args[1] for call in bot.send_message.await_args_list]
+    assert "Обновляю минус-слова…" in sent_texts
+    assert any(
+        "Включите бота для кампании, затем повторите обновление минус-слов."
+        in text
+        for text in sent_texts
+    )

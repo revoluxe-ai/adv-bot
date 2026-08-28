@@ -3,7 +3,9 @@
 import asyncio
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any, Coroutine
+
+CabinetProcessResult = dict[str, int | bool | str | float | None]
 
 from dependency_injector.wiring import inject, Provide
 from sqlalchemy import exists, func, select, and_
@@ -11,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.client_bot.notification_sender import get_notification_sender
+from app.client_bot.user_interface.services.auto_management_mode import (
+    apply_free_mode_transition,
+)
 from app.modules.billing.event_manager.event_manager import BillingEventManager
 
 from app.modules.billing.di import BillingContainer
@@ -76,6 +81,27 @@ GRACE_EXCEEDED_MESSAGE = (
 )
 
 
+async def _load_cabinet_user_chats(
+    session: AsyncSession,
+    cabinet_id: int,
+) -> list[tuple[int, int | None]]:
+    """Загрузить Telegram ID пользователей кабинета в переданной PG-сессии."""
+    stmt = (
+        select(User.id, User.user_telegram_id)
+        .select_from(WBUserCabinet)
+        .join(User, User.id == WBUserCabinet.user_id)
+        .where(
+            WBUserCabinet.wb_cabinet_id == cabinet_id,
+            User.user_telegram_id.is_not(None),
+        )
+    )
+    result = await session.execute(stmt)
+    return [
+        (int(user_id), int(chat_id) if chat_id is not None else None)
+        for user_id, chat_id in result.all()
+    ]
+
+
 def _days_until_block_message(days_left: int) -> str:
     """Склонение: 1 день / 2-4 дня / 5-20 дней / 21 день / ..."""
     if days_left % 10 == 1 and days_left % 100 != 11:
@@ -92,18 +118,8 @@ async def _notify_days_until_block(cabinet_id: int, days_left: int) -> None:
         f"Ежедневное списание выполнено. До полной блокировки осталось {days_left} {word}."
     )
     sender = get_notification_sender()
-    async with sm() as session:
-        stmt = (
-            select(User.id, User.user_telegram_id)
-            .select_from(WBUserCabinet)
-            .join(User, User.id == WBUserCabinet.user_id)
-            .where(
-                WBUserCabinet.wb_cabinet_id == cabinet_id,
-                User.user_telegram_id.is_not(None),
-            )
-        )
-        result = await session.execute(stmt)
-        rows = result.all()
+    async with sm(read_only=True) as session:
+        rows = await _load_cabinet_user_chats(session, cabinet_id)
     for _user_id, chat_id in rows:
         if chat_id is None:
             continue
@@ -122,25 +138,15 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
     """Отправить уведомление пользователям кабинета об отключении из-за превышения лимита минуса."""
     event_manager = BillingEventManager()
     sender = get_notification_sender()
-    async with sm() as session:
-        stmt = (
-            select(User.id, User.user_telegram_id)
-            .select_from(WBUserCabinet)
-            .join(User, User.id == WBUserCabinet.user_id)
-            .where(
-                WBUserCabinet.wb_cabinet_id == cabinet_id,
-                User.user_telegram_id.is_not(None),
-            )
-        )
-        result = await session.execute(stmt)
-        rows = result.all()
+    async with sm(read_only=True) as session:
+        rows = await _load_cabinet_user_chats(session, cabinet_id)
     for user_id, chat_id in rows:
         if chat_id is None:
             continue
         try:
             success = await sender.send_message(int(chat_id), GRACE_EXCEEDED_MESSAGE)
             if success:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     await event_manager.emit_balance_grace_exceeded_sent(
                         user_id=user_id,
                         user_telegram_id=int(chat_id),
@@ -149,7 +155,7 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
                     )
                     await session.commit()
             else:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     await event_manager.emit_balance_grace_exceeded_failed(
                         user_id=user_id,
                         user_telegram_id=int(chat_id),
@@ -167,7 +173,7 @@ async def _notify_grace_exceeded(cabinet_id: int) -> None:
                 exc_info=True,
             )
             try:
-                async with sm() as session:
+                async with sm(read_only=False) as session:
                     await event_manager.emit_balance_grace_exceeded_failed(
                         user_id=user_id,
                         user_telegram_id=int(chat_id) if chat_id else None,
@@ -235,7 +241,7 @@ async def _process_single_cabinet(
     redis_manager: RedisManager,
     skip_by_redis: bool = True
 ) -> dict[str, int | bool | str | float | None]:
-    async with sm() as session:
+    async with sm(read_only=False) as session:
         return await __process_single_cabinet(
             session=session,
             cabinet_id=cabinet_id,
@@ -360,12 +366,11 @@ async def __process_single_cabinet(
             )
             raise exc
 
-        _effective_count, _anchors, billables = await compute_cabinet_billable_units(
+        effective_count, _anchors, billables = await compute_cabinet_billable_units(
             cabinet_adv_settings,
             latch=leg_latch,
             utc_date=day,
         )
-        effective_count = _effective_count
 
         result["price_for_day"] = price_for_shop_for_day
         if price_for_shop_for_day <= 0:
@@ -428,11 +433,10 @@ async def __process_single_cabinet(
             if balance_after_charge < -max_allowed_negative:
                 # Превышен лимит минуса — деактивируем кампании, не списываем, не сбрасываем neg_at
                 grace_exceeded_cabinet_id = cabinet_id
+                # TODO(strategy-transition): Вынести переключение стратегий в общий хелпер!
                 for campaign in wb_cabinet.adv_settings:
                     if campaign.bot_active:
-                        campaign.bot_active = False
-                        campaign.auto_update_white_list = False
-                        campaign.auto_update_target_place = False
+                        apply_free_mode_transition(campaign, wb_cabinet)
             else:
                 # В пределах лимита: списание в минус
                 if getattr(wb_cabinet, "balance_went_negative_at", None) is None:
@@ -620,24 +624,24 @@ async def _process_payment_for_advs(
         logger.debug("Нет активных кабинетов с кампаниями (read-only выборка)")
         return
     logger.debug(f"К обработке кабинетов: {len(cabinet_ids)}")
-    tasks_list: list[Any] = []
+    coros: list[Coroutine[Any, Any, CabinetProcessResult]] = []
 
     for cabinet_id in cabinet_ids:
-        task = _process_single_cabinet(
-            cabinet_id=cabinet_id,
-            current_dt=current_dt,
-            pricer=pricer,
-            redis_manager=redis_manager,
-            skip_by_redis=skip_by_redis
+        coros.append(
+            _process_single_cabinet(
+                cabinet_id=cabinet_id,
+                current_dt=current_dt,
+                pricer=pricer,
+                redis_manager=redis_manager,
+                skip_by_redis=skip_by_redis,
+            )
         )
-        tasks_list.append(task)
-    gathered = await asyncio.gather(*tasks_list, return_exceptions=True)
-    results = cast(list[Any], list(gathered))
+    results = await asyncio.gather(*coros, return_exceptions=True)
     for res in results:
         if isinstance(res, BaseException):
             logger.error("Ошибка в обработке кабинета: %s", res, exc_info=True)
-        elif isinstance(res, dict):
-            payload = cast(dict[str, Any], res)
+        else:
+            payload: CabinetProcessResult = res
             logger.info(
                 "Cabinet %s: processed=%s, payment_successful=%s, reason=%s, campaigns=%s, price_for_day=%s",
                 payload.get("cabinet_id"),
@@ -647,5 +651,3 @@ async def _process_payment_for_advs(
                 payload.get("campaigns"),
                 payload.get("price_for_day"),
             )
-        else:
-            logger.error("Неожиданный результат обработки кабинета: %s", res)

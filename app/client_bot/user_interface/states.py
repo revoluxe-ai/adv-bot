@@ -63,6 +63,7 @@ class CPMSetting(StatesGroup):
     waiting_for_max_cpm = State()
     waiting_for_manual_cpm = State()
     waiting_for_max_position = State()
+    waiting_for_target_place_workbook = State()
 
 
 class AddBlackPhrasesTemplates(StatesGroup):
@@ -122,6 +123,24 @@ class AdminGrantGate(StatesGroup):
     """Админ: открыть гейт пользователю по Telegram ID."""
 
     waiting_telegram_id = State()
+
+
+class AdminResetUserAccess(StatesGroup):
+    """Админ: сбросить доступ пользователя по Telegram ID."""
+
+    waiting_telegram_id = State()
+
+
+class AdminPartnerPayout(StatesGroup):
+    """Админ: ввод суммы выплаты партнёру."""
+
+    waiting_amount = State()
+
+
+class AdminPartnerList(StatesGroup):
+    """РђРґРјРёРЅ: СЌРєСЂР°РЅ СЃРїРёСЃРєР° РїР°СЂС‚РЅС‘СЂРѕРІ, РѕР¶РёРґР°РЅРёРµ С„РёР»СЊС‚СЂР°."""
+
+    waiting_filter = State()
 
 
 class AdvExcelRoundtrip(StatesGroup):

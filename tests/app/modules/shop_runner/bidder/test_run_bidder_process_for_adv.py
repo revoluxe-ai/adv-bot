@@ -181,6 +181,63 @@ async def test_run_bidder_process_for_adv_injects_redis_caches(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_run_bidder_process_for_adv_bidder_for_auto_false_keeps_search_path(
+    monkeypatch,
+):
+    """bidder_for_auto gates only auto campaign CPM application to WB; search/manual stays on."""
+
+    class DummyAdvParameterManager:
+        async def get_min_cpm(self, _):
+            return 1
+
+    monkeypatch.setattr(bidder_func, "AdvParameterManager", DummyAdvParameterManager)
+    auction_adv = make_auction_adv(100, 444, 701)
+    best_keyword = make_keyword()
+    monkeypatch.setattr(
+        bidder_func,
+        "_update_and_get_advs_from_wb",
+        AsyncMock(return_value=[auction_adv]),
+    )
+    monkeypatch.setattr(
+        bidder_func.data_manager,
+        "get_best_keyword",
+        Mock(return_value=best_keyword),
+    )
+
+    adv_setting = SimpleNamespace(
+        adv_id=333,
+        bidder_for_auto=False,
+        search_adv_id=444,
+        max_cpm=150,
+        nmids=[701],
+        bidder_step=5,
+        max_place=10,
+        reset_place=False,
+        id=2,
+    )
+    wb_api = SimpleNamespace(
+        shop_id=55,
+        access=SimpleNamespace(wb_cabinet=SimpleNamespace(id=2000)),
+        update_cpm=AsyncMock(),
+    )
+    redis_last_views = SimpleNamespace(get=AsyncMock(return_value=None), set=AsyncMock())
+    stamp_cache = SimpleNamespace(get=AsyncMock(return_value=None), set=AsyncMock())
+
+    await run_bidder_process_for_adv(
+        adv_setting,
+        wb_api,
+        [best_keyword],
+        redis_last_total_views=redis_last_views,
+        last_keyword_stamp_timestamp_cache=stamp_cache,
+    )
+
+    wb_api.update_cpm.assert_awaited_once()
+    assert wb_api.update_cpm.await_args.args[0] == 444
+    redis_last_views.set.assert_awaited_once_with(best_keyword)
+    stamp_cache.set.assert_awaited_once_with(best_keyword)
+
+
+@pytest.mark.asyncio
 async def test_run_bidder_process_for_adv_applies_v3_cap(monkeypatch):
     monkeypatch.setattr(
         "app.core.di.databases.redis.RedisLifecycle.init",
@@ -363,7 +420,5 @@ async def test_run_bidder_process_for_adv_skips_when_cap_below_min(monkeypatch):
             app_container.redis_client_wrapper.reset_override()
             app_container.redis_client.reset_override()
             app_container.settings.reset_override()
-
-
 
 

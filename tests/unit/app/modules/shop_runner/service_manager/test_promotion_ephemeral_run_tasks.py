@@ -24,7 +24,8 @@ _PROMOTION_HEAVY_METHODS = (
     "adv_settings_auto_update",
     "update_minus_phrases_in_advs",
     "auto_budget_watchdog",
-    "update_individual_keyword_target_places",
+    # D3: update_individual_keyword_target_places is intentional v3-only no-op
+    # (no run_tasks); do not parametrize obsolete V2 KeywordTargetPlaceUpdater path.
     "auto_shelf_bid_increment_stats",
     "auto_shelf_bid_control",
 )

@@ -1,0 +1,15 @@
+{
+  "suite": "git-packaging-contract",
+  "version": 1,
+  "targets": [
+    ".cursor/commands/opsx-commit.md",
+    ".cursor/commands/opsx-create-pr.md",
+    ".cursor/pipeline/GRAPH.md"
+  ],
+  "unchanged_authority": [
+    ".cursor/commands/opsx-verify.md",
+    ".cursor/commands/opsx-archive.md",
+    ".cursor/commands/opsx-static-check.md"
+  ],
+  "runner": ".cursor/pipeline/control-plane-tests/run_git_packaging_contract_tests.py"
+}

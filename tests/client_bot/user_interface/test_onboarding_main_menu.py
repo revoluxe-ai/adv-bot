@@ -1,4 +1,6 @@
-"""Unit tests for MainMenu and get_main_menu_keyboard."""
+"""Unit tests for MainMenu and onboarding keyboards."""
+
+from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
@@ -9,73 +11,112 @@ from app.client_bot.user_interface.handlers.shop_choice_message import (
     get_main_menu_keyboard,
 )
 from app.client_bot.user_interface.views import callbacks
+from app.client_bot.user_interface.views.callbacks import Gate
 from app.modules.cabinet_bonus_manager.callbacks import AdminPanel
+from tests.helpers.telegram_message_asserts import (
+    assert_html_is_telegram_safe,
+    assert_keyboard_has_buttons,
+    assert_message_contains_required_phrases,
+    assert_message_within_telegram_limit,
+    assert_no_raw_technical_text,
+)
 
 
 def test_main_menu_text_contains_key_phrases() -> None:
-    """MainMenu.text returns text from get_main_text, contains key phrases."""
+    """MainMenu.text returns user-facing onboarding copy."""
     menu = MainMenu(bot=None, chat_id=12345, full_client_ui=True)  # type: ignore[arg-type]
     text = menu.text
+    assert_message_within_telegram_limit(text)
+    assert_html_is_telegram_safe(text)
+    assert_message_contains_required_phrases(
+        text,
+        [
+            "Telegram ID",
+            "Wildberries",
+            "Начните с раздела",
+            "Мои магазины",
+            "подключите токен",
+            "выберите рекламную кампанию",
+        ],
+    )
     assert "Экономическое управление" in text
-    assert "Wildberries" in text
+    assert_no_raw_technical_text(text)
+
+
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 def test_get_main_menu_keyboard_regular_user_three_buttons(mock_settings) -> None:
-    """Обычный пользователь: Мои магазины, Мой баланс, Показать инвайт."""
+    """Regular user with invite_gate on sees shops, balance, and invite."""
     mock_settings.presentation_only = False
     mock_settings.invite_gate = True
-    user_id = 999999  # Not in ADMINS
-    kb = get_main_menu_keyboard(user_id, full_client_ui=True)
+    kb = get_main_menu_keyboard(999999, full_client_ui=True)
+    assert_keyboard_has_buttons(kb, ["Мои магазины", "Мой баланс", "Показать инвайт"])
     rows = kb.inline_keyboard
     assert len(rows) == 3
-    assert rows[0][0].text == "Мои магазины"
     assert rows[0][0].callback_data == callbacks.ShowShopsList().pack()
-    assert rows[1][0].text == "Мой баланс"
     assert rows[1][0].callback_data == callbacks.UserBalanceMenu().pack()
-    assert rows[2][0].text == "Показать инвайт"
     assert rows[2][0].callback_data == callbacks.InviteShow().pack()
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-def test_get_main_menu_keyboard_invite_visible_when_invite_gate_off(mock_settings) -> None:
-    """INVITE_GATE=false не скрывает кнопку «Показать инвайт» на полном меню."""
+def test_get_main_menu_keyboard_hides_invite_when_invite_gate_off(mock_settings) -> None:
+    """INVITE_GATE=false hides partner-invite button in the full menu."""
     mock_settings.presentation_only = False
     mock_settings.invite_gate = False
     kb = get_main_menu_keyboard(999999, full_client_ui=True)
-    rows = kb.inline_keyboard
-    assert len(rows) == 3
-    assert rows[2][0].text == "Показать инвайт"
-
+    assert_keyboard_has_buttons(kb, ["Мои магазины", "Мой баланс"])
+    texts = [btn.text for row in kb.inline_keyboard for btn in row]
+    assert "Показать инвайт" not in texts
+    assert len(kb.inline_keyboard) == 2
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
 @patch("app.client_bot.admin_access.const.ADMINS", [123])
 def test_get_main_menu_keyboard_admin_four_buttons(mock_settings) -> None:
-    """Админ: Панель, Мои магазины, Мой баланс, Показать инвайт."""
+    """Admin sees panel, shops, balance, and invite buttons."""
     mock_settings.presentation_only = False
     mock_settings.invite_gate = True
-    user_id = 123
-    kb = get_main_menu_keyboard(user_id, full_client_ui=True)
+    kb = get_main_menu_keyboard(123, full_client_ui=True)
+    assert_keyboard_has_buttons(
+        kb,
+        ["Панель администратора", "Мои магазины", "Мой баланс", "Показать инвайт"],
+    )
     rows = kb.inline_keyboard
     assert len(rows) == 4
-    assert rows[0][0].text == "Панель администратора"
     assert rows[0][0].callback_data == AdminPanel(action="menu").pack()
-    assert rows[1][0].text == "Мои магазины"
-    assert rows[2][0].text == "Мой баланс"
-    assert rows[3][0].text == "Показать инвайт"
 
 
 @pytest.mark.asyncio
 async def test_main_menu_calls_bot_send_message() -> None:
-    """MainMenu(bot, chat_id)() calls bot.send_message with text, reply_markup, parse_mode=HTML."""
+    """MainMenu(bot, chat_id)() calls bot.send_message with HTML text and keyboard."""
     bot = AsyncMock()
-    chat_id = 12345
-    menu = MainMenu(bot, chat_id, full_client_ui=True)
+    menu = MainMenu(bot, 12345, full_client_ui=True)
     await menu()
     bot.send_message.assert_awaited_once()
-    call_kw = bot.send_message.call_args[1]
-    assert call_kw["chat_id"] == chat_id
-    assert "Экономическое управление" in call_kw["text"]
-    assert "Wildberries" in call_kw["text"]
-    assert call_kw["reply_markup"] is not None
-    assert call_kw["parse_mode"] == "HTML"
+    kwargs = bot.send_message.call_args.kwargs
+    text = kwargs["text"]
+    assert_message_within_telegram_limit(text)
+    assert_html_is_telegram_safe(text)
+    assert_message_contains_required_phrases(
+        text,
+        ["Telegram ID", "Wildberries", "Начните с раздела", "Мои магазины"],
+    )
+    assert kwargs["reply_markup"] is not None
+    assert kwargs["parse_mode"] == "HTML"
+
+
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
+def test_get_main_menu_keyboard_legacy_minimal_branch_shows_invite_entry(
+    mock_settings,
+) -> None:
+    """Legacy helper: presentation_only + full_client_ui=False → invite-only kb.
+
+    Primary /start path no longer uses this branch
+    (``use_minimal_presentation_ui`` is always False).
+    """
+    mock_settings.presentation_only = True
+    kb = get_main_menu_keyboard(999999, full_client_ui=False)
+    assert_keyboard_has_buttons(kb, ["Ввести инвайт"])
+    rows = kb.inline_keyboard
+    assert len(rows) == 1
+    assert rows[0][0].callback_data == Gate(action="invite_enter").pack()

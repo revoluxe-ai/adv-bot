@@ -130,7 +130,7 @@ async def test_create_complex_advs_upsert_logic(
             assert adv_from_db.active_status == "created_by_bot"
             assert adv_from_db.wb_cabinet.id == access_mock.wb_cabinet.id
             # Проверяем, что дефолтные настройки были применены
-            assert adv_from_db.bidder_active is True
+            assert adv_from_db.bidder_active is False
             assert adv_from_db.max_place == 1
 
             # # 2. Имитируем ситуацию, когда фоновый процесс уже добавил запись

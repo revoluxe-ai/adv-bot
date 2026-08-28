@@ -12,7 +12,10 @@
 from __future__ import annotations
 
 from app.modules.common_slaves.wildberries.models import KeywordSetting
-from app.modules.common_slaves.wildberries.models.enums import KeywordStrategyMode
+from app.modules.common_slaves.wildberries.models.enums import (
+    KeywordStrategyMode,
+    campaign_strategy_to_keyword_strategy_mode,
+)
 from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 
 _HARD_STATUS_BLACK_LIST = 0
@@ -31,16 +34,7 @@ def keyword_strategy_mode_for_adv_strategy(
     adv_strategy: Strategy | str | None,
 ) -> KeywordStrategyMode:
     """Активный ``strategy_mode`` при входе в БС/фикс.фразы по стратегии РК."""
-    if adv_strategy is None:
-        return KeywordStrategyMode.MIN_CPA
-    normalized = (
-        adv_strategy
-        if isinstance(adv_strategy, Strategy)
-        else Strategy(str(adv_strategy))
-    )
-    if normalized == Strategy.MAX_CONV:
-        return KeywordStrategyMode.MAX_CONVERSION
-    return KeywordStrategyMode.MIN_CPA
+    return campaign_strategy_to_keyword_strategy_mode(adv_strategy)
 
 
 def strategy_mode_for_hard_status_write_v3(

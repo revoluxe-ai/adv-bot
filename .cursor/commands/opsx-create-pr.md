@@ -1,34 +1,264 @@
 # /opsx-create-pr
 
-Create a GitHub pull request with a Russian PR title and body.
+Create a GitHub pull request — **publication and review container only**.
+This command does **not** own product quality verification and does **not**
+authorize merge/integration.
 
-This is a local WB Sky OpenSpec workflow command.
-It is not an upstream OpenSpec command.
+## Architectural invariant (mandatory)
+
+```text
+PR creation MUST NOT be blocked by absence, staleness, or failure of product
+verification.
+
+Allowed: create PR when verification=PENDING | FAIL | ABSENT.
+Forbidden: require verify PASS, static-check receipt, tests/build/browser/
+security/scenario PASS; requiring ledger COMPLETE; or archive readiness as a PR
+precondition.
+```
+
+Merge/integration gates remain on `/opsx-verify`, `/opsx-archive`, CI, and
+human merge approval — not here.
 
 ## Policy source
 
-Before preparing or creating the PR, inspect and follow:
+Before preparing or creating the PR, inspect when present:
 
 - `openspec/policies/pr-context.md`
 
-Read that exact path directly (`.cursor/commands/opsx-source-resolution.md`). Do not search the repo to rediscover the policy when the path is known.
-If this policy file exists, treat it as the source of truth for PR context rules.
-
-If this command and the policy conflict:
-
-- follow `openspec/policies/pr-context.md`;
-- mention the conflict;
-- stop before creating the PR.
+Read via `.cursor/commands/opsx-source-resolution.md`. Policy wins on conflict;
+stop before PR if policy blocks publication for non-verification reasons.
 
 ## Purpose
 
+Create a GitHub PR from the current branch:
+
+- validate source/target branches and remote mechanics;
+- push branch when `GO` is present (existing explicit contract);
+- build Russian title/body from task intent and diff;
+- return PR URL/identity;
+- reference OpenSpec change/commits when available.
+
+The PR explains the task — it does **not** certify quality or merge readiness.
+
+## Verification boundary (mandatory)
+
+This command **must not**:
+
+- running or requiring `/opsx-static-check`, pytest, build, browser, security,
+  scenario coverage, or `/opsx-verify`;
+- requiring `PROJECT_BUG_HUNT_RECEIPT`, verification ledger, or archive PASS;
+- blocking PR because verification is PENDING/FAIL/ABSENT.
+
+Optional non-blocking PR body content:
+
+- Owner-supplied test commands/results;
+- `VERIFICATION: not evaluated by /opsx-create-pr`;
+- links to existing artifacts — never invent PASS.
+
+## Language
+
+- PR title MUST be in Russian.
+- PR body MUST be in Russian.
+- Technical names, paths, branch names, commands, and change IDs may stay English.
+
+## Required input
+
+The user MUST provide:
+
+- `Target/base branch`;
+- `Task`.
+
+The user MAY provide: `User PR context`, reviewer focus, OpenSpec change-id,
+known risks, what must not change, related issue.
+
+## Target branch rule
+
+PR MUST have an explicitly provided target/base branch.
+
+If missing, stop and ask:
+
+```text
+На какую target/base branch открыть PR?
+```
+
+Do not infer from `main`, `master`, current branch, memory, or repo default.
+
+## GO rule
+
+Push/create PR **only** when user input contains exact token `GO`.
+
+Without `GO`: read-only plan — title, body, branch facts — no push, no PR, no
+file edits.
+
+## User PR context handling
+
+1. Inspect commits and diff against target/base branch.
+2. Compare `User PR context` with actual diff.
+3. Build title/body from intent + diff + OpenSpec context.
+
+If context conflicts with diff → stop and ask Owner before PR creation.
+
+Do not create a generic PR when author intent is unclear.
+
+## Hard stop conditions (publication safety only)
+
+Stop before PR creation if:
+
+- target/base branch is missing;
+- current branch is unknown;
+- current branch is `main`, `master`, `stage`, `prod`, or `production`;
+- working tree has uncommitted changes (unless explicit contract allows otherwise);
+- remote is not configured;
+- `gh` CLI unavailable or not authenticated;
+- target branch does not exist on origin;
+- no commits ahead of target/base branch;
+- open PR already exists for current branch;
+- PR title/body would be generic or meaningless;
+- `GO` is absent.
+
+**Not** hard stops: verification PENDING/FAIL/ABSENT, missing static-check
+receipt, missing bug-hunt receipt, incomplete verification ledger.
+
+## Required read-only checks before PR
+
+Follow `.cursor/commands/opsx-execution-preflight.md`.
+
+```bash
+git branch --show-current
+git status --short
+git remote -v
+git log --oneline -10
+git fetch --all --prune
+git rev-parse --verify origin/<TARGET_BRANCH>
+git diff --stat origin/<TARGET_BRANCH>...HEAD
+git diff --name-only origin/<TARGET_BRANCH>...HEAD
+git log --oneline origin/<TARGET_BRANCH>..HEAD
+gh pr list --head "$(git branch --show-current)" --state open
+gh auth status
+```
+
+## PR title rules
+
+Describe behavior or intent, not files.
+
+## PR body template
+
+```md
+## Цель
+
+[Ожидаемое поведение после merge.]
+
+## Контекст от автора
+
+[User PR context или «Не указан».]
+
+## Почему это нужно
+
+[Проблема / требование.]
+
+## Что изменено
+
+- …
+
+## Как это работает после изменения
+
+[Краткий flow.]
+
+## Что не должно измениться
+
+- …
+
+## Риски
+
+- …
+
+## Что проверить reviewer / Bugbot
+
+- [Конкретные residual-риски для human/CI review — не quality gate этой команды]
+
+## Проверки (информационно)
+
+VERIFICATION: not evaluated by /opsx-create-pr
+
+[Опционально: Owner-supplied команды/результаты без ложного PASS.]
+
+## OpenSpec
+
+- Change: [change-id или «нет»]
+- Specs/tasks: [путь или «нет»]
+
+## Статус интеграции
+
+PR creation ≠ merge authorization. Integration gates: /opsx-verify, CI, Owner merge.
+```
+
+## Bugbot/reviewer focus
+
+Section `## Что проверить reviewer / Bugbot` must be specific when Owner
+provided focus or diff implies concrete risks. This is guidance for reviewers,
+not a command-owned quality gate.
+
+## PR creation flow
+
+**Without `GO`:** validate inputs → read-only checks → title/body plan → wait.
+
+**With `GO`:** validate → read-only checks → confirm title/body → write body
+file → `git push -u origin <branch>` → `gh pr create`.
+
+## Commands after explicit GO only
+
+```bash
+CURRENT_BRANCH="$(git branch --show-current)"
+
+cat > /tmp/pr_body.md <<'EOF'
+<FINAL_PR_BODY>
+EOF
+
+git push -u origin "$CURRENT_BRANCH"
+
+gh pr create \
+  --base "<TARGET_BRANCH>" \
+  --head "$CURRENT_BRANCH" \
+  --title "<PR_TITLE>" \
+  --body-file /tmp/pr_body.md
+```
+
+Do not push or `gh pr create` before `GO`. No force-push unless Owner
+explicitly authorizes.
+
+## Output format before GO
+
+1. Target/base branch
+2. Current/head branch
+3. Commits to include
+4. Changed files
+5. User PR context
+6. Diff/context conflicts
+7. PR title
+8. PR body
+9. Waiting for GO
+
+## Output format after PR creation
+
+1. PR URL
+2. Target/base branch
+3. Head branch
+4. PR title
+5. Next recommended action (optional `/opsx-verify`, `/opsx-project-bug-hunt`,
+   `/opsx-static-check` — **not** prerequisites for this PR)Create a GitHub pull request with a Russian PR title and body.
+This is a local WB Sky OpenSpec workflow command.
+It is not an upstream OpenSpec command.
+Before preparing or creating the PR, inspect and follow:
+Read that exact path directly (`.cursor/commands/opsx-source-resolution.md`). Do not search the repo to rediscover the policy when the path is known.
+If this policy file exists, treat it as the source of truth for PR context rules.
+If this command and the policy conflict:
+- follow `openspec/policies/pr-context.md`;
+- mention the conflict;
+- stop before creating the PR.
 Create a GitHub PR from the current branch, or **update** an existing open PR
 for the same head when one already exists.
-
 No extra token is required for update: the same `GO` covers CREATE and UPDATE.
-
 The PR must explain the task, not just the diff:
-
 - what the user wanted to achieve;
 - why the change is needed;
 - what changed;
@@ -36,15 +266,11 @@ The PR must explain the task, not just the diff:
 - what must not change;
 - what Bugbot/reviewer should inspect (**residual** only — see project hunt gate);
 - how the change was verified.
-
 ## Project bug-hunt gate (pre-Bugbot)
-
 External Bugbot is a **residual** safety net. Primary discovery for product /
 behavioral diffs belongs to `/opsx-project-bug-hunt`.
-
 Before preparing or creating a PR that changes product/runtime behavior
 (not pure docs/process-only):
-
 1. Prefer a same-chat or pasted `PROJECT_BUG_HUNT_RECEIPT` from
    `/opsx-project-bug-hunt` for this `base..head` (target/base = PR base,
    head = current branch tip).
@@ -60,24 +286,10 @@ Before preparing or creating a PR that changes product/runtime behavior
 4. In `## Что проверить Bugbot / reviewer`, list only **residual** risks the
    project hunt marked unclear / low-risk / out-of-budget — not a full first-pass
    audit dump.
-
-## Language
-
-- PR title MUST be in Russian.
-- PR body MUST be in Russian.
 - Technical names, file paths, branch names, commands, test names, enum names, and OpenSpec change IDs may stay in English.
 - Avoid vague phrases.
 - Do not write a PR that only lists changed files.
-
-## Required input
-
-The user MUST provide:
-
-- `Target/base branch`;
-- `Task`.
-
 The user MAY provide:
-
 - `User PR context`;
 - `Bugbot/reviewer focus`;
 - `OpenSpec change-id`;
@@ -85,61 +297,31 @@ The user MAY provide:
 - `Known risks`;
 - `What must not change`;
 - related issue/task.
-
-## Target branch rule
-
 A PR MUST have an explicitly provided target/base branch.
-
 If target/base branch is missing, stop and ask exactly:
-
-```text
-На какую target/base branch открыть PR?
-```
-
 Do not infer target branch from:
-
 - `main`;
 - `master`;
 - current branch;
 - previous PRs;
 - memory;
 - repository default branch.
-
-## GO rule
-
 Creating or updating a PR requires explicit user confirmation.
-
 The PR may be pushed / created / updated ONLY if the current user message
 contains the exact token:
-
-```text
 GO
-```
-
 No separate `UPDATE_PR` (or similar) token is required. `GO` alone selects
 CREATE or UPDATE from the open-PR check.
-
 If `GO` is absent:
-
 - do not push;
 - do not create or update a PR;
 - do not modify files;
 - output only the proposed PR plan, title, and body (including MODE).
-
-## User PR context handling
-
 The user may provide:
-
-```text
 User PR context:
 [author explanation]
-```
-
 Use this as high-priority intent context.
-
 Before preparing the PR:
-
-1. Inspect commits and diff against target/base branch.
 2. Compare `User PR context` with actual commits and diff.
 3. Build the Russian PR title from:
    - user intent;
@@ -151,210 +333,100 @@ Before preparing the PR:
    - why it matters;
    - how the behavior should work;
    - what Bugbot/reviewer must check.
-
 If `User PR context` conflicts with actual diff:
-
 - stop;
 - explain the conflict;
 - ask the user what to do before PR creation.
-
 Do not create PR if author intent is unclear and PR body would become generic.
-
 ## CREATE vs UPDATE mode
-
 After the open-PR JSON check (must include `baseRefName`; see Required
 read-only checks):
-
 Resolve MODE by comparing each open PR's `baseRefName` to the requested
 `<TARGET_BRANCH>` with an exact string match (as returned by `gh`).
-
 | Open PRs for head | MODE | On `GO` |
 |---|---|---|
 | none | `CREATE_PR` | `git push` + `gh pr create` |
 | exactly one, and its `baseRefName` == requested target/base | `UPDATE_PR` | `git push` + `gh pr edit` (title/body); **never** `gh pr create` |
 | exactly one, but `baseRefName` ≠ requested target/base | STOP | explain base mismatch; do not push/create/edit |
 | more than one | STOP | explain ambiguity; do not push/create/edit |
-
 Do **not** resolve MODE from default table `gh pr list` output — it omits
 base and cannot detect mismatch.
-
 An existing open PR is **not** a hard stop when MODE resolves to `UPDATE_PR`.
-
 ## Hard stop conditions
-
 Stop before PR create/update if:
-
-- target/base branch is missing;
-- current branch is unknown;
-- current branch is `main`, `master`, `stage`, `prod`, or `production`;
 - working tree has uncommitted changes;
-- remote is not configured;
 - `gh` CLI is unavailable;
 - `gh` is not authenticated;
-- target branch does not exist on origin;
 - no commits exist ahead of target/base branch;
 - open-PR check yields base mismatch or more than one open PR for head;
-- PR title/body would be generic or meaningless;
 - `GO` is absent;
 - working tree has unmerged paths (`UU` / `AA` / …) or merge|rebase is in
   progress — especially on process surfaces
   (`.cursor/commands/**`, rules, skills, mirrors, …):
   set `NEXT_ACTION: /opsx-admin-command-resolve-conflicts` and do not open a PR.
-
-## Required read-only checks before PR
-
-Follow `.cursor/commands/opsx-execution-preflight.md`.
-
 Git ops below are typically **REQUIRED_FOR** PR creation. Still apply TIME_BUDGET and FAILURE_BEHAVIOR; never hang silently.
-
-```text
 TIME_BUDGET: branch/status 5s/10s; log 10s; fetch 30s; diff/log vs target 15s; gh 20s
 FAILURE_BEHAVIOR: blocked_preflight_timeout or stop with named missing fact; no retry loop
-```
-
 Preferred order — local facts first; remote only when needed:
-
-```bash
-git branch --show-current
-git status --short
-git remote -v
-git log --oneline -10
-```
-
 Check target branch (REQUIRED_FOR base validation):
-
-```bash
-git fetch --all --prune
-git rev-parse --verify origin/<TARGET_BRANCH>
-```
-
 Inspect diff and commits:
-
-```bash
-git diff --stat origin/<TARGET_BRANCH>...HEAD
-git diff --name-only origin/<TARGET_BRANCH>...HEAD
-git log --oneline origin/<TARGET_BRANCH>..HEAD
-```
-
 Check existing PR (REQUIRED_FOR CREATE vs UPDATE / base mismatch STOP).
 Must request `baseRefName` — default table output is not enough:
-
-```bash
 gh pr list --head "$(git branch --show-current)" --state open \
   --json number,url,title,baseRefName,headRefName
-```
-
 Check GitHub auth:
-
-```bash
-gh auth status
-```
-
 Skip or defer any step whose result is already known from a fresh prior receipt in the same invocation.
-## PR title rules
-
 Title must describe behavior or intent, not files.
-
 Good examples:
-
 - `Fix: лендинг paid больше не меняет bot_active кампании`
 - `Tests: добавлена регрессия для inactive campaign gate`
 - `Feature: добавлена проверка invite-доступа перед paid flow`
 - `Refactor: упрощена навигация paid landing без изменения поведения`
-
 Bad examples:
-
 - `Fix tests`
 - `Update handlers`
 - `Changes`
 - `PR`
 - `Refactor code`
-
-## PR body template
-
 Use this template for the PR body:
-
-```md
-## Цель
-
 [Какое поведение или результат должен появиться после merge.]
-
-## Контекст от автора
-
 [Если пользователь дал User PR context — кратко и точно перенести его сюда. Если не дал — написать "Не указан".]
-
-## Почему это нужно
-
 [Какая проблема была: баг, риск регрессии, недостающая проверка, изменение требования.]
-
-## Что изменено
-
 - [Пункт 1]
 - [Пункт 2]
 - [Пункт 3]
-
-## Как это работает после изменения
-
 [Кратко объяснить новый или исправленный flow.]
-
-## Что не должно измениться
-
 - [Инвариант 1]
 - [Инвариант 2]
 - [Существующий flow, который нельзя сломать]
-
-## Риски
-
 - [Риск 1]
 - [Риск 2]
-
 Если тесты не запускались или риск не проверен — написать прямо.
-
 ## Что проверить Bugbot / reviewer
-
 - [Конкретный риск для проверки]
 - [Hidden side effect]
 - [Paid/free boundary, campaign state, async, DB, Redis, ClickHouse, callbacks, если затронуто]
-
 ## Тесты и проверки
-
-```bash
 [команда 1]
 [команда 2]
-```
-
 Результат:
-
 - [passed / failed / not run с причиной]
-
-## OpenSpec
-
 - Change: [change-id или "нет"]
 - Specs/tasks: [путь или "нет"]
-```
-
 ## Bugbot/reviewer focus rule
-
 The section `## Что проверить Bugbot / reviewer` MUST be specific.
-
 Bad:
-
 - `Проверь код`
 - `Посмотри PR`
 - `Проверь тесты`
-
 Good:
-
 - `Проверь, что paid landing не меняет campaign.bot_active.`
 - `Проверь, что free flow не получает доступ к paid automation.`
 - `Проверь, что тест не мокает away реальный inactive gate.`
 - `Проверь, что SQLAlchemy query не меняет cardinality и не грузит лишние relationships.`
 - `Проверь, что callback flow не ломает старую навигацию.`
-
 ## PR create-or-update flow
-
 If `GO` is absent:
-
 1. Validate that target/base branch was explicitly provided.
 2. Run read-only checks (including open-PR list).
 3. Resolve MODE (`CREATE_PR` | `UPDATE_PR` | STOP).
@@ -364,9 +436,7 @@ If `GO` is absent:
 7. Build Russian PR body.
 8. Output the final MODE, title/body (and existing PR #/URL if UPDATE).
 9. Stop and wait for `GO`.
-
 If `GO` is present:
-
 1. Validate that target/base branch was explicitly provided.
 2. Enforce **Project bug-hunt gate** (receipt or
    `OVERRIDE_SKIP_PROJECT_BUG_HUNT` or process/docs-only exception).
@@ -378,79 +448,34 @@ If `GO` is present:
    If MODE is `UPDATE_PR`: update with `gh pr edit` (no `gh pr create`).
 8. Run **Post-PR Bugbot report** (below) unless noted escapes.
 9. Emit final output including dual-channel `BUGBOT_POST_PR`.
-
-## Commands after explicit GO only
-
 After user says `GO`, run one MODE recipe end-to-end. Both recipes write the
 same body file path (`/tmp/pr_body.md`) that `gh` then reads.
-
 CREATE (`MODE=CREATE_PR`):
-
-```bash
-CURRENT_BRANCH="$(git branch --show-current)"
-
-cat > /tmp/pr_body.md <<'EOF'
-<FINAL_PR_BODY>
-EOF
-
-git push -u origin "$CURRENT_BRANCH"
-
-gh pr create \
-  --base "<TARGET_BRANCH>" \
   --head "<CURRENT_BRANCH>" \
-  --title "<PR_TITLE>" \
-  --body-file /tmp/pr_body.md
-```
-
 UPDATE (`MODE=UPDATE_PR` — exactly one open PR, base matches target):
-
-```bash
-CURRENT_BRANCH="$(git branch --show-current)"
-
-cat > /tmp/pr_body.md <<'EOF'
-<FINAL_PR_BODY>
-EOF
-
-git push -u origin "$CURRENT_BRANCH"
-
 gh pr edit <EXISTING_PR_NUMBER> \
-  --title "<PR_TITLE>" \
-  --body-file /tmp/pr_body.md
-```
-
 Do not run `git push`, `gh pr create`, or `gh pr edit` before explicit `GO`.
-
 ## Post-PR Bugbot report (mandatory after successful create or update)
-
 Runs after a successful PR publish that yields a PR URL/number in either MODE:
 - `CREATE_PR` — after successful `gh pr create`;
 - `UPDATE_PR` — after successful `git push` + `gh pr edit` on the existing PR.
-
 Does **not** replace `/opsx-project-bug-hunt` (pre-PR primary). Does **not**
 auto-fix findings.
-
 Two **different channels** must not be collapsed into one silent zero:
-
 | Channel | What it is |
 |---|---|
 | `cursor_task` | One in-chat Cursor Task (`subagent_type: bugbot`) on branch diff vs PR base |
 | `github_cursor_bot` | Review/issue comments posted on the PR by GitHub user `cursor[bot]` |
-
 `cursor_task` alone is **not** authority that GitHub Bugbot is empty.
 A thin chat reply «Bugbot found no bugs» while PR UI shows findings is a
 contract failure of the report shape — fix the report, do not tell Owner
 «0 findings» without a `github_cursor_bot` status.
-
 Does **not** treat unbounded waiting on GitHub CI as a substitute for
 `cursor_task`. Bounded fetch of already-posted `cursor[bot]` comments is
 required (see below).
-
 ### Escape: `SKIP_BUGBOT_POST_PR`
-
 If user `GO` message contains the exact token `SKIP_BUGBOT_POST_PR`,
 skip the Cursor Task **and** skip GitHub fetch; emit:
-
-```text
 BUGBOT_POST_PR:
 - cursor_task:
   - invoked: no
@@ -462,22 +487,15 @@ BUGBOT_POST_PR:
   - status: skipped
   - findings_count: n/a
   - skip_reason: SKIP_BUGBOT_POST_PR
-```
-
 ### Otherwise (default)
-
 1. Launch **exactly one** Task with:
    - `subagent_type: bugbot`
    - `description: "Bugbot"`
    - `run_in_background: false`
    - prompt shape (Cursor `review-bugbot` skill contract):
-
-```text
 Full Repository Path: <absolute workspace / repo root>
 Diff: branch changes
 Base Branch: <PR target/base branch>
-```
-
 2. Retry policy: follow `review-bugbot` (one retry on bad invocation; one
    natural-language Diff fallback only if diff could not be computed; then stop).
 3. Classify `cursor_task.findings_envelope`:
@@ -499,8 +517,6 @@ Base Branch: <PR target/base branch>
      - `unavailable` — `gh`/API error or auth gap (record short `error`);
      - `skipped` — only with `SKIP_BUGBOT_POST_PR`.
 5. Emit in the create-pr reply (before product-fix handoffs):
-
-```text
 BUGBOT_POST_PR:
 - cursor_task:
   - invoked: yes
@@ -514,22 +530,15 @@ BUGBOT_POST_PR:
   - findings_count: <N or n/a>
   - findings: none | <markdown table Severity | Location | Finding>
   - error: <short blocker if unavailable; else omit>
-```
-
 Priority of the report for the owner:
-
 1. Were **both** channels reported? (`cursor_task` + `github_cursor_bot`)
 2. Did Cursor Task run? (`cursor_task.invoked` / `ran` / `findings_envelope`)
 3. What does GitHub `cursor[bot]` show? (`github_cursor_bot.status` / count)
 4. Tables for whichever channel has findings — do not invent rows.
-
 Do not invent findings. Do not open a second Bugbot Task in the same create-pr
 turn after a completed `cursor_task` report. Do not claim «0 Bugbot findings»
 when `github_cursor_bot.status=pending` or `unavailable`, or when
 `cursor_task.findings_envelope=incomplete` and GitHub was not fetched.
-
-## Output format before GO
-
 1. MODE: CREATE_PR | UPDATE_PR | STOP
 2. Existing PR (if UPDATE): number + URL
 3. Target/base branch:
@@ -543,9 +552,7 @@ when `github_cursor_bot.status=pending` or `unavailable`, or when
 11. Tests:
 12. Risks:
 13. Waiting for GO:
-
 ## Output format after PR create/update
-
 1. PR created: | PR updated:
 2. Target/base branch:
 3. Head branch:

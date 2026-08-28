@@ -1,5 +1,28 @@
 {
-  "schema": "opsx-resolve-conflict/package-manifest/v1",
+  "package_id": "OPSX_RESOLVE_CONFLICT_RUNTIME_V1",
+  "version": "1.0.0",
+  "command_version": "1.0.0",
+  "contract_schema_version": "opsx-resolve-conflict/v3",
+  "runtime_entry": "runtime/boot_opsx_conflict.py",
+  "schemas": [
+    "schemas/conflict-manifest.schema.json",
+    "schemas/resolution-ledger.schema.json"
+  ],
+  "modules": [
+    "runtime/opsx_conflict/__init__.py",
+    "runtime/opsx_conflict/models.py",
+    "runtime/opsx_conflict/git_capture.py",
+    "runtime/opsx_conflict/partition.py",
+    "runtime/opsx_conflict/cluster.py",
+    "runtime/opsx_conflict/classify.py",
+    "runtime/opsx_conflict/resolve_text.py",
+    "runtime/opsx_conflict/ledger.py",
+    "runtime/opsx_conflict/verify.py",
+    "runtime/opsx_conflict/process_policy.py",
+    "runtime/opsx_conflict/pipeline.py",
+    "runtime/opsx_conflict/__main__.py"
+  ]
+}}  "schema": "opsx-resolve-conflict/package-manifest/v1",
   "package_name": "OPSX_RESOLVE_CONFLICT_COMMAND_001_R40",
   "command_id": "opsx-resolve-conflict",
   "package_version": "0.40.0",
@@ -41,7 +64,6 @@
       "0.30.0",
       "0.31.0",
       "0.32.0"
-    ],
     "verdict": "REVISION_REQUIRED"
   },
   "source_branch_compare": {
@@ -59,7 +81,6 @@
     "Git executable",
     "Poetry executable for mandatory Wave A/B validation",
     "digest-bound external OS sandbox runner"
-  ],
   "required_repo_paths": [
     ".cursor/commands/opsx-execution-preflight.md",
     ".cursor/commands/opsx-resolve-conflict.md",
@@ -84,12 +105,10 @@
     "openspec/config.yaml",
     "openspec/decisions/index.md",
     "openspec/policies/VERIFY_POLICY.md"
-  ],
   "input_categories": {
     "package_owned_required": [
       ".cursor/commands/opsx-resolve-conflict.md",
       ".cursor/opsx-resolve-conflict/process_surfaces.json"
-    ],
     "host_frozen_contracts": [
       ".cursor/commands/opsx-source-resolution.md",
       ".cursor/commands/opsx-execution-preflight.md",
@@ -112,12 +131,10 @@
       ".cursor/opsx-review-commands",
       ".github/copilot-instructions.md",
       ".github/git-commit-instructions.md"
-    ],
     "runtime_repository_input_kinds": [
       "active Git operation objects",
       "openspec/changes/<change>/conflict-authority.json",
       "authority files explicitly listed by conflict-authority.json"
-    ]
   },
   "entrypoints": {
     "command": ".cursor/commands/opsx-resolve-conflict.md",
@@ -133,7 +150,6 @@
     "live PG/CH and production-bound checks stop when mandatory",
     "no claim of opsx verify or archive readiness",
     "0.5.0 through 0.11.0 REJECTED \u2014 do not use"
-  ],
   "file_sha256": {
     "runtime/opsx_conflict/__init__.py": "f1c3b430dc6bb4a61ee83ac600a7e5a38fb53dcdda124533529587e47bcb112f",
     "runtime/opsx_conflict/__main__.py": "51f8e7085b717a1ba7cd099474919aec6dee197e45d05917d136138f05541fcb",
@@ -204,8 +220,6 @@
       "package_path": "runtime/opsx_conflict/sandbox_runner.py",
       "enforcement_level": "BEST_EFFORT",
       "note": "Packaged runner is path-confinement only. GO requires an independently supplied OS_VERIFIED runner (BLOCKER_OS_SANDBOX_RUNNER_MISSING)."
-    }
-  ],
   "go_capability": false,
   "limitations": [
     "consumer-side trust enforcement implemented",
@@ -214,7 +228,6 @@
     "BLOCKER_AUTHORITY_PRODUCER_MISSING",
     "BLOCKER_OS_SANDBOX_RUNNER_MISSING",
     "ADR-OPSX-RC-PLATFORM-001 APPROVE_WINDOWS_ONLY"
-  ],
   "safe_usage_scope": "PREVIEW_ONLY",
   "origin_source_commit": "2f13557d799438ef4cd5104d29eef8de2c72d57b",
   "host_contract_snapshot_commit": "78aa902fc961a7244f75e557a58b864d142fa47c",
@@ -224,6 +237,3 @@
       ".cursor/static-check/checks/mypy/execution.json",
       ".cursor/static-check/checks/pytest-unit/execution.json",
       ".cursor/static-check/checks/pytest-full/execution.json"
-    ]
-  }
-}

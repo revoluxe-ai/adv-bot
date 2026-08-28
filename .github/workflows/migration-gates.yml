@@ -75,8 +75,45 @@ jobs:
           # shellcheck disable=SC1091
           source .github/ci/migration-ephemeral.env
           set +a
+          BASELINE_REV=8c541a39b7e2
+          HEAD=$(poetry run python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+
+          script = ScriptDirectory.from_config(Config("alembic.ini"))
+          heads = script.get_heads()
+          if len(heads) != 1:
+              raise SystemExit(f"expected exactly one repository head, got {heads}")
+          head = heads[0]
+
+          def closure_down(revision_id: str) -> set[str]:
+              """All revisions reachable from revision_id following down_revision."""
+              rev = script.get_revision(revision_id)
+              result = {rev.revision}
+              down = rev.down_revision
+              if down is None:
+                  return result
+              if isinstance(down, tuple):
+                  for parent in down:
+                      result |= closure_down(parent)
+              else:
+                  result |= closure_down(down)
+              return result
+
+          ancestors = closure_down(head)
+          required = {"8c541a39b7e2", "e8f9a0b1c2d3"}
+          missing = required - ancestors
+          if missing:
+              raise SystemExit(
+                  f"fixture topology invalid for HEAD {head}: "
+                  f"missing ancestor revisions {sorted(missing)}"
+              )
+          print(head)
+          PY
+          )
+          echo "fixture topology ok: HEAD=$HEAD ancestors include $BASELINE_REV and e8f9a0b1c2d3"
           # Full historical upgrade-from-empty is not CI-safe (legacy out-of-order
-          # revisions). Gate the release Expand path: stub table → stamp parent → head.
+          # revisions). Gate the release Expand path: stub table → stamp baseline → head.
           poetry run python - <<'PY'
           from sqlalchemy import create_engine, text
           eng = create_engine("postgresql://replay:replay@localhost:5432/replay_db")
@@ -91,29 +128,12 @@ jobs:
           eng.dispose()
           print("stub advsetting+auto_shelf ok")
           PY
-          PARENT=$(poetry run python - <<'PY'
-          from alembic.config import Config
-          from alembic.script import ScriptDirectory
-          script = ScriptDirectory.from_config(Config("alembic.ini"))
-          heads = script.get_heads()
-          assert len(heads) == 1, heads
-          rev = script.get_revision(heads[0])
-          print(rev.down_revision)
-          PY
-          )
-          HEAD=$(poetry run python - <<'PY'
-          from alembic.config import Config
-          from alembic.script import ScriptDirectory
-          print(ScriptDirectory.from_config(Config("alembic.ini")).get_heads()[0])
-          PY
-          )
-          echo "stamp $PARENT then upgrade to $HEAD"
-          poetry run alembic stamp "$PARENT"
-          poetry run alembic upgrade head
+          echo "stamp $BASELINE_REV then upgrade to $HEAD"
+          poetry run alembic stamp "$BASELINE_REV"
+          poetry run alembic upgrade "$HEAD"
           # Do NOT run `alembic check` here: stub schema ≠ full models (expected drift).
           test "$(poetry run alembic current | awk '{print $1}')" = "$HEAD"
-          # Head e8f9 adds shelf-exhausted SoT columns; stamp(parent) skips f2a3
-          # Expand DDL, so do not assert card_ab_hold_emergency_* on advsetting.
+          # Baseline 8c541 skips f2a3 Expand DDL on advsetting; upgrade applies e8f9 shelf SoT.
           poetry run python - <<'PY'
           from sqlalchemy import create_engine, text
           eng = create_engine("postgresql://replay:replay@localhost:5432/replay_db")

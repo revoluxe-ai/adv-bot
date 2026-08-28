@@ -3584,15 +3584,17 @@ async def test_apply_main_bid_refresh_if_needed_clamps_desired_bid() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("current_mode", "enabled", "expected_result"),
+    ("current_mode", "enabled", "bot_active", "expected_result"),
     [
-        ("test", True, MainBidRefreshResult.SKIPPED_NOT_MAIN),
-        ("main", False, MainBidRefreshResult.SKIPPED_DISABLED),
+        ("test", True, True, MainBidRefreshResult.SKIPPED_NOT_MAIN),
+        ("main", False, True, MainBidRefreshResult.SKIPPED_DISABLED),
+        ("main", True, False, MainBidRefreshResult.SKIPPED_DISABLED),
     ],
 )
 async def test_apply_main_bid_refresh_if_needed_skips_non_applicable_states(
     current_mode: str,
     enabled: bool,
+    bot_active: bool,
     expected_result: MainBidRefreshResult,
 ) -> None:
     repository = MagicMock()
@@ -3618,7 +3620,7 @@ async def test_apply_main_bid_refresh_if_needed_skips_non_applicable_states(
     complex_adv = MagicMock(
         main_nmid=111,
         auto_adv_id=222,
-        bot_active=True,
+        bot_active=bot_active,
         auto_adv_active_status=True,
         auto_shelf_bid_control_enabled=enabled,
         auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
@@ -3636,6 +3638,18 @@ async def test_apply_main_bid_refresh_if_needed_skips_non_applicable_states(
     assert result == expected_result
     manager._choose_main_bid_by_strategy.assert_not_awaited()
     manager._persist_state_then_set_bid.assert_not_awaited()
+
+
+def test_is_coroutine_candidate_requires_bot_active_and_module_enabled() -> None:
+    complex_adv = MagicMock(bot_active=True, auto_shelf_bid_control_enabled=True)
+    assert AutoShelfBidControlManager.is_coroutine_candidate(complex_adv) is True
+
+    complex_adv.bot_active = False
+    assert AutoShelfBidControlManager.is_coroutine_candidate(complex_adv) is False
+
+    complex_adv.bot_active = True
+    complex_adv.auto_shelf_bid_control_enabled = False
+    assert AutoShelfBidControlManager.is_coroutine_candidate(complex_adv) is False
 
 
 @pytest.mark.asyncio

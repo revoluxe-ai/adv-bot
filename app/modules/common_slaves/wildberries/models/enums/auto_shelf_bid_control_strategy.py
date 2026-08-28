@@ -1,4 +1,5 @@
-from enum import StrEnum, auto
+from enum import StrEnum
+
 
 class AutoShelfBidControlStrategy(StrEnum):
     """User-facing main-bid strategies for auto shelf bid control."""

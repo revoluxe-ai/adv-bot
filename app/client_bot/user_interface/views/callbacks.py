@@ -72,6 +72,12 @@ class ChoiceAdvPaginator(CallbackData, prefix="choice_adv_paginator"):
     reset_filter: bool = False
 
 
+class UiModeToggle(CallbackData, prefix="ui_mode_toggle"):
+    """Toggle the admin-selected UI mode between free and paid."""
+
+    wb_user_cabinet_original_id: int
+
+
 class Action:
     new = "new"
     select = "select"
@@ -108,6 +114,21 @@ class Adv(CallbackData, prefix="adv"):
 class TurnBot(CallbackData, prefix="turn_bot"):
     action: str
     adv_original_id: int | None = None
+    wb_user_cabinet_original_id: int
+
+
+class AutoManagementLanding(CallbackData, prefix="auto_mgmt_landing"):
+    """Коллбеки paid-landing автоуправления рекламой в меню кампании."""
+
+    action: str
+    adv_setting_original_id: int
+    wb_user_cabinet_original_id: int
+
+
+class MinusPhrasesSetting(CallbackData, prefix="minus_phrases_setting"):
+    """Коллбеки экрана настройки фонового обновления минус-фраз."""
+    action: str
+    adv_setting_original_id: int
     wb_user_cabinet_original_id: int
 
 
@@ -267,6 +288,15 @@ class InviteShow(CallbackData, prefix="invite"):
     """Показать инвайт (для приглашения). Только для passed_gate."""
 
     action: str = "show"
+
+
+class PartnerAdminAction(CallbackData, prefix="partner_admin"):
+    """Admin callbacks for partner statistics and partner payouts."""
+
+    action: str
+    partner_user_id: int | None = None
+    page: int | None = None
+    sort_key: str | None = None
 
 
 class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):

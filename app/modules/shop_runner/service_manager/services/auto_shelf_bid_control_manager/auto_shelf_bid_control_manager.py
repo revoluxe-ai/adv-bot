@@ -461,6 +461,8 @@ class AutoShelfBidControlManager:
     @classmethod
     def is_coroutine_candidate(cls, complex_adv: ComplexAdv) -> bool:
         """Кампании для тика ``auto_shelf_bid_control`` (без лишних skip-логов)."""
+        if not complex_adv.bot_active:
+            return False
         if not complex_adv.auto_shelf_bid_control_enabled:
             return False
         return True

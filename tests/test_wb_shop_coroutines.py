@@ -62,7 +62,7 @@ async def test_adv_settings_auto_update(
     fake_redis,
     monkeypatch,
 ):
-    """v3-only: ``adv_settings_auto_update`` dispatch'ит ``process_adv_v3`` через ``run_tasks``."""
+    """v3-only: ``adv_settings_auto_update`` dispatch'РёС‚ ``process_adv_v3`` С‡РµСЂРµР· ``run_tasks``."""
     monkeypatch.setenv("AUTO_SETTING_ACTIVE", "true")
     adv_setting_mock.auto_update_white_list = True
     adv_setting_mock.auto_update_target_place = True
@@ -120,7 +120,7 @@ async def test_adv_settings_auto_update(
         manager._redis_stats_freshness_cache.mget_entries = AsyncMock(
             side_effect=_mget_entries
         )
-        await manager.adv_settings_auto_update.__wrapped__(manager)
+        await manager.adv_settings_auto_update.__wrapped__(manager, only_bot_active=True)
 
     run_tasks_mock.assert_called_once()
     handlers = run_tasks_mock.call_args.args[0]
@@ -135,13 +135,13 @@ async def test_get_keywords_stat_from_clickhouse_returns_data(
     clickhouse_client,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    """Seed clusters_adv_stats → Act with rewritten default_db SQL → assert aggregates."""
+    """Seed clusters_adv_stats в†’ Act with rewritten default_db SQL в†’ assert aggregates."""
     await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.clusters_adv_stats")
     await clickhouse_client.command("TRUNCATE TABLE test_adv_bot_clickhouse.adv_events_ticks")
     setup_redis_cache()
     nmid = 987_654_321
     base_date = date.today()
-    # TODO: Перевести проект на работу с датой в utc
+    # TODO: РџРµСЂРµРІРµСЃС‚Рё РїСЂРѕРµРєС‚ РЅР° СЂР°Р±РѕС‚Сѓ СЃ РґР°С‚РѕР№ РІ utc
     now_dt = datetime.now(timezone.utc)
 
     records = [

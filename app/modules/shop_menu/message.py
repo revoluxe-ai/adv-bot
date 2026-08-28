@@ -1,3 +1,10 @@
+"""Меню магазина: текст, главная и mass-ops клавиатуры Telegram UI.
+
+Содержит ``ShopMenu`` и builders клавиатур. ``build_shop_main_keyboard``
+безопасно обрабатывает отсутствие ``WBUserCabinet.user`` (admin toggle
+не показывается без валидного admin telegram id).
+"""
+
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Mapping
@@ -9,12 +16,16 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dependency_injector.wiring import Provide, inject
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.client_bot import const
 from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.cashback_snapshot import parse_cashback_snapshot
+from app.client_bot.ui_access import UiAccessMode, UiAccessResolver
+from app.client_bot.ui_mode import UiModeService
 from app.client_bot.user_interface.message_templates import TextWithKeyboard
+from app.client_bot.user_interface.utils import format_required_wb_token_scopes
 from app.client_bot.user_interface.views.callbacks import (
     AddNewToken,
     ApplyDefaultsForShop,
@@ -22,9 +33,9 @@ from app.client_bot.user_interface.views.callbacks import (
     ResetShopNonRelevantPhrases,
     ShopMassAdvOpsBack,
     ShopMassAdvOpsMenu,
-    ToggleCabinetActive,
     ExportShopAdvExcel,
     ImportShopAdvExcel,
+    ToggleCabinetActive,
 )
 from app.client_bot.user_interface.views.callbacks import (
     AddBalance,
@@ -32,6 +43,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ConnectExistingAdvs,
     ShowShopsList,
     TurnBot,
+    UiModeToggle,
 )
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
@@ -62,10 +74,34 @@ def _is_admin_user(user_telegram_id: int | None) -> bool:
     return is_bot_admin(user_telegram_id)
 
 
+def _has_read_only_only_tokens(token_status: TokenStatusReport) -> bool:
+    """Return True when the shop has only active read-only tokens for analytics."""
+    has_active_read_only_token = any(
+        token.is_read_only and token.is_valid and not token.is_expired
+        for token in token_status.all_tokens
+    )
+    return has_active_read_only_token and not token_status.valid_tokens
+
+
 def build_shop_main_keyboard(
     wb_user_cabinet: WBUserCabinet,
     wb_cabinet: WBCabinet,
+    ui_access: UiAccessMode = UiAccessMode.FREE,
 ) -> InlineKeyboardMarkup:
+    """Собрать главную inline-клавиатуру магазина для FREE/PAID режима UI.
+
+    Админский toggle режима UI добавляется только при валидном
+    telegram id админа. Отсутствие ``wb_user_cabinet.user`` (или ``None``)
+    не должно приводить к ``AttributeError`` — toggle просто не показывается.
+
+    Args:
+        wb_user_cabinet: Кабинет пользователя WB (может быть без загруженного ``user``).
+        wb_cabinet: Кабинет магазина.
+        ui_access: Режим доступа UI (FREE/PAID), влияет на платные кнопки.
+
+    Returns:
+        InlineKeyboardMarkup главной клавиатуры магазина.
+    """
     wb_cabinet_original_id = wb_cabinet.id
     builder = InlineKeyboardBuilder()
 
@@ -116,32 +152,47 @@ def build_shop_main_keyboard(
         )
     )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Массовые операции с РК",
-            callback_data=ShopMassAdvOpsMenu(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+    if ui_access == UiAccessMode.PAID:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Массовые операции с РК",
+                callback_data=ShopMassAdvOpsMenu(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
         )
-    )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Выгрузить все РК в Excel",
-            callback_data=ExportShopAdvExcel(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Выгрузить все РК в Excel",
+                callback_data=ExportShopAdvExcel(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
         )
-    )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Загрузить настройки из Excel",
-            callback_data=ImportShopAdvExcel(
-                wb_user_cabinet_original_id=wb_user_cabinet.id
-            ).pack(),
+    # Безопасный resolve: user может отсутствовать / быть None
+    # (например, loader без joinedload или detached ORM вне сессии).
+    user = getattr(wb_user_cabinet, "user", None)
+    if _is_admin_user(getattr(user, "user_telegram_id", None)):
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=f"Режим интерфейса: {ui_access.name}",
+                callback_data=UiModeToggle(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
         )
-    )
+
+    if ui_access == UiAccessMode.PAID:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Загрузить настройки из Excel",
+                callback_data=ImportShopAdvExcel(
+                    wb_user_cabinet_original_id=wb_user_cabinet.id
+                ).pack(),
+            )
+        )
 
     _ = builder.row(
         InlineKeyboardButton(
@@ -160,7 +211,7 @@ def build_shop_mass_adv_ops_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
-            text="Отключить все кампании",
+            text="Полностью отключить бот от управления всех РК",
             callback_data=TurnBot(
                 action="off_all",
                 wb_user_cabinet_original_id=wb_user_cabinet.id,
@@ -227,9 +278,14 @@ class ShopMenu(TextWithKeyboard):
         self._billing_redis_manager: BillingRedisManager | None = None
         self._balance_snapshot_manager: RedisShopBalanceSnapshotManager | None = None
         self._shop_balance_snapshot: dict[str, int | str | None] | None = None
+        self._ui_mode_service: UiModeService | None = None
+        self._ui_access_resolver: UiAccessResolver | None = None
+        self._ui_access: UiAccessMode = UiAccessMode.FREE
         if isinstance(redis_client, RedisClient):
             self._billing_redis_manager = BillingRedisManager(redis_client=redis_client)
             self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
+            self._ui_mode_service = UiModeService(redis_client=redis_client)
+            self._ui_access_resolver = UiAccessResolver(self._ui_mode_service)
 
         # Initialize token status attributes
         self._token_status: TokenStatusReport | None = None
@@ -255,6 +311,27 @@ class ShopMenu(TextWithKeyboard):
             self._token_status = None
             self._token_status_loaded = False
 
+    async def _load_tariff_details_in_session(
+        self, session: AsyncSession, shop_id: str
+    ) -> TariffDetails:
+        """Load tariff details via Pricer using caller-opened session.
+
+        Parent ``_load_all_data`` opens ``sm(read_only=True)`` and passes
+        the session here (PURE_READ handoff). Threads ``leg_latch`` and
+        ``utc_date`` like billing charge (PBH-003 latch parity).
+        """
+        leg_latch = None
+        utc_date = None
+        if self._billing_redis_manager is not None:
+            leg_latch = self._billing_redis_manager.leg_latch()
+            utc_date = datetime.now(timezone.utc).date()
+        return await self._pricer.get_tariff_details(
+            session,
+            shop_id,
+            leg_latch=leg_latch,
+            utc_date=utc_date,
+        )
+
     async def _load_all_data(self) -> bool:
         """Оптимизированная загрузка всех данных в одной транзакции"""
         start_time = datetime.now()
@@ -267,33 +344,16 @@ class ShopMenu(TextWithKeyboard):
         _ = await self._state.update_data(
             last_wb_user_cabinet_original_id=self._wb_user_cabinet_original_id
         )
+        wb_user_cabinet_original_id = self._wb_user_cabinet_original_id
         async with sm(read_only=True) as session:
-            # 1. Основной запрос с загрузкой WBUserCabinet и связанных данных
-            stmt = (
-                select(WBUserCabinet)
-                .join(WBUserCabinet.wb_cabinet)
-                .options(
-                    # Загружаем WBCabinet со всеми необходимыми связями
-                    selectinload(WBUserCabinet.wb_cabinet),
-                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                        WBCabinet.bonus_payments
-                    ),
-                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                        WBCabinet.balance_payments
-                    ),
-                    # Загружаем пользователя
-                    selectinload(WBUserCabinet.user),
-                    # Предзагружаем активные рекламные кампании
-                    selectinload(WBUserCabinet.wb_cabinet).selectinload(
-                        WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
-                    ),
-                )
-                .where(WBUserCabinet.id == self._wb_user_cabinet_original_id)
+            wb_user_cabinet: WBUserCabinet = await self._get_wb_user_cabinet_with_user_and_wb_cabinet(
+                session,
+                wb_user_cabinet_original_id,
             )
 
-            result = await session.execute(stmt)
-            self._wb_user_cabinet = result.scalar_one()
-            self._wb_cabinet = self._wb_user_cabinet.wb_cabinet
+            wb_cabinet = wb_user_cabinet.wb_cabinet
+            self._wb_user_cabinet: WBUserCabinet = wb_user_cabinet
+            self._wb_cabinet = wb_cabinet
 
             # 3. Расчет метрик кабинета
             self._now = datetime.now()
@@ -309,6 +369,10 @@ class ShopMenu(TextWithKeyboard):
                 self._shop_balance_snapshot = await self._balance_snapshot_manager.get(
                     self._wb_cabinet.shop_id
                 )
+            if self._ui_access_resolver is not None:
+                self._ui_access = await self._ui_access_resolver.resolve_shop_ui_access(
+                    self._user_telegram_id, session, self._wb_cabinet.shop_id
+                )
             # 6. Load token status
             await self.get_shop_token_status()
 
@@ -321,7 +385,12 @@ class ShopMenu(TextWithKeyboard):
                 f"Данные успешно загружены за {(datetime.now() - start_time).total_seconds():.2f} сек"
             )
 
-        await self._load_tariff_preview()
+        # TODO: Почему-то на выброс этой ошибки мне не приходят сообщения в бот
+        shop_id = self._wb_cabinet.shop_id
+        async with sm(read_only=True) as session:
+            self._tariff_details = await self._load_tariff_details_in_session(
+                session, shop_id
+            )
         self._total_active_advs_count = (
             self._tariff_details.count if self._tariff_details else 0
         )
@@ -334,22 +403,6 @@ class ShopMenu(TextWithKeyboard):
                 logger.debug("Не удалось получить last_charge_at из Redis: %s", exc)
 
         return True
-
-    async def _load_tariff_preview(self) -> None:
-        """Превью тарифа: тот же leg_metering + latch read, что и billing charge."""
-        shop_id = self._wb_cabinet.shop_id
-        leg_latch = None
-        utc_date = None
-        if self._billing_redis_manager is not None:
-            leg_latch = self._billing_redis_manager.leg_latch()
-            utc_date = datetime.now(timezone.utc).date()
-        async with sm() as session:
-            self._tariff_details = await self._pricer.get_tariff_details(
-                session,
-                shop_id,
-                leg_latch=leg_latch,
-                utc_date=utc_date,
-            )
 
     async def _process_tokens(self):
         """Обработка токенов для магазина"""
@@ -575,6 +628,15 @@ class ShopMenu(TextWithKeyboard):
                             text += f"📅 Токены действуют до {date_str} (через {days_until_break} дн.)\n"
             else:
                 # Missing permissions - show critical status
+                if _has_read_only_only_tokens(token_status):
+                    text += (
+                        "\n⚠️ <b>У этого WB API токена доступны только права чтения.</b>\n\n"
+                        "Бот работает в режиме аналитики: можно смотреть кампании, ключи, историю и статистику.\n\n"
+                        "Автоуправление ставками и кампаниями недоступно.\n"
+                        "Для управления кампаниями из бота нужен токен с возможностью изменений в кабинете (без галочки"
+                        " Только для чтения).\n"
+                        f"{format_required_wb_token_scopes()}"
+                    )
                 text += "\n🔑 <b>Токены:</b> ❌ <b>Требуется обновление</b>\n"
                 text += f"❌ <b>Отсутствуют права:</b> {', '.join(sorted(token_status.missing_permissions))}\n"
                 text += "🔧 <b>Добавьте новые токены для восстановления работы</b>\n"
@@ -601,7 +663,9 @@ class ShopMenu(TextWithKeyboard):
 
     @property
     def keyboard(self):
-        return build_shop_main_keyboard(self._wb_user_cabinet, self._wb_cabinet)
+        return build_shop_main_keyboard(
+            self._wb_user_cabinet, self._wb_cabinet, ui_access=self._ui_access
+        )
 
     @staticmethod
     def _format_cashback_snapshot_line(
@@ -617,3 +681,50 @@ class ShopMenu(TextWithKeyboard):
             f"🧾 <b>Cashback</b>: {parsed.total} руб"
             f"{parsed.percent_part}{exp_part}"
         )
+    @staticmethod
+    async def _get_wb_user_cabinet_with_user_and_wb_cabinet(
+        session: AsyncSession,
+        wb_user_cabinet_original_id: int,
+    ) -> WBUserCabinet:
+        """Загрузить WBUserCabinet с user и wb_cabinet (eager load).
+
+        Делает INNER JOIN по relationship-путям и selectinload связанных
+        сущностей для меню магазина. В SQLAlchemy 2.0 каждый relationship
+        joinится отдельным ``.join(...)`` без второго позиционного onclause.
+
+        Args:
+            session: Async SQLAlchemy-сессия.
+            wb_user_cabinet_original_id: PK ``WBUserCabinet``.
+
+        Returns:
+            ``WBUserCabinet`` с предзагруженными связями.
+        """
+        stmt = (
+            select(WBUserCabinet)
+            # SA 2.0: каждый relationship — отдельный .join(); второй
+            # позиционный аргумент — onclause, не вторая связь.
+            .join(WBUserCabinet.wb_cabinet)
+            .join(WBUserCabinet.user)
+            .options(
+                selectinload(WBUserCabinet.user),
+                # Загружаем WBCabinet со всеми необходимыми связями
+                selectinload(WBUserCabinet.wb_cabinet),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.bonus_payments
+                ),
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.balance_payments
+                ),
+                # Загружаем пользователя
+                selectinload(WBUserCabinet.user),
+                # Предзагружаем активные рекламные кампании
+                selectinload(WBUserCabinet.wb_cabinet).selectinload(
+                    WBCabinet.adv_settings.and_(AdvSetting.bot_active.is_(True))
+                ),
+            )
+            .where(WBUserCabinet.id == wb_user_cabinet_original_id)
+        )
+
+        result = await session.execute(stmt)
+        wb_cabinet = result.scalar_one()
+        return wb_cabinet

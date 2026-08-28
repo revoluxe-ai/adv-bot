@@ -5,6 +5,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 
 """DTO wrapper over AdvSetting for shop-runner control flows."""
 
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -61,14 +62,17 @@ class GetKeywordsProvider(Protocol):
 
     Реализация — ``fetch_calculated_keywords_from_redis``; при miss —
     ``ShopRunnerKeywordsCacheMissError``. Пересчёт из БД — ``fetch_keywords_from_database``.
+
+    Возврат ``Awaitable`` (не ``async def``/Coroutine): совместим с
+    обёртками вроде ``@single_run``, чей тип — ``Awaitable[list[...]]``.
     """
 
-    async def __call__(
+    def __call__(
         self,
         complex_adv: ComplexAdv,
         *,
         cache_only: bool = True,
-    ) -> list[CalculatedKeyword]: ...
+    ) -> Awaitable[list[CalculatedKeyword]]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,6 +265,10 @@ class ComplexAdv:
     def auto_update_white_list(self) -> bool:
         return self._adv_setting.auto_update_white_list
 
+    @property
+    def auto_update_minus_phrases(self) -> bool:
+        """Возвращает persisted-флаг без постоянного ``None → True`` fallback."""
+        return bool(getattr(self._adv_setting, "auto_update_minus_phrases", False))
 
     @property
     def bidder_active(self) -> bool:
@@ -518,7 +526,8 @@ class ComplexAdv:
         return self._adv_setting.search_auto_budget_daily_limit
 
     @property
-    def auto_budget_watchdog_enabled(self) -> bool: # настройка отвечает за управление активностью РК в целом: от пополнения бюджета до активности
+    def auto_budget_watchdog_enabled(self) -> bool:
+        """Флаг автобюджета: free top-up и paid start/pause (см. auto_budget_watchdog)."""
         return bool(self._adv_setting.auto_budget_watchdog_enabled)
 
     @property

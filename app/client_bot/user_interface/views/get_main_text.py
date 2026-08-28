@@ -1,25 +1,25 @@
+
+"""Main-menu text builders for the client bot onboarding screens."""
+
 from app.client_bot import const
-from app.settings import settings
 
 
-def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str:
-    if settings.presentation_only and not full_client_ui:
-        return (
-            f"Ваш Telegram ID: <code>{user_telegram_id}</code>\n\n"
-            "Сервис сейчас доступен по записи на презентацию.\n"
-            "Нажмите «Запросить презентацию» и отправьте инвайт-код одним сообщением.\n\n"
-        )
+def get_main_text(user_telegram_id: int,) -> str:
+    """Return the appropriate main-menu text for the current onboarding mode."""
 
-    text = f"""
-Ваш Телеграм ID: {user_telegram_id}\n
+    return f"""
+Ваш Telegram ID: <code>{user_telegram_id}</code>
 
-📈 Экономическое управление рекламой на Wildberries \n
+📈 Экономическое управление рекламой на Wildberries
+
 Я управляю рекламой на Wildberries через экономику, а не через бесконечные ручные правки.
+
+Начните с раздела «Мои магазины»: добавьте магазин, подключите токен и выберите рекламную кампанию.
 
 🤖 Бот автоматически создаёт и ведёт поисковую рекламу и авторекламу:
 • 🔎 подбирает запросы и кластеры
 • 💸 регулирует ставки и работу в аукционе
-• 🔁 перераспределяет трафик между кампаниями
+• 🔃 перераспределяет трафик между кампаниями
 
 🚀 Этап набора объёма
 Бот усиливает самые эффективные запросы, чтобы выйти к плану продаж.
@@ -29,13 +29,10 @@ def get_main_text(user_telegram_id: int, *, full_client_ui: bool = False) -> str
 
 🧯 Если расход выходит за рамки
 Сначала бот отключает самый дорогой и наименее эффективный трафик, оставляя лучшие запросы.
-Если этого недостаточно — дополнительно снижает ставки.
+Если этого недостаточно, дополнительно снижает ставки.
 
-⛔️ Если реклама “не крутится”
-Чаще это связано с настройками, бюджетом или лимитами, а не с “поломкой” ✅
+⛔️ Если реклама "не крутится"
+Чаще это связано с настройками, бюджетом или лимитами, а не с "поломкой" бота.
 
 Поддержка и помощь -> {const.SUPPORT_LINK}
-
 """
-
-    return text

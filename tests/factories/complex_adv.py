@@ -206,7 +206,10 @@ async def create_complex_adv_seed(session: AsyncSession) -> ComplexAdvSeed:
     )
     wb_cabinet: WBCabinet | None = existing.scalar_one_or_none()
     if wb_cabinet is None:
-        wb_cabinet = WBCabinetFactory.build(
+        # Не используем factory Sequence для ``id``: при полном pytest-ране
+        # в БД могут оставаться записи от других DB-тестов, и фиксированный
+        # ``1_000_000 + n`` даёт ложные UniqueViolation до очистки.
+        wb_cabinet = WBCabinet(
             shop_id="test_shop_id",
             active=True,
             balance=0.0,
@@ -256,4 +259,3 @@ async def create_complex_adv_seed(session: AsyncSession) -> ComplexAdvSeed:
         keyword_settings=keyword_settings,
         calculated_keywords=calculated_keywords,
     )
-

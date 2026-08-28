@@ -15,15 +15,24 @@ def is_bot_admin(telegram_id: int) -> bool:
 
 
 def use_minimal_presentation_ui(telegram_id: int, passed_gate: bool) -> bool:
-    """Минимальный экран «только презентация» — только для новых без passed_gate.
+    """Always False: free client UI is the default after entry gates.
 
-    Админы и пользователи с открытым гейтом видят полный клиентский UI на /start.
+    Invite/presentation onboarding deferred for current rollout
+    (``invite_gate`` default off). Helper kept for stable /start call sites.
+    Legacy ``PRESENTATION_ONLY_MODE=true`` still forks keyboard in
+    ``shop_choice_message`` only — not recommended; see invite-gate-deferred
+    decision.
+
+    Args:
+        telegram_id: Caller Telegram id (unused; signature preserved).
+        passed_gate: Whether the user passed invite gate (unused while deferred).
+
+    Returns:
+        False — callers show full free MainMenu; gate screen only if
+        ``settings.invite_gate`` is explicitly enabled later.
     """
-    if not settings.presentation_only:
-        return False
-    if is_bot_admin(telegram_id):
-        return False
-    return not passed_gate
+    _ = (telegram_id, passed_gate, settings.presentation_only)
+    return False
 
 
 class IsBotAdminFilter(BaseFilter):

@@ -47,6 +47,7 @@ from app.utils.db.session_maker import get_async_session_maker as sm
 
 router = Router()
 
+
 def _tg_message(callback: CallbackQuery) -> Message | None:
     """Вернуть Message из callback, исключая InaccessibleMessage."""
     message = callback.message
@@ -57,7 +58,6 @@ def _asb_exhausted_reset_filter(callback: CallbackQuery) -> bool:
     """Фильтр callback сброса паузы shelf-exhausted."""
     data = callback.data
     return bool(data) and str(data).startswith("asb_exh_reset:")
-
 
 
 async def _show_bid_point_viewer(
@@ -194,11 +194,12 @@ async def auto_shelf_bid_control_bid_points_router(
             adv_setting_original_id=callback_data.adv_setting_original_id,
             index=callback_data.index,
         )
-        message = _tg_message(callback)
-        if not shown and message:
-            await message.answer(
-                "В покрытии ставок теста пока нет доступных строк."
-            )
+        if not shown:
+            message = _tg_message(callback)
+            if message:
+                await message.answer(
+                    "В покрытии ставок теста пока нет доступных строк."
+                )
     except AutoShelfBidControlTelegramError as exc:
         message = _tg_message(callback)
         if message:
@@ -218,7 +219,20 @@ async def auto_shelf_bid_control_menu_router(
     action = callbacks.normalize_auto_shelf_bid_control_action(callback_data.action)
     adv_setting_original_id = callback_data.adv_setting_original_id
     service = AutoShelfBidControlTelegramService(redis_client=redis_client)
+    guarded_write_actions = {
+        "enable",
+        "disable",
+        "reset_cycle",
+        "force_main",
+        "set_max_bid",
+        "set_test_share",
+        "set_target_test_impressions",
+        "set_target_test_observation_minutes",
+        "set_min_bid_distance",
+    }
     try:
+        if action in guarded_write_actions:
+            await service.ensure_write_allowed(adv_setting_original_id)
         if action in {"open", "refresh"}:
             await _send_main_screen(
                 callback,

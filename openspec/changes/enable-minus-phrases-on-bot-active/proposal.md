@@ -7,8 +7,10 @@
 - При явном включении paid auto-management режима система MUST включать автообновление минус-фраз для этой кампании.
 - При переходе в free/manual режим система MUST выключать автообновление минус-фраз как paid WB write automation.
 - Включение и выключение `auto_update_minus_phrases` должно применяться декларативно через mode overlay policies, а не прямым присваиванием внутри transition-helper.
-- Существующий runtime gate должен остаться строгим: обновление минус-фраз выполняется только когда включены и `bot_active`, и `auto_update_minus_phrases`.
-- Out of scope: изменение алгоритма построения минус-фраз, изменение WB API write-пути, миграции БД, изменение free-mode runtime доступа, изменение whitelist/ставочных auto-flags.
+- Существующий runtime gate: обновление минус-фраз выполняется когда включён
+  `auto_update_minus_phrases` (default false). Фича входит в free-пакет и
+  **не** требует `bot_active`; paid-start MAY дополнительно включать флаг.
+- Out of scope: изменение алгоритма построения минус-фраз, изменение WB API write-пути, миграции БД, изменение whitelist/ставочных auto-flags.
 
 ## Capabilities
 
