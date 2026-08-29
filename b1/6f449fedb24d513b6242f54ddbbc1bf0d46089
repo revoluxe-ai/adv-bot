@@ -1,0 +1,43 @@
+.cursor/devops/OPS_STATE.md
+  s_b3bbd2e65f3e1a::t_5520e1a229c2a8 100
+  s_b3bbd2e65f3e1a::t_25b49bcc1d13b5 101
+  s_e10b45cbb255fd::t_df898cfac59315 76
+  s_e10b45cbb255fd::t_179216c8fe282c 52-58
+  s_b3bbd2e65f3e1a::t_2d7756ba5fd5a0 41
+  s_b3bbd2e65f3e1a::t_22e172a43c714e 59
+  s_b3bbd2e65f3e1a::t_03021125e6784e 74
+  s_e10b45cbb255fd::t_eb3ff7cb8bcb45 102
+  s_e10b45cbb255fd::t_1fea8eddba9fbe 104
+  s_e10b45cbb255fd::t_9761c01724f5fe 42
+  s_b3bbd2e65f3e1a::t_a0d0b2f423cc10 75
+  s_e10b45cbb255fd::t_b227b771333ca5 77-78
+  s_e10b45cbb255fd::t_7b2d9fb28d96ee 103
+.cursor/devops/LAST.json
+  s_e10b45cbb255fd::t_ed1f1cb22ec576 3,12-13,17-19,23,35-36,47-48,51-57,59-61,63-64
+  s_b3bbd2e65f3e1a::t_b8228b092e0cf8 6,14-15,20
+  s_e10b45cbb255fd::t_a58c80c74cb998 21,34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "b16f449fedb24d513b6242f54ddbbc1bf0d46089",
+  "prompts": {},
+  "sessions": {
+    "s_b3bbd2e65f3e1a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "77c2281d-4cc3-4204-8f18-46110e3447cd",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_e10b45cbb255fd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2758170-be8f-4c42-b181-be07964ade11",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
