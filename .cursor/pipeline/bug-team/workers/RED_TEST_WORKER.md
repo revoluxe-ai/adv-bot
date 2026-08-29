@@ -28,7 +28,9 @@ RED evidence; TEST_IDs; TEST_CONTENT_SHA256; RED_CONFIRMED|PASS_ALREADY|INVALID_
 
 ```text
 ALLOWED:
-  tests/** (+fixtures); results/RED-*.md
+  tests/** (+fixtures); results/RED-*.md; LEDGER.md;
+  findings/** (RED status annotation only);
+  team/packets/; team/heartbeats/; results/
 FORBIDDEN:
   production writes; GREEN write; Owner GO forgery
 ```

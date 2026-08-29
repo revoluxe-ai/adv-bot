@@ -28,9 +28,12 @@ CLAIM_TOKEN + FINDING_ID + STATUS=claimed | blocker
 
 ```text
 ALLOWED:
-  finding STATUS/CLAIM_TOKEN; LEDGER claim row
+  findings/**; CASE.md (ROOT_FINDING_ID / stage when minting root);
+  intakes/** (link SOURCE_INTAKE only); LEDGER claim row;
+  team/packets/; team/heartbeats/; results/PROOF-
 FORBIDDEN:
-  claim bypass; invent CLAIM_TOKEN; dual active claim
+  claim bypass; invent CLAIM_TOKEN; dual active claim;
+  production; classify rewrite; OpenSpec
 ```
 
 ## TIMEOUT_SECONDS
