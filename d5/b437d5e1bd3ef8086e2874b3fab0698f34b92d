@@ -1,0 +1,24 @@
+.cursor/_go_result.json
+  s_713fb289ec0ab4::t_06a2da555ba358 2-4,6-9,17-61,85-1213
+  s_713fb289ec0ab4::t_797136c59082cd 1,5,10-16,62-84,1214-1216
+.cursor/_capture_v2.json
+  s_713fb289ec0ab4::t_f3b0a02d461671 1-877
+.cursor/_preview_v2.json
+  s_713fb289ec0ab4::t_574e387d7e66c1 1-877
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "d5b437d5e1bd3ef8086e2874b3fab0698f34b92d",
+  "prompts": {},
+  "sessions": {
+    "s_713fb289ec0ab4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4102e8e1-7f1b-4eb7-ba5f-3462ba5c9f50",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
