@@ -1,0 +1,19 @@
+scripts/a1_daily_spend_control_reconciliation.py
+  s_f419f2a2231d86::t_f62121e4224d94 761,964-966
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "27da1134214f5423dd6f799151dad07d9cf2ca52",
+  "prompts": {},
+  "sessions": {
+    "s_f419f2a2231d86": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a04d60-c6f8-79f2-b44a-93f5e66b7c4d",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
