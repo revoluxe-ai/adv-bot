@@ -758,14 +758,13 @@ def _feasibility_verdict(matrix: list[dict[str, Any]], active_count: int) -> dic
     }
 
 
-async def run_package(output_dir: Path) -> dict[str, Any]:
+async def run_package(output_dir: Path, pg_rows: list[dict[str, str]]) -> dict[str, Any]:
     """Собрать полный reconciliation package."""
     output_dir.mkdir(parents=True, exist_ok=True)
     sql_dir = output_dir / "sql"
     sql_dir.mkdir(parents=True, exist_ok=True)
     checked_msk = datetime.now(timezone.utc).astimezone(MSK)
 
-    pg_rows = _load_pg_advsettings(output_dir, sql_dir)
     pg_by_adv = _pg_by_adv_id(pg_rows)
 
     collect_dir = output_dir / "collect"
@@ -962,9 +961,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     out = Path(args.output_dir).resolve()
     _bootstrap_cluster_infra()
-    pg_rows = _load_pg_advsettings(out, out / "sql")  # warm PG before asyncio
-    del pg_rows
-    result = asyncio.run(run_package(out))
+    sql_dir = out / "sql"
+    pg_rows = _load_pg_advsettings(out, sql_dir)
+    result = asyncio.run(run_package(out, pg_rows))
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
