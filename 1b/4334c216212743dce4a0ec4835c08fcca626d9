@@ -1,0 +1,19 @@
+AGENTS.md
+  s_e5ce57538c39ba::t_e9ee7a80043b08 3-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "1b4334c216212743dce4a0ec4835c08fcca626d9",
+  "prompts": {},
+  "sessions": {
+    "s_e5ce57538c39ba": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c38770b1-736a-41b0-84e8-df6df41484a5",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
