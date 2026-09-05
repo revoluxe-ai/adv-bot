@@ -49,14 +49,14 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `2077dd7511e9b57d36f177d3bb443b00fa954927` |
-| Platform digest | `sha256:8db0e8e985fe8454e3e6208407becff7f600a698f76bce70815bca3fd017cb9a` (CI index digest; digest_pin) |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:2077dd7511e9b57d36f177d3bb443b00fa954927` |
-| App Deployments on this image | **all entrypoints on `2077dd…`** (phased CAS shop_runner_last 2026-08-28 recovery); `free-bot` replicas=0 |
-| Last CONTROL | `app-db-control-2077dd751-r1` → `ACQUIRED` (fencing_token=3; CONTROL_DRY_RUN=0) |
-| Last migrate Job | schema NOOP already `0b0fe`; data via `app-db-backfill-minus-2077dd751-r1` → OK (69823 rows; 13 enabled) |
-| Last complete_release | `app-db-ctrlplane-2077dd751-r1-complete` → OK lease released |
-| Prepared fallback (prior LKG) | tag `be173f55d8d2c8df7170d209e1d50a73f3281b07` / digest `sha256:83e41e08b70077dd377fea70c3b7be064294169c543c8070d02ecb6802e4dd61` |
+| Image tag | `dd061bf0b1816937dbe5667f14a5ac22577b01b1` |
+| Platform digest | `sha256:d4878d958e4651ad75d176e130e0c8e1496d2b326b6a37660117100631551587` (CI index digest; digest_pin) |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:dd061bf0b1816937dbe5667f14a5ac22577b01b1` |
+| App Deployments on this image | **all entrypoints on `dd061bf0…`** (WB token rotation fix; schema unchanged); `free-bot` replicas=0 |
+| Last CONTROL | `app-db-control-dd061bf0-r1` → `ACQUIRED` (fencing_token=4; CONTROL_DRY_RUN=0) |
+| Last migrate Job | `app-db-migrate-dd061bf0-r1` → `SUCCESS_NOOP` (schema already `0b0fe484ba6b`) |
+| Last complete_release | `app-db-ctrlplane-dd061bf0-r1-complete` → OK lease released |
+| Prepared fallback (prior LKG) | tag `2077dd7511e9b57d36f177d3bb443b00fa954927` / digest `sha256:8db0e8e985fe8454e3e6208407becff7f600a698f76bce70815bca3fd017cb9a` |
 
 ## Open risks / follow-ups
 
@@ -102,3 +102,4 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-28 | CAS rollback `wb-sky-bot` + `free-bot` → `be173f55…` | UI + shop-runner on `be173f55…`; schema `0b0fe…`; minus backfill still deferred |
 | 2026-08-28 | GO safe_prod_release `2077dd751…` CONTROL_DRY_RUN=0 + backfill | CONTROL ACQUIRED token=3; mark_started OK; migrate Failed (SET ROLE skip on NOOP backfill); **PARTIAL — lease held; no CAS** |
 | 2026-08-28 | GO recovery SET_ROLE_BACKFILL + CAS `2077dd…` | backfill OK 69823/13; mark_succeeded→begin→CAS W1–W6→complete; lease released; LKG `2077dd…` |
+| 2026-09-05 | GO safe_prod_release `dd061bf0…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=4 → mark_started → migrate SUCCESS_NOOP `0b0fe…` → mark_noop → begin → CAS all entrypoints → complete_release OK; LKG `dd061bf0…` (WB token rotation) |

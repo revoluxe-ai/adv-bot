@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at_utc": "2026-08-28T16:41:40Z",
+  "updated_at_utc": "2026-09-05T02:37:00Z",
   "namespace": "prod-adv-bot",
   "database_identity": "prod-adv-bot/postgres-db/adv_updater",
   "alembic_head": "0b0fe484ba6b",
@@ -9,18 +9,18 @@
   "control_baseline_status": "RECONCILED",
   "prod_automation_enablement_allowed": "NO",
   "image_repository": "harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot",
-  "image_tag": "2077dd7511e9b57d36f177d3bb443b00fa954927",
-  "image_digest": "sha256:8db0e8e985fe8454e3e6208407becff7f600a698f76bce70815bca3fd017cb9a",
-  "fallback_image_tag": "be173f55d8d2c8df7170d209e1d50a73f3281b07",
-  "fallback_image_digest": "sha256:83e41e08b70077dd377fea70c3b7be064294169c543c8070d02ecb6802e4dd61",
+  "image_tag": "dd061bf0b1816937dbe5667f14a5ac22577b01b1",
+  "image_digest": "sha256:d4878d958e4651ad75d176e130e0c8e1496d2b326b6a37660117100631551587",
+  "fallback_image_tag": "2077dd7511e9b57d36f177d3bb443b00fa954927",
+  "fallback_image_digest": "sha256:8db0e8e985fe8454e3e6208407becff7f600a698f76bce70815bca3fd017cb9a",
   "canary_status": "complete",
-  "last_migrate_outcome": "SUCCESS_VIA_SET_ROLE_BACKFILL",
-  "last_migrate_job": "app-db-backfill-minus-2077dd751-r1",
-  "last_migrate_detail": "SET ROLE app_owner; updated_records=69823; expected_enabled=13; incompatible=0; NOT NULL applied",
+  "last_migrate_outcome": "SUCCESS_NOOP",
+  "last_migrate_job": "app-db-migrate-dd061bf0-r1",
+  "last_migrate_detail": "heads already at 0b0fe484ba6b; no schema change; WB token rotation release",
   "last_control_outcome": "ACQUIRED",
-  "last_control_job": "app-db-control-2077dd751-r1",
+  "last_control_job": "app-db-control-dd061bf0-r1",
   "last_complete_release_outcome": "OK",
-  "last_complete_release_job": "app-db-ctrlplane-2077dd751-r1-complete",
+  "last_complete_release_job": "app-db-ctrlplane-dd061bf0-r1-complete",
   "release_controller_wired": true,
   "release_controller_baseline_select": true,
   "last_authz_job": "app-db-authz-grant-baseline-select-0816",
@@ -31,9 +31,9 @@
   "active_fencing_token": null,
   "active_lease_expires_at_utc": null,
   "active_lease_valid": false,
-  "workflow_run_id": "33188635744",
-  "completed_release_id": "2077dd7511e9b57d36f177d3bb443b00fa954927",
-  "completed_fencing_token": 3,
+  "workflow_run_id": "33938524062",
+  "completed_release_id": "dd061bf0b1816937dbe5667f14a5ac22577b01b1",
+  "completed_fencing_token": 4,
   "zalando_cluster_status": "UpdateFailed",
   "entrypoints_on_image": [
     "wb-sky-bot",
@@ -44,8 +44,8 @@
     "trunc-system-log-clickhouse",
     "free-bot"
   ],
-  "ui_image_tag": "2077dd7511e9b57d36f177d3bb443b00fa954927",
-  "shop_runner_image_tag": "2077dd7511e9b57d36f177d3bb443b00fa954927",
+  "ui_image_tag": "dd061bf0b1816937dbe5667f14a5ac22577b01b1",
+  "shop_runner_image_tag": "dd061bf0b1816937dbe5667f14a5ac22577b01b1",
   "shop_runner_replicas": 1,
   "free_bot_replicas": 0,
   "auto_update_minus_phrases_backfill": {
@@ -56,11 +56,11 @@
     "incompatible_records": 0
   },
   "notes": [
-    "2026-08-28 recovery GO: SET_ROLE backfill + CAS all to 2077dd; lease released; LKG 2077dd",
+    "2026-09-05 SAFE_PROD_RELEASE dd061bf0: WB token rotation fix; migrate NOOP; CAS all; lease released",
     "Product debt: migrate.py must SET ROLE app_owner before backfill on current==target NOOP path",
     "Harbor git-registry-cache is pull-through proxy; CI Harbor push may fail",
     "Do not laptop-alembic; Job path only under /opsx-devops SAFE_PROD_RELEASE",
-    "Prepared fallback remains be173f55",
+    "Prepared fallback remains 2077dd751",
     "Zalando status UpdateFailed after adding release_controller; patroni.pg_hba host-all-md5 pinned"
   ]
 }
