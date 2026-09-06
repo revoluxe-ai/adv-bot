@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, Mock
 
 import pytest
 
@@ -31,7 +31,7 @@ async def test_open_shop_mass_adv_ops_menu_edits_reply_markup() -> None:
     callback.message.edit_reply_markup.assert_awaited_once()
     reply_markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]
-    assert "Отключить все кампании" in texts
+    assert "Полностью отключить бот от управления всех РК" in texts
     assert "Применить дефолты всем кампаниям" in texts
     assert "Сбросить все НРФ во всех РК" in texts
     assert "Назад" in texts
@@ -46,8 +46,20 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
     callback_data = callbacks.ShopMassAdvOpsBack(
         wb_user_cabinet_original_id=wb_user_cabinet_id
     )
-    wb_cabinet = SimpleNamespace(id=7, active=True)
-    wb_user_cabinet = SimpleNamespace(id=wb_user_cabinet_id, wb_cabinet=wb_cabinet)
+    wb_cabinet = SimpleNamespace(
+        id=7,
+        active=True,
+        adv_settings=[SimpleNamespace(bot_active=True)],
+    )
+    user = Mock()
+
+    # non-admin user: admin UI-mode toggle must not appear; .user must be present
+    # so close → build_shop_main_keyboard matches production eager-loaded shape.
+    wb_user_cabinet = SimpleNamespace(
+        id=wb_user_cabinet_id,
+        wb_cabinet=wb_cabinet,
+        user=SimpleNamespace(user_telegram_id=1_000_001),
+    )
 
     with patch(
         "app.client_bot.user_interface.handlers.start.start._get_wb_user_cabinet_for_shop_menu",
@@ -59,4 +71,4 @@ async def test_close_shop_mass_adv_ops_menu_restores_main_keyboard() -> None:
     reply_markup = callback.message.edit_reply_markup.await_args.kwargs["reply_markup"]
     texts = [btn.text for row in reply_markup.inline_keyboard for btn in row]
     assert "Массовые операции с РК" in texts
-    assert "Отключить все кампании" not in texts
+    assert "Полностью отключить бот от управления всех РК" not in texts

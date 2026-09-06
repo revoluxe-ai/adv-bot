@@ -12,6 +12,8 @@
   EXPECTED_CURRENT_REVISION_SETS is rendered as JSON list-of-lists for
   python -m app.db.migrate. Template placeholders use __TOKEN__ form so
   value substitution cannot rewrite YAML env key names.
+  BackfillKind is empty for ordinary releases and explicit for a one-time
+  classifier-owned data transition.
 #>
 [CmdletBinding()]
 param(
@@ -26,6 +28,9 @@ param(
 
     [Parameter(Mandatory = $true)]
     [string] $ExpectedCurrentRevision,
+
+    [Parameter(Mandatory = $false)]
+    [string] $BackfillKind = "",
 
     [Parameter(Mandatory = $false)]
     [string[]] $AdditionalAllowedCurrentRevisions = @(),
@@ -72,7 +77,8 @@ $rendered = (Get-Content -Raw -LiteralPath $JobTemplate) `
     -replace "__RELEASE_ID__", $ReleaseId `
     -replace "__IMAGE_REF__", $ImageRef `
     -replace "__EXPECTED_TARGET_REVISION__", $ExpectedTargetRevision `
-    -replace "__EXPECTED_CURRENT_REVISION_SETS_JSON__", $expectedCurrentRevisionSetsJson
+    -replace "__EXPECTED_CURRENT_REVISION_SETS_JSON__", $expectedCurrentRevisionSetsJson `
+    -replace "__MIGRATION_BACKFILL_KIND__", $BackfillKind
 
 if ($rendered -match "__[A-Z0-9_]+__") {
     throw "Unresolved template placeholders remain in rendered Job YAML."

@@ -1,4 +1,4 @@
-"""Regression tests for AutoResetBidService (partial get_min_bids results)."""
+"""Regression tests for auto campaign CPM reset behavior and partial get_min_bids results."""
 
 from __future__ import annotations
 
@@ -164,4 +164,35 @@ async def test_ensure_auto_bids_minimum_empty_auto_cache_returns_early() -> None
     ):
         await service.ensure_auto_bids_minimum([adv])
 
+    hub.wb_modifier.update_auto_adv_cpm.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_ensure_auto_bids_minimum_requires_bidder_for_auto() -> None:
+    hub = MagicMock()
+    hub.wb_manager = MagicMock()
+    hub.wb_modifier = MagicMock()
+    hub.wb_modifier.update_auto_adv_cpm = AsyncMock()
+
+    adv = MagicMock()
+    adv.bot_active = True
+    adv.bidder_for_auto = False
+    adv.nmids = [10]
+    adv.auto_adv_id = 504
+    adv.adv_setting.cpm = 900
+
+    hub.wb_manager.get_min_bids_cache_only = AsyncMock(
+        return_value=AdvMinNmidsBids(auto={10: 150}, search={})
+    )
+
+    service = AutoResetBidService(hub, MagicMock())
+
+    with patch(
+        "app.modules.shop_runner.service_manager.services.auto_reset_bid_service.run_tasks",
+        new=_run_handlers_inline,
+    ):
+        await service.ensure_auto_bids_minimum([adv])
+
+    hub.wb_manager.get_min_bids_cache_only.assert_awaited_once()
+    assert hub.wb_manager.get_min_bids_cache_only.await_args.args[0] == []
     hub.wb_modifier.update_auto_adv_cpm.assert_not_called()

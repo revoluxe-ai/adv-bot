@@ -20,10 +20,19 @@ _HANDLER = "app.client_bot.user_interface.handlers.keyword_settings"
 
 
 def _keyword_setting(*, mode: str, target_place: int = 5) -> SimpleNamespace:
+    """Stub KeywordSetting + AdvSetting для AB Hold / OFF write-path.
+
+    ``auto_update_target_place=False`` — чтобы handler дошёл до AB Hold /
+    OFF asserts (auto-update gate покрыт отдельно в
+    ``test_keyword_target_place_guard.py``).
+    """
     return SimpleNamespace(
         id=1,
         target_place=target_place,
-        adv_setting=SimpleNamespace(card_ab_hold_mode=mode),
+        adv_setting=SimpleNamespace(
+            card_ab_hold_mode=mode,
+            auto_update_target_place=False,
+        ),
     )
 
 

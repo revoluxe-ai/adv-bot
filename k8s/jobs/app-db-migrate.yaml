@@ -8,7 +8,8 @@
 #
 # Placeholders (must be unique tokens, not bare env names):
 #   __JOB_NAME_SUFFIX__, __RELEASE_ID__, __IMAGE_REF__,
-#   __EXPECTED_TARGET_REVISION__, __EXPECTED_CURRENT_REVISION_SETS_JSON__
+#   __EXPECTED_TARGET_REVISION__, __EXPECTED_CURRENT_REVISION_SETS_JSON__,
+#   __MIGRATION_BACKFILL_KIND__ (empty for ordinary schema-only releases)
 # ============================================================================
 apiVersion: batch/v1
 kind: Job
@@ -50,6 +51,8 @@ spec:
               value: '__EXPECTED_CURRENT_REVISION_SETS_JSON__'
             - name: SET_ROLE_APP_OWNER
               value: "1"
+            - name: MIGRATION_BACKFILL_KIND
+              value: "__MIGRATION_BACKFILL_KIND__"
             # Must win over POSTGRES_* from ConfigMap for migrator DSN (primary, not pooler).
             - name: DATABASE_URL
               valueFrom:

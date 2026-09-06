@@ -38,8 +38,8 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| `alembic_version` (prod) | `e8f9a0b1c2d3` |
-| Expand columns | shelf-exhausted pause SoT columns (INC-AUTO-SHELF-PAUSE-01) + prior `card_ab_hold_*` |
+| `alembic_version` (prod) | `0b0fe484ba6b` |
+| Expand columns | shelf-exhausted pause SoT + `card_ab_hold_*` + `advsetting.auto_update_minus_phrases` (**NOT NULL**; backfill DONE 2026-08-28) |
 | APPLICATION baseline | `baseline-adv-updater-20260731-post-cutover-app` / `RECONCILED` |
 | APPLICATION `source_history_hash` | `interim-forensics-20260731T093353Z` |
 | CONTROL baseline | `baseline-adv-updater-20260731-control-plane` / `RECONCILED` |
@@ -49,14 +49,14 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `be173f55d8d2c8df7170d209e1d50a73f3281b07` |
-| Platform digest | `sha256:83e41e08b70077dd377fea70c3b7be064294169c543c8070d02ecb6802e4dd61` |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:be173f55d8d2c8df7170d209e1d50a73f3281b07` |
-| App Deployments on this image | yes (phased CAS 2026-08-22; `free-bot` replicas=0) |
-| Last CONTROL | `app-db-control-be173f55-r1` → `DRY_RUN_OK` (CONTROL_DRY_RUN=1; no lease) |
-| Last migrate Job | `app-db-migrate-3ad2d7d6-r2` → SUCCESS `f2a3…`→`e8f9…` (unchanged; skip on be173 release) |
-| Last complete_release | `app-db-ctrlplane-3ad2d7d6-complete-r2` (prior full release; skipped on dry-run CAS) |
-| Prepared fallback (prior LKG) | tag `bb81f827f102b613a84f4f7a66d093668e1b2839` / digest `sha256:cdd6864dba2ecaa3e13d1fade70902aad771527e76a4e2823841b463f739156a` |
+| Image tag | `dd061bf0b1816937dbe5667f14a5ac22577b01b1` |
+| Platform digest | `sha256:d4878d958e4651ad75d176e130e0c8e1496d2b326b6a37660117100631551587` (CI index digest; digest_pin) |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:dd061bf0b1816937dbe5667f14a5ac22577b01b1` |
+| App Deployments on this image | **all entrypoints on `dd061bf0…`** (WB token rotation fix; schema unchanged); `free-bot` replicas=0 |
+| Last CONTROL | `app-db-control-dd061bf0-r1` → `ACQUIRED` (fencing_token=4; CONTROL_DRY_RUN=0) |
+| Last migrate Job | `app-db-migrate-dd061bf0-r1` → `SUCCESS_NOOP` (schema already `0b0fe484ba6b`) |
+| Last complete_release | `app-db-ctrlplane-dd061bf0-r1-complete` → OK lease released |
+| Prepared fallback (prior LKG) | tag `2077dd7511e9b57d36f177d3bb443b00fa954927` / digest `sha256:8db0e8e985fe8454e3e6208407becff7f600a698f76bce70815bca3fd017cb9a` |
 
 ## Open risks / follow-ups
 
@@ -71,6 +71,11 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 * Shop-runner operational noise (`NotFoundActiveAdvCompany`, keywords cache miss) is not schema regression.
 * **2026-08-22 v3 predeploy:** Q1 gate applied (`bot_active=FALSE` for 5 legacy rows). Orphan-cabinet admin `NoResultFound` — tech debt in `DOTO/WORKLOG.md` (not deploy blocker).
 * **2026-08-22 v3-only release DONE:** PR #438 → `be173f55…` phased CAS all entrypoints; migrate skip; shop-runner `replicas=1` (was already 1 pre-rollout).
+* **2026-08-28 land-free-bot release DONE:** PR #441 → `39e77cdd…`; CONTROL acquire token=2; migrate Expand `auto_update_minus_phrases` + merges → `0b0fe…`; phased CAS canary→shop-runner-last; complete_release OK. Minus-phrases backfill Job still deferred.
+* **2026-08-28 shop-runner rollback:** CAS `run-shop-update-worker` only → `be173f55…` (Owner: minus-phrases backfill not run; leave UI/`wb-sky-bot` on `39e77…`). Schema stays `0b0fe…` (nullable column; no downgrade).
+* **2026-08-28 UI rollback:** CAS `wb-sky-bot` + `free-bot` → `be173f55…` (Owner bug on land-free-bot UI). Schema stays `0b0fe…`; minus backfill still deferred; updater/asq/active-shops remain on `39e77…`.
+* **2026-08-28 SAFE_PROD_RELEASE 2077dd PARTIAL then RECOVERED:** CONTROL token=3; migrate Failed (SET ROLE skip on NOOP backfill). Recovery GO: `app-db-backfill-minus-2077dd751-r1` with `SET ROLE app_owner` → updated 69823 / enabled 13; mark_succeeded → begin → phased CAS all → `2077dd…` → complete_release OK. Product debt: `migrate.py` must `_maybe_set_role` before backfill when `current == target`.
+* Post-release watch: shop-runner `NotFoundActiveAdvCompany` remains known noise; monitor FREE/PAID overlays, owner-check UI, v3 cycles, updater restarts, minus auto-update for 13 bot_active rows.
 
 ## Action log (append-only summary)
 
@@ -92,3 +97,9 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-22 | Pre-v3-cutover gate: `advsetting.bot_active=FALSE` where `bot_active=TRUE AND automatic_version!=3` | UPDATE 5 rows (ids 1151716277–1151716280, 201852); Q1 verify 0 rows |
 | 2026-08-22 | PR #438 merge → stage CI `be173f55…`; CONTROL DRY_RUN_OK; canary CAS `run-update-active-shop-ids` | pod Running on `be173f55…`; migrate skip; остальные на `bb81f827…` |
 | 2026-08-22 | Phased CAS waves 2–7 all entrypoints → `be173f55…` | all Running 0 restarts; v3 shop-runner cycles OK; wb-sky-bot polling; LKG `be173f55…` |
+| 2026-08-28 | GO safe_prod_release `39e77cdd…` CONTROL_DRY_RUN=0 phased shop_runner_last | CONTROL ACQUIRED token=2 → migrate SUCCESS `0b0fe…` → begin → CAS W1–W6 → complete_release OK; LKG `39e77cdd…` |
+| 2026-08-28 | CAS rollback `run-shop-update-worker` only → `be173f55…` | UI/`wb-sky-bot` stays `39e77…`; schema `0b0fe…`; minus backfill still deferred |
+| 2026-08-28 | CAS rollback `wb-sky-bot` + `free-bot` → `be173f55…` | UI + shop-runner on `be173f55…`; schema `0b0fe…`; minus backfill still deferred |
+| 2026-08-28 | GO safe_prod_release `2077dd751…` CONTROL_DRY_RUN=0 + backfill | CONTROL ACQUIRED token=3; mark_started OK; migrate Failed (SET ROLE skip on NOOP backfill); **PARTIAL — lease held; no CAS** |
+| 2026-08-28 | GO recovery SET_ROLE_BACKFILL + CAS `2077dd…` | backfill OK 69823/13; mark_succeeded→begin→CAS W1–W6→complete; lease released; LKG `2077dd…` |
+| 2026-09-05 | GO safe_prod_release `dd061bf0…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=4 → mark_started → migrate SUCCESS_NOOP `0b0fe…` → mark_noop → begin → CAS all entrypoints → complete_release OK; LKG `dd061bf0…` (WB token rotation) |

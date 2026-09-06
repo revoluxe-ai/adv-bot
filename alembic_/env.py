@@ -1,4 +1,9 @@
-# alembic_/env.py
+"""Alembic environment configuration for project migrations.
+
+Keeps the application logger tree intact during migration runs so test and
+runtime log capture continue to work after Alembic initializes its own logging.
+"""
+
 import os
 from logging.config import fileConfig
 
@@ -24,14 +29,15 @@ dotenv.load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
-# Job wrapper may pass DATABASE_URL; otherwise legacy POSTGRES_* settings.
-row = get_alchemy_row_for_migration()
-config.set_main_option("sqlalchemy.url", row)
+# Job wrapper may pass DATABASE_URL; pytest stamp passes connection via attributes.
+if config.attributes.get("connection") is None:
+    row = get_alchemy_row_for_migration()
+    config.set_main_option("sqlalchemy.url", row)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support

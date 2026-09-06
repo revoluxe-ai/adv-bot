@@ -884,9 +884,16 @@ def get_keyword_setting_keyboard(
 
 
 def get_subscribe_keyboard() -> InlineKeyboardMarkup:
+    """Build the support-channel subscription keyboard."""
     builder = InlineKeyboardBuilder()
     _ = builder.row(
-        InlineKeyboardButton(text="Подписаться", url="https://t.me/auto_wb_master")
+        InlineKeyboardButton(text="Подписаться", url=const.SUPPORT_CHANNEL_URL)
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Проверить подписку",
+            callback_data=callbacks.CheckSubscribe().pack(),
+        )
     )
     return builder.as_markup()
 
@@ -923,7 +930,7 @@ def get_shop_menu_keyboard(
     if is_active_adv:
         _ = builder.row(
             InlineKeyboardButton(
-                text="Отключить все кампании",
+                text="Полностью отключить бот от управления всех РК",
                 callback_data=callbacks.TurnBot(
                     action="off_all", wb_user_cabinet_original_id=wb_user_cabinet.id
                 ).pack(),

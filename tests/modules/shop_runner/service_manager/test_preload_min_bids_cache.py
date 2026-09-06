@@ -69,7 +69,7 @@ async def test_preload_min_bids_cache_miss_calls_only_miss_refresh() -> None:
             tasks_manager=TasksManager(max_workers=1),
             wb_manager_hub=wb_manager_hub,
         )
-        await _unwrap(mgr.preload_min_bids_cache_miss)(mgr)
+        await _unwrap(mgr.preload_min_bids_cache_miss)(mgr, only_bot_active=False)
 
     wb_manager.find_min_bids_cache_miss_cells.assert_has_calls(
         [
@@ -136,7 +136,7 @@ async def test_preload_min_bids_cache_miss_no_cells_does_not_touch_event_refresh
         )
         clear_mock = MagicMock(wraps=mgr._min_bids_old_refresh_permitted.clear)
         mgr._min_bids_old_refresh_permitted.clear = clear_mock
-        await _unwrap(mgr.preload_min_bids_cache_miss)(mgr)
+        await _unwrap(mgr.preload_min_bids_cache_miss)(mgr, only_bot_active=False)
 
     clear_mock.assert_not_called()
     wb_manager.refresh_min_bids_cache_miss_cells.assert_not_called()
@@ -189,7 +189,7 @@ async def test_preload_min_bids_cache_old_calls_full_refresh_after_wait() -> Non
             tasks_manager=TasksManager(max_workers=1),
             wb_manager_hub=wb_manager_hub,
         )
-        await _unwrap(mgr.preload_min_bids_cache_old)(mgr)
+        await _unwrap(mgr.preload_min_bids_cache_old)(mgr, only_bot_active=False)
 
     wb_manager.refresh_min_bids_cache.assert_awaited_once_with([adv])
     wb_manager.find_min_bids_cache_miss_cells.assert_not_called()
@@ -254,10 +254,10 @@ async def test_miss_wb_refresh_waits_while_old_holds_lock() -> None:
             tasks_manager=TasksManager(max_workers=1),
             wb_manager_hub=wb_manager_hub,
         )
-        t_old = asyncio.create_task(_unwrap(mgr.preload_min_bids_cache_old)(mgr))
+        t_old = asyncio.create_task(_unwrap(mgr.preload_min_bids_cache_old)(mgr, only_bot_active=False))
         await asyncio.wait_for(old_entered.wait(), timeout=2.0)
 
-        t_miss = asyncio.create_task(_unwrap(mgr.preload_min_bids_cache_miss)(mgr))
+        t_miss = asyncio.create_task(_unwrap(mgr.preload_min_bids_cache_miss)(mgr, only_bot_active=False))
         for _ in range(10):
             await asyncio.sleep(0)
         wb_manager.refresh_min_bids_cache_miss_cells.assert_not_called()

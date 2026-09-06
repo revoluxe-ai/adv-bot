@@ -72,8 +72,6 @@ $ARGUMENTS
 |--------------|--------|
 | pasted `EXTERNAL_CALL_COVERAGE_REPORT` / `GAPS:` / `SURFACES:` | primary input |
 | pasted `REFACTOR_AND_TEST_PACKET` | packetized primary input (preferred for mixed FAIL pipeline) |
-| pasted `SCENARIO_REFACTOR_AND_TEST_PACKET` | PG/CH seam + provider integration from Scenario coverage |
-| pasted `SCENARIO_CERTIFY_PACKET` | authored PG/CH provider tests awaiting authorized execution |
 | `kind=pg` \| `kind=ch` | optional filter; default = все PG+CH FAIL gaps из packet |
 | `symbols=a,b` | optional subset of SYMBOL names |
 | `base=` | **запрещён** → `STATUS=BLOCKED`; скажи: base только у coverage |
@@ -97,66 +95,19 @@ $ARGUMENTS
 Если прислан `TEST_ONLY_PACKET` (без REFACTOR_AND_TEST items) →
 `STATUS=BLOCKED_REDIRECT_TEST_ONLY_PACKET` и отправь в `/opsx-test`.
 
-Если прислан `SCENARIO_TEST_ONLY_PACKET` без PG/CH refactor/certify items →
-`STATUS=BLOCKED_REDIRECT_TEST_ONLY_PACKET` и отправь в `/opsx-test`, сохранив
-Scenario/GAP identity.
-
 ## Required input
 
-Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH, нет
-`REFACTOR_AND_TEST_PACKET`, `SCENARIO_REFACTOR_AND_TEST_PACKET` или
-`SCENARIO_CERTIFY_PACKET` с PG|CH items →
-`STATUS=BLOCKED_NEEDS_PACKET`.
+Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH и нет
+`REFACTOR_AND_TEST_PACKET` с PG|CH items → `STATUS=BLOCKED_NEEDS_PACKET`.
 
 Спроси один раз:
 
 ```text
-Вставь EXTERNAL_CALL_COVERAGE_REPORT / GAPS / REFACTOR_AND_TEST_PACKET из
-/opsx-external-call-coverage либо Scenario packet из
-/opsx-spec-scenario-coverage. base= здесь не нужен.
+Вставь EXTERNAL_CALL_COVERAGE_REPORT / GAPS или REFACTOR_AND_TEST_PACKET из
+/opsx-external-call-coverage. base= здесь не нужен.
 ```
 
 Не выдумывай gaps из git diff.
-
-## Scenario coverage packets
-
-Authority:
-`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
-Taxonomy:
-`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
-
-Для `SCENARIO_REFACTOR_AND_TEST_PACKET`:
-
-1. принять только `SCHEMA_VERSION=1`, `DISPOSITION=REFACTOR_AND_TEST`,
-   `KIND=PG|CH`;
-2. сохранить `CHANGE_ID`, `GAP_ID`, Windows-safe `GAP_FILE_ID`,
-   `SCENARIO_ID`, `CONTRACT_ID` и hashes;
-3. сверить `SOURCE_SPEC_SHA`, `WORKTREE_FINGERPRINT` и `CONTRACT_SHA`;
-4. stale packet → `DATA_GAP`, без edits;
-5. создать минимальный production seam и real provider integration tests;
-6. использовать переданный reviewed `ContractCase`;
-7. не менять semantic expectation ContractCase/golden.
-
-Если production reality противоречит ContractCase:
-
-```text
-STATUS: BLOCKED_CONTRACT_MISMATCH
-```
-
-Не обновляй golden текущим provider output. Material behavior ambiguity
-принадлежит Owner/planning route.
-
-Для `SCENARIO_CERTIFY_PACKET`:
-
-1. production/test authorship не повторять без freshness gap;
-2. проверить exact provider test ids и все hashes;
-3. принять `INDEPENDENT_REAUDIT` только по schema
-   `.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`, включая
-   `GAP_FILE_IDS`, audited-state hashes и `ALLOWED_RUN_BLOCK_SHA256`;
-4. без valid independent re-audit и `AUTHORIZE_ONE_LIVE_RUN` вернуть
-   `BLOCKED_NEEDS_LIVE_RUN_AUTH` либо `BLOCKED_NEEDS_INDEPENDENT_REAUDIT`;
-5. после фактического запуска создать `PROVIDER_EXECUTION_RECEIPT`;
-6. не выдавать `SCENARIO_TEST_COVERAGE_PASS`.
 
 ## LOC_LINK (mandatory for report items)
 
@@ -246,7 +197,6 @@ Accept **only** together with:
 
 ```text
 INDEPENDENT_REAUDIT:
-  SOURCE_COMMAND: /opsx-external-call-coverage | /opsx-spec-scenario-coverage
   VERDICT: READY_FOR_ONE_AUTHORIZED_RUN
   AUDITED_HEAD: <sha>
   AUDITED_STATUS_SHA256: <sha256>
@@ -562,8 +512,6 @@ Allowed under autonomous refactor + causal scope:
 * local and shared test helpers/fixtures/factories when required by gap;
 * new local integration tests and mock-only unit tests;
 * docstrings on changed public symbols.
-* `.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md`
-  только после фактического authorized provider run по Scenario packet.
 
 Forbidden:
 
@@ -579,8 +527,7 @@ Forbidden:
 ## Steps
 
 1. Разобрать packet; извлечь `BASE`, `HEAD`, FAIL gaps (или items из
-   `REFACTOR_AND_TEST_PACKET` / Scenario packets); применить filter
-   `kind` / `symbols`.
+   `REFACTOR_AND_TEST_PACKET`); применить filter `kind` / `symbols`.
    Для items с location перенести/сформировать `LOC_LINK`.
 2. Если `base=` в args → `BLOCKED` (не путать с BASE внутри packet).
 3. Если нет PG/CH FAIL gaps → `BLOCKED_NEEDS_PACKET` или
@@ -594,24 +541,20 @@ Forbidden:
    mock-only unit as needed.
 8. Do **NOT** run live/destructive pytest unless `AUTHORIZE_ONE_LIVE_RUN`
    + valid `INDEPENDENT_REAUDIT` present and audited-state preflight passes.
-9. После Scenario live run создать `PROVIDER_EXECUTION_RECEIPT` по shared
-   schema; receipt не равен final coverage PASS.
-10. Print Final report as self-report + pasteable independent re-audit
-    (`PACKET_BASE` для ECC или Scenario identity для Scenario route).
+9. Print Final report as self-report + pasteable independent re-audit
+   (`PACKET_BASE`).
 
 ## Status
 
 | STATUS | Когда |
 |--------|--------|
 | `READY_FOR_READ_ONLY_REAUDIT` | seam/helper/test code authored; mock-only checks done; awaiting independent coverage |
-| `PROVIDER_EXECUTION_RECEIPT_READY` | authorized Scenario provider tests выполнены; receipt создан; awaiting scenario certify |
 | `BLOCKED_NEEDS_PACKET` | нет входа из coverage |
 | `BLOCKED_REDIRECT_TEST_ONLY` | gaps не PG/CH refactor path → `/opsx-test` |
 | `BLOCKED_REDIRECT_TEST_ONLY_PACKET` | передан только `TEST_ONLY_PACKET` → `/opsx-test` |
 | `BLOCKED_NEEDS_SEAM_SCOPE` | нужна broad business feature, не seam/refactor → `/opsx-apply` |
 | `BLOCKED_NEEDS_LIVE_RUN_AUTH` | live invoke without `AUTHORIZE_ONE_LIVE_RUN` |
 | `BLOCKED_NEEDS_INDEPENDENT_REAUDIT` | live token without valid independent packet |
-| `BLOCKED_CONTRACT_MISMATCH` | provider reality и reviewed ContractCase расходятся; auto-update forbidden |
 | `DATA_GAP` | audited state changed / non-regular untracked / dangerous operational area / missing evidence |
 | `BLOCKED` | неизвестный token / `base=` в args / preflight |
 
@@ -623,12 +566,10 @@ as independent truth. Optional internal counters (`SEAMS_AUTHORED`,
 ## Final report (required)
 
 ```text
-STATUS: READY_FOR_READ_ONLY_REAUDIT | PROVIDER_EXECUTION_RECEIPT_READY | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_REDIRECT_TEST_ONLY_PACKET | BLOCKED_NEEDS_SEAM_SCOPE | BLOCKED_NEEDS_LIVE_RUN_AUTH | BLOCKED_NEEDS_INDEPENDENT_REAUDIT | BLOCKED_CONTRACT_MISMATCH | DATA_GAP | BLOCKED
+STATUS: READY_FOR_READ_ONLY_REAUDIT | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_REDIRECT_TEST_ONLY_PACKET | BLOCKED_NEEDS_SEAM_SCOPE | BLOCKED_NEEDS_LIVE_RUN_AUTH | BLOCKED_NEEDS_INDEPENDENT_REAUDIT | DATA_GAP | BLOCKED
 
 PACKET_BASE: <from report>
 PACKET_HEAD: <from report>
-SCENARIO_CHANGE_ID: <from Scenario packet | n/a>
-SCENARIO_GAP_IDS: <from Scenario packet | n/a>
 KIND_FILTER: pg|ch|pg+ch|…
 GAPS_SELECTED: <n>
 
@@ -652,21 +593,6 @@ TESTS_AUTHORED:
 
 LIVE_RUN: not_attempted | authorized_pass | authorized_fail | blocked_no_auth
 
-PROVIDER_EXECUTION_RECEIPTS:
-- PATH: .tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
-  GAP_ID:
-  GAP_FILE_ID:
-  SCENARIO_ID:
-  CONTRACT_ID:
-  CONTRACT_SHA:
-  TEST_CONTENT_SHA:
-  PRODUCTION_BOUNDARY_SHA:
-  SCHEMA_SHA:
-  WORKTREE_FINGERPRINT:
-  RESULT:
-  LOG_SHA:
-  SECRETS_REDACTED: YES
-
 CLOSE_RESULTS:
 - SYMBOL: <name>
   PATH: <path>
@@ -675,8 +601,14 @@ CLOSE_RESULTS:
   MODE: REFACTOR_AND_TEST|TEST_ONLY_REDIRECT
   DISPOSITION_BEFORE: …
   RESULT: AUTHORED|REMAINING|REDIRECTED|BLOCKED
+  EXPECTED_REAUDIT: COVERED | WEAK_HANDOFF_ONLY | REMAINING | UNKNOWN
   NOTE: implementation self-report only; not independent PASS/CLOSED
         (| SQL_REWRITE_UNPROVEN when SQL rewritten + only HANDOFF_MOCK_ONLY)
+
+EXPECTED_REAUDIT_SUMMARY:
+- COVERED: <n>
+- WEAK_HANDOFF_ONLY: <n>   # re-audit FAIL expected; progress from UNTESTABLE
+- REMAINING: <n>
 
 WHAT_HAPPENED:
 WHY:
@@ -692,12 +624,17 @@ DO_NOT_DO_YET:
 
 * `READY_FOR_READ_ONLY_REAUDIT` →  
   `/opsx-external-call-coverage base=<PACKET_BASE> focus=<kind>`  
-  затем при focused PASS / independent live-ready verdict → owner may
+  **Expected interim:** items with `EXPECTED_REAUDIT=WEAK_HANDOFF_ONLY`
+  usually remain `WEAK_EVIDENCE` FAIL on re-audit — that is **progress**
+  from `UNTESTABLE_SEAM`, not “close did nothing”. Next work for those
+  symbols is integration / live evidence (or close TEST_ONLY_REDIRECT /
+  integration authorship), **not** reinventing `*_in_session`.
+  WHAT_HAPPENED MUST list AUTHORED counts vs how many are expected
+  still-FAIL-as-WEAK.
+  Только после focused PASS / independent live-ready verdict → owner may
   authorize one live run; then coverage `focus=all` as needed.
-  Для Scenario packet → `/opsx-spec-scenario-coverage mode=audit
-  change=<SCENARIO_CHANGE_ID>`.
-* `PROVIDER_EXECUTION_RECEIPT_READY` →
-  `/opsx-spec-scenario-coverage mode=certify change=<SCENARIO_CHANGE_ID>`.
+  Do **not** imply focused PASS is the immediate next milestone after
+  handoff-only close.
 * `BLOCKED_REDIRECT_TEST_ONLY` → `/opsx-test` затем coverage rerun.
 * `BLOCKED_REDIRECT_TEST_ONLY_PACKET` → `/opsx-test` с этим packet, затем coverage rerun.
 * `BLOCKED_NEEDS_PACKET` → попросить paste report.
@@ -706,8 +643,6 @@ DO_NOT_DO_YET:
   independent `READY_FOR_ONE_AUTHORIZED_RUN`.
 * `BLOCKED_NEEDS_INDEPENDENT_REAUDIT` → run independent coverage/re-audit
   first.
-* `BLOCKED_CONTRACT_MISMATCH` → Owner/planning decision; не auto-update
-  ContractCase/golden.
 * `DATA_GAP` (`AUDITED_STATE_CHANGED` or operational danger) → new re-audit
   and/or redirect to the owning operational command.
 
@@ -729,6 +664,11 @@ DO_NOT_DO_YET:
 * Не treat `GO` / `AUTHORIZE_COMMAND_FIX` as live auth.
 * Не делать opportunistic refactor вне causal scope.
 * Do not stage, commit, push, or invoke commit commands.
+* Не трактовать post-handoff re-audit `WEAK_EVIDENCE` FAIL как
+  «close ничего не сделал» / нулевой прогресс.
+* Не подразумевать focused PASS сразу после handoff-only
+  `READY_FOR_READ_ONLY_REAUDIT` без `EXPECTED_REAUDIT=COVERED`.
+* Не опускать `EXPECTED_REAUDIT` на AUTHORED CLOSE_RESULTS items.
 
 ## Handoff
 
@@ -736,9 +676,6 @@ DO_NOT_DO_YET:
 |------|-----|
 | `/opsx-external-call-coverage` FAIL PG/CH / UNTESTABLE | this (paste report) |
 | this `READY_FOR_READ_ONLY_REAUDIT` | coverage `focus=<kind>` → independent verdict → optional live auth → `focus=all` |
-| `/opsx-spec-scenario-coverage` PG/CH REFACTOR_AND_TEST | this (paste Scenario packet) |
-| this Scenario authorship self-report | `/opsx-spec-scenario-coverage mode=audit` |
-| this `PROVIDER_EXECUTION_RECEIPT_READY` | `/opsx-spec-scenario-coverage mode=certify` |
 | TEST_ONLY gaps | `/opsx-test` |
 | broad business feature | `/opsx-apply` |
 
@@ -764,11 +701,6 @@ DO_NOT_DO_YET:
 | 16 | Live token reuse | reject; need new re-audit + token |
 | 17 | Prod CH/PG SQL/db qualification rewritten; only handoff mock patches away rewritten callable | forbidden as sole pre-live proof; need `SQL_CONTRACT_UNIT` or `RESULT=REMAINING` / `NOTE=SQL_REWRITE_UNPROVEN` |
 | 18 | Prod SQL rewritten + capturing fake client asserts SQL contract | `TESTS_AUTHORED` tag `SQL_CONTRACT_UNIT`; store path may be AUTHORED (still not independent PASS) |
-| 19 | Valid Scenario REFACTOR packet | preserve Scenario/GAP/Contract identity; author seam + provider tests |
-| 20 | Scenario TEST_ONLY packet | redirect unchanged to `/opsx-test` |
-| 21 | Scenario ContractCase differs from provider reality | `BLOCKED_CONTRACT_MISMATCH`; no golden rewrite |
-| 22 | Valid Scenario certify + re-audit + live token | one run; Windows-safe provider receipt; no Scenario PASS |
-| 23 | Scenario receipt hashes stale after run | receipt remains evidence for old snapshot; certification must re-audit |
 
 ## Regression checks (self)
 
@@ -779,6 +711,8 @@ DO_NOT_DO_YET:
 - [ ] PG evidence: explicit `read_only=` matches WRITE|PURE_READ|READ_AFTER_WRITE (no bare)
 - [ ] NEXT_ACTION re-audit использует PACKET_BASE, не выдуманный base
 - [ ] Final report напечатан as self-report (no independent PASS/CLOSED)
+- [ ] AUTHORED CLOSE_RESULTS include `EXPECTED_REAUDIT`; summary printed
+- [ ] READY_FOR_READ_ONLY_REAUDIT warns WEAK-after-handoff is expected interim
 - [ ] У каждого relevant result/seam/test item есть `LOC_LINK` (`<path>:<line>`)
 - [ ] HELPER_DISCOVERY / HELPER_STRATEGY printed; new helper not auto-BLOCKED
 - [ ] no design/protected approval tokens required for normal close
@@ -786,4 +720,87 @@ DO_NOT_DO_YET:
 - [ ] causal SCOPE_EXPANSION is informational, not permission ask
 - [ ] simulation matrix scenarios considered (static/dry-run)
 - [ ] PG/CH SQL rewrite → `SQL_CONTRACT_UNIT` or REMAINING/`SQL_REWRITE_UNPROVEN`; no sole handoff mock of rewritten callable
-- [ ] no stage/commit/push/commit-command invoke
+- [ ] no stage/commit/push/commit-command invoke| pasted `SCENARIO_REFACTOR_AND_TEST_PACKET` | PG/CH seam + provider integration from Scenario coverage |
+| pasted `SCENARIO_CERTIFY_PACKET` | authored PG/CH provider tests awaiting authorized execution |
+Если прислан `SCENARIO_TEST_ONLY_PACKET` без PG/CH refactor/certify items →
+`STATUS=BLOCKED_REDIRECT_TEST_ONLY_PACKET` и отправь в `/opsx-test`, сохранив
+Scenario/GAP identity.
+Если нет packet / GAPS / SURFACES с FAIL dispositions для PG|CH, нет
+`REFACTOR_AND_TEST_PACKET`, `SCENARIO_REFACTOR_AND_TEST_PACKET` или
+`SCENARIO_CERTIFY_PACKET` с PG|CH items →
+`STATUS=BLOCKED_NEEDS_PACKET`.
+Вставь EXTERNAL_CALL_COVERAGE_REPORT / GAPS / REFACTOR_AND_TEST_PACKET из
+/opsx-external-call-coverage либо Scenario packet из
+/opsx-spec-scenario-coverage. base= здесь не нужен.
+## Scenario coverage packets
+Authority:
+`.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`.
+Taxonomy:
+`.cursor/pipeline/contracts/TEST_EVIDENCE_TAXONOMY.md`.
+Для `SCENARIO_REFACTOR_AND_TEST_PACKET`:
+1. принять только `SCHEMA_VERSION=1`, `DISPOSITION=REFACTOR_AND_TEST`,
+   `KIND=PG|CH`;
+2. сохранить `CHANGE_ID`, `GAP_ID`, Windows-safe `GAP_FILE_ID`,
+   `SCENARIO_ID`, `CONTRACT_ID` и hashes;
+3. сверить `SOURCE_SPEC_SHA`, `WORKTREE_FINGERPRINT` и `CONTRACT_SHA`;
+4. stale packet → `DATA_GAP`, без edits;
+5. создать минимальный production seam и real provider integration tests;
+6. использовать переданный reviewed `ContractCase`;
+7. не менять semantic expectation ContractCase/golden.
+Если production reality противоречит ContractCase:
+STATUS: BLOCKED_CONTRACT_MISMATCH
+Не обновляй golden текущим provider output. Material behavior ambiguity
+принадлежит Owner/planning route.
+Для `SCENARIO_CERTIFY_PACKET`:
+1. production/test authorship не повторять без freshness gap;
+2. проверить exact provider test ids и все hashes;
+3. принять `INDEPENDENT_REAUDIT` только по schema
+   `.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md`, включая
+   `GAP_FILE_IDS`, audited-state hashes и `ALLOWED_RUN_BLOCK_SHA256`;
+4. без valid independent re-audit и `AUTHORIZE_ONE_LIVE_RUN` вернуть
+   `BLOCKED_NEEDS_LIVE_RUN_AUTH` либо `BLOCKED_NEEDS_INDEPENDENT_REAUDIT`;
+5. после фактического запуска создать `PROVIDER_EXECUTION_RECEIPT`;
+6. не выдавать `SCENARIO_TEST_COVERAGE_PASS`.
+  SOURCE_COMMAND: /opsx-external-call-coverage | /opsx-spec-scenario-coverage
+* `.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md`
+  только после фактического authorized provider run по Scenario packet.
+   `REFACTOR_AND_TEST_PACKET` / Scenario packets); применить filter
+   `kind` / `symbols`.
+9. После Scenario live run создать `PROVIDER_EXECUTION_RECEIPT` по shared
+   schema; receipt не равен final coverage PASS.
+10. Print Final report as self-report + pasteable independent re-audit
+    (`PACKET_BASE` для ECC или Scenario identity для Scenario route).
+| `PROVIDER_EXECUTION_RECEIPT_READY` | authorized Scenario provider tests выполнены; receipt создан; awaiting scenario certify |
+| `BLOCKED_CONTRACT_MISMATCH` | provider reality и reviewed ContractCase расходятся; auto-update forbidden |
+STATUS: READY_FOR_READ_ONLY_REAUDIT | PROVIDER_EXECUTION_RECEIPT_READY | BLOCKED_NEEDS_PACKET | BLOCKED_REDIRECT_TEST_ONLY | BLOCKED_REDIRECT_TEST_ONLY_PACKET | BLOCKED_NEEDS_SEAM_SCOPE | BLOCKED_NEEDS_LIVE_RUN_AUTH | BLOCKED_NEEDS_INDEPENDENT_REAUDIT | BLOCKED_CONTRACT_MISMATCH | DATA_GAP | BLOCKED
+SCENARIO_CHANGE_ID: <from Scenario packet | n/a>
+SCENARIO_GAP_IDS: <from Scenario packet | n/a>
+PROVIDER_EXECUTION_RECEIPTS:
+- PATH: .tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
+  GAP_ID:
+  GAP_FILE_ID:
+  SCENARIO_ID:
+  CONTRACT_ID:
+  CONTRACT_SHA:
+  TEST_CONTENT_SHA:
+  PRODUCTION_BOUNDARY_SHA:
+  SCHEMA_SHA:
+  WORKTREE_FINGERPRINT:
+  RESULT:
+  LOG_SHA:
+  SECRETS_REDACTED: YES
+  затем при focused PASS / independent live-ready verdict → owner may
+  Для Scenario packet → `/opsx-spec-scenario-coverage mode=audit
+  change=<SCENARIO_CHANGE_ID>`.
+* `PROVIDER_EXECUTION_RECEIPT_READY` →
+  `/opsx-spec-scenario-coverage mode=certify change=<SCENARIO_CHANGE_ID>`.
+* `BLOCKED_CONTRACT_MISMATCH` → Owner/planning decision; не auto-update
+  ContractCase/golden.
+| `/opsx-spec-scenario-coverage` PG/CH REFACTOR_AND_TEST | this (paste Scenario packet) |
+| this Scenario authorship self-report | `/opsx-spec-scenario-coverage mode=audit` |
+| this `PROVIDER_EXECUTION_RECEIPT_READY` | `/opsx-spec-scenario-coverage mode=certify` |
+| 19 | Valid Scenario REFACTOR packet | preserve Scenario/GAP/Contract identity; author seam + provider tests |
+| 20 | Scenario TEST_ONLY packet | redirect unchanged to `/opsx-test` |
+| 21 | Scenario ContractCase differs from provider reality | `BLOCKED_CONTRACT_MISMATCH`; no golden rewrite |
+| 22 | Valid Scenario certify + re-audit + live token | one run; Windows-safe provider receipt; no Scenario PASS |
+| 23 | Scenario receipt hashes stale after run | receipt remains evidence for old snapshot; certification must re-audit |

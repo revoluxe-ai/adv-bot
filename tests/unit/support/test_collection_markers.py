@@ -126,6 +126,9 @@ def test_no_duplicate_pytestmark_assignment_in_test_modules() -> None:
 
     for path in _iter_test_files(tests_root):
         src = path.read_text(encoding="utf-8-sig")
+        # Без двух вхождений pytestmark повторного assignment быть не может.
+        if src.count("pytestmark") < 2:
+            continue
         tree = ast.parse(src)
         assignments = 0
         for node in tree.body:
@@ -163,6 +166,12 @@ def test_destructive_fixture_callers_have_effective_marker() -> None:
 
     for path in _iter_test_files(tests_root):
         src = path.read_text(encoding="utf-8-sig")
+        # Fast-path: без risky fixture и без destructive_local AST не нужен —
+        # файл не может дать missing_marker / leaked_module_scope.
+        if "destructive_local" not in src and not any(
+            name in src for name in risky_fixtures
+        ):
+            continue
         tree = ast.parse(src)
 
         module_mark_assignments: list[ast.Assign] = []

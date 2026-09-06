@@ -431,6 +431,7 @@ class TestInfraLifecycle:
             self._compose_cmd = self.docker_preflight()
 
         compose_up_args = self._decide_up_args(services)
+        reusing_external_healthy = "--force-recreate" not in compose_up_args
         rc, _out, err = self.sync_run(
             *self._compose_cmd,
             "-f",
@@ -440,7 +441,9 @@ class TestInfraLifecycle:
             timeout=180,
         )
         self.state.compose_up_count += 1
-        self.state.compose_started_by_pytest = True
+        # External /opsx-test-env stack: healthy reuse must not claim pytest ownership.
+        if not reusing_external_healthy:
+            self.state.compose_started_by_pytest = True
         if rc != 0:
             self.raise_docker_stage(
                 stage="up",
@@ -485,7 +488,9 @@ class TestInfraLifecycle:
                 cid,
                 timeout=10,
             )
-            if rc_inspect != 0 or (status_out or "").strip() != "healthy":
+            status = (status_out or "").strip() if rc_inspect == 0 else ""
+            is_healthy = status == "healthy" or status.endswith(" healthy")
+            if rc_inspect != 0 or not is_healthy:
                 all_healthy = False
                 break
         if all_healthy and services:

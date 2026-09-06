@@ -41,8 +41,10 @@ def test_shops_list_page_text_equals_title() -> None:
     assert "[Каб][Ток]" in page.text
 
 
-def test_get_shops_list_keyboard_empty_list() -> None:
-    """Empty shops: Add, Мой баланс, Показать инвайт, Назад."""
+@patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
+def test_get_shops_list_keyboard_empty_list(mock_settings) -> None:
+    """Empty shops with invite_gate on: Add, balance, invite, Back."""
+    mock_settings.invite_gate = True
     kb = get_shops_list_keyboard([], 123)
     rows = kb.inline_keyboard
     assert len(rows) == 4
@@ -57,13 +59,19 @@ def test_get_shops_list_keyboard_empty_list() -> None:
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")
-def test_get_shops_list_keyboard_empty_invite_even_when_invite_gate_off(mock_settings) -> None:
-    """Кнопка инвайта на списке магазинов не зависит от INVITE_GATE."""
+def test_get_shops_list_keyboard_empty_hides_invite_when_invite_gate_off(
+    mock_settings,
+) -> None:
+    """INVITE_GATE=false hides partner-invite on shops list."""
     mock_settings.invite_gate = False
     kb = get_shops_list_keyboard([], 123)
     rows = kb.inline_keyboard
-    assert len(rows) == 4
-    assert rows[2][0].text == "Показать инвайт"
+    assert len(rows) == 3
+    assert rows[0][0].text == "➕Добавить магазин"
+    assert rows[1][0].text == "Мой баланс"
+    assert rows[2][0].text == "Назад"
+    texts = [btn.text for row in rows for btn in row]
+    assert "Показать инвайт" not in texts
 
 
 @patch("app.client_bot.user_interface.handlers.shop_choice_message.settings")

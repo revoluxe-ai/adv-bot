@@ -20,7 +20,7 @@ FINAL_CONTROL: OWNER_REVIEWS_UNCOMMITTED_GIT_DIFF
 SUBAGENT_EXECUTION_REQUIRED: YES
 SINGLE_CHAT_ROLE_SIMULATION_ALLOWED: NO
 SUBAGENT_RUNTIME_MODEL: CURSOR_TASK_WORKERS
-MODEL_SELECTION_POLICY: auto
+MODEL_SELECTION_POLICY: inherit
 COMMIT_AUTHORITY: OWNER_ONLY
 GIT_COMMIT: FORBIDDEN
 GIT_PUSH: FORBIDDEN
@@ -256,7 +256,7 @@ For **every** worker hop call the Cursor **Task** tool using the shape in
 Rules:
 
 - `subagent_type` from registry (`generalPurpose` unless specialized);
-- **omit** `model` (auto / inherit only);
+- **`model: inherit`** (explicit — see `.cursor/pipeline/shared/MODEL_DISPATCH.md`);
 - unique `WORKER_EXECUTION_ID` per hop;
 - append `.tmp/opsx-bug-cases/<CASE_ID>/team/DISPATCH.jsonl` per
   `TASK_DISPATCH.md` **Append recipe** (prefer `live_task_hop`; ad-hoc

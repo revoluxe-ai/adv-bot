@@ -30,3 +30,71 @@ What this means for reviewers:
 
 If you disagree with this policy, open an RFC issue (label: architecture) instead of requesting ad-hoc code changes in feature PRs.
 
+На всякий случай (кратко)
+-------------------------
+
+- **Один ACK на callback** — делает ``ImmediateCallbackAnswerUpdateMiddleware`` на
+  ``Dispatcher`` до handler'а; см. ``app/client_bot/dispatcher_factory.py``.
+- **Handler'ы не вызывают** ``callback.answer()`` / ``query.answer()`` — иначе
+  кнопки залипают; см. ``BUGBOT.md`` для чеклиста ревью.
+- **Текст пользователю** — ``message.answer`` / ``bot.send_message``, не второй answer.
+- **Код-якорь:** ``app/client_bot/callback_helpers.py``.
+
+Handlers: не вызывать второй callback.answer()
+---------------------------------------------
+
+Pre-answer middleware **уже** вызвал ``callback.answer()`` на Dispatcher до handler'а
+(``app/client_bot/dispatcher_factory.py`` → ``ImmediateCallbackAnswerUpdateMiddleware``).
+Краткая выжимка для кода: ``app/client_bot/callback_helpers.py``.
+
+### Почему это важно
+
+Telegram принимает **один** ``answerCallbackQuery`` на inline query. Повторный
+``callback.answer()`` / ``query.answer()`` в handler'е:
+
+- часто падает с ``TelegramBadRequest``;
+- или пользователь видит только первый toast из middleware («Запрос в обработке»);
+- inline-кнопка **залипает** (spinner), пока query не протухнет.
+
+### Запрещено в handler'ах
+
+```python
+# Плохо — middleware уже ACK'нул query
+await callback.answer("Подписка подтверждена")
+await query.answer("Готово", show_alert=True)
+```
+
+### Разрешено
+
+- Логика handler'а (replay, FSM, ``NeedSubscribe``, переход в меню).
+- Текст пользователю — ``callback.message.answer(...)`` или ``bot.send_message(...)``,
+  **не** второй ``callback.answer()``.
+
+```python
+# Хорошо
+async def handler(callback: CallbackQuery, bot: Bot) -> None:
+    await do_work(...)
+    if callback.message is not None:
+        await callback.message.answer("Готово")
+```
+
+### Примеры в репо
+
+| Место | Контракт |
+|-------|----------|
+| ``user_subscribe_on_channel.check_subscribe`` | без ``callback.answer()`` |
+| ``card_ab_hold/telegram/handlers.py`` | AST: no ``query.answer`` |
+| ``card_ab_hold/telegram/confirm_handlers.py`` | ``_notify_callback_user`` → message/bot |
+
+### Тесты
+
+- ``tests/unit/client_bot/test_check_subscribe_no_callback_answer.py``
+- ``tests/unit/auto_updater_v3/card_ab_hold/test_handlers_no_callback_answer.py``
+- ``tests/client_bot/test_channel_subscription.py`` — ``callback.answer.assert_not_awaited()``
+
+### Чеклист при ревью PR
+
+- [ ] Новый/изменённый ``@router.callback_query`` — нет ``callback.answer()``?
+- [ ] Нет «fix» через второй answer; при необходимости — message/bot?
+- [ ] Pre-answer middleware не снят и не переехал после Gate?
+

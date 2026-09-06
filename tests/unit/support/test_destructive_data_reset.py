@@ -16,7 +16,9 @@ from tests.support.destructive_ch_reset import (
 from tests.support.destructive_clickhouse import ALLOWED_CH_DATABASE
 from tests.support.destructive_pg_reset import (
     PG_RESET_ADVISORY_LOCK_KEY,
+    PG_TERMINATE_OTHER_BACKENDS_SQL,
     PG_TRUNCATE_SQL,
+    init_postgres_schema_and_seed,
     is_pg_deadlock_error,
     reset_postgres_test_data,
 )
@@ -57,6 +59,42 @@ def test_pg_truncate_sql_restarts_identity_cascade() -> None:
     assert "RESTART IDENTITY" in PG_TRUNCATE_SQL
     assert "CASCADE" in PG_TRUNCATE_SQL
     assert "wbcabinet" in PG_TRUNCATE_SQL
+
+
+@pytest.mark.unit
+def test_pg_terminate_other_backends_sql_targets_client_backends() -> None:
+    """Terminate SQL не трогает свой pid и только client backend."""
+    assert "pg_terminate_backend" in PG_TERMINATE_OTHER_BACKENDS_SQL
+    assert "pg_backend_pid()" in PG_TERMINATE_OTHER_BACKENDS_SQL
+    assert "client backend" in PG_TERMINATE_OTHER_BACKENDS_SQL
+    assert "current_database()" in PG_TERMINATE_OTHER_BACKENDS_SQL
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_pg_schema_init_terminates_backends_before_drop() -> None:
+    """Bootstrap обязан terminate + timeouts до DROP SCHEMA (анти-hang)."""
+    conn = AsyncMock()
+    begin_cm = AsyncMock()
+    begin_cm.__aenter__.return_value = conn
+    begin_cm.__aexit__.return_value = None
+    engine = MagicMock()
+    engine.begin.return_value = begin_cm
+    conn.run_sync = AsyncMock(return_value=None)
+
+    with patch(
+        "tests.support.destructive_pg_reset._restore_baseline_wbcabinet",
+        new=AsyncMock(),
+    ):
+        await init_postgres_schema_and_seed(engine)
+
+    sqls = [str(call.args[0]) for call in conn.execute.await_args_list]
+    term_idx = next(i for i, s in enumerate(sqls) if "pg_terminate_backend" in s)
+    drop_idx = next(i for i, s in enumerate(sqls) if "DROP SCHEMA" in s)
+    assert any("lock_timeout" in s for s in sqls[:term_idx])
+    assert any("statement_timeout" in s for s in sqls[:term_idx])
+    assert term_idx < drop_idx
+    conn.run_sync.assert_awaited()
 
 
 @pytest.mark.unit

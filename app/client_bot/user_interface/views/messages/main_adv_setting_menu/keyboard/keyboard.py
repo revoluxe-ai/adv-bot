@@ -4,13 +4,13 @@
 from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.client_bot.ui_access import UiAccessMode
 from app.client_bot.user_interface.views import callbacks
 from .v3_rollout_aggressiveness_ui import v3_rollout_aggressiveness_main_button
 from .v3_calibration_step_ui import v3_calibration_step_main_button
 from .v3_tick_report_button import v3_tick_report_main_button
 from app.client_bot.user_interface.views.callbacks import (
     IncrementalStatsToggle,
-    TurnBot,
     OrdersSourceToggle,
     SalesPredictMethodToggle,
     ChangeAutoAddOnlyRelevantPhraseStatus,
@@ -116,9 +116,46 @@ def get_adv_setting_keyboard(
     wb_user_cabinet: WBUserCabinet,
     adv_setting: AdvSetting,
     in_favorites: bool,
+    ui_access: UiAccessMode = UiAccessMode.PAID,
 ):
     """Собрать inline-клавиатуру главного меню настроек кампании."""
     builder = InlineKeyboardBuilder()
+    is_paid_access = ui_access == UiAccessMode.PAID
+
+    auto_button_text = (
+        "🟢 Автоуправление включено"
+        if adv_setting.bot_active
+        else "🔴 Автоуправление выключено / подключить"
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=auto_button_text,
+            callback_data=callbacks.AutoManagementLanding(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
+
+    minus_phrases_enabled = bool(
+        getattr(adv_setting, "auto_update_minus_phrases", False)
+    )
+    minus_phrases_button_text = (
+        "🟢 Обновление минус-фраз: включено"
+        if minus_phrases_enabled
+        else "🔴 Обновление минус-фраз: выключено"
+    )
+    _ = builder.row(
+        InlineKeyboardButton(
+            text=minus_phrases_button_text,
+            callback_data=callbacks.MinusPhrasesSetting(
+                action="open",
+                adv_setting_original_id=adv_setting.id,
+                wb_user_cabinet_original_id=wb_user_cabinet.id,
+            ).pack(),
+        )
+    )
 
     """План продаж"""
     from .buttoms import sales_plan_button
@@ -148,11 +185,13 @@ def get_adv_setting_keyboard(
 
     """Рекомендательные системы (настройка)"""
     from .buttoms import rec_system_button
-    rec_bottom = rec_system_button.get(adv_setting, wb_user_cabinet)
-    _ = builder.row(rec_bottom)
+    if is_paid_access:
+        rec_bottom = rec_system_button.get(adv_setting, wb_user_cabinet)
+        _ = builder.row(rec_bottom)
 
     # TODO: Из free удалить все не не релевантных фраз, это только автомат
     # TODO: сделать для free отдельное описание Рел не рел Фраз
+
     relevant_button = InlineKeyboardButton(
         text="Управление релевантными и нерелевантными фразами",
         callback_data=ManageRelevantAndNonRelevantPhrases(
@@ -169,12 +208,13 @@ def get_adv_setting_keyboard(
     indiv_place_callback = IndividualKeywordsTargetPlaceToggle(
         adv_id=adv_setting.adv_id, new_status=not indiv_place_mode
     ).pack()
-    _ = builder.row(
-        InlineKeyboardButton(
-            text=indiv_place_text,
-            callback_data=indiv_place_callback,
+    if is_paid_access:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text=indiv_place_text,
+                callback_data=indiv_place_callback,
+            )
         )
-    )
     white_list_button = InlineKeyboardButton(
         text="Режимы Управления Белым Списком",
         callback_data=WhiteListModeMenu(adv_id=adv_setting.adv_id).pack(),
@@ -207,9 +247,10 @@ def get_adv_setting_keyboard(
     common_bid_callback = ChangeCommonBidInSearchAdvStatus(
         adv_id=adv_setting.adv_id, new_status=not common_bid_active
     ).pack()
-    _ = builder.row(
-        InlineKeyboardButton(text=common_bid_text, callback_data=common_bid_callback)
-    )
+    if is_paid_access:
+        _ = builder.row(
+            InlineKeyboardButton(text=common_bid_text, callback_data=common_bid_callback)
+        )
 
 
 
@@ -230,15 +271,16 @@ def get_adv_setting_keyboard(
             callback_data=TS(a="open", adv=adv_setting.id).pack(),
         )
     )
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Стратегия РК",
-            callback_data=callbacks.StrategyMenu(
-                action="open",
-                adv_setting_original_id=adv_setting.id,
-            ).pack(),
+    if is_paid_access:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Стратегия РК",
+                callback_data=callbacks.StrategyMenu(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                ).pack(),
+            )
         )
-    )
 
     button = InlineKeyboardButton(
         text="Управление ставкой",
@@ -247,26 +289,28 @@ def get_adv_setting_keyboard(
         ).pack(),
     )
     _ = builder.row(button)
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Управление ставкой в полках",
-            callback_data=callbacks.AutoShelfBidControlMenu(
-                action="open",
-                adv_setting_original_id=adv_setting.id,
-            ).pack(),
+    if is_paid_access:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Управление ставкой в полках",
+                callback_data=callbacks.AutoShelfBidControlMenu(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                ).pack(),
+            )
         )
-    )
 
-    _ = builder.row(
-        InlineKeyboardButton(
-            text="Перепривязать кампании WB",
-            callback_data=RebindAdvCampaignIds(
-                action="menu",
-                adv_setting_original_id=adv_setting.id,
-                wb_user_cabinet_original_id=wb_user_cabinet.id,
-            ).pack(),
+    if is_paid_access:
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Перепривязать кампании WB",
+                callback_data=RebindAdvCampaignIds(
+                    action="menu",
+                    adv_setting_original_id=adv_setting.id,
+                    wb_user_cabinet_original_id=wb_user_cabinet.id,
+                ).pack(),
+            )
         )
-    )
 
     watchdog_enabled = getattr(adv_setting, "auto_budget_watchdog_enabled", False)
     watchdog_button = InlineKeyboardButton(
@@ -280,10 +324,11 @@ def get_adv_setting_keyboard(
             new_status=not watchdog_enabled,
         ).pack(),
     )
-    _ = builder.row(watchdog_button)
+    if is_paid_access:
+        _ = builder.row(watchdog_button)
 
     # Кнопка для применения дефолтных настроек
-    if adv_setting.bot_active:
+    if adv_setting.bot_active and is_paid_access:
         button = InlineKeyboardButton(
             text="Применить дефолтные настройки",
             callback_data=callbacks.ApplyCampaignDefaults(
@@ -300,38 +345,15 @@ def get_adv_setting_keyboard(
         bidder_text = "Переключить на стандартный биддер (CPM)"
         new_bidder_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
 
-    bidder_callback = BidderCoroutineTypeToggle(
-        new_type=new_bidder_type.value,
-        adv_setting_original_id=adv_setting.id,
-    ).pack()
-    bidder_button = InlineKeyboardButton(
-        text=bidder_text, callback_data=bidder_callback
-    )
-    _ = builder.row(bidder_button)
-
-    if adv_setting.bot_active:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="$ Выключить автоматическое управление",
-                callback_data=TurnBot(
-                    action="off",
-                    adv_original_id=adv_setting.id,
-                    wb_user_cabinet_original_id=wb_user_cabinet.id,
-                ).pack(),
-            )
+    if is_paid_access:
+        bidder_callback = BidderCoroutineTypeToggle(
+            new_type=new_bidder_type.value,
+            adv_setting_original_id=adv_setting.id,
+        ).pack()
+        bidder_button = InlineKeyboardButton(
+            text=bidder_text, callback_data=bidder_callback
         )
-
-    else:
-        _ = builder.row(
-            InlineKeyboardButton(
-                text="Включить автоматическое управление (платно, см. тарифы)",
-                callback_data=TurnBot(
-                    action="on",
-                    adv_original_id=adv_setting.id,
-                    wb_user_cabinet_original_id=wb_user_cabinet.id,
-                ).pack(),
-            )
-        )
+        _ = builder.row(bidder_button)
 
     if adv_setting.auto_update_target_place:
         text = "$ Выключить автоуправление целевой позицией"
@@ -343,8 +365,9 @@ def get_adv_setting_keyboard(
     callback = AutoUpdateTargetPlaceSettingCallBack(
         new_status=new_status, adv_setting_original_id=adv_setting.id
     ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
+    if is_paid_access:
+        button = InlineKeyboardButton(text=text, callback_data=callback)
+        _ = builder.row(button)
 
     # Добавляем кнопку переключения источника заказов для автоуправления
     if adv_setting.orders_source_for_auto_mode == OrdersSourceForAutoMode.ADV_SUM:
@@ -359,8 +382,9 @@ def get_adv_setting_keyboard(
     callback = OrdersSourceToggle(
         new_source=new_source, adv_setting_original_id=adv_setting.id  # type:ignore
     ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
+    if is_paid_access:
+        button = InlineKeyboardButton(text=text, callback_data=callback)
+        _ = builder.row(button)
 
     # Кнопка переключения метода прогноза продаж (сразу под источником заказов)
     if adv_setting.sales_predict_method == FactMethods.DIRECT_SALES:
@@ -373,10 +397,12 @@ def get_adv_setting_keyboard(
     callback = SalesPredictMethodToggle(
         new_method=new_method, adv_setting_original_id=adv_setting.id
     ).pack()
-    button = InlineKeyboardButton(text=text, callback_data=callback)
-    _ = builder.row(button)
+    if is_paid_access:
+        button = InlineKeyboardButton(text=text, callback_data=callback)
+        _ = builder.row(button)
 
-    if adv_setting.bot_active:
+    # V3-only runtime (D3): no version-toggle UI; v3 controls when bot_active.
+    if adv_setting.bot_active and is_paid_access:
         _ = builder.row(v3_tick_report_main_button(adv_setting))
         _ = builder.row(v3_calibration_step_main_button(adv_setting))
         _ = builder.row(v3_rollout_aggressiveness_main_button(adv_setting))
@@ -454,21 +480,12 @@ def get_adv_setting_keyboard(
 
 
     button = InlineKeyboardButton(
-        text="Загрузить статистику из WB",
-        callback_data=callbacks.WBUpdate(
-            action="update_keyword_stat", adv_setting_original_id=adv_setting.id
-        ).pack(),
-    )
-    _ = builder.row(button)
-
-    button = InlineKeyboardButton(
         text="Изменить ставку в Авто",
         callback_data=callbacks.ChangeAutoBid(
             action="open", adv_original_id=adv_setting.id
         ).pack(),
     )
     _ = builder.row(button)
-
 
     if adv_setting.search_adv_id:
         set_common_bid_callback = SetCommonBidManual(
@@ -477,20 +494,10 @@ def get_adv_setting_keyboard(
         ).pack()
         _ = builder.row(
             InlineKeyboardButton(
-                text="Установить общую ставку (аукцион)",
+                text="Поставить общую ставку для Поисковой РК",
                 callback_data=set_common_bid_callback,
             )
         )
-
-
-    button = InlineKeyboardButton(
-        text="Обновить минус-слова",
-        callback_data=callbacks.WBUpdate(
-            action="update_minus_keywords", adv_setting_original_id=adv_setting.id
-        ).pack(),
-    )
-
-    _ = builder.row(button)
 
     button = InlineKeyboardButton(
         text="Сбросить белый список",

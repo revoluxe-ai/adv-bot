@@ -18,7 +18,19 @@ class StatsFreshnessManager:
     """Single entry point for stats freshness evaluation from ClickHouse.
     Used by UI (AdvSettingMenu) and CoroutinesManager. Builds reader + guard and calls evaluate_batch."""
 
+    def __init__(
+        self,
+        reader: ClickHouseStatsFreshnessReader | None = None,
+    ) -> None:
+        """Store an injectable ClickHouse reader for freshness evaluation.
+
+        Args:
+            reader: Reader used by the guard. When omitted, production wiring
+                creates the standard ClickHouse reader.
+        """
+        self._reader = reader or ClickHouseStatsFreshnessReader()
+
     async def evaluate(self, complex_adv: ComplexAdv) -> StatsFreshnessState:
-        reader = ClickHouseStatsFreshnessReader()
-        guard = StatsFreshnessGuard(reader)
+        """Evaluate campaign freshness through the configured ClickHouse reader."""
+        guard = StatsFreshnessGuard(self._reader)
         return await guard.evaluate_batch(complex_adv)

@@ -74,7 +74,9 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
     ],
     "CLAIM_WORKER": [
         "findings/",
+        "CASE.md",
         "LEDGER.md",
+        "intakes/",
         "team/packets/",
         "team/heartbeats/",
         "results/PROOF-",
@@ -92,7 +94,14 @@ WORKER_ALLOWLISTS: Dict[str, List[str]] = {
         "team/heartbeats/",
         "results/",
     ],
-    "RED_TEST_WORKER": ["results/RED-", "team/packets/", "team/heartbeats/", "results/"],
+    "RED_TEST_WORKER": [
+        "results/RED-",
+        "LEDGER.md",
+        "findings/",
+        "team/packets/",
+        "team/heartbeats/",
+        "results/",
+    ],
     "IMPLEMENTATION_EXECUTOR": [
         "results/FIX-",
         "team/packets/",

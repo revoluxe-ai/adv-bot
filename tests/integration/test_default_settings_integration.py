@@ -1,8 +1,8 @@
 """Integration: apply campaign/shop defaults handlers against live test PG.
 
 Fixtures reuse baseline ``wbcabinet`` id=1 from
-``reset_postgres_test_data(restore_baseline=True)`` — do not INSERT id=1 again
-via ``WBCabinetFactory`` (Sequence starts at 1 → UniqueViolation on pkey).
+``reset_postgres_test_data(restore_baseline=True)`` вЂ” do not INSERT id=1 again
+via ``WBCabinetFactory`` (Sequence starts at 1 в†’ UniqueViolation on pkey).
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from app.client_bot.modules.default_settings.default_models.common_default impor
     CampaignDefaultsV1,
 )
 from app.client_bot.user_interface.handlers.adv_setting import (
-    apply_campaign_defaults,  # Хэндлер для одной кампании
-    apply_defaults_for_shop,  # Хэндлер для всех кампаний магазина
-    turn_adv_on,  # Хэндлер для включения одной кампании
+    apply_campaign_defaults,  # РҐСЌРЅРґР»РµСЂ РґР»СЏ РѕРґРЅРѕР№ РєР°РјРїР°РЅРёРё
+    apply_defaults_for_shop,  # РҐСЌРЅРґР»РµСЂ РґР»СЏ РІСЃРµС… РєР°РјРїР°РЅРёР№ РјР°РіР°Р·РёРЅР°
+    turn_adv_on,  # РҐСЌРЅРґР»РµСЂ РґР»СЏ РІРєР»СЋС‡РµРЅРёСЏ РѕРґРЅРѕР№ РєР°РјРїР°РЅРёРё
 )
 from app.client_bot.user_interface.views.callbacks import (
     ApplyCampaignDefaults,
@@ -36,15 +36,52 @@ from app.modules.common_slaves.wildberries.models.models import (
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.utils.db.models import User
 
-# Фабрики для UserCabinet / AdvSetting; кабинет берём из baseline (не WBCabinetFactory)
+# Р¤Р°Р±СЂРёРєРё РґР»СЏ UserCabinet / AdvSetting; РєР°Р±РёРЅРµС‚ Р±РµСЂС‘Рј РёР· baseline (РЅРµ WBCabinetFactory)
 from tests.factories.adv_factory import AdvSettingFactory, WBUserCabinetFactory
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio, pytest.mark.destructive_local]
 
+# Shared-defaults path (``apply_common_defaults_settings_for_adv``) applies only
+# ``CommonCampaignDefaultsPolicy``. FREE/PAID overlay fields stay untouched.
+_COMMON_DEFAULT_FIELDS = (
+    "bidder_mode",
+    "bidder_coroutine_type",
+    "orders_source_for_auto_mode",
+    "sales_predict_method",
+    "auto_budget_watchdog_enabled",
+    "use_common_budget",
+    "target_ctr_mode",
+    "new_auto_min_ctr_mode",
+    "reset_place",
+)
+_MODE_OVERLAY_FIELDS = (
+    "bidder_active",
+    "bidder_for_auto",
+    "auto_update_white_list",
+    "auto_update_target_place",
+    "auto_update_minus_phrases",
+)
+
+
+def _assert_common_defaults_applied(
+    updated: AdvSetting,
+    *,
+    expected: CampaignDefaultsV1,
+    overlay_before: dict[str, object],
+) -> None:
+    """Assert common policy fields match defaults; mode overlays unchanged."""
+    for key in _COMMON_DEFAULT_FIELDS:
+        assert hasattr(updated, key), f"AdvSetting missing attribute {key}"
+        assert getattr(updated, key) == getattr(expected, key), f"Mismatch for {key}"
+    for key in _MODE_OVERLAY_FIELDS:
+        assert getattr(updated, key) == overlay_before[key], (
+            f"Mode overlay field {key} must not change under common apply"
+        )
+
 
 class MockSessionMaker:
-    """Мок для session maker, чтобы хэндлеры использовали тестовую сессию"""
+    """РњРѕРє РґР»СЏ session maker, С‡С‚РѕР±С‹ С…СЌРЅРґР»РµСЂС‹ РёСЃРїРѕР»СЊР·РѕРІР°Р»Рё С‚РµСЃС‚РѕРІСѓСЋ СЃРµСЃСЃРёСЋ"""
     def __init__(self, session):
         self.session = session
     def __call__(self, read_only=False):
@@ -56,7 +93,7 @@ class MockSessionMaker:
 
 
 async def _baseline_wb_cabinet(async_session: AsyncSession) -> WBCabinet:
-    """Вернуть baseline WBCabinet id=1 после destructive PG reset (без повторного INSERT)."""
+    """Р’РµСЂРЅСѓС‚СЊ baseline WBCabinet id=1 РїРѕСЃР»Рµ destructive PG reset (Р±РµР· РїРѕРІС‚РѕСЂРЅРѕРіРѕ INSERT)."""
     row = await async_session.get(WBCabinet, 1)
     assert row is not None, (
         "expected baseline wbcabinet id=1 from reset_postgres_test_data"
@@ -66,14 +103,14 @@ async def _baseline_wb_cabinet(async_session: AsyncSession) -> WBCabinet:
 
 
 def _build_wb_user_cabinet(*, user: User, wb_cabinet: WBCabinet) -> WBUserCabinet:
-    """Собрать WBUserCabinet без factory Sequence id (избегает wbusercabinet_pkey).
+    """РЎРѕР±СЂР°С‚СЊ WBUserCabinet Р±РµР· factory Sequence id (РёР·Р±РµРіР°РµС‚ wbusercabinet_pkey).
 
-    ``WBUserCabinetFactory.id = Sequence(n+1)`` стартует с 1 и конфликтует с
-    residual rows / неотдвинутым sequence после гонок truncate. После
-    ``TRUNCATE ... RESTART IDENTITY`` id назначает PostgreSQL.
+    ``WBUserCabinetFactory.id = Sequence(n+1)`` СЃС‚Р°СЂС‚СѓРµС‚ СЃ 1 Рё РєРѕРЅС„Р»РёРєС‚СѓРµС‚ СЃ
+    residual rows / РЅРµРѕС‚РґРІРёРЅСѓС‚С‹Рј sequence РїРѕСЃР»Рµ РіРѕРЅРѕРє truncate. РџРѕСЃР»Рµ
+    ``TRUNCATE ... RESTART IDENTITY`` id РЅР°Р·РЅР°С‡Р°РµС‚ PostgreSQL.
     """
     wb_user_cabinet = WBUserCabinetFactory.build(user=user, wb_cabinet=wb_cabinet)
-    # Drop factory Sequence id so INSERT omits PK → DB serial after RESTART IDENTITY.
+    # Drop factory Sequence id so INSERT omits PK в†’ DB serial after RESTART IDENTITY.
     wb_user_cabinet.id = None  # type: ignore[assignment]
     wb_user_cabinet.wb_cabinet_id = int(wb_cabinet.id)
     assert user.id is not None, "user must be flushed before linking WBUserCabinet"
@@ -105,7 +142,7 @@ async def setup_adv_data(async_session: AsyncSession):
     async_session.add(user)
     await async_session.flush()
 
-    # Baseline wbcabinet id=1 уже сеется reset_postgres_test_data — не INSERT через factory
+    # Baseline wbcabinet id=1 СѓР¶Рµ СЃРµРµС‚СЃСЏ reset_postgres_test_data вЂ” РЅРµ INSERT С‡РµСЂРµР· factory
     wb_cabinet = await _baseline_wb_cabinet(async_session)
 
     wb_user_cabinet = _build_wb_user_cabinet(user=user, wb_cabinet=wb_cabinet)
@@ -114,15 +151,15 @@ async def setup_adv_data(async_session: AsyncSession):
     assert wb_user_cabinet.id is not None, "wbusercabinet id must be assigned on flush"
     assert await async_session.get(WBUserCabinet, wb_user_cabinet.id) is not None
 
-    # Создаем AdvSetting с недефолтными значениями
+    # РЎРѕР·РґР°РµРј AdvSetting СЃ РЅРµРґРµС„РѕР»С‚РЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё
     adv_setting = AdvSettingFactory.build(
         adv_id=1000,
         name="Test Campaign 1",
         wb_cabinet=wb_cabinet,
         wb_cabinet_id=wb_cabinet.id,
-        bot_active=True,  # Активная кампания
-        bidder_active=False,  # Недефолтное значение
-        auto_update_white_list=False,  # Недефолтное значение
+        bot_active=True,  # РђРєС‚РёРІРЅР°СЏ РєР°РјРїР°РЅРёСЏ
+        bidder_active=False,  # РќРµРґРµС„РѕР»С‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
+        auto_update_white_list=False,  # РќРµРґРµС„РѕР»С‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
     )
     async_session.add(adv_setting)
     await async_session.flush()
@@ -132,9 +169,9 @@ async def setup_adv_data(async_session: AsyncSession):
         name="Test Campaign Inactive",
         wb_cabinet=wb_cabinet,
         wb_cabinet_id=wb_cabinet.id,
-        bot_active=False,  # Неактивная кампания
-        bidder_active=False,  # Недефолтное значение
-        auto_update_white_list=False,  # Недефолтное значение
+        bot_active=False,  # РќРµР°РєС‚РёРІРЅР°СЏ РєР°РјРїР°РЅРёСЏ
+        bidder_active=False,  # РќРµРґРµС„РѕР»С‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
+        auto_update_white_list=False,  # РќРµРґРµС„РѕР»С‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
     )
     async_session.add(adv_setting_inactive)
     await async_session.flush()
@@ -152,12 +189,12 @@ async def setup_adv_data(async_session: AsyncSession):
 
 @pytest.fixture
 async def setup_multiple_advs_data(async_session: AsyncSession):
-    """Seed multi-adv shop data with flush-only fixture writes (см. setup_adv_data)."""
+    """Seed multi-adv shop data with flush-only fixture writes (СЃРј. setup_adv_data)."""
     user = User(user_telegram_id=45678, username="test_user_multi")
     async_session.add(user)
     await async_session.flush()
 
-    # Baseline wbcabinet id=1 — без повторного INSERT (см. setup_adv_data)
+    # Baseline wbcabinet id=1 вЂ” Р±РµР· РїРѕРІС‚РѕСЂРЅРѕРіРѕ INSERT (СЃРј. setup_adv_data)
     wb_cabinet = await _baseline_wb_cabinet(async_session)
 
     wb_user_cabinet = _build_wb_user_cabinet(user=user, wb_cabinet=wb_cabinet)
@@ -165,7 +202,7 @@ async def setup_multiple_advs_data(async_session: AsyncSession):
     await async_session.flush()
     assert wb_user_cabinet.id is not None
 
-    # Активные кампании с недефолтными значениями
+    # РђРєС‚РёРІРЅС‹Рµ РєР°РјРїР°РЅРёРё СЃ РЅРµРґРµС„РѕР»С‚РЅС‹РјРё Р·РЅР°С‡РµРЅРёСЏРјРё
     adv_active_1 = AdvSettingFactory.build(
         adv_id=2000,
         name="Multi Adv Active 1",
@@ -182,14 +219,14 @@ async def setup_multiple_advs_data(async_session: AsyncSession):
         bot_active=True,
         bidder_active=False,
     )
-    # Неактивная кампания
+    # РќРµР°РєС‚РёРІРЅР°СЏ РєР°РјРїР°РЅРёСЏ
     adv_inactive_1 = AdvSettingFactory.build(
         adv_id=2002,
         name="Multi Adv Inactive 1",
         wb_cabinet=wb_cabinet,
         wb_cabinet_id=wb_cabinet.id,
         bot_active=False,
-        bidder_active=True,  # Недефолтное значение, но не должно быть изменено
+        bidder_active=True,  # РќРµРґРµС„РѕР»С‚РЅРѕРµ Р·РЅР°С‡РµРЅРёРµ, РЅРѕ РЅРµ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РёР·РјРµРЅРµРЅРѕ
     )
     async_session.add_all([adv_active_1, adv_active_2, adv_inactive_1])
     await async_session.flush()
@@ -211,41 +248,34 @@ async def test_apply_campaign_defaults_single_active_campaign(
     adv_setting = setup_adv_data["adv_setting"]
     wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
 
-    # Проверяем, что начальные значения отличаются от дефолтных
     initial_defaults = CampaignDefaultsV1()
 
-    # Явно устанавливаем отличающиеся значения для тестовой кампании
-    # Для булевых полей инвертируем значение
-    adv_setting.bidder_active = not initial_defaults.bidder_active
-    adv_setting.auto_update_white_list = not initial_defaults.auto_update_white_list
-    adv_setting.auto_update_target_place = not initial_defaults.auto_update_target_place
+    # Invert common-policy fields so apply must rewrite them; leave overlays alone.
     adv_setting.target_ctr_mode = not initial_defaults.target_ctr_mode
     adv_setting.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
     adv_setting.reset_place = not initial_defaults.reset_place
+    adv_setting.auto_budget_watchdog_enabled = (
+        not initial_defaults.auto_budget_watchdog_enabled
+    )
+    adv_setting.use_common_budget = not initial_defaults.use_common_budget
     adv_setting.bot_active = True
-
-    # bidder_coroutine_type
     if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
         adv_setting.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
     else:
         adv_setting.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-
-    # orders_source_for_auto_mode
     if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
         adv_setting.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
     else:
         adv_setting.orders_source_for_auto_mode = OrdersSourceForAutoMode.COMMON_STATISTIC
-
-    # sales_predict_method
     if initial_defaults.sales_predict_method == FactMethods.BY_CARTS:
         adv_setting.sales_predict_method = FactMethods.DIRECT_SALES
     else:
         adv_setting.sales_predict_method = FactMethods.BY_CARTS
 
-    # flush into fixture transaction — avoid commit()+refresh() vs outer session.begin()
+    overlay_before = {key: getattr(adv_setting, key) for key in _MODE_OVERLAY_FIELDS}
     await async_session.flush()
 
-    # Вызываем хэндлер
+    # Р’С‹Р·С‹РІР°РµРј С…СЌРЅРґР»РµСЂ
     callback_data = ApplyCampaignDefaults(
         adv_setting_original_id=adv_setting.id,
         wb_user_cabinet_original_id=wb_user_cabinet.id,
@@ -273,7 +303,7 @@ async def test_apply_campaign_defaults_single_active_campaign(
     mock_menu_instance = AsyncMock()
     mock_menu_instance.return_value = None
 
-    # Мокаем session maker чтобы хэндлер использовал тестовую сессию
+    # РњРѕРєР°РµРј session maker С‡С‚РѕР±С‹ С…СЌРЅРґР»РµСЂ РёСЃРїРѕР»СЊР·РѕРІР°Р» С‚РµСЃС‚РѕРІСѓСЋ СЃРµСЃСЃРёСЋ
     class MockSessionMaker:
         def __init__(self, session):
             self.session = session
@@ -300,19 +330,11 @@ async def test_apply_campaign_defaults_single_active_campaign(
     updated_adv_setting = await async_session.get(AdvSetting, adv_setting.id)
     assert updated_adv_setting is not None
 
-    expected_defaults = CampaignDefaultsV1()
-
-    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
-    default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place"
-    ]
-
-    for key in default_fields:
-        assert hasattr(updated_adv_setting, key), f"AdvSetting missing attribute {key}"
-        assert getattr(updated_adv_setting, key) == getattr(expected_defaults, key), f"Mismatch for {key}"
+    _assert_common_defaults_applied(
+        updated_adv_setting,
+        expected=CampaignDefaultsV1(),
+        overlay_before=overlay_before,
+    )
 
 
 @pytest.mark.integration
@@ -322,11 +344,10 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     adv_setting_inactive = setup_adv_data["adv_setting_inactive"]
     wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
 
-    # Сохраняем исходные значения AdvSetting, чтобы проверить те поля,
-    # которые не затрагиваются дефолтными настройками
-    initial_adv_setting_state = {key: getattr(adv_setting_inactive, key) for key in adv_setting_inactive.__table__.columns.keys()}
+    overlay_before = {
+        key: getattr(adv_setting_inactive, key) for key in _MODE_OVERLAY_FIELDS
+    }
 
-    # Вызываем хэндлер для неактивной кампании
     callback_data = ApplyCampaignDefaults(
         adv_setting_original_id=adv_setting_inactive.id,
         wb_user_cabinet_original_id=wb_user_cabinet.id,
@@ -351,7 +372,7 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
         message=message,
     )
 
-    # flush-only: keep outer fixture transaction (см. active-campaign test)
+    # flush-only: keep outer fixture transaction (СЃРј. active-campaign test)
     await async_session.flush()
 
     mock_menu_instance = AsyncMock()
@@ -370,18 +391,11 @@ async def test_apply_campaign_defaults_single_inactive_campaign(
     updated_adv_setting = await async_session.get(AdvSetting, adv_setting_inactive.id)
     assert updated_adv_setting is not None
 
-    defaults_v1 = CampaignDefaultsV1()
-
-    # Поля, которые должны быть в дефолтах (из apply_defaults_to_adv_setting)
-    default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place"
-    ]
-
-    for key in default_fields:
-        assert getattr(updated_adv_setting, key) == getattr(defaults_v1, key), f"Mismatch for {key} (expected default)"
+    _assert_common_defaults_applied(
+        updated_adv_setting,
+        expected=CampaignDefaultsV1(),
+        overlay_before=overlay_before,
+    )
 
 
 @pytest.mark.integration
@@ -391,13 +405,13 @@ async def test_turn_adv_on_applies_defaults(
     adv_setting_inactive = setup_adv_data["adv_setting_inactive"]
     wb_user_cabinet = setup_adv_data["wb_user_cabinet"]
 
-    # Проверяем, что изначально бот неактивен
+    # РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ РёР·РЅР°С‡Р°Р»СЊРЅРѕ Р±РѕС‚ РЅРµР°РєС‚РёРІРµРЅ
     assert not adv_setting_inactive.bot_active
 
-    # Сохраняем недефолтные значения
+    # РЎРѕС…СЂР°РЅСЏРµРј РЅРµРґРµС„РѕР»С‚РЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ
     initial_defaults = CampaignDefaultsV1()
-    # Явно устанавливаем отличающиеся значения для тестовой кампании
-    # Для булевых полей инвертируем значение
+    # РЇРІРЅРѕ СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј РѕС‚Р»РёС‡Р°СЋС‰РёРµСЃСЏ Р·РЅР°С‡РµРЅРёСЏ РґР»СЏ С‚РµСЃС‚РѕРІРѕР№ РєР°РјРїР°РЅРёРё
+    # Р”Р»СЏ Р±СѓР»РµРІС‹С… РїРѕР»РµР№ РёРЅРІРµСЂС‚РёСЂСѓРµРј Р·РЅР°С‡РµРЅРёРµ
     adv_setting_inactive.bidder_active = not initial_defaults.bidder_active
     adv_setting_inactive.auto_update_white_list = not initial_defaults.auto_update_white_list
     adv_setting_inactive.auto_update_target_place = not initial_defaults.auto_update_target_place
@@ -426,7 +440,7 @@ async def test_turn_adv_on_applies_defaults(
 
     await async_session.flush()
 
-    # Вызываем хэндлер turn_adv_on
+    # Р’С‹Р·С‹РІР°РµРј С…СЌРЅРґР»РµСЂ turn_adv_on
     callback_data = TurnBot(
         action="on",
         adv_original_id=adv_setting_inactive.id,
@@ -459,7 +473,7 @@ async def test_turn_adv_on_applies_defaults(
         patch("app.modules.balance_manager.get_cabinet_balance_and_bonuses", new_callable=AsyncMock) as mock_get_balance,
     ):
         mock_get_price.return_value = 100
-        mock_get_balance.return_value = (1000, 0) # Достаточно средств
+        mock_get_balance.return_value = (1000, 0) # Р”РѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃСЂРµРґСЃС‚РІ
 
         mock_menu_instance = AsyncMock()
         with (
@@ -474,13 +488,13 @@ async def test_turn_adv_on_applies_defaults(
         ):
             await turn_adv_on(callback_query, mock_state, callback_data, mock_bot)
 
-    # Проверяем только bot_active, дефолты НЕ должны применяться
+    # РџСЂРѕРІРµСЂСЏРµРј С‚РѕР»СЊРєРѕ bot_active, РґРµС„РѕР»С‚С‹ РќР• РґРѕР»Р¶РЅС‹ РїСЂРёРјРµРЅСЏС‚СЊСЃСЏ
     expected_bidder_active = adv_setting_inactive.bidder_active
     updated_adv_setting = await async_session.get(AdvSetting, adv_setting_inactive.id)
     assert updated_adv_setting is not None
 
     assert updated_adv_setting.bot_active
-    # Остальные настройки (например, bidder_active) не должны сбрасываться к дефолтам
+    # РћСЃС‚Р°Р»СЊРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё (РЅР°РїСЂРёРјРµСЂ, bidder_active) РЅРµ РґРѕР»Р¶РЅС‹ СЃР±СЂР°СЃС‹РІР°С‚СЊСЃСЏ Рє РґРµС„РѕР»С‚Р°Рј
     assert updated_adv_setting.bidder_active == expected_bidder_active
 
 
@@ -493,40 +507,37 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
     adv_active_2 = setup_multiple_advs_data["adv_active_2"]
     adv_inactive_1 = setup_multiple_advs_data["adv_inactive_1"]
 
-    # Проверяем, что начальные значения отличаются от дефолтных для активных кампаний
     initial_defaults = CampaignDefaultsV1()
+    overlays_before: dict[int, dict[str, object]] = {}
     for adv in [adv_active_1, adv_active_2]:
-        # Явно устанавливаем отличающиеся значения для тестовой кампании
-        # Для булевых полей инвертируем значение
-        adv.bidder_active = not initial_defaults.bidder_active
-        adv.auto_update_white_list = not initial_defaults.auto_update_white_list
-        adv.auto_update_target_place = not initial_defaults.auto_update_target_place
         adv.target_ctr_mode = not initial_defaults.target_ctr_mode
         adv.new_auto_min_ctr_mode = not initial_defaults.new_auto_min_ctr_mode
         adv.reset_place = not initial_defaults.reset_place
+        adv.auto_budget_watchdog_enabled = (
+            not initial_defaults.auto_budget_watchdog_enabled
+        )
+        adv.use_common_budget = not initial_defaults.use_common_budget
         adv.bot_active = True
-
-        # bidder_coroutine_type
         if initial_defaults.bidder_coroutine_type == BidderCoroutineType.UPDATE_CLUSTER_BIDS:
             adv.bidder_coroutine_type = BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
         else:
             adv.bidder_coroutine_type = BidderCoroutineType.UPDATE_CLUSTER_BIDS
-
-        # orders_source_for_auto_mode
         if initial_defaults.orders_source_for_auto_mode == OrdersSourceForAutoMode.COMMON_STATISTIC:
             adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.ADV_SUM
         else:
             adv.orders_source_for_auto_mode = OrdersSourceForAutoMode.COMMON_STATISTIC
-
-        # sales_predict_method
         if initial_defaults.sales_predict_method == FactMethods.BY_CARTS:
             adv.sales_predict_method = FactMethods.DIRECT_SALES
         else:
             adv.sales_predict_method = FactMethods.BY_CARTS
+        overlays_before[int(adv.id)] = {
+            key: getattr(adv, key) for key in _MODE_OVERLAY_FIELDS
+        }
+
 
     await async_session.flush()
 
-    # Вызываем хэндлер для магазина
+    # Р’С‹Р·С‹РІР°РµРј С…СЌРЅРґР»РµСЂ РґР»СЏ РјР°РіР°Р·РёРЅР°
     callback_data = ApplyDefaultsForShop(wb_user_cabinet_original_id=wb_user_cabinet.id)
     telegram_user = TelegramUser(
         id=wb_user_cabinet.user.user_telegram_id,
@@ -561,24 +572,17 @@ async def test_apply_defaults_for_shop_multiple_campaigns(
     ):
         await apply_defaults_for_shop(callback_query, callback_data, mock_bot, mock_state)
 
-    # Проверяем активные кампании
-    updated_adv_active_1 = await async_session.get(AdvSetting, adv_active_1.id)
-    assert updated_adv_active_1 is not None
-
     expected_defaults = CampaignDefaultsV1()
-    default_fields = [
-        "bidder_active", "bidder_for_auto", "bidder_mode",
-        "bidder_coroutine_type", "orders_source_for_auto_mode", "sales_predict_method",
-        "auto_update_white_list", "auto_update_target_place", "target_ctr_mode",
-        "new_auto_min_ctr_mode", "reset_place"
-    ]
+    for adv_id in (adv_active_1.id, adv_active_2.id):
+        updated = await async_session.get(AdvSetting, adv_id)
+        assert updated is not None
+        assert adv_id is not None
+        _assert_common_defaults_applied(
+            updated,
+            expected=expected_defaults,
+            overlay_before=overlays_before[int(adv_id)],
+        )
 
-    for key in default_fields:
-        assert hasattr(updated_adv_active_1, key), f"AdvSetting missing attribute {key}"
-        assert getattr(updated_adv_active_1, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_1"
-
-    updated_adv_active_2 = await async_session.get(AdvSetting, adv_active_2.id)
-    assert updated_adv_active_2 is not None
-    for key in default_fields:
-        assert hasattr(updated_adv_active_2, key), f"AdvSetting missing attribute {key}"
-        assert getattr(updated_adv_active_2, key) == getattr(expected_defaults, key), f"Mismatch for {key} in active_2"
+    updated_inactive = await async_session.get(AdvSetting, adv_inactive_1.id)
+    assert updated_inactive is not None
+    assert updated_inactive.bot_active is False

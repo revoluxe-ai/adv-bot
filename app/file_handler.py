@@ -1,3 +1,5 @@
+"""Подготовка изображений для отправки в Telegram (URL, диск, BufferedInputFile)."""
+
 import hashlib
 import io
 import logging
@@ -17,7 +19,18 @@ from app.utils.image_master import image_tools
 logger = logging.getLogger(__name__)
 
 
-async def get_telegram_image(image_path: str | BufferedInputFile, bot: aiogram.Bot) -> InputFile | str:
+async def get_telegram_image(
+    image_path: str | BufferedInputFile, bot: aiogram.Bot
+) -> InputFile | str:
+    """Вернуть InputFile или file_id для передачи в Telegram send_* API.
+
+    Args:
+        image_path: URL/локальный путь (str) либо уже готовый BufferedInputFile.
+        bot: экземпляр aiogram Bot (нужен для lookup file_id в БД).
+
+    Returns:
+        BufferedInputFile / InputFile либо строковый telegram file_id.
+    """
     result = await _get_telegram_file(image_path, bot)
     return result
 
@@ -48,15 +61,38 @@ async def save_image_to_disc(url: str, image: BytesIO):
         await f.write(image.getvalue())
 
 
-async def _get_telegram_file(image_path: str | None, bot: Bot) -> str | InputFile | int:
+async def _get_telegram_file(
+    image_path: str | BytesIO | BufferedInputFile | None, bot: Bot
+) -> str | InputFile | int:
+    """Подготовить изображение к отправке в Telegram.
+
+    BufferedInputFile возвращается без изменений (passthrough).
+    BytesIO оборачивается в BufferedInputFile.
+    Для str: HTTP URL загружается (с дисковым кэшем), локальный путь читается
+    с диска; при возможности возвращается уже известный telegram file_id.
+
+    Args:
+        image_path: URL/путь, BytesIO, BufferedInputFile или None.
+        bot: экземпляр Bot для lookup file_id.
+
+    Returns:
+        file_id (str/int) либо InputFile/BufferedInputFile для upload.
+
+    Raises:
+        Exception: ошибки HTTP/IO при загрузке изображения по str-пути.
+    """
     logger.debug(f"Начало обработки файла: {image_path}")
+
+    if isinstance(image_path, BufferedInputFile):
+        logger.debug("image_path является BufferedInputFile — passthrough")
+        return image_path
 
     if isinstance(image_path, BytesIO):
         logger.debug("image_path является BytesIO объектом")
         return BufferedInputFile(image_path.getvalue(), filename="wbgram.png")
 
     try:
-        if image_path.startswith("http"):
+        if image_path is not None and image_path.startswith("http"):
             buffered_image = await get_image_from_disc(image_path)
             if buffered_image:
                 return BufferedInputFile(buffered_image.getvalue(), filename="wbgram")

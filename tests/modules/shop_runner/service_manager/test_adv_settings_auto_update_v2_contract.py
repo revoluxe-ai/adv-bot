@@ -525,4 +525,3 @@ async def test_adv_settings_auto_update_run_tasks_max_workers_matches_handler_co
     assert kwargs["return_exceptions"] is False
     handlers = run_tasks_mock.call_args.args[0]
     assert len(handlers) == 2
-

@@ -1,0 +1,158 @@
+{
+  "suite": "git-packaging-contract",
+  "total": 25,
+  "passed": 25,
+  "failed": 0,
+  "results": [
+    {
+      "id": "C01",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "no static-check FULL receipt gate"
+    },
+    {
+      "id": "C02",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "no stale receipt gate"
+    },
+    {
+      "id": "C03",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "no missing receipt gate"
+    },
+    {
+      "id": "C04",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "failed verification does not block commit"
+    },
+    {
+      "id": "C05",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "no ledger COMPLETE gate"
+    },
+    {
+      "id": "C06",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "commit does not run pytest"
+    },
+    {
+      "id": "C07",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "commit does not run build"
+    },
+    {
+      "id": "C08",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "commit does not run static-check"
+    },
+    {
+      "id": "C09",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "commit does not run browser/security/scenario checks"
+    },
+    {
+      "id": "C10",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "git safety preserved"
+    },
+    {
+      "id": "C11",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "unrelated dirt stays unstaged"
+    },
+    {
+      "id": "P12",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "create-pr does not require verify PASS"
+    },
+    {
+      "id": "P13",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "no ledger COMPLETE gate"
+    },
+    {
+      "id": "P14",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "no static-check receipt gate"
+    },
+    {
+      "id": "P15",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "create-pr does not execute quality gates"
+    },
+    {
+      "id": "P16",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "PR allowed when verification PENDING"
+    },
+    {
+      "id": "P17",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "PR allowed when verification FAIL/ABSENT"
+    },
+    {
+      "id": "P18",
+      "command": "opsx-create-pr",
+      "pass": true,
+      "detail": "PR does not assert MERGE_READY"
+    },
+    {
+      "id": "P19",
+      "command": "integration",
+      "pass": true,
+      "detail": "verify/archive gates preserved"
+    },
+    {
+      "id": "P20",
+      "command": "opsx-commit",
+      "pass": true,
+      "detail": "no broad git reset introduced"
+    },
+    {
+      "id": "P21",
+      "command": "opsx-static-check",
+      "pass": true,
+      "detail": "static-check unchanged"
+    },
+    {
+      "id": "P22",
+      "command": "opsx-verify",
+      "pass": true,
+      "detail": "verify command untouched"
+    },
+    {
+      "id": "P23",
+      "command": "scenario-coverage",
+      "pass": true,
+      "detail": "scenario coverage commands not modified in this slice"
+    },
+    {
+      "id": "P24",
+      "command": "evidence",
+      "pass": true,
+      "detail": "verification/archive evidence not modified in this slice"
+    },
+    {
+      "id": "G25",
+      "command": "GRAPH",
+      "pass": true,
+      "detail": "graph does not mandate verify before commit/PR"
+    }
+  ]
+}

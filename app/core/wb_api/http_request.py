@@ -152,6 +152,7 @@ async def requests(
     headers: dict[str, str] | None = None,
 ) -> str:
     """Обертка для выполнения HTTP-запросов с обработкой ошибок и логированием."""
+    response_text: str = ""
     async with session.request(
         method, url, data=data, headers=headers, json=json_data
     ) as response:
@@ -167,6 +168,11 @@ async def requests(
         except aiohttp.ClientResponseError as e:  # Предполагая использование aiohttp
             if e.status == 401:
                 raise ApiForbiddenError("Неверный API ключ") from e
+            if e.status == 403 and "scope is not allowed" in response_text:
+                # Токен есть, но не имеет нужного scope — переключаем на следующий
+                raise ApiForbiddenError(
+                    "Токен не имеет нужного scope для данного ресурса"
+                ) from e
             if e.status == 429:
                 logger.debug("Превышен лимит запросов к API: %s", url)
                 raise TooManyRequests(e) from e

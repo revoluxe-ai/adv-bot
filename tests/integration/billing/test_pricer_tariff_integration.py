@@ -77,7 +77,7 @@ async def test_auto_mode_applies_new_tariffs_when_any_part_auto_enabled(
         adv_id=90002,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        bot_active=False,
+        bot_active=True,
         wl=True,
         tp=False,
     )
@@ -105,7 +105,7 @@ async def test_old_mode_applies_old_tariffs_when_no_part_auto_enabled(
         adv_id=90102,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        bot_active=False,
+        bot_active=True,
         wl=False,
         tp=False,
     )
@@ -133,7 +133,7 @@ async def test_auto_mode_applies_without_active_search_campaigns(
         adv_id=90402,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=None,
-        bot_active=False,
+        bot_active=True,
         wl=True,
         tp=False,
     )
@@ -160,7 +160,7 @@ async def test_auto_mode_triggered_by_individual_keyword_target_places(
         adv_id=90602,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        bot_active=False,
+        bot_active=True,
         wl=False,
         tp=False,
     )
@@ -195,7 +195,7 @@ async def test_count_includes_auto_advs_even_if_search_campaign_not_started(
         adv_id=90202,
         wb_cabinet_id=wb_cabinet_id,
         search_adv_id=search.adv_id,
-        bot_active=False,
+        bot_active=True,
         wl=True,
         tp=True,
     )
@@ -225,7 +225,7 @@ async def test_auto_tariff_thresholds_apply_to_total_count(
             adv_id=90310 + i,
             wb_cabinet_id=wb_cabinet_id,
             search_adv_id=search.adv_id,
-            bot_active=False,
+            bot_active=True,
             wl=True if i == 0 else False,  # достаточно одной, чтобы включить AUTO
             tp=False,
         )

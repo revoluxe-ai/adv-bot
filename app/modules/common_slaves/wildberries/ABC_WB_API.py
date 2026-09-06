@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from aiohttp import ClientSession
 
 from app.core.wb_api.exceptions import ApiForbiddenError, NO_FREE_TOKENS_MESSAGE
+from app.core.wb_api.token_rotation import sort_tokens_write_first
 from app.modules.token_monitoring.models import NotificationType
 from app.modules.token_monitoring.services.cabinet_status_service import (
     deactivate_cabinet_atomic_with_user_trackers,
@@ -60,7 +61,7 @@ class ABC_WB_API(WbRequestApiMixin): # noqa
                 "Нет токенов для доступа к API",
                 wb_user_cabinet=wb_access.wb_user_cabinet,
             )
-        tokens = sorted(tokens, key=lambda x: x.expires, reverse=True)
+        tokens = sort_tokens_write_first(tokens)
         self._free_tokens = tokens
         current_token = self._free_tokens[0]
         self._current_token = current_token

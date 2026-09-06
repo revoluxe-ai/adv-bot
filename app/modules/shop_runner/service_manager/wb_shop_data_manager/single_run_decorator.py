@@ -9,35 +9,41 @@ import logging
 import os
 import time
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from functools import wraps
-from typing import Any
+from typing import Any, Concatenate, Literal, ParamSpec, TypeVar, cast
 
-from app.modules.shop_runner.service_manager.exc import StopShopUpdateException
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
 
 logger = logging.getLogger(__name__)
 
 SINGLE_RUN_WAIT_TIMEOUT_SECONDS = 900
 
-_TRACE_TIMING_ENABLED: bool | None = None
+# Lazy cache env flag (lowercase: mutated once; not a true constant).
+_trace_timing_enabled: bool | None = None
+
+_SingleRunResult = tuple[Literal["ok", "exc"], Any]
 
 
 def _coroutine_trace_enabled() -> bool:
     """True, если включён whitelist ``COROUTINE_PHASE_TRACE_ADV_IDS``."""
-    global _TRACE_TIMING_ENABLED
-    if _TRACE_TIMING_ENABLED is None:
+    global _trace_timing_enabled
+    if _trace_timing_enabled is None:
         raw = os.environ.get("COROUTINE_PHASE_TRACE_ADV_IDS", "").strip()
-        _TRACE_TIMING_ENABLED = bool(raw)
-    return bool(_TRACE_TIMING_ENABLED)
+        _trace_timing_enabled = bool(raw)
+    return bool(_trace_timing_enabled)
 
 
 def _to_hashable(val: Any) -> Any:
     """Convert a value to a hashable form for cache key; dicts become sorted tuples."""
     if isinstance(val, dict):
-        return tuple(sorted((_to_hashable(k), _to_hashable(v)) for k, v in val.items()))
+        mapping = cast(dict[Any, Any], val)
+        return tuple(
+            sorted((_to_hashable(k), _to_hashable(v)) for k, v in mapping.items())
+        )
     if isinstance(val, (list, tuple)):
-        return tuple(_to_hashable(x) for x in val)
+        seq = cast(Sequence[Any], val)
+        return tuple(_to_hashable(x) for x in seq)
     try:
         hash(val)
         return val
@@ -46,31 +52,55 @@ def _to_hashable(val: Any) -> Any:
 
 
 def make_key(func_name: str, args: tuple[Any, ...], kwargs: dict[Any, Any]) -> str:
+    """Строит стабильный строковый ключ single_run из имени функции и аргументов."""
     key_items = [(k, _to_hashable(v)) for k, v in kwargs.items()]
     return f"{func_name}:{args}:{frozenset(key_items)}"
 
 
-def single_run() -> (
-    Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]
-):
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
-        @wraps(func)
-        async def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            if not hasattr(self, "_single_run_events"):
-                self._single_run_events = {}
-            if not hasattr(self, "_single_run_results"):
-                self._single_run_results = {}
-            if not hasattr(self, "_single_run_call_counter"):
-                self._single_run_call_counter = Counter()
+P = ParamSpec("P")
+R = TypeVar("R")
 
-            events: dict[str, asyncio.Event] = self._single_run_events
-            results: dict[str, Any] = self._single_run_results
+
+def single_run() -> Callable[
+    [Callable[Concatenate[Any, P], Awaitable[R]]],
+    Callable[Concatenate[Any, P], Awaitable[R]],
+]:
+    """Фабрика декоратора: один in-flight вызов на ключ для async-методов инстанса."""
+
+    def decorator(
+        func: Callable[Concatenate[Any, P], Awaitable[R]],
+    ) -> Callable[Concatenate[Any, P], Awaitable[R]]:
+        """Оборачивает async-метод shared Event/results/counter на ``self``."""
+
+        @wraps(func)
+        async def wrapper(self: Any, *args: P.args, **kwargs: P.kwargs) -> R:
+            # Typed locals + getattr: avoid reportUnknownMemberType on self attrs.
+            events_attr: Any = getattr(self, "_single_run_events", None)
+            if events_attr is None:
+                events: dict[str, asyncio.Event] = {}
+                self._single_run_events = events
+            else:
+                events = cast(dict[str, asyncio.Event], events_attr)
+
+            results_attr: Any = getattr(self, "_single_run_results", None)
+            if results_attr is None:
+                results: dict[str, _SingleRunResult] = {}
+                self._single_run_results = results
+            else:
+                results = cast(dict[str, _SingleRunResult], results_attr)
+
+            counter_attr: Any = getattr(self, "_single_run_call_counter", None)
+            if counter_attr is None:
+                call_counter: Counter[str] = Counter()
+                self._single_run_call_counter = call_counter
+            else:
+                call_counter = cast(Counter[str], counter_attr)
 
             key = make_key(func.__name__, args, kwargs)
 
             # Уже выполняется — ждём завершения first caller (не удаляем key при timeout).
             if key in events:
-                self._single_run_call_counter[key] += 1
+                call_counter[key] += 1
                 wait_started: float | None = None
                 if _coroutine_trace_enabled():
                     wait_started = time.perf_counter()
@@ -78,7 +108,7 @@ def single_run() -> (
                         "[coroutine_timing] coroutine=single_run phase=%s step=wait_start "
                         "waiters=%s key=%s",
                         func.__name__,
-                        self._single_run_call_counter[key],
+                        call_counter[key],
                         key[:240],
                     )
                 try:
@@ -109,17 +139,17 @@ def single_run() -> (
                             "duration_ms=%.2f waiters=%s",
                             func.__name__,
                             wait_ms,
-                            self._single_run_call_counter[key],
+                            call_counter[key],
                         )
-                    return payload
+                    return cast(R, payload)
                 finally:
-                    self._single_run_call_counter[key] -= 1
+                    call_counter[key] -= 1
 
             # Первый вызов — единственный, кто создаёт и очищает shared state.
             event = asyncio.Event()
             event.clear()
             events[key] = event
-            self._single_run_call_counter[key] = 0
+            call_counter[key] = 0
 
             try:
                 run_started: float | None = None
@@ -171,12 +201,12 @@ def single_run() -> (
             finally:
                 event.set()
                 # Ждём, пока активные waiters прочитают results; только first caller чистит state.
-                while self._single_run_call_counter.get(key, 0) > 0:
+                while call_counter.get(key, 0) > 0:
                     await asyncio.sleep(0)
                 events.pop(key, None)
                 results.pop(key, None)
-                self._single_run_call_counter.pop(key, None)
+                call_counter.pop(key, None)
 
-        return wrapper
+        return cast(Callable[Concatenate[Any, P], Awaitable[R]], wrapper)
 
     return decorator

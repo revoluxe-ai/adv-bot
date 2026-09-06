@@ -11,16 +11,25 @@ from ..modules.cabinet_bonus_manager.bonus_scene import (
     register_bonus_scene,
 )
 from .common_routers import common_router
+from .middlewars.channel_subscription import ChannelSubscriptionMiddleware
 from .middlewars.gate import GateMiddleware
+from .middlewars.phone_required import PhoneRequiredMiddleware
 from .middlewars.return_to_start_from_state import ReturnToStart
-from .user_interface.handlers import gate, request_presentation, start
+from .user_interface.handlers import gate, phone_collection, request_presentation, start
 
 global_router = Router()
 
 # Pre-answer: ImmediateCallbackAnswerUpdateMiddleware на Dispatcher (dispatcher_factory).
 
+# Aiogram wraps with reversed(list): last registered runs first (outermost).
+# Desired runtime: Gate → Channel → Phone → handler.
+# Invite deferred: Gate no-ops when settings.invite_gate is False (default).
 _ = global_router.message.middleware(ReturnToStart())
+_ = global_router.message.middleware(PhoneRequiredMiddleware())
+_ = global_router.message.middleware(ChannelSubscriptionMiddleware())
 _ = global_router.message.middleware(GateMiddleware())
+_ = global_router.callback_query.middleware(PhoneRequiredMiddleware())
+_ = global_router.callback_query.middleware(ChannelSubscriptionMiddleware())
 _ = global_router.callback_query.middleware(GateMiddleware())
 # Один SceneRegistry на роутер: обе сцены должны быть в одном реестре,
 # иначе при двух вызовах SceneRegistry(router) второй перезаписывает первый.
@@ -28,9 +37,9 @@ scene_registry = SceneRegistry(global_router)
 scene_registry.add(BonusScene)
 scene_registry.add(UserBalanceScene)
 
-# ВАЖНО: порядок подключения роутеров критически важен
-# gate_router первым — обрабатывает callback'и gate:* для пользователей без passed_gate
+# gate.router first — gate:* callbacks when invite_gate re-enabled (dormant on rollout)
 _ = global_router.include_router(gate.router)
+_ = global_router.include_router(phone_collection.router)
 _ = global_router.include_router(request_presentation.router)
 # Затем start.router (команда /start и callback Start)
 _ = global_router.include_router(start.router)

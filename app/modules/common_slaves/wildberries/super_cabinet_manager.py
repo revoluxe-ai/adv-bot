@@ -1,3 +1,5 @@
+"""Доступ к WB-кабинету: выбор валидных personal-токенов и deactivate при их отсутствии."""
+
 import logging
 import typing
 from dataclasses import dataclass
@@ -55,86 +57,135 @@ class WBCabinetAccess:
             return "Не определен"
 
 
+async def resolve_wb_cabinet_id_by_shop_id_in_session(
+    session: AsyncSession, shop_id: str
+) -> int:
+    """Resolve WBCabinet.id for shop_id (PURE_READ).
+
+    Args:
+        session: injectable async session (caller: ``sm(read_only=True)``).
+        shop_id: WB shop identifier string.
+
+    Returns:
+        WBCabinet primary key.
+
+    Raises:
+        WBCabinetNotFoundError: when shop_id has no cabinet row.
+    """
+    stmt = select(WBCabinet.id).where(WBCabinet.shop_id == shop_id)
+    result = await session.execute(stmt)
+    wb_cabinet_id = result.scalar()
+    if wb_cabinet_id is None:
+        raise exceptions.WBCabinetNotFoundError(shop_id)
+    return int(wb_cabinet_id)
+
+
+async def load_wb_cabinet_access_in_session(
+    session: AsyncSession, wb_cabinet_id: int
+) -> WBCabinetAccess | str:
+    """Load personal-token access or mark cabinet inactive (WRITE).
+
+    Args:
+        session: injectable async session (``sm(read_only=False)`` — may commit).
+        wb_cabinet_id: WBCabinet primary key.
+
+    Returns:
+        WBCabinetAccess when personal tokens exist; otherwise shop_id string after
+        marking the cabinet inactive (caller runs deactivate + raises).
+
+    Raises:
+        WBCabinetNotFoundError: when cabinet id is missing.
+    """
+    wb_cabinet: WBCabinet | None = await session.get(WBCabinet, wb_cabinet_id)
+
+    if wb_cabinet is None:
+        raise exceptions.WBCabinetNotFoundError(wb_cabinet_id)
+
+    shop_id = str(wb_cabinet.shop_id)
+    stmt_for_wb_tokens = select(WBToken).where(WBToken.shop_id == shop_id)
+    result_for_wb_tokens = await session.execute(stmt_for_wb_tokens)
+    wb_tokens: typing.Sequence[WBToken] = result_for_wb_tokens.scalars().all()
+
+    valited_tokens: list[WBToken] = []
+    for token in wb_tokens:
+        token.api_key = token.api_key.replace("\r", "").replace("\n", "").strip()
+        if not token.check_valid():
+            logger.debug(f"Не валидный токен {token.api_key}")
+            continue
+        if not token.is_personal:
+            logger.debug("Не персональный токен, пропускаем: token_id=%s", token.id)
+            continue
+        if token.shop_id == shop_id:
+            valited_tokens.append(token)
+    if not valited_tokens:
+        # Keep historical side effect expected by unit tests and callers:
+        # when access is forbidden due to missing personal tokens, mark cabinet inactive.
+        wb_cabinet.active = False
+        await session.commit()
+        return shop_id
+
+    return WBCabinetAccess(
+        tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
+    )
+
+
+async def find_common_access_token_in_session(
+    session: AsyncSession,
+    client_session: ClientSession,
+) -> WBToken | None:
+    """Вернуть первый валидный personal-токен с правами общего доступа."""
+    stmt = select(WBToken)
+    async for wb_token in await session.stream_scalars(stmt):
+        wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
+        if not wb_token.check_valid():
+            logger.debug(f"Не валидный токен {wb_token.api_key}")
+            continue
+        if not wb_token.is_personal:
+            logger.debug(
+                "Не персональный токен в get_common_access, пропускаем: token_id=%s",
+                wb_token.id,
+            )
+            continue
+        result = await token_check_righter.check_all_rights(wb_token, client_session)
+        if result:
+            return wb_token
+    return None
+
+
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: int | str,
-) -> WBCabinetAccess:
-
+) -> WBCabinetAccess | None:
+    """Resolve cabinet access with parent→child PG session handoff."""
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id
-        stmt = select(WBCabinet.id).where(WBCabinet.shop_id == shop_id)
-        async with sm() as session:
-            result = await session.execute(stmt)
-            wb_cabinet_id = result.scalar()
-            if wb_cabinet_id is None:
-                raise exceptions.WBCabinetNotFoundError(shop_id)
+        async with sm(read_only=True) as session:
+            wb_cabinet_id = await resolve_wb_cabinet_id_by_shop_id_in_session(
+                session, shop_id
+            )
     else:
         wb_cabinet_id = wb_cabinet_id_or_shop_id
 
-    shop_id_for_deactivate: str | None = None
-    async with sm() as session:
-        wb_cabinet: WBCabinet | None = await session.get(WBCabinet, wb_cabinet_id)
+    async with sm(read_only=False) as session:
+        access_or_shop = await load_wb_cabinet_access_in_session(session, wb_cabinet_id)
+        if isinstance(access_or_shop, WBCabinetAccess):
+            return access_or_shop
+        shop_id_for_deactivate = access_or_shop
 
-        if wb_cabinet is None:
-            raise exceptions.WBCabinetNotFoundError(wb_cabinet_id)
-
-        shop_id = str(wb_cabinet.shop_id)
-        stmt_for_wb_tokens = select(WBToken).where(WBToken.shop_id == shop_id)
-        result_for_wb_tokens = await session.execute(stmt_for_wb_tokens)
-        wb_tokens: typing.Sequence[WBToken] = result_for_wb_tokens.scalars().all()
-
-        valited_tokens = []
-        for token in wb_tokens:
-            token.api_key = token.api_key.replace("\r", "").replace("\n", "").strip()
-            if not token.check_valid():
-                logger.debug(f"Не валидный токен {token.api_key}")
-                continue
-            if not token.is_personal:
-                logger.debug("Не персональный токен, пропускаем: token_id=%s", token.id)
-                continue
-            if token.shop_id == shop_id:
-                valited_tokens.append(token)
-        if not valited_tokens:
-            # Keep historical side effect expected by unit tests and callers:
-            # when access is forbidden due to missing personal tokens, mark cabinet inactive.
-            wb_cabinet.active = False
-            await session.commit()
-            shop_id_for_deactivate = shop_id
-        else:
-            access = WBCabinetAccess(
-                tokens=valited_tokens, wb_user_cabinet=None, wb_cabinet=wb_cabinet
-            )
-            return access
-
-    if shop_id_for_deactivate is not None:
-        await deactivate_cabinet_atomic_with_user_trackers(
-            shop_id_for_deactivate,
-            notification_type=NotificationType.TOKEN_DEACTIVATED.value,
-        )
-        raise ApiForbiddenError(
-            f"Нет валидных токенов для кабинета с shop_id {shop_id_for_deactivate}"
-        )
+    await deactivate_cabinet_atomic_with_user_trackers(
+        shop_id_for_deactivate,
+        notification_type=NotificationType.TOKEN_DEACTIVATED.value,
+    )
+    raise ApiForbiddenError(
+        f"Нет валидных токенов для кабинета с shop_id {shop_id_for_deactivate}"
+    )
 
 
 async def get_common_access(client_session: ClientSession) -> WBCabinetAccess:
-    stmt = select(WBToken)
-    async with sm() as session:
-        async for wb_token in await session.stream_scalars(stmt):
-            wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
-            if not wb_token.check_valid():
-                logger.debug(f"Не валидный токен {wb_token.api_key}")
-                continue
-            if not wb_token.is_personal:
-                logger.debug(
-                    "Не персональный токен в get_common_access, пропускаем: token_id=%s",
-                    wb_token.id,
-                )
-                continue
-            result = await token_check_righter.check_all_rights(
-                wb_token, client_session
+    """Открыть read-only PG-сессию и вернуть общий доступ по валидному токену."""
+    async with sm(read_only=True) as session:
+        wb_token = await find_common_access_token_in_session(session, client_session)
+        if wb_token is not None:
+            return WBCabinetAccess(
+                tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
             )
-            if result:
-                access = WBCabinetAccess(
-                    tokens=[wb_token], wb_user_cabinet=None, wb_cabinet=None
-                )
-                return access
     raise ApiForbiddenError("Нет валидных токенов для доступа к API")
