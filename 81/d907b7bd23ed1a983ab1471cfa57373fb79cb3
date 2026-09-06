@@ -1,0 +1,1275 @@
+.cursor/pipeline/contracts/bug-episode/FANIN.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 8,17
+.cursor/commands/opsx-learn-from-bug.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 126,161,540
+.opsx/runs/bootstrap/20260812T212501Z/MERGE_RECEIPT.md
+  s_46ea7f10ba92cd::t_2102cb5941d73c 13-20
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-12
+.cursor/pipeline/bug-team/packets/WORKER_IO.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 12-13
+.cursor/pipeline/bug-team/CHECKPOINT.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 8
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/findings/ROOT-001.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-35
+.cursor/commands/opsx-distribute-brief.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 150
+.cursor/pipeline/bug-team/workers/FAN_IN_ASSEMBLER.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 39
+.cursor/commands/opsx-classify-bug.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 57-58,86-88,93,820
+.cursor/pipeline/bug-team/workers/MATERIALIZER.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 31
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/LEDGER.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-122
+.cursor/pipeline/bug-team/controlled-tests/test_phase4_storage_migration.py
+  s_46ea7f10ba92cd::t_0d5dec7ea21f9a 107-108,118-127
+  s_46ea7f10ba92cd::t_dbaac4fad14cd6 212
+  s_46ea7f10ba92cd::t_a221fa0b2b055e 202
+  s_d4523f77e8e556::t_74453fb030a798 46,48-56
+  s_d4523f77e8e556::t_7800068fecad11 139-154
+  s_d4523f77e8e556::t_e4632f7e25daba 273,276-336
+  s_46ea7f10ba92cd::t_77e8555f477dc6 1-45,47,57-106,109-117,128-138,155-201,203-211,215-223,241-272,274-275,337-340
+  s_46ea7f10ba92cd::t_02d47c80a4bc7d 213-214
+  s_d4523f77e8e556::t_3b3169c4aecd8f 224-240
+.cursor/pipeline/contracts/bug-episode/TASK_DELTA.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 7,77
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/findings/FINDING-CAH-CONFIRM-004.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-38
+.opsx/runs/bootstrap/20260812T212312Z/MERGE_RECEIPT.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-13,22-26
+  s_46ea7f10ba92cd::t_2102cb5941d73c 14-21
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-002-20260821-001.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-78
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/INDEX.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-12
+.cursor/commands/opsx-new.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 16
+.cursor/commands/opsx-meta-export-pack.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 26,42,56,125,137,243,260,326,337,437,529
+.cursor/commands/opsx-source-resolution.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 38-44,164,175
+.opsx/runs/bootstrap/20260812T213453Z/MERGE_RECEIPT.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-13,20
+  s_46ea7f10ba92cd::t_2102cb5941d73c 14-19
+.cursor/opsx-resolve-conflict/process_surfaces.json
+  s_46ea7f10ba92cd::t_95641453eaf1e0 28
+.cursor/pipeline/bug-team/REGISTRY.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 33,89-92
+.opsx/runs/README.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-47
+.cursor/commands/opsx-bug-debt-board.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 8,67-68,93,96,138,158
+.cursor/pipeline/GRAPH.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 246,266-267,291,913,1097,1190,1240
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/ROUTE-TRACE.jsonl
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-18
+.cursor/commands/opsx-fanout-bug-hunt.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 47,519,837,839,875
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/LEDGER.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-116
+.cursor/pipeline/bug-team/WRITE_BOUNDARY.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 13,41-43
+.cursor/pipeline/bug-team/gates/OWNER_GO_SCHEMA.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 13
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/CASE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-51
+.gitignore
+  s_d4523f77e8e556::t_45b5b2981257eb 91-92
+.cursor/pipeline/contracts/bug-episode/LESSON_GATE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 9
+.cursor/pipeline/contracts/bug-episode/README.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 53,63
+.cursor/commands/opsx-admin-command-export-bundle.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 24,81,147
+.cursor/pipeline/contracts/bug-episode/GREEN_EVIDENCE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 8
+.cursor/commands/opsx-owner-contract-review.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 16
+.cursor/commands/opsx-close-external-gap.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 765,779
+.cursor/commands/opsx-fix-bug.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 74,108,336,349,378,405-408,432,459,557,993,1157,1371,1411,1524
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/findings/FINDING-CAH-CONFIRM-003.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-40
+.opsx/sources.yaml
+  s_c8ea29d4492be7::t_13688c0d1b1462 33
+  s_d4523f77e8e556::t_2827fc2f7f0709 24
+  s_c8ea29d4492be7::t_c760049e52d439 45
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/PROOF-MATERIALIZER-WEX168da3e259.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-30
+.cursor/commands/opsx-materialize-bug-queue.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 21,29,38,67,139,159,166,183,322,811,859,878,1250,1537,1636
+.cursor/pipeline/bug-team/dispatch/TASK_DISPATCH.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 64-65,107
+.cursor/commands/opsx-explore.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 273
+.cursor/commands/opsx-verify.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 216,231
+.cursor/pipeline/bug-team/README.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 52
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/findings/FINDING-CAH-CONFIRM-005.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-30
+.cursor/opsx-export/export_bundle.py
+  s_d4523f77e8e556::t_756841907f601f 125
+  s_d4523f77e8e556::t_3bd0b7be3005b8 168
+.opsx/runs/bootstrap/20260812T212652Z/MERGE_RECEIPT.md
+  s_46ea7f10ba92cd::t_2102cb5941d73c 26
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-25
+.cursor/commands/opsx-projectize.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 47
+.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 8
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/CASE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-44
+.cursor/pipeline/contracts/bug-episode/RED_EVIDENCE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 8
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/RED-WEX-RED-004-20260821-001.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-60
+.cursor/pipeline/contracts/SCENARIO_TEST_COVERAGE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 295,573
+.cursor/pipeline/bug-team/roles/ROLES.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 95
+.cursor/commands/opsx-meta-import-command.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 25,132,143,195,205,221,346
+.cursor/commands/opsx-apply.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 419
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/FANIN.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-173
+.opsx/import/README.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 14
+.cursor/commands/opsx-bug-hunt.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 819,909
+.cursor/commands/opsx-test.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 265,337,361-362,528,554,686
+.opsx/runs/bug-cases/INDEX.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-59
+.cursor/commands/opsx-bug-team.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 54,261,362
+.opsx/runs/bootstrap/20260812T212441Z/MERGE_RECEIPT.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-5,7-28
+  s_46ea7f10ba92cd::t_2102cb5941d73c 6
+.cursor/pipeline/ORCHESTRATION_MVP.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 291,327,355,462,490,543,576,664,750,854
+.cursor/commands/opsx-update.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 277-278,429,550
+.cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 6
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/CASE.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/HUMAN_SUMMARY.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-95
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/findings/FINDING-001.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 1-55
+.cursor/commands/opsx-claim-next-bug.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 62-63,115-119,439,713
+.cursor/commands/opsx-invariant.md
+  s_46ea7f10ba92cd::t_95641453eaf1e0 134
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/intakes/INTAKE-001.md
+  s_74f2cc61f9b572::t_45d196c9a49d4f 1-137
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/intakes/_RAW_INTAKE_SEED.txt
+  s_1b168ce9fa6c05::t_d222f076acfebd 1-99
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/FIX-FINDING-001.md
+  s_4087ef2145ce19::t_109ade7c0b2bf2 1-38
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/HUMAN_SUMMARY.md
+  s_7a8346e4785a65::t_d1ab50a4a7b681 1-70
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/OWNER-CLOSURE-FINDING-001.md
+  s_7a8346e4785a65::t_677099d2e165a4 1-49
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/CHECKPOINT.json
+  s_1b168ce9fa6c05::t_b35acec7aeccdb 1-38
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/DISPATCH.jsonl
+  s_1b168ce9fa6c05::t_62a03162477192 1-23
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_CLAIM_WORKER_ad88e201ca.identity.json
+  s_1b168ce9fa6c05::t_0047f5e925506b 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_CLASSIFIER_300e4e0437.identity.json
+  s_1b168ce9fa6c05::t_bc02e551a3b61f 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_CLOSURE_OPERATOR_77a8cb9e0d.identity.json
+  s_1b168ce9fa6c05::t_0deca1ef77ae6b 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_FAMILY_LEARNING_WORKER_08e6a51076.identity.json
+  s_1b168ce9fa6c05::t_fb29f1085c00ea 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_FAN_IN_ASSEMBLER_38f14651a4.identity.json
+  s_1b168ce9fa6c05::t_034a19380c0aad 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_GREEN_VERIFIER_0db2308b5a.identity.json
+  s_1b168ce9fa6c05::t_d72dc9f257fa61 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.identity.json
+  s_1b168ce9fa6c05::t_367a3d2141a4e5 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_MATERIALIZER_8937b1bee0.identity.json
+  s_1b168ce9fa6c05::t_50f4e97c44baf5 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_RED_TEST_WORKER_ac57f6e512.identity.json
+  s_1b168ce9fa6c05::t_6f57d8720108be 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_BOUNDED_HUNTER_c9a36b66db.json
+  s_afc4cdb449894d::t_f39774ea42b292 1-9
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_CLAIM_WORKER_ad88e201ca.json
+  s_74f2cc61f9b572::t_eee2b864b6501b 1-15
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_CLOSURE_OPERATOR_77a8cb9e0d.json
+  s_7a8346e4785a65::t_48ba6671ce95ae 1-9
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_FAN_IN_ASSEMBLER_38f14651a4.json
+  s_6ab8905630dcd7::t_65347b78e8590a 1-9
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_GREEN_VERIFIER_0db2308b5a.json
+  s_dbad94ae8ff34f::t_d2f89d6555d058 1-9
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_RED_TEST_WORKER_ac57f6e512.json
+  s_226dbd5a792f4e::t_d1b60dd21ed0e3 1-14
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_CLAIM_WORKER_ad88e201ca.intent.json
+  s_1b168ce9fa6c05::t_9bd1e88bf67986 1-69
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_CLASSIFIER_300e4e0437.intent.json
+  s_1b168ce9fa6c05::t_bb98baa1cb8490 1-82
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_CLOSURE_OPERATOR_77a8cb9e0d.intent.json
+  s_1b168ce9fa6c05::t_f786296edc0e1e 1-89
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_FAMILY_LEARNING_WORKER_08e6a51076.intent.json
+  s_1b168ce9fa6c05::t_563dc870230e14 1-71
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_FAN_IN_ASSEMBLER_38f14651a4.intent.json
+  s_1b168ce9fa6c05::t_a6fd1d8a156e1b 1-78
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_GREEN_VERIFIER_0db2308b5a.intent.json
+  s_1b168ce9fa6c05::t_389697a1ec176f 1-81
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.intent.json
+  s_1b168ce9fa6c05::t_0d28fc0c4c1d1a 1-72
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_MATERIALIZER_8937b1bee0.intent.json
+  s_1b168ce9fa6c05::t_7a78a90013a733 1-53
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_RED_TEST_WORKER_ac57f6e512.intent.json
+  s_1b168ce9fa6c05::t_a9151c8d112a49 1-68
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_TASK_COMPLETION_WORKER_f21030172f.intent.json
+  s_1b168ce9fa6c05::t_e96b241de41212 1-68
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_BOUNDED_HUNTER_c9a36b66db.out.json
+  s_afc4cdb449894d::t_5a2e967902c0e3 1-43
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLAIM_WORKER_ad88e201ca.finalize_reject.json
+  s_1b168ce9fa6c05::t_43819e638f5cf2 1-10
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLAIM_WORKER_ad88e201ca.in.json
+  s_1b168ce9fa6c05::t_202c9044bff63d 1-39
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLAIM_WORKER_ad88e201ca.out.json
+  s_1b168ce9fa6c05::t_8eed265a710bad 1-63
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLAIM_WORKER_ad88e201ca.wb.json
+  s_1b168ce9fa6c05::t_da27509725de29 1-26
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLASSIFIER_300e4e0437.in.json
+  s_1b168ce9fa6c05::t_d60da028d77516 1-43
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLASSIFIER_300e4e0437.wb.json
+  s_1b168ce9fa6c05::t_e48b2702b40685 1-21
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLOSURE_OPERATOR_77a8cb9e0d.in.json
+  s_1b168ce9fa6c05::t_2d0036f517ec2a 1-49
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLOSURE_OPERATOR_77a8cb9e0d.out.json
+  s_7a8346e4785a65::t_74f3763dd5dd76 1-66
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLOSURE_OPERATOR_77a8cb9e0d.wb.json
+  s_1b168ce9fa6c05::t_2c1abaa22927fa 1-24
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_FAMILY_LEARNING_WORKER_08e6a51076.in.json
+  s_1b168ce9fa6c05::t_0a94d0c54475e1 1-40
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_FAMILY_LEARNING_WORKER_08e6a51076.wb.json
+  s_1b168ce9fa6c05::t_cbb54cc0d87bbc 1-18
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_FAN_IN_ASSEMBLER_38f14651a4.out.json
+  s_6ab8905630dcd7::t_23bca63e070c2d 1-50
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_FAN_IN_ASSEMBLER_38f14651a4.wb.json
+  s_1b168ce9fa6c05::t_bc47d01c17d508 1-17
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_GREEN_VERIFIER_0db2308b5a.in.json
+  s_1b168ce9fa6c05::t_e9c4833e50b42f 1-49
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_GREEN_VERIFIER_0db2308b5a.out.json
+  s_dbad94ae8ff34f::t_a90c4106e3fe38 1-61
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_GREEN_VERIFIER_0db2308b5a.wb.json
+  s_1b168ce9fa6c05::t_8c5a9a920b38ec 1-17
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.in.json
+  s_1b168ce9fa6c05::t_0661fe8d035b01 1-49
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.wb.json
+  s_1b168ce9fa6c05::t_1ee9127f5359a8 1-17
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_MATERIALIZER_8937b1bee0.finalize_reject.json
+  s_1b168ce9fa6c05::t_2dd92c03658aa2 1-24
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_MATERIALIZER_8937b1bee0.in.json
+  s_1b168ce9fa6c05::t_49f6482709321b 1-40
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_MATERIALIZER_8937b1bee0.in.md
+  s_1b168ce9fa6c05::t_6c574dd4d4a957 1-27
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_MATERIALIZER_8937b1bee0.out.json
+  s_1b168ce9fa6c05::t_8fa265c4ffe8d3 1-51
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_MATERIALIZER_8937b1bee0.wb.json
+  s_1b168ce9fa6c05::t_f2ae080817a710 1-22
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_RED_TEST_WORKER_ac57f6e512.finalize_reject.json
+  s_1b168ce9fa6c05::t_bfa02b6c22880d 1-10
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_RED_TEST_WORKER_ac57f6e512.in.json
+  s_1b168ce9fa6c05::t_73f293037c9bdd 1-56
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_RED_TEST_WORKER_ac57f6e512.out.json
+  s_226dbd5a792f4e::t_6e94d4a92b0423 1-97
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_RED_TEST_WORKER_ac57f6e512.wb.json
+  s_1b168ce9fa6c05::t_8f67635901b001 1-24
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_TASK_COMPLETION_WORKER_f21030172f.in.json
+  s_1b168ce9fa6c05::t_9807eb437b2a74 1-39
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/retries/.host_retry_authority
+  s_1b168ce9fa6c05::t_269e828b0d8e72 1
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_CLAIM_WORKER_ad88e201ca.after.json
+  s_1b168ce9fa6c05::t_6fbfdf6d2d715d 1-36
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_CLAIM_WORKER_ad88e201ca.before.json
+  s_1b168ce9fa6c05::t_18b16c6b84b5aa 1-26
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_CLASSIFIER_300e4e0437.after.json
+  s_1b168ce9fa6c05::t_a816cbf8ce9d10 1-44
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_CLASSIFIER_300e4e0437.before.json
+  s_1b168ce9fa6c05::t_fe6da7135061b0 1-37
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_CLOSURE_OPERATOR_77a8cb9e0d.after.json
+  s_1b168ce9fa6c05::t_5383780f8947cb 1-121
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_CLOSURE_OPERATOR_77a8cb9e0d.before.json
+  s_1b168ce9fa6c05::t_214a00071b4469 1-113
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_FAMILY_LEARNING_WORKER_08e6a51076.after.json
+  s_1b168ce9fa6c05::t_030a585499b21d 1-109
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_FAMILY_LEARNING_WORKER_08e6a51076.before.json
+  s_1b168ce9fa6c05::t_5f4b6efd87c20f 1-103
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_FAN_IN_ASSEMBLER_38f14651a4.after.json
+  s_1b168ce9fa6c05::t_0a56499a9d4e63 1-99
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_GREEN_VERIFIER_0db2308b5a.after.json
+  s_1b168ce9fa6c05::t_794d08210d65ad 1-73
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_GREEN_VERIFIER_0db2308b5a.before.json
+  s_1b168ce9fa6c05::t_37ddaaa372453a 1-68
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.after.json
+  s_1b168ce9fa6c05::t_d40d6e37936f1c 1-64
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.before.json
+  s_1b168ce9fa6c05::t_c179e64a93b1a5 1-59
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_MATERIALIZER_8937b1bee0.after.json
+  s_1b168ce9fa6c05::t_22bc5e9ff2a87d 1-21
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_MATERIALIZER_8937b1bee0.before.json
+  s_1b168ce9fa6c05::t_c7b1849016a185 1-8
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_RED_TEST_WORKER_ac57f6e512.after.json
+  s_1b168ce9fa6c05::t_16a1e4ea707fe2 1-57
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_RED_TEST_WORKER_ac57f6e512.before.json
+  s_1b168ce9fa6c05::t_de49ca0b8fcbc5 1-48
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_TASK_COMPLETION_WORKER_f21030172f.before.json
+  s_1b168ce9fa6c05::t_e30e7207e65eff 1-77
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-003-20260821-001.md
+  s_de94f11c688d9e::t_5c5815d21080f6 1-82
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-005-20260821-001.md
+  s_9bc202d06f1cae::t_4b911bd30669b6 1-76
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-005-20260821-002.md
+  s_9bc202d06f1cae::t_c0a778bb941db5 1-78
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/GREEN-WEX-GREEN-003-20260821-001.md
+  s_de94f11c688d9e::t_1d56431170a697 1-115
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/RED-WEX-RED-001-20260821-001.md
+  s_ed75d5b03ff8f7::t_c6f71bfea15911 1-42
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/RED-WEX-RED-002-20260821-001.md
+  s_de94f11c688d9e::t_8144a634cb141f 1-31
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/ROUTE-TRACE.jsonl
+  s_63435409330290::t_0049d53e35add5 1-6
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLAIM-003-20260821-001.json
+  s_9dd3bfff6766f0::t_6c4d25de9853f9 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLASS-002-20260821-001.json
+  s_de94f11c688d9e::t_074879fe23c6a9 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLASS-003-20260821-001.json
+  s_951b2f5eb0723a::t_74420c419d89a0 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLASS-005-20260821-001.json
+  s_de94f11c688d9e::t_e2208e2e694961 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-GREEN-001-20260821-001.json
+  s_65886eb73a794f::t_0896dbb1d28def 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-GREEN-005-20260821-001.json
+  s_9e283694d76d3e::t_5c58d4f5fe5bed 1-13
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-MAT-20260821-001.json
+  s_54bbf41dda5694::t_a3c83bc1a2256f 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-MAT-20260821-002.json
+  s_9d91377a0b89f6::t_d54ddf70e6c1e3 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-RED-002-20260821-001.json
+  s_de94f11c688d9e::t_004d2f9792d062 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-RED-005-20260821-001.json
+  s_98181978cb8d08::t_3553802d0db6b0 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-003-20260821-001.out.md
+  s_9dd3bfff6766f0::t_362ee477391190 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-20260821-001.in.md
+  s_54bbf41dda5694::t_a2d8d8a4ac6457 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-004-20260821-001.in.md
+  s_902b586edab378::t_101c22c6b0bf51 1-46
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-004-20260821-001.out.md
+  s_902b586edab378::t_98282cf2f29f8f 1-35
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-005-20260821-001.in.md
+  s_902b586edab378::t_b166719da7d692 1-45
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-005-20260821-001.out.md
+  s_de94f11c688d9e::t_73111138de00a5 1-35
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-001-20260821-001.in.md
+  s_ed75d5b03ff8f7::t_5c97c8719ab98a 1-46
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-001-20260821-001.out.md
+  s_ed75d5b03ff8f7::t_cfbc8be9353480 1-57
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-002-20260821-001.in.md
+  s_de94f11c688d9e::t_151c0fcc30f68a 1-55
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-003-20260821-001.in.md
+  s_de94f11c688d9e::t_69d1392259c957 1-51
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-MAT-20260821-001.out.md
+  s_54bbf41dda5694::t_3df437139d86a0 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-MAT-20260821-002.in.md
+  s_a6c9523b182a97::t_6fc4f62a2c051d 1-41
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-MAT-20260821-002.out.md
+  s_9d91377a0b89f6::t_6ff6ea957776d7 1-40
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-002-20260821-001.out.md
+  s_de94f11c688d9e::t_0de0578fbfd16b 1-34
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-005-20260821-001.in.md
+  s_de94f11c688d9e::t_98cca91cf3c8f1 1-47
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-005-20260821-001.out.md
+  s_de94f11c688d9e::t_f6a35c525c7588 1-37
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/INDEX.md
+  s_408fa85d532431::t_40dd40d9097cb6 1-23
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/intakes/INTAKE-001.md
+  s_5f7da8dc7bc840::t_4568866a751560 1-39
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/OWNER-CLOSURE-ROOT-001.md
+  s_cb75ea572bf043::t_95bb4e10f28fc4 1-46
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/ROUTE-TRACE.jsonl
+  s_dd4443b84cb691::t_685d5dc8e5c642 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/CHECKPOINT.json
+  s_dd4443b84cb691::t_86e9837e6b9a2a 1-41
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/DISPATCH.jsonl
+  s_dd4443b84cb691::t_42a5d69b431ed5 1-27
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_BOUNDED_HUNTER_f3e8ab146c.identity.json
+  s_dd4443b84cb691::t_4b52f374590e09 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_CLAIM_WORKER_95976a38fb.identity.json
+  s_dd4443b84cb691::t_e4c301627991d2 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_CLASSIFIER_e241000982.identity.json
+  s_dd4443b84cb691::t_80c1339eb80e0d 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_CLOSURE_OPERATOR_37a699a3bf.identity.json
+  s_dd4443b84cb691::t_ae4719cfaf9fcf 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.identity.json
+  s_dd4443b84cb691::t_936da0f6465913 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.identity.json
+  s_dd4443b84cb691::t_ae537cb74c1e3d 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_GREEN_VERIFIER_1f55d4f820.identity.json
+  s_dd4443b84cb691::t_060ae646f5a8c0 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.identity.json
+  s_dd4443b84cb691::t_21a19e8c255c43 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.identity.json
+  s_dd4443b84cb691::t_cfbbb4dda016f9 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_MATERIALIZER_168da3e259.identity.json
+  s_dd4443b84cb691::t_24443b6e337820 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_RED_TEST_WORKER_7145827ae8.identity.json
+  s_dd4443b84cb691::t_a14f1affc097ce 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/executions/WEX_TASK_COMPLETION_WORKER_c5afd81af5.identity.json
+  s_dd4443b84cb691::t_f04ae5522b2d0b 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.json
+  s_e504e65f9e5f71::t_eb31cda3c6e6a9 1-11
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_MATERIALIZER_168da3e259.json
+  s_5f7da8dc7bc840::t_86c62f8dae8b8c 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_BOUNDED_HUNTER_f3e8ab146c.intent.json
+  s_dd4443b84cb691::t_94a93f2153bb41 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_CLAIM_WORKER_95976a38fb.intent.json
+  s_dd4443b84cb691::t_9289ded34e0029 1-69
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_CLASSIFIER_e241000982.intent.json
+  s_dd4443b84cb691::t_d5001d992a93af 1-82
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_CLOSURE_OPERATOR_37a699a3bf.intent.json
+  s_dd4443b84cb691::t_d610bb7cc8e2d5 1-89
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.intent.json
+  s_dd4443b84cb691::t_7bd417b65550d6 1-82
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.intent.json
+  s_dd4443b84cb691::t_e75ca42d7cd719 1-71
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_GREEN_VERIFIER_1f55d4f820.intent.json
+  s_dd4443b84cb691::t_be828c57fc92bd 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.intent.json
+  s_dd4443b84cb691::t_e17489b62b3f11 1-72
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.intent.json
+  s_dd4443b84cb691::t_c10ea2e6051ab3 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_MATERIALIZER_168da3e259.intent.json
+  s_dd4443b84cb691::t_5aa0a5316302c0 1-53
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_RED_TEST_WORKER_7145827ae8.intent.json
+  s_dd4443b84cb691::t_18c7ab0392738b 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_RED_TEST_WORKER_9c91fcd50a.intent.json
+  s_dd4443b84cb691::t_52dde56760c179 1-70
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/intents/WEX_TASK_COMPLETION_WORKER_c5afd81af5.intent.json
+  s_dd4443b84cb691::t_e392971310760a 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_BOUNDED_HUNTER_f3e8ab146c.in.json
+  s_dd4443b84cb691::t_f0a630f0e50654 1-42
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_BOUNDED_HUNTER_f3e8ab146c.wb.json
+  s_dd4443b84cb691::t_4f913a8bc4edce 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLAIM_WORKER_95976a38fb.in.json
+  s_dd4443b84cb691::t_1eb3f604569c06 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLAIM_WORKER_95976a38fb.wb.json
+  s_dd4443b84cb691::t_5f6072f2d30a05 1-18
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLASSIFIER_e241000982.in.json
+  s_dd4443b84cb691::t_03655535f84b0f 1-50
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLASSIFIER_e241000982.wb.json
+  s_dd4443b84cb691::t_345cb88a416ea2 1-18
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLOSURE_OPERATOR_37a699a3bf.in.json
+  s_dd4443b84cb691::t_667e5e24af512d 1-46
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLOSURE_OPERATOR_37a699a3bf.out.json
+  s_b6b5d99a95de2f::t_301e5f948f9cf8 1-65
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLOSURE_OPERATOR_37a699a3bf.wb.json
+  s_dd4443b84cb691::t_66e42ad5556c70 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.in.json
+  s_dd4443b84cb691::t_4d85f6cd6b890c 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.wb.json
+  s_dd4443b84cb691::t_43102fddf2f921 1-18
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.in.json
+  s_dd4443b84cb691::t_1f901e95b545bd 1-39
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.wb.json
+  s_dd4443b84cb691::t_0933e013840594 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_GREEN_VERIFIER_1f55d4f820.in.json
+  s_dd4443b84cb691::t_68fa2ec8224e3d 1-40
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_GREEN_VERIFIER_1f55d4f820.wb.json
+  s_dd4443b84cb691::t_66384c6a5cacd4 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.finalize_reject.json
+  s_dd4443b84cb691::t_356c7c3b7cd258 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.in.json
+  s_dd4443b84cb691::t_a7991cc84e7f9c 1-40
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.wb.json
+  s_dd4443b84cb691::t_abf53b133e117b 1-22
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.in.json
+  s_dd4443b84cb691::t_0a20af3a8f65ed 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.out.json
+  s_86bf83f01c2564::t_6b7950c46d173e 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.wb.json
+  s_dd4443b84cb691::t_6eb6f1a8f4bdb9 1-20
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_MATERIALIZER_168da3e259.finalize_reject.json
+  s_dd4443b84cb691::t_32c55be4d6d71d 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_MATERIALIZER_168da3e259.in.json
+  s_dd4443b84cb691::t_33980504853c6c 1-35
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_MATERIALIZER_168da3e259.wb.json
+  s_dd4443b84cb691::t_96db9cd30b2abb 1-23
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_RED_TEST_WORKER_7145827ae8.in.json
+  s_dd4443b84cb691::t_e3afbe1540b370 1-39
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_RED_TEST_WORKER_7145827ae8.wb.json
+  s_dd4443b84cb691::t_d268227f3972bc 1-19
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_RED_TEST_WORKER_9c91fcd50a.in.json
+  s_dd4443b84cb691::t_d903196d85f676 1-42
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_RED_TEST_WORKER_9c91fcd50a.out.json
+  s_9be26b213332dd::t_98e7de211e84a4 1-56
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_TASK_COMPLETION_WORKER_c5afd81af5.in.json
+  s_dd4443b84cb691::t_e8c5c828b93dc8 1-37
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_TASK_COMPLETION_WORKER_c5afd81af5.out.json
+  s_9be26b213332dd::t_2debae89234c22 1-40
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_TASK_COMPLETION_WORKER_c5afd81af5.wb.json
+  s_dd4443b84cb691::t_6d6130035ee7aa 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/retries/.host_retry_authority
+  s_dd4443b84cb691::t_0e59a637a7d463 1
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/retries/.reserve_lock_RETRYAUTH-a8300c5cae4e
+  s_dd4443b84cb691::t_81b267a5e302c7 1
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/retries/RETRY-AUTH-REGISTRY.jsonl
+  s_dd4443b84cb691::t_84f959f3e2aa08 1-3
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/retries/RETRYAUTH-a8300c5cae4e.json
+  s_dd4443b84cb691::t_d5c4017f7e89cd 1-25
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/retries/by_prev_WEX_RED_TEST_WORKER_9c91fcd50a.json
+  s_dd4443b84cb691::t_c1b45d253e8cfc 1-4
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_BOUNDED_HUNTER_f3e8ab146c.after.json
+  s_dd4443b84cb691::t_c081319fd2b910 1-104
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_BOUNDED_HUNTER_f3e8ab146c.before.json
+  s_dd4443b84cb691::t_7ecc7bb161e38a 1-99
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_CLAIM_WORKER_95976a38fb.after.json
+  s_dd4443b84cb691::t_d0bbc00923358e 1-29
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_CLAIM_WORKER_95976a38fb.before.json
+  s_dd4443b84cb691::t_c08ffd60a98917 1-25
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_CLASSIFIER_e241000982.after.json
+  s_dd4443b84cb691::t_0a8f881a13f330 1-37
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_CLASSIFIER_e241000982.before.json
+  s_dd4443b84cb691::t_c4834563ba4830 1-33
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_CLOSURE_OPERATOR_37a699a3bf.after.json
+  s_dd4443b84cb691::t_ac30421f367531 1-133
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_CLOSURE_OPERATOR_37a699a3bf.before.json
+  s_dd4443b84cb691::t_d268e57c2c027d 1-126
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.after.json
+  s_dd4443b84cb691::t_cecd3479106b5a 1-113
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.before.json
+  s_dd4443b84cb691::t_87433b1e51e412 1-108
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.after.json
+  s_dd4443b84cb691::t_60acb3bf7ee6c4 1-122
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.before.json
+  s_dd4443b84cb691::t_cb8a3429088d7e 1-117
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_GREEN_VERIFIER_1f55d4f820.after.json
+  s_dd4443b84cb691::t_4c858a6c9492fd 1-74
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_GREEN_VERIFIER_1f55d4f820.before.json
+  s_dd4443b84cb691::t_7756941d06b08c 1-69
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.after.json
+  s_dd4443b84cb691::t_40ac346940b1ca 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.before.json
+  s_dd4443b84cb691::t_9970557df2eea1 1-59
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.after.json
+  s_dd4443b84cb691::t_6f4e3a24eaae8d 1-95
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.before.json
+  s_dd4443b84cb691::t_469b9aa91d1d8f 1-87
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_MATERIALIZER_168da3e259.after.json
+  s_dd4443b84cb691::t_ad9c3f9080e36a 1-21
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_MATERIALIZER_168da3e259.before.json
+  s_dd4443b84cb691::t_9aefbfbe832eec 1-7
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_RED_TEST_WORKER_7145827ae8.after.json
+  s_dd4443b84cb691::t_c86f153b2f8077 1-55
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_RED_TEST_WORKER_7145827ae8.before.json
+  s_dd4443b84cb691::t_6eec1e85b9d94d 1-51
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_RED_TEST_WORKER_9c91fcd50a.before.json
+  s_dd4443b84cb691::t_cc623f5dc94135 1-41
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_TASK_COMPLETION_WORKER_c5afd81af5.after.json
+  s_dd4443b84cb691::t_3478c22c61a85d 1-83
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/snapshots/WEX_TASK_COMPLETION_WORKER_c5afd81af5.before.json
+  s_dd4443b84cb691::t_47a2443dc7c83e 1-78
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/results/GREEN-ROOT-001.md
+  s_2fd37b928be87c::t_999b92a951bb7d 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/results/ROUTE-TRACE.jsonl
+  s_dd4443b84cb691::t_32a9c5ccf8af33 1-6
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/CHECKPOINT.json
+  s_dd4443b84cb691::t_831719072d92a3 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/DISPATCH.jsonl
+  s_dd4443b84cb691::t_beb8b59575bd18 1-11
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/executions/WEX_CLASSIFIER_69aecfc79c.identity.json
+  s_dd4443b84cb691::t_9f11ba96e4193d 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/executions/WEX_GREEN_VERIFIER_7402a3823e.identity.json
+  s_dd4443b84cb691::t_9421f05b76df8e 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/executions/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.identity.json
+  s_dd4443b84cb691::t_c3474f6db40c7a 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/executions/WEX_MATERIALIZER_56bd3ed61c.identity.json
+  s_dd4443b84cb691::t_476dee51ab92b5 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/executions/WEX_RED_TEST_WORKER_ea82c8e691.identity.json
+  s_dd4443b84cb691::t_43c6c4147580c3 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/heartbeats/WEX_CLASSIFIER_69aecfc79c.json
+  s_b9a69422a07ef4::t_2597158411f700 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/heartbeats/WEX_GREEN_VERIFIER_7402a3823e.json
+  s_2fd37b928be87c::t_771b518cd40505 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/intents/WEX_CLASSIFIER_69aecfc79c.intent.json
+  s_dd4443b84cb691::t_22ae92666ac784 1-69
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/intents/WEX_GREEN_VERIFIER_7402a3823e.intent.json
+  s_dd4443b84cb691::t_6d89afb9d00d7e 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/intents/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.intent.json
+  s_dd4443b84cb691::t_162ef89b826272 1-72
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/intents/WEX_MATERIALIZER_56bd3ed61c.intent.json
+  s_dd4443b84cb691::t_5766a7cc83699f 1-53
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/intents/WEX_RED_TEST_WORKER_ea82c8e691.intent.json
+  s_dd4443b84cb691::t_6318ae7bcb3caa 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_CLASSIFIER_69aecfc79c.finalize_reject.json
+  s_f7e1b1dcaad8ce::t_ac76f0999ab37d 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_CLASSIFIER_69aecfc79c.in.json
+  s_dd4443b84cb691::t_08049bc161dd6c 1-45
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_CLASSIFIER_69aecfc79c.wb.json
+  s_dd4443b84cb691::t_0891f47bca38df 1-21
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_GREEN_VERIFIER_7402a3823e.in.json
+  s_dd4443b84cb691::t_a527b337e4c6e7 1-39
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_GREEN_VERIFIER_7402a3823e.out.json
+  s_2fd37b928be87c::t_5ea50d54b34b40 1-67
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_GREEN_VERIFIER_7402a3823e.wb.json
+  s_dd4443b84cb691::t_412d3d1570dc4f 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.finalize_reject.json
+  s_dd4443b84cb691::t_8f8f7318aeb438 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.in.json
+  s_dd4443b84cb691::t_ca739d6b736e39 1-54
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.wb.json
+  s_dd4443b84cb691::t_57ba49a2da1a18 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_MATERIALIZER_56bd3ed61c.finalize_reject.json
+  s_dd4443b84cb691::t_70bb71449d6176 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_MATERIALIZER_56bd3ed61c.in.json
+  s_dd4443b84cb691::t_c23230d243f520 1-36
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_MATERIALIZER_56bd3ed61c.wb.json
+  s_dd4443b84cb691::t_7ab9ab2eb02962 1-20
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_RED_TEST_WORKER_ea82c8e691.finalize_reject.json
+  s_dd4443b84cb691::t_325a1cbcb193c2 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_RED_TEST_WORKER_ea82c8e691.wb.json
+  s_dd4443b84cb691::t_733b10c5faf2d7 1-17
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/retries/.host_retry_authority
+  s_dd4443b84cb691::t_8552eac026541f 1
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_CLASSIFIER_69aecfc79c.after.json
+  s_dd4443b84cb691::t_d8e1c095230271 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_CLASSIFIER_69aecfc79c.before.json
+  s_dd4443b84cb691::t_ecc0962711207e 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_GREEN_VERIFIER_7402a3823e.after.json
+  s_dd4443b84cb691::t_b69226867c8ffa 1-56
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_GREEN_VERIFIER_7402a3823e.before.json
+  s_dd4443b84cb691::t_4819a9f7a73e43 1-51
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.after.json
+  s_dd4443b84cb691::t_4f328b04a67c9a 1-47
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.before.json
+  s_dd4443b84cb691::t_065e278620c6cc 1-42
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_MATERIALIZER_56bd3ed61c.after.json
+  s_dd4443b84cb691::t_d06d8efcde7b23 1-18
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_MATERIALIZER_56bd3ed61c.before.json
+  s_dd4443b84cb691::t_405aedae450d35 1-7
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_RED_TEST_WORKER_ea82c8e691.after.json
+  s_dd4443b84cb691::t_7418969cd52d2a 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-003-20260821-001.out.md
+  s_de94f11c688d9e::t_949bdccf1b735c 1-58
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-001-20260821-001.in.md
+  s_c71df1117b14e2::t_ef2c64fbeaec19 1-46
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/GREEN-FINDING-001.md
+  s_dd4443b84cb691::t_ff98f43d4663d1 1-30
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/HUNT-FINDING-001.md
+  s_dd4443b84cb691::t_c1a161b610bf91 1-72
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/LEARNING_DECISION.json
+  s_dd4443b84cb691::t_cb17ba6e97079a 1-41
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/LEARNING_REPORT.md
+  s_dd4443b84cb691::t_b9b3470055770b 1-27
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/PROOF-CLASSIFIER-300e4e0437.json
+  s_dd4443b84cb691::t_e7d8df9851cd72 1-21
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/RED-FINDING-001.md
+  s_dd4443b84cb691::t_a9fc6c1c3074a9 1-28
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_BOUNDED_HUNTER_c9a36b66db.identity.json
+  s_dd4443b84cb691::t_d41456f505a523 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/executions/WEX_TASK_COMPLETION_WORKER_f21030172f.identity.json
+  s_dd4443b84cb691::t_13def9ffb878ed 1-32
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_CLASSIFIER_300e4e0437.json
+  s_dd4443b84cb691::t_0bf89446e1c871 1-14
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_FAMILY_LEARNING_WORKER_08e6a51076.json
+  s_dd4443b84cb691::t_ef88907d2e5273 1-9
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.json
+  s_dd4443b84cb691::t_2ef816833b8ae7 1-14
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_MATERIALIZER_8937b1bee0.json
+  s_dd4443b84cb691::t_aa23a1513f21c2 1-15
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_TASK_COMPLETION_WORKER_f21030172f.json
+  s_dd4443b84cb691::t_28b01d53109ba5 1-9
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/intents/WEX_BOUNDED_HUNTER_c9a36b66db.intent.json
+  s_dd4443b84cb691::t_2fc614e496a68e 1-81
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_BOUNDED_HUNTER_c9a36b66db.in.json
+  s_dd4443b84cb691::t_da5dfc8a59f72b 1-48
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_BOUNDED_HUNTER_c9a36b66db.wb.json
+  s_dd4443b84cb691::t_520a757dcb2883 1-17
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_CLASSIFIER_300e4e0437.out.json
+  s_dd4443b84cb691::t_f015f31a22c61d 1-127
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_FAMILY_LEARNING_WORKER_08e6a51076.out.json
+  s_dd4443b84cb691::t_fdf032bc17a15d 1-44
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_FAN_IN_ASSEMBLER_38f14651a4.in.json
+  s_dd4443b84cb691::t_e886e87427f5c0 1-49
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.out.json
+  s_dd4443b84cb691::t_19f5344979ffa8 1-61
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_TASK_COMPLETION_WORKER_f21030172f.out.json
+  s_dd4443b84cb691::t_e764643fd9b01c 1-37
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_TASK_COMPLETION_WORKER_f21030172f.wb.json
+  s_dd4443b84cb691::t_47219462d129be 1-16
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_BOUNDED_HUNTER_c9a36b66db.after.json
+  s_dd4443b84cb691::t_501e83d9853b8b 1-90
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_BOUNDED_HUNTER_c9a36b66db.before.json
+  s_dd4443b84cb691::t_876e801f591d89 1-85
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_FAN_IN_ASSEMBLER_38f14651a4.before.json
+  s_dd4443b84cb691::t_d540b5e4a5e4e4 1-94
+.opsx/runs/bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/snapshots/WEX_TASK_COMPLETION_WORKER_f21030172f.after.json
+  s_dd4443b84cb691::t_e3f857fe84a923 1-81
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/CASE.md
+  s_dd4443b84cb691::t_31e5d73e537fc4 1-19
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/LEDGER.md
+  s_dd4443b84cb691::t_885f1eae2963ff 1-60
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/findings/FINDING-CAH-CONFIRM-001.md
+  s_dd4443b84cb691::t_283506807f6cf3 1-18
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/findings/FINDING-CAH-CONFIRM-002.md
+  s_dd4443b84cb691::t_96b3e8f3acff2b 1-33
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/intakes/RAW_INTAKE.normalized.md
+  s_dd4443b84cb691::t_cc4538baa0cf00 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-001-20260821-001.md
+  s_dd4443b84cb691::t_7bd6e335d2c5a6 1-52
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-001-20260821-002.md
+  s_dd4443b84cb691::t_f07466b7c5bdbe 1-98
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/FIX-WEX-EXEC-004-20260821-001.md
+  s_dd4443b84cb691::t_1d59735d5417fe 1-81
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/GREEN-WEX-GREEN-001-20260821-001.md
+  s_dd4443b84cb691::t_7fa4213d07f819 1-95
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/GREEN-WEX-GREEN-001-20260821-002.md
+  s_dd4443b84cb691::t_05f92259442f50 1-142
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/GREEN-WEX-GREEN-002-20260821-001.md
+  s_dd4443b84cb691::t_04dd5a5ff7af84 1-94
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/GREEN-WEX-GREEN-004-20260821-001.md
+  s_dd4443b84cb691::t_9e91967ec0ccb6 1-105
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/GREEN-WEX-GREEN-005-20260821-001.md
+  s_dd4443b84cb691::t_907cde88054243 1-94
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/HUMAN_SUMMARY.md
+  s_dd4443b84cb691::t_8250357e497450 1-41
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/RED-WEX-RED-001-20260821-002.md
+  s_dd4443b84cb691::t_d3d1a9bebda1d2 1-85
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/RED-WEX-RED-003-20260821-001.md
+  s_dd4443b84cb691::t_e36e3fbd59666a 1-35
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/results/RED-WEX-RED-005-20260821-001.md
+  s_dd4443b84cb691::t_c40f2cc31d1f49 1-34
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/CHECKPOINT.md
+  s_dd4443b84cb691::t_41e1555e4d5924 1-25
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/DISPATCH.jsonl
+  s_dd4443b84cb691::t_4bfa54c7500afa 1-48
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLAIM-002-20260821-001.json
+  s_dd4443b84cb691::t_c351fa55703e8e 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLAIM-002-20260821-002.json
+  s_dd4443b84cb691::t_1306cab147881c 1-12
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLAIM-004-20260821-001.json
+  s_dd4443b84cb691::t_d927476b8edeb5 1-15
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLAIM-005-20260821-001.json
+  s_dd4443b84cb691::t_4b000592e238a6 1-11
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLAIM-20260821-001.json
+  s_dd4443b84cb691::t_acd00c3444910a 1
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLASS-001-20260821-001.json
+  s_dd4443b84cb691::t_f4af5938d388d4 1
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLASS-001-20260821-002.json
+  s_dd4443b84cb691::t_fe7df6abafa4b3 1
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-CLASS-004-20260821-001.json
+  s_dd4443b84cb691::t_1593585a4ff11b 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-EXEC-001-20260821-001.json
+  s_dd4443b84cb691::t_002287d6b2fbb8 1
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-EXEC-001-20260821-002.json
+  s_dd4443b84cb691::t_ffabfbb1c38a87 1-14
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-EXEC-002-20260821-001.json
+  s_dd4443b84cb691::t_d9ec0d7860eca2 1-11
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-EXEC-005-20260821-001.json
+  s_dd4443b84cb691::t_2742b94ab71bdf 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-EXEC-005-20260821-002.json
+  s_dd4443b84cb691::t_419e9ba1431f8d 1-14
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-GREEN-001-20260821-002.json
+  s_dd4443b84cb691::t_a0522f8eb8e80d 1
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-GREEN-002-20260821-001.json
+  s_dd4443b84cb691::t_d6af158a495985 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-GREEN-003-20260821-001.json
+  s_dd4443b84cb691::t_64a8a0d42b6619 1-13
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-GREEN-004-20260821-001.json
+  s_dd4443b84cb691::t_921571e3f99c61 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-RED-001-20260821-001.json
+  s_dd4443b84cb691::t_ea07ee1ecb9dd3 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-RED-001-20260821-002.json
+  s_dd4443b84cb691::t_258d4dcbbbe688 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-RED-003-20260821-001.json
+  s_dd4443b84cb691::t_466d55a7c09082 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/heartbeats/WEX-RED-004-20260821-001.json
+  s_dd4443b84cb691::t_1cc616eacb74be 1-12
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-002-20260821-001.in.md
+  s_dd4443b84cb691::t_73addcc59b55c9 1-25
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-002-20260821-001.out.md
+  s_dd4443b84cb691::t_321884a1c1219f 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-002-20260821-002.in.md
+  s_dd4443b84cb691::t_eeb081f412819d 1-26
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-002-20260821-002.out.md
+  s_dd4443b84cb691::t_984bdc1579f448 1-29
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-003-20260821-001.in.md
+  s_dd4443b84cb691::t_a3cbfd31d3580d 1-37
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-004-20260821-001.in.md
+  s_dd4443b84cb691::t_88bdb0b638d104 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-004-20260821-001.out.md
+  s_dd4443b84cb691::t_8644416510b01a 1-26
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-005-20260821-001.in.md
+  s_dd4443b84cb691::t_3fb0776c3432f3 1-39
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-005-20260821-001.out.md
+  s_dd4443b84cb691::t_eed9afc8cbc512 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLAIM-20260821-001.out.md
+  s_dd4443b84cb691::t_8e8cd5c24779e7 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-001-20260821-001.in.md
+  s_dd4443b84cb691::t_a96aa389298b49 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-001-20260821-001.out.md
+  s_dd4443b84cb691::t_91613833e6e4ae 1-37
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-001-20260821-002.in.md
+  s_dd4443b84cb691::t_311ba3f89579b4 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-001-20260821-002.out.md
+  s_dd4443b84cb691::t_b2a4a0212f4e12 1-33
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-002-20260821-001.in.md
+  s_dd4443b84cb691::t_901f40b596755b 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-002-20260821-001.out.md
+  s_dd4443b84cb691::t_1c625db0d3b481 1-41
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-003-20260821-001.in.md
+  s_dd4443b84cb691::t_685b2d6a9b9087 1-46
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-CLASS-003-20260821-001.out.md
+  s_dd4443b84cb691::t_75b9a445394fe1 1-32
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-001-20260821-002.in.md
+  s_dd4443b84cb691::t_01f623c21e71be 1-48
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-001-20260821-002.out.md
+  s_dd4443b84cb691::t_b877396805d9a8 1-95
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-002-20260821-001.out.md
+  s_dd4443b84cb691::t_038a8052bcba54 1-69
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-003-20260821-001.in.md
+  s_dd4443b84cb691::t_6e5037bc1ae37b 1-58
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-003-20260821-001.out.md
+  s_dd4443b84cb691::t_17d84ed5f9702c 1-91
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-004-20260821-001.in.md
+  s_dd4443b84cb691::t_b6be417d12e728 1-58
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-004-20260821-001.out.md
+  s_dd4443b84cb691::t_c71bfe527ea101 1-71
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-005-20260821-001.in.md
+  s_dd4443b84cb691::t_9706ef16d073e7 1-50
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-005-20260821-001.out.md
+  s_dd4443b84cb691::t_c4601cae4cc3de 1-68
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-005-20260821-002.in.md
+  s_dd4443b84cb691::t_73a953f5b48eef 1-40
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-EXEC-005-20260821-002.out.md
+  s_dd4443b84cb691::t_b4e94187a83eef 1-65
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-001-20260821-001.in.md
+  s_dd4443b84cb691::t_6c4fe16873173f 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-001-20260821-001.out.md
+  s_dd4443b84cb691::t_530fcddf09935e 1-24
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-001-20260821-002.in.md
+  s_dd4443b84cb691::t_002586150dfe30 1-45
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-001-20260821-002.out.md
+  s_dd4443b84cb691::t_2287dc3fcc1caa 1-75
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-002-20260821-001.in.md
+  s_dd4443b84cb691::t_aff1b41e608533 1-49
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-002-20260821-001.out.md
+  s_dd4443b84cb691::t_b78104465b9921 1-82
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-004-20260821-001.in.md
+  s_dd4443b84cb691::t_8ef04b9a9bdd1e 1-52
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-004-20260821-001.out.md
+  s_dd4443b84cb691::t_f82988ecf790a1 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-005-20260821-001.in.md
+  s_dd4443b84cb691::t_ba1d978c958d61 1-36
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-GREEN-005-20260821-001.out.md
+  s_dd4443b84cb691::t_0ebd3258c0d318 1-64
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-MAT-20260821-001.in.md
+  s_dd4443b84cb691::t_634bbe0702feaf 1-36
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-001-20260821-001.out.md
+  s_dd4443b84cb691::t_f7149734815f77 1-36
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-001-20260821-002.in.md
+  s_dd4443b84cb691::t_86f1628838aa11 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-001-20260821-002.out.md
+  s_dd4443b84cb691::t_b62878aeea66d3 1-58
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-002-20260821-001.in.md
+  s_dd4443b84cb691::t_2b0f2dcdc347f2 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-003-20260821-001.in.md
+  s_dd4443b84cb691::t_4afa54bd2aa30a 1-48
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-003-20260821-001.out.md
+  s_dd4443b84cb691::t_be83f34694bdaf 1-22
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-004-20260821-001.in.md
+  s_dd4443b84cb691::t_8a3e035e38d7ee 1-47
+.opsx/runs/bug-cases/BUGCASE-CAH-CONFIRM-20260821-001/team/packets/WEX-RED-004-20260821-001.out.md
+  s_dd4443b84cb691::t_2295f09558a358 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/family/FAMILY.json
+  s_dd4443b84cb691::t_914e9a857932b7 1-22
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/family/INVARIANT.json
+  s_dd4443b84cb691::t_d8e685f2d0e79e 1-10
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/family/INVARIANT.md
+  s_dd4443b84cb691::t_5fa537aa9daf27 1-48
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/family/LEARNING_DECISION.json
+  s_dd4443b84cb691::t_6a62edb6c11340 1-46
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/family/ROOT-GREEN-PROOF.json
+  s_dd4443b84cb691::t_76e1c244a09295 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/findings/ROOT-001.md
+  s_dd4443b84cb691::t_0adc2279a2b6d6 1-73
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/FAMILY-FANIN.md
+  s_dd4443b84cb691::t_4893f3a5149521 1-30
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/FIX-ROOT-001.md
+  s_dd4443b84cb691::t_a01d416e1aab21 1-33
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/GREEN-ROOT-001.md
+  s_dd4443b84cb691::t_434fd72beb7bf0 1-40
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/PROOF-HUNT-BOUNDED-HUNTER-001.md
+  s_dd4443b84cb691::t_d1a15e231c5fbc 1-38
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/RED-ROOT-001.md
+  s_dd4443b84cb691::t_43f6616f026286 1-12
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/results/TASK-COMPLETION-ROOT-001.md
+  s_dd4443b84cb691::t_ece580f054399d 1-27
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_BOUNDED_HUNTER_f3e8ab146c.json
+  s_dd4443b84cb691::t_33983db3be9d0b 1-15
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_CLAIM_WORKER_95976a38fb.json
+  s_dd4443b84cb691::t_32bd81bdc65b95 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_CLASSIFIER_e241000982.json
+  s_dd4443b84cb691::t_ae49281619d3c0 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_CLOSURE_OPERATOR_37a699a3bf.json
+  s_dd4443b84cb691::t_590ad8ad3a7a50 1-20
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.json
+  s_dd4443b84cb691::t_bd8358a558d89c 1-13
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.json
+  s_dd4443b84cb691::t_c25b070b6cd855 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_GREEN_VERIFIER_1f55d4f820.json
+  s_dd4443b84cb691::t_744fc8c29ff7e8 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.json
+  s_dd4443b84cb691::t_dc52c0f8dc4666 1-15
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_RED_TEST_WORKER_7145827ae8.json
+  s_dd4443b84cb691::t_07778f0b119c8f 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_RED_TEST_WORKER_9c91fcd50a.json
+  s_dd4443b84cb691::t_dd0390e9d9dbaf 1-16
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/heartbeats/WEX_TASK_COMPLETION_WORKER_c5afd81af5.json
+  s_dd4443b84cb691::t_427c4b050d1eca 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_BOUNDED_HUNTER_f3e8ab146c.out.json
+  s_dd4443b84cb691::t_03af26f9c58f70 1-45
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLAIM_WORKER_95976a38fb.out.json
+  s_dd4443b84cb691::t_8adfdcd6cfaac7 1-41
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_CLASSIFIER_e241000982.out.json
+  s_dd4443b84cb691::t_f09e9fa5e57ece 1-51
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.out.json
+  s_dd4443b84cb691::t_f62236dbc118d5 1-49
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_FAMILY_LEARNING_WORKER_bb41448f0a.out.json
+  s_dd4443b84cb691::t_35f1e1e69835e1 1-42
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_GREEN_VERIFIER_1f55d4f820.out.json
+  s_dd4443b84cb691::t_34536e0370fb46 1-51
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.out.json
+  s_dd4443b84cb691::t_e7a4bae4631094 1-53
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_MATERIALIZER_168da3e259.out.json
+  s_dd4443b84cb691::t_523a6398371f41 1-44
+.opsx/runs/bug-cases/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/team/packets/WEX_RED_TEST_WORKER_7145827ae8.out.json
+  s_dd4443b84cb691::t_90d47ec3cdca8d 1-50
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/LEDGER.md
+  s_dd4443b84cb691::t_820c4c11fe3d19 1-77
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/intakes/INTAKE-001.md
+  s_dd4443b84cb691::t_b789a835a7b3a1 1-27
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.json
+  s_dd4443b84cb691::t_18532706927cec 1-13
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/heartbeats/WEX_MATERIALIZER_56bd3ed61c.json
+  s_dd4443b84cb691::t_380db4fe6a485f 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/heartbeats/WEX_RED_TEST_WORKER_ea82c8e691.json
+  s_dd4443b84cb691::t_0ca05ec5efac0c 1-9
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_CLASSIFIER_69aecfc79c.out.json
+  s_dd4443b84cb691::t_9c8654b5d40b18 1-186
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_8ae43b39ab.out.json
+  s_dd4443b84cb691::t_e10483e3db85ce 1-64
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_MATERIALIZER_56bd3ed61c.out.json
+  s_dd4443b84cb691::t_8e380040c56956 1-67
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_RED_TEST_WORKER_ea82c8e691.in.json
+  s_dd4443b84cb691::t_e5a8fc76f8a1bf 1-43
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_RED_TEST_WORKER_ea82c8e691.out.json
+  s_dd4443b84cb691::t_dc2b578ceb9585 1-77
+.opsx/runs/bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/snapshots/WEX_RED_TEST_WORKER_ea82c8e691.before.json
+  s_dd4443b84cb691::t_7cc2d8ea0aa667 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "81d907b7bd23ed1a983ab1471cfa57373fb79cb3",
+  "prompts": {},
+  "sessions": {
+    "s_1b168ce9fa6c05": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "236c183e-4ccb-4a2b-bad9-f09fccdda723",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_226dbd5a792f4e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "29008248-bb41-4d16-93c4-2475fbbcb33f",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_2fd37b928be87c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b35761d7-2ca3-4b63-80b0-ccd0d8d83ce2",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_4087ef2145ce19": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "88498fe5-ad5a-4664-bef7-5dfedd69b804",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_408fa85d532431": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "20ef51fe-d015-404c-9c4c-748e3692e54d",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_46ea7f10ba92cd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "acb8a2e2-4882-4494-ba87-d0f551f42a15",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_54bbf41dda5694": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c13d3aaf-711c-4fb1-8de3-9c2f654fcc4b",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_5f7da8dc7bc840": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "43a290b1-6ef9-4fb0-88db-4c2cc0906970",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_63435409330290": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "237b578e-4ad5-41c7-a178-570e8ce3b77a",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_65886eb73a794f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7cc06e1f-affd-4253-8e6e-f0fcf4c77a94",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_6ab8905630dcd7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a927e871-e11f-4a30-a596-a3fb7fec980b",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_74f2cc61f9b572": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f0f9581e-6d1d-4fa2-9419-a56762cab29d",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_7a8346e4785a65": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a949b61d-a0e7-4d1e-858f-9b95061542c1",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_86bf83f01c2564": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "57f0e2cd-50ab-4804-9dd0-28c9fbcba083",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_902b586edab378": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0a17b918-8eb4-43b9-9c73-9d9d1db06853",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_951b2f5eb0723a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5d25a129-e34b-4af1-9da2-804585d72934",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_98181978cb8d08": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "096eaa47-91d4-45d6-bf68-8c4c08314987",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9bc202d06f1cae": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0e15c72e-73b6-4ffa-9d2b-5aca95dcf297",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9d91377a0b89f6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fee43c34-76fc-4881-8907-8cdcbbc3be32",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9dd3bfff6766f0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "532843bf-b49c-420c-a1cb-b4820faf312d",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9e283694d76d3e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "60f77758-f1f4-43b6-b3d6-4e5366ee53eb",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_a6c9523b182a97": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a011b4-6bcc-7e30-b711-7f26e512d892",
+        "model": "gpt-5.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_afc4cdb449894d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fa9c4852-9649-448c-b754-fb649a8c7b70",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_b6b5d99a95de2f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d558ac94-467b-4154-95b2-9e77c7d11f07",
+        "model": "gpt-5.6-luna-medium"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_b9a69422a07ef4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a5cec065-a07a-4213-b4ce-f22cbb73e587",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_c71df1117b14e2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c5310f31-9050-45df-92d9-4d7239a57e14",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_c8ea29d4492be7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9120c9ba-d14f-473a-88cc-eb5bfa1f72dd",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_cb75ea572bf043": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9f9efaa8-8a5d-4c17-882e-f72ef153ae64",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_d4523f77e8e556": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "bbbefccd-69d4-4071-891f-974e11217406",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_dbad94ae8ff34f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "320d425c-c7c3-478c-bc2c-02558c090ef7",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_dd4443b84cb691": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8a3c2d1e-e3b3-492a-824a-c547bb75253f",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_e504e65f9e5f71": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a02380-4efe-7570-850e-68785036afec",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ed75d5b03ff8f7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6f4a4772-7e14-4800-9eae-1fb5abc42da7",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f7e1b1dcaad8ce": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3bbdba11-8a55-47d3-92ee-437520830a92",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
