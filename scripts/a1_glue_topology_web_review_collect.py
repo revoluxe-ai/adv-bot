@@ -61,9 +61,6 @@ CATEGORY_LABELS = {
     "yoga_pillows": "yoga pillows (подушки для йоги)",
 }
 
-NAME_SEARCH = re.compile(r"<!-\[(\d+)\]-!>")  # noqa: F841 — reserved for campaign name parsing
-
-
 def _msk_now() -> datetime:
     return datetime.now(timezone.utc).astimezone(MSK)
 
