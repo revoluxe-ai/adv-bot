@@ -1,0 +1,21 @@
+scripts/a1_cpc_two_sku_safety_preflight.py
+  s_4f5303dd26d1c5::t_d6d9d86b1930c2 1-741
+scripts/a1_sale_price_snapshot.py
+  s_4f5303dd26d1c5::t_ac3063e0f32bb0 1-308
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "2b848882473d4b1862cfef3ae4996f9e635e57ab",
+  "prompts": {},
+  "sessions": {
+    "s_4f5303dd26d1c5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ad38ff3b-3cc3-4138-a040-0809643a03af",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
