@@ -16,6 +16,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 
 | title | path | runnable | tests | battle_tested | last_local_at | last_cluster_at | last_image_ref | notes |
 |-------|------|----------|-------|---------------|---------------|-----------------|----------------|-------|
+| Adv-bot historical state extractor | scripts/adv_bot_historical_state_extractor.py | WORKS | COVERED | NO | 2026-08-25T21:44:04Z | 2026-08-25T22:40:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9d269aa9e95afe64da03f8c8f5c07231da26c50e | DILERA battle run Job ops-script-adv-hist-dilera-20260825-223759 COMPLETE; PRIMARY zip 181d077f…; supplier_id→shop bab6bc8e…; gaps=[] |
 | Backfill L2 | scripts/backfill_l2.py | UNKNOWN | NONE | NO | - | - | - | |
 | Backfill MV for keyword clusters | scripts/backfill_mv_for_keyword_clusters.py | UNKNOWN | NONE | NO | - | - | - | |
 | Delete user by Telegram id | scripts/delete_user_by_telegram_id.py | UNKNOWN | NONE | NO | - | - | - | |
@@ -48,6 +49,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Main user generator | scripts/users_communicate_module/main_user_generator.py | UNKNOWN | NONE | NO | - | - | - | |
 | Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-14T12:47:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:c1e1fa7c523cdcec81ea23aaf7d8b2dc8e08248a | Job ops-script-users-csv-20260814-123657 Complete exit=0; all_users.xlsx 129957B sha256 670f02cba87457967b0b26c50032d3a26cc51ca466743ebd9c5bac8ff60ddb15 |
 | WB API read-only preflight/collect | scripts/wb_api_readonly_ops/run.py | WORKS | PARTIAL | NO | 2026-08-21T10:54:00Z | 2026-08-21T15:40:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:4451a5645f9256c1978af1b64420b84a00a540eb | collect Job ops-script-wb-collect-a1-20260821-153424 OOO-A1 PARTIAL; LOCAL_ARTIFACT_HANDOFF=PASS; L0 zip abf3c048…; Stage-A limits — see SCRIPTS_REPORT |
+| A1 glue topology Web review | scripts/a1_glue_topology_web_review_collect.py | UNKNOWN | NONE | NO | - | - | - | READ_ONLY glue/price/ad evidence for Web analytical chat; PRIMARY A1-GLUE-TOPOLOGY-WEB-REVIEW.zip |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
