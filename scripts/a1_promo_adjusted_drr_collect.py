@@ -34,7 +34,6 @@ from scripts.a1_promotion_funding_snapshot import (
     _api_model_dict,
     _bootstrap_cluster_infra,
     _cashbacks_to_list,
-    _collect_wb_funding,
     _load_adv_settings,
 )
 from scripts.wb_a1_associated_conversions import (
@@ -437,11 +436,11 @@ def _build_promo_mechanics_md(accounting_status: str) -> str:
     )
 
 
-async def _wb_collect(
+async def _async_collect_all(
     closed_end: date,
     open_d: date,
-    pg_rows: list[dict[str, str]],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[int]]:
+) -> dict[str, Any]:
+    """Единый async pipeline — один event loop для DI/SQLAlchemy/Redis/WB API."""
     from app.core.di.app_container import AppContainer
     from app.core.di.di_manager import DIManager
     from app.core.mp.wb.api.adapter.promotion_client.fullstats.chunked import (
@@ -451,6 +450,8 @@ async def _wb_collect(
     campaigns: list[dict[str, Any]] = []
     fullstats_raw: list[dict[str, Any]] = []
     orders_raw: list[dict[str, Any]] = []
+    central: dict[str, Any] = {}
+    campaign_budgets: list[dict[str, Any]] = []
 
     async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
         factory = (
@@ -459,7 +460,18 @@ async def _wb_collect(
         hub = factory.get_wb_manager_hub(SHOP_ID)
         dm = hub.wb_data_manager
         pm = dm.promotion_manager
+        finance = pm._client.finance_adapter
         budget = ApiCallBudget(max_seconds=1800.0, max_api_calls=2500)
+
+        balance_resp = await finance.get_campaign_balance()
+        balance_data = _api_model_dict(balance_resp)
+        central = {
+            "balance": balance_data.get("balance"),
+            "net": balance_data.get("net"),
+            "bonus": balance_data.get("bonus"),
+            "cashbacks": _cashbacks_to_list(balance_data.get("cashbacks")),
+        }
+
         reports_manager = getattr(dm, "reports_manager", None)
 
         async def fetch_orders(df: str) -> list[object]:
@@ -484,6 +496,30 @@ async def _wb_collect(
             if isinstance(row, dict):
                 campaigns.append(row)
 
+        from scripts.a1_promotion_funding_snapshot import ACTIVE_STATUSES
+
+        active_ids: list[int] = []
+        for item in camps_raw:
+            adv_id = int(getattr(item, "id", 0) or 0)
+            status_raw = getattr(item, "status", None)
+            status_val = int(
+                status_raw.value if hasattr(status_raw, "value") else status_raw or 0
+            )
+            if status_val in ACTIVE_STATUSES:
+                active_ids.append(adv_id)
+        for adv_id in sorted(active_ids):
+            try:
+                b = await finance.get_campaign_budget(adv_id)
+                budget_data = _api_model_dict(b)
+                campaign_budgets.append(
+                    {
+                        "adv_id": adv_id,
+                        "total": budget_data.get("total"),
+                    }
+                )
+            except Exception:
+                pass
+
         client = pm._client
         adapter = client.fullstats_adapter
 
@@ -496,7 +532,14 @@ async def _wb_collect(
         for item in items:
             fullstats_raw.append(_jsonable(item.to_dict()))
 
-    return campaigns, fullstats_raw, orders_raw, cabinet_adv_ids
+    return {
+        "central": central,
+        "campaign_budgets": campaign_budgets,
+        "campaigns": campaigns,
+        "fullstats_raw": fullstats_raw,
+        "orders_raw": orders_raw,
+        "cabinet_adv_ids": cabinet_adv_ids,
+    }
 
 
 def _campaign_promo_reconciliation(
@@ -592,12 +635,13 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
 
     normalized = [_normalize_topup(r) for r in topup_raw_deduped]
 
-    wb_funding = asyncio.run(_collect_wb_funding())
-    central = wb_funding["central"]
-    campaign_budgets = wb_funding["campaign_budgets"]
-
-    wb_payload = asyncio.run(_wb_collect(closed_end, open_d, settings_rows))
-    campaigns, fullstats_raw, orders_raw, cabinet_adv_ids = wb_payload
+    wb_payload = asyncio.run(_async_collect_all(closed_end, open_d))
+    central = wb_payload["central"]
+    campaign_budgets = wb_payload["campaign_budgets"]
+    campaigns = wb_payload["campaigns"]
+    fullstats_raw = wb_payload["fullstats_raw"]
+    orders_raw = wb_payload["orders_raw"]
+    cabinet_adv_ids = wb_payload["cabinet_adv_ids"]
 
     with (raw_dir / "campaigns_v2.jsonl").open("w", encoding="utf-8") as handle:
         for row in campaigns:
