@@ -1,0 +1,21 @@
+{
+  "WORKER_ID": "CLASSIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/PROOF-CLASSIFIER-300e4e0437.json",
+    "team/heartbeats/WEX_CLASSIFIER_300e4e0437.json",
+    "team/intents/WEX_CLASSIFIER_300e4e0437.intent.json",
+    "team/packets/WEX_CLASSIFIER_300e4e0437.out.json",
+    "team/packets/_classifier_300e4e0437_append.py",
+    "team/packets/_classifier_300e4e0437_events.json",
+    "team/snapshots/WEX_CLASSIFIER_300e4e0437.before.json"
+  ],
+  "MODIFIED": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

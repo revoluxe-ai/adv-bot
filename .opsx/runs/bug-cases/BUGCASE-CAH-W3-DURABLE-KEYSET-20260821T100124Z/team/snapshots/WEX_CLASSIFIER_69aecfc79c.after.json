@@ -1,0 +1,32 @@
+{
+  "digests": {
+    "CASE.md": "05032f3f451bc7bdda66d8c68d0750bbb42e8e4cbf615d8eca5c7901b585b3c1",
+    "LEDGER.md": "255efa5e54e8351b5a55fcb43b09f2cad706d40df0a7d516d47dded30a41569c",
+    "findings/ROOT-001.md": "4a0b2f859de6ccffe585546bf46126b2cbd8c765d12d303722592edfad71d8f0",
+    "intakes/INTAKE-001.md": "ca572e58d65501df417be37cf79d24ef94c7ee3015e67840823c1cb78fd4d3b4",
+    "results/ROUTE-TRACE.jsonl": "98033d8bb4bd24c1ed9ff1fddb4d2b223027bc9858fd9bae8500cf6560f1775a",
+    "team/CHECKPOINT.json": "af115edbb5df3f9eac85592f82c0e8d7c6a929d09bf243c01569fd130ac82d95",
+    "team/DISPATCH.jsonl": "14676247891faa3e5a1a1cb45e58870faacd29e1d63d1f2bb5e74262e263b701",
+    "team/executions/WEX_CLASSIFIER_69aecfc79c.identity.json": "e1fd38c4090a9dbdd2b1d21ede9cbf446b6ad7e4dfab01eec5b21ac6bf541d85",
+    "team/executions/WEX_MATERIALIZER_56bd3ed61c.identity.json": "640ecfd52ba5ba802a56ca35a7525ca08a9bb94e29578466615c370fea3f4e08",
+    "team/heartbeats/WEX_CLASSIFIER_69aecfc79c.json": "8aea347ee5c330ec69f1fa2e3a32d1d00dc8811b366beba91ea1cef5a53b2d32",
+    "team/heartbeats/WEX_MATERIALIZER_56bd3ed61c.json": "593fc596267a78f1ce1e21413b7d4e0c40b59e7f73726a448f8fd45162423b3c",
+    "team/intents/WEX_CLASSIFIER_69aecfc79c.intent.json": "06fec8ec31850eede4d939a2c6c6694addb4e9ba17cf6dd1a1bd31ea6d1d2696",
+    "team/intents/WEX_MATERIALIZER_56bd3ed61c.intent.json": "51a85e8b96333e5ab8d8e27e5bd989be73f8e424d96a74166892c7913d4b7105",
+    "team/packets/WEX_CLASSIFIER_69aecfc79c.finalize_reject.json": "608582373b6ec9f2f93a1cf31d1d6fbba3ba47d3394efcbf71c808ff81486b18",
+    "team/packets/WEX_CLASSIFIER_69aecfc79c.in.json": "ebda3341764e0fd87f13b829f0f3e364d85e4d5873f45d278e255d5def09534e",
+    "team/packets/WEX_CLASSIFIER_69aecfc79c.out.json": "d604007098b1b39a3e5f398c59ba452b3cea54d59277aa7e09e5bed12be6037f",
+    "team/packets/WEX_CLASSIFIER_69aecfc79c.wb.json": "cbfcf49b6ee8feb9996d905e015a5c4c9e4a840c8ec34b29855f5a1cbcbbfc4d",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.finalize_reject.json": "2969a5d28642ce50fb5953614263ae001eb9867b7b74a2a91eaf95850699dbae",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.in.json": "4f681373be037df937d332012585044e2008b218720563d45f163e35d5d29bea",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.out.json": "6d59617bcfdc7cb9402927c6c93ec136ed86fed7162fbc67acfb53aa0db8d425",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.wb.json": "6c6ef51e0c8f0f53ef86aad5e75f69bb1aefd5401f2b06ff6af07c1bacc6b317",
+    "team/retries/.host_retry_authority": "6ef8c8362242c7e6e3e7d68c186044a56c3f76bd2f5bcae7ac8746ebe1167fa2",
+    "team/snapshots/WEX_CLASSIFIER_69aecfc79c.after.json": "2e4eb3dc14a46a5b7d74f637ca454be0ba4b730506177073d96c91748378528f",
+    "team/snapshots/WEX_CLASSIFIER_69aecfc79c.before.json": "5e7efe38124c4811c454b2ad85a211be28b5b70b76ed439082ce8ba64ccae1b5",
+    "team/snapshots/WEX_MATERIALIZER_56bd3ed61c.after.json": "c705b0b04fcefd8750b4c97a5da5f40a79e070ff964f93850d3b77445db1ef50",
+    "team/snapshots/WEX_MATERIALIZER_56bd3ed61c.before.json": "d620cec97b29dc6e8051c1173fd1e028dacb2b428017d5ca307de99c6b7dde90"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "taken_at": 1787309028.0601542
+}

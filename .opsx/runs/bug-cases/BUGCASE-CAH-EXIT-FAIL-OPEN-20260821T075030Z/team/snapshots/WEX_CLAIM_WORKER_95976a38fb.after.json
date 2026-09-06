@@ -1,0 +1,29 @@
+{
+  "digests": {
+    "CASE.md": "f7f9a49ce61eabcef8c52d4ab9b037b1e37240a0b9f5e1eb5ad4c3b2df952693",
+    "LEDGER.md": "6a834377d0dfb993743928422c60110840ca9e7e5fd192ed3ea86309ba9e08f9",
+    "findings/ROOT-001.md": "60cb38f1a7c2d5e1bafab6602e3d75203b528ce67cb499fd8eaefea6b55b0dbd",
+    "intakes/INTAKE-001.md": "d588d329f373aaba9eed41c53086f802e55353641c95ba3cf8ec5902801645a5",
+    "results/PROOF-MATERIALIZER-WEX168da3e259.md": "084efab989fc6bbe6b2da0d49d6e83a4beed7db637326f9406fc77d09f145c8c",
+    "results/ROUTE-TRACE.jsonl": "2138dd609dbd292c987e81aa2337b989e4311d0576114f78eb246bf258e8a253",
+    "team/CHECKPOINT.json": "1d50caab23d565f8c3da13be6bd1ab2857bb53c758648212525b1e5df300bf8f",
+    "team/DISPATCH.jsonl": "757ce739f8a0cc48f0233c7d35919c86e13697be7622a9b97c31cde8c3f21add",
+    "team/executions/WEX_MATERIALIZER_168da3e259.identity.json": "e779555a30deafa3dff9e0b7af92e8eedc5400608232909c901d6d225ed7c7ef",
+    "team/heartbeats/WEX_CLAIM_WORKER_95976a38fb.json": "3b20f567f6e206403b16ae7b3a29593b417f359425a704fb4305e8069f196e21",
+    "team/heartbeats/WEX_MATERIALIZER_168da3e259.json": "c0901914dee45ba01fb4c879a7d96e0590528e62989eed1170aa29b499c6c7ed",
+    "team/intents/WEX_CLAIM_WORKER_95976a38fb.intent.json": "2745e568aebe91afb2ac3c48c1998b8323138f784d70b3294fec10a321be1bf6",
+    "team/intents/WEX_MATERIALIZER_168da3e259.intent.json": "c373fb8e8d08b7813d730e9f204e471b05fa49196118045ca701c53e17f251b8",
+    "team/packets/WEX_CLAIM_WORKER_95976a38fb.in.json": "1c0bc1569096d53cf1bb0003a69b49daf9dac2d3e53c63b9a45aebefd21f9733",
+    "team/packets/WEX_CLAIM_WORKER_95976a38fb.out.json": "8db6ec13419ac02de886d0fc3271437d290376fc142cf29f46349b011dc2117c",
+    "team/packets/WEX_MATERIALIZER_168da3e259.finalize_reject.json": "573035fab3f8d0c00a7cf9be8b88327094ec0552945516b0986fccc42f0290ea",
+    "team/packets/WEX_MATERIALIZER_168da3e259.in.json": "fa8644c44146b5bb6938bf248424e26c6d9e57a521d9eb143862759b86869cc6",
+    "team/packets/WEX_MATERIALIZER_168da3e259.out.json": "b075caf1d8688ce35d4eee151d81bdec79a0859dbb5b0219450dfc567efe20ec",
+    "team/packets/WEX_MATERIALIZER_168da3e259.wb.json": "ec227891d3125cf01dbaf93b75364b6e63bede9d1475e3236babbc183f328aec",
+    "team/retries/.host_retry_authority": "580455882566d8ee0ee579063b758352d5058d7177d2b125f04f1f7494550c77",
+    "team/snapshots/WEX_CLAIM_WORKER_95976a38fb.before.json": "6992ec55cbb01819c193e6c02811298ba3844a1a24b9b330424a9255aaf1a929",
+    "team/snapshots/WEX_MATERIALIZER_168da3e259.after.json": "e221ebae90f50c9699be785ee25fe060c5ab6bf8678b25471a173345a51aed81",
+    "team/snapshots/WEX_MATERIALIZER_168da3e259.before.json": "533fb78038f9a59d89bfd96fb137d86f6df5b8f9a742bee35ce22e66df5dafa5"
+  },
+  "root": ".tmp\\opsx-bug-cases\\BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "taken_at": 1787299725.1300807
+}

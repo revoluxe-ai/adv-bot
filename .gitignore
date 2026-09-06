@@ -89,3 +89,4 @@ k8s/xray-client/README.md
 k8s/xray-client/config.json
 .tmp/
 opsx-export/
+.opsx/runs/**/team/packets/_*

@@ -1,0 +1,16 @@
+{
+  "WORKER_ID": "TASK_COMPLETION_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/heartbeats/WEX_TASK_COMPLETION_WORKER_f21030172f.json",
+    "team/intents/WEX_TASK_COMPLETION_WORKER_f21030172f.intent.json",
+    "team/packets/WEX_TASK_COMPLETION_WORKER_f21030172f.out.json",
+    "team/snapshots/WEX_TASK_COMPLETION_WORKER_f21030172f.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

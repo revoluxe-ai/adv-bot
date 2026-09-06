@@ -1,0 +1,77 @@
+{
+  "SCHEMA_VERSION": "1",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1787309572,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/69aecfc79c/OUT": {
+      "RAW_SHA256": "d604007098b1b39a3e5f398c59ba452b3cea54d59277aa7e09e5bed12be6037f",
+      "CANONICAL_SHA256": "5fc65c93acc68a61f31bcac527e8b9f4217ada533f8e815ebeddc65749fb36ad"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/69aecfc79c/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787312739.8522973,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 3,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ea82c8e691/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ea82c8e691/IN",
+  "PAYLOAD": {
+    "ACTUAL_EXECUTION_ROUTE": "ROUTE_A",
+    "ACTUAL_NEXT_COMMAND": "/opsx-fix-bug case=BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z intake=INTAKE-001 finding=ROOT-001",
+    "RED_STATUS": "RED_CONFIRMED",
+    "TEST_COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read -vv",
+    "TEST_COMMAND_EXECUTED": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read -vv",
+    "TEST_IDS": [
+      "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read"
+    ],
+    "TEST_CONTENT_PATH": "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py",
+    "TEST_CONTENT_SHA256": "9dbd10dd7d6ef9a5523b336bdd1e7219a3605355b68327c4a0e43875fe3ea636",
+    "REGRESSION_TEST_BLOCK_SHA256": "460f4d0ab48c0fd93f89eaaf1aa7581e71ffd14720ec1d6f23cfa8b78718d037",
+    "PYTEST_EXIT_CODE": 1,
+    "PYTEST_RESULT": "1 failed, 3 warnings in 1.73s",
+    "FAILURE_EVIDENCE": {
+      "ASSERTION": "assert adv.card_ab_hold_confirmed_keywords_json == [\"alpha\", \"beta\"]",
+      "OBSERVED": [
+        "['alpha'] == ['alpha', 'beta']",
+        "beta was removed from the durable set"
+      ],
+      "FAILURE_LOCATION": "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py:578"
+    },
+    "DURABLE_KEYWORDS_BEFORE": [
+      "alpha",
+      "beta"
+    ],
+    "DURABLE_TARGETS_BEFORE": {
+      "alpha": 5,
+      "beta": 8
+    },
+    "PARTIAL_LIVE_POSITIONS": {
+      "alpha": 14.0
+    },
+    "EXPECTED_DURABLE_KEYWORDS_AFTER": [
+      "alpha",
+      "beta"
+    ],
+    "OBSERVED_DURABLE_KEYWORDS_AFTER": [
+      "alpha"
+    ],
+    "COMPLETE_AUTHORITATIVE_DISTINCTION": "The regression asserts that the live result is a strict subset of the durable confirmed keys. The sibling complete-read case includes beta with an explicit non-positive fact, so missing beta here is incomplete-read evidence rather than authoritative invalidation.",
+    "WRITE_BOUNDARY_VALIDATION": "PASS",
+    "WORKER_PRODUCTION_WRITES": [],
+    "WORKER_SCOPE": "tests/** plus required team packet and heartbeat paths"
+  },
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/ea82c8e691",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

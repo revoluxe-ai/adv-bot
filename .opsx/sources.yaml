@@ -21,6 +21,7 @@ allowlist:
   - .cursor/antipattern-gate/**
   - .cursor/devops/**
   - .cursor/opsx-resolve-conflict/**
+  - .cursor/opsx-export/**
   - .cursor/opsx-review-commands
   - .cursor/BUGBOT.md
   - .agents/**
@@ -29,6 +30,7 @@ allowlist:
   - .github/copilot-instructions.md
   - .github/git-commit-instructions.md
   - AGENTS.md
+  - .gitignore
   - WORKLOG.md
   - .opsx/adapters/**
   - .opsx/registry/**
@@ -40,6 +42,7 @@ allowlist:
   - .opsx/sources.yaml
   - .opsx/lock.yaml
   - .opsx/tools/**
+  - .opsx/runs/**
 
 hard_exclude:
   - .env

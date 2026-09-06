@@ -1,0 +1,14 @@
+{
+  "worker_id": "IMPLEMENTATION_EXECUTOR",
+  "worker_execution_id": "WEX-EXEC-001-20260821-002",
+  "parent_orchestration_id": "ORCH-BUGTEAM-20260821-001",
+  "case_id": "BUGCASE-CAH-CONFIRM-20260821-001",
+  "finding_id": "FINDING-CAH-CONFIRM-001",
+  "status": "FAIL",
+  "terminal_status": "IMPLEMENTED_NOT_VALIDATED",
+  "last_heartbeat_at": "2026-08-21T13:04:16.6555573Z",
+  "attempt": 2,
+  "max_attempts": 2,
+  "error": "Frozen RED bytes restored; focused and adjacent tests fail on the immutable fixture assertion mismatch.",
+  "final_test_content_sha256": "D281123048BB143A9EFC8822DF01B10FDEAF41EEC1B5F2793056E214156CED36"
+}

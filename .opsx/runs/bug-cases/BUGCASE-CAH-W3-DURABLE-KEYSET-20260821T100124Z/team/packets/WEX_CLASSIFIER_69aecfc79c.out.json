@@ -1,0 +1,186 @@
+{
+  "SCHEMA_VERSION": "1",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 3,
+  "CREATED_AT": 1787307624.540541,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/MATERIALIZER/56bd3ed61c/OUT": {
+      "CANONICAL_SHA256": "3477a35ee106dc6587f124241f6f5f3d3daf653d1b78f43cc308e1059cbadaf2",
+      "RAW_SHA256": "6d59617bcfdc7cb9402927c6c93ec136ed86fed7162fbc67acfb53aa0db8d425"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/56bd3ed61c/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787310933.312797,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 2,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/69aecfc79c/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/69aecfc79c/IN",
+  "PAYLOAD": {
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_ROUTE_STATE": "AWAITING_FIX_BUG",
+    "DIAGNOSIS": "The production path has no distinction between a complete authoritative absence and an incomplete partial read, so it can treat a partial subset as the complete confirmed set and remove a durable keyword.",
+    "EXECUTION_PREFLIGHT": {
+      "blocked_on_preflight": false,
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted repository reads and symbol searches only"
+    },
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "EXPECTED_NEXT_COMMAND": "/opsx-fix-bug",
+    "IMPLEMENTATION_EVIDENCE": {
+      "concrete_example": {
+        "durable_after": [
+          "alpha"
+        ],
+        "durable_before": [
+          "alpha",
+          "beta"
+        ],
+        "partial_live_positions": {
+          "alpha": 14.0
+        },
+        "removed_keyword": "beta",
+        "rows": [
+          [
+            "alpha",
+            14,
+            14
+          ]
+        ],
+        "tp_map": {
+          "alpha": 14
+        }
+      },
+      "current_flow": [
+        "confirm_handlers.py:1034-1048 loads positions, filters rows, and sends only tp_map to the writer.",
+        "confirm_handlers.py:333-391 treats missing live positions as exclusions without a completeness result.",
+        "epoch_write.py:59-100 validates a payload subset and returns only payload keys.",
+        "epoch_write.py:332-362 writes that subset to card_ab_hold_confirmed_keywords_json."
+      ],
+      "durable_keyword_can_be_removed": "yes",
+      "partial_live_data_can_be_persisted_as_complete_subset": true,
+      "regression_confirmation": [
+        "test_w3_confirmed_flow.py:467-511 asserts the callback passes only the positive subset.",
+        "test_epoch_write_gates.py:205-224 asserts the writer persists only the remaining subset."
+      ]
+    },
+    "IMPLEMENTATION_FIX_SCOPE": {
+      "ALLOWED_FILES": [
+        "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py",
+        "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py",
+        "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py",
+        "tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py",
+        "tests/integration/card_ab_hold/test_load_factual_positions_ch_seam.py"
+      ],
+      "FIX_EXECUTED": false,
+      "FORBIDDEN_FILES": [
+        "unrelated production modules",
+        "migrations",
+        "OpenSpec artifacts during Route A implementation",
+        "git metadata and external systems"
+      ],
+      "REQUIRED_REGRESSION_TEST": "Exercise the real confirmation boundary with durable alpha and beta and a partial live read containing only alpha; assert beta remains durable and distinguish this from a complete authoritative missing-position case.",
+      "VERIFICATION_COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py"
+    },
+    "NEXT_COMMAND": "/opsx-fix-bug case=BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z intake=INTAKE-001 finding=ROOT-001",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "OPENSPEC_UPDATE_REQUIRED": "no",
+    "OWNER_EXPECTATION": "An already confirmed durable keyword must not be removed solely because a live factual-position read is partial.",
+    "PROCESS_ID_OR_TASK_ID": "WEX/CLASSIFIER/69aecfc79c",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "ROUTE_TRACE_APPENDED": "no",
+    "ROUTE_TRACE_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\results\\ROUTE-TRACE.jsonl",
+    "ROUTE_TRANSITION": {
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none",
+      "FROM_STATE": "CLASSIFYING",
+      "MISSION_COMPLETE": "no",
+      "NEXT_ARGS": "case=BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z intake=INTAKE-001 finding=ROOT-001",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "ON_FAILURE_STATE": "CLASSIFICATION_BLOCKED",
+      "ON_SUCCESS_STATE": "AWAITING_FIX_BUG",
+      "PRECONDITIONS": {
+        "CLAIM_REQUIRED": "no",
+        "GO_TOKEN": "FORBIDDEN",
+        "GREEN_REQUIRED": "not_applicable",
+        "RED_REQUIRED": "not_applicable"
+      },
+      "RECOVERY_CLASS": "ADVANCE",
+      "RECOVERY_COMMAND": "/opsx-classify-bug",
+      "REQUIRED_EVIDENCE": [
+        ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/findings/ROOT-001.md",
+        ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/team/packets/WEX_MATERIALIZER_56bd3ed61c.out.json",
+        "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py",
+        "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py"
+      ],
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_FIX_BUG"
+    },
+    "RUNTIME_EVIDENCE": {
+      "dead_or_legacy_path": "no",
+      "direct_callers": [
+        "telegram/confirm_handlers.py:1016-1054"
+      ],
+      "entrypoints": [
+        "card_ab_hold_confirm_router callback CahTpConfirmAll -> on_tp_confirm_all"
+      ],
+      "indirect_callers": [
+        "_load_factual_positions -> _tp_rows_from_adv -> tp_map -> confirm_target_places -> confirm_target_places_in_session"
+      ],
+      "runtime_reachable": "yes",
+      "test_only_callers": [
+        "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py:467-511",
+        "tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py:205-224"
+      ],
+      "write_user_boundary": [
+        "Telegram callback confirmation",
+        "ClickHouse/PG live read model",
+        "PostgreSQL durable AdvSetting write"
+      ]
+    },
+    "SOURCE_RESOLUTION": {
+      "fallback_used": false,
+      "mode": "exact_path",
+      "primary_path": ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/findings/ROOT-001.md",
+      "search_operations": [
+        "targeted symbol search in named affected area",
+        "bounded reads of referenced spec and accepted decision"
+      ],
+      "search_scope": [
+        "confirm_handlers.py",
+        "epoch_write.py",
+        "test_w3_confirmed_flow.py",
+        "test_epoch_write_gates.py",
+        "harden-ab-hold-confirmation-boundaries/spec.md",
+        "decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md"
+      ],
+      "unresolved_gap": "none"
+    },
+    "SPEC_EVIDENCE": {
+      "evidence": [
+        "openspec/changes/harden-ab-hold-confirmation-boundaries/specs/card-ab-hold-mode/spec.md:35-46 requires evaluation of every confirmed keyword and excludes only invalid factual positions; :78-100 limits durable confirmation to the valid remainder.",
+        "openspec/decisions/ab-hold-confirmed-epoch-parameters-sot/decision.md:15-19 makes the confirmed keyword set durable SoT and live factual position read-only and separate."
+      ],
+      "gap": "The spec does not name a completeness flag for partial reads; the owner-confirmed invariant in the intake resolves that interpretation for this classification.",
+      "status": "explicit_spec_contract"
+    },
+    "route_trace_appended": "no",
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The accepted durable confirmed-set and fact/target separation contracts establish the retention boundary; this finding is a runtime completeness-handling defect, not a requested contract change."
+  },
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/69aecfc79c",
+  "WORKER_ID": "CLASSIFIER"
+}

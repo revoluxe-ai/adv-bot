@@ -1,0 +1,26 @@
+{
+  "digests": {
+    "CASE.md": "565a98b928e922b6a42efc1d3b04ae4c8c3aa4811d4363ba4c397223753d798e",
+    "LEDGER.md": "cf4e71fc0940451a247f791449621ee0103be016f86a05f26397821eff6940e8",
+    "intakes/INTAKE-001.md": "0ac6f0852881602b160554a1a2dbec6eac3f9a48adbd9eeb1542722d3100da21",
+    "intakes/_RAW_INTAKE_SEED.txt": "65ee1638fef83aec6b45f309253e408c62fc6783ae959ec970555f8cd956a15a",
+    "results/ROUTE-TRACE.jsonl": "5cd4613c269781e03e76b890554837d81c48000abaefa837153d2386c3d7316f",
+    "team/CHECKPOINT.json": "55aaf545f074836cc2fa72122843e24d5a54914e09ed0096fca023428d05a42d",
+    "team/DISPATCH.jsonl": "227b82c44b711900a336240e323a15c69764d9b6b056dd0cf6fedc787491f7e0",
+    "team/executions/WEX_MATERIALIZER_8937b1bee0.identity.json": "9ce635d7ff8ddc8e1236092a1e86ba814e06803b5dfb8490aec3200f40534d9b",
+    "team/heartbeats/WEX_MATERIALIZER_8937b1bee0.json": "de98e31c05facabf6a71f7330551818aebd6b726a07066b55c45d28502dfdd36",
+    "team/intents/WEX_MATERIALIZER_8937b1bee0.intent.json": "07c1f88534eb9e05fa554763f161d31ecfcf3af557de18354906996282f8f736",
+    "team/packets/WEX_CLAIM_WORKER_ad88e201ca.in.json": "2160e0c28329032e3d37f3638fb8c3f9694f51d30a7b835a5609bd89e7c085a5",
+    "team/packets/WEX_MATERIALIZER_8937b1bee0.finalize_reject.json": "086e5439296a36c0f1e768cfca5d743c9c646859d2bc0311e5d177a214e8562f",
+    "team/packets/WEX_MATERIALIZER_8937b1bee0.in.json": "8b14cc071171908eaab9d8d0fb8ff8396bb1f0175db57e68cdc2c851b167d68e",
+    "team/packets/WEX_MATERIALIZER_8937b1bee0.in.md": "0442905fdb87c56c62b5cc7f8d066909d7c97dd1ca78539ab427b004da3fe9ae",
+    "team/packets/WEX_MATERIALIZER_8937b1bee0.out.json": "a0e22b9e7dd2c0aad38bf49382920ecbd974fe03b00f78a4bfa31bd97c4e717d",
+    "team/packets/WEX_MATERIALIZER_8937b1bee0.wb.json": "a34a706f4879d69f96fc9dcebe78f712d93f54918eaea100ed9b30c4abdcb3e0",
+    "team/packets/_materialize_intake_8937b1bee0.py": "95ca8f44b8088de56fa08cc1350758f9ad2fe8a5201764cc36fe534e4a376290",
+    "team/retries/.host_retry_authority": "419ec40f876b76066a972a74cb504b3a9bab0858842818c5b86f4580c94c26de",
+    "team/snapshots/WEX_MATERIALIZER_8937b1bee0.after.json": "58383b1acaaea447d4b9453e0741bcffee5dcb036bf4712c8cd3daf51db8f5f9",
+    "team/snapshots/WEX_MATERIALIZER_8937b1bee0.before.json": "6cedb4e5ee5b395e192c7c0a0a468621b3beef1ad471b47649222126cbd8606b"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "taken_at": 1787928122.3165865
+}

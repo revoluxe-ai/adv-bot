@@ -270,7 +270,7 @@ ALSO_OK (if still unsure; separate paste — never with first-intake RAW_REPORT)
 ```
 
 4. Prefer INDEX / LEDGER `CASE_ID` over chat memory. If IDs unknown → ask
-   once or point to `.tmp/opsx-bug-cases/INDEX.md`; **omit** `case=` /
+   once or point to `.opsx/runs/bug-cases/INDEX.md`; **omit** `case=` /
    `ALSO_OK` lines until a real id exists. Never paste handback `case=`
    into the same message as free-form first-intake `RAW_REPORT`.
 

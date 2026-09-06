@@ -1,0 +1,38 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "CHECKPOINT_GENERATION": 9,
+  "CREATED_AT": 1787303408.6020708,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/1f55d4f820/OUT": {
+      "CANONICAL_SHA256": "c7fa27c7cd6623c99ce098df0b3f150d86e561cc5003b7c3dfdbb9146bcbf690",
+      "RAW_SHA256": "1a95e4c7f0a3bbc2bf4c9bbe06dd955886fb32800cdf59176fa5b09b3370b5e4"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/GREEN_VERIFIER/1f55d4f820/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787307008.6020708,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-c1f8a3a34110",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/INVARIANT_CAPTURE_WORKER/ec8ace112d/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/1f55d4f820/OUT",
+  "PAYLOAD": {
+    "INVARIANT_CANDIDATE": "Public destructive callback operations must fail closed when actor identity is absent or invalid: reject before write-session or external mutation.",
+    "ROOT_CAUSE": "_callback_actor_id returned None and the session seam interpreted None as an ownership-check bypass.",
+    "ROOT_FIX": "Validate actor at public EXIT boundary before opening the write session; preserve explicit internal seam behavior.",
+    "ROOT_FIX_EVIDENCE": "results/FIX-ROOT-001.md",
+    "ROOT_GREEN_EVIDENCE": "results/GREEN-ROOT-001.md",
+    "WORKER_ID": "INVARIANT_CAPTURE_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/INVARIANT_CAPTURE_WORKER/ec8ace112d",
+  "WORKER_ID": "INVARIANT_CAPTURE_WORKER"
+}

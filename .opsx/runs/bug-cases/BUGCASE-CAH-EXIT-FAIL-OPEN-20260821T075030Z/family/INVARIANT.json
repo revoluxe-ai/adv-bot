@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/ROOT-001/EXIT-FAIL-CLOSED",
+  "INVARIANT_REQUIRED_BEHAVIOR": "Validate the actor before opening the write session; reject invalid input and perform no PostgreSQL mutation or commit.",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "Do not interpret a missing actor as an ownership-check bypass, open a write session for that input, invoke the session seam, mutate PostgreSQL, or commit.",
+  "INVARIANT_ENTRY_CONDITIONS": "An external Telegram update reaches the public disable_card_ab_hold EXIT handler with an absent, malformed, or otherwise invalid actor identity.",
+  "INVARIANT_SCOPE": "The card_ab_hold Telegram EXIT callback path, including its actor boundary and write-session handoff.",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

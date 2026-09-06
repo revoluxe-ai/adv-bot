@@ -54,8 +54,8 @@ route durability (schema:
 `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md`):
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl   # append one event
-.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md                   # ## ROUTE_STATE only
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl   # append one event
+.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md                   # ## ROUTE_STATE only
 ```
 
 JSONL append via Shell/Python MUST follow
@@ -83,14 +83,14 @@ Also follow `.cursor/commands/opsx-execution-preflight.md` for git/shell ops.
 
 If `case` and `finding` are provided, resolve in this exact order and **do not search the repo for the finding file**:
 
-1. `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
-2. if missing, read `.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md` only to locate `PACKET_PATH`
-3. if still missing, read `.tmp/opsx-bug-cases/INDEX.md` only for the case recovery row
+1. `.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
+2. if missing, read `.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md` only to locate `PACKET_PATH`
+3. if still missing, read `.opsx/runs/bug-cases/INDEX.md` only for the case recovery row
 
 If `case` and `intake` are provided, read:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
 ```
 
 If `path=` is provided, read that exact path first.
@@ -817,7 +817,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Append encoding: follow ROUTE_TRACE **Write rules** and

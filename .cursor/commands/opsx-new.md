@@ -13,7 +13,7 @@ donor_source_id: adv-bot/split-payment-for-adv-without-pay-for-adv-on-pauses
 donor_snapshot_head: db91149ae1d96d1fd85ceae7a405e65c09f0c29b
 donor_occurrence_id: ba52fae55cd2632e
 donor_full_file_hash: e265586f3064ca000168f5e7762eb8b080a810894d40a363ae7c0fbe4a9d048b
-inbound_packet: .tmp/opsx-inbound/20260816T154000Z/DIFF_PACKET.md
+inbound_packet: .opsx/runs/inbound/20260816T154000Z/DIFF_PACKET.md
 name: /opsx-new
 id: opsx-new
 category: Workflow

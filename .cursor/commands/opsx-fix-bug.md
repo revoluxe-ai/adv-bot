@@ -71,7 +71,7 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
 взят из same-chat prior `COMMAND_RECEIPT`):
 
 1. Прочитай exact path
-   `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
+   `.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
    (при необходимости сверка строки в `LEDGER.md` того же case).
 2. **Duplicate-root refuse (before claim-first):** если выполняется любое из:
    - `FINDING_ID` с префиксом `DUP-*`;
@@ -105,7 +105,7 @@ Ownership, закреплённый `/opsx-claim-next-bug`, обязан про�
    fall-through; при `CHAT_REQUIRED: false` — **не** п.6 optional).
    Не направляй на `/opsx-claim-next-bug` (ineligible).
    Pasteable next: `none` (или читать
-   `.tmp/opsx-bug-cases/<CASE_ID>/` INDEX / ledger; не claim).
+   `.opsx/runs/bug-cases/<CASE_ID>/` INDEX / ledger; не claim).
    Aligns with claim-next ineligible / materialize terminal writes
    (`promoted_to_root_case`, `duplicate_ancestor`,
    `duplicate_root_observation`, closed FP, …).
@@ -333,7 +333,7 @@ packet → `blocked_red_not_applicable_incomplete`.
 Если `GO` отсутствует, всё равно разрешены записи только process artifacts внутри:
 
 ```text
-.tmp/opsx-bug-cases/**
+.opsx/runs/bug-cases/**
 ```
 
 Разрешённые process-writes без `GO`:
@@ -346,7 +346,7 @@ packet → `blocked_red_not_applicable_incomplete`.
 
 * изменять production code;
 * изменять tests;
-* изменять любые другие repo paths вне `.tmp/opsx-bug-cases/**`;
+* изменять любые другие repo paths вне `.opsx/runs/bug-cases/**`;
 * делать stage, commit, push;
 * запускать разрушительные команды.
 
@@ -375,7 +375,7 @@ Owner: `.cursor/commands/opsx-fix-types.md`.
 Единственный authoritative storage:
 
 ```text
-.tmp/opsx-bug-cases/**
+.opsx/runs/bug-cases/**
 ```
 
 Не создавай второй storage layout и не копируй логику записи файлов вне контракта `/opsx-materialize-bug-queue`.
@@ -402,10 +402,10 @@ Owner: `.cursor/commands/opsx-fix-types.md`.
 Canonical paths:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
-.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md
-.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md
-.tmp/opsx-bug-cases/INDEX.md
+.opsx/runs/bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md
+.opsx/runs/bug-cases/INDEX.md
 ```
 
 Если durable source не найден после direct resolution — `blocked_needs_exact_source` / существующий blocker, а не бесконечный search и не hang на git.
@@ -429,7 +429,7 @@ Canonical paths:
 2. Запрещено угадывать case по «похожему тексту» в `INDEX.md` или по другим чатам. Resume только из explicit IDs во вводе или из prior receipt **этого** чата.
 3. Если resume невозможен (нет prior receipt / receipt без IDs):
    - при токене `GO` **и** пустом/отсутствующем новом raw bug payload (типичный follow-up только `GO`) → stop с blocker `blocked_needs_case_intake`;
-     не создавай новый case; верни pasteable next из `.tmp/opsx-bug-cases/INDEX.md` recovery row или попроси вставить `case=`/`intake=` из предыдущего receipt;
+     не создавай новый case; верни pasteable next из `.opsx/runs/bug-cases/INDEX.md` recovery row или попроси вставить `case=`/`intake=` из предыдущего receipt;
    - при токене `GO` **и** непустом новом raw bug payload без prior receipt (редкий one-shot) → first-run `mode=intake` ниже, затем forensics; это **не** путь для повторного GO по уже adjudicated сигналу;
    - без `GO` (истинный first-run) → создай новый intake через `mode=intake` ниже.
 
@@ -456,7 +456,7 @@ Intake обязан быть на диске до глубокого анали�
 ### Если `case` и `intake` присутствуют
 
 1. Если также передан `finding=` — сначала **Claim ownership gate**; при blocker остановись.
-2. Прочитай durable intake из `.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md`.
+2. Прочитай durable intake из `.opsx/runs/bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md`.
 3. Используй `RAW_REPORT` / symptom / context из intake как source of truth для сигнала.
 4. Выполни read-only adjudication.
 5. Выбери ровно один `PERSISTENCE_DECISION` и persist через `mode=update`.
@@ -554,7 +554,7 @@ cross_intake_finding_update_without_relation
    token gate, включая `blocked_claimed_without_durable_token` при
    пустом durable `CLAIM_TOKEN`). При любом gate blocker — остановись.
 2. Прочитай finding packet
-   `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
+   `.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
 3. Разреши intake в этом порядке:
    - non-empty `SOURCE_INTAKE_ID` из finding packet/ledger → используй как
      `intake=` и продолжай как ветка `case` + `intake` + `finding`;
@@ -990,7 +990,7 @@ Durable case map:
 - INTAKE_ID:
 - FINDING_ID:
 - SOURCE_INTAKE_ID:
-- INDEX_PATH: .tmp/opsx-bug-cases/INDEX.md
+- INDEX_PATH: .opsx/runs/bug-cases/INDEX.md
 - INTAKE_PATH:
 - FINDING_PATH:
 
@@ -1154,7 +1154,7 @@ plan_only | needs_entrypoint_map | needs_openspec_update:
 
 Оно должно быть read-only prompt/command для поиска entrypoints.
 
-После потери чатов продолжение восстанавливается из `.tmp/opsx-bug-cases/INDEX.md` по полям recovery row case.
+После потери чатов продолжение восстанавливается из `.opsx/runs/bug-cases/INDEX.md` по полям recovery row case.
 
 ## Поведение с GO
 
@@ -1368,7 +1368,7 @@ Follow-up:
 - не обновлён finding чужого intake без `relation=duplicate_intake`;
 - finding persisted через `mode=update` согласно persistence decision;
 - INDEX recovery row обновлён и содержит pasteable `NEXT_ACTION`;
-- без `GO` изменены только paths под `.tmp/opsx-bug-cases/**`;
+- без `GO` изменены только paths под `.opsx/runs/bug-cases/**`;
 - diff соответствует invariant, а не только тексту report;
 - reachability доказана или явно отмечена как unknown;
 - unrelated files не изменены;
@@ -1408,7 +1408,7 @@ raw user bug report
 → mode=update пишет новый finding с SOURCE_INTAKE_ID=<current intake>
 → INDEX.md recovery row обновлён
 → чаты потеряны
-→ продолжение из .tmp/opsx-bug-cases/INDEX.md через pasteable NEXT_ACTION
+→ продолжение из .opsx/runs/bug-cases/INDEX.md через pasteable NEXT_ACTION
 ```
 
 ## Acceptance scenario (same-chat GO resume — no duplicate case)
@@ -1521,7 +1521,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:

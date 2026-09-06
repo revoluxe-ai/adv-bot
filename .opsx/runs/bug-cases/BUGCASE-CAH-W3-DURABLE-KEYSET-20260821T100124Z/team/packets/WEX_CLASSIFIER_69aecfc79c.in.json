@@ -1,0 +1,45 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 3,
+  "CREATED_AT": 1787307333.312797,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/MATERIALIZER/56bd3ed61c/OUT": {
+      "CANONICAL_SHA256": "3477a35ee106dc6587f124241f6f5f3d3daf653d1b78f43cc308e1059cbadaf2",
+      "RAW_SHA256": "6d59617bcfdc7cb9402927c6c93ec136ed86fed7162fbc67acfb53aa0db8d425"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/56bd3ed61c/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787310933.312797,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 2,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/69aecfc79c/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/MATERIALIZER/56bd3ed61c/OUT",
+  "PAYLOAD": {
+    "ALLOWED_CLASSIFICATIONS": [
+      "IMPLEMENTATION_BUG",
+      "SPEC_BUG",
+      "SPEC_GAP",
+      "FALSE_POSITIVE",
+      "OUT_OF_SCOPE",
+      "INSUFFICIENT_EVIDENCE"
+    ],
+    "MATERIALIZER_OUTPUT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\team\\packets\\WEX_MATERIALIZER_56bd3ed61c.out.json",
+    "REPOSITORY_EVIDENCE_REQUIRED": true,
+    "ROOT_FINDING_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\findings\\ROOT-001.md",
+    "TASK": "Classify ROOT-001 using repository evidence and the materializer packet. Choose exactly one allowed classification and one route. Determine whether the live factual-position subset can be mistaken for an authoritative full set and shrink card_ab_hold_confirmed_keywords_json. If implementation behavior confirms the report and code/tests can be changed, use IMPLEMENTATION_BUG with Route A.",
+    "WORKER_ID": "CLASSIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/69aecfc79c",
+  "WORKER_ID": "CLASSIFIER"
+}

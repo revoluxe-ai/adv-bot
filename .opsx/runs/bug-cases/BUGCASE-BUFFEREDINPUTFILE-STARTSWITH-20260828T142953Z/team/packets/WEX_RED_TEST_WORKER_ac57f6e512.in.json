@@ -1,0 +1,56 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "CHECKPOINT_GENERATION": 4,
+  "CREATED_AT": 1787929147.0631816,
+  "DEPENDENCY_HASHES": {
+    "CLASSIFIER": {
+      "CANONICAL_SHA256": "ed7564f1a75db485889b72bbac1231a877ab8d3f5830e91d170d5518bef8e8c3",
+      "RAW_SHA256": "950ca02018b090540941ca7a59aa07c9d34c77689c1c5182756b1cdf557dffaa"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "CLASSIFIER"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787932747.0631816,
+  "FINDING_ID": "FINDING-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team/9745ba6a72d6",
+  "PACKET_GENERATION": 4,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ac57f6e512/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": null,
+  "PAYLOAD": {
+    "ALLOWED_FIX_FILES": [
+      "app/file_handler.py"
+    ],
+    "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+    "CHAT_LABEL": "opsx-bug-team-host",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "FINDING_ID": "FINDING-001",
+    "INTAKE_ID": "INTAKE-001",
+    "MAPS_TO": "/opsx-test",
+    "MODE": "bug-regression",
+    "REQUIRED_REGRESSION_TEST": "unit test: _get_telegram_file / get_telegram_image with BufferedInputFile must not call startswith; return passthrough or valid InputFile",
+    "RUNTIME_EVIDENCE": {
+      "dead_or_legacy_path": "no",
+      "entrypoints": [
+        "keyword_settings.setting_keywords_by_adv",
+        "AdvKeywordsSetting.__call__",
+        "file_handler.get_telegram_image",
+        "file_handler._get_telegram_file"
+      ],
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Telegram UX message / image render"
+    }
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/ac57f6e512",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

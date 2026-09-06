@@ -3,7 +3,7 @@
 This file is the **schema**. The only runtime instance is:
 
 ```text
-.tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+.opsx/runs/bug-cases/<ROOT_CASE_ID>/LEDGER.md
   ## BRANCH_REGISTRY
 ```
 

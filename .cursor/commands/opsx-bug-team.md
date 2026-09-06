@@ -51,7 +51,7 @@ NORMAL / real-intake-shaped invocation + RUNTIME_STATUS != ACTIVE
 → STATUS: BLOCKED_CANDIDATE_NOT_ACTIVE
 → TASK_DISPATCH_COUNT: 0
 → do not call Task tool
-→ do not create real .tmp/opsx-bug-cases cases
+→ do not create real .opsx/runs/bug-cases cases
 ```
 
 Allowed exception only:
@@ -258,7 +258,7 @@ Rules:
 - `subagent_type` from registry (`generalPurpose` unless specialized);
 - **`model: inherit`** (explicit — see `.cursor/pipeline/shared/MODEL_DISPATCH.md`);
 - unique `WORKER_EXECUTION_ID` per hop;
-- append `.tmp/opsx-bug-cases/<CASE_ID>/team/DISPATCH.jsonl` per
+- append `.opsx/runs/bug-cases/<CASE_ID>/team/DISPATCH.jsonl` per
   `TASK_DISPATCH.md` **Append recipe** (prefer `live_task_hop`; ad-hoc
   Shell/Python MUST follow
   `.cursor/commands/opsx-execution-preflight.md` →
@@ -359,7 +359,7 @@ EXPECTED_EXECUTION_ROUTE / ACTUAL_EXECUTION_ROUTE / ROUTE_RECONCILIATION
 `FAN_IN_ASSEMBLER` may write only:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/FANIN.md
+.opsx/runs/bug-cases/<CASE_ID>/results/FANIN.md
 ```
 
 `FAMILY_LEARNING_WORKER` may write:

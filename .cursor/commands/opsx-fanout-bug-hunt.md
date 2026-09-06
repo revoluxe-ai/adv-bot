@@ -44,7 +44,7 @@ Implements Durable Handoff Readiness (section **F**) in
 Before emitting `Verdict: ready` or any claimable `/opsx-claim-next-bug`
 handoff (including coordinator "open child chat" instructions):
 
-1. Check the exact path `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` exists
+1. Check the exact path `.opsx/runs/bug-cases/<ROOT_CASE_ID>/` exists
    (canonical path only; do not search the wider repository).
    This existence check is allowed process I/O — it is **not** production-code
    inspection and does **not** authorize rediscovery of findings.
@@ -516,7 +516,7 @@ REGRESSION_TEST:
 RECOMMENDED_ACTION:
 
 PREREQ:
-GATE: `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` must exist (see Durable case-map gate).
+GATE: `.opsx/runs/bug-cases/<ROOT_CASE_ID>/` must exist (see Durable case-map gate).
 If absent → overall Verdict blocked (`durable_case_map_missing`); do not claim.
 Durable findings must exist on disk via
 /opsx-materialize-bug-queue mode=hunt-result (or already materialized).
@@ -834,9 +834,9 @@ Next action:
 * No structured root-aware bug-hunt result → no fan-out.
 * Do not infer the root from the invariant alone.
 * Do not inspect repository code (exact-path check of
-  `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` is allowed process I/O only).
+  `.opsx/runs/bug-cases/<ROOT_CASE_ID>/` is allowed process I/O only).
 * No `Verdict: ready` and no claimable `/opsx-claim-next-bug` handoff when
-  `.tmp/opsx-bug-cases/<ROOT_CASE_ID>/` is absent — block with
+  `.opsx/runs/bug-cases/<ROOT_CASE_ID>/` is absent — block with
   `durable_case_map_missing` and route Next action / packet `NEXT_COMMAND` to
   `/opsx-materialize-bug-queue mode=hunt-result`. A PREREQ note alone is not enough.
 * Do not repeat production reachability analysis.
@@ -872,7 +872,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:

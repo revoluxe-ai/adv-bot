@@ -1,0 +1,18 @@
+{
+  "digests": {
+    "CASE.md": "05032f3f451bc7bdda66d8c68d0750bbb42e8e4cbf615d8eca5c7901b585b3c1",
+    "LEDGER.md": "255efa5e54e8351b5a55fcb43b09f2cad706d40df0a7d516d47dded30a41569c",
+    "findings/ROOT-001.md": "4a0b2f859de6ccffe585546bf46126b2cbd8c765d12d303722592edfad71d8f0",
+    "intakes/INTAKE-001.md": "ca572e58d65501df417be37cf79d24ef94c7ee3015e67840823c1cb78fd4d3b4",
+    "team/CHECKPOINT.json": "7a5268558ff696fd70dc76913a41a53de2415577c4bbd706c94b035bb3deae08",
+    "team/DISPATCH.jsonl": "10283ef68a7695946d2c50b1d6f76c4594134be978e01a278447cc17e5dafac6",
+    "team/heartbeats/WEX_MATERIALIZER_56bd3ed61c.json": "593fc596267a78f1ce1e21413b7d4e0c40b59e7f73726a448f8fd45162423b3c",
+    "team/intents/WEX_MATERIALIZER_56bd3ed61c.intent.json": "3fa12f7cfa20642f27c17c7e256536a5430a19d003763ade87d759ca3c481437",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.finalize_reject.json": "2969a5d28642ce50fb5953614263ae001eb9867b7b74a2a91eaf95850699dbae",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.in.json": "4f681373be037df937d332012585044e2008b218720563d45f163e35d5d29bea",
+    "team/packets/WEX_MATERIALIZER_56bd3ed61c.out.json": "6d59617bcfdc7cb9402927c6c93ec136ed86fed7162fbc67acfb53aa0db8d425",
+    "team/snapshots/WEX_MATERIALIZER_56bd3ed61c.before.json": "d620cec97b29dc6e8051c1173fd1e028dacb2b428017d5ca307de99c6b7dde90"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "taken_at": 1787307252.7070506
+}

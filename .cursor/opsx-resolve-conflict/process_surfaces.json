@@ -25,6 +25,6 @@
     "openspec/policies/",
     "openspec/decisions/",
     "openspec/changes/",
-    ".tmp/opsx-bug-cases/"
+    ".opsx/runs/bug-cases/"
   ]
 }

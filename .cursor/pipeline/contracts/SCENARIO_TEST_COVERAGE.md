@@ -292,7 +292,7 @@ openspec/changes/<CHANGE_ID>/scenario-coverage/plan.receipt.json
 ```
 
 One logical evidence pair. Do **not** use `.tmp` as the canonical
-cross-command SoT for plan evidence (`.tmp/opsx-scenario-coverage/` remains
+cross-command SoT for plan evidence (`.opsx/runs/scenario-coverage/` remains
 for provider/audit receipts only).
 
 ### Sole writer
@@ -570,7 +570,7 @@ Producer: `/opsx-close-external-gap` после фактического раз�
 Recommended durable path:
 
 ```text
-.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
+.opsx/runs/scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
 ```
 
 Schema:

@@ -50,7 +50,7 @@ SCHEMA DEFINITION:
   .cursor/pipeline/contracts/bug-episode/BRANCH_REGISTRY.md
 
 RUNTIME INSTANCE (only):
-  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+  .opsx/runs/bug-cases/<ROOT_CASE_ID>/LEDGER.md
     section "## BRANCH_REGISTRY"
 ```
 
@@ -60,7 +60,7 @@ Do **not** create a sibling `BRANCH_REGISTRY.md` file inside the case map.
 
 ```text
 CASE_MAP_WRITE_ALLOWED:
-  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+  .opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 ALL_OTHER_WRITES: DENIED
 Mechanism: /opsx-materialize-bug-queue mode=fanin_assemble
 NEW_SLASH: /opsx-fan-in-* FORBIDDEN

@@ -1,0 +1,21 @@
+{
+  "digests": {
+    "CASE.md": "f7f9a49ce61eabcef8c52d4ab9b037b1e37240a0b9f5e1eb5ad4c3b2df952693",
+    "LEDGER.md": "06d2b25988a4cb4d8fb5fca100ce0362b20ff11a1a35c826323c80391709e48b",
+    "findings/ROOT-001.md": "0f48a4d462475e98757e7d890f3cdced628e145c6315fe2627524d10b47023f8",
+    "intakes/INTAKE-001.md": "d588d329f373aaba9eed41c53086f802e55353641c95ba3cf8ec5902801645a5",
+    "results/PROOF-MATERIALIZER-WEX168da3e259.md": "084efab989fc6bbe6b2da0d49d6e83a4beed7db637326f9406fc77d09f145c8c",
+    "team/CHECKPOINT.json": "4bc88ffaee42ea858a861e5c29e0a3f540cc21a4d727cc6f96ce9cdf216ade31",
+    "team/DISPATCH.jsonl": "590b70918815ee015c889b9b9f89a8ce285fc6b2b9f2619b2db35974b4958912",
+    "team/heartbeats/WEX_MATERIALIZER_168da3e259.json": "c0901914dee45ba01fb4c879a7d96e0590528e62989eed1170aa29b499c6c7ed",
+    "team/intents/WEX_MATERIALIZER_168da3e259.intent.json": "f64fc5af01a28e1fc59c2f599f39b4604582a902d83be61b6746da05f8674fe7",
+    "team/packets/WEX_MATERIALIZER_168da3e259.finalize_reject.json": "573035fab3f8d0c00a7cf9be8b88327094ec0552945516b0986fccc42f0290ea",
+    "team/packets/WEX_MATERIALIZER_168da3e259.in.json": "fa8644c44146b5bb6938bf248424e26c6d9e57a521d9eb143862759b86869cc6",
+    "team/packets/WEX_MATERIALIZER_168da3e259.out.json": "b075caf1d8688ce35d4eee151d81bdec79a0859dbb5b0219450dfc567efe20ec",
+    "team/packets/WEX_MATERIALIZER_168da3e259.wb.json": "43fdae71397fe635e7e2240c35bf00bd93bc69eb2e97e0b5f02f8b8d4f149dea",
+    "team/snapshots/WEX_MATERIALIZER_168da3e259.after.json": "eb12f893b6aa4fc5565b43cd85a3747e4b15f459f6f60ce223b3269e0db20736",
+    "team/snapshots/WEX_MATERIALIZER_168da3e259.before.json": "533fb78038f9a59d89bfd96fb137d86f6df5b8f9a742bee35ce22e66df5dafa5"
+  },
+  "root": ".tmp\\opsx-bug-cases\\BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "taken_at": 1787299419.504847
+}

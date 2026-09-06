@@ -243,7 +243,7 @@
 - purpose: READ_ONLY cross-case bug debt inventory (INDEX + cases); pasteable recovery exits
 - input_state: anytime (esp. post-GREEN | FANIN | chat-loss | pre-verify spare slot | family_closed)
 - output_state: debt_clear | debt_found | blocked (missing INDEX/cases / bad case=)
-- artifacts_read: `.tmp/opsx-bug-cases/INDEX.md` + case LEDGER/FANIN/findings/HC-*
+- artifacts_read: `.opsx/runs/bug-cases/INDEX.md` + case LEDGER/FANIN/findings/HC-*
 - artifacts_written: none (READ_ONLY; never INDEX/LEDGER/close writer)
 - decision_owner: operator picks which debt row; FANIN/close remain other commands
 - next_typical: first HARD_BLOCK / OPEN_CANDIDATE FIX_EXIT | /opsx-bug-team resume | /opsx-claim-next-bug | materialize update | continue planned hop if CLEAR
@@ -263,8 +263,8 @@
 - purpose: durable bug-case map (intake/update/hunt-result/promote/fanin_assemble) + corrupt-claim repair + ROUTE_STATE assist
 - input_state: bug_signal_raw | finding_queued | finding_claimed | all_branches_terminal | FANIN_READY
 - output_state: intake_recorded | finding_queued | finding_claimed | FANIN_READY | lesson_candidate_only
-- artifacts_read: .tmp/opsx-bug-cases/**
-- artifacts_written: .tmp/opsx-bug-cases/** ; fanin_assemble writes ONLY results/FANIN.md ; may append ROUTE-TRACE
+- artifacts_read: .opsx/runs/bug-cases/**
+- artifacts_written: .opsx/runs/bug-cases/** ; fanin_assemble writes ONLY results/FANIN.md ; may append ROUTE-TRACE
 - decision_owner: materialize contract (no Owner / class authority)
 - next_typical: /opsx-claim-next-bug | /opsx-classify-bug | /opsx-learn-from-bug FANIN_PATH= | repair pasteable
 - known_flaws: F8 (repair path exists; operators may still invent tokens)
@@ -288,7 +288,7 @@
 - input_state: classified_impl | task_delta_unchanged | finding_claimed | intake_recorded | adjudicating | fix_now_ready | production_go_ready | fix_implementing
 - output_state: adjudicating | fix_now_ready | production_go_ready | fix_implementing | fixed_or_closed | learning_candidate | invariant_defined
 - artifacts_read: intakes/findings; ROUTE_STATE/classification; RED evidence; code forensics
-- artifacts_written: .tmp/opsx-bug-cases/** without GO; production only with GO+fix_now+RED gate; tests forbidden under GO; ROUTE-TRACE
+- artifacts_written: .opsx/runs/bug-cases/** without GO; production only with GO+fix_now+RED gate; tests forbidden under GO; ROUTE-TRACE
 - decision_owner: adjudicator + claim gate + classify-first + Owner GO + RED-before-GO
 - next_typical: /opsx-classify-bug (if missing) | /opsx-test case= finding= | /opsx-fix-bug GO (after RED) | /opsx-claim-next-bug | /opsx-invariant | /opsx-bug-team handback (post-GO SECONDARY) | /opsx-learn-from-bug | none
 - known_flaws: |
@@ -910,7 +910,7 @@ command-contract classes (F6).
 ## Terminal / recovery
 
 - Lifecycle terminal: `archived` (commit/PR may happen earlier)
-- Bug recovery: `.tmp/opsx-bug-cases/INDEX.md` pasteable NEXT_ACTION
+- Bug recovery: `.opsx/runs/bug-cases/INDEX.md` pasteable NEXT_ACTION
 - Same-chat `/opsx-fix-bug` GO resume: prior `COMMAND_RECEIPT` (CASE_ID / INTAKE_ID / FINDING_ID / CLAIM_TOKEN)
 - Known-root skip-claim: `CHAT_REQUIRED=false` + durable `available` → fix-bug (±GO) without claim-next
 - Claimable queue: `available`+`CHAT_REQUIRED=true` → claim-next first (never invent token)
@@ -1094,7 +1094,7 @@ command-contract classes (F6).
   SCENARIO_TEST_ONLY_PACKET | `/opsx-close-external-gap` with Scenario
   REFACTOR/CERTIFY packet | `/opsx-verify` after `mode=certify` PASS
 - known_flaws: durable plan/report persistence still chat-output in v1
-  (receipts may live under `.tmp/opsx-scenario-coverage/`); archive activation
+  (receipts may live under `.opsx/runs/scenario-coverage/`); archive activation
   via `SCENARIO_COVERAGE_REQUIRED` **and** forced when
   `PRODUCT_ACCEPTANCE_REQUIRED=true` (legacy opt-out alone cannot waive PA)
 - purpose: diff-scoped antipattern over-report (`base...head`); optional practice ledger via `accept|reject` + GO
@@ -1187,7 +1187,7 @@ command-contract classes (F6).
 - purpose: first-contact seed/bind OPSX; bare GO = one STEP (bind→meta→lifecycle→support); STEP=all opt-in; SAVE = central lessons
 - input_state: change_idea | empty/partial `.opsx` | bootstrap_in_progress
 - output_state: bootstrap_in_progress | projectization_required
-- artifacts_read: central profile; `.tmp/opsx-bootstrap/**`; local `.opsx/**`
+- artifacts_read: central profile; `.opsx/runs/bootstrap/**`; ephemeral `.tmp/opsx-bootstrap/**`; local `.opsx/**`
 - artifacts_written: staged bootstrap surfaces under allowlist; no product openspec wipe; no auto projectize:GO
 - decision_owner: bootstrap operator (GO/SAVE exclusive)
 - next_typical: /opsx-projectize | /opsx-meta-bootstrap GO (next STEP)
@@ -1237,7 +1237,7 @@ command-contract classes (F6).
 - purpose: sole command-import owner (index default / raw donor); KEEP-gated materialize
 - input_state: discovery_ready | import_packet_ready | projectization_complete
 - output_state: import_packet_ready | process_dirty | projectization_required
-- artifacts_read: index OCCURRENCE / ADOPTION_PACKET / donor path; staging `.tmp/opsx-inbound/**`
+- artifacts_read: index OCCURRENCE / ADOPTION_PACKET / donor path; staging `.opsx/runs/inbound/**`
 - artifacts_written: selected command packet + companions under allowlist (GO)
 - decision_owner: Owner KEEP set + GO
 - next_typical: /opsx-meta-commit | /opsx-adapt-project | /opsx-projectize | /opsx-meta-bootstrap

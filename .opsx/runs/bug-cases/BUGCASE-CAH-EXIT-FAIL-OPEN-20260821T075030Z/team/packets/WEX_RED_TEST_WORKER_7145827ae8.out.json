@@ -1,0 +1,50 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/7145827ae8/OUT",
+  "PACKET_GENERATION": 2,
+  "ORCHESTRATION_ID": "ORCH/bug-team-c1f8a3a34110",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/7145827ae8",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "CASE_ID": "BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/7145827ae8/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/e241000982/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/e241000982/OUT": {
+      "CANONICAL_SHA256": "5574f5a303cfc98f2ed513b3242364946bf770ece4634d814f08a48035c1a6f9",
+      "RAW_SHA256": "adb949933b43f8748e7083df5b2e7daa2043e0ca578a80302892b8926ff7bb7c"
+    }
+  },
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1787302033.3084748,
+  "EXPIRES_AT": 1787305633.3084748,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "RED_STATUS": "RED_CONFIRMED",
+    "TEST_IDS": [
+      "tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py::test_public_disable_rejects_missing_actor_before_commit[no_from_user]",
+      "tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py::test_public_disable_rejects_missing_actor_before_commit[id_none]",
+      "tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py::test_public_disable_rejects_missing_actor_before_commit[id_str]",
+      "tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py::test_public_disable_rejects_missing_actor_before_commit[id_bool]"
+    ],
+    "TEST_CONTENT_SHA256": {
+      "tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py": "dfecfb3e51d1a771dbe4750f742de6ae0133216b3f0a692981e2cd4dba0a360e"
+    },
+    "COMMANDS_RUN": [
+      "poetry run pytest -q tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py --tb=line"
+    ],
+    "EVIDENCE_PATH": "results/RED-ROOT-001.md"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/RED-ROOT-001.md",
+    "team/heartbeats/WEX_RED_TEST_WORKER_7145827ae8.json",
+    "team/packets/WEX_RED_TEST_WORKER_7145827ae8.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 2
+}

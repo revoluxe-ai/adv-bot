@@ -5,7 +5,7 @@ SCHEMA: bug-episode/ROUTE_TRACE
 SCHEMA_VERSION: 2
 POLICY_SOT: .cursor/pipeline/ORCHESTRATION_MVP.md
 RUNTIME_PATH:
-  .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+  .opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 ## Role

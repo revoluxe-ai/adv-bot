@@ -1,0 +1,1 @@
+{"worker_id":"IMPLEMENTATION_EXECUTOR","worker_execution_id":"WEX-EXEC-001-20260821-001","parent_orchestration_id":"ORCH-BUGTEAM-20260821-001","case_id":"BUGCASE-CAH-CONFIRM-20260821-001","finding_id":"FINDING-CAH-CONFIRM-001","status":"PASS","terminal_status":"IMPLEMENTED_NOT_VALIDATED","last_heartbeat_at":"2026-08-21T12:52:00.0000000Z","green_verification":"NOT_PERFORMED"}

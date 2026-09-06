@@ -59,8 +59,8 @@ Blocker:
 You MAY update files only under:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/
-.tmp/opsx-bug-cases/INDEX.md
+.opsx/runs/bug-cases/<CASE_ID>/
+.opsx/runs/bug-cases/INDEX.md
 ```
 
 You MUST NOT:
@@ -112,11 +112,11 @@ The chat must not automatically begin implementation.
 Expected files:
 
 ```text
-.tmp/opsx-bug-cases/INDEX.md
-.tmp/opsx-bug-cases/<CASE_ID>/CASE.md
-.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md
-.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md
-.tmp/opsx-bug-cases/<CASE_ID>/handoffs/COMMON_HANDOFF.md
+.opsx/runs/bug-cases/INDEX.md
+.opsx/runs/bug-cases/<CASE_ID>/CASE.md
+.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md
+.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/handoffs/COMMON_HANDOFF.md
 ```
 
 ## Source resolution (mandatory)
@@ -436,7 +436,7 @@ SOURCE_RESOLUTION:
 - primary_path:
 - fallback_used: false
 - search_operations: 0
-- search_scope: .tmp/opsx-bug-cases/<CASE_ID>
+- search_scope: .opsx/runs/bug-cases/<CASE_ID>
 - unresolved_gap:
 ```
 
@@ -710,7 +710,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:

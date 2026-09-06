@@ -1,0 +1,67 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-ROOT-001.md"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 9,
+  "CREATED_AT": 1787310979.0455778,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab/OUT": {
+      "CANONICAL_SHA256": "27a7b5382d27b0da21dd6b1195f16753bfa04ce096c1536209f58174aaaf98da",
+      "RAW_SHA256": "e575183d06b720b42ad6f090d31829cb32948cae64f5dacc5656b9c00fdb7561"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787312779.0455778,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 5,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/7402a3823e/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/7402a3823e/IN",
+  "PAYLOAD": {
+    "ACTUAL_EXECUTION_ROUTE": "ROUTE_A",
+    "ADJACENT_UNIT_TESTS": {
+      "COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py tests/unit/auto_updater_v3/card_ab_hold/test_confirmation_contracts.py -q",
+      "EXIT_CODE": 0,
+      "RESULT": "66 passed"
+    },
+    "ARTIFACT_EVIDENCE_PATH": "results/GREEN-ROOT-001.md",
+    "COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read -vv",
+    "COMPLETENESS_GUARD": "_has_complete_factual_position_read rejects a strict subset before confirm_target_places, phase/FSM transition, or durable mutation.",
+    "COMPLETE_READ_INVALID_POSITION_BEHAVIOR": "Full authoritative presence permits explicit zero, negative, or non-finite exclusion while preserving the positive subset writer behavior.",
+    "DIFF_CHECK": {
+      "COMMAND": "git diff --check -- app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py",
+      "RESULT": "PASS"
+    },
+    "FAILURE_EVIDENCE": {
+      "CODE": "FROZEN_TEST_HASH_MISMATCH",
+      "EXPECTED_TEST_CONTENT_SHA256": "9dbd10dd7d6ef9a5523b336bdd1e7219a3605355b68327c4a0e43875fe3ea636",
+      "NON_WEAKEN_DELTA": "NOT_PROVIDED; Owner approval required",
+      "OBSERVED_TEST_CONTENT_SHA256": "5f913bae2700169d32c21491e53f81ae43f053b1ca2193f37dd571b3dba6f843"
+    },
+    "FORBIDDEN_ACTIONS_PERFORMED": [],
+    "FROZEN_TEST_CONTENT_SHA256": "9dbd10dd7d6ef9a5523b336bdd1e7219a3605355b68327c4a0e43875fe3ea636",
+    "GREEN_CLAIM": false,
+    "OBSERVED_TEST_CONTENT_SHA256": "5f913bae2700169d32c21491e53f81ae43f053b1ca2193f37dd571b3dba6f843",
+    "PRODUCTION_HASH_AFTER": "f4487e268ca409b108400226f6879635e6a2e111",
+    "REGRESSION_TEST": {
+      "COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read -vv",
+      "EXIT_CODE": 0,
+      "RESULT": "1 passed"
+    },
+    "ROUTE_RECONCILIATION": "MATCH",
+    "TEST_CONTENT_HASH_MATCH": false,
+    "TEST_ID": "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "FAIL",
+  "TERMINAL_STATUS": "FROZEN_TEST_HASH_MISMATCH",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/7402a3823e",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

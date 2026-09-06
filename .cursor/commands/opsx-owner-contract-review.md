@@ -13,7 +13,7 @@ donor_source_id: adv-bot/split-payment-for-adv-without-pay-for-adv-on-pauses
 donor_snapshot_head: db91149ae1d96d1fd85ceae7a405e65c09f0c29b
 donor_occurrence_id: 879dc2514cb7352d
 donor_full_file_hash: fd3ba1be2dc684aa230f3be67ef445845b7b93243b5e98fcf12c0db36c58a6e4
-inbound_packet: .tmp/opsx-inbound/20260816T153600Z/DIFF_PACKET.md
+inbound_packet: .opsx/runs/inbound/20260816T153600Z/DIFF_PACKET.md
 description: "READ_ONLY interactive semantic review of owner-contract.md: gather context, ask real Owner choices, emit OWNER_REVIEW_HANDOFF for /opsx-new, re-review. Never writes."
 argument-hint: "change=<name> | path=<owner-contract.md> [paste EVOLUTION_HANDOFF / EXPLORE_HANDOFF / OWNER_REVIEW_HANDOFF] [Owner answers]"
 ---

@@ -1,0 +1,53 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/FIX-ROOT-001.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "CHECKPOINT_GENERATION": 6,
+  "CREATED_AT": 1787302310.0375793,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/7145827ae8/OUT": {
+      "CANONICAL_SHA256": "180b261f1d4d4ad1bccec9ba6864488e6660ae54ce5835af54192b7d3298b018",
+      "RAW_SHA256": "453190d6710339722274d9e61114341c5395428adb13e62cda539a75ff98a724"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/7145827ae8/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787305910.0375793,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-c1f8a3a34110",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/dffebe9086/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/dffebe9086/IN",
+  "PAYLOAD": {
+    "ACTUAL_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "CHANGED_PATHS": [
+      "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py"
+    ],
+    "COMMANDS_RUN": [
+      "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py",
+      "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_pg_session_handoff_seams.py tests/unit/auto_updater_v3/card_ab_hold/test_telegram_menu_open_hotfix.py",
+      "git diff --check"
+    ],
+    "FIX_EVIDENCE_PATH": "results/FIX-ROOT-001.md",
+    "FIX_STATUS": "IMPLEMENTED_AND_VALIDATED",
+    "TEST_RESULTS": [
+      "Frozen regression: PASS, 4 passed",
+      "Adjacent unit tests: PASS, 31 passed",
+      "Diff check: PASS",
+      "Linter diagnostics: PASS, no errors"
+    ]
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/dffebe9086",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+}

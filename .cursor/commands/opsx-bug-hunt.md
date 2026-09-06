@@ -816,7 +816,7 @@ CHILD_CASE_PACKET:
 - FORBIDDEN_ACTIONS:
 ```
 
-`PREREQ`: `.tmp/opsx-bug-cases/<CASE_ID>/` must exist (durable case map via
+`PREREQ`: `.opsx/runs/bug-cases/<CASE_ID>/` must exist (durable case map via
 `/opsx-materialize-bug-queue mode=hunt-result`, or already materialized). Do not
 adjudicate from a chat-only packet without case-map rows.
 
@@ -906,7 +906,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:

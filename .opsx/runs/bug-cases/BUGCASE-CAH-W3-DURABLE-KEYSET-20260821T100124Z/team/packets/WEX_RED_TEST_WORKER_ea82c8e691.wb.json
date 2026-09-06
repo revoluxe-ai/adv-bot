@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "RED_TEST_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/heartbeats/WEX_RED_TEST_WORKER_ea82c8e691.json",
+    "team/intents/WEX_RED_TEST_WORKER_ea82c8e691.intent.json",
+    "team/packets/WEX_RED_TEST_WORKER_ea82c8e691.finalize_reject.json",
+    "team/packets/WEX_RED_TEST_WORKER_ea82c8e691.out.json",
+    "team/snapshots/WEX_RED_TEST_WORKER_ea82c8e691.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,8 @@
+{
+  "digests": {
+    "intakes/_RAW_INTAKE_SEED.txt": "65ee1638fef83aec6b45f309253e408c62fc6783ae959ec970555f8cd956a15a",
+    "team/packets/WEX_MATERIALIZER_8937b1bee0.in.json": "8b14cc071171908eaab9d8d0fb8ff8396bb1f0175db57e68cdc2c851b167d68e"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "taken_at": 1787927394.2866173
+}

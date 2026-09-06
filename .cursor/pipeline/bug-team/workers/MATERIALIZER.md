@@ -28,7 +28,7 @@ RAW_INTAKE normalized + case/finding ids + DUPLICATE_OUTCOME
 
 ```text
 ALLOWED:
-  .tmp/opsx-bug-cases/<CASE_ID>/intakes/**, findings/**, CASE.md, LEDGER (materialize), team packets out
+  .opsx/runs/bug-cases/<CASE_ID>/intakes/**, findings/**, CASE.md, LEDGER (materialize), team packets out
 FORBIDDEN:
   classify; propose fix; Owner GO; production
 ```

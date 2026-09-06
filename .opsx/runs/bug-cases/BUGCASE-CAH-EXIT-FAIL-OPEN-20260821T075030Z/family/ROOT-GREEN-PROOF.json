@@ -1,0 +1,43 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/ROOT-001/EXIT-FAIL-CLOSED",
+  "ROOT_FINDING_ID": "ROOT-001",
+  "ROOT_RED_CLAIMS": [
+    "A missing callback actor reached the destructive EXIT flow.",
+    "The session seam interpreted None as an ownership-check bypass."
+  ],
+  "ROOT_FAILURE_BEHAVIOR": "Public disable_card_ab_hold could proceed with a missing actor and reach a write-session path.",
+  "ROOT_FIX_CLAIMS": [
+    "Validate actor identity at the public EXIT boundary.",
+    "Perform validation before opening the write session.",
+    "Preserve explicit internal session seam behavior."
+  ],
+  "ROOT_GREEN_CLAIMS": [
+    "Public EXIT rejects missing or invalid actor before opening the write session.",
+    "No PostgreSQL mutation or commit occurs for invalid actor input.",
+    "The internal session seam remains unchanged."
+  ],
+  "REQUIRED_BEHAVIOR_PROVEN": [
+    "Actor validation occurs before opening the write session.",
+    "Invalid actor input is rejected without PostgreSQL mutation or commit."
+  ],
+  "FORBIDDEN_BEHAVIOR_PROVEN": [
+    "Missing actor is not treated as an ownership-check bypass."
+  ],
+  "EVIDENCE_PATHS": {
+    "GREEN_EVIDENCE": "results/GREEN-ROOT-001.md",
+    "FIX_EVIDENCE": "results/FIX-ROOT-001.md"
+  },
+  "EVIDENCE_HASHES": {
+    "GREEN_EVIDENCE": "2ccd0a94d7ff08ede4cc73e5e661083ab3e5e5ab86cd743d8f1694eadf07abd0",
+    "FIX_EVIDENCE": "4d37ed50ae3ed95e0bf4753790817701f8fde3782c3bfcf27b2f8a7d16e28e68"
+  },
+  "SCOPE_TOKENS": [
+    "card_ab_hold",
+    "disable_card_ab_hold",
+    "actor",
+    "write_session",
+    "postgresql"
+  ],
+  "PROOF_STATUS": "PASS",
+  "VALIDATION_NOTES": "GREEN evidence independently verifies the frozen test, adjacent tests, diff check, actor-before-write ordering, and no mutation or commit on invalid actor input."
+}

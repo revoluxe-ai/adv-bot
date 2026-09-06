@@ -1,0 +1,51 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-ROOT-001.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_1f55d4f820.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "CHECKPOINT_GENERATION": 7,
+  "CREATED_AT": 1787302903.8938072,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/dffebe9086/OUT": {
+      "CANONICAL_SHA256": "cb50b8f5e0650cc98ad949114126ff6f7ecbdee3a273e54a0b3206919c05a047",
+      "RAW_SHA256": "4d3db2e348f13f6b2e4cbfc52bd3ee4ebd87965ec83e8fd736fb11848e6cf462"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/dffebe9086/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787306503.8938072,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-c1f8a3a34110",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/1f55d4f820/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/1f55d4f820/IN",
+  "PAYLOAD": {
+    "EVIDENCE_PATH": "results/GREEN-ROOT-001.md",
+    "FROZEN_TEST_HASH_STATUS": "MATCH",
+    "GREEN_STATUS": "PASS",
+    "INVARIANT_VERIFIED": "Public EXIT rejects missing/invalid actor before opening the write session, without PG mutation or commit; internal session seam remains unchanged.",
+    "SCOPE_CHECK": "PASS: only the requested production diff was inspected; frozen tests and production files were not modified by GREEN_VERIFIER.",
+    "TEST_RESULTS": {
+      "adjacent": {
+        "command": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_pg_session_handoff_seams.py tests/unit/auto_updater_v3/card_ab_hold/test_telegram_menu_open_hotfix.py",
+        "result": "31 passed"
+      },
+      "diff_check": "PASS",
+      "frozen": {
+        "command": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py",
+        "result": "4 passed"
+      }
+    }
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/1f55d4f820",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

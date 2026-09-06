@@ -92,7 +92,7 @@ COMPLETION_DECISION
 
 ## FAN_IN_ASSEMBLER
 
-- Sole write: `.tmp/opsx-bug-cases/<CASE_ID>/results/FANIN.md`.
+- Sole write: `.opsx/runs/bug-cases/<CASE_ID>/results/FANIN.md`.
 - No LEDGER / ROUTE-TRACE / CASE / finding / INDEX / production /
   tests / OpenSpec / `.cursor` writes.
 - No Owner closure authority.

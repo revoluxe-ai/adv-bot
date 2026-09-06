@@ -122,7 +122,7 @@ def build_zip(
     if dry_run:
         return None, members, total_bytes
 
-    out_dir = output_dir or (repo_root / ".tmp" / "opsx-export")
+    out_dir = output_dir or (repo_root / "opsx-export")
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     zip_path = out_dir / f"opsx-bundle-{stamp}.zip"
@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         "--output-dir",
         type=Path,
         default=None,
-        help="Directory for zip (default: <repo>/.tmp/opsx-export)",
+        help="Directory for zip (default: <repo>/opsx-export)",
     )
     args = parser.parse_args(argv)
 
