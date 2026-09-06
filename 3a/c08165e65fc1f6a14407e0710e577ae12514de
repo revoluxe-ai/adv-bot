@@ -1,0 +1,19 @@
+scripts/a1_promo_adjusted_drr_collect.py
+  s_60c33d8ff4bb13::t_20fd2efee68893 1-996
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3ac08165e65fc1f6a14407e0710e577ae12514de",
+  "prompts": {},
+  "sessions": {
+    "s_60c33d8ff4bb13": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "601ab54a-bffa-4904-b84d-b66982f837d6",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
