@@ -1,0 +1,19 @@
+scripts/REGISTRY.md
+  s_8549b3a5b9d277::t_318e396365468d 53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "4a4dd6fa86a0cf3f8ccc36bfd79add0c29ee448c",
+  "prompts": {},
+  "sessions": {
+    "s_8549b3a5b9d277": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ceab3ab3-e954-4ab2-8c54-9172ee4886ad",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
