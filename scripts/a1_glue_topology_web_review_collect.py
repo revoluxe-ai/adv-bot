@@ -31,6 +31,7 @@ from scripts.a1_cpc_two_sku_safety_preflight import (
     _fetch_seller_stocks,
     _load_pg,
     _parse_nmids,
+    _pg_db,
 )
 from scripts.a1_sale_price_snapshot import fetch_prices
 from scripts.wb_a1_associated_conversions import (
@@ -290,6 +291,34 @@ def _direct_assoc_split(
     }
 
 
+def _unique_contour_adv_ids(contours: list[dict[str, Any]]) -> set[int]:
+    """Уникальные advert_id по всем contour legs (auto + search) для одного nmID."""
+    out: set[int] = set()
+    for c in contours:
+        for leg in ("auto_adv_id", "search_adv_id"):
+            aid = c.get(leg)
+            if aid:
+                out.add(int(aid))
+    return out
+
+
+def _decision_spend_for_contours(
+    contours: list[dict[str, Any]],
+    day_rows: list[dict[str, Any]],
+    dates_by_window: tuple[set[str], set[str], set[str]],
+) -> dict[int, float]:
+    """Суммировать ad spend по уникальным advert_id — семантика как в 08_ADV_PERFORMANCE_WINDOWS."""
+    spend = {w: 0.0 for w in WINDOWS}
+    for adv_id in _unique_contour_adv_ids(contours):
+        for window, dates in zip(WINDOWS, dates_by_window):
+            spend[window] += sum(
+                r["day_spend"]
+                for r in day_rows
+                if r["advert_id"] == adv_id and r["date"] in dates
+            )
+    return spend
+
+
 def _association_edges(
     nm_rows: list[dict[str, Any]],
     adv_id: int,
@@ -501,6 +530,23 @@ async def _async_pipeline(
     }
 
 
+def _load_wb_cabinet_id(staging: Path) -> int | None:
+    """PG wbcabinet.id для shop_id (read-only identity)."""
+    out = staging / "wb_cabinet_id.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    q = (
+        f"SELECT c.id FROM public.wbcabinet c "
+        f"WHERE c.shop_id = '{SHOP_ID}' LIMIT 1"
+    )
+    st = evidence.run_pg_query(
+        _pg_db(), q, out, staging / "sql" / "wb_cabinet_id.sql", csv_output=False
+    )
+    if not st["success"]:
+        return None
+    text = out.read_text(encoding="utf-8").strip()
+    return int(text) if text.isdigit() else None
+
+
 def run_collect(output_dir: Path) -> dict[str, Any]:
     """Собрать evidence package и вернуть manifest summary."""
     if output_dir.exists():
@@ -553,9 +599,12 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     dates_28 = _closed_dates(closed_end, 28)
     nm_contours = _nm_to_contours(pg_rows, campaigns)
 
+    wb_cabinet_id = _load_wb_cabinet_id(staging)
+
     scope_rows = [
         {
             "shop_id": SHOP_ID,
+            "wb_cabinet_id": wb_cabinet_id if wb_cabinet_id is not None else "GAP",
             "store_total_nmids": store_total_cards,
             "scoped_nmids_count": len(scoped_list),
             "priority_category_nmids_count": len(priority_nmids),
@@ -935,18 +984,9 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
                 if x and str(x).isdigit()
             }
         )
-        spend = {w: 0.0 for w in WINDOWS}
-        for c in contours:
-            for leg in ("auto_adv_id", "search_adv_id"):
-                aid = c.get(leg)
-                if not aid:
-                    continue
-                for w, dates in zip(WINDOWS, (dates_7, dates_14, dates_28)):
-                    spend[w] += sum(
-                        r["day_spend"]
-                        for r in day_rows
-                        if r["advert_id"] == int(aid) and r["date"] in dates
-                    )
+        spend = _decision_spend_for_contours(
+            contours, day_rows, (dates_7, dates_14, dates_28)
+        )
         promoted: set[int] = set()
         auto_id = c0.get("auto_adv_id")
         if auto_id:
@@ -1112,7 +1152,8 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
         f"- scoped_nmids: {len(scoped_list)}",
         f"- priority_category_nmids: {len(priority_nmids)}",
         f"- imt_groups_in_scope: {len(imt_scoped)}",
-        f"- campaigns_in_fullstats: {len(adv_ids)}",
+        f"- wb_campaigns_in_cabinet: {len(campaigns)}",
+        f"- pg_adv_ids_queried_for_fullstats: {len(adv_ids)}",
         f"- supplier_orders_raw: {len(orders_raw)}",
         "",
         "## Gaps",
