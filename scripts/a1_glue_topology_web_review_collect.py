@@ -433,7 +433,7 @@ async def _all_cards() -> list[dict[str, Any]]:
         )
         hub = factory.get_wb_manager_hub(SHOP_ID)
         store = RawStore(Path("/tmp/cards_raw"))
-        budget = ApiCallBudget(max_calls=10_000)
+        budget = ApiCallBudget(max_seconds=1800.0, max_api_calls=10_000)
         _, cards = await collect_cards(
             hub.wb_data_manager, store=store, budget=budget, page_limit=100
         )
