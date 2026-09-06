@@ -440,23 +440,11 @@ async def _all_cards() -> list[dict[str, Any]]:
     return cards
 
 
-def run_collect(output_dir: Path) -> dict[str, Any]:
-    """Собрать evidence package и вернуть manifest summary."""
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-    raw_dir = output_dir / "raw"
-    raw_dir.mkdir(parents=True)
-    staging = output_dir / "staging"
-    staging.mkdir(parents=True)
-
-    _bootstrap()
-    checked_at = _msk_now()
-    closed_end = _closed_end_day(checked_at)
-    gaps: list[str] = []
-
-    cards = asyncio.run(_all_cards())
-    _write_jsonl(raw_dir / "content_cards_all.jsonl", cards)
-
+async def _async_pipeline(
+    pg_rows: list[dict[str, str]],
+) -> dict[str, Any]:
+    """Единый async pipeline — один event loop для DI/SQLAlchemy/Redis."""
+    cards = await _all_cards()
     card_by_nmid: dict[int, dict[str, Any]] = {}
     imt_members: dict[int, set[int]] = defaultdict(set)
     for card in cards:
@@ -485,12 +473,67 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
         if imt and imt in imt_members:
             scoped_nmids |= imt_members[imt]
 
+    scoped_list = sorted(scoped_nmids)
+    cards_subset = {
+        n: card_by_nmid[n] for n in scoped_list if n in card_by_nmid
+    }
+
+    campaigns, fullstats_raw, orders_raw, adv_ids = await _wb_collect(pg_rows)
+    price_rows, price_route, price_gaps = await fetch_prices(scoped_list)
+    stock_data = await _fetch_stocks_for_cards(cards_subset)
+
+    return {
+        "cards": cards,
+        "card_by_nmid": card_by_nmid,
+        "imt_members": imt_members,
+        "priority_nmids": priority_nmids,
+        "nmid_category": nmid_category,
+        "scoped_nmids": scoped_nmids,
+        "scoped_list": scoped_list,
+        "campaigns": campaigns,
+        "fullstats_raw": fullstats_raw,
+        "orders_raw": orders_raw,
+        "adv_ids": adv_ids,
+        "price_rows": price_rows,
+        "price_route": price_route,
+        "price_gaps": price_gaps,
+        "stock_data": stock_data,
+    }
+
+
+def run_collect(output_dir: Path) -> dict[str, Any]:
+    """Собрать evidence package и вернуть manifest summary."""
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    raw_dir = output_dir / "raw"
+    raw_dir.mkdir(parents=True)
+    staging = output_dir / "staging"
+    staging.mkdir(parents=True)
+
+    _bootstrap()
+    checked_at = _msk_now()
+    closed_end = _closed_end_day(checked_at)
+    gaps: list[str] = []
+
+    pg_rows = _load_pg(staging)
+    payload = asyncio.run(_async_pipeline(pg_rows))
+
+    cards = payload["cards"]
+    _write_jsonl(raw_dir / "content_cards_all.jsonl", cards)
+
+    card_by_nmid = payload["card_by_nmid"]
+    priority_nmids = payload["priority_nmids"]
+    nmid_category = payload["nmid_category"]
+    scoped_nmids = payload["scoped_nmids"]
+    scoped_list = payload["scoped_list"]
     store_total_cards = len(card_by_nmid)
     if not scoped_nmids:
         gaps.append("SCOPED_NMIDS_EMPTY — no priority category matches in Content API cards")
 
-    pg_rows = _load_pg(staging)
-    campaigns, fullstats_raw, orders_raw, adv_ids = asyncio.run(_wb_collect(pg_rows))
+    campaigns = payload["campaigns"]
+    fullstats_raw = payload["fullstats_raw"]
+    orders_raw = payload["orders_raw"]
+    adv_ids = payload["adv_ids"]
     _write_jsonl(raw_dir / "campaigns_v2.jsonl", campaigns)
     _write_jsonl(raw_dir / "fullstats_v3_raw.jsonl", fullstats_raw)
     _write_jsonl(raw_dir / "supplier_orders_raw.jsonl", orders_raw)
@@ -498,17 +541,12 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     nm_rows, day_rows = _nm_rows(fullstats_raw)
     wb_by_id = {_read_int(c, "id", "advertId"): c for c in campaigns}
 
-    scoped_list = sorted(scoped_nmids)
-    price_rows, price_route, price_gaps = asyncio.run(fetch_prices(scoped_list))
-    gaps.extend(price_gaps)
-    price_by_nmid = {int(r["nmID"]): r for r in price_rows if r.get("nmID") is not None}
-
-    cards_subset = {
-        n: card_by_nmid[n]
-        for n in scoped_list
-        if n in card_by_nmid
+    price_route = payload["price_route"]
+    gaps.extend(payload["price_gaps"])
+    price_by_nmid = {
+        int(r["nmID"]): r for r in payload["price_rows"] if r.get("nmID") is not None
     }
-    stock_data = asyncio.run(_fetch_stocks_for_cards(cards_subset))
+    stock_data = payload["stock_data"]
 
     dates_7 = _closed_dates(closed_end, 7)
     dates_14 = _closed_dates(closed_end, 14)
