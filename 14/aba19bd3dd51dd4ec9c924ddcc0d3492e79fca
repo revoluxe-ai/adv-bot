@@ -1,0 +1,33 @@
+scripts/REGISTRY.md
+  s_df86e7658eaaba::t_9b0f52bc3b0975 19
+  s_80432b1171c339::t_677e88351d4f4f 52
+scripts/a1_glue_topology_web_review_collect.py
+  s_80432b1171c339::t_87cff1af5dddd8 502
+  s_80432b1171c339::t_141703ccfcc570 358,389-414
+  s_80432b1171c339::t_6378d17610cd28 1-63,65-357,359-388,415-501,503-1210
+  s_80432b1171c339::t_4ca4a1b2468e52 64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "14aba19bd3dd51dd4ec9c924ddcc0d3492e79fca",
+  "prompts": {},
+  "sessions": {
+    "s_80432b1171c339": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0d93ec37-5841-410c-a130-2142022e9858",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_df86e7658eaaba": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b8e42d96-6844-43e5-a6cd-02bc3bc8f7b2",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
