@@ -3,11 +3,14 @@
 from scripts.a1_controlled_ad_expansion_v1 import (
     Candidate,
     _candidate_rows,
+    _next_observation_day,
     classify_bottleneck,
     choose_contour,
+    choose_contours,
     validate_allowlist,
     validate_incremental_spend,
 )
+from datetime import date
 
 
 def test_allowlist_rejects_forbidden_nmid() -> None:
@@ -32,15 +35,34 @@ def test_incremental_spend_is_bounded() -> None:
 
 
 def test_contour_pick_prefers_priority_paused_leg() -> None:
-    """Приоритетный paused leg выбирается раньше secondary candidate."""
+    """Совместимый single-result helper сохраняет порядок приоритетов."""
     selected = choose_contour(
         [
             Candidate(20, (388166103,), 11, 100, "activate_paused_leg", 388166103),
-            Candidate(10, (14824677,), 11, 100, "activate_paused_leg", 14824677),
+            Candidate(10, (837395782,), 11, 100, "activate_paused_leg", 837395782),
         ]
     )
     assert selected is not None
-    assert selected.nm_id == 14824677
+    assert selected.nm_id == 837395782
+
+
+def test_contour_selection_is_not_mutex() -> None:
+    """Actionable 837 and 148 legs are both retained in one write-set."""
+    selected = choose_contours(
+        [
+            Candidate(39900256, (837395782,), 11, 100, "activate_paused_leg", 837395782),
+            Candidate(39943851, (14824677,), 9, 0, "top_up_budget", 14824677),
+        ]
+    )
+    assert [candidate.nm_id for candidate in selected] == [837395782, 14824677]
+
+
+def test_mat_candidate_388166103_is_ranked() -> None:
+    """MATS candidate 388166103 participates in ranking."""
+    selected = choose_contours(
+        [Candidate(77, (388166103,), 9, 0, "top_up_budget", 388166103)]
+    )
+    assert [candidate.nm_id for candidate in selected] == [388166103]
 
 
 def test_preflight_classifies_paused_search_before_budget() -> None:
@@ -91,3 +113,10 @@ def test_budget_topup_is_not_selected_for_forbidden_nmids() -> None:
         status=9, budget=700, daily_limit=500, has_paused_leg=False,
         max_cpo=1200, sales_7d=1000,
     ) == "BUDGET_LIMITED"
+
+
+def test_next_observation_day_uses_source_cutoff() -> None:
+    """При данных только до вчера следующий закрытый день — сегодня."""
+    assert _next_observation_day(
+        [{"date": "2026-09-07"}], today=date(2026, 9, 8)
+    ) == date(2026, 9, 8)

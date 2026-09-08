@@ -19,9 +19,10 @@ from collections import defaultdict
 import sys
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
+from zoneinfo import ZoneInfo
 
 import dotenv
 from sqlalchemy import select
@@ -36,12 +37,14 @@ if TYPE_CHECKING:
 SHOP_ID = "5339e9ad-cbfe-50fc-8d77-b9f337a80417"
 WB_CABINET_ID = 401
 PREFLIGHT_NMIDS = frozenset(
-    {837395782, 14824677, 14166423, 85970344, 7974113, 147281596}
+    {837395782, 14824677, 14166423, 388166103, 85970344, 7974113, 147281596}
 )
 ALLOWED_NMIDS = frozenset({837395782, 14824677, 14166423, 388166103})
 FORBIDDEN_NMIDS = frozenset({7974113, 147281596})
 NO_WRITE_NMIDS = frozenset({7974113, 147281596, 85970344})
-PRIORITY_NMIDS = (14824677, 837395782, 14166423)
+# Each contour is evaluated independently.  The order is only the deterministic
+# tie-break/order of the resulting write-set, not a mutex between contours.
+PRIORITY_NMIDS = (837395782, 14824677, 14166423, 388166103)
 MAX_INCREMENTAL_RUB = 2_000
 DEFAULT_TOPUP_RUB = 1_000
 PREFERRED_INCREMENTAL_MIN_RUB = 1_000
@@ -49,6 +52,7 @@ DAILY_LIMIT_CAP_RUB = 500
 MAX_14166423_INCREMENT_RUB = 300
 PAUSED_STATUS = 11
 ACTIVE_STATUSES = frozenset({9})
+MSK = ZoneInfo("Europe/Moscow")
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,7 +109,7 @@ def _campaign_kind(raw: dict[str, Any]) -> str:
 
 def _sales_by_nmid(order_rows: Iterable[dict[str, Any]]) -> dict[int, tuple[float, float]]:
     """Собрать factual sales за 3d/7d из свежих supplier-order строк."""
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(MSK).date()
     totals: dict[int, list[float]] = defaultdict(lambda: [0.0, 0.0])
     for row in order_rows:
         if str(row.get("isCancel", "")).lower() in {"true", "1", "t"}:
@@ -167,21 +171,42 @@ def classify_bottleneck(
     return "UNRESOLVED"
 
 
-def choose_contour(candidates: Iterable[Candidate]) -> Candidate | None:
-    """Выбрать один кандидат по priority, не усиливая слабые forbidden-контуры."""
+def _best_candidate(candidates: Iterable[Candidate]) -> Candidate | None:
+    """Выбрать лучший actionable leg внутри одного nmID."""
     ranked = list(candidates)
-    for nmid in PRIORITY_NMIDS + (388166103,):
-        matches = [item for item in ranked if item.nm_id == nmid]
-        if matches:
-            return sorted(
-                matches,
-                key=lambda item: (
-                    item.action != "activate_paused_leg",
-                    item.classification not in {"BUDGET_LIMITED", "TRAFFIC_LIMITED"},
-                    item.adv_id,
-                ),
-            )[0]
-    return None
+    if not ranked:
+        return None
+    return sorted(
+        ranked,
+        key=lambda item: (
+            item.action != "activate_paused_leg",
+            item.classification not in {"BUDGET_LIMITED", "TRAFFIC_LIMITED"},
+            item.adv_id,
+        ),
+    )[0]
+
+
+def choose_contours(candidates: Iterable[Candidate]) -> list[Candidate]:
+    """Выбрать независимые actionable legs для всех разрешённых контуров.
+
+    Один actionable кандидат выбирается на nmID. Поэтому наличие приоритетного
+    кандидата для 14824677 не блокирует независимый paused leg 837395782 или
+    вторичный MATS-кандидат 388166103.
+    """
+    ranked = list(candidates)
+    selected: list[Candidate] = []
+    selected_adv_ids: set[int] = set()
+    for nmid in PRIORITY_NMIDS:
+        candidate = _best_candidate(item for item in ranked if item.nm_id == nmid)
+        if candidate is not None and candidate.adv_id not in selected_adv_ids:
+            selected.append(candidate)
+            selected_adv_ids.add(candidate.adv_id)
+    return selected
+
+
+def choose_contour(candidates: Iterable[Candidate]) -> Candidate | None:
+    """Совместимый helper: вернуть первый результат независимого выбора."""
+    return next(iter(choose_contours(candidates)), None)
 
 
 def _candidate_rows(
@@ -297,14 +322,34 @@ async def _inventory(
 
 
 async def _fresh_sales(data_manager: Any) -> tuple[dict[int, tuple[float, float]], list[dict[str, Any]]]:
-    """Получить свежие factual supplier orders для шести обязательных nmID и mat."""
-    from datetime import timedelta
-
+    """Получить свежие factual supplier orders для обязательных nmID и MATS."""
     date_from = (datetime.now(timezone.utc).date() - timedelta(days=7)).isoformat()
     rows = await data_manager.get_supplier_orders(date_from=date_from, flag=0) or []
     normalized = [_jsonable(row) for row in rows]
     normalized = [row for row in normalized if isinstance(row, dict)]
     return _sales_by_nmid(normalized), normalized
+
+
+def _next_observation_day(
+    supplier_orders: Iterable[dict[str, Any]],
+    *,
+    today: date | None = None,
+) -> date:
+    """Определить ближайший полностью закрытый день из источника продаж.
+
+    Если источник содержит данные только до вчера, сегодняшний день станет
+    следующим закрытым днём после его закрытия; наличие сегодняшних строк
+    переносит наблюдение на завтра.
+    """
+    current = today or datetime.now(MSK).date()
+    source_days: list[date] = []
+    for row in supplier_orders:
+        raw_day = str(row.get("date") or row.get("lastChangeDate") or "")[:10]
+        try:
+            source_days.append(date.fromisoformat(raw_day))
+        except ValueError:
+            continue
+    return current if not source_days or max(source_days) < current else current + timedelta(days=1)
 
 
 async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str, Any]:
@@ -378,8 +423,9 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
             and item.nm_id not in NO_WRITE_NMIDS
             and item.sales_7d > 0
         ]
-        selected = choose_contour(proposed_candidates)
-        if selected is not None:
+        selected_contours = choose_contours(proposed_candidates)
+        selected_amounts: dict[int, int] = {}
+        for selected in selected_contours:
             selected_amount = 0 if selected.action == "activate_paused_leg" else topup_amount
             if selected.action == "top_up_budget":
                 if selected.nm_id in {837395782, 14824677}:
@@ -388,7 +434,12 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
                     selected_amount = min(selected_amount, DAILY_LIMIT_CAP_RUB)
                 if selected.nm_id == 14166423:
                     selected_amount = min(selected_amount, MAX_14166423_INCREMENT_RUB)
-            validate_incremental_spend([selected_amount])
+                if selected.nm_id == 388166103:
+                    selected_amount = min(selected_amount, DAILY_LIMIT_CAP_RUB)
+            selected_amounts[selected.adv_id] = selected_amount
+        validate_incremental_spend(selected_amounts.values())
+        for selected in selected_contours:
+            selected_amount = selected_amounts[selected.adv_id]
             proposed.append({
                 "adv_id": selected.adv_id, "nm_id": selected.nm_id,
                 "field": selected.action,
@@ -425,31 +476,33 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         balance = _jsonable(await modifier.get_campaign_balance())
         cashbacks = balance.get("cashbacks") if isinstance(balance, dict) else []
         cashback_pool = sum(_int(item.get("sum")) or 0 for item in (cashbacks or []) if isinstance(item, dict))
-        if execute and selected is not None:
-            if selected.action == "top_up_budget":
-                promo_amount = min(selected_amount, cashback_pool)
-                ordinary_amount = selected_amount - promo_amount
-                result = await modifier.top_up_budget(
-                    adv_id=selected.adv_id, amount=selected_amount, balance_type="balance",
-                    return_total=True, cashback_sum=promo_amount or None,
-                    cashback_percent=50 if promo_amount else None,
-                )
-                topups.append({
-                    "adv_id": selected.adv_id, "amount": selected_amount,
-                    "promo_topup": promo_amount, "ordinary_topup": ordinary_amount,
-                    "result": _jsonable(result),
-                })
-                executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "budget", "status": "success"})
-                ledger.append(_ledger(selected, "budget", selected.budget_before, result.total, selected_amount, "success", promo_amount, ordinary_amount))
-            if selected.action == "activate_paused_leg":
-                try:
-                    await promotion_manager.start_campaign(selected.adv_id)
-                    executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "status", "status": "success"})
-                    ledger.append(_ledger(selected, "status", selected.status, 9, 0, "success", 0, 0))
-                except Exception as exc:
-                    executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "status", "status": "failed"})
-                    ledger.append(_ledger(selected, "status", selected.status, "FAILED_ROLLED_BACK", 0, f"failed: {type(exc).__name__}", 0, 0))
-                    raise
+        if execute:
+            for selected in selected_contours:
+                selected_amount = selected_amounts[selected.adv_id]
+                if selected.action == "top_up_budget":
+                    promo_amount = min(selected_amount, cashback_pool)
+                    ordinary_amount = selected_amount - promo_amount
+                    result = await modifier.top_up_budget(
+                        adv_id=selected.adv_id, amount=selected_amount, balance_type="balance",
+                        return_total=True, cashback_sum=promo_amount or None,
+                        cashback_percent=50 if promo_amount else None,
+                    )
+                    topups.append({
+                        "adv_id": selected.adv_id, "amount": selected_amount,
+                        "promo_topup": promo_amount, "ordinary_topup": ordinary_amount,
+                        "result": _jsonable(result),
+                    })
+                    executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "budget", "status": "success"})
+                    ledger.append(_ledger(selected, "budget", selected.budget_before, result.total, selected_amount, "success", promo_amount, ordinary_amount))
+                if selected.action == "activate_paused_leg":
+                    try:
+                        await promotion_manager.start_campaign(selected.adv_id)
+                        executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "status", "status": "success"})
+                        ledger.append(_ledger(selected, "status", selected.status, 9, 0, "success", 0, 0))
+                    except Exception as exc:
+                        executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "status", "status": "failed"})
+                        ledger.append(_ledger(selected, "status", selected.status, "FAILED_ROLLED_BACK", 0, f"failed: {type(exc).__name__}", 0, 0))
+                        raise
         for item in proposed:
             adv_id = int(item["adv_id"])
             budget_after = (await modifier.get_campaign_budget(adv_id)).total
@@ -475,9 +528,16 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         "verification_source", "status",
     ])
     (output_dir / "00_MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    observation_day = _next_observation_day(supplier_orders)
     (output_dir / "08_OBSERVATION_CONTRACT.md").write_text(
-        "# Observation contract\n\nObserve closed-day gross DRR and campaign spend for one full day after write. "
-        "Do not add pressure or change price/glue/cards during the observation.\n", encoding="utf-8"
+        "# Observation contract\n\n"
+        f"NEXT_FULLY_CLOSED_DAY: {observation_day.isoformat()}\n"
+        "Observe closed-day gross DRR and campaign spend for one full day after write. "
+        "Do not add pressure or change price/glue/cards during the observation.\n\n"
+        "Escalation: <=8% with sales stable/growing and contour response -> "
+        "NEXT_ESCALATION_CANDIDATE; 8-10% -> HOLD; >10% without sales -> "
+        "ROLLBACK_OR_REDUCE.\n",
+        encoding="utf-8",
     )
     (output_dir / "09_DATA_QUALITY_AND_GAPS.md").write_text(
         "# Data quality and gaps\n\nNo standalone WB daily-limit setter was found. "
