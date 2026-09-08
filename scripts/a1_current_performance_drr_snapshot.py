@@ -43,7 +43,6 @@ from scripts.a1_glue_topology_web_review_collect import (
     _sales_window,
 )
 from scripts.a1_promo_adjusted_drr_collect import (
-    _async_collect_all as _promo_async_collect_all,
     _bootstrap_cluster_infra,
     _drr_pct,
     _is_cancelled,
@@ -621,8 +620,14 @@ def _top_movers(
     return rows
 
 
-async def _collect_cards() -> list[dict[str, Any]]:
-    return await _all_cards()
+async def _async_pipeline(closed_end: date, open_d: date) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Единый event loop для WB API + Content cards (избегаем loop mismatch)."""
+    import scripts.a1_promo_adjusted_drr_collect as promo_mod
+
+    promo_mod.COLLECT_FROM = COLLECT_FROM
+    wb_payload = await promo_mod._async_collect_all(closed_end, open_d)
+    cards = await _all_cards()
+    return wb_payload, cards
 
 
 def run_collect(output_dir: Path) -> dict[str, Any]:
@@ -660,8 +665,7 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     import scripts.a1_promo_adjusted_drr_collect as promo_mod
 
     promo_mod.COLLECT_FROM = COLLECT_FROM
-    wb_payload = asyncio.run(_promo_async_collect_all(closed_end, open_d))
-    cards = asyncio.run(_collect_cards())
+    wb_payload, cards = asyncio.run(_async_pipeline(closed_end, open_d))
 
     central = wb_payload["central"]
     campaigns = wb_payload["campaigns"]
