@@ -12,6 +12,7 @@ __all__ = [
     "AdvTimeWeekMask",
     "WBCabinet",
     "WBAutoBudgetTopUp",
+    "WBCampaignPromoSpend",
     "AutoShelfBidControlSettings",
     "AutoShelfBidControlState",
 ]
@@ -31,6 +32,7 @@ from .models import (
 )
 
 from .wb_auto_budget_topup import WBAutoBudgetTopUp
+from .wb_campaign_promo_spend import WBCampaignPromoSpend
 from .wb_cabinet import WBCabinet
 from .auto_shelf_bid_control import (
     AutoShelfBidControlSettings,
