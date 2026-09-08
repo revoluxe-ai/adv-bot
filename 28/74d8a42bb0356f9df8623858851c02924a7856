@@ -1,0 +1,408 @@
+app/shared/domains/wb/utils/promo_plan_multiplier.py
+  s_57171798ac4554::t_20ff4dc64a3cd9 1-120,133-137,140-151
+  s_57171798ac4554::t_814b368bd4f1ee 130
+  s_57171798ac4554::t_6bd1b71d6653fa 138-139
+  s_57171798ac4554::t_5f609a82d04d5b 121-129,131-132
+app/modules/shop_runner/service_manager/old_modules/setting_auto_updater_v2/adv_control_system/adv_control_system.py
+  s_ada7d0577664c2::t_1f0abf8bfe9f1b 13,15,51-55,67-82
+  s_ada7d0577664c2::t_ed5e30308e65ce 59-60,66,90,142
+  s_ada7d0577664c2::t_c0f39bba3012b9 83
+app/modules/auto_budget_manager/promo_ledger.py
+  s_57171798ac4554::t_5a72945679c0b6 141-142,144-145,149-150,155-160
+  s_ee419e6d9d112f::t_14e7c446f66185 183-187,190-191
+  s_ee419e6d9d112f::t_95d6efad0f7c53 146-148
+  s_2e5d4e91328687::t_f07af78939230c 28,108-137,223-229,252-265,286-291,298
+  s_57171798ac4554::t_68a64d4f968066 154
+  s_57171798ac4554::t_ad24939b94e0f9 75
+  s_57171798ac4554::t_b129cabd165e13 1-6,8-11,13-27,29-33,40-61,64,72-74,76-79,84-107,138-140,143,151-153,161-180,189,192-210,231,233-234,236-237,239-240,243-244,247,249-251,266-270,272-276,278,292,299-301,307-314
+  s_57171798ac4554::t_e5cb15139534fe 211-222,230,232,235,238,241-242,245-246,248,271,277,279-285,293-297,302-306
+  s_ee419e6d9d112f::t_9ce8acc069116e 34-37
+  s_57171798ac4554::t_e1467a73ce9eb0 7
+  s_57171798ac4554::t_456a2b701ab03c 181-182,188
+  s_57171798ac4554::t_9c3d93e760f0c3 12
+  s_57171798ac4554::t_d9413054d27ab7 62-63,65-66,71,80-83
+  s_ee419e6d9d112f::t_69931aaef96c93 67-70
+  s_57171798ac4554::t_40198fbcb10595 38-39
+app/shared/domains/wb/utils/promo_accounting.py
+  s_00f064d4c09a98::t_9440c84d978f92 147
+  s_57171798ac4554::t_422cefd0f4e868 12
+  s_57171798ac4554::t_b0c49ba2b6e0d8 1-11,14-24,28-138,152-153,189-194,202-206,211-217,220,222,226,230-231,277-286,318-324,326-336,347-364,382-383,394-426,428,442-449
+  s_419edf7096926c::t_3ca1fec2c4d524 171-172
+  s_2e5d4e91328687::t_b4a8441bd03017 25-27,381,427,429-441,450-452
+  s_d6f9402540a29f::t_10a37c56aba74b 139-146,148-149
+  s_0f435dea0fdce7::t_2096cd270581cf 386-389
+  s_00f064d4c09a98::t_288176a84f2ad7 289-294,304,316-317
+  s_419edf7096926c::t_22808964ca2bc4 207-208
+  s_00f064d4c09a98::t_e13b7a3205bc2f 233,235-241
+  s_00f064d4c09a98::t_d001ce2e4e65c7 150-151,154-170,173-187,232,234,242-276
+  s_00f064d4c09a98::t_ebb567b3595752 200
+  s_57171798ac4554::t_852eb9f68d3b84 13
+  s_00f064d4c09a98::t_3ef3a5ca4ab5e1 307-315
+  s_1e204c85cce4fb::t_99790eccfa0586 228,287-288,295-303,305-306,325
+  s_d6f9402540a29f::t_1f09230a697a84 188,195-199,201,209-210,218-219,221,223-225,227,229
+  s_2b30b021fe8b55::t_0a12c2a223b442 337-346,372-380
+  s_fda8c3d3ae5c56::t_44a9e2e29aa067 365-371,384-385,390-393
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/pre_complex_adv.py
+  s_57171798ac4554::t_a683dd6f908cd0 2,13,23-25
+app/modules/plan_fact/provider.py
+  s_57171798ac4554::t_34d5249159091f 193
+  s_4957693b047972::t_516322aee84fb1 108,112-113
+  s_57171798ac4554::t_152a84bf7473d6 170-176
+  s_57171798ac4554::t_4d74629348cece 149
+  s_57171798ac4554::t_35ac146376959a 123-148,150-169,192,194-195,198,207-208
+  s_57171798ac4554::t_86b4c3e67d5cba 177,181,190-191,196-197,199-206
+  s_d6f9402540a29f::t_f9199524e553f2 178-180,182-189
+  s_57171798ac4554::t_4cfcee783ee38e 12
+pyrightconfig_strict.json
+  s_4957693b047972::t_e4f606dd7a779b 134-145
+app/core/mp/wb/api/managers/wb_promotion_manager/wb_promotion_manager.py
+  s_57171798ac4554::t_c7695daf64621e 348-353,367-370
+  s_57171798ac4554::t_888fc02d768469 354-366
+  s_57171798ac4554::t_55826411f66a68 10
+  s_57171798ac4554::t_2f25bfb6935b42 371
+app/core/mp/wb/api/adapter/promotion_client/finance/adapter.py
+  s_57171798ac4554::t_20468dc126be3e 91,95,99-106
+  s_57171798ac4554::t_f21d772cbcdb74 116-120
+  s_57171798ac4554::t_59b5ba8f514da0 90,92-94,96-98
+  s_57171798ac4554::t_909e65876664da 5
+  s_57171798ac4554::t_99011f8bd904a7 3
+  s_57171798ac4554::t_45084b37c84bd3 83-89,107-115,121-125
+  s_57171798ac4554::t_c1252446b9a454 14,20
+  s_57171798ac4554::t_046af1c07b9455 126
+app/modules/shop_runner/service_manager/services/plan_fact_controller/plan_fact_controller.py
+  s_a441f6bff61aab::t_fc1a5f258f4908 130-133,136,144,146,150
+  s_c798930de280e2::t_1246acf1cb6f47 134-135,145
+app/modules/shop_runner/service_manager/services/adv_strategy_selector.py
+  s_57171798ac4554::t_3ccaa6a4ea0bac 113-115
+app/modules/shop_runner/service_manager/manager.py
+  s_57171798ac4554::t_0e4b253d9ed857 838-842
+  s_57171798ac4554::t_8ad40ced24535e 824,826,833-834
+  s_2e5d4e91328687::t_09e6584f515563 827-831
+app/modules/shop_runner/service_manager/services/v3_point_order_cpo.py
+  s_2e5d4e91328687::t_6d9cc730b43c82 195,199-200,214-217
+  s_2e5d4e91328687::t_3379ee829980d9 201
+app/modules/auto_budget_manager/service.py
+  s_57171798ac4554::t_6cb2482acec2de 1105,1127-1129,1156-1159
+  s_57171798ac4554::t_a89e921fbe64c0 586,588-609,623-631,640-642,670-673,682-685
+  s_57171798ac4554::t_42b38f31879ed7 515,520-521,525-526
+  s_2e5d4e91328687::t_ce176d2e4f2f9a 111-112,612-616,632-639,643-657
+  s_57171798ac4554::t_04deb9218e9702 31,587
+  s_57171798ac4554::t_7d81939ff45320 33,48-52
+  s_57171798ac4554::t_ad6cc3764f4a6f 610-611,617-622
+  s_57171798ac4554::t_1d4aacfbc02cbc 364,387-389,415-418
+  s_57171798ac4554::t_cb467fede65d16 585
+  s_2e5d4e91328687::t_f88fd3a5da9e18 658
+app/shared/domains/wb/utils/rec_system_shelf_mode.py
+  s_2e5d4e91328687::t_13bbcca1ee1348 24-25,28
+  s_2e5d4e91328687::t_4fff7dd662da6d 22,26-27,36
+app/modules/auto_budget_manager/redis_promo_state_manager.py
+  s_57171798ac4554::t_9db0178087a576 188-189,192-193
+  s_2e5d4e91328687::t_d4299e86d3b33a 84-85,117,120,124-125,137-141,209-211
+  s_57171798ac4554::t_c8cb45427cf6d3 170,173,175,179-180,183,186,190-191,195-196
+  s_57171798ac4554::t_c89fb93d487d3d 1-8,10-17,39-68,70,76-81,88-90,92-115,119,130-131,142-145,147-169,171-172,174,177-178,181-182,184-185,187,194,197-202,204,207,214-216
+  s_57171798ac4554::t_6cc233368bc666 9
+  s_7e60572eabfa27::t_2a8b68ac29f384 69,71-75,86-87
+  s_57171798ac4554::t_8f464028417779 82-83,116,121-123,129,132-136,208
+  s_57171798ac4554::t_92eda3086aecdc 22-38
+  s_7e60572eabfa27::t_e9c55a87d08f19 91
+  s_57171798ac4554::t_04db7bf389d069 203,205-206
+  s_57171798ac4554::t_a6ac7d27b5889d 18-21
+  s_7e60572eabfa27::t_8936c911799b00 118,126-128,146,212-213
+  s_57171798ac4554::t_afbd102e9e165b 176
+app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_decision_snapshot_builder.py
+  s_57171798ac4554::t_7e38c3d1414492 113
+  s_57171798ac4554::t_4d03e07d2f08a0 19
+  s_57171798ac4554::t_4eb7edc46bac9d 110-112,118-127
+app/modules/shop_runner/service_manager/wb_shop_data_manager/wb_shop_data_manager.py
+  s_57171798ac4554::t_4dea3f179972b3 317
+  s_57171798ac4554::t_aed93f64fec8dc 449-453
+  s_7e60572eabfa27::t_76e2822efea0c8 520-524
+  s_57171798ac4554::t_e155cd2e586153 279-282
+  s_57171798ac4554::t_1a62d924198717 277
+  s_57171798ac4554::t_509c5445f8d6c8 16-18
+  s_57171798ac4554::t_2b197213065716 312-314
+  s_57171798ac4554::t_c79614437d3ff2 426
+  s_57171798ac4554::t_0f9bc8a176f5ad 420
+  s_57171798ac4554::t_49df8eedfa5756 283-285,287,289-290,304-305,316
+  s_57171798ac4554::t_1a96de9927e29c 335-338
+  s_57171798ac4554::t_d2323692e1f3ac 517-519
+  s_57171798ac4554::t_606c5f66fc5243 27
+  s_57171798ac4554::t_f36284c8b45ec2 278,286,288,291-303,306-311,315,318-331
+  s_57171798ac4554::t_66177cc571feab 332
+app/modules/shop_runner/service_manager/services/auto_updater_v3/keyword_dto/dto/adv_state.py
+  s_2e5d4e91328687::t_6b193eb2cd567a 70-72
+app/modules/shop_runner/service_manager/services/update_cluster_bids_manager/update_cluster_bids_manager.py
+  s_57171798ac4554::t_e1373c995f0add 992-994
+app/shared/domains/wb/utils/auto_campaign_cost_activity.py
+  s_2e5d4e91328687::t_6edf382c9dfe37 7-17,20-21
+  s_2e5d4e91328687::t_29ae3bf5099b16 204-205,208-212,215-218
+  s_2e5d4e91328687::t_2ab6dddaa7df03 177-178,182-183
+  s_2e5d4e91328687::t_f19b2341033968 114-119
+  s_2e5d4e91328687::t_1cf38efda21fba 95
+  s_2e5d4e91328687::t_a52648efeccedc 179-181
+  s_7b8ce3eeb0a319::t_a6aaf6f16860d4 130,136-152,158-176,184-196,220-224
+  s_7b8ce3eeb0a319::t_f6e3230b1e9e21 30
+  s_2e5d4e91328687::t_48b7937c44452e 56
+  s_7b8ce3eeb0a319::t_094c41c36df79f 46-48
+  s_57171798ac4554::t_1bbca076636cf2 225-226,228
+  s_57171798ac4554::t_43f573db81e453 202
+  s_2e5d4e91328687::t_12555fb5461e7e 18-19,22-23
+  s_7b8ce3eeb0a319::t_f4038228e58b41 308,323
+  s_7b8ce3eeb0a319::t_749b5e71e07de7 227
+  s_2e5d4e91328687::t_d487c38c7dedd9 153-157
+  s_2e5d4e91328687::t_790fee535e7c23 313-314
+  s_2e5d4e91328687::t_16b06a1cfe89f3 71-78
+  s_2e5d4e91328687::t_e4c853f5f5753e 131-135
+  s_2e5d4e91328687::t_0ffd1ddc00dccf 310-312,315-318
+  s_2e5d4e91328687::t_2f0dacfb864c3d 206-207,213-214
+  s_7b8ce3eeb0a319::t_383386b8bb13cb 49
+app/modules/shop_runner/service_manager/services/auto_updater_v3/data_update_manager/manager.py
+  s_57171798ac4554::t_5c692dc134f428 7
+  s_57171798ac4554::t_168369194d1032 105-121
+  s_2e5d4e91328687::t_91acdeb981ea6f 258
+app/modules/sales_plan_settings/raise_plan_on_promobonuses.py
+  s_57171798ac4554::t_bc56c8ebf09469 1-23
+app/modules/wb_adv_updater/calculated_keywords_manager/calculated_keywords_manager.py
+  s_7b8ce3eeb0a319::t_73e761435192da 472-475
+  s_7b8ce3eeb0a319::t_6c185607a17627 46
+  s_7b8ce3eeb0a319::t_42d058fd41fc31 399-400,404-415
+  s_7e60572eabfa27::t_22149ac4ba4f06 398,402-403,418-420,424-438,525,623
+app/shared/domains/wb/utils/balance_source.py
+  s_2b30b021fe8b55::t_a3f1b3752edb05 249,256-261,271-275
+  s_4957693b047972::t_1d7b9e23676d46 5,165-169
+  s_4957693b047972::t_aef780b1f1c0de 132-134,136-139
+  s_0f435dea0fdce7::t_aa14c2e264174a 190-193,195-198,204-205,208-211,214-215
+  s_57171798ac4554::t_56641b4bce6d3a 251-255,270,278-281
+  s_57171798ac4554::t_661817860e7b22 87-93
+  s_0f435dea0fdce7::t_2fc89aaa52e964 107,110-121
+  s_2b30b021fe8b55::t_54d0aea8aa60aa 262-269
+  s_4957693b047972::t_550928c2ca85e0 131
+  s_57171798ac4554::t_9e4a3d2e136c0e 177-186
+  s_57171798ac4554::t_ae5d4304d11bc3 187-188
+app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_view_provider.py
+  s_57171798ac4554::t_23a7f2b9bfa3b0 935
+  s_ca13940aa7cdeb::t_474e685c8d477b 8
+  s_ca13940aa7cdeb::t_1bbd445270bff0 136-137,140-155
+  s_ca13940aa7cdeb::t_a11cbcedce155f 931-933
+  s_ca13940aa7cdeb::t_467c64e2a7e265 596-601
+  s_57171798ac4554::t_f72fb241be4c53 940-949
+  s_57171798ac4554::t_abc20ad3159723 76
+  s_ca13940aa7cdeb::t_a32b01b7dc9717 101-102
+  s_adb2321bb8cb32::t_87e727cfa21f37 118-134,138-139
+  s_ca13940aa7cdeb::t_df3f439ab82b08 73-75,80
+  s_57171798ac4554::t_23a8d9f4bb5f3c 135,934
+app/modules/auto_budget_manager/redis_shop_balance_snapshot_manager.py
+  s_57171798ac4554::t_acd508986a94b7 60
+  s_57171798ac4554::t_6954f863dfcf47 83-85
+  s_57171798ac4554::t_9e878bdbb78aa4 38,40-43,52
+  s_57171798ac4554::t_b58c388bf636ad 80,99
+  s_57171798ac4554::t_348623330da2ff 81-82
+app/shared/domains/wb/utils/promo_overlay.py
+  s_2e5d4e91328687::t_bab274bcb1fff4 57-58,71,75,89,108-147
+  s_57171798ac4554::t_855b2a05aebe78 19,24-33
+  s_57171798ac4554::t_2079216d5062ef 1-18,20-23,34-56,72
+  s_7e60572eabfa27::t_760b48fc5e06fb 101-105
+  s_fda8c3d3ae5c56::t_03c01c31fbf619 59-70,73-74,76-88,90-100,106-107
+app/core/mp/wb/api/domain_managers/promotion/promotion_manager.py
+  s_57171798ac4554::t_ee8db69c19db4d 384-405
+  s_57171798ac4554::t_082ea9c30b099d 378-383,406-410
+app/modules/shop_runner/service_manager/services/auto_adv_active_control/auto_adv_active_control_service.py
+  s_57171798ac4554::t_f19cf73719390d 1087-1089
+app/modules/auto_budget_manager/promo_state_service.py
+  s_7e60572eabfa27::t_2fce36d38db22c 312,315-316,321-323
+  s_7e60572eabfa27::t_2e9927d5fa21d6 131-133,156-160,210
+  s_7e60572eabfa27::t_14af16bb751ab7 181
+  s_57171798ac4554::t_f739901c2223c8 1-10,12-13,15-32,35-36,88-127,129,136-146,162-164,212,215,226-227,244-250,252,269,276-309,313-314,317-320,324
+  s_2e5d4e91328687::t_f48a3ad48b84e4 14,41,53-82,84-85,176-178,180,193-209
+  s_57171798ac4554::t_c01a7317a1dde0 213-214
+  s_7e60572eabfa27::t_b690ca2465f5da 237
+  s_4a021d969250e1::t_9175c3020780d6 128,134-135,147-154,161
+  s_7e60572eabfa27::t_1b28898f440e38 234
+  s_2e5d4e91328687::t_ebbbe1784c6933 211,219-223,225,228-233,238-243,311
+  s_996dbd30a1f98d::t_cc50d23f2a0bf8 155
+  s_57171798ac4554::t_49afa1232a0b4a 33-34
+  s_2e5d4e91328687::t_9a517b4caff8f8 182-192
+  s_7e60572eabfa27::t_7beb30b26d8d9f 251,253-268,270-275
+  s_57171798ac4554::t_516dcfb5c07f13 11
+  s_57171798ac4554::t_85ff31f9c8f997 37-40,42-46,50-52,83,86-87,165-175,179,216-218,224,235-236,310
+  s_996dbd30a1f98d::t_7c580d3bce2d21 130
+  s_2e5d4e91328687::t_5e5fe196fb346d 47-49
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py
+  s_57171798ac4554::t_33e95158df93d7 122
+  s_57171798ac4554::t_27ff9ce327e0f0 10
+  s_57171798ac4554::t_322c81525485b5 154
+  s_7e60572eabfa27::t_7e4b8a8de2ae28 123,125-130,149,597-605
+  s_57171798ac4554::t_39289ac90385eb 561-563
+  s_57171798ac4554::t_5f69bb6619b9e4 31
+  s_57171798ac4554::t_ef8794195fd2a9 538-540,545-547
+  s_57171798ac4554::t_5fac128dd70117 120-121,152-153
+  s_7e60572eabfa27::t_20849aa073d892 606
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "2874d8a42bb0356f9df8623858851c02924a7856",
+  "prompts": {},
+  "sessions": {
+    "s_00f064d4c09a98": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "82c74217-aaf7-409b-badc-5441e9847c39",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_0f435dea0fdce7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a14f2c6c-8718-4e88-807b-4faaea46cc1a",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_1e204c85cce4fb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9f164667-6d5c-4aaa-8c8b-209fbf1d4fb2",
+        "model": "cursor-grok-4.6-high-fast"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_2b30b021fe8b55": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4bc094c3-f475-4dc5-9a0a-96107a8a35a4",
+        "model": "gpt-5.6-luna-max"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_2e5d4e91328687": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9de0059e-52ca-4983-b9a0-09c0d6613c4b",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_419edf7096926c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ed206ba5-202e-4d9e-bdd5-63eac45c2eb3",
+        "model": "cursor-grok-4.6-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_4957693b047972": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1adf20d9-a71f-4b5e-aa8c-6c79b5dbea61",
+        "model": "gpt-5.6-luna-max"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_4a021d969250e1": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1f6d7a75-974a-465e-a28e-e46085e62be7",
+        "model": "cursor-grok-4.6-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_57171798ac4554": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7d11d15e-4b50-460f-be6b-f4d1bf646e0e",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_7b8ce3eeb0a319": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1eb74e9a-bda7-4d22-9ac4-b0ff2b285c6f",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_7e60572eabfa27": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "08d2c702-aa68-4181-bd8a-add24fea88c5",
+        "model": "gpt-5.6-luna-max"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_996dbd30a1f98d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b487ad6e-1f7a-45c8-b6e3-9d3dc825e188",
+        "model": "cursor-grok-4.6-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_a441f6bff61aab": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d3f77df6-23d7-4197-806b-72a37cf9b8e3",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ada7d0577664c2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "32d43adc-ed11-4ae2-a9b0-3f14ea9618f9",
+        "model": "gpt-5.6-luna-max"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_adb2321bb8cb32": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "24187d32-6c1f-4a02-a879-ff81018b59b1",
+        "model": "grok-4.6"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_c798930de280e2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "43e0d61c-e908-4c3e-9c57-e11afb8d9e87",
+        "model": "gpt-5.6-luna-max"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ca13940aa7cdeb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ca653da0-f4bb-44d0-b9e2-a661a6f93abe",
+        "model": "cursor-grok-4.6-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_d6f9402540a29f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "80c57317-00d7-47b0-8ff9-d6714a927130",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ee419e6d9d112f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2dcdd0eb-1067-40cd-9863-41d03f002cf0",
+        "model": "cursor-grok-4.6-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_fda8c3d3ae5c56": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "eaf8bcfb-cf12-4d5d-aa0c-777783d83e5d",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
