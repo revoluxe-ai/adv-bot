@@ -37,7 +37,10 @@ ops modes (`INVENTORY`/`STATUS`/`TEST_LOCAL`/`PUSH`/`PLAN_RUN`/`RUN`/
 реализуй» that needs OpenSpec product change →
 `STATUS: ROLE_BOUNDARY_REFUSAL` + pasteable `/opsx-new|/opsx-ff|/opsx-update`
 then `/opsx-apply`. Do not silently become product apply. `GO` here authorizes
-only this command's allowlisted push/Job/ledger paths.
+only this command's allowlisted collector, test, registry, push, and Job paths.
+For a factual data-collection goal, `RUN GO` may add a new collector when no
+compatible existing collector is found; it may not rewrite an existing
+collector or implement product behavior.
 
 ## What this is
 
@@ -47,6 +50,8 @@ only this command's allowlisted push/Job/ledger paths.
   (`PUSH GO` only — not `/opsx-commit`, not prepare).
 * Goal executor: one `RUN GO` owns the safe chain from image readiness through
   GHA/Job monitoring, logs, known output retrieval, and final report.
+* Goal-driven collector resolver: reuse an exact compatible collector or create
+  one bounded, read-only collector when the requested contract has no match.
 * Emitter of `SCRIPTS_REPORT` with explicit human next action.
 
 ## What this is NOT
@@ -55,7 +60,8 @@ only this command's allowlisted push/Job/ledger paths.
 * NOT generic cluster diagnose → `/opsx-devops`.
 * NOT bug-episode RED/GREEN writer → `/opsx-test` / `/opsx-fix-bug`.
 * NOT OpenSpec feature implement / verify / archive.
-* NOT silent rewrite of working scripts.
+* NOT silent rewrite of working scripts; a new collector may be added only by
+  an explicit `RUN GO` and only within the collector creation allowlist.
 * NOT commit owner → `/opsx-commit` (product) or `/opsx-admin-command-commit` (process).
 * NOT force-push, push of non-`scripts` branches, merge, rebase, or reset.
 * NOT CSI / port-forward / secret dump / prod DB migration.
@@ -68,6 +74,8 @@ only this command's allowlisted push/Job/ledger paths.
 * “Check this script locally / cover with a smoke test.”
 * “Publish branch scripts so GHA builds `:scripts` image.”
 * “Plan or run script X via image + Job.”
+* “Collect a declared factual data contract: reuse a matching collector or
+  create one and run it.”
 * “Mark script as battle-tested after real use.”
 
 ## When not to use
@@ -101,9 +109,10 @@ $ARGUMENTS
 | `TEST_LOCAL` | Local workability / targeted pytest; update ledger |
 | `PUSH` | Requires `GO`; push branch `scripts` to origin for image build |
 | `PLAN_RUN` | Build Job plan from template; no cluster mutate |
-| `RUN` | Requires `GO`; apply one Job; collect report |
+| `RUN` | Requires `GO`; resolve/reuse/create one collector, apply one Job, collect report |
 | `RECORD_BATTLE` | Requires Owner evidence; set `battle_tested=YES` |
-| `script=<title\|path>` | Target by human `title` (preferred) or repo path |
+| `script=<title\|path>` | Optional target by human `title` (preferred) or repo path; required outside goal-driven RUN |
+| `request=<goal\|artifact contract>` | Requested data goal and exact output contract; defaults to the current user request |
 | `args=…` | Extra CLI args for the script (PLAN_RUN/RUN) |
 | `ns=<namespace>` | Job namespace; default from template |
 | `image=<ref>` | Override image ref (else latest scripts-branch tag/sha) |
@@ -116,8 +125,17 @@ Follow `.cursor/commands/opsx-human-label-display.md`. Local rules:
 
 * Ledger field `title` is required for every entrypoint.
 * Resolve `script=` as: exact path match, else case-insensitive exact title
-  match, else unique case-insensitive title substring. If ambiguous or none →
-  `STATUS=BLOCKED` and list candidates as `Title (path)`.
+  match, else unique case-insensitive title substring.
+* For `PLAN_RUN` / `RUN` with `request=` (or a current user request) and no
+  `script=`, first perform bounded collector resolution:
+  - `EXISTING` only when one collector covers the declared sources, factual
+    fields, output contract, and zero-write constraints;
+  - `CREATED` only in `RUN GO`, when the contract is complete and no compatible
+    collector exists;
+  - `BLOCKED` when the request is ambiguous, incomplete, or cannot be covered.
+* For `STATUS`, `TEST_LOCAL`, `PUSH`, and `RECORD_BATTLE`, `script=` remains
+  mandatory and an ambiguous or missing target returns `STATUS=BLOCKED` with
+  candidates listed as `Title (path)`.
 * Every human-facing inventory / status / report / `NEXT_ACTION` line names a
   script as **`Title (path)`**. Path alone is not the primary label.
 * Pasteable commands may use `script=<Title>` when the title is unique; still
@@ -137,6 +155,38 @@ Examples:
 ```
 
 (Paths remain valid: `script=scripts/export_non_zero_balance_users.py`.)
+
+## Goal-driven collector resolution
+
+This resolution runs before image preparation for `PLAN_RUN` and `RUN` when a
+data goal is supplied without `script=`:
+
+1. Run the bounded equivalent of `INVENTORY` and read the registry entries
+   needed for candidate matching; do not scan unrelated projects or import
+   collectors from another worktree.
+2. Compare candidates to the request's declared source coverage, factual
+   fields, output filenames/schema, time-window rules, and write prohibition.
+3. If exactly one compatible collector exists, set
+   `COLLECTOR_RESOLUTION=EXISTING` and use its resolved `Title (path)`.
+4. If no compatible collector exists and the request is a complete factual
+   collection contract, `PLAN_RUN` returns a read-only creation plan and
+   `RUN GO` creates a new collector under the creation allowlist, then
+   registers and tests it before continuing.
+5. Never select an incompatible expansion, dry-run, analysis, ranking, or
+   write-capable script as a fallback.
+6. If multiple candidates remain, required sources/outputs are unspecified, or
+   creation would require product code or a new external capability, return
+   `COLLECTOR_RESOLUTION=BLOCKED` and do not create a script or Job.
+
+Creation allowlist for a new collector:
+
+* `scripts/<new_collector>.py`;
+* `tests/unit/scripts/<matching_test>.py` when a unit test is feasible;
+* the corresponding `scripts/REGISTRY.md` entry;
+* the run receipt under `.tmp/opsx-scripts/<UTC_TS>/`.
+
+Creation never permits edits to existing collectors, `app/**`, migrations,
+product specifications/tasks, secrets, or unrelated tests.
 
 ## Ledger contract (`scripts/REGISTRY.md`)
 
@@ -196,9 +246,11 @@ the primary label. No writes.
 
 ### PLAN_RUN — READ_ONLY plan
 
-Produce `SCRIPTS_RUN_PLAN` from `k8s/jobs/ops-script-runner.yaml` with
-substituted placeholders. May `kubectl apply --dry-run=client` when paths
-ready. No live mutate.
+Resolve an existing compatible collector or describe the bounded collector
+creation that `RUN GO` would perform, then produce `SCRIPTS_RUN_PLAN` from
+`k8s/jobs/ops-script-runner.yaml` with substituted placeholders. May
+`kubectl apply --dry-run=client` when paths ready. No live mutate and no file
+creation.
 
 Requires infra preconditions. If image for branch `scripts` is unknown,
 show the full automatic chain that `RUN GO` will perform. `PUSH GO` remains an
@@ -235,7 +287,19 @@ result. Do not return intermediate “push/wait/run again” instructions when
 the command can continue itself.
 
 1. Validate the RUN GO gate and restate one `SCRIPTS_RUN_PLAN`.
-2. Resolve image readiness (Harbor proxy-cache only for cluster Jobs):
+2. Resolve the collector before image preparation:
+   - with `script=`, validate the named collector against the declared
+     request contract;
+   - without `script=`, perform bounded inventory and compatibility matching;
+   - reuse one compatible collector and set
+     `COLLECTOR_RESOLUTION=EXISTING`;
+   - if none is compatible, create one new strict read-only collector under
+     the creation allowlist, add its registry entry, run its local check, and
+     set `COLLECTOR_RESOLUTION=CREATED`;
+   - if the contract is incomplete, creation needs product code/new external
+     capability, or matching is ambiguous, stop with
+     `COLLECTOR_RESOLUTION=BLOCKED` and do not create a Job.
+3. Resolve image readiness (Harbor proxy-cache only for cluster Jobs):
    - default `IMAGE_REF`:
      `harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<commit-sha>`;
    - GHCR `ghcr.io/revoluxe-ai/adv-bot:<sha>` is CI publication only — **never**
@@ -252,20 +316,20 @@ the command can continue itself.
      if Job still hits `ErrImagePull`/`ImagePullBackOff` after the one allowed
      image-race retry, stop with explicit image-readiness failure — no fallback
      to direct GHCR.
-3. Monitor the matching GHA run to terminal state (default timeout **20 min**).
+4. Monitor the matching GHA run to terminal state (default timeout **20 min**).
    Stay in this invocation; use bounded polling / `gh run watch`, not a
    “wait and invoke me again” response. On success use the immutable Harbor
    proxy ref `harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<pushed-commit-sha>`
    (not mutable `:scripts`, not `ghcr.io/...`).
-4. Render the Job, run client dry-run, and create one uniquely named Job.
-5. Monitor Job/pod to terminal state (default timeout **30 min**), collecting
+5. Render the Job, run client dry-run, and create one uniquely named Job.
+6. Monitor Job/pod to terminal state (default timeout **30 min**), collecting
    concise status, events, logs, and container exit code.
-6. One controlled recovery is allowed only for the expected image-availability
+7. One controlled recovery is allowed only for the expected image-availability
    race: if this invocation's pod reaches `ErrImagePull` /
    `ImagePullBackOff` while its matching GHA build is still running, finish
    waiting for GHA, delete only this invocation's Job, and create it once more
    with the immutable SHA image. No retry for script/runtime/cluster errors.
-7. **Artifact retrieval (general, mandatory when outputs declared):**
+8. **Artifact retrieval (general, mandatory when outputs declared):**
    - render Job with `__HOLD_SECONDS__=900` (15 min) unless Owner scoped shorter;
    - default output dir: `.tmp/opsx-scripts/<UTC_TS>/outputs/`;
    - after script success is visible in logs (`ops-script: success; holding`) or
@@ -286,12 +350,12 @@ the command can continue itself.
    When the plan declares a **primary** contract/handoff artifact (see
    **Artifact contract** below), that primary (+ checksum sidecar if declared)
    is the success criterion — research/side dumps alone never suffice.
-8. **Artifact-contract gate** (when primary is declared): if primary file
+9. **Artifact-contract gate** (when primary is declared): if primary file
    missing, required sidecar missing, or `PRIMARY_SHA256` ≠ on-disk digest →
    do **not** emit `RUN_DONE` as handoff success; set
    `STATUS=FAIL_ARTIFACT_CONTRACT` (even if container exit 0 / script-reported
    partial OK). Do not set `battle_tested` from this path.
-9. Update ledger only with terminal evidence:
+10. Update ledger only with terminal evidence:
    - true success (gates pass) → `runnable=WORKS`, timestamp, immutable image,
      concise note (include `ARTIFACT_CLASS` when set; do not claim external
      handoff closed from side/research artifacts only);
@@ -299,13 +363,13 @@ the command can continue itself.
      imply handoff ready;
    - script/runtime failure → `runnable=BROKEN`;
    - pre-start image/infra failure → keep `runnable=UNKNOWN`.
-10. Emit one terminal `SCRIPTS_REPORT` (including artifact schema fields when
+11. Emit one terminal `SCRIPTS_REPORT` (including artifact schema fields when
     applicable); do not ask for another GO between the authorized stages.
 
-The command may stop early only on definitive GHA/Job failure, authentication
-or authorization denial, execution-critical dirty files, hard-forbid hit,
-artifact-contract failure, or bounded timeout. A queued/running workflow is an
-expected wait, not a blocker.
+The command may stop early only on incomplete/ambiguous collector contract,
+definitive GHA/Job failure, authentication or authorization denial,
+execution-critical dirty files, hard-forbid hit, artifact-contract failure, or
+bounded timeout. A queued/running workflow is an expected wait, not a blocker.
 
 Hard forbids identical in spirit to `/opsx-devops` (CSI, port-forward,
 secret dump, namespace delete, uncontrolled force-delete, prod DB migration).
@@ -342,13 +406,17 @@ For **PUSH**:
 For **RUN**:
 
 1. Exact token `GO`.
-2. `script=` resolves uniquely; `image=` is optional. If absent/unpullable,
-   RUN owns safe push + build monitoring under the same GO.
+2. Either `script=` resolves uniquely or a complete `request=` / current-user
+   data contract is present and collector resolution can produce
+   `EXISTING` or `CREATED`; `image=` is optional. If absent/unpullable, RUN
+   owns safe push + build monitoring under the same GO.
 3. Infra preconditions hold.
 4. No `FORBIDDEN_HIT`.
 5. Current branch is `scripts` when image publication is required.
-6. Tracked dirty paths are empty or exactly `scripts/REGISTRY.md`; never
-   auto-commit/stash other changes.
+6. Before RUN, tracked dirty paths are empty or exactly
+   `scripts/REGISTRY.md`; files created by this invocation may additionally
+   be only within the collector creation allowlist. Never auto-commit/stash
+   other changes.
 7. Push, if needed, is only non-force `git push -u origin HEAD`.
 8. PowerShell-safe kubectl.
 
@@ -365,6 +433,9 @@ SCRIPTS_RUN_PLAN:
 SCRIPT_TITLE:
 SCRIPT_PATH:
 SCRIPT_DISPLAY: Title (path)
+REQUEST_CONTRACT:
+COLLECTOR_RESOLUTION: EXISTING | CREATED | BLOCKED | N_A
+CREATED_SCRIPT_PATH:
 IMAGE_REF:
 IMAGE_SOURCE: supplied | existing | built_by_run
 PUSH_REQUIRED: yes | no
@@ -444,6 +515,8 @@ FORBIDDEN_HIT: NONE | <id>
 WHAT_HAPPENED:
 WHY:
 CURRENT_STATE:
+COLLECTOR_RESOLUTION: EXISTING | CREATED | BLOCKED | N_A
+CREATED_SCRIPT_PATH:
 OWNER_DECISION_REQUIRED: yes | no
 NEXT_ACTION:
 DO_NOT_DO_YET:
