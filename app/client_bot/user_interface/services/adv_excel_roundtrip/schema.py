@@ -99,6 +99,7 @@ EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
         "use_incremental_stats",
         "max_place",
         "substitute_fact_cpo_for_max",
+        "raise_plan_on_promobonuses",
     }
 )
 
@@ -279,6 +280,7 @@ _FIELD_DISPLAY_NAMES: dict[str, str] = {
     "use_incremental_stats": "Использовать инкрементальную статистику",
     "max_place": "Максимальная позиция",
     "substitute_fact_cpo_for_max": "Авто max CPO (V3 Raise)",
+    "raise_plan_on_promobonuses": "RaisePlanOnPromobonuses",
 }
 
 

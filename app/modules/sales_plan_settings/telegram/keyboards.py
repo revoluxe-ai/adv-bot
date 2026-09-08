@@ -39,6 +39,9 @@ class KeyboardsGetter:
         self._v3_substitute_fact_cpo_for_max = bool(
             getattr(adv, "substitute_fact_cpo_for_max", False)
         )
+        self._raise_plan_on_promobonuses = bool(
+            getattr(adv, "raise_plan_on_promobonuses", False)
+        )
 
     def get_keyboard(
         self,
@@ -67,6 +70,7 @@ class KeyboardsGetter:
         builder.row(setting_max_price_for_order)
 
         builder.row(self.get_v3_raise_max_cpo_toggle_button())
+        builder.row(self.get_raise_plan_on_promobonuses_toggle_button())
 
         builder.row(
             InlineKeyboardButton(
@@ -132,6 +136,20 @@ class KeyboardsGetter:
             text = "Включить авто max CPO (V3 Raise)"
             new_status = True
         callback = callbacks.V3RaiseMaxCpoToggle(
+            adv_id=self._adv_id,
+            new_status=new_status,
+        ).pack()
+        return InlineKeyboardButton(text=text, callback_data=callback)
+
+    def get_raise_plan_on_promobonuses_toggle_button(self) -> InlineKeyboardButton:
+        """Тумблер RaisePlanOnPromobonuses: proportional overlay Plan/budget."""
+        if self._raise_plan_on_promobonuses:
+            text = "Выключить RaisePlanOnPromobonuses"
+            new_status = False
+        else:
+            text = "Включить RaisePlanOnPromobonuses"
+            new_status = True
+        callback = callbacks.RaisePlanOnPromobonusesToggle(
             adv_id=self._adv_id,
             new_status=new_status,
         ).pack()

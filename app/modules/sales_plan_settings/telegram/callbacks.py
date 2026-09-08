@@ -9,3 +9,8 @@ class ChangePlanSetting(CallbackData, prefix="change-plan-setting"):
 class V3RaiseMaxCpoToggle(CallbackData, prefix="v3_raise_max_cpo_toggle"):
     adv_id: int
     new_status: bool
+
+
+class RaisePlanOnPromobonusesToggle(CallbackData, prefix="raise_plan_on_promobonuses"):
+    adv_id: int
+    new_status: bool
