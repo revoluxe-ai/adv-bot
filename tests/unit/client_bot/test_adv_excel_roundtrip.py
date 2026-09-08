@@ -12,6 +12,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.deviation import
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     EXCEL_TEMPLATE_VERSION,
     column_header,
+    display_name_for_field,
     edit_header,
     enum_names_for_field,
     header_type_suffix,
@@ -137,8 +138,16 @@ def test_parse_edit_bool_v3_raise_max_cpo() -> None:
 
 
 @pytest.mark.unit
+def test_parse_edit_bool_raise_plan_on_promobonuses() -> None:
+    assert parse_edit_value("raise_plan_on_promobonuses", "TRUE") is True
+    assert parse_edit_value("raise_plan_on_promobonuses", "FALSE") is False
+    assert header_type_suffix("raise_plan_on_promobonuses") == "BOOL"
+    assert display_name_for_field("raise_plan_on_promobonuses") == "RaisePlanOnPromobonuses"
+
+
+@pytest.mark.unit
 def test_template_version_constant() -> None:
-    assert EXCEL_TEMPLATE_VERSION == 7
+    assert EXCEL_TEMPLATE_VERSION == 8
 
 
 @pytest.mark.unit

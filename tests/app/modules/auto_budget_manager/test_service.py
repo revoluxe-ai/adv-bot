@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -13,12 +14,18 @@ from app.modules.auto_budget_manager import (
     AutoBudgetEnsureResult,
     AutoBudgetEnsureStatus,
 )
+from app.modules.auto_budget_manager.redis_promo_state_manager import (
+    CachedCampaignPromoState,
+    CachedShopPromoState,
+)
 from app.shared.domains.wb.enums import (
     AdvType,
 )
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.balance_source import (
     BalanceSnapshot,
+    CashbackTopup,
+    TopUpBalanceDecision,
     cashback_summary_from_response,
     pick_cashback_for_topup,
     select_balance_source,
@@ -208,6 +215,45 @@ def test_compute_planned_amount_uses_default_topup_amount(monkeypatch) -> None:
     assert planned == 1000
 
 
+def test_allocation_fields_from_decision_persist_promo_metadata() -> None:
+    decision = TopUpBalanceDecision(
+        balance_type=0,
+        balance_name="balance",
+        cashback=CashbackTopup(
+            cashback_sum=200,
+            cashback_percent=50,
+            expiration_date="2026-04-03T21:00:00Z",
+        ),
+    )
+    promo_amount, promo_percent, expires, ordinary = (
+        AutoBudgetService._allocation_fields_from_decision(decision, 1000)
+    )
+    assert promo_amount == 200
+    assert promo_percent == 50
+    assert ordinary == 800
+    assert expires is not None
+
+
+def test_get_campaign_config_uses_promo_auto_budget_when_overlay_active() -> None:
+    adv_setting = SimpleNamespace(
+        id=1,
+        adv_id=42,
+        search_adv_id=None,
+        auto_budget_daily_limit=1000,
+        search_auto_budget_daily_limit=0,
+    )
+    overlay = SimpleNamespace(
+        active=True,
+        PromoAutoBudget=1250,
+        PropoSearchBudget=0,
+    )
+    complex_adv = _wrap_complex_adv(adv_setting)
+    complex_adv.effective_promo_plan = overlay
+    config = AutoBudgetService.get_campaign_config(complex_adv, AdvType.AUTO)
+    assert config is not None
+    assert config.limit == 1250
+
+
 def test_get_campaign_config_selects_search_when_active() -> None:
     adv_setting = SimpleNamespace(
         id=1,
@@ -265,7 +311,11 @@ def test_balance_source_from_response_raises_when_insufficient() -> None:
         select_balance_source_from_response(response)
 
 
-def test_pick_cashback_for_topup_prefers_earliest_expiration() -> None:
+def test_pick_cashback_for_topup_skips_expired_prefers_earliest_live_fefo() -> None:
+    """Expired April/May 2026 не выбираются при now=Sep 2026; live FEFO — October."""
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 9, 6, 12, tzinfo=timezone.utc)
     response = _FakeBalanceResponse(
         balance=0,
         net=5000,
@@ -274,22 +324,27 @@ def test_pick_cashback_for_topup_prefers_earliest_expiration() -> None:
             {
                 "sum": 99999,
                 "percent": 50,
-                "expiration_date": "2026-05-03T21:00:00Z",
+                "expiration_date": "2026-10-03T21:00:00Z",
             },
             {
                 "sum": 1000,
                 "percent": 40,
                 "expiration_date": "2026-04-03T21:00:00Z",
             },
+            {
+                "sum": 2000,
+                "percent": 45,
+                "expiration_date": "2026-05-03T21:00:00Z",
+            },
         ],
     )
 
-    cashback = pick_cashback_for_topup(response, topup_amount=1000)
+    cashback = pick_cashback_for_topup(response, topup_amount=1000, now=now)
 
     assert cashback is not None
-    assert cashback.cashback_percent == 40
-    assert cashback.cashback_sum == 400
-    assert cashback.expiration_date == "2026-04-03T21:00:00Z"
+    assert cashback.cashback_percent == 50
+    assert cashback.cashback_sum == 500
+    assert cashback.expiration_date == "2026-10-03T21:00:00Z"
 
 
 def test_select_topup_balance_decision_prefers_non_bonus_when_cashback_present() -> None:
@@ -301,7 +356,7 @@ def test_select_topup_balance_decision_prefers_non_bonus_when_cashback_present()
             {
                 "sum": 2000,
                 "percent": 50,
-                "expiration_date": "2026-04-03T21:00:00Z",
+                "expiration_date": "2026-12-03T21:00:00Z",
             }
         ],
     )
@@ -313,6 +368,67 @@ def test_select_topup_balance_decision_prefers_non_bonus_when_cashback_present()
     assert decision.cashback is not None
     assert decision.cashback.cashback_sum == 500
     assert decision.cashback.cashback_percent == 50
+
+
+def test_select_topup_balance_decision_ordinary_covers_remainder_only() -> None:
+    response = _FakeBalanceResponse(
+        balance=0,
+        net=600,
+        bonus=5000,
+        cashbacks=[
+            {
+                "sum": 2000,
+                "percent": 50,
+                "expiration_date": "2026-12-03T21:00:00Z",
+            }
+        ],
+    )
+    decision = select_topup_balance_decision(response, topup_amount=1000)
+    assert decision.balance_name == "net"
+    assert decision.cashback is not None
+    assert decision.cashback.cashback_sum == 500
+
+
+def test_select_topup_balance_decision_allows_full_cashback_without_ordinary_balance() -> None:
+    """100% WB cashback покрывает весь top-up; type остаётся обязательным для API."""
+    response = _FakeBalanceResponse(
+        balance=0,
+        net=0,
+        bonus=0,
+        cashbacks=[
+            {
+                "sum": 5000,
+                "percent": 100,
+                "expiration_date": "2026-12-03T21:00:00Z",
+            }
+        ],
+    )
+
+    decision = select_topup_balance_decision(response, topup_amount=1000)
+
+    assert decision.balance_type == 0
+    assert decision.balance_name == "balance"
+    assert decision.cashback is not None
+    assert decision.cashback.cashback_sum == 1000
+    assert decision.cashback.cashback_percent == 100
+
+
+def test_select_topup_balance_decision_drops_promo_if_remainder_unfunded() -> None:
+    response = _FakeBalanceResponse(
+        balance=0,
+        net=100,
+        bonus=5000,
+        cashbacks=[
+            {
+                "sum": 2000,
+                "percent": 50,
+                "expiration_date": "2026-12-03T21:00:00Z",
+            }
+        ],
+    )
+    decision = select_topup_balance_decision(response, topup_amount=1000)
+    assert decision.cashback is None
+    assert decision.balance_name == "bonus"
 
 
 def test_cashback_summary_collects_total_best_percent_and_earliest_date() -> None:
@@ -667,6 +783,59 @@ async def test_ensure_common_budget_rejects_when_one_campaign_has_stale_stats(
 
     assert result.status == AutoBudgetEnsureStatus.NOT_NEW_ADV_STATS
     assert result.reason == "Last full adv stats too old"
+
+
+@pytest.mark.asyncio
+async def test_refresh_promo_state_applies_fresh_snapshot_to_current_advs() -> None:
+    """Watchdog refresh должен обновить уже построенные DTO без следующего тика."""
+    updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cached_state = CachedShopPromoState(
+        updated_at=updated_at,
+        topup_amount=1000,
+        pool_usable=False,
+        pool_amount=0,
+        pool_fraction=Decimal("0"),
+        campaigns={
+            11: CachedCampaignPromoState(
+                remaining=200,
+                fraction=Decimal("0.2"),
+                expires_at=None,
+                usable=True,
+                effective_fraction=Decimal("0.2"),
+                pool_usable=False,
+                campaign_usable=True,
+            )
+        },
+    )
+    adv_setting = SimpleNamespace(
+        raise_plan_on_promobonuses=True,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100.0,
+        max_price_for_order=200.0,
+        auto_budget_daily_limit=1000,
+        search_auto_budget_daily_limit=0,
+        common_budget_daily_limit=None,
+    )
+    complex_adv = SimpleNamespace(
+        adv_setting=adv_setting,
+        adv_id=11,
+        search_adv_id=None,
+        promo_fraction=Decimal("0"),
+        promo_multiplier=Decimal("1"),
+        effective_promo_plan=None,
+    )
+    service = AutoBudgetService(redis_client=_FakeRedis())
+    service._promo_state_service.refresh = AsyncMock()
+    service._promo_state_manager.get = AsyncMock(return_value=cached_state)
+
+    await service.refresh_promo_state(
+        [complex_adv],
+        SimpleNamespace(wb_modifier=SimpleNamespace()),
+        "shop-1",
+    )
+
+    assert complex_adv.promo_fraction == Decimal("0.2")
+    assert complex_adv.effective_promo_plan is not None
 
 
 @pytest.mark.asyncio

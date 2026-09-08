@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 from datetime import datetime, UTC
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
+
+from app.modules.auto_budget_manager.redis_promo_state_manager import (
+    CachedCampaignPromoState,
+    CachedShopPromoState,
+    RedisPromoStateManager,
+)
+from app.modules.plan_fact.provider import PlanFactProvider
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider import (
     AutoShelfBidControlViewProvider,
@@ -1505,6 +1513,159 @@ async def test_build_view_rec_bid_plan_context_uses_max_cost_when_plan_not_met(
         ].target_order_cost
         == 200.0
     )
+
+
+def test_shop_id_from_adv_uses_wb_cabinet_not_adv_setting_column() -> None:
+    """AdvSetting Redis overlay key is WBCabinet.shop_id, not a missing AdvSetting.shop_id."""
+    adv = SimpleNamespace(shop_id=None, wb_cabinet=SimpleNamespace(shop_id="cab-1"))
+    assert AutoShelfBidControlViewProvider._shop_id_from_adv(adv) == "cab-1"
+    assert AutoShelfBidControlViewProvider._shop_id_from_adv(SimpleNamespace(adv_id=1)) is None
+    complex_like = SimpleNamespace(shop_id="dto-shop", wb_cabinet=None)
+    assert AutoShelfBidControlViewProvider._shop_id_from_adv(complex_like) == "dto-shop"
+
+
+def _fresh_cached_promo_state(
+    *,
+    adv_id: int,
+    fraction: Decimal,
+) -> CachedShopPromoState:
+    """Свежий Redis overlay-кэш с usable promo_fraction > 0 для кампании."""
+    return CachedShopPromoState(
+        updated_at=datetime.now(UTC),
+        topup_amount=1000,
+        pool_usable=False,
+        pool_amount=0,
+        pool_fraction=Decimal("0"),
+        campaigns={
+            adv_id: CachedCampaignPromoState(
+                remaining=200,
+                fraction=fraction,
+                expires_at=None,
+                usable=True,
+                effective_fraction=fraction,
+                pool_usable=False,
+                campaign_usable=True,
+            ),
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Telegram rec-bid обязан кормить plan_context scaled overlay CPO при f>0.
+
+    AdvSetting не хранит live promo_fraction и не имеет колонки shop_id:
+    f и ключ Redis живут на WBCabinet / overlay-кэше.
+    get_effective_promo_plan нельзя подменять: spy только проксирует реальный overlay.
+    """
+    live_fraction = Decimal("0.2")
+    adv = MagicMock()
+    adv.nmids = [111]
+    adv.adv_id = 12345
+    # Production AdvSetting has no shop_id column; Redis key lives on WBCabinet.
+    adv.shop_id = None
+    adv.wb_cabinet = SimpleNamespace(shop_id="shop-promo-red")
+    adv.search_adv_id = None
+    adv.auto_shelf_bid_control_enabled = True
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 100
+    adv.max_price_for_order = 200
+    adv.raise_plan_on_promobonuses = True
+    adv.promo_fraction = None
+    adv.auto_budget_daily_limit = 0
+    adv.search_auto_budget_daily_limit = 0
+    adv.common_budget_daily_limit = None
+
+    settings_obj = MagicMock()
+    settings_obj.currency = "RUB"
+    settings_obj.target_test_impressions = 500
+    settings_obj.test_share = 0.1
+    settings_obj.max_bid_minor = 500
+    settings_obj.min_bid_distance_minor = 1
+
+    repository = MagicMock()
+    repository.get_adv_setting_by_original_id = AsyncMock(return_value=adv)
+    repository.get_state = AsyncMock(return_value=None)
+    repository.get_or_create_default_settings = AsyncMock(return_value=settings_obj)
+
+    analytics = MagicMock()
+    analytics.get_bid_stats = AsyncMock(return_value=[])
+    analytics.get_best_bid_by_ctr = AsyncMock(return_value=None)
+    analytics.get_best_bid_by_cart_cpa = AsyncMock(return_value=None)
+    analytics.fetch_rec_bid_ctr_by_bid_for_nmid = AsyncMock(return_value={111: 0.1})
+    analytics.fetch_rec_bid_click_to_order_cr_7d_for_nmid = AsyncMock(
+        return_value=0.05
+    )
+
+    redis_client = MagicMock()
+    provider = AutoShelfBidControlViewProvider(
+        redis_client=redis_client,
+        repository=repository,
+        analytics_repository=analytics,
+    )
+    provider._bid_cache.get_bid = AsyncMock(return_value=None)  # type: ignore[attr-defined]
+    provider._fetch_wb_min_bid_minor = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    provider._rec_bid_recommendation_service.get_rec_bid_recommendations = AsyncMock(
+        return_value={"view": {"best_expected_bid": 111}}
+    )  # type: ignore[attr-defined]
+
+    plan_fact_summary = MagicMock()
+    plan_fact_summary.fact_predict_orders = 10.0
+    plan_fact_summary.fact_pay_for_order = 150.0
+
+    mock_plan_fact_reader = MagicMock()
+    mock_plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=plan_fact_summary)
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider.PlanFactReader",
+        lambda: mock_plan_fact_reader,
+    )
+
+    cached_state = _fresh_cached_promo_state(adv_id=12345, fraction=live_fraction)
+    redis_get = AsyncMock(return_value=cached_state)
+    monkeypatch.setattr(RedisPromoStateManager, "get", redis_get)
+
+    real_get_effective_promo_plan = PlanFactProvider.get_effective_promo_plan
+    overlay_calls: list[object] = []
+
+    def _spy_get_effective_promo_plan(
+        adv_arg: object,
+        *,
+        fraction: object | None = None,
+        complex_adv: object | None = None,
+    ) -> object:
+        overlay = real_get_effective_promo_plan(
+            adv_arg,
+            fraction=fraction,
+            complex_adv=complex_adv,
+        )
+        overlay_calls.append(overlay)
+        return overlay
+
+    monkeypatch.setattr(
+        PlanFactProvider,
+        "get_effective_promo_plan",
+        _spy_get_effective_promo_plan,
+    )
+
+    expected_overlay = real_get_effective_promo_plan(adv, fraction=live_fraction)
+    assert expected_overlay.plan is not None
+    expected_target = float(expected_overlay.plan.target_pay_for_order)
+    expected_max = float(expected_overlay.plan.max_pay_for_order)
+    assert expected_target == 125.0
+    assert expected_max == 250.0
+
+    view = await provider.build_view(adv_setting_original_id=1)
+
+    assert overlay_calls, "build_view must call real get_effective_promo_plan"
+    redis_get.assert_awaited()
+    assert redis_get.await_args.args[-1] == "shop-promo-red"
+    rec_call = provider._rec_bid_recommendation_service.get_rec_bid_recommendations
+    plan_context = rec_call.await_args.kwargs["plan_context"]
+    assert plan_context.target_order_cost == expected_target
+    assert plan_context.max_order_cost == expected_max
+    assert view.rec_bid_recommendation == {"best_expected_bid": 111}
 
 
 @pytest.mark.asyncio

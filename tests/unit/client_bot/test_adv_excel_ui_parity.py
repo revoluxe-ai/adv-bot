@@ -29,6 +29,7 @@ ADV_UI_HANDLER_BY_FIELD: dict[str, str] = {
     "target_price_for_order": "app/modules/sales_plan_settings/telegram/setting_handlers/change_target_price_for_order.py",
     "max_price_for_order": "app/modules/sales_plan_settings/telegram/setting_handlers/change_max_price_for_order.py",
     "substitute_fact_cpo_for_max": "app/modules/sales_plan_settings/telegram/setting_handlers/toggle_v3_raise_max_cpo.py",
+    "raise_plan_on_promobonuses": "app/modules/sales_plan_settings/telegram/setting_handlers/toggle_raise_plan_on_promobonuses.py",
     "bidder_for_auto": "app/modules/bidder_auto_mode/handlers.py",
     "auto_update_white_list": "app/modules/shop_runner/service_manager/old_modules/setting_auto_updater/modules/white_list_updater/auto_white_list_updater/telegram/handlers.py",
     "auto_budget_watchdog_enabled": "app/client_bot/user_interface/handlers/auto_budget_watchdog_toggle.py",

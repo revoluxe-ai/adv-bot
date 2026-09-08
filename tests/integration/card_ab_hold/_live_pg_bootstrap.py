@@ -192,6 +192,7 @@ CREATE TABLE advsetting (
     target_price_for_order FLOAT,
     max_price_for_order INTEGER,
     substitute_fact_cpo_for_max BOOLEAN,
+    raise_plan_on_promobonuses BOOLEAN DEFAULT false,
     cpm INTEGER,
     bidder_for_auto BOOLEAN,
     auto_update_white_list BOOLEAN,

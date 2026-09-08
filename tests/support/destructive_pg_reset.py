@@ -249,6 +249,9 @@ async def init_postgres_schema_and_seed(engine: Any) -> None:
             WBToken,
             WBUserCabinet,
         )
+        from app.modules.common_slaves.wildberries.models.wb_campaign_promo_spend import (  # noqa: F401
+            WBCampaignPromoSpend,
+        )
         from app.modules.wb_adv_updater.modules.balance_exp_informer.models import (  # noqa: F401
             BalanceReminder,
         )

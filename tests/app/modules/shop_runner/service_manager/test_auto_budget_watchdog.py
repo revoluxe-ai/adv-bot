@@ -51,6 +51,7 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
 
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
+    auto_budget_service_instance.refresh_promo_state = AsyncMock()
 
     async def mock_run_tasks(handlers, *args, **kwargs):
         return [await handler() for handler in handlers]
@@ -131,6 +132,7 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
     auto_budget_service_instance.ensure_common_budget = AsyncMock(return_value=None)
+    auto_budget_service_instance.refresh_promo_state = AsyncMock()
 
     async def mock_run_tasks(handlers, *args, **kwargs):
         return [await handler() for handler in handlers]
@@ -210,6 +212,7 @@ async def test_auto_budget_watchdog_runs_active_control_without_budget_handlers(
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
     auto_budget_service_instance.ensure_common_budget = AsyncMock(return_value=None)
+    auto_budget_service_instance.refresh_promo_state = AsyncMock()
 
     active_control = AsyncMock()
     wb_manager_hub = MagicMock()

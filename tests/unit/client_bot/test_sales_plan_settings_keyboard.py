@@ -35,3 +35,5 @@ def test_sales_plan_settings_keyboard_ignores_fact_pfo_plumbing() -> None:
     keyboard = KeyboardsGetter().get_keyboard(adv)
 
     assert keyboard.inline_keyboard[0][0].text == "Изменить план продаж в день (12)"
+    texts = [row[0].text for row in keyboard.inline_keyboard]
+    assert "Включить RaisePlanOnPromobonuses" in texts

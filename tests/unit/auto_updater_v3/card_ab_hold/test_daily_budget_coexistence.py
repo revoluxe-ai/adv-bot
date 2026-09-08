@@ -136,6 +136,7 @@ async def test_auto_budget_watchdog_passes_unfiltered_advs_to_active_control() -
     mgr._wb_shop_data_manager = MagicMock()
     mgr._wb_shop_data_manager.get_complex_advs = AsyncMock(return_value=pool)
     mgr._auto_budget_service = MagicMock()
+    mgr._auto_budget_service.refresh_promo_state = AsyncMock()
     control = AsyncMock()
     stale_filter = MagicMock()
 

@@ -33,6 +33,11 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
     adv1.nmids = [1]
     adv1.search_adv_id = None
     adv1.rec_system_mode = False
+    adv1.raise_plan_on_promobonuses = False
+    adv1.auto_budget_daily_limit = 0
+    adv1.search_auto_budget_daily_limit = 0
+    adv1.common_budget_daily_limit = None
+    adv1.auto_common_budget = False
 
     adv2 = MagicMock()
     adv2.id = 20
@@ -40,8 +45,11 @@ async def test_get_complex_advs_prefills_target_pay_for_order_from_seed() -> Non
     adv2.nmids = [2]
     adv2.search_adv_id = None
     adv2.rec_system_mode = False
+    adv2.raise_plan_on_promobonuses = False
+    adv2.auto_common_budget = False
 
     manager._get_advs = AsyncMock(return_value=[adv1, adv2])
+    manager._load_cached_promo_state = AsyncMock(return_value=None)
     manager._get_adv_id_to_search_adv_map = AsyncMock(return_value={})
     manager._traffic_clicks_manager.enrich = AsyncMock(return_value=None)
     manager._get_min_bids = AsyncMock(return_value=None)
@@ -95,8 +103,11 @@ async def test_get_complex_advs_returns_base_list_when_min_bids_cache_fails() ->
     adv.nmids = [1]
     adv.search_adv_id = None
     adv.rec_system_mode = False
+    adv.raise_plan_on_promobonuses = False
+    adv.auto_common_budget = False
 
     manager._get_advs = AsyncMock(return_value=[adv])
+    manager._load_cached_promo_state = AsyncMock(return_value=None)
     manager._get_adv_id_to_search_adv_map = AsyncMock(return_value={})
     manager._traffic_clicks_manager.enrich = AsyncMock(return_value=None)
     manager._get_min_bids = AsyncMock(side_effect=ConnectionError("redis mget failed"))
