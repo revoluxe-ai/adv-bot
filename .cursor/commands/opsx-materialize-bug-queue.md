@@ -18,7 +18,7 @@ This command is NOT browser automation and MUST NOT open ChatGPT chats.
 Its only purpose is to create or update process artifacts under:
 
 ```text
-.tmp/opsx-bug-cases/
+.opsx/runs/bug-cases/
 ```
 
 so raw intakes and findings survive across chats and can recursively spawn descendant cases.
@@ -26,7 +26,7 @@ so raw intakes and findings survive across chats and can recursively spawn desce
 Authoritative storage is only:
 
 ```text
-.tmp/opsx-bug-cases/**
+.opsx/runs/bug-cases/**
 ```
 
 ## Source resolution (mandatory)
@@ -35,7 +35,7 @@ Follow `.cursor/commands/opsx-source-resolution.md` and `.cursor/commands/opsx-e
 
 When `case` / `intake` / `finding` are provided:
 
-* resolve only under `.tmp/opsx-bug-cases/<CASE_ID>/...` canonical paths;
+* resolve only under `.opsx/runs/bug-cases/<CASE_ID>/...` canonical paths;
 * do not search the wider repository for these artifacts;
 * do not run git status/branch as a gate for materialize;
 * if the canonical path is missing, return `blocked` / `unknown_case` / `unknown_finding` / `unknown_intake` rather than repo-wide rediscovery.
@@ -64,7 +64,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:
@@ -136,7 +136,7 @@ Blocker:
 You MAY create or update files only under:
 
 ```text
-.tmp/opsx-bug-cases/
+.opsx/runs/bug-cases/
 ```
 
 You MUST NOT:
@@ -156,14 +156,14 @@ You MUST NOT:
 
 `GO` has no authorization effect for production edits in this command.
 
-If `GO` is present, ignore it for code changes and still write only process artifacts under `.tmp/opsx-bug-cases/`.
+If `GO` is present, ignore it for code changes and still write only process artifacts under `.opsx/runs/bug-cases/`.
 
 ## Durable layout
 
 Use exactly this layout. Do not add extra files without a concrete function required by this contract.
 
 ```text
-.tmp/opsx-bug-cases/
+.opsx/runs/bug-cases/
   INDEX.md
 
   <CASE_ID>/
@@ -180,7 +180,7 @@ Use exactly this layout. Do not add extra files without a concrete function requ
 
 Rules:
 
-* Cases are stored flat under `.tmp/opsx-bug-cases/`.
+* Cases are stored flat under `.opsx/runs/bug-cases/`.
 * Parent/child relationships live in metadata, not in nested folders.
 * `results/` may be empty until a later command writes a result.
 * Do not create placeholder junk files.
@@ -319,7 +319,7 @@ Schema definition:
 **Only** runtime instance:
 
 ```text
-.tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+.opsx/runs/bug-cases/<ROOT_CASE_ID>/LEDGER.md
   ## BRANCH_REGISTRY
 ```
 
@@ -808,7 +808,7 @@ PRODUCTION_READ_ONLY: YES
 COMMAND_AND_GRAPH_READ_ONLY: YES
 
 CASE_MAP_WRITE_ALLOWED:
-  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+  .opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 
 ALL_OTHER_WRITES: DENIED
 ```
@@ -856,7 +856,7 @@ any path other than `results/FANIN.md`.
 Write exactly:
 
 ```text
-.tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+.opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 ```
 
 Include required FANIN fields from the schema (STATUS, BRANCH_SUMMARY,
@@ -875,7 +875,7 @@ Else `FANIN_INCOMPLETE`.
 Pasteable next when `FANIN_READY`:
 
 ```text
-/opsx-learn-from-bug case=<ROOT_CASE_ID> FANIN_PATH=.tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+/opsx-learn-from-bug case=<ROOT_CASE_ID> FANIN_PATH=.opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 ```
 
 When incomplete:
@@ -1247,7 +1247,7 @@ OWNER_GATE_STATUS:
 TASK_DELTA:
 TERMINAL_STATUS:
 
-ROUTE_TRACE_PATH: .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+ROUTE_TRACE_PATH: .opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 NEXT_ACTION:
 ```
 
@@ -1534,7 +1534,7 @@ SOURCE_RESOLUTION:
 - primary_path:
 - fallback_used: true | false
 - search_operations: 0
-- search_scope: .tmp/opsx-bug-cases/<CASE_ID>
+- search_scope: .opsx/runs/bug-cases/<CASE_ID>
 - unresolved_gap:
 ```
 
@@ -1633,4 +1633,4 @@ Corrupt-claim repair:
 * Do not update an existing finding whose `SOURCE_INTAKE_ID` differs from the current intake unless `relation=duplicate_intake` is explicit; then leave the canonical finding unchanged.
 * Reject cross-intake finding patches without relation with blocker `cross_intake_finding_update_without_relation`.
 * Do not migrate or rewrite existing cases unless explicitly requested by a later command.
-* Do not invent a second authoritative storage outside `.tmp/opsx-bug-cases/**`.
+* Do not invent a second authoritative storage outside `.opsx/runs/bug-cases/**`.

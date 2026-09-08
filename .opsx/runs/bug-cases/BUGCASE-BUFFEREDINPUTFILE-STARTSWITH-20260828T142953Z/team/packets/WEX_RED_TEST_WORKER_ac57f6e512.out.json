@@ -1,0 +1,97 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ac57f6e512/OUT",
+  "PACKET_GENERATION": 4,
+  "ORCHESTRATION_ID": "ORCH/bug-team/9745ba6a72d6",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/ac57f6e512",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "FINDING_ID": "FINDING-001",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ac57f6e512/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "CLASSIFIER"
+  ],
+  "DEPENDENCY_HASHES": {
+    "CLASSIFIER": {
+      "CANONICAL_SHA256": "ed7564f1a75db485889b72bbac1231a877ab8d3f5830e91d170d5518bef8e8c3",
+      "RAW_SHA256": "950ca02018b090540941ca7a59aa07c9d34c77689c1c5182756b1cdf557dffaa"
+    }
+  },
+  "CHECKPOINT_GENERATION": 4,
+  "CREATED_AT": 1787929489.089937,
+  "EXPIRES_AT": 1787933089.089937,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "MAPS_TO": "/opsx-test",
+    "MODE": "bug-regression",
+    "RED_STATUS": "RED_CONFIRMED",
+    "STATUS_DETAIL": "RED_CONFIRMED",
+    "FAILURE_MATCH": "YES",
+    "TEST_IDS": [
+      "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_image_accepts_buffered_input_file_without_startswith",
+      "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_file_accepts_buffered_input_file_without_startswith"
+    ],
+    "TEST_ID": "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_image_accepts_buffered_input_file_without_startswith",
+    "TEST_CONTENT_SHA256": "d6386cded0528f71e428e832d792e8eee94d3aa8eff35f5d92826e3411490169",
+    "PRODUCTION_HASH_BEFORE": "7d425e30354685dfee73202234529f065ea9d45d334fc913fee114052d6fb458",
+    "PRODUCTION_PATHS": [
+      "app/file_handler.py"
+    ],
+    "COMMAND": "poetry run pytest tests/unit/test_file_handler_buffered_input_file.py -vv --tb=short",
+    "PYTEST_EXIT_CODE": 1,
+    "PYTEST_SUMMARY": "2 failed",
+    "EXPECTED_FAILURE": "AttributeError: 'BufferedInputFile' object has no attribute 'startswith' at app/file_handler.py:_get_telegram_file L59",
+    "ACTUAL_FAILURE": "AttributeError: 'BufferedInputFile' object has no attribute 'startswith' (file_handler.py:59 startswith; re-raised L93)",
+    "RED_EVIDENCE_PATH": ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/RED-FINDING-001.md",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+    "CHAT_LABEL": "opsx-bug-team-host",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "/opsx-test",
+    "ROUTE_RECONCILIATION": "MATCH",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z intake=INTAKE-001 finding=FINDING-001 claim_token=CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_RED",
+      "RESULT": "RED_CONFIRMED",
+      "TO_STATE": "AWAITING_OWNER_GO",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z intake=INTAKE-001 finding=FINDING-001 claim_token=CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "REQUIRED",
+        "RED_REQUIRED": "satisfied"
+      },
+      "REQUIRED_EVIDENCE": "RED_EVIDENCE_PATH",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "packet_paths",
+      "primary_path": ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/findings/FINDING-001.md",
+      "fallback_used": false,
+      "search_operations": 0,
+      "search_scope": "none",
+      "unresolved_gap": null
+    },
+    "EXECUTION_PREFLIGHT": {
+      "mode": "bug-regression_RED",
+      "production_edits": false,
+      "tests_edited": [
+        "tests/unit/test_file_handler_buffered_input_file.py"
+      ]
+    }
+  },
+  "ARTIFACTS_WRITTEN": [
+    "tests/unit/test_file_handler_buffered_input_file.py",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/RED-FINDING-001.md",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/ROUTE-TRACE.jsonl",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_RED_TEST_WORKER_ac57f6e512.out.json",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_RED_TEST_WORKER_ac57f6e512.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

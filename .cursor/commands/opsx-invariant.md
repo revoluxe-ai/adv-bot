@@ -131,7 +131,7 @@ $ARGUMENTS
 Также следуй `.cursor/commands/opsx-execution-preflight.md`: не запускай unconditional `git status`/`git branch` до чтения exact change/finding; git только если REQUIRED_FOR base/head/dirty claim.
 
 * `change=<id>` → читай только `openspec/changes/<id>/...` exact paths; не делай inventory всего `openspec/` без `EVIDENCE_GAP`.
-* `case`/`finding` → сначала `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
+* `case`/`finding` → сначала `.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`.
 * `scope=` ограничивает любой последующий code search.
 * Budget: ≤ 3 targeted searches на незакрытый evidence target после direct reads.
 * В финальном output включи `SOURCE_RESOLUTION` и при необходимости `EXECUTION_PREFLIGHT`.

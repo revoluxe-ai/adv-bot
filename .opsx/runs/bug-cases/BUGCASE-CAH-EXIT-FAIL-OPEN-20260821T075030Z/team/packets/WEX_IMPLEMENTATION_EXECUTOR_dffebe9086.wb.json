@@ -1,0 +1,22 @@
+{
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/FIX-ROOT-001.md",
+    "team/executions/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.identity.json",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.json",
+    "team/intents/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.intent.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.finalize_reject.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.out.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.wb.json",
+    "team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.after.json",
+    "team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_dffebe9086.before.json"
+  ],
+  "MODIFIED": [
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

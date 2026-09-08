@@ -49,7 +49,7 @@ pipeline**, not `.cursor/agents/*`.
 
 | Concern | Existing live SoT | Candidate extension |
 |---------|-------------------|---------------------|
-| Durable case map | `.tmp/opsx-bug-cases/**` | same |
+| Durable case map | `.opsx/runs/bug-cases/**` | same |
 | Route history | `ROUTE-TRACE.jsonl` v2 | worker role + heartbeat fields |
 | Fan-in write | materialize `mode=fanin_assemble` → `FANIN.md` only | `FAN_IN_ASSEMBLER` role mirrors that boundary |
 | Classification | `/opsx-classify-bug` | `CLASSIFIER` worker wraps same categories |

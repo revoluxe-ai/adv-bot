@@ -22,7 +22,7 @@ newline_normalization: none
 - Commands / rules / pipeline: `.cursor/commands/**`, `.cursor/rules/**`, `.cursor/pipeline/**`
 - OpenSpec process: `openspec/policies/**`, `openspec/schemas/**`
 - OPSX shared / registry / adapters docs: `.opsx/shared/**`, `.opsx/registry/**`, `.opsx/adapters/**`
-- Staging only: `.tmp/opsx-inbound/**`
+- Staging only: `.opsx/runs/inbound/**`
 - Frozen upstream (read): `.opsx/upstream/**` — **do not overwrite by default**
 
 ### Hard target bans
@@ -129,7 +129,7 @@ $ARGUMENTS
 | `query=` / `OCCURRENCE=` / `ADOPTION_PACKET=` | INDEX_DEFAULT | Resolve candidate from fresh catalog index (preferred) |
 | `source=<path>` | RAW_DONOR | Absolute or repo-relative donor checkout **or** extracted archive root |
 | `surfaces=` | no | Comma list; default `commands,rules,pipeline,openspec-process,opsx-shared` |
-| `packet=<path>` | GO | Path to prior `DIFF_PACKET.md` under `.tmp/opsx-inbound/` (or chat-attached equivalent) |
+| `packet=<path>` | GO | Path to prior `DIFF_PACKET.md` under `.opsx/runs/inbound/` (or chat-attached equivalent) |
 | `KEEP=<ids>` | GO | Comma list of row ids / command ids / relative paths from the packet to merge |
 | `GO` | APPLY | Exact apply token |
 
@@ -140,7 +140,7 @@ Empty invoke without index selector and without `source=` / clear donor →
 
 | Input | Mode | Writes |
 |---|---|---|
-| no `GO` | `READ_ONLY` | staging under `.tmp/opsx-inbound/<UTC>/` allowed for DIFF_PACKET / ADOPTION_PACKET only |
+| no `GO` | `READ_ONLY` | staging under `.opsx/runs/inbound/<UTC>/` allowed for DIFF_PACKET / ADOPTION_PACKET only |
 | exact `GO` + packet + KEEP | `APPLY` | approved process files + MERGE_RECEIPT + lock/activation/provenance as needed |
 | `GO` without packet or KEEP | `FAIL_CLOSED` | none |
 
@@ -192,7 +192,7 @@ Donor vs local, when present:
    `OCCURRENCE=`, else `query=` against by-command / by-hash / by-repo views.
 4. Materialize a bounded compare of the selected occurrence (and listed
    companions) vs local — do **not** merge. Write staging
-   `.tmp/opsx-inbound/<UTC>/` with `SOURCE.txt`, `ADOPTION_PACKET.md` (echo),
+   `.opsx/runs/inbound/<UTC>/` with `SOURCE.txt`, `ADOPTION_PACKET.md` (echo),
    and `DIFF_PACKET.md`.
 5. Emit output contract. Owner must approve KEEP before GO.
 
@@ -202,7 +202,7 @@ Donor vs local, when present:
 2. Resolve `source=`. If missing → `BLOCKED_NEEDS_EVIDENCE`.
 3. Confirm donor root looks like OPSX (at least one of: `.cursor/commands`,
    `openspec/policies`, `.opsx`). Else `FAIL_CLOSED` `REASON: NOT_OPSX_SURFACE`.
-4. Create staging dir `.tmp/opsx-inbound/<UTC>/` and write `SOURCE.txt`
+4. Create staging dir `.opsx/runs/inbound/<UTC>/` and write `SOURCE.txt`
    (resolved path + optional git short SHA if `.git` present — best effort).
 5. Inventory donor vs local for selected `surfaces=` (filename / id inventory
    first; content hash or bounded section compare for UPDATED rows).
@@ -218,7 +218,7 @@ Donor vs local, when present:
 
 1. Projectization gate again.
 2. Require exact token `GO`.
-3. Load `packet=` (or newest `.tmp/opsx-inbound/*/DIFF_PACKET.md` only if
+3. Load `packet=` (or newest `.opsx/runs/inbound/*/DIFF_PACKET.md` only if
    unambiguous in this chat). Missing → `FAIL_CLOSED`.
 4. Require non-empty `KEEP=` (ids from packet). Empty KEEP → `FAIL_CLOSED`.
 5. Validate every KEEP target is inside the write boundary. Any forbidden path
@@ -343,7 +343,7 @@ DO_NOT_DO_YET: …
 
 ## Regression checks (implementer / operator)
 
-- [ ] READ_ONLY never writes outside `.tmp/opsx-inbound/**`
+- [ ] READ_ONLY never writes outside `.opsx/runs/inbound/**`
 - [ ] GO without KEEP fails closed
 - [ ] Cannot write product changes/decisions/src
 - [ ] TARGET OVERRIDE preserved on UPDATED merges

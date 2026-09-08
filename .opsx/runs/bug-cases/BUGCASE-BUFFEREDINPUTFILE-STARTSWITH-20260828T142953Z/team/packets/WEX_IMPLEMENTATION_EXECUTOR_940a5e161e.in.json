@@ -1,0 +1,49 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1787929688.6933782,
+  "DEPENDENCY_HASHES": {
+    "RED_TEST_WORKER": {
+      "CANONICAL_SHA256": "ab0838017d0690477611a431568fdedcc038bb38582c2de232b26acc8df1a49f",
+      "RAW_SHA256": "a7e0cea9825eca7f3594926ace0e6d51e1fbe3438e9ccd147c209984dd850f10"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "RED_TEST_WORKER"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787933288.6933782,
+  "FINDING_ID": "FINDING-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team/9745ba6a72d6",
+  "PACKET_GENERATION": 5,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/940a5e161e/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": null,
+  "PAYLOAD": {
+    "ALLOWED_FIX_FILES": [
+      "app/file_handler.py"
+    ],
+    "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+    "CHAT_LABEL": "opsx-bug-team-host",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "FINDING_ID": "FINDING-001",
+    "FIX_SUMMARY_HINT": "_get_telegram_file must accept BufferedInputFile (passthrough) before str.startswith('http'); align with get_telegram_image typing",
+    "INTAKE_ID": "INTAKE-001",
+    "LOCAL_AUTHORITY": "CONTROLLED_LIVE_UNCOMMITTED",
+    "MAPS_TO": "/opsx-fix-bug",
+    "RED_STATUS": "RED_CONFIRMED",
+    "TEST_CONTENT_SHA256": "d6386cded0528f71e428e832d792e8eee94d3aa8eff35f5d92826e3411490169",
+    "TEST_IDS": [
+      "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_image_accepts_buffered_input_file_without_startswith",
+      "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_file_accepts_buffered_input_file_without_startswith"
+    ]
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/940a5e161e",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+}

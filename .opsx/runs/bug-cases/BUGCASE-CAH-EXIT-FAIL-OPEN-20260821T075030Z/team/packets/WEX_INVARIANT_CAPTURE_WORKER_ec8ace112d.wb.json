@@ -1,0 +1,20 @@
+{
+  "WORKER_ID": "INVARIANT_CAPTURE_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "family/FAMILY.json",
+    "family/INVARIANT.json",
+    "family/INVARIANT.md",
+    "family/ROOT-GREEN-PROOF.json",
+    "team/heartbeats/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.json",
+    "team/intents/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.intent.json",
+    "team/packets/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.out.json",
+    "team/snapshots/WEX_INVARIANT_CAPTURE_WORKER_ec8ace112d.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

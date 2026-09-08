@@ -123,7 +123,7 @@ Class-level lesson (eligible for Phase 2 GO write of a class rule) requires:
 ```text
 FANIN_READY
 AND FANIN_PATH exists
-  (.tmp/opsx-bug-cases/<ROOT>/results/FANIN.md)
+  (.opsx/runs/bug-cases/<ROOT>/results/FANIN.md)
 AND coverage assessed
 AND FIXED branches contain RED/GO/FIX/GREEN evidence linkage
 ```
@@ -158,7 +158,7 @@ Fanout `LEARNING_READY=true` alone does **not** unlock class lesson.
 
 If `case` + `finding` provided, read in order:
 
-1. `.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
+1. `.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`
 2. optional intake / CASE.md / prior same-chat `/opsx-classify-bug` or `/opsx-fix-bug` output
 3. do **not** rediscover via repo-wide search
 4. do **not** run unconditional git status/branch
@@ -537,7 +537,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:

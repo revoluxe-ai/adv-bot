@@ -1,0 +1,64 @@
+{
+  "SCHEMA_VERSION": "1",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py",
+    "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 7,
+  "CREATED_AT": 1787310214.016943,
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 4,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PAYLOAD": {
+    "ACTUAL_EXECUTION_ROUTE": "ROUTE_A",
+    "ACTUAL_NEXT_COMMAND": "/opsx-test case=BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z finding=ROOT-001 verify",
+    "CHANGED_FILES": [
+      "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py",
+      "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py"
+    ],
+    "FIX_STATUS": "IMPLEMENTED",
+    "FIX_SUMMARY": "The W3 callback now refuses to enter the durable writer when the live read does not contain every durable confirmed keyword. A complete read still permits explicit non-positive-position exclusions.",
+    "ROOT_CAUSE": "The callback built a writer payload from valid rows alone, so a strict subset returned by an incomplete live read was interpreted as the complete durable keyword set.",
+    "REGRESSION_TEST": {
+      "COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read -vv",
+      "EXIT_CODE": 0,
+      "RESULT": "PASS"
+    },
+    "ADJACENT_UNIT_TESTS": {
+      "COMMAND": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py tests/unit/auto_updater_v3/card_ab_hold/test_confirmation_contracts.py -q",
+      "EXIT_CODE": 0,
+      "RESULT": "66 passed"
+    },
+    "DIFF_CHECK": {
+      "COMMAND": "git diff --check -- app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py",
+      "EXIT_CODE": 0,
+      "RESULT": "PASS"
+    },
+    "LINT_CHECK": "No IDE linter errors for changed files.",
+    "INCOMPLETE_READ_BEHAVIOR": "No confirm_target_places call, no phase/FSM confirmation transition, and durable keyword/target state remains unchanged.",
+    "COMPLETE_READ_BEHAVIOR": "Presence of every durable keyword is sufficient for completeness; explicit zero, negative, or non-finite facts remain eligible for the existing exclusion and positive-subset writer behavior.",
+    "GREEN_CLAIM": false,
+    "FORBIDDEN_ACTIONS_PERFORMED": []
+  },
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/ea82c8e691/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/ea82c8e691/OUT": {
+      "RAW_SHA256": "a07518e79205c96f185f132b72cb8b279a5e4b74ed916009180e58abcf66ac36",
+      "CANONICAL_SHA256": "e45ab7819cc9cc9a276655f4170f7e8302288a802f445558ec605f2ee760038e"
+    }
+  },
+  "EXPIRES_AT": 1787313506.2460456
+}

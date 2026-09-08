@@ -288,7 +288,7 @@ Schema: `.cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md` (`SCHEMA_VERSION
 
 ```text
 RUNTIME:
-  .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+  .opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Append-only. Monotonic `EVENT_SEQUENCE` per CASE_ID; unique `EVENT_ID`;
@@ -324,7 +324,7 @@ EXPECTED_EXECUTION_ROUTE= eventual production executor
 
 ### 0.4 Human-readable `## ROUTE_STATE` (LEDGER)
 
-In `.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md` maintain **current** snapshot
+In `.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md` maintain **current** snapshot
 aligned with the latest applicable JSONL event:
 
 ```text
@@ -352,7 +352,7 @@ OWNER_GATE_STATUS:
 TASK_DELTA:
 TERMINAL_STATUS:
 
-ROUTE_TRACE_PATH: .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+ROUTE_TRACE_PATH: .opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 NEXT_ACTION:
 ```
 
@@ -459,7 +459,7 @@ Presence of new OpenSpec tasks after `/opsx-update` does **not** authorize
 |------|-----------------|-----------|
 | Classifier | `/opsx-classify-bug` | route trace + `ROUTE_STATE` only (no OpenSpec/code) |
 | Spec reviser | `/opsx-update` | OpenSpec planning artifacts; TASK_DELTA evidence; route trace |
-| Bug Analyst | `/opsx-fix-bug` WITHOUT GO | `.tmp/opsx-bug-cases/**` only |
+| Bug Analyst | `/opsx-fix-bug` WITHOUT GO | `.opsx/runs/bug-cases/**` only |
 | Regression Author | `/opsx-test` | `tests/**` (+ fixtures); RED evidence in case map |
 | Owner | human | production GO; `RED_NOT_APPLICABLE_APPROVED`; FINAL class verdict |
 | Coordinator | human / operator (not a new agent type) | routes episode; invokes read-only fan-in assembly |
@@ -487,7 +487,7 @@ is practical.
 **Allowed before production GO:**
 
 - read-only forensics;
-- `.tmp/opsx-bug-cases/**` process writes;
+- `.opsx/runs/bug-cases/**` process writes;
 - `tests/**` (+ fixtures) via `/opsx-test`;
 - narrow pytest for RED evidence;
 - RED evidence packets under the case map.
@@ -540,7 +540,7 @@ At RED, also record `TEST_CONTENT_SHA256` of the authoritative test source
 Durable path (recommended):
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
 ```
 
 Required fields:
@@ -573,7 +573,7 @@ STATUS:
 Durable path (recommended):
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md
 ```
 
 Required fields:
@@ -661,7 +661,7 @@ command gates, Owner authority or durable case state.
 
 ```text
 RUNTIME_BRANCH_REGISTRY:
-  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/LEDGER.md
+  .opsx/runs/bug-cases/<ROOT_CASE_ID>/LEDGER.md
   section: ## BRANCH_REGISTRY
 ```
 
@@ -747,7 +747,7 @@ Fan-in is a **read-only rollup procedure** over the case map, performed by
 ### 5.2 Path
 
 ```text
-.tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+.opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 ```
 
 Optional timestamped copies: `results/FANIN-<UTC>.md` with `FANIN.md` as
@@ -851,7 +851,7 @@ Phase 2 GO write of a class rule) requires:
 
 ```text
 FANIN_READY
-∧ FANIN_PATH = .tmp/opsx-bug-cases/<ROOT>/results/FANIN.md
+∧ FANIN_PATH = .opsx/runs/bug-cases/<ROOT>/results/FANIN.md
 ∧ invariant coverage known
 ∧ FIXED rows did not lose RED/GREEN linkage
 ∧ input ≠ root-only anecdote without branch rollup

@@ -1,0 +1,61 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/940a5e161e/OUT",
+  "PACKET_GENERATION": 5,
+  "ORCHESTRATION_ID": "ORCH/bug-team/9745ba6a72d6",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/940a5e161e",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "FINDING_ID": "FINDING-001",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/940a5e161e/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "RED_TEST_WORKER"
+  ],
+  "DEPENDENCY_HASHES": {
+    "RED_TEST_WORKER": {
+      "CANONICAL_SHA256": "ab0838017d0690477611a431568fdedcc038bb38582c2de232b26acc8df1a49f",
+      "RAW_SHA256": "a7e0cea9825eca7f3594926ace0e6d51e1fbe3438e9ccd147c209984dd850f10"
+    }
+  },
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1787929850.2165632,
+  "EXPIRES_AT": 1787933450.2165632,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "MAPS_TO": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ROUTE_RECONCILIATION": "MATCH",
+    "FIX_STATUS": "FIXED_UNCOMMITTED",
+    "SUMMARY": "Early isinstance(BufferedInputFile) passthrough in _get_telegram_file; startswith only on str; BytesIO path kept; type hints and Russian docstrings updated.",
+    "FILES_CHANGED": [
+      "app/file_handler.py"
+    ],
+    "PRODUCTION_HASH_BEFORE": "7d425e30354685dfee73202234529f065ea9d45d334fc913fee114052d6fb458",
+    "PRODUCTION_HASH_AFTER": "480bf4a77a3ca8ad2a467d37c1e1d7560d7b75ea5df0f5d1960e358bc4075215",
+    "FIX_EVIDENCE_PATH": ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/FIX-FINDING-001.md",
+    "TEST_IDS": [
+      "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_image_accepts_buffered_input_file_without_startswith",
+      "tests/unit/test_file_handler_buffered_input_file.py::test_get_telegram_file_accepts_buffered_input_file_without_startswith"
+    ],
+    "PYTEST_COMMAND": "poetry run pytest tests/unit/test_file_handler_buffered_input_file.py -vv --tb=short",
+    "PYTEST_EXIT_CODE": 0,
+    "PYTEST_SUMMARY": "2 passed",
+    "TESTS_EDITED": false,
+    "GREEN_WRITTEN": false,
+    "INTAKE_ID": "INTAKE-001",
+    "CHAT_LABEL": "opsx-bug-team-host",
+    "NEXT_ACTION": "/opsx-test case=BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z finding=FINDING-001 verify"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "app/file_handler.py",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/FIX-FINDING-001.md",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.out.json",
+    ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_940a5e161e.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

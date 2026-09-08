@@ -30,7 +30,7 @@ WORKER_SPECS_DIR: .cursor/pipeline/bug-team/workers/
    - **`model: inherit`** (explicit — see `.cursor/pipeline/shared/MODEL_DISPATCH.md`);
    - unique `WORKER_EXECUTION_ID`;
    - input packet path under
-     `.tmp/opsx-bug-cases/<CASE_ID>/team/packets/`;
+     `.opsx/runs/bug-cases/<CASE_ID>/team/packets/`;
    - required output packet path;
    - `TIMEOUT_SECONDS` / heartbeat contract from `TIMEOUT_POLICY.md`;
    - durable line in `team/DISPATCH.jsonl`.
@@ -86,10 +86,10 @@ write boundary.
 ## Packet I/O convention
 
 ```text
-INPUT:  .tmp/opsx-bug-cases/<CASE_ID>/team/packets/<HOP_ID>.in.md
-OUTPUT: .tmp/opsx-bug-cases/<CASE_ID>/team/packets/<HOP_ID>.out.md
-STATE:  .tmp/opsx-bug-cases/<CASE_ID>/team/CHECKPOINT.md
-TRACE:  .tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+INPUT:  .opsx/runs/bug-cases/<CASE_ID>/team/packets/<HOP_ID>.in.md
+OUTPUT: .opsx/runs/bug-cases/<CASE_ID>/team/packets/<HOP_ID>.out.md
+STATE:  .opsx/runs/bug-cases/<CASE_ID>/team/CHECKPOINT.md
+TRACE:  .opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 See `packets/WORKER_IO.md`.

@@ -35,13 +35,13 @@ emit ready/claimable case-map handoffs (still not hang-budget policy).
 ### Canonical bug-case paths
 
 ```text
-.tmp/opsx-bug-cases/INDEX.md
-.tmp/opsx-bug-cases/<CASE_ID>/CASE.md
-.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md
-.tmp/opsx-bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
-.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md
-.tmp/opsx-bug-cases/<CASE_ID>/results/<RESULT_ID>.md
-.tmp/opsx-bug-cases/<CASE_ID>/handoffs/COMMON_HANDOFF.md
+.opsx/runs/bug-cases/INDEX.md
+.opsx/runs/bug-cases/<CASE_ID>/CASE.md
+.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md
+.opsx/runs/bug-cases/<CASE_ID>/intakes/<INTAKE_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/<RESULT_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/handoffs/COMMON_HANDOFF.md
 ```
 
 ### Canonical OpenSpec change paths
@@ -161,7 +161,7 @@ Applies when an OPSX command is about to emit **any** of:
 
 * `Verdict: ready` that authorizes coordinator/claim-chat opening;
 * a claimable `NEXT_COMMAND` of `/opsx-claim-next-bug …`;
-* an equivalent handoff that assumes rows under `.tmp/opsx-bug-cases/<CASE_ID>/`
+* an equivalent handoff that assumes rows under `.opsx/runs/bug-cases/<CASE_ID>/`
   already exist for adjudication/claim.
 
 This section is **artifact readiness**, not hang-budget policy
@@ -172,7 +172,7 @@ write ownership.
 ### Mandatory producer check
 
 1. Resolve the durable case directory by exact canonical path:
-   `.tmp/opsx-bug-cases/<CASE_ID>/` (or the specific `CASE.md` / `LEDGER.md`
+   `.opsx/runs/bug-cases/<CASE_ID>/` (or the specific `CASE.md` / `LEDGER.md`
    paths the command already requires).
 2. Use a direct existence check only — no repo-wide rediscovery.
 3. If absent:

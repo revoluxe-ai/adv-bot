@@ -21,7 +21,7 @@ rewrite process trees.
 - пакует **целые деревья** (новые файлы внутри подхватываются сами);
 - **всегда all** — параметра `scope=` нет и не будет;
 - source trees не изменяет и не удаляет;
-- пишет только новый zip под `.tmp/opsx-export/`.
+- пишет только новый zip под `opsx-export/`.
 
 ## User input
 
@@ -78,7 +78,7 @@ Zip member paths preserve repo-relative structure (e.g. `openspec/config.yaml`).
 
 ## Authority boundary
 
-- Owns only the export zip artifact under `.tmp/opsx-export/`
+- Owns only the export zip artifact under `opsx-export/`
 - Does **not** stage/commit/push
 - Does **not** mutate include roots
 - Does **not** bypass verify / apply / archive product gates
@@ -144,7 +144,7 @@ BYTES: <n>
 ZIP_ABS_PATH: <absolute filesystem path>
 FILE_URI: file:///...
 ZIP_BYTES: <n>
-WHAT_HAPPENED: copy-only zip written under .tmp/opsx-export/
+WHAT_HAPPENED: copy-only zip written under opsx-export/
 WHY: GO present; always-all roots packed
 CURRENT_STATE: exported
 OWNER_DECISION_REQUIRED: none (copy ZIP_ABS_PATH to target)

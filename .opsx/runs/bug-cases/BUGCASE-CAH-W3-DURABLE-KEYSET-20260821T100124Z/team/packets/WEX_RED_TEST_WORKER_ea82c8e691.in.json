@@ -1,0 +1,43 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1787309139.8522973,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/69aecfc79c/OUT": {
+      "CANONICAL_SHA256": "5fc65c93acc68a61f31bcac527e8b9f4217ada533f8e815ebeddc65749fb36ad",
+      "RAW_SHA256": "d604007098b1b39a3e5f398c59ba452b3cea54d59277aa7e09e5bed12be6037f"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/69aecfc79c/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787312739.8522973,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 3,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ea82c8e691/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/69aecfc79c/OUT",
+  "PAYLOAD": {
+    "CLASSIFIER_PACKET_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\team\\packets\\WEX_CLASSIFIER_69aecfc79c.out.json",
+    "EXPECTED_ROUTE": "ROUTE_A",
+    "REQUIRED_RED_STATUS": "RED_CONFIRMED",
+    "TARGET_TEST_AREAS": [
+      "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py",
+      "tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py",
+      "tests/integration/card_ab_hold/test_load_factual_positions_ch_seam.py"
+    ],
+    "TASK": "Create and run a regression test that fails on the current implementation for ROOT-001: durable confirmed keywords are [alpha, beta], the live factual-position read is a partial result containing only alpha, and W3 must not remove beta from the durable set. The test must distinguish this from a complete authoritative result and stay within tests/**. Do not change production files.",
+    "TEST_COMMAND_CANDIDATE": "poetry run pytest -m unit tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py",
+    "WORKER_ID": "RED_TEST_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/ea82c8e691",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

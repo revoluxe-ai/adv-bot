@@ -5,7 +5,7 @@ argument-hint: "[case=<CASE_ID>] [focus=all|open_candidates|claims|residuals|clo
 
 # /opsx-bug-debt-board
 
-Покажи **весь видимый bug debt** по `.tmp/opsx-bug-cases/` — open findings,
+Покажи **весь видимый bug debt** по `.opsx/runs/bug-cases/` — open findings,
 `OPEN_CANDIDATE` / HARD_BLOCK_READY residuals, CLOSED-with-residual,
 stale claims — и дай **pasteable** next step на каждую строку.
 
@@ -64,8 +64,8 @@ $ARGUMENTS
 ## Authority surfaces
 
 ```text
-INDEX:     .tmp/opsx-bug-cases/INDEX.md          (read; SoT for recovery rows)
-CASES:     .tmp/opsx-bug-cases/<CASE_ID>/        (LEDGER, FANIN, findings, HC-*)
+INDEX:     .opsx/runs/bug-cases/INDEX.md          (read; SoT for recovery rows)
+CASES:     .opsx/runs/bug-cases/<CASE_ID>/        (LEDGER, FANIN, findings, HC-*)
 CONTRACTS: .cursor/pipeline/contracts/bug-episode/FANIN.md
            .cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md
 MATERIALIZE INDEX rules: /opsx-materialize-bug-queue (INDEX writer)
@@ -90,10 +90,10 @@ When unsure whether a residual is still open → emit the row as debt, not silen
 
 ## Scan algorithm
 
-1. If `.tmp/opsx-bug-cases/` missing → `STATUS=BLOCKED` with create hint.
+1. If `.opsx/runs/bug-cases/` missing → `STATUS=BLOCKED` with create hint.
 2. Read `INDEX.md` (bounded). If missing → `BLOCKED` + pasteable
    `/opsx-materialize-bug-queue` (or note that no cases exist yet).
-3. Enumerate case dirs under `.tmp/opsx-bug-cases/` (skip non-case paths).
+3. Enumerate case dirs under `.opsx/runs/bug-cases/` (skip non-case paths).
    If `case=` set → only that case; unknown case → `BLOCKED`.
 4. For each in-scope case, bounded Grep/Read (prefer section reads ≤ 120 lines):
    - `INDEX.md` recovery / CLOSED / RESIDUAL notes for that case
@@ -135,7 +135,7 @@ Never paste close/commit as the primary exit for open debt.
 | `DEBT_FOUND` | ≥1 debt row |
 | `BLOCKED` | missing cases dir / INDEX (when required) / bad `case=` / unknown token |
 
-`CLEAR` with empty `.tmp/opsx-bug-cases/` (no cases ever) is `BLOCKED` or
+`CLEAR` with empty `.opsx/runs/bug-cases/` (no cases ever) is `BLOCKED` or
 explicit empty-board note — prefer `BLOCKED` with create hint if INDEX absent.
 
 ## Authority boundaries
@@ -155,7 +155,7 @@ STATUS: CLEAR | DEBT_FOUND | BLOCKED
 FOCUS: all | open_candidates | claims | residuals | closed_with_debt
 CASE_FILTER: <CASE_ID|all>
 LIMIT: <n>
-INDEX: .tmp/opsx-bug-cases/INDEX.md
+INDEX: .opsx/runs/bug-cases/INDEX.md
 CASES_SCANNED: <n>
 ROWS_SHOWN: <n>
 ROWS_TRUNCATED: yes|no

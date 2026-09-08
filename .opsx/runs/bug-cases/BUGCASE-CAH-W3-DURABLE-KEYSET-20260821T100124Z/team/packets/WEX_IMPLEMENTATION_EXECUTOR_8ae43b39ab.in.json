@@ -1,0 +1,54 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "CHECKPOINT_GENERATION": 7,
+  "CREATED_AT": 1787309906.2460456,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/ea82c8e691/OUT": {
+      "CANONICAL_SHA256": "e45ab7819cc9cc9a276655f4170f7e8302288a802f445558ec605f2ee760038e",
+      "RAW_SHA256": "a07518e79205c96f185f132b72cb8b279a5e4b74ed916009180e58abcf66ac36"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/ea82c8e691/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787313506.2460456,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "PACKET_GENERATION": 4,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/ea82c8e691/OUT",
+  "PAYLOAD": {
+    "ALLOWED_PRODUCTION_AREAS": [
+      "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py",
+      "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py"
+    ],
+    "ALLOWED_TEST_AREAS": [
+      "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py",
+      "tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py",
+      "tests/integration/card_ab_hold/test_load_factual_positions_ch_seam.py"
+    ],
+    "FORBIDDEN": [
+      "git commit",
+      "git push",
+      "deploy",
+      "external mutations",
+      "green confirmation"
+    ],
+    "LOCAL_IMPLEMENTATION_AUTHORIZED": true,
+    "RED_PACKET_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\team\\packets\\WEX_RED_TEST_WORKER_ea82c8e691.out.json",
+    "RED_STATUS": "RED_CONFIRMED",
+    "REGRESSION_TEST_ID": "tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py::test_tp_confirm_all_does_not_shrink_durable_set_for_partial_live_read",
+    "TASK": "Implement ROOT-001 so a partial live factual-position read cannot shrink the durable confirmed keyword set. Preserve already confirmed keywords when the live read is incomplete; do not silently interpret a strict subset as authoritative invalidation. Keep any complete authoritative invalid-position behavior explicit and covered. Make the smallest safe production change, update/add focused tests as needed, preserve existing public API behavior, and add required Russian docstrings for changed business-logic public artifacts. Run the RED test and adjacent tests.",
+    "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/8ae43b39ab",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+}

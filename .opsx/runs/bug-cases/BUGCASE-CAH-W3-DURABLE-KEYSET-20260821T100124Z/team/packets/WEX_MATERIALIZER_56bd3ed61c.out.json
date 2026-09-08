@@ -1,0 +1,67 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/MATERIALIZER/56bd3ed61c/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/bug-team-8a50117e813e",
+  "WORKER_EXECUTION_ID": "WEX/MATERIALIZER/56bd3ed61c",
+  "WORKER_ID": "MATERIALIZER",
+  "CASE_ID": "BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+  "FINDING_ID": null,
+  "PARENT_PACKET_ID": "PKT/WEX/MATERIALIZER/56bd3ed61c/IN",
+  "DEPENDENCY_PACKET_IDS": [],
+  "DEPENDENCY_HASHES": {},
+  "CHECKPOINT_GENERATION": 1,
+  "CREATED_AT": 1787307060.0,
+  "EXPIRES_AT": 1787310660.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "RAW_INTAKE_TEXT": "\u0414\u0430, \u0432 \u0442\u0430\u043a\u043e\u043c \u0441\u043b\u0443\u0447\u0430\u0435 \u0443\u0431\u0438\u0440\u0430\u0442\u044c \u043a\u043b\u044e\u0447 \u043d\u0435\u043b\u044c\u0437\u044f",
+    "RAW_INTAKE_SOURCE": "USER_MESSAGE",
+    "RAW_INTAKE_RECEIVED_AT": "2026-08-21T10:01:24.329377+00:00",
+    "RAW_INTAKE_HASH": "c7da421822d1fdcfcbe074983e872b0434294e2e2f88e86de3dd42a606bf67cc",
+    "OBSERVED_BEHAVIOR": "A partial live factual-position response can be filtered into a subset and persisted as card_ab_hold_confirmed_keywords_json, which may remove a previously confirmed durable keyword.",
+    "EXPECTED_BEHAVIOR_CANDIDATE": "An already confirmed durable keyword must not be removed solely because a live factual-position read is partial; this remains a candidate expectation pending classification.",
+    "AFFECTED_AREA_CANDIDATE": "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py; app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py",
+    "REPRODUCTION_INFORMATION": "Partial live factual-position response during on_tp_confirm_all; no standalone reproduction steps or runtime capture supplied.",
+    "EVIDENCE_REFERENCES": [
+      "CURRENT_CHAT_CONTEXT from the input packet",
+      "WEX/MATERIALIZER/56bd3ed61c input packet",
+      "RAW_INTAKE_HASH c7da421822d1fdcfcbe074983e872b0434294e2e2f88e86de3dd42a606bf67cc"
+    ],
+    "INFERRED_ASSUMPTIONS": [
+      "The partial live response is possible in the described execution path.",
+      "The supplied persistence path is the relevant durable write path."
+    ],
+    "UNRESOLVED_QUESTIONS": [
+      "Whether the partial response is distinguishable from an authoritative empty result.",
+      "What merge or retention rule is required at the durable epoch boundary.",
+      "Whether the supplied path reproduces the report in the current repository state."
+    ],
+    "INTAKE_SUFFICIENCY": "SUFFICIENT_FOR_CLASSIFICATION",
+    "DUPLICATE_SEARCH_ROOT": ".tmp/opsx-bug-cases",
+    "DUPLICATE_OUTCOME": "NEW_CASE_CREATED",
+    "DUPLICATE_MATCHES": [],
+    "EXISTING_ROOT": false,
+    "ROOT_FINDING_CREATED": true,
+    "ROOT_FINDING_ID": "ROOT-001",
+    "PRODUCTION_CLASSIFICATION_SET": false,
+    "FIX_PROPOSED": false,
+    "CASE_PATH": ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z",
+    "INTAKE_PATH": ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/intakes/INTAKE-001.md",
+    "FINDING_PATH": ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/findings/ROOT-001.md",
+    "LEDGER_PATH": ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/LEDGER.md",
+    "PROCESS_ID_OR_TASK_ID": "WEX/MATERIALIZER/56bd3ed61c",
+    "NEXT_ACTION": "/opsx-classify-bug case=BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z finding=ROOT-001"
+  },
+  "ARTIFACTS_WRITTEN": [
+    ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/intakes/INTAKE-001.md",
+    ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/findings/ROOT-001.md",
+    ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/CASE.md",
+    ".tmp/opsx-bug-cases/BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z/LEDGER.md"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

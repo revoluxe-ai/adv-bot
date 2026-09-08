@@ -1,0 +1,9 @@
+{
+  "STARTED_AT": 1787307333.333798,
+  "LAST_HEARTBEAT_AT": 1787308733.4571707,
+  "PROGRESS_MARKER": "packet_written_validation_pending",
+  "PROCESS_ID_OR_TASK_ID": "WEX/CLASSIFIER/69aecfc79c",
+  "ATTEMPT": 1,
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\team\\CHECKPOINT.json",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot\\.tmp\\opsx-bug-cases\\BUGCASE-CAH-W3-DURABLE-KEYSET-20260821T100124Z\\team\\packets\\WEX_CLASSIFIER_69aecfc79c.out.json"
+}

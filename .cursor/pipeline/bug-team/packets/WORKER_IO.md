@@ -9,8 +9,8 @@ RUNTIME_STATUS: NOT_ACTIVE
 ## Paths
 
 ```text
-INPUT:  .tmp/opsx-bug-cases/<CASE_ID>/team/packets/<WEX>.in.md
-OUTPUT: .tmp/opsx-bug-cases/<CASE_ID>/team/packets/<WEX>.out.md
+INPUT:  .opsx/runs/bug-cases/<CASE_ID>/team/packets/<WEX>.in.md
+OUTPUT: .opsx/runs/bug-cases/<CASE_ID>/team/packets/<WEX>.out.md
 ```
 
 ## Write safety (mandatory — packets / JSONL)

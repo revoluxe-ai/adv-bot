@@ -1,0 +1,21 @@
+{
+  "PROOF_ID": "PROOF-CLASSIFIER-300e4e0437",
+  "WORKER_ID": "CLASSIFIER",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/300e4e0437",
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "FINDING_ID": "FINDING-001",
+  "CLASSIFICATION": "IMPLEMENTATION_BUG",
+  "CHOSEN_ROUTE": "ROUTE_A",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "EVIDENCE": {
+    "public_signature": "get_telegram_image(image_path: str | BufferedInputFile)",
+    "defect_line": "app/file_handler.py:59 image_path.startswith(\"http\")",
+    "stack": "setting_keywords_by_adv -> AdvKeywordsSetting -> get_telegram_image -> _get_telegram_file"
+  },
+  "ROUTE_TRACE_EVENTS": [
+    "RTE/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/6",
+    "RTE/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/7"
+  ],
+  "CREATED_AT": "2026-08-28T14:58:45Z"
+}

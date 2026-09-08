@@ -274,8 +274,8 @@ Before **any** OpenSpec planning write, TASK_DELTA write, or route-state
 mutation on a bug episode, read durable classification evidence from:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
-.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md  → ## ROUTE_STATE
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md  → ## ROUTE_STATE
 ```
 
 Required durable receipt (all must hold; do **not** silently infer missing
@@ -426,7 +426,7 @@ CURRENT_ROUTE            → CURRENT_ROUTE_STATE (best-effort)
    `TASK_DELTA` evidence under:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
 ```
 
 3. After TASK_DELTA:
@@ -547,7 +547,7 @@ On every significant bug-episode hop (including hard-stop blockers and
 successful update / task_delta_decision), append **one** JSONL line to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Required fields:

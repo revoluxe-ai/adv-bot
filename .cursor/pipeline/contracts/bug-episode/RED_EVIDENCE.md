@@ -5,7 +5,7 @@ Policy SoT: `.cursor/pipeline/ORCHESTRATION_MVP.md` §2.2.
 ## Durable path
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
 ```
 
 ## Required fields

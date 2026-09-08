@@ -147,7 +147,7 @@ When `write=disk` (default):
 1. If archive root resolved:
    `openspec/changes/archive/<YYYY-MM-DD-change>/DISTRIBUTION_BRIEF.md`
 2. Else (active/DRAFT):
-   `.tmp/opsx-distribute/<CHANGE_ID>/DISTRIBUTION_BRIEF.md`
+   `.opsx/runs/distribute/<CHANGE_ID>/DISTRIBUTION_BRIEF.md`
 
 Create parent dirs if needed. Overwrite only the brief file. Never touch other
 archive artifacts.

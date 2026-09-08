@@ -44,7 +44,7 @@ NEXT_COMMAND: /opsx-meta-bootstrap
 
 1. Inventory imported/raw/**bootstrap-staged** surfaces (commands, rules,
    pipeline, openspec, `.opsx`). Prefer citing
-   `.tmp/opsx-bootstrap/*/MERGE_RECEIPT.md` when present in this chat.
+   `.opsx/runs/bootstrap/*/MERGE_RECEIPT.md` when present in this chat.
 2. Classify each: `KEEP` / `DELETE` / `REWRITE` / `DEFER`.
 3. Enumerate destructive paths — and mark which are **forbidden** on this
    product tree (existing WB `openspec/**` must stay).

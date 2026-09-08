@@ -213,7 +213,7 @@ Authority: `.cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md`.
 When the change is tied to a durable bug case (`case=` in request, design,
 ROUTE_STATE, or tasks mention `BUGCASE-…`):
 
-1. Read `.tmp/opsx-bug-cases/INDEX.md` and the case LEDGER/finding rows
+1. Read `.opsx/runs/bug-cases/INDEX.md` and the case LEDGER/finding rows
    (bounded; do not invent IDs).
 2. Soft-report `OPEN_LINKED_FINDINGS`, `CLOSE_FINDING_INTENT`,
    `POST_GREEN_OWNER`, whether GREEN exists, and pasteable handback if
@@ -228,7 +228,7 @@ ROUTE_STATE, or tasks mention `BUGCASE-…`):
    `/opsx-materialize-bug-queue mode=update … close=fixed` (solo only).
 6. Soft recommend cross-case debt inventory (does not change GO/NO_GO alone):
    `/opsx-bug-debt-board case=<CASE_ID>` when a linked case is known, else
-   `/opsx-bug-debt-board` when `.tmp/opsx-bug-cases/INDEX.md` exists.
+   `/opsx-bug-debt-board` when `.opsx/runs/bug-cases/INDEX.md` exists.
    Surface CLOSED_WITH_RESIDUAL / OPEN_CANDIDATE / HARD_BLOCK_READY debt
    in the soft linked-cards section if the board would show rows.
 

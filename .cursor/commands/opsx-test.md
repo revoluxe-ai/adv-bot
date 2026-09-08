@@ -262,7 +262,7 @@ On every significant hop that touches a durable case map, append **one**
 JSONL event to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl
 ```
 
 Mandatory identity/order fields on every event:
@@ -334,7 +334,7 @@ NEXT_ACTION: /opsx-close-external-gap
 - Prefer minimal targeted tests over broad rewrites.
 - Do not create fake passing tests that only assert trivial behavior.
 - In bug-regression / verify modes: also allow durable writes under
-  `.tmp/opsx-bug-cases/<CASE_ID>/results/` for RED/GREEN evidence only
+  `.opsx/runs/bug-cases/<CASE_ID>/results/` for RED/GREEN evidence only
   (and materialize field updates for evidence paths via
   `/opsx-materialize-bug-queue mode=update`).
 
@@ -358,8 +358,8 @@ Allowed:
 - test fixtures under `tests/**`
 - test factories under `tests/**`
 - test-only helpers under `tests/**`
-- `.tmp/opsx-bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md` (bug-regression)
-- `.tmp/opsx-bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md` (verify mode only)
+- `.opsx/runs/bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md` (bug-regression)
+- `.opsx/runs/bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md` (verify mode only)
 - case-map evidence path fields via materialize `mode=update` (paths only)
 
 Forbidden unless explicitly approved:
@@ -525,7 +525,7 @@ finding=<FINDING_ID>
 ```
 
 Resolve durable finding packet first
-(`.tmp/opsx-bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`).
+(`.opsx/runs/bug-cases/<CASE_ID>/findings/<FINDING_ID>.md`).
 
 ### Allowed / forbidden
 
@@ -551,7 +551,7 @@ FAILURE_MATCH: YES | NO
 4. Write durable RED evidence:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/RED-<FINDING_ID>.md
 ```
 
 Schema: `.cursor/pipeline/contracts/bug-episode/RED_EVIDENCE.md`.
@@ -683,7 +683,7 @@ GREEN_BLOCKED_PENDING_TEST_DELTA_REVIEW
 5. If pass + hash match (or approved non-weaken delta): write
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md
+.opsx/runs/bug-cases/<CASE_ID>/results/GREEN-<FINDING_ID>.md
 ```
 
    Schema: `.cursor/pipeline/contracts/bug-episode/GREEN_EVIDENCE.md`.

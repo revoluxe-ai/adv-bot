@@ -4,7 +4,7 @@
 SCHEMA: bug-episode/TASK_DELTA
 POLICY_SOT: .cursor/pipeline/ORCHESTRATION_MVP.md
 RUNTIME_PATH (recommended):
-  .tmp/opsx-bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
+  .opsx/runs/bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
 ```
 
 ## Role
@@ -74,7 +74,7 @@ EXPECTED_EXECUTION_ROUTE:
   | /opsx-fix-bug
 
 TASK_DELTA_EVIDENCE_PATH:
-  .tmp/opsx-bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
+  .opsx/runs/bug-cases/<CASE_ID>/results/TASK-DELTA-<FINDING_ID>.md
 
 DECISION_REASON:
 

@@ -5,7 +5,7 @@ SCHEMA: opsx-bug-team/CHECKPOINT
 IMPLEMENTATION_STATUS: IMPLEMENTED_NOT_VALIDATED
 RUNTIME_STATUS: NOT_ACTIVE
 RUNTIME_PATH:
-  .tmp/opsx-bug-cases/<CASE_ID>/team/CHECKPOINT.md
+  .opsx/runs/bug-cases/<CASE_ID>/team/CHECKPOINT.md
 ```
 
 ## Required fields

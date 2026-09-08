@@ -5,7 +5,7 @@ Policy SoT: `.cursor/pipeline/ORCHESTRATION_MVP.md` §5.
 ## Path
 
 ```text
-.tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+.opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 ```
 
 ## Assembler write boundary
@@ -14,7 +14,7 @@ Policy SoT: `.cursor/pipeline/ORCHESTRATION_MVP.md` §5.
 PRODUCTION_READ_ONLY: YES
 COMMAND_AND_GRAPH_READ_ONLY: YES
 CASE_MAP_WRITE_ALLOWED:
-  .tmp/opsx-bug-cases/<ROOT_CASE_ID>/results/FANIN.md
+  .opsx/runs/bug-cases/<ROOT_CASE_ID>/results/FANIN.md
 ALL_OTHER_WRITES: DENIED
 Mechanism: /opsx-materialize-bug-queue mode=fanin_assemble
 NEW_SLASH: /opsx-fan-in-* FORBIDDEN

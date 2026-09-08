@@ -10,7 +10,7 @@ RUNTIME_STATUS: NOT_ACTIVE
 Sole allowed write:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/results/FANIN.md
+.opsx/runs/bug-cases/<CASE_ID>/results/FANIN.md
 ```
 
 Forbidden for FAN_IN_ASSEMBLER:
@@ -38,9 +38,9 @@ Mechanism alignment: live
 Allowed:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/team/**          # packets, checkpoint, DISPATCH
-.tmp/opsx-bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl  # append only
-.tmp/opsx-bug-cases/<CASE_ID>/LEDGER.md  ## ROUTE_STATE / team summary only
+.opsx/runs/bug-cases/<CASE_ID>/team/**          # packets, checkpoint, DISPATCH
+.opsx/runs/bug-cases/<CASE_ID>/results/ROUTE-TRACE.jsonl  # append only
+.opsx/runs/bug-cases/<CASE_ID>/LEDGER.md  ## ROUTE_STATE / team summary only
 ```
 
 Forbidden:

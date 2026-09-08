@@ -1,0 +1,45 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/PROOF-HUNT-BOUNDED-HUNTER-001.md",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_f3e8ab146c.json",
+    "team/packets/WEX_BOUNDED_HUNTER_f3e8ab146c.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "CHECKPOINT_GENERATION": 10,
+  "CREATED_AT": 1787304077.9748976,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/ec8ace112d/OUT": {
+      "CANONICAL_SHA256": "4f27834f48b54212c78555ce12a2b547f87f8011da475a2126a08ea29e99d898",
+      "RAW_SHA256": "3460a2f734aa488600da66e7b7b76d2a5ce739398558286d4a0f45ddae50727e"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/ec8ace112d/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1787307677.9748976,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/bug-team-c1f8a3a34110",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/f3e8ab146c/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/f3e8ab146c/IN",
+  "PAYLOAD": {
+    "CANDIDATES": [],
+    "HUNT_EFFECTIVENESS": "HIGH_WITHIN_DECLARED_SCOPE",
+    "HUNT_FALSE_NEGATIVE_RISK": "LOW_WITHIN_DECLARED_SCOPE; files and callbacks outside the declared packet scope were not inspected",
+    "HUNT_RESULT": "CLEAR",
+    "HUNT_SCOPE": [
+      "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py",
+      "app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py",
+      "public destructive EXIT callback paths that can open a write session or trigger epoch cleanup"
+    ]
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/f3e8ab146c",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

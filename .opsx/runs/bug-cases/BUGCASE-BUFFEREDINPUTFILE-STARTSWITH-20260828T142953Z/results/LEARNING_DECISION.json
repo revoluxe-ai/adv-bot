@@ -1,0 +1,41 @@
+{
+  "LEARNING_DECISION_ID": "LDEC/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/84784b2d65",
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "BUG_FAMILY_ID": null,
+  "INVARIANT_ID": "TYPE_UNION_STR_METHOD_ON_INPUTFILE",
+  "LEARNING_STAGE_INVOKED": true,
+  "LEARNING_VERDICT": "LOCAL_CASE_NOTE_ONLY",
+  "POLICY_ALREADY_EXISTS": false,
+  "POLICY_REFS": [],
+  "ENFORCEMENT_GAP": "none",
+  "PROMOTION_DECISION": "NONE",
+  "RECOMMENDATIONS": {
+    "STATIC_CHECK_CANDIDATE": false,
+    "PROJECT_WIDE_HUNT_REQUEST": false,
+    "TESTING_RULES_CANDIDATE": false
+  },
+  "FULL_PACKET_REQUIRED": false,
+  "FULL_PACKET_PATH": null,
+  "SOURCE_FANIN_PATH": "results/FANIN.md",
+  "SOURCE_FANIN_HASH": "552a17158d5f79a3ff5fc3c42317624fab12bb15a5a4e647dab6efe3d565d219",
+  "SOURCE_ARTIFACT_PATHS": {
+    "FANIN": "results/FANIN.md",
+    "HUNT": "results/HUNT-FINDING-001.md",
+    "GREEN": "results/GREEN-FINDING-001.md",
+    "FIX": "results/FIX-FINDING-001.md",
+    "RED": "results/RED-FINDING-001.md"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FANIN": "552a17158d5f79a3ff5fc3c42317624fab12bb15a5a4e647dab6efe3d565d219",
+    "HUNT": "a9adf9a58188ca35fdd5c387b3a69322b963a3690294d31ee49d8c12702dbb34",
+    "GREEN": "ed2acc74e8df96157e7eb6f0dce99c91e038d426448145207b4f3cce95b5e8d3",
+    "FIX": "0ce44550149d3d4c388ac8b12a328c8e814a1c590419a721f950350ec4721855",
+    "RED": "3a8a4019a3c7ffb05fbb58d5abc4a167828ed5c6c4e02a589f3275620ae5d04f"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "DECISION_RATIONALE": "Episode-only single-site fix: BufferedInputFile passthrough before startswith in app/file_handler.py:_get_telegram_file. Bounded hunt CLEAR with zero SAME_INVARIANT candidates; no family/ materialized. Local case note only - no class lesson, compliance enforcement, or promotion queue. PREVENTION/REUSABLE_CHECK notes in FANIN remain non-binding commentary, not promotion evidence.",
+  "CREATED_AT": "2026-08-28T15:40:57Z",
+  "PRODUCT_CLOSURE_VALID": true,
+  "PROCESS_METADATA_CORRECTED": false,
+  "DECISION_HASH": "9cd35664e3e5f532065435bff860f9f8e9f752503aeb8f4402a033b7867afd77"
+}

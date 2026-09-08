@@ -1,0 +1,127 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/300e4e0437/OUT",
+  "PACKET_GENERATION": 3,
+  "ORCHESTRATION_ID": "ORCH/bug-team/9745ba6a72d6",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/300e4e0437",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z",
+  "FINDING_ID": "FINDING-001",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/300e4e0437/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "MATERIALIZER",
+    "CLAIM_WORKER"
+  ],
+  "DEPENDENCY_HASHES": {
+    "CLAIM_WORKER": {
+      "CANONICAL_SHA256": "d7a7fa2b98c23dfd65b93af2908890e0d07253c9dc8fb020754a797585de6f8f",
+      "RAW_SHA256": "11531659ea77f89f6c8034495d552dc37d146003c59432783bbe0142c3456e57"
+    },
+    "MATERIALIZER": {
+      "CANONICAL_SHA256": "ffa91c0751fd6d8f02c5bcf6c7d5f703edf105145e66b48eee24d383500fa12d",
+      "RAW_SHA256": "a0e22b9e7dd2c0aad38bf49382920ecbd974fe03b00f78a4bfa31bd97c4e717d"
+    }
+  },
+  "CHECKPOINT_GENERATION": 3,
+  "CREATED_AT": 1787929125.0,
+  "EXPIRES_AT": 1787932725.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+    "CHAT_LABEL": "opsx-bug-team-host",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-fix-bug",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A selected; awaiting /opsx-fix-bug WITHOUT GO.",
+    "CURRENT_ROUTE_STATE": "AWAITING_FIX_BUG",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "VERDICT_SUMMARY": "get_telegram_image typed as str|BufferedInputFile but _get_telegram_file calls startswith without InputFile guard; production AdvKeywordsSetting stack proves AttributeError.",
+    "SOURCE_RESOLUTION": {
+      "mode": "canonical_id",
+      "primary_path": ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/findings/FINDING-001.md",
+      "fallback_used": false,
+      "search_operations": 0,
+      "search_scope": "none",
+      "unresolved_gap": null
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Telegram UX message / image render",
+      "entrypoints": [
+        "keyword_settings.setting_keywords_by_adv",
+        "AdvKeywordsSetting.__call__",
+        "file_handler.get_telegram_image",
+        "file_handler._get_telegram_file"
+      ],
+      "dead_or_legacy_path": "no"
+    },
+    "SPEC_EVIDENCE": {
+      "status": "explicit_spec_contract",
+      "evidence": "app/file_handler.py:20 get_telegram_image(image_path: str | BufferedInputFile) already declares BufferedInputFile acceptance; implementation at line 59 calls startswith without isinstance(InputFile|BufferedInputFile) early return.",
+      "gap": null
+    },
+    "NEXT_COMMAND": "/opsx-fix-bug case=BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z intake=INTAKE-001 finding=FINDING-001 claim_token=CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+    "NEXT_COMMAND_ARGS": "case=BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z intake=INTAKE-001 finding=FINDING-001 claim_token=CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "CLASSIFYING",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_FIX_BUG",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z intake=INTAKE-001 finding=FINDING-001 claim_token=CLAIM/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/FINDING-001/2026-08-28T14:46:12Z",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "not_applicable",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "ROUTE-TRACE classification_route_selection"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_FIX_BUG",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "ALLOWED_FIX_FILES": [
+      "app/file_handler.py"
+    ],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/** (except required regression after RED)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "unit test: _get_telegram_file / get_telegram_image with BufferedInputFile must not call startswith; return passthrough or valid InputFile",
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit/ -k file_handler -q",
+    "ROUTE_TRACE_PATH": ".tmp/opsx-bug-cases/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "LAST_ROUTE_EVENT_ID": "RTE/BUGCASE-BUFFEREDINPUTFILE-STARTSWITH-20260828T142953Z/7",
+    "WORKER_META_STARTED_AT": "2026-08-28T14:57:00Z",
+    "WORKER_META_COMPLETED_AT": "2026-08-28T14:58:45Z",
+    "WORKER_META_LAST_HEARTBEAT_AT": "2026-08-28T14:58:30Z",
+    "WORKER_META_PARENT_ORCHESTRATION_ID": "ORCH/bug-team/9745ba6a72d6",
+    "WORKER_META_ERROR": null
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/ROUTE-TRACE.jsonl",
+    "LEDGER.md",
+    "team/heartbeats/WEX_CLASSIFIER_300e4e0437.json",
+    "team/packets/WEX_CLASSIFIER_300e4e0437.out.json",
+    "results/PROOF-CLASSIFIER-300e4e0437.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

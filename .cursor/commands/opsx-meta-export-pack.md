@@ -23,7 +23,7 @@ newline_normalization: none
 - OpenSpec static: `openspec/config.yaml`, `policies`, `schemas`, `specs`, `decisions`, `tools`
 - Project-local OPSX: `.opsx/adapters/**`, `.opsx/registry/**`, `.opsx/shared/**`,
   `.opsx/project/**`, `.opsx/import/**`, `.opsx/manifest.yaml`, `.opsx/projectization.yaml`
-- Export writes **only**: `.tmp/opsx-export/<utc_ts>/`
+- Export writes **only**: `opsx-export/<utc_ts>/`
 
 ### Hard target bans
 
@@ -39,7 +39,7 @@ newline_normalization: none
 
 ### Projectization gate
 
-Read `.opsx/projectization.yaml` before any write under `.tmp/opsx-export/`.
+Read `.opsx/projectization.yaml` before any write under `opsx-export/`.
 If `status` != `COMPLETE` or `normal_commands_enabled` is false:
 
 ```text
@@ -53,7 +53,7 @@ NEXT_COMMAND: /opsx-projectize
 # /opsx-meta-export-pack
 
 Side-lane **copy-only** utility: collect allowlisted OPSX / OpenSpec surfaces into
-a new zip under `.tmp/opsx-export/<utc_ts>/`, print the **absolute** archive path,
+a new zip under `opsx-export/<utc_ts>/`, print the **absolute** archive path,
 and leave every source tree untouched.
 
 ```text
@@ -122,7 +122,7 @@ Unrecognized tokens that request delete/cleanup/rm → `REFUSED_DELETE_REQUEST`.
 
 | Input | Mode | Writes |
 |---|---|---|
-| default / any scope flags | `COPY_ONLY` | **only** new files under `.tmp/opsx-export/<utc_ts>/` |
+| default / any scope flags | `COPY_ONLY` | **only** new files under `opsx-export/<utc_ts>/` |
 | `GO` | ignored for extra power | same — still COPY_ONLY; never delete |
 | delete / cleanup / rm requests | refuse | **no** writes that remove anything |
 
@@ -134,7 +134,7 @@ MUST NOT:
 
 - delete, unlink, truncate, move, or rename any source path;
 - `git clean`, `git reset --hard`, or overwrite existing export dirs;
-- write outside `.tmp/opsx-export/<utc_ts>/`;
+- write outside `opsx-export/<utc_ts>/`;
 - stage or commit the zip;
 - expand allowlist into `src/`, `public/`, `backend/` application code, `.env*`,
   secrets, or IDE prefs (`.cursor/settings.json`);
@@ -240,7 +240,7 @@ FAILURE_OR_RECOVERY_STEP: leave partial export dir; never delete sources; re-run
    `STATUS: REFUSED_DELETE_REQUEST`, stop, no writes.
 3. Resolve `scope` (default=`default`) and optional include flags.
 4. Build include-root list from allowlist; verify at least one root exists.
-5. Create `.tmp/opsx-export/<utc_ts>/` (utc like `20260805-191530`).
+5. Create `opsx-export/<utc_ts>/` (utc like `20260805-191530`).
 6. Copy allowlisted trees into a staging folder **or** add directly to zip
    with stable relative paths from repo root. Prefer zip name:
    `opsx-pack.zip`.
@@ -257,7 +257,7 @@ FAILURE_OR_RECOVERY_STEP: leave partial export dir; never delete sources; re-run
 - Never `rm -rf` staging of **sources**. Staging under the new export dir may
   be left as-is after zip; do not delete source trees to “clean up”.
 - Cleaning the export staging folder after zip is **optional** and only allowed
-  **inside** the new `.tmp/opsx-export/<utc_ts>/` directory created this run —
+  **inside** the new `opsx-export/<utc_ts>/` directory created this run —
   never outside it. Prefer leaving staging + zip both present if unsure.
 - Time-budget large `include_archived_changes` / `include_upstream_snapshot`
   walks; on hang → `BLOCKED_IO`.
@@ -323,7 +323,7 @@ the same chat for other reasons — never to commit the zip.
 ## Anti-patterns
 
 - Naming or describing this as “archive the change”
-- Deleting old `.tmp/opsx-export/*` “to save space” from this command
+- Deleting old `opsx-export/*` “to save space” from this command
 - Dumping whole monorepo / `src/` / `public/`
 - Committing `opsx-pack.zip` into `.cursor/`
 - Using `GO` to unlock delete
@@ -334,7 +334,7 @@ the same chat for other reasons — never to commit the zip.
 Before returning:
 
 - [ ] `delete_performed: false`
-- [ ] Writes only under this run’s `.tmp/opsx-export/<utc_ts>/`
+- [ ] Writes only under this run’s `opsx-export/<utc_ts>/`
 - [ ] `absolute_archive_path` is absolute and clickable/copyable
 - [ ] Not confused with `/opsx-archive` or `/opsx-meta-import-command`
 - [ ] Allowlist not expanded into product/secrets
@@ -434,7 +434,7 @@ HARD **exclude** (always, any scope that walks trees): `opsx-export/**` —
 this command’s write-root at repo root; never nest prior export zips into a
 new pack. `opsx-export/**` is **not** an include root; always
 `SKIPPED (write-root nesting ban)` in ROOT_COVERAGE.
-Optional note for legacy leftovers under `.tmp/opsx-export/**` is OK;
+Optional note for legacy leftovers under `opsx-export/**` is OK;
 that path is **not** this command’s write-root anymore.
 Skip under `.tmp` walks: `__pycache__/`, `*.pyc`, `.pytest_cache/`,
 `node_modules/`, and other obvious junk dirs.
@@ -526,7 +526,7 @@ FAILURE_OR_RECOVERY_STEP: leave partial artifacts under opsx-export/<utc_ts>/; n
   absolute path receipt + ROOT_COVERAGE.
 - Deleting old `opsx-export/*` “to save space” from this command
 - Nesting prior `opsx-export/**` contents into a new pack
-- Writing under `.tmp/opsx-export/` again (legacy; write-root is repo-root
+- Writing under `opsx-export/` again (legacy; write-root is repo-root
   `opsx-export/`)
 - Flat multi-run dump under `opsx-export/` without `opsx-export/<utc_ts>/`
 - Omitting `absolute_export_dir_path` from the receipt

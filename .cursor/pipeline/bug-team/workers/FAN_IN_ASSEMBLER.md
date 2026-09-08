@@ -36,7 +36,7 @@ If any remain undisposed → emit `FANIN_INCOMPLETE` and pasteable
 
 ```text
 ALLOWED:
-  ONLY .tmp/opsx-bug-cases/<CASE_ID>/results/FANIN.md
+  ONLY .opsx/runs/bug-cases/<CASE_ID>/results/FANIN.md
 FORBIDDEN:
   LEDGER; ROUTE-TRACE; CASE; findings; INDEX; production; tests; OpenSpec; .cursor; checkpoint
 ```

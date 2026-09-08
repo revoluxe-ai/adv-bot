@@ -6,7 +6,7 @@ Policy SoT: `.cursor/pipeline/ORCHESTRATION_MVP.md` §6.
 
 ```text
 FANIN_READY
-AND FANIN_PATH = .tmp/opsx-bug-cases/<ROOT>/results/FANIN.md exists
+AND FANIN_PATH = .opsx/runs/bug-cases/<ROOT>/results/FANIN.md exists
 AND coverage assessed (invariant coverage known)
 AND FIXED branches contain RED/GO/FIX/GREEN evidence linkage
 AND input ≠ root-only anecdote without branch rollup

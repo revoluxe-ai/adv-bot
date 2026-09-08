@@ -61,8 +61,8 @@ arguments:
     TIMEOUT_SECONDS: <n>
     ATTEMPT: <n>
     MAX_ATTEMPTS: <n>
-    CHECKPOINT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/CHECKPOINT.md
-    HEARTBEAT_PATH: .tmp/opsx-bug-cases/<CASE_ID>/team/heartbeats/<WEX>.json
+    CHECKPOINT_PATH: .opsx/runs/bug-cases/<CASE_ID>/team/CHECKPOINT.md
+    HEARTBEAT_PATH: .opsx/runs/bug-cases/<CASE_ID>/team/heartbeats/<WEX>.json
     MODEL_SELECTION_POLICY: inherit
     FORBIDDEN: do not perform other workers' duties
     FORBIDDEN: bash heredoc (cat <<EOF / <<'EOF') for multi-line JSON/Python/packet writes
@@ -104,7 +104,7 @@ Child worker `TIMEOUT_SECONDS` rows in `TIMEOUT_POLICY.md` still apply
 After each Task launch / completion, orchestrator appends one line to:
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/team/DISPATCH.jsonl
+.opsx/runs/bug-cases/<CASE_ID>/team/DISPATCH.jsonl
 ```
 
 Required fields:

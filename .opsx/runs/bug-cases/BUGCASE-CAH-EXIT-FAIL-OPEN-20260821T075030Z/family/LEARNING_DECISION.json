@@ -1,0 +1,46 @@
+{
+  "LEARNING_DECISION_ID": "LD/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/ROOT-001",
+  "CASE_ID": "BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z",
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/ROOT-001/EXIT-FAIL-CLOSED",
+  "INVARIANT_ID": "INV/BUGCASE-CAH-EXIT-FAIL-OPEN-20260821T075030Z/ROOT-001/EXIT-FAIL-CLOSED",
+  "LEARNING_STAGE_INVOKED": true,
+  "LEARNING_VERDICT": "EXISTING_POLICY_COMPLIANCE_FAILURE",
+  "POLICY_ALREADY_EXISTS": true,
+  "POLICY_REFS": [
+    ".cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json",
+    ".cursor/pipeline/bug-team/contracts/LEARNING_DECISION.md"
+  ],
+  "ENFORCEMENT_GAP": "none",
+  "PROMOTION_DECISION": "RESOLVED_NO_PROMOTE",
+  "RECOMMENDATIONS": {
+    "STATIC_CHECK_CANDIDATE": false,
+    "PROJECT_WIDE_HUNT_REQUEST": false,
+    "TESTING_RULES_CANDIDATE": false
+  },
+  "FULL_PACKET_REQUIRED": false,
+  "FULL_PACKET_PATH": null,
+  "SOURCE_FANIN_PATH": "results/FAMILY-FANIN.md",
+  "SOURCE_FANIN_HASH": "0b4c605225242af629396b1d58a9583adcb8e85a293e4dd57272c871b33b7fcf",
+  "SOURCE_ARTIFACT_PATHS": [
+    "family/INVARIANT.md",
+    "results/FAMILY-FANIN.md",
+    "results/GREEN-ROOT-001.md",
+    "results/PROOF-HUNT-BOUNDED-HUNTER-001.md",
+    "team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.out.json"
+  ],
+  "SOURCE_ARTIFACT_HASHES": {
+    "family/INVARIANT.md": "8c6075cc362f8d9c34b1a91f0baa3f488f0d00f2d729854a142b72d1880f29ff",
+    "results/FAMILY-FANIN.md": "0b4c605225242af629396b1d58a9583adcb8e85a293e4dd57272c871b33b7fcf",
+    "results/GREEN-ROOT-001.md": "2ccd0a94d7ff08ede4cc73e5e661083ab3e5e5ab86cd743d8f1694eadf07abd0",
+    "results/PROOF-HUNT-BOUNDED-HUNTER-001.md": "6dda5abad047c698837bdefebfbead4c698348539a6bffd02ad007afc1b79189",
+    "team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_cf218809d3.out.json": "80668e71155831452270a5060906a266cf698723a7d37d68821e73a7ca3fe362"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "DECISION_RATIONALE": "The family is closure-ready and the bounded hunt is CLEAR. The observed fail-open behavior was a compliance failure against an existing actor-before-write invariant and existing fan-out policy; the root fix and independent green evidence restore that invariant. No reusable global lesson, enforcement gap, static check, project-wide hunt, testing-rule change, or promotion is justified by this narrowly scoped case.",
+  "REUSABLE_LESSON_SUMMARY": "Existing policy and invariant were sufficient; the case exposed a local public EXIT handler compliance failure. Keep actor validation before write-session entry and preserve the internal trusted seam, with no global policy mutation.",
+  "PRODUCT_CLOSURE_VALID": true,
+  "PROCESS_METADATA_CORRECTED": false,
+  "LEARNING_DECISION_VALIDATED": false,
+  "CREATED_AT": "2026-08-21T09:27:46Z",
+  "DECISION_HASH": "485c6308897243d89ff4fe501909319618661658047ac9798d63efdbd706ef26"
+}

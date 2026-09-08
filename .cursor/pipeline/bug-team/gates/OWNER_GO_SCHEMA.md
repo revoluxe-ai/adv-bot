@@ -10,7 +10,7 @@ WORKER_VISIBLE_CREATE: FORBIDDEN
 ## Production GO path
 
 ```text
-.tmp/opsx-bug-cases/<CASE_ID>/gates/OWNER-PRODUCTION-GO-<FINDING_ID>.json
+.opsx/runs/bug-cases/<CASE_ID>/gates/OWNER-PRODUCTION-GO-<FINDING_ID>.json
 # proof mode:
 <PROOF_ROOT>/case/gates/OWNER-PRODUCTION-GO-<FINDING_ID>.json
 ```

@@ -762,7 +762,7 @@ STATUS: BLOCKED_CONTRACT_MISMATCH
 5. после фактического запуска создать `PROVIDER_EXECUTION_RECEIPT`;
 6. не выдавать `SCENARIO_TEST_COVERAGE_PASS`.
   SOURCE_COMMAND: /opsx-external-call-coverage | /opsx-spec-scenario-coverage
-* `.tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md`
+* `.opsx/runs/scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md`
   только после фактического authorized provider run по Scenario packet.
    `REFACTOR_AND_TEST_PACKET` / Scenario packets); применить filter
    `kind` / `symbols`.
@@ -776,7 +776,7 @@ STATUS: READY_FOR_READ_ONLY_REAUDIT | PROVIDER_EXECUTION_RECEIPT_READY | BLOCKED
 SCENARIO_CHANGE_ID: <from Scenario packet | n/a>
 SCENARIO_GAP_IDS: <from Scenario packet | n/a>
 PROVIDER_EXECUTION_RECEIPTS:
-- PATH: .tmp/opsx-scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
+- PATH: .opsx/runs/scenario-coverage/<CHANGE_ID>/receipts/PROVIDER-<GAP_FILE_ID>.md
   GAP_ID:
   GAP_FILE_ID:
   SCENARIO_ID:
