@@ -1,0 +1,57 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "family/BRANCHES.jsonl",
+    "family/FAMILY.json",
+    "findings/HC-FINDING-004-STALE-TEST.md",
+    "team/heartbeats/WEX_RELATION_CLASSIFIER_b4dedb0ca7.json",
+    "team/packets/WEX_RELATION_CLASSIFIER_b4dedb0ca7.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 52,
+  "CREATED_AT": 1788804001.1387076,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/BOUNDED_HUNTER/4e8665d743/OUT": {
+      "CANONICAL_SHA256": "5e3a36727cf6b3f65f282219fa02b190158ae48dd1b7e03208db43fc8f257262",
+      "RAW_SHA256": "9bbdd35e19450c23f7f8f1d9f3c9c4c346a35eca9f5c8cba37c3a6080e664594"
+    },
+    "PKT/WEX/FAN_IN_ASSEMBLER/f588de6e82/OUT": {
+      "CANONICAL_SHA256": "946150a37aef6e89dc32586fd607b9af2ffca0b5584274ef46a554e03b89e279",
+      "RAW_SHA256": "8fbfddd6eacea6b5fee0825a2d48093d112d65075de44bd81df328e3a9a2132e"
+    },
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/47307bd24f/OUT": {
+      "CANONICAL_SHA256": "2efc6707a44930435b7f9ec2f1c24a94672430e907c80b1ac8cb71d7a4e2d33c",
+      "RAW_SHA256": "7c7d1cf59346742553d082604e26a39a206ae1728e74c80f79d7df19c85e5afe"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/47307bd24f/OUT",
+    "PKT/WEX/BOUNDED_HUNTER/4e8665d743/OUT",
+    "PKT/WEX/FAN_IN_ASSEMBLER/f588de6e82/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788807601.1387076,
+  "FINDING_ID": "FINDING-004",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RELATION_CLASSIFIER/b4dedb0ca7/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RELATION_CLASSIFIER/b4dedb0ca7/IN",
+  "PAYLOAD": {
+    "ALLOCATED_FINDING_ID": "HC-FINDING-004-STALE-TEST",
+    "BLOCKS_FAMILY_CLOSURE": true,
+    "BRANCH_STATUS": "MATERIALIZED",
+    "FAMILY_STATUS": "FANOUT_ACTIVE",
+    "HUNT_CANDIDATE_ID": "HC-FINDING-004-STALE-TEST",
+    "MODE": "resume-family-fanout",
+    "NEXT_WORKER": "CLASSIFIER",
+    "RATIONALE": "Independent of hunter claim. HC-FINDING-004-STALE-TEST is SAME_INVARIANT_FINDING of INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED. Plain-language invariant: apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150. Evidence: test_fefo_spend_and_expired_tranche_unusable (tests/unit/wb/utils/test_promo_accounting.py:40-68) builds that exact fixture (expired leftover 300 expires_at=_dt(-1), live leftover 200 expires_at=_dt(5), spend 50 at NOW) and asserts remaining==200 at line 67. FINDING-004 frozen GREEN node test_fefo_spend_hits_live_leftover_not_expired (lines 71-105) uses the same inputs and asserts remaining==150. results/GREEN-FINDING-004.md adjacent file run FAILED assert 150==200 at line 67 after production skip-expired; frozen node PASSED. results/RED-FINDING-004.md already recorded this sibling as bug-encoding. Production apply_spend_fefo skips is_expired (promo_accounting.py:188-189); remaining filter also skips expired (199-203). campaign_ledger_from_rows / load_campaign_ledgers only call the fixed helper. Not a second production spend loop. Not NEW_ROOT_CAUSE (same writer, same fixture, same forbidden remaining==200). Not FALSE_POSITIVE (adjacent fail is real). Not OUT_OF_SCOPE (INVARIANT HUNT_SCOPE / KNOWN_READERS name this sibling). Not INCONCLUSIVE. Policy RELATION_RULES.SAME_INVARIANT_FINDING.BLOCKS_FAMILY_CLOSURE=true. Allocated FINDING_ID=HC-FINDING-004-STALE-TEST (not FINDING-005/006). FAMILY_STATUS=FANOUT_ACTIVE. No PRODUCTION_CLASSIFICATION this hop. NEXT_WORKER=CLASSIFIER.",
+    "RELATION": "SAME_INVARIANT_FINDING"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/RELATION_CLASSIFIER/b4dedb0ca7",
+  "WORKER_ID": "RELATION_CLASSIFIER"
+}

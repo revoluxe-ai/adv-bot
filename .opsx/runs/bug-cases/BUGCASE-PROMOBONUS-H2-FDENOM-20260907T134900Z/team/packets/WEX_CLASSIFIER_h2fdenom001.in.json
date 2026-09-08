@@ -1,0 +1,30 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/h2fdenom001/IN",
+  "WORKER_ID": "CLASSIFIER",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/h2fdenom001",
+  "PARENT_ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "TIMEOUT_SECONDS": 900,
+  "ALLOWED_INPUT_ARTIFACTS": [
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/findings/ROOT-001.md",
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/intakes/INTAKE-001.md",
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/LEDGER.md",
+    "app/shared/domains/wb/utils/promo_accounting.py",
+    "app/modules/auto_budget_manager/promo_state_service.py",
+    "tests/unit/wb/utils/test_promo_accounting.py",
+    "openspec/decisions/index.md"
+  ],
+  "WRITE_BOUNDARY_SUMMARY": "ROUTE-TRACE append; LEDGER ROUTE_STATE only; team/packets output",
+  "HEARTBEAT_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/heartbeats/WEX_CLASSIFIER_h2fdenom001.json",
+  "OUTPUT_PACKET_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_CLASSIFIER_h2fdenom001.out.json",
+  "CHAT_LABEL": "SUP-PROMOBONUS-H2-FIX-20260908",
+  "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/ROOT-001/2026-09-07T14:02:09Z",
+  "MISSION_ID": "SUP-PROMOBONUS-H2-FIX-20260908",
+  "TASK_ID": "T-BUGTEAM-H2-001",
+  "STALE_CLASSIFICATION_OVERRIDE": "Prior LEDGER SPEC_GAP/ROUTE_B has no V10-valid CLASSIFIER identity; reclassify independently. Finding packet PRODUCTION_CLASSIFICATION=confirmed production bug. Invariant: leftover 200 / top-up unit 1000 -> f=0.2 M=1.25; denominator tranche.amount not budget_after/wallet."
+}

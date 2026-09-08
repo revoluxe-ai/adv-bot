@@ -1,0 +1,11 @@
+{
+  "FINDING_ID": "HC-001",
+  "CHANGED_PATHS": [
+    "app/modules/auto_budget_manager/promo_state_service.py"
+  ],
+  "PATCH_SHA256": "731b5abe0aa92a0683504d1c42dd77f4cbd14b512022728d870a62cc58f0d6af",
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "PRODUCTION_PATH": "app/modules/auto_budget_manager/promo_state_service.py",
+  "PRODUCTION_HASH_AFTER": "d83c97f6b96b73e9f520e96ad891642ff360ca1037136c898bdd3cf5eba45b7c",
+  "NOTE": "Record of already-applied in-place change. Not copied into a fake workspace. integrate_branch_patches not used."
+}

@@ -1,0 +1,19 @@
+{
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+  "INTEGRATION_STATUS": "PASS",
+  "APPLIED_PATCHES": [
+    {
+      "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+      "PATCH_SHA256": "d566227629884be32f105d460022d2846c75c68d2a0dfb0d4201d3f1781cca87",
+      "ORDER": 1,
+      "IN_PLACE_MAIN_WORKTREE": true
+    }
+  ],
+  "CONFLICTS": [],
+  "DETERMINISTIC_ORDER": [
+    "HC-FINDING-004-STALE-TEST"
+  ],
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "NOTE": "integrate_branch_patches was not used because the test-only patch is already on main (in-place worktree; no isolated PATCH.diff workspace). INTEGRATION_STATUS=PASS records already-applied HC-FINDING-004-STALE-TEST (remaining 200->150 + docstring).",
+  "UPDATED_AT": "2026-09-07T18:36:30Z"
+}

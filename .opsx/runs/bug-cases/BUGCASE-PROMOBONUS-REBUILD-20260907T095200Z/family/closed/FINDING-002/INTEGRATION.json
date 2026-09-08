@@ -1,0 +1,19 @@
+{
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY",
+  "INTEGRATION_STATUS": "PASS",
+  "APPLIED_PATCHES": [
+    {
+      "FINDING_ID": "HC-001",
+      "PATCH_SHA256": "731b5abe0aa92a0683504d1c42dd77f4cbd14b512022728d870a62cc58f0d6af",
+      "ORDER": 1,
+      "IN_PLACE_MAIN_WORKTREE": true
+    }
+  ],
+  "CONFLICTS": [],
+  "DETERMINISTIC_ORDER": [
+    "HC-001"
+  ],
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "NOTE": "integrate_branch_patches was not used because the patch is already on main (in-place worktree; no isolated PATCH.diff workspace). INTEGRATION_STATUS=PASS records already-applied HC-001.",
+  "UPDATED_AT": "2026-09-07T14:40:54Z"
+}

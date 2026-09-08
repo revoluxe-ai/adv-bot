@@ -1,0 +1,76 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 77,
+  "CREATED_AT": 1788813977.3326013,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/BOUNDED_HUNTER/14c710e724/OUT": {
+      "CANONICAL_SHA256": "2ca1418266e4d92b6bc4b5a891c753b43ff334b058ec192e724de16e17bfed22",
+      "RAW_SHA256": "d5b8d42a55a6c62e69fd35d9b0003d8bd512494d4a72315d4edd9bc83a132a03"
+    },
+    "PKT/WEX/CLASSIFIER/30d9a4e237/OUT": {
+      "CANONICAL_SHA256": "e6e904babef417e1f8bfd8a2bce8345b72d91b4693e65cf5085e78b7118425e0",
+      "RAW_SHA256": "5c2a4304a50ede9238f1bd331291f605f06742dba81667f3f7087a76218416de"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/BOUNDED_HUNTER/14c710e724/OUT",
+    "PKT/WEX/CLASSIFIER/30d9a4e237/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788817577.3326013,
+  "FINDING_ID": "FINDING-006",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t11-d11",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/FAN_IN_ASSEMBLER/601562bda0/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/14c710e724/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-006.md",
+      "findings/FINDING-005.md",
+      "findings/FINDING-004.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "findings/HC-FINDING-004-STALE-TEST.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "INDEX.md",
+      "team/packets/WEX_BOUNDED_HUNTER_14c710e724.out.json",
+      "team/packets/WEX_CLASSIFIER_30d9a4e237.out.json",
+      "results/PROOF-CLASSIFIER-WEX30d9a4e237.md",
+      "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-006.md",
+      ".cursor/pipeline/bug-team/workers/FAN_IN_ASSEMBLER.md",
+      ".cursor/pipeline/contracts/bug-episode/FANIN.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_FINDING_004": true,
+    "DO_NOT_REOPEN_FINDING_005": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_HC_FINDING_004_STALE_TEST": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "FINDING_ID": "FINDING-006",
+    "HARD_BLOCK_READY": true,
+    "HUNT_PACKET": "team/packets/WEX_BOUNDED_HUNTER_14c710e724.out.json",
+    "HUNT_RESULT": "CLEAR",
+    "MAPS_TO": "/opsx-materialize-bug-queue mode=fanin_assemble",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "RESIDUAL_INTAKE_ITEMS": [],
+    "WORKER_ID": "FAN_IN_ASSEMBLER",
+    "WRITE_ONLY": "results/FANIN.md"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/FAN_IN_ASSEMBLER/601562bda0",
+  "WORKER_ID": "FAN_IN_ASSEMBLER"
+}

@@ -1,0 +1,90 @@
+{
+  "BLOCKS_FAMILY_CLOSURE": false,
+  "BLOCKS_PARENT_FAMILY_CLOSURE": false,
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+  "CASE_ID": "BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z",
+  "CLASSIFY_RELATION_CALLED": false,
+  "EXISTING_BACKLOG": [
+    {
+      "BLOCKS_FAMILY_CLOSURE": false,
+      "BLOCKS_PARENT_FAMILY_CLOSURE": false,
+      "EXISTING_ON_CASE": true,
+      "FINDING_ID": "FINDING-H2",
+      "LINKED_CASE_CREATED": false,
+      "PARENT_BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+      "REASON": "campaign f denominator (budget_after/wallet vs top-up unit); not leftover-90d AND-stop",
+      "RELATION": "NEW_ROOT_CAUSE",
+      "RELATION_TO_ROOT": "different_invariant",
+      "STATUS": "backlog"
+    },
+    {
+      "BLOCKS_FAMILY_CLOSURE": false,
+      "BLOCKS_PARENT_FAMILY_CLOSURE": false,
+      "EXISTING_ON_CASE": true,
+      "FINDING_ID": "FINDING-H3",
+      "LINKED_CASE_CREATED": false,
+      "PARENT_BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+      "REASON": "one-tick overlay lag after pool and leftover exhausted; not leftover-90d AND-stop",
+      "RELATION": "NEW_ROOT_CAUSE",
+      "RELATION_TO_ROOT": "different_invariant",
+      "STATUS": "backlog"
+    },
+    {
+      "BLOCKS_FAMILY_CLOSURE": false,
+      "BLOCKS_PARENT_FAMILY_CLOSURE": false,
+      "EXISTING_ON_CASE": true,
+      "FINDING_ID": "FINDING-H4",
+      "LINKED_CASE_CREATED": false,
+      "PARENT_BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+      "REASON": "plan_fact_stats persists overlay.plan instead of raw get_plan_data; not leftover-90d AND-stop",
+      "RELATION": "NEW_ROOT_CAUSE",
+      "RELATION_TO_ROOT": "different_invariant",
+      "STATUS": "backlog"
+    },
+    {
+      "BLOCKS_FAMILY_CLOSURE": false,
+      "BLOCKS_PARENT_FAMILY_CLOSURE": false,
+      "EXISTING_ON_CASE": true,
+      "FINDING_ID": "FINDING-H5",
+      "LINKED_CASE_CREATED": false,
+      "PARENT_BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+      "REASON": "keyword GOOD/BAD resolve wipes overlay CPO via AdvSetting/CH; not leftover-90d AND-stop",
+      "RELATION": "NEW_ROOT_CAUSE",
+      "RELATION_TO_ROOT": "different_invariant",
+      "STATUS": "backlog"
+    },
+    {
+      "BLOCKS_FAMILY_CLOSURE": false,
+      "BLOCKS_PARENT_FAMILY_CLOSURE": false,
+      "EXISTING_ON_CASE": true,
+      "FINDING_ID": "FINDING-H6",
+      "LINKED_CASE_CREATED": false,
+      "PARENT_BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+      "REASON": "pick_cashback_for_topup prefers expired package over live FEFO; not leftover-90d AND-stop",
+      "RELATION": "NEW_ROOT_CAUSE",
+      "RELATION_TO_ROOT": "different_invariant",
+      "STATUS": "backlog"
+    }
+  ],
+  "EXISTING_BACKLOG_RELATION": "NEW_ROOT_CAUSE",
+  "EXISTING_ON_CASE": true,
+  "FAMILY_STATUS": "HUNTING",
+  "FAMILY_STATUS_NOTE": "READY_FOR_VACUOUS_INTEGRATION",
+  "FANOUT_REQUIRED": false,
+  "HUNT_RESULT": "CLEAR",
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/4ae535b7",
+  "LINKED_CASE_CREATED": false,
+  "OPEN_SAME_INVARIANT_CANDIDATES": [],
+  "PARENT_BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+  "PARENT_BUG_FAMILY_ID_REQUIRED": true,
+  "POLICY_RELATION": "NEW_ROOT_CAUSE",
+  "ROOT_FINDING_ID": "ROOT-001",
+  "SAME_INVARIANT_BRANCHES_APPENDED": false,
+  "SAME_INVARIANT_COUNT": 0,
+  "SAME_INVARIANT_FINDINGS": [],
+  "VALIDATE_HUNT_RESULT": {
+    "CANDIDATE_COUNT": 0,
+    "HUNT_RESULT": "CLEAR",
+    "STATUS": "PASS"
+  }
+}

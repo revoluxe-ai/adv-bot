@@ -1,0 +1,53 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 67,
+  "CREATED_AT": 1788810132.7969892,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/883c7beaa2/OUT": {
+      "CANONICAL_SHA256": "a853dc1eca084d768dfabbf277b955bc37761899edeb099d6534fa9bc60c06ac",
+      "RAW_SHA256": "1a85f26b6136d0f7fd5b1bf56d693ce9abe74cdb49a9d42ef038bef2e96a97f6"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/883c7beaa2/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788813732.7969892,
+  "FINDING_ID": "FINDING-005",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t10-d10",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/77aab87368/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/883c7beaa2/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-005.md",
+      "results/RED-FINDING-005.md",
+      "results/FIX-FINDING-005.md",
+      "team/packets/WEX_RED_TEST_WORKER_d17c05e46a.out.json",
+      "team/packets/WEX_IMPLEMENTATION_EXECUTOR_883c7beaa2.out.json",
+      ".cursor/pipeline/bug-team/workers/GREEN_VERIFIER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-test.md",
+      "tests/unit/wb/utils/test_promo_accounting.py",
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ],
+    "FINDING_ID": "FINDING-005",
+    "FIX_EVIDENCE_PATH": "results/FIX-FINDING-005.md",
+    "FROZEN_TEST_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FROZEN_TEST_SHA256": "d2b77e376699bfe70729aec6a028759353a20d1a6d4a35fef2dfdce3532954a9",
+    "MAPS_TO": "/opsx-test verify",
+    "RED_EVIDENCE_PATH": "results/RED-FINDING-005.md",
+    "REQUIRED_INVARIANT": "campaign leftover fraction must use remaining over the top-up unit (tranche.amount), not budget_after or campaign_budget_total. leftover remaining 200 with amount 1000 and budget_after 12000 must yield fraction 0.2 (M=1.25), not 200/12000.",
+    "WORKER_ID": "GREEN_VERIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/77aab87368",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

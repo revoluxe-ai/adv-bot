@@ -1,0 +1,24 @@
+{
+  "WORKER_ID": "CLOSURE_OPERATOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "INDEX.md",
+    "results/HUMAN_SUMMARY.md",
+    "results/OWNER-CLOSURE-ROOT-001.md",
+    "team/heartbeats/WEX_CLOSURE_OPERATOR_834feb7f6c.json",
+    "team/intents/WEX_CLOSURE_OPERATOR_834feb7f6c.intent.json",
+    "team/packets/WEX_CLOSURE_OPERATOR_834feb7f6c.out.json",
+    "team/snapshots/WEX_CLOSURE_OPERATOR_834feb7f6c.before.json"
+  ],
+  "MODIFIED": [
+    "CASE.md",
+    "LEDGER.md",
+    "family/FAMILY.json",
+    "findings/ROOT-001.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

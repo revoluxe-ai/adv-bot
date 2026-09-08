@@ -1,0 +1,14 @@
+# FIX-ROOT-001-diff.patch
+# CASE: BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z
+# WORKER: WEX/IMPLEMENTATION_EXECUTOR/h2fdenom001
+# FIX_STATUS: FIX_ALREADY_APPLIED
+#
+# Executor made no additional edits. git diff app/shared/domains/wb/utils/promo_accounting.py
+# is empty because the file is untracked (??) in the worktree and already contains the fix.
+#
+# Verified fix locations in app/shared/domains/wb/utils/promo_accounting.py:
+#   - apply_spend_fefo: reference_budget = row.amount (line ~212)
+#   - campaign_ledger_from_rows: del campaign_budget_total; fraction from reference (lines ~245-253)
+#
+# Regression test PASS:
+#   test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after

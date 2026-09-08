@@ -1,0 +1,66 @@
+{
+  "LEARNING_PACKET_ID": "LEARN/BFAM/BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z/c80261ae/82251919",
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z/c80261ae",
+  "CASE_ID": "BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z",
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z/94fd0959",
+  "INVARIANT_VERSION": 1,
+  "INVARIANT": "# INVARIANT\n\n```text\nINVARIANT_ID: INV/BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z/94fd0959\n```\n\n## PLAIN_LANGUAGE_INVARIANT\n\nПока на кампании есть usable promo (leftover или common pool), overlay fraction f MUST браться из package percent (50% → f=0.5, M=2). Elevated spend remaining = leftover/f затем STOP. Запрещено f = summed leftover / last_tranche.amount.\n\n## TECHNICAL_INVARIANT\n\nWhile usable promo exists on campaign leftover OR common pool, overlay fraction f MUST come from package percent (promo_amount/amount per tranche via promo_fraction_from_amounts). Elevated spend remaining MUST be leftover/f then STOP. MUST NOT derive f as remaining/last_tranche.amount (causes M~1e6 on multi-tranche campaigns).\n\n## SCOPE\n\napply_spend_fefo / campaign_ledger_from_rows / pool_usable_from_pick → overlay consumers\n\n## ENTRY_CONDITIONS\n\nmulti-tranche campaign ledger with live leftover promo remaining>0\n\n## REQUIRED_BEHAVIOR\n\nfraction=package percent; promo_multiplier≈1/(1-f); f<0.9 on multi-tranche fixture\n\n## FORBIDDEN_BEHAVIOR\n\nf=remaining/last_tranche.amount; overlay M explosion (~1e6); RaisePlanOnPromobonuses persist\n\n## KNOWN_WRITERS\n\n- app/shared/domains/wb/utils/promo_accounting.py\n- app/shared/domains/wb/utils/promo_plan_multiplier.py\n\n## KNOWN_READERS\n\n- app/shared/domains/wb/utils/promo_overlay.py\n- app/modules/plan_fact/provider.py\n- app/modules/shop_runner/service_manager/wb_shop_data_manager/wb_shop_data_manager.py\n\n## PROOF_FROM_ROOT_FINDING\n\nresults/GREEN-P0-001.md multi-tranche f=0.5 M=2 GREEN_CONFIRMED\n\n## HUNT_SCOPE\n\ngrep/read callers deriving promo fraction from leftover vs last tranche amount; promo_accounting apply_spend_fefo neighborhood; overlay multiplier consumers\n",
+  "ROOT_CAUSE": "Root finding P0-001",
+  "ROOT_FAILURE": "See ROOT_RED / intake",
+  "ROOT_FIX": "See results/FIX-P0-001.md if present",
+  "ROOT_RED_EVIDENCE": "results/RED-P0-001.md",
+  "ROOT_GREEN_EVIDENCE": "results/GREEN-P0-001.md",
+  "ALL_HUNT_CANDIDATES": [],
+  "ALL_SAME_INVARIANT_FINDINGS": [],
+  "ALL_LINKED_NEW_ROOT_CASES": [],
+  "ALL_FALSE_POSITIVES": [],
+  "ALL_OUT_OF_SCOPE_FINDINGS": [],
+  "ALL_INCONCLUSIVE_ITEMS": [],
+  "BRANCH_ROUTES": {},
+  "BRANCH_RED_RESULTS": {},
+  "BRANCH_FIXES": {},
+  "BRANCH_GREEN_RESULTS": {},
+  "BRANCH_PATCH_HASHES": {},
+  "INTEGRATION_RESULT": "PASS",
+  "FAMILY_GREEN_RESULT": "PASS",
+  "MISSED_ORIGINAL_DETECTION_POINTS": [
+    "Sibling same-invariant findings were not auto-fanned-out in ACTIVE_V1"
+  ],
+  "HUNT_SCOPE": "See family/INVARIANT.md HUNT_SCOPE",
+  "HUNT_EFFECTIVENESS": {
+    "CANDIDATES": 0,
+    "SAME_INVARIANT": 0,
+    "FALSE_POSITIVES": 0
+  },
+  "HUNT_FALSE_NEGATIVE_RISK": "bounded hunt may miss distant writers",
+  "HUNT_FALSE_POSITIVE_RESULTS": [],
+  "TESTS_ADDED": [],
+  "FILES_CHANGED_BY_BRANCH": {},
+  "FILES_CHANGED_COMBINED": [],
+  "UNRELATED_DIRTY_FILES": [],
+  "ROUTE_DECISIONS": {},
+  "REJECTED_OPTIONS": [],
+  "RETRIES_AND_TIMEOUTS": [],
+  "REUSABLE_LESSONS": [
+    "Hunt candidates in the same invariant family must fan out automatically.",
+    "Branch GREEN is not family GREEN."
+  ],
+  "PROPOSED_INVARIANT_TESTS": [
+    "family invariant covers root + siblings"
+  ],
+  "PROPOSED_PROCESS_IMPROVEMENTS": [
+    "enable BUG_FAMILY_FANOUT after independent pass"
+  ],
+  "SOURCE_ARTIFACT_PATHS": {
+    "FAMILY_FANIN_JSON": "results/FAMILY-FANIN.json",
+    "INTEGRATION": "family/INTEGRATION.json",
+    "FAMILY_GREEN": "results/FAMILY-GREEN-REPORT.md"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FAMILY_FANIN_JSON": "b42bb4d5996f7f0ea9770a49fdc6589b52f97d9ce7864d371e6e4c674575c180",
+    "INTEGRATION": "a2f44faa5233d3e5112dbe54a38f2cb7781b32db4a965e2be5195cda0ebe60a8",
+    "FAMILY_GREEN": "aea838c356c342e3cdc1230944809ad06904d2accf3c6abad3ef6e5b366b89c9"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "UPDATED_AT": "2026-09-08T03:25:45Z"
+}

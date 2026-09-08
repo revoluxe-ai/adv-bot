@@ -1,0 +1,19 @@
+{
+  "WORKER_ID": "INTEGRATION_OPERATOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/FAMILY-GREEN-REPORT.md",
+    "team/heartbeats/WEX_INTEGRATION_OPERATOR_bcbf43358c.json",
+    "team/intents/WEX_INTEGRATION_OPERATOR_bcbf43358c.intent.json",
+    "team/packets/WEX_INTEGRATION_OPERATOR_bcbf43358c.out.json",
+    "team/snapshots/WEX_INTEGRATION_OPERATOR_bcbf43358c.before.json"
+  ],
+  "MODIFIED": [
+    "family/FAMILY.json",
+    "family/INTEGRATION.json",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

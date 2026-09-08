@@ -1,0 +1,44 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 9,
+  "CREATED_AT": 1788779814.2771819,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02/OUT": {
+      "CANONICAL_SHA256": "6bfad6cd1e6b446f6d4c949e52316ebc4021e1c912cbf1c974df50b2f9ee8173",
+      "RAW_SHA256": "fde925bcdffaccd4c4ceab2993b92c46f801511766b8e279f6eb41f9e48865a1"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788783414.2771819,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/266277452c/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02/OUT",
+  "PAYLOAD": {
+    "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/PROMO-OVERLAY-REC-BID",
+    "FINDING_ID": "ROOT-001",
+    "HUNT_BOUND": "Find only same-invariant call sites that compute rec-bid / Telegram plan display via get_effective_promo_plan without passing live overlay fraction or complex_adv. Do not hunt intake items 2-6 (promo_state_service ledger accounting leftover journal). Do not fix, test, classify, or close candidates. Do not re-open ROOT-001 as a candidate.",
+    "HUNT_SCOPE": [
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_view_provider.py",
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_decision_snapshot_builder.py",
+      "app/shared/domains/wb/utils/promo_overlay.py",
+      "Telegram rec-bid / plan_context display call sites of get_effective_promo_plan"
+    ],
+    "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/PROMO-OVERLAY-REC-BID",
+    "MAPS_TO": "/opsx-bug-hunt bounds",
+    "WORKER_ID": "BOUNDED_HUNTER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/266277452c",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

@@ -1,0 +1,12 @@
+{
+  "digests": {
+    "CASE.md": "ad2c3d324e3e1b1ef1208b8ef060e709a290dcc8cbb950edaa0d0973677e092e",
+    "LEDGER.md": "a987b578c74aed76a4eed6ea3a9c4f95c0497bd9fac4f342242b03af6930bf68",
+    "handoffs/COMMON_HANDOFF.md": "1140355a8ae704121ac51fb7dce7df582b6a59d5eb90ad019149c10d75b3f8f2",
+    "intakes/INTAKE-001.md": "c24d976851cc0d875d0edd01dce643c9385836902e402e8d88b967ce937aa823",
+    "results/ROUTE-TRACE.jsonl": "11535af4fb862a537522e633ea5a1efe062fc88fa897efdccb9dc21ad1065ec1",
+    "team/packets/WEX_MATERIALIZER_1090d9ac64.in.json": "8b53c70013666740c6cb0f3b3414e3e5598fd7a2b3b5c8fa72f9be6acdfd708f"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "taken_at": 1788775286.9070222
+}

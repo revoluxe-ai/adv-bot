@@ -1,0 +1,57 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "findings/HC-001.md",
+    "family/BRANCHES.jsonl",
+    "family/FAMILY.json",
+    "team/heartbeats/WEX_RELATION_CLASSIFIER_eded5a8fdf.json",
+    "team/packets/WEX_RELATION_CLASSIFIER_eded5a8fdf.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 23,
+  "CREATED_AT": 1788788510.7581522,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT": {
+      "CANONICAL_SHA256": "991e0e9835cbdbe4fa3982e83f079f40db24bbb9b07ea5bfc33a3d35b86c529f",
+      "RAW_SHA256": "8856f31f5ce46476ca62bd2abef1cd73d26edebc41808daf38d368b9efa6ebee"
+    },
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT": {
+      "CANONICAL_SHA256": "1f4edba1f20142866ddbafafe80ac264442f26919feddb626fe67f709e778433",
+      "RAW_SHA256": "c7a8ae5b6b0f77e1c186f63bd0d94063d7202a4ba12f5fdb8fe340a8b775d2eb"
+    },
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT": {
+      "CANONICAL_SHA256": "8e57d390b949221a26fc3d24b6ed682335e32587305fbfc68d06413084767d04",
+      "RAW_SHA256": "2f9e117f68e32c12737e7beaf0b886776b4025e6b8bd8d9ad856aa9c2c711208"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT",
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT",
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788792110.7581522,
+  "FINDING_ID": "FINDING-002",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RELATION_CLASSIFIER/eded5a8fdf/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RELATION_CLASSIFIER/eded5a8fdf/IN",
+  "PAYLOAD": {
+    "ALLOCATED_FINDING_ID": "HC-001",
+    "BLOCKS_FAMILY_CLOSURE": true,
+    "BRANCH_STATUS": "MATERIALIZED",
+    "FAMILY_STATUS": "FANOUT_ACTIVE",
+    "HUNT_CANDIDATE_ID": "HC-001",
+    "MODE": "resume-family-fanout",
+    "NEXT_WORKER": "CLASSIFIER",
+    "RATIONALE": "Independent of hunter claim. HC-001 is SAME_INVARIANT_FINDING of INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY. Plain-language invariant: on get_campaign_balance failure, do not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1. Evidence: PromoStateService.refresh (promo_state_service.py:146-147) sets pool_fetch_ok=True on any non-raising return, including None. FinanceAdapter.get_campaign_balance returns None on unexpected parsed type (finance/adapter.py:80) — a fetch failure, not true-empty cashback. resolve_promo_availability(None) yields pool_usable=false; RedisPromoStateManager.set then writes shop-promo-state with updated_at=now (line 219). FINDING-002 GREEN_CONFIRMED only the Exception path (pool_fetch_ok stays False; skip set; return at 176-182). Same function and same Redis key as FINDING-002; HUNT_SCOPE explicitly includes None return without Exception. Not NEW_ROOT_CAUSE (same forbidden write, not a new family). Not ROOT-001 (closed overlay snapshot at family/closed/ROOT-001/). Not intake 3-6. Not FALSE_POSITIVE (current worktree still writes). Not OUT_OF_SCOPE. Not INCONCLUSIVE. Policy RELATION_RULES.SAME_INVARIANT_FINDING.BLOCKS_FAMILY_CLOSURE=true. Allocated FINDING_ID=HC-001 (not FINDING-003..006). FAMILY_STATUS=FANOUT_ACTIVE. No PRODUCTION_CLASSIFICATION this hop. NEXT_WORKER=CLASSIFIER.",
+    "RELATION": "SAME_INVARIANT_FINDING"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/RELATION_CLASSIFIER/eded5a8fdf",
+  "WORKER_ID": "RELATION_CLASSIFIER"
+}

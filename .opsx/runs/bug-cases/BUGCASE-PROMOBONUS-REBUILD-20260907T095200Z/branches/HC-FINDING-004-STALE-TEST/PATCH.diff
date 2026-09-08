@@ -1,0 +1,23 @@
+--- a/tests/unit/wb/utils/test_promo_accounting.py
++++ b/tests/unit/wb/utils/test_promo_accounting.py
+@@ -39,6 +39,7 @@ def test_payment_type_keshbek_and_cyrillic() -> None:
+
+ @pytest.mark.unit
+ def test_fefo_spend_and_expired_tranche_unusable() -> None:
++    """Spend обязан бить live leftover, не expired leftover; remaining 150."""
+     tranches = [
+         PromoAllocationTranche(
+             topup_id=1,
+@@ -64,7 +65,7 @@ def test_fefo_spend_and_expired_tranche_unusable() -> None:
+     )
+     assert allocated == 500
+     assert spent == 50
+-    assert remaining == 200
++    assert remaining == 150
+     assert expires_at == _dt(5)
+
+
+RECORD_ONLY: already applied in-place on main worktree.
+Do not re-apply. integrate_branch_patches was not used (no isolated PATCH.diff workspace).
+PRODUCTION_HASH_AFTER: 4bef922a87c533cd0c202a5b665162428f89395bccbe6efea1a86d122991344b
+TEST_CONTENT_SHA256: 233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53

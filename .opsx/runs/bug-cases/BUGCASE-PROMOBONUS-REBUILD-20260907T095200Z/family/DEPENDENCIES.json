@@ -1,0 +1,18 @@
+{
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+  "WRITE_SETS": {
+    "HC-FINDING-004-STALE-TEST": [
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "FINDING-004": [
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ]
+  },
+  "WRITE_SET_CONFLICTS": [],
+  "SERIALIZATION_ORDER": [],
+  "PARALLEL_ALLOWED_PAIRS": [],
+  "PARALLEL_IMPLEMENTATION_ALLOWED": false,
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "NOTE": "WRITE_SETS: HC-FINDING-004-STALE-TEST -> test_promo_accounting.py (stale assert 200->150 + docstring). FINDING-004 production already applied. No write-set overlap. Serialization not needed (already serial in-place on main). integrate_branch_patches not used.",
+  "UPDATED_AT": "2026-09-07T18:36:30Z"
+}

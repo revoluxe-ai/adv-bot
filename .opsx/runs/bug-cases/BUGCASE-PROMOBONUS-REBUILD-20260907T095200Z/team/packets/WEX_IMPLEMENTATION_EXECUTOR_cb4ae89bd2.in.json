@@ -1,0 +1,62 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 17,
+  "CREATED_AT": 1788784666.8090096,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/060d28fe2f/OUT": {
+      "CANONICAL_SHA256": "4a062035a39dd2ff2bdf4918c29d3de5adc4f229f54b013d89c2c4d93e176068",
+      "RAW_SHA256": "1649675935fd2301c807662096a12146492c7ffa8aa3cd3e07a833d649020df4"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/060d28fe2f/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788788266.8090096,
+  "FINDING_ID": "FINDING-002",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t05-d05",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/cb4ae89bd2/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/060d28fe2f/OUT",
+  "PAYLOAD": {
+    "ALLOWED_FIX_FILES": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-002.md",
+      "results/RED-FINDING-002.md",
+      "team/packets/WEX_RED_TEST_WORKER_060d28fe2f.out.json",
+      "team/packets/WEX_CLASSIFIER_7d5f4dc267.out.json",
+      ".cursor/pipeline/bug-team/workers/IMPLEMENTATION_EXECUTOR.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-fix-bug.md",
+      "app/modules/auto_budget_manager/promo_state_service.py",
+      "tests/unit/auto_budget_manager/test_promo_state_service.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/2026-09-07T12:15:07Z",
+    "COMMIT_ALLOWED": false,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_3_TO_6": true,
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "FINDING_ID": "FINDING-002",
+    "FROZEN_TEST_CONTENT_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "FROZEN_TEST_ID": "tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails",
+    "FROZEN_TEST_PATH": "tests/unit/auto_budget_manager/test_promo_state_service.py",
+    "INVARIANT": "On get_campaign_balance failure, do not redis.set a fresh pool_usable=false snapshot; leave cache miss/stale so overlay readers take conservative M=1.",
+    "LOCAL_IMPLEMENTATION_AUTHORIZED": true,
+    "MAPS_TO": "/opsx-fix-bug",
+    "OWNER_PRODUCTION_GO": "NOT_REQUIRED",
+    "RED_EVIDENCE_PATH": "results/RED-FINDING-002.md",
+    "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/cb4ae89bd2",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+}

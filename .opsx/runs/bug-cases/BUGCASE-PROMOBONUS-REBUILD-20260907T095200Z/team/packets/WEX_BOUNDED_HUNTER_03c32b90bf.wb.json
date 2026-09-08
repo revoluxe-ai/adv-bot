@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "BOUNDED_HUNTER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-005.md",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_03c32b90bf.json",
+    "team/intents/WEX_BOUNDED_HUNTER_03c32b90bf.intent.json",
+    "team/packets/WEX_BOUNDED_HUNTER_03c32b90bf.out.json",
+    "team/snapshots/WEX_BOUNDED_HUNTER_03c32b90bf.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

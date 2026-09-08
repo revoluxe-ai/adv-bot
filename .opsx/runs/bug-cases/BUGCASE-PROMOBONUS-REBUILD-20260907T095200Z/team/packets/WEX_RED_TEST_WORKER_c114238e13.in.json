@@ -1,0 +1,49 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 25,
+  "CREATED_AT": 1788789304.9083476,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/6e103632ac/OUT": {
+      "CANONICAL_SHA256": "d45be47b445959a672b24c76ebcccf65563de8c275701e143f7cadbd934abc96",
+      "RAW_SHA256": "fd268bca5a5b5fa6d1422ba654758a584daf81d310b291160430eccbf20646c0"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/6e103632ac/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788792904.9083476,
+  "FINDING_ID": "HC-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/c114238e13/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/6e103632ac/OUT",
+  "PAYLOAD": {
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "DO_NOT_EDIT_PRODUCTION": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_3_TO_6": true,
+    "DO_NOT_WEAKEN_FINDING_002_TEST": true,
+    "FINDING_ID": "HC-001",
+    "FROZEN_FINDING_002_TEST_FILE": "tests/unit/auto_budget_manager/test_promo_state_service.py",
+    "FROZEN_FINDING_002_TEST_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "MAPS_TO": "/opsx-test",
+    "MODE": "resume-family-fanout",
+    "PARENT_FINDING_ID": "FINDING-002",
+    "PROPOSED_TEST_FILE": "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py",
+    "REQUIRED_OUTCOME": "RED_CONFIRMED",
+    "REQUIRED_REGRESSION": "get_campaign_balance None return (no Exception) must not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1. Do not mock away the None path. Do not change FINDING-002 Exception test.",
+    "TARGET_SITE": "app/modules/auto_budget_manager/promo_state_service.py:146-147 pool_fetch_ok=True on None then RedisPromoStateManager.set:219",
+    "WORKER_ID": "RED_TEST_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/c114238e13",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

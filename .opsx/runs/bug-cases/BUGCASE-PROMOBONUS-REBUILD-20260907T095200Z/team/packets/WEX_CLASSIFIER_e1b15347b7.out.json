@@ -1,0 +1,154 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/e1b15347b7/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t07-d07",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/e1b15347b7",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-003",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/e1b15347b7/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/7e22123ed3/OUT",
+    "PKT/WEX/MATERIALIZER/efd2d1333b/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/7e22123ed3/OUT": {
+      "CANONICAL_SHA256": "79456223665bcab9d76645d1aac44e3e8aeb3b649bdd2581922b2bfaa2605113",
+      "RAW_SHA256": "1b56079ff59c8def52794906e2755d0f6d86baeebb041b0f924dadcbbc087063"
+    },
+    "PKT/WEX/MATERIALIZER/efd2d1333b/OUT": {
+      "CANONICAL_SHA256": "08daca8d8b3ab647585ca7d656748bbcd3f7bff68100df930778a81085ec9833",
+      "RAW_SHA256": "b76dd7f60ccd94e84757a6b436c14be77bcb4aafbaf742871ab795492fbe91a3"
+    }
+  },
+  "CHECKPOINT_GENERATION": 37,
+  "CREATED_AT": 1788795722.3924124,
+  "EXPIRES_AT": 1788799322.3924124,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "CURRENT_CLASSIFICATION": "FALSE_POSITIVE",
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "EXPECTED_NEXT_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+    "ACTUAL_NEXT_COMMAND": "NOT_APPLICABLE",
+    "NEXT_COMMAND_RECONCILIATION": "NOT_APPLICABLE",
+    "EXPECTED_EXECUTION_ROUTE": "CLOSED_NO_IMPLEMENTATION",
+    "ACTUAL_EXECUTION_ROUTE": "NOT_APPLICABLE",
+    "ROUTE_RECONCILIATION": "NOT_APPLICABLE",
+    "RECONCILIATION_REASON": "Route C selected; leftover-usable load does not apply 90d cutoff. EXPECTED_NEXT_COMMAND=CLOSED_NO_IMPLEMENTATION. ACTUAL_* remain NOT_APPLICABLE.",
+    "CURRENT_ROUTE_STATE": "CLOSED_NO_IMPLEMENTATION",
+    "RATIONALE": "promo_ledger leftover-usable path (load_campaign_ledgers) does not pass cutoff to load_success_tranches/load_spend_rows. PROMO_LOOKBACK_DAYS=90 is the UPD ingest recovery window in PromoStateService._resolve_upd_from_date, not a leftover load filter. Module comments encode Owner law: living leftover older than 90d must remain usable. Production refresh calls load_campaign_ledgers without cutoff; no other app/ caller of the loaders. resolve_promo_availability is OR-active / AND-stop only when pool AND campaign are both unusable. A 90-day ingest miss would omit spend (inflate remaining), not drop leftover remaining into a false AND-stop. Reported drop path is a misread of ingest lookback as leftover cutoff. Residual items 4-6 not classified. ROOT-001 / FINDING-002 / HC-001 stay closed_fixed.",
+    "NEXT_ACTION": "CLOSED_NO_IMPLEMENTATION",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-003/2026-09-07T15:33:26Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "implicit_product_invariant",
+      "evidence": "PromoAvailability: OR-active / AND-stop. resolve_promo_availability: OR pool/campaign; AND-stop when both empty. stop_on_exhaustion true only when both sources unusable. promo_ledger leftover-usable: living leftover older than 90d must remain usable; load_campaign_ledgers passes no cutoff.",
+      "gap": "OpenSpec decisions/index.md is silent on promo leftover lookback vs UPD ingest window; not SPEC_GAP because the leftover-usable production path already implements Owner leftover law."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "no",
+      "write_user_boundary": "Redis derived overlay cache write of campaign remaining/usable via PromoStateService.refresh. No WB production mutation asserted for this finding.",
+      "entrypoints": [
+        "shop-runner auto_budget_watchdog",
+        "PromoStateService.refresh",
+        "load_campaign_ledgers"
+      ],
+      "direct_callers": [
+        "promo_ledger.py:load_campaign_ledgers -> load_success_tranches/load_spend_rows without cutoff",
+        "promo_state_service.py:189 load_campaign_ledgers"
+      ],
+      "indirect_callers": [
+        "resolve_promo_availability AND-stop (pool AND campaign unusable)",
+        "PromoStateService._resolve_upd_from_date 90d UPD ingest recovery only"
+      ],
+      "test_only_callers": [],
+      "dead_or_legacy_path": "optional cutoff= on loaders exists but leftover-usable production path does not pass it"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "exact_path",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/FINDING-003.md",
+      "fallback_used": false,
+      "search_operations": [
+        "read cited promo_ledger leftover-usable load",
+        "read PromoStateService UPD ingest lookback and load_campaign_ledgers call",
+        "read resolve_promo_availability OR/AND",
+        "bounded openspec/decisions/index.md promo lookup"
+      ],
+      "search_scope": [
+        "findings/FINDING-003.md",
+        "intakes/INTAKE-001.md",
+        "LEDGER.md",
+        "promo_ledger.py",
+        "promo_state_service.py",
+        "promo_accounting.py",
+        "openspec/decisions/index.md"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding/intake and cited promo_ledger leftover/UPD symbols only",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "FINDING_CLAIMED_AWAITING_CLASSIFY",
+      "RESULT": "FALSE_POSITIVE",
+      "TO_STATE": "CLOSED_NO_IMPLEMENTATION",
+      "NEXT_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-003",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "not_applicable",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEXe1b15347b7.md"
+      ],
+      "ON_SUCCESS_STATE": "CLOSED_NO_IMPLEMENTATION",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+      "RECOVERY_CLASS": "TERMINAL",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "NEXT_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+    "ALLOWED_FIX_FILES": [],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/**",
+      "app/** (no implementation on Route C)",
+      "unrelated promo_accounting FEFO / leftover fraction / journal (intake items 4-6)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)",
+      "promo_state_service.py pool-failure path (FINDING-002/HC-001 closed_fixed)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "not_applicable (FALSE_POSITIVE; no implementation). Optional later: leftover older than 90d with remaining>0 must stay campaign_usable when pool empty.",
+    "VERIFICATION_COMMAND_PROPOSED": "not_applicable",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "Leftover-usable load already encodes Owner law (living leftover older than ingest window remains usable) and does not apply PROMO_LOOKBACK_DAYS as a remaining cutoff. AND-stop remains both-sources-empty.",
+    "GO_TOKEN": "FORBIDDEN",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "results/PROOF-CLASSIFIER-WEXe1b15347b7.md",
+    "team/heartbeats/WEX_CLASSIFIER_e1b15347b7.json",
+    "team/packets/WEX_CLASSIFIER_e1b15347b7.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

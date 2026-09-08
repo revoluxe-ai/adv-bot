@@ -1,0 +1,66 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 46,
+  "CREATED_AT": 1788800622.588136,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/94410e06f6/OUT": {
+      "CANONICAL_SHA256": "70ba9f60deec913217fa312e8893cb85efe6c634ca07d65002728b9cfa278a28",
+      "RAW_SHA256": "59609cb9221f7b71510875666a7fa943239dc3ebd2c80822de43c8b37e42c803"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/94410e06f6/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788804222.588136,
+  "FINDING_ID": "FINDING-004",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/9c9a6d6d7e/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/94410e06f6/OUT",
+  "PAYLOAD": {
+    "ALLOWED_FIX_FILES": [
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ],
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-004.md",
+      "results/RED-FINDING-004.md",
+      "team/packets/WEX_RED_TEST_WORKER_94410e06f6.out.json",
+      "team/packets/WEX_CLASSIFIER_2d43d59752.out.json",
+      ".cursor/pipeline/bug-team/workers/IMPLEMENTATION_EXECUTOR.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-fix-bug.md",
+      ".cursor/rules/documentation.mdc",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/2026-09-07T16:37:42Z",
+    "COMMIT_ALLOWED": false,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_5_TO_6": true,
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "FINDING_ID": "FINDING-004",
+    "FROZEN_TEST_CONTENT_SHA256": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+    "FROZEN_TEST_ID": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "INVARIANT": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150.",
+    "LOCAL_IMPLEMENTATION_AUTHORIZED": true,
+    "MAPS_TO": "/opsx-fix-bug",
+    "OWNER_PRODUCTION_GO": "NOT_REQUIRED",
+    "RED_EVIDENCE_PATH": "results/RED-FINDING-004.md",
+    "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/9c9a6d6d7e",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+}

@@ -1,0 +1,21 @@
+{
+  "WORKER_ID": "MATERIALIZER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "findings/ROOT-001.md",
+    "results/PROOF-MATERIALIZER-WEX1090d9ac64.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl",
+    "team/heartbeats/WEX_MATERIALIZER_1090d9ac64.json",
+    "team/intents/WEX_MATERIALIZER_1090d9ac64.intent.json",
+    "team/packets/WEX_MATERIALIZER_1090d9ac64.out.json",
+    "team/snapshots/WEX_MATERIALIZER_1090d9ac64.before.json"
+  ],
+  "MODIFIED": [
+    "CASE.md",
+    "LEDGER.md",
+    "intakes/INTAKE-001.md"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,68 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 22,
+  "CREATED_AT": 1788787422.9187417,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT": {
+      "CANONICAL_SHA256": "991e0e9835cbdbe4fa3982e83f079f40db24bbb9b07ea5bfc33a3d35b86c529f",
+      "RAW_SHA256": "8856f31f5ce46476ca62bd2abef1cd73d26edebc41808daf38d368b9efa6ebee"
+    },
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT": {
+      "CANONICAL_SHA256": "1f4edba1f20142866ddbafafe80ac264442f26919feddb626fe67f709e778433",
+      "RAW_SHA256": "c7a8ae5b6b0f77e1c186f63bd0d94063d7202a4ba12f5fdb8fe340a8b775d2eb"
+    },
+    "PKT/WEX/GREEN_VERIFIER/2770822420/OUT": {
+      "CANONICAL_SHA256": "d242263f09cee823a4e4d6f05dc503b755262837d94dea46f2b04401413037b2",
+      "RAW_SHA256": "8b6b7c6b71ef12846a65093520d635e20da0d6bda63bd83ed0a92011c006799d"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/GREEN_VERIFIER/2770822420/OUT",
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT",
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788791022.9187417,
+  "FINDING_ID": "FINDING-002",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT",
+  "PAYLOAD": {
+    "CLOSED_FAMILY_SNAPSHOT_DIR": "family/closed/ROOT-001/",
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_HC001_RED": true,
+    "DO_NOT_START_ITEMS_3_TO_6": true,
+    "FAMILY_STATUS_AFTER": "HUNTING",
+    "FINDING_ID": "FINDING-002",
+    "FROZEN_TEST_NODE": "tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails",
+    "FROZEN_TEST_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "HUNT_ALREADY_COMPLETE": true,
+    "INVARIANT_CANDIDATE": "On get_campaign_balance failure, do not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1.",
+    "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY",
+    "MAPS_TO": "post-root-GREEN invariant capture",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "MODE": "resume-family-fanout",
+    "NEXT_WORKER_AFTER_PASS": "RELATION_CLASSIFIER",
+    "OPEN_CANDIDATE_PATH": "findings/HC-001.md",
+    "PRESERVE_CLOSED_FAMILY_ROOT_001": true,
+    "RED_EVIDENCE": "results/RED-FINDING-002.md",
+    "RERUN_ROOT_IMPLEMENTATION": false,
+    "REUSE_ROOT_GREEN": true,
+    "ROOT_CAUSE": "PromoStateService.refresh persisted a fresh Redis shop-promo-state snapshot with pool_usable=false after get_campaign_balance failed.",
+    "ROOT_FINDING_ID": "FINDING-002",
+    "ROOT_FIX": "On Exception from get_campaign_balance, leave pool_fetch_ok=False, skip RedisPromoStateManager.set, return.",
+    "ROOT_FIX_EVIDENCE": "results/FIX-FINDING-002.md",
+    "ROOT_GREEN_EVIDENCE": "results/GREEN-FINDING-002.md",
+    "WORKER_ID": "INVARIANT_CAPTURE_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/INVARIANT_CAPTURE_WORKER/c05f376a93",
+  "WORKER_ID": "INVARIANT_CAPTURE_WORKER"
+}

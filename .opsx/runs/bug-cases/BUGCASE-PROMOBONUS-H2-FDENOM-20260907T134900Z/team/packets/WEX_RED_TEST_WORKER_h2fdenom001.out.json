@@ -1,0 +1,32 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/h2fdenom001/OUT",
+  "ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/h2fdenom001",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/h2fdenom001/IN",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "ATTEMPT": 1,
+  "PAYLOAD": {
+    "RED_STATUS": "RED_CONFIRMED_WITH_FIX_PRESENT",
+    "TEST_ID": "test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "NODEID": "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "TEST_CONTENT_SHA256": "8d8738c3572470a5384480f9c659163ab352cdc7a19d42bbd2c3d47949e020d1",
+    "PYTEST_COMMAND": "poetry run pytest -m unit tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after -v",
+    "PYTEST_EXIT": 0,
+    "RED_EVIDENCE_PATH": "results/RED-ROOT-001.md",
+    "FIX_PRESENT": true,
+    "WOULD_FAIL_WITHOUT_FIX": true,
+    "RUNTIME_PATH": "app/shared/domains/wb/utils/promo_accounting.py",
+    "DURABLE_FILE_WRITTEN": "YES"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/RED-ROOT-001.md",
+    "team/packets/WEX_RED_TEST_WORKER_h2fdenom001.out.json"
+  ]
+}

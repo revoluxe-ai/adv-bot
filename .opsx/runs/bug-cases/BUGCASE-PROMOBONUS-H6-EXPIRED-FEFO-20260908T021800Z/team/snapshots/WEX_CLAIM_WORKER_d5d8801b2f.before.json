@@ -1,0 +1,26 @@
+{
+  "digests": {
+    "CASE.md": "ceca612a69571ce223fae4887d3a49834ff6e64b4124cb202e0ed5c3ab649f09",
+    "LEDGER.md": "0b72c51bc94ad14aeadecc9834819d6aeb71410255af5f2ef76abbe9179cba80",
+    "findings/ROOT-001.md": "8acbe6eda13ee786336e89003a5d9569047953a7e00fd5846750c546fae8bed2",
+    "handoffs/COMMON_HANDOFF.md": "e2f5018a5aac424a87a1098252488160e1910e85a6853d1c5eddf2c8e25c7c8e",
+    "intakes/INTAKE-001.md": "5a914779f3883b945ef4c18810b7cb383ca9da050b26f10eb7175362cc67cef2",
+    "results/GREEN-ROOT-001.md": "ee75b762b5e4f9b75c43f64cf711fd70bc0063dba8931afcc823f69017f33269",
+    "results/PROOF-CLAIM-WEX_CLAIM_WORKER_2916fd5657.md": "a57d8fd5aa86d8d5a213ac94584d28618e018b2d4c76826d5f17f6e809da554a",
+    "results/RED-ROOT-001.md": "bd610e53730d4ce895720f22a99fc7920ad96f65f40b01da0695f4c11cfb51bf",
+    "results/ROUTE-TRACE.jsonl": "7c5530b282d61d07a9807feea0e9b0051a7b90dc51099895e947c229cd9f0e8b",
+    "team/CHECKPOINT.json": "9dceff83cdf626cf6e0cdd9c28a4ab22dad581d1769e50d83d0dd920656b6549",
+    "team/DISPATCH.jsonl": "3aedc0d2dce4861478cf491d47cd341903da0ceea40d68b4e88484e30c147c4a",
+    "team/intents/WEX_CLAIM_WORKER_2916fd5657.intent.json": "fa7f4ad0793a04cac0fe310fd664d620b849135f3df730d4ebbaf03cdf5df4bd",
+    "team/packets/WEX_CLAIM_WORKER_2916fd5657.in.json": "d8e6c66c4ad7979e7be0e45060a166239b8a29af826a69831edbff2101ad5b46",
+    "team/packets/WEX_CLAIM_WORKER_2916fd5657.out.json": "374d7ded91f390446ffad67f1e7c56364d6f0a82fbfda34ce0da889fa6410b67",
+    "team/packets/WEX_CLAIM_WORKER_d5d8801b2f.in.json": "e5ab07bb25cc5d8903c57cc9d79f9aab2de341bbd4f52a15dea6234700128355",
+    "team/packets/WEX_CLASSIFIER_h6expired001.out.json": "1cda359f6b3be0c07327952ff2c0ed8dbf397efcc3cbf07e1fde16bea27ceb47",
+    "team/packets/WEX_GREEN_VERIFIER_h6expired001.out.json": "19ac8b8ba753939c2f841e3647341290fe72cc1c3a132350f4744830eb07d4fd",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_h6expired001.out.json": "913860e20e52a7a29cd5d75a4d632ae9857c26a585ca225b6b0f68d0cf891ea2",
+    "team/packets/WEX_RED_TEST_WORKER_h6expired001.out.json": "279ab61ea20a37e27691b6ee8a12ae23d6dd62500dfa416cc083a3e1b23d5e13",
+    "team/snapshots/WEX_CLAIM_WORKER_2916fd5657.before.json": "dbcf0fa0d8d26a15d313ab54fdb570a2775c96a71206bc3b9c1144e266e12b9a"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+  "taken_at": 1788825174.0308146
+}

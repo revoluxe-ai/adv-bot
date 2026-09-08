@@ -1,0 +1,16 @@
+{
+  "CASE_ID": "BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+  "FINDING_ID": "ROOT-001",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/h6expired001",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "LOCAL_IMPLEMENTATION_AUTHORIZED": true,
+  "PAYLOAD": {
+    "FILES_CHANGED": [
+      "app/shared/domains/wb/utils/balance_source.py",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "tests/app/modules/auto_budget_manager/test_service.py"
+    ]
+  }
+}

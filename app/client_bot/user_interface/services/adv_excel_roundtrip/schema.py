@@ -31,7 +31,8 @@ TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 # v4: добавлены колонки биддера полок ``auto_shelf_bid_control``.
 # v5: EDIT-колонка ``substitute_fact_cpo_for_max`` (V3 Raise MAX).
 # v7: ``automatic_version`` исключена из Excel (legacy DB-колонка; SoT — ``bot_active``).
-EXCEL_TEMPLATE_VERSION = 7
+# v8: EDIT-колонка ``raise_plan_on_promobonuses`` (RaisePlanOnPromobonuses).
+EXCEL_TEMPLATE_VERSION = 8
 
 # Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
 READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(

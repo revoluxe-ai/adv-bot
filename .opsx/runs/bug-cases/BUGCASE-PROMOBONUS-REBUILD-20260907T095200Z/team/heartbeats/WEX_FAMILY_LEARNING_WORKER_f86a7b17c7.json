@@ -1,0 +1,13 @@
+{
+  "STARTED_AT": "2026-09-07T16:04:30Z",
+  "LAST_HEARTBEAT_AT": "2026-09-07T16:04:36Z",
+  "TIMEOUT_SECONDS": 600,
+  "PROGRESS_MARKER": "output_packet_written",
+  "PROCESS_ID_OR_TASK_ID": "WEX/FAMILY_LEARNING_WORKER/f86a7b17c7",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "PACKET_GENERATION": 1,
+  "STATUS": "PASS",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_FAMILY_LEARNING_WORKER_f86a7b17c7.out.json"
+}

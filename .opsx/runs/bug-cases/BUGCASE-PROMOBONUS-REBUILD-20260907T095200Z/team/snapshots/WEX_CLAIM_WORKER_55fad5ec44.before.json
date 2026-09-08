@@ -1,0 +1,25 @@
+{
+  "digests": {
+    "CASE.md": "34d2afbaee52527a129e50115e9806dc84080d55f6c8f3a66180814b1dd87136",
+    "LEDGER.md": "5914efb0c77cf73ad66d53857788330e53fc8bcae2f0fecf49285b27606cd86b",
+    "findings/ROOT-001.md": "6604400eb589a85d2df65250b39db79920f9ded59d87f5dc85eec799703e2177",
+    "handoffs/COMMON_HANDOFF.md": "1140355a8ae704121ac51fb7dce7df582b6a59d5eb90ad019149c10d75b3f8f2",
+    "intakes/INTAKE-001.md": "8d761f4249f4cd1c31be9993c3029aa0625784ba9e36bc7a033eadee0504389a",
+    "results/PROOF-MATERIALIZER-WEX1090d9ac64.md": "74b2c3531e59b460deb42fe25d7b290cd8a92bb00a6c3a5d0682373580517376",
+    "results/ROUTE-TRACE.jsonl": "2f53f082b6ba865cb7a2615a2f2323771ff478aa68e72f715a907e43b8bc87b3",
+    "team/CHECKPOINT.json": "e4d4e74b2b5f608e954b1bc86e89004314b0b67f1a7e28cf5d9b7bc718dec81d",
+    "team/DISPATCH.jsonl": "88178fcb4a17e3349b0deef9abd94240829c612c44167f096e5c637a6d02771b",
+    "team/executions/WEX_MATERIALIZER_1090d9ac64.identity.json": "1cb8b0b15d1c2a76edcde16cec415799ad1dd8518319ed9039a6282e64491008",
+    "team/heartbeats/WEX_MATERIALIZER_1090d9ac64.json": "1e8e26e7dfb0a7e2116ce6eb6659963a9ab6be2b09271fb498dd90da77199810",
+    "team/intents/WEX_MATERIALIZER_1090d9ac64.intent.json": "872ec10571045974e68c0adb6b876f565b94e0cd901b551a546efcb1b565c278",
+    "team/packets/WEX_CLAIM_WORKER_55fad5ec44.in.json": "390279d926569b81b8289a80fbed0658149553701f9626bfca4b8f811e232504",
+    "team/packets/WEX_MATERIALIZER_1090d9ac64.in.json": "8b53c70013666740c6cb0f3b3414e3e5598fd7a2b3b5c8fa72f9be6acdfd708f",
+    "team/packets/WEX_MATERIALIZER_1090d9ac64.out.json": "6632cbcb24f34819d70760c15af8f01469ab73adc8b1a3acb17af3ca499cb53e",
+    "team/packets/WEX_MATERIALIZER_1090d9ac64.wb.json": "7c4caf1f590d93109a82d34956645684106f4ab7b2d3d13429110a9b8bebc306",
+    "team/retries/.host_retry_authority": "6464b18614353f604b9d0109e4632bc779183d1831dc2056384ca5bf384125ed",
+    "team/snapshots/WEX_MATERIALIZER_1090d9ac64.after.json": "e347030f91d4ab35a9abed5f8fad8d215db55df24b24e0f4e45c0ce4ea0bcabb",
+    "team/snapshots/WEX_MATERIALIZER_1090d9ac64.before.json": "b42044a11ea45765557172f8a4cb608c8fcb8feaeefc816ae9d2985e5c31ad78"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "taken_at": 1788775752.2235062
+}

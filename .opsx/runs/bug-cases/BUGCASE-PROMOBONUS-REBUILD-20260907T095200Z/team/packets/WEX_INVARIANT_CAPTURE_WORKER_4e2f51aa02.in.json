@@ -1,0 +1,43 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 8,
+  "CREATED_AT": 1788779276.1479301,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/c633e1549e/OUT": {
+      "CANONICAL_SHA256": "5bd48d000eb81962cc4bb35ce4d848984e61c506e3fef1c6afbf9f247d925c7d",
+      "RAW_SHA256": "a78a218a3f6ce544a20805ca7d36ef3e264082d0474ec3b877b66cc236d3bc51"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/GREEN_VERIFIER/c633e1549e/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788782876.1479301,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/c633e1549e/OUT",
+  "PAYLOAD": {
+    "FINDING_ID": "ROOT-001",
+    "FROZEN_TEST_NODE": "tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive",
+    "FROZEN_TEST_SHA256": "7b8cf8861d66e61c8eb46e1a75c283684b44dbcda54f82530654ef3b3c848aae",
+    "INVARIANT_CANDIDATE": "Telegram rec-bid plan_context uses overlay target/max pay when live promo_fraction > 0.",
+    "MAPS_TO": "post-root-GREEN invariant capture",
+    "RED_EVIDENCE": "results/RED-ROOT-001.md",
+    "ROOT_CAUSE": "build_view rec-bid called PlanFactProvider.get_effective_promo_plan(adv) without fraction= or complex_adv=, so overlay treated f=0.",
+    "ROOT_FIX": "Resolve live promo fraction from Redis overlay cache and pass fraction=live_fraction into get_effective_promo_plan.",
+    "ROOT_FIX_EVIDENCE": "results/FIX-ROOT-001.md",
+    "ROOT_GREEN_EVIDENCE": "results/GREEN-ROOT-001.md",
+    "WORKER_ID": "INVARIANT_CAPTURE_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02",
+  "WORKER_ID": "INVARIANT_CAPTURE_WORKER"
+}

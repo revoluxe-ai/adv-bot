@@ -1,0 +1,39 @@
+{
+  "LEARNING_DECISION_ID": "LDEC/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/7dfd1df99f",
+  "CASE_ID": "BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z",
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/33480c90",
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/4ae535b7",
+  "LEARNING_STAGE_INVOKED": true,
+  "LEARNING_VERDICT": "LOCAL_CASE_NOTE_ONLY",
+  "POLICY_ALREADY_EXISTS": false,
+  "POLICY_REFS": [],
+  "ENFORCEMENT_GAP": null,
+  "PROMOTION_DECISION": "NONE",
+  "RECOMMENDATIONS": {
+    "STATIC_CHECK_CANDIDATE": false,
+    "PROJECT_WIDE_HUNT_REQUEST": false,
+    "TESTING_RULES_CANDIDATE": false
+  },
+  "FULL_PACKET_REQUIRED": false,
+  "FULL_PACKET_PATH": null,
+  "SOURCE_FANIN_PATH": "results/FAMILY-FANIN.json",
+  "SOURCE_FANIN_HASH": "fe92b03044a79e029603df2f6a2e00d33d1d2825f3dc9a0eb4d5a063a6ea971a",
+  "SOURCE_ARTIFACT_PATHS": {
+    "FANIN_MD": "results/FANIN.md",
+    "FAMILY_FANIN_MD": "results/FAMILY-FANIN.md",
+    "GREEN_ROOT_001": "results/GREEN-ROOT-001.md",
+    "INVARIANT_MD": "family/INVARIANT.md"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FANIN_MD": "5ebf31bacb527cef26f94664775d58b59d4fec9dc274cd8dcd832f8b38d9a005",
+    "FAMILY_FANIN_MD": "7bbccc9a8e72cc019cad0cc5ad62e1293ddede748315bf680a235e1867f1162e",
+    "GREEN_ROOT_001": "0ff86c6d2ba6dd9d205949ff8f6f94b909a65660084b032f91cc3aecc1ac4dc8",
+    "INVARIANT_MD": "3127313faab0f18c87e61133b2a8e467dd8880e8b44bc4479577a7ad064736c7"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "DECISION_RATIONALE": "Family fan-in is READY_FOR_FAMILY_CLOSURE: ROOT-001 leftover-90d AND-stop is GREEN_CONFIRMED, bounded hunt CLEAR, and no SAME_INVARIANT branches. The defect was local to load_campaign_ledgers applying PROMO_LOOKBACK_DAYS as a leftover-usable filter. Overlay remaining+expiry semantics already exist; this hop only removed the local 90d cutoff on leftover/spend load. No reusable class lesson, existing policy citation, enforcement gap, static check, project-wide hunt, testing-rule change, or promotion is justified. LOCAL_CASE_NOTE_ONLY is sufficient.",
+  "CREATED_AT": "2026-09-07T13:29:42Z",
+  "PRODUCT_CLOSURE_VALID": true,
+  "PROCESS_METADATA_CORRECTED": false,
+  "DECISION_HASH": "28d18d830b778b56e01ac6cb4bfea68e09feb02c302cc84ec539cc95cf2e3b16"
+}

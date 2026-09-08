@@ -1,0 +1,64 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/5db3e08ddd/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/5db3e08ddd",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "HC-001",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/5db3e08ddd/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/c114238e13/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/c114238e13/OUT": {
+      "CANONICAL_SHA256": "786acb2077434c9693580713be47295d7ec70d0b9ad95ca9c7be89f1eae91a34",
+      "RAW_SHA256": "73d70272c903a63fdf9bb868960522b85c1ab220ce5a3eca69e9cbeb8e6da321"
+    }
+  },
+  "CHECKPOINT_GENERATION": 26,
+  "CREATED_AT": 1788790280.7510703,
+  "EXPIRES_AT": 1788793451.8500133,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "FIX_STATUS": "APPLIED",
+    "CHANGED_PATHS": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "FILES_CHANGED": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "PRODUCTION_HASH_BEFORE": "da0a710c5039fa700d812bc2a1116afedb7e9b44ea1ec192eae43dc4ba591ca0",
+    "PRODUCTION_HASH_AFTER": "d83c97f6b96b73e9f520e96ad891642ff360ca1037136c898bdd3cf5eba45b7c",
+    "ACTUAL_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ROUTE_RECONCILIATION": "MATCH",
+    "EVIDENCE_PATH": "results/FIX-HC-001.md",
+    "FROZEN_TESTS_UNCHANGED": true,
+    "FROZEN_TEST_UNCHANGED": true,
+    "FROZEN_TEST_PATH": "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py",
+    "FROZEN_TEST_CONTENT_SHA256": "0aebe0f2d17f9dd68069d7966e6cc110efa1f877144c2d20759b00fd41049a4f",
+    "FINDING_002_FROZEN_TEST_PATH": "tests/unit/auto_budget_manager/test_promo_state_service.py",
+    "FINDING_002_FROZEN_TEST_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "COMMIT_CREATED": "NO",
+    "NEXT_ACTION": "/opsx-test verify finding=HC-001",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "app/modules/auto_budget_manager/promo_state_service.py",
+    "results/FIX-HC-001.md",
+    "results/ROUTE-TRACE.jsonl",
+    "LEDGER.md",
+    "findings/HC-001.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_5db3e08ddd.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_5db3e08ddd.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

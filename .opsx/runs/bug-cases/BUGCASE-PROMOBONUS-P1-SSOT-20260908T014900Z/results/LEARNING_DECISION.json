@@ -1,0 +1,46 @@
+{
+  "LEARNING_DECISION_ID": "LDEC/BUGCASE-PROMOBONUS-P1-SSOT-20260908T014900Z/a7f3e91c42",
+  "CASE_ID": "BUGCASE-PROMOBONUS-P1-SSOT-20260908T014900Z",
+  "BUG_FAMILY_ID": null,
+  "INVARIANT_ID": "promobonus_overlay_ssot_boundary_violation",
+  "LEARNING_STAGE_INVOKED": true,
+  "LEARNING_VERDICT": "CLASS_LESSON_CANDIDATE",
+  "POLICY_ALREADY_EXISTS": false,
+  "POLICY_REFS": [
+    ".cursor/rules/testing-rules.mdc (Reality constraints — partial overlap, not overlay-specific)"
+  ],
+  "ENFORCEMENT_GAP": "candidate",
+  "PROMOTION_DECISION": "KEEP_LESSON_CANDIDATE_ONLY",
+  "OWNER_FINAL": "KEEP_LESSON_CANDIDATE_ONLY",
+  "OWNER_FINAL_AT": "2026-09-08T03:05:00Z",
+  "OWNER_FINAL_DISPATCH": "D-017",
+  "CLASS_STATUS": "CANDIDATE_RETAINED",
+  "CLASS_LEVEL_GO_WRITE": "FORBIDDEN",
+  "RECOMMENDATIONS": {
+    "STATIC_CHECK_CANDIDATE": true,
+    "PROJECT_WIDE_HUNT_REQUEST": true,
+    "TESTING_RULES_CANDIDATE": true
+  },
+  "FULL_PACKET_REQUIRED": true,
+  "FULL_PACKET_PATH": "results/LEARNING_PACKET.json",
+  "SOURCE_FANIN_PATH": "results/FANIN.md",
+  "SOURCE_FANIN_HASH": "31aa64b3b8d7bcfe4a0282e705e5c6b932c6ddb90dd92520a170dd52ec377a53",
+  "SOURCE_ARTIFACT_PATHS": {
+    "FANIN": "results/FANIN.md",
+    "ROOT_RED": "results/RED-ROOT-001.md",
+    "ROOT_FIX": "results/FIX-ROOT-001.md",
+    "ROOT_GREEN": "results/GREEN-ROOT-001.md",
+    "CHILD_RED": "results/RED-CHILD-001.md",
+    "CHILD_FIX": "results/FIX-CHILD-001.md",
+    "CHILD_GREEN": "results/GREEN-CHILD-001.md"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FANIN": "31aa64b3b8d7bcfe4a0282e705e5c6b932c6ddb90dd92520a170dd52ec377a53"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "DECISION_RATIONALE": "FANIN_READY with ROOT-001+CHILD-001 same-invariant branches FIXED (RED/GO/GREEN). Split SSOT violation: CH persisted overlay Plan at process_pre_adv write boundary while runtime consumers omitted ComplexAdv on get_effective_plan_data or read bare AdvSetting. LESSON_GATE_PASS satisfied; Owner FINAL KEEP_LESSON_CANDIDATE_ONLY (D-017): class lesson remains case-local in LEARNING_PACKET.json / LEARNING_REPORT.md; no promotion to .cursor/commands or .cursor/rules; CLASS_LEVEL_GO_WRITE FORBIDDEN; WRITE_ALLOWED=false.",
+  "CREATED_AT": "2026-09-08T02:58:30Z",
+  "PRODUCT_CLOSURE_VALID": true,
+  "PROCESS_METADATA_CORRECTED": false,
+  "DECISION_HASH": "pending_validation"
+}

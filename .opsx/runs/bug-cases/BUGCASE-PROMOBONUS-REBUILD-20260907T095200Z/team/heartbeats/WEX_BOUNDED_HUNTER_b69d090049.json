@@ -1,0 +1,10 @@
+{
+  "STARTED_AT": "2026-09-07T15:50:00Z",
+  "LAST_HEARTBEAT_AT": "2026-09-07T15:51:00Z",
+  "PROGRESS_MARKER": "output_packet_written",
+  "PROCESS_ID_OR_TASK_ID": "WEX/BOUNDED_HUNTER/b69d090049",
+  "ATTEMPT": 1,
+  "STATUS": "PASS",
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_BOUNDED_HUNTER_b69d090049.out.json"
+}

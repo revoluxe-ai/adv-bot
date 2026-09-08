@@ -1,0 +1,79 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 76,
+  "CREATED_AT": 1788813700.2948976,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/30d9a4e237/OUT": {
+      "CANONICAL_SHA256": "e6e904babef417e1f8bfd8a2bce8345b72d91b4693e65cf5085e78b7118425e0",
+      "RAW_SHA256": "5c2a4304a50ede9238f1bd331291f605f06742dba81667f3f7087a76218416de"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/30d9a4e237/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788817300.2948976,
+  "FINDING_ID": "FINDING-006",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t11-d11",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/14c710e724/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/30d9a4e237/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-006.md",
+      "findings/FINDING-005.md",
+      "findings/FINDING-004.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "findings/HC-FINDING-004-STALE-TEST.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_CLASSIFIER_30d9a4e237.out.json",
+      "results/PROOF-CLASSIFIER-WEX30d9a4e237.md",
+      ".cursor/pipeline/bug-team/workers/BOUNDED_HUNTER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json",
+      "app/modules/auto_budget_manager/promo_ledger.py",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
+      "app/modules/auto_budget_manager/service.py",
+      "app/modules/auto_budget_manager/redis_promo_state_manager.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_FINDING_004": true,
+    "DO_NOT_REOPEN_FINDING_005": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_HC_FINDING_004_STALE_TEST": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "FINDING_ID": "FINDING-006",
+    "HUNT_BOUND": "FINDING-006 is FALSE_POSITIVE: WBAutoBudgetTopUp is the bot auto-budget journal by design; unused wallet promo stays on live WB cashbacks. Hunt ONLY sibling sites that actually persist or load manual seller-portal promo deposits into WBAutoBudgetTopUp, or that treat missing manual deposits as a journal defect that empties leftover/pool. Do not hunt leftover fraction (FINDING-005), FEFO expired-spend (FINDING-004), 90d cutoff (FINDING-003), pool-failure (FINDING-002), or overlay (ROOT-001) as same-invariant unless they literally write/read manual deposits in WBAutoBudgetTopUp. Do not reopen closed findings. Do not fix, write RED, classify, or close candidates. If no such sibling exists, HUNT_RESULT=CLEAR.",
+    "HUNT_SCOPE": [
+      "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
+      "app/modules/auto_budget_manager/promo_ledger.py load_success_tranches",
+      "app/modules/auto_budget_manager/service.py _create_topup_entry",
+      "app/shared/domains/wb/utils/promo_accounting.py campaign remaining SoT",
+      "app/modules/auto_budget_manager/redis_promo_state_manager.py"
+    ],
+    "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-006/JOURNAL-BOT-ONLY",
+    "INVARIANT_TEXT": "WBAutoBudgetTopUp is the bot auto-budget journal only. Campaign remaining uses verified bot allocations minus UPD spend. Unused wallet promo stays on live WB cashbacks. Manual seller-portal deposits are outside this journal SoT.",
+    "MAPS_TO": "/opsx-bug-hunt bounds",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "ROUTE_C_SKIP_GREEN": true,
+    "WORKER_ID": "BOUNDED_HUNTER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/14c710e724",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

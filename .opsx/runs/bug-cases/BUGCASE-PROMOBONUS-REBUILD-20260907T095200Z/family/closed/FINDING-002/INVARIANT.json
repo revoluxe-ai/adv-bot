@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY",
+  "INVARIANT_REQUIRED_BEHAVIOR": "On Exception from get_campaign_balance, leave pool_fetch_ok=False, skip RedisPromoStateManager.set of a fresh pool_usable=false snapshot, and return so miss/stale stays conservative M=1.",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "Do not redis.set a fresh shop-promo-state snapshot with pool_usable=false after get_campaign_balance Exception; that stamps updated_at=now and makes overlay readers treat a fetch failure as a known-empty pool.",
+  "INVARIANT_ENTRY_CONDITIONS": "PromoStateService.refresh is invoked and get_campaign_balance raises Exception (frozen RED/GREEN node: RuntimeError from WB get_campaign_balance).",
+  "INVARIANT_SCOPE": "promo_state_service PromoStateService.refresh Exception path around get_campaign_balance: do not persist shop-promo-state with pool_usable=false. Excludes ROOT-001 Telegram rec-bid overlay (view_provider plan_context) and intake items 3-6 (ledger 90d / FEFO / leftover fraction / journal).",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

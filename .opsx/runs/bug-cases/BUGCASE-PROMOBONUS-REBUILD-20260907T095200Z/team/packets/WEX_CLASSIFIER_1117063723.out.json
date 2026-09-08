@@ -1,0 +1,147 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/1117063723/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/1117063723",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/1117063723/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/55fad5ec44/OUT",
+    "PKT/WEX/MATERIALIZER/1090d9ac64/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/55fad5ec44/OUT": {
+      "CANONICAL_SHA256": "e38462ea6fd2c7ba68db3162d211c60b58d9a0e07aa9b274927bee8077b2070f",
+      "RAW_SHA256": "eb54f5f534cf137b8de3dfc72dabf9bfb5e228589c6dbdf2726788d5a82df4ab"
+    },
+    "PKT/WEX/MATERIALIZER/1090d9ac64/OUT": {
+      "CANONICAL_SHA256": "22cb1126bd2d8f3c7ac791bcc60dc422137f799e9337dcfc892b9aac0a4a302e",
+      "RAW_SHA256": "6632cbcb24f34819d70760c15af8f01469ab73adc8b1a3acb17af3ca499cb53e"
+    }
+  },
+  "CHECKPOINT_GENERATION": 3,
+  "CREATED_AT": 1788776670.0,
+  "EXPIRES_AT": 1788780270.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-test",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A selected; team WAVE_3A is RED then executor. EXPECTED_NEXT_COMMAND=/opsx-test; EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug. ACTUAL_* remain PENDING.",
+    "CURRENT_ROUTE_STATE": "AWAITING_RED",
+    "RATIONALE": "Telegram rec-bid in AutoShelfBidControlViewProvider.build_view line 881 calls PlanFactProvider.get_effective_promo_plan(adv) with repository AdvSetting only, without fraction= or complex_adv=. The overlay API resolves live promo share from complex_adv.promo_fraction or fraction; otherwise adv.promo_fraction; missing values stay Decimal(0), so overlay.plan equals get_plan_data and rec-bid plan_context uses unscaled target/max pay. Canonical helper overlay_for_adv always passes fraction. Sibling shop-runner snapshot builder already passes complex_adv=complex_adv. Runtime path is Telegram auto-shelf rec-bid presentation via auto_shelf_bid_control_telegram_service.build_view. No OpenSpec promo overlay contract exists, but this is missed wiring against the rebuild's own provider contract, not a product-decision gap requiring /opsx-update. OpenSpec update not required. Residual intake items 2-6 not classified.",
+    "NEXT_ACTION": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=ROOT-001",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/2026-09-07T10:12:02Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "implicit_product_invariant",
+      "evidence": "PlanFactProvider.get_effective_plan_data docstring: fraction / complex_adv.promo_fraction is the live promo share; f=0 returns the same Plan as get_plan_data. promo_overlay.overlay_for_adv(adv, fraction=fraction) is the canonical helper. Sibling auto_shelf_bid_control_decision_snapshot_builder.py:110-112 passes complex_adv=complex_adv. No matching requirement in openspec/specs or active openspec/changes.",
+      "gap": "OpenSpec is silent on promo overlay rec-bid; not sufficient to force SPEC_GAP because the overlay API and sibling call site already state the required inputs."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Telegram UX rec-bid presentation (read/compute). No WB/DB/Redis write asserted for this finding.",
+      "entrypoints": [
+        "auto_shelf_bid_control_telegram_service.build_view",
+        "AutoShelfBidControlViewProvider.build_view"
+      ],
+      "direct_callers": [
+        "auto_shelf_bid_control_view_provider.py:881 PlanFactProvider.get_effective_promo_plan(adv)"
+      ],
+      "indirect_callers": [
+        "auto_shelf_bid_control_telegram_service.py build_view and UI handlers that rebuild the view"
+      ],
+      "test_only_callers": [],
+      "dead_or_legacy_path": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "exact_path",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/ROOT-001.md",
+      "fallback_used": false,
+      "search_operations": [
+        "read cited view_provider rec-bid site",
+        "read PlanFactProvider.get_effective_promo_plan",
+        "read promo_overlay.overlay_for_adv",
+        "bounded sibling snapshot builder call site"
+      ],
+      "search_scope": [
+        "findings/ROOT-001.md",
+        "intakes/INTAKE-001.md",
+        "LEDGER.md",
+        "CASE.md",
+        "auto_shelf_bid_control_view_provider.py",
+        "promo_overlay.py",
+        "plan_fact/provider.py",
+        "auto_shelf_bid_control_decision_snapshot_builder.py"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding/intake and cited overlay symbols only",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_CLASSIFY",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_RED",
+      "NEXT_COMMAND": "/opsx-test",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=ROOT-001",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "yes",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX1117063723.md"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_RED",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-test",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "NEXT_COMMAND": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=ROOT-001",
+    "ALLOWED_FIX_FILES": [
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_view_provider.py"
+    ],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/** (RED owned by /opsx-test)",
+      "unrelated promo_state_service / promo_ledger / promo_accounting (intake items 2-6)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "Telegram rec-bid / build_view with raise_plan_on_promobonuses and live promo_fraction > 0 must feed overlay target/max pay into plan_context; f=0 remains unscaled. Do not mock get_effective_promo_plan away.",
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit -k rec_bid -q",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": false,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The overlay API and sibling ComplexAdv call site already require fraction/complex_adv. This finding is a missed Telegram rec-bid wiring, not a new product contract."
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/PROOF-CLASSIFIER-WEX1117063723.md",
+    "team/heartbeats/WEX_CLASSIFIER_1117063723.json",
+    "team/packets/WEX_CLASSIFIER_1117063723.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

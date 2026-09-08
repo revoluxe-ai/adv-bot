@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/FIX-FINDING-005.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_883c7beaa2.json",
+    "team/intents/WEX_IMPLEMENTATION_EXECUTOR_883c7beaa2.intent.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_883c7beaa2.out.json",
+    "team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_883c7beaa2.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,93 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/05c283a184",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/05c283a184/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT": {
+      "CANONICAL_SHA256": "9624cdea33aef89affd34661b4edf0c6346f68c45115ce1db2c2e285443996ef",
+      "RAW_SHA256": "a1e121f36ba68d4d65009087dd7b3732e9da416a5f7b17338bf74c299f6158e2"
+    }
+  },
+  "CHECKPOINT_GENERATION": 56,
+  "CREATED_AT": 1788805525.0,
+  "EXPIRES_AT": 1788809125.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "GREEN_CONFIRMED",
+  "PAYLOAD": {
+    "GREEN_STATUS": "GREEN_CONFIRMED",
+    "FROZEN_TEST_HASH_STATUS": "MATCH",
+    "EVIDENCE_PATH": "results/GREEN-HC-FINDING-004-STALE-TEST.md",
+    "TEST_CONTENT_SHA256": "233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53",
+    "FINDING_004_NODE_STILL_PASSES": true,
+    "TEST_RESULTS": {
+      "FROZEN_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+      "FROZEN_COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable -vv --tb=short",
+      "FROZEN_RESULT": "PASSED",
+      "FROZEN_EXIT": 0,
+      "FINDING_004_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+      "FINDING_004_NODE_STILL_PASSES": true,
+      "FINDING_004_NODE_RESULT": "PASSED in adjacent file run",
+      "ADJACENT_FILE_COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -vv --tb=short",
+      "ADJACENT_FILE_RESULT": "6 passed, 1 warning in 0.37s; all-pass as expected after remaining==150 assert",
+      "ADJACENT_FILE_EXIT": 0,
+      "TEST_CONTENT_SHA256": "233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53",
+      "TEST_CONTENT_SHA256_MATCH_POST_FIX": true,
+      "TEST_CONTENT_SHA256_MATCH_RED": false,
+      "SHA_CHANGE_EXPECTED": true,
+      "RED_TEST_CONTENT_SHA256": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+      "POST_FIX_EXPECTED_SHA256": "233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53",
+      "VERIFY_ADJACENT_IS_GREEN_GATE": false
+    },
+    "INVARIANT_VERIFIED": true,
+    "MAPS_TO": "/opsx-test verify",
+    "TEST_ID": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FROZEN_TEST_SHA256": "233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53",
+    "REQUIRED_INVARIANT": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150.",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no",
+    "DURABLE_FILE_WRITTEN": "YES",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_GREEN",
+      "RESULT": "GREEN_CONFIRMED",
+      "TO_STATE": "AWAITING_CLOSE",
+      "NEXT_COMMAND": "/opsx-bug-team",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z mode=resume-family-fanout",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "NOT_APPLICABLE",
+        "CLAIM_REQUIRED": "no",
+        "RED_REQUIRED": "satisfied",
+        "GREEN_REQUIRED": "satisfied",
+        "OTHER": "POST_GREEN_OWNER=bug-team; CLOSE_FINDING_INTENT=ask_after_green; items 5-6 not started"
+      },
+      "REQUIRED_EVIDENCE": [
+        "GREEN_EVIDENCE_PATH"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_CLOSE",
+      "ON_FAILURE_STATE": "BLOCKED",
+      "RECOVERY_COMMAND": "NOT_APPLICABLE",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    }
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-HC-FINDING-004-STALE-TEST.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_05c283a184.json",
+    "team/packets/WEX_GREEN_VERIFIER_05c283a184.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

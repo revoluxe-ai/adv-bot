@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z/94fd0959",
+  "INVARIANT_REQUIRED_BEHAVIOR": "fraction=package percent; promo_multiplier≈1/(1-f); f<0.9 on multi-tranche fixture",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "f=remaining/last_tranche.amount; overlay M explosion (~1e6); RaisePlanOnPromobonuses persist",
+  "INVARIANT_ENTRY_CONDITIONS": "multi-tranche campaign ledger with live leftover promo remaining>0",
+  "INVARIANT_SCOPE": "apply_spend_fefo / campaign_ledger_from_rows / pool_usable_from_pick → overlay consumers",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

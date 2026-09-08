@@ -1,0 +1,73 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 37,
+  "CREATED_AT": 1788795489.7526977,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/7e22123ed3/OUT": {
+      "CANONICAL_SHA256": "79456223665bcab9d76645d1aac44e3e8aeb3b649bdd2581922b2bfaa2605113",
+      "RAW_SHA256": "1b56079ff59c8def52794906e2755d0f6d86baeebb041b0f924dadcbbc087063"
+    },
+    "PKT/WEX/MATERIALIZER/efd2d1333b/OUT": {
+      "CANONICAL_SHA256": "08daca8d8b3ab647585ca7d656748bbcd3f7bff68100df930778a81085ec9833",
+      "RAW_SHA256": "b76dd7f60ccd94e84757a6b436c14be77bcb4aafbaf742871ab795492fbe91a3"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/7e22123ed3/OUT",
+    "PKT/WEX/MATERIALIZER/efd2d1333b/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788799089.7526977,
+  "FINDING_ID": "FINDING-003",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t07-d07",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/e1b15347b7/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLAIM_WORKER/7e22123ed3/OUT",
+  "PAYLOAD": {
+    "ALLOWED_CLASSIFICATIONS": [
+      "IMPLEMENTATION_BUG",
+      "SPEC_BUG",
+      "SPEC_GAP",
+      "FALSE_POSITIVE",
+      "OUT_OF_SCOPE",
+      "INSUFFICIENT_EVIDENCE"
+    ],
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_MATERIALIZER_efd2d1333b.out.json",
+      "team/packets/WEX_CLAIM_WORKER_7e22123ed3.out.json",
+      ".cursor/pipeline/bug-team/workers/CLASSIFIER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-classify-bug.md",
+      ".cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md",
+      ".cursor/pipeline/bug-team/packets/ROUTE_FIELDS.md",
+      "app/modules/auto_budget_manager/promo_ledger.py",
+      "openspec/decisions/index.md"
+    ],
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-003/2026-09-07T15:33:26Z",
+    "DO_NOT_CLASSIFY_ITEMS_4_TO_6": true,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "FINDING_ID": "FINDING-003",
+    "FINDING_PATH": "findings/FINDING-003.md",
+    "INTAKE_PATH": "intakes/INTAKE-001.md",
+    "MAPS_TO": "/opsx-classify-bug",
+    "WORKER_ID": "CLASSIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/e1b15347b7",
+  "WORKER_ID": "CLASSIFIER"
+}

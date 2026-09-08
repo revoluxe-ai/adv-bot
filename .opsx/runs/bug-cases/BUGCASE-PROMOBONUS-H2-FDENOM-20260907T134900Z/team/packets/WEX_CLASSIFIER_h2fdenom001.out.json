@@ -1,0 +1,83 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/h2fdenom001/OUT",
+  "WORKER_ID": "CLASSIFIER",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/h2fdenom001",
+  "PARENT_ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/h2fdenom001/IN",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "STARTED_AT": "2026-09-08T00:12:00Z",
+  "COMPLETED_AT": "2026-09-08T00:13:21Z",
+  "LAST_HEARTBEAT_AT": "2026-09-08T00:13:21Z",
+  "ATTEMPT": 1,
+  "PAYLOAD": {
+    "BUG_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-fix-bug",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A IMPLEMENTATION_BUG selected; overrides stale LEDGER SPEC_GAP/ROUTE_B (no V10-valid CLASSIFIER identity). Finding invariant explicit: leftover 200 / top-up unit 1000 -> f=0.2 M=1.25; denominator tranche.amount not budget_after/wallet. Code may already use tranche.amount; episode still requires RED->EXECUTOR->GREEN.",
+    "CURRENT_ROUTE_STATE": "AWAITING_FIX_BUG",
+    "RATIONALE": "ROOT-001 PRODUCTION_CLASSIFICATION=confirmed production bug. Prior campaign_ledger_from_rows used budget_after/wallet as denominator when campaign_budget_total absent (PromoStateService.refresh empty dict) -> remaining=200 / budget_after=5000 -> f=0.04, M!=1.25. pool_usable_from_pick already uses cashback_sum/topup_amount (same top-up-unit contract). Finding INVARIANT is explicit; not SPEC_GAP. Current promo_accounting.py apply_spend_fefo sets reference_budget=tranche.amount; campaign_ledger_from_rows ignores campaign_budget_total; test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after covers collapse vector. Fix may be present; classification remains IMPLEMENTATION_BUG for Route A verification episode.",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z intake=INTAKE-001 finding=ROOT-001 claim_token=CLAIM/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/ROOT-001/2026-09-07T14:02:09Z",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/ROOT-001/2026-09-07T14:02:09Z",
+    "CHAT_LABEL": "SUP-PROMOBONUS-H2-FIX-20260908",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "WHY_NOT_SPEC_GAP": "Finding packet states invariant explicitly. pool_usable_from_pick and promo_fraction_from_amounts already encode top-up-unit denominator. Wrong budget_after denominator was implementation drift, not missing product spec.",
+    "STALE_CLASSIFICATION_OVERRIDE": {
+      "prior": {"CLASSIFICATION": "SPEC_GAP", "CHOSEN_ROUTE": "ROUTE_B"},
+      "reason": "Prior classify lacked V10-valid CLASSIFIER worker identity; OpenSpec silence does not override explicit finding invariant."
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_SPEC_UPDATE",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_FIX_BUG",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z intake=INTAKE-001 finding=ROOT-001 claim_token=CLAIM/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/ROOT-001/2026-09-07T14:02:09Z",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "not_applicable",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": "classification envelope + RED evidence path",
+      "ON_SUCCESS_STATE": "AWAITING_FIX_BUG",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "REJECTED_ROUTES": ["ROUTE_B", "ROUTE_C", "ROUTE_D"],
+    "REJECTED_ROUTE_REASONS": {
+      "ROUTE_B": "explicit finding invariant + pool top-up-unit mix sufficient; not SPEC_GAP",
+      "ROUTE_C": "confirmed production bug; runtime reachable with wrong denominator",
+      "ROUTE_D": "H2 root finding in scope for this case"
+    },
+    "EVIDENCE_PATHS": [
+      ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/findings/ROOT-001.md",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "GO_TOKEN": "FORBIDDEN"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/heartbeats/WEX_CLASSIFIER_h2fdenom001.json",
+    "team/packets/WEX_CLASSIFIER_h2fdenom001.out.json"
+  ]
+}

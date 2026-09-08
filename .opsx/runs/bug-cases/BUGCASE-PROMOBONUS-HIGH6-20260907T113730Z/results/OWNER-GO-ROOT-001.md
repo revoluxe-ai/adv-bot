@@ -1,0 +1,18 @@
+# OWNER GO receipt: ROOT-001
+
+```text
+BUG_CASE_ID: BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z
+FINDING_ID: ROOT-001
+COMMAND: /opsx-fix-bug
+GO: yes
+OWNER_GO_SOURCE: Owner mission text "Пофикси" after independent review of H1-H6; RED_CONFIRMED on ROOT-001
+OWNER_GATE_STATUS: APPROVED
+OWNER_GATE_OPENED_AT: 2026-09-07T12:21:25Z
+OWNER_GO_ISSUED_AT: 2026-09-07T12:30:20Z
+OWNER_WAIT_DURATION_MS: 535000
+RED_STATUS: RED_CONFIRMED
+RED_EVIDENCE_PATH: results/RED-ROOT-001.md
+CLAIM_TOKEN_PRESENT: true
+SCOPE: leftover-usable in load_campaign_ledgers only
+FORBIDDEN_THIS_HOP: FINDING-H2..H6; alembic apply; RaisePlanOnPromobonuses enable; ingest lookback widening; commit/push/PR
+```

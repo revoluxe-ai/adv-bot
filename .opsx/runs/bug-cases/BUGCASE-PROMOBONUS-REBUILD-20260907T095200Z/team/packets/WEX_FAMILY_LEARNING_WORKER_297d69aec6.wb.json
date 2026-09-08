@@ -1,0 +1,20 @@
+{
+  "WORKER_ID": "FAMILY_LEARNING_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "family/LEARNING_DECISION.json",
+    "team/heartbeats/WEX_FAMILY_LEARNING_WORKER_297d69aec6.json",
+    "team/intents/WEX_FAMILY_LEARNING_WORKER_297d69aec6.intent.json",
+    "team/packets/WEX_FAMILY_LEARNING_WORKER_297d69aec6.out.json",
+    "team/snapshots/WEX_FAMILY_LEARNING_WORKER_297d69aec6.before.json"
+  ],
+  "MODIFIED": [
+    "family/FAMILY.json",
+    "family/LEARNING_PACKET.json",
+    "results/LEARNING_REPORT.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

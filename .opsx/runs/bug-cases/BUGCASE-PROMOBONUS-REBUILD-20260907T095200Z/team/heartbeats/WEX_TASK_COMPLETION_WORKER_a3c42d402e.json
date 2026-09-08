@@ -1,0 +1,10 @@
+{
+  "STARTED_AT": "2026-09-07T17:20:33Z",
+  "LAST_HEARTBEAT_AT": "2026-09-07T17:22:05Z",
+  "PROGRESS_MARKER": "output_packet_written",
+  "STATUS": "PASS",
+  "PROCESS_ID_OR_TASK_ID": "WEX/TASK_COMPLETION_WORKER/a3c42d402e",
+  "ATTEMPT": 1,
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_TASK_COMPLETION_WORKER_a3c42d402e.out.json"
+}

@@ -1,0 +1,62 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/packets/WEX_CLASSIFIER_b497811f3f.out.json"
+  ],
+  "ATTEMPT": 3,
+  "CASE_ID": "BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1788825619.2305324,
+  "DEPENDENCY_HASHES": {
+    "CLAIM_OUT": {
+      "CANONICAL_SHA256": "0e847ff0bf35d5881aed8e59511040e9b78fca1742d1d70de824ed3129721b0c",
+      "RAW_SHA256": "fea8cf224e61dfd3c39776ccb4b54dade06e65f82379741e9a8267526c6de424"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "CLAIM_OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788829219.2305324,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z/CASE-RESUME-ATTEMPT3-20260908",
+  "PACKET_GENERATION": 6,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/b497811f3f/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/b497811f3f/IN",
+  "PAYLOAD": {
+    "ATTEMPT": 3,
+    "BUG_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CASE_ID": "BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+    "CHAT_LABEL": "SUP-PROMOBONUS-H6-FIX-20260908",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z/ROOT-001/2026-09-08T02:45:00Z",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_ROUTE_STATE": "CLASSIFIED_ROUTE_A",
+    "EXPECTED_EXECUTION_ROUTE": "RED->LOCAL_AUTHORITY->EXECUTOR->GREEN",
+    "ACTUAL_EXECUTION_ROUTE": "RED->LOCAL_AUTHORITY->EXECUTOR->GREEN",
+    "ROUTE_RECONCILIATION": "MATCH",
+    "EXPECTED_NEXT_COMMAND": "RED_TEST_WORKER",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "FINDING_ID": "ROOT-001",
+    "INVARIANT": "pick_cashback_for_topup must skip expired packages and pick the next live FEFO row",
+    "MAPS_TO": "/opsx-classify-bug",
+    "MISSION_ID": "SUP-PROMOBONUS-H6-FIX-20260908",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "RATIONALE": "pick_cashback_for_topup sorted cashbacks FEFO by expiration_date but the pre-fix loop did not call _is_expired before selecting the first payable row, so expired April/May 2026 packages won over live October 2026. ROOT-001 invariant and module docstring require skip-expired plus earliest-live FEFO. Production path pick_cashback_for_topup -> select_topup_balance_decision -> AutoBudgetService top-up write is reachable. openspec/decisions/index.md is silent on cashback expiry; not SPEC_GAP because the finding invariant and balance_source contract are explicit. Not FALSE_POSITIVE: stale test test_pick_cashback_for_topup_prefers_earliest_expiration encoded the wrong behavior.",
+    "RUNTIME_PATH": "app/shared/domains/wb/utils/balance_source.py",
+    "ROUTE_TRACE_APPENDED": true,
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z/results/ROUTE-TRACE.jsonl",
+    "LAST_ROUTE_EVENT_ID": "RTE/BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z/5",
+    "REQUIRED_REGRESSION_TEST": "test_pick_cashback_for_topup_skips_expired_prefers_earliest_live_fefo",
+    "TASK_ID": "T-BUGTEAM-H6-003"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/b497811f3f",
+  "WORKER_ID": "CLASSIFIER"
+}

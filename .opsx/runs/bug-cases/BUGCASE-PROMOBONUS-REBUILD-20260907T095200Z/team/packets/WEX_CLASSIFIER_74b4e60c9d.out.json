@@ -1,0 +1,165 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/74b4e60c9d/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t10-d10",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/74b4e60c9d",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-005",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/74b4e60c9d/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/a2c7db25dd/OUT",
+    "PKT/WEX/MATERIALIZER/187e482f7f/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/a2c7db25dd/OUT": {
+      "CANONICAL_SHA256": "d9a2ba73f101f630693cf836b6e257603be66e33fb40ba5b2ffeee78482ad043",
+      "RAW_SHA256": "9dcff0d684447970a3603f80713e3f5b3953807970ac685bfc8bcfcddbb118f0"
+    },
+    "PKT/WEX/MATERIALIZER/187e482f7f/OUT": {
+      "CANONICAL_SHA256": "f984a44cdcb757078357121284af010ece28603b670eb32a9a9589c34efc7827",
+      "RAW_SHA256": "d987e3ed474c4416591ae46dccd572fa55d7beff6b5e006fba28c56222943ff3"
+    }
+  },
+  "CHECKPOINT_GENERATION": 64,
+  "CREATED_AT": 1788808988.375661,
+  "EXPIRES_AT": 1788812588.375661,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-fix-bug",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A selected; leftover fraction uses remaining/(campaign_budget_total|budget_after) so M collapses. EXPECTED_NEXT_COMMAND=/opsx-fix-bug; EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug. ACTUAL_* remain PENDING.",
+    "CURRENT_ROUTE_STATE": "AWAITING_FIX_BUG",
+    "RATIONALE": "campaign_ledger_from_rows sets leftover fraction as remaining / (campaign_budget_total or apply_spend_fefo reference_budget). reference_budget is last leftover budget_after, else tranche.amount. Pool mix in the same module is cashback_sum / topup_amount (200/1000 -> 0.2). Leftover remaining over campaign-level budget_after/total collapses f and therefore M=1/(1-f) toward 1 while leftover remains usable. Existing test_campaign_ledger_fraction_uses_remaining_not_ceiling uses amount=budget_after=campaign_budget_total=1000 and does not catch leftover << budget_after. openspec/decisions/index.md is silent on leftover fraction; not SPEC_GAP because the rebuild already states the top-up-unit mix. Residual intake item 6 not classified. ROOT-001 / FINDING-002 / HC-001 stay closed_fixed. FINDING-003 stays closed_false_positive. FINDING-004 / HC-FINDING-004-STALE-TEST stay closed_fixed.",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=FINDING-005 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "implicit_product_invariant",
+      "evidence": "promo_fraction_from_amounts documents 200/1000 -> 0.2. pool_usable_from_pick uses cashback_sum / topup_amount. promo_multiplier is M = 1/(1-f). Leftover fraction must use remaining over the top-up unit (tranche.amount), not campaign-level budget_after or campaign_budget_total.",
+      "gap": "openspec/decisions/index.md has no leftover-fraction / budget_after decision; not SPEC_GAP because the rebuild module already states the top-up-unit mix."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Redis derived overlay cache write of campaign remaining/usable/fraction via campaign ledger. Overlay M collapses while leftover remains usable. No WB production mutation asserted for this finding.",
+      "entrypoints": [
+        "load_campaign_ledgers",
+        "campaign_ledger_from_rows",
+        "apply_spend_fefo reference_budget",
+        "resolve_promo_availability campaign_fraction",
+        "promo_multiplier"
+      ],
+      "direct_callers": [
+        "promo_accounting.py campaign_ledger_from_rows remaining / (campaign_budget_total|budget_after)",
+        "promo_ledger.py:load_campaign_ledgers -> campaign_ledger_from_rows"
+      ],
+      "indirect_callers": [
+        "resolve_promo_availability campaign_fraction",
+        "promo_plan_multiplier.promo_multiplier"
+      ],
+      "test_only_callers": [
+        "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_fraction_uses_remaining_not_ceiling (amount=budget_after=total; does not catch collapse)"
+      ],
+      "dead_or_legacy_path": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/FINDING-005.md",
+      "fallback_used": false,
+      "search_operations": [
+        "canonical finding FINDING-005.md",
+        "INTAKE-001 item 5",
+        "read campaign_ledger_from_rows and apply_spend_fefo reference_budget",
+        "read promo_plan_multiplier promo_fraction_from_amounts / promo_multiplier",
+        "read promo_ledger load_campaign_ledgers caller",
+        "bounded openspec/decisions/index.md leftover-fraction lookup"
+      ],
+      "search_scope": [
+        "findings/FINDING-005.md",
+        "intakes/INTAKE-001.md",
+        "LEDGER.md",
+        "CASE.md",
+        "app/shared/domains/wb/utils/promo_accounting.py",
+        "app/shared/domains/wb/utils/promo_plan_multiplier.py",
+        "app/modules/auto_budget_manager/promo_ledger.py",
+        "openspec/decisions/index.md",
+        "tests/unit/wb/utils/test_promo_accounting.py"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding/intake, campaign leftover fraction, load_campaign_ledgers, and bounded decisions/index.md",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "FINDING_CLAIMED_AWAITING_CLASSIFY",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_FIX_BUG",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=FINDING-005 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "not_applicable",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX74b4e60c9d.md"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_FIX_BUG",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "NEXT_COMMAND": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=FINDING-005 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z",
+    "ALLOWED_FIX_FILES": [
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/** (RED owned by later /opsx-test after fix_now)",
+      "unrelated journal / manual deposits (intake item 6)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)",
+      "promo_state_service.py pool-failure path (FINDING-002/HC-001 closed_fixed)",
+      "promo_ledger.py leftover lookback (FINDING-003 closed_false_positive)",
+      "apply_spend_fefo expired-spend skip (FINDING-004/HC-FINDING-004-STALE-TEST closed_fixed)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "campaign leftover fraction must use remaining over the top-up unit (tranche.amount), not budget_after or campaign_budget_total. leftover remaining 200 with amount 1000 and budget_after 12000 must yield fraction 0.2 (M=1.25), not 200/12000. Do not reuse amount=budget_after=total as the only vector.",
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -q",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The rebuild already requires promo/top-up-unit mix via promo_fraction_from_amounts and pool_usable_from_pick. This finding is implementation drift from that contract, not a missing OpenSpec product decision.",
+    "GO_TOKEN": "FORBIDDEN",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "results/PROOF-CLASSIFIER-WEX74b4e60c9d.md",
+    "team/heartbeats/WEX_CLASSIFIER_74b4e60c9d.json",
+    "team/packets/WEX_CLASSIFIER_74b4e60c9d.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

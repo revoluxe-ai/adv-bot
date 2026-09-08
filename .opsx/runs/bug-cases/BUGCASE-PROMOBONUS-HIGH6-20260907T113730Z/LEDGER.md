@@ -1,0 +1,240 @@
+# Ledger: BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z
+
+## Summary
+- TOTAL_INTAKES: 1
+- TOTAL_FINDINGS: 6
+- CHATS_REQUIRED: 0
+- READY_TO_CLAIM: 0
+- CLAIMED_NOT_COMPLETED: 0
+- BLOCKED: 0
+- BACKLOG: 3
+- CLOSED: 1
+- PROMOTED: 2
+- EXISTING_ROOT: true
+- CLOSED_FALSE_POSITIVES: 0
+- BLOCKED_ITEMS: 0
+- HUNT_PASSES_EXECUTED: 1
+- MAX_DEPTH_SEEN: 1
+- ACTIVE_BRANCH_COUNT: 0
+- MAX_HUNT_PASSES: 3
+- MAX_DEPTH_FROM_ROOT: 3
+- MAX_ACTIVE_BRANCHES: 3
+- CASE_STATUS: open
+- CASE_CLOSED: no
+- MISSION_COMPLETE: no
+- WORKTREE_STATUS: UNCOMMITTED_CHANGES_AWAITING_USER_REVIEW
+- COMMIT_CREATED: NO
+- ACTIVE_FINDING_ID:
+- UPDATED_AT: 2026-09-08T02:27:00Z
+
+## Intakes
+
+### INTAKE-001
+- STATUS: adjudicated
+- SOURCE_TYPE: independent_review
+- CREATED_AT: 2026-09-07T11:37:30Z
+- LAST_ACTIVITY_AT: 2026-09-07T13:35:05Z
+- NEXT_ACTION: /opsx-claim-next-bug case=BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z chat_label="SUP-PROMOBONUS-FIX-20260907"
+- DISPOSITION: new_finding
+- CANONICAL_INTAKE_ID:
+- RELATED_FINDING_ID: ROOT-001
+- RESULT_PATH: results/OWNER-CLOSURE-ROOT-001.md
+- PACKET_PATH: intakes/INTAKE-001.md
+
+## Findings
+
+### ROOT-001
+- TITLE: H1 90d lookback false-stop — overlay OFF while campaign leftover remains
+- SOURCE_INTAKE_ID: INTAKE-001
+- PARENT_FINDING_ID:
+- PRODUCTION_CLASSIFICATION: confirmed production bug
+- RELATION_TO_ROOT: root
+- STATUS: closed_fixed
+- CHAT_REQUIRED: true
+- CLAIM_PRIORITY: 1
+- PACKET_PATH: findings/ROOT-001.md
+- OWNER_CHAT: SUP-PROMOBONUS-FIX-20260907
+- CLAIM_TOKEN: CLAIM/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/ROOT-001/2026-09-07T11:54:28Z
+- CREATED_AT: 2026-09-07T11:50:00Z
+- CLAIMED_AT: 2026-09-07T11:54:28Z
+- LAST_ACTIVITY_AT: 2026-09-07T13:35:05Z
+- COMPLETED_AT: 2026-09-07T13:35:05Z
+- NEXT_ACTION: /opsx-claim-next-bug case=BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z chat_label="SUP-PROMOBONUS-FIX-20260907"
+- BLOCKER:
+- RESULT_PATH: results/OWNER-CLOSURE-ROOT-001.md
+- DISPOSITION: closed_fixed
+- EPISODE_TERMINAL: FIXED
+- FINDING_TERMINAL: yes
+- FINDING_TERMINAL_KIND: CLOSED_GREEN
+- RED_EVIDENCE_PATH: results/RED-ROOT-001.md
+- GREEN_EVIDENCE_PATH: results/GREEN-ROOT-001.md
+- OWNER_GO_RECEIPT_PATH: results/OWNER-GO-ROOT-001.md
+- FIX_EVIDENCE_PATH: results/FIX-ROOT-001.md
+- OWNER_CLOSURE_PATH: results/OWNER-CLOSURE-ROOT-001.md
+- HUMAN_SUMMARY_PATH: results/HUMAN_SUMMARY.md
+- TEST_ID: tests/unit/auto_budget_manager/test_promo_ledger.py::test_leftover_older_than_lookback_keeps_campaign_usable_when_pool_zero
+- TEST_CONTENT_SHA256: ec18863bc09e7075787173b86c854ec6019eac58394d746904b7494c59eeb72a
+- FANIN_PATH: results/FANIN.md
+
+### FINDING-H2
+- TITLE: H2 campaign f denominator uses budget_after/wallet instead of top-up unit
+- SOURCE_INTAKE_ID: INTAKE-001
+- PARENT_FINDING_ID: ROOT-001
+- PRODUCTION_CLASSIFICATION: confirmed production bug
+- RELATION_TO_ROOT: different_invariant
+- STATUS: promoted_to_root_case
+- CHAT_REQUIRED: false
+- CLAIM_PRIORITY: 4
+- PACKET_PATH: findings/FINDING-H2.md
+- OWNER_CHAT:
+- CLAIM_TOKEN:
+- CREATED_AT: 2026-09-07T11:50:00Z
+- CLAIMED_AT:
+- LAST_ACTIVITY_AT: 2026-09-07T13:57:00Z
+- COMPLETED_AT: 2026-09-07T13:57:00Z
+- NEXT_ACTION: none
+- BLOCKER:
+- RESULT_PATH: ../BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE.md
+- DISPOSITION: promoted_to_root_case
+- EPISODE_TERMINAL:
+- RED_EVIDENCE_PATH:
+- GREEN_EVIDENCE_PATH:
+- OWNER_GO_RECEIPT_PATH:
+- FIX_EVIDENCE_PATH:
+- TEST_ID:
+- FANIN_PATH:
+
+### FINDING-H3
+- TITLE: H3 one-tick overlay lag — raised CPO/limits after pool and leftover exhausted
+- SOURCE_INTAKE_ID: INTAKE-001
+- PARENT_FINDING_ID: ROOT-001
+- PRODUCTION_CLASSIFICATION: confirmed production bug
+- RELATION_TO_ROOT: different_invariant
+- STATUS: backlog
+- CHAT_REQUIRED: false
+- CLAIM_PRIORITY: 4
+- PACKET_PATH: findings/FINDING-H3.md
+- CREATED_AT: 2026-09-07T11:50:00Z
+- LAST_ACTIVITY_AT: 2026-09-07T11:50:00Z
+- NEXT_ACTION: none
+
+### FINDING-H4
+- TITLE: H4 plan_fact_stats persists overlay.plan instead of raw get_plan_data
+- SOURCE_INTAKE_ID: INTAKE-001
+- PARENT_FINDING_ID: ROOT-001
+- PRODUCTION_CLASSIFICATION: confirmed production bug
+- RELATION_TO_ROOT: different_invariant
+- STATUS: backlog
+- CHAT_REQUIRED: false
+- CLAIM_PRIORITY: 4
+- PACKET_PATH: findings/FINDING-H4.md
+- CREATED_AT: 2026-09-07T11:50:00Z
+- LAST_ACTIVITY_AT: 2026-09-07T11:50:00Z
+- NEXT_ACTION: none
+
+### FINDING-H5
+- TITLE: H5 keyword GOOD/BAD resolve wipes overlay CPO via AdvSetting/CH
+- SOURCE_INTAKE_ID: INTAKE-001
+- PARENT_FINDING_ID: ROOT-001
+- PRODUCTION_CLASSIFICATION: confirmed production bug
+- RELATION_TO_ROOT: different_invariant
+- STATUS: backlog
+- CHAT_REQUIRED: false
+- CLAIM_PRIORITY: 4
+- PACKET_PATH: findings/FINDING-H5.md
+- CREATED_AT: 2026-09-07T11:50:00Z
+- LAST_ACTIVITY_AT: 2026-09-07T11:50:00Z
+- NEXT_ACTION: none
+
+### FINDING-H6
+- TITLE: H6 pick_cashback_for_topup prefers expired package over live FEFO
+- SOURCE_INTAKE_ID: INTAKE-001
+- PARENT_FINDING_ID: ROOT-001
+- PRODUCTION_CLASSIFICATION: confirmed production bug
+- RELATION_TO_ROOT: different_invariant
+- STATUS: promoted_to_root_case
+- CHAT_REQUIRED: false
+- CLAIM_PRIORITY: 4
+- PACKET_PATH: findings/FINDING-H6.md
+- OWNER_CHAT:
+- CLAIM_TOKEN:
+- CREATED_AT: 2026-09-07T11:50:00Z
+- CLAIMED_AT:
+- LAST_ACTIVITY_AT: 2026-09-08T02:27:00Z
+- COMPLETED_AT: 2026-09-08T02:27:00Z
+- NEXT_ACTION: none
+- BLOCKER:
+- RESULT_PATH: ../BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z/CASE.md
+- DISPOSITION: promoted_to_root_case
+- EPISODE_TERMINAL:
+- RED_EVIDENCE_PATH:
+- GREEN_EVIDENCE_PATH:
+- OWNER_GO_RECEIPT_PATH:
+- FIX_EVIDENCE_PATH:
+- TEST_ID:
+- FANIN_PATH:
+
+## BRANCH_REGISTRY
+
+HUNT_PASSES_EXECUTED: 1
+MAX_DEPTH_SEEN: 1
+ACTIVE_BRANCH_COUNT: 0
+MAX_HUNT_PASSES: 3
+MAX_DEPTH_FROM_ROOT: 3
+MAX_ACTIVE_BRANCHES: 3
+
+ROOT-001 DEPTH=0 EPISODE_TERMINAL=FIXED OWNER_PRODUCTION_GO=yes STATUS=closed_fixed
+FINDING-H2 STATUS=promoted_to_root_case RESULT_PATH=../BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE.md (not started on this case)
+FINDING-H6 STATUS=promoted_to_root_case RESULT_PATH=../BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z/CASE.md (not started on this case)
+FINDING-H3..H5 backlog different_invariant (not started)
+
+## ROUTE_STATE
+
+CURRENT_CLASSIFICATION: NOT_APPLICABLE
+CHOSEN_ROUTE: NOT_APPLICABLE
+EXPECTED_NEXT_COMMAND: /opsx-claim-next-bug
+ACTUAL_NEXT_COMMAND: /opsx-claim-next-bug
+NEXT_COMMAND_RECONCILIATION: MATCH
+EXPECTED_EXECUTION_ROUTE: NOT_APPLICABLE
+ACTUAL_EXECUTION_ROUTE: NOT_APPLICABLE
+ROUTE_RECONCILIATION: NOT_APPLICABLE
+RECONCILIATION_REASON: mode=promote created descendant case BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z; no implementation route selected. FINDING-H6 is promoted_to_root_case and not claimable here. FINDING-H3..H5 remain different_invariant backlog.
+
+CURRENT_ROUTE_STATE: H6_PROMOTED
+LAST_ROUTE_EVENT_ID: RTE/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/23
+LAST_ROUTE_EVENT_SEQUENCE: 23
+LAST_ROUTE_EVENT_AT: 2026-09-08T02:27:00Z
+
+CURRENT_ACTOR_ROLE: CASE_WRITER
+CURRENT_ACTOR_AGENT_ID: CURRENT_CHAT_AGENT
+CURRENT_ACTOR_CHAT_ID: SUP-PROMOBONUS-H6-FIX-20260908
+LAST_COMMAND: /opsx-materialize-bug-queue mode=promote
+
+OWNER_GATE_STATUS: NOT_APPLICABLE
+OWNER_GATE_OPENED_AT: NOT_APPLICABLE
+OWNER_GO_ISSUED_AT: NOT_APPLICABLE
+OWNER_WAIT_DURATION_MS: null
+TASK_DELTA: NOT_APPLICABLE
+TERMINAL_STATUS: PASS
+
+ROUTE_TRACE_PATH: .opsx/runs/bug-cases/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/results/ROUTE-TRACE.jsonl
+NEXT_ACTION: /opsx-claim-next-bug case=BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z chat_label="SUP-PROMOBONUS-FIX-20260907"
+HANDBACK_COMMAND: /opsx-claim-next-bug case=BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z chat_label="SUP-PROMOBONUS-H6-FIX-20260908"
+POST_GREEN_OWNER: bug-team
+CLOSE_FINDING_INTENT: closed_fixed
+ACTIVE_FINDING_ID:
+
+## History
+
+- 2026-09-07T11:37:30Z /opsx-materialize-bug-queue mode=intake created INTAKE-001; no findings.
+- 2026-09-07T11:50:00Z /opsx-fix-bug adjudicated INTAKE-001; new_finding ROOT-001 (H1, available); FINDING-H2..H6 backlog; no GO; no production edits.
+- 2026-09-07T11:54:28Z /opsx-claim-next-bug claimed ROOT-001 for OWNER_CHAT=SUP-PROMOBONUS-FIX-20260907; next classify_before_impl_route; no GO; no production edits.
+- 2026-09-07T12:12:00Z /opsx-fix-bug Route A pre-GO forensics confirmed ROOT-001 fix_now; leftover 90d cutoff false AND-stop; no GO; no production/test edits; next /opsx-test RED.
+- 2026-09-07T12:21:25Z /opsx-test RED_CONFIRMED leftover older than 90d keeps campaign_usable when pool=0; production unchanged; GO not issued; next /opsx-fix-bug with Owner GO.
+- 2026-09-07T12:30:20Z /opsx-fix-bug GO patched load_campaign_ledgers leftover-usable (no 90d cutoff on allocation/spend load; ingest unchanged); optional pytest PASS; GREEN not written; finding not closed.
+- 2026-09-07T12:37:51Z /opsx-test verify GREEN_CONFIRMED frozen leftover-older-than-lookback node PASS exit 0; TEST_CONTENT_SHA256 matches RED; production_patched in place; finding not closed; next bug-team handback.
+- 2026-09-07T13:35:05Z CLOSURE_OPERATOR closed ROOT-001 closed_fixed CLOSED_GREEN; FAMILY_STATUS CLOSED_FIXED_VERIFIED; CASE remains open (H2-H6 backlog); CLAIMED_NOT_COMPLETED=0; ACTIVE_FINDING_ID cleared; COMMIT_CREATED=NO; next /opsx-claim-next-bug.
+- 2026-09-07T13:43:22Z /opsx-claim-next-bug none_available; chat_label=SUP-PROMOBONUS-FIX-20260907; ROOT-001 not reclaimed; FINDING-H2..H6 remain backlog CHAT_REQUIRED=false; no CLAIM_TOKEN minted; no GO; no production edits.
+- 2026-09-07T13:57:00Z /opsx-materialize-bug-queue mode=promote FINDING-H2 -> BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z STATUS=promoted_to_root_case; ancestor fingerprint mismatch; DEPTH=1; H3-H6 remain backlog; no GO; no production edits.
+- 2026-09-07T23:15:41Z /opsx-claim-next-bug none_available; chat_label=SUP-PROMOBONUS-FIX-20260907; WEX/CLAIM_WORKER/354a0996be; no eligible STATUS=available AND CHAT_REQUIRED=true; ROOT-001 closed_fixed not reclaimed; FINDING-H2 promoted_to_root_case; FINDING-H3..H6 remain backlog CHAT_REQUIRED=false different_invariant; no CLAIM_TOKEN minted; no finding STATUS flip; no GO; no production edits.
+- 2026-09-08T02:27:00Z /opsx-materialize-bug-queue mode=promote FINDING-H6 -> BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z STATUS=promoted_to_root_case; ancestor fingerprint mismatch; DEPTH=1; H3-H5 remain backlog; no GO; no claim; no production edits.

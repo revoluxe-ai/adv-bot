@@ -1,0 +1,71 @@
+{
+  "SCHEMA_VERSION": "1",
+  "INTENT_TYPE": "LIVE_TASK_DISPATCH",
+  "STATUS": "FINALIZED",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "WORKER_ID": "CLAIM_WORKER",
+  "WORKER_EXECUTION_ID": "WEX/CLAIM_WORKER/14affeebf5",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-004",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "PACKET_GENERATION": 1,
+  "CHECKPOINT_GENERATION": 43,
+  "INPUT_PACKET_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_CLAIM_WORKER_14affeebf5.in.json",
+  "INPUT_PACKET_RAW_SHA256": "0cb5ca271aae228003945dd56d0cd252f2db060cdcade0c6c321bc5f0c5d5024",
+  "INPUT_PACKET_CANONICAL_SHA256": "dfc2fb1078f84815c9fec8bd708dcc08c1b07292e3de43c8c22c3daebc3e4848",
+  "EXPECTED_OUTPUT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_CLAIM_WORKER_14affeebf5.out.json",
+  "EXPECTED_OUTPUT_REL": "team\\packets\\WEX_CLAIM_WORKER_14affeebf5.out.json",
+  "BEFORE_SNAPSHOT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\snapshots\\WEX_CLAIM_WORKER_14affeebf5.before.json",
+  "ALLOWED_WRITE_PATHS": [
+    "findings/",
+    "CASE.md",
+    "LEDGER.md",
+    "intakes/",
+    "team/packets/",
+    "team/heartbeats/",
+    "results/PROOF-"
+  ],
+  "ALLOWED_WRITE_BOUNDARY_HASH": "b1ce07c693657033329b299e55c54442e347ef5a95907afda75c290bac34613d",
+  "WORKER_CONTRACT_HASH": "cd0d06cd037ffccfdcdd7d8fe95ed0434519b4ad6bbc86222aa23fb563ee60ed",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "REQUEST_FINGERPRINT_SHA256": "1044809621d8001aa81a7e9124cc18922f8ad01eaef7f4e56369f5c9ba41ba8d",
+  "PREPARE_FINGERPRINT_SHA256": "4b4a8a39684388782912e64033750ef0a8511e7ac8834d8ffbc9632d5683f018",
+  "PREPARED_AT": 1788798875.623529,
+  "TASK_STARTED_AT": 1788798912.860599,
+  "TASK_FINISHED_AT": 1788799310.3525014,
+  "FINALIZED_AT": 1788799310.3525014,
+  "DURATION_MS": 397491,
+  "OWNER_RECEIPT_GATE_ID": null,
+  "LOCAL_IMPLEMENTATION_AUTHORIZED": false,
+  "LIVE_RUNTIME_AUTHORITY": "runtime/live_task_hop.py",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT"
+  ],
+  "DEPENDENCY_PACKETS": {
+    "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_MATERIALIZER_0c75e0a10d.out.json",
+      "RAW_SHA256": "f0b164615e8d54b349e374fdc227e25ea4a4b5bf001dbad68b2512cb1451e68a",
+      "CANONICAL_SHA256": "6e62613f8f1abaf68aee67d81eb0c3288764a34c5a9f1cb1ea06ea20062ef4b9"
+    }
+  },
+  "DEPENDENCY_MANIFEST": {
+    "packets": {
+      "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_MATERIALIZER_0c75e0a10d.out.json",
+        "RAW_SHA256": "f0b164615e8d54b349e374fdc227e25ea4a4b5bf001dbad68b2512cb1451e68a",
+        "CANONICAL_SHA256": "6e62613f8f1abaf68aee67d81eb0c3288764a34c5a9f1cb1ea06ea20062ef4b9"
+      }
+    }
+  },
+  "DEPENDENCY_RAW_HASHES": {
+    "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT": "f0b164615e8d54b349e374fdc227e25ea4a4b5bf001dbad68b2512cb1451e68a"
+  },
+  "DEPENDENCY_CANONICAL_HASHES": {
+    "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT": "6e62613f8f1abaf68aee67d81eb0c3288764a34c5a9f1cb1ea06ea20062ef4b9"
+  },
+  "RETRY_AUTHORIZATION_ID": null,
+  "CURSOR_AGENT_ID": "3ca63fe0-3b38-49be-9e4b-27a6da4c054a",
+  "EXECUTION_IDENTITY_VALIDATION": "PASS"
+}

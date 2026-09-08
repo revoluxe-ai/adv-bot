@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "TASK_COMPLETION_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/TASK-COMPLETION-HC-FINDING-004-STALE-TEST.md",
+    "team/heartbeats/WEX_TASK_COMPLETION_WORKER_c68abeee84.json",
+    "team/intents/WEX_TASK_COMPLETION_WORKER_c68abeee84.intent.json",
+    "team/packets/WEX_TASK_COMPLETION_WORKER_c68abeee84.out.json",
+    "team/snapshots/WEX_TASK_COMPLETION_WORKER_c68abeee84.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

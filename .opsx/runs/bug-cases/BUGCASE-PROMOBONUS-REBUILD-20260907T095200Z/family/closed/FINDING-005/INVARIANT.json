@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/LEFTOVER-FRACTION-TRANCHE-AMOUNT",
+  "INVARIANT_REQUIRED_BEHAVIOR": "leftover fraction uses remaining over tranche.amount; leftover remaining 200 / amount 1000 / budget_after 12000 yields fraction 0.2 (M=1.25).",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "do not mix leftover remaining over budget_after or campaign_budget_total (that collapses 200/12000 and M toward 1).",
+  "INVARIANT_ENTRY_CONDITIONS": "campaign_ledger_from_rows leftover remaining 200, tranche.amount 1000, budget_after 12000, campaign_budget_total 12000 (frozen node test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after).",
+  "INVARIANT_SCOPE": "promo_accounting.apply_spend_fefo reference_budget and campaign_ledger_from_rows mix. Excludes ROOT-001 overlay, FINDING-002/HC-001 pool-failure, FINDING-003 90d leftover cutoff, FINDING-004 FEFO skip-expired, intake item 6 journal.",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

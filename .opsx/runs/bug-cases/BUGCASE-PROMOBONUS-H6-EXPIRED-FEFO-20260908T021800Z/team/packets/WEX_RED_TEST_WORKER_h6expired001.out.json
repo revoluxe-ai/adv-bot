@@ -1,0 +1,14 @@
+{
+  "CASE_ID": "BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+  "FINDING_ID": "ROOT-001",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/h6expired001",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "RED_CONFIRMED": true,
+    "TEST_PATH": "tests/app/modules/auto_budget_manager/test_service.py",
+    "TEST_NAME": "test_pick_cashback_for_topup_skips_expired_prefers_earliest_live_fefo",
+    "RED_EVIDENCE_PATH": "results/RED-ROOT-001.md"
+  }
+}

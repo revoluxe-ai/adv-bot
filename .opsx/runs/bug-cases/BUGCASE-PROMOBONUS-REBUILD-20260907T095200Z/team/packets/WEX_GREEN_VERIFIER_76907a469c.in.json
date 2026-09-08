@@ -1,0 +1,56 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 28,
+  "CREATED_AT": 1788790936.9442034,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/c9a6d788fb/OUT": {
+      "CANONICAL_SHA256": "af885e9edae25d6020e1f3eac86e716391115d8edc909ddeff4e94525ea71c0f",
+      "RAW_SHA256": "2b0a92ea35787514fdd2af660ba82cac7a8f1c25444d861c046a6b4b7ab43282"
+    },
+    "PKT/WEX/RED_TEST_WORKER/c114238e13/OUT": {
+      "CANONICAL_SHA256": "786acb2077434c9693580713be47295d7ec70d0b9ad95ca9c7be89f1eae91a34",
+      "RAW_SHA256": "73d70272c903a63fdf9bb868960522b85c1ab220ce5a3eca69e9cbeb8e6da321"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/c9a6d788fb/OUT",
+    "PKT/WEX/RED_TEST_WORKER/c114238e13/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788794536.9442034,
+  "FINDING_ID": "HC-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/76907a469c/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/c9a6d788fb/OUT",
+  "PAYLOAD": {
+    "ADJACENT_COMMAND": "poetry run pytest tests/unit/auto_budget_manager/ -vv --tb=short",
+    "DO_NOT_EDIT_PRODUCTION": true,
+    "DO_NOT_EDIT_TESTS": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_3_TO_6": true,
+    "FINDING_002_FROZEN_NODE": "tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails",
+    "FINDING_002_FROZEN_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "FINDING_ID": "HC-001",
+    "FIX_EVIDENCE_PATH": "results/FIX-HC-001.md",
+    "FROZEN_TEST_NODE": "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_returns_none",
+    "FROZEN_TEST_PATH": "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py",
+    "FROZEN_TEST_SHA256": "0aebe0f2d17f9dd68069d7966e6cc110efa1f877144c2d20759b00fd41049a4f",
+    "MAPS_TO": "/opsx-test verify",
+    "MODE": "resume-family-fanout",
+    "PRODUCTION_HASH_AFTER": "d83c97f6b96b73e9f520e96ad891642ff360ca1037136c898bdd3cf5eba45b7c",
+    "PRODUCTION_HASH_BEFORE": "da0a710c5039fa700d812bc2a1116afedb7e9b44ea1ec192eae43dc4ba591ca0",
+    "RED_EVIDENCE_PATH": "results/RED-HC-001.md",
+    "REQUIRED_INVARIANT": "On get_campaign_balance None return, do not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1.",
+    "WORKER_ID": "GREEN_VERIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/76907a469c",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

@@ -1,0 +1,67 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 38,
+  "CREATED_AT": 1788795962.712121,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/e1b15347b7/OUT": {
+      "CANONICAL_SHA256": "7a2900756fdfec0c1a482ad1ccd2838795e41c9c8a17c3cde74fc61c22155c17",
+      "RAW_SHA256": "bedeb54cf76274121f82e2aa26aec2929511fdc33f7cdfe97802df3dc57973cc"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/e1b15347b7/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788799562.712121,
+  "FINDING_ID": "FINDING-003",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t07-d07",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/b69d090049/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/e1b15347b7/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_CLASSIFIER_e1b15347b7.out.json",
+      "results/PROOF-CLASSIFIER-WEXe1b15347b7.md",
+      ".cursor/pipeline/bug-team/workers/BOUNDED_HUNTER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json",
+      "app/modules/auto_budget_manager/promo_ledger.py",
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_4_TO_6": true,
+    "FINDING_ID": "FINDING-003",
+    "HUNT_BOUND": "FINDING-003 is FALSE_POSITIVE: leftover-usable load does not apply the 90d ingest window as leftover cutoff. Hunt ONLY sibling sites that actually pass PROMO_LOOKBACK_DAYS/90d cutoff into leftover-usable campaign remaining (the claimed drop path). Do not hunt FEFO, leftover fraction, or journal (intake items 4-6) as same-invariant unless they literally apply leftover cutoff. Do not hunt FINDING-002 pool-failure. Do not reopen closed findings. Do not fix, test, classify, or close candidates. If no leftover-cutoff caller exists, HUNT_RESULT=CLEAR.",
+    "HUNT_SCOPE": [
+      "app/modules/auto_budget_manager/promo_ledger.py",
+      "app/modules/auto_budget_manager/promo_state_service.py",
+      "load_campaign_ledgers / load_success_tranches / load_spend_rows cutoff="
+    ],
+    "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-003/LEFTOVER-NO-90D-CUTOFF",
+    "INVARIANT_TEXT": "Leftover-usable campaign remaining must not be filtered by the 90-day UPD ingest lookback; living leftover older than 90d stays usable.",
+    "MAPS_TO": "/opsx-bug-hunt bounds",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "ROUTE_C_SKIP_GREEN": true,
+    "WORKER_ID": "BOUNDED_HUNTER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/b69d090049",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

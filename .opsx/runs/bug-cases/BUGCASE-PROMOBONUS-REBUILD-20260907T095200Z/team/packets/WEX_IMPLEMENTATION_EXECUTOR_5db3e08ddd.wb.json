@@ -1,0 +1,23 @@
+{
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WRITE_BOUNDARY_RESULT": "VIOLATION",
+  "VIOLATIONS": [
+    "LEDGER.md",
+    "findings/HC-001.md"
+  ],
+  "CREATED": [
+    "results/FIX-HC-001.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_5db3e08ddd.json",
+    "team/intents/WEX_IMPLEMENTATION_EXECUTOR_5db3e08ddd.intent.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_5db3e08ddd.out.json",
+    "team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_5db3e08ddd.before.json"
+  ],
+  "MODIFIED": [
+    "LEDGER.md",
+    "findings/HC-001.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,104 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py",
+    "results/RED-HC-001.md",
+    "results/ROUTE-TRACE.jsonl",
+    "LEDGER.md",
+    "findings/HC-001.md",
+    "team/heartbeats/WEX_RED_TEST_WORKER_c114238e13.json",
+    "team/packets/WEX_RED_TEST_WORKER_c114238e13.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 25,
+  "CREATED_AT": 1788789304.9083476,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/6e103632ac/OUT": {
+      "CANONICAL_SHA256": "d45be47b445959a672b24c76ebcccf65563de8c275701e143f7cadbd934abc96",
+      "RAW_SHA256": "fd268bca5a5b5fa6d1422ba654758a584daf81d310b291160430eccbf20646c0"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/6e103632ac/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788792904.9083476,
+  "FINDING_ID": "HC-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/c114238e13/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/c114238e13/IN",
+  "PAYLOAD": {
+    "RED_STATUS": "RED_CONFIRMED",
+    "TEST_ID": "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_returns_none",
+    "TEST_IDS": [
+      "tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_returns_none"
+    ],
+    "TEST_CONTENT_SHA256": "0aebe0f2d17f9dd68069d7966e6cc110efa1f877144c2d20759b00fd41049a4f",
+    "PRODUCTION_HASH_BEFORE": "sha256:da0a710c5039fa700d812bc2a1116afedb7e9b44ea1ec192eae43dc4ba591ca0",
+    "COMMAND": "poetry run pytest tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py -vv --tb=short",
+    "COMMANDS_RUN": [
+      "poetry run pytest tests/unit/auto_budget_manager/test_promo_state_none_return_false_empty.py -vv --tb=short",
+      "poetry run pytest tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails -q"
+    ],
+    "FINDING_002_FROZEN_FILE_UNCHANGED": true,
+    "FROZEN_FINDING_002_TEST_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "FROZEN_FINDING_002_NODE_STILL_PASSES": true,
+    "FAILURE_MATCH": "YES",
+    "PYTEST_EXIT": 1,
+    "EVIDENCE_PATH": "results/RED-HC-001.md",
+    "RED_EVIDENCE_PATH": "results/RED-HC-001.md",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": null,
+    "CONTROLLED_LIVE_UNCOMMITTED": "GO_TOKEN NOT_REQUIRED",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-001",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_RED",
+      "RESULT": "RED_CONFIRMED",
+      "TO_STATE": "AWAITING_FIX_BUG_RED",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-001",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "NOT_REQUIRED",
+        "CLAIM_REQUIRED": "no",
+        "RED_REQUIRED": "satisfied",
+        "GREEN_REQUIRED": "not_applicable",
+        "OTHER": "CONTROLLED_LIVE_UNCOMMITTED LOCAL_IMPLEMENTATION_AUTHORIZED"
+      },
+      "REQUIRED_EVIDENCE": [
+        "RED_EVIDENCE_PATH",
+        "results/RED-HC-001.md"
+      ],
+      "ON_SUCCESS_STATE": "LOCAL_IMPLEMENTATION_AUTHORIZED",
+      "ON_FAILURE_STATE": "BLOCKED",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none",
+      "DURABLE_FILE_WRITTEN": "YES"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/HC-001.md",
+      "fallback_used": false,
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding, frozen FINDING-002 test, promo_state_service.py:146-147; hashes; focused pytest",
+      "blocked_on_preflight": false
+    }
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "RED_CONFIRMED",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/c114238e13",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

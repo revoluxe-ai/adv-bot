@@ -1,0 +1,19 @@
+{
+  "WORKER_ID": "RELATION_CLASSIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/heartbeats/WEX_RELATION_CLASSIFIER_eded5a8fdf.json",
+    "team/intents/WEX_RELATION_CLASSIFIER_eded5a8fdf.intent.json",
+    "team/packets/WEX_RELATION_CLASSIFIER_eded5a8fdf.out.json",
+    "team/snapshots/WEX_RELATION_CLASSIFIER_eded5a8fdf.before.json"
+  ],
+  "MODIFIED": [
+    "family/BRANCHES.jsonl",
+    "family/FAMILY.json",
+    "findings/HC-001.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,40 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY",
+  "ROOT_FINDING_ID": "FINDING-002",
+  "ROOT_RED_CLAIMS": [
+    "PromoStateService.refresh still RedisPromoStateManager.set(pool_usable=false, updated_at=now) after get_campaign_balance raises",
+    "Overlay would treat that as a fresh empty pool instead of miss/stale -> M=1"
+  ],
+  "ROOT_FAILURE_BEHAVIOR": "PromoStateService.refresh persisted a fresh Redis shop-promo-state snapshot with pool_usable=false after get_campaign_balance failed.",
+  "ROOT_FIX_CLAIMS": [
+    "On Exception from get_campaign_balance, leave pool_fetch_ok=False, skip RedisPromoStateManager.set, return",
+    "PromoStateService.refresh no longer RedisPromoStateManager.set a fresh pool_usable=false empty pool",
+    "Exception-path skip of Redis set"
+  ],
+  "ROOT_GREEN_CLAIMS": [
+    "On get_campaign_balance failure, do not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1",
+    "Frozen TEST_ID PASSED; TEST_CONTENT_SHA256 match RED; production promo_state_service hash changed",
+    "Exception-path skip of Redis set confirmed by GREEN"
+  ],
+  "REQUIRED_BEHAVIOR_PROVEN": [
+    "On Exception from get_campaign_balance, leave pool_fetch_ok=False, skip RedisPromoStateManager.set of a fresh pool_usable=false snapshot, and return so miss/stale stays conservative M=1."
+  ],
+  "FORBIDDEN_BEHAVIOR_PROVEN": [
+    "Do not redis.set a fresh shop-promo-state snapshot with pool_usable=false after get_campaign_balance Exception; that stamps updated_at=now and makes overlay readers treat a fetch failure as a known-empty pool."
+  ],
+  "EVIDENCE_PATHS": {
+    "GREEN_EVIDENCE": "results/GREEN-FINDING-002.md",
+    "FIX_EVIDENCE": "results/FIX-FINDING-002.md"
+  },
+  "EVIDENCE_HASHES": {
+    "GREEN_EVIDENCE": "1d0188499d0c5ec822df7e7c41a60b5809410c550c3407d1b73b980f5dadc8cc",
+    "FIX_EVIDENCE": "2c8d9b8001f3566ac42b0adef83a7bc95d3931f1b7aed13c9cfe93119f1c2d76"
+  },
+  "SCOPE_TOKENS": [
+    "pool_usable",
+    "get_campaign_balance",
+    "promo_state_service",
+    "refresh",
+    "RedisPromoStateManager"
+  ]
+}

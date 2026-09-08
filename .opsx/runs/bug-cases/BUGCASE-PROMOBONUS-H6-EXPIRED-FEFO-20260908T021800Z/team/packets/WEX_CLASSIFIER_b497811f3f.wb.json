@@ -1,0 +1,19 @@
+{
+  "WORKER_ID": "CLASSIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/intents/WEX_CLASSIFIER_b497811f3f.intent.json",
+    "team/packets/WEX_CLASSIFIER_b497811f3f.finalize_reject.json",
+    "team/packets/WEX_CLASSIFIER_b497811f3f.out.json",
+    "team/packets/_classifier_b497811f3f_route_events.jsonl",
+    "team/snapshots/WEX_CLASSIFIER_b497811f3f.before.json"
+  ],
+  "MODIFIED": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,26 @@
+{
+  "WORKER_ID": "CLAIM_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/PROOF-CLAIM-WEX55fad5ec44.md",
+    "team/executions/WEX_CLAIM_WORKER_55fad5ec44.identity.json",
+    "team/heartbeats/WEX_CLAIM_WORKER_55fad5ec44.json",
+    "team/intents/WEX_CLAIM_WORKER_55fad5ec44.intent.json",
+    "team/packets/WEX_CLAIM_WORKER_55fad5ec44.finalize_reject.json",
+    "team/packets/WEX_CLAIM_WORKER_55fad5ec44.out.json",
+    "team/packets/WEX_CLAIM_WORKER_55fad5ec44.wb.json",
+    "team/snapshots/WEX_CLAIM_WORKER_55fad5ec44.after.json",
+    "team/snapshots/WEX_CLAIM_WORKER_55fad5ec44.before.json"
+  ],
+  "MODIFIED": [
+    "CASE.md",
+    "LEDGER.md",
+    "findings/ROOT-001.md",
+    "intakes/INTAKE-001.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

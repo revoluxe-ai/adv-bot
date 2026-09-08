@@ -1,0 +1,85 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 64,
+  "CREATED_AT": 1788808706.8410954,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/a2c7db25dd/OUT": {
+      "CANONICAL_SHA256": "d9a2ba73f101f630693cf836b6e257603be66e33fb40ba5b2ffeee78482ad043",
+      "RAW_SHA256": "9dcff0d684447970a3603f80713e3f5b3953807970ac685bfc8bcfcddbb118f0"
+    },
+    "PKT/WEX/MATERIALIZER/187e482f7f/OUT": {
+      "CANONICAL_SHA256": "f984a44cdcb757078357121284af010ece28603b670eb32a9a9589c34efc7827",
+      "RAW_SHA256": "d987e3ed474c4416591ae46dccd572fa55d7beff6b5e006fba28c56222943ff3"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/a2c7db25dd/OUT",
+    "PKT/WEX/MATERIALIZER/187e482f7f/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788812306.8410954,
+  "FINDING_ID": "FINDING-005",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t10-d10",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/74b4e60c9d/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLAIM_WORKER/a2c7db25dd/OUT",
+  "PAYLOAD": {
+    "ALLOWED_CLASSIFICATIONS": [
+      "IMPLEMENTATION_BUG",
+      "SPEC_BUG",
+      "SPEC_GAP",
+      "FALSE_POSITIVE",
+      "OUT_OF_SCOPE",
+      "INSUFFICIENT_EVIDENCE"
+    ],
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-005.md",
+      "findings/FINDING-004.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "findings/HC-FINDING-004-STALE-TEST.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_MATERIALIZER_187e482f7f.out.json",
+      "team/packets/WEX_CLAIM_WORKER_a2c7db25dd.out.json",
+      ".cursor/pipeline/bug-team/workers/CLASSIFIER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-classify-bug.md",
+      ".cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md",
+      ".cursor/pipeline/bug-team/packets/ROUTE_FIELDS.md",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "app/shared/domains/wb/utils/promo_plan_multiplier.py",
+      "app/modules/auto_budget_manager/promo_ledger.py",
+      "openspec/decisions/index.md",
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z",
+    "DO_NOT_CLASSIFY_ITEM_6": true,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_FINDING_004": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_HC_FINDING_004_STALE_TEST": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "FINDING_ID": "FINDING-005",
+    "FINDING_PATH": "findings/FINDING-005.md",
+    "INTAKE_PATH": "intakes/INTAKE-001.md",
+    "ITEM_TEXT": "campaign leftover fraction uses budget_after/total so M collapses",
+    "MAPS_TO": "/opsx-classify-bug",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "WORKER_ID": "CLASSIFIER",
+    "WRITE_LEDGER_ROUTE_STATE_ONLY": true
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/74b4e60c9d",
+  "WORKER_ID": "CLASSIFIER"
+}

@@ -1,0 +1,76 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/HUNT-ROOT-001.md",
+    "results/HUNT-CANDIDATES.json",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_6b40a73f89.json",
+    "team/packets/WEX_BOUNDED_HUNTER_6b40a73f89.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z",
+  "CHECKPOINT_GENERATION": 2,
+  "CREATED_AT": 1788785949.347269,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/bfa4b019d6/OUT": {
+      "CANONICAL_SHA256": "72844955c6ae3426c231c5cad4792e4cda1f9d429dc792ebd9769428833fe804",
+      "RAW_SHA256": "0b474d81ed794e489e3d2ef59d23619a81c1ea18b0862171f5b752fe2b56fb52"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/bfa4b019d6/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788789549.347269,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/FANOUT-1",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/6b40a73f89/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/6b40a73f89/IN",
+  "PAYLOAD": {
+    "CANDIDATES": [],
+    "EXISTING_BACKLOG_OBSERVED": [
+      {
+        "FINDING_ID": "FINDING-H2",
+        "NOT_HUNT_CANDIDATE": true,
+        "REASON": "campaign f denominator (budget_after/wallet vs top-up unit); not leftover-90d AND-stop",
+        "RELATION_TO_ROOT": "different_invariant",
+        "STATUS": "backlog"
+      },
+      {
+        "FINDING_ID": "FINDING-H3",
+        "NOT_HUNT_CANDIDATE": true,
+        "REASON": "one-tick overlay lag after pool and leftover exhausted; not leftover-90d AND-stop",
+        "RELATION_TO_ROOT": "different_invariant",
+        "STATUS": "backlog"
+      },
+      {
+        "FINDING_ID": "FINDING-H4",
+        "NOT_HUNT_CANDIDATE": true,
+        "REASON": "plan_fact_stats persists overlay.plan instead of raw get_plan_data; not leftover-90d AND-stop",
+        "RELATION_TO_ROOT": "different_invariant",
+        "STATUS": "backlog"
+      },
+      {
+        "FINDING_ID": "FINDING-H5",
+        "NOT_HUNT_CANDIDATE": true,
+        "REASON": "keyword GOOD/BAD resolve wipes overlay CPO via AdvSetting/CH; not leftover-90d AND-stop",
+        "RELATION_TO_ROOT": "different_invariant",
+        "STATUS": "backlog"
+      },
+      {
+        "FINDING_ID": "FINDING-H6",
+        "NOT_HUNT_CANDIDATE": true,
+        "REASON": "pick_cashback_for_topup prefers expired package over live FEFO; not leftover-90d AND-stop",
+        "RELATION_TO_ROOT": "different_invariant",
+        "STATUS": "backlog"
+      }
+    ],
+    "HUNT_RESULT": "CLEAR"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/6b40a73f89",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

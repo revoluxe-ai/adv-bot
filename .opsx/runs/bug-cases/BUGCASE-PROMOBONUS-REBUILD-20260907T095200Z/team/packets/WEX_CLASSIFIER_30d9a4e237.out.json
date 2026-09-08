@@ -1,0 +1,165 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/30d9a4e237/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t11-d11",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/30d9a4e237",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-006",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/30d9a4e237/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/9dd2d750be/OUT",
+    "PKT/WEX/CLAIM_WORKER/357e6bf3b5/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/357e6bf3b5/OUT": {
+      "CANONICAL_SHA256": "783dffbd86506f66b629a23a86d8b5579c566252ceb6563b1f3fcb7d221f83e4",
+      "RAW_SHA256": "0cc066cdb2869e29406d119bc2fe0ceb7701fd064da8609722bc44470213296b"
+    },
+    "PKT/WEX/MATERIALIZER/9dd2d750be/OUT": {
+      "CANONICAL_SHA256": "c86a5170f1db160680537a8e8d556482303fc2ce91ffc9b8a976fd29695862d2",
+      "RAW_SHA256": "cf197193036f94d153ad32a7763bb81b4077608e78e23955261a2fe9d5953117"
+    }
+  },
+  "CHECKPOINT_GENERATION": 75,
+  "CREATED_AT": 1788813720.0,
+  "EXPIRES_AT": 1788817320.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "CURRENT_CLASSIFICATION": "FALSE_POSITIVE",
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "EXPECTED_NEXT_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+    "ACTUAL_NEXT_COMMAND": "NOT_APPLICABLE",
+    "NEXT_COMMAND_RECONCILIATION": "NOT_APPLICABLE",
+    "EXPECTED_EXECUTION_ROUTE": "CLOSED_NO_IMPLEMENTATION",
+    "ACTUAL_EXECUTION_ROUTE": "NOT_APPLICABLE",
+    "ROUTE_RECONCILIATION": "NOT_APPLICABLE",
+    "RECONCILIATION_REASON": "Route C selected; WBAutoBudgetTopUp is the bot auto-budget journal. Manual seller-portal deposits are outside that journal SoT. EXPECTED_NEXT_COMMAND=CLOSED_NO_IMPLEMENTATION. ACTUAL_* remain NOT_APPLICABLE.",
+    "CURRENT_ROUTE_STATE": "CLOSED_NO_IMPLEMENTATION",
+    "RATIONALE": "WBAutoBudgetTopUp is documented as the bot auto-budget top-up journal. Campaign remaining is FEFO on verified WBAutoBudgetTopUp allocations minus UPD spend. The bot write path is AutoBudgetManager.service _create_topup_entry -> wb_modifier.top_up_budget. Manual seller-portal deposits are not this journal's SoT. Unused wallet promo stays visible via live WB cashbacks[] / pool_usable. The review restates the journal contract as a defect. openspec/decisions/index.md is silent on journal completeness; not SPEC_GAP because the rebuild already states verified bot allocation. Residual intake empty. ROOT-001 / FINDING-002 / HC-001 stay closed_fixed. FINDING-003 stays closed_false_positive. FINDING-004 / HC-FINDING-004-STALE-TEST stay closed_fixed. FINDING-005 stays closed_fixed.",
+    "NEXT_ACTION": "CLOSED_NO_IMPLEMENTATION",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-006/2026-09-07T20:30:22Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "explicit_spec_contract",
+      "evidence": "WBAutoBudgetTopUp: journal of bot auto-budget campaign top-ups. promo_accounting: campaign remaining = verified WBAutoBudgetTopUp minus WBCampaignPromoSpend. load_success_tranches reads only success rows with promo_amount > 0. RedisPromoStateManager is derived; live WB cashbacks[] remains the unused-wallet path.",
+      "gap": "openspec/decisions/index.md has no promo-journal / manual-deposit decision; not SPEC_GAP because the rebuild already states the bot-verified allocation SoT."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "no",
+      "write_user_boundary": "PG journal write of bot auto-budget top-ups only. Redis derived overlay of campaign remaining/usable. No WB production mutation asserted. Manual seller-portal deposits have no write path into WBAutoBudgetTopUp by design.",
+      "entrypoints": [
+        "AutoBudgetManager.service _create_topup_entry",
+        "load_success_tranches",
+        "load_campaign_ledgers",
+        "campaign_ledger_from_rows"
+      ],
+      "direct_callers": [
+        "service.py bot top_up_budget writes WBAutoBudgetTopUp",
+        "promo_ledger.py:load_success_tranches -> WBAutoBudgetTopUp status=success promo_amount>0"
+      ],
+      "indirect_callers": [
+        "load_campaign_ledgers -> campaign_ledger_from_rows",
+        "resolve_promo_availability campaign leftover vs live WB pool"
+      ],
+      "test_only_callers": [],
+      "dead_or_legacy_path": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/FINDING-006.md",
+      "fallback_used": false,
+      "search_operations": [
+        "canonical finding FINDING-006.md",
+        "INTAKE-001 item 6",
+        "read WBAutoBudgetTopUp model journal contract",
+        "read load_success_tranches / load_campaign_ledgers",
+        "read promo_accounting campaign remaining SoT",
+        "read AutoBudgetManager.service bot write path",
+        "read redis_promo_state_manager derived-cache contract",
+        "bounded openspec/decisions/index.md promo-journal lookup"
+      ],
+      "search_scope": [
+        "findings/FINDING-006.md",
+        "intakes/INTAKE-001.md",
+        "LEDGER.md",
+        "CASE.md",
+        "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
+        "app/modules/auto_budget_manager/promo_ledger.py",
+        "app/shared/domains/wb/utils/promo_accounting.py",
+        "app/modules/auto_budget_manager/service.py",
+        "app/modules/auto_budget_manager/redis_promo_state_manager.py",
+        "openspec/decisions/index.md"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding/intake, bot journal write path, verified allocation load, and bounded decisions/index.md",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "FINDING_CLAIMED_AWAITING_CLASSIFY",
+      "RESULT": "FALSE_POSITIVE",
+      "TO_STATE": "CLOSED_NO_IMPLEMENTATION",
+      "NEXT_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-006",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "not_applicable",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX30d9a4e237.md"
+      ],
+      "ON_SUCCESS_STATE": "CLOSED_NO_IMPLEMENTATION",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+      "RECOVERY_CLASS": "TERMINAL",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "yes",
+      "FINDING_TERMINAL_KIND": "CLOSED_FALSE_POSITIVE"
+    },
+    "NEXT_COMMAND": "CLOSED_NO_IMPLEMENTATION",
+    "ALLOWED_FIX_FILES": [],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/**",
+      "app/** (no implementation on Route C)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)",
+      "promo_state_service.py pool-failure path (FINDING-002/HC-001 closed_fixed)",
+      "promo_ledger.py leftover lookback (FINDING-003 closed_false_positive)",
+      "apply_spend_fefo expired-spend skip (FINDING-004/HC-FINDING-004-STALE-TEST closed_fixed)",
+      "promo_accounting leftover fraction (FINDING-005 closed_fixed)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "not_applicable (FALSE_POSITIVE; no implementation). Journal SoT remains bot WBAutoBudgetTopUp; unused wallet promo remains live WB cashbacks[].",
+    "VERIFICATION_COMMAND_PROPOSED": "not_applicable",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The rebuild already requires WBAutoBudgetTopUp as the bot auto-budget journal and verified allocation SoT for campaign remaining. Manual seller-portal deposits are outside that journal. Live WB cashbacks[] remains the unused-wallet path.",
+    "GO_TOKEN": "FORBIDDEN",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "yes",
+    "FINDING_TERMINAL_KIND": "CLOSED_FALSE_POSITIVE"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "results/PROOF-CLASSIFIER-WEX30d9a4e237.md",
+    "team/heartbeats/WEX_CLASSIFIER_30d9a4e237.json",
+    "team/packets/WEX_CLASSIFIER_30d9a4e237.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

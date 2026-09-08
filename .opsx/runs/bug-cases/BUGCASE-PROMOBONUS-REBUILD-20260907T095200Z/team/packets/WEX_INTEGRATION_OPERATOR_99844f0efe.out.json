@@ -1,0 +1,105 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "branches/HC-FINDING-004-STALE-TEST/PATCH.diff",
+    "branches/HC-FINDING-004-STALE-TEST/CHANGED_PATHS.json",
+    "family/BRANCHES.jsonl",
+    "family/INTEGRATION.json",
+    "family/FAMILY.json",
+    "family/DEPENDENCIES.json",
+    "results/FAMILY-GREEN-REPORT.md",
+    "team/heartbeats/WEX_INTEGRATION_OPERATOR_99844f0efe.json",
+    "team/packets/WEX_INTEGRATION_OPERATOR_99844f0efe.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 58,
+  "CREATED_AT": 1788805868.3389258,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT": {
+      "CANONICAL_SHA256": "c91f11cb0e00077a4c4191ad719feb2f48513c2982c5b9ee769e6f1a5693e349",
+      "RAW_SHA256": "08ee9bd2201f6a9f8bf68f22ac97f296b02f21445ffb010a0e8d11abc602bb51"
+    },
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT": {
+      "CANONICAL_SHA256": "9624cdea33aef89affd34661b4edf0c6346f68c45115ce1db2c2e285443996ef",
+      "RAW_SHA256": "a1e121f36ba68d4d65009087dd7b3732e9da416a5f7b17338bf74c299f6158e2"
+    },
+    "PKT/WEX/TASK_COMPLETION_WORKER/c68abeee84/OUT": {
+      "CANONICAL_SHA256": "8f6e1187ecb18c414c8d2c0c680ee0f110c134dc4c41ff075e0981e00f3152e1",
+      "RAW_SHA256": "08efe4a853d6f85eba27713adfa26b729f409aa864c4f72c0096867356de444d"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/TASK_COMPLETION_WORKER/c68abeee84/OUT",
+    "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT",
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788809468.3389258,
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/IN",
+  "PAYLOAD": {
+    "ACTUAL_CHANGED_PATHS": [
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "APPLIED_PATCHES": [
+      {
+        "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+        "IN_PLACE_MAIN_WORKTREE": true,
+        "ORDER": 1,
+        "PATCH_SHA256": "d566227629884be32f105d460022d2846c75c68d2a0dfb0d4201d3f1781cca87"
+      }
+    ],
+    "BRANCH_ID": "BR/HC-FINDING-004-STALE-TEST/b4dedb0c",
+    "BRANCH_STATUS": "INTEGRATED",
+    "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+    "CASE_REMAINS": "OPEN_RESIDUAL_INTAKE",
+    "CONFLICTS": [],
+    "DETERMINISTIC_ORDER": [
+      "HC-FINDING-004-STALE-TEST"
+    ],
+    "DO_NOT_CLOSE": [
+      "FINDING-004",
+      "FINDING-003",
+      "FINDING-002",
+      "ROOT-001",
+      "HC-001"
+    ],
+    "FAMILY_GREEN_STATUS": "PASS",
+    "FAMILY_INVARIANT_PYTEST": {
+      "COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -q --tb=line",
+      "OK": true,
+      "RETURNCODE": 0,
+      "TAIL": "\n============================== warnings summary ===============================\napp\\utils\\db\\base.py:5\n  c:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\app\\utils\\db\\base.py:5: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n    Base = declarative_base()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n======================== 6 passed, 1 warning in 0.31s ========================="
+    },
+    "FAMILY_STATUS": "FANIN_READY",
+    "FINDING_004_FROZEN_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+    "FINDING_004_FROZEN_NODE_PASS": true,
+    "FINDING_TERMINAL": "no",
+    "GREEN_REPORT_HASH": "2cb4c964ad12b34333ca0acd8291e618a6f5882098973862376aa2202f2487e3",
+    "INTAKE_ITEMS_5_TO_6": "not_started",
+    "INTEGRATE_BRANCH_PATCHES_CALLED": false,
+    "INTEGRATION_STATUS": "PASS",
+    "IN_PLACE_MAIN_WORKTREE": true,
+    "MISSION_COMPLETE": "no",
+    "NEXT_WORKER": "FAN_IN_ASSEMBLER",
+    "NOTE": "HC-FINDING-004-STALE-TEST already on main (test-only remaining 200->150 + docstring); recorded PATCH.diff without re-apply. write_family_fanin preconditions: INTEGRATION_STATUS=PASS, BRANCH_STATUS=INTEGRATED, FAMILY_GREEN_STATUS: PASS.",
+    "PATCH_HASH": "d566227629884be32f105d460022d2846c75c68d2a0dfb0d4201d3f1781cca87",
+    "PATCH_PATH": "branches/HC-FINDING-004-STALE-TEST/PATCH.diff",
+    "PATCH_SHA256": "d566227629884be32f105d460022d2846c75c68d2a0dfb0d4201d3f1781cca87",
+    "PRODUCTION_HASH_AFTER": "4bef922a87c533cd0c202a5b665162428f89395bccbe6efea1a86d122991344b",
+    "PRODUCTION_UNCHANGED": true,
+    "RED_EVIDENCE_HASH": "ee41ed0209cab75fdbdf3fcb4826d3c7e5e458ed449dbc2f9c26175128f6c6d8",
+    "SIBLING_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+    "SIBLING_NODE_PASS": true
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/INTEGRATION_OPERATOR/99844f0efe",
+  "WORKER_ID": "INTEGRATION_OPERATOR"
+}

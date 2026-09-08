@@ -1,0 +1,72 @@
+{
+  "SCHEMA_VERSION": "1",
+  "INTENT_TYPE": "LIVE_TASK_DISPATCH",
+  "STATUS": "FINALIZED",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/bfac483107",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "ROOT-001",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "PACKET_GENERATION": 1,
+  "CHECKPOINT_GENERATION": 5,
+  "INPUT_PACKET_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_IMPLEMENTATION_EXECUTOR_bfac483107.in.json",
+  "INPUT_PACKET_RAW_SHA256": "873a80946cfa5eff009ed5695877532a9a5599dff59c4d2db1f6365bbbf0dd72",
+  "INPUT_PACKET_CANONICAL_SHA256": "09bc55f25cdc46fbea24b554bb938b3ec1a4f573600d5a5f1834b9c4ce8a70bb",
+  "EXPECTED_OUTPUT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_IMPLEMENTATION_EXECUTOR_bfac483107.out.json",
+  "EXPECTED_OUTPUT_REL": "team\\packets\\WEX_IMPLEMENTATION_EXECUTOR_bfac483107.out.json",
+  "BEFORE_SNAPSHOT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\snapshots\\WEX_IMPLEMENTATION_EXECUTOR_bfac483107.before.json",
+  "ALLOWED_WRITE_PATHS": [
+    "results/FIX-",
+    "team/packets/",
+    "team/heartbeats/",
+    "results/",
+    "app/",
+    "tests/",
+    "openspec/changes/",
+    ".cursor/rules/"
+  ],
+  "ALLOWED_WRITE_BOUNDARY_HASH": "e6f3f694b976fd65615ce2b22a5addcfc61d8fae46f85c6c92fb17b2f50a3cf2",
+  "WORKER_CONTRACT_HASH": "57b10152b237ce1f96899a6c527591d26c9c40b188374b3aac3eae585096a23e",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "REQUEST_FINGERPRINT_SHA256": "aa7ff2738fa2d8c871ad6d3791196c547616528f84a12826f6d540abe21ec7d7",
+  "PREPARE_FINGERPRINT_SHA256": "ea3a0fc9cee5b54f8ba4c4d27be7103172df52d0420b0f62a2a0f66d15c6b216",
+  "PREPARED_AT": 1788777781.4479373,
+  "TASK_STARTED_AT": null,
+  "TASK_FINISHED_AT": 1788778222.2300205,
+  "FINALIZED_AT": 1788778222.2300205,
+  "DURATION_MS": 440782,
+  "OWNER_RECEIPT_GATE_ID": null,
+  "LOCAL_IMPLEMENTATION_AUTHORIZED": true,
+  "LIVE_RUNTIME_AUTHORITY": "runtime/live_task_hop.py",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT"
+  ],
+  "DEPENDENCY_PACKETS": {
+    "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_RED_TEST_WORKER_3d2b91716b.out.json",
+      "RAW_SHA256": "441db2a0e0ccde4ac98c759eb45af22bba07e5ef8b87a6a102e3f944e1c60194",
+      "CANONICAL_SHA256": "7ad0cf7971abfa36873ac1be11304b713f101d4c3873b16d09723fef58e52ea7"
+    }
+  },
+  "DEPENDENCY_MANIFEST": {
+    "packets": {
+      "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_RED_TEST_WORKER_3d2b91716b.out.json",
+        "RAW_SHA256": "441db2a0e0ccde4ac98c759eb45af22bba07e5ef8b87a6a102e3f944e1c60194",
+        "CANONICAL_SHA256": "7ad0cf7971abfa36873ac1be11304b713f101d4c3873b16d09723fef58e52ea7"
+      }
+    }
+  },
+  "DEPENDENCY_RAW_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT": "441db2a0e0ccde4ac98c759eb45af22bba07e5ef8b87a6a102e3f944e1c60194"
+  },
+  "DEPENDENCY_CANONICAL_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT": "7ad0cf7971abfa36873ac1be11304b713f101d4c3873b16d09723fef58e52ea7"
+  },
+  "RETRY_AUTHORIZATION_ID": null,
+  "CURSOR_AGENT_ID": "ca653da0-f4bb-44d0-b9e2-a661a6f93abe",
+  "EXECUTION_IDENTITY_VALIDATION": "PASS"
+}

@@ -1,0 +1,91 @@
+{
+  "SCHEMA_VERSION": "1",
+  "INTENT_TYPE": "LIVE_TASK_DISPATCH",
+  "STATUS": "FINALIZED",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "WORKER_ID": "FAN_IN_ASSEMBLER",
+  "WORKER_EXECUTION_ID": "WEX/FAN_IN_ASSEMBLER/ac80bca2a4",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-004",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "PACKET_GENERATION": 1,
+  "CHECKPOINT_GENERATION": 59,
+  "INPUT_PACKET_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_FAN_IN_ASSEMBLER_ac80bca2a4.in.json",
+  "INPUT_PACKET_RAW_SHA256": "00372b992f3acdead5ba067ca71fe9354ab59da2a86943b13636dfd16c099876",
+  "INPUT_PACKET_CANONICAL_SHA256": "ae4074723521dd8c4c8fa2f1a3e7ed509c65e2a70bdb9b7cdfdfe9e195578493",
+  "EXPECTED_OUTPUT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_FAN_IN_ASSEMBLER_ac80bca2a4.out.json",
+  "EXPECTED_OUTPUT_REL": "team\\packets\\WEX_FAN_IN_ASSEMBLER_ac80bca2a4.out.json",
+  "BEFORE_SNAPSHOT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\snapshots\\WEX_FAN_IN_ASSEMBLER_ac80bca2a4.before.json",
+  "ALLOWED_WRITE_PATHS": [
+    "results/FANIN.md"
+  ],
+  "ALLOWED_WRITE_BOUNDARY_HASH": "c16d6fe1ec0d38f0d421bf1b9d23cf8dfe08affb7ed635efff860b365c64dda8",
+  "WORKER_CONTRACT_HASH": "9096c792cf89b33570e473a6cc550d3e218ba0e9f2357563dc91eef1cde5ed6e",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "REQUEST_FINGERPRINT_SHA256": "99d907ca0c1012fcc501a73b93ae32d56f4c86a7c9bbd0e2d83cf44f11eeef86",
+  "PREPARE_FINGERPRINT_SHA256": "2b57f7eefbfd229b7a1f9431a9b05a330cedcc1d15883dcfbc873f76ffc39642",
+  "PREPARED_AT": 1788806283.8225577,
+  "TASK_STARTED_AT": 1788806283.840159,
+  "TASK_FINISHED_AT": 1788806639.3295074,
+  "FINALIZED_AT": 1788806639.3295074,
+  "DURATION_MS": 355489,
+  "OWNER_RECEIPT_GATE_ID": null,
+  "LOCAL_IMPLEMENTATION_AUTHORIZED": false,
+  "LIVE_RUNTIME_AUTHORITY": "runtime/live_task_hop.py",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/OUT",
+    "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT",
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT"
+  ],
+  "DEPENDENCY_PACKETS": {
+    "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_INTEGRATION_OPERATOR_99844f0efe.out.json",
+      "RAW_SHA256": "c3a8167f4461c6e6d964db7d7487db5c75403ecf6ecedaf033aa807d27c48097",
+      "CANONICAL_SHA256": "6f630689146d1314ffb5a18c7fcab301a5d8bb9ef2ba6515e50ba4242b1fe4a7"
+    },
+    "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_GREEN_VERIFIER_05c283a184.out.json",
+      "RAW_SHA256": "08ee9bd2201f6a9f8bf68f22ac97f296b02f21445ffb010a0e8d11abc602bb51",
+      "CANONICAL_SHA256": "c91f11cb0e00077a4c4191ad719feb2f48513c2982c5b9ee769e6f1a5693e349"
+    },
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_GREEN_VERIFIER_ce96b5a340.out.json",
+      "RAW_SHA256": "8fd0b712cd4152ed81fd64d141e2f4371dcc1c3495d714759e64b08b894bddac",
+      "CANONICAL_SHA256": "1ecca3298e728f1c8973e96d20645fe9501b31d02fa83f6d232e696e6035162d"
+    }
+  },
+  "DEPENDENCY_MANIFEST": {
+    "packets": {
+      "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_INTEGRATION_OPERATOR_99844f0efe.out.json",
+        "RAW_SHA256": "c3a8167f4461c6e6d964db7d7487db5c75403ecf6ecedaf033aa807d27c48097",
+        "CANONICAL_SHA256": "6f630689146d1314ffb5a18c7fcab301a5d8bb9ef2ba6515e50ba4242b1fe4a7"
+      },
+      "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_GREEN_VERIFIER_05c283a184.out.json",
+        "RAW_SHA256": "08ee9bd2201f6a9f8bf68f22ac97f296b02f21445ffb010a0e8d11abc602bb51",
+        "CANONICAL_SHA256": "c91f11cb0e00077a4c4191ad719feb2f48513c2982c5b9ee769e6f1a5693e349"
+      },
+      "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_GREEN_VERIFIER_ce96b5a340.out.json",
+        "RAW_SHA256": "8fd0b712cd4152ed81fd64d141e2f4371dcc1c3495d714759e64b08b894bddac",
+        "CANONICAL_SHA256": "1ecca3298e728f1c8973e96d20645fe9501b31d02fa83f6d232e696e6035162d"
+      }
+    }
+  },
+  "DEPENDENCY_RAW_HASHES": {
+    "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/OUT": "c3a8167f4461c6e6d964db7d7487db5c75403ecf6ecedaf033aa807d27c48097",
+    "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT": "08ee9bd2201f6a9f8bf68f22ac97f296b02f21445ffb010a0e8d11abc602bb51",
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT": "8fd0b712cd4152ed81fd64d141e2f4371dcc1c3495d714759e64b08b894bddac"
+  },
+  "DEPENDENCY_CANONICAL_HASHES": {
+    "PKT/WEX/INTEGRATION_OPERATOR/99844f0efe/OUT": "6f630689146d1314ffb5a18c7fcab301a5d8bb9ef2ba6515e50ba4242b1fe4a7",
+    "PKT/WEX/GREEN_VERIFIER/05c283a184/OUT": "c91f11cb0e00077a4c4191ad719feb2f48513c2982c5b9ee769e6f1a5693e349",
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT": "1ecca3298e728f1c8973e96d20645fe9501b31d02fa83f6d232e696e6035162d"
+  },
+  "RETRY_AUTHORIZATION_ID": null,
+  "CURSOR_AGENT_ID": "7e1326cb-89d7-4664-add2-fa2c4de981c7",
+  "EXECUTION_IDENTITY_VALIDATION": "PASS"
+}

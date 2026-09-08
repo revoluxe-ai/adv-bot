@@ -1,0 +1,41 @@
+{
+  "LEARNING_DECISION_ID": "LDEC/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/9c303aa97c",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+  "LEARNING_STAGE_INVOKED": true,
+  "LEARNING_VERDICT": "LOCAL_CASE_NOTE_ONLY",
+  "POLICY_ALREADY_EXISTS": false,
+  "POLICY_REFS": [],
+  "ENFORCEMENT_GAP": "none",
+  "PROMOTION_DECISION": "RESOLVED_NO_PROMOTE",
+  "RECOMMENDATIONS": {
+    "STATIC_CHECK_CANDIDATE": false,
+    "PROJECT_WIDE_HUNT_REQUEST": false,
+    "TESTING_RULES_CANDIDATE": false
+  },
+  "FULL_PACKET_REQUIRED": false,
+  "FULL_PACKET_PATH": null,
+  "SOURCE_FANIN_PATH": "results/FANIN.md",
+  "SOURCE_FANIN_HASH": "d8ea2d40c5e92df4389b98e59788e53ce94f0cd477fd3f43c1a7b7d6a3c805e6",
+  "SOURCE_ARTIFACT_PATHS": {
+    "FANIN_MD": "results/FANIN.md",
+    "GREEN_FINDING_004": "results/GREEN-FINDING-004.md",
+    "GREEN_HC": "results/GREEN-HC-FINDING-004-STALE-TEST.md",
+    "FIX_FINDING_004": "results/FIX-FINDING-004.md",
+    "HUNT_PROOF": "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-004.md"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FANIN_MD": "d8ea2d40c5e92df4389b98e59788e53ce94f0cd477fd3f43c1a7b7d6a3c805e6",
+    "GREEN_FINDING_004": "0018dab0baab9f10ad34b0bd621588987b584368f35c830779f7ebd1826ed94f",
+    "GREEN_HC": "ca4441374065ef5eb752d74f34dc11f3a204553f873611a2acff87b785cc5487",
+    "FIX_FINDING_004": "343f1e8a71191d7b58f632b3b0ca242111210dc58cab9828845fd72d680a69ff",
+    "HUNT_PROOF": "edcd5b3d1a286c1a7a151cf908ec5afa6503695d3d1725bc6bf240dca1c4fbad"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "DECISION_RATIONALE": "FINDING-004 production skip-expired GREEN; HC-FINDING-004-STALE-TEST SAME_INVARIANT INTEGRATED (assert 200→150); HARD_BLOCK cleared; residual intake 5-6 different items not started; closed findings not reopened. Local implementation miss in apply_spend_fefo: the spend loop lacked the is_expired continue already used by remaining, so expired leftover absorbed spend and live remaining inflated. No reusable policy or enforcement gap; remaining filter already skipped expired leftover. LOCAL_CASE_NOTE_ONLY; PROMOTION_DECISION=RESOLVED_NO_PROMOTE. Do not activate global rules / class lessons / superclass / testing-rules.",
+  "CREATED_AT": "2026-09-07T18:48:23Z",
+  "PRODUCT_CLOSURE_VALID": true,
+  "PROCESS_METADATA_CORRECTED": false,
+  "DECISION_HASH": "69861fbfaa7f7469cfae3e1de2dbc6c49374a1bf2c7a5383d0f6fa38da691c8f"
+}

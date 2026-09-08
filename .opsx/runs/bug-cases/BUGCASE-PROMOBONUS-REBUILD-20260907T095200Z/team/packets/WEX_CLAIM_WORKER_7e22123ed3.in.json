@@ -1,0 +1,59 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 36,
+  "CREATED_AT": 1788795077.0246015,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/MATERIALIZER/efd2d1333b/OUT": {
+      "CANONICAL_SHA256": "08daca8d8b3ab647585ca7d656748bbcd3f7bff68100df930778a81085ec9833",
+      "RAW_SHA256": "b76dd7f60ccd94e84757a6b436c14be77bcb4aafbaf742871ab795492fbe91a3"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/efd2d1333b/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788798677.0246015,
+  "FINDING_ID": "FINDING-003",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t07-d07",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLAIM_WORKER/7e22123ed3/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/MATERIALIZER/efd2d1333b/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "CASE.md",
+      "LEDGER.md",
+      "INDEX.md",
+      "intakes/INTAKE-001.md",
+      "team/packets/WEX_MATERIALIZER_efd2d1333b.out.json",
+      ".cursor/pipeline/bug-team/workers/CLAIM_WORKER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-claim-next-bug.md"
+    ],
+    "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "CLAIM_MODE": "claim_next_open_finding",
+    "DO_NOT_CLAIM_FINDING_002": true,
+    "DO_NOT_CLAIM_HC_001": true,
+    "DO_NOT_CLAIM_ITEMS_4_TO_6": true,
+    "DO_NOT_CLAIM_ROOT_001": true,
+    "FINDING_ID": "FINDING-003",
+    "INTAKE_ID": "INTAKE-001",
+    "MAPS_TO": "/opsx-claim-next-bug",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "REQUIRE_CLAIM": true,
+    "WORKER_ID": "CLAIM_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLAIM_WORKER/7e22123ed3",
+  "WORKER_ID": "CLAIM_WORKER"
+}

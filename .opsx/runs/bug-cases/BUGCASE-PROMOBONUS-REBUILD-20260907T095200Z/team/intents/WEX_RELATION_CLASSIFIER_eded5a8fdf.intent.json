@@ -1,0 +1,97 @@
+{
+  "SCHEMA_VERSION": "1",
+  "INTENT_TYPE": "LIVE_TASK_DISPATCH",
+  "STATUS": "FINALIZED",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "WORKER_ID": "RELATION_CLASSIFIER",
+  "WORKER_EXECUTION_ID": "WEX/RELATION_CLASSIFIER/eded5a8fdf",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-002",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "PACKET_GENERATION": 1,
+  "CHECKPOINT_GENERATION": 23,
+  "INPUT_PACKET_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_RELATION_CLASSIFIER_eded5a8fdf.in.json",
+  "INPUT_PACKET_RAW_SHA256": "1d8ed722463d182c046e5bbdf9bc41c620bd59803134151d25b0786063b0ad8a",
+  "INPUT_PACKET_CANONICAL_SHA256": "d6ac06bec26e30b95bbf11ec55624ac05d850aaae3e03095f618c409c40c360f",
+  "EXPECTED_OUTPUT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_RELATION_CLASSIFIER_eded5a8fdf.out.json",
+  "EXPECTED_OUTPUT_REL": "team\\packets\\WEX_RELATION_CLASSIFIER_eded5a8fdf.out.json",
+  "BEFORE_SNAPSHOT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\snapshots\\WEX_RELATION_CLASSIFIER_eded5a8fdf.before.json",
+  "ALLOWED_WRITE_PATHS": [
+    "findings/",
+    "family/",
+    "results/LINKED-CASE-",
+    "results/OUT-OF-SCOPE-",
+    "results/INCONCLUSIVE-",
+    "team/packets/",
+    "team/heartbeats/"
+  ],
+  "ALLOWED_WRITE_BOUNDARY_HASH": "1a26011b076a4da83f4d2b97b76260ed2ea202fc88a98777e9553ea84de9ec8b",
+  "WORKER_CONTRACT_HASH": "37f51dd22d119a87d9afc45e24dac315bb6187da1b347736ba54f5ba5f828b2a",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "REQUEST_FINGERPRINT_SHA256": "d0d0a751241a9066c3faca62704111fe69a82a498df47bd1cad77e8c215aa080",
+  "PREPARE_FINGERPRINT_SHA256": "9c488e9fef116274bad94b868d5e2d0222a411c30d9ee3a7d7d9374f4244f4f7",
+  "PREPARED_AT": 1788788178.8177705,
+  "TASK_STARTED_AT": 1788788178.8387563,
+  "TASK_FINISHED_AT": 1788788620.9742413,
+  "FINALIZED_AT": 1788788620.9742413,
+  "DURATION_MS": 442135,
+  "OWNER_RECEIPT_GATE_ID": null,
+  "LOCAL_IMPLEMENTATION_AUTHORIZED": false,
+  "LIVE_RUNTIME_AUTHORITY": "runtime/live_task_hop.py",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT",
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT",
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT"
+  ],
+  "DEPENDENCY_PACKETS": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_INVARIANT_CAPTURE_WORKER_c05f376a93.out.json",
+      "RAW_SHA256": "2f9e117f68e32c12737e7beaf0b886776b4025e6b8bd8d9ad856aa9c2c711208",
+      "CANONICAL_SHA256": "8e57d390b949221a26fc3d24b6ed682335e32587305fbfc68d06413084767d04"
+    },
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_BOUNDED_HUNTER_9b10ba8467.out.json",
+      "RAW_SHA256": "8856f31f5ce46476ca62bd2abef1cd73d26edebc41808daf38d368b9efa6ebee",
+      "CANONICAL_SHA256": "991e0e9835cbdbe4fa3982e83f079f40db24bbb9b07ea5bfc33a3d35b86c529f"
+    },
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT": {
+      "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_FAN_IN_ASSEMBLER_eaddd78ea1.out.json",
+      "RAW_SHA256": "c7a8ae5b6b0f77e1c186f63bd0d94063d7202a4ba12f5fdb8fe340a8b775d2eb",
+      "CANONICAL_SHA256": "1f4edba1f20142866ddbafafe80ac264442f26919feddb626fe67f709e778433"
+    }
+  },
+  "DEPENDENCY_MANIFEST": {
+    "packets": {
+      "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_INVARIANT_CAPTURE_WORKER_c05f376a93.out.json",
+        "RAW_SHA256": "2f9e117f68e32c12737e7beaf0b886776b4025e6b8bd8d9ad856aa9c2c711208",
+        "CANONICAL_SHA256": "8e57d390b949221a26fc3d24b6ed682335e32587305fbfc68d06413084767d04"
+      },
+      "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_BOUNDED_HUNTER_9b10ba8467.out.json",
+        "RAW_SHA256": "8856f31f5ce46476ca62bd2abef1cd73d26edebc41808daf38d368b9efa6ebee",
+        "CANONICAL_SHA256": "991e0e9835cbdbe4fa3982e83f079f40db24bbb9b07ea5bfc33a3d35b86c529f"
+      },
+      "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT": {
+        "path": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_FAN_IN_ASSEMBLER_eaddd78ea1.out.json",
+        "RAW_SHA256": "c7a8ae5b6b0f77e1c186f63bd0d94063d7202a4ba12f5fdb8fe340a8b775d2eb",
+        "CANONICAL_SHA256": "1f4edba1f20142866ddbafafe80ac264442f26919feddb626fe67f709e778433"
+      }
+    }
+  },
+  "DEPENDENCY_RAW_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT": "2f9e117f68e32c12737e7beaf0b886776b4025e6b8bd8d9ad856aa9c2c711208",
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT": "8856f31f5ce46476ca62bd2abef1cd73d26edebc41808daf38d368b9efa6ebee",
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT": "c7a8ae5b6b0f77e1c186f63bd0d94063d7202a4ba12f5fdb8fe340a8b775d2eb"
+  },
+  "DEPENDENCY_CANONICAL_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT": "8e57d390b949221a26fc3d24b6ed682335e32587305fbfc68d06413084767d04",
+    "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT": "991e0e9835cbdbe4fa3982e83f079f40db24bbb9b07ea5bfc33a3d35b86c529f",
+    "PKT/WEX/FAN_IN_ASSEMBLER/eaddd78ea1/OUT": "1f4edba1f20142866ddbafafe80ac264442f26919feddb626fe67f709e778433"
+  },
+  "RETRY_AUTHORIZATION_ID": null,
+  "CURSOR_AGENT_ID": "77798fc8-a761-41d8-9ef2-e59fcd399d85",
+  "EXECUTION_IDENTITY_VALIDATION": "PASS"
+}

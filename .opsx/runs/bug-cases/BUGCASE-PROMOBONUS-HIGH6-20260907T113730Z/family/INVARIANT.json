@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/4ae535b7",
+  "INVARIANT_REQUIRED_BEHAVIOR": "leftover success-tranche remaining>0 and not expired must keep campaign_usable true and overlay usable true even when created_at is older than 90d lookback and pool=0",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "90d lookback cutoff must not AND-stop a living leftover; must not drop leftover via created_at>=now-90d so campaign_usable becomes false when remaining>0 not expired and pool=0",
+  "INVARIANT_ENTRY_CONDITIONS": "leftover success-tranche remaining>0, not expired, created_at older than PROMO_LOOKBACK_DAYS (90d), pool=0",
+  "INVARIANT_SCOPE": "promo_ledger leftover usable lookback campaign overlay campaign_usable pool",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

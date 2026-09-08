@@ -1,0 +1,48 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/PROOF-HUNT-BOUNDED-HUNTER-001.md",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_266277452c.json",
+    "team/packets/WEX_BOUNDED_HUNTER_266277452c.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 9,
+  "CREATED_AT": 1788780194.9394243,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02/OUT": {
+      "CANONICAL_SHA256": "6bfad6cd1e6b446f6d4c949e52316ebc4021e1c912cbf1c974df50b2f9ee8173",
+      "RAW_SHA256": "fde925bcdffaccd4c4ceab2993b92c46f801511766b8e279f6eb41f9e48865a1"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/4e2f51aa02/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788783794.9394243,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/266277452c/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/266277452c/IN",
+  "PAYLOAD": {
+    "CANDIDATES": [],
+    "HUNT_EFFECTIVENESS": "HIGH_WITHIN_DECLARED_SCOPE: repo-wide get_effective_promo_plan( enumeration completed; rec-bid/Telegram sites pass fraction= or complex_adv=; ROOT-001 not re-opened",
+    "HUNT_FALSE_NEGATIVE_RISK": "BOUNDED_KWARGS_ONLY: missing fraction=/complex_adv= on rec-bid/Telegram display. Distant non-API writers and intake 2-6 not in scope. Telegram build_view may overwrite rec-bid from snapshot whose synthetic ComplexAdv-like object lacks promo_fraction; not emitted because snapshot already passes complex_adv= (declared sibling).",
+    "HUNT_RESULT": "CLEAR",
+    "HUNT_SCOPE": [
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_view_provider.py",
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_decision_snapshot_builder.py",
+      "app/shared/domains/wb/utils/promo_overlay.py",
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/rec_bid_plan_context.py",
+      "app/client_bot/user_interface/views/messages/auto_shelf_bid_control_render.py",
+      "app/modules/plan_fact/provider.py"
+    ]
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/266277452c",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

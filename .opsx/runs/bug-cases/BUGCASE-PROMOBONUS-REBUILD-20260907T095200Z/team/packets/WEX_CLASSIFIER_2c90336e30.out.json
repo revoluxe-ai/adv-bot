@@ -1,0 +1,160 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/PROOF-CLASSIFIER-WEX2c90336e30.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/heartbeats/WEX_CLASSIFIER_2c90336e30.json",
+    "team/packets/WEX_CLASSIFIER_2c90336e30.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 53,
+  "CREATED_AT": 1788804423.8279843,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/47307bd24f/OUT": {
+      "CANONICAL_SHA256": "2efc6707a44930435b7f9ec2f1c24a94672430e907c80b1ac8cb71d7a4e2d33c",
+      "RAW_SHA256": "7c7d1cf59346742553d082604e26a39a206ae1728e74c80f79d7df19c85e5afe"
+    },
+    "PKT/WEX/RELATION_CLASSIFIER/b4dedb0ca7/OUT": {
+      "CANONICAL_SHA256": "99faa1e983598a079312ef8ccc6772ea3d08af2bb7cb9e51dc2ab746c7d5fd9a",
+      "RAW_SHA256": "9766a494e57ef772984f83b7fb126c395f9627698956939e2c1728b7f9589cf7"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RELATION_CLASSIFIER/b4dedb0ca7/OUT",
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/47307bd24f/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788808023.8279843,
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/2c90336e30/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/2c90336e30/IN",
+  "PAYLOAD": {
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "ALLOWED_FIX_FILES": [
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "BRANCH_ID": "BR/HC-FINDING-004-STALE-TEST/b4dedb0c",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": null,
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_ROUTE_STATE": "AWAITING_RED",
+    "EXECUTION_PREFLIGHT": {
+      "blocked_on_preflight": false,
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding, frozen RED/GREEN, sibling test, apply_spend_fefo, bounded openspec/decisions/index.md"
+    },
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "EXPECTED_NEXT_COMMAND": "/opsx-test",
+    "FINDING_TERMINAL": "no",
+    "FORBIDDEN_FIX_FILES": [
+      "app/shared/domains/wb/utils/promo_accounting.py (FINDING-004 production GREEN_CONFIRMED)",
+      "openspec/**",
+      "unrelated leftover-fraction / journal (intake items 5-6)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)",
+      "FINDING-002 / HC-001 / FINDING-003 (closed)"
+    ],
+    "GO_TOKEN": "FORBIDDEN",
+    "INTAKE_ID": "INTAKE-001",
+    "MAPS_TO": "/opsx-classify-bug",
+    "MISSION_COMPLETE": "no",
+    "NEXT_ACTION": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-FINDING-004-STALE-TEST",
+    "NEXT_COMMAND": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-FINDING-004-STALE-TEST",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "PARENT_FINDING_ID": "FINDING-004",
+    "RATIONALE": "FINDING-004 GREEN_CONFIRMED already skips is_expired in apply_spend_fefo; remaining==150. HC-FINDING-004-STALE-TEST is the sibling frozen assertion remaining==200 on the same expired 300 + live 200 + spend 50 fixture (test_promo_accounting.py:67). GREEN-FINDING-004 adjacent file run failed assert 150==200. Same invariant; not a second production spend loop. OpenSpec decisions index is silent on FEFO spend; not SPEC_GAP because family PLAIN_LANGUAGE_INVARIANT and production docstring already require remaining==150. FINDING-004 stays claimed GREEN_CONFIRMED. Residual intake items 5-6 not classified.",
+    "RECONCILIATION_REASON": "Route A selected; team WAVE is RED then executor. EXPECTED_NEXT_COMMAND=/opsx-test; EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug. ACTUAL_* remain PENDING. HC-FINDING-004-STALE-TEST has no dedicated CLAIM_TOKEN (max_active_findings=1; FINDING-004 remains GREEN_CONFIRMED claimed). Classify did not block on missing HC claim.",
+    "RELATION": "SAME_INVARIANT_FINDING",
+    "REQUIRED_REGRESSION_TEST": "test_fefo_spend_and_expired_tranche_unusable must assert remaining==150 on expired leftover 300 + live leftover 200 + spend 50 (same fixture as frozen FINDING-004 node). Do not keep remaining==200. Do not weaken the frozen GREEN node remaining==150. Production apply_spend_fefo already skips is_expired.",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "ROUTE_TRACE_APPENDED": true,
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRANSITION": {
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none",
+      "FROM_STATE": "AWAITING_CLASSIFY",
+      "MISSION_COMPLETE": "no",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-FINDING-004-STALE-TEST",
+      "NEXT_COMMAND": "/opsx-test",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "ON_SUCCESS_STATE": "AWAITING_RED",
+      "PRECONDITIONS": {
+        "CLAIM_REQUIRED": "no",
+        "GO_TOKEN": "FORBIDDEN",
+        "GREEN_REQUIRED": "not_applicable",
+        "RED_REQUIRED": "yes"
+      },
+      "RECOVERY_CLASS": "ADVANCE",
+      "RECOVERY_COMMAND": "/opsx-test",
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX2c90336e30.md"
+      ],
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_RED"
+    },
+    "RUNTIME_EVIDENCE": {
+      "dead_or_legacy_path": "no",
+      "direct_callers": [
+        "test_fefo_spend_and_expired_tranche_unusable line 67 remaining==200",
+        "apply_spend_fefo (production already skips is_expired)"
+      ],
+      "indirect_callers": [
+        "campaign_ledger_from_rows",
+        "promo_ledger.load_campaign_ledgers"
+      ],
+      "runtime_reachable": "yes (unit test node; production spend loop already GREEN)",
+      "test_only_callers": [
+        "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable"
+      ],
+      "write_user_boundary": "test-only assertion on campaign remaining. No WB production mutation for this finding."
+    },
+    "SOURCE_RESOLUTION": {
+      "fallback_used": false,
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/HC-FINDING-004-STALE-TEST.md",
+      "search_operations": [
+        "read findings/HC-FINDING-004-STALE-TEST.md via canonical case+finding path",
+        "read findings/FINDING-004.md",
+        "read family INVARIANT/FAMILY/BRANCHES",
+        "read GREEN/RED/HUNT proofs for FINDING-004",
+        "read test_promo_accounting.py sibling vs frozen node",
+        "read apply_spend_fefo skip-expired",
+        "bounded openspec/decisions/index.md FEFO lookup"
+      ],
+      "search_scope": [
+        "findings/HC-FINDING-004-STALE-TEST.md",
+        "findings/FINDING-004.md",
+        "family/INVARIANT.md",
+        "results/GREEN-FINDING-004.md",
+        "results/RED-FINDING-004.md",
+        "tests/unit/wb/utils/test_promo_accounting.py",
+        "app/shared/domains/wb/utils/promo_accounting.py",
+        "openspec/decisions/index.md"
+      ],
+      "unresolved_gap": "none"
+    },
+    "SPEC_EVIDENCE": {
+      "evidence": "Family PLAIN_LANGUAGE_INVARIANT: expired 300 + live 200 + spend 50 must yield remaining 150. FORBIDDEN remaining inflated to 200. Production apply_spend_fefo docstring and skip-expired loop already encode that. FINDING-004 GREEN_CONFIRMED on frozen node remaining==150.",
+      "gap": "openspec/decisions/index.md has no FEFO spend decision. Not sufficient to force SPEC_GAP: the rebuild family invariant and production helper already require remaining==150.",
+      "status": "implicit_product_invariant"
+    },
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -q",
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "FINDING-004 GREEN and family INVARIANT already require remaining==150. The residual is a stale sibling assertion remaining==200, not a new product contract.",
+    "static_analysis_failure": "no"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/2c90336e30",
+  "WORKER_ID": "CLASSIFIER"
+}

@@ -1,0 +1,14 @@
+{
+  "CASE_ID": "BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+  "FINDING_ID": "ROOT-001",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/h6expired001",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "GREEN_CONFIRMED": true,
+    "GREEN_EVIDENCE_PATH": "results/GREEN-ROOT-001.md",
+    "PYTEST_COMMAND": "poetry run pytest tests/app/modules/auto_budget_manager/test_service.py::test_pick_cashback_for_topup_skips_expired_prefers_earliest_live_fefo tests/unit/wb/utils/test_promo_accounting.py -v",
+    "EXIT_CODE": 0
+  }
+}

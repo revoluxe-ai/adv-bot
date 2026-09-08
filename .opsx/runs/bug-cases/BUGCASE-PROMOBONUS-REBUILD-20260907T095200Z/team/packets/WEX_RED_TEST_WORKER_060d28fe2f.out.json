@@ -1,0 +1,86 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/060d28fe2f/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t05-d05",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/060d28fe2f",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-002",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/060d28fe2f/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/7d5f4dc267/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/7d5f4dc267/OUT": {
+      "CANONICAL_SHA256": "8296c90285c9304fc0c44d8d01e3823e7932de4e2b40f512982a0a8e83baa82b",
+      "RAW_SHA256": "e85853a3cf3f13733757f238f70cff0e551fe9a337a94389c51dede7260dd795"
+    }
+  },
+  "CHECKPOINT_GENERATION": 16,
+  "CREATED_AT": 1788784505.0,
+  "EXPIRES_AT": 1788788105.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "RED_CONFIRMED",
+  "PAYLOAD": {
+    "RED_STATUS": "RED_CONFIRMED",
+    "TEST_IDS": [
+      "tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails"
+    ],
+    "TEST_CONTENT_SHA256": {
+      "tests/unit/auto_budget_manager/test_promo_state_service.py": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5"
+    },
+    "COMMANDS_RUN": [
+      "poetry run pytest tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails -vv --tb=short"
+    ],
+    "EVIDENCE_PATH": "results/RED-FINDING-002.md",
+    "FAILURE_MATCH": "YES",
+    "PYTEST_EXIT": 1,
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/2026-09-07T12:15:07Z",
+    "INTAKE_ID": "INTAKE-001",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=FINDING-002 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/2026-09-07T12:15:07Z",
+    "CONTROLLED_LIVE_UNCOMMITTED": "GO_TOKEN NOT_REQUIRED",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_RED",
+      "RESULT": "RED_CONFIRMED",
+      "TO_STATE": "AWAITING_FIX",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=FINDING-002 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/2026-09-07T12:15:07Z",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "NOT_REQUIRED",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "satisfied",
+        "GREEN_REQUIRED": "not_applicable",
+        "OTHER": "CONTROLLED_LIVE_UNCOMMITTED LOCAL_IMPLEMENTATION_AUTHORIZED"
+      },
+      "REQUIRED_EVIDENCE": [
+        "RED_EVIDENCE_PATH",
+        "results/RED-FINDING-002.md"
+      ],
+      "ON_SUCCESS_STATE": "LOCAL_IMPLEMENTATION_AUTHORIZED",
+      "ON_FAILURE_STATE": "BLOCKED",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none",
+      "DURABLE_FILE_WRITTEN": "YES"
+    }
+  },
+  "ARTIFACTS_WRITTEN": [
+    "tests/unit/auto_budget_manager/test_promo_state_service.py",
+    "results/RED-FINDING-002.md",
+    "results/ROUTE-TRACE.jsonl",
+    "LEDGER.md",
+    "findings/FINDING-002.md",
+    "team/heartbeats/WEX_RED_TEST_WORKER_060d28fe2f.json",
+    "team/packets/WEX_RED_TEST_WORKER_060d28fe2f.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}
