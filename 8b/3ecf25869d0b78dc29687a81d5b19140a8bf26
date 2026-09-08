@@ -1,0 +1,21 @@
+tests/unit/scripts/test_a1_current_performance_drr_snapshot.py
+  s_d0b562b919382e::t_862c4c028f307a 40-96
+scripts/a1_current_performance_drr_snapshot.py
+  s_d0b562b919382e::t_b33930bd1816e2 462-524,529-534,536-539
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "8b3ecf25869d0b78dc29687a81d5b19140a8bf26",
+  "prompts": {},
+  "sessions": {
+    "s_d0b562b919382e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2a519e33-f3c9-4e54-b9bf-88c78ef80ddf",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
