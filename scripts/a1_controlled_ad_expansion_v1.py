@@ -209,6 +209,18 @@ def choose_contour(candidates: Iterable[Candidate]) -> Candidate | None:
     return next(iter(choose_contours(candidates)), None)
 
 
+def rank_mats_candidates(candidates: Iterable[Candidate]) -> list[Candidate]:
+    """Отранжировать MATS-кандидатов, не усиливая 85970344 автоматически."""
+    return sorted(
+        (item for item in candidates if item.nm_id == 388166103),
+        key=lambda item: (
+            item.action == "no_change",
+            item.classification not in {"BUDGET_LIMITED", "TRAFFIC_LIMITED"},
+            item.adv_id,
+        ),
+    )
+
+
 def _candidate_rows(
     campaigns: Iterable[dict[str, Any]],
     budgets: dict[int, int | None],
@@ -424,6 +436,48 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
             and item.sales_7d > 0
         ]
         selected_contours = choose_contours(proposed_candidates)
+        mats_candidates = rank_mats_candidates(candidates)
+        mats_comparison = [
+            {
+                "nm_id": 388166103,
+                "candidate_adv_id": candidate.adv_id,
+                "campaign_kind": candidate.campaign_kind,
+                "status": candidate.status,
+                "budget_before": candidate.budget_before,
+                "classification": candidate.classification,
+                "action": candidate.action,
+                "decision": "SELECTED" if candidate in selected_contours else "NO_WRITE_MATS",
+                "reason": (
+                    "existing campaign is actionable"
+                    if candidate in selected_contours
+                    else "no existing actionable Search/Auction leg; no campaign creation in this run"
+                ),
+            }
+            for candidate in mats_candidates
+        ]
+        if not mats_comparison:
+            mats_comparison.append({
+                "nm_id": 388166103,
+                "candidate_adv_id": "",
+                "campaign_kind": "NONE",
+                "status": "",
+                "budget_before": "",
+                "classification": "TRAFFIC_LIMITED" if sales.get(388166103, (0, 0))[1] > 0 else "UNRESOLVED",
+                "action": "no_change",
+                "decision": "NO_WRITE_MATS",
+                "reason": "no existing candidate; no campaign creation in this run",
+            })
+        mats_comparison.append({
+            "nm_id": 85970344,
+            "candidate_adv_id": "",
+            "campaign_kind": "NONE",
+            "status": "",
+            "budget_before": "",
+            "classification": "NO_WRITE",
+            "action": "no_change",
+            "decision": "EXCLUDED",
+            "reason": "never auto-strengthen 85970344",
+        })
         selected_amounts: dict[int, int] = {}
         for selected in selected_contours:
             selected_amount = 0 if selected.action == "activate_paused_leg" else topup_amount
@@ -527,6 +581,10 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         "reason", "expected_incremental_spend", "promo_topup", "ordinary_topup",
         "verification_source", "status",
     ])
+    _write_csv(output_dir / "12_MATS_COMPARISON.csv", mats_comparison, [
+        "nm_id", "candidate_adv_id", "campaign_kind", "status", "budget_before",
+        "classification", "action", "decision", "reason",
+    ])
     (output_dir / "00_MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     observation_day = _next_observation_day(supplier_orders)
     (output_dir / "08_OBSERVATION_CONTRACT.md").write_text(
@@ -544,10 +602,14 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         "Promo accounting is CASH_FLOW_ONLY; no CASH_DRR is inferred.\n", encoding="utf-8"
     )
     (output_dir / "10_MASTER_QA_REPORT.md").write_text(
-        f"# Master QA\n\nStatus: {status}\nWrites: {len(executed)}\nPRICE/GLUE/CARD: 0/0/0\n", encoding="utf-8"
+        f"# Master QA\n\nStatus: {status}\nWrites: {len(executed)}\n"
+        f"Expected incremental RUB: {sum(item['expected_incremental_spend'] for item in proposed)}\n"
+        f"MATS: {'WRITE' if any(item['decision'] == 'SELECTED' for item in mats_comparison) else 'NO_WRITE_MATS'}\n"
+        "PRICE/GLUE/CARD: 0/0/0\n", encoding="utf-8"
     )
     (output_dir / "11_HUMAN_SUMMARY.md").write_text(
-        f"# Human summary\n\n{status}. Selected action: {proposed[0] if proposed else 'none'}\n",
+        f"# Human summary\n\n{status}. Selected actions: {proposed or 'none'}\n"
+        f"MATS: {'WRITE' if any(item['decision'] == 'SELECTED' for item in mats_comparison) else 'NO_WRITE_MATS'}\n",
         encoding="utf-8",
     )
     zip_path = output_dir / "a1_controlled_ad_expansion_v1.zip"

@@ -7,6 +7,7 @@ from scripts.a1_controlled_ad_expansion_v1 import (
     classify_bottleneck,
     choose_contour,
     choose_contours,
+    rank_mats_candidates,
     validate_allowlist,
     validate_incremental_spend,
 )
@@ -63,6 +64,7 @@ def test_mat_candidate_388166103_is_ranked() -> None:
         [Candidate(77, (388166103,), 9, 0, "top_up_budget", 388166103)]
     )
     assert [candidate.nm_id for candidate in selected] == [388166103]
+    assert rank_mats_candidates(selected)[0].nm_id == 388166103
 
 
 def test_preflight_classifies_paused_search_before_budget() -> None:
