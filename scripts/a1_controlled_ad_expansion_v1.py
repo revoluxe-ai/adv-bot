@@ -221,7 +221,7 @@ def _candidate_rows(
             max_cpo=max_cpo,
             sales_7d=s7,
         )
-        if classification == "PAUSED_LEG_AVAILABLE" and kind == "SEARCH":
+        if classification == "PAUSED_LEG_AVAILABLE" and kind in {"SEARCH", "AUTO"}:
             action = "activate_paused_leg"
         elif classification == "BUDGET_LIMITED":
             action = "top_up_budget"
@@ -381,12 +381,13 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         selected = choose_contour(proposed_candidates)
         if selected is not None:
             selected_amount = 0 if selected.action == "activate_paused_leg" else topup_amount
-            if selected.nm_id in {837395782, 14824677}:
-                selected_amount = max(300, min(selected_amount, 500))
-            else:
-                selected_amount = min(selected_amount, DAILY_LIMIT_CAP_RUB)
-            if selected.nm_id == 14166423:
-                selected_amount = min(selected_amount, MAX_14166423_INCREMENT_RUB)
+            if selected.action == "top_up_budget":
+                if selected.nm_id in {837395782, 14824677}:
+                    selected_amount = max(300, min(selected_amount, 500))
+                else:
+                    selected_amount = min(selected_amount, DAILY_LIMIT_CAP_RUB)
+                if selected.nm_id == 14166423:
+                    selected_amount = min(selected_amount, MAX_14166423_INCREMENT_RUB)
             validate_incremental_spend([selected_amount])
             proposed.append({
                 "adv_id": selected.adv_id, "nm_id": selected.nm_id,

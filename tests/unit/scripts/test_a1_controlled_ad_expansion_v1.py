@@ -59,6 +59,21 @@ def test_preflight_classifies_paused_search_before_budget() -> None:
     assert rows[0].action == "activate_paused_leg"
 
 
+def test_paused_auto_leg_is_an_allowed_zero_spend_lever() -> None:
+    """Подходящий paused Auto leg также разрешён без искусственного top-up."""
+    rows = _candidate_rows(
+        [{
+            "id": 39900256,
+            "status": 11,
+            "name": "Auto A1",
+            "nm_settings": [{"nmID": 837395782}],
+        }],
+        {39900256: 3000},
+        {837395782: (1000.0, 3000.0)},
+    )
+    assert rows[0].action == "activate_paused_leg"
+
+
 def test_budget_topup_is_not_selected_for_forbidden_nmids() -> None:
     """Наблюдаемые forbidden nmID не проходят в mutation candidate set."""
     rows = _candidate_rows(
