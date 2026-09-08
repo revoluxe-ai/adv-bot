@@ -55,6 +55,8 @@ DAILY_LIMIT_CAP_RUB = 500
 MAX_14166423_INCREMENT_RUB = 300
 PAUSED_STATUS = 11
 ACTIVE_STATUSES = frozenset({9})
+STATUS_READBACK_ATTEMPTS = 6
+STATUS_READBACK_DELAY_SECONDS = 10
 MSK = ZoneInfo("Europe/Moscow")
 
 
@@ -201,6 +203,28 @@ def _sales_direction(window: dict[str, float]) -> str:
     if ratio <= 0.8:
         return "DOWN"
     return "FLAT"
+
+
+async def _poll_campaign_status(
+    promotion_manager: Any,
+    adv_id: int,
+    expected_status: int,
+) -> tuple[int | None, list[int | None]]:
+    """Повторно читать статус WB после start с bounded backoff.
+
+    WB может вернуть старое состояние сразу после успешного ``start``.
+    Возвращаются последний статус и вся последовательность readback-ов для
+    аудита; исчерпание попыток не считается исключением.
+    """
+    statuses: list[int | None] = []
+    for attempt in range(STATUS_READBACK_ATTEMPTS):
+        status = await promotion_manager.get_campaign_status(adv_id)
+        statuses.append(status)
+        if status == expected_status:
+            return status, statuses
+        if attempt + 1 < STATUS_READBACK_ATTEMPTS:
+            await asyncio.sleep(STATUS_READBACK_DELAY_SECONDS)
+    return statuses[-1] if statuses else None, statuses
 
 
 def validate_allowlist(nm_ids: Iterable[int]) -> None:
@@ -470,6 +494,9 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
     readback: list[dict[str, Any]] = []
     topups: list[dict[str, Any]] = []
     ledger: list[dict[str, Any]] = []
+    started_campaigns: set[int] = set()
+    status_poll_history: dict[int, list[int | None]] = {}
+    protected_readback_failures: list[int] = []
 
     cabinet = await _cabinet()
     from app.core.di.wb_manager_hub.wb_manager_hub_factory import WBManagerHubFactory
@@ -751,6 +778,7 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
                 if selected.action == "activate_paused_leg":
                     try:
                         await promotion_manager.start_campaign(selected.adv_id)
+                        started_campaigns.add(selected.adv_id)
                         executed.append({"adv_id": selected.adv_id, "nm_id": selected.nm_id, "field": "status", "status": "success"})
                         ledger.append(_ledger(selected, "status", selected.status, 9, 0, "success", 0, 0))
                     except Exception as exc:
@@ -760,7 +788,13 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         for item in proposed:
             adv_id = int(item["adv_id"])
             budget_after = (await modifier.get_campaign_budget(adv_id)).total
-            status_after = await promotion_manager.get_campaign_status(adv_id)
+            if execute and adv_id in started_campaigns:
+                status_after, status_samples = await _poll_campaign_status(
+                    promotion_manager, adv_id, 9
+                )
+                status_poll_history[adv_id] = status_samples
+            else:
+                status_after = await promotion_manager.get_campaign_status(adv_id)
             readback.append({
                 "adv_id": adv_id,
                 "nm_id": item["nm_id"],
@@ -771,14 +805,22 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
                 "expected_status": 9 if item["field"] == "activate_paused_leg" else "",
             })
         for adv_id in (ROLLBACK_ADV_ID, *KEEP_ACTIVE_ADV_IDS):
-            status_after = await promotion_manager.get_campaign_status(adv_id)
+            if execute and adv_id in started_campaigns:
+                status_after = status_poll_history[adv_id][-1]
+            else:
+                status_after = await promotion_manager.get_campaign_status(adv_id)
             if execute and adv_id == ROLLBACK_ADV_ID and status_after != PAUSED_STATUS:
                 raise RuntimeError(
                     f"rollback readback failed for {ROLLBACK_ADV_ID}: {status_after}"
                 )
             if execute and adv_id in KEEP_ACTIVE_ADV_IDS and status_after != 9:
-                raise RuntimeError(
-                    f"protected campaign readback failed for {adv_id}: {status_after}"
+                protected_readback_failures.append(adv_id)
+                logger.error(
+                    "protected campaign remained non-active after bounded polling: "
+                    "adv_id=%s status=%s samples=%s",
+                    adv_id,
+                    status_after,
+                    status_poll_history.get(adv_id, [status_after]),
                 )
             readback.append({
                 "adv_id": adv_id,
@@ -789,7 +831,12 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
                 "before_status": rollback_before if adv_id == ROLLBACK_ADV_ID else "",
                 "expected_status": PAUSED_STATUS if adv_id == ROLLBACK_ADV_ID else 9,
             })
-        status = "EXECUTED_VERIFIED" if execute and executed else ("NO_CHANGE" if not proposed else "DRY_RUN_READY")
+        if execute and protected_readback_failures:
+            status = "EXECUTED_PARTIAL"
+        else:
+            status = "EXECUTED_VERIFIED" if execute and executed else (
+                "NO_CHANGE" if not proposed else "DRY_RUN_READY"
+            )
     finally:
         await httpx.shutdown()
         await redis_raw.close()
@@ -804,6 +851,9 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         ),
         "budget_writes": sum(1 for item in executed if item["field"] == "budget"),
         "rollback_adv_id": ROLLBACK_ADV_ID,
+        "started_campaigns": sorted(started_campaigns),
+        "status_poll_history": status_poll_history,
+        "protected_readback_failures": protected_readback_failures,
     }
     _write_csv(output_dir / "04_EXECUTED_WRITES.csv", executed, ["adv_id", "nm_id", "field", "status"])
     _write_csv(output_dir / "05_POSTWRITE_READBACK.csv", readback, [
