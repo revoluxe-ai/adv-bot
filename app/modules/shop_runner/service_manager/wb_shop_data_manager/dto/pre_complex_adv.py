@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from decimal import Decimal
 
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
@@ -9,6 +10,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactSummary,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.shared.domains.wb.utils.promo_plan_multiplier import EffectivePromoPlan
 
 
 @dataclass
@@ -18,6 +20,9 @@ class PreComplexAdv:
     plan_fact_summary: PlanFactSummary | None = None
     fact_data: FactData | None = None
     search_adv: AdvSetting | None = None
+    promo_fraction: Decimal = Decimal("0")
+    promo_multiplier: Decimal = Decimal("1")
+    effective_promo_plan: EffectivePromoPlan | None = None
 
     @property
     def resolved_target_pay_for_order(self) -> float | None:

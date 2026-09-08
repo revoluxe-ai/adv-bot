@@ -7,6 +7,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 
 from collections.abc import Awaitable
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Protocol
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
@@ -27,6 +28,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.states import Ke
 from app.shared.domains.wb.enums import AdvType
 from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.shared.domains.wb.utils.promo_plan_multiplier import EffectivePromoPlan
 
 
 
@@ -115,7 +117,17 @@ class ComplexAdv:
         fact_pay_for_order: float | None = None,
         resolve_cpo: float | None = None,
         original_max_cpo: float | None = None,
+        promo_fraction: Decimal | None = None,
+        promo_multiplier: Decimal | None = None,
+        effective_promo_plan: EffectivePromoPlan | None = None,
+        fact_predict_orders: float | None = None,
     ):
+        """Создать runtime DTO кампании и сохранить доступный факт заказов.
+
+        ``fact_predict_orders`` нужен только для повторного разрешения CPO
+        после обновления runtime promo overlay. ``fact_pay_for_order`` остаётся
+        отдельным spend-CPO и намеренно не используется как факт заказов.
+        """
         self._mean_auto_ctr: float | None = None
         self._shop_id = shop_id
         self._adv_setting: AdvSetting = adv_setting
@@ -134,8 +146,12 @@ class ComplexAdv:
         self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._fact_pay_for_order: float | None = fact_pay_for_order
+        self._fact_predict_orders: float | None = fact_predict_orders
         self._resolve_cpo: float | None = resolve_cpo
         self._original_max_cpo = original_max_cpo
+        self.promo_fraction: Decimal = promo_fraction or Decimal("0")
+        self.promo_multiplier: Decimal = promo_multiplier or Decimal("1")
+        self.effective_promo_plan: EffectivePromoPlan | None = effective_promo_plan
 
     def __repr__(self):
         return str(self._adv_setting.id)
@@ -519,10 +535,16 @@ class ComplexAdv:
 
     @property
     def auto_budget_daily_limit(self) -> int:
+        overlay = self.effective_promo_plan
+        if overlay is not None and getattr(overlay, "active", False):
+            return int(overlay.PromoAutoBudget)
         return self._adv_setting.auto_budget_daily_limit
 
     @property
     def search_auto_budget_daily_limit(self) -> int:
+        overlay = self.effective_promo_plan
+        if overlay is not None and getattr(overlay, "active", False):
+            return int(overlay.PropoSearchBudget)
         return self._adv_setting.search_auto_budget_daily_limit
 
     @property
@@ -536,6 +558,9 @@ class ComplexAdv:
 
     @property
     def common_budget_daily_limit(self) -> int | None:
+        overlay = self.effective_promo_plan
+        if overlay is not None and getattr(overlay, "active", False):
+            return overlay.promo_target_budget
         return self._adv_setting.common_budget_daily_limit
 
     @property
@@ -568,6 +593,16 @@ class ComplexAdv:
     def fact_pay_for_order(self) -> float | None:
         """Фактическое CPO кампании (cost per order) из plan-fact статистики."""
         return self._fact_pay_for_order
+
+    @property
+    def fact_predict_orders(self) -> float | None:
+        """Факт/прогноз заказов для выбора target или max CPO."""
+        return self._fact_predict_orders
+
+    def apply_runtime_resolve_cpo(self, resolved_cpo: float | None) -> None:
+        """Обновить baked target и resolve CPO после смены runtime overlay."""
+        self._target_pay_for_order = resolved_cpo
+        self._resolve_cpo = resolved_cpo
 
     @property
     def resolve_cpo(self) -> float | None:

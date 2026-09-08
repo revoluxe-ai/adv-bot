@@ -10,7 +10,9 @@
 # TODO: Настроить мощность исполнителям
 
 import logging
+from decimal import Decimal
 
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -46,15 +48,38 @@ class AdvControlSystem:
         self.planner = ScenarioPlanner()
 
     async def process_adv(self, complex_adv: ComplexAdv, force: float = 1) -> None:
+        """Определяет состояние РК и запускает соответствующий сценарий.
+
+        Для runtime-решения учитывает promo-overlay, не изменяя и не сохраняя
+        базовый план из настроек кампании.
+        """
         keywords = await complex_adv.get_keywords()
         adv = complex_adv.adv_setting
         # 2. Получаем план
-        plan = AdvSettingAutoUpdater.get_plan_data(adv)
-        if not plan:
+        base_plan = AdvSettingAutoUpdater.get_plan_data(adv)
+        if not base_plan:
             logger.debug(
                 "[adv_id=%s] План не установлен, пропускаем обработку", adv.adv_id
             )
             return
+
+        plan = base_plan
+        try:
+            promo_fraction = Decimal(
+                str(getattr(complex_adv, "promo_fraction", Decimal("0")) or "0")
+            )
+        except Exception:
+            promo_fraction = Decimal("0")
+        if (
+            getattr(adv, "raise_plan_on_promobonuses", False) is True
+            and promo_fraction > 0
+        ):
+            effective_plan = PlanFactProvider.get_effective_plan_data(
+                adv, complex_adv=complex_adv
+            )
+            if effective_plan is not None:
+                # Для runtime-решений нужен Plan с учётом promo, базовый не меняем.
+                plan = effective_plan
 
         # 3. Получаем факт
         updater = AdvSettingAutoUpdater(adv, self.max_last_period)
@@ -62,7 +87,7 @@ class AdvControlSystem:
 
         # 3.1. Проверяем, изменились ли план и факт с прошлого раза
         plan_fact_change = ChangePlanFact(adv)
-        if await plan_fact_change.check_equal_in_cache(plan, fact):
+        if await plan_fact_change.check_equal_in_cache(base_plan, fact):
             logger.debug(
                 "[adv_id=%s] План и факт не изменились с прошлого раза, пропускаем",
                 adv.adv_id,
@@ -114,5 +139,5 @@ class AdvControlSystem:
             await session.commit()
 
         # 7. Сохраняем новое состояние план-факт
-        await plan_fact_change.set_new_plan_fact(plan, fact)
+        await plan_fact_change.set_new_plan_fact(base_plan, fact)
 

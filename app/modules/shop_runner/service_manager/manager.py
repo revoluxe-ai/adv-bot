@@ -821,16 +821,25 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60, 60)
     async def auto_budget_watchdog(self, only_bot_active: bool = False) -> None:
-        """РЎРЅР°С‡Р°Р»Р° Р°РІС‚РѕРїРѕРїРѕР»РЅРµРЅРёРµ Р±СЋРґР¶РµС‚РѕРІ (РµСЃР»Рё РµСЃС‚СЊ РєР°РЅРґРёРґР°С‚С‹), Р·Р°С‚РµРј Р·Р°РїСѓСЃРє/РїР°СѓР·Р° Р Рљ.
+        """Пополнить бюджеты, затем выполнить activity control кампаний.
 
-        Р Р°РЅСЊС€Рµ `auto_adv_active_control` РєСЂСѓС‚РёР»СЃСЏ РѕС‚РґРµР»СЊРЅРѕР№ Р·Р°РґР°С‡РµР№ СЃ С‚РµРј Р¶Рµ РёРЅС‚РµСЂРІР°Р»РѕРј,
-        РёР·вЂ‘Р·Р° С‡РµРіРѕ WB РјРѕРі РѕС‚РІРµС‡Р°С‚СЊ ``Low Budget`` РЅР° ``start`` РґРѕ РїРѕРїРѕР»РЅРµРЅРёСЏ СЃС‡С‘С‚Р° РєР°РјРїР°РЅРёРё.
+        Перед refresh создаются ``ComplexAdv`` из уже сохранённого Redis
+        promo-overlay. ``refresh_promo_state`` читает WB/PG, записывает
+        более свежий snapshot и сразу пришивает его к этим DTO. Поэтому
+        budget/activity paths используют новый promo multiplier в текущем
+        watchdog-тике; при cache miss/stale остаётся консервативная база
+        ``M=1``.
 
-        РљРѕРЅС‚СЂРѕР»СЊ Р°РєС‚РёРІРЅРѕСЃС‚Рё (`_run_auto_adv_active_control`) РІС‹Р·С‹РІР°РµС‚СЃСЏ РІ `finally` Рё РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ
-        РєР°Р¶РґС‹Р№ С‚РёРє, РґР°Р¶Рµ РµСЃР»Рё РЅРµС‚ Р Рљ РїРѕРґ Р°РІС‚РѕР±СЋРґР¶РµС‚ РёР»Рё СЃРїРёСЃРѕРє РєР°РјРїР°РЅРёР№ РїСѓСЃС‚.
+        Activity control запускается в ``finally`` каждого тика, в том числе
+        если для auto-budget не нашлось кандидатов.
         """
         advs = await self._wb_shop_data_manager.get_complex_advs(only_bot_active=only_bot_active, load_extras=False)
         try:
+            await self._auto_budget_service.refresh_promo_state(
+                advs,
+                self._wb_manager_hub,
+                self.shop_id,
+            )
             if not advs:
                 return None
             from app.modules.shop_runner.service_manager.services.auto_updater_v3.card_ab_hold.emergency import (

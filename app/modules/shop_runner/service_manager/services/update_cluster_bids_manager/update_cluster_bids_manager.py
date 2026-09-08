@@ -989,7 +989,9 @@ class UpdateClusterBidsManager:
         plan_datas_map: dict[int, PlanData] = {}
         from app.modules.plan_fact.provider import PlanFactProvider
         for adv in advs:
-            plan = PlanFactProvider.get_plan_data(adv.adv_setting)
+            plan = PlanFactProvider.get_effective_plan_data(
+                adv.adv_setting, complex_adv=adv
+            )
             if plan is not None:
                 plan_datas_map[adv.adv_id] = plan
 

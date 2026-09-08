@@ -375,6 +375,39 @@ class PromotionManager:
     async def get_campaign_balance(self) -> GetAdvV1BalanceResponse200 | None:
         return await self._client.finance_adapter.get_campaign_balance()
 
+    async def get_costs_history(
+        self,
+        *,
+        from_date: datetime.date,
+        to_date: datetime.date,
+    ) -> list[Any]:
+        """Фактические списания с бюджета кампаний WB (УПД), не аналитический spend.
+
+        Это не ClickHouse-статистика показов/кликов и не live ``GET /adv/v1/budget``
+        (там только fungible ``total``). WB отдаёт бухгалтерские строки начисления
+        за период: сколько списали с конкретной кампании и **с какого кошелька**.
+
+        Поле ``paymentType`` (v1: ``Keshbek`` / ``Balans`` / ``Bonusy`` / ``Schet``;
+        в более новых версиях API встречается ``Кэшбэк``) — источник денег.
+        Для promo remaining учитываются только строки кэшбэка; этот метод **не
+        фильтрует** типы: фильтр делает ``iter_promo_upd_items``.
+
+        Read-only WB API. Вызывающий путь: ``PromoStateService.refresh`` → ingest
+        в ``WBCampaignPromoSpend``.
+
+        Args:
+            from_date: начало периода ``from`` в ``GET /adv/v1/upd``.
+            to_date: конец периода ``to``.
+
+        Returns:
+            Список ``GetAdvV1UpdResponse200Item`` (advertId, updSum, paymentType,
+            updTime, updNum). Пустой список при неожиданном ответе WB.
+        """
+        return await self._client.finance_adapter.get_costs_history(
+            from_date=from_date,
+            to_date=to_date,
+        )
+
     async def start_campaign(self, advert_id: int) -> None:
         """Запустить рекламную кампанию WB."""
         await start_adv_method(

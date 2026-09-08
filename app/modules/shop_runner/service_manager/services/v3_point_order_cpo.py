@@ -192,8 +192,12 @@ async def load_rec_orders_per_view_for_v3(
     adv: AdvSetting,
     *,
     rec_system_promotion_mode_active: bool,
+    complex_adv: object | None = None,
 ) -> float | None:
     """Baseline полок (заказы/показ) для state-level rec_gate — те же условия, что ``above_rec_conversion``.
+
+    Cost-activity получает ``complex_adv`` явно. Без него overlay только если
+    fraction уже пришит на ``adv``.
 
     Returns:
         ``get_rec_conversion`` или ``None``, если правило не применяется (auto campaign inactive и т.д.).
@@ -207,7 +211,10 @@ async def load_rec_orders_per_view_for_v3(
         get_rec_conversion,
     )
 
-    auto_campaign_active = await is_auto_campaign_active(adv)
+    auto_campaign_active = await is_auto_campaign_active(
+        adv,
+        complex_adv=complex_adv,
+    )
     if auto_campaign_active is False:
         return None
     return await get_rec_conversion(adv.adv_id)

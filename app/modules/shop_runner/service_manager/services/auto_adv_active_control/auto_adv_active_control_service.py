@@ -1084,7 +1084,9 @@ class AutoAdvActiveControlService:
                 return None
             budget_ok = auto_limit > 0 and spend_today < auto_limit
 
-        plan = PlanFactProvider.get_plan_data(adv.adv_setting)
+        plan = PlanFactProvider.get_effective_plan_data(
+            adv.adv_setting, complex_adv=adv
+        )
         plan_fact_summary = await self._plan_fact_reader.get_latest_plan_fact(
             auto_adv_id
         )

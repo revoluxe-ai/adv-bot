@@ -43,6 +43,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.orders_per_1000_rub 
     calc_pay_for_order,
 )
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -394,31 +395,47 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
             is_auto_campaign_active,
         )
         pre_keywords.sort(key=lambda kw: kw.rating or 0, reverse=True)
-        _plan_o = _coerce_optional_int_for_resolve(
-            complex_adv.adv_setting.plan_for_sales_for_day
+        effective_promo_plan = PlanFactProvider.get_effective_promo_plan(
+            complex_adv.adv_setting,
+            complex_adv=complex_adv,
         )
-        _plan_t = _coerce_optional_float_for_resolve(
-            complex_adv.adv_setting.target_price_for_order
-        )
-        _plan_m = _coerce_optional_float_for_resolve(
-            complex_adv.adv_setting.max_price_for_order
-        )
-
-        # Target cost already resolved at WBShopDataManager.get_complex_advs():
-        # PreComplexAdv.resolved_target_pay_for_order uses batch get_latest_plan_facts.
-        # Do not query ClickHouse again per campaign.
-        resolved_target_cost: float | None
-        _raw_target = complex_adv.target_pay_for_order
-        if _raw_target is None or isinstance(_raw_target, bool):
-            resolved_target_cost = None
-        elif isinstance(_raw_target, Real):
-            resolved_target_cost = float(_raw_target)
+        effective_plan = effective_promo_plan.plan
+        overlay_active = effective_promo_plan.active
+        if effective_plan is not None:
+            _plan_o = _coerce_optional_int_for_resolve(effective_plan.orders)
+            _plan_t = _coerce_optional_float_for_resolve(
+                effective_plan.target_pay_for_order
+            )
+            _plan_m = _coerce_optional_float_for_resolve(
+                effective_plan.max_pay_for_order
+            )
         else:
-            resolved_target_cost = None
-        if resolved_target_cost is None:
+            _plan_o = None
+            _plan_t = None
+            _plan_m = None
+
+        resolved_target_cost: float | None
+        if overlay_active:
+            # Runtime overlay is authoritative even if the baked seed still
+            # contains the base target from an earlier construction phase.
             resolved_target_cost = resolve_target_cost(
                 _plan_o, _plan_t, _plan_m, None
             )
+        else:
+            # Target cost is normally resolved at
+            # WBShopDataManager.get_complex_advs(); keep it as a fast path
+            # when no active overlay is present.
+            _raw_target = complex_adv.target_pay_for_order
+            if _raw_target is None or isinstance(_raw_target, bool):
+                resolved_target_cost = None
+            elif isinstance(_raw_target, Real):
+                resolved_target_cost = float(_raw_target)
+            else:
+                resolved_target_cost = None
+            if resolved_target_cost is None:
+                resolved_target_cost = resolve_target_cost(
+                    _plan_o, _plan_t, _plan_m, None
+                )
         _resolved_ch: float | None = None
         try:
             _summary = await PlanFactReader().get_latest_plan_fact(
@@ -452,7 +469,10 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                 get_rec_conversion,
             )
             # TODO: Придумать фоллбек для этой функции
-            auto_campaign_active = await is_auto_campaign_active(complex_adv.adv_setting)
+            auto_campaign_active = await is_auto_campaign_active(
+                complex_adv.adv_setting,
+                complex_adv=complex_adv,
+            )
             if auto_campaign_active is not None:
                 rec_conversion = await get_rec_conversion(complex_adv.adv_id)
 
@@ -502,7 +522,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     keyword_setting=pre_kw.keyword_setting,
                     cluster_stat=pre_kw.cluster_stat,
                     state=state,
-                    target_pay_for_order=complex_adv.target_pay_for_order,
+                    target_pay_for_order=resolved_target_cost,
                     above_rec_conversion=None,
                     cpm_sources=pre_kw.cpm_sources,
                     rating=pre_kw.rating,
@@ -600,7 +620,7 @@ class CalculatedKeywordsManager(BaseClickHouseManager):
                     keyword_setting=pre_kw.keyword_setting,
                     cluster_stat=pre_kw.cluster_stat,
                     state=state,
-                    target_pay_for_order=complex_adv.target_pay_for_order,
+                    target_pay_for_order=resolved_target_cost,
                     above_rec_conversion=above_rec,
                     cpm_sources=pre_kw.cpm_sources,
                     rating=pre_kw.rating,

@@ -35,8 +35,12 @@ class RedisShopBalanceSnapshotManager:
         cashbacks_total: int = 0,
         cashbacks_earliest_expiration: str | None = None,
         cashbacks_best_percent: int | None = None,
+        cashbacks_packages: list[dict[str, Any]] | None = None,
     ) -> None:
-        """Store balance snapshot for the given shop."""
+        """Store balance snapshot for the given shop.
+
+        ``cashbacks_packages`` — UI/cache projection live ``cashbacks[]``, не ledger.
+        """
         key = self._key(shop_id)
         payload = {
             "balance": balance,
@@ -45,6 +49,7 @@ class RedisShopBalanceSnapshotManager:
             "cashbacks_total": cashbacks_total,
             "cashbacks_earliest_expiration": cashbacks_earliest_expiration,
             "cashbacks_best_percent": cashbacks_best_percent,
+            "cashbacks_packages": cashbacks_packages or [],
             "updated_at": _now_utc().isoformat(),
         }
         _ = await self._redis_client.set(key, json.dumps(payload), ex=_TTL)
@@ -52,7 +57,7 @@ class RedisShopBalanceSnapshotManager:
     async def get(
         self,
         shop_id: str | int,
-    ) -> dict[str, int | str | None] | None:
+    ) -> dict[str, Any] | None:
         """Load the last stored balance snapshot. Returns None if missing or invalid."""
         key = self._key(shop_id)
         raw = await self._redis_client.get(key)
@@ -72,6 +77,12 @@ class RedisShopBalanceSnapshotManager:
                 "cashbacks_earliest_expiration", None
             )
             updated_at: str = str(data.get("updated_at", ""))
+            packages_raw: Any = data.get("cashbacks_packages", [])
+            packages: list[dict[str, Any]] = []
+            if isinstance(packages_raw, list):
+                for pkg_raw in cast(list[object], packages_raw):
+                    if isinstance(pkg_raw, dict):
+                        packages.append(cast(dict[str, Any], pkg_raw))
             return {
                 "balance": int(balance_raw) if balance_raw is not None else 0,
                 "net": int(net_raw) if net_raw is not None else 0,
@@ -85,6 +96,7 @@ class RedisShopBalanceSnapshotManager:
                 "cashbacks_earliest_expiration": str(cashbacks_earliest_expiration_raw)
                 if cashbacks_earliest_expiration_raw
                 else None,
+                "cashbacks_packages": packages,
                 "updated_at": updated_at,
             }
         except (json.JSONDecodeError, TypeError, ValueError):

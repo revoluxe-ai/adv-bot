@@ -5,6 +5,7 @@ from __future__ import annotations
 import inspect
 import logging
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any, cast
 from types import SimpleNamespace
 
@@ -69,9 +70,14 @@ from .dto.selected_cpo_contract import (
     coerce_finite_float,
     extract_selected_cpo_details_from_view,
 )
+from app.modules.auto_budget_manager.redis_promo_state_manager import (
+    RedisPromoStateManager,
+)
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
+from app.shared.domains.wb.utils.promo_overlay import fraction_from_cached_state
 from app.settings import settings
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
@@ -92,6 +98,8 @@ class AutoShelfBidControlViewProvider:
         analytics_repository: AutoShelfBidControlAnalyticsRepository | None = None,
         plan_fact_reader: PlanFactReader | None = None,
     ) -> None:
+        """Инициализировать read-only зависимости экрана, включая Redis overlay-клиент."""
+        self._redis_client = redis_client
         self._repository = repository or AutoShelfBidControlRepository()
         self._analytics = analytics_repository or AutoShelfBidControlAnalyticsRepository()
         self._bid_cache = RedisAutoRecommendationsBidValueManager(redis_client=redis_client)
@@ -106,6 +114,44 @@ class AutoShelfBidControlViewProvider:
         if self._plan_fact_reader is None:
             self._plan_fact_reader = PlanFactReader()
         return self._plan_fact_reader
+
+    @staticmethod
+    def _shop_id_from_adv(adv: Any) -> str | int | None:
+        """Ключ Redis overlay: ``WBCabinet.shop_id``.
+
+        У ``AdvSetting`` нет колонки ``shop_id``; Telegram-репозиторий уже
+        делает ``joinedload(wb_cabinet)``. Fallback ``adv.shop_id`` — для
+        DTO вроде ``ComplexAdv``.
+        """
+        cabinet = getattr(adv, "wb_cabinet", None)
+        if cabinet is not None:
+            cabinet_shop_id = getattr(cabinet, "shop_id", None)
+            if isinstance(cabinet_shop_id, (str, int)) and cabinet_shop_id != "":
+                return cabinet_shop_id
+        shop_id = getattr(adv, "shop_id", None)
+        if isinstance(shop_id, (str, int)) and shop_id != "":
+            return shop_id
+        return None
+
+    async def _resolve_live_promo_fraction(self, adv: Any) -> Decimal:
+        """Фактическая promo-доля из Redis overlay-кэша. Miss/ошибка → 0 (M=1)."""
+        shop_id = self._shop_id_from_adv(adv)
+        if shop_id is None:
+            return Decimal("0")
+        try:
+            cached = await RedisPromoStateManager(self._redis_client).get(shop_id)
+        except Exception:
+            logger.debug(
+                "promo overlay cache miss/error for rec-bid shop_id=%s",
+                shop_id,
+                exc_info=True,
+            )
+            return Decimal("0")
+        return fraction_from_cached_state(
+            cached,
+            getattr(adv, "adv_id", None),
+            getattr(adv, "search_adv_id", None),
+        )
 
     async def _fetch_wb_min_bid_minor(self, auto_adv_id: int, nmid: int) -> int | None:
         """Минимальная ставка WB для Auto-РК из Redis min_bids (рубли → bid_minor)."""
@@ -547,7 +593,12 @@ class AutoShelfBidControlViewProvider:
         return sorted(rows, key=_sort_key)
 
     async def build_view(self, adv_setting_original_id: int) -> AutoShelfBidControlViewDTO:
-        """Собрать DTO для read-only Telegram экрана."""
+        """Собрать DTO для read-only Telegram экрана.
+
+        Rec-bid ``plan_context`` использует scaled overlay CPO: live
+        ``promo_fraction`` из Redis overlay-кэша передаётся в
+        ``get_effective_promo_plan(..., fraction=)``, как ``overlay_for_adv``.
+        """
         app_dry_run = self._app_dry_run()
         bid_units_confirmed = settings.AUTO_SHELF_BID_CONTROL_BID_UNITS_CONFIRMED
 
@@ -877,12 +928,25 @@ class AutoShelfBidControlViewProvider:
                             date_to=rec_date_to,
                         )
                     )
+                    live_fraction = await self._resolve_live_promo_fraction(adv)
+                    overlay = PlanFactProvider.get_effective_promo_plan(
+                        adv, fraction=live_fraction
+                    )
+                    plan_overlay = overlay.plan
                     plan_context = build_rec_bid_plan_context(
                         sales_plan=float(adv.plan_for_sales_for_day or 0.0),
                         current_fact_sales=float(fact_predict_orders or 0.0),
                         current_sales_forecast=float(fact_predict_orders or 0.0),
-                        target_price_for_order=adv.target_price_for_order,
-                        max_price_for_order=adv.max_price_for_order,
+                        target_price_for_order=(
+                            plan_overlay.target_pay_for_order
+                            if plan_overlay is not None
+                            else adv.target_price_for_order
+                        ),
+                        max_price_for_order=(
+                            plan_overlay.max_pay_for_order
+                            if plan_overlay is not None
+                            else adv.max_price_for_order
+                        ),
                         click_to_order_cr_7d=click_to_order_cr_7d,
                     )
                     rec_result = await self._rec_bid_recommendation_service.get_rec_bid_recommendations(

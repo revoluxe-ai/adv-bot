@@ -67,7 +67,9 @@ class AdvState:
         preamble-executors и связанные gates. Здесь намеренно нет отдельного
         helper-а в ``update_pipeline.utils``: дублировать вычисление потолка по
         пер-ключевой логике не нужно, потому что источник истины уже живёт в
-        ``AdvState``.
+        ``AdvState``. V3 Raise MAX и Promobonus остаются независимыми флагами:
+        ``max_pay_for_order`` уже может быть promo-effective, а отдельный
+        глобальный cap на их композицию здесь не вводится.
         """
         if self.fact_pay_for_order is None:
             return None
