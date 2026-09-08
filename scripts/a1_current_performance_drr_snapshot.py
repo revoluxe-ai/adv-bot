@@ -459,8 +459,97 @@ def _unique_contour_adv_ids(contours: list[dict[str, Any]]) -> set[int]:
     return out
 
 
+def _pick_pg_contour(
+    contours: list[dict[str, Any]],
+    pg_by_adv: dict[int, dict[str, str]],
+) -> dict[str, Any]:
+    """Выбрать первый PG-mapped контур; для WB-only — подтянуть поля из pg_by_adv."""
+    for c in contours:
+        if c.get("adv_setting_id"):
+            return c
+    for c in contours:
+        for leg in ("auto_adv_id", "search_adv_id"):
+            aid = c.get(leg)
+            if not aid:
+                continue
+            pg = pg_by_adv.get(int(aid))
+            if not pg:
+                continue
+            return {
+                **c,
+                "adv_setting_id": pg.get("id") or c.get("adv_setting_id"),
+                "bot_active": pg.get("bot_active", c.get("bot_active")),
+                "target_cpo": pg.get("target_price_for_order", c.get("target_cpo")),
+                "max_cpo": pg.get("max_price_for_order", c.get("max_cpo")),
+                "auto_daily_limit": pg.get("auto_budget_daily_limit", c.get("auto_daily_limit")),
+                "search_daily_limit": pg.get(
+                    "search_auto_budget_daily_limit", c.get("search_daily_limit")
+                ),
+                "pg_active_status": pg.get("active_status", c.get("pg_active_status")),
+                "_pg_row": pg,
+            }
+    return contours[0] if contours else {}
+
+
+def _pg_field(
+    pg_info: dict[str, Any],
+    pg_by_adv: dict[int, dict[str, str]],
+    field: str,
+    *,
+    contour_key: str | None = None,
+) -> Any:
+    """Поле из PG-контура или pg_by_adv по auto/search adv_id."""
+    if contour_key and pg_info.get(contour_key) not in (None, "", "GAP"):
+        return pg_info[contour_key]
+    pg_row = pg_info.get("_pg_row") or {}
+    if pg_row.get(field) not in (None, ""):
+        return pg_row[field]
+    for leg in ("auto_adv_id", "search_adv_id"):
+        aid = pg_info.get(leg)
+        if aid and int(aid) in pg_by_adv:
+            val = pg_by_adv[int(aid)].get(field)
+            if val not in (None, ""):
+                return val
+    return "GAP"
+
+
+def _delta_metric_row(
+    metric: str,
+    baseline_from: date,
+    baseline_to: date,
+    current_from: date,
+    current_to: date,
+    baseline_value: Any,
+    current_value: Any,
+    *,
+    comparable: str = "YES",
+    note: str = "",
+) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "metric": metric,
+        "baseline_period_from": baseline_from.isoformat(),
+        "baseline_period_to": baseline_to.isoformat(),
+        "current_period_from": current_from.isoformat(),
+        "current_period_to": current_to.isoformat(),
+        "baseline_value": baseline_value,
+        "current_value": current_value,
+        "delta_abs": "GAP",
+        "delta_pct": "GAP",
+        "comparable": comparable,
+        "note": note,
+    }
+    try:
+        b_val = float(baseline_value)
+        c_val = float(current_value)
+        row["delta_abs"] = round(c_val - b_val, 2)
+        row["delta_pct"] = round(100 * (c_val - b_val) / b_val, 2) if b_val else "GAP"
+    except (TypeError, ValueError):
+        pass
+    return row
+
+
 def _load_baseline_store_windows() -> dict[str, dict[str, str]]:
-    """Прочитать baseline store windows из prior promo pack (lineage only)."""
+    """Прочитать baseline store windows из prior promo pack (lineage only, optional)."""
     out: dict[str, dict[str, str]] = {}
     if not BASELINE_PROMO_ZIP.exists():
         return out
@@ -481,75 +570,302 @@ def _load_baseline_store_windows() -> dict[str, dict[str, str]]:
 
 
 def _delta_rows(
+    *,
+    baseline_end: date,
+    current_closed_end: date,
+    sales_daily: dict[str, dict[str, Any]],
+    spend_daily: dict[str, dict[str, Any]],
+    topup_daily: dict[str, dict[str, Any]],
     current_windows: list[dict[str, Any]],
-    baseline_day: date,
+    orders: list[dict[str, Any]],
+    day_rows: list[dict[str, Any]],
+    nmid_category: dict[int, str],
+    nm_contours: dict[int, list[dict[str, Any]]],
+    inventory: dict[int, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    baseline = _load_baseline_store_windows()
+    """Delta vs baseline ending baseline_end from this run's daily rows (no external ZIP mount)."""
     rows: list[dict[str, Any]] = []
+    base7_from = baseline_end - timedelta(days=6)
+    base7_to = baseline_end
     cur7 = next((w for w in current_windows if w["window_label"] == "CURRENT_7D"), None)
-    base_fixed = baseline.get("LAST_7_CLOSED") or baseline.get("FIXED_20260830_20260905")
-    if cur7 and base_fixed:
-        try:
-            b_sales = float(base_fixed.get("factual_order_value") or 0)
-            b_spend = float(base_fixed.get("gross_ad_spend") or 0)
-            b_drr = base_fixed.get("gross_drr", "GAP")
-            c_sales = float(cur7["factual_order_value"])
-            c_spend = float(cur7["gross_ad_spend"])
-            rows.append(
-                {
-                    "metric": "store_7d_factual_order_value",
-                    "baseline_ref": f"promo_pack_{baseline_day.isoformat()}",
-                    "baseline_value": b_sales,
-                    "current_value": c_sales,
-                    "delta_abs": round(c_sales - b_sales, 2),
-                    "delta_pct": round(100 * (c_sales - b_sales) / b_sales, 2) if b_sales else "GAP",
-                    "comparable": "PARTIAL",
-                    "note": "Baseline LAST_7_CLOSED ending ~2026-09-05 vs CURRENT_7D ending last closed",
-                }
-            )
-            rows.append(
-                {
-                    "metric": "store_7d_gross_ad_spend",
-                    "baseline_ref": f"promo_pack_{baseline_day.isoformat()}",
-                    "baseline_value": b_spend,
-                    "current_value": c_spend,
-                    "delta_abs": round(c_spend - b_spend, 2),
-                    "delta_pct": round(100 * (c_spend - b_spend) / b_spend, 2) if b_spend else "GAP",
-                    "comparable": "PARTIAL",
-                    "note": "Same window-length caveat as sales",
-                }
-            )
-            rows.append(
-                {
-                    "metric": "store_7d_gross_drr",
-                    "baseline_ref": f"promo_pack_{baseline_day.isoformat()}",
-                    "baseline_value": b_drr,
-                    "current_value": cur7["gross_drr"],
-                    "delta_abs": "GAP",
-                    "delta_pct": "GAP",
-                    "comparable": "PARTIAL",
-                    "note": "DRR delta descriptive only; low DRR != good",
-                }
-            )
-        except (TypeError, ValueError):
-            rows.append({"metric": "baseline_parse", "baseline_ref": str(BASELINE_PROMO_ZIP), "note": "PARSE_GAP"})
-    else:
+    if not cur7:
         rows.append(
             {
                 "metric": "baseline_compare",
-                "baseline_ref": str(BASELINE_PROMO_ZIP),
+                "baseline_period_from": base7_from.isoformat(),
+                "baseline_period_to": base7_to.isoformat(),
+                "current_period_from": "GAP",
+                "current_period_to": "GAP",
+                "baseline_value": "GAP",
                 "current_value": "GAP",
-                "note": "BASELINE_OR_CURRENT_7D_MISSING",
+                "delta_abs": "GAP",
+                "delta_pct": "GAP",
+                "comparable": "GAP",
+                "note": "CURRENT_7D_MISSING",
             }
         )
+        return rows
+
+    cur7_from = date.fromisoformat(cur7["period_from"])
+    cur7_to = date.fromisoformat(cur7["period_to"])
+    roll_days = (cur7_to - base7_to).days
+    roll_note = (
+        f"Baseline 7d ends {base7_to.isoformat()}; current 7d ends {cur7_to.isoformat()} "
+        f"({roll_days}d roll). Prior promo LAST_7 may end 2026-09-06 (+1d vs this baseline)."
+        if roll_days
+        else f"Baseline and current 7d both end {base7_to.isoformat()}."
+    )
+
+    base7 = _aggregate_window(
+        "BASELINE_7D",
+        base7_from,
+        base7_to,
+        sales_daily,
+        spend_daily,
+        topup_daily,
+        baseline_end,
+    )
+
+    for metric, b_key, c_key in (
+        ("store_7d_factual_order_value", "factual_order_value", "factual_order_value"),
+        ("store_7d_gross_ad_spend", "gross_ad_spend", "gross_ad_spend"),
+    ):
+        rows.append(
+            _delta_metric_row(
+                metric,
+                base7_from,
+                base7_to,
+                cur7_from,
+                cur7_to,
+                base7[b_key],
+                cur7[c_key],
+                comparable="PARTIAL" if roll_days else "YES",
+                note=roll_note,
+            )
+        )
+
+    rows.append(
+        _delta_metric_row(
+            "store_7d_gross_drr",
+            base7_from,
+            base7_to,
+            cur7_from,
+            cur7_to,
+            base7["gross_drr"],
+            cur7["gross_drr"],
+            comparable="PARTIAL" if roll_days else "YES",
+            note=f"{roll_note}; DRR delta descriptive only; low DRR != good",
+        )
+    )
+
+    base_dates_7 = _closed_dates(baseline_end, 7)
+    cur_dates_7 = _closed_dates(current_closed_end, 7)
+    for cat_key, cat_label in CATEGORY_LABELS.items():
+        cat_nmids = {n for n, c in nmid_category.items() if c == cat_key}
+        if not cat_nmids:
+            rows.append(
+                {
+                    "metric": f"category_{cat_key}_7d_sales",
+                    "baseline_period_from": base7_from.isoformat(),
+                    "baseline_period_to": base7_to.isoformat(),
+                    "current_period_from": cur7_from.isoformat(),
+                    "current_period_to": cur7_to.isoformat(),
+                    "baseline_value": "GAP",
+                    "current_value": "GAP",
+                    "delta_abs": "GAP",
+                    "delta_pct": "GAP",
+                    "comparable": "GAP",
+                    "note": f"{cat_label}: NO_NMIDS_IN_CATEGORY",
+                }
+            )
+            continue
+        b_sales = sum(_sales_window(orders, n, base_dates_7)["value"] for n in cat_nmids)
+        c_sales = sum(_sales_window(orders, n, cur_dates_7)["value"] for n in cat_nmids)
+        rows.append(
+            _delta_metric_row(
+                f"category_{cat_key}_7d_sales",
+                base7_from,
+                base7_to,
+                cur7_from,
+                cur7_to,
+                round(b_sales, 2),
+                round(c_sales, 2),
+                comparable="PARTIAL" if roll_days else "YES",
+                note=f"{cat_label}; category mover; no causality",
+            )
+        )
+
+    campaign_deltas: list[tuple[int, float, float, float]] = []
+    for adv_id in sorted(inventory):
+        b_spend = sum(
+            r["day_spend"]
+            for r in day_rows
+            if r["advert_id"] == adv_id and r["date"] in base_dates_7
+        )
+        c_spend = sum(
+            r["day_spend"]
+            for r in day_rows
+            if r["advert_id"] == adv_id and r["date"] in cur_dates_7
+        )
+        if b_spend or c_spend:
+            campaign_deltas.append((adv_id, b_spend, c_spend, c_spend - b_spend))
+    campaign_deltas.sort(key=lambda x: abs(x[3]), reverse=True)
+    for adv_id, b_spend, c_spend, _ in campaign_deltas[:10]:
+        rows.append(
+            _delta_metric_row(
+                f"campaign_{adv_id}_7d_spend",
+                base7_from,
+                base7_to,
+                cur7_from,
+                cur7_to,
+                round(b_spend, 2),
+                round(c_spend, 2),
+                comparable="PARTIAL" if roll_days else "YES",
+                note="campaign spend change; no causality",
+            )
+        )
+
+    lineage = _load_baseline_store_windows()
+    prior = lineage.get("LAST_7_CLOSED")
+    if prior:
+        try:
+            p_to = prior.get("period_to", "GAP")
+            rows.append(
+                {
+                    "metric": "lineage_prior_promo_last_7_closed_sales",
+                    "baseline_period_from": prior.get("period_from", "GAP"),
+                    "baseline_period_to": p_to,
+                    "current_period_from": cur7_from.isoformat(),
+                    "current_period_to": cur7_to.isoformat(),
+                    "baseline_value": prior.get("factual_order_value", "GAP"),
+                    "current_value": cur7["factual_order_value"],
+                    "delta_abs": "GAP",
+                    "delta_pct": "GAP",
+                    "comparable": "PARTIAL",
+                    "note": (
+                        "Optional lineage vs prior promo ZIP; "
+                        f"period_to {p_to} may differ by 1d from this baseline"
+                    ),
+                }
+            )
+        except (TypeError, ValueError, KeyError):
+            pass
+
     rows.append(
         {
             "metric": "campaign_status_limits_cpo",
-            "baseline_ref": f"glue_pack_{baseline_day.isoformat()}",
-            "note": "See 08_PRIORITY_ENTRY_SNAPSHOT vs glue 07_CAMPAIGN_CONTOUR; no causal claims",
+            "baseline_period_from": base7_from.isoformat(),
+            "baseline_period_to": base7_to.isoformat(),
+            "current_period_from": cur7_from.isoformat(),
+            "current_period_to": cur7_to.isoformat(),
+            "baseline_value": "GAP",
+            "current_value": "GAP",
+            "delta_abs": "GAP",
+            "delta_pct": "GAP",
+            "comparable": "GAP",
+            "note": "See 08_PRIORITY_ENTRY_SNAPSHOT; status/limits/CPO not time-series delta",
         }
     )
     return rows
+
+
+def _master_qa_self_check(
+    *,
+    checked_at: datetime,
+    closed_end: date,
+    open_d: date,
+    store_daily_rows: list[dict[str, Any]],
+    window_rows: list[dict[str, Any]],
+    delta_rows: list[dict[str, Any]],
+    priority_rows: list[dict[str, Any]],
+    campaign_current: list[dict[str, Any]],
+    gaps: list[str],
+) -> str:
+    """Collector self-check draft for MASTER QA (not a one-line stub)."""
+    lines = [
+        "# Master QA Report (collector draft)",
+        "",
+        f"Package `{PACKAGE}` collected at {_iso_msk(checked_at)}.",
+        f"LAST_FULLY_CLOSED_DAY={closed_end.isoformat()}; OPEN_DAY={open_d.isoformat()}.",
+        "",
+        "## Store daily vs windows",
+        "",
+    ]
+    closed_rows = [r for r in store_daily_rows if r.get("day_state") == "CLOSED"]
+    sum_sales = round(sum(float(r["factual_order_value"]) for r in closed_rows), 2)
+    sum_spend = round(sum(float(r["gross_ad_spend"]) for r in closed_rows), 2)
+    lines.append(f"- Closed daily rows: {len(closed_rows)} (from {COLLECT_FROM} through {closed_end}).")
+    lines.append(f"- Sum factual_order_value (closed days): {sum_sales:,.2f}")
+    lines.append(f"- Sum gross_ad_spend (closed days): {sum_spend:,.2f}")
+
+    cur7 = next((w for w in window_rows if w["window_label"] == "CURRENT_7D"), {})
+    cur7_dates = _closed_dates(closed_end, 7)
+    cur7_sales_from_daily = round(
+        sum(float(r["factual_order_value"]) for r in closed_rows if r["date"] in cur7_dates),
+        2,
+    )
+    cur7_spend_from_daily = round(
+        sum(float(r["gross_ad_spend"]) for r in closed_rows if r["date"] in cur7_dates),
+        2,
+    )
+    lines.extend(
+        [
+            "",
+            "## CURRENT_7D reconciliation",
+            "",
+            f"- Window aggregate sales: {cur7.get('factual_order_value', 'GAP')}",
+            f"- Sum from 01_STORE_DAILY (7d): {cur7_sales_from_daily}",
+            f"- Match: {'PASS' if cur7 and float(cur7.get('factual_order_value') or 0) == cur7_sales_from_daily else 'CHECK'}",
+            f"- Window aggregate spend: {cur7.get('gross_ad_spend', 'GAP')}",
+            f"- Sum from 01_STORE_DAILY (7d): {cur7_spend_from_daily}",
+            f"- Match: {'PASS' if cur7 and float(cur7.get('gross_ad_spend') or 0) == cur7_spend_from_daily else 'CHECK'}",
+        ]
+    )
+
+    open_in_windows = [r for r in store_daily_rows if r.get("day_state") == "OPEN"]
+    lines.extend(
+        [
+            "",
+            "## Open day exclusion",
+            "",
+            f"- Open-day rows in 01: {len(open_in_windows)} ({open_d.isoformat()})",
+            f"- Open day excluded from closed windows: {'PASS' if not any(open_d.isoformat() == w.get('period_to') for w in window_rows if w.get('window_label', '').startswith('CURRENT')) or closed_end < open_d else 'CHECK'}",
+        ]
+    )
+
+    real_delta = [r for r in delta_rows if r.get("metric", "").startswith(("store_", "category_", "campaign_"))]
+    lines.extend(
+        [
+            "",
+            "## Delta (09)",
+            "",
+            f"- Total delta rows: {len(delta_rows)}",
+            f"- Comparable metric rows: {len(real_delta)}",
+            f"- Stub-only (BASELINE_OR_CURRENT_7D_MISSING): {'FAIL' if any(r.get('note') == 'BASELINE_OR_CURRENT_7D_MISSING' for r in delta_rows) else 'PASS'}",
+            f"- cash_drr in windows: GAP (expected CASH_FLOW_ONLY)",
+        ]
+    )
+
+    pg_mapped = sum(
+        1
+        for r in priority_rows
+        if r.get("bot_active") not in (None, "", "GAP")
+        or r.get("auto_daily_limit") not in (None, "", "GAP")
+    )
+    lines.extend(
+        [
+            "",
+            "## Priority entry (08)",
+            "",
+            f"- Priority+adjacent nmIDs: {len(priority_rows)} (expected {len(ALL_PRIORITY_NMIDS)})",
+            f"- Rows with bot_active or auto_daily_limit populated: {pg_mapped}",
+            f"- Campaign current rows (05): {len(campaign_current)}",
+        ]
+    )
+
+    lines.extend(["", "## Declared gaps", ""] + [f"- {g}" for g in gaps])
+    lines.extend(["", "MASTER should rewrite with independent verification."])
+    return "\n".join(lines)
 
 
 def _top_movers(
@@ -858,8 +1174,9 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
             assoc_o += split["associated_orders"]
             gmv_d += float(split["direct_gmv"])
             gmv_a += float(split["associated_gmv"])
-        pg_info = contours[0] if contours else {}
-        wb_c = wb_by_id.get(int(pg_info.get("auto_adv_id") or 0), {})
+        pg_info = _pick_pg_contour(contours, pg_by_adv)
+        auto_id = int(pg_info.get("auto_adv_id") or 0)
+        wb_c = wb_by_id.get(auto_id, {})
         cpo_direct = round(spend7 / direct_o, 2) if direct_o else "GAP"
         cpo_total = round(spend7 / (direct_o + assoc_o), 2) if (direct_o + assoc_o) else "GAP"
         priority_rows.append(
@@ -872,13 +1189,24 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
                 "campaign_ids": ",".join(str(x) for x in adv_ids) or "GAP",
                 "wb_status": wb_c.get("status", "GAP"),
                 "pg_active": pg_info.get("pg_active_status", "GAP"),
-                "bot_active": pg_info.get("bot_active", "GAP"),
-                "strategy": pg_by_adv.get(int(pg_info.get("auto_adv_id") or 0), {}).get("strategy", "GAP"),
-                "aggressiveness": pg_by_adv.get(int(pg_info.get("auto_adv_id") or 0), {}).get("aggressiveness", "GAP"),
-                "target_cpo": pg_info.get("target_cpo", "GAP"),
-                "max_cpo": pg_info.get("max_cpo", "GAP"),
-                "auto_daily_limit": pg_info.get("auto_daily_limit", "GAP"),
-                "search_daily_limit": pg_info.get("search_daily_limit", "GAP"),
+                "bot_active": _pg_field(pg_info, pg_by_adv, "bot_active", contour_key="bot_active"),
+                "strategy": _pg_field(pg_info, pg_by_adv, "strategy"),
+                "aggressiveness": _pg_field(pg_info, pg_by_adv, "aggressiveness"),
+                "target_cpo": _pg_field(
+                    pg_info, pg_by_adv, "target_price_for_order", contour_key="target_cpo"
+                ),
+                "max_cpo": _pg_field(
+                    pg_info, pg_by_adv, "max_price_for_order", contour_key="max_cpo"
+                ),
+                "auto_daily_limit": _pg_field(
+                    pg_info, pg_by_adv, "auto_budget_daily_limit", contour_key="auto_daily_limit"
+                ),
+                "search_daily_limit": _pg_field(
+                    pg_info,
+                    pg_by_adv,
+                    "search_auto_budget_daily_limit",
+                    contour_key="search_daily_limit",
+                ),
                 "spend_3d": round(spend3, 2),
                 "spend_7d": round(spend7, 2),
                 "spend_14d": round(spend14, 2),
@@ -891,7 +1219,19 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
             }
         )
 
-    delta_rows = _delta_rows(window_rows, BASELINE_DAY)
+    delta_rows = _delta_rows(
+        baseline_end=BASELINE_DAY,
+        current_closed_end=closed_end,
+        sales_daily=sales_daily,
+        spend_daily=spend_daily,
+        topup_daily=topup_daily,
+        current_windows=window_rows,
+        orders=orders_raw,
+        day_rows=day_rows,
+        nmid_category=nmid_category,
+        nm_contours=nm_contours,
+        inventory=inventory,
+    )
     mover_rows = _top_movers(product_rows)
 
     _write_csv(root / "01_STORE_DAILY.csv", store_daily_rows, list(store_daily_rows[0].keys()) if store_daily_rows else ["date"])
@@ -910,12 +1250,28 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     _write_csv(root / "06_CAMPAIGN_WINDOWS.csv", campaign_window_rows, list(campaign_window_rows[0].keys()) if campaign_window_rows else ["adv_id"])
     _write_csv(root / "07_DIRECT_ASSOC_WINDOWS.csv", direct_assoc_rows, list(direct_assoc_rows[0].keys()) if direct_assoc_rows else ["adv_id"])
     _write_csv(root / "08_PRIORITY_ENTRY_SNAPSHOT.csv", priority_rows, list(priority_rows[0].keys()) if priority_rows else ["nmID"])
-    _write_csv(root / "09_DELTA_SINCE_20260905.csv", delta_rows, list(delta_rows[0].keys()) if delta_rows else ["metric"])
+    _write_csv(
+        root / "09_DELTA_SINCE_20260905.csv",
+        delta_rows,
+        [
+            "metric",
+            "baseline_period_from",
+            "baseline_period_to",
+            "current_period_from",
+            "current_period_to",
+            "baseline_value",
+            "current_value",
+            "delta_abs",
+            "delta_pct",
+            "comparable",
+            "note",
+        ],
+    )
     _write_csv(root / "11_PROMO_ACCOUNTING.csv", promo_acct_rows, list(promo_acct_rows[0].keys()) if promo_acct_rows else ["date"])
     _write_csv(root / "12_TOP_GROWERS_DECLINERS.csv", mover_rows, list(mover_rows[0].keys()) if mover_rows else ["flag"])
 
     if not BASELINE_PROMO_ZIP.exists():
-        gaps.append("BASELINE_PROMO_ZIP_MISSING_FOR_DELTA")
+        gaps.append("BASELINE_PROMO_ZIP_MISSING_FOR_LINEAGE")
     gaps.extend(
         [
             "CASH_AD_COST_GAP (CASH_FLOW_ONLY)",
@@ -945,16 +1301,16 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     cur3 = next(w for w in window_rows if w["window_label"] == "CURRENT_3D")
     cur7 = next(w for w in window_rows if w["window_label"] == "CURRENT_7D")
     (root / "14_MASTER_QA_REPORT.md").write_text(
-        "\n".join(
-            [
-                "# Master QA Report (collector draft)",
-                "",
-                f"Package `{PACKAGE}` at {_iso_msk(checked_at)}.",
-                f"LAST_FULLY_CLOSED_DAY={closed_end.isoformat()}.",
-                f"CURRENT_3D gross_drr={cur3['gross_drr']} sales={cur3['factual_order_value']}.",
-                f"CURRENT_7D gross_drr={cur7['gross_drr']} sales={cur7['factual_order_value']}.",
-                "MASTER should rewrite.",
-            ]
+        _master_qa_self_check(
+            checked_at=checked_at,
+            closed_end=closed_end,
+            open_d=open_d,
+            store_daily_rows=store_daily_rows,
+            window_rows=window_rows,
+            delta_rows=delta_rows,
+            priority_rows=priority_rows,
+            campaign_current=campaign_current,
+            gaps=gaps,
         ),
         encoding="utf-8",
     )

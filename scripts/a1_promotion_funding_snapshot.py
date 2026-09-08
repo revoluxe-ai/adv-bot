@@ -66,10 +66,11 @@ def _load_adv_settings(root: Path) -> tuple[int, list[dict[str, str]]]:
     st2 = evidence.run_pg_query(
         _pg_database(),
         (
-            "SELECT id, adv_id, _search_adv_id, name, active_status, bot_active, "
+            "SELECT id, adv_id, _search_adv_id, name, nmids, active_status, bot_active, "
             "auto_budget_watchdog_enabled, auto_budget_daily_limit, "
             "search_auto_budget_daily_limit, use_common_budget, "
-            "common_budget_daily_limit, max_balance_adding_for_day "
+            "common_budget_daily_limit, max_balance_adding_for_day, "
+            "strategy, aggressiveness, target_price_for_order, max_price_for_order "
             f"FROM public.advsetting WHERE wb_cabinet_id = {wb_cabinet_id}"
         ),
         setting_path,
