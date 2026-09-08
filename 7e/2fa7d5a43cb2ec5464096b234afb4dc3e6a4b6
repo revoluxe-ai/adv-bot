@@ -1,0 +1,29 @@
+DOTO/WORKLOG.md
+  s_2e5d4e91328687::t_af57643a03cf3c 749-786,791-800
+  s_16a4f63fc49039::t_9a1869469c5f26 801-852
+  s_2e5d4e91328687::t_496c47059b352d 787-790
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "7e2fa7d5a43cb2ec5464096b234afb4dc3e6a4b6",
+  "prompts": {},
+  "sessions": {
+    "s_16a4f63fc49039": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d822d218-a250-430b-94cc-f021b311ec70",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_2e5d4e91328687": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9de0059e-52ca-4983-b9a0-09c0d6613c4b",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
