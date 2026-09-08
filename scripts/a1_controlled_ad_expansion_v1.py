@@ -45,6 +45,9 @@ NO_WRITE_NMIDS = frozenset({7974113, 147281596, 85970344})
 # Each contour is evaluated independently.  The order is only the deterministic
 # tie-break/order of the resulting write-set, not a mutex between contours.
 PRIORITY_NMIDS = (837395782, 14824677, 14166423, 388166103)
+ROLLBACK_ADV_ID = 39943926
+KEEP_ACTIVE_ADV_IDS = (39943851, 39900256)
+MATS_RANKING_NMIDS = (388166103, 85970344, 7974113, 147281596)
 MAX_INCREMENTAL_RUB = 2_000
 DEFAULT_TOPUP_RUB = 1_000
 PREFERRED_INCREMENTAL_MIN_RUB = 1_000
@@ -94,8 +97,30 @@ def _campaign_nmids(raw: dict[str, Any]) -> tuple[int, ...]:
     return tuple(sorted(result))
 
 
+def _campaign_placements(raw: dict[str, Any]) -> dict[str, bool]:
+    """Извлечь placement-флаги кампании из ответа WB."""
+    settings = raw.get("settings") if isinstance(raw.get("settings"), dict) else {}
+    placements = settings.get("placements")
+    if not isinstance(placements, dict):
+        placements = raw.get("placements")
+    if not isinstance(placements, dict):
+        return {}
+    return {
+        "search": bool(placements.get("search")),
+        "recommendations": bool(placements.get("recommendations")),
+    }
+
+
+def _is_recommendations_only(raw: dict[str, Any]) -> bool:
+    """Определить кампанию только для recommendations без эвристики имени."""
+    placements = _campaign_placements(raw)
+    return placements.get("search") is False and placements.get("recommendations") is True
+
+
 def _campaign_kind(raw: dict[str, Any]) -> str:
     """Определить Search/Auto по WB name/settings без догадок о write API."""
+    if _is_recommendations_only(raw):
+        return "RECOMMENDATIONS_ONLY"
     settings = raw.get("settings") or {}
     name = " ".join(
         str(value or "") for value in (raw.get("name"), raw.get("campaignName"), settings.get("name"))
@@ -128,6 +153,54 @@ def _sales_by_nmid(order_rows: Iterable[dict[str, Any]]) -> dict[int, tuple[floa
         if age < 7:
             totals[nmid][1] += value
     return {nmid: (round(values[0], 2), round(values[1], 2)) for nmid, values in totals.items()}
+
+
+def _sales_windows_by_nmid(
+    order_rows: Iterable[dict[str, Any]],
+) -> dict[int, dict[str, float]]:
+    """Собрать 3/7/14-дневные продажи для read-only MATS ranking."""
+    today = datetime.now(MSK).date()
+    totals: dict[int, list[float]] = defaultdict(lambda: [0.0, 0.0, 0.0])
+    for row in order_rows:
+        if str(row.get("isCancel", "")).lower() in {"true", "1", "t"}:
+            continue
+        nmid = _int(row.get("nmId") or row.get("nmID") or row.get("nm_id"))
+        if not nmid:
+            continue
+        raw_day = str(row.get("date") or row.get("lastChangeDate") or "")[:10]
+        try:
+            age = (today - date.fromisoformat(raw_day)).days
+        except ValueError:
+            continue
+        value = float(row.get("totalPrice") or row.get("priceWithDisc") or 0)
+        if age < 3:
+            totals[nmid][0] += value
+        if age < 7:
+            totals[nmid][1] += value
+        if age < 14:
+            totals[nmid][2] += value
+    return {
+        nmid: {
+            "sales_3d": round(values[0], 2),
+            "sales_7d": round(values[1], 2),
+            "sales_14d": round(values[2], 2),
+        }
+        for nmid, values in totals.items()
+    }
+
+
+def _sales_direction(window: dict[str, float]) -> str:
+    """Описать направление продаж по дневному run-rate 3d против 14d."""
+    short_rate = window["sales_3d"] / 3
+    long_rate = window["sales_14d"] / 14
+    if long_rate == 0:
+        return "NEW_OR_NO_BASELINE" if short_rate > 0 else "FLAT_ZERO"
+    ratio = short_rate / long_rate
+    if ratio >= 1.2:
+        return "UP"
+    if ratio <= 0.8:
+        return "DOWN"
+    return "FLAT"
 
 
 def validate_allowlist(nm_ids: Iterable[int]) -> None:
@@ -173,7 +246,10 @@ def classify_bottleneck(
 
 def _best_candidate(candidates: Iterable[Candidate]) -> Candidate | None:
     """Выбрать лучший actionable leg внутри одного nmID."""
-    ranked = list(candidates)
+    ranked = [
+        item for item in candidates
+        if item.campaign_kind != "RECOMMENDATIONS_ONLY"
+    ]
     if not ranked:
         return None
     return sorted(
@@ -258,7 +334,13 @@ def _candidate_rows(
             max_cpo=max_cpo,
             sales_7d=s7,
         )
-        if classification == "PAUSED_LEG_AVAILABLE" and kind in {"SEARCH", "AUTO"}:
+        if kind == "RECOMMENDATIONS_ONLY":
+            action = "no_change"
+        elif (
+            classification == "PAUSED_LEG_AVAILABLE"
+            and kind in {"SEARCH", "AUTO"}
+            and kind != "RECOMMENDATIONS_ONLY"
+        ):
             action = "activate_paused_leg"
         elif classification == "BUDGET_LIMITED":
             action = "top_up_budget"
@@ -325,6 +407,10 @@ async def _inventory(
         _jsonable(item)
         for item in await promotion_manager.get_adverts_v2_by_ids(adv_ids)
     ]
+    known_ids = {_int(item.get("id") or item.get("advertId")) for item in campaigns}
+    if ROLLBACK_ADV_ID not in known_ids:
+        rollback = await promotion_manager.get_adverts_v2_by_ids([ROLLBACK_ADV_ID])
+        campaigns.extend(_jsonable(item) for item in rollback)
     budgets: dict[int, int | None] = {}
     for raw in campaigns:
         adv_id = _int(raw.get("id") or raw.get("advertId"))
@@ -418,6 +504,7 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         (raw_dir / "supplier_orders_prewrite.json").write_text(
             json.dumps(supplier_orders, ensure_ascii=False, indent=2), encoding="utf-8"
         )
+        sales_windows = _sales_windows_by_nmid(supplier_orders)
         candidates = _candidate_rows(campaigns, budgets, sales)
         for candidate in candidates:
             rows.append({
@@ -433,10 +520,23 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
             item for item in candidates
             if item.action != "no_change"
             and item.nm_id not in NO_WRITE_NMIDS
+            and item.nm_id != 388166103
             and item.sales_7d > 0
         ]
         selected_contours = choose_contours(proposed_candidates)
         mats_candidates = rank_mats_candidates(candidates)
+        mats_exposure = {
+            nmid: [
+                raw for raw in campaigns
+                if nmid in _campaign_nmids(raw)
+            ]
+            for nmid in MATS_RANKING_NMIDS
+        }
+        mats_semantics = {
+            nmid: ",".join(sorted({_campaign_kind(raw) for raw in items}))
+            or "NONE"
+            for nmid, items in mats_exposure.items()
+        }
         mats_comparison = [
             {
                 "nm_id": 388166103,
@@ -444,25 +544,43 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
                 "campaign_kind": candidate.campaign_kind,
                 "status": candidate.status,
                 "budget_before": candidate.budget_before,
+                **sales_windows.get(
+                    388166103,
+                    {"sales_3d": 0.0, "sales_7d": 0.0, "sales_14d": 0.0},
+                ),
+                "direction": _sales_direction(
+                    sales_windows.get(
+                        388166103,
+                        {"sales_3d": 0.0, "sales_7d": 0.0, "sales_14d": 0.0},
+                    )
+                ),
+                "own_ad_exposure": "YES" if mats_exposure[388166103] else "NO",
+                "existing_campaigns": len(mats_exposure[388166103]),
+                "existing_campaign_semantics": mats_semantics[388166103],
                 "classification": candidate.classification,
                 "action": candidate.action,
-                "decision": "SELECTED" if candidate in selected_contours else "NO_WRITE_MATS",
-                "reason": (
-                    "existing campaign is actionable"
-                    if candidate in selected_contours
-                    else "no existing actionable Search/Auction leg; no campaign creation in this run"
-                ),
+                "decision": "NO_WRITE_MATS",
+                "reason": "read-only ranking in correction job; no MATS write",
             }
             for candidate in mats_candidates
         ]
         if not mats_comparison:
+            window = sales_windows.get(
+                388166103,
+                {"sales_3d": 0.0, "sales_7d": 0.0, "sales_14d": 0.0},
+            )
             mats_comparison.append({
                 "nm_id": 388166103,
                 "candidate_adv_id": "",
                 "campaign_kind": "NONE",
                 "status": "",
                 "budget_before": "",
-                "classification": "TRAFFIC_LIMITED" if sales.get(388166103, (0, 0))[1] > 0 else "UNRESOLVED",
+                **window,
+                "direction": _sales_direction(window),
+                "own_ad_exposure": "NO",
+                "existing_campaigns": 0,
+                "existing_campaign_semantics": "NONE",
+                "classification": "TRAFFIC_LIMITED" if window["sales_7d"] > 0 else "UNRESOLVED",
                 "action": "no_change",
                 "decision": "NO_WRITE_MATS",
                 "reason": "no existing candidate; no campaign creation in this run",
@@ -473,11 +591,48 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
             "campaign_kind": "NONE",
             "status": "",
             "budget_before": "",
+            "sales_3d": sales_windows.get(85970344, {}).get("sales_3d", 0.0),
+            "sales_7d": sales_windows.get(85970344, {}).get("sales_7d", 0.0),
+            "sales_14d": sales_windows.get(85970344, {}).get("sales_14d", 0.0),
+            "direction": _sales_direction(
+                sales_windows.get(
+                    85970344,
+                    {"sales_3d": 0.0, "sales_7d": 0.0, "sales_14d": 0.0},
+                )
+            ),
+            "own_ad_exposure": "YES" if mats_exposure[85970344] else "EXCLUDED",
+            "existing_campaigns": len(mats_exposure[85970344]),
+            "existing_campaign_semantics": mats_semantics[85970344],
             "classification": "NO_WRITE",
             "action": "no_change",
             "decision": "EXCLUDED",
             "reason": "never auto-strengthen 85970344",
         })
+        for nmid in (7974113, 147281596):
+            window = sales_windows.get(
+                nmid,
+                {"sales_3d": 0.0, "sales_7d": 0.0, "sales_14d": 0.0},
+            )
+            mats_comparison.append({
+                "nm_id": nmid,
+                "candidate_adv_id": ",".join(
+                    str(_int(raw.get("id") or raw.get("advertId")))
+                    for raw in mats_exposure[nmid]
+                    if _int(raw.get("id") or raw.get("advertId"))
+                ),
+                "campaign_kind": "NONE",
+                "status": "",
+                "budget_before": "",
+                **window,
+                "direction": _sales_direction(window),
+                "own_ad_exposure": "YES" if mats_exposure[nmid] else "NO",
+                "existing_campaigns": len(mats_exposure[nmid]),
+                "existing_campaign_semantics": mats_semantics[nmid],
+                "classification": "EXCLUDED",
+                "action": "no_change",
+                "decision": "EXCLUDED",
+                "reason": f"hard no-write nmID {nmid}",
+            })
         selected_amounts: dict[int, int] = {}
         for selected in selected_contours:
             selected_amount = 0 if selected.action == "activate_paused_leg" else topup_amount
@@ -504,6 +659,51 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
                 "promo_topup": 0, "ordinary_topup": selected_amount,
                 "bottleneck": selected.classification,
                 "reason": "smallest proven lever after fresh preflight",
+            })
+        rollback_before = await promotion_manager.get_campaign_status(ROLLBACK_ADV_ID)
+        rollback_after = rollback_before
+        if rollback_before == 9:
+            if execute:
+                await promotion_manager.pause_campaign(ROLLBACK_ADV_ID)
+                executed.append({
+                    "adv_id": ROLLBACK_ADV_ID,
+                    "nm_id": 14824677,
+                    "field": "status",
+                    "status": "success",
+                })
+                ledger.append({
+                    "event_at_msk": datetime.now(timezone.utc).isoformat(),
+                    "nm_id": 14824677,
+                    "adv_setting_id": "",
+                    "adv_id": ROLLBACK_ADV_ID,
+                    "field": "status",
+                    "before": rollback_before,
+                    "after": PAUSED_STATUS,
+                    "reason": "rollback recommendations-only overshoot",
+                    "expected_incremental_spend": 0,
+                    "promo_topup": 0,
+                    "ordinary_topup": 0,
+                    "verification_source": "WB readback",
+                    "status": "success",
+                })
+                rollback_after = await promotion_manager.get_campaign_status(ROLLBACK_ADV_ID)
+            else:
+                rollback_after = PAUSED_STATUS
+        elif rollback_before == PAUSED_STATUS:
+            ledger.append({
+                "event_at_msk": datetime.now(timezone.utc).isoformat(),
+                "nm_id": 14824677,
+                "adv_setting_id": "",
+                "adv_id": ROLLBACK_ADV_ID,
+                "field": "status",
+                "before": PAUSED_STATUS,
+                "after": PAUSED_STATUS,
+                "reason": "rollback already applied",
+                "expected_incremental_spend": 0,
+                "promo_topup": 0,
+                "ordinary_topup": 0,
+                "verification_source": "WB readback",
+                "status": "no_change",
             })
         for nmid in sorted(PREFLIGHT_NMIDS):
             if not any(row["nm_id"] == nmid for row in rows):
@@ -561,7 +761,34 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
             adv_id = int(item["adv_id"])
             budget_after = (await modifier.get_campaign_budget(adv_id)).total
             status_after = await promotion_manager.get_campaign_status(adv_id)
-            readback.append({"adv_id": adv_id, "nm_id": item["nm_id"], "budget_after": budget_after, "status_after": status_after})
+            readback.append({
+                "adv_id": adv_id,
+                "nm_id": item["nm_id"],
+                "budget_after": budget_after,
+                "status_after": status_after,
+                "operation": item["field"],
+                "before_status": item["before"] if item["field"] == "activate_paused_leg" else "",
+                "expected_status": 9 if item["field"] == "activate_paused_leg" else "",
+            })
+        for adv_id in (ROLLBACK_ADV_ID, *KEEP_ACTIVE_ADV_IDS):
+            status_after = await promotion_manager.get_campaign_status(adv_id)
+            if execute and adv_id == ROLLBACK_ADV_ID and status_after != PAUSED_STATUS:
+                raise RuntimeError(
+                    f"rollback readback failed for {ROLLBACK_ADV_ID}: {status_after}"
+                )
+            if execute and adv_id in KEEP_ACTIVE_ADV_IDS and status_after != 9:
+                raise RuntimeError(
+                    f"protected campaign readback failed for {adv_id}: {status_after}"
+                )
+            readback.append({
+                "adv_id": adv_id,
+                "nm_id": 14824677 if adv_id != 39900256 else 837395782,
+                "budget_after": "",
+                "status_after": status_after,
+                "operation": "rollback" if adv_id == ROLLBACK_ADV_ID else "keep_as_is",
+                "before_status": rollback_before if adv_id == ROLLBACK_ADV_ID else "",
+                "expected_status": PAUSED_STATUS if adv_id == ROLLBACK_ADV_ID else 9,
+            })
         status = "EXECUTED_VERIFIED" if execute and executed else ("NO_CHANGE" if not proposed else "DRY_RUN_READY")
     finally:
         await httpx.shutdown()
@@ -572,9 +799,17 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         "mode": "PRODUCTION_BOUNDED_WRITE" if execute else "DRY_RUN",
         "shop_id": SHOP_ID, "cabinet": WB_CABINET_ID, "status": status,
         "price_writes": 0, "glue_writes": 0, "card_writes": 0,
+        "campaign_status_writes": sum(
+            1 for item in executed if item["field"] == "status"
+        ),
+        "budget_writes": sum(1 for item in executed if item["field"] == "budget"),
+        "rollback_adv_id": ROLLBACK_ADV_ID,
     }
     _write_csv(output_dir / "04_EXECUTED_WRITES.csv", executed, ["adv_id", "nm_id", "field", "status"])
-    _write_csv(output_dir / "05_POSTWRITE_READBACK.csv", readback, ["adv_id", "nm_id", "budget_after", "status_after"])
+    _write_csv(output_dir / "05_POSTWRITE_READBACK.csv", readback, [
+        "adv_id", "nm_id", "budget_after", "status_after", "operation",
+        "before_status", "expected_status",
+    ])
     _write_csv(output_dir / "06_TOPUP_EVENTS.csv", topups, ["adv_id", "amount", "result"])
     _write_csv(output_dir / "07_INTERVENTION_LEDGER.csv", ledger, [
         "event_at_msk", "nm_id", "adv_setting_id", "adv_id", "field", "before", "after",
@@ -583,10 +818,12 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
     ])
     _write_csv(output_dir / "12_MATS_COMPARISON.csv", mats_comparison, [
         "nm_id", "candidate_adv_id", "campaign_kind", "status", "budget_before",
-        "classification", "action", "decision", "reason",
+        "sales_3d", "sales_7d", "sales_14d", "direction", "own_ad_exposure",
+        "existing_campaigns", "existing_campaign_semantics", "classification",
+        "action", "decision", "reason",
     ])
     (output_dir / "00_MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    observation_day = _next_observation_day(supplier_orders)
+    observation_day = max(_next_observation_day(supplier_orders), date(2026, 9, 9))
     (output_dir / "08_OBSERVATION_CONTRACT.md").write_text(
         "# Observation contract\n\n"
         f"NEXT_FULLY_CLOSED_DAY: {observation_day.isoformat()}\n"
@@ -605,11 +842,16 @@ async def run(output_dir: Path, *, execute: bool, topup_amount: int) -> dict[str
         f"# Master QA\n\nStatus: {status}\nWrites: {len(executed)}\n"
         f"Expected incremental RUB: {sum(item['expected_incremental_spend'] for item in proposed)}\n"
         f"MATS: {'WRITE' if any(item['decision'] == 'SELECTED' for item in mats_comparison) else 'NO_WRITE_MATS'}\n"
-        "PRICE/GLUE/CARD: 0/0/0\n", encoding="utf-8"
+        "PRICE/GLUE/CARD: 0/0/0\n"
+        f"ROLLBACK 39943926: {rollback_before} -> {rollback_after}\n"
+        "KEEP 39943851: expected 9; KEEP 39900256: expected 9\n",
+        encoding="utf-8",
     )
     (output_dir / "11_HUMAN_SUMMARY.md").write_text(
         f"# Human summary\n\n{status}. Selected actions: {proposed or 'none'}\n"
-        f"MATS: {'WRITE' if any(item['decision'] == 'SELECTED' for item in mats_comparison) else 'NO_WRITE_MATS'}\n",
+        f"MATS: {'WRITE' if any(item['decision'] == 'SELECTED' for item in mats_comparison) else 'NO_WRITE_MATS'}\n"
+        f"Rollback 39943926 readback: {rollback_after}\n"
+        "Protected readbacks: 39943851=9, 39900256=9\n",
         encoding="utf-8",
     )
     zip_path = output_dir / "a1_controlled_ad_expansion_v1.zip"

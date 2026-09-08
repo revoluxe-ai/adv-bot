@@ -98,6 +98,26 @@ def test_paused_auto_leg_is_an_allowed_zero_spend_lever() -> None:
     assert rows[0].action == "activate_paused_leg"
 
 
+def test_recommendations_only_leg_is_never_selected() -> None:
+    """Recommendations-only placement cannot be activated by the executor."""
+    rows = _candidate_rows(
+        [{
+            "id": 39943926,
+            "status": 9,
+            "name": "Search overshoot",
+            "settings": {
+                "placements": {"search": False, "recommendations": True},
+            },
+            "nm_settings": [{"nmID": 14824677}],
+        }],
+        {39943926: 1200},
+        {14824677: (1000.0, 3000.0)},
+    )
+    assert rows[0].campaign_kind == "RECOMMENDATIONS_ONLY"
+    assert rows[0].action == "no_change"
+    assert choose_contours(rows) == []
+
+
 def test_budget_topup_is_not_selected_for_forbidden_nmids() -> None:
     """Наблюдаемые forbidden nmID не проходят в mutation candidate set."""
     rows = _candidate_rows(
