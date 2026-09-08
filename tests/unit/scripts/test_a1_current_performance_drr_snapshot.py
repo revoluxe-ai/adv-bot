@@ -37,6 +37,63 @@ def test_pick_pg_contour_prefers_adv_setting_id_over_wb_only() -> None:
     assert picked["bot_active"] == "True"
 
 
+def test_pick_pg_contour_prefers_bot_active_pg_over_inactive_pg() -> None:
+    """WB-first bot=False contour must lose to later PG bot_active=True campaign."""
+    contours = [
+        {
+            "adv_setting_id": 100,
+            "auto_adv_id": 20987465,
+            "search_adv_id": None,
+            "name": "INACTIVE_PG",
+            "bot_active": "False",
+            "target_cpo": "GAP",
+            "max_cpo": "GAP",
+            "auto_daily_limit": "0",
+            "search_daily_limit": "0",
+        },
+        {
+            "adv_setting_id": 200,
+            "auto_adv_id": 20987867,
+            "search_adv_id": None,
+            "name": "ACTIVE_BOT_PG",
+            "bot_active": "True",
+            "target_cpo": "100",
+            "max_cpo": "400",
+            "auto_daily_limit": "500",
+            "search_daily_limit": "200",
+            "strategy": "MIN_CPO",
+        },
+    ]
+    picked = _pick_pg_contour(contours, {})
+    assert picked["auto_adv_id"] == 20987867
+    assert picked["bot_active"] == "True"
+    assert picked["target_cpo"] == "100"
+    assert picked["auto_daily_limit"] == "500"
+
+
+def test_pick_pg_contour_prefers_bot_active_pg_over_wb_only_first() -> None:
+    contours = [
+        {
+            "adv_setting_id": None,
+            "auto_adv_id": 20987465,
+            "search_adv_id": None,
+            "name": "WB_ONLY_UNMAPPED_PG",
+            "bot_active": "GAP",
+        },
+        {
+            "adv_setting_id": 200,
+            "auto_adv_id": 20987867,
+            "search_adv_id": None,
+            "bot_active": "True",
+            "auto_daily_limit": "500",
+            "search_daily_limit": "200",
+        },
+    ]
+    picked = _pick_pg_contour(contours, {})
+    assert picked["auto_adv_id"] == 20987867
+    assert picked["bot_active"] == "True"
+
+
 def test_pick_pg_contour_merges_pg_by_adv_for_wb_only() -> None:
     contours = [
         {

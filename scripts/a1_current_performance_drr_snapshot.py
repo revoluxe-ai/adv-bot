@@ -459,36 +459,84 @@ def _unique_contour_adv_ids(contours: list[dict[str, Any]]) -> set[int]:
     return out
 
 
+def _is_bot_active_true(value: Any) -> bool:
+    """True для PG/WB bot_active в bool или строковом виде."""
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes")
+    return False
+
+
+def _contour_pg_mapped(
+    contour: dict[str, Any],
+    pg_by_adv: dict[int, dict[str, str]],
+) -> bool:
+    """Кontur PG-mapped если есть adv_setting_id или adv_id в pg_by_adv."""
+    if contour.get("adv_setting_id"):
+        return True
+    for leg in ("auto_adv_id", "search_adv_id"):
+        aid = contour.get(leg)
+        if aid and int(aid) in pg_by_adv:
+            return True
+    return False
+
+
+def _merge_pg_by_adv_into_contour(
+    contour: dict[str, Any],
+    pg_by_adv: dict[int, dict[str, str]],
+) -> dict[str, Any]:
+    """Подтянуть PG-поля по auto/search adv_id для WB-only контура."""
+    for leg in ("auto_adv_id", "search_adv_id"):
+        aid = contour.get(leg)
+        if not aid:
+            continue
+        pg = pg_by_adv.get(int(aid))
+        if not pg:
+            continue
+        return {
+            **contour,
+            "adv_setting_id": pg.get("id") or contour.get("adv_setting_id"),
+            "bot_active": pg.get("bot_active", contour.get("bot_active")),
+            "target_cpo": pg.get("target_price_for_order", contour.get("target_cpo")),
+            "max_cpo": pg.get("max_price_for_order", contour.get("max_cpo")),
+            "auto_daily_limit": pg.get("auto_budget_daily_limit", contour.get("auto_daily_limit")),
+            "search_daily_limit": pg.get(
+                "search_auto_budget_daily_limit", contour.get("search_daily_limit")
+            ),
+            "pg_active_status": pg.get("active_status", contour.get("pg_active_status")),
+            "strategy": pg.get("strategy", contour.get("strategy")),
+            "aggressiveness": pg.get("aggressiveness", contour.get("aggressiveness")),
+            "_pg_row": pg,
+        }
+    return contour
+
+
+def _resolve_contour_for_pick(
+    contour: dict[str, Any],
+    pg_by_adv: dict[int, dict[str, str]],
+) -> dict[str, Any]:
+    """Нормализовать контур перед ранжированием (PG row as-is, WB-only — merge)."""
+    if contour.get("adv_setting_id"):
+        return contour
+    return _merge_pg_by_adv_into_contour(contour, pg_by_adv)
+
+
 def _pick_pg_contour(
     contours: list[dict[str, Any]],
     pg_by_adv: dict[int, dict[str, str]],
 ) -> dict[str, Any]:
-    """Выбрать первый PG-mapped контур; для WB-only — подтянуть поля из pg_by_adv."""
-    for c in contours:
-        if c.get("adv_setting_id"):
+    """Выбрать PG-контур: bot_active=True > PG-mapped > WB-only fallback."""
+    if not contours:
+        return {}
+    resolved = [_resolve_contour_for_pick(c, pg_by_adv) for c in contours]
+    for c in resolved:
+        if _contour_pg_mapped(c, pg_by_adv) and _is_bot_active_true(c.get("bot_active")):
             return c
-    for c in contours:
-        for leg in ("auto_adv_id", "search_adv_id"):
-            aid = c.get(leg)
-            if not aid:
-                continue
-            pg = pg_by_adv.get(int(aid))
-            if not pg:
-                continue
-            return {
-                **c,
-                "adv_setting_id": pg.get("id") or c.get("adv_setting_id"),
-                "bot_active": pg.get("bot_active", c.get("bot_active")),
-                "target_cpo": pg.get("target_price_for_order", c.get("target_cpo")),
-                "max_cpo": pg.get("max_price_for_order", c.get("max_cpo")),
-                "auto_daily_limit": pg.get("auto_budget_daily_limit", c.get("auto_daily_limit")),
-                "search_daily_limit": pg.get(
-                    "search_auto_budget_daily_limit", c.get("search_daily_limit")
-                ),
-                "pg_active_status": pg.get("active_status", c.get("pg_active_status")),
-                "_pg_row": pg,
-            }
-    return contours[0] if contours else {}
+    for c in resolved:
+        if _contour_pg_mapped(c, pg_by_adv):
+            return c
+    return resolved[0]
 
 
 def _pg_field(
