@@ -746,3 +746,107 @@ BidderCoroutineType.OLD_UPDATE_CPM_BIDDER - РІС‹РїРёР»РёС‚СЊ �
 2. РџСЂРѕРІРµСЂРёС‚СЊ billing logs: РїСЂРѕРїСѓСЃРєРё hourly run Р·Р° 24h РїРѕСЃР»Рµ OOM.
 3. РћР±РЅРѕРІРёС‚СЊ OPS_STATE РїРѕСЃР»Рµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ release posture `be173f55`.
 4. Bridge (РµСЃР»Рё РЅСѓР¶РµРЅ РґРѕ fix): `/opsx-devops PLAN_WRITE intent=CONFIG_PATCH ns=prod-adv-bot resource=deploy/adv-bot-updater symptom=OOM bridge 1536Miв†’2560Mi`.
+
+## TECH DEBT: Promobonus — per-leg Raise Plan overlay на ComplexAdv (2026-09-08)
+
+Контекст: independent review dirty Promobonus rebuild vs Owner plan (`cursor_promobonus_feature_rebuild_plan.md`);
+Owner — **не включать флаг** до фикса; не production migrate.
+
+**Проблема:** L2 leftover и `f`/`M` уже считаются **per advert_id** (auto `adv_id`, search `search_adv_id`) в
+`PromoStateService` / Redis `campaigns[adv_id]`. Но runtime overlay на пару auto+search **схлопывается в один**
+`EffectivePromoPlan` на весь `ComplexAdv` через `max(f_auto, f_search)`:
+
+- `fraction_from_cached_state(state, adv.adv_id, search_adv_id)` → берёт **максимум**;
+- `WBShopDataManager._build_pre_complex_adv` → один `overlay` / `promo_fraction` / `plan_data`;
+- `ComplexAdv.effective_promo_plan` → один `M` на обе ноги;
+- `PromoAutoBudget` и `PropoSearchBudget` масштабируются **одинаково**, хотя leftover может быть только на одной ноге.
+
+**Пример:** auto leftover `f=0.2` (M=1.25), search пуст + pool пуст → сейчас search тоже получает `PropoSearchBudget ×1.25`.
+Нарушает I-GATE per-campaign: uplift должен жить на ноге с usable promo, не «заражать» соседнюю.
+
+**Что уже раздельно (не ломать):** journal `WBAutoBudgetTopUp` по `adv_id`, UPD spend `WBCampaignPromoSpend`,
+FEFO remaining, top-up `get_campaign_config(AUTO|SEARCH)`.
+
+**Целевое поведение (Owner, 2026-09-08):**
+- `f_auto` = pool OR leftover **auto** advert_id; `f_search` = pool OR leftover **search** advert_id;
+- `PromoAutoBudget` ← `f_auto`; `PropoSearchBudget` ← `f_search`;
+- **не** `max(auto, search)` для всей пары.
+
+**Открытый Owner-choice (блокирует CPO/common):** Plan в PG один на `AdvSetting` (max/target/common).
+Варианты для `PromoMaxCPO` / `PromoTargetCPO` / `PromoTarget Budget`:
+- **A)** CPO тоже per-leg (разные effective plan на auto vs search runtime);
+- **B)** CPO общий на пару, бюджеты per-leg;
+- **C)** CPO поднимается, если usable **хотя бы одна** нога (как сейчас через max).
+
+До выбора — чинить **бюджетные ноги**; CPO/common явно TODO.
+
+**Связанные gaps (тот же контур, отдельные задачи):**
+- [ ] **P1 — snapshot keywords без overlay:** `PostgresSnapshotProviderLive` строит `ComplexAdv` с сырым Plan,
+  без `promo_fraction` / `effective_promo_plan` → Redis `calculated_keywords:{adv_id}` GOOD/BAD на base max/target
+  (`postgres_provider.py:131`, `calculated_keywords_warmup.py`).
+- [x] **P2 — `inspect.stack` в cost-activity (2026-09-08):** `_fraction_from_caller_complex_adv` удалён;
+  overlay только через явный ``complex_adv=`` или ``promo_fraction`` на setting. Проброс в
+  ``rec_system_shelf_mode``, ``v3_point_order_cpo``, ``auto_updater_v3/manager``,
+  ``keyword_v3_profile_loader``. Тесты: ``test_auto_campaign_cost_activity_overlay.py``.
+
+**Связанные файлы:** `promo_overlay.py`, `wb_shop_data_manager.py`, `complex_adv.py`,
+`promo_state_service.py`, `plan_fact/provider.py`, `auto_budget_manager/service.py`.
+
+**Приоритет:** **P1** перед enable `RaisePlanOnPromobonuses`; флаг default `false` — не блокер merge, блокер rollout.
+
+**Next:**
+1. Per-leg overlay model на `ComplexAdv` (или `PreComplexAdv`): `effective_promo_plan_auto` / `_search` или resolver по `AdvType`.
+2. Тест: auto leftover, search empty → `PropoSearchBudget` ×1, `PromoAutoBudget` ×M.
+3. Owner lock A/B/C для CPO/common; затем snapshot keywords overlay.
+
+## TECH DEBT: Promobonus — independent review follow-up (2026-09-08)
+
+Контекст: независимое Read Only ревью dirty-разработки по
+`C:\Users\vkita\Downloads\cursor_promobonus_feature_rebuild_plan.md`.
+Код и тесты не менялись в рамках ревью.
+
+**Что разрешено оставить техдолгом при выключенном по умолчанию
+`RaisePlanOnPromobonuses`:**
+
+- **H1 / campaign leftover semantics:** attached-план описывает leftover
+  `200/1000 -> f=0.2 -> M=1.25`, но P0 Owner-lock от 2026-09-08 закрепил
+  для уже зачисленного 50%-транша правило `package percent` до полного
+  исчерпания leftover (`500/1000`, leftover `200` -> `f=0.5 -> M=2`).
+  Пул следующего top-up продолжает использовать фактический payable/top-up.
+  Это осознанная асимметрия двух разных сценариев, не исправлять без нового
+  Owner-решения. Не считать H1 регрессией P0.
+- **Snapshot warmup:** `PostgresSnapshotProviderLive` создаёт
+  `ComplexAdv` с сырым Plan и без `promo_fraction` / effective overlay;
+  warmup calculated keywords может отличаться от runtime shop-runner.
+- **One-tick/cache lag:** часть V3/cluster/shelf/keywords paths читает
+  предыдущий Redis promo snapshot; после refresh watchdog пришивает новый
+  overlay только к уже созданным DTO.
+- **`original_max_cpo`:** обычный `ComplexAdv` не заполняет это поле; shelf
+  recommendation и Telegram могут видеть разные max-CPO значения при активном
+  promo overlay.
+- **V3 composition:** при одновременных V3 Raise MAX и promo overlay нет
+  общего потолка; effective ceiling может превысить 2x от базового значения.
+  Это Owner choice, не выбирать автоматически.
+- **UPD recovery/accounting:** per-campaign remaining зависит от bot-created
+  allocations и WB `Keshbek`/`Кэшбэк` UPD. Manual/out-of-band top-ups,
+  отсутствующая или поздняя UPD-история могут временно завысить usable
+  leftover. Recovery-window gap зафиксирован в
+  `BUGCASE-PROMOBONUS-OWNER4-20260908T045100Z/ROOT-001.md`.
+
+**Критичные условия перед production rollout (не техдолг):**
+
+1. Применить Alembic revision
+   `c4f8a1b2d3e4_add_raise_plan_on_promobonuses_and_promo_ledger.py` до
+   запуска новой версии: код читает новые колонки даже при выключенном
+   флаге.
+2. Не включать `RaisePlanOnPromobonuses` глобально; сначала ограниченный
+   pilot с наблюдением UPD/ledger и фактических расходов.
+3. При проблемах refresh Redis overlay должен оставаться fail-closed
+   (`M=1`); не ослаблять это поведение ради доступности.
+
+**Next (после отдельного Owner GO):**
+
+1. Пер-leg overlay для auto/search budget paths.
+2. Тесты H1/P0-семантики, snapshot warmup и one-tick refresh.
+3. Решить A/B/C для CPO/common budget и композиции с V3 Raise MAX.
+4. Закрыть UPD recovery/backfill и зафиксировать policy для manual top-ups.
