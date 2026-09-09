@@ -352,6 +352,74 @@ async def test_process_add_new_token_strips_whitespace_before_validate_and_persi
     ):
         await start_module.process_add_new_token(message, bot, state, client_session)
 
-    validator.validate.assert_awaited_once_with(raw_token, mode="claims_plus_api")
+    validator.validate.assert_awaited_once_with(raw_token, mode="claims_only")
     saved_token = commit_token.await_args.args[1]
     assert saved_token.api_key == raw_token
+
+
+@pytest.mark.asyncio
+async def test_process_add_new_token_accepts_read_only_token() -> None:
+    """Add-token flow must persist read-only tokens and send the warning copy."""
+    session = MagicMock(name="add_token_read_only_session")
+    sm_mock = MagicMock(return_value=_SessionMakerMock(session))
+    shop_id = "shop-read-only"
+    user_id_loader = AsyncMock(return_value=7)
+    cabinet = SimpleNamespace(
+        id=9,
+        name="Cab",
+        wb_cabinet=SimpleNamespace(shop_id=shop_id, active=True),
+    )
+    load_uc = AsyncMock(return_value=cabinet)
+    load_existing = AsyncMock(return_value=None)
+    commit_token = AsyncMock()
+    load_cab = AsyncMock(return_value=cabinet.wb_cabinet)
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_read_only=True,
+        is_expired=False,
+        shop_id=shop_id,
+    )
+    validator = MagicMock()
+    validator.validate = AsyncMock(return_value=validation_result)
+    notif = MagicMock()
+    notif.mark_notifications_resolved = AsyncMock(return_value=0)
+
+    message = SimpleNamespace(
+        text="r" * 32,
+        chat=SimpleNamespace(id=333),
+        from_user=SimpleNamespace(id=444),
+    )
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"wb_user_cabinet_original_id": 9})
+    state.clear = AsyncMock()
+    client_session = MagicMock()
+
+    with (
+        patch.object(start_module, "sm", sm_mock),
+        patch.object(start_module, "_load_user_id_in_session", user_id_loader),
+        patch.object(start_module, "_load_wb_user_cabinet_in_session", load_uc),
+        patch.object(
+            start_module, "_load_existing_wb_token_in_session", load_existing
+        ),
+        patch.object(start_module, "commit_new_wb_token_in_session", commit_token),
+        patch.object(
+            start_module, "_load_wb_cabinet_by_shop_id_in_session", load_cab
+        ),
+        patch.object(
+            start_module, "TokenPermissionsValidator", MagicMock(return_value=validator)
+        ),
+        patch.object(
+            start_module, "NotificationManager", MagicMock(return_value=notif)
+        ),
+        patch.object(start_module, "ShopMenu", MagicMock(return_value=AsyncMock())),
+    ):
+        await start_module.process_add_new_token(message, bot, state, client_session)
+
+    commit_token.assert_awaited_once()
+    success_messages = [
+        call.args[1]
+        for call in bot.send_message.await_args_list
+        if len(call.args) > 1
+    ]
+    assert any("Только для чтения" in message for message in success_messages)

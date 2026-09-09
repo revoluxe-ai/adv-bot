@@ -449,7 +449,112 @@ async def test_process_cabinet_api_strips_whitespace_before_validate_and_wb_toke
     ):
         await start_module.process_cabinet_api(message, bot, state, client_session)
 
-    validator.validate.assert_awaited_once_with(raw_token, mode="claims_plus_api")
+    validator.validate.assert_awaited_once_with(raw_token, mode="claims_only")
     existing_token_loader.assert_awaited_once_with(session, raw_token, shop_id)
     saved_token = persist_token.await_args.args[1]
     assert saved_token.api_key == raw_token
+
+
+async def test_token_acceptable_for_persist_allows_any_scopes() -> None:
+    """Persist gate must not reject tokens with partial scopes or read-only."""
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_expired=False,
+        shop_id="shop-partial",
+    )
+    assert start_module._token_acceptable_for_persist(validation_result) is None
+
+
+async def test_token_acceptable_for_persist_rejects_expired() -> None:
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_expired=True,
+        shop_id="shop-expired",
+    )
+    rejection = start_module._token_acceptable_for_persist(validation_result)
+    assert rejection is not None
+    assert "истёк" in rejection.lower()
+
+
+@pytest.mark.asyncio
+async def test_process_cabinet_api_accepts_token_without_full_scopes() -> None:
+    """Registration must persist tokens even when required WB scopes are missing."""
+    session = MagicMock(name="cabinet_api_partial_session")
+    sm_mock = MagicMock(return_value=_SessionMakerMock(session))
+    user_id_loader = AsyncMock(return_value=1)
+    existing_token_loader = AsyncMock(return_value=None)
+    persist_token = AsyncMock()
+    shop_id = "shop-partial"
+    validation_result = SimpleNamespace(
+        is_valid_jwt=True,
+        is_read_only=True,
+        is_expired=False,
+        shop_id=shop_id,
+    )
+    validator = MagicMock()
+    validator.validate = AsyncMock(return_value=validation_result)
+
+    message = SimpleNamespace(
+        text="p" * 32,
+        chat=SimpleNamespace(id=909),
+        from_user=SimpleNamespace(id=1010),
+    )
+    bot = AsyncMock()
+    state = AsyncMock()
+    state.get_data = AsyncMock(return_value={"cabinet_name": "Cabinet"})
+    client_session = MagicMock()
+
+    with (
+        patch.object(start_module, "sm", sm_mock),
+        patch.object(start_module, "_load_user_id_in_session", user_id_loader),
+        patch.object(
+            start_module,
+            "_load_existing_wb_token_in_session",
+            existing_token_loader,
+        ),
+        patch.object(start_module, "persist_wb_token_in_session", persist_token),
+        patch.object(
+            start_module,
+            "_load_wb_cabinet_by_shop_id_in_session",
+            AsyncMock(return_value=None),
+        ),
+        patch.object(
+            start_module,
+            "create_wb_cabinet_and_user_binding_in_session",
+            AsyncMock(
+                return_value=(
+                    SimpleNamespace(id=1, shop_id=shop_id),
+                    SimpleNamespace(id=2, name="Cab"),
+                )
+            ),
+        ),
+        patch.object(
+            start_module,
+            "_load_user_cabinets_for_user_in_session",
+            AsyncMock(return_value=[]),
+        ),
+        patch.object(
+            start_module,
+            "TokenPermissionsValidator",
+            MagicMock(return_value=validator),
+        ),
+        patch.object(
+            start_module.messages,
+            "ShopUpdateInfo",
+            MagicMock(return_value=AsyncMock()),
+        ),
+        patch.object(
+            start_module.messages,
+            "ShopAddedSuccess",
+            MagicMock(return_value=AsyncMock()),
+        ),
+        patch.object(start_module, "ShopChoice", MagicMock(return_value=AsyncMock())),
+        patch.object(
+            start_module,
+            "get_shop_ids_with_complete_token_status",
+            AsyncMock(return_value=set()),
+        ),
+    ):
+        await start_module.process_cabinet_api(message, bot, state, client_session)
+
+    persist_token.assert_awaited_once()
