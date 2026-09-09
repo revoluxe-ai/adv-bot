@@ -60,6 +60,7 @@ from app.modules.shop_menu.message import (
 )
 from app.modules.shop_runner.modules.wb_api import WBApi
 from app.modules.token_permissions import TokenPermissionsValidator
+from app.modules.token_permissions.dto import ValidationResult
 from app.settings import settings
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker
@@ -87,17 +88,6 @@ def _build_token_invalid_format_message() -> str:
     )
 
 
-def _build_token_read_only_rejected_message() -> str:
-    """Вернуть подсказку, когда в add-token flow пришёл read-only токен."""
-    return (
-        "Обнаружен токен только для чтения. Такой токен подходит для просмотра аналитики, "
-        "магазинов и кампаний.\n"
-        "Бот не будет менять рекламу с таким токеном.\n"
-        "Для управления ставками нужен токен с возможностью изменений в кабинете.\n"
-        f"{format_required_wb_token_scopes()}"
-    )
-
-
 def _build_token_read_only_added_message() -> str:
     """Вернуть уведомление после сохранения read-only токена."""
     return (
@@ -115,6 +105,25 @@ def _build_token_success_added_message(shop_name: str) -> str:
         f"Токен успешно добавлен для магазина {shop_name}.\n\n"
         "Теперь откройте «Мои магазины», выберите магазин и рекламную кампанию."
     )
+
+
+def _token_acceptable_for_persist(validation_result: ValidationResult) -> str | None:
+    """Вернуть текст ошибки, если токен нельзя сохранить, иначе None.
+
+    Проверяются только JWT, срок действия и shop_id. Права и read-only
+    не блокируют добавление — их проверяет бекенд при запуске магазина.
+    """
+    if not validation_result.is_valid_jwt:
+        return _build_token_invalid_format_message()
+    if validation_result.is_expired:
+        return (
+            "Токен истёк. Пожалуйста, создайте новый токен в личном кабинете Wildberries."
+        )
+    if not validation_result.shop_id:
+        return (
+            "Не удалось получить идентификатор магазина из токена. Попробуйте еще раз."
+        )
+    return None
 
 
 async def __get_wb_user_cabinet(
@@ -659,57 +668,26 @@ async def process_cabinet_api(
         )
         return None
 
-    # Validate token using centralized validator
     validator = TokenPermissionsValidator(http_session=client_session)
-    validation_result = await validator.validate(token_text, mode="claims_plus_api")
+    validation_result = await validator.validate(token_text, mode="claims_only")
     if validation_result is None:
         return None
 
-    if not validation_result.is_valid_jwt:
-        logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
-        _= await bot.send_message(chat_id, _build_token_invalid_format_message())
-        return None
-
-    if not validation_result.is_personal:
-        logger.info("Token is not personal for user %s", user_telegram_id)
-        _ = await bot.send_message(
-            chat_id,
-            "Этот токен не персональный. Нужен персональный токен WB.",
-        )
-        await state.set_state(states.CabinetRegistration.api)
-        return None
-
-    if validation_result.is_expired:
-        logger.info("Token is expired for user %s", user_telegram_id)
-        _= await bot.send_message(
-            chat_id,
-            "Токен истёк. Пожалуйста, создайте новый токен в личном кабинете Wildberries.",
-        )
-        await state.set_state(states.CabinetRegistration.api)
-        return None
-
-    if not validation_result.can_be_used_for_free:
-        missing_str = ", ".join(sorted(validation_result.missing_required))
-        logger.info(
-            "Token missing required permissions for user %s: %s",
-            user_telegram_id,
-            missing_str,
-        )
-        _= await bot.send_message(
-            chat_id,
-            f"Токен не имеет необходимых прав: {missing_str}.\n\n"
-            "Создайте токен с правами: Контент, Статистика, Аналитика, Продвижение.",
-        )
-        await state.set_state(states.CabinetRegistration.api)
+    persist_rejection = _token_acceptable_for_persist(validation_result)
+    if persist_rejection is not None:
+        if not validation_result.is_valid_jwt:
+            logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
+        elif validation_result.is_expired:
+            logger.info("Token is expired for user %s", user_telegram_id)
+        else:
+            logger.warning("Valid token but no shop_id for user %s", user_telegram_id)
+        _ = await bot.send_message(chat_id, persist_rejection)
+        if validation_result.is_expired:
+            await state.set_state(states.CabinetRegistration.api)
         return None
 
     shop_id = validation_result.shop_id
     if not shop_id:
-        logger.warning("Valid token but no shop_id for user %s", user_telegram_id)
-        _= await bot.send_message(
-            chat_id,
-            "Не удалось получить идентификатор магазина из токена. Попробуйте еще раз.",
-        )
         return None
     async with sm(read_only=False) as session:
         user_id = await _load_user_id_in_session(session, user_telegram_id)
@@ -924,66 +902,26 @@ async def process_add_new_token(
         await state.clear()
         return None
 
-    # Validate token using centralized validator
     validator = TokenPermissionsValidator(http_session=client_session)
-    validation_result = await validator.validate(token_text, mode="claims_plus_api")
+    validation_result = await validator.validate(token_text, mode="claims_only")
     if validation_result is None:
         return None
 
-    if not validation_result.is_valid_jwt:
-        logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
-        _ = await bot.send_message(chat_id, _build_token_invalid_format_message())
-        return None
-
-    if not validation_result.is_personal:
-        logger.info("Token is not personal for user %s", user_telegram_id)
-        _ = await bot.send_message(
-            chat_id,
-            "Этот токен не персональный. Нужен персональный токен WB.",
-        )
-        await state.set_state(states.AddNewToken.token)
-        return None
-
-    if validation_result.is_read_only:
-        logger.info("Token is read-only for user %s", user_telegram_id)
-        _ = await bot.send_message(
-            chat_id,
-            _build_token_read_only_rejected_message(),
-        )
-        await state.set_state(states.AddNewToken.token)
-        return None
-
-    if validation_result.is_expired:
-        logger.info("Token is expired for user %s", user_telegram_id)
-        _ = await bot.send_message(
-            chat_id,
-            "Токен истёк. Пожалуйста, создайте новый токен в личном кабинете Wildberries.",
-        )
-        await state.set_state(states.AddNewToken.token)
-        return None
-
-    if not validation_result.can_be_used_for_free:
-        missing_str = ", ".join(sorted(validation_result.missing_required))
-        logger.info(
-            "Token missing required permissions for user %s: %s",
-            user_telegram_id,
-            missing_str,
-        )
-        _ = await bot.send_message(
-            chat_id,
-            f"Токен не имеет необходимых прав: {missing_str}.\n\n"
-            "Создайте токен с правами: Контент, Статистика, Аналитика, Продвижение.",
-        )
-        await state.set_state(states.AddNewToken.token)
+    persist_rejection = _token_acceptable_for_persist(validation_result)
+    if persist_rejection is not None:
+        if not validation_result.is_valid_jwt:
+            logger.info("Invalid token (JWT decode failed) for user %s", user_telegram_id)
+        elif validation_result.is_expired:
+            logger.info("Token is expired for user %s", user_telegram_id)
+        else:
+            logger.warning("Valid token but no shop_id for user %s", user_telegram_id)
+        _ = await bot.send_message(chat_id, persist_rejection)
+        if validation_result.is_expired:
+            await state.set_state(states.AddNewToken.token)
         return None
 
     shop_id = validation_result.shop_id
     if not shop_id:
-        logger.warning("Valid token but no shop_id for user %s", user_telegram_id)
-        _ = await bot.send_message(
-            chat_id,
-            "Не удалось получить идентификатор магазина из токена. Попробуйте еще раз.",
-        )
         return None
     shop_id = str(shop_id)
     # Получение user_id из БД
@@ -1146,13 +1084,13 @@ async def process_add_new_token(
             exc_info=True,
         )
 
-    # Отправка сообщений об успехе
     _ = await bot.send_message(chat_id, "Токен проверяется...")
 
-    _ = await bot.send_message(
-        chat_id,
-        _build_token_success_added_message(wb_user_cabinet.name or ""),
-    )
+    if validation_result.is_read_only:
+        success_message = _build_token_read_only_added_message()
+    else:
+        success_message = _build_token_success_added_message(wb_user_cabinet.name or "")
+    _ = await bot.send_message(chat_id, success_message)
 
     # Очистка состояния
     await state.clear()
