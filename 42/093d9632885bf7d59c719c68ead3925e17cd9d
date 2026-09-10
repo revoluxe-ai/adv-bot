@@ -1,0 +1,33 @@
+app/client_bot/user_interface/handlers/connect_existing_advs.py
+  s_80c0b86041344e::t_0aa6bb885ef11d 1269-1272
+  s_80c0b86041344e::t_c36a7b92867c9b 1238-1241
+  s_80c0b86041344e::t_e0d50da5b55cbd 1143
+  s_80c0b86041344e::t_6bdfc4aa7bc72e 1425
+app/client_bot/user_interface/handlers/CONNECT_EXISTING_SPEC.md
+  s_80c0b86041344e::t_621c7e5631b24d 148-157
+tests/unit/client_bot/test_connect_existing_confirm_routing.py
+  s_80c0b86041344e::t_bc0e3e0749ee68 99-101
+  s_80c0b86041344e::t_961f8adb62008d 76-78,80
+  s_80c0b86041344e::t_95c6437b6a2cae 25-38
+  s_80c0b86041344e::t_7caea036c14c7b 106-108,110
+  s_80c0b86041344e::t_62579d1e3f9aaf 1-24,39-75,79,81-98,102-105,109,111-129
+tests/modules/connect_existing_advs/test_handlers.py
+  s_80c0b86041344e::t_20118b388674ec 45-46
+  s_80c0b86041344e::t_2c4f570ce71105 1192-1268
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "42093d9632885bf7d59c719c68ead3925e17cd9d",
+  "prompts": {},
+  "sessions": {
+    "s_80c0b86041344e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b7fa958c-b8a6-4a3b-b919-af2a7695437a",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
