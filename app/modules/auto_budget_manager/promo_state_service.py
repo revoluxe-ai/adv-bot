@@ -33,6 +33,9 @@ logger = logging.getLogger(__name__)
 # Единое окно с приходом/расходом ledger (см. promo_ledger.PROMO_LOOKBACK_DAYS).
 _UPD_LOOKBACK_DAYS = PROMO_LOOKBACK_DAYS
 
+# Максимальная длина одного WB GET /adv/v1/upd (интервал inclusive, календарные дни).
+UPD_API_MAX_WINDOW_DAYS = 30
+
 
 def _resolve_upd_from_date(
     *,
@@ -71,10 +74,14 @@ def _iter_upd_date_ranges(
     from_date: datetime.date,
     to_date: datetime.date,
 ) -> Iterable[tuple[datetime.date, datetime.date]]:
-    """Разбить исторический UPD-backfill на API-окна не больше 90 дней."""
+    """Разбить UPD-backfill на непересекающиеся API-окна ≤ ``UPD_API_MAX_WINDOW_DAYS``.
+
+    Recovery-горизонт ``PROMO_LOOKBACK_DAYS`` задаётся в ``_resolve_upd_from_date``;
+    здесь только chunking под лимит WB «не больше месяца» на один запрос.
+    """
     if from_date > to_date:
         return
-    window_days = max(1, PROMO_LOOKBACK_DAYS)
+    window_days = max(1, UPD_API_MAX_WINDOW_DAYS)
     current = from_date
     while current <= to_date:
         window_end = min(
@@ -226,12 +233,34 @@ class PromoStateService:
                 from_date=from_date,
                 to_date=to_date,
             ):
-                items = await wb_modifier.get_costs_history(
-                    from_date=window_from,
-                    to_date=window_to,
-                )
-                async with sm(read_only=False) as session:
-                    _ = await ingest_promo_upd_items(session, items or [])
+                try:
+                    items = await wb_modifier.get_costs_history(
+                        from_date=window_from,
+                        to_date=window_to,
+                    )
+                except Exception:
+                    logger.warning(
+                        "promo state: UPD_FETCH_FAILED shop_id=%s "
+                        "from=%s to=%s",
+                        shop_id,
+                        window_from,
+                        window_to,
+                        exc_info=True,
+                    )
+                    raise
+                try:
+                    async with sm(read_only=False) as session:
+                        _ = await ingest_promo_upd_items(session, items or [])
+                except Exception:
+                    logger.warning(
+                        "promo state: UPD_PG_INGEST_FAILED shop_id=%s "
+                        "from=%s to=%s",
+                        shop_id,
+                        window_from,
+                        window_to,
+                        exc_info=True,
+                    )
+                    raise
             # Обновляем watermark только после успешного request и PG ingest.
             upd_ingested_at = now
             if upd_coverage_from is None and coverage_lookup_ok:
@@ -242,11 +271,8 @@ class PromoStateService:
                 )
             upd_ingest_ok = True
         except Exception:
-            logger.warning(
-                "promo state: UPD ingest failed shop_id=%s",
-                shop_id,
-                exc_info=True,
-            )
+            # Детали уже в UPD_FETCH_FAILED / UPD_PG_INGEST_FAILED выше.
+            pass
         ledgers: dict[int, Any] = {}
         ledger_load_ok = True
         if advert_ids:
