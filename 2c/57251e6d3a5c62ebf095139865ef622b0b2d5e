@@ -1,0 +1,25 @@
+app/modules/auto_budget_manager/promo_state_service.py
+  s_f8d2ebe1224884::t_26ffecffee1ec5 274-275
+  s_f8d2ebe1224884::t_62105c6883903d 77-81,84
+  s_f8d2ebe1224884::t_05bb9c6c70483d 36-38
+  s_f8d2ebe1224884::t_9647575aef47a0 236-263
+tests/unit/auto_budget_manager/test_promo_state_service.py
+  s_f8d2ebe1224884::t_b55b7a9642f9b6 329
+  s_f8d2ebe1224884::t_4a343a965d7f1d 5,13-17,76-93,174-187,189-193,196-232,279,281,321-328,330-469
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "2c57251e6d3a5c62ebf095139865ef622b0b2d5e",
+  "prompts": {},
+  "sessions": {
+    "s_f8d2ebe1224884": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6315db66-21b4-4abd-b172-348aa67ee6bb",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
