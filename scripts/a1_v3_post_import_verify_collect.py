@@ -102,7 +102,7 @@ async def _pg_bundle(adv_setting_id: int) -> dict[str, Any]:
     kws = await conn.fetch(
         """
         SELECT id, text, hard_status, strategy_mode::text AS strategy_mode,
-               target_place, relevant, updated_at
+               target_place, relevant
         FROM keywordsetting
         WHERE adv_setting_id = $1
         ORDER BY id
