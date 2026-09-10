@@ -1,0 +1,28 @@
+scripts/a1_sku_factual_ad_economics_collect.py
+  s_c3c41ce6bba322::t_c96b6dd06926ab 460-461,463-480
+  s_c3c41ce6bba322::t_60645989460588 194-195,198
+  s_c3c41ce6bba322::t_c7bbb2eb642c93 254,257-259,263-266,268
+  s_c3c41ce6bba322::t_1522175317a7e7 415
+  s_c3c41ce6bba322::t_91ab9d3d3eb26a 1-147,150-193,196-197,199-253,255-256,267,269-278,287-343,345-348,350-414,416-438,445-459,462,481-490
+  s_c3c41ce6bba322::t_2e172f82a62a40 148-149
+  s_c3c41ce6bba322::t_36924ded61a340 439-444
+  s_c3c41ce6bba322::t_4b3f01e9a2a2a0 279,281-286
+  s_c3c41ce6bba322::t_6c675d01e45c33 260-262
+  s_c3c41ce6bba322::t_d6409c837b636e 280,344,349
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "793d622363f6ef3d88be92980f1647d8365f1376",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
