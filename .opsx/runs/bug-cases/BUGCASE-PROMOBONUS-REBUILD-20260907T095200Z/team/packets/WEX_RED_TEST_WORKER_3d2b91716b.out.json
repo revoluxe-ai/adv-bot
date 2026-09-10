@@ -1,0 +1,83 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/3d2b91716b",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/3d2b91716b/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/1117063723/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/1117063723/OUT": {
+      "CANONICAL_SHA256": "4aa7fd1dbba8d35338f783c89b100dc41508632fc1b0dc573277ceba190088df",
+      "RAW_SHA256": "c7005b25ca49105d1abb20423d454c25c82ced1440710620e9cce31a198e6670"
+    }
+  },
+  "CHECKPOINT_GENERATION": 4,
+  "CREATED_AT": 1788777520.0,
+  "EXPIRES_AT": 1788779920.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "RED_CONFIRMED",
+  "PAYLOAD": {
+    "RED_STATUS": "RED_CONFIRMED",
+    "TEST_IDS": [
+      "tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive"
+    ],
+    "TEST_CONTENT_SHA256": {
+      "tests/unit/test_auto_shelf_bid_control_view_provider.py": "7b8cf8861d66e61c8eb46e1a75c283684b44dbcda54f82530654ef3b3c848aae"
+    },
+    "COMMANDS_RUN": [
+      "poetry run pytest tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive -vv --tb=short"
+    ],
+    "EVIDENCE_PATH": "results/RED-ROOT-001.md",
+    "FAILURE_MATCH": "YES",
+    "PYTEST_EXIT": 1,
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/2026-09-07T10:12:02Z",
+    "INTAKE_ID": "INTAKE-001",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=ROOT-001 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/2026-09-07T10:12:02Z",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_RED",
+      "RESULT": "RED_CONFIRMED",
+      "TO_STATE": "AWAITING_OWNER_GO",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z intake=INTAKE-001 finding=ROOT-001 claim_token=CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/2026-09-07T10:12:02Z",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "REQUIRED",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "satisfied",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "RED_EVIDENCE_PATH",
+        "results/RED-ROOT-001.md"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_OWNER_GO",
+      "ON_FAILURE_STATE": "BLOCKED",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    }
+  },
+  "ARTIFACTS_WRITTEN": [
+    "tests/unit/test_auto_shelf_bid_control_view_provider.py",
+    "results/RED-ROOT-001.md",
+    "results/ROUTE-TRACE.jsonl",
+    "LEDGER.md",
+    "findings/ROOT-001.md",
+    "team/heartbeats/WEX_RED_TEST_WORKER_3d2b91716b.json",
+    "team/packets/WEX_RED_TEST_WORKER_3d2b91716b.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

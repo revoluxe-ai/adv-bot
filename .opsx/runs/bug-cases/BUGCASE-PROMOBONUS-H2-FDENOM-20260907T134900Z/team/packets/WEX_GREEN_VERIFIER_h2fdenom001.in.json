@@ -1,0 +1,23 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/h2fdenom001/IN",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/h2fdenom001",
+  "PARENT_ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "TIMEOUT_SECONDS": 2400,
+  "ALLOWED_INPUT_ARTIFACTS": [
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_h2fdenom001.out.json",
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_RED_TEST_WORKER_h2fdenom001.out.json",
+    "tests/unit/wb/utils/test_promo_accounting.py"
+  ],
+  "WRITE_BOUNDARY_SUMMARY": "results/GREEN-*.md; team/packets; LEDGER GREEN fields",
+  "HEARTBEAT_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/heartbeats/WEX_GREEN_VERIFIER_h2fdenom001.json",
+  "OUTPUT_PACKET_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_GREEN_VERIFIER_h2fdenom001.out.json",
+  "PRIMARY_NODEID": "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+  "SUPPLEMENTARY_SCOPE": "tests/unit/wb/utils/test_promo_accounting.py full file"
+}

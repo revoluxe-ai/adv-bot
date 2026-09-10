@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "GREEN_VERIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/GREEN-HC-FINDING-004-STALE-TEST.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_05c283a184.json",
+    "team/intents/WEX_GREEN_VERIFIER_05c283a184.intent.json",
+    "team/packets/WEX_GREEN_VERIFIER_05c283a184.out.json",
+    "team/snapshots/WEX_GREEN_VERIFIER_05c283a184.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

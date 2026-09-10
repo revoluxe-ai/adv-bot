@@ -1,0 +1,97 @@
+{
+  "LEARNING_PACKET_ID": "LPKT/BUGCASE-PROMOBONUS-P1-SSOT-20260908T014900Z/a7f3e91c42",
+  "BUG_FAMILY_ID": null,
+  "CASE_ID": "BUGCASE-PROMOBONUS-P1-SSOT-20260908T014900Z",
+  "INVARIANT_ID": "promobonus_overlay_ssot_boundary_violation",
+  "INVARIANT_VERSION": 1,
+  "INVARIANT": "ClickHouse plan_fact history MUST store base Plan only (PlanFactProvider.get_plan_data). Runtime CPO/plan overlay MUST be a single SoT via PlanFactProvider.get_effective_plan_data / promo overlay with ComplexAdv.",
+  "ROOT_CAUSE": "Split SSOT violation: overlay Plan conflated with base Plan at CH write boundary and not consistently consumed at runtime read paths.",
+  "ROOT_FAILURE": "process_pre_adv persisted pre_adv.plan_data (overlay-seeded) to CH; keyword/telegram/menu consumers used base AdvSetting or get_effective_plan_data without ComplexAdv.",
+  "ROOT_FIX": "ROOT-001: process_pre_adv uses get_plan_data at write boundary. CHILD-001: consumers wired to get_effective_plan_data(..., complex_adv=...).",
+  "ROOT_RED_EVIDENCE": "results/RED-ROOT-001.md",
+  "ROOT_GREEN_EVIDENCE": "results/GREEN-ROOT-001.md",
+  "ALL_HUNT_CANDIDATES": [],
+  "ALL_SAME_INVARIANT_FINDINGS": ["ROOT-001", "CHILD-001"],
+  "ALL_LINKED_NEW_ROOT_CASES": [],
+  "ALL_FALSE_POSITIVES": [],
+  "ALL_OUT_OF_SCOPE_FINDINGS": [],
+  "ALL_INCONCLUSIVE_ITEMS": [],
+  "BRANCH_ROUTES": {
+    "ROOT-001": "ROUTE_A",
+    "CHILD-001": "ROUTE_A"
+  },
+  "BRANCH_RED_RESULTS": {
+    "ROOT-001": "RED_CONFIRMED",
+    "CHILD-001": "RED_CONFIRMED"
+  },
+  "BRANCH_FIXES": {
+    "ROOT-001": "results/FIX-ROOT-001.md",
+    "CHILD-001": "results/FIX-CHILD-001.md"
+  },
+  "BRANCH_GREEN_RESULTS": {
+    "ROOT-001": "GREEN_CONFIRMED",
+    "CHILD-001": "GREEN_CONFIRMED"
+  },
+  "BRANCH_PATCH_HASHES": {
+    "ROOT-001": "sha256:b1ffe3307fa17fcdc1f856e9d304034e57971b85a24e319522194863faf8d50d",
+    "CHILD-001": "sha256:f7ee81d503523cffe77088385662683faf884fba0ebe9df69a33614b70137872"
+  },
+  "INTEGRATION_RESULT": "NOT_APPLICABLE",
+  "FAMILY_GREEN_RESULT": "NOT_APPLICABLE",
+  "MISSED_ORIGINAL_DETECTION_POINTS": [
+    "test_get_plan_data_stays_raw covered read helper only, not CH write path via process_pre_adv",
+    "Partial overlay wiring: some consumers (watchdog/V3/shelf) already correct while keywords/telegram/menu were not"
+  ],
+  "HUNT_SCOPE": "owner-materialized pair; HUNT_PASSES_EXECUTED=0",
+  "HUNT_EFFECTIVENESS": "NOT_APPLICABLE",
+  "HUNT_FALSE_NEGATIVE_RISK": "low_after_fix",
+  "HUNT_FALSE_POSITIVE_RESULTS": [],
+  "TESTS_ADDED": [
+    "tests/unit/app/modules/shop_runner/services/plan_fact_controller/test_process_pre_adv_plan_source.py::test_process_pre_adv_persists_base_plan_not_overlay_on_write_boundary",
+    "tests/unit/app/modules/promobonus_overlay/test_child_001_incomplete_overlay_wiring.py::test_keyword_above_target_gate_uses_effective_overlay_max_not_base_adv_setting"
+  ],
+  "FILES_CHANGED_BY_BRANCH": {
+    "ROOT-001": ["app/modules/shop_runner/service_manager/services/plan_fact_controller/plan_fact_controller.py"],
+    "CHILD-001": [
+      "app/modules/wb_adv_updater/calculated_keywords_manager/calculated_keywords_manager.py",
+      "app/shared/domains/wb/utils/auto_campaign_cost_activity.py",
+      "app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py"
+    ]
+  },
+  "FILES_CHANGED_COMBINED": [
+    "app/modules/shop_runner/service_manager/services/plan_fact_controller/plan_fact_controller.py",
+    "app/modules/wb_adv_updater/calculated_keywords_manager/calculated_keywords_manager.py",
+    "app/shared/domains/wb/utils/auto_campaign_cost_activity.py",
+    "app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py"
+  ],
+  "UNRELATED_DIRTY_FILES": [],
+  "ROUTE_DECISIONS": ["ROUTE_A for ROOT-001 and CHILD-001"],
+  "REJECTED_OPTIONS": ["ROUTE_B/C/D for CHILD-001"],
+  "RETRIES_AND_TIMEOUTS": [],
+  "REUSABLE_LESSONS": [
+    "CH plan_fact write paths must source plan columns from get_plan_data, never overlay-seeded pre_adv.plan_data",
+    "Runtime threshold/gate consumers must use get_effective_plan_data with complex_adv when overlay fraction is on ComplexAdv",
+    "Regression tests must target each write/read boundary independently"
+  ],
+  "PROPOSED_INVARIANT_TESTS": [
+    "Unit boundary test per CH write surface persisting base Plan only",
+    "Unit test per runtime consumer gate using effective overlay with ComplexAdv"
+  ],
+  "PROPOSED_PROCESS_IMPROVEMENTS": [
+    {
+      "target": ".cursor/commands/opsx-project-bug-hunt.md",
+      "change": "Add checklist: CH plan_fact write uses get_plan_data not overlay DTO; runtime gates use get_effective_plan_data with complex_adv"
+    },
+    {
+      "target": ".cursor/rules/testing-rules.mdc",
+      "change": "Add overlay SSOT boundary test obligations for write vs read paths"
+    }
+  ],
+  "SOURCE_ARTIFACT_PATHS": {
+    "FANIN": "results/FANIN.md"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FANIN": "31aa64b3b8d7bcfe4a0282e705e5c6b932c6ddb90dd92520a170dd52ec377a53"
+  },
+  "LEARNING_STATUS": "COMPLETE"
+}

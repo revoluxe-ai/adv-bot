@@ -1,0 +1,19 @@
+{
+  "WORKER_ID": "RELATION_CLASSIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "family/HUNT_CANDIDATES.json",
+    "family/RELATION.json",
+    "results/LINKED-CASE-BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z.md",
+    "team/heartbeats/WEX_RELATION_CLASSIFIER_221135ca08.json",
+    "team/intents/WEX_RELATION_CLASSIFIER_221135ca08.intent.json",
+    "team/packets/WEX_RELATION_CLASSIFIER_221135ca08.out.json",
+    "team/snapshots/WEX_RELATION_CLASSIFIER_221135ca08.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

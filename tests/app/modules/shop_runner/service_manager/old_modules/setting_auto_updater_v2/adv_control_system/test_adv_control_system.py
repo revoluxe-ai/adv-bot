@@ -1,6 +1,7 @@
 """Тесты для AdvControlSystem.process_adv"""
 
 
+from decimal import Decimal
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch, ANY
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system import (
@@ -53,6 +54,62 @@ async def test_process_adv_no_plan(complex_adv_mock):
 
         # Проверяем, что get_keywords был вызван
         complex_adv_mock.get_keywords.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_process_adv_uses_promo_effective_plan_for_state(complex_adv_mock):
+    """Состояние определяется по promo-overlay, а не по базовому max CPO."""
+    control_system = AdvControlSystem(max_last_period=2)
+    adv = complex_adv_mock.adv_setting
+    adv.plan_for_sales_for_day = 10
+    adv.target_price_for_order = 50
+    adv.max_price_for_order = 100
+    adv.raise_plan_on_promobonuses = True
+    complex_adv_mock.promo_fraction = Decimal("0.5")
+
+    base_plan = PlanData(orders=10, target_pay_for_order=50, max_pay_for_order=100)
+    fact = FactData(
+        predict_orders=10,
+        pay_for_order=150,
+        original_orders=10,
+        fact_method=FactMethods.DIRECT_SALES,
+    )
+    mock_updater = MagicMock()
+    mock_updater.get_fact_data = AsyncMock(return_value=fact)
+    mock_change_plan_fact = MagicMock()
+    mock_change_plan_fact.check_equal_in_cache = AsyncMock(return_value=False)
+    mock_change_plan_fact.set_new_plan_fact = AsyncMock()
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+    mock_session.commit = AsyncMock()
+
+    with (
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.AdvSettingAutoUpdater",
+            return_value=mock_updater,
+        ) as mock_updater_class,
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.ChangePlanFact",
+            return_value=mock_change_plan_fact,
+        ),
+        patch(
+            "app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.adv_control_system.sm",
+            return_value=mock_session,
+        ),
+    ):
+        mock_updater_class.get_plan_data.return_value = base_plan
+        control_system.planner.run_for_state = AsyncMock()
+        await control_system.process_adv(complex_adv_mock)
+
+    checked_plan = mock_change_plan_fact.check_equal_in_cache.call_args.args[0]
+    assert checked_plan == base_plan
+    context = control_system.planner.run_for_state.call_args.args[0]
+    assert context.state == SalesStates.STABLE
+    assert context.plan.max_pay_for_order == 200
+    persisted_plan = mock_change_plan_fact.set_new_plan_fact.call_args.args[0]
+    assert persisted_plan == base_plan
+    mock_session.commit.assert_awaited_once()
 
 
 @pytest.mark.asyncio

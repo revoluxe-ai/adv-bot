@@ -1,0 +1,60 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 40,
+  "CREATED_AT": 1788796819.963684,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/FAN_IN_ASSEMBLER/ee7fa48fa3/OUT": {
+      "CANONICAL_SHA256": "0f66c4648a33cd2a7f6d32104ea89adb59620c757b5024a4ae4a18e0025a1af0",
+      "RAW_SHA256": "9b4198472af604a283333e24abaa9995474c1a48d9a3b22867fa189afb4e68d2"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/FAN_IN_ASSEMBLER/ee7fa48fa3/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788800419.963684,
+  "FINDING_ID": "FINDING-003",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t07-d07",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/FAMILY_LEARNING_WORKER/f86a7b17c7/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/FAN_IN_ASSEMBLER/ee7fa48fa3/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "results/FANIN.md",
+      "team/packets/WEX_FAN_IN_ASSEMBLER_ee7fa48fa3.out.json",
+      "team/packets/WEX_CLASSIFIER_e1b15347b7.out.json",
+      "team/packets/WEX_BOUNDED_HUNTER_b69d090049.out.json",
+      "results/PROOF-CLASSIFIER-WEXe1b15347b7.md",
+      "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-003.md",
+      "findings/FINDING-003.md",
+      "LEDGER.md",
+      "CASE.md",
+      "family/LEARNING_DECISION.json",
+      ".cursor/pipeline/bug-team/workers/FAMILY_LEARNING_WORKER.md",
+      ".cursor/pipeline/bug-team/contracts/LEARNING_DECISION.md",
+      ".cursor/pipeline/bug-team/runtime/learning_decision.py",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_4_TO_6": true,
+    "EPISODE_ONLY": true,
+    "FANIN_PATH": "results/FANIN.md",
+    "FINDING_ID": "FINDING-003",
+    "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-003/LEFTOVER-NO-90D-CUTOFF",
+    "REQUIREMENT": "Write canonical family/LEARNING_DECISION.json via runtime.learning_decision.build_learning_decision + write_learning_decision. LEARNING_VERDICT=LOCAL_CASE_NOTE_ONLY. PROMOTION_DECISION=RESOLVED_NO_PROMOTE. FULL_PACKET_REQUIRED=false. Do not write family/LEARNING_PACKET.json. Do not rewrite family/FAMILY.json. Also write results/LEARNING_REPORT.md.",
+    "SOURCE_FANIN_PATH": "results/FANIN.md",
+    "WORKER_ID": "FAMILY_LEARNING_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/FAMILY_LEARNING_WORKER/f86a7b17c7",
+  "WORKER_ID": "FAMILY_LEARNING_WORKER"
+}

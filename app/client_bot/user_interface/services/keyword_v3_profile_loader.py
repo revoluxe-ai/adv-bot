@@ -308,6 +308,7 @@ async def load_keyword_v3_profile_data(
     rec_orders_per_view = await load_rec_orders_per_view_for_v3(
         adv_setting,
         rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
+        complex_adv=complex_adv,
     )
     ladder_inputs = LadderInputs.from_contexts(
         all_contexts,

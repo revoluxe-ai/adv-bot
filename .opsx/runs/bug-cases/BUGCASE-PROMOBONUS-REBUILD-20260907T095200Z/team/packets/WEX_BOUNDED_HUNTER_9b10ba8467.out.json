@@ -1,0 +1,66 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t05-d05",
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/9b10ba8467",
+  "WORKER_ID": "BOUNDED_HUNTER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-002",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/9b10ba8467/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/TASK_COMPLETION_WORKER/2ba3c0bfba/OUT",
+    "PKT/WEX/GREEN_VERIFIER/2770822420/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/2770822420/OUT": {
+      "CANONICAL_SHA256": "d242263f09cee823a4e4d6f05dc503b755262837d94dea46f2b04401413037b2",
+      "RAW_SHA256": "8b6b7c6b71ef12846a65093520d635e20da0d6bda63bd83ed0a92011c006799d"
+    },
+    "PKT/WEX/TASK_COMPLETION_WORKER/2ba3c0bfba/OUT": {
+      "CANONICAL_SHA256": "e9d473e45877aaaa3ded2f8f526614c3d96fd5010951511c6dacf7a957ec9671",
+      "RAW_SHA256": "e2478b6cf4b08f537779cff498ca52df1f6ae57ffeb8eac722f4a4a050a9a839"
+    }
+  },
+  "CHECKPOINT_GENERATION": 20,
+  "CREATED_AT": 1788786181.4854772,
+  "EXPIRES_AT": 1788789781.4854772,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "HUNT_RESULT": "CANDIDATES_FOUND",
+    "CANDIDATES": [
+      {
+        "HUNT_CANDIDATE_ID": "HC-001",
+        "EVIDENCE_PATHS": [
+          "findings/HC-001.md",
+          "app/modules/auto_budget_manager/promo_state_service.py",
+          "app/core/mp/wb/api/adapter/promotion_client/finance/adapter.py"
+        ],
+        "OBSERVED_BEHAVIOR": "PromoStateService.refresh sets pool_fetch_ok=True when get_campaign_balance returns None without raising, then RedisPromoStateManager.set writes a fresh pool_usable=false snapshot (updated_at=now). Overlay readers treat that as known-empty pool instead of miss/stale conservative M=1.",
+        "POSSIBLE_INVARIANT_VIOLATION": "On get_campaign_balance failure (None return / unusable payload), do not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1.",
+        "AFFECTED_COMPONENT": "auto_budget_manager.promo_state_service.PromoStateService.refresh",
+        "CONFIDENCE": "high",
+        "LOC_LINK": "app/modules/auto_budget_manager/promo_state_service.py:147",
+        "RELATION_TO_ROOT_CANDIDATE": "SAME_INVARIANT_FINDING"
+      }
+    ],
+    "HUNT_SCOPE": [
+      "app/modules/auto_budget_manager/promo_state_service.py",
+      "app/modules/auto_budget_manager/",
+      "get_campaign_balance failure paths that Redis-set derived promo pool state"
+    ],
+    "HUNT_EFFECTIVENESS": "HIGH_WITHIN_DECLARED_SCOPE: enumerated production get_campaign_balance callers and the sole RedisPromoStateManager.set writer; FINDING-002 Exception skip reconfirmed not re-emitted; one sibling None-return gate remains",
+    "HUNT_FALSE_NEGATIVE_RISK": "BOUNDED_TO_REDIS_DERIVED_POOL: hunt matches fresh shop-promo-state pool_usable=false writes on balance-fetch failure. True-empty successful WB payloads, shop-balance-snapshot, ledger/FEFO/leftover/journal, and Telegram rec-bid overlay classified out. HTTP raise paths remain FINDING-002 (fixed). deep flag absent; Pass 3 not expanded."
+  },
+  "ARTIFACTS_WRITTEN": [
+    "findings/HC-001.md",
+    "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-002.md",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_9b10ba8467.json",
+    "team/packets/WEX_BOUNDED_HUNTER_9b10ba8467.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

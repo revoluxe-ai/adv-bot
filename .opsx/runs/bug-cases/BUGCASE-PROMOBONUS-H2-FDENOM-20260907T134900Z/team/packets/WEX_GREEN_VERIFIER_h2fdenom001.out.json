@@ -1,0 +1,52 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/h2fdenom001/OUT",
+  "ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/h2fdenom001",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/h2fdenom001/IN",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "GREEN_CONFIRMED",
+  "ATTEMPT": 1,
+  "PAYLOAD": {
+    "GREEN_CONFIRMED": true,
+    "GREEN_STATUS": "GREEN_CONFIRMED",
+    "GREEN_EVIDENCE_PATH": "results/GREEN-ROOT-001.md",
+    "TEST_ID": "test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "PRIMARY_NODEID": "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "NODEIDS": [
+      "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+      "tests/unit/wb/utils/test_promo_accounting.py::test_payment_type_keshbek_and_cyrillic",
+      "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+      "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+      "tests/unit/wb/utils/test_promo_accounting.py::test_or_active_and_stop",
+      "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_fraction_uses_remaining_not_ceiling",
+      "tests/unit/wb/utils/test_promo_accounting.py::test_spend_fingerprint_stable"
+    ],
+    "TEST_CONTENT_SHA256": "8d8738c3572470a5384480f9c659163ab352cdc7a19d42bbd2c3d47949e020d1",
+    "TEST_CONTENT_SHA256_MATCH_RED": "YES",
+    "FROZEN_TEST_HASH_STATUS": "MATCH",
+    "NON_WEAKEN_DELTA": "none",
+    "PYTEST_COMMAND": "poetry run pytest -m unit tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after -vv --tb=short",
+    "PYTEST_EXIT_CODE": 0,
+    "SUPPLEMENTARY_PYTEST_COMMAND": "poetry run pytest -m unit tests/unit/wb/utils/test_promo_accounting.py -vv --tb=short",
+    "SUPPLEMENTARY_PYTEST_EXIT_CODE": 0,
+    "SUPPLEMENTARY_PASSED": 7,
+    "RED_EVIDENCE_PATH": "results/RED-ROOT-001.md",
+    "FIX_EVIDENCE_PATH": "results/FIX-ROOT-001.md",
+    "DURABLE_FILE_WRITTEN": "YES",
+    "EXECUTED": "yes",
+    "INVARIANT_VERIFIED": true,
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-ROOT-001.md",
+    "team/packets/WEX_GREEN_VERIFIER_h2fdenom001.out.json",
+    "team/heartbeats/WEX_GREEN_VERIFIER_h2fdenom001.json"
+  ]
+}

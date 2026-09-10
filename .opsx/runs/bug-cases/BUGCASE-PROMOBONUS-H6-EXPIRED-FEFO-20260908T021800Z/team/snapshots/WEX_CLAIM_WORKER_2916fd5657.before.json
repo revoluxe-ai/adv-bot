@@ -1,0 +1,13 @@
+{
+  "digests": {
+    "CASE.md": "2b98a939bf5ad8235c9435c16b0e49f1dc1ac6240a4677124a7e8c1e260e6551",
+    "LEDGER.md": "0b72c51bc94ad14aeadecc9834819d6aeb71410255af5f2ef76abbe9179cba80",
+    "findings/ROOT-001.md": "33c5dde433587ddab58fc4877941138c6ac2375a3fccd8e3147dc8458c724ab4",
+    "handoffs/COMMON_HANDOFF.md": "e2f5018a5aac424a87a1098252488160e1910e85a6853d1c5eddf2c8e25c7c8e",
+    "intakes/INTAKE-001.md": "5a914779f3883b945ef4c18810b7cb383ca9da050b26f10eb7175362cc67cef2",
+    "results/ROUTE-TRACE.jsonl": "7c5530b282d61d07a9807feea0e9b0051a7b90dc51099895e947c229cd9f0e8b",
+    "team/packets/WEX_CLAIM_WORKER_2916fd5657.in.json": "d8e6c66c4ad7979e7be0e45060a166239b8a29af826a69831edbff2101ad5b46"
+  },
+  "root": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-H6-EXPIRED-FEFO-20260908T021800Z",
+  "taken_at": 1788823975.82699
+}

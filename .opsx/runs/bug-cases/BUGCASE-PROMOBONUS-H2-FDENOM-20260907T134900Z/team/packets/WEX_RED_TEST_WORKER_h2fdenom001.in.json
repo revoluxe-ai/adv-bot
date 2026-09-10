@@ -1,0 +1,27 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/h2fdenom001/IN",
+  "WORKER_ID": "RED_TEST_WORKER",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/h2fdenom001",
+  "PARENT_ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "TIMEOUT_SECONDS": 2400,
+  "ALLOWED_INPUT_ARTIFACTS": [
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_CLASSIFIER_h2fdenom001.out.json",
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/findings/ROOT-001.md",
+    "app/shared/domains/wb/utils/promo_accounting.py",
+    "tests/unit/wb/utils/test_promo_accounting.py"
+  ],
+  "WRITE_BOUNDARY_SUMMARY": "tests/**; results/RED-*.md; LEDGER RED fields; team/packets",
+  "HEARTBEAT_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/heartbeats/WEX_RED_TEST_WORKER_h2fdenom001.json",
+  "OUTPUT_PACKET_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_RED_TEST_WORKER_h2fdenom001.out.json",
+  "CLASSIFICATION": "IMPLEMENTATION_BUG",
+  "CHOSEN_ROUTE": "ROUTE_A",
+  "INVARIANT": "leftover 200 / top-up unit 1000 -> f=0.2 M=1.25; denominator tranche.amount not budget_after",
+  "REQUIRED_REGRESSION_TEST": "test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+  "TEST_VECTOR": "remaining=200, amount=1000, budget_after=12000 (or 5000); must assert fraction=0.2 and M=1.25"
+}

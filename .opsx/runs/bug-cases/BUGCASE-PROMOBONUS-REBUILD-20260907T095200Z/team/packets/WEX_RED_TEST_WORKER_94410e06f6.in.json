@@ -1,0 +1,62 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 45,
+  "CREATED_AT": 1788799996.9193408,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/2d43d59752/OUT": {
+      "CANONICAL_SHA256": "4d0532d09a898f47235d79dc459b0aaa2d2e4772efefaabd9567463b63532618",
+      "RAW_SHA256": "f084d1e9c219ecd12b1f2274a50446c4c526dd7a8356bcd4131629c16c9749f5"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/2d43d59752/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788803596.9193408,
+  "FINDING_ID": "FINDING-004",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/94410e06f6/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/2d43d59752/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-004.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_CLASSIFIER_2d43d59752.out.json",
+      ".cursor/pipeline/bug-team/workers/RED_TEST_WORKER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-test.md",
+      ".cursor/rules/testing-rules.mdc",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/2026-09-07T16:37:42Z",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "DO_NOT_EDIT_PRODUCTION": true,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_5_TO_6": true,
+    "EXISTING_TEST_FILE": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FINDING_ID": "FINDING-004",
+    "MAPS_TO": "/opsx-test",
+    "MODE": "bug-regression",
+    "REQUIRED_OUTCOME": "RED_CONFIRMED",
+    "REQUIRED_REGRESSION": "apply_spend_fefo must not apply spend to expired leftover before live leftover. Expired 300 + live 200 + spend 50 must yield remaining 150 (live reduced), not 200 (inflation). Do not reuse remaining==200 as the passing expectation. Do not mock away apply_spend_fefo. Do not edit production.",
+    "TARGET_SITE": "app/shared/domains/wb/utils/promo_accounting.py apply_spend_fefo",
+    "WORKER_ID": "RED_TEST_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/94410e06f6",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

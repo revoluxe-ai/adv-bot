@@ -1,0 +1,73 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/4e8665d743/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/4e8665d743",
+  "WORKER_ID": "BOUNDED_HUNTER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-004",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/4e8665d743/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/TASK_COMPLETION_WORKER/a3c42d402e/OUT",
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT": {
+      "CANONICAL_SHA256": "1ecca3298e728f1c8973e96d20645fe9501b31d02fa83f6d232e696e6035162d",
+      "RAW_SHA256": "8fd0b712cd4152ed81fd64d141e2f4371dcc1c3495d714759e64b08b894bddac"
+    },
+    "PKT/WEX/TASK_COMPLETION_WORKER/a3c42d402e/OUT": {
+      "CANONICAL_SHA256": "3ce1cc9b799f6f5c0b9a2bd0891b7b6f4cd9a44bd85401c4bf5692cf8c1bb7e7",
+      "RAW_SHA256": "32eacb8b6d90ee1578267a76879b2fe0a2302be48e1a4a93fc8e810e57df1d05"
+    }
+  },
+  "CHECKPOINT_GENERATION": 49,
+  "CREATED_AT": 1788802195.0,
+  "EXPIRES_AT": 1788805795.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "HUNT_RESULT": "CANDIDATES_FOUND",
+    "CANDIDATES": [
+      {
+        "HUNT_CANDIDATE_ID": "HC-FINDING-004-STALE-TEST",
+        "EVIDENCE_PATHS": [
+          "findings/HC-FINDING-004-STALE-TEST.md",
+          "tests/unit/wb/utils/test_promo_accounting.py",
+          "results/GREEN-FINDING-004.md",
+          "results/RED-FINDING-004.md",
+          "app/shared/domains/wb/utils/promo_accounting.py"
+        ],
+        "OBSERVED_BEHAVIOR": "Sibling test_fefo_spend_and_expired_tranche_unusable uses expired leftover 300 + live leftover 200 + spend 50 and asserts remaining==200. After FINDING-004 production skip of is_expired in apply_spend_fefo, remaining is 150. Adjacent GREEN file run failed assert 150 == 200 at line 67. Encodes the same inflation; not a new production spend loop.",
+        "POSSIBLE_INVARIANT_VIOLATION": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150. This sibling still encodes remaining==200.",
+        "AFFECTED_COMPONENT": "tests.unit.wb.utils.test_promo_accounting.test_fefo_spend_and_expired_tranche_unusable",
+        "CONFIDENCE": "high",
+        "LOC_LINK": "tests/unit/wb/utils/test_promo_accounting.py:67",
+        "RELATION_TO_ROOT_CANDIDATE": "SAME_INVARIANT_FINDING"
+      }
+    ],
+    "HUNT_SCOPE": [
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "apply_spend_fefo / is_expired spend loop",
+      "callers of apply_spend_fefo",
+      "tests/unit/wb/utils/test_promo_accounting.py remaining==200 sibling"
+    ],
+    "HUNT_EFFECTIVENESS": "HIGH_WITHIN_DECLARED_SCOPE: enumerated apply_spend_fefo definition, remaining filter, sole production caller campaign_ledger_from_rows, downstream load_campaign_ledgers, and nearest tests. Production skip-expired reconfirmed not re-emitted; one stale sibling assertion remains.",
+    "HUNT_FALSE_NEGATIVE_RISK": "BOUNDED_TO_APPLY_SPEND_FEFO: hunt matches sites that apply spend to expired leftover before live leftover. Items 5-6 leftover-fraction/journal not expanded. Overlay / pool-failure / 90d cutoff families not scanned.",
+    "HUNTER_IMPLEMENTED_FIX": false,
+    "HUNTER_WROTE_RED": false,
+    "HUNTER_CHOSE_ROUTE": false,
+    "HUNTER_CLOSED_CANDIDATE": false
+  },
+  "ARTIFACTS_WRITTEN": [
+    "findings/HC-FINDING-004-STALE-TEST.md",
+    "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-004.md",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_4e8665d743.json",
+    "team/packets/WEX_BOUNDED_HUNTER_4e8665d743.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

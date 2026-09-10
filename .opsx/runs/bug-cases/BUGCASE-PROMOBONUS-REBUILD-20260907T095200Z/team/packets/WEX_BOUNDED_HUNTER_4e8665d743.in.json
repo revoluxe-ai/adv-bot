@@ -1,0 +1,77 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 49,
+  "CREATED_AT": 1788801866.4575477,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT": {
+      "CANONICAL_SHA256": "1ecca3298e728f1c8973e96d20645fe9501b31d02fa83f6d232e696e6035162d",
+      "RAW_SHA256": "8fd0b712cd4152ed81fd64d141e2f4371dcc1c3495d714759e64b08b894bddac"
+    },
+    "PKT/WEX/TASK_COMPLETION_WORKER/a3c42d402e/OUT": {
+      "CANONICAL_SHA256": "3ce1cc9b799f6f5c0b9a2bd0891b7b6f4cd9a44bd85401c4bf5692cf8c1bb7e7",
+      "RAW_SHA256": "32eacb8b6d90ee1578267a76879b2fe0a2302be48e1a4a93fc8e810e57df1d05"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/TASK_COMPLETION_WORKER/a3c42d402e/OUT",
+    "PKT/WEX/GREEN_VERIFIER/ce96b5a340/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788805466.4575477,
+  "FINDING_ID": "FINDING-004",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/4e8665d743/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/TASK_COMPLETION_WORKER/a3c42d402e/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-004.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "results/GREEN-FINDING-004.md",
+      "results/FIX-FINDING-004.md",
+      "results/RED-FINDING-004.md",
+      "team/packets/WEX_GREEN_VERIFIER_ce96b5a340.out.json",
+      "team/packets/WEX_TASK_COMPLETION_WORKER_a3c42d402e.out.json",
+      ".cursor/pipeline/bug-team/workers/BOUNDED_HUNTER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/pipeline/bug-team/policy/BUG_FAMILY_FANOUT_POLICY.json",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_5_TO_6": true,
+    "FINDING_ID": "FINDING-004",
+    "HUNT_BOUND": "Find only same-invariant sites that apply spend to expired leftover before live leftover (inflating live remaining). Production fix already skips is_expired in apply_spend_fefo. Do not hunt intake items 5-6 leftover-fraction or journal unless they literally apply spend to expired leftover. Do not hunt ROOT-001 overlay, FINDING-002 pool-failure, or FINDING-003 90d leftover cutoff. Do not reopen closed findings. Do not fix, write RED, classify, or close. Sibling test test_fefo_spend_and_expired_tranche_unusable asserting remaining==200 may be recorded as a candidate if it encodes the same inflation; do not treat it as a new root. If no remaining production sibling, HUNT_RESULT may be CLEAR or CANDIDATES_FOUND for the stale test only.",
+    "HUNT_SCOPE": [
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "apply_spend_fefo / is_expired spend loop",
+      "callers of apply_spend_fefo",
+      "tests/unit/wb/utils/test_promo_accounting.py remaining==200 sibling"
+    ],
+    "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+    "INVARIANT_TEXT": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150.",
+    "MAPS_TO": "/opsx-bug-hunt bounds",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "WORKER_ID": "BOUNDED_HUNTER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/4e8665d743",
+  "WORKER_ID": "BOUNDED_HUNTER"
+}

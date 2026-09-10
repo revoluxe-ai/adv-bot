@@ -85,6 +85,14 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2
 from app.shared.domains.wb.utils.auto_campaign_cost_activity import (
     get_auto_campaign_cost_activity_metrics,
 )
+from app.shared.domains.wb.utils.promo_overlay import (
+    attach_overlay_fields,
+    fraction_from_cached_state,
+    overlay_for_adv,
+)
+from app.modules.auto_budget_manager.redis_promo_state_manager import (
+    RedisPromoStateManager,
+)
 
 from ..last_auto_update_informer import LastAutoUpdateSettingInformer
 from ..last_v3_action_informer import load_last_v3_action_display
@@ -153,6 +161,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
         self._topup_failed_manager = RedisAutoBudgetTopupFailedManager(redis_client)
         self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
+        self._redis_client = redis_client
         self._reason_auto = None
         self._reason_search = None
         self._shop_balance_snapshot: dict[str, int | str | None] | None = None
@@ -201,6 +210,39 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             "refused": "отк",
         }
         return text_to_ru.get(status, status)
+
+    async def _resolve_cost_activity_complex_adv(self) -> ComplexAdv:
+        """Собрать ComplexAdv с runtime promo overlay для cost-activity."""
+        search_adv: AdvSetting | None = None
+        if self.adv.search_adv_id is not None:
+            async with sm(read_only=True) as session:
+                result = await session.execute(
+                    select(AdvSetting).where(
+                        AdvSetting.adv_id == self.adv.search_adv_id
+                    )
+                )
+                search_adv = result.scalar_one_or_none()
+        complex_adv = ComplexAdv(self.adv, search_adv)
+        shop_id: str | None = None
+        async with sm(read_only=True) as session:
+            result = await session.execute(
+                select(WBCabinet.shop_id).where(WBCabinet.id == self.adv.wb_cabinet_id)
+            )
+            shop_id = result.scalar_one_or_none()
+        promo_state = None
+        if shop_id is not None:
+            promo_state = await RedisPromoStateManager(self._redis_client).get(shop_id)
+        fraction = fraction_from_cached_state(
+            promo_state,
+            self.adv.adv_id,
+            getattr(self.adv, "search_adv_id", None),
+        )
+        overlay = overlay_for_adv(self.adv, fraction=fraction)
+        attach_overlay_fields(self.adv, overlay, adv_id=self.adv.adv_id)
+        complex_adv.promo_fraction = overlay.fraction
+        complex_adv.promo_multiplier = overlay.multiplier
+        complex_adv.effective_promo_plan = overlay
+        return complex_adv
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
     @staticmethod
@@ -329,8 +371,10 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             self._v3_last_action_str = None
         self.last_cluster_bids_update = await self._redis_cluster_bids_timestamp_manager.get(self.adv) # noqa
 
+        cost_activity_complex_adv = await self._resolve_cost_activity_complex_adv()
         cost_metrics = await get_auto_campaign_cost_activity_metrics(
             self.adv,
+            complex_adv=cost_activity_complex_adv,
         )
         self._target_cost = cost_metrics.target_cost
         self._avg_cost_additional = cost_metrics.avg_cost

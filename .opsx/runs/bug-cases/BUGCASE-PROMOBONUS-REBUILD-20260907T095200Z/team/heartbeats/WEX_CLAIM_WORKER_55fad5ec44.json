@@ -1,0 +1,9 @@
+{
+  "STARTED_AT": "2026-09-07T10:12:02Z",
+  "LAST_HEARTBEAT_AT": "2026-09-07T10:12:02Z",
+  "PROGRESS_MARKER": "output_packet_written",
+  "PROCESS_ID_OR_TASK_ID": "WEX/CLAIM_WORKER/55fad5ec44",
+  "ATTEMPT": 1,
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_CLAIM_WORKER_55fad5ec44.out.json"
+}

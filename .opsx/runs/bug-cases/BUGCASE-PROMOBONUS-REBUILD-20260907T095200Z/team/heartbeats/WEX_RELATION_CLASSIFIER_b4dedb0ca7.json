@@ -1,0 +1,10 @@
+{
+  "STARTED_AT": "2026-09-07T17:59:26Z",
+  "LAST_HEARTBEAT_AT": "2026-09-07T18:00:01Z",
+  "PROGRESS_MARKER": "output_packet_written",
+  "PROCESS_ID_OR_TASK_ID": "WEX/RELATION_CLASSIFIER/b4dedb0ca7",
+  "ATTEMPT": 1,
+  "STATUS": "PASS",
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_RELATION_CLASSIFIER_b4dedb0ca7.out.json"
+}

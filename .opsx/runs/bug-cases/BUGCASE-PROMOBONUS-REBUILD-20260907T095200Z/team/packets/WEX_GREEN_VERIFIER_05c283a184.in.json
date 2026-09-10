@@ -1,0 +1,49 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 56,
+  "CREATED_AT": 1788805315.944915,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT": {
+      "CANONICAL_SHA256": "9624cdea33aef89affd34661b4edf0c6346f68c45115ce1db2c2e285443996ef",
+      "RAW_SHA256": "a1e121f36ba68d4d65009087dd7b3732e9da416a5f7b17338bf74c299f6158e2"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788808915.944915,
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/05c283a184/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/OUT",
+  "PAYLOAD": {
+    "DO_NOT_EDIT_PRODUCTION": true,
+    "DO_NOT_EDIT_TESTS": true,
+    "DO_NOT_START_ITEMS_5_TO_6": true,
+    "FINDING_004_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+    "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+    "FIX_EVIDENCE_PATH": "results/FIX-HC-FINDING-004-STALE-TEST.md",
+    "FROZEN_TEST_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FROZEN_TEST_SHA256": "233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53",
+    "MAPS_TO": "/opsx-test verify",
+    "MODE": "resume-family-fanout",
+    "PARENT_FINDING_ID": "FINDING-004",
+    "RED_EVIDENCE_PATH": "results/RED-HC-FINDING-004-STALE-TEST.md",
+    "RED_TEST_SHA256_BEFORE_FIX": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+    "REQUIRED_INVARIANT": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150.",
+    "SHA_CHANGE_EXPECTED": true,
+    "WORKER_ID": "GREEN_VERIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/05c283a184",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

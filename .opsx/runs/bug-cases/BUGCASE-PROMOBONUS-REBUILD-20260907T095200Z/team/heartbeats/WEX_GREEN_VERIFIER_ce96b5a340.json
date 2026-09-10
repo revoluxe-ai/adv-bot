@@ -1,0 +1,9 @@
+{
+  "STARTED_AT": "2026-09-07T17:15:30Z",
+  "LAST_HEARTBEAT_AT": "2026-09-07T17:16:50Z",
+  "PROGRESS_MARKER": "output_packet_written",
+  "PROCESS_ID_OR_TASK_ID": "WEX/GREEN_VERIFIER/ce96b5a340",
+  "ATTEMPT": 1,
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_GREEN_VERIFIER_ce96b5a340.out.json"
+}

@@ -1,0 +1,103 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "results/RED-HC-FINDING-004-STALE-TEST.md",
+    "results/ROUTE-TRACE.jsonl",
+    "LEDGER.md",
+    "findings/HC-FINDING-004-STALE-TEST.md",
+    "team/heartbeats/WEX_RED_TEST_WORKER_4b639be98a.json",
+    "team/packets/WEX_RED_TEST_WORKER_4b639be98a.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 54,
+  "CREATED_AT": 1788804803.7974696,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/2c90336e30/OUT": {
+      "CANONICAL_SHA256": "6d4e7949477334b394e2418adbba153eb24a2ad6cdd871349a9ea886cd863892",
+      "RAW_SHA256": "01d96959dc2a480c34c6d78350660b46164fb38420680fa85d7736b461771c91"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/2c90336e30/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788808403.7974696,
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/4b639be98a/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/4b639be98a/IN",
+  "PAYLOAD": {
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": null,
+    "COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable -vv --tb=short",
+    "COMMANDS_RUN": [
+      "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable -vv --tb=short",
+      "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired -vv --tb=short"
+    ],
+    "CONTROLLED_LIVE_UNCOMMITTED": "GO_TOKEN NOT_REQUIRED",
+    "EVIDENCE_PATH": "results/RED-HC-FINDING-004-STALE-TEST.md",
+    "EXECUTION_PREFLIGHT": {
+      "blocked_on_preflight": false,
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted pytest of stale sibling + frozen FINDING-004 node; sha256 of test_promo_accounting.py and promo_accounting.py"
+    },
+    "FAILURE_MATCH": "YES",
+    "FINDING_004_FROZEN_FILE_UNCHANGED": true,
+    "FINDING_TERMINAL": "no",
+    "FROZEN_FINDING_004_NODE_STILL_PASSES": true,
+    "FROZEN_FINDING_004_TEST_SHA256": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+    "INTAKE_ID": null,
+    "MISSION_COMPLETE": "no",
+    "NEXT_ACTION": "/opsx-fix-bug case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-FINDING-004-STALE-TEST",
+    "PRODUCTION_HASH_BEFORE": "sha256:4bef922a87c533cd0c202a5b665162428f89395bccbe6efea1a86d122991344b",
+    "PYTEST_EXIT": 1,
+    "RED_EVIDENCE_PATH": "results/RED-HC-FINDING-004-STALE-TEST.md",
+    "RED_STATUS": "RED_CONFIRMED",
+    "ROUTE_TRANSITION": {
+      "DURABLE_FILE_WRITTEN": "YES",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none",
+      "FROM_STATE": "AWAITING_RED",
+      "MISSION_COMPLETE": "no",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-FINDING-004-STALE-TEST",
+      "NEXT_COMMAND": "/opsx-fix-bug",
+      "ON_FAILURE_STATE": "BLOCKED",
+      "ON_SUCCESS_STATE": "AWAITING_FIX_BUG_RED",
+      "PRECONDITIONS": {
+        "CLAIM_REQUIRED": "no",
+        "GO_TOKEN": "NOT_REQUIRED",
+        "GREEN_REQUIRED": "not_applicable",
+        "OTHER": "CONTROLLED_LIVE_UNCOMMITTED LOCAL_IMPLEMENTATION_AUTHORIZED",
+        "RED_REQUIRED": "satisfied"
+      },
+      "RECOVERY_CLASS": "ADVANCE",
+      "RECOVERY_COMMAND": "/opsx-fix-bug",
+      "REQUIRED_EVIDENCE": [
+        "RED_EVIDENCE_PATH",
+        "results/RED-HC-FINDING-004-STALE-TEST.md"
+      ],
+      "RESULT": "RED_CONFIRMED",
+      "TO_STATE": "AWAITING_FIX_BUG_RED"
+    },
+    "SOURCE_RESOLUTION": {
+      "fallback_used": false,
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/HC-FINDING-004-STALE-TEST.md",
+      "unresolved_gap": "none"
+    },
+    "TEST_CONTENT_SHA256": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+    "TEST_ID": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+    "TEST_IDS": [
+      "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable"
+    ]
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/4b639be98a",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

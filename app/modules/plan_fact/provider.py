@@ -9,6 +9,7 @@ from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.da
     FactData,
     PlanData,
 )
+from app.shared.domains.wb.utils.promo_plan_multiplier import EffectivePromoPlan
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -104,9 +105,11 @@ class PlanFactProvider:
     @staticmethod
     def get_plan_data(adv: AdvSetting) -> PlanData | None:
         plan_orders = adv.plan_for_sales_for_day
-        max_pay_for_order: float | None = adv.max_price_for_order
+        max_pay_for_order: int | None = adv.max_price_for_order
         target_pay_for_order = adv.target_price_for_order
         if any([not plan_orders, not target_pay_for_order, not max_pay_for_order]):
+            return None
+        if not max_pay_for_order:
             return None
         try:
             return PlanData(
@@ -117,3 +120,89 @@ class PlanFactProvider:
         except Exception as exc:
             logger.exception("Ошибка получения плана")
             raise exc
+
+    @staticmethod
+    def get_effective_plan_data(
+        adv: AdvSetting,
+        *,
+        fraction: object | None = None,
+        complex_adv: object | None = None,
+    ) -> PlanData | None:
+        """Runtime overlay Plan. Базовый ``get_plan_data`` и CH history не меняет.
+
+        ``fraction`` / ``complex_adv.promo_fraction`` — фактическая promo-доля.
+        Без флага или при f=0 возвращает тот же Plan, что ``get_plan_data``.
+        """
+        overlay = PlanFactProvider.get_effective_promo_plan(
+            adv,
+            fraction=fraction,
+            complex_adv=complex_adv,
+        )
+        return overlay.plan
+
+    @staticmethod
+    def get_effective_promo_plan(
+        adv: AdvSetting,
+        *,
+        fraction: object | None = None,
+        complex_adv: object | None = None,
+    ) -> EffectivePromoPlan:
+        """Пять Owner effective entities + scaled PlanData."""
+        from decimal import Decimal
+
+        from app.shared.domains.wb.utils.promo_plan_multiplier import (
+            build_effective_promo_plan,
+        )
+
+        base = PlanFactProvider.get_plan_data(adv)
+        resolved = Decimal("0")
+        if complex_adv is not None:
+            raw = getattr(complex_adv, "promo_fraction", Decimal("0"))
+            try:
+                resolved = Decimal(str(raw or "0"))
+            except Exception:
+                resolved = Decimal("0")
+        elif fraction is not None:
+            try:
+                resolved = Decimal(str(fraction))
+            except Exception:
+                resolved = Decimal("0")
+        else:
+            raw_attr = getattr(adv, "promo_fraction", None)
+            if raw_attr is not None:
+                try:
+                    resolved = Decimal(str(raw_attr))
+                except Exception:
+                    resolved = Decimal("0")
+        def _as_int(value: object, default: int = 0) -> int:
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return int(value)
+            if isinstance(value, int):
+                return value
+            text = str(value).strip()
+            if not text:
+                return default
+            try:
+                return int(text)
+            except ValueError:
+                return default
+
+        overlay = build_effective_promo_plan(
+            flag_enabled=getattr(adv, "raise_plan_on_promobonuses", False) is True,
+            fraction=resolved,
+            base_plan=base,
+            auto_budget_daily_limit=_as_int(
+                getattr(adv, "auto_budget_daily_limit", 0), 0
+            ),
+            search_auto_budget_daily_limit=_as_int(
+                getattr(adv, "search_auto_budget_daily_limit", 0), 0
+            ),
+            common_budget_daily_limit=(
+                None
+                if getattr(adv, "common_budget_daily_limit", None) is None
+                else _as_int(getattr(adv, "common_budget_daily_limit", None), 0)
+            ),
+        )
+        return overlay

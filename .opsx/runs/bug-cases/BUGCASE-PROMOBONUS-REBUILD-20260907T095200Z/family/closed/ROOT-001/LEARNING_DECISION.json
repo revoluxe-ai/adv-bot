@@ -1,0 +1,48 @@
+{
+  "LEARNING_DECISION_ID": "LD/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/PROMO-OVERLAY-REC-BID",
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/PROMO-OVERLAY-REC-BID",
+  "LEARNING_STAGE_INVOKED": true,
+  "LEARNING_VERDICT": "EXISTING_POLICY_COMPLIANCE_FAILURE",
+  "POLICY_ALREADY_EXISTS": true,
+  "POLICY_REFS": [
+    "app/shared/domains/wb/utils/promo_overlay.py",
+    "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_decision_snapshot_builder.py"
+  ],
+  "ENFORCEMENT_GAP": "none",
+  "PROMOTION_DECISION": "RESOLVED_NO_PROMOTE",
+  "RECOMMENDATIONS": {
+    "STATIC_CHECK_CANDIDATE": false,
+    "PROJECT_WIDE_HUNT_REQUEST": false,
+    "TESTING_RULES_CANDIDATE": false
+  },
+  "FULL_PACKET_REQUIRED": false,
+  "FULL_PACKET_PATH": null,
+  "SOURCE_FANIN_PATH": "results/FAMILY-FANIN.md",
+  "SOURCE_FANIN_HASH": "fd1cfacdd0d889041b1368039c0f426585e48784615a0e4298d54e37b8af5a25",
+  "SOURCE_ARTIFACT_PATHS": {
+    "FAMILY_FANIN_MD": "results/FAMILY-FANIN.md",
+    "FAMILY_FANIN_JSON": "results/FAMILY-FANIN.json",
+    "GREEN": "results/GREEN-ROOT-001.md",
+    "HUNT": "results/PROOF-HUNT-BOUNDED-HUNTER-001.md",
+    "INVARIANT": "family/INVARIANT.md",
+    "FANIN_OUT": "team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_8ee302dd4e.out.json"
+  },
+  "SOURCE_ARTIFACT_HASHES": {
+    "FAMILY_FANIN_MD": "fd1cfacdd0d889041b1368039c0f426585e48784615a0e4298d54e37b8af5a25",
+    "FAMILY_FANIN_JSON": "9b2cb4bca2aee6f13ed2a39de176345ec0789aa5ca8f4b37c928dbc0a02882aa",
+    "GREEN": "a7a887be59aa1021b04f249b470a0fb51e2ce9559aa9109ddfa3f93a53ae9396",
+    "HUNT": "ef9aa29070e77766d504f12c3da55c182e6a3e4b093f7b868199bce5c6595cb0",
+    "INVARIANT": "8d88dc229e24b10135860351c387cf50cfe620c23699286140e422a34fa9a629",
+    "FANIN_OUT": "48f9e88aa369ec8ce810fc64ddff20f621277fd7e08dca3ede524c1767fa8467"
+  },
+  "LEARNING_STATUS": "COMPLETE",
+  "DECISION_RATIONALE": "Fan-in is READY_FOR_FAMILY_CLOSURE: root GREEN_CONFIRMED, bounded hunt CLEAR with zero same-invariant siblings, and PASS_NO_BRANCH_INTEGRATION_REQUIRED. The overlay architecture already exists (promo_overlay.overlay_for_adv; sibling auto_shelf_bid_control_decision_snapshot_builder passes complex_adv=). ROOT-001 was a local Telegram rec-bid call site that omitted fraction=, so get_effective_promo_plan treated overlay as f=0. That is a compliance failure against the existing overlay contract, not a missing policy. Residual intake items 2-6 (ledger/balance/FEFO/journal) are different invariants and are not this family's lesson. No reusable global lesson, enforcement gap, static check, project-wide hunt, testing-rule change, or promotion is justified.",
+  "CREATED_AT": "2026-09-07T11:43:07Z",
+  "PRODUCT_CLOSURE_VALID": true,
+  "PROCESS_METADATA_CORRECTED": false,
+  "DECISION_HASH": "2ae2f985d5eaef2ed4fff37dd96fe02e8d34cdab113b794c6025811d8b9308d2",
+  "REUSABLE_LESSON_SUMMARY": "Existing overlay contract was sufficient; ROOT-001 was a local rec-bid call site missing fraction=. No promotion.",
+  "LEARNING_DECISION_VALIDATED": false
+}

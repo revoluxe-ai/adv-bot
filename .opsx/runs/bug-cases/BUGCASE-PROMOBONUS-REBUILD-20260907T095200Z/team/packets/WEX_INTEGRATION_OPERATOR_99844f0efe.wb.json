@@ -1,0 +1,23 @@
+{
+  "WORKER_ID": "INTEGRATION_OPERATOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "branches/HC-FINDING-004-STALE-TEST/CHANGED_PATHS.json",
+    "branches/HC-FINDING-004-STALE-TEST/PATCH.diff",
+    "team/heartbeats/WEX_INTEGRATION_OPERATOR_99844f0efe.json",
+    "team/intents/WEX_INTEGRATION_OPERATOR_99844f0efe.intent.json",
+    "team/packets/WEX_INTEGRATION_OPERATOR_99844f0efe.out.json",
+    "team/snapshots/WEX_INTEGRATION_OPERATOR_99844f0efe.before.json"
+  ],
+  "MODIFIED": [
+    "family/BRANCHES.jsonl",
+    "family/DEPENDENCIES.json",
+    "family/FAMILY.json",
+    "family/INTEGRATION.json",
+    "results/FAMILY-GREEN-REPORT.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

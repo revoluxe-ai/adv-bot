@@ -1,0 +1,87 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 75,
+  "CREATED_AT": 1788813274.5888548,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/357e6bf3b5/OUT": {
+      "CANONICAL_SHA256": "783dffbd86506f66b629a23a86d8b5579c566252ceb6563b1f3fcb7d221f83e4",
+      "RAW_SHA256": "0cc066cdb2869e29406d119bc2fe0ceb7701fd064da8609722bc44470213296b"
+    },
+    "PKT/WEX/MATERIALIZER/9dd2d750be/OUT": {
+      "CANONICAL_SHA256": "c86a5170f1db160680537a8e8d556482303fc2ce91ffc9b8a976fd29695862d2",
+      "RAW_SHA256": "cf197193036f94d153ad32a7763bb81b4077608e78e23955261a2fe9d5953117"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/9dd2d750be/OUT",
+    "PKT/WEX/CLAIM_WORKER/357e6bf3b5/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788816874.5888548,
+  "FINDING_ID": "FINDING-006",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t11-d11",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/30d9a4e237/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLAIM_WORKER/357e6bf3b5/OUT",
+  "PAYLOAD": {
+    "ALLOWED_CLASSIFICATIONS": [
+      "IMPLEMENTATION_BUG",
+      "SPEC_BUG",
+      "SPEC_GAP",
+      "FALSE_POSITIVE",
+      "OUT_OF_SCOPE",
+      "INSUFFICIENT_EVIDENCE"
+    ],
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-006.md",
+      "findings/FINDING-005.md",
+      "findings/FINDING-004.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "findings/HC-FINDING-004-STALE-TEST.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_MATERIALIZER_9dd2d750be.out.json",
+      "team/packets/WEX_CLAIM_WORKER_357e6bf3b5.out.json",
+      ".cursor/pipeline/bug-team/workers/CLASSIFIER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-classify-bug.md",
+      ".cursor/pipeline/contracts/bug-episode/ROUTE_TRACE.md",
+      ".cursor/pipeline/bug-team/packets/ROUTE_FIELDS.md",
+      "app/modules/auto_budget_manager/promo_ledger.py",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
+      "app/modules/auto_budget_manager/service.py",
+      "app/modules/auto_budget_manager/redis_promo_state_manager.py",
+      "openspec/decisions/index.md"
+    ],
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-006/2026-09-07T20:30:22Z",
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_FINDING_004": true,
+    "DO_NOT_REOPEN_FINDING_005": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_HC_FINDING_004_STALE_TEST": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "FINDING_ID": "FINDING-006",
+    "FINDING_PATH": "findings/FINDING-006.md",
+    "INTAKE_PATH": "intakes/INTAKE-001.md",
+    "ITEM_TEXT": "journal only bot WBAutoBudgetTopUp; manual WB promo deposits invisible",
+    "MAPS_TO": "/opsx-classify-bug",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "WORKER_ID": "CLASSIFIER",
+    "WRITE_LEDGER_ROUTE_STATE_ONLY": true
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/30d9a4e237",
+  "WORKER_ID": "CLASSIFIER"
+}

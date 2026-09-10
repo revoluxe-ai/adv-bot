@@ -93,6 +93,28 @@ async def test_top_up_budget_sends_cashback_fields(monkeypatch) -> None:
     assert body.cashback_percent == 50
 
 
+@pytest.mark.asyncio
+async def test_get_costs_history_returns_upd_items(monkeypatch) -> None:
+    from app.core.mp.wb.api.generated.promotion.v1.marketing_and_promotions_client.models import (
+        GetAdvV1UpdResponse200Item,
+    )
+
+    item = GetAdvV1UpdResponse200Item(
+        upd_num=1,
+        upd_sum=50,
+        advert_id=42,
+        payment_type="Keshbek",
+    )
+    adapter, mock_raise = _build_adapter(monkeypatch, [item])
+    rows = await adapter.get_costs_history(
+        from_date=__import__("datetime").date(2026, 1, 1),
+        to_date=__import__("datetime").date(2026, 1, 31),
+    )
+    assert len(rows) == 1
+    assert rows[0].payment_type == "Keshbek"
+    mock_raise.assert_awaited()
+
+
 def test_resolve_balance_type_unknown(monkeypatch) -> None:
     adapter, _ = _build_adapter(monkeypatch, None)
     with pytest.raises(BalanceTypeNotSupportedError):

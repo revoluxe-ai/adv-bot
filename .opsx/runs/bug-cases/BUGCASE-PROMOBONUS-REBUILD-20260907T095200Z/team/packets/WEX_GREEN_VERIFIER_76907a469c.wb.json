@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "GREEN_VERIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/GREEN-HC-001.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_76907a469c.json",
+    "team/intents/WEX_GREEN_VERIFIER_76907a469c.intent.json",
+    "team/packets/WEX_GREEN_VERIFIER_76907a469c.out.json",
+    "team/snapshots/WEX_GREEN_VERIFIER_76907a469c.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

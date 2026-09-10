@@ -1,0 +1,84 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 41,
+  "CREATED_AT": 1788797192.2876203,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/FAMILY_LEARNING_WORKER/f86a7b17c7/OUT": {
+      "CANONICAL_SHA256": "c44dd71e0bac6f5b1abc6d6dd1926b6f508204a6cd2088e8615bd22284a013db",
+      "RAW_SHA256": "7d9b49c945ca66bd421942163b005107f9426932b4f1109a206868fb57f1176b"
+    },
+    "PKT/WEX/FAN_IN_ASSEMBLER/ee7fa48fa3/OUT": {
+      "CANONICAL_SHA256": "0f66c4648a33cd2a7f6d32104ea89adb59620c757b5024a4ae4a18e0025a1af0",
+      "RAW_SHA256": "9b4198472af604a283333e24abaa9995474c1a48d9a3b22867fa189afb4e68d2"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/FAMILY_LEARNING_WORKER/f86a7b17c7/OUT",
+    "PKT/WEX/FAN_IN_ASSEMBLER/ee7fa48fa3/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788800792.2876203,
+  "FINDING_ID": "FINDING-003",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t07-d07",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLOSURE_OPERATOR/99a510bc28/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/FAMILY_LEARNING_WORKER/f86a7b17c7/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "results/FANIN.md",
+      "family/LEARNING_DECISION.json",
+      "results/LEARNING_REPORT.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "CASE.md",
+      "LEDGER.md",
+      "INDEX.md",
+      "intakes/INTAKE-001.md",
+      "results/HUMAN_SUMMARY.md",
+      "results/OWNER-CLOSURE-FINDING-002.md",
+      "results/OWNER-CLOSURE-ROOT-001.md",
+      "team/packets/WEX_FAMILY_LEARNING_WORKER_f86a7b17c7.out.json",
+      "team/packets/WEX_FAN_IN_ASSEMBLER_ee7fa48fa3.out.json",
+      "team/packets/WEX_CLASSIFIER_e1b15347b7.out.json",
+      ".cursor/pipeline/bug-team/workers/CLOSURE_OPERATOR.md",
+      ".cursor/pipeline/contracts/bug-episode/CLOSE_POLICY.md",
+      ".cursor/pipeline/contracts/bug-episode/ROUTE_TRANSITION.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/pipeline/bug-team/runtime/learning_decision.py"
+    ],
+    "CALL_CLOSE_FAMILY": false,
+    "CASE_REMAINS_OPEN_RESIDUAL_INTAKE": true,
+    "CHOSEN_ROUTE": "ROUTE_C",
+    "CLASSIFICATION": "FALSE_POSITIVE",
+    "DO_NOT_OVERWRITE_OWNER_CLOSURE_FINDING_002": true,
+    "DO_NOT_OVERWRITE_OWNER_CLOSURE_ROOT_001": true,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_4_TO_6": true,
+    "FINDING_ID": "FINDING-003",
+    "FINDING_TERMINAL_KIND": "CLOSED_FALSE_POSITIVE",
+    "HUMAN_SUMMARY_OVERWRITE_OK": true,
+    "MAPS_TO": "automatic episode closure Route C",
+    "MISSION_COMPLETE": "no",
+    "RESIDUAL_AFTER_CLOSE": [
+      "4",
+      "5",
+      "6"
+    ],
+    "TARGET_FINDING_STATUS": "closed_false_positive",
+    "WORKER_ID": "CLOSURE_OPERATOR",
+    "WRITE_OWNER_CLOSURE": "results/OWNER-CLOSURE-FINDING-003.md"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLOSURE_OPERATOR/99a510bc28",
+  "WORKER_ID": "CLOSURE_OPERATOR"
+}

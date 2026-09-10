@@ -608,6 +608,15 @@ class AdvSetting(BaseTable):
             "V3 Raise MAX: in-memory max=fact CPO when fact>db max (per tick, no persist)"
         ),
     )
+    raise_plan_on_promobonuses: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+        comment=(
+            "RaisePlanOnPromobonuses: разрешать увеличение Plan, если доступны промобонусы"
+        ),
+    )
     cpm = mapped_column(Integer, nullable=True, default=None)
     bidder_for_auto = mapped_column(
         Boolean, nullable=True, default=True, server_default="true",

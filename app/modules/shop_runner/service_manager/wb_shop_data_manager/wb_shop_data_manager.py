@@ -13,6 +13,9 @@ from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.wb_manager import (
     WBManager,
 )
+from app.modules.auto_budget_manager.redis_promo_state_manager import (
+    CachedShopPromoState,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.plan_fact import PlanFactProvider
 from app.modules.shop_runner.service_manager.exceptions import NotFoundActiveAdvCompany
@@ -21,6 +24,7 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
 )
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
+    PlanFactSummary,
 )
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.data_classes import (
     FactData,
@@ -270,9 +274,68 @@ class WBShopDataManager:
             return None
         return first_bids
 
+    async def _load_cached_promo_state(self) -> CachedShopPromoState | None:
+        """Derived promo overlay. Miss/stale → None (conservative M=1)."""
+        from app.modules.auto_budget_manager.redis_promo_state_manager import (
+            CachedShopPromoState,
+            RedisPromoStateManager,
+        )
+        from app.modules.cluster_bids_redis.redis_client_provider import (
+            get_redis_client,
+        )
+
+        try:
+            manager = RedisPromoStateManager(get_redis_client())
+            state: CachedShopPromoState | None = await manager.get(self.shop_id)
+            return state
+        except Exception:
+            logger.warning(
+                "promo overlay cache miss/error shop_id=%s",
+                self.shop_id,
+                exc_info=True,
+            )
+            return None
+
+    @staticmethod
+    def _build_pre_complex_adv(
+        adv: AdvSetting,
+        *,
+        search_adv_idv: dict[int, AdvSetting],
+        summaries_by_adv_id: dict[int, PlanFactSummary],
+        promo_state: CachedShopPromoState | None,
+    ) -> PreComplexAdv:
+        from app.shared.domains.wb.utils.promo_overlay import (
+            fraction_from_cached_state,
+            overlay_for_adv,
+        )
+
+        fraction = fraction_from_cached_state(
+            promo_state, adv.adv_id, getattr(adv, "search_adv_id", None)
+        )
+        overlay = overlay_for_adv(adv, fraction=fraction)
+        plan_data = overlay.plan
+        setattr(adv, "promo_fraction", overlay.fraction)
+        pre_adv = PreComplexAdv(
+            auto_adv=adv,
+            plan_data=plan_data,
+            plan_fact_summary=summaries_by_adv_id.get(adv.adv_id),
+            search_adv=(
+                search_adv_idv.get(adv.search_adv_id)
+                if adv.search_adv_id is not None
+                else None
+            ),
+            promo_fraction=overlay.fraction,
+            promo_multiplier=overlay.multiplier,
+            effective_promo_plan=overlay,
+        )
+        return pre_adv
+
     @staticmethod
     async def _collect_plan_data(complex_adv: ComplexAdv) -> PlanData:
-        plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
+        plan = PlanFactProvider.get_effective_plan_data(
+            complex_adv.adv_setting,
+            complex_adv=complex_adv,
+        )
         if plan is None:
             raise RuntimeError(
                 "Plan data is not configured for adv_id=%s" % complex_adv.adv_id
@@ -354,12 +417,13 @@ class WBShopDataManager:
             )
 
         self._set_auto_commom_budget(adv_settings)
+        promo_state = await self._load_cached_promo_state()
         search_adv_ids: set[int] = {
             adv.search_adv_id for adv in adv_settings if adv.search_adv_id
         }
 
         adv_ids_for_plan_fact = [adv.adv_id for adv in adv_settings]
-        summaries_by_adv_id = {}
+        summaries_by_adv_id: dict[int, PlanFactSummary] = {}
         if skip_plan_fact:
             plan_fact_reader = None
         else:
@@ -382,15 +446,11 @@ class WBShopDataManager:
                 )
 
         return [
-            PreComplexAdv(
-                auto_adv=adv,
-                plan_data=PlanFactProvider.get_plan_data(adv),
-                plan_fact_summary=summaries_by_adv_id.get(adv.adv_id),
-                search_adv=(
-                    search_adv_idv.get(adv.search_adv_id)
-                    if adv.search_adv_id is not None
-                    else None
-                ),
+            self._build_pre_complex_adv(
+                adv,
+                search_adv_idv=search_adv_idv,
+                summaries_by_adv_id=summaries_by_adv_id,
+                promo_state=promo_state,
             )
             for adv in adv_settings
         ]
@@ -454,6 +514,14 @@ class WBShopDataManager:
                 target_pay_for_order=pre_adv.resolved_target_pay_for_order,
                 fact_pay_for_order=pre_adv.plan_fact_summary.fact_pay_for_order if pre_adv.plan_fact_summary else None,
                 resolve_cpo=pre_adv.resolved_target_pay_for_order,
+                promo_fraction=pre_adv.promo_fraction,
+                promo_multiplier=pre_adv.promo_multiplier,
+                effective_promo_plan=pre_adv.effective_promo_plan,
+                fact_predict_orders=(
+                    pre_adv.plan_fact_summary.fact_predict_orders
+                    if pre_adv.plan_fact_summary
+                    else None
+                ),
             )
             complex_advs.append(complex_adv)
         handlers: list[Callable[[], Awaitable[None]]] = [

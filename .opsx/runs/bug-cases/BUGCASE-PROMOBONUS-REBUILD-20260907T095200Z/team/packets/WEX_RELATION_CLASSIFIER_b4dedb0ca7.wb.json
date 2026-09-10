@@ -1,0 +1,19 @@
+{
+  "WORKER_ID": "RELATION_CLASSIFIER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/heartbeats/WEX_RELATION_CLASSIFIER_b4dedb0ca7.json",
+    "team/intents/WEX_RELATION_CLASSIFIER_b4dedb0ca7.intent.json",
+    "team/packets/WEX_RELATION_CLASSIFIER_b4dedb0ca7.out.json",
+    "team/snapshots/WEX_RELATION_CLASSIFIER_b4dedb0ca7.before.json"
+  ],
+  "MODIFIED": [
+    "family/BRANCHES.jsonl",
+    "family/FAMILY.json",
+    "findings/HC-FINDING-004-STALE-TEST.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

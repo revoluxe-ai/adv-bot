@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "FAN_IN_ASSEMBLER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/heartbeats/WEX_FAN_IN_ASSEMBLER_665d4ffc8b.json",
+    "team/intents/WEX_FAN_IN_ASSEMBLER_665d4ffc8b.intent.json",
+    "team/packets/WEX_FAN_IN_ASSEMBLER_665d4ffc8b.out.json",
+    "team/snapshots/WEX_FAN_IN_ASSEMBLER_665d4ffc8b.before.json"
+  ],
+  "MODIFIED": [
+    "results/FANIN.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

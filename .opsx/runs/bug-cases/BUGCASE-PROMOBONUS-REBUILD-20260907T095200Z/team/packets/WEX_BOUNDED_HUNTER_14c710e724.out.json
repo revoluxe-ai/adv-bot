@@ -1,0 +1,52 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/14c710e724/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t11-d11",
+  "WORKER_EXECUTION_ID": "WEX/BOUNDED_HUNTER/14c710e724",
+  "WORKER_ID": "BOUNDED_HUNTER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-006",
+  "PARENT_PACKET_ID": "PKT/WEX/BOUNDED_HUNTER/14c710e724/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/30d9a4e237/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/30d9a4e237/OUT": {
+      "CANONICAL_SHA256": "e6e904babef417e1f8bfd8a2bce8345b72d91b4693e65cf5085e78b7118425e0",
+      "RAW_SHA256": "5c2a4304a50ede9238f1bd331291f605f06742dba81667f3f7087a76218416de"
+    }
+  },
+  "CHECKPOINT_GENERATION": 76,
+  "CREATED_AT": 1788815000.0,
+  "EXPIRES_AT": 1788818600.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "HUNT_RESULT": "CLEAR",
+    "CANDIDATES": [],
+    "HUNT_SCOPE": [
+      "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
+      "app/modules/auto_budget_manager/promo_ledger.py load_success_tranches",
+      "app/modules/auto_budget_manager/service.py _create_topup_entry",
+      "app/shared/domains/wb/utils/promo_accounting.py campaign remaining SoT",
+      "app/modules/auto_budget_manager/redis_promo_state_manager.py"
+    ],
+    "HUNT_EFFECTIVENESS": "HIGH_WITHIN_DECLARED_SCOPE: enumerated WBAutoBudgetTopUp constructor, both _create_topup_entry callers, load_success_tranches / load_campaign_ledgers, campaign remaining SoT, resolve_promo_availability pool vs leftover, and Redis derived cache. Zero persist/load of seller-portal deposits. Zero leftover/pool empty-as-journal-defect. FINDING-006 not re-emitted; closed findings not opened",
+    "HUNT_FALSE_NEGATIVE_RISK": "BOUNDED_TO_MANUAL_DEPOSIT_JOURNAL: hunt matches sites that persist or load manual seller-portal promo deposits into WBAutoBudgetTopUp, or that treat missing manual deposits as a journal defect that empties leftover/pool. Leftover fraction, FEFO spend skip, 90d leftover cutoff, pool-failure, and overlay classified out. deep flag absent; Pass 3 not expanded",
+    "HUNTER_IMPLEMENTED_FIX": false,
+    "HUNTER_WROTE_RED": false,
+    "HUNTER_CHOSE_ROUTE": false,
+    "HUNTER_CLOSED_CANDIDATE": false,
+    "MISSION_COMPLETE": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/PROOF-HUNT-BOUNDED-HUNTER-FINDING-006.md",
+    "team/heartbeats/WEX_BOUNDED_HUNTER_14c710e724.json",
+    "team/packets/WEX_BOUNDED_HUNTER_14c710e724.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

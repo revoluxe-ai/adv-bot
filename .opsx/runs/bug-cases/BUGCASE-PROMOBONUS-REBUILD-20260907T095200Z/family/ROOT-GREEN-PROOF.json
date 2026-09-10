@@ -1,0 +1,41 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+  "ROOT_FINDING_ID": "FINDING-004",
+  "ROOT_RED_CLAIMS": [
+    "apply_spend_fefo applied spend to expired leftover before live leftover",
+    "expired leftover 300 absorbed spend 50 so remaining inflated to 200"
+  ],
+  "ROOT_FAILURE_BEHAVIOR": "In apply_spend_fefo spend loop, dated leftover was FEFO-sorted and spend was applied without skipping is_expired leftover, so remaining summed only leftover after expired absorbed spend.",
+  "ROOT_FIX_CLAIMS": [
+    "In the spend loop, continue when is_expired(item.expires_at, now=now)",
+    "remaining sums only live leftover",
+    "skip expired leftover in spend loop; remaining == 150"
+  ],
+  "ROOT_GREEN_CLAIMS": [
+    "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150",
+    "Frozen TEST_CONTENT_SHA256 cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2 MATCH",
+    "Production promo_accounting.py after 4bef922a87c533cd0c202a5b665162428f89395bccbe6efea1a86d122991344b",
+    "GREEN_CONFIRMED remaining==150"
+  ],
+  "REQUIRED_BEHAVIOR_PROVEN": [
+    "skip expired leftover in spend loop; remaining == 150."
+  ],
+  "FORBIDDEN_BEHAVIOR_PROVEN": [
+    "do not apply spend to expired leftover before live leftover (that inflates remaining to 200)."
+  ],
+  "EVIDENCE_PATHS": {
+    "GREEN_EVIDENCE": "results/GREEN-FINDING-004.md",
+    "FIX_EVIDENCE": "results/FIX-FINDING-004.md"
+  },
+  "EVIDENCE_HASHES": {
+    "GREEN_EVIDENCE": "0018dab0baab9f10ad34b0bd621588987b584368f35c830779f7ebd1826ed94f",
+    "FIX_EVIDENCE": "343f1e8a71191d7b58f632b3b0ca242111210dc58cab9828845fd72d680a69ff"
+  },
+  "SCOPE_TOKENS": [
+    "apply_spend_fefo",
+    "remaining",
+    "leftover",
+    "expired",
+    "promo_accounting"
+  ]
+}

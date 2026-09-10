@@ -1,0 +1,96 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "branches/HC-001/PATCH.diff",
+    "branches/HC-001/CHANGED_PATHS.json",
+    "family/BRANCHES.jsonl",
+    "family/INTEGRATION.json",
+    "family/FAMILY.json",
+    "family/DEPENDENCIES.json",
+    "results/FAMILY-GREEN-REPORT.md",
+    "team/heartbeats/WEX_INTEGRATION_OPERATOR_df3a1929eb.json",
+    "team/packets/WEX_INTEGRATION_OPERATOR_df3a1929eb.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 30,
+  "CREATED_AT": 1788791759.2382805,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/GREEN_VERIFIER/76907a469c/OUT": {
+      "CANONICAL_SHA256": "9c114fc26699192359235478e2513fab091320b44b261484fc47eff9114f2b1a",
+      "RAW_SHA256": "4df7a05113aa344c5d16b3be831e1d74971ff31caf74bd2cbce92fe888514634"
+    },
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/c9a6d788fb/OUT": {
+      "CANONICAL_SHA256": "af885e9edae25d6020e1f3eac86e716391115d8edc909ddeff4e94525ea71c0f",
+      "RAW_SHA256": "2b0a92ea35787514fdd2af660ba82cac7a8f1c25444d861c046a6b4b7ab43282"
+    },
+    "PKT/WEX/TASK_COMPLETION_WORKER/a774d5aa41/OUT": {
+      "CANONICAL_SHA256": "304f3f4a37f0ff9d91b9cb4b5617c20fc86c6d234329afc225bccc09fac51f0b",
+      "RAW_SHA256": "73245fe53370d83c8243fabd24ce500072006b7ff434b769aa7d7cd272f38231"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/TASK_COMPLETION_WORKER/a774d5aa41/OUT",
+    "PKT/WEX/GREEN_VERIFIER/76907a469c/OUT",
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/c9a6d788fb/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788795359.2382805,
+  "FINDING_ID": "HC-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/INTEGRATION_OPERATOR/df3a1929eb/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/INTEGRATION_OPERATOR/df3a1929eb/IN",
+  "PAYLOAD": {
+    "ACTUAL_CHANGED_PATHS": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "APPLIED_PATCHES": [
+      {
+        "FINDING_ID": "HC-001",
+        "IN_PLACE_MAIN_WORKTREE": true,
+        "ORDER": 1,
+        "PATCH_SHA256": "731b5abe0aa92a0683504d1c42dd77f4cbd14b512022728d870a62cc58f0d6af"
+      }
+    ],
+    "BRANCH_ID": "BR/HC-001/a6b8a8fb",
+    "BRANCH_STATUS": "INTEGRATED",
+    "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY",
+    "CASE_REMAINS": "OPEN_RESIDUAL_INTAKE",
+    "CONFLICTS": [],
+    "DETERMINISTIC_ORDER": [
+      "HC-001"
+    ],
+    "DO_NOT_CLOSE": [
+      "FINDING-002",
+      "ROOT-001"
+    ],
+    "FAMILY_GREEN_STATUS": "PASS",
+    "FAMILY_INVARIANT_PYTEST": {
+      "COMMAND": "poetry run pytest tests/unit/auto_budget_manager/ -q --tb=line",
+      "OK": true,
+      "RETURNCODE": 0,
+      "TAIL": "\n============================== warnings summary ===============================\napp\\utils\\db\\base.py:5\n  C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\app\\utils\\db\\base.py:5: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)\n    Base = declarative_base()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n======================== 6 passed, 1 warning in 0.41s ========================="
+    },
+    "FAMILY_STATUS": "FANIN_READY",
+    "FINDING_TERMINAL": "no",
+    "GREEN_REPORT_HASH": "8673f6200e1e9aab7424a4d90e966b534f37b4b73ca85ac8b78c90691890f2e6",
+    "INTAKE_ITEMS_3_TO_6": "not_started",
+    "INTEGRATE_BRANCH_PATCHES_CALLED": false,
+    "INTEGRATION_STATUS": "PASS",
+    "IN_PLACE_MAIN_WORKTREE": true,
+    "MISSION_COMPLETE": "no",
+    "NOTE": "HC-001 already on main; recorded PATCH.diff without re-apply. write_family_fanin preconditions: INTEGRATION_STATUS=PASS, BRANCH_STATUS=INTEGRATED, FAMILY_GREEN_STATUS: PASS.",
+    "PATCH_HASH": "731b5abe0aa92a0683504d1c42dd77f4cbd14b512022728d870a62cc58f0d6af",
+    "PATCH_PATH": "branches/HC-001/PATCH.diff",
+    "PATCH_SHA256": "731b5abe0aa92a0683504d1c42dd77f4cbd14b512022728d870a62cc58f0d6af",
+    "PRODUCTION_HASH_AFTER": "d83c97f6b96b73e9f520e96ad891642ff360ca1037136c898bdd3cf5eba45b7c",
+    "RED_EVIDENCE_HASH": "cd231dfe181932e8c716e75c9716a5f0706740e7ea25aff003bc4ffc2c22a30f"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/INTEGRATION_OPERATOR/df3a1929eb",
+  "WORKER_ID": "INTEGRATION_OPERATOR"
+}

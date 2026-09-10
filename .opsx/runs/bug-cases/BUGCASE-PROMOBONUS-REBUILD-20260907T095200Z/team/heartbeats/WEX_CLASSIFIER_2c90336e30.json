@@ -1,0 +1,13 @@
+{
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\CHECKPOINT.json",
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "LAST_HEARTBEAT_AT": "2026-09-07T18:11:10Z",
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z\\team\\packets\\WEX_CLASSIFIER_2c90336e30.out.json",
+  "PROCESS_ID_OR_TASK_ID": "WEX/CLASSIFIER/2c90336e30",
+  "PROGRESS_MARKER": "output_packet_written",
+  "STARTED_AT": "2026-09-07T18:06:20Z",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS"
+}

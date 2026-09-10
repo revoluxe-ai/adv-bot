@@ -1,0 +1,42 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 4,
+  "CREATED_AT": 1788776857.6603403,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/1117063723/OUT": {
+      "CANONICAL_SHA256": "4aa7fd1dbba8d35338f783c89b100dc41508632fc1b0dc573277ceba190088df",
+      "RAW_SHA256": "c7005b25ca49105d1abb20423d454c25c82ced1440710620e9cce31a198e6670"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/1117063723/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788780457.6603403,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/3d2b91716b/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/1117063723/OUT",
+  "PAYLOAD": {
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/2026-09-07T10:12:02Z",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "EXISTING_TEST_FILE": "tests/unit/test_auto_shelf_bid_control_view_provider.py",
+    "FINDING_ID": "ROOT-001",
+    "MAPS_TO": "/opsx-test",
+    "REQUIRED_OUTCOME": "RED_CONFIRMED",
+    "REQUIRED_REGRESSION": "Telegram rec-bid / build_view with raise_plan_on_promobonuses and live promo_fraction > 0 must feed overlay target/max pay into plan_context; f=0 remains unscaled. Do not mock get_effective_promo_plan away.",
+    "TARGET_SITE": "auto_shelf_bid_control_view_provider.py:881 PlanFactProvider.get_effective_promo_plan(adv)",
+    "WORKER_ID": "RED_TEST_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/3d2b91716b",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

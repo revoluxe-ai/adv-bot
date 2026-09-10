@@ -1,0 +1,34 @@
+{
+  "WORKER_ID": "CLOSURE_OPERATOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "family/closed/FINDING-004/BRANCHES.jsonl",
+    "family/closed/FINDING-004/DEPENDENCIES.json",
+    "family/closed/FINDING-004/FAMILY.json",
+    "family/closed/FINDING-004/INTEGRATION.json",
+    "family/closed/FINDING-004/INVARIANT.json",
+    "family/closed/FINDING-004/INVARIANT.md",
+    "family/closed/FINDING-004/LEARNING_DECISION.json",
+    "family/closed/FINDING-004/LEARNING_PACKET.json",
+    "family/closed/FINDING-004/ROOT-GREEN-PROOF.json",
+    "results/OWNER-CLOSURE-FINDING-004.md",
+    "team/heartbeats/WEX_CLOSURE_OPERATOR_50390aa9e9.json",
+    "team/intents/WEX_CLOSURE_OPERATOR_50390aa9e9.intent.json",
+    "team/packets/WEX_CLOSURE_OPERATOR_50390aa9e9.out.json",
+    "team/snapshots/WEX_CLOSURE_OPERATOR_50390aa9e9.before.json"
+  ],
+  "MODIFIED": [
+    "CASE.md",
+    "INDEX.md",
+    "LEDGER.md",
+    "family/FAMILY.json",
+    "findings/FINDING-004.md",
+    "findings/HC-FINDING-004-STALE-TEST.md",
+    "results/HUMAN_SUMMARY.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

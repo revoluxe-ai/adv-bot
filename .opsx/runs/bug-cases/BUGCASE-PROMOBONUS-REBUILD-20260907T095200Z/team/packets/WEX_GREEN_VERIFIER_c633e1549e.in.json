@@ -1,0 +1,41 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 6,
+  "CREATED_AT": 1788778260.1453972,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/OUT": {
+      "CANONICAL_SHA256": "aff02ecfc61a835957d6bf9b90b96940f13829f803c672a707fd532f974055ed",
+      "RAW_SHA256": "80e886fc9bc1cf5671c100329a69f9c01d284d2f4c1bbee587220f95643ebe17"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788781860.1453972,
+  "FINDING_ID": "ROOT-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/c633e1549e/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/OUT",
+  "PAYLOAD": {
+    "FINDING_ID": "ROOT-001",
+    "FIX_EVIDENCE_PATH": "results/FIX-ROOT-001.md",
+    "FROZEN_TEST_NODE": "tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive",
+    "FROZEN_TEST_PATH": "tests/unit/test_auto_shelf_bid_control_view_provider.py",
+    "FROZEN_TEST_SHA256": "7b8cf8861d66e61c8eb46e1a75c283684b44dbcda54f82530654ef3b3c848aae",
+    "MAPS_TO": "/opsx-test verify",
+    "RED_EVIDENCE_PATH": "results/RED-ROOT-001.md",
+    "REQUIRED_INVARIANT": "Telegram rec-bid plan_context uses overlay target/max pay when live promo_fraction > 0.",
+    "WORKER_ID": "GREEN_VERIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/c633e1549e",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

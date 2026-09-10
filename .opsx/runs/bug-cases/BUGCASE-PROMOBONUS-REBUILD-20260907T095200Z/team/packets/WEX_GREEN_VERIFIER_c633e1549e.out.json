@@ -1,0 +1,61 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/c633e1549e/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/c633e1549e",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/c633e1549e/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/OUT": {
+      "CANONICAL_SHA256": "aff02ecfc61a835957d6bf9b90b96940f13829f803c672a707fd532f974055ed",
+      "RAW_SHA256": "80e886fc9bc1cf5671c100329a69f9c01d284d2f4c1bbee587220f95643ebe17"
+    }
+  },
+  "CHECKPOINT_GENERATION": 6,
+  "CREATED_AT": 1788778536.7909675,
+  "EXPIRES_AT": 1788782136.7909675,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "GREEN_CONFIRMED",
+  "PAYLOAD": {
+    "GREEN_STATUS": "GREEN_CONFIRMED",
+    "FROZEN_TEST_HASH_STATUS": "MATCH",
+    "EVIDENCE_PATH": "results/GREEN-ROOT-001.md",
+    "TEST_RESULTS": {
+      "FROZEN_NODE": "tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive",
+      "FROZEN_COMMAND": "poetry run pytest tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive -vv --tb=short",
+      "FROZEN_RESULT": "PASSED",
+      "FROZEN_EXIT": 0,
+      "ADJACENT_PAIR_COMMAND": "poetry run pytest tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_recommendation_fail_soft -vv --tb=short",
+      "ADJACENT_PAIR_RESULT": "2 passed, 1 warning in 0.34s",
+      "ADJACENT_PAIR_EXIT": 0,
+      "ADJACENT_FILE_COMMAND": "poetry run pytest tests/unit/test_auto_shelf_bid_control_view_provider.py -vv --tb=short",
+      "ADJACENT_FILE_RESULT": "34 passed, 1 warning in 2.26s",
+      "ADJACENT_FILE_EXIT": 0,
+      "TEST_CONTENT_SHA256": "7b8cf8861d66e61c8eb46e1a75c283684b44dbcda54f82530654ef3b3c848aae",
+      "TEST_CONTENT_SHA256_MATCH_RED": true
+    },
+    "INVARIANT_VERIFIED": true,
+    "MAPS_TO": "/opsx-test verify",
+    "TEST_ID": "tests/unit/test_auto_shelf_bid_control_view_provider.py::test_build_view_rec_bid_plan_context_uses_promo_overlay_when_fraction_positive",
+    "FROZEN_TEST_PATH": "tests/unit/test_auto_shelf_bid_control_view_provider.py",
+    "FROZEN_TEST_SHA256": "7b8cf8861d66e61c8eb46e1a75c283684b44dbcda54f82530654ef3b3c848aae",
+    "REQUIRED_INVARIANT": "Telegram rec-bid plan_context uses overlay target/max pay when live promo_fraction > 0.",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-ROOT-001.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_c633e1549e.json",
+    "team/packets/WEX_GREEN_VERIFIER_c633e1549e.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

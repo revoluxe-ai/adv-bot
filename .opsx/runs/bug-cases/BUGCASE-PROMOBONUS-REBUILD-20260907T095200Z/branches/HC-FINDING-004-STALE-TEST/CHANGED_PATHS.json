@@ -1,0 +1,14 @@
+{
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "CHANGED_PATHS": [
+    "tests/unit/wb/utils/test_promo_accounting.py"
+  ],
+  "PATCH_SHA256": "d566227629884be32f105d460022d2846c75c68d2a0dfb0d4201d3f1781cca87",
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+  "TEST_CONTENT_SHA256": "233084e637cfaa1f4c3ac5bea151f5f1cb8a377f6f30b286ac19f2bba9f50c53",
+  "PRODUCTION_PATH": "app/shared/domains/wb/utils/promo_accounting.py",
+  "PRODUCTION_HASH_AFTER": "4bef922a87c533cd0c202a5b665162428f89395bccbe6efea1a86d122991344b",
+  "PRODUCTION_UNCHANGED": true,
+  "NOTE": "Record of already-applied in-place test-only change (remaining 200->150 + docstring). Not copied into a fake workspace. integrate_branch_patches not used."
+}

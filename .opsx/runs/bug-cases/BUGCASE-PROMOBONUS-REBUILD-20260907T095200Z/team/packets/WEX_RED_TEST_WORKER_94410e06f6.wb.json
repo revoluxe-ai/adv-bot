@@ -1,0 +1,20 @@
+{
+  "WORKER_ID": "RED_TEST_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/RED-FINDING-004.md",
+    "team/heartbeats/WEX_RED_TEST_WORKER_94410e06f6.json",
+    "team/intents/WEX_RED_TEST_WORKER_94410e06f6.intent.json",
+    "team/packets/WEX_RED_TEST_WORKER_94410e06f6.out.json",
+    "team/snapshots/WEX_RED_TEST_WORKER_94410e06f6.before.json"
+  ],
+  "MODIFIED": [
+    "LEDGER.md",
+    "findings/FINDING-004.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

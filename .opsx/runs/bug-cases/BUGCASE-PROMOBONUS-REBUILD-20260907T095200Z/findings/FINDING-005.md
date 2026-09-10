@@ -1,0 +1,91 @@
+FINDING_PACKET
+
+CASE_ID: BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z
+FINDING_ID: FINDING-005
+SOURCE_INTAKE_ID: INTAKE-001
+PARENT_FINDING_ID:
+TITLE: campaign leftover fraction uses budget_after/total so M collapses
+PRODUCTION_CLASSIFICATION: IMPLEMENTATION_BUG
+CHOSEN_ROUTE: ROUTE_A
+RELATION_TO_ROOT: sequential_residual
+STATUS: closed_fixed
+CHAT_REQUIRED: true
+CLAIM_PRIORITY: 3
+PACKET_PATH: findings/FINDING-005.md
+OWNER_CHAT: SUP-PROMO-FIX-20260907
+CLAIM_TOKEN: CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z
+CLAIMED_AT: 2026-09-07T19:14:25Z
+COMPLETED_AT: 2026-09-07T20:12:45Z
+PACKET_PURPOSE: adjudication
+INVARIANT: INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/LEFTOVER-FRACTION-TRANCHE-AMOUNT
+ORIGINAL_FINDING: campaign leftover fraction uses budget_after/total so M collapses
+EVIDENCE: INTAKE-001 MEDIUM item 5; RAW_INTAKE_HASH 637477c63f7498ef1f0f6201bd2408e6548154bac9cc32b85336c40032261794. Sequential residual after ROOT-001 closed_fixed, FINDING-002+HC-001 closed_fixed, FINDING-003 closed_false_positive, FINDING-004+HC-FINDING-004-STALE-TEST closed_fixed. Leftover mix GREEN_CONFIRMED; hunt CLEAR; no HC sibling.
+RUNTIME_PATH: app/shared/domains/wb/utils/promo_accounting.py
+CAUSAL_BOUNDARY: leftover mix used remaining/(budget_after|campaign_budget_total) so remaining 200 / wallet 12000 collapsed M toward 1.
+WRITE_BOUNDARY: apply_spend_fefo reference_budget and campaign_ledger_from_rows mix. Fixed: remaining / tranche.amount.
+SOURCE_SNAPSHOT: intakes/INTAKE-001.md item 5; team/packets/WEX_MATERIALIZER_187e482f7f.in.json
+DISPOSITION: CLOSED_FIXED_VERIFIED
+CREATED_AT: 2026-09-07T19:07:14Z
+LAST_ACTIVITY_AT: 2026-09-07T20:12:45Z
+BLOCKER:
+RESULT_PATH: results/OWNER-CLOSURE-FINDING-005.md
+EPISODE_TERMINAL: FIXED
+FINDING_TERMINAL: yes
+FINDING_TERMINAL_KIND: CLOSED_GREEN
+RED_EVIDENCE_PATH: results/RED-FINDING-005.md
+GREEN_EVIDENCE_PATH: results/GREEN-FINDING-005.md
+OWNER_GO_RECEIPT_PATH:
+FIX_EVIDENCE_PATH: results/FIX-FINDING-005.md
+TEST_ID: tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after
+TEST_CONTENT_SHA256: d2b77e376699bfe70729aec6a028759353a20d1a6d4a35fef2dfdce3532954a9
+FANIN_PATH: results/FANIN.md
+HUMAN_SUMMARY_PATH: results/HUMAN_SUMMARY.md
+CLOSURE_EVIDENCE_PATH: results/OWNER-CLOSURE-FINDING-005.md
+CLASSIFICATION: IMPLEMENTATION_BUG
+NEXT_ACTION: /opsx-bug-team case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z (item 6 residual, no FINDING-006 yet)
+
+NEXT_COMMAND (finding closed_fixed; CASE residual_intake item 6):
+/opsx-bug-team case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z
+
+MODE: READ_ONLY
+
+## Terminal closure
+
+FINDING_STATUS=closed_fixed
+EPISODE_TERMINAL=FIXED
+FINDING_TERMINAL=yes
+FINDING_TERMINAL_KIND=CLOSED_GREEN
+CLASSIFICATION=IMPLEMENTATION_BUG
+CHOSEN_ROUTE=ROUTE_A
+FAMILY_STATUS=CLOSED_FIXED_VERIFIED
+CLOSURE_STATUS=CLOSED_FIXED_VERIFIED
+CASE_STATUS=OPEN_RESIDUAL_INTAKE
+LEAVE_OPEN_REASON=partial_residual
+RESIDUAL_INTAKE_ITEMS=6
+LEARNING_STATUS=COMPLETE
+LEARNING_VERDICT=LOCAL_CASE_NOTE_ONLY
+PROMOTION_DECISION=RESOLVED_NO_PROMOTE
+WORKTREE_STATUS=UNCOMMITTED_CHANGES_AWAITING_USER_REVIEW
+COMMIT_CREATED=NO
+USER_ACTION_REQUIRED=REVIEW_DIFF_AND_DECIDE_COMMIT
+MISSION_COMPLETE=no
+OPEN_SAME_INVARIANT_CANDIDATES=NONE
+HARD_BLOCK_READY=PASS
+
+FORBIDDEN:
+- do not edit production files
+- do not use GO
+- do not claim a second finding
+- do not open other chats
+- do not promote without /opsx-materialize-bug-queue mode=promote
+- do not emit bare /opsx-fix-bug without case=/finding=/claim_token=
+- do not reopen ROOT-001 (closed_fixed)
+- do not reopen FINDING-002 (closed_fixed)
+- do not reopen HC-001 (closed_fixed)
+- do not reopen FINDING-003 (closed_false_positive)
+- do not reopen FINDING-004 (closed_fixed)
+- do not reopen HC-FINDING-004-STALE-TEST (closed_fixed / INTEGRATED)
+- do not create FINDING-006 from residual intake item 6 in this hop
+- do not rewrite results/FANIN.md
+- do not rewrite family/LEARNING_DECISION.json
+- do not git commit / push / deploy

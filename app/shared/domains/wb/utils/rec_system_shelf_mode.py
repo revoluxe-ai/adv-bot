@@ -19,8 +19,13 @@ async def is_rec_system_shelf_mode_operational(
     adv_setting: AdvSetting,
     *,
     plan_fact_reader: PlanFactReader | None = None,
+    complex_adv: object | None = None,
 ) -> bool:
-    """Полки считаем операционными только при включённом rec_system, старте авто и активности по себестоимости."""
+    """Полки операционны только при rec_system + started + cost-rule ``True``.
+
+    ``complex_adv`` пробрасывается в cost-activity; без него overlay только
+    если fraction уже пришит на ``adv_setting``.
+    """
     if not adv_setting.rec_system_mode:
         return False
     if adv_setting.active_status != "started":
@@ -28,6 +33,7 @@ async def is_rec_system_shelf_mode_operational(
     active = await is_auto_campaign_active(
         adv_setting,
         plan_fact_reader=plan_fact_reader,
+        complex_adv=complex_adv,
     )
     return active is True
 

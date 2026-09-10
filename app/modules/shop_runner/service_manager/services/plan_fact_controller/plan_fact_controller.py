@@ -127,6 +127,13 @@ class PlanFactController:
         pre_adv: PreComplexAdv,
         version: float,
     ) -> PlanFactStatDTO | None:
+        """Обрабатывает pre-complex кампанию: план из base Plan, факт из Redis/summary.
+
+        ``PreComplexAdv.plan_data`` может содержать overlay Plan для runtime-потребителей;
+        в ClickHouse сохраняется только base Plan через ``PlanFactProvider.get_plan_data``.
+        ``PreComplexAdv.auto_adv`` содержит сам ``AdvSetting``, без вложенного
+        атрибута ``adv_setting``.
+        """
         fact = await PlanFactController._resolve_fact_for_pre_adv(pre_adv)
         if fact is None:
             logger.warning(
@@ -134,10 +141,13 @@ class PlanFactController:
                 pre_adv.adv_id,
             )
             return None
+        plan: Optional[PlanData] = PlanFactProvider.get_plan_data(
+            pre_adv.auto_adv
+        )
         return PlanFactStatDTO.create(
             adv_id=pre_adv.adv_id,
             shop_id=pre_adv.auto_adv.wb_cabinet.shop_id,
-            plan=pre_adv.plan_data,
+            plan=plan,
             fact=fact,
             version=version,
         )

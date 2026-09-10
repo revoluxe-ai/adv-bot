@@ -1,0 +1,60 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 55,
+  "CREATED_AT": 1788804917.5155394,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/4b639be98a/OUT": {
+      "CANONICAL_SHA256": "c104c73302e7515b384a205fc6b9f17f3789afc073b0f175fc095f1ff033d40b",
+      "RAW_SHA256": "e1fb4fb0af32e448a26dda67a1aef3c777482ee1aa75ca0dd68ea161c97f05cb"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/4b639be98a/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788808517.5155394,
+  "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t09-d09",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/494521aed5/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/RED_TEST_WORKER/4b639be98a/OUT",
+  "PAYLOAD": {
+    "ALLOWED_FIX_FILES": [
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "COMMIT_ALLOWED": false,
+    "DO_NOT_EDIT_PRODUCTION": true,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_SELF_CONFIRM_GREEN": true,
+    "DO_NOT_START_ITEMS_5_TO_6": true,
+    "DO_NOT_WEAKEN_FINDING_004_NODE": true,
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "FINDING_004_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+    "FINDING_ID": "HC-FINDING-004-STALE-TEST",
+    "FIX_HINT": "Change test_fefo_spend_and_expired_tranche_unusable assert remaining==200 to remaining==150 (and comment if it still describes expired leftover as absorbing spend). Do not change test_fefo_spend_hits_live_leftover_not_expired. Do not edit promo_accounting.py.",
+    "FROZEN_TEST_ID": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "INVARIANT": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150.",
+    "LOCAL_IMPLEMENTATION_AUTHORIZED": true,
+    "MAPS_TO": "/opsx-fix-bug",
+    "MODE": "resume-family-fanout",
+    "OWNER_PRODUCTION_GO": "NOT_REQUIRED",
+    "PARENT_FINDING_ID": "FINDING-004",
+    "RED_EVIDENCE_PATH": "results/RED-HC-FINDING-004-STALE-TEST.md",
+    "RED_TEST_CONTENT_SHA256": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+    "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/494521aed5",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR"
+}

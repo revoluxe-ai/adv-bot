@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/PROMO-OVERLAY-REC-BID",
+  "INVARIANT_REQUIRED_BEHAVIOR": "Pass live promo_fraction into get_effective_promo_plan so rec-bid plan_context target/max pay use overlay values.",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "Do not call get_effective_promo_plan(adv) without fraction= or complex_adv= on the Telegram rec-bid path when overlay fraction can be > 0 (that treats f=0 and shows unscaled AdvSetting target/max).",
+  "INVARIANT_ENTRY_CONDITIONS": "build_view rec-bid with live Redis overlay fraction > 0 (frozen test f=0.2 expects overlay 125/250 not raw 100/200).",
+  "INVARIANT_SCOPE": "auto_shelf_bid_control_view_provider.build_view rec-bid plan_context / get_effective_promo_plan. rec_bid overlay promo fraction plan_context view_provider. Not intake items 2-6 (promo_state_service ledger accounting leftover journal).",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

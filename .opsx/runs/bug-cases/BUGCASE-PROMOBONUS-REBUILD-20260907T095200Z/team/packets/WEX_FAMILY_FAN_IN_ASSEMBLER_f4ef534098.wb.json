@@ -1,0 +1,19 @@
+{
+  "WORKER_ID": "FAMILY_FAN_IN_ASSEMBLER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "team/heartbeats/WEX_FAMILY_FAN_IN_ASSEMBLER_f4ef534098.json",
+    "team/intents/WEX_FAMILY_FAN_IN_ASSEMBLER_f4ef534098.intent.json",
+    "team/packets/WEX_FAMILY_FAN_IN_ASSEMBLER_f4ef534098.out.json",
+    "team/snapshots/WEX_FAMILY_FAN_IN_ASSEMBLER_f4ef534098.before.json"
+  ],
+  "MODIFIED": [
+    "family/FAMILY.json",
+    "results/FAMILY-FANIN.json",
+    "results/FAMILY-FANIN.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

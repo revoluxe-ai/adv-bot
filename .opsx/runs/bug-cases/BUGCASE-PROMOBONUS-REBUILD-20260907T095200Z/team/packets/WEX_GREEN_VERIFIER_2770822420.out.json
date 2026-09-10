@@ -1,0 +1,61 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/2770822420/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t05-d05",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/2770822420",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-002",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/2770822420/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/cb4ae89bd2/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/cb4ae89bd2/OUT": {
+      "CANONICAL_SHA256": "553be557db329b1c4d5571cc08804ad8f25d30ccc8409e1d858543635f59d5e8",
+      "RAW_SHA256": "bcd28b5f9d8b45c7cf38ff3e8e5f684d1b5359485d3b35a1d3b97f236f5d9b7d"
+    }
+  },
+  "CHECKPOINT_GENERATION": 18,
+  "CREATED_AT": 1788785277.157881,
+  "EXPIRES_AT": 1788788877.157881,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "GREEN_CONFIRMED",
+  "PAYLOAD": {
+    "GREEN_STATUS": "GREEN_CONFIRMED",
+    "FROZEN_TEST_HASH_STATUS": "MATCH",
+    "EVIDENCE_PATH": "results/GREEN-FINDING-002.md",
+    "TEST_RESULTS": {
+      "FROZEN_NODE": "tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails",
+      "FROZEN_COMMAND": "poetry run pytest tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails -vv --tb=short",
+      "FROZEN_RESULT": "PASSED",
+      "FROZEN_EXIT": 0,
+      "ADJACENT_PAIR_COMMAND": "poetry run pytest tests/unit/auto_budget_manager/ -vv --tb=short",
+      "ADJACENT_PAIR_RESULT": "5 passed, 1 warning in 0.40s",
+      "ADJACENT_PAIR_EXIT": 0,
+      "ADJACENT_FILE_COMMAND": "poetry run pytest tests/unit/auto_budget_manager/ -vv --tb=short",
+      "ADJACENT_FILE_RESULT": "5 passed, 1 warning in 0.40s",
+      "ADJACENT_FILE_EXIT": 0,
+      "TEST_CONTENT_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+      "TEST_CONTENT_SHA256_MATCH_RED": true
+    },
+    "INVARIANT_VERIFIED": true,
+    "MAPS_TO": "/opsx-test verify",
+    "TEST_ID": "tests/unit/auto_budget_manager/test_promo_state_service.py::test_refresh_does_not_set_fresh_false_empty_pool_when_balance_fetch_fails",
+    "FROZEN_TEST_PATH": "tests/unit/auto_budget_manager/test_promo_state_service.py",
+    "FROZEN_TEST_SHA256": "4abf693330ccdd5b2aed034bdab31936f9e66f57d6d24669d213f718005414b5",
+    "REQUIRED_INVARIANT": "On get_campaign_balance failure, do not redis.set a fresh pool_usable=false snapshot; miss/stale -> conservative M=1.",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-FINDING-002.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_2770822420.json",
+    "team/packets/WEX_GREEN_VERIFIER_2770822420.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

@@ -1,0 +1,41 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z/4ae535b7",
+  "ROOT_FINDING_ID": "ROOT-001",
+  "ROOT_RED_CLAIMS": [
+    "leftover success-tranche remaining>0 not expired created_at older than 90d lookback AND-stops campaign_usable when pool=0",
+    "load_campaign_ledgers created_at>=now-PROMO_LOOKBACK_DAYS drops leftover so overlay usable=false while remaining>0"
+  ],
+  "ROOT_FAILURE_BEHAVIOR": "load_campaign_ledgers AND-stops via created_at>=now-90d so leftover success-tranche remaining>0 not expired is dropped; campaign_usable and overlay usable become false when pool=0",
+  "ROOT_FIX_CLAIMS": [
+    "leftover success-tranche and persisted spend load without PROMO_LOOKBACK_DAYS cutoff so remaining>0 not expired stays campaign_usable when pool=0",
+    "90d lookback cutoff must not AND-stop a living leftover in promo_ledger campaign overlay"
+  ],
+  "ROOT_GREEN_CLAIMS": [
+    "leftover older than lookback keeps campaign_usable=true and overlay usable=true when pool=0",
+    "90d cutoff must not AND-stop a living leftover success-tranche with remaining>0 not expired"
+  ],
+  "REQUIRED_BEHAVIOR_PROVEN": [
+    "leftover success-tranche remaining>0 not expired keeps campaign_usable and overlay usable even when created_at is older than PROMO_LOOKBACK_DAYS 90d and pool=0"
+  ],
+  "FORBIDDEN_BEHAVIOR_PROVEN": [
+    "90d lookback AND-stop of a living leftover when pool=0 making campaign_usable false",
+    "dropping leftover via created_at>=now-90d so overlay usable becomes false while remaining>0 and not expired"
+  ],
+  "EVIDENCE_PATHS": {
+    "ROOT_GREEN": "results/GREEN-ROOT-001.md",
+    "ROOT_RED": "results/RED-ROOT-001.md",
+    "ROOT_FIX": "results/FIX-ROOT-001.md"
+  },
+  "EVIDENCE_HASHES": {
+    "ROOT_GREEN": "0ff86c6d2ba6dd9d205949ff8f6f94b909a65660084b032f91cc3aecc1ac4dc8",
+    "ROOT_RED": "5a297f37b3e12c986b501229daef7ffff59ab026a34b944ce50bdb38174bf35d",
+    "ROOT_FIX": "84038d9042a9e79f3654562af507700c66277302b5c5079ae1fbc8a8c5fc682d"
+  },
+  "SCOPE_TOKENS": [
+    "leftover",
+    "usable",
+    "promo_ledger",
+    "lookback",
+    "campaign"
+  ]
+}

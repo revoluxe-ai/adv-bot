@@ -1,0 +1,18 @@
+{
+  "WORKER_ID": "CLAIM_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/PROOF-CLAIM-WEX_CLAIM_WORKER_c15e6dd4f9.md",
+    "team/intents/WEX_CLAIM_WORKER_c15e6dd4f9.intent.json",
+    "team/packets/WEX_CLAIM_WORKER_c15e6dd4f9.out.json",
+    "team/snapshots/WEX_CLAIM_WORKER_c15e6dd4f9.before.json"
+  ],
+  "MODIFIED": [
+    "LEDGER.md",
+    "findings/ROOT-001.md",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

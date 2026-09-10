@@ -1,0 +1,18 @@
+{
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/FIX-HC-FINDING-004-STALE-TEST.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_494521aed5.json",
+    "team/intents/WEX_IMPLEMENTATION_EXECUTOR_494521aed5.intent.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_494521aed5.out.json",
+    "team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_494521aed5.before.json"
+  ],
+  "MODIFIED": [
+    "results/ROUTE-TRACE.jsonl",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

@@ -1,0 +1,39 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/h2fdenom001/OUT",
+  "ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/h2fdenom001",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/h2fdenom001/IN",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "ATTEMPT": 1,
+  "PAYLOAD": {
+    "FIX_STATUS": "FIX_ALREADY_APPLIED",
+    "FILES_VERIFIED_NO_CHANGE": [
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ],
+    "FILES_CHANGED": [],
+    "RUNTIME_PATH": "app/shared/domains/wb/utils/promo_accounting.py",
+    "INVARIANT": "leftover 200 / top-up unit 1000 -> f=0.2 M=1.25; reference_budget=tranche.amount; campaign_ledger uses reference not budget_after/campaign_budget_total",
+    "TEST_ID": "test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "PYTEST_COMMAND": "poetry run pytest -m unit tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after -v",
+    "PYTEST_EXIT": 0,
+    "FIX_EVIDENCE_PATH": "results/FIX-ROOT-001.md",
+    "FIX_DIFF_PATH": "results/FIX-ROOT-001-diff.patch",
+    "RED_EVIDENCE_PATH": "results/RED-ROOT-001.md",
+    "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+    "LOCAL_AUTHORITY": "OWNER_GO_2026-09-08",
+    "DURABLE_FILE_WRITTEN": "YES",
+    "ACTUAL_EXECUTION_ROUTE": "/opsx-fix-bug"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/FIX-ROOT-001.md",
+    "results/FIX-ROOT-001-diff.patch",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_h2fdenom001.out.json"
+  ]
+}

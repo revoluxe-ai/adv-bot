@@ -1,0 +1,74 @@
+# Closure — P0-001
+
+```text
+CASE_ID: BUGCASE-PROMOBONUS-P0-LEFTOVER-20260908T030401Z
+FINDING_ID: P0-001
+STATUS: closed_fixed
+FINDING_TERMINAL: yes
+FINDING_TERMINAL_KIND: CLOSED_GREEN
+DURABLE_FILE_WRITTEN: YES
+GREEN_EVIDENCE_PATH: results/GREEN-P0-001.md
+RED_EVIDENCE_PATH: results/RED-P0-001.md
+FIX_EVIDENCE_PATH: results/FIX-P0-001.md
+CLOSE_EVIDENCE_PATH: results/OWNER-CLOSURE-P0-001.md
+MISSION_COMPLETE: no
+CASE_CLOSED: yes
+OPEN_FINDINGS: 0
+OPEN_CANDIDATES: 0
+BLOCKERS: NONE
+WORKTREE_STATUS: UNCOMMITTED_CHANGES_AWAITING_USER_REVIEW
+COMMIT_CREATED: NO
+FAMILY_STATUS: CLOSED_FIXED_VERIFIED
+CONTROL_MODEL: USER_REVIEWS_UNCOMMITTED_WORKTREE
+EXECUTION_MODE: CONTROLLED_LIVE_UNCOMMITTED
+USER_ACTION_REQUIRED: REVIEW_DIFF_AND_DECIDE_COMMIT
+CLOSED_AT: 2026-09-08T03:25:45Z
+WORKER_ID: CLOSURE_OPERATOR
+WORKER_EXECUTION_ID: WEX_BUGTEAM_P0
+DISPATCH_ID: D-025
+```
+
+## Gates
+
+```text
+HARD_BLOCK_READY: PASS
+OPEN_SAME_INVARIANT_CANDIDATES: 0
+BLOCKING_FINDINGS: NONE
+FANIN_STATUS: FANIN_READY
+FAMILY_FANIN_STATUS: READY_FOR_FAMILY_CLOSURE
+LEARNING_STAGE_INVOKED: true
+LEARNING_STATUS: COMPLETE
+LEARNING_VERDICT: CLASS_LESSON_CANDIDATE
+PROMOTION_DECISION: DEFERRED
+LEARNING_DECISION_VALIDATED: true
+HUNT_RESULT: CLEAR
+```
+
+## Root resolution
+
+`campaign_ledger_from_rows` / `apply_spend_fefo` теперь берут overlay fraction из package percent
+(`promo_amount/amount` через `promo_fraction_from_amounts`), а не `remaining/last_tranche.amount`.
+Multi-tranche fixture: `remaining=1000`, `f=0.5`, `M=2`, без взрыва M~1e6. Bounded hunt CLEAR —
+SAME_INVARIANT siblings нет. P1 не reopen. RaisePlanOnPromobonuses не включён.
+
+## Artifacts
+
+- results/OWNER-CLOSURE-P0-001.md
+- results/HUMAN_SUMMARY.md
+- results/FANIN.md
+- results/FAMILY-FANIN.md
+- results/FAMILY-FANIN.json
+- results/GREEN-P0-001.md
+- results/RED-P0-001.md
+- results/FIX-P0-001.md
+- results/HUNT-P0-001.md
+- family/INVARIANT.md
+- family/LEARNING_DECISION.json
+
+## Next command
+
+```text
+(none — case queue exhausted; Owner reviews uncommitted diff)
+```
+
+Do not commit from this command.

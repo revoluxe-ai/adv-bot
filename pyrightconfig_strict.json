@@ -131,7 +131,18 @@
     "app/modules/user_message_sender/message_for_not_pay_user_sender.py",
     "app/modules/white_list_mode_settings/telegram/keyboards.py",
     "app/modules/white_list_mode_settings/telegram/main_message.py",
-    "run_send_info_message_to_users_process.py"
+    "run_send_info_message_to_users_process.py",
+    "app/shared/domains/wb/utils/promo_plan_multiplier.py",
+    "app/shared/domains/wb/utils/promo_overlay.py",
+    "app/shared/domains/wb/utils/promo_accounting.py",
+    "app/shared/domains/wb/utils/auto_campaign_cost_activity.py",
+    "app/shared/domains/wb/utils/balance_source.py",
+    "app/modules/sales_plan_settings/raise_plan_on_promobonuses.py",
+    "app/modules/sales_plan_settings/telegram/setting_handlers/toggle_raise_plan_on_promobonuses.py",
+    "app/modules/common_slaves/wildberries/models/wb_campaign_promo_spend.py",
+    "app/modules/plan_fact/provider.py",
+    "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
+    "app/modules/sales_plan_settings/telegram/callbacks.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

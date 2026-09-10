@@ -58,6 +58,26 @@ class WBAutoBudgetTopUp(BaseTable):
         String(64), nullable=False, unique=True
     )
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    promo_amount: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Сумма промобонусов в пополнении; credit только при status=success",
+    )
+    promo_percent: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="percent выбранного WB cashback-пакета",
+    )
+    promo_expires_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="expiration_date исходного пакета common pool",
+    )
+    ordinary_amount: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Обычная доля пополнения (amount - promo_amount)",
+    )
     balance_type: Mapped[str] = mapped_column(String(32), nullable=False)
     budget_before: Mapped[float | None] = mapped_column(Float, nullable=True)
     budget_after: Mapped[float | None] = mapped_column(Float, nullable=True)

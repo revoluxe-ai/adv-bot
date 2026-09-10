@@ -1,0 +1,162 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/2d43d59752/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/2d43d59752",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-004",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/2d43d59752/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/14affeebf5/OUT",
+    "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/14affeebf5/OUT": {
+      "CANONICAL_SHA256": "6d03ec7bde84d5f61a57731d445518adaa3d72f16d0775e7a7f08037e95f9dc6",
+      "RAW_SHA256": "106013ff495f6beafb8725e6974843b0e52ba789bae3b4d4a81cf60fb1a0b68c"
+    },
+    "PKT/WEX/MATERIALIZER/0c75e0a10d/OUT": {
+      "CANONICAL_SHA256": "6e62613f8f1abaf68aee67d81eb0c3288764a34c5a9f1cb1ea06ea20062ef4b9",
+      "RAW_SHA256": "f0b164615e8d54b349e374fdc227e25ea4a4b5bf001dbad68b2512cb1451e68a"
+    }
+  },
+  "CHECKPOINT_GENERATION": 44,
+  "CREATED_AT": 1788799780.21565,
+  "EXPIRES_AT": 1788803380.21565,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-test",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A selected; apply_spend_fefo consumes expired leftover before live leftover. EXPECTED_NEXT_COMMAND=/opsx-test; EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug. ACTUAL_* remain PENDING.",
+    "CURRENT_ROUTE_STATE": "AWAITING_RED",
+    "RATIONALE": "apply_spend_fefo sorts dated leftover by earliest expiry then applies all spend without skipping is_expired, then counts only non-expired leftover as remaining. Expired leftover therefore absorbs spend and live remaining is inflated. Module docstring requires FEFO spend on non-expired leftover; expired leftover is not usable even if local leftover is still positive. Production path PromoStateService.refresh -> load_campaign_ledgers -> campaign_ledger_from_rows is reachable. Existing test_fefo_spend_and_expired_tranche_unusable asserts remaining==200 for expired 300 + live 200 + spend 50, which matches the inflation (docstring-correct remaining is 150) and is not a counterproof. OpenSpec decisions/index.md is silent on promo FEFO; not SPEC_GAP because the rebuild module already states the non-expired spend contract. Residual intake items 5-6 not classified. ROOT-001 / FINDING-002 / HC-001 stay closed_fixed. FINDING-003 stays closed_false_positive.",
+    "NEXT_ACTION": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-004",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/2026-09-07T16:37:42Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "implicit_product_invariant",
+      "evidence": "promo_accounting.apply_spend_fefo docstring: spend is applied FEFO to non-expired leftover; expired leftover is not usable even if local leftover remains positive. campaign_ledger remaining/usable feeds resolve_promo_availability OR-active / AND-stop.",
+      "gap": "openspec/decisions/index.md has no promo FEFO decision; not SPEC_GAP because the rebuild module already states the non-expired spend contract."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Redis derived overlay cache write of campaign remaining/usable/fraction via PromoStateService.refresh. No WB production mutation asserted for this finding.",
+      "entrypoints": [
+        "shop-runner auto_budget_watchdog",
+        "PromoStateService.refresh",
+        "load_campaign_ledgers",
+        "campaign_ledger_from_rows",
+        "apply_spend_fefo"
+      ],
+      "direct_callers": [
+        "promo_accounting.py apply_spend_fefo spend loop (no is_expired skip)",
+        "promo_ledger.py:load_campaign_ledgers -> campaign_ledger_from_rows"
+      ],
+      "indirect_callers": [
+        "promo_state_service.py:189 load_campaign_ledgers",
+        "resolve_promo_availability campaign remaining/usable"
+      ],
+      "test_only_callers": [
+        "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_and_expired_tranche_unusable (does not catch inflation)"
+      ],
+      "dead_or_legacy_path": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/FINDING-004.md",
+      "fallback_used": true,
+      "search_operations": [
+        "canonical finding FINDING-004.md",
+        "exact cited path app/modules/auto_budget_manager/promo_accounting.py missing",
+        "bounded glob promo_accounting.py -> app/shared/domains/wb/utils/promo_accounting.py",
+        "read apply_spend_fefo and campaign_ledger_from_rows",
+        "read promo_ledger load_campaign_ledgers caller",
+        "bounded openspec/decisions/index.md promo FEFO lookup"
+      ],
+      "search_scope": [
+        "findings/FINDING-004.md",
+        "intakes/INTAKE-001.md",
+        "LEDGER.md",
+        "app/shared/domains/wb/utils/promo_accounting.py",
+        "app/modules/auto_budget_manager/promo_ledger.py",
+        "openspec/decisions/index.md",
+        "tests/unit/wb/utils/test_promo_accounting.py"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding/intake, apply_spend_fefo, load_campaign_ledgers, and bounded decisions/index.md",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_CLASSIFY",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_RED",
+      "NEXT_COMMAND": "/opsx-test",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-004",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "yes",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX2d43d59752.md"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_RED",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-test",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "NEXT_COMMAND": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-004",
+    "ALLOWED_FIX_FILES": [
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/** (RED owned by /opsx-test)",
+      "unrelated leftover fraction / journal (intake items 5-6)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)",
+      "promo_state_service.py pool-failure path (FINDING-002/HC-001 closed_fixed)",
+      "promo_ledger.py leftover lookback (FINDING-003 closed_false_positive)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "apply_spend_fefo must not apply spend to expired leftover before live leftover. Expired 300 + live 200 + spend 50 must yield remaining 150 (live reduced), not 200 (inflation). Do not reuse remaining==200 as the passing expectation.",
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -q",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The rebuild apply_spend_fefo docstring already requires FEFO spend on non-expired leftover. This finding is implementation drift from that contract, not a missing OpenSpec product decision.",
+    "GO_TOKEN": "FORBIDDEN",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/ROUTE-TRACE.jsonl",
+    "results/PROOF-CLASSIFIER-WEX2d43d59752.md",
+    "team/heartbeats/WEX_CLASSIFIER_2d43d59752.json",
+    "team/packets/WEX_CLASSIFIER_2d43d59752.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

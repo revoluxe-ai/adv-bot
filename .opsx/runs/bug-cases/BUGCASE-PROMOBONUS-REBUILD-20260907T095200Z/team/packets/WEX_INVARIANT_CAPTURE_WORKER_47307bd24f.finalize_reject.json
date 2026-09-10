@@ -1,0 +1,10 @@
+{
+  "STATUS": "FAIL",
+  "TERMINAL_STATUS": "FAIL_WRITE_BOUNDARY",
+  "DETAIL": "team/scripts/finalize_invariant_capture_t09.py,team/scripts/prepare_invariant_capture_t09.result.json",
+  "CHECKPOINT_ADVANCED": false,
+  "ROUTE_TRACE_SUCCESS_EVENT_APPENDED": false,
+  "DEPENDENT_WORKERS_DISPATCHED": false,
+  "WORKER_EXECUTION_ID": "WEX/INVARIANT_CAPTURE_WORKER/47307bd24f",
+  "VALIDATION": null
+}

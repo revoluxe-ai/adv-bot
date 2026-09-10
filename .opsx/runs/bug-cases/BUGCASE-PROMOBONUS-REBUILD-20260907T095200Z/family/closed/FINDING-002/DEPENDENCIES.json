@@ -1,0 +1,18 @@
+{
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/PROMO-POOL-FAIL-NO-FALSE-EMPTY",
+  "WRITE_SETS": {
+    "HC-001": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "FINDING-002": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ]
+  },
+  "WRITE_SET_CONFLICTS": [],
+  "SERIALIZATION_ORDER": [],
+  "PARALLEL_ALLOWED_PAIRS": [],
+  "PARALLEL_IMPLEMENTATION_ALLOWED": false,
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "NOTE": "WRITE_SETS: HC-001 -> promo_state_service.py; FINDING-002 same path already applied. No new conflicts. Serialization not needed (already serial in-place on main).",
+  "UPDATED_AT": "2026-09-07T14:41:09Z"
+}

@@ -1,0 +1,10 @@
+{
+  "STATUS": "FAIL",
+  "TERMINAL_STATUS": "FAIL_WRITE_BOUNDARY",
+  "DETAIL": "team/finalize_materializer_item3.py,team/prepare_materializer_item3.result.json,team/validate_materializer_item3.py,team/validate_materializer_item3.result.json",
+  "CHECKPOINT_ADVANCED": false,
+  "ROUTE_TRACE_SUCCESS_EVENT_APPENDED": false,
+  "DEPENDENT_WORKERS_DISPATCHED": false,
+  "WORKER_EXECUTION_ID": "WEX/MATERIALIZER/efd2d1333b",
+  "VALIDATION": null
+}

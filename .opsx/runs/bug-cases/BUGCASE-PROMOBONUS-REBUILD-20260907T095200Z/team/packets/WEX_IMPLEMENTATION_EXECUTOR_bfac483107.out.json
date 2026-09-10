@@ -1,0 +1,49 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t04-d04",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/bfac483107",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "ROOT-001",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/bfac483107/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/RED_TEST_WORKER/3d2b91716b/OUT": {
+      "CANONICAL_SHA256": "7ad0cf7971abfa36873ac1be11304b713f101d4c3873b16d09723fef58e52ea7",
+      "RAW_SHA256": "441db2a0e0ccde4ac98c759eb45af22bba07e5ef8b87a6a102e3f944e1c60194"
+    }
+  },
+  "CHECKPOINT_GENERATION": 5,
+  "CREATED_AT": 1788778114.8457873,
+  "EXPIRES_AT": 1788780514.8457873,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "FILES_CHANGED": [
+      "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_view_provider.py"
+    ],
+    "ACTUAL_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "EVIDENCE_PATH": "results/FIX-ROOT-001.md",
+    "FROZEN_TEST_UNCHANGED": true,
+    "FROZEN_TEST_PATH": "tests/unit/test_auto_shelf_bid_control_view_provider.py",
+    "FROZEN_TEST_CONTENT_SHA256": "7b8cf8861d66e61c8eb46e1a75c283684b44dbcda54f82530654ef3b3c848aae",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/ROOT-001/2026-09-07T10:12:02Z",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "app/modules/shop_runner/service_manager/services/auto_shelf_bid_control_manager/auto_shelf_bid_control_view_provider.py",
+    "results/FIX-ROOT-001.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_bfac483107.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_bfac483107.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

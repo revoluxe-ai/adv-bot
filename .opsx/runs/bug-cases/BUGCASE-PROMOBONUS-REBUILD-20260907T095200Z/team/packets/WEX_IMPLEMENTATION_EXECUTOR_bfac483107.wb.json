@@ -1,0 +1,17 @@
+{
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "results/FIX-ROOT-001.md",
+    "team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_bfac483107.json",
+    "team/intents/WEX_IMPLEMENTATION_EXECUTOR_bfac483107.intent.json",
+    "team/packets/WEX_IMPLEMENTATION_EXECUTOR_bfac483107.out.json",
+    "team/snapshots/WEX_IMPLEMENTATION_EXECUTOR_bfac483107.before.json"
+  ],
+  "MODIFIED": [
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": []
+}

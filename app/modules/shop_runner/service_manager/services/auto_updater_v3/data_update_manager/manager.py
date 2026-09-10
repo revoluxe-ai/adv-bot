@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater.plan_fact_change_redis_caches import (
     ChangePlanFact,
 )
@@ -101,6 +102,23 @@ class DataUpdateManager:
         all_contexts = build_keyword_v3_contexts(ledger.keywords, raw_profiles)
         contexts = all_contexts
         plan = AdvSettingAutoUpdater.get_plan_data(adv)
+        from decimal import Decimal
+
+        try:
+            promo_fraction = Decimal(
+                str(getattr(complex_adv, "promo_fraction", Decimal("0")) or "0")
+            )
+        except Exception:
+            promo_fraction = Decimal("0")
+        if (
+            getattr(adv, "raise_plan_on_promobonuses", False) is True
+            and promo_fraction > 0
+        ):
+            effective_plan = PlanFactProvider.get_effective_plan_data(
+                adv, complex_adv=complex_adv
+            )
+            if effective_plan is not None:
+                plan = effective_plan
         sales_state = None
         fact = None
         fact_source: str | None = None
@@ -237,6 +255,7 @@ class DataUpdateManager:
             rec_orders_per_view = await load_rec_orders_per_view_for_v3(
                 adv,
                 rec_system_promotion_mode_active=complex_adv.rec_system_promotion_mode_active,
+                complex_adv=complex_adv,
             )
             tick_input = UpdateContextInput(
                 keywords=[ctx.keyword for ctx in contexts],

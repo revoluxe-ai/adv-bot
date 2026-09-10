@@ -1,0 +1,158 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/7d5f4dc267/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t05-d05",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/7d5f4dc267",
+  "WORKER_ID": "CLASSIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-002",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/7d5f4dc267/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLAIM_WORKER/a43a5a14a7/OUT",
+    "PKT/WEX/MATERIALIZER/5b0aa616a3/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLAIM_WORKER/a43a5a14a7/OUT": {
+      "CANONICAL_SHA256": "bb37ca4cc0074b94f768a6628a90359ca8445c89c996fb2700254cc0fd43365a",
+      "RAW_SHA256": "437a6e6286a6bc3cedd03d59086b509100c87af61f1f801854ed95ecbfc6f38e"
+    },
+    "PKT/WEX/MATERIALIZER/5b0aa616a3/OUT": {
+      "CANONICAL_SHA256": "c62aa7659c871ab1407ea72d01fdc54a47ffb6140557643da68fbdc9d5ff7d09",
+      "RAW_SHA256": "69c83c77824326c3cbe68fc8bbe40635dcaa7a4ac8f4e61d39b5c1e0a5ef60cb"
+    }
+  },
+  "CHECKPOINT_GENERATION": 15,
+  "CREATED_AT": 1788783799.4989264,
+  "EXPIRES_AT": 1788787399.4989264,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "PAYLOAD": {
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-test",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A selected; team WAVE is RED then executor. EXPECTED_NEXT_COMMAND=/opsx-test; EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug. ACTUAL_* remain PENDING.",
+    "CURRENT_ROUTE_STATE": "AWAITING_RED",
+    "RATIONALE": "PromoStateService.refresh catches get_campaign_balance failure, leaves pool_response=None, then still RedisPromoStateManager.set with pool_usable=false and updated_at=now. resolve_promo_availability treats None as known-empty pool, not unknown. Overlay contract (fraction_from_cached_state / CachedShopPromoState) is stale/miss -> Decimal(0) conservative M=1. Fresh false-empty snapshot bypasses that path for 15 min and can drop pool contribution while campaign leftover still overlays. Outer AutoBudgetService.refresh_promo_state only preserves prior/M=1 when the whole refresh raises; the inner catch converts WB failure into a successful lying write. No OpenSpec promo pool-failure contract; rebuild already encodes stale->M=1, so this is missed failure-path wiring, not SPEC_GAP. ROOT-001 (Telegram rec-bid) stays closed_fixed. Residual intake items 3-6 not classified.",
+    "NEXT_ACTION": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-002",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/2026-09-07T12:15:07Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "implicit_product_invariant",
+      "evidence": "CachedShopPromoState docstring: Stale -> conservative M=1. fraction_from_cached_state: Stale/miss -> 0 (conservative M=1). AutoBudgetService.refresh_promo_state: on refresh error runtime stays on prior overlay or conservative M=1. RedisPromoStateManager.set always stamps updated_at=now (freshness window 15 min).",
+      "gap": "OpenSpec specs/decisions are silent on promo pool-failure vs stale overlay; not sufficient to force SPEC_GAP because the rebuild overlay/cache API already states unknown/stale must not be treated as a known-empty pool."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Redis derived overlay cache write (pool_usable / campaigns / updated_at). No WB production mutation asserted for this finding.",
+      "entrypoints": [
+        "shop-runner auto_budget_watchdog",
+        "AutoBudgetService.refresh_promo_state",
+        "PromoStateService.refresh"
+      ],
+      "direct_callers": [
+        "promo_state_service.py:127-135 get_campaign_balance except",
+        "promo_state_service.py:194-202 RedisPromoStateManager.set"
+      ],
+      "indirect_callers": [
+        "wb_shop_data_manager._build_pre_complex_adv fraction_from_cached_state on next watchdog tick",
+        "auto_shelf_bid_control_view_provider fraction_from_cached_state (overlay read, not this write)"
+      ],
+      "test_only_callers": [],
+      "dead_or_legacy_path": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "exact_path",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/FINDING-002.md",
+      "fallback_used": false,
+      "search_operations": [
+        "read cited promo_state_service refresh failure path",
+        "read RedisPromoStateManager.set/is_stale",
+        "read fraction_from_cached_state overlay",
+        "read resolve_promo_availability None pool_response",
+        "read AutoBudgetService.refresh_promo_state outer catch",
+        "bounded openspec/decisions/index.md promo lookup"
+      ],
+      "search_scope": [
+        "findings/FINDING-002.md",
+        "intakes/INTAKE-001.md",
+        "LEDGER.md",
+        "promo_state_service.py",
+        "redis_promo_state_manager.py",
+        "promo_overlay.py",
+        "promo_accounting.py",
+        "auto_budget_manager/service.py",
+        "shop_runner/service_manager/manager.py",
+        "openspec/decisions/index.md"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding/intake and cited promo-state symbols only",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_CLASSIFY",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_RED",
+      "NEXT_COMMAND": "/opsx-test",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-002",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "yes",
+        "RED_REQUIRED": "yes",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX7d5f4dc267.md"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_RED",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-test",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "NEXT_COMMAND": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=FINDING-002",
+    "ALLOWED_FIX_FILES": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/** (RED owned by /opsx-test)",
+      "unrelated promo_ledger 90d / promo_accounting FEFO / leftover fraction / journal (intake items 3-6)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "get_campaign_balance exception must not redis.set a fresh pool_usable=false snapshot; overlay readers must take miss/stale -> M=1, not a known-empty pool. Do not mock refresh away.",
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit/auto_budget_manager/ -q",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": false,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The overlay/cache API already requires stale/miss -> conservative M=1. This finding is a missed WB-failure write that mints a fresh false-empty pool, not a new product contract.",
+    "GO_TOKEN": "FORBIDDEN",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no"
+  },
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/PROOF-CLASSIFIER-WEX7d5f4dc267.md",
+    "team/heartbeats/WEX_CLASSIFIER_7d5f4dc267.json",
+    "team/packets/WEX_CLASSIFIER_7d5f4dc267.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

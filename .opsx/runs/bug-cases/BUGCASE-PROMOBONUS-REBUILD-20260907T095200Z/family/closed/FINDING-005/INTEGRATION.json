@@ -1,0 +1,10 @@
+{
+  "BUG_FAMILY_ID": "BFAM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/LEFTOVER-FRACTION-TRANCHE-AMOUNT",
+  "INTEGRATION_STATUS": "N/A",
+  "APPLIED_PATCHES": [],
+  "CONFLICTS": [],
+  "DETERMINISTIC_ORDER": [],
+  "IN_PLACE_MAIN_WORKTREE": true,
+  "NOTE": "FINDING-005 family has no hunt sibling (HUNT_RESULT=CLEAR; CANDIDATES=[]). No branch integration. Production leftover-mix fix already on main worktree.",
+  "UPDATED_AT": "2026-09-07T20:12:45Z"
+}

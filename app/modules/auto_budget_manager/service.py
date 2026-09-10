@@ -28,7 +28,9 @@ from app.modules.common_slaves.wildberries.models import AdvSetting, WBCabinet
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.shared.domains.wb.exceptions import NotEnoughBalanceOnShopError
 from app.shared.domains.wb.utils.balance_source import (
+    TopUpBalanceDecision,
     balance_snapshot_from_response,
+    cashback_packages_from_response,
     cashback_summary_from_response,
     select_topup_balance_decision,
 )
@@ -43,6 +45,11 @@ from app.modules.auto_budget_manager.redis_auto_budget_topup_failed_manager impo
 from app.modules.auto_budget_manager.redis_shop_balance_snapshot_manager import (
     RedisShopBalanceSnapshotManager,
 )
+from app.modules.auto_budget_manager.redis_promo_state_manager import (
+    RedisPromoStateManager,
+)
+from app.modules.auto_budget_manager.promo_state_service import PromoStateService
+from app.shared.domains.wb.utils.promo_accounting import parse_expiration
 
 import typing
 
@@ -101,6 +108,8 @@ class AutoBudgetService:
     ) -> None:
         self._redis = redis_client
         self._balance_snapshot_manager = RedisShopBalanceSnapshotManager(redis_client)
+        self._promo_state_manager = RedisPromoStateManager(redis_client)
+        self._promo_state_service = PromoStateService(self._promo_state_manager)
         self._topup_failed_manager = RedisAutoBudgetTopupFailedManager(redis_client)
         self._last_success_manager = RedisAutoBudgetLastSuccessManager(redis_client)
         self._lock_ttl = settings.AUTO_BUDGET_LOCK_TTL_SEC
@@ -352,6 +361,7 @@ class AutoBudgetService:
             cashbacks_total=cashback_summary.total,
             cashbacks_earliest_expiration=cashback_summary.earliest_expiration_date,
             cashbacks_best_percent=cashback_summary.best_percent,
+            cashbacks_packages=cashback_packages_from_response(balance_response),
         )
         try:
             balance_decision = select_topup_balance_decision(
@@ -374,6 +384,9 @@ class AutoBudgetService:
                 available_limit=limit - spend_today,
                 reason="Not enough balance on shop",
             )
+        promo_amount, promo_percent, promo_expires_at, ordinary_amount = (
+            self._allocation_fields_from_decision(balance_decision, planned_amount)
+        )
         async with sm(read_only=False) as session:
             topup_log = await self._create_topup_entry(
                 session=session,
@@ -399,6 +412,10 @@ class AutoBudgetService:
                         else None
                     ),
                 },
+                promo_amount=promo_amount,
+                promo_percent=promo_percent,
+                promo_expires_at=promo_expires_at,
+                ordinary_amount=ordinary_amount,
             )
 
         try:
@@ -495,13 +512,18 @@ class AutoBudgetService:
         complex_adv: ComplexAdv, campaign_type: AdvType
     ) -> _CampaignConfig | None:
         adv_setting = complex_adv.adv_setting
+        overlay = getattr(complex_adv, "effective_promo_plan", None)
 
         if campaign_type == AdvType.AUTO:
             adv_id = adv_setting.adv_id
             limit = adv_setting.auto_budget_daily_limit or 0
+            if overlay is not None and getattr(overlay, "active", False):
+                limit = int(overlay.PromoAutoBudget)
         elif campaign_type == AdvType.SEARCH:
             adv_id = adv_setting.search_adv_id
             limit = adv_setting.search_auto_budget_daily_limit or 0
+            if overlay is not None and getattr(overlay, "active", False):
+                limit = int(overlay.PropoSearchBudget)
         else:
             raise ValueError(f"Unknown auto budget campaign type: {campaign_type}")
         if adv_id is None:
@@ -561,6 +583,80 @@ class AutoBudgetService:
         return float(success_total), float(attempts_total)
 
     @staticmethod
+    def _allocation_fields_from_decision(
+        balance_decision: TopUpBalanceDecision,
+        amount: int,
+    ) -> tuple[int | None, int | None, datetime.datetime | None, int]:
+        """Typed promo allocation metadata для журнала. Credit только при success."""
+        cashback = getattr(balance_decision, "cashback", None)
+        if cashback is None:
+            return None, None, None, int(amount)
+        promo_amount = int(getattr(cashback, "cashback_sum", 0) or 0)
+        if promo_amount <= 0:
+            return None, None, None, int(amount)
+        promo_percent = int(getattr(cashback, "cashback_percent", 0) or 0)
+        promo_expires_at = parse_expiration(
+            getattr(cashback, "expiration_date", None)
+        )
+        ordinary_amount = max(0, int(amount) - promo_amount)
+        return promo_amount, promo_percent, promo_expires_at, ordinary_amount
+
+    async def refresh_promo_state(
+        self,
+        advs: list[ComplexAdv],
+        wb_manager_hub: "WBManagerHub",
+        shop_id: str | int,
+    ) -> None:
+        """Обновить derived promo-overlay из live WB и PG ledger в Redis.
+
+        Вызывается watchdog после построения ``advs``. После записи snapshot
+        тот же snapshot сразу применяется к уже созданным DTO, поэтому
+        budget/activity paths используют новый overlay в текущем тике, а не
+        ждут следующего запуска. При miss/stale runtime получает
+        консервативное ``M=1``.
+
+        Args:
+            advs: DTO кампаний текущего watchdog-тика.
+            wb_manager_hub: WB API facade для balance и UPD.
+            shop_id: идентификатор кабинета, ключ Redis state.
+        """
+        try:
+            await self._promo_state_service.refresh(
+                shop_id=shop_id,
+                advs=advs,
+                wb_modifier=wb_manager_hub.wb_modifier,
+            )
+        except Exception:
+            logger.warning(
+                "promo state refresh failed shop_id=%s",
+                shop_id,
+                exc_info=True,
+            )
+        try:
+            cached_state = await self._promo_state_manager.get(shop_id)
+        except Exception:
+            logger.warning(
+                "promo state snapshot read failed shop_id=%s",
+                shop_id,
+                exc_info=True,
+            )
+            cached_state = None
+        from app.shared.domains.wb.utils.promo_overlay import (
+            apply_cached_state_to_complex_adv,
+        )
+
+        for complex_adv in advs:
+            try:
+                _ = apply_cached_state_to_complex_adv(complex_adv, cached_state)
+            except Exception:
+                logger.warning(
+                    "promo state overlay apply failed shop_id=%s adv_id=%s",
+                    shop_id,
+                    getattr(complex_adv, "adv_id", None),
+                    exc_info=True,
+                )
+
+    @staticmethod
     async def _create_topup_entry(
         session: AsyncSession,
         adv_setting_id: int,
@@ -571,6 +667,10 @@ class AutoBudgetService:
         balance_type: str,
         budget_before: int | None,
         request_payload: dict[str, Any],
+        promo_amount: int | None = None,
+        promo_percent: int | None = None,
+        promo_expires_at: datetime.datetime | None = None,
+        ordinary_amount: int | None = None,
     ) -> WBAutoBudgetTopUp:
         entry = WBAutoBudgetTopUp(
             adv_setting_id=adv_setting_id,
@@ -579,6 +679,10 @@ class AutoBudgetService:
             date_msk=date_msk,
             idempotency_key=uuid.uuid4().hex,
             amount=amount,
+            promo_amount=promo_amount,
+            promo_percent=promo_percent,
+            promo_expires_at=promo_expires_at,
+            ordinary_amount=ordinary_amount,
             balance_type=balance_type,
             budget_before=float(budget_before)
             if budget_before is not None
@@ -998,6 +1102,7 @@ class AutoBudgetService:
             cashbacks_total=cashback_summary.total,
             cashbacks_earliest_expiration=cashback_summary.earliest_expiration_date,
             cashbacks_best_percent=cashback_summary.best_percent,
+            cashbacks_packages=cashback_packages_from_response(balance_response),
         )
         try:
             balance_decision = select_topup_balance_decision(
@@ -1019,6 +1124,9 @@ class AutoBudgetService:
                 available_limit=limit - spend_today,
                 reason="Not enough balance on shop",
             )
+        promo_amount, promo_percent, promo_expires_at, ordinary_amount = (
+            self._allocation_fields_from_decision(balance_decision, planned_amount)
+        )
         async with sm(read_only=False) as session:
             topup_log = await self._create_topup_entry(
                 session=session,
@@ -1045,6 +1153,10 @@ class AutoBudgetService:
                         else None
                     ),
                 },
+                promo_amount=promo_amount,
+                promo_percent=promo_percent,
+                promo_expires_at=promo_expires_at,
+                ordinary_amount=ordinary_amount,
             )
         try:
             deposit_result = await wb_manager_hub.wb_modifier.top_up_budget(

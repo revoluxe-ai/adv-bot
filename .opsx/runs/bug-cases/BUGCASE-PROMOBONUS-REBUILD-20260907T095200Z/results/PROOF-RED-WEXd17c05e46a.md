@@ -1,0 +1,22 @@
+# PROOF-RED WEX/RED_TEST_WORKER/d17c05e46a
+
+WORKER_EXECUTION_ID: WEX/RED_TEST_WORKER/d17c05e46a
+CASE_ID: BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z
+FINDING_ID: FINDING-005
+STATUS: RED_CONFIRMED
+FAILURE_MATCH: YES
+
+TEST_ID: tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after
+TEST_CONTENT_SHA256: d2b77e376699bfe70729aec6a028759353a20d1a6d4a35fef2dfdce3532954a9
+PRODUCTION_HASH_BEFORE: 4bef922a87c533cd0c202a5b665162428f89395bccbe6efea1a86d122991344b
+COMMAND: poetry run pytest tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after -vv --tb=short
+PYTEST_EXIT: 1
+ACTUAL_FAILURE: assert Decimal('0.01666666666666666666666666667') == Decimal('0.2')
+
+EVIDENCE_PATH: results/RED-FINDING-005.md
+PRODUCTION_EDITED: no
+GREEN_WRITTEN: no
+EXISTING_CEILING_TEST_WEAKENED: no
+EXISTING_CEILING_TEST_RESULT: PASSED
+ITEM_6_STARTED: no
+CLOSED_FINDINGS_REOPENED: no

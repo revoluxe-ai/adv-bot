@@ -1,0 +1,67 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 74,
+  "CREATED_AT": 1788812921.0131438,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/MATERIALIZER/9dd2d750be/OUT": {
+      "CANONICAL_SHA256": "c86a5170f1db160680537a8e8d556482303fc2ce91ffc9b8a976fd29695862d2",
+      "RAW_SHA256": "cf197193036f94d153ad32a7763bb81b4077608e78e23955261a2fe9d5953117"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/MATERIALIZER/9dd2d750be/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788816521.0131438,
+  "FINDING_ID": "FINDING-006",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t11-d11",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLAIM_WORKER/357e6bf3b5/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/MATERIALIZER/9dd2d750be/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-006.md",
+      "findings/FINDING-005.md",
+      "findings/FINDING-004.md",
+      "findings/FINDING-003.md",
+      "findings/FINDING-002.md",
+      "findings/ROOT-001.md",
+      "findings/HC-001.md",
+      "findings/HC-FINDING-004-STALE-TEST.md",
+      "CASE.md",
+      "LEDGER.md",
+      "INDEX.md",
+      "intakes/INTAKE-001.md",
+      "team/packets/WEX_MATERIALIZER_9dd2d750be.out.json",
+      ".cursor/pipeline/bug-team/workers/CLAIM_WORKER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-claim-next-bug.md"
+    ],
+    "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "CLAIM_MODE": "claim_next_open_finding",
+    "DO_NOT_CLAIM_FINDING_002": true,
+    "DO_NOT_CLAIM_FINDING_003": true,
+    "DO_NOT_CLAIM_FINDING_004": true,
+    "DO_NOT_CLAIM_FINDING_005": true,
+    "DO_NOT_CLAIM_HC_001": true,
+    "DO_NOT_CLAIM_HC_FINDING_004_STALE_TEST": true,
+    "DO_NOT_CLAIM_ROOT_001": true,
+    "DO_NOT_CREATE_FINDING_007": true,
+    "FINDING_ID": "FINDING-006",
+    "INTAKE_ID": "INTAKE-001",
+    "MAPS_TO": "/opsx-claim-next-bug",
+    "MAX_ACTIVE_FINDINGS": 1,
+    "REQUIRE_CLAIM": true,
+    "WORKER_ID": "CLAIM_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/CLAIM_WORKER/357e6bf3b5",
+  "WORKER_ID": "CLAIM_WORKER"
+}

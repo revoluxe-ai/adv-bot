@@ -1,0 +1,28 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/h2fdenom001/IN",
+  "WORKER_ID": "IMPLEMENTATION_EXECUTOR",
+  "WORKER_EXECUTION_ID": "WEX/IMPLEMENTATION_EXECUTOR/h2fdenom001",
+  "PARENT_ORCHESTRATION_ID": "ORCH/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/CASE-RESUME-20260908",
+  "CASE_ID": "BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z",
+  "FINDING_ID": "ROOT-001",
+  "ATTEMPT": 1,
+  "MAX_ATTEMPTS": 2,
+  "TIMEOUT_SECONDS": 2400,
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "LOCAL_AUTHORITY": "OWNER_GO_2026-09-08",
+  "RED_STATUS": "RED_CONFIRMED_WITH_FIX_PRESENT",
+  "RED_EVIDENCE_PATH": "results/RED-ROOT-001.md",
+  "ALLOWED_INPUT_ARTIFACTS": [
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_RED_TEST_WORKER_h2fdenom001.out.json",
+    ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_CLASSIFIER_h2fdenom001.out.json",
+    "app/shared/domains/wb/utils/promo_accounting.py",
+    "tests/unit/wb/utils/test_promo_accounting.py"
+  ],
+  "WRITE_BOUNDARY_SUMMARY": "app/** tests/** results/FIX-* team/packets",
+  "HEARTBEAT_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/heartbeats/WEX_IMPLEMENTATION_EXECUTOR_h2fdenom001.json",
+  "OUTPUT_PACKET_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-H2-FDENOM-20260907T134900Z/team/packets/WEX_IMPLEMENTATION_EXECUTOR_h2fdenom001.out.json",
+  "INVARIANT": "leftover 200 / top-up unit 1000 -> f=0.2 M=1.25; reference_budget=tranche.amount in apply_spend_fefo; campaign_ledger_from_rows uses reference not budget_after",
+  "RUNTIME_PATH": "app/shared/domains/wb/utils/promo_accounting.py"
+}

@@ -1,0 +1,53 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 47,
+  "CREATED_AT": 1788801069.3115873,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/9c9a6d6d7e/OUT": {
+      "CANONICAL_SHA256": "017ffc6c196260b6e14bfa75a166fa75838e192de007bcf391818b5524e280da",
+      "RAW_SHA256": "f1f34de6288d2d6bf2c8ff09654e39b5c82453559f2dadba4a4f6f111ea56bc4"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/9c9a6d6d7e/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788804669.3115873,
+  "FINDING_ID": "FINDING-004",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t08-d08",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/ce96b5a340/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/IMPLEMENTATION_EXECUTOR/9c9a6d6d7e/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-004.md",
+      "results/RED-FINDING-004.md",
+      "results/FIX-FINDING-004.md",
+      "team/packets/WEX_RED_TEST_WORKER_94410e06f6.out.json",
+      "team/packets/WEX_IMPLEMENTATION_EXECUTOR_9c9a6d6d7e.out.json",
+      ".cursor/pipeline/bug-team/workers/GREEN_VERIFIER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-test.md",
+      "tests/unit/wb/utils/test_promo_accounting.py",
+      "app/shared/domains/wb/utils/promo_accounting.py"
+    ],
+    "FINDING_ID": "FINDING-004",
+    "FIX_EVIDENCE_PATH": "results/FIX-FINDING-004.md",
+    "FROZEN_TEST_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_fefo_spend_hits_live_leftover_not_expired",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FROZEN_TEST_SHA256": "cd926666fd7fcd2f958440220a58e1a6ff621fb8b839b518133ee0084ffc67b2",
+    "MAPS_TO": "/opsx-test verify",
+    "RED_EVIDENCE_PATH": "results/RED-FINDING-004.md",
+    "REQUIRED_INVARIANT": "apply_spend_fefo must not apply spend to expired leftover before live leftover; expired 300 + live 200 + spend 50 must yield remaining 150.",
+    "WORKER_ID": "GREEN_VERIFIER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/ce96b5a340",
+  "WORKER_ID": "GREEN_VERIFIER"
+}

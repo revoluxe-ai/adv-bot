@@ -1,0 +1,66 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 65,
+  "CREATED_AT": 1788809267.6458125,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/74b4e60c9d/OUT": {
+      "CANONICAL_SHA256": "50f19915e362182d8c1b85c350c53b02f3127a2ae5fe53fdfd0bb6e66b856884",
+      "RAW_SHA256": "255d113b0813d0880b8acb0ba70a645d169c44e1b344ed69f55aceaa8f6ae704"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/74b4e60c9d/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788812867.6458125,
+  "FINDING_ID": "FINDING-005",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t10-d10",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/d17c05e46a/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/74b4e60c9d/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-005.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "CASE.md",
+      "team/packets/WEX_CLASSIFIER_74b4e60c9d.out.json",
+      ".cursor/pipeline/bug-team/workers/RED_TEST_WORKER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-test.md",
+      ".cursor/rules/testing-rules.mdc",
+      "app/shared/domains/wb/utils/promo_accounting.py",
+      "app/shared/domains/wb/utils/promo_plan_multiplier.py",
+      "tests/unit/wb/utils/test_promo_accounting.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-005/2026-09-07T19:14:25Z",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "DO_NOT_EDIT_PRODUCTION": true,
+    "DO_NOT_REOPEN_FINDING_002": true,
+    "DO_NOT_REOPEN_FINDING_003": true,
+    "DO_NOT_REOPEN_FINDING_004": true,
+    "DO_NOT_REOPEN_HC_001": true,
+    "DO_NOT_REOPEN_HC_FINDING_004_STALE_TEST": true,
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEM_6": true,
+    "EXISTING_TEST_FILE": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FINDING_ID": "FINDING-005",
+    "MAPS_TO": "/opsx-test",
+    "MODE": "bug-regression",
+    "REQUIRED_OUTCOME": "RED_CONFIRMED",
+    "REQUIRED_REGRESSION": "campaign leftover fraction must use remaining over the top-up unit (tranche.amount), not budget_after or campaign_budget_total. leftover remaining 200 with amount 1000 and budget_after 12000 must yield fraction 0.2 (M=1.25), not 200/12000. Do not reuse amount=budget_after=total as the only vector. Do not mock away campaign_ledger_from_rows. Do not edit production.",
+    "TARGET_SITE": "app/shared/domains/wb/utils/promo_accounting.py campaign_ledger_from_rows",
+    "WAVE_3A": "RED before IMPLEMENTATION_EXECUTOR",
+    "WORKER_ID": "RED_TEST_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/d17c05e46a",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

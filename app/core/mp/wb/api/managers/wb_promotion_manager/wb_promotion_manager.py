@@ -7,6 +7,7 @@ Auto PATCH ставок (``update_auto_adv_cpm``, ``patch_auto_adv_bids_kopecks`
 
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import typing
@@ -343,6 +344,30 @@ class WBModifier:
 
     async def get_campaign_balance(self) -> typing.Union["GetAdvV1BalanceResponse200", None]:
         return await self._promotion_manager.get_campaign_balance()
+
+    async def get_costs_history(
+        self,
+        *,
+        from_date: datetime.date,
+        to_date: datetime.date,
+    ) -> list[typing.Any]:
+        """Фактические списания с бюджета кампаний (УПД, ``GET /adv/v1/upd``).
+
+        Не аналитический spend и не текущий budget.total: строки начисления
+        с ``paymentType`` источника денег. Кэшбэк из ответа идёт в promo remaining;
+        остальные типы здесь не отбрасываются.
+
+        Args:
+            from_date: начало периода.
+            to_date: конец периода.
+
+        Returns:
+            Список UPD-items от ``FinanceAdapter.get_costs_history``.
+        """
+        return await self._promotion_manager.get_costs_history(
+            from_date=from_date,
+            to_date=to_date,
+        )
 
 
     async def start_auto_campaign(self, complex_adv: ComplexAdv) -> None:

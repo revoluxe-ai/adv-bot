@@ -1,0 +1,13 @@
+{
+  "ATTEMPT": 1,
+  "CHECKPOINT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z\\team\\CHECKPOINT.json",
+  "LAST_HEARTBEAT_AT": 1788822997.2296991,
+  "OUTPUT_ARTIFACT_PATH": "C:\\Users\\vkita\\my_code\\meta-repo\\implement-promobonus-mechanics\\.opsx\\runs\\bug-cases\\BUGCASE-PROMOBONUS-HIGH6-20260907T113730Z\\team\\packets\\WEX_CLAIM_WORKER_354a0996be.out.json",
+  "PROCESS_ID_OR_TASK_ID": "WEX/CLAIM_WORKER/354a0996be",
+  "PROGRESS_MARKER": "ELIGIBILITY_SCAN_NONE_AVAILABLE",
+  "STARTED_AT": 1788822845.0,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/CLAIM_WORKER/354a0996be",
+  "WORKER_ID": "CLAIM_WORKER"
+}

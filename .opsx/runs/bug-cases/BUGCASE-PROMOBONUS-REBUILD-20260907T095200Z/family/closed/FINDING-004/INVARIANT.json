@@ -1,0 +1,10 @@
+{
+  "INVARIANT_ID": "INV/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-004/FEFO-SPEND-SKIP-EXPIRED",
+  "INVARIANT_REQUIRED_BEHAVIOR": "skip expired leftover in spend loop; remaining == 150.",
+  "INVARIANT_FORBIDDEN_BEHAVIOR": "do not apply spend to expired leftover before live leftover (that inflates remaining to 200).",
+  "INVARIANT_ENTRY_CONDITIONS": "apply_spend_fefo with expired leftover 300 + live leftover 200 + spend 50 (frozen node test_fefo_spend_hits_live_leftover_not_expired).",
+  "INVARIANT_SCOPE": "promo_accounting.apply_spend_fefo spend loop + remaining filter. Excludes ROOT-001 overlay, FINDING-002/HC-001 pool-failure, FINDING-003 90d leftover cutoff, intake items 5-6 leftover-fraction/journal.",
+  "CONTRADICTS_ROOT_GREEN": false,
+  "CONTRADICTS_ROOT_FIX": false,
+  "INTRODUCES_UNRELATED_RULE": false
+}

@@ -110,7 +110,9 @@ class AdvStrategySelector:
 
         ``reason`` в ``StrategySelection`` — для логов и диагностики.
         """
-        plan = PlanFactProvider.get_plan_data(complex_adv.adv_setting)
+        plan = PlanFactProvider.get_effective_plan_data(
+            complex_adv.adv_setting, complex_adv=complex_adv
+        )
         summary = None
         if plan is not None:
             summary = await plan_fact_reader.get_latest_plan_fact(complex_adv.adv_id)

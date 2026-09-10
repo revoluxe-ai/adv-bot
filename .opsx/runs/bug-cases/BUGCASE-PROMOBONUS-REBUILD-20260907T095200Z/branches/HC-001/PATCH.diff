@@ -1,0 +1,15 @@
+--- a/app/modules/auto_budget_manager/promo_state_service.py
++++ b/app/modules/auto_budget_manager/promo_state_service.py
+@@ -147,7 +147,7 @@ class PromoStateService:
+         pool_fetch_ok = False
+         try:
+             pool_response = await wb_modifier.get_campaign_balance()
+-            pool_fetch_ok = True
++            pool_fetch_ok = pool_response is not None
+         except Exception:
+             logger.warning(
+                 "promo state: get_campaign_balance failed shop_id=%s",
+
+RECORD_ONLY: already applied in-place on main worktree.
+Do not re-apply. integrate_branch_patches was not used (no isolated PATCH.diff workspace).
+PRODUCTION_HASH_AFTER: d83c97f6b96b73e9f520e96ad891642ff360ca1037136c898bdd3cf5eba45b7c

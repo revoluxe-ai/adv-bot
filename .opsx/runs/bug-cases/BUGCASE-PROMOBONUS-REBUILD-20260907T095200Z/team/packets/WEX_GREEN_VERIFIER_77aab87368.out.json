@@ -1,0 +1,87 @@
+{
+  "SCHEMA_VERSION": "1",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PACKET_ID": "PKT/WEX/GREEN_VERIFIER/77aab87368/OUT",
+  "PACKET_GENERATION": 1,
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t10-d10",
+  "WORKER_EXECUTION_ID": "WEX/GREEN_VERIFIER/77aab87368",
+  "WORKER_ID": "GREEN_VERIFIER",
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "FINDING_ID": "FINDING-005",
+  "PARENT_PACKET_ID": "PKT/WEX/GREEN_VERIFIER/77aab87368/IN",
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/883c7beaa2/OUT"
+  ],
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/IMPLEMENTATION_EXECUTOR/883c7beaa2/OUT": {
+      "CANONICAL_SHA256": "a853dc1eca084d768dfabbf277b955bc37761899edeb099d6534fa9bc60c06ac",
+      "RAW_SHA256": "1a85f26b6136d0f7fd5b1bf56d693ce9abe74cdb49a9d42ef038bef2e96a97f6"
+    }
+  },
+  "CHECKPOINT_GENERATION": 67,
+  "CREATED_AT": 1788810308.6996844,
+  "EXPIRES_AT": 1788813908.6996844,
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "GREEN_CONFIRMED",
+  "PAYLOAD": {
+    "GREEN_STATUS": "GREEN_CONFIRMED",
+    "FROZEN_TEST_HASH_STATUS": "MATCH",
+    "EVIDENCE_PATH": "results/GREEN-FINDING-005.md",
+    "TEST_RESULTS": {
+      "FROZEN_NODE": "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+      "FROZEN_COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after -vv --tb=short",
+      "FROZEN_RESULT": "PASSED",
+      "FROZEN_EXIT": 0,
+      "ADJACENT_PAIR_COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -vv --tb=short",
+      "ADJACENT_PAIR_RESULT": "7 passed, 1 warning in 0.31s",
+      "ADJACENT_PAIR_EXIT": 0,
+      "ADJACENT_FILE_COMMAND": "poetry run pytest tests/unit/wb/utils/test_promo_accounting.py -vv --tb=short",
+      "ADJACENT_FILE_RESULT": "7 passed, 1 warning in 0.31s",
+      "ADJACENT_FILE_EXIT": 0,
+      "TEST_CONTENT_SHA256": "d2b77e376699bfe70729aec6a028759353a20d1a6d4a35fef2dfdce3532954a9",
+      "TEST_CONTENT_SHA256_MATCH_RED": true,
+      "VERIFY_ADJACENT_IS_GREEN_GATE": false
+    },
+    "INVARIANT_VERIFIED": true,
+    "MAPS_TO": "/opsx-test verify",
+    "TEST_ID": "tests/unit/wb/utils/test_promo_accounting.py::test_campaign_ledger_leftover_fraction_uses_tranche_amount_not_budget_after",
+    "FROZEN_TEST_PATH": "tests/unit/wb/utils/test_promo_accounting.py",
+    "FROZEN_TEST_SHA256": "d2b77e376699bfe70729aec6a028759353a20d1a6d4a35fef2dfdce3532954a9",
+    "REQUIRED_INVARIANT": "leftover remaining 200 / amount 1000 / budget_after 12000 => fraction 0.2 (M=1.25), not 200/12000.",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no",
+    "DURABLE_FILE_WRITTEN": "YES",
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_GREEN",
+      "RESULT": "GREEN_CONFIRMED",
+      "TO_STATE": "AWAITING_TASK_COMPLETION",
+      "NEXT_COMMAND": "/opsx-bug-team",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z WAVE_4",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "NOT_APPLICABLE",
+        "CLAIM_REQUIRED": "no",
+        "RED_REQUIRED": "satisfied",
+        "GREEN_REQUIRED": "satisfied",
+        "OTHER": "WAVE_4"
+      },
+      "REQUIRED_EVIDENCE": [
+        "GREEN_EVIDENCE_PATH"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_TASK_COMPLETION",
+      "ON_FAILURE_STATE": "BLOCKED",
+      "RECOVERY_COMMAND": "NOT_APPLICABLE",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    }
+  },
+  "ARTIFACTS_WRITTEN": [
+    "results/GREEN-FINDING-005.md",
+    "team/heartbeats/WEX_GREEN_VERIFIER_77aab87368.json",
+    "team/packets/WEX_GREEN_VERIFIER_77aab87368.out.json"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ATTEMPT": 1
+}

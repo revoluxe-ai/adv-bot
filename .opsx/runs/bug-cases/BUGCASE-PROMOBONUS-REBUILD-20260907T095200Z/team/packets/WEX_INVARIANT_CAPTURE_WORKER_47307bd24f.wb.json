@@ -1,0 +1,38 @@
+{
+  "WORKER_ID": "INVARIANT_CAPTURE_WORKER",
+  "WRITE_BOUNDARY_RESULT": "PASS",
+  "VIOLATIONS": [],
+  "CREATED": [
+    "family/closed/FINDING-002/BRANCHES.jsonl",
+    "family/closed/FINDING-002/DEPENDENCIES.json",
+    "family/closed/FINDING-002/FAMILY.json",
+    "family/closed/FINDING-002/INTEGRATION.json",
+    "family/closed/FINDING-002/INVARIANT.json",
+    "family/closed/FINDING-002/INVARIANT.md",
+    "family/closed/FINDING-002/LEARNING_DECISION.json",
+    "family/closed/FINDING-002/LEARNING_PACKET.json",
+    "family/closed/FINDING-002/ROOT-GREEN-PROOF.json",
+    "results/ROOT-GREEN-REUSED-FINDING-004.md",
+    "team/heartbeats/WEX_INVARIANT_CAPTURE_WORKER_47307bd24f.json",
+    "team/intents/WEX_INVARIANT_CAPTURE_WORKER_47307bd24f.intent.json",
+    "team/packets/WEX_INVARIANT_CAPTURE_WORKER_47307bd24f.finalize_reject.json",
+    "team/packets/WEX_INVARIANT_CAPTURE_WORKER_47307bd24f.out.json",
+    "team/packets/WEX_INVARIANT_CAPTURE_WORKER_47307bd24f.wb.json",
+    "team/snapshots/WEX_INVARIANT_CAPTURE_WORKER_47307bd24f.before.json"
+  ],
+  "MODIFIED": [
+    "family/BRANCHES.jsonl",
+    "family/DEPENDENCIES.json",
+    "family/FAMILY.json",
+    "family/INTEGRATION.json",
+    "family/INVARIANT.json",
+    "family/INVARIANT.md",
+    "family/LEARNING_PACKET.json",
+    "family/ROOT-GREEN-PROOF.json",
+    "team/CHECKPOINT.json",
+    "team/DISPATCH.jsonl"
+  ],
+  "DELETED": [
+    "family/LEARNING_DECISION.json"
+  ]
+}

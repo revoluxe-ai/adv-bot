@@ -1,0 +1,57 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 16,
+  "CREATED_AT": 1788784045.9825222,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/CLASSIFIER/7d5f4dc267/OUT": {
+      "CANONICAL_SHA256": "8296c90285c9304fc0c44d8d01e3823e7932de4e2b40f512982a0a8e83baa82b",
+      "RAW_SHA256": "e85853a3cf3f13733757f238f70cff0e551fe9a337a94389c51dede7260dd795"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/CLASSIFIER/7d5f4dc267/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788787645.9825222,
+  "FINDING_ID": "FINDING-002",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t05-d05",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/RED_TEST_WORKER/060d28fe2f/IN",
+  "PACKET_TYPE": "WORKER_INPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/7d5f4dc267/OUT",
+  "PAYLOAD": {
+    "ALLOWED_INPUT_ARTIFACTS": [
+      "findings/FINDING-002.md",
+      "intakes/INTAKE-001.md",
+      "LEDGER.md",
+      "team/packets/WEX_CLASSIFIER_7d5f4dc267.out.json",
+      "results/PROOF-CLASSIFIER-WEX7d5f4dc267.md",
+      ".cursor/pipeline/bug-team/workers/RED_TEST_WORKER.md",
+      ".cursor/pipeline/bug-team/WRITE_BOUNDARY.md",
+      ".cursor/commands/opsx-test.md",
+      ".cursor/rules/testing-rules.mdc",
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "CLAIM_TOKEN": "CLAIM/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/FINDING-002/2026-09-07T12:15:07Z",
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "DO_NOT_REOPEN_ROOT_001": true,
+    "DO_NOT_START_ITEMS_3_TO_6": true,
+    "EXISTING_TEST_FILE": "tests/unit/auto_budget_manager/test_promo_ledger.py",
+    "FINDING_ID": "FINDING-002",
+    "MAPS_TO": "/opsx-test",
+    "PROPOSED_TEST_FILE": "tests/unit/auto_budget_manager/test_promo_state_service.py",
+    "REQUIRED_OUTCOME": "RED_CONFIRMED",
+    "REQUIRED_REGRESSION": "get_campaign_balance exception must not redis.set a fresh pool_usable=false snapshot; overlay readers must take miss/stale -> M=1. Do not mock away the failure path.",
+    "TARGET_SITE": "app/modules/auto_budget_manager/promo_state_service.py:127-202 get_campaign_balance except then RedisPromoStateManager.set",
+    "WORKER_ID": "RED_TEST_WORKER"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PENDING",
+  "TERMINAL_STATUS": null,
+  "WORKER_EXECUTION_ID": "WEX/RED_TEST_WORKER/060d28fe2f",
+  "WORKER_ID": "RED_TEST_WORKER"
+}

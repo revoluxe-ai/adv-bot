@@ -16,6 +16,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.auto_shelf_bid_recommendation_read_service import (
     AutoShelfBidRecommendationReadService,
 )
+from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
@@ -106,12 +107,24 @@ async def fetch_plan_distance_rec_result(
         fact_predict_orders = (
             plan_fact_summary.fact_predict_orders if plan_fact_summary else None
         )
+        overlay = PlanFactProvider.get_effective_promo_plan(
+            complex_adv.adv_setting, complex_adv=complex_adv
+        )
+        plan_overlay = overlay.plan
         plan_context = build_rec_bid_plan_context(
             sales_plan=float(complex_adv.adv_setting.plan_for_sales_for_day or 0.0),
             current_fact_sales=float(fact_predict_orders or 0.0),
             current_sales_forecast=float(fact_predict_orders or 0.0),
-            target_price_for_order=complex_adv.adv_setting.target_price_for_order,
-            max_price_for_order=complex_adv.adv_setting.max_price_for_order,
+            target_price_for_order=(
+                plan_overlay.target_pay_for_order
+                if plan_overlay is not None
+                else complex_adv.adv_setting.target_price_for_order
+            ),
+            max_price_for_order=(
+                plan_overlay.max_pay_for_order
+                if plan_overlay is not None
+                else complex_adv.adv_setting.max_price_for_order
+            ),
             max_order_cost=complex_adv.original_max_cpo,
             click_to_order_cr_7d=click_to_order_cr_7d,
         )

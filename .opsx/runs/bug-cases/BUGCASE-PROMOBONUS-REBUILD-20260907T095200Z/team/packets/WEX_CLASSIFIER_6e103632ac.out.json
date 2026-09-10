@@ -1,0 +1,168 @@
+{
+  "ACTIVATION_STATE_HASH": "b2821737b3a684868377e1b526a4adbcb73a538486d516afd4c43f10696d5239",
+  "ARTIFACTS_WRITTEN": [
+    "LEDGER.md",
+    "results/PROOF-CLASSIFIER-WEX6e103632ac.md",
+    "results/ROUTE-TRACE.jsonl",
+    "team/heartbeats/WEX_CLASSIFIER_6e103632ac.json",
+    "team/packets/WEX_CLASSIFIER_6e103632ac.out.json"
+  ],
+  "ATTEMPT": 1,
+  "CASE_ID": "BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z",
+  "CHECKPOINT_GENERATION": 24,
+  "CREATED_AT": 1788788701.1407356,
+  "DEPENDENCY_HASHES": {
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT": {
+      "CANONICAL_SHA256": "8e57d390b949221a26fc3d24b6ed682335e32587305fbfc68d06413084767d04",
+      "RAW_SHA256": "2f9e117f68e32c12737e7beaf0b886776b4025e6b8bd8d9ad856aa9c2c711208"
+    },
+    "PKT/WEX/RELATION_CLASSIFIER/eded5a8fdf/OUT": {
+      "CANONICAL_SHA256": "08e15128aac1bb384763deee183b207e3f81efe132a892625014dee9118fc7c3",
+      "RAW_SHA256": "fb775036419d59575c8c8c82171e47c65ff8163ba03cdb519425f65efb781420"
+    }
+  },
+  "DEPENDENCY_PACKET_IDS": [
+    "PKT/WEX/RELATION_CLASSIFIER/eded5a8fdf/OUT",
+    "PKT/WEX/INVARIANT_CAPTURE_WORKER/c05f376a93/OUT"
+  ],
+  "EXECUTION_MODE": "CONTROLLED_LIVE_UNCOMMITTED",
+  "EXPIRES_AT": 1788792301.1407356,
+  "FINDING_ID": "HC-001",
+  "ORCHESTRATION_ID": "ORCH/sup-promo-t06-d06",
+  "PACKET_GENERATION": 1,
+  "PACKET_ID": "PKT/WEX/CLASSIFIER/6e103632ac/OUT",
+  "PACKET_TYPE": "WORKER_OUTPUT",
+  "PARENT_PACKET_ID": "PKT/WEX/CLASSIFIER/6e103632ac/IN",
+  "PAYLOAD": {
+    "CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CURRENT_CLASSIFICATION": "IMPLEMENTATION_BUG",
+    "CHOSEN_ROUTE": "ROUTE_A",
+    "EXPECTED_NEXT_COMMAND": "/opsx-test",
+    "ACTUAL_NEXT_COMMAND": "PENDING",
+    "NEXT_COMMAND_RECONCILIATION": "PENDING",
+    "EXPECTED_EXECUTION_ROUTE": "/opsx-fix-bug",
+    "ACTUAL_EXECUTION_ROUTE": "PENDING",
+    "ROUTE_RECONCILIATION": "PENDING",
+    "RECONCILIATION_REASON": "Route A selected; team WAVE is RED then executor. EXPECTED_NEXT_COMMAND=/opsx-test; EXPECTED_EXECUTION_ROUTE=/opsx-fix-bug. ACTUAL_* remain PENDING. HC-001 has no dedicated CLAIM_TOKEN (max_active_findings=1; FINDING-002 remains GREEN_CONFIRMED claimed). Classify did not block on missing HC-001 claim.",
+    "CURRENT_ROUTE_STATE": "AWAITING_RED",
+    "RATIONALE": "FINDING-002 GREEN_CONFIRMED skipped Redis set on get_campaign_balance Exception. HC-001 is the sibling non-raising None return in the same PromoStateService.refresh: line 147 still sets pool_fetch_ok=True after FinanceAdapter.get_campaign_balance returns None (adapter.py:80, unexpected parsed type, no raise). resolve_promo_availability(pool_response=None) yields pool_usable=false. RedisPromoStateManager.set then stamps updated_at=now. Overlay readers treat that as a known-empty pool instead of miss/stale conservative M=1. Frozen RED/GREEN node uses only side_effect=RuntimeError and does not cover None. Same overlay contract as FINDING-002; OpenSpec is silent but rebuild cache/overlay API already encodes stale/miss -> M=1, so this is missed failure-path wiring, not SPEC_GAP. ROOT-001 stays closed_fixed. Residual intake items 3-6 not classified. FINDING-002 stays GREEN_CONFIRMED not closed.",
+    "NEXT_ACTION": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-001",
+    "MAPS_TO": "/opsx-classify-bug",
+    "INTAKE_ID": "INTAKE-001",
+    "PARENT_FINDING_ID": "FINDING-002",
+    "RELATION": "SAME_INVARIANT_FINDING",
+    "BRANCH_ID": "BR/HC-001/a6b8a8fb",
+    "CLAIM_TOKEN": null,
+    "CHAT_LABEL": "SUP-PROMO-FIX-20260907",
+    "OPENSPEC_UPDATE_REQUIRED": false,
+    "SPEC_EVIDENCE": {
+      "status": "implicit_product_invariant",
+      "evidence": "CachedShopPromoState docstring: Stale -> conservative M=1. fraction_from_cached_state: Stale/miss -> 0 (conservative M=1). Family PLAIN_LANGUAGE_INVARIANT: On get_campaign_balance failure, do not redis.set a fresh pool_usable=false snapshot. AutoBudgetService.refresh_promo_state: on refresh error runtime stays on prior overlay or conservative M=1. RedisPromoStateManager.set always stamps updated_at=now.",
+      "gap": "OpenSpec specs/decisions are silent on promo pool-failure vs stale overlay; not sufficient to force SPEC_GAP because the rebuild overlay/cache API and family invariant already require unknown/stale must not be treated as a known-empty pool."
+    },
+    "RUNTIME_EVIDENCE": {
+      "runtime_reachable": "yes",
+      "write_user_boundary": "Redis derived overlay cache write (pool_usable / campaigns / updated_at). No WB production mutation asserted for this finding.",
+      "entrypoints": [
+        "shop-runner auto_budget_watchdog",
+        "AutoBudgetService.refresh_promo_state",
+        "PromoStateService.refresh"
+      ],
+      "direct_callers": [
+        "promo_state_service.py:146-147 get_campaign_balance then pool_fetch_ok=True with no truthiness check",
+        "promo_state_service.py:219 RedisPromoStateManager.set",
+        "finance/adapter.py:80 return None on unexpected parsed type"
+      ],
+      "indirect_callers": [
+        "wb_shop_data_manager._build_pre_complex_adv fraction_from_cached_state on next watchdog tick"
+      ],
+      "test_only_callers": [],
+      "dead_or_legacy_path": "no"
+    },
+    "SOURCE_RESOLUTION": {
+      "mode": "canonical_id",
+      "primary_path": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/findings/HC-001.md",
+      "fallback_used": false,
+      "search_operations": [
+        "read findings/HC-001.md via canonical case+finding path",
+        "read cited promo_state_service refresh None vs Exception gates",
+        "read FinanceAdapter.get_campaign_balance None return",
+        "read resolve_promo_availability None pool_response",
+        "read RedisPromoStateManager.set/is_stale and fraction_from_cached_state",
+        "read frozen RED/GREEN FINDING-002 RuntimeError-only test",
+        "bounded openspec/decisions/index.md promo lookup"
+      ],
+      "search_scope": [
+        "findings/HC-001.md",
+        "LEDGER.md",
+        "family/INVARIANT.md",
+        "results/GREEN-FINDING-002.md",
+        "results/RED-FINDING-002.md",
+        "tests/unit/auto_budget_manager/test_promo_state_service.py",
+        "promo_state_service.py",
+        "finance/adapter.py",
+        "promo_accounting.py",
+        "redis_promo_state_manager.py",
+        "promo_overlay.py",
+        "auto_budget_manager/service.py",
+        "openspec/decisions/index.md"
+      ],
+      "unresolved_gap": "none"
+    },
+    "EXECUTION_PREFLIGHT": {
+      "git_branch": "deferred_not_required",
+      "git_status": "deferred_not_required",
+      "other_ops": "targeted reads of finding, frozen RED/GREEN, and cited promo-state symbols only",
+      "blocked_on_preflight": false
+    },
+    "ROUTE_TRANSITION": {
+      "FROM_STATE": "AWAITING_CLASSIFY",
+      "RESULT": "IMPLEMENTATION_BUG",
+      "TO_STATE": "AWAITING_RED",
+      "NEXT_COMMAND": "/opsx-test",
+      "NEXT_ARGS": "case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-001",
+      "PRECONDITIONS": {
+        "GO_TOKEN": "FORBIDDEN",
+        "CLAIM_REQUIRED": "no",
+        "RED_REQUIRED": "yes",
+        "GREEN_REQUIRED": "not_applicable"
+      },
+      "REQUIRED_EVIDENCE": [
+        "classification envelope",
+        "results/PROOF-CLASSIFIER-WEX6e103632ac.md"
+      ],
+      "ON_SUCCESS_STATE": "AWAITING_RED",
+      "ON_FAILURE_STATE": "BLOCKED_ROUTE_MISMATCH",
+      "RECOVERY_COMMAND": "/opsx-test",
+      "RECOVERY_CLASS": "ADVANCE",
+      "MISSION_COMPLETE": "no",
+      "FINDING_TERMINAL": "no",
+      "FINDING_TERMINAL_KIND": "none"
+    },
+    "NEXT_COMMAND": "/opsx-test case=BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z finding=HC-001",
+    "ALLOWED_FIX_FILES": [
+      "app/modules/auto_budget_manager/promo_state_service.py"
+    ],
+    "FORBIDDEN_FIX_FILES": [
+      "openspec/**",
+      "tests/** (RED owned by /opsx-test)",
+      "unrelated promo_ledger 90d / promo_accounting FEFO / leftover fraction / journal (intake items 3-6)",
+      "auto_shelf_bid_control_view_provider.py (ROOT-001 closed_fixed)",
+      "FINDING-002 Exception path (GREEN_CONFIRMED, do not reopen)"
+    ],
+    "REQUIRED_REGRESSION_TEST": "get_campaign_balance returning None without Exception must not redis.set a fresh pool_usable=false snapshot; overlay readers must take miss/stale -> M=1. Frozen FINDING-002 RuntimeError node is insufficient. Do not mock refresh away.",
+    "VERIFICATION_COMMAND_PROPOSED": "poetry run pytest tests/unit/auto_budget_manager/test_promo_state_service.py -q",
+    "ROUTE_TRACE_PATH": ".opsx/runs/bug-cases/BUGCASE-PROMOBONUS-REBUILD-20260907T095200Z/results/ROUTE-TRACE.jsonl",
+    "ROUTE_TRACE_APPENDED": true,
+    "WHY_EXISTING_SPEC_IS_SUFFICIENT": "The overlay/cache API already requires stale/miss -> conservative M=1. Family PLAIN_LANGUAGE_INVARIANT already forbids a fresh false-empty pool on get_campaign_balance failure. HC-001 is a missed None-return write, not a new product contract.",
+    "GO_TOKEN": "FORBIDDEN",
+    "MISSION_COMPLETE": "no",
+    "FINDING_TERMINAL": "no",
+    "static_analysis_failure": "no"
+  },
+  "SCHEMA_VERSION": "1",
+  "STATUS": "PASS",
+  "TERMINAL_STATUS": "PASS",
+  "WORKER_EXECUTION_ID": "WEX/CLASSIFIER/6e103632ac",
+  "WORKER_ID": "CLASSIFIER"
+}
