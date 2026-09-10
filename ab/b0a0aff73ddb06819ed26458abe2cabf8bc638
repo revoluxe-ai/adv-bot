@@ -1,0 +1,31 @@
+scripts/REGISTRY.md
+  s_ff7ca45a8cc52f::t_77a0fc26b23ead 57
+  s_c3c41ce6bba322::t_c47d97b1149611 56
+scripts/a1_v3_post_import_verify_collect.py
+  s_c3c41ce6bba322::t_473926b5a37197 1-13,16-463
+  s_c3c41ce6bba322::t_6d892be592e05e 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "abb0a0aff73ddb06819ed26458abe2cabf8bc638",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
