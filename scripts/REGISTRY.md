@@ -53,6 +53,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | A1 promo-adjusted DRR / cash ad cost | scripts/a1_promo_adjusted_drr_collect.py | WORKS | NONE | NO | - | 2026-09-07T01:28:04Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:2f6d3026dbfe27c04d42a3bc357764c093720b90 | Job ops-script-a1-promo-drr-20260907-012426 COMPLETE; PRIMARY zip a22f8cfa…; CASH_FLOW_ONLY; promo_adjusted=GAP |
 | A1 current performance / DRR snapshot | scripts/a1_current_performance_drr_snapshot.py | WORKS | NONE | NO | - | 2026-09-08T02:48:08Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:349ef965a7b1af7b70f452c0f082af54ef6085ab | Job ops-script-a1-perf-drr-20260908-054700 COMPLETE; PRIMARY zip 9e6fbb1e…; CASH_FLOW_ONLY; wb_cabinet 401 verified |
 | A1 strict read-only contract collector | scripts/a1_strict_read_only_contract_collect.py | WORKS | PARTIAL | NO | 2026-09-08T15:55:27Z | - | - | Targeted unit tests 7 passed; exact 00–07 contract ZIP + .sha256; no production writes |
+| A1 SKU factual ad economics collect | scripts/a1_sku_factual_ad_economics_collect.py | UNKNOWN | NONE | NO | 2026-09-10T12:05:00Z | - | - | supplier orders GMV + WB campaigns/spend; gross SKU DRR; READ_ONLY |
 | A1 controlled ad expansion v1 | scripts/a1_controlled_ad_expansion_v1.py | WORKS | COVERED | NO | 2026-09-08T05:45:00Z | - | - | DRY_RUN default; explicit --execute; allowlisted top-up/start adapters; PRICE/GLUE/CARD=0 |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
