@@ -1,0 +1,19 @@
+scripts/a1_v3_post_import_verify_collect.py
+  s_c3c41ce6bba322::t_400391f4b3ba50 105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8e783280646874fc96e897aa5ea03290c67946eb",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
