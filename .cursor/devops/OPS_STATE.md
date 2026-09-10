@@ -38,8 +38,8 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| `alembic_version` (prod) | `0b0fe484ba6b` |
-| Expand columns | shelf-exhausted pause SoT + `card_ab_hold_*` + `advsetting.auto_update_minus_phrases` (**NOT NULL**; backfill DONE 2026-08-28) |
+| `alembic_version` (prod) | `c4f8a1b2d3e4` |
+| Expand columns | shelf-exhausted pause SoT + `card_ab_hold_*` + `advsetting.auto_update_minus_phrases` (**NOT NULL**; backfill DONE 2026-08-28) + `raise_plan_on_promobonuses` + promo allocation/spend journals |
 | APPLICATION baseline | `baseline-adv-updater-20260731-post-cutover-app` / `RECONCILED` |
 | APPLICATION `source_history_hash` | `interim-forensics-20260731T093353Z` |
 | CONTROL baseline | `baseline-adv-updater-20260731-control-plane` / `RECONCILED` |
@@ -49,14 +49,14 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `dd061bf0b1816937dbe5667f14a5ac22577b01b1` |
-| Platform digest | `sha256:d4878d958e4651ad75d176e130e0c8e1496d2b326b6a37660117100631551587` (CI index digest; digest_pin) |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:dd061bf0b1816937dbe5667f14a5ac22577b01b1` |
-| App Deployments on this image | **all entrypoints on `dd061bf0…`** (WB token rotation fix; schema unchanged); `free-bot` replicas=0 |
-| Last CONTROL | `app-db-control-dd061bf0-r1` → `ACQUIRED` (fencing_token=4; CONTROL_DRY_RUN=0) |
-| Last migrate Job | `app-db-migrate-dd061bf0-r1` → `SUCCESS_NOOP` (schema already `0b0fe484ba6b`) |
-| Last complete_release | `app-db-ctrlplane-dd061bf0-r1-complete` → OK lease released |
-| Prepared fallback (prior LKG) | tag `2077dd7511e9b57d36f177d3bb443b00fa954927` / digest `sha256:8db0e8e985fe8454e3e6208407becff7f600a698f76bce70815bca3fd017cb9a` |
+| Image tag | `82c3d36b2d38192c8f859bb9abf85a45939430ff` |
+| Platform digest | `sha256:4b9a9e14acdb350f8d284b857eb0e1cbb0467bb560cc2b46799c0ea34ae4b2dd` (digest_pin) |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:82c3d36b2d38192c8f859bb9abf85a45939430ff` |
+| App Deployments on this image | **all entrypoints on `82c3d36b2…`** (fix raise CPO on promo — chunked UPD backfill); `free-bot` replicas=0 |
+| Last CONTROL | `app-db-control-82c3d36-r1` → `ACQUIRED` (fencing_token=6; CONTROL_DRY_RUN=0) |
+| Last migrate Job | `app-db-migrate-82c3d36-r1` → `SUCCESS_NOOP` (schema already `c4f8a1b2d3e4`) |
+| Last complete_release | `app-db-ctrlplane-82c3d36-r1-complete` → OK lease released |
+| Prepared fallback (prior LKG) | tag `70106ad3838fc998f168453ce594938051001e12` / digest `sha256:aa29e42e80096e8899db5d3c9fdf6387523eb7bc7d8688105e2613b53391aab0` |
 
 ## Open risks / follow-ups
 
@@ -103,3 +103,5 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-08-28 | GO safe_prod_release `2077dd751…` CONTROL_DRY_RUN=0 + backfill | CONTROL ACQUIRED token=3; mark_started OK; migrate Failed (SET ROLE skip on NOOP backfill); **PARTIAL — lease held; no CAS** |
 | 2026-08-28 | GO recovery SET_ROLE_BACKFILL + CAS `2077dd…` | backfill OK 69823/13; mark_succeeded→begin→CAS W1–W6→complete; lease released; LKG `2077dd…` |
 | 2026-09-05 | GO safe_prod_release `dd061bf0…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=4 → mark_started → migrate SUCCESS_NOOP `0b0fe…` → mark_noop → begin → CAS all entrypoints → complete_release OK; LKG `dd061bf0…` (WB token rotation) |
+| 2026-09-09 | GO safe_prod_release `70106ad38…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=5 → mark_started → migrate SUCCESS `c4f8a1…` → mark_succeeded → begin → phased CAS W1–W5 → complete_release OK; LKG `70106ad38…` (token add relax + promobonus) |
+| 2026-09-10 | GO safe_prod_release `82c3d36b2…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=6 → mark_started → migrate SUCCESS_NOOP `c4f8a1…` → mark_noop → begin → phased CAS W1–W5 → complete_release OK; LKG `82c3d36b2…` (fix raise CPO on promo) |
