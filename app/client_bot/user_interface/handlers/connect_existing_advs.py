@@ -1140,6 +1140,7 @@ async def connect_existing_choose_auction(
                 )
             ],
         )
+        await state.set_state(ConnectExistingAdvsStates.confirm_type1)
         await bot.send_message(
             chat_id,
             "Выберите поисковую (аукцион) кампанию из списка:",
@@ -1234,7 +1235,10 @@ async def connect_existing_auction_adv_id_entered(
 
 
 @router.callback_query(
-    StateFilter(ConnectExistingAdvsStates.confirm_type1),
+    StateFilter(
+        ConnectExistingAdvsStates.confirm_type1,
+        ConnectExistingAdvsStates.waiting_auction_adv_id,
+    ),
     callbacks.ConnectExistingConfirmType1.filter(),
 )
 async def connect_existing_confirm_type1(
@@ -1262,7 +1266,10 @@ async def connect_existing_confirm_type1(
 
 
 @router.callback_query(
-    StateFilter(ConnectExistingAdvsStates.confirm_type2),
+    StateFilter(
+        ConnectExistingAdvsStates.confirm_type2,
+        ConnectExistingAdvsStates.waiting_auto_adv_id,
+    ),
     callbacks.ConnectExistingConfirmType2.filter(),
 )
 async def connect_existing_confirm_type2(
@@ -1415,6 +1422,7 @@ async def connect_existing_choose_auto(
                 )
             ],
         )
+        await state.set_state(ConnectExistingAdvsStates.confirm_type2)
         await bot.send_message(
             chat_id,
             "Выберите авто-кампанию из списка:",
