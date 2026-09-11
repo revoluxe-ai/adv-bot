@@ -1,0 +1,30 @@
+app/modules/shop_runner/service_manager/old_modules/setting_auto_updater/plan_fact_change_redis_caches.py
+  s_f665c5202c4d51::t_377c987e7afbcb 48-51
+  s_9387ddf3137f2f::t_7abbd496890c6b 62-69
+app/modules/shop_runner/service_manager/manager.py
+  s_f665c5202c4d51::t_c548adbed87308 538-539
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "1a75e9a04363753cb281530db4f75f8e409492f3",
+  "prompts": {},
+  "sessions": {
+    "s_9387ddf3137f2f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2539acf0-e085-4260-a06b-448fbb07c64f",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f665c5202c4d51": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c86ba072-c0b5-454d-b143-535f2a6d6c93",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
