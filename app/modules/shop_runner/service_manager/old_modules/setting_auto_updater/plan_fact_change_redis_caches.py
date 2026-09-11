@@ -45,6 +45,10 @@ class ChangePlanFact(AdvSettingRedisCache, RedisCacheBase, prefix="ChangePlanFac
         value = f"{plan_value}|{fact_value}"
         await self._client.set(key, value)
 
+    async def clear_cached_plan_fact(self) -> None:
+        """Сброс snapshot plan/fact (например после смены плана в PG без V3-тика)."""
+        await self._client.delete(self._key)
+
     def _equal_plan(self, plan: PlanData, old_plan: PlanData) -> bool:
         return plan == old_plan
 
@@ -55,3 +59,11 @@ class ChangePlanFact(AdvSettingRedisCache, RedisCacheBase, prefix="ChangePlanFac
                 fact.pay_for_order == old_fact.pay_for_order,
             ]
         )
+
+
+async def clear_change_plan_fact_cache(adv_id: int) -> None:
+    """Сброс ``ChangePlanFact:{adv_id}`` без загрузки ``AdvSetting`` из PG."""
+    from types import SimpleNamespace
+
+    ref = SimpleNamespace(adv_id=int(adv_id))
+    await ChangePlanFact(ref).clear_cached_plan_fact()  # type: ignore[arg-type]
