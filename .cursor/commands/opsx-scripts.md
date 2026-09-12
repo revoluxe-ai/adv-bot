@@ -48,10 +48,16 @@ collector or implement product behavior.
 * Consumer of `SCRIPTS_INFRA_READY` artifacts from `/opsx-scripts-prepare`.
 * Owner of the intentional **no-PR** `git push` of branch `scripts` for image publish
   (`PUSH GO` only — not `/opsx-commit`, not prepare).
-* Goal executor: one `RUN GO` owns the safe chain from image readiness through
-  GHA/Job monitoring, logs, known output retrieval, and final report.
+* Goal executor: one `RUN GO` owns the safe chain from collector resolution
+  (including allowlisted auto-commit when a new collector is created) through
+  image readiness, GHA/Job monitoring, logs, known output retrieval, and
+  final report — without a separate Owner commit hop for that creation set.
 * Goal-driven collector resolver: reuse an exact compatible collector or create
   one bounded, read-only collector when the requested contract has no match.
+* Scoped **git commit** for `RUN GO` only: after `COLLECTOR_RESOLUTION=CREATED`,
+  commit **only** creation-allowlist paths on branch `scripts` (see **RUN GO —
+  allowlisted auto-commit**). All other VCS changes remain Owner /
+  `/opsx-commit` / `/opsx-admin-command-commit`.
 * Emitter of `SCRIPTS_REPORT` with explicit human next action.
 
 ## What this is NOT
@@ -62,7 +68,11 @@ collector or implement product behavior.
 * NOT OpenSpec feature implement / verify / archive.
 * NOT silent rewrite of working scripts; a new collector may be added only by
   an explicit `RUN GO` and only within the collector creation allowlist.
-* NOT commit owner → `/opsx-commit` (product) or `/opsx-admin-command-commit` (process).
+* NOT general commit owner → `/opsx-commit` (product) and
+  `/opsx-admin-command-commit` (process) still own commits outside this lane;
+  **exception:** `RUN GO` auto-commit is limited to the collector creation
+  allowlist on branch `scripts` (never stash, never unrelated paths, never
+  force-push, never merge/rebase/reset).
 * NOT force-push, push of non-`scripts` branches, merge, rebase, or reset.
 * NOT CSI / port-forward / secret dump / prod DB migration.
 * NOT a substitute for external handoff packs: research/side dumps ≠ declared
@@ -188,6 +198,33 @@ Creation allowlist for a new collector:
 Creation never permits edits to existing collectors, `app/**`, migrations,
 product specifications/tasks, secrets, or unrelated tests.
 
+### RUN GO — allowlisted auto-commit
+
+When `COLLECTOR_RESOLUTION=CREATED`, this command **must** finish VCS for the
+new collector inside the same `RUN GO` (do not stop with `BLOCKED` solely
+because allowlisted files are uncommitted):
+
+1. Confirm current branch is exactly `scripts` when image publication is required.
+2. Confirm tracked dirty paths are **only** within this invocation's creation
+   allowlist (`scripts/<new_collector>.py`, optional
+   `tests/unit/scripts/<matching_test>.py`, and the matching
+   `scripts/REGISTRY.md` delta). Any other tracked dirty path →
+   `STATUS=BLOCKED`; never `git stash` and never partial-commit unrelated work.
+3. `git add` only those allowlisted paths; create **one** conventional commit
+   (e.g. `feat(scripts): add <title> read-only collector`).
+4. Record `AUTO_COMMIT=yes` and `COMMITTED_SHA` in `SCRIPTS_RUN_PLAN` and the
+   terminal report.
+5. Pre-commit hook auto-fixes **only** on allowlisted paths: stage the hook
+   output and create at most **one** additional commit in the same RUN GO; if
+   hooks touch anything else → `STATUS=BLOCKED`.
+6. Before non-force push, tracked working tree must be clean (`.tmp/opsx-scripts/`
+   receipts may remain untracked).
+
+When `COLLECTOR_RESOLUTION=EXISTING`, do not auto-commit (`AUTO_COMMIT=no`).
+
+`PUSH GO` never commits. `/opsx-commit` and `/opsx-admin-command-commit` are
+not invoked for this auto-commit path.
+
 ## Ledger contract (`scripts/REGISTRY.md`)
 
 Authoritative readiness fields per entrypoint:
@@ -296,6 +333,8 @@ the command can continue itself.
    - if none is compatible, create one new strict read-only collector under
      the creation allowlist, add its registry entry, run its local check, and
      set `COLLECTOR_RESOLUTION=CREATED`;
+   - when `COLLECTOR_RESOLUTION=CREATED`, run **RUN GO — allowlisted
+     auto-commit** before image push (do not delegate commit to Owner);
    - if the contract is incomplete, creation needs product code/new external
      capability, or matching is ambiguous, stop with
      `COLLECTOR_RESOLUTION=BLOCKED` and do not create a Job.
@@ -368,8 +407,11 @@ the command can continue itself.
 
 The command may stop early only on incomplete/ambiguous collector contract,
 definitive GHA/Job failure, authentication or authorization denial,
-execution-critical dirty files, hard-forbid hit, artifact-contract failure, or
-bounded timeout. A queued/running workflow is an expected wait, not a blocker.
+unrelated tracked dirty files (outside creation allowlist), auto-commit or
+push failure, hard-forbid hit, artifact-contract failure, or bounded timeout.
+A queued/running workflow is an expected wait, not a blocker. Uncommitted
+allowlisted creation paths alone are **not** a valid stop reason — commit them
+under **RUN GO — allowlisted auto-commit** and continue.
 
 Hard forbids identical in spirit to `/opsx-devops` (CSI, port-forward,
 secret dump, namespace delete, uncontrolled force-delete, prod DB migration).
@@ -413,12 +455,14 @@ For **RUN**:
 3. Infra preconditions hold.
 4. No `FORBIDDEN_HIT`.
 5. Current branch is `scripts` when image publication is required.
-6. Before RUN, tracked dirty paths are empty or exactly
-   `scripts/REGISTRY.md`; files created by this invocation may additionally
-   be only within the collector creation allowlist. Never auto-commit/stash
-   other changes.
-7. Push, if needed, is only non-force `git push -u origin HEAD`.
-8. PowerShell-safe kubectl.
+6. Tracked dirty paths before push are empty, or **only** the creation
+   allowlist files for this invocation (see **RUN GO — allowlisted
+   auto-commit**). Any other tracked dirty path → `STATUS=BLOCKED`; never
+   stash unrelated changes.
+7. When `COLLECTOR_RESOLUTION=CREATED`, allowlisted auto-commit completed
+   successfully (`COMMITTED_SHA` recorded) before push.
+8. Push, if needed, is only non-force `git push -u origin HEAD`.
+9. PowerShell-safe kubectl.
 
 For **RECORD_BATTLE**:
 
@@ -439,6 +483,8 @@ CREATED_SCRIPT_PATH:
 IMAGE_REF:
 IMAGE_SOURCE: supplied | existing | built_by_run
 PUSH_REQUIRED: yes | no
+AUTO_COMMIT: yes | no
+COMMITTED_SHA:
 PUSHED_SHA:
 GHA_RUN:
 NS:
@@ -530,6 +576,8 @@ Optional durable receipt: `.tmp/opsx-scripts/<UTC_TS>/SCRIPTS_REPORT.md`
 RUN report additionally includes:
 
 ```text
+AUTO_COMMIT:
+COMMITTED_SHA:
 PUSHED_SHA:
 GHA_RUN:
 GHA_RESULT:
@@ -553,8 +601,10 @@ LOCAL_REPORT_PATH:
 ```
 
 When process-surface command files change (rare here): commit via
-`/opsx-admin-command-commit`. Ledger-only updates under `scripts/REGISTRY.md`
-are operated here; Owner decides commit cadence.
+`/opsx-admin-command-commit`. Registry rows for a new collector created in
+`RUN GO` are committed via **RUN GO — allowlisted auto-commit** together with
+the script (and optional unit test). Other ledger-only edits without a RUN
+creation still follow Owner commit cadence.
 
 ## Failure / recovery
 
@@ -571,7 +621,8 @@ are operated here; Owner decides commit cadence.
 * Declared primary missing or sha mismatch after exit 0 →
   `FAIL_ARTIFACT_CONTRACT`; do not treat as external handoff success; do not
   promote side/research dumps as primary.
-* Push auth failure or execution-critical dirty tree → `BLOCKED`; no force.
+* Push auth failure, unrelated dirty tree, or auto-commit failure → `BLOCKED`;
+  no force.
 * Same mutate error ≥ 3 → stop; escalate Owner.
 
 ## Pipeline position
@@ -593,7 +644,8 @@ FAILURE: no bypass of prepare infra or devops forbids; no force-push;
 - [ ] RUN / PUSH without GO → BLOCKED
 - [ ] PUSH only on branch `scripts`; never `--force`
 - [ ] PUSH does not commit
-- [ ] RUN GO continues through push/build/Job/output without another GO
+- [ ] RUN GO auto-commits only creation allowlist on `scripts`; never stash unrelated dirty
+- [ ] RUN GO continues through commit (when CREATED)/push/build/Job/output without another GO
 - [ ] Matching GHA queued/running is monitored, not returned as a blocker
 - [ ] Only one image-readiness retry; no generic Job retry
 - [ ] Known outputs copied and reported after success
