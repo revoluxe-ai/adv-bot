@@ -1,0 +1,26 @@
+scripts/a1_client_management_scope_reconcile_collect.py
+  s_c3c41ce6bba322::t_fedf45d0cb45cc 13
+  s_c3c41ce6bba322::t_48de80a3e15afd 119
+  s_c3c41ce6bba322::t_5775e5833b785c 99
+  s_c3c41ce6bba322::t_5fb6e7caf81645 65-68
+  s_c3c41ce6bba322::t_df4b6b90079046 1-12,14-64,69-98,100-118,120-501
+scripts/REGISTRY.md
+  s_c3c41ce6bba322::t_54336b70c771c4 59
+  s_c3c41ce6bba322::t_d3c93d95bd38bb 58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b47b21af53857f4bb96bc60e4703cd4220cbca87",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
