@@ -55,6 +55,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | A1 strict read-only contract collector | scripts/a1_strict_read_only_contract_collect.py | WORKS | PARTIAL | NO | 2026-09-08T15:55:27Z | - | - | Targeted unit tests 7 passed; exact 00–07 contract ZIP + .sha256; no production writes |
 | A1 SKU factual ad economics collect | scripts/a1_sku_factual_ad_economics_collect.py | WORKS | NONE | NO | 2026-09-10T12:05:00Z | 2026-09-10T12:18:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9d2a5b1f6ba0078f706ff35d98da8b6b64e58ebb | Job ops-script-prokraft-sku266109990-202609101215; nmid 266109990; PRIMARY sha 0d8c38c0…; gaps=[] |
 | A1 V3 post-import verify collect | scripts/a1_v3_post_import_verify_collect.py | UNKNOWN | NONE | NO | 2026-09-10T19:30:00Z | - | - | PG+Redis V3+WB live; READ_ONLY post-import verification |
+| Whole-shop factual economics | scripts/a1_whole_shop_economics_collect.py | UNKNOWN | NONE | NO | - | - | - | WB cabinet 573; closed/open factual economics, all-shop campaigns, DRR=10% headroom; READ_ONLY |
 | A1 controlled ad expansion v1 | scripts/a1_controlled_ad_expansion_v1.py | WORKS | COVERED | NO | 2026-09-08T05:45:00Z | - | - | DRY_RUN default; explicit --execute; allowlisted top-up/start adapters; PRICE/GLUE/CARD=0 |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
