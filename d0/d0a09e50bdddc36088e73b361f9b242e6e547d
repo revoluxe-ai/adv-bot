@@ -1,0 +1,19 @@
+scripts/a1_prokraft_spp_dynamics_collect.py
+  s_c3c41ce6bba322::t_c92f7ae51235c4 179,187-189,199-200,252,260,263-274,278-285
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d0d0a09e50bdddc36088e73b361f9b242e6e547d",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
