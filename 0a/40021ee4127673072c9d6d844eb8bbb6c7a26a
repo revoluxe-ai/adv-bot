@@ -1,0 +1,23 @@
+scripts/REGISTRY.md
+  s_c3c41ce6bba322::t_229409cce14219 63
+scripts/a1_prokraft_spp_dynamics_collect.py
+  s_c3c41ce6bba322::t_c90d05de5c9745 1-363
+tests/unit/scripts/test_a1_prokraft_spp_dynamics_collect.py
+  s_c3c41ce6bba322::t_df1b4727bcb7b2 1-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0a40021ee4127673072c9d6d844eb8bbb6c7a26a",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
