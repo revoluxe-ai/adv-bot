@@ -176,6 +176,7 @@ def _store_series(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for day in DAY_STRINGS:
         cohorts: dict[str, list[float]] = {"managed": [], "other": [], "all": []}
+        finished_prices: list[float] = []
         orders: dict[str, int] = {"managed": 0, "other": 0, "all": 0}
         for row in rows:
             if row["date_msk"] != day:
@@ -183,6 +184,9 @@ def _store_series(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
             cohort = "managed" if row["nmid"] in MANAGED_NMIDS else "other"
             orders[cohort] = int(orders[cohort]) + 1
             orders["all"] = int(orders["all"]) + 1
+            finished = _number(row, "finishedPrice")
+            if finished is not None:
+                finished_prices.append(finished)
             if row["spp_valid"] is not None:
                 cohorts[cohort].append(float(row["spp_valid"]))
                 cohorts["all"].append(float(row["spp_valid"]))
@@ -192,6 +196,8 @@ def _store_series(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "orders": orders["all"],
                 "managed_orders": orders["managed"],
                 "other_orders": orders["other"],
+                "GMV": round(sum(finished_prices), 2),
+                "median_finishedPrice": round(statistics.median(finished_prices), 4) if finished_prices else None,
                 "median_spp": round(statistics.median(cohorts["all"]), 4) if cohorts["all"] else None,
                 "order_weighted_mean_spp": round(statistics.mean(cohorts["all"]), 4) if cohorts["all"] else None,
                 "managed_median_spp": round(statistics.median(cohorts["managed"]), 4) if cohorts["managed"] else None,
@@ -243,6 +249,7 @@ def _analysis(sku_rows: list[dict[str, Any]], store_rows: list[dict[str, Any]], 
         xs: list[float] = []
         spp: list[float] = []
         orders: list[float] = []
+        gmv: list[float] = []
         for index, day in enumerate(DAY_STRINGS[:-lag] if lag else DAY_STRINGS):
             target_index = index + lag
             target = by_day[DAY_STRINGS[target_index]]
@@ -250,12 +257,32 @@ def _analysis(sku_rows: list[dict[str, Any]], store_rows: list[dict[str, Any]], 
                 xs.append(spend[day])
                 spp.append(float(target["median_spp"]))
                 orders.append(float(target["orders"]))
+                gmv.append(float(target["GMV"]))
         spp_r, spp_n = _pearson(xs, spp)
         order_r, order_n = _pearson(xs, orders)
-        lag_relations.append({"lag_days": lag, "ad_spend_vs_spp_r": spp_r, "spp_n": spp_n, "ad_spend_vs_orders_r": order_r, "orders_n": order_n})
+        gmv_r, gmv_n = _pearson(xs, gmv)
+        lag_relations.append(
+            {
+                "lag_days": lag,
+                "ad_spend_vs_spp_r": spp_r,
+                "spp_n": spp_n,
+                "ad_spend_vs_orders_r": order_r,
+                "orders_n": order_n,
+                "ad_spend_vs_GMV_r": gmv_r,
+                "GMV_n": gmv_n,
+            }
+        )
     return {
         "INTERVENTION_TIMELINE": [{"event": "ProKraft advertising intervention", "timestamp_status": "GAP", "evidence": "No independently reconciled ProKraft timestamp in collector sources"}],
         "DAILY_AD_SPP_ORDER_RELATIONS": lag_relations,
+        "SKU_CHANGE_RANKING": {
+            "status": "GAP",
+            "reason": "No independently proven ProKraft intervention timestamp; no pre/post ranking inferred",
+        },
+        "BEFORE_AFTER_COMPARISON": {
+            "status": "GAP",
+            "reason": "No independently proven ProKraft intervention timestamp",
+        },
         "SKU_OBSERVATIONS": len(sku_rows),
         "VERDICT": "INSUFFICIENT_EVIDENCE",
         "SPP_BEFORE": "GAP",
