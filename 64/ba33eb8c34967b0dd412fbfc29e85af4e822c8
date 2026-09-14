@@ -1,0 +1,21 @@
+scripts/REGISTRY.md
+  s_ff7ca45a8cc52f::t_369076e1712ca0 61
+scripts/a1_prokraft_delayed_ad_effect_collect.py
+  s_ff7ca45a8cc52f::t_ea07d96e46757f 1-829
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "64ba33eb8c34967b0dd412fbfc29e85af4e822c8",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
