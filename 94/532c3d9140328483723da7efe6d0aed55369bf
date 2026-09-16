@@ -1,0 +1,23 @@
+scripts/REGISTRY.md
+  s_c3c41ce6bba322::t_cb052f8e50e69e 56
+scripts/a1_cabinet401_run_go_contract_collect.py
+  s_c3c41ce6bba322::t_50cd50e6268b30 1-259
+tests/unit/scripts/test_a1_cabinet401_run_go_contract_collect.py
+  s_c3c41ce6bba322::t_1784eaac8ea6ef 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "94532c3d9140328483723da7efe6d0aed55369bf",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
