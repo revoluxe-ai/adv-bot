@@ -31,6 +31,20 @@ import logging
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+# When Python runs this file by path, only the file directory is added to
+# sys.path. Resolve both repository import roots from __file__ so the
+# compatibility entrypoint is independent of the caller's CWD.
+_PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+_REPOSITORY_ROOT = _PACKAGE_ROOT.parent
+for _path in (str(_REPOSITORY_ROOT), str(_PACKAGE_ROOT)):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
 try:
     from set_path import add_project_root_to_path
 except ImportError:
@@ -40,7 +54,7 @@ add_project_root_to_path()
 
 import dotenv
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(dotenv_path=_PACKAGE_ROOT / ".env", override=False)
 
 from redis.asyncio import Redis
 
