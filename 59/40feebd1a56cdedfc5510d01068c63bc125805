@@ -1,0 +1,30 @@
+tests/unit/scripts/wb_api_readonly_ops/test_portable.py
+  s_054c98864e7d93::t_46fcc05f113a6a 1-142,150-162,200-207,222-226
+  s_054c98864e7d93::t_32f8b2ce662f09 143-149,163-199,208-221,227
+scripts/wb_api_readonly_ops/run.py
+  s_054c98864e7d93::t_552166f97b3fcf 34-38
+  s_054c98864e7d93::t_2f2f60db108519 39-47,57
+pyproject.toml
+  s_054c98864e7d93::t_13a8dafd0c82a8 5,17
+scripts/wb_api_readonly_ops/collect/__main__.py
+  s_054c98864e7d93::t_13a8dafd0c82a8 1-5
+scripts/wb_api_readonly_ops/collect/portable.py
+  s_054c98864e7d93::t_2b3c7676b5913f 19,23
+  s_054c98864e7d93::t_13a8dafd0c82a8 1-18,20-22,24-452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "5940feebd1a56cdedfc5510d01068c63bc125805",
+  "prompts": {},
+  "sessions": {
+    "s_054c98864e7d93": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0af87-4d60-7f31-aeb7-0476a8b2ffa5",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
