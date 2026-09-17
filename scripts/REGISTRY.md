@@ -64,6 +64,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | ProKraft delayed advertising-effect evidence collector | scripts/a1_prokraft_delayed_ad_effect_collect.py | WORKS | NONE | NO | - | 2026-09-14T04:41:55Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:64ba33eb8c34967b0dd412fbfc29e85af4e822c8 | Job ops-script-prokraft-delay-halo-20260914-0457; ZIP sha 908f3849…; artifact PASS; integrity GAP on page metadata, campaign identity, and whole-store control semantics |
 | ProKraft historical SPP dynamics collector | scripts/a1_prokraft_spp_dynamics_collect.py | WORKS | PARTIAL | NO | 2026-09-14T16:35:00Z | 2026-09-14T16:55:01Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:d0d0a09e50bdddc36088e73b361f9b242e6e547d | Job ops-script-prokraft-spp-20260914-1955; primary ZIP sha 84e99292…; 898 rows, 29-day coverage, artifact PASS; intervention/pre-post ranking GAP |
 | A1 controlled ad expansion v1 | scripts/a1_controlled_ad_expansion_v1.py | WORKS | COVERED | NO | 2026-09-08T05:45:00Z | - | - | DRY_RUN default; explicit --execute; allowlisted top-up/start adapters; PRICE/GLUE/CARD=0 |
+| Generic multi-client advertising preflight | scripts/multi_client_ad_preflight_collect.py | UNKNOWN | PARTIAL | NO | - | - | - | Parameterized read-only identity envelope; primary ZIP + SHA; FBO/FBS/reservations and funding remain explicit GAP |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
