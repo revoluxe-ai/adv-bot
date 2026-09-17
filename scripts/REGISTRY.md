@@ -65,6 +65,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | ProKraft historical SPP dynamics collector | scripts/a1_prokraft_spp_dynamics_collect.py | WORKS | PARTIAL | NO | 2026-09-14T16:35:00Z | 2026-09-14T16:55:01Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:d0d0a09e50bdddc36088e73b361f9b242e6e547d | Job ops-script-prokraft-spp-20260914-1955; primary ZIP sha 84e99292…; 898 rows, 29-day coverage, artifact PASS; intervention/pre-post ranking GAP |
 | A1 controlled ad expansion v1 | scripts/a1_controlled_ad_expansion_v1.py | WORKS | COVERED | NO | 2026-09-08T05:45:00Z | - | - | DRY_RUN default; explicit --execute; allowlisted top-up/start adapters; PRICE/GLUE/CARD=0 |
 | Generic multi-client advertising preflight | scripts/multi_client_ad_preflight_collect.py | UNKNOWN | PARTIAL | NO | - | - | - | Parameterized read-only identity envelope; primary ZIP + SHA; FBO/FBS/reservations and funding remain explicit GAP |
+| Generic multi-client CPC topology | scripts/multi_client_cpc_topology_collect.py | UNKNOWN | PARTIAL | NO | - | - | - | Explicit shop/cabinet/nmID/adv_id; topology-only strict read-only ZIP + SHA; no stock/economics/DRR |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
