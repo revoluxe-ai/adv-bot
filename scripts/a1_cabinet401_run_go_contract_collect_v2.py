@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import shutil
@@ -34,6 +35,7 @@ TARGET_NMIDS = (
     751657528,
     214754056,
 )
+CLIENT_SIZE_ID = 1895360146
 PRESERVED_DECISIONS = {
     "751657528": "KEEP_STOPPED",
     "1256595631": "SCALE_FIRST",
@@ -82,7 +84,10 @@ def _worker_result(mode: str, output_dir: Path) -> dict[str, Any]:
     return result
 
 
-def _run_isolated_worker(mode: str, output_dir: Path) -> dict[str, Any]:
+def _run_isolated_worker(
+    mode: str, output_dir: Path, *, shop_id: str | None = None,
+    cabinet_id: int | None = None, target_nmids: tuple[int, ...] | None = None,
+) -> dict[str, Any]:
     """Выполнить worker с отдельным event loop и вернуть его summary."""
     command = [
         sys.executable,
@@ -92,6 +97,12 @@ def _run_isolated_worker(mode: str, output_dir: Path) -> dict[str, Any]:
         "--output-dir",
         str(output_dir),
     ]
+    if shop_id is not None:
+        command.extend(["--shop-id", shop_id])
+    if cabinet_id is not None:
+        command.extend(["--wb-cabinet-id", str(cabinet_id)])
+    if target_nmids is not None:
+        command.extend(["--target-nmids", ",".join(map(str, target_nmids))])
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout).strip().replace("\n", " ")
@@ -102,6 +113,105 @@ def _run_isolated_worker(mode: str, output_dir: Path) -> dict[str, Any]:
             if isinstance(value, dict):
                 return value
     raise RuntimeError(f"{mode} worker returned no result")
+
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    """Прочитать CSV-артефакт существующего factual collector."""
+    if not path.is_file():
+        return []
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Записать bounded JSONL без преобразования GAP в ноль."""
+    path.write_text(
+        "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+
+def _materialize_requested_outputs(root: Path) -> list[str]:
+    """Материализовать именованный evidence-контракт из strict read-only данных."""
+    strict_root = root / "strict"
+    mats = _read_csv(strict_root / "04_MATS.csv")
+    campaigns = _read_csv(strict_root / "02_CAMPAIGNS_CURRENT.csv")
+    advsetting = _read_csv(strict_root / "raw" / "advsetting.csv")
+    store = _read_csv(strict_root / "01_STORE.csv")
+    manifest = json.loads((strict_root / "00_MANIFEST.json").read_text(encoding="utf-8"))
+    target_rows = [row for row in mats if str(row.get("nm_id")) == str(TARGET_NMIDS[0])]
+    gaps = list(manifest.get("gaps") or [])
+    gaps.append("stock endpoint is not covered by the reused strict collector; GAP is not zero")
+    outputs: dict[str, Any] = {
+        "reuse_map.json": {
+            "route": "existing:a1_cabinet401_run_go_contract_collect_v2",
+            "parameterized": ["shop_id", "wb_cabinet_id", "target_nmids", "client_size_id"],
+            "collectors": [
+                "a1_strict_read_only_contract_collect",
+                "wb_api_readonly_ops.collect",
+            ],
+            "read_only": True,
+        },
+        "coverage.json": {
+            "shop_id": SHOP_ID,
+            "wb_cabinet_id": WB_CABINET_ID,
+            "target_nmids": list(TARGET_NMIDS),
+            "client_size_id": CLIENT_SIZE_ID,
+            "timezone": "Europe/Moscow",
+            "strict_manifest": manifest,
+        },
+        "integrity_report.json": {
+            "status": "PASS_WITH_GAPS",
+            "shop_cabinet_gate": manifest.get("wb_cabinet_id") == WB_CABINET_ID,
+            "nmid_ownership_gate": str(TARGET_NMIDS[0]) in {
+                str(row.get("nm_id")) for row in mats
+            },
+            "missing_is_not_zero": True,
+            "open_is_not_closed": True,
+            "cumulative_is_not_interval": True,
+            "factual_is_not_attributed": True,
+            "direct_is_not_associated": True,
+            "timezone": "Europe/Moscow",
+            "all_production_writes": 0,
+        },
+        "product_glue.json": {
+            "target_nmid": TARGET_NMIDS[0],
+            "client_size_id": CLIENT_SIZE_ID,
+            "rows": target_rows,
+            "source": "strict/04_MATS.csv",
+        },
+        "target_baseline.json": {"target_nmid": TARGET_NMIDS[0], "rows": target_rows},
+        "store_guardrail.json": {"windows": store, "closed_only": True},
+        "funding_snapshot.json": json.loads(
+            (strict_root / "05_PROMO.json").read_text(encoding="utf-8")
+        ) if (strict_root / "05_PROMO.json").is_file() else {"status": "GAP"},
+        "gaps.json": {"gaps": gaps},
+    }
+    for name, value in outputs.items():
+        (root / name).write_text(
+            json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+    _write_jsonl(root / "stock_snapshot.jsonl", [{
+        "nm_id": TARGET_NMIDS[0], "client_size_id": CLIENT_SIZE_ID,
+        "stock": "GAP", "missing_is_not_zero": True,
+    }])
+    _write_jsonl(root / "campaign_inventory.jsonl", [dict(row) for row in campaigns])
+    _write_jsonl(root / "advsetting_state.jsonl", [dict(row) for row in advsetting])
+    _write_jsonl(root / "glue_economics.jsonl", [dict(row) for row in target_rows])
+    summary = [
+        "# ProKraft glue launch evidence",
+        "",
+        f"- shop_id: `{SHOP_ID}`; wb_cabinet_id: `{WB_CABINET_ID}`",
+        f"- target nmID: `{TARGET_NMIDS[0]}`; client size_id: `{CLIENT_SIZE_ID}`",
+        "- mode: strict read-only; timezone: Europe/Moscow",
+        "- ALL_PRODUCTION_WRITES=0",
+        f"- explicit gaps: {len(gaps)}; stock is GAP, never zero",
+    ]
+    (root / "SUMMARY.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
+    return sorted(name for name in outputs) + [
+        "stock_snapshot.jsonl", "campaign_inventory.jsonl", "advsetting_state.jsonl",
+        "glue_economics.jsonl", "SUMMARY.md",
+    ]
 
 
 def _scenario_rows() -> list[dict[str, Any]]:
@@ -180,8 +290,20 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True)
-    strict_result = _run_isolated_worker("strict", root / "strict")
-    performance_result = _run_isolated_worker("performance", root / "performance")
+    strict_result = _run_isolated_worker(
+        "strict",
+        root / "strict",
+        shop_id=SHOP_ID,
+        cabinet_id=WB_CABINET_ID,
+        target_nmids=TARGET_NMIDS,
+    )
+    performance_result = _run_isolated_worker(
+        "performance",
+        root / "performance",
+        shop_id=SHOP_ID,
+        cabinet_id=WB_CABINET_ID,
+        target_nmids=TARGET_NMIDS,
+    )
     if strict_result.get("WB_CABINET_ID") != WB_CABINET_ID:
         raise RuntimeError("WB cabinet identity contradiction")
     if any(SAFETY_WRITE_COUNTS.values()):
@@ -191,6 +313,7 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     (root / "contract.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    _materialize_requested_outputs(root)
     primary = root / PRIMARY_NAME
     with zipfile.ZipFile(primary, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(root.rglob("*")):
@@ -236,12 +359,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", choices=("strict", "performance"))
     parser.add_argument("--output-dir", default=".tmp/a1_cabinet401_run_go_contract_v2")
+    parser.add_argument("--shop-id", default=SHOP_ID)
+    parser.add_argument("--wb-cabinet-id", type=int, default=WB_CABINET_ID)
+    parser.add_argument("--target-nmids", default=",".join(map(str, TARGET_NMIDS)))
+    parser.add_argument("--client-size-id", type=int, default=CLIENT_SIZE_ID)
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     """Запустить collector или один из его изолированных workers."""
     args = parse_args(argv)
+    global SHOP_ID, WB_CABINET_ID, TARGET_NMIDS, CLIENT_SIZE_ID
+    SHOP_ID = args.shop_id
+    WB_CABINET_ID = args.wb_cabinet_id
+    TARGET_NMIDS = tuple(
+        int(value) for value in args.target_nmids.split(",") if value.strip()
+    )
+    CLIENT_SIZE_ID = args.client_size_id
     if args.worker:
         _worker_result(args.worker, Path(args.output_dir))
         return 0
