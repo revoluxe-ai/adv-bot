@@ -1,0 +1,19 @@
+scripts/a1_cabinet401_run_go_contract_collect_v2.py
+  s_ff7ca45a8cc52f::t_ec4c7ab759f44f 12,38,87-90,100-105,118-216,293-306,316,362-365,372-378
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a7478226bc5c6e47dcf28da997d8c9f932760ebb",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
