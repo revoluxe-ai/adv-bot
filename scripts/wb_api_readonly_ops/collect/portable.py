@@ -418,7 +418,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.env_file:
             load_dotenv(Path(args.env_file).expanduser(), override=False)
         else:
-            load_dotenv(_COLLECT_PACKAGE_ROOT / ".env", override=False)
+            load_dotenv(_REPOSITORY_ROOT / ".env", override=False)
         contract = build_contract(args)
         require_credentials()
         if args.preflight_only:

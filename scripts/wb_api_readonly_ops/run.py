@@ -54,7 +54,7 @@ add_project_root_to_path()
 
 import dotenv
 
-dotenv.load_dotenv(dotenv_path=_PACKAGE_ROOT / ".env", override=False)
+dotenv.load_dotenv(dotenv_path=_REPOSITORY_ROOT / ".env", override=False)
 
 from redis.asyncio import Redis
 
