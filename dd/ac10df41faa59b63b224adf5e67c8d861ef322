@@ -1,0 +1,23 @@
+app/client_bot/user_interface/handlers/start/start.py
+  s_7bfcb65375660b::t_97a8e002aedd6c 1089-1093
+  s_7bfcb65375660b::t_8acd265215e0c2 63
+  s_7bfcb65375660b::t_cc7f057b5c5571 110-128
+  s_7bfcb65375660b::t_f50be522ac68b3 906,910-920
+  s_7bfcb65375660b::t_7342f3466be763 672,676-686
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "ddac10df41faa59b63b224adf5e67c8d861ef322",
+  "prompts": {},
+  "sessions": {
+    "s_7bfcb65375660b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "58217d35-3f4f-4e48-9794-01b218746b8a",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

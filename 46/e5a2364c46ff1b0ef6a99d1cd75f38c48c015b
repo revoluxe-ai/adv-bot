@@ -1,0 +1,21 @@
+app/client_bot/user_interface/handlers/adv_setting/adv_setting.py
+  s_3189e63191602f::t_07ddf0be68b1f9 166,182
+tests/unit/client_bot/handlers/test_turn_adv_on_read_only_token.py
+  s_3189e63191602f::t_976286e7cb2955 162-193
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "46e5a2364c46ff1b0ef6a99d1cd75f38c48c015b",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

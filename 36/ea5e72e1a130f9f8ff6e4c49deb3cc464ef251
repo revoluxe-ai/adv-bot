@@ -1,0 +1,19 @@
+scripts/REGISTRY.md
+  s_584a12d58b7d37::t_71fab0170c3541 52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "36ea5e72e1a130f9f8ff6e4c49deb3cc464ef251",
+  "prompts": {},
+  "sessions": {
+    "s_584a12d58b7d37": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "06617aed-2829-437e-a0b8-d6af0638fc9f",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

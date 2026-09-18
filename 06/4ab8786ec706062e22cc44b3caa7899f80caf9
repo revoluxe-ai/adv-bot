@@ -1,0 +1,35 @@
+scripts/wb_api_readonly_ops/collect/funnel.py
+  s_de94f11c688d9e::t_d6200124a8648d 31,36,40-63
+  s_de94f11c688d9e::t_79ba2038c300f1 64-72
+  s_de94f11c688d9e::t_3c3d5dc9e4d4b7 82
+  s_de94f11c688d9e::t_838e4e0da90793 108-111
+  s_de94f11c688d9e::t_776dd64e4983f1 16-18
+  s_de94f11c688d9e::t_dec2b5d35f7358 1
+  s_de94f11c688d9e::t_4f197d67e9ae62 94-96,98-99
+  s_de94f11c688d9e::t_27a7c5f1d0adef 97
+scripts/wb_api_readonly_ops/collect/runner.py
+  s_de94f11c688d9e::t_c0d0858428b19e 24
+  s_de94f11c688d9e::t_aadeb49d9bd710 123
+  s_de94f11c688d9e::t_6b045dcbb68cbd 33
+tests/unit/scripts/wb_api_readonly_ops/test_collect_core.py
+  s_de94f11c688d9e::t_b32ea491f144ef 266,274,280-281,284,286-330,332,334-337,339-342
+  s_de94f11c688d9e::t_a334096242a5ff 331
+  s_de94f11c688d9e::t_83a4d1338f37e6 27-28
+  s_de94f11c688d9e::t_d6b2fd67307924 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "064ab8786ec706062e22cc44b3caa7899f80caf9",
+  "prompts": {},
+  "sessions": {
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

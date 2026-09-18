@@ -1,0 +1,30 @@
+alembic_/versions/d1e2f3a4b5c6_add_auto_update_minus_phrases_to_advsetting.py
+  s_49973f20748fa6::t_12c7137aa76720 22,39
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py
+  s_49973f20748fa6::t_f2d3ab4d98633f 270-271
+k8s/jobs/app-db-migrate.yaml
+  s_49973f20748fa6::t_0e72f1378cba44 11-12,54-55
+app/db/auto_update_minus_phrases_backfill.py
+  s_49973f20748fa6::t_6e3cc268aa0657 1-130
+app/db/migrate.py
+  s_49973f20748fa6::t_8a40136d33e73c 26-30,53,65-66,215-252,275,304,312,315,323,342,377,410
+  s_49973f20748fa6::t_53170db852e45c 58
+scripts/Invoke-ProdDbMigrateThenRollout.ps1
+  s_49973f20748fa6::t_7e0ef4ad89729d 15-16,32-34,80-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "62a022b3a359c5f9ffbbec99b271fe99cc5bcc6b",
+  "prompts": {},
+  "sessions": {
+    "s_49973f20748fa6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "efe95670-22f3-4877-bb25-f6e35aae334a",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+tests/unit/client_bot/test_start_shop_menu_pg_seam_handoff.py
+  s_7bfcb65375660b::t_c72a8d37728a32 355
+  s_7bfcb65375660b::t_d1ad38e39572fb 358-425
+tests/unit/client_bot/test_start_pg_seam_handoff.py
+  s_7bfcb65375660b::t_3eb132576247dc 468
+  s_7bfcb65375660b::t_d23817d984c2ee 458
+  s_7bfcb65375660b::t_ef8838df8b85de 456-457,459-467,469-560
+  s_7bfcb65375660b::t_52c262eca7a371 452
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "70106ad3838fc998f168453ce594938051001e12",
+  "prompts": {},
+  "sessions": {
+    "s_7bfcb65375660b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "58217d35-3f4f-4e48-9794-01b218746b8a",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

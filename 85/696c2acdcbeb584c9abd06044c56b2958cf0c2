@@ -1,0 +1,45 @@
+tests/unit/shop_runner/service_manager/test_update_minus_phrases_filter.py
+  s_9be26b213332dd::t_4422eee5f0a194 77-127
+app/db/auto_update_minus_phrases_backfill.py
+  s_9be26b213332dd::t_3010c37494c063 4-5,29,41,53-55,74-82,90-93,100,102-104,110,121-129
+  s_9be26b213332dd::t_ee7efd9f98b96e 1,6-14
+openspec/changes/enable-minus-phrases-on-bot-active/proposal.md
+  s_9be26b213332dd::t_310e709c8ae9ec 10-13
+app/modules/shop_runner/service_manager/manager.py
+  s_e849113793b156::t_c1b7ba64736a60 870-874
+  s_9be26b213332dd::t_3bf20563c4c81c 888-889,891
+  s_9be26b213332dd::t_78b5c5501eac49 868-869,875
+tests/migrations/test_auto_update_minus_phrases_backfill.py
+  s_9be26b213332dd::t_d331112090f6d4 63,72-73,83-84,91-92,95-96,106-107,109-110,114,123
+alembic_/versions/d1e2f3a4b5c6_add_auto_update_minus_phrases_to_advsetting.py
+  s_9be26b213332dd::t_05c1b4674a51b1 23,29
+  s_9be26b213332dd::t_edfe6c588f47a8 22,24-28
+tests/integration/migrations/test_auto_update_minus_phrases_backfill_live_pg.py
+  s_9be26b213332dd::t_240c86bdac5980 17-18,32,61-63,66-67
+app/modules/shop_runner/wb_shop.py
+  s_9be26b213332dd::t_b17d6047ab7420 70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "85696c2acdcbeb584c9abd06044c56b2958cf0c2",
+  "prompts": {},
+  "sessions": {
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_e849113793b156": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2d99016d-e326-4295-891f-b069f8a8a51e",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

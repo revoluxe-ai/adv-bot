@@ -1,0 +1,23 @@
+scripts/REGISTRY.md
+  s_01bcd3035dd89e::t_0b46e9e9b560bb 69
+scripts/multi_client_strict_eight_target_directive_audit.py
+  s_01bcd3035dd89e::t_b570b65e0c5c9c 1-326
+tests/unit/scripts/test_multi_client_strict_eight_target_directive_audit.py
+  s_01bcd3035dd89e::t_e8a0a09de7c173 1-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "a9a954abe6449bae8dabf4e18f71675f881cc841",
+  "prompts": {},
+  "sessions": {
+    "s_01bcd3035dd89e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e77a4fc9-e0bf-45d5-baec-3a4a0c3c8460",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+.cursor/commands/opsx-scripts.md
+  s_9a75696fb9715b::t_724db8f9008a7e 112,114-115,128-138
+  s_9a75696fb9715b::t_6e55f0b265d815 159-190
+  s_9a75696fb9715b::t_e4d5d65e9a30e9 409-412,416-419
+  s_9a75696fb9715b::t_7de2a64ae19f3b 436-438,518-519
+  s_9a75696fb9715b::t_4628c79f6b1cee 290-302
+  s_9a75696fb9715b::t_c800305a67c447 40-43,53-54,63-64,77-78
+  s_9a75696fb9715b::t_9d6f3d89b52713 249-253
+  s_9a75696fb9715b::t_98dd65ecf2281e 319,324-325,327,332,353,358,366,369-372
+scripts/a1_strict_read_only_contract_collect.py
+  s_1a4bacd70ad9e4::t_a13bc40385f1a5 1-262,268-894,896-917,919,923-961,980-1010,1012-1050,1052-1202,1204-1347,1349-1352,1354-1358,1370-1375,1390-1620
+  s_1a4bacd70ad9e4::t_1f545ee7de3504 263-267,962-979
+  s_1a4bacd70ad9e4::t_a0125cdd61fd76 895,918,920-922,1011,1051,1203
+  s_1a4bacd70ad9e4::t_e5d260420dc8f0 1348,1353,1359-1369,1376-1389
+tests/unit/scripts/test_a1_strict_read_only_contract_collect.py
+  s_1a4bacd70ad9e4::t_c3adfddd927793 1-160
+scripts/REGISTRY.md
+  s_1a4bacd70ad9e4::t_a399261303dbe3 55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "3d6070583a39fd667174b5d35607dc37ff502392",
+  "prompts": {},
+  "sessions": {
+    "s_1a4bacd70ad9e4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6425dafe-2834-448e-a232-46c04c332819",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9a75696fb9715b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7f145575-79ef-4cad-a19a-1341b0bc9caf",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

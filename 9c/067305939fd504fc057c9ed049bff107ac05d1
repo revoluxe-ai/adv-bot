@@ -1,0 +1,89 @@
+app/client_bot/user_interface/handlers/adv_setting/adv_setting.py
+  s_62530fd74f5e66::t_a8c3d464b35077 273-285,732-733
+  s_62530fd74f5e66::t_019de8627e70f3 5,9
+  s_62530fd74f5e66::t_ce2b80767c8652 286-298
+  s_62530fd74f5e66::t_369b808928db21 227-242,670-671,790-791,866-867
+  s_62530fd74f5e66::t_3b6619a08d0d8b 212-226,346-347
+  s_62530fd74f5e66::t_9f2bc38d4da0d1 697-698,702,705-706,708,759-760
+  s_62530fd74f5e66::t_4ae3c8a29b0bd3 1-2
+  s_62530fd74f5e66::t_127bbe1710d84b 161-162,164,206-207
+  s_62530fd74f5e66::t_aeae135c74cc18 262-272,299-331,379-380,411-413,436-441,443,445-447
+  s_62530fd74f5e66::t_0285649bab778a 159-160,693-695,703,707,869
+  s_3f873febd3acf8::t_f6df9e8202f8ba 345,378,410,696,758
+  s_62530fd74f5e66::t_8867d36ced3192 243-261,885-886
+  s_62530fd74f5e66::t_b9ee9d270bfc7d 332-333
+app/modules/shop_runner/service_manager/auto_updater_version_toggle/telegram/handlers.py
+  s_62530fd74f5e66::t_15396d6ea4a118 79,91-101,111
+  s_62530fd74f5e66::t_3c958624cc00d9 156-157,247-248,250-253
+  s_62530fd74f5e66::t_d3807999712a4b 71-78,191-192
+  s_3f873febd3acf8::t_38a7140b43a9e0 110,155,190,246
+  s_62530fd74f5e66::t_bad5f903844d55 1
+  s_62530fd74f5e66::t_cf89738ada621b 2
+  s_62530fd74f5e66::t_9a3fedd5c495b4 80-81
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py
+  s_3f873febd3acf8::t_7209a3eb87cbbd 117,119-130,136-138
+  s_3f873febd3acf8::t_cbdbd89c0d0033 767-770
+app/client_bot/user_interface/handlers/keyword_settings.py
+  s_62530fd74f5e66::t_4c8eef9f3209c8 752-759
+  s_3f873febd3acf8::t_87ae17a9d3cb8f 1213
+  s_62530fd74f5e66::t_e3359add494350 575,621,647,697
+  s_62530fd74f5e66::t_9ed9bb8743923a 234-269,581-582,749
+  s_62530fd74f5e66::t_07781888f48030 210-219,282
+  s_62530fd74f5e66::t_12d137514a14b3 220-233,329,380,436,499
+  s_62530fd74f5e66::t_7c062d32d553de 738-740
+  s_62530fd74f5e66::t_f91dfed12d8055 750
+  s_3f873febd3acf8::t_bab001e9c3bb7a 281,328,379,435,498,574,580,620,646,696,737,948
+  s_62530fd74f5e66::t_283952a6bba4c6 11,747
+  s_62530fd74f5e66::t_90b9d609b6847c 1-2
+  s_62530fd74f5e66::t_2d00fe43b3306f 270-271
+app/client_bot/user_interface/views/messages/messages.py
+  s_62530fd74f5e66::t_27d3ca4c5310b0 93-125
+  s_62530fd74f5e66::t_384c528ce688be 1049
+  s_62530fd74f5e66::t_3b066d5a9fd0bf 1
+  s_62530fd74f5e66::t_0dc38fda416733 2
+  s_62530fd74f5e66::t_b0a20dae119a34 126-129
+  s_62530fd74f5e66::t_842d9b20059d82 19,236-244,247,249-251
+  s_62530fd74f5e66::t_e2fe930155f322 269-270
+  s_62530fd74f5e66::t_b9463212394f67 235,588-589,591-599,603-604,1199
+  s_62530fd74f5e66::t_453e546bab3e89 590
+  s_62530fd74f5e66::t_9a0664a74c3211 871-873,895
+  s_3f873febd3acf8::t_b5a71c54a28d44 248,268,870,894,1048,1198,1239,1323,1508,1531
+  s_62530fd74f5e66::t_084378e1dc745d 130-131
+app/modules/white_list_mode_settings/telegram/main_message.py
+  s_62530fd74f5e66::t_2ac281eabacfda 5,60-70,73,75-76
+  s_3f873febd3acf8::t_49999b64590426 74
+  s_62530fd74f5e66::t_474f624ec7c05b 1
+  s_cb13dba393cbbf::t_f228e26ae626fc 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "9c067305939fd504fc057c9ed049bff107ac05d1",
+  "prompts": {},
+  "sessions": {
+    "s_3f873febd3acf8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "4e63c29e-efed-410c-aabb-28c1cdf5bb12",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_62530fd74f5e66": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "52541c3a-70eb-4fb8-bf64-365a42c32193",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_cb13dba393cbbf": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c6779a44-fd90-4d3d-a0fa-bac80b0a5bd3",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

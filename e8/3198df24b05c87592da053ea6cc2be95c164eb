@@ -1,0 +1,14 @@
+app/modules/common_slaves/wildberries/super_cabinet_manager.py
+  h_267f51d775769b 97,104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "e83198df24b05c87592da053ea6cc2be95c164eb",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

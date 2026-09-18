@@ -1,0 +1,25 @@
+app/core/wb_api/base.py
+  s_b77c2a17a61c04::t_781f58508967d5 10,53
+app/core/wb_api/http_request.py
+  s_b77c2a17a61c04::t_fd832158dcd573 155,171-175
+app/core/wb_api/token_rotation.py
+  s_b77c2a17a61c04::t_bac3af2545f04a 1-39
+app/modules/common_slaves/wildberries/ABC_WB_API.py
+  s_b77c2a17a61c04::t_4532c56315fc1e 10,64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "e282582f1e0b41bb760d22e93dfa9f38e9472717",
+  "prompts": {},
+  "sessions": {
+    "s_b77c2a17a61c04": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b71d056e-5ccc-489a-a414-ff9eba87f266",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

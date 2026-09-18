@@ -1,0 +1,21 @@
+scripts/a1_whole_shop_economics_collect.py
+  s_c3c41ce6bba322::t_ca0c8ced587977 1-129
+scripts/REGISTRY.md
+  s_c3c41ce6bba322::t_683ea1179acfe1 58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9c192d82af120121cfe9228ee748e55adc06ef1f",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

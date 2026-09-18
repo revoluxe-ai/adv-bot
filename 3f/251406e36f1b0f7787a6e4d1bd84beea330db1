@@ -1,0 +1,19 @@
+.vscode/settings.json
+  s_4211826aa3ca32::t_4089eafcb97f59 8-11,33-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "3f251406e36f1b0f7787a6e4d1bd84beea330db1",
+  "prompts": {},
+  "sessions": {
+    "s_4211826aa3ca32": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9eec4b58-54b7-4452-92ca-494526d10c21",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

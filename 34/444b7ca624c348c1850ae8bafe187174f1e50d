@@ -1,0 +1,25 @@
+app/client_bot/user_interface/handlers/start/start.py
+  s_3189e63191602f::t_2502f0adff1f5d 720,1013
+  s_3189e63191602f::t_2966ac28303dc3 664,929
+  s_3189e63191602f::t_3bef6121b5262b 654
+tests/unit/client_bot/test_start_pg_seam_handoff.py
+  s_3189e63191602f::t_57e9ac4b45dec4 365-455
+tests/unit/client_bot/test_start_shop_menu_pg_seam_handoff.py
+  s_3189e63191602f::t_3980020c3bd110 284-351
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "34444b7ca624c348c1850ae8bafe187174f1e50d",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

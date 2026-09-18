@@ -1,0 +1,89 @@
+.opsx-knowledge/SOURCE_MANIFEST.json
+  s_c46a38a9a19b83::t_d3e09fdc9baf31 40-41,55-59
+  s_c46a38a9a19b83::t_39790b4aa7d008 37-39
+  s_c46a38a9a19b83::t_29b26da3617bb3 42-44,52-54
+  s_c46a38a9a19b83::t_a8089ae9b5f9ce 60-62
+  s_c46a38a9a19b83::t_44fbdef41a2bcf 2-36,45-51,63-90,92-94
+.cursor/commands/opsx-advance-bounded-verify.md
+  s_c46a38a9a19b83::t_8b0b4b43035652 1-93
+.cursor/commands/opsx-freeze-bounded-verify-plan.md
+  s_c46a38a9a19b83::t_1d5dc0b4d22478 1-83
+.cursor/commands/opsx-run-bounded-verify-check.md
+  s_c46a38a9a19b83::t_4d65ddf86fc103 1-92
+.cursor/pipeline/bounded-verify-tests/fixtures/minimal_change_tree.json
+  s_c46a38a9a19b83::t_e32a6d4af18b03 1-10
+.cursor/pipeline/bounded-verify-tests/fixtures/registry_snapshot.yaml
+  s_c46a38a9a19b83::t_4cd2d60cbc12a9 1-16
+.cursor/pipeline/bounded-verify-tests/run_bounded_verify_tests.py
+  s_c46a38a9a19b83::t_e82082aecf609c 1-36
+.cursor/pipeline/bounded-verify-tests/test_atomic_publication.py
+  s_c46a38a9a19b83::t_d2d5f4471a7560 1-230
+.cursor/pipeline/bounded-verify-tests/test_composition_interaction.py
+  s_c46a38a9a19b83::t_53bbd92878af86 1-894
+.cursor/pipeline/bounded-verify-tests/test_executor.py
+  s_c46a38a9a19b83::t_3f6677b353c0cb 1-344
+.cursor/pipeline/bounded-verify-tests/test_ledger_schedule.py
+  s_c46a38a9a19b83::t_11be6179e02bbd 1-452
+.cursor/pipeline/bounded-verify-tests/test_plan_freeze.py
+  s_c46a38a9a19b83::t_41b57e6e649da7 1-461
+.cursor/pipeline/bounded-verify-tests/test_result_model.py
+  s_c46a38a9a19b83::t_ea6b6dfb0c8649 1-188
+.cursor/pipeline/bounded-verify/__init__.py
+  s_c46a38a9a19b83::t_594a2bcd820311 1-74
+.cursor/pipeline/bounded-verify/bounded_verify_atomic.py
+  s_c46a38a9a19b83::t_954a746729893e 1-93
+.cursor/pipeline/bounded-verify/bounded_verify_executor.py
+  s_c46a38a9a19b83::t_03229c556af7dc 1-384
+.cursor/pipeline/bounded-verify/bounded_verify_ledger.py
+  s_c46a38a9a19b83::t_6698bf0e92139d 1-593
+.cursor/pipeline/bounded-verify/bounded_verify_plan.py
+  s_c46a38a9a19b83::t_dd31042e3a8147 1-420
+.cursor/pipeline/bounded-verify/bounded_verify_result.py
+  s_c46a38a9a19b83::t_bbed9d28b78ed9 1-367
+.cursor/pipeline/contracts/bounded-verify/ATOMIC_PUBLICATION.md
+  s_c46a38a9a19b83::t_c6e9e22694338c 1-35
+.cursor/pipeline/contracts/bounded-verify/AUTHORITY_SPLIT.md
+  s_c46a38a9a19b83::t_6a5a1f09131315 1-52
+.cursor/pipeline/contracts/bounded-verify/LEDGER_SCHEMA.json
+  s_c46a38a9a19b83::t_9e9a067a6adc15 1-88
+.cursor/pipeline/contracts/bounded-verify/PLAN_SCHEMA.json
+  s_c46a38a9a19b83::t_8f48178f74f666 1-102
+.cursor/pipeline/contracts/bounded-verify/RESULT_SCHEMA.json
+  s_c46a38a9a19b83::t_974699703dc0be 1-62
+.cursor/pipeline/knowledge/read_current_knowledge.py
+  s_c46a38a9a19b83::t_46393260ab047d 90-100,250-251,602-603,605-607,637-670,712-720,726,886-1099
+.opsx-knowledge/CURRENT.json
+  s_c46a38a9a19b83::t_346c9134364e4e 2-3,5-8,10
+.opsx-knowledge/KNOWLEDGE.jsonl
+  s_c46a38a9a19b83::t_80e6f67c114f97 1-52
+.opsx-knowledge/REALIZATION_MAP.jsonl
+  s_c46a38a9a19b83::t_5c6061e56f1993 1-492
+.opsx-knowledge/baselines/LATEST.json
+  s_c46a38a9a19b83::t_7ff207ee9b019f 2-6
+.opsx-knowledge/baselines/TARGET-KNOWLEDGE-V1-001-evidence-envelope.json
+  s_c46a38a9a19b83::t_d074f5b14d396c 1-12
+.opsx-knowledge/baselines/TARGET-KNOWLEDGE-V1-001.json
+  s_c46a38a9a19b83::t_50b86ad8a2e360 1-14
+.opsx-knowledge/runs/freeze/TARGET-KNOWLEDGE-V1-001-freeze-001.json
+  s_c46a38a9a19b83::t_7f0cbf2782c058 1-12
+.opsx-knowledge/runs/freeze/TARGET-KNOWLEDGE-V1-001-transaction-state.json
+  s_c46a38a9a19b83::t_8db4e4f55cbdc9 1-10
+.opsx/registry/command_activation.ndjson
+  s_c46a38a9a19b83::t_b92ee1d1b528d5 34-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "e347112b682276b81efbec95811108fde59d2376",
+  "prompts": {},
+  "sessions": {
+    "s_c46a38a9a19b83": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6fec4331-8fc5-4900-b1ce-d8d7eaf9b772",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

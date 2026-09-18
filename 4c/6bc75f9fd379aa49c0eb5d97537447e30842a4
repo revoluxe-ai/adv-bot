@@ -1,0 +1,23 @@
+scripts/REGISTRY.md
+  s_c3c41ce6bba322::t_81024e23ecabf8 67
+scripts/multi_client_ad_preflight_collect.py
+  s_c3c41ce6bba322::t_cc19de98254c06 1-292
+tests/unit/scripts/test_multi_client_ad_preflight_collect.py
+  s_c3c41ce6bba322::t_9e7af56fb9ef2e 1-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4c6bc75f9fd379aa49c0eb5d97537447e30842a4",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+scripts/multi_client_strict_eight_target_directive_audit.py
+  s_ff7ca45a8cc52f::t_69f7bc61e2a141 76-80
+tests/unit/scripts/test_multi_client_strict_eight_target_directive_audit.py
+  s_ff7ca45a8cc52f::t_63862d6eeeabf2 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4c9f5441d5b284b0dfb3ec785d49534317d37304",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

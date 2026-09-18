@@ -1,0 +1,29 @@
+app/modules/shop_runner/service_manager/services/auto_adv_active_control/auto_adv_active_control_service.py
+  s_3189e63191602f::t_76b47fe5223358 170,172-175
+  s_3189e63191602f::t_53ac2f427e217b 224
+app/modules/shop_runner/service_manager/manager.py
+  s_3189e63191602f::t_f7054a38dbe609 924,926-936,939-940
+  s_3189e63191602f::t_abf4e8d9d043d5 1055
+  s_3189e63191602f::t_fcaf96491c1db1 1064
+  s_3189e63191602f::t_7db6ac54b9bb86 953
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py
+  s_3189e63191602f::t_2b9bd8fe213fe3 542-543
+app/modules/shop_runner/wb_shop.py
+  s_3189e63191602f::t_e30da97bfbc520 77-80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "866bbc888a2bc6b3eb31fae57b58a42b629dde91",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

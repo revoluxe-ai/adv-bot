@@ -1,0 +1,398 @@
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/actor.py
+  s_0c2d657c254aae::t_fc93ed0d34b686 1-26
+tests/integration/card_ab_hold/_live_pg_bootstrap.py
+  s_f90334e1b4a6fd::t_fa303d13a6175c 785-787
+  s_f90334e1b4a6fd::t_03ad84b9734080 131-132,235-250,508-567
+  s_758496676c8f3c::t_221eb7487f6c83 568-569
+tests/unit/auto_updater_v3/card_ab_hold/test_w3_confirmed_flow.py
+  s_f90334e1b4a6fd::t_dcbfb72cd24c76 172,420-421,500-501,879-889,891-898,907-908,910-913
+  s_144b3438ab85a3::t_2c3e0acbb4ebb3 680
+  s_f90334e1b4a6fd::t_960551b5cd1e27 36-37,44-46,312-339
+  s_f90334e1b4a6fd::t_3c747b152d55c8 35,56,250-254,261-310
+  s_f90334e1b4a6fd::t_6ad10d0fa7549c 344-362
+  s_f90334e1b4a6fd::t_1a0d43597501ef 34,340-343,390-417
+  s_f90334e1b4a6fd::t_e81a0e0a9b47d1 173-205
+  s_f90334e1b4a6fd::t_f3861d56c710cf 502,508-529,533-556
+  s_0723768a0baf02::t_2503245867763f 503-507
+  s_2baf39e0057e2f::t_7d74f0780f85a8 55,899-906,909
+  s_f90334e1b4a6fd::t_a47a613723903e 626-671
+  s_17e602234dbe53::t_b4732a50dec49f 237,239,241,243-245
+  s_17e602234dbe53::t_c0619a675e62f8 52-54
+  s_0723768a0baf02::t_a3ed5e821950cb 530-532,619
+  s_0c2d657c254aae::t_8f27dadb7759d9 101
+  s_0c2d657c254aae::t_3de33fa0014554 422-448
+  s_f90334e1b4a6fd::t_c91d21ba16adbc 363-364,366-374,376-389
+  s_17e602234dbe53::t_a7450cdcab3169 890
+  s_17e602234dbe53::t_a0b102c59d2bfc 365,375
+  s_9a70a9dbbd2ee4::t_387d22b6abee01 29-31,672-679,681-735
+  s_f90334e1b4a6fd::t_d9a82b0f7d3a80 206-231
+  s_3183aa5b4e3537::t_e25fee9eeeb0dc 557-618,620-625
+  s_de94f11c688d9e::t_6d3b3410d16e6e 232-233,311,418-419,736-737
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/handlers.py
+  s_0c2d657c254aae::t_c28c1dcc5509be 147-150
+  s_0c2d657c254aae::t_a61c623193e43b 459-461
+  s_3efd9ea2d8b76d::t_e78accb7e29873 452-454,456-457,463-468,478,480-489,495
+  s_0c2d657c254aae::t_0bb56758e2dd0b 458,462
+  s_3efd9ea2d8b76d::t_006fd8d7df6647 765,767-777,783,789-791,793-799,801-804,810-812,821-824
+  s_3efd9ea2d8b76d::t_4af33bdbf9b72a 15,55-57,106-112
+  s_3efd9ea2d8b76d::t_67e043e01a5324 381-401,404-405,407-410
+  s_0c2d657c254aae::t_e895b44e74f7af 563-570
+  s_0c2d657c254aae::t_47753be8dce663 550-551
+  s_3efd9ea2d8b76d::t_f3b035d7e907f7 479
+  s_0c2d657c254aae::t_a524bd052b05d8 870
+  s_3efd9ea2d8b76d::t_5a4e1e7a6276d7 183,194-196,227,294,307-308,337-338,344-354
+  s_3efd9ea2d8b76d::t_08c2b80f4bff51 12,402-403,406,606,635-641,647,766
+  s_0c2d657c254aae::t_75fb3fc329691a 216-219
+  s_f90334e1b4a6fd::t_2c3e32b446d492 540-541,545-549,571-579,876-877
+  s_0c2d657c254aae::t_48e6658e2e42d2 936-939
+  s_3efd9ea2d8b76d::t_80d4c77add3d68 620-623
+  s_d05a3c7012317d::t_88173aa4425e07 864-865,867-869,871-873,878
+  s_3efd9ea2d8b76d::t_0bc89adb2fbcda 113
+  s_0c2d657c254aae::t_b68ad2f192519b 552
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_screens.py
+  s_f90334e1b4a6fd::t_37f152fdc03df3 182,184-190,195,211-214,218,220
+  s_3151bd840607b5::t_6693a61452754d 12,26-27,191-194,215-217,219,221-263
+tests/unit/auto_updater_v3/card_ab_hold/test_confirmation_contracts.py
+  s_17e602234dbe53::t_36c1ad8d5f8142 44,48-51,148-184,477,560-569
+  s_2baf39e0057e2f::t_ed205b26739317 21,250-301
+  s_2baf39e0057e2f::t_4b93fdc37f658d 47,62,222-237,239-240,242,246-249
+  s_213772c9e31f8b::t_44bee77dde9459 29-32,416-421,423-445,447-468,473-475
+  s_2baf39e0057e2f::t_e05fb178769c23 54
+  s_213772c9e31f8b::t_f859bbbbd5204b 55,422,446,469-472
+  s_213772c9e31f8b::t_0a9dae1a30a0f6 1-20,22-28,33-43,45-46,52-53,56-61,63-147,185-187,198-221,238,241,243-245,302-332,336-345,403-415,476,478-559
+  s_213772c9e31f8b::t_daf7ec0488ef9a 188-197
+  s_2baf39e0057e2f::t_32e38ad7f88f25 333-335,346-402,570
+tests/unit/auto_updater_v3/card_ab_hold/test_exit_rejects_missing_actor.py
+  s_ef34da8fadd3fb::t_f9fe730d3f58b2 1-132
+openspec/changes/harden-ab-hold-confirmation-boundaries/tasks.md
+  s_0c2d657c254aae::t_09667624451b17 37
+  s_0c2d657c254aae::t_fceee2948cbfab 27
+  s_0c2d657c254aae::t_8f20c9a3250607 3
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_keyboards.py
+  s_f90334e1b4a6fd::t_8e2b76176f0556 388-401
+tests/unit/auto_updater_v3/card_ab_hold/test_pending_liveness.py
+  s_0c2d657c254aae::t_606219fa24ac1e 528,537,541-545
+tests/unit/auto_updater_v3/card_ab_hold/test_minus_freeze.py
+  s_0c2d657c254aae::t_8fdfe49d1b4468 339
+  s_0c2d657c254aae::t_b970bc14439b72 353-354,358-362
+tests/unit/auto_updater_v3/card_ab_hold/test_epoch_s1_keyword_candidates_after_enable.py
+  s_0c2d657c254aae::t_3b22428b7c6863 69
+tests/integration/card_ab_hold/test_load_factual_positions_ch_seam.py
+  s_2baf39e0057e2f::t_c26757ca6b6f17 1,3-7
+  s_2baf39e0057e2f::t_6de444717566f4 16,29,32-33,43-47,50,52
+  s_2baf39e0057e2f::t_d32464c4f55865 93-94,96-107
+  s_17e602234dbe53::t_48ce35ebc1961a 28,30-31,53,63,67,84,86,90,108-109,117-118,126,132,147
+  s_213772c9e31f8b::t_71d13b1c002172 110-116,119-125,128-131,133,141-142,144-146,148
+  s_2baf39e0057e2f::t_360bf1e001bf33 48
+  s_2baf39e0057e2f::t_ef2bfb54483fe7 135-140,143
+  s_f90334e1b4a6fd::t_1e65c8958a44ac 134
+tests/unit/auto_updater_v3/card_ab_hold/test_epoch_write_gates.py
+  s_f90334e1b4a6fd::t_24e59d1f8a7fd2 15,17,163-173,175-178,180-224
+  s_f90334e1b4a6fd::t_e6530f5ef5a152 174,179
+tests/unit/auto_updater_v3/card_ab_hold/confirmation_contract.py
+  s_758b5ced376a36::t_73296a82f005a4 47-55,212-216,238
+  s_17e602234dbe53::t_2e191e78489ef7 219-220,228,239-240
+  s_213772c9e31f8b::t_ae448c631e9a89 1-12,14-46,67-177,199-211,217-218,229-237,241-242
+  s_2baf39e0057e2f::t_cb2982d114d1b1 13,56-66,178-198,221-227
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_handlers.py
+  s_0c2d657c254aae::t_e53f310636f09e 35-37
+  s_e57bf423770d34::t_d5569598d2892c 46,922-923,927-932,945-946,953-963
+  s_f90334e1b4a6fd::t_878fd65c506fd5 842-844,846
+  s_1bd4980ef488c8::t_2dae26fedeab56 203
+  s_0c2d657c254aae::t_d077feac1ac5a0 847,849-857,859-862,865
+  s_0c2d657c254aae::t_042882827244b9 341-350
+  s_0c2d657c254aae::t_fb52d93e960c3e 1378
+  s_0c2d657c254aae::t_45cfae69d73f8a 1511-1517
+  s_aeeb9cc9eb5b24::t_9474c0f5081a51 45,1190-1204
+  s_0c2d657c254aae::t_3eaf8828be1876 353,362-366
+  s_0c2d657c254aae::t_d1ef283ea0e016 1105
+  s_0c2d657c254aae::t_50fe464bc9a4fb 21
+  s_0c2d657c254aae::t_e95fc18f9ead43 462,464
+  s_f90334e1b4a6fd::t_8fd75f5a891a4d 455,488,845,869,871-872
+  s_0c2d657c254aae::t_2ac9c2a9ef63fb 1397
+  s_0c2d657c254aae::t_d8a0e64aeda5d9 885-916
+  s_0c2d657c254aae::t_7a093651191a72 419
+  s_f90334e1b4a6fd::t_cf8af3d83a4993 19,33,351,354-355,386,388-389,395-403,410-412,414-418,420-432,848,858,864,866,868,870,873-882
+  s_0c2d657c254aae::t_86625963621cfb 70-73
+  s_0723768a0baf02::t_ee781d2d082938 436-437,439-454,1169-1176
+  s_0c2d657c254aae::t_f19566c0a9d49d 489-505,512,516-523,526-527,534-535,539,544-545,547
+  s_0c2d657c254aae::t_1dbeaafdb3aa4b 456-458,460-461,463,465-476,480-486
+  s_0c2d657c254aae::t_72a6e7e9648625 1220
+  s_0c2d657c254aae::t_bfa83003010c4e 478-479
+  s_f90334e1b4a6fd::t_f4846a84ecb0ef 749,753-756,1177,1180,1182-1189
+  s_0c2d657c254aae::t_140195f6e0f8ed 974-975,1024-1025,1058-1059,1081-1082,1124-1125,1160-1161,1242-1243,1269-1270,1300-1301,1440-1441,1464-1465,1484-1485,1539-1540
+  s_0c2d657c254aae::t_878ef51a179b1a 999
+  s_0c2d657c254aae::t_11d1536028b4f6 438
+  s_f90334e1b4a6fd::t_a6e814f43bfefa 376-384,390-394,404-409
+  s_0c2d657c254aae::t_6cba86b7996aac 477
+  s_0c2d657c254aae::t_d8be5e4c7f0b48 31-32
+  s_0c2d657c254aae::t_38361d8de099c3 459
+  s_f90334e1b4a6fd::t_7923000f80ecd8 487,863,883-884
+tests/unit/auto_updater_v3/card_ab_hold/test_pg_session_handoff_seams.py
+  s_e57bf423770d34::t_c9f40f5a5595b3 463,465,468,488-490,507-511
+tests/unit/auto_updater_v3/card_ab_hold/test_auto_bid_finiteness_red.py
+  s_98181978cb8d08::t_6c6bd4acc96f48 1-23,25,29,35,37-43,45,54-74
+  s_98181978cb8d08::t_883146236c38ce 24,26-28,30-34,36,44,46-53
+.cursor/BUGBOT.md
+  s_0c2d657c254aae::t_d1da7cc7c84a79 326-327
+  s_0c2d657c254aae::t_6666f3242b75f4 356,360,362-366
+  s_0c2d657c254aae::t_e13e7844c39669 355,357-359,361,367-387
+  s_0c2d657c254aae::t_e3161ed6f9ff80 325
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/epoch_write.py
+  s_f90334e1b4a6fd::t_a522b506d561b0 62
+  s_1bd4980ef488c8::t_7a195f091bf991 14,421-422
+  s_e57bf423770d34::t_fc42ed27c52a32 651-652,654-661,671-672
+  s_f90334e1b4a6fd::t_9ebbb851b05ca9 60-61,63-103,350,355
+  s_f90334e1b4a6fd::t_a3b00d34a65d75 15,336,368
+tests/unit/auto_updater_v3/card_ab_hold/test_a2_auto_bid_edit_numeric_entry.py
+  s_0c2d657c254aae::t_5da42023ca7caa 89
+app/modules/shop_runner/service_manager/services/auto_updater_v3/card_ab_hold/telegram/confirm_callbacks.py
+  s_0c2d657c254aae::t_71ea98fa4db613 192-196,199
+tests/unit/auto_updater_v3/card_ab_hold/test_confirm_payload_limits.py
+  s_f90334e1b4a6fd::t_998f998d03ab70 7,33
+  s_f90334e1b4a6fd::t_eb2cfc2a05519a 13,16,105-121
+  s_2cb753fa79ebe9::t_d46ddb1e4ffe8c 165-184
+  s_f90334e1b4a6fd::t_2aab8c76ed9914 145-161
+  s_f90334e1b4a6fd::t_6347588842f7c7 104
+  s_f90334e1b4a6fd::t_d62cb2f47c8843 122-123
+  s_f90334e1b4a6fd::t_30837e9abf16a3 144
+  s_f90334e1b4a6fd::t_909abba8cf60c0 162-164
+tests/unit/support/test_destructive_fixture_gates.py
+  s_29fd804e83fde9::t_9cdb7b82af0cb4 104-108,117-118,120-121
+openspec/changes/harden-ab-hold-confirmation-boundaries/decisions/architecture-decision-lookup/decision.md
+  s_0c2d657c254aae::t_c927b3c99ff6ea 1-76
+tests/unit/auto_updater_v3/card_ab_hold/test_exit_atomicity_red.py
+  s_e57bf423770d34::t_33fa3980bc3bb7 3-4
+  s_e57bf423770d34::t_a1d64b581c3ba8 16,52,55-61,68-72,92,97-107,109-112,114-116,121-122,127,131-142,144,146-147
+  s_e57bf423770d34::t_e1a951f276dfe1 120
+  s_29369aed26e1d5::t_634d9974664aed 1-2,5-15,17-51,53-54,62-67,73-91,93-96,108,113,117-119,123-126,128-130,143,145
+tests/unit/auto_updater_v3/card_ab_hold/test_epoch_s0_confirm_bridge.py
+  s_8302740fabadd6::t_4ea3651084acbd 60,66-67,73-74,104-123
+  s_8302740fabadd6::t_54a345d682bd95 124-125
+tests/integration/card_ab_hold/test_confirmation_boundaries_live.py
+  s_17e602234dbe53::t_5bc611c633bb06 731-732,741,747,751
+  s_213772c9e31f8b::t_5e569f9b9b3b47 803-807
+  s_f90334e1b4a6fd::t_b737b11cf2e955 25-29,31,63,65,513-517,573-581,584-590,592-594,596-633,635-668
+  s_f90334e1b4a6fd::t_c6e604247900a1 727-730,733-740,742-746,748-750,752-756
+  s_2baf39e0057e2f::t_16f6f4e367921f 34-41,80
+  s_2baf39e0057e2f::t_f1a3a670c65c33 550,554
+  s_17e602234dbe53::t_e17c7ae38cfb37 70,72-73,75-79,81-83,85,115-126,141-142,150,189,205,238,249,266-269,296-298,329-332,336,340,342,356,478,511,522,530,582-583,591,595,634,669-670
+  s_2baf39e0057e2f::t_ef8cbb467a2990 698-700,703-705
+  s_2baf39e0057e2f::t_6eddf9898ed3de 179-183,558,711-715
+  s_17e602234dbe53::t_a155c879d594da 562-566
+  s_213772c9e31f8b::t_3db4836cb87f17 792-802,808,811-830,853-855,860-864,870,896-910
+  s_213772c9e31f8b::t_544e50f80c25df 51
+  s_2baf39e0057e2f::t_3acf8c3ec1176a 30,426-430
+  s_213772c9e31f8b::t_7676646c7eb2ab 831-850,856-857,859,865-869,871-895,918
+  s_17e602234dbe53::t_c8f45bbe5565e3 71,671-697,701-702,706-710,716-721
+  s_2baf39e0057e2f::t_bcc11ef1607aa8 74,84
+  s_f90334e1b4a6fd::t_f100b615549b0e 42-45,722-726,757-791
+  s_2baf39e0057e2f::t_af17a0559bbd75 171,175
+  s_2baf39e0057e2f::t_9ec286a644a54b 809-810,851-852,858,911-917
+  s_f90334e1b4a6fd::t_795577207811d8 304-328,333-335,337-339,341,343-355,357-361
+  s_17e602234dbe53::t_3263354f815605 160-161,185
+  s_2baf39e0057e2f::t_1750fdf96a649d 362-422,424-425,431-473
+  s_f90334e1b4a6fd::t_a8dc6b8b56ae59 1-24,46-50,52-62,64,66-69,86-114,127-140,143-149,151-159,162-170,172-174,176-178,184,186-188,190-204,206-237,239-248,250-265,270-295,299-303,474-477,479-510,512
+  s_2baf39e0057e2f::t_80c1353ca23e0e 32-33,423
+  s_f90334e1b4a6fd::t_dfc72023837e7b 518-521,523-529,531-549,551-553,555-557,559-561,567-572
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "3294cf7b602a6bf49e5d15445b87f57ba3b8b1e4",
+  "prompts": {},
+  "sessions": {
+    "s_0723768a0baf02": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "d4baf209-891b-4469-907f-9494ca804611",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_0c2d657c254aae": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "11be7cdb-40e9-4bae-99f2-2e35cdd4c076",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_144b3438ab85a3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7f2d71e8-621a-4ae3-bb7f-6d8d3d562a2c",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_17e602234dbe53": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0dc8b516-4b2d-459f-9c2b-4676dda3209d",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_1bd4980ef488c8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "342922bf-8cfb-41d0-b07e-934625707844",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_213772c9e31f8b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "81842f0f-6520-4c1f-b525-9f753d4ed871",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_29369aed26e1d5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8143c2f8-91f7-42e6-a750-ebabbdcccded",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_29fd804e83fde9": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "965bd328-2834-45ed-ac2c-a73d6a28d806",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_2baf39e0057e2f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c5df08db-fa15-41a1-9be7-54fad7b0bb82",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_2cb753fa79ebe9": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c24ddd34-a2dd-4c35-887d-51862b1bd271",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_3151bd840607b5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b0a0445b-d7c7-47d6-a0e8-4274e516dc08",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_3183aa5b4e3537": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b1f234d7-2307-4cd6-995c-607238b04964",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_3efd9ea2d8b76d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6f73c26e-e39d-4ce6-858c-36b33d873d09",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_758496676c8f3c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "343145ed-76c6-48c3-b048-54c526c94278",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_758b5ced376a36": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2f12e50a-7e06-4853-8916-d2c7718aa687",
+        "model": "gpt-5.6-luna-high"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_8302740fabadd6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0013d9e5-621e-4a0a-9436-659f79ec26fc",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_98181978cb8d08": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "096eaa47-91d4-45d6-bf68-8c4c08314987",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_9a70a9dbbd2ee4": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "de988b98-937f-4da8-aac8-6bb804ddde7a",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_aeeb9cc9eb5b24": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "17d2ba92-9401-49bf-9193-1f72e9b239c4",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_d05a3c7012317d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ec1fef53-cc7d-4435-8658-4d02d3851ba2",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_e57bf423770d34": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "34d1e16f-46b0-4930-b693-667d4df7eab4",
+        "model": "gpt-5.6-luna-xhigh"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ef34da8fadd3fb": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a7607112-ef10-4989-a470-5e9583e274f1",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f90334e1b4a6fd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "383c5f8f-660c-4bc0-a768-f1d1070ee7cb",
+        "model": "grok-4.6"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+scripts/a1_current_performance_drr_snapshot.py
+  s_153a049f6e6f71::t_d94042b0ddef92 1-1052
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "89242462071ab30fc931e60d4ecd3352a8dc4898",
+  "prompts": {},
+  "sessions": {
+    "s_153a049f6e6f71": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b2fa1b09-46f8-4d42-baec-1e59ff692eb3",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

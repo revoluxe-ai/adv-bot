@@ -1,0 +1,68 @@
+.cursor/opsx-resolve-conflict/tests/test_r3_hardening.py
+  s_f3ba9455123935::t_ead74aabd84c58 52-53,55
+  s_f3ba9455123935::t_5971cbef07eaa7 1-51,54,56-75
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/models.py
+  s_f3ba9455123935::t_a3efd06348c5f6 250
+  s_f3ba9455123935::t_4c02a293d53ca3 247-249
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/git_capture.py
+  s_f3ba9455123935::t_9ec4a60dbf7d5f 34-35,38-39,42,44
+.opsx/tools/trusted_resolver_boot.py
+  s_f3ba9455123935::t_a7d3ac54501e90 1-7,9-14,16-30,33-37,55-66,68-105,109-111,120-134,153-162
+  s_f3ba9455123935::t_99c55dccb78257 8,15,38-54,67,106-108,112-119,135-152
+  s_f3ba9455123935::t_7224ba1505b635 31-32
+.cursor/opsx-resolve-conflict/tests/test_qr_hardening.py
+  s_f3ba9455123935::t_258961524a969a 1-4,6-11,14,17,19-22,30-35,37,47-61,63-74,80-87,90-103,105-107
+  s_f3ba9455123935::t_6c06b2e2cc0738 88-89
+  s_f3ba9455123935::t_b81918b81fa60b 12-13,15-16,18,23-29,36,38-46,62,75-79,104
+  s_f3ba9455123935::t_61516619de17ef 5
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/cluster.py
+  s_f3ba9455123935::t_8a50c3e69a3a27 6
+  s_f3ba9455123935::t_f7ca2f0408666e 102-109
+  s_f3ba9455123935::t_98b5dc598c8607 42-71
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/pipeline.py
+  s_f3ba9455123935::t_40c87b0f138718 90-93,96,98,106,111-120,122-123
+  s_f3ba9455123935::t_90dfa9467b9c97 555
+  s_f3ba9455123935::t_c0fc82aeca025a 107,121
+  s_f3ba9455123935::t_8ee4d64c9b6b95 197
+  s_f3ba9455123935::t_63e22a47e31c11 97
+  s_f3ba9455123935::t_aa187e1487b0b2 6
+  s_f3ba9455123935::t_14180d4ae836d6 165-183,194-196
+  s_f3ba9455123935::t_38a0d9cf131004 554,564-567
+.cursor/opsx_resolve_conflict_launcher.py
+  s_f3ba9455123935::t_642febcd8cd53c 120
+  s_f3ba9455123935::t_b803c0e4dd1af5 1-30,33-35,38-86,88-119,121-130
+  s_f3ba9455123935::t_5d966fd6ce40dc 31-32,36-37
+  s_f3ba9455123935::t_e82b49260c22a7 87
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/__main__.py
+  s_f3ba9455123935::t_db69ef5c6ebfe6 7,18,41,43,51-52,55-57,69-70,78-79
+  s_f3ba9455123935::t_620f26e0bd1c67 39
+  s_f3ba9455123935::t_ed7e5470fce532 40,53-54,58-59,67-68
+.cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py
+  s_f3ba9455123935::t_dd088bdb783e29 5,10-18,21,23-25,27-39
+  s_f3ba9455123935::t_6b2fcbf9bf977e 1,19-20,22,26
+.cursor/opsx-resolve-conflict/tests/conftest.py
+  s_f3ba9455123935::t_49b943d89c9b70 25-26
+  s_f3ba9455123935::t_0647b0f6d7ed1f 36
+  s_f3ba9455123935::t_18fa6ba75d7d5f 93-99,106-121,123,141-144,146,149-150,159-160,167-169
+  s_f3ba9455123935::t_e6210a451d1dea 213-295
+  s_f3ba9455123935::t_906a00cc9702ad 212,407-455
+  s_f3ba9455123935::t_8523f463e8d3a1 100-105,122,124-140,145,147-148,161-166
+  s_f3ba9455123935::t_faa3e5c90a11aa 5-6,14
+  s_f3ba9455123935::t_6ce0b5a703171e 151-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "ecf2cd28cbdefafa901f1957646fb690f4a5cd0f",
+  "prompts": {},
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

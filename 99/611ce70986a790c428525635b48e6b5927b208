@@ -1,0 +1,23 @@
+scripts/REGISTRY.md
+  s_ff7ca45a8cc52f::t_505d64a0ac1436 56
+scripts/a1_current_state_gap_collect.py
+  s_ff7ca45a8cc52f::t_432baa03ed799d 1-670
+tests/unit/scripts/test_a1_current_state_gap_collect.py
+  s_ff7ca45a8cc52f::t_b4e700687d241d 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "99611ce70986a790c428525635b48e6b5927b208",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

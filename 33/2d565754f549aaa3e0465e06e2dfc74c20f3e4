@@ -1,0 +1,27 @@
+scripts/a1_glue_topology_web_review_collect.py
+  s_584a12d58b7d37::t_aeb36ba23174a1 533-541,543-549
+  s_584a12d58b7d37::t_1ad75698c80503 294-321
+  s_584a12d58b7d37::t_6b51863a969d86 34
+  s_584a12d58b7d37::t_6bb2bdcf8a8491 542
+  s_584a12d58b7d37::t_ed4d09851a151e 602-603,607
+  s_584a12d58b7d37::t_64dc7e8a49b1f3 1155-1156
+  s_584a12d58b7d37::t_898a7a23918812 987-989
+tests/unit/scripts/test_a1_glue_topology_decision_spend.py
+  s_584a12d58b7d37::t_4919594ba4ce9c 1-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "332d565754f549aaa3e0465e06e2dfc74c20f3e4",
+  "prompts": {},
+  "sessions": {
+    "s_584a12d58b7d37": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "06617aed-2829-437e-a0b8-d6af0638fc9f",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

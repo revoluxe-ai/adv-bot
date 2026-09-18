@@ -1,0 +1,19 @@
+openspec/specs/callback-start-menu-return/spec.md
+  s_9be26b213332dd::t_df8d7a4fdc86be 7-11,15-18,26-27,30,32-35,39-41,56-57,61-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "dba28ec851847c305c8e5d5df492c97747477195",
+  "prompts": {},
+  "sessions": {
+    "s_9be26b213332dd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3ca886b1-4e59-442d-a62e-80581621e6b9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

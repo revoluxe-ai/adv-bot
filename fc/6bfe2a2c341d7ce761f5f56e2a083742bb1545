@@ -1,0 +1,21 @@
+scripts/REGISTRY.md
+  s_c3c41ce6bba322::t_d76470d1de229a 59
+scripts/a1_whole_store_daily_drr_collect.py
+  s_c3c41ce6bba322::t_d775142b3a7e1f 1-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fc6bfe2a2c341d7ce761f5f56e2a083742bb1545",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

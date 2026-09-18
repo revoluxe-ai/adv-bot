@@ -1,0 +1,102 @@
+tests/unit/client_bot/test_cpm_workbook_pg_seam_handoff.py
+  s_5650cea139415a::t_2895b74c653dd2 67-69,77-79,87
+  s_5650cea139415a::t_e14a9c7c0edc43 65-66
+app/client_bot/user_interface/handlers/cpm_builder.py
+  s_5650cea139415a::t_c6dd5f4458aed0 14,19-23
+  s_fa284e25d6673b::t_3c73f29a9d7a18 241
+  s_5650cea139415a::t_9968cde3d7c081 320,322-325,327-329
+  s_5650cea139415a::t_7086115ad6bf50 188,190-193,195-197
+  s_fa284e25d6673b::t_b115f62acef825 316-317
+  s_5650cea139415a::t_dc778bd121c3c4 242,463-471
+  s_5650cea139415a::t_e9e1a996c6e4a9 77-95
+  s_5650cea139415a::t_979c31b18b54c8 245,248-251,253-255
+  s_fa284e25d6673b::t_ffeafccecb35fd 432
+  s_fa284e25d6673b::t_e9e77f243765b8 184-185
+  s_fa284e25d6673b::t_333648d17ab9b9 130-131
+  s_5650cea139415a::t_93aa9054cc9809 135,137-140,142-144
+  s_5650cea139415a::t_503222a90c9716 24
+  s_5650cea139415a::t_9f7a4444c9b43a 96-97
+tests/integration/client_bot/test_pg_seam_batch_a.py
+  s_99913561baad7f::t_a25588b327a562 154
+app/client_bot/user_interface/services/cpm_target_place_workbook.py
+  s_5650cea139415a::t_35362f0e445183 39-46
+  s_5650cea139415a::t_92ffe42a3e65fe 18-23
+  s_5650cea139415a::t_36a299de6da50a 276,278-287,292-296
+  s_5650cea139415a::t_c7e6be0768f297 113-132,138-139,148,152-154,156
+tests/client_bot/user_interface/handlers/test_minus_phrases_setting.py
+  s_99913561baad7f::t_8c89517151b53b 89
+  s_99913561baad7f::t_8c37648a02b7d6 96,112
+  s_99913561baad7f::t_5b8fa8222ee1bb 191
+  s_99913561baad7f::t_0620d634a8a875 18-19,22
+  s_99913561baad7f::t_5a62837fa06c40 125,145
+  s_99913561baad7f::t_90ef3410ce1273 168
+  s_99913561baad7f::t_6f411129469257 41-48,51-53,55-66,80-82
+  s_99913561baad7f::t_51a07401128afd 23
+tests/integration/client_bot/test_pg_seam_close_external_gap.py
+  s_67ee505744888b::t_8d3c6b09295d67 36
+  s_67ee505744888b::t_3595e4975395b6 205-209
+  s_67ee505744888b::t_9439614efd837b 49
+  s_67ee505744888b::t_f86470c8d5be1d 116-117,119-125,143
+  s_67ee505744888b::t_df156734c3ce6c 137-142
+tests/integration/client_bot/test_white_list_mode_toggle_pg_seam_close_external_gap.py
+  s_99913561baad7f::t_347deb98aa0edd 22,24-26
+  s_99913561baad7f::t_7e7d7b70439688 80-81
+  s_99913561baad7f::t_ee6b59a46a672f 49-62
+tests/client_bot/user_interface/handlers/test_cpm_target_place_workbook.py
+  s_67ee505744888b::t_c79d78ba9601ee 25-29,31
+  s_fa284e25d6673b::t_0f4d9ebb9275a5 313
+  s_99913561baad7f::t_019252d74b3d50 429
+  s_67ee505744888b::t_b256fa39cb3dea 45
+  s_67ee505744888b::t_384909cc772f12 84,86-92
+  s_67ee505744888b::t_dd125636c89d1e 122-127
+  s_67ee505744888b::t_b6fa91e0ab5c61 246-248
+  s_67ee505744888b::t_2b15fd67239e77 46
+tests/client_bot/user_interface/handlers/test_cpm_builder.py
+  s_5650cea139415a::t_3593971dafcdf0 564,570,573,586,592,595
+  s_5650cea139415a::t_984f63f22cd1f0 3,6,15-18,20-24,26
+  s_5650cea139415a::t_900030a4f33831 78-80,84
+  s_5650cea139415a::t_a1104f24aa3f00 98,100-106,126-131
+  s_5650cea139415a::t_4135cd95702a6c 41-42
+  s_5650cea139415a::t_6c721531de08bb 519-563,565-569,571-572,574-585,587-591,593-594,596-618
+  s_5650cea139415a::t_a414a235060b30 43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "1db1370d9ebcca2ff56988574eb7493355a972bc",
+  "prompts": {},
+  "sessions": {
+    "s_5650cea139415a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "45c010b9-f006-4ffd-a826-0b15a1dbc590",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_67ee505744888b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8416efc0-af06-4e70-b183-f77578c4481f",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_99913561baad7f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8548d8fa-95e0-4099-93ea-b44b6c1b0cd2",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_fa284e25d6673b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "63b905db-1110-48d0-b103-6706f7f819d6",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

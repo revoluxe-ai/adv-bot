@@ -1,0 +1,21 @@
+scripts/wb_api_readonly_ops/run.py
+  s_054c98864e7d93::t_e0ba3f5da2aaef 57
+scripts/wb_api_readonly_ops/collect/portable.py
+  s_054c98864e7d93::t_e0ba3f5da2aaef 421
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f87193f054e343357176de2cc4b53172aa5e5698",
+  "prompts": {},
+  "sessions": {
+    "s_054c98864e7d93": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0af87-4d60-7f31-aeb7-0476a8b2ffa5",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+tests/unit/scripts/test_a1_controlled_ad_expansion_v1.py
+  s_ff4e3ca49ebb2a::t_9366cfd09ae2f7 10,67
+scripts/a1_controlled_ad_expansion_v1.py
+  s_ff4e3ca49ebb2a::t_8b24a81fba3fed 212-223,439-480,584-587,605-608,611-612
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "93b7e6547c1b01cb7b540b0b7f30553cee6e5442",
+  "prompts": {},
+  "sessions": {
+    "s_ff4e3ca49ebb2a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8f7fbf71-3243-4e0c-b58c-56ccfab7949a",
+        "model": "gpt-5.6-luna-max"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

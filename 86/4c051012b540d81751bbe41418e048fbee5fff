@@ -1,0 +1,29 @@
+scripts/a1_promotion_funding_snapshot.py
+  s_5bb71c63977017::t_2b1d8b091dd174 69,72-73
+tests/unit/scripts/test_a1_current_performance_drr_snapshot.py
+  s_5bb71c63977017::t_ca9f51fe4847f9 1-111
+scripts/a1_current_performance_drr_snapshot.py
+  s_5bb71c63977017::t_9af4cf1be6f110 1274
+  s_5bb71c63977017::t_37a34cccfec76c 1222-1234
+  s_5bb71c63977017::t_8b93cf44df04f9 1304-1313
+  s_5bb71c63977017::t_0597d577b4762a 462-550,552,573-578,580-584,586,588-589,591-643,645-665,668-678,681-732,735-741,745-748,751-753,757-766,772-868
+  s_5bb71c63977017::t_eb94cd3cbf1ad5 1253-1269
+  s_5bb71c63977017::t_d235b2a94a7420 1177-1179,1192-1209
+  s_5bb71c63977017::t_e155dc1f3524c6 869-870
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "864c051012b540d81751bbe41418e048fbee5fff",
+  "prompts": {},
+  "sessions": {
+    "s_5bb71c63977017": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7ec56f99-0ac6-40fd-b719-07e33b5bc3eb",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

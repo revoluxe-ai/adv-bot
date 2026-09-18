@@ -1,0 +1,19 @@
+.cursor/pipeline/bug-team/runtime/live_task_hop.py
+  s_1b168ce9fa6c05::t_f5294628e8287f 2129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "914ee874561f66263ef1f5c0bf7ba86449fcbfde",
+  "prompts": {},
+  "sessions": {
+    "s_1b168ce9fa6c05": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "236c183e-4ccb-4a2b-bad9-f09fccdda723",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

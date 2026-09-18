@@ -1,0 +1,19 @@
+scripts/a1_glue_topology_web_review_collect.py
+  s_80432b1171c339::t_fa12d71ff69cff 443-447,476-528,533-536,544-547,549
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "9e0afd2d7f191a5ff9fce6431aad2954a1320821",
+  "prompts": {},
+  "sessions": {
+    "s_80432b1171c339": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "0d93ec37-5841-410c-a130-2142022e9858",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

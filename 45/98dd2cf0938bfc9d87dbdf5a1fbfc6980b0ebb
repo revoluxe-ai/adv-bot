@@ -1,0 +1,36 @@
+app/client_bot/user_interface/handlers/adv_setting/adv_setting.py
+  s_bf5f6444d89910::t_429bef487a6476 221-250
+  s_bf5f6444d89910::t_4408aa2aee61c2 79-88
+  s_bf5f6444d89910::t_47f4e716705059 786-797,800-801
+  s_bf5f6444d89910::t_798b9b40e057f2 336-342,344-345,348,351-353,356,359-362,365-388,395,402,409
+  s_bf5f6444d89910::t_b0dc7c767b806d 514-515,517,519-521,523-529
+  s_bf5f6444d89910::t_c1f6dbab84ef4b 676-691,695
+  s_bf5f6444d89910::t_ccb8ea563674f2 164-179,181-186
+  s_bf5f6444d89910::t_d269bfea46ea38 335
+  s_bf5f6444d89910::t_9eb71db3729b4d 333
+tests/unit/client_bot/handlers/test_turn_adv_on_read_only_token.py
+  s_bf5f6444d89910::t_176cd3d02010da 106-107,109
+  s_bf5f6444d89910::t_d77c4ee556dc9b 328-329,332-333
+  s_bf5f6444d89910::t_de615c45ee2afb 92
+  s_bf5f6444d89910::t_6f42aff47694e9 37,39-42
+tests/unit/client_bot/handlers/test_adv_setting_write_path_hardening.py
+  s_bf5f6444d89910::t_96a6272e672e4d 102,226
+  s_bf5f6444d89910::t_f4daca5ad1438f 253
+  s_bf5f6444d89910::t_c031185c1035e0 1-101,103-225,227-252,254-291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "4598dd2cf0938bfc9d87dbdf5a1fbfc6980b0ebb",
+  "prompts": {},
+  "sessions": {
+    "s_bf5f6444d89910": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e5a6ceba-f51b-4923-8c28-72136dcdd1c3",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

@@ -1,0 +1,136 @@
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/models.py
+  s_f3ba9455123935::t_db63d22e23998e 243-246
+  s_f3ba9455123935::t_d78e7fbd5f2dc2 158-161
+  s_f3ba9455123935::t_b62ec751bfb911 1-70,73-157,162-182,188-205,211-242
+  s_f3ba9455123935::t_8ba1cd74d12947 183-187,206-210
+  s_f3ba9455123935::t_7012888b488d53 71-72
+.cursor/opsx-resolve-conflict/tests/test_resolve_classify.py
+  s_f3ba9455123935::t_d469749072c778 1-59
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/verify.py
+  s_f3ba9455123935::t_1900f79ab6b1f9 1-9,17-18,21-109,111,113-114,119-121,123-139,141,168-172,190-191,196
+  s_f3ba9455123935::t_38c7d8280b543e 19-20
+  s_f3ba9455123935::t_d191dde1df2afc 10
+  s_f3ba9455123935::t_a07e67d536aede 154-167
+  s_f3ba9455123935::t_ef5f187f96198a 183,185-188
+  s_f3ba9455123935::t_96fc28c3e905cb 140,142-143,149,153,173-182,184,189,192-195
+  s_f3ba9455123935::t_b9867ad35ccc98 122
+  s_f3ba9455123935::t_049c3ba8c4df9d 110,112,115-118
+  s_f3ba9455123935::t_5c6b00be26dbde 11-16
+  s_f3ba9455123935::t_1f5620e5dfd27d 144-148,150-152
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/semantic_authority.py
+  s_f3ba9455123935::t_dae0a5e5446e49 1-52,54-66,68-72,81-93,95,99-109,111-172
+  s_f3ba9455123935::t_60e8c1056067e3 110
+  s_f3ba9455123935::t_06be6627dd49ce 94
+  s_f3ba9455123935::t_d34af0ad23f704 96-98
+  s_f3ba9455123935::t_cb2135ef7e6e65 67,73-80
+  s_f3ba9455123935::t_cc4a9974328d56 53
+.cursor/opsx-resolve-conflict/schemas/resolution-ledger.schema.json
+  s_f3ba9455123935::t_add5a2c62354e2 1-30,37-38
+  s_f3ba9455123935::t_f9711c60114a3f 31-36
+.cursor/opsx-resolve-conflict/tests/test_op_hardening.py
+  s_f3ba9455123935::t_63bc1d5177398c 69
+  s_f3ba9455123935::t_9fa99deb738e06 1-57,59-67,70-171
+  s_f3ba9455123935::t_329a5c8f9a7082 58
+  s_f3ba9455123935::t_36d0740b15cf29 68
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/verification_handoff.py
+  s_f3ba9455123935::t_8483e0f11479b5 10-15,24,28,37,39,43,52-56,59-68,72,94,110,114,125,127,130,132-137,139-140,142-148
+  s_f3ba9455123935::t_8cdfbd11d4ebad 138,141,149-155
+  s_f3ba9455123935::t_1fe5d06d19eb51 1-9,16-23,25-27,29-36,38,40-42,44-51,69-71,73,75-93,95-109,111-113,115-124,126,128-129,131,156-168
+  s_f3ba9455123935::t_0927c18cbde1b9 74
+  s_f3ba9455123935::t_00dd09649aa76a 57-58
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/cluster.py
+  s_f3ba9455123935::t_201a01392e1ca8 1-83
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/resolve_text.py
+  s_f3ba9455123935::t_01e7faed0a8672 1-131
+.cursor/opsx-resolve-conflict/tests/test_hardening.py
+  s_f3ba9455123935::t_2eac9f2fff8247 1-38,40-44,46-51,53,55,57-58,60-74,77-93,96-109,112-152,154-156
+  s_f3ba9455123935::t_ebdb885f62c09c 94-95
+  s_f3ba9455123935::t_a71da73e95e397 157
+  s_f3ba9455123935::t_6bd602241a46a3 75-76
+  s_f3ba9455123935::t_6d83665258da82 39,45,52,54,56,59
+  s_f3ba9455123935::t_bd68768101349f 153
+  s_f3ba9455123935::t_c07cba0a289429 110-111
+.cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py
+  s_f3ba9455123935::t_9a6e64913787d4 1-15
+.cursor/opsx-resolve-conflict/tests/test_acceptance_extended.py
+  s_f3ba9455123935::t_c1aa8606126b5f 1-73
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/partition.py
+  s_f3ba9455123935::t_62d6ca48cd93bc 1-110
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/process_policy.py
+  s_f3ba9455123935::t_3b94e7839e761f 1-35
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/pipeline.py
+  s_f3ba9455123935::t_1e8f9989566ed7 453,476-478,494
+  s_f3ba9455123935::t_13013b133acccb 452
+  s_f3ba9455123935::t_6e600b78e16685 448,456,458
+  s_f3ba9455123935::t_db67e50ee47d8d 195-204,208,215-233
+  s_f3ba9455123935::t_2c7667d3e00fe7 7,9,11,13,39,45-48,55,57-58,60,127-128,140,162-164,166,191,205-207,209-212,214,234,236,240,243-245,262-277,298-300,302,307-320,322-327,333,337,345-349,353-357,364-365,367,371-372,382-383,385,391-392,422,428,432-440,442-447,449-451,454-455,459-475,481-482,490-493,507-508,511-515,517-520
+  s_f3ba9455123935::t_8b47b3840a767e 295
+  s_f3ba9455123935::t_ec0f3c736f5ad0 32-36
+  s_f3ba9455123935::t_25a5aba100b7fe 213
+  s_f3ba9455123935::t_d62ae85eb2aae6 181-189
+  s_f3ba9455123935::t_1378174712cbd8 1-6,8,10,12,14-31,37-38,40-44,49-54,56,59,61-126,129-139,141-161,165,167-180,190,192-194,235,237-239,241-242,246-261,278-294,296-297,301,303-306,321,328-332,334-336,338-344,350-352,358-363,366,368-370,373-381,384,386-390,393-421,423-427,429-431,441,457,479-480,483-489,495-506,509-510,516,521-570
+.cursor/opsx-resolve-conflict/tests/test_acceptance_pipeline.py
+  s_f3ba9455123935::t_b533f67f3289df 38-39
+  s_f3ba9455123935::t_ad1fb56b96b464 47
+  s_f3ba9455123935::t_78529dae850088 96
+  s_f3ba9455123935::t_c1583a242f4f4c 1-37,40-46,48-95
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/execution_state.py
+  s_f3ba9455123935::t_bbfe40d95824a2 28-29,41-42
+  s_f3ba9455123935::t_5fb3f080761acb 1-27,30-40,43-74,77
+  s_f3ba9455123935::t_6a26c7388198b4 75-76
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/path_cas.py
+  s_f3ba9455123935::t_2ceee3f3275157 1-60
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/__main__.py
+  s_f3ba9455123935::t_74a1d85810f658 1-69
+.cursor/opsx-resolve-conflict/MANIFEST.json
+  s_f3ba9455123935::t_ab25dc1d74c744 1-25
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/ledger.py
+  s_f3ba9455123935::t_119ff69d768647 1-5
+  s_f3ba9455123935::t_79fc9115ddd712 6-57
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/classify.py
+  s_f3ba9455123935::t_542c0aafb08cbc 76
+  s_f3ba9455123935::t_28f26b5104bf69 38,44-53,56
+  s_f3ba9455123935::t_a20e50cec7e64e 7,19
+  s_f3ba9455123935::t_7965d5c6df6d79 185
+  s_f3ba9455123935::t_26d90402d2f6fd 170
+  s_f3ba9455123935::t_81b5e5568357d8 206-207
+  s_f3ba9455123935::t_65345e66b799b1 1-6,8-18,20-37,39-43,54-55,57-66,69-75,77-135,154-158,168-169,171-184,186-205,208-248
+  s_f3ba9455123935::t_15dad767a6e13d 136-153,159-167
+  s_f3ba9455123935::t_84421cd0469c38 67-68
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/git_capture.py
+  s_f3ba9455123935::t_3568b4404d5714 1-250
+  s_f3ba9455123935::t_81b391121ffa09 251-279
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/__init__.py
+  s_f3ba9455123935::t_d305330d895f78 1-7
+.cursor/opsx-resolve-conflict/schemas/conflict-manifest.schema.json
+  s_f3ba9455123935::t_5fa3fa907a6d99 1-29
+.cursor/opsx-resolve-conflict/tests/conftest.py
+  s_f3ba9455123935::t_dd837bf78f0107 217,225,233
+  s_f3ba9455123935::t_44f55801645208 53-56
+  s_f3ba9455123935::t_d8b431e0cb7443 126
+  s_f3ba9455123935::t_487266cbf469a8 162
+  s_f3ba9455123935::t_ea30e8f979ef83 220
+  s_f3ba9455123935::t_d89f312d6ecd08 1-15,17-21,23,31,51-52,57-101,103-105,107-111,113-115,118-121,123-125,127-132,134-137,139-140,142-151,153,160,163
+  s_f3ba9455123935::t_2c5d49c07c6443 206-216,218-219,221-224,226-232,234-240
+  s_f3ba9455123935::t_40845bb1871bc5 16,22,24-30,32-50
+  s_f3ba9455123935::t_46ca88b0c28f11 164-167,169-179,181-182,186-205
+  s_f3ba9455123935::t_5529bdbdfefa76 141
+  s_f3ba9455123935::t_ab1662e939906a 102,106,112,116-117,122,133,138,152,154-159,161
+  s_f3ba9455123935::t_9f2a0bf6b4da77 168,180,183-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "7fb4f689655a5bc5835aafaa591a6fa034f14c88",
+  "prompts": {},
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

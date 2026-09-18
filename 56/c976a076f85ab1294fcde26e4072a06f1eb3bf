@@ -1,0 +1,19 @@
+app/client_bot/modules/default_settings/adv_setting_policy/paid_mode_defaults_policy.py
+  s_9b529ee93639ea::t_c1f6f066720620 46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "56c976a076f85ab1294fcde26e4072a06f1eb3bf",
+  "prompts": {},
+  "sessions": {
+    "s_9b529ee93639ea": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f4a32805-0eaf-46ce-9a75-cbb7886774c3",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

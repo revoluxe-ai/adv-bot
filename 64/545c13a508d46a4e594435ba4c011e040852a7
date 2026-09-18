@@ -1,0 +1,23 @@
+.cursor/commands/opsx-static-check.md
+  s_758496676c8f3c::t_77503476f76a7e 163-167,169,175-179
+.cursor/commands/opsx-supervisor.md
+  s_758496676c8f3c::t_358bf00ca5ce65 753-779
+.cursor/static-check/checks/pytest-destructive/instructions.md
+  s_758496676c8f3c::t_7470ac2243234d 19-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "64545c13a508d46a4e594435ba4c011e040852a7",
+  "prompts": {},
+  "sessions": {
+    "s_758496676c8f3c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "343145ed-76c6-48c3-b048-54c526c94278",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

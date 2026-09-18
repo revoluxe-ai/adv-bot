@@ -1,0 +1,37 @@
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/pipeline.py
+  s_f3ba9455123935::t_8c7e8f19a75a10 16
+  s_f3ba9455123935::t_1a4f9b8b33f412 298
+  s_f3ba9455123935::t_a3c8a537f586ea 278-289,291,295-297,299
+  s_f3ba9455123935::t_d3e3056a67e3ab 101,164-189,192,201,203
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/authority_policy.py
+  s_f3ba9455123935::t_f1df04d9bd9410 349
+  s_f3ba9455123935::t_3134f60d7cdee2 434-483
+  s_f3ba9455123935::t_363680f9a88699 331,338
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/__main__.py
+  s_f3ba9455123935::t_1c1f54281e9fd0 56-60
+.cursor/opsx-resolve-conflict/tests/test_u6_hardening.py
+  s_f3ba9455123935::t_e37b81f2ce8096 1-166
+.cursor/commands/opsx-resolve-conflict.md
+  s_f3ba9455123935::t_21afc2ea8151f2 110-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "283ccec1cb7d3a14a7563858d7574498b9c1678b",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

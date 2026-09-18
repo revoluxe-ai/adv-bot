@@ -1,0 +1,117 @@
+tests/modules/wb_adv_updater/test_data_manager_add_relevant_phrases.py
+  s_43451a00f05919::t_66136aecc47927 16
+tests/unit/test_default_settings.py
+  s_43451a00f05919::t_66136aecc47927 21
+  s_43451a00f05919::t_5338d206b350ae 44-45
+tests/unit/client_bot/test_keyword_decision_trace_fallback.py
+  s_43451a00f05919::t_66136aecc47927 36
+tests/integration/shop_runner/test_auto_updater_v2_integration.py
+  s_43451a00f05919::t_66136aecc47927 50
+tests/unit/client_bot/test_relevant_phrase_management_menu.py
+  s_43451a00f05919::t_66136aecc47927 75
+tests/factories/adv_factory.py
+  s_43451a00f05919::t_40f912cd0776d6 59
+tests/unit/client_bot/test_pg_session_handoff_phrase_hard_status.py
+  s_43451a00f05919::t_66136aecc47927 143
+tests/client_bot/test_adv_setting_menu_v3_obnovl.py
+  s_43451a00f05919::t_20c525cca3c577 20,25
+  s_43451a00f05919::t_66136aecc47927 85,98
+tests/unit/client_bot/test_keyword_v3_decision_trace_keyboard.py
+  s_43451a00f05919::t_66136aecc47927 40,53,66,79,92,104
+  s_43451a00f05919::t_1d371d3ff96277 19,23
+tests/unit/test_v3_ui_sort.py
+  s_43451a00f05919::t_66136aecc47927 93
+conftest.py
+  s_43451a00f05919::t_164adff303406f 867
+tests/unit/client_bot/test_apply_defaults_ab_hold_guard.py
+  s_43451a00f05919::t_f059aefb7fb50d 232
+  s_43451a00f05919::t_8e3bf2ddb29f41 95,203
+  s_43451a00f05919::t_f1c12511271e1f 106-107
+  s_43451a00f05919::t_c6623ed7ee22d6 264-266
+  s_43451a00f05919::t_baf57828a08285 15-16
+  s_43451a00f05919::t_66136aecc47927 51,67
+tests/modules/wb_adv_updater/test_data_manager_white_fixed_phrases_v3.py
+  s_43451a00f05919::t_66136aecc47927 20
+tests/modules/billing/test_pricer_tariffs.py
+  s_43451a00f05919::t_66136aecc47927 146,155,199
+  s_43451a00f05919::t_bb8066ac19da44 177
+  s_43451a00f05919::t_a8140c0844d894 125-126
+  s_43451a00f05919::t_6d253db18911dc 110-113
+tests/integration/client_bot/test_ab_hold_phrase_hard_status_pg_seams.py
+  s_43451a00f05919::t_91300096dda792 57,65
+  s_43451a00f05919::t_66136aecc47927 402,408
+tests/unit/auto_updater_v3/card_ab_hold/test_v3_requirement_gates.py
+  s_43451a00f05919::t_7bc47ee18f8a5e 1,4-5,26-27,29-30,32-33,46
+  s_43451a00f05919::t_66136aecc47927 57
+  s_43451a00f05919::t_f53beb000daf6a 38-40
+tests/integration/helpers/v3_target_place_samples.py
+  s_43451a00f05919::t_5bc8013100c66d 53
+tests/unit/test_v3_calibration_step_setting_handler.py
+  s_43451a00f05919::t_da05a61e91c6bf 65
+tests/integration/billing/test_pricer_tariff_integration.py
+  s_43451a00f05919::t_66136aecc47927 80,108,136,163,198,228
+  s_43451a00f05919::t_bbb1d0ae6045c3 52,60
+tests/unit/test_v3_status_mode_sync.py
+  s_43451a00f05919::t_66136aecc47927 64-65,177,189,204,221
+  s_43451a00f05919::t_1b3fee26a7fe4b 63
+tests/modules/shop_runner/service_manager/test_adv_settings_auto_update_v2_contract.py
+  s_43451a00f05919::t_034d7b88f9770d 410-413
+  s_43451a00f05919::t_cc7198b49266d8 417
+  s_43451a00f05919::t_fd0d54a0e0823a 367
+  s_43451a00f05919::t_c1ef99acb36845 51-52,59-62
+  s_43451a00f05919::t_6506de16394b2c 1,3,7-9
+  s_43451a00f05919::t_141550b60cd5cf 460-462
+tests/modules/shop_runner/service_manager/services/test_update_cluster_bids_cache_keywords.py
+  s_43451a00f05919::t_66136aecc47927 270,331,371
+tests/modules/shop_runner/service_manager/test_stats_emergency_manager.py
+  s_43451a00f05919::t_66136aecc47927 197
+tests/test_wb_shop_coroutines.py
+  s_43451a00f05919::t_fc8e7bcb4479cd 7,14-16,33,41-47,63,65-66,70-71,80,90,94,96-97,105-107,118,120-128
+tests/unit/auto_updater_v3/keyword_decision_trace/test_keyword_decision_trace_e2e.py
+  s_43451a00f05919::t_66136aecc47927 103
+tests/unit/client_bot/test_keyword_decision_trace_formatter.py
+  s_43451a00f05919::t_66136aecc47927 74,103
+tests/unit/client_bot/test_pbh010_change_keyword_hard_status_ab_hold_freeze.py
+  s_43451a00f05919::t_66136aecc47927 43
+tests/unit/client_bot/test_pbh010_r1_hard_status_reset_ab_hold_freeze.py
+  s_43451a00f05919::t_66136aecc47927 54,109
+tests/integration/test_default_settings_integration.py
+  s_43451a00f05919::t_a15937fbf6b34f 307,377,570
+  s_43451a00f05919::t_83a30766d22fc8 225
+  s_43451a00f05919::t_b7335dfc470768 124-125
+  s_43451a00f05919::t_0f8fe5b6cefb94 136-137
+  s_43451a00f05919::t_483a0e885c7204 507
+  s_43451a00f05919::t_a3c2ea0be96123 192
+  s_43451a00f05919::t_66325c03f2bf3e 407
+tests/client_bot/user_interface/handlers/test_adv_setting.py
+  s_43451a00f05919::t_66136aecc47927 126,132,138
+  s_43451a00f05919::t_5ff84d33275b13 72,79
+tests/unit/client_bot/test_adv_excel_roundtrip.py
+  s_156c0f6815f33e::t_7707afca97b150 140
+tests/unit/client_bot/test_ctr_boost_redis_auto_block.py
+  s_43451a00f05919::t_66136aecc47927 44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "f62e0ec5844c0f24dbbcd4ee1f6a415c0b98cd24",
+  "prompts": {},
+  "sessions": {
+    "s_156c0f6815f33e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f41f14c3-5a68-45bc-85e8-3039407119bf",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_43451a00f05919": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8da8d1d8-a399-45b6-ba22-d78158cb475c",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

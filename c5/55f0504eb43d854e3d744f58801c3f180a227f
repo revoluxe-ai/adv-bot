@@ -1,0 +1,39 @@
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/23-no-active-worker-dispatch-or-block.md
+  s_f7533d2097c5a2::t_a1a6a625817393 1-28
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/21-id-correlation-mismatch.md
+  s_f7533d2097c5a2::t_4f05bcdb37fa1e 1-34
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/22-reconciliation-no-graph-mutation.md
+  s_f7533d2097c5a2::t_1b421fc503654e 1-22
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/19-three-sequential-workers.md
+  s_f7533d2097c5a2::t_dadb0730dee821 1-26
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/20-completed-worker-not-running.md
+  s_f7533d2097c5a2::t_353840242ad2df 1-24
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/README.md
+  s_f7533d2097c5a2::t_c6374ab4c40a63 36-42
+  s_f7533d2097c5a2::t_04ab9e4eee0ca0 62-68
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/25-manual-abort-after-progress.md
+  s_f7533d2097c5a2::t_3ec70a2e454cbb 1-35
+.cursor/commands/_fixtures/supervisor-sequential-bug-mission/24-repeated-state-no-progress.md
+  s_f7533d2097c5a2::t_dea8c26bbb2df6 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c555f0504eb43d854e3d744f58801c3f180a227f",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f7533d2097c5a2": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c905c22f-ceda-4884-be03-0c3985296827",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

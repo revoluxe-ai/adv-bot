@@ -1,0 +1,55 @@
+app/modules/sales_plan_settings/telegram/callbacks.py
+  s_57171798ac4554::t_0d0be624dbe689 12-16
+app/client_bot/user_interface/services/adv_excel_roundtrip/schema.py
+  s_57171798ac4554::t_f67fdfe1dec0e0 283
+  s_57171798ac4554::t_ab473c1ebccef8 102
+app/modules/sales_plan_settings/telegram/setting_handlers/toggle_raise_plan_on_promobonuses.py
+  s_57171798ac4554::t_e0ba0302542f0b 1-47
+app/client_bot/user_interface/services/keyword_v3_profile_loader.py
+  s_2e5d4e91328687::t_0c6ed2db76628b 311
+app/modules/sales_plan_settings/telegram/setting_handlers/routers.py
+  s_57171798ac4554::t_f732e45f8746eb 10,19
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py
+  s_7b8ce3eeb0a319::t_44e541a7685dcb 164
+  s_7b8ce3eeb0a319::t_5cad012e6439e9 214-246
+  s_7b8ce3eeb0a319::t_571e43304c6011 88-95
+  s_7b8ce3eeb0a319::t_7d77b4dab54d9d 374,377
+app/modules/sales_plan_settings/telegram/keyboards.py
+  s_57171798ac4554::t_b62eb50887e6ce 73
+  s_57171798ac4554::t_f3a4ed8cfdbf30 143-152
+  s_57171798ac4554::t_c4733d7e2e868f 42-44
+  s_57171798ac4554::t_6077d184aa03d7 153-155
+  s_57171798ac4554::t_d270fa80808ea6 156
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "546ba36accd592f9cf501cb280a306ba538be966",
+  "prompts": {},
+  "sessions": {
+    "s_2e5d4e91328687": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9de0059e-52ca-4983-b9a0-09c0d6613c4b",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_57171798ac4554": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7d11d15e-4b50-460f-be6b-f4d1bf646e0e",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_7b8ce3eeb0a319": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1eb74e9a-bda7-4d22-9ac4-b0ff2b285c6f",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

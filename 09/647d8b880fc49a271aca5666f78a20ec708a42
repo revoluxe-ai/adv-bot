@@ -1,0 +1,21 @@
+tests/modules/billing/test_billing.py
+  s_9b529ee93639ea::t_286686e26886ba 12,37-38,40-45,53-68,71
+  s_9b529ee93639ea::t_a621f0b8c975bb 148,150-154,161,165,180-185
+  s_9b529ee93639ea::t_9577bddee88678 244,270
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "09647d8b880fc49a271aca5666f78a20ec708a42",
+  "prompts": {},
+  "sessions": {
+    "s_9b529ee93639ea": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f4a32805-0eaf-46ce-9a75-cbb7886774c3",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

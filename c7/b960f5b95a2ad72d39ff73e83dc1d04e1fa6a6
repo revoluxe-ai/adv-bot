@@ -1,0 +1,41 @@
+app/client_bot/modules/default_settings/adv_setting_policy/paid_mode_defaults_policy.py
+  s_3189e63191602f::t_2355022cc5111b 54-62
+tests/integration/test_default_settings_integration.py
+  s_3189e63191602f::t_3a31ff13e3f478 446-448
+  s_3189e63191602f::t_c12123f0613e1e 567
+  s_3189e63191602f::t_aa93c8a1c3c1de 582
+  s_3189e63191602f::t_1d4b5a1d21e4cd 640
+  s_3189e63191602f::t_af1dec5f40d4fc 350,449,758-761,780-783
+  s_3189e63191602f::t_47abc0d7b36adc 347-349
+tests/unit/test_adv_setting_defaults_policy.py
+  s_3189e63191602f::t_761b1c78aa1fb4 242
+  s_3189e63191602f::t_585bf508ad8d9a 53
+  s_3189e63191602f::t_22dac89e50943d 282
+  s_3189e63191602f::t_b31eeb54abc66d 260
+tests/unit/client_bot/test_auto_management_mode.py
+  s_3189e63191602f::t_d4d7e4d6e6e431 119
+  s_3189e63191602f::t_716460773ddc26 73
+  s_3189e63191602f::t_94e4ebf4e6034e 74-89
+app/client_bot/modules/default_settings/adv_setting_policy/free_mode_defaults_policy.py
+  s_3189e63191602f::t_f16b2e6a68a725 59-67
+tests/unit/client_bot/handlers/test_turn_adv_on_read_only_token.py
+  s_3189e63191602f::t_ca46a4e63072c8 242
+tests/unit/test_default_settings.py
+  s_3189e63191602f::t_df05af996502ca 119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "c7b960f5b95a2ad72d39ff73e83dc1d04e1fa6a6",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

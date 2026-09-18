@@ -1,0 +1,14 @@
+.cursor/commands/opsx-commit.md
+  h_267f51d775769b 1-501
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "e9e877ac3c890f46ebc938a425ff046029add25d",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

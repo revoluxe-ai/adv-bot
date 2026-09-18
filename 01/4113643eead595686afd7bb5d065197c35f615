@@ -1,0 +1,21 @@
+.cursor/commands/opsx-supervisor.md
+  s_f90334e1b4a6fd::t_32aeaf678448ba 2212-2216
+  s_f90334e1b4a6fd::t_73a38bddbb8c2d 1029-1048,1052-1055,1058-1072
+  s_f90334e1b4a6fd::t_5b193c45c43630 1073
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "014113643eead595686afd7bb5d065197c35f615",
+  "prompts": {},
+  "sessions": {
+    "s_f90334e1b4a6fd": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "383c5f8f-660c-4bc0-a768-f1d1070ee7cb",
+        "model": "grok-4.6"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

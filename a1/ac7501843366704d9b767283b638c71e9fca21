@@ -1,0 +1,42 @@
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/git_repo_root.py
+  s_f3ba9455123935::t_c04cc985d6c014 1-46
+.cursor/commands/opsx-resolve-conflict.md
+  s_f3ba9455123935::t_65d049fc411f64 92-98
+.cursor/opsx_resolve_conflict_launcher.py
+  s_f3ba9455123935::t_321473f13fff06 18-48,77,140-143,152
+.opsx/tools/trusted_resolver_boot.py
+  s_f3ba9455123935::t_d656f9550f0d41 18-48
+  s_f3ba9455123935::t_a41800cf0d2b8b 184
+  s_f3ba9455123935::t_d7d741456022b4 160-163
+.cursor/opsx-resolve-conflict/tests/conftest.py
+  s_f3ba9455123935::t_7deb7cd6a42631 147-156,158,163
+  s_f3ba9455123935::t_93a99fb4d0abb4 467-514
+  s_f3ba9455123935::t_75407572850178 64
+.cursor/opsx-resolve-conflict/runtime/boot_opsx_conflict.py
+  s_f3ba9455123935::t_f87348c2bd71da 9,13-17
+.cursor/opsx-resolve-conflict/tests/test_s_hardening.py
+  s_f3ba9455123935::t_ae29ff2f0efb13 1-52
+.cursor/opsx-resolve-conflict/runtime/opsx_conflict/__main__.py
+  s_f3ba9455123935::t_e6ddb42df3a5ec 62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "a1ac7501843366704d9b767283b638c71e9fca21",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_f3ba9455123935": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1c673589-d0d0-41df-a2e8-635006eb60d9",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

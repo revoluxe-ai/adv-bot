@@ -1,0 +1,26 @@
+tests/client_bot/test_channel_subscription.py
+  s_b45bbb26ad5504::t_13a559871fd27b 70-79
+  s_b45bbb26ad5504::t_60d6738148400b 221
+  s_b45bbb26ad5504::t_6348546fae92c8 205-220,222-241,243-246
+  s_b45bbb26ad5504::t_e1f6379296fd85 242
+app/client_bot/middlewars/channel_subscription.py
+  s_b45bbb26ad5504::t_9533c3dfe87c1c 293
+  s_b45bbb26ad5504::t_341204851e0308 276
+  s_b45bbb26ad5504::t_25dfaa03fead67 82-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "7058e92ba46e45c6322f6b844473f2c1f25c8710",
+  "prompts": {},
+  "sessions": {
+    "s_b45bbb26ad5504": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9d09280c-16e1-4fb1-ac3c-9e5da4ff79b3",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

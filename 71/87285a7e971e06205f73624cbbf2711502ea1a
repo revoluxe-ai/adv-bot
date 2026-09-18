@@ -1,0 +1,20 @@
+DOTO/WORKLOG.md
+  s_3e2c9ac7c2c426::t_52581afc15b80b 523-555
+  s_3e2c9ac7c2c426::t_20fe95607c937f 556-580
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "7187285a7e971e06205f73624cbbf2711502ea1a",
+  "prompts": {},
+  "sessions": {
+    "s_3e2c9ac7c2c426": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b69551d5-3eaa-49b8-b80f-dbdeac8d5821",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

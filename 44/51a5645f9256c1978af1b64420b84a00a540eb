@@ -1,0 +1,20 @@
+scripts/REGISTRY.md
+  s_9d91377a0b89f6::t_1fdd1a026ff5bc 50
+  s_9d91377a0b89f6::t_5ad4e6b0a01eae 49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "4451a5645f9256c1978af1b64420b84a00a540eb",
+  "prompts": {},
+  "sessions": {
+    "s_9d91377a0b89f6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fee43c34-76fc-4881-8907-8cdcbbc3be32",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

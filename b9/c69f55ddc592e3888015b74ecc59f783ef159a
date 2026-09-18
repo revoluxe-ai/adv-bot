@@ -1,0 +1,21 @@
+.cursor/devops/LAST.json
+  s_b77c2a17a61c04::t_b501267b907124 3,12-15,17-19,21,23,34-36,47-48,59,63
+.cursor/devops/OPS_STATE.md
+  s_b77c2a17a61c04::t_0cdbb46793147f 52-59,105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "b9c69f55ddc592e3888015b74ecc59f783ef159a",
+  "prompts": {},
+  "sessions": {
+    "s_b77c2a17a61c04": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b71d056e-5ccc-489a-a414-ff9eba87f266",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

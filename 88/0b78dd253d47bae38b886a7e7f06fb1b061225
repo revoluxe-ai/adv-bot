@@ -1,0 +1,25 @@
+tests/unit/client_bot/test_ctr_boost_redis_auto_block.py
+  s_3189e63191602f::t_8f1ad84d217526 6-8,27-32
+  s_3189e63191602f::t_b81bfd241a9d25 47
+  s_3189e63191602f::t_305a44b0191b7d 33
+tests/unit/client_bot/test_ch_handoff_keyword_ctr_boost.py
+  s_3189e63191602f::t_fab3d71855c363 5-7,25-30
+  s_3189e63191602f::t_dd24bec7710de7 51
+  s_3189e63191602f::t_7f8cebb5353c70 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "880b78dd253d47bae38b886a7e7f06fb1b061225",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

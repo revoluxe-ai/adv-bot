@@ -1,0 +1,23 @@
+scripts/adv_bot_historical_state_extractor.py
+  s_df86e7658eaaba::t_504f1fb6d3098e 1305
+tests/unit/scripts/test_adv_bot_historical_state_extractor.py
+  s_df86e7658eaaba::t_2a32d6be143a75 386-428
+  s_df86e7658eaaba::t_d4149e88571743 429-430
+  s_df86e7658eaaba::t_390477f7d803b9 385
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "9d269aa9e95afe64da03f8c8f5c07231da26c50e",
+  "prompts": {},
+  "sessions": {
+    "s_df86e7658eaaba": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b8e42d96-6844-43e5-a6cd-02bc3bc8f7b2",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

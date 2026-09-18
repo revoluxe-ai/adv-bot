@@ -1,0 +1,24 @@
+.cursor/pipeline/bug-team/workers/CLAIM_WORKER.md
+  s_1b168ce9fa6c05::t_fe9ec59d84d0fc 31-33,35-36
+.cursor/pipeline/bug-team/workers/RED_TEST_WORKER.md
+  s_1b168ce9fa6c05::t_e18cbd5069c51e 31-33
+.cursor/pipeline/bug-team/runtime/fs_boundary.py
+  s_1b168ce9fa6c05::t_fe9ec59d84d0fc 77,79
+  s_1b168ce9fa6c05::t_6284508fe4ad90 97-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "a4aa1821b90133a06ee9ddbdb5c91df0f104796a",
+  "prompts": {},
+  "sessions": {
+    "s_1b168ce9fa6c05": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "236c183e-4ccb-4a2b-bad9-f09fccdda723",
+        "model": "default"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

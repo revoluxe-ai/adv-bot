@@ -1,0 +1,19 @@
+openspec/evolution/v3-only-retire-v2.md
+  s_43451a00f05919::t_11cb2c3be52af3 125-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "2686095e537c988583253684e194e57d6dd66569",
+  "prompts": {},
+  "sessions": {
+    "s_43451a00f05919": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8da8d1d8-a399-45b6-ba22-d78158cb475c",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

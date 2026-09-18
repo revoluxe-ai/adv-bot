@@ -1,0 +1,19 @@
+tests/unit/core/wb_api/test_token_rotation_scope_403.py
+  s_b77c2a17a61c04::t_95b76ad771a17b 1-229
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "dd061bf0b1816937dbe5667f14a5ac22577b01b1",
+  "prompts": {},
+  "sessions": {
+    "s_b77c2a17a61c04": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b71d056e-5ccc-489a-a414-ff9eba87f266",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

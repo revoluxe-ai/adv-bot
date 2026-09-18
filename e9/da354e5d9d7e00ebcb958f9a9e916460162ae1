@@ -1,0 +1,24 @@
+scripts/ops_script_job_cp.ps1
+  s_de94f11c688d9e::t_49cc00cb3e4067 189
+  s_de94f11c688d9e::t_dc46fccc0c0fc6 157-160
+  s_de94f11c688d9e::t_7be80a533d6a17 187-188
+  s_de94f11c688d9e::t_f6fdab6744a01e 178-186,190,192-193
+scripts/REGISTRY.md
+  s_de94f11c688d9e::t_7d683db482904b 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "e9da354e5d9d7e00ebcb958f9a9e916460162ae1",
+  "prompts": {},
+  "sessions": {
+    "s_de94f11c688d9e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "49fd0f22-c4f7-4bdc-a90f-1f8418e7df33",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

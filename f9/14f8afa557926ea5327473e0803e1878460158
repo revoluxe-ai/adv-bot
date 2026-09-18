@@ -1,0 +1,21 @@
+app/modules/partner_program/partner_stats.py
+  s_bf5f6444d89910::t_d975bce5762816 116-118,120-125
+tests/unit/test_partner_stats.py
+  s_bf5f6444d89910::t_60695a363d3242 107-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "f914f8afa557926ea5327473e0803e1878460158",
+  "prompts": {},
+  "sessions": {
+    "s_bf5f6444d89910": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "e5a6ceba-f51b-4923-8c28-72136dcdd1c3",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

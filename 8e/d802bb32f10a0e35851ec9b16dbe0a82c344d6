@@ -1,0 +1,21 @@
+tests/client_bot/test_phone_collection.py
+  s_4f0b057f2cea11::t_5429f066429de5 140-201
+app/client_bot/middlewars/phone_required.py
+  s_4f0b057f2cea11::t_9c89f29158b50d 75-89,91,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.24",
+  "base_commit_sha": "8ed802bb32f10a0e35851ec9b16dbe0a82c344d6",
+  "prompts": {},
+  "sessions": {
+    "s_4f0b057f2cea11": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8059822c-5500-4aff-9cba-ac87b707a382",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

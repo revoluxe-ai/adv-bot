@@ -1,0 +1,28 @@
+alembic_/versions/c4f8a1b2d3e4_add_raise_plan_on_promobonuses_and_promo_ledger.py
+  s_57171798ac4554::t_392bf6ed2efb24 1-120
+app/modules/common_slaves/wildberries/models/__init__.py
+  s_57171798ac4554::t_2158440d2eead4 35
+  s_57171798ac4554::t_4ada2c571d5b86 15
+app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py
+  s_57171798ac4554::t_171c8d5e9fc3be 61-80
+app/modules/common_slaves/wildberries/models/models.py
+  s_57171798ac4554::t_22bc25d64edf71 611-619
+app/modules/common_slaves/wildberries/models/wb_campaign_promo_spend.py
+  s_57171798ac4554::t_92fdcbc01b0106 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.2",
+  "base_commit_sha": "687d25942e0a31610ceb1cdb9af20ca5f5a80816",
+  "prompts": {},
+  "sessions": {
+    "s_57171798ac4554": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7d11d15e-4b50-460f-be6b-f4d1bf646e0e",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

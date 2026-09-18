@@ -1,0 +1,19 @@
+app/modules/common_slaves/wildberries/super_cabinet_manager.py
+  s_156bfa7badd75e::t_0683c2e164352e 1-2,63-71,100,119-128,134-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.23",
+  "base_commit_sha": "63f96ac177e9dbf69f175a31fc02a8f15f2ed15c",
+  "prompts": {},
+  "sessions": {
+    "s_156bfa7badd75e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3e982039-8180-45d9-a9a4-d9c0b04eda67",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}

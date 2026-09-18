@@ -1,0 +1,71 @@
+tests/integration/client_bot/test_pg_external_gap_seams.py
+  s_f2e353fe2e0389::t_4449b64e4cda3d 1-185
+tests/unit/client_bot/test_strategy_setting_pg_seam.py
+  s_f2e353fe2e0389::t_6e3fec24fb3242 1-38
+tests/integration/client_bot/test_white_list_mode_toggle_pg_seam_close_external_gap.py
+  s_cbcb88deac30ba::t_ab8ee563ff0e6f 60-94
+  s_cbcb88deac30ba::t_86257918842dd8 57-59
+  s_cbcb88deac30ba::t_80b0f18613104c 95-96
+  s_cbcb88deac30ba::t_e7158642ac28c1 1-56
+tests/integration/migrations/test_migrate_wrapper_live_pg.py
+  s_f2e353fe2e0389::t_8adcc488da89ed 1-63
+tests/integration/test_shop_runner_ch_external_gap_seams.py
+  s_f2e353fe2e0389::t_a2a117fdc4f072 11,44
+  s_f2e353fe2e0389::t_cd488a2afa86b3 1-4,6-7,9-10,14-15,18,28,30,37-43,45-101
+  s_f2e353fe2e0389::t_7b783d986b476e 16-17
+  s_f2e353fe2e0389::t_c196defdd63034 8,13,21,24-27,29,31-36,103-113,115-144,147-154,156-197
+  s_f2e353fe2e0389::t_7bf5e1303d06c2 12,155
+  s_f2e353fe2e0389::t_6a530c0ccf83d1 102,145-146
+  s_cbcb88deac30ba::t_05a3afdfc1c7f6 5,114
+  s_f2e353fe2e0389::t_8bc9c816573ba5 19-20,22-23
+tests/client_bot/test_callback_start_registration.py
+  s_019e62ff696fe3::t_cb6151b88208d5 419
+tests/client_bot/user_interface/handlers/test_cpm_target_place_workbook.py
+  s_019e62ff696fe3::t_fb57410cb8cd4b 367
+tests/test_adv_setting.py
+  s_019e62ff696fe3::t_5c814898108de7 11,29,39
+tests/test_start.py
+  s_019e62ff696fe3::t_fa40c17bdb8fa0 14
+tests/unit/client_bot/handlers/test_auto_management_landing_handlers.py
+  s_019e62ff696fe3::t_f4322f3cbaf79b 187,190-201,205,209-210,215,221,223,225-232,236,248-250
+tests/unit/client_bot/handlers/test_turn_adv_on_read_only_token.py
+  s_019e62ff696fe3::t_7ee104303962dd 204,208,247-251,255,259,263,267,271,313-317
+tests/unit/client_bot/handlers/test_white_list_mode_toggle.py
+  s_019e62ff696fe3::t_f8f8752f38261c 45,47-48,93,139,178,190-226
+tests/unit/client_bot/test_apply_defaults_ab_hold_guard.py
+  s_019e62ff696fe3::t_dfb05f1560b044 35-40,90-103,119,122,245,279
+tests/unit/client_bot/test_start_pg_seam_handoff.py
+  s_019e62ff696fe3::t_f851882c1d6115 111,145-149,159-165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "7a5fded657d422b73f375334f68c1ff584706bf9",
+  "prompts": {},
+  "sessions": {
+    "s_019e62ff696fe3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5910b2f7-0b22-4958-911e-52deb94f8be2",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_cbcb88deac30ba": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "135ae85a-40d2-4ce8-905b-fdb53a2edf41",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_f2e353fe2e0389": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "67074bf6-7682-4e92-bf09-d5eea5b6bd14",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
