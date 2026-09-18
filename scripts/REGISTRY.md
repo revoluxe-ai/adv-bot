@@ -67,6 +67,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Generic multi-client advertising preflight | scripts/multi_client_ad_preflight_collect.py | UNKNOWN | PARTIAL | NO | - | - | - | Parameterized read-only identity envelope; primary ZIP + SHA; FBO/FBS/reservations and funding remain explicit GAP |
 | Generic multi-client CPC topology | scripts/multi_client_cpc_topology_collect.py | WORKS | PARTIAL | NO | 2026-09-17T20:25:06Z | 2026-09-17T20:25:06Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:57984c0250abee172f4c8b736807504e3a105fc7 | Job ops-script-cpc-topology-20260917-2308 COMPLETE; primary SHA 56c95558…67d1ec; identity exact; ALL_PRODUCTION_WRITES=0 |
 | Generic eight-target directive audit | scripts/multi_client_strict_eight_target_directive_audit.py | UNKNOWN | COVERED | NO | - | - | - | Parameterized strict read-only 3d/7d store DRR, AdvSetting/WB state, mapping and bounded glue checks; missing != zero |
+| ProKraft 14D entry economics R1 | scripts/prokraft_14d_entry_economics_r1.py | WORKS | PARTIAL | NO | 2026-09-18T15:54:20Z | - | - | Strict read-only logical nmID economics; Auto/Search/other physical spend dedupe; targeted pure aggregation tests passed; live PG/WB run pending |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
