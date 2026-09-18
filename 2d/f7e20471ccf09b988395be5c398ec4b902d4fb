@@ -1,0 +1,118 @@
+scripts/ch_a1_compact_export.py
+  s_ab4d88191a0061::t_eecd108fe99825 103-106,109-110
+  s_ab4d88191a0061::t_23ee744376bfe6 1-98,192-259,275-299,301-489,498-688
+  s_ab4d88191a0061::t_8cae79150d6b1e 490-497
+  s_ab4d88191a0061::t_6d8d4004f39681 260-274,300
+  s_ab4d88191a0061::t_3cfdfc6a2cfeaf 99-102,107-108,111-129,131-134,136-145,147-155,157-162,164-181,184-191
+  s_ab4d88191a0061::t_e8cac78f8f0ad4 130,135,146,156,163
+  s_ab4d88191a0061::t_ec0056ef214f08 182-183
+scripts/ch_a1_profile.py
+  s_ab4d88191a0061::t_7a8bfe20eaecee 254-256,277-282,284-298
+  s_ab4d88191a0061::t_8133081300b7d9 151-157
+  s_ab4d88191a0061::t_5dfc898d51558a 381-382,679-683
+  s_ab4d88191a0061::t_012298a15ec3c2 579-581
+  s_ab4d88191a0061::t_922c641e9eaccc 651-654
+  s_ab4d88191a0061::t_191bad200dc0e2 625-626
+  s_ab4d88191a0061::t_0c8ba64984651a 324-328,380
+  s_ab4d88191a0061::t_c38c8c1016885e 148-150,158-162,323,329,343,346,379,453
+  s_ab4d88191a0061::t_17839510bb3965 432
+  s_ab4d88191a0061::t_e1384f792cc322 655-657,660-662
+  s_ab4d88191a0061::t_0d830af2c6021d 1-53,59-85,87-99,101-126,128-129,131-144,146-147,163-197,199-253,257-276,299-322,330-342,344-345,347,358-365,369,374-378,383,397-409,412-421,428-431,438-443,447,454-457,462-507,513-521,537-578,582-624,627-650,658-659,663-678,684-853
+  s_ab4d88191a0061::t_854ca2217ffc56 384-396,422-427,448-452
+  s_ab4d88191a0061::t_78e0abdcbc25d2 533-536
+  s_ab4d88191a0061::t_1c8d061be63a12 86
+  s_ab4d88191a0061::t_d75b1e9fd52428 508-512,522,531
+  s_ab4d88191a0061::t_a5bb05258a0e92 198
+  s_ab4d88191a0061::t_3635c685e0d933 100
+  s_ab4d88191a0061::t_613d9016c06701 127,130,145
+  s_ab4d88191a0061::t_809e2b5dd4ddd1 348-357,446
+  s_ab4d88191a0061::t_543af0fc84ebad 54-58,283
+  s_ab4d88191a0061::t_f000351c5b6b68 366-368,370-373,433-437,444-445,458-461
+  s_ab4d88191a0061::t_0afa4827f22f23 410-411,523-530,532
+scripts/REGISTRY.md
+  s_ab4d88191a0061::t_2179daaabd5b85 68
+scripts/a1_adv34210859_placement_economics.py
+  s_ab4d88191a0061::t_8f59ee9fad5c91 1-477
+scripts/a1_closed_20260902_store_snapshot.py
+  s_ab4d88191a0061::t_9e89a69ed0e71e 1-568
+scripts/a1_cpc_candidate_fbs_stock_check.py
+  s_ab4d88191a0061::t_5f8f0f6d125fc6 1-412
+scripts/a1_cpc_growth_experiment_prep.py
+  s_ab4d88191a0061::t_e9b15927197d92 1-998
+scripts/a1_cpc_target_stock_check.py
+  s_ab4d88191a0061::t_73021e5fe1fb8e 1-283
+scripts/a1_current_ad_funding_snapshot.py
+  s_ab4d88191a0061::t_46dccfc7e96952 1-315
+scripts/a1_current_store_snapshot.py
+  s_ab4d88191a0061::t_745f75bb839603 1-694
+scripts/a1_daily_spend_cap_input_data.py
+  s_ab4d88191a0061::t_0083feb4cb14f6 1-510
+scripts/a1_daily_spend_control_reissue.py
+  s_ab4d88191a0061::t_8c31684b563ac5 1-669
+scripts/a1_direct_associated_value_review.py
+  s_ab4d88191a0061::t_aab1ccb1283ce6 1-724
+scripts/a1_direct_associated_value_review_v2.py
+  s_ab4d88191a0061::t_9688a9e76dad26 1-602
+scripts/a1_exact_subject_semantics.py
+  s_ab4d88191a0061::t_8569275b92ac22 1-688
+scripts/a1_existing_campaign_reuse_inventory.py
+  s_ab4d88191a0061::t_7e354f0f284778 1-751
+scripts/a1_full_fbs_stock_snapshot.py
+  s_ab4d88191a0061::t_0e8b1b8c6ef5a7 1-725
+scripts/a1_iteration_04_current_state.py
+  s_ab4d88191a0061::t_4a8291ed9d6429 1-1074
+scripts/a1_iteration_05_observation.py
+  s_ab4d88191a0061::t_587a96d8a5e675 1-702
+scripts/a1_iteration_06_aggressiveness_design.py
+  s_ab4d88191a0061::t_103c4eb79de444 1-672
+scripts/a1_iteration_06_keyword_mechanism_baseline.py
+  s_ab4d88191a0061::t_4579296986733e 1-695
+scripts/a1_order_growth_sku_decomposition.py
+  s_ab4d88191a0061::t_0efd78418b2c71 1-701
+scripts/a1_paused_reuse_final_check.py
+  s_ab4d88191a0061::t_6881a0243978a7 1-512
+scripts/a1_physical_contour_search_control_map.py
+  s_ab4d88191a0061::t_11d5420d4d7bf5 1-696
+scripts/a1_prechange_ad_corrective_evidence.py
+  s_ab4d88191a0061::t_f1f5018e328a64 1-1134
+scripts/a1_pressure_and_shortlist_refresh.py
+  s_ab4d88191a0061::t_4c272b85e90496 1-1161
+scripts/a1_sku837_ad_leg_launch_evidence.py
+  s_ab4d88191a0061::t_44424f9b256133 1-722
+scripts/a1_sku837_exact_subject_patch.py
+  s_ab4d88191a0061::t_58840bc6346002 1-483
+scripts/a1_sku837_temporal_candidate_stock.py
+  s_ab4d88191a0061::t_3bf0741c4294f0 1-271
+scripts/a1_sku_195764899_bulk_order_forensic.py
+  s_ab4d88191a0061::t_b2be0413e0acb4 1-335
+scripts/a1_sku_195764899_growth_forensic.py
+  s_ab4d88191a0061::t_2d5a9ecdc31c04 1-903
+scripts/a1_sku_837395782_bulk_order_forensic.py
+  s_ab4d88191a0061::t_629ff985ad4451 1-365
+scripts/a1_sku_837395782_growth_forensic.py
+  s_ab4d88191a0061::t_c9b4b8951c6648 1-749
+scripts/a1_store_baseline_rebuild.py
+  s_ab4d88191a0061::t_8e3c7718327c0c 1-598
+scripts/a1_transactional_sale_price_fallback.py
+  s_ab4d88191a0061::t_37a0d68f1f3040 1-295
+scripts/wb_api_readonly_ops/collect_layout.py
+  s_ab4d88191a0061::t_26552566545160 1-60
+tests/unit/scripts/test_a1_daily_spend_control_layout.py
+  s_ab4d88191a0061::t_6c7e1a782708fd 1-40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "2df7e20471ccf09b988395be5c398ec4b902d4fb",
+  "prompts": {},
+  "sessions": {
+    "s_ab4d88191a0061": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c94c9a61-bd62-4087-945f-3adb2686d77f",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
