@@ -73,7 +73,11 @@ def _parse_target(raw: str) -> Target:
         raise ValueError(f"invalid target {raw!r}") from exc
     if not values[0]:
         raise ValueError(f"target NMID must be positive: {raw!r}")
-    if len(values) <= 3:
+    if len(values) == 1:
+        return Target(values[0])
+    if len(values) == 2:
+        return Target(values[0], None, values[1])
+    if len(values) == 3:
         return Target(values[0], None, values[1], values[2])
     return Target(values[0], values[1], values[2], values[3], values[4])
 
