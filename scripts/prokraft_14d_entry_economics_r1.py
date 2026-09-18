@@ -733,9 +733,14 @@ def _build_entry_rows(
         for index in range((end - start).days + 1)
     ]
     for nmid in sorted(all_nmids):
-        campaign_rows = [
-            row for row in physical if nmid in set(row["explicit_nmids"])
-        ]
+        historical_only = nmid == STOP_LOW_STOCK_NMID
+        campaign_rows = (
+            []
+            if historical_only
+            else [
+                row for row in physical if nmid in set(row["explicit_nmids"])
+            ]
+        )
         single_rows = [
             row for row in campaign_rows if len(row["explicit_nmids"]) == 1
         ]
@@ -887,7 +892,7 @@ def _build_entry_rows(
         entry = {
             "nm_id": nmid,
             "logical_entry_key": f"nmid:{nmid}",
-            "historical_only": nmid == STOP_LOW_STOCK_NMID,
+            "historical_only": historical_only,
             "priority": nmid in priority_nmids,
             "physical_campaign_ids": physical_ids,
             "physical_campaign_types": sorted(

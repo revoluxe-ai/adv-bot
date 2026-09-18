@@ -168,6 +168,7 @@ def test_priority_stop_low_stock_target_is_historical_only() -> None:
     assert gaps == []
     assert entries[0]["nm_id"] == 751657528
     assert entries[0]["historical_only"] is True
+    assert entries[0]["physical_campaign_ids"] == []
     assert entries[0]["spend_rub"] is None
     assert "STOP_LOW_STOCK_HISTORICAL_ONLY" in entries[0]["evidence_quality"]
 
