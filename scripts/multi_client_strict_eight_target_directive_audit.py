@@ -105,6 +105,28 @@ def _number(row: dict[str, Any], *keys: str) -> float | None:
 
 def _aggregate_store(rows: list[dict[str, str]], days: int) -> dict[str, Any]:
     """Агрегировать только CLOSED rows из существующего store contract."""
+    window_rows = [row for row in rows if row.get("window") == f"{days}d"]
+    if window_rows:
+        row = window_rows[-1]
+        gmv = _number(row, "sales", "factual_order_value", "factual_GMV")
+        spend = _number(row, "gross_ad_spend", "all_shop_ad_spend")
+        if gmv is None or spend is None:
+            return {"status": "GAP", "reason": "aggregate metric missing"}
+        drr = spend / gmv if gmv else None
+        return {
+            "status": "AVAILABLE" if drr is not None else "GAP",
+            "closed_days": days,
+            "factual_store_gmv_rub": round(gmv, 2),
+            "physical_ad_spend_rub": round(spend, 2),
+            "store_drr": round(drr, 8) if drr is not None else None,
+            "store_drr_percent": round(drr * 100, 4) if drr is not None else None,
+            "unclamped_headroom_to_8_percent_rub": (
+                round(gmv * 0.08 - spend, 2) if drr is not None else None
+            ),
+            "unclamped_headroom_to_10_percent_rub": (
+                round(gmv * 0.10 - spend, 2) if drr is not None else None
+            ),
+        }
     closed = [row for row in rows if row.get("day_state") in (None, "CLOSED")]
     selected = closed[-days:]
     if len(selected) < days:
@@ -144,9 +166,22 @@ def _target_state(
 ) -> dict[str, Any]:
     """Сопоставить target с текущими Auto/Search rows без restart/write."""
     rows = [row for row in campaign_rows if row.get("nm_id") == str(target.nmid)]
-    by_type = {str(row.get("campaign_type", "")).lower(): row for row in rows}
+    by_type: dict[str, dict[str, str]] = {}
+    for row in rows:
+        raw_type = str(row.get("campaign_type", "")).lower()
+        normalized = (
+            "auto"
+            if raw_type in {"8", "auto"}
+            else "search"
+            if raw_type in {"9", "search"}
+            else "old_cpc"
+            if raw_type == "manual/cpc"
+            else raw_type
+        )
+        by_type[normalized] = row
     auto = by_type.get("auto") or {}
     search = by_type.get("search") or {}
+    old_cpc = by_type.get("old_cpc") or {}
     mapping = {
         "requested_advsetting_id": target.advsetting_id,
         "observed_advsetting_id": _number(auto, "adv_setting_id"),
@@ -155,7 +190,7 @@ def _target_state(
         "requested_search_adv_id": target.search_adv_id,
         "observed_search_adv_id": _number(search, "adv_id"),
         "requested_old_cpc_adv_id": target.old_cpc_adv_id,
-        "observed_old_cpc_adv_id": _number(auto, "old_cpc_adv_id"),
+        "observed_old_cpc_adv_id": _number(old_cpc, "adv_id"),
     }
     mapping["mapping_status"] = (
         "VERIFIED"
@@ -176,13 +211,14 @@ def _target_state(
         "advsetting_rows": rows,
         "auto": auto or {"status": "GAP"},
         "search": search or {"status": "GAP"},
+        "old_cpc": old_cpc or {"status": "GAP"},
         "mapping": mapping,
         "wb_auto_status": auto.get("WB_status", "GAP"),
         "wb_search_status": search.get("WB_status", "GAP"),
         "stopped_verification": (
             "STOPPED"
             if target.nmid == 751657528
-            and str(auto.get("WB_status", "")).lower() in {"9", "stopped", "paused"}
+            and str(auto.get("WB_status", "")).lower() in {"9", "11", "stopped", "paused"}
             else "GAP"
             if target.nmid == 751657528
             else "N_A"
