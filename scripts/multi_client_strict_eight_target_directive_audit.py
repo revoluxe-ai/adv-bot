@@ -15,6 +15,7 @@ import hashlib
 import json
 import shutil
 import sys
+import traceback
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -323,6 +324,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     except Exception as exc:  # noqa: BLE001 — stable Job failure line
         print(f"ops-script: failed; error={exc}", file=sys.stderr)
+        traceback.print_exc()
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print(f"PRIMARY_ARTIFACT={result['PRIMARY_ARTIFACT']}")
