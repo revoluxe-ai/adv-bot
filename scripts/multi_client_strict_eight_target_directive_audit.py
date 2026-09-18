@@ -34,11 +34,13 @@ WRITE_COUNTS = {
 
 @dataclass(frozen=True)
 class Target:
-    """Один target NMID и опциональные ожидаемые Auto/Search campaign IDs."""
+    """Target NMID и ожидаемые AdvSetting/Auto/Search/legacy CPC IDs."""
 
     nmid: int
+    advsetting_id: int | None = None
     auto_adv_id: int | None = None
     search_adv_id: int | None = None
+    old_cpc_adv_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -60,9 +62,9 @@ def _sha256(path: Path) -> str:
 
 
 def _parse_target(raw: str) -> Target:
-    """Разобрать ``nmid[:auto_adv_id[:search_adv_id]]`` без эвристик."""
+    """Разобрать ``nmid[:auto:search]`` или полный mapping contract."""
     parts = raw.split(":")
-    if not 1 <= len(parts) <= 3:
+    if not 1 <= len(parts) <= 5:
         raise ValueError(f"invalid target {raw!r}")
     try:
         values = [int(value) if value else None for value in parts]
@@ -70,7 +72,9 @@ def _parse_target(raw: str) -> Target:
         raise ValueError(f"invalid target {raw!r}") from exc
     if not values[0]:
         raise ValueError(f"target NMID must be positive: {raw!r}")
-    return Target(values[0], values[1], values[2])
+    if len(values) <= 3:
+        return Target(values[0], None, values[1], values[2])
+    return Target(values[0], values[1], values[2], values[3], values[4])
 
 
 def _read_csv(path: Path) -> list[dict[str, str]]:
@@ -139,10 +143,14 @@ def _target_state(
     auto = by_type.get("auto") or {}
     search = by_type.get("search") or {}
     mapping = {
+        "requested_advsetting_id": target.advsetting_id,
+        "observed_advsetting_id": _number(auto, "adv_setting_id"),
         "requested_auto_adv_id": target.auto_adv_id,
         "observed_auto_adv_id": _number(auto, "adv_id"),
         "requested_search_adv_id": target.search_adv_id,
         "observed_search_adv_id": _number(search, "adv_id"),
+        "requested_old_cpc_adv_id": target.old_cpc_adv_id,
+        "observed_old_cpc_adv_id": _number(auto, "old_cpc_adv_id"),
     }
     mapping["mapping_status"] = (
         "VERIFIED"
@@ -150,8 +158,10 @@ def _target_state(
             expected is None
             or int(mapping[key] or -1) == expected
             for expected, key in (
+                (target.advsetting_id, "observed_advsetting_id"),
                 (target.auto_adv_id, "observed_auto_adv_id"),
                 (target.search_adv_id, "observed_search_adv_id"),
+                (target.old_cpc_adv_id, "observed_old_cpc_adv_id"),
             )
         )
         else "GAP"

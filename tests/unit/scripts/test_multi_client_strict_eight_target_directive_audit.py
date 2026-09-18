@@ -20,8 +20,8 @@ from scripts.multi_client_strict_eight_target_directive_audit import (
 
 def test_target_parser_keeps_explicit_mapping() -> None:
     """Target syntax must preserve Auto/Search mapping IDs."""
-    assert _parse_target("1285392243:1151722170:40252183") == Target(
-        1285392243, 1151722170, 40252183
+    assert _parse_target("1285392243:1151722170:40252178:40252183:40235423") == Target(
+        1285392243, 1151722170, 40252178, 40252183, 40235423
     )
 
 
