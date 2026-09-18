@@ -66,6 +66,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | A1 controlled ad expansion v1 | scripts/a1_controlled_ad_expansion_v1.py | WORKS | COVERED | NO | 2026-09-08T05:45:00Z | - | - | DRY_RUN default; explicit --execute; allowlisted top-up/start adapters; PRICE/GLUE/CARD=0 |
 | Generic multi-client advertising preflight | scripts/multi_client_ad_preflight_collect.py | UNKNOWN | PARTIAL | NO | - | - | - | Parameterized read-only identity envelope; primary ZIP + SHA; FBO/FBS/reservations and funding remain explicit GAP |
 | Generic multi-client CPC topology | scripts/multi_client_cpc_topology_collect.py | WORKS | PARTIAL | NO | 2026-09-17T20:25:06Z | 2026-09-17T20:25:06Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:57984c0250abee172f4c8b736807504e3a105fc7 | Job ops-script-cpc-topology-20260917-2308 COMPLETE; primary SHA 56c95558…67d1ec; identity exact; ALL_PRODUCTION_WRITES=0 |
+| Generic eight-target directive audit | scripts/multi_client_strict_eight_target_directive_audit.py | UNKNOWN | COVERED | NO | - | - | - | Parameterized strict read-only 3d/7d store DRR, AdvSetting/WB state, mapping and bounded glue checks; missing != zero |
 
 | Verify local env | scripts/verify-local-env.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 
