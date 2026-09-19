@@ -1,0 +1,14 @@
+openspec/changes/scripts-collector-lifecycle-architecture/verification/READY_FOR_REVERIFY.json
+  h_267f51d775769b 4-5,51-52,61-68,72-77,110-113,115-116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9dacf0a805d68eab3efb412daeb31e0f7124d7a0",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
