@@ -1,0 +1,83 @@
+scripts/ch_a1_evidence.py
+  s_3189e63191602f::t_6b14b2608713e8 29,33,48,205,208-231,240,247,337,368,388,401,413,634-647,653-656,660,662,664,667-669,672,675-677,680,684-686,689,691-707,716-719,724,730-732,735-740,743-748,751-756,760-765,773,778,821,826,844-849,883,885,887-889,891-899,909,926,990,1009,1057-1086,1188-1194,1204,1334,1340,1359,1365,1383-1389,1408
+scripts/a1_cabinet401_run_go_contract_collect_v2.py
+  s_ff7ca45a8cc52f::t_c382c597744350 21-24,292,361-363,381-389,391,393
+.cursor/commands/opsx-scripts-prepare.md
+  s_3189e63191602f::t_9ff862796a3faf 76-80,88-93,106-112,162-164,202
+.cursor/commands/opsx-scripts.md
+  s_3189e63191602f::t_983d8f3c812b96 5,17-18,42-46,54-60,69-70,72,84-85,97-98,100-103,105-110,125,132,143-149,173-240,267-268,275,279-283,290,297-298,304-309,311-313,339-346,348-354,361-367,376-377,432-436,473-475,477-478,494-495,539-547,582-583,619-621,627,638,661-662
+openspec/changes/scripts-collector-lifecycle-architecture/.openspec.yaml
+  s_3189e63191602f::t_6aca1a2012b924 1-2
+openspec/changes/scripts-collector-lifecycle-architecture/decisions/scripts-collector-lifecycle-ownership/decision.md
+  s_3189e63191602f::t_8e0a0c4aae60ba 1-169
+openspec/changes/scripts-collector-lifecycle-architecture/design.md
+  s_3189e63191602f::t_257f289786c5ed 1-642
+openspec/changes/scripts-collector-lifecycle-architecture/proposal.md
+  s_3189e63191602f::t_3b5057e347189c 1-113
+openspec/changes/scripts-collector-lifecycle-architecture/specs/scripts-branch-independent-invocation/spec.md
+  s_3189e63191602f::t_eca6937ed9a99a 1-280
+openspec/changes/scripts-collector-lifecycle-architecture/specs/scripts-collector-resolution/spec.md
+  s_3189e63191602f::t_faaad2b97413ff 1-362
+openspec/changes/scripts-collector-lifecycle-architecture/specs/scripts-registry-contract/spec.md
+  s_3189e63191602f::t_e400f97f58bd55 1-183
+openspec/changes/scripts-collector-lifecycle-architecture/tasks.md
+  s_3189e63191602f::t_31e22b0d760844 1-127
+scripts/REGISTRY.md
+  s_3189e63191602f::t_e5bb2ac23770e4 3,12,18-48,51-65,67-68,70
+scripts/REGISTRY.yaml
+  s_3189e63191602f::t_e5c3cdf9a0965b 1-895
+scripts/a1_cabinet401_run_go_contract_collect.py
+  s_3189e63191602f::t_37a2f5ac7901e6 19-22,180,241,243-244,250-260
+scripts/a1_strict_read_only_contract_collect.py
+  s_3189e63191602f::t_694231c3e8c09e 31-34,49-52,56,367,374,411,418,443-444,452,1269-1270,1279,1588-1603,1606,1608-1609,1616-1624,1626-1635
+scripts/multi_client_ad_preflight_collect.py
+  s_3189e63191602f::t_bc2abf296bdd62 22-23,147
+tests/integration/scripts/test_canonical_bootstrap_fixture.py
+  s_3189e63191602f::t_b1adf678f3a3e1 1-337
+tests/unit/scripts/test_a1_strict_read_only_contract_collect.py
+  s_3189e63191602f::t_cf7c0faf561986 7,162-233
+tests/unit/scripts/test_ch_a1_evidence_sql.py
+  s_3189e63191602f::t_8cde78b510e06a 1-124
+tests/unit/tools/test_compose_runtime.py
+  s_3189e63191602f::t_267420c3ffe1f7 1-470
+tests/unit/tools/test_scripts_receipts.py
+  s_3189e63191602f::t_39f4508b4f9967 1-120
+tests/unit/tools/test_scripts_registry_resolver.py
+  s_3189e63191602f::t_6ded7938fb88c2 1-819
+tools/scripts/__init__.py
+  s_3189e63191602f::t_cd628748fe39e0 1
+tools/scripts/bootstrap.py
+  s_3189e63191602f::t_7fa14fd9832ca5 1-136
+tools/scripts/compose_runtime.py
+  s_3189e63191602f::t_dde2916670736b 1-316
+tools/scripts/receipts.py
+  s_3189e63191602f::t_8844bc0a609436 1-269
+tools/scripts/registry.py
+  s_3189e63191602f::t_c56c0dfed0cf3c 1-610
+tools/scripts/resolver.py
+  s_3189e63191602f::t_07a3e13410d809 1-786
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+  "prompts": {},
+  "sessions": {
+    "s_3189e63191602f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9281ed73-0aa8-42ed-b208-48ca02cd63ce",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
