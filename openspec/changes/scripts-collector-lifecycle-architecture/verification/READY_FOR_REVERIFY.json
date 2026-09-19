@@ -1,0 +1,103 @@
+{
+  "schema_version": "opsx.change-verification.v1",
+  "change_id": "scripts-collector-lifecycle-architecture",
+  "status": "NO_GO",
+  "implementation_status": "CANONICAL_IMPLEMENTATION_VERIFIED_COMPOSE_RUN_EVIDENCE_PENDING",
+  "caller": {
+    "root": "C:/Users/vkita/my_code/meta-repo/scripts-fix",
+    "branch": "scripts-fix",
+    "head": "2df7e20471ccf09b988395be5c398ec4b902d4fb"
+  },
+  "canonical": {
+    "root": "C:/Users/vkita/my_code/meta-repo/scripts",
+    "branch": "refs/heads/scripts",
+    "implementation_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+    "common_dir": "C:/Users/vkita/my_code/meta-repo/adv-bot/.git",
+    "discovery_override": "NONE",
+    "topology_candidates": 1
+  },
+  "source_manifest": {
+    "file_count": 29,
+    "sha256_equivalence": "PASS",
+    "excluded": [
+      ".gitignore",
+      "verification/READY_FOR_REVERIFY.json",
+      "Temp/debug debris",
+      "caches",
+      "*.pyc"
+    ]
+  },
+  "e2e": {
+    "reuse": {
+      "mode": "PLAN_RUN",
+      "request_id": "canonical-reuse",
+      "exit_code": 0,
+      "outcome": "REUSE",
+      "execution_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+      "registry_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+      "selection": [
+        {
+          "registry_id": "a1-strict-read-only-contract",
+          "collector_path": "scripts/a1_strict_read_only_contract_collect.py"
+        }
+      ]
+    },
+    "run_routing": {
+      "mode": "RUN",
+      "request_id": "canonical-reuse",
+      "exit_code": 0,
+      "outcome": "REUSE",
+      "external_execution": "NOT_PERFORMED",
+      "artifact_gate": "UNIT_VERIFIED_ONLY"
+    },
+    "compose": {
+      "mode": "PLAN_RUN",
+      "request_id": "canonical-compose-probe",
+      "exit_code": 10,
+      "outcome": "FORMAL_CHANGE_REQUIRED",
+      "compose_plan": null,
+      "reason": "Committed Registry contains no resolution-enabled composable rows",
+      "status": "UNVERIFIED"
+    },
+    "runtime_artifact_gates": {
+      "unit_tests": "PASS",
+      "actual_topology_run_harness": "UNAVAILABLE",
+      "status": "UNVERIFIED"
+    }
+  },
+  "targeted_tests": {
+    "correction_command": "poetry run pytest tests/unit/tools/test_scripts_registry_resolver.py tests/unit/tools/test_compose_runtime.py tests/integration/scripts/test_canonical_bootstrap_fixture.py -q",
+    "correction_result": "53 passed, 1 warning",
+    "full_command": "poetry run pytest tests/unit/tools/test_scripts_registry_resolver.py tests/unit/tools/test_compose_runtime.py tests/unit/tools/test_scripts_receipts.py tests/integration/scripts/test_canonical_bootstrap_fixture.py tests/unit/scripts/test_ch_a1_evidence_sql.py tests/unit/scripts/test_a1_strict_read_only_contract_collect.py -q",
+    "full_result": "78 passed, 1 warning",
+    "warning": "SQLAlchemy declarative_base deprecation at app/utils/db/base.py:5"
+  },
+  "registry_checks": {
+    "validate": "PASS: VALID",
+    "check_drift": "PASS: IN_SYNC",
+    "scoped_hardcoding_gate": "PASS",
+    "render": "NOT RUN: write mode not required"
+  },
+  "openspec_validation": {
+    "config_contract": "PASS",
+    "strict_change_validation": "PASS",
+    "status": "COMPLETE"
+  },
+  "provenance": {
+    "expected_registry_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+    "observed_registry_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+    "registry_sha_equal": true,
+    "registry_sha_is_content_digest": false
+  },
+  "production_writes": "NONE",
+  "push_merge_rebase_reset": "NONE",
+  "integration_commit": {
+    "sha": "9543485515bca32631a5e11219afc8f006b134d2",
+    "message": "feat(scripts): integrate canonical collector lifecycle"
+  },
+  "blocking_evidence": [
+    "No valid COMPOSE plan exists in the committed Registry",
+    "Actual topology RUN with local child artifact execution was not available without inventing a parallel harness"
+  ],
+  "generated_at": "2026-09-19T09:00:00Z"
+}
