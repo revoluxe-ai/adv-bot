@@ -1,0 +1,24 @@
+openspec/changes/prod-adv-bot-strict-read-only-gap/.openspec.yaml
+  h_267f51d775769b 1-2
+openspec/changes/prod-adv-bot-strict-read-only-gap/decisions/strict-single-nmid-audit-evidence/decision.md
+  h_267f51d775769b 1-76
+openspec/changes/prod-adv-bot-strict-read-only-gap/design.md
+  h_267f51d775769b 1-175
+openspec/changes/prod-adv-bot-strict-read-only-gap/proposal.md
+  h_267f51d775769b 1-66
+openspec/changes/prod-adv-bot-strict-read-only-gap/specs/strict-single-nmid-read-only-audit/spec.md
+  h_267f51d775769b 1-254
+openspec/changes/prod-adv-bot-strict-read-only-gap/tasks.md
+  h_267f51d775769b 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b117343f11fceac3c84b81be7c128f2d87f05e65",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
