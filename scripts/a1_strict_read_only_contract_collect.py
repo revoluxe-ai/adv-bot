@@ -16,7 +16,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import sys
 import zipfile
 from collections import defaultdict
@@ -29,6 +28,10 @@ import dotenv
 
 dotenv.load_dotenv()
 
+from tools.scripts.receipts import (
+    invocation_output_path,
+    prepare_invocation_output_dir,
+)
 from scripts import ch_a1_evidence as evidence
 from scripts.wb_a1_associated_conversions import (
     _jsonable,
@@ -43,22 +46,14 @@ from scripts.wb_api_readonly_ops.collect.orders_sales import _paginate_supplier_
 from scripts.wb_api_readonly_ops.collect.raw_store import RawStore
 
 
-SHOP_ID = "5339e9ad-cbfe-50fc-8d77-b9f337a80417"
-EXPECTED_WB_CABINET_ID = 401
+# Identity is supplied by the invocation contract. Compatibility wrappers set
+# these module values before calling ``run_collect``.
+SHOP_ID = ""
+EXPECTED_WB_CABINET_ID = 0
 MSK = ZoneInfo("Europe/Moscow")
 PACKAGE_NAME = "A1-STRICT-READ-ONLY-CONTRACT"
 
-TARGET_NMIDS = frozenset(
-    {
-        837395782,
-        14824677,
-        14166423,
-        85970344,
-        388166103,
-        7974113,
-        147281596,
-    }
-)
+TARGET_NMIDS: frozenset[int] = frozenset()
 RECONCILE_CAMPAIGNS: dict[int, frozenset[int]] = {
     837395782: frozenset({39900256, 39900211}),
     14824677: frozenset({39943926, 39943851}),
@@ -369,13 +364,14 @@ def _load_pg_identity_and_settings(
     identity_query = (
         "SELECT id, shop_id, balance, bonus "
         "FROM public.wbcabinet "
-        f"WHERE shop_id = '{SHOP_ID}'"
+        "WHERE shop_id = $1"
     )
     identity_status = evidence.run_pg_query(
         _pg_database(),
         identity_query,
         identity_path,
         sql_dir / "pg_wbcabinet_shop.sql",
+        query_params=(SHOP_ID,),
         csv_output=True,
     )
     if not identity_status["success"]:
@@ -412,13 +408,14 @@ def _load_pg_identity_and_settings(
         f"SELECT {columns} "
         "FROM public.advsetting a "
         "JOIN public.wbcabinet c ON a.wb_cabinet_id = c.id "
-        f"WHERE c.shop_id = '{SHOP_ID}'"
+        "WHERE c.shop_id = $1"
     )
     settings_status = evidence.run_pg_query(
         _pg_database(),
         settings_query,
         settings_path,
         sql_dir / "pg_advsetting_shop.sql",
+        query_params=(SHOP_ID,),
         csv_output=True,
     )
     if not settings_status["success"]:
@@ -443,8 +440,8 @@ def _load_topups(
         "t.date_msk, t.amount, t.request_payload, t.created_at "
         "FROM public.wbautobudgettopup t "
         "JOIN public.advsetting a ON t.adv_setting_id = a.id "
-        f"WHERE a.wb_cabinet_id = {wb_cabinet_id} "
-        f"AND t.date_msk >= '{date_from.isoformat()}' "
+        "WHERE a.wb_cabinet_id = $1 "
+        "AND t.date_msk >= $2 "
         "ORDER BY t.created_at"
     )
     status = evidence.run_pg_query(
@@ -452,6 +449,7 @@ def _load_topups(
         query,
         path,
         sql_dir / "pg_wbautobudgettopup_last_7_closed.sql",
+        query_params=(wb_cabinet_id, date_from),
         csv_output=True,
     )
     if not status["success"]:
@@ -1268,8 +1266,8 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     """Собрать ZIP contract и вернуть factual execution summary.
 
     Args:
-        output_dir: Локальный каталог package contents. Existing contents are
-            removed because the output path is invocation-owned.
+        output_dir: Новый каталог package contents, заранее вычисленный внутри
+            `.tmp/opsx-scripts/<run_id>/`.
 
     Returns:
         Summary with primary ZIP path, SHA-256, coverage and zero write counts.
@@ -1278,10 +1276,7 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
         _SourceError: если обязательный PG/WB read-only source unavailable.
         RuntimeError: если local primary layout or secret scan fails.
     """
-    root = output_dir.resolve()
-    if root.exists():
-        shutil.rmtree(root)
-    root.mkdir(parents=True, exist_ok=True)
+    root = prepare_invocation_output_dir(output_dir)
     (root / "raw").mkdir(parents=True, exist_ok=True)
     gaps: list[str] = []
     checked_at = _msk_now()
@@ -1591,18 +1586,53 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="A1 strict factual read-only contract collector."
     )
     parser.add_argument(
-        "--output-dir",
-        default=".tmp/a1_strict_read_only_contract",
-        help="Directory containing the exact primary ZIP source files.",
+        "--shop-id",
+        required=True,
+        help="WB shop identity supplied by the resolver contract.",
     )
+    parser.add_argument(
+        "--wb-cabinet-id",
+        required=True,
+        type=int,
+        help="WB cabinet identity supplied by the resolver contract.",
+    )
+    parser.add_argument(
+        "--target-nmids",
+        required=True,
+        help="Comma-separated target NMIDs supplied by the resolver contract.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Optional precomputed invocation-owned output directory.",
+    )
+    parser.add_argument("--run-id", default="local-run")
+    parser.add_argument("--caller-root", default=".")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     """Запустить collector, напечатать machine-readable primary handoff."""
     args = parse_args(argv)
+    global SHOP_ID, EXPECTED_WB_CABINET_ID, TARGET_NMIDS
+    SHOP_ID = args.shop_id
+    EXPECTED_WB_CABINET_ID = args.wb_cabinet_id
+    TARGET_NMIDS = frozenset(
+        int(value) for value in args.target_nmids.split(",") if value.strip()
+    )
+    if not SHOP_ID or not TARGET_NMIDS:
+        print("ops-script: failed; identity arguments must be non-empty", file=sys.stderr)
+        return 1
     try:
-        result = run_collect(Path(args.output_dir))
+        output_dir = (
+            Path(args.output_dir)
+            if args.output_dir
+            else invocation_output_path(
+                Path(args.caller_root).resolve(),
+                args.run_id,
+                "a1-strict-read-only-contract",
+            )
+        )
+        result = run_collect(output_dir)
     except Exception as exc:  # noqa: BLE001
         print(f"ops-script: failed; error={_safe_error(exc)}", file=sys.stderr)
         return 1

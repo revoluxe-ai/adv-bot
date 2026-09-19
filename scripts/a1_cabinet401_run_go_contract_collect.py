@@ -12,11 +12,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 import zipfile
 from pathlib import Path
 from typing import Any
 
+from tools.scripts.receipts import (
+    invocation_output_path,
+    prepare_invocation_output_dir,
+)
 from scripts import a1_current_performance_drr_snapshot as performance
 from scripts import a1_strict_read_only_contract_collect as strict
 
@@ -174,10 +177,7 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
         RuntimeError: если identity или zero-write invariant нарушены.
     """
     _patch_target_scope()
-    root = output_dir.resolve()
-    if root.exists():
-        shutil.rmtree(root)
-    root.mkdir(parents=True)
+    root = prepare_invocation_output_dir(output_dir)
     strict_result = strict.run_collect(root / "strict")
     performance_result = performance.run_collect(root / "performance")
     if strict_result.get("WB_CABINET_ID") != WB_CABINET_ID:
@@ -238,15 +238,26 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output-dir",
-        default=".tmp/a1_cabinet401_run_go_contract",
-        help="Invocation-owned output directory.",
+        help="Optional precomputed invocation-owned output directory.",
     )
+    parser.add_argument("--run-id", default="local-run")
+    parser.add_argument("--caller-root", default=".")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     """Запустить collector и вывести primary artifact metadata."""
-    result = run_collect(Path(parse_args(argv).output_dir))
+    args = parse_args(argv)
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else invocation_output_path(
+            Path(args.caller_root).resolve(),
+            args.run_id,
+            "a1-cabinet401-run-go-contract",
+        )
+    )
+    result = run_collect(output_dir)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print(f"PRIMARY_ARTIFACT={result['PRIMARY_ARTIFACT']}")
     print(f"PRIMARY_SHA256={result['PRIMARY_SHA256']}")

@@ -12,13 +12,16 @@ import argparse
 import csv
 import hashlib
 import json
-import shutil
 import subprocess
 import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 
+from tools.scripts.receipts import (
+    invocation_output_path,
+    prepare_invocation_output_dir,
+)
 from scripts import a1_current_performance_drr_snapshot as performance
 from scripts import a1_strict_read_only_contract_collect as strict
 
@@ -286,10 +289,7 @@ def run_collect(output_dir: Path) -> dict[str, Any]:
     Raises:
         RuntimeError: при contradiction identity, worker failure или write gate.
     """
-    root = output_dir.resolve()
-    if root.exists():
-        shutil.rmtree(root)
-    root.mkdir(parents=True)
+    root = prepare_invocation_output_dir(output_dir)
     strict_result = _run_isolated_worker(
         "strict",
         root / "strict",
@@ -358,7 +358,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Разобрать режим worker и каталог output."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--worker", choices=("strict", "performance"))
-    parser.add_argument("--output-dir", default=".tmp/a1_cabinet401_run_go_contract_v2")
+    parser.add_argument("--output-dir")
+    parser.add_argument("--run-id", default="local-run")
+    parser.add_argument("--caller-root", default=".")
     parser.add_argument("--shop-id", default=SHOP_ID)
     parser.add_argument("--wb-cabinet-id", type=int, default=WB_CABINET_ID)
     parser.add_argument("--target-nmids", default=",".join(map(str, TARGET_NMIDS)))
@@ -376,10 +378,19 @@ def main(argv: list[str] | None = None) -> int:
         int(value) for value in args.target_nmids.split(",") if value.strip()
     )
     CLIENT_SIZE_ID = args.client_size_id
+    output_dir = (
+        Path(args.output_dir)
+        if args.output_dir
+        else invocation_output_path(
+            Path(args.caller_root).resolve(),
+            args.run_id,
+            "a1-cabinet401-run-go-contract-v2",
+        )
+    )
     if args.worker:
-        _worker_result(args.worker, Path(args.output_dir))
+        _worker_result(args.worker, output_dir)
         return 0
-    result = run_collect(Path(args.output_dir))
+    result = run_collect(output_dir)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     print(f"PRIMARY_ARTIFACT={result['PRIMARY_ARTIFACT']}")
     print(f"PRIMARY_SHA256={result['PRIMARY_SHA256']}")

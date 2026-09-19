@@ -73,6 +73,11 @@ Examples:
 
 All must be present and coherent for `SCRIPTS_INFRA=READY`:
 
+For a `PLAN_RUN` / `RUN` request, this checklist is evaluated against the
+canonical `refs/heads/scripts` snapshot selected by the thin bootstrap. The
+caller worktree is not a Registry source and need not contain
+`scripts/REGISTRY.yaml` or `scripts/REGISTRY.md`.
+
 1. **GHA workflow** — push (and preferably `workflow_dispatch`) on branch
    `scripts` builds+pushes image from existing `dockers/Dockerfile` without
    requiring a PR. Canonical path:
@@ -80,11 +85,12 @@ All must be present and coherent for `SCRIPTS_INFRA=READY`:
 2. **Job template** — parameterized one-shot Job for running
    `python <script>` (or equivalent) from the built image. Canonical path:
    `k8s/jobs/ops-script-runner.yaml`
-3. **Registry** — durable readiness ledger at `scripts/REGISTRY.md` with
-   schema for `title` / `path` / `runnable` / `tests` / `battle_tested`.
-   `title` is required (human primary label); `path` is the secondary hint
-   (see `.cursor/commands/opsx-human-label-display.md`).
-   CHECK treats a registry missing the `title` column as
+3. **Registry** — machine source at canonical
+   `scripts/REGISTRY.yaml`, validated with
+   `tools/scripts/registry.py`, plus generated readiness view at
+   `scripts/REGISTRY.md`. `title` is required (human primary label); `path`
+   is the secondary hint (see `.cursor/commands/opsx-human-label-display.md`).
+   CHECK treats missing/invalid YAML or generated drift as
    `REGISTRY_STATUS=INVALID` (GAP) until repaired.
 4. **Reuse, do not reinvent** — existing Dockerfile, imagePullSecrets /
    envFrom patterns from `k8s/jobs/app-db-migrate.yaml` where applicable;
@@ -97,10 +103,13 @@ Owner explicitly lists those paths in GO (default: leave them alone).
 
 ### CHECK (default) — READ_ONLY
 
-1. Verify presence and minimal shape of the three artifacts above.
-2. Grep/read bounded sections only; do not dump whole `.cursor/commands/**`.
-3. Emit `SCRIPTS_INFRA_REPORT` with gaps and pasteable GO if needed.
-4. Never write files. Never apply Jobs. Never push.
+1. Resolve the canonical `refs/heads/scripts` snapshot before checking the
+   Registry; never require or read a caller-local Registry for bootstrap.
+2. Verify presence and minimal shape of the three artifacts above in that
+   canonical snapshot.
+3. Grep/read bounded sections only; do not dump whole `.cursor/commands/**`.
+4. Emit `SCRIPTS_INFRA_REPORT` with gaps and pasteable GO if needed.
+5. Never write files. Never apply Jobs. Never push.
 
 ### GO — materialize missing
 
@@ -150,8 +159,9 @@ Allowed paths (create/update only when missing or Owner-listed gap):
 
 1. `.github/workflows/deploy_scripts.yml`
 2. `k8s/jobs/ops-script-runner.yaml`
-3. `scripts/REGISTRY.md` (schema including required `title` + `path`, seed
-   rows; reconcile missing entrypoints / backfill missing titles)
+3. `scripts/REGISTRY.yaml` and generated `scripts/REGISTRY.md` (Registry v2
+   schema including required `title` + `path`, seed rows; reconcile missing
+   entrypoints / backfill missing titles)
 
 Optional companion soft redirects only if already part of an approved packet
 (normally already present): `.cursor/commands/opsx-devops.md`,
@@ -189,7 +199,7 @@ WORKFLOW_PATH:
 WORKFLOW_STATUS: PRESENT | MISSING | INVALID
 JOB_TEMPLATE_PATH:
 JOB_TEMPLATE_STATUS: PRESENT | MISSING | INVALID
-REGISTRY_PATH: scripts/REGISTRY.md
+REGISTRY_PATH: scripts/REGISTRY.yaml + scripts/REGISTRY.md
 REGISTRY_STATUS: PRESENT | MISSING | INVALID
 GAPS:
 REUSED_EXISTING:

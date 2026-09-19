@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shutil
 import sys
 import zipfile
 from dataclasses import dataclass
@@ -19,6 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, cast
 from zoneinfo import ZoneInfo
+
+from tools.scripts.receipts import prepare_invocation_output_dir
 
 TIMEZONE = ZoneInfo("Europe/Moscow")
 STATUS_FAIL_IDENTITY = "FAIL_IDENTITY"
@@ -143,10 +144,7 @@ def run_collect(
     Raises:
         RuntimeError: при identity/semantic/write gate violation.
     """
-    root = output_dir.resolve()
-    if root.exists():
-        shutil.rmtree(root)
-    root.mkdir(parents=True)
+    root = prepare_invocation_output_dir(output_dir)
 
     source_result = _run_existing_read_only_seam(identity, root)
     identity_errors = reconcile_identity(root / "source", identity)

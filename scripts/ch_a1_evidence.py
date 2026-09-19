@@ -26,9 +26,11 @@ import urllib.error
 import urllib.request
 import zipfile
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
+from urllib.parse import urlencode
 
 
 SHOP_ID = "5339e9ad-cbfe-50fc-8d77-b9f337a80417"
@@ -43,6 +45,7 @@ PG_EXTERNAL_PORT = 30432
 REDIS_NAMESPACE = "prod-analytics"
 REDIS_POD = "redis2-master-0"
 _PG_CREDENTIALS: tuple[str, str] | None = None
+_QUERY_PARAMETER_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_]*$")
 
 SENSITIVE_NAMES = (
     "api_key",
@@ -199,9 +202,33 @@ def run_ch_query(
     output_path: Path,
     sql_path: Path,
     *,
+    query_params: Mapping[str, object] | None = None,
     timeout_seconds: int = 1800,
 ) -> dict[str, Any]:
-    """Выполнить ClickHouse SELECT через штатный pod path."""
+    """Выполнить ClickHouse SELECT через штатный pod path.
+
+    Args:
+        query: SQL с ClickHouse placeholders вида ``{name:Type}``.
+        output_path: Файл для JSONEachRow-ответа.
+        sql_path: Сохраняемый SQL без значений runtime-параметров.
+        query_params: Значения HTTP query parameters `param_<name>`.
+        timeout_seconds: Максимальное время запроса.
+
+    Returns:
+        Machine-readable status без выполнения mutation-запросов.
+
+    Raises:
+        ValueError: если имя параметра не соответствует allowlist.
+    """
+    encoded_params = {"default_format": "JSONEachRow"}
+    for name, value in (query_params or {}).items():
+        if not _QUERY_PARAMETER_PATTERN.fullmatch(name):
+            raise ValueError(f"unsafe ClickHouse query parameter name: {name}")
+        encoded_params[f"param_{name}"] = (
+            json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+            if isinstance(value, (list, tuple))
+            else str(value)
+        )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     write_text(
         sql_path,
@@ -210,14 +237,14 @@ def run_ch_query(
             f"-- {sql_path.name}\n"
             "-- Назначение: READ_ONLY technical evidence extraction for ООО «А1».\n"
             "-- Таблица(и): ClickHouse system/data tables; credentials are never selected.\n"
-            "-- Параметры: shop_id is embedded only as a bounded A1 filter when applicable.\n"
+            "-- Параметры: runtime values use ClickHouse HTTP query parameters.\n"
             "-- Вызывается: scripts/ch_a1_evidence.py.\n"
             "-- ============================================================================\n\n"
             f"{query.rstrip()}\n"
         ),
     )
     request = urllib.request.Request(
-        f"{CH_HTTP_URL}?default_format=JSONEachRow",
+        f"{CH_HTTP_URL}?{urlencode(encoded_params)}",
         data=query.encode("utf-8"),
         headers={"Content-Type": "text/plain; charset=utf-8"},
         method="POST",
@@ -307,6 +334,7 @@ async def _write_pg_query(
     query: str,
     output_path: Path,
     *,
+    query_params: Sequence[object],
     timeout_seconds: int,
     csv_output: bool,
     csv_columns: list[str] | None,
@@ -337,7 +365,7 @@ async def _write_pg_query(
         with output_path.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.writer(handle, delimiter="," if csv_output else "\t", lineterminator="\n")
             async with connection.transaction():
-                cursor = connection.cursor(query, prefetch=1000)
+                cursor = connection.cursor(query, *query_params, prefetch=1000)
                 header_written = False
                 if csv_output and csv_columns:
                     writer.writerow(csv_columns)
@@ -357,6 +385,7 @@ def run_pg_query(
     output_path: Path,
     sql_path: Path,
     *,
+    query_params: Sequence[object] = (),
     timeout_seconds: int = 1800,
     csv_output: bool = False,
     csv_columns: list[str] | None = None,
@@ -369,7 +398,7 @@ def run_pg_query(
             f"-- {sql_path.name}\n"
             "-- Назначение: READ_ONLY technical evidence extraction for ООО «А1».\n"
             "-- Таблица(и): PostgreSQL information_schema/public tables; sensitive columns excluded.\n"
-            "-- Параметры: shop_id is embedded only as a bounded A1 filter when applicable.\n"
+            "-- Параметры: values are passed through asyncpg bind parameters ($1, $2, ...).\n"
             "-- Вызывается: scripts/ch_a1_evidence.py.\n"
             "-- ============================================================================\n\n"
             f"{query.rstrip()}\n"
@@ -381,6 +410,7 @@ def run_pg_query(
                 database,
                 query,
                 output_path,
+                query_params=query_params,
                 timeout_seconds=timeout_seconds,
                 csv_output=csv_output,
                 csv_columns=csv_columns,
@@ -601,39 +631,80 @@ def temporal_column(columns: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def _clickhouse_parameter_list(
+    prefix: str, values: Iterable[int], type_name: str
+) -> tuple[str, dict[str, int]]:
+    """Сформировать bound-плейсхолдеры ClickHouse для списка integer values."""
+    ordered = sorted(values)
+    parameters = {
+        f"{prefix}_{index}": value for index, value in enumerate(ordered)
+    }
+    placeholders = ", ".join(
+        f"{{{name}:{type_name}}}" for name in parameters
+    )
+    return placeholders, parameters
+
+
 def filter_for_clickhouse(
     columns: list[dict[str, Any]],
     cabinet_ids: set[int],
     adv_ids: set[int],
     nmids: set[int],
-) -> tuple[str | None, str]:
-    """Построить A1 mapping filter и описание mapping."""
+    *,
+    shop_id: str,
+) -> tuple[str | None, str, dict[str, object]]:
+    """Построить ClickHouse filter без интерполяции runtime values."""
     names = {str(row.get("name", "")).lower(): str(row.get("name", "")) for row in columns}
     clauses: list[str] = []
     mappings: list[str] = []
+    bound_parameters: dict[str, object] = {}
     if "shop_id" in names:
-        clauses.append(f"{quote_ch(names['shop_id'])} = '{SHOP_ID}'")
+        clauses.append(f"{quote_ch(names['shop_id'])} = {{shop_id:String}}")
         mappings.append("direct shop_id")
-        return clauses[0], "; ".join(mappings)
+        return clauses[0], "; ".join(mappings), {"shop_id": shop_id}
     for key in ("cabinet_id", "wb_cabinet_id"):
         if key in names and cabinet_ids:
-            values = ", ".join(str(value) for value in sorted(cabinet_ids))
+            values, parameters = _clickhouse_parameter_list(
+                "cabinet_id", cabinet_ids, "UInt64"
+            )
             clauses.append(f"{quote_ch(names[key])} IN ({values})")
             mappings.append(f"PG wbcabinet.id -> {key}")
+            bound_parameters.update(parameters)
     for key in ("adv_id", "advert_id", "campaign_id"):
         if key in names and adv_ids:
-            values = ", ".join(str(value) for value in sorted(adv_ids))
+            values, parameters = _clickhouse_parameter_list(
+                "adv_id", adv_ids, "UInt64"
+            )
             clauses.append(f"{quote_ch(names[key])} IN ({values})")
             mappings.append(f"PG advsetting.adv_id -> {key}")
+            bound_parameters.update(parameters)
     for key in ("nmid", "nm_id", "nmID", "nmId"):
         lower_key = key.lower()
         if lower_key in names and nmids:
-            values = ", ".join(str(value) for value in sorted(nmids))
+            values, parameters = _clickhouse_parameter_list(
+                "nmid", nmids, "UInt64"
+            )
             clauses.append(f"{quote_ch(names[lower_key])} IN ({values})")
             mappings.append(f"PG advsetting.nmids -> {names[lower_key]}")
+            bound_parameters.update(parameters)
     if not clauses:
-        return None, "no safe A1 mapping"
-    return " OR ".join(f"({clause})" for clause in clauses), "; ".join(mappings)
+        return None, "no safe A1 mapping", {}
+    return (
+        " OR ".join(f"({clause})" for clause in clauses),
+        "; ".join(mappings),
+        bound_parameters,
+    )
+
+
+def _postgres_parameter_list(
+    identifier: str, values: Iterable[int], start_index: int
+) -> tuple[str, tuple[int, ...]]:
+    """Сформировать asyncpg positional placeholders для integer values."""
+    ordered = tuple(sorted(values))
+    placeholders = ", ".join(
+        f"${index}" for index in range(start_index, start_index + len(ordered))
+    )
+    return f"{identifier} IN ({placeholders})", ordered
 
 
 def filter_for_postgres(
@@ -642,36 +713,56 @@ def filter_for_postgres(
     adv_setting_ids: set[int],
     adv_ids: set[int],
     nmids: set[int],
-) -> tuple[str | None, str, list[str]]:
-    """Построить PostgreSQL A1 mapping filter и безопасный projection."""
+    *,
+    shop_id: str,
+) -> tuple[str | None, str, list[str], tuple[object, ...]]:
+    """Построить PostgreSQL filter и asyncpg bind parameters."""
     lower = {column.lower(): column for column in columns}
     clauses: list[str] = []
     mappings: list[str] = []
     if "shop_id" in lower:
-        clauses.append(f"{quote_pg(lower['shop_id'])} = '{SHOP_ID}'")
+        clauses.append(f"{quote_pg(lower['shop_id'])} = $1")
         mappings.append("direct shop_id")
         return clauses[0], "; ".join(mappings), [
             column
             for column in columns
             if not any(marker in column.lower() for marker in SENSITIVE_NAMES)
-        ]
+        ], (shop_id,)
+    parameters: list[object] = []
+    parameter_index = 1
     for key in ("wb_cabinet_id", "cabinet_id"):
         if key in lower and cabinet_ids:
-            values = ", ".join(str(value) for value in sorted(cabinet_ids))
-            clauses.append(f"{quote_pg(lower[key])} IN ({values})")
+            clause, values = _postgres_parameter_list(
+                quote_pg(lower[key]), cabinet_ids, parameter_index
+            )
+            clauses.append(clause)
+            parameters.extend(values)
+            parameter_index += len(values)
             mappings.append(f"PG wbcabinet.id -> {key}")
     if "adv_setting_id" in lower and adv_setting_ids:
-        values = ", ".join(str(value) for value in sorted(adv_setting_ids))
-        clauses.append(f"{quote_pg(lower['adv_setting_id'])} IN ({values})")
+        clause, values = _postgres_parameter_list(
+            quote_pg(lower["adv_setting_id"]), adv_setting_ids, parameter_index
+        )
+        clauses.append(clause)
+        parameters.extend(values)
+        parameter_index += len(values)
         mappings.append("PG advsetting.id -> adv_setting_id")
     if "adv_id" in lower and adv_ids:
-        values = ", ".join(str(value) for value in sorted(adv_ids))
-        clauses.append(f"{quote_pg(lower['adv_id'])} IN ({values})")
+        clause, values = _postgres_parameter_list(
+            quote_pg(lower["adv_id"]), adv_ids, parameter_index
+        )
+        clauses.append(clause)
+        parameters.extend(values)
+        parameter_index += len(values)
         mappings.append("PG advsetting.adv_id -> adv_id")
     for key in ("nmid", "nm_id"):
         if key in lower and nmids:
-            values = ", ".join(str(value) for value in sorted(nmids))
-            clauses.append(f"{quote_pg(lower[key])} IN ({values})")
+            clause, values = _postgres_parameter_list(
+                quote_pg(lower[key]), nmids, parameter_index
+            )
+            clauses.append(clause)
+            parameters.extend(values)
+            parameter_index += len(values)
             mappings.append(f"PG advsetting.nmids -> {key}")
     safe_columns = [
         column
@@ -679,11 +770,12 @@ def filter_for_postgres(
         if not any(marker in column.lower() for marker in SENSITIVE_NAMES)
     ]
     if not safe_columns:
-        return None, "all columns are sensitive", []
+        return None, "all columns are sensitive", [], tuple(parameters)
     return (
         " OR ".join(f"({clause})" for clause in clauses) if clauses else None,
         "; ".join(mappings) if mappings else "no safe A1 mapping",
         safe_columns,
+        tuple(parameters),
     )
 
 
@@ -726,11 +818,12 @@ def extract_ch_table(
     table: str,
     columns: list[dict[str, Any]],
     filter_sql: str | None,
+    filter_params: Mapping[str, object],
     mapping: str,
     table_meta: dict[str, Any],
     sequence: int,
 ) -> dict[str, Any]:
-    """Собрать одну ClickHouse table в JSONL и вернуть coverage record."""
+    """Собрать одну ClickHouse table через bound filters."""
     qualified = f"{quote_ch(database)}.{quote_ch(table)}"
     temporal = temporal_column(columns)
     column_types = {
@@ -748,7 +841,12 @@ def extract_ch_table(
     stem = f"{sequence:03d}_{safe_filename(database)}_{safe_filename(table)}"
     stats_path = out / "metadata" / f"{stem}_stats.jsonl"
     stats_sql = sql_dir / f"{stem}_stats.sql"
-    stats_result = run_ch_query(count_query, stats_path, stats_sql)
+    stats_result = run_ch_query(
+        count_query,
+        stats_path,
+        stats_sql,
+        query_params=filter_params,
+    )
     stats_rows = read_jsonl(stats_path)
     stats = stats_rows[0] if stats_rows else {}
     column_names = [str(row.get("name", "")) for row in columns]
@@ -782,15 +880,23 @@ def extract_ch_table(
         while start <= end:
             stop = min(start + timedelta(days=7), end + timedelta(days=1))
             if "date" in temporal_type and "datetime" not in temporal_type:
-                lower_bound = f"toDate('{start.isoformat()}')"
-                upper_bound = f"toDate('{stop.isoformat()}')"
+                window_type = "Date"
             else:
-                lower_bound = f"toDateTime('{start.isoformat()} 00:00:00')"
-                upper_bound = f"toDateTime('{stop.isoformat()} 00:00:00')"
+                window_type = "DateTime"
             window_filter = (
-                f"({filter_sql}) AND {quote_ch(temporal)} >= {lower_bound} "
-                f"AND {quote_ch(temporal)} < {upper_bound}"
+                f"({filter_sql}) AND {quote_ch(temporal)} >= "
+                f"{{window_start:{window_type}}} AND {quote_ch(temporal)} < "
+                f"{{window_end:{window_type}}}"
             )
+            window_params = {
+                **filter_params,
+                "window_start": start.isoformat()
+                if window_type == "Date"
+                else f"{start.isoformat()} 00:00:00",
+                "window_end": stop.isoformat()
+                if window_type == "Date"
+                else f"{stop.isoformat()} 00:00:00",
+            }
             window_stem = (
                 f"{stem}_{start.strftime('%Y%m%d')}_{(stop - timedelta(days=1)).strftime('%Y%m%d')}"
             )
@@ -800,6 +906,7 @@ def extract_ch_table(
                 f"SELECT * FROM {qualified} WHERE {window_filter}",
                 window_path,
                 window_sql,
+                query_params=window_params,
                 timeout_seconds=3600,
             )
             written, window_nmids, window_adv_ids = count_json_rows(window_path)
@@ -816,6 +923,7 @@ def extract_ch_table(
             f"SELECT * FROM {qualified}{where}",
             raw_path,
             raw_sql,
+            query_params=filter_params,
             timeout_seconds=3600,
         )
         rows_written, observed_nmids, observed_adv_ids = count_json_rows(raw_path)
@@ -879,6 +987,7 @@ def extract_pg_table(
     table: str,
     columns: list[str],
     filter_sql: str,
+    filter_params: Sequence[object],
     mapping: str,
     sequence: int,
     *,
@@ -897,6 +1006,7 @@ def extract_pg_table(
         query,
         raw_path,
         sql_path,
+        query_params=filter_params,
         csv_output=True,
         csv_columns=columns,
     )
@@ -942,6 +1052,36 @@ def extract_pg_table(
         "completeness": completeness,
         "query_status": result,
     }
+
+
+def _build_wbcabinet_query(
+    columns: list[str], shop_id: str
+) -> tuple[str, tuple[object, ...]]:
+    """Построить cabinet SELECT с asyncpg bind parameter для shop_id."""
+    query = (
+        f"SELECT {', '.join(quote_pg(column) for column in columns)} "
+        f"FROM {quote_pg('public')}.{quote_pg('wbcabinet')} "
+        f"WHERE {quote_pg('shop_id')} = $1"
+    )
+    return query, (shop_id,)
+
+
+def _build_advsetting_query(
+    columns: list[str], cabinet_ids: set[int]
+) -> tuple[str, tuple[object, ...]]:
+    """Построить AdvSetting SELECT с bind parameters для cabinet IDs."""
+    if cabinet_ids and "wb_cabinet_id" in columns:
+        setting_filter, setting_params = _postgres_parameter_list(
+            quote_pg("wb_cabinet_id"), cabinet_ids, 1
+        )
+    else:
+        setting_filter, setting_params = "1 = 0", ()
+    query = (
+        f"SELECT {', '.join(quote_pg(column) for column in columns)} "
+        f"FROM {quote_pg('public')}.{quote_pg('advsetting')} "
+        f"WHERE {setting_filter}"
+    )
+    return query, setting_params
 
 
 def collect_infrastructure(out: Path) -> list[dict[str, Any]]:
@@ -1045,7 +1185,13 @@ def collect_clickhouse(
         engine = str(table_meta.get("engine", ""))
         if "View" in engine:
             continue
-        filter_sql, mapping = filter_for_clickhouse(columns, cabinet_ids, adv_ids, nmids)
+        filter_sql, mapping, filter_params = filter_for_clickhouse(
+            columns,
+            cabinet_ids,
+            adv_ids,
+            nmids,
+            shop_id=SHOP_ID,
+        )
         if filter_sql is None:
             continue
         item = extract_ch_table(
@@ -1055,6 +1201,7 @@ def collect_clickhouse(
             table,
             columns,
             filter_sql,
+            filter_params,
             mapping,
             table_meta,
             sequence,
@@ -1184,16 +1331,13 @@ def collect_postgres(
         if not any(marker in column.lower() for marker in SENSITIVE_NAMES)
     ]
     cabinet_path = out / "postgres" / f"{safe_filename(app_db)}_public_wbcabinet.csv"
-    cabinet_query = (
-        f"SELECT {', '.join(quote_pg(column) for column in safe_wbcabinet)} "
-        f"FROM {quote_pg('public')}.{quote_pg('wbcabinet')} "
-        f"WHERE {quote_pg('shop_id')} = '{SHOP_ID}'"
-    )
+    cabinet_query, cabinet_params = _build_wbcabinet_query(safe_wbcabinet, SHOP_ID)
     cabinet_status = run_pg_query(
         app_db,
         cabinet_query,
         cabinet_path,
         sql_dir / "020_pg_a1_wbcabinet.sql",
+        query_params=cabinet_params,
         csv_output=True,
         csv_columns=safe_wbcabinet,
     )
@@ -1207,25 +1351,18 @@ def collect_postgres(
 
     setting_key = (app_db, "public", "advsetting")
     setting_columns = columns_by_table.get(setting_key, [])
-    setting_filter = (
-        f"{quote_pg('wb_cabinet_id')} IN ({', '.join(str(value) for value in sorted(cabinet_ids))})"
-        if cabinet_ids and "wb_cabinet_id" in setting_columns
-        else "1 = 0"
-    )
     setting_safe = [
         column for column in setting_columns
         if not any(marker in column.lower() for marker in SENSITIVE_NAMES)
     ]
     setting_path = out / "postgres" / f"{safe_filename(app_db)}_public_advsetting.csv"
-    setting_query = (
-        f"SELECT {', '.join(quote_pg(column) for column in setting_safe)} "
-        f"FROM {quote_pg('public')}.{quote_pg('advsetting')} WHERE {setting_filter}"
-    )
+    setting_query, setting_params = _build_advsetting_query(setting_safe, cabinet_ids)
     setting_status = run_pg_query(
         app_db,
         setting_query,
         setting_path,
         sql_dir / "021_pg_a1_advsetting.sql",
+        query_params=setting_params,
         csv_output=True,
         csv_columns=setting_safe,
     )
@@ -1243,8 +1380,13 @@ def collect_postgres(
             continue
         if lower_table in {"alembic_version"}:
             continue
-        filter_sql, mapping, safe_columns = filter_for_postgres(
-            table_columns, cabinet_ids, setting_ids, adv_ids, nmids
+        filter_sql, mapping, safe_columns, filter_params = filter_for_postgres(
+            table_columns,
+            cabinet_ids,
+            setting_ids,
+            adv_ids,
+            nmids,
+            shop_id=SHOP_ID,
         )
         if filter_sql is None or not safe_columns:
             continue
@@ -1263,6 +1405,7 @@ def collect_postgres(
             table,
             safe_columns,
             filter_sql,
+            filter_params,
             mapping,
             sequence,
             table_semantic=semantic,
