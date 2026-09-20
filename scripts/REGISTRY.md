@@ -63,6 +63,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Set sales plan | scripts/set_sales_plan.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Set shop id for all WB tokens | scripts/set_shop_id_for_all_wbtokens.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Start campaigns by nmids | scripts/start_campaigns_by_nmids.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
+| Strict single-NMID read-only audit | scripts/strict_single_nmid_audit.py | UNKNOWN | COVERED | NO | - | - | - | Generic identity-safe bounded audit; readers are injected by Owner-bot Job. |
 | Sync local env from k8s | scripts/sync-local-env-from-k8s.ps1 | UNKNOWN | NONE | NO | - | - | - | local/ops ps1; not default Job |
 | Translit YAML | scripts/translit_yaml.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Users CSV export | scripts/users_csv_exporter/csv_export.py | WORKS | NONE | NO | - | 2026-08-14T12:47:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:c1e1fa7c523cdcec81ea23aaf7d8b2dc8e08248a | Legacy ledger row; not available to resolver. |

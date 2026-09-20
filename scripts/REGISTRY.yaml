@@ -818,6 +818,72 @@ entries:
     tests: NONE
   resolution_enabled: false
   title: Start campaigns by nmids
+- capabilities:
+  - strict-read-only-audit
+  composable: false
+  compose_with: []
+  deprecated_by: null
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers: []
+    justification: ''
+  id: strict-single-nmid-audit
+  optional_args: {}
+  output_schema_version: strict-single-nmid-audit-v1
+  path: scripts/strict_single_nmid_audit.py
+  primary_artifact_pattern: STRICT-SINGLE-NMID-AUDIT.json
+  provided_fields:
+  - attribution
+  - decision
+  - evidence
+  - human_summary
+  - identity
+  - period
+  - physical_spend
+  - stock
+  - totals
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Generic identity-safe bounded audit; readers are injected by Owner-bot Job.
+    runnable: UNKNOWN
+    tests: COVERED
+  required_args:
+    cabinet:
+      description: Exact WB cabinet identity
+      secret: false
+      type: integer
+    nmid:
+      description: Exact single NMID identity
+      secret: false
+      type: integer
+    output:
+      description: Invocation-owned output JSON path
+      secret: false
+      type: path
+    shop_id:
+      description: Exact WB shop identity
+      secret: false
+      type: string
+    size_id:
+      description: Exact client size identity
+      secret: false
+      type: integer
+    timezone:
+      description: IANA audit timezone
+      secret: false
+      type: string
+  resolution_enabled: true
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  sources:
+  - POSTGRES
+  - WB_API
+  tenant_scope: PARAMETERIZED
+  title: Strict single-NMID read-only audit
 - deprecated_by: null
   explicit_invocation_enabled: false
   id: sync-local-env
