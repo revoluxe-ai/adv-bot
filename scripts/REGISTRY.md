@@ -52,7 +52,9 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | Migrate black phrases Redis to Postgres | scripts/migrate_black_phrases_redis_to_postgres.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Generic multi-client advertising preflight | scripts/multi_client_ad_preflight_collect.py | UNKNOWN | PARTIAL | NO | - | - | - | Parameterized read-only identity envelope; explicit coverage gaps remain. |
 | Generic multi-client CPC topology | scripts/multi_client_cpc_topology_collect.py | WORKS | PARTIAL | NO | 2026-09-17T20:25:06Z | 2026-09-17T20:25:06Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:57984c0250abee172f4c8b736807504e3a105fc7 | Legacy ledger row; not available to resolver. |
+| Generic eight-target directive audit | scripts/multi_client_strict_eight_target_directive_audit.py | UNKNOWN | COVERED | NO | - | - | - | Parameterized strict read-only 3d/7d store DRR, AdvSetting/WB state, mapping and bounded glue checks; missing != zero. |
 | Path smoke | scripts/test_path.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
+| ProKraft 14D entry economics R1 | scripts/prokraft_14d_entry_economics_r1.py | WORKS | PARTIAL | NO | 2026-09-18T15:54:20Z | - | - | Strict read-only logical nmID economics; Auto/Search/other physical spend dedupe; live PG/WB run may remain pending. |
 | Resource gap | scripts/resource_gap.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Billing debug cabinet | scripts/run_billing_debug_cabinet.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Send message to all users | scripts/send_message/send_message_all_users.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
