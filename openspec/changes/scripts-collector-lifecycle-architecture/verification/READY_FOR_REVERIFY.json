@@ -11,7 +11,7 @@
   "canonical": {
     "root": "C:/Users/vkita/my_code/meta-repo/scripts",
     "branch": "refs/heads/scripts",
-    "implementation_sha": "479a8fc18308a5b23c2caa093ecdbbc347309e8c",
+    "implementation_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
     "common_dir": "C:/Users/vkita/my_code/meta-repo/adv-bot/.git",
     "discovery_override": "NONE",
     "topology_candidates": 1
@@ -33,8 +33,8 @@
       "request_id": "canonical-reuse",
       "exit_code": 0,
       "outcome": "REUSE",
-      "execution_sha": "9543485515bca32631a5e11219afc8f006b134d2",
-      "registry_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+      "execution_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+      "registry_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
       "selection": [
         {
           "registry_id": "a1-strict-read-only-contract",
@@ -96,16 +96,16 @@
     "status": "COMPLETE"
   },
   "provenance": {
-    "expected_registry_sha": "9543485515bca32631a5e11219afc8f006b134d2",
-    "observed_registry_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+    "expected_registry_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+    "observed_registry_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
     "registry_sha_equal": true,
     "registry_sha_is_content_digest": false
   },
   "production_writes": "NONE",
   "push_merge_rebase_reset": "NONE",
   "integration_commit": {
-    "sha": "479a8fc18308a5b23c2caa093ecdbbc347309e8c",
-    "message": "merge: integrate origin/scripts collectors into lifecycle registry"
+    "sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+    "message": "fix(scripts): restore registry scope after merge; preserve remote collectors"
   },
   "informational_limitations": [
     "Current R1 Registry has no operational composable row; no production-shaped COMPOSE PLAN_RUN probe was executed.",
@@ -114,5 +114,5 @@
     "Post-merge REGISTRY_SCOPE_EXPANSION_WITHOUT_FORMAL_CHANGE corrected: registry rows multi-client-strict-eight-target-directive-audit and prokraft-14d-entry-economics-r1 removed; on-disk collectors and unit tests preserved but are not R1-verified registry scope (no false A/B registry verification claim)."
   ],
   "blockers": [],
-  "generated_at": "2026-09-19T13:10:00Z"
+  "generated_at": "2026-09-20T05:55:00Z"
 }
