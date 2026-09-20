@@ -1,0 +1,19 @@
+scripts/strict_single_nmid_audit_owner_bot_plane.py
+  s_ff7ca45a8cc52f::t_984b482f30e1e1 49-66,225-228,230-235,237-239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fe0a28b097081012ef9e991475103fddea0239a5",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
