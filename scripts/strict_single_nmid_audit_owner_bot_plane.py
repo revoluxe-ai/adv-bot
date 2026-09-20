@@ -46,6 +46,24 @@ def _read_int(row: dict[str, Any], *names: str) -> int:
     return 0
 
 
+def _jsonable(value: Any) -> Any:
+    """Привести WB DTO к JSON-совместимому dict для evidence readers."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonable(item) for item in value]
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return _jsonable(to_dict())
+    if hasattr(value, "__dict__"):
+        return _jsonable(vars(value))
+    return str(value)
+
+
 def _read_number(row: dict[str, Any], *names: str) -> float | None:
     """Вернуть первое числовое поле или ``None``."""
     for name in names:
@@ -204,20 +222,21 @@ async def _load_wb_bundle(
             adapter = promotion._client.fullstats_adapter
 
             async def fetcher(
-                ids: list[int], begin: date, end: date
-            ) -> list[dict[str, Any]]:
-                assert_read_only_op("get_fullstats")
-                raw = await adapter.get_fullstats(ids, begin, end)
-                return cast(list[dict[str, Any]], raw or [])
+                chunk: list[int], begin: date, end: date
+            ) -> list[Any]:
+                assert_read_only_op("fullstats_request_chunk")
+                return await adapter._request_chunk(chunk, begin, end)
 
+            raw_items = await run_chunked_single_range(
+                campaign_ids,
+                period.start,
+                period.end,
+                fetcher=fetcher,
+            )
             fullstats = [
-                dict(item)
-                for item in await run_chunked_single_range(
-                    campaign_ids,
-                    period.start,
-                    period.end,
-                    fetcher=fetcher,
-                )
+                cast(dict[str, Any], _jsonable(item.to_dict()))
+                for item in raw_items
+                if hasattr(item, "to_dict")
             ]
         budget = ApiCallBudget(max_seconds=900.0, max_api_calls=50)
         with tempfile.TemporaryDirectory(prefix="strict-nmid-audit-") as tmp:
