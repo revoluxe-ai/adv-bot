@@ -1,0 +1,25 @@
+scripts/strict_single_nmid_audit.py
+  s_ff7ca45a8cc52f::t_517f6c6b5eefdd 971-975
+scripts/strict_single_nmid_audit_owner_bot_plane.py
+  s_ff7ca45a8cc52f::t_adef6a2f600d1d 247-252,256-282,310-311,337
+tests/unit/scripts/test_strict_single_nmid_audit_job.py
+  s_ff7ca45a8cc52f::t_537d965ab7eda5 7,126-127,138-139
+tests/unit/scripts/test_strict_single_nmid_audit_owner_bot_plane.py
+  s_ff7ca45a8cc52f::t_43cb0873c8e286 1-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "7336ffad9e1e930add359cb1beb4096b5f8b1bbd",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
