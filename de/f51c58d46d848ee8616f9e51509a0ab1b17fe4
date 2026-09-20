@@ -1,0 +1,22 @@
+pyrightconfig_strict.json
+  h_267f51d775769b 49
+scripts/REGISTRY.md
+  h_267f51d775769b 66
+scripts/REGISTRY.yaml
+  h_267f51d775769b 821-886
+scripts/strict_single_nmid_audit.py
+  h_267f51d775769b 1-971
+tests/unit/scripts/test_strict_single_nmid_audit.py
+  h_267f51d775769b 1-369
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "def51c58d46d848ee8616f9e51509a0ab1b17fe4",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
