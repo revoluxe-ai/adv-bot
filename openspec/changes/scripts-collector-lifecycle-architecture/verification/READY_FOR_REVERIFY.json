@@ -11,7 +11,7 @@
   "canonical": {
     "root": "C:/Users/vkita/my_code/meta-repo/scripts",
     "branch": "refs/heads/scripts",
-    "implementation_sha": "9543485515bca32631a5e11219afc8f006b134d2",
+    "implementation_sha": "479a8fc18308a5b23c2caa093ecdbbc347309e8c",
     "common_dir": "C:/Users/vkita/my_code/meta-repo/adv-bot/.git",
     "discovery_override": "NONE",
     "topology_candidates": 1
@@ -104,8 +104,8 @@
   "production_writes": "NONE",
   "push_merge_rebase_reset": "NONE",
   "integration_commit": {
-    "sha": "9543485515bca32631a5e11219afc8f006b134d2",
-    "message": "feat(scripts): integrate canonical collector lifecycle"
+    "sha": "479a8fc18308a5b23c2caa093ecdbbc347309e8c",
+    "message": "merge: integrate origin/scripts collectors into lifecycle registry"
   },
   "informational_limitations": [
     "Current R1 Registry has no operational composable row; no production-shaped COMPOSE PLAN_RUN probe was executed.",
