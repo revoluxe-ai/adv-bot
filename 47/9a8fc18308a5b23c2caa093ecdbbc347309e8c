@@ -1,0 +1,37 @@
+scripts/REGISTRY.md
+  s_819d70a3ffdf1d::t_229c46e3d69c93 55,57
+scripts/multi_client_strict_eight_target_directive_audit.py
+  s_819d70a3ffdf1d::t_8a2dcb99ce4479 1-378
+scripts/prokraft_14d_entry_economics_r1.py
+  s_819d70a3ffdf1d::t_baac904418e150 1-1553
+tests/unit/scripts/test_multi_client_strict_eight_target_directive_audit.py
+  s_819d70a3ffdf1d::t_fd63dbd1294bde 1-62
+tests/unit/scripts/test_prokraft_14d_entry_economics_r1.py
+  s_819d70a3ffdf1d::t_b93fb4b2710ad0 1-188
+scripts/REGISTRY.yaml
+  s_ff7ca45a8cc52f::t_34f3653ae81fa9 667-726,741-801
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "479a8fc18308a5b23c2caa093ecdbbc347309e8c",
+  "prompts": {},
+  "sessions": {
+    "s_819d70a3ffdf1d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0bd3d-1af5-7a02-a09a-4933a0e3caa2",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
