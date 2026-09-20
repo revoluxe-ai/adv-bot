@@ -18,6 +18,19 @@ from scripts.wb_api_readonly_ops.collect.jsonable import jsonable
 from scripts.wb_api_readonly_ops.mutation_guard import assert_read_only_op
 
 
+def _pg_row_as_dict(row: Any) -> dict[str, Any]:
+    """Нормализовать SQLAlchemy RowMapping в plain dict для `.get()` readers."""
+    if isinstance(row, dict):
+        return cast(dict[str, Any], row)
+    if hasattr(row, "_mapping"):
+        normalized = jsonable(dict(row._mapping))
+    else:
+        normalized = jsonable(row)
+    if not isinstance(normalized, dict):
+        raise TypeError(f"PG row is not mapping-like: {type(row)!r}")
+    return cast(dict[str, Any], normalized)
+
+
 @dataclass(frozen=True)
 class EvidenceReaderFailure(Exception):
     """Typed failure для collector GAP provenance (не infrastructure BLOCKED)."""
@@ -103,7 +116,7 @@ async def load_pg_advsetting_rows(shop_id: str, cabinet: int) -> list[dict[str, 
                 error_class="StrictAuditError",
                 message=f"PG identity missing for cabinet={cabinet}",
             )
-        actual_shop = str(identity[0]["shop_id"])
+        actual_shop = str(_pg_row_as_dict(identity[0])["shop_id"])
         if actual_shop != shop_id:
             raise EvidenceReaderFailure(
                 section="identity",
@@ -130,7 +143,7 @@ async def load_pg_advsetting_rows(shop_id: str, cabinet: int) -> list[dict[str, 
                 {"cabinet": cabinet},
             )
         ).mappings().all()
-    return [dict(row) for row in rows]
+    return [_pg_row_as_dict(row) for row in rows]
 
 
 def _parse_nmids(raw: Any) -> set[int]:
