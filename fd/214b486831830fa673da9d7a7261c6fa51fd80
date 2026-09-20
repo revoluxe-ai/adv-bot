@@ -1,0 +1,19 @@
+openspec/changes/scripts-collector-lifecycle-architecture/verification/READY_FOR_REVERIFY.json
+  s_816ca9884a088c::t_718510884c9588 91,113-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "fd214b486831830fa673da9d7a7261c6fa51fd80",
+  "prompts": {},
+  "sessions": {
+    "s_816ca9884a088c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9dd292e6-aefc-4187-a3c8-9994f190e95a",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
