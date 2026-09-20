@@ -210,6 +210,17 @@ coverage and a decision block that separates confirmed facts from
 - **WHEN** one or more required sections contain unresolved gaps
 - **THEN** the decision block SHALL expose those gaps
 - **AND** it MUST NOT claim complete audit success
+- **AND** if identity, output contract validation and write budget remain valid,
+  `decision.status` MAY be `PARTIAL` rather than `BLOCKED`
+
+#### Scenario: Fail-closed contract violation
+
+- **WHEN** identity is ambiguous, substituted, write-capable execution occurs,
+  output contract validation fails, or mandatory execution provenance is missing
+- **THEN** `decision.status` SHALL be `BLOCKED` (or execution SHALL fail closed
+  before a trustworthy artifact is emitted)
+- **AND** `BLOCKED` MUST NOT be used solely because individual evidence sections
+  have GAP or reader/runtime errors while the aggregate output contract is valid
 
 ### Requirement: Strict read-only safety and bounded execution
 

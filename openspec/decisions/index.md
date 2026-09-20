@@ -35,6 +35,11 @@ architecture decisions belong here.
   - Scope: ownership/layering for offline API Master map builder in `tools/`;
     entries only from local vN swagger; no invent URL, download, or codegen;
     map does not authorize WB calls.
+- [strict-single-nmid-audit-evidence](strict-single-nmid-audit-evidence/decision.md)
+  - Status: Accepted
+  - Scope: strict single-NMID read-only audit evidence ownership; authoritative
+    attribution/spend boundaries; `PARTIAL` vs `BLOCKED` output semantics;
+    honest GAP provenance without inference or double physical spend.
 
 ## Change Requirements
 

@@ -48,14 +48,15 @@ WB, DB, Redis, Excel, кампании или shared infrastructure.
 - `openspec/decisions/orders-or-sales-reports-read-identity/decision.md` —
   authoritative supplier orders/sales identity, statistics Reports stack and
   honest period attestation.
-- `openspec/changes/prod-adv-bot-strict-read-only-gap/decisions/strict-single-nmid-audit-evidence/decision.md`
-  — proposed reusable ownership and evidence invariant for strict audit.
+- `openspec/decisions/strict-single-nmid-audit-evidence/decision.md`
+  — **Accepted** reusable ownership, evidence invariant, `PARTIAL` vs `BLOCKED`
+  semantics for strict audit.
 
 Context-first lookup выполнен: сначала прочитан `openspec/decisions/index.md`,
-затем два declared applicable decisions и proposed decision change. Accepted
-решения не покрывали identity-safe evidence/reconciliation invariant, поэтому
-создан proposed decision artifact; он должен быть принят или отклонён до
-архивирования. Другие decisions не требуются для этого read-only placement.
+затем declared applicable accepted decisions и
+`strict-single-nmid-audit-evidence`. Decision **Accepted** (registry +
+change artifact) closes identity-safe evidence/reconciliation invariant for
+archive verification.
 
 ## Ownership & Placement
 
@@ -156,16 +157,30 @@ Rollback для реализации — отключить entrypoint/Job capab
 её локальные output artifacts; production/shared state не требует rollback,
 поскольку writes запрещены.
 
-## Open Questions
+## Open Questions disposition
 
-- Какие конкретные существующие endpoint families в текущем runtime
-  authoritative для direct и associated attribution, а какие должны
-  возвращать `unsupported`?
-- Какой существующий source предоставляет authoritative FBO/FBS/TOTAL stock
-  для заданного NMID; если ни один, какой именно GAP code использовать?
-- Какой canonical overlap key доступен для каждого physical-spend source без
-  введения inference?
-- Какие поля decision block обязательны для `PARTIAL` против `BLOCKED`?
+Все бывшие Open Questions имеют явную disposition; implicit archive blockers
+сняты. Evidence-plane completeness (reader/runtime errors в t1048) не входит в
+acceptance criterion bounded contract — см. scope boundary ниже.
+
+| Question | Disposition | Answer / follow-up | Location |
+|----------|-------------|-------------------|----------|
+| Authoritative endpoint families for direct/associated attribution | `DEFERRED_TO_FOLLOWUP` | t1048: attribution/orders sections GAP + RuntimeError; bounded contract требует honest GAP, не выбор endpoint family. Follow-up: evidence-plane hardening для Owner-bot readers (отдельный track, не этот change). | `design.md` (here); `openspec/decisions/strict-single-nmid-audit-evidence/decision.md` |
+| Authoritative FBO/FBS/TOTAL stock source | `DEFERRED_TO_FOLLOWUP` | t1048: stock `unsupported`/GAP без authoritative view; audit MUST NOT invent stock. Follow-up: identify/implement stock reader when source proven. | same |
+| Canonical overlap key per physical-spend source | `DEFERRED_TO_FOLLOWUP` | Reconciliation invariant принят (single canonical total, no double count); per-source overlap key catalog не доказан runtime evidence. Follow-up: document keys per wired source when spend readers stabilize. | `openspec/decisions/strict-single-nmid-audit-evidence/decision.md` |
+| Decision block `PARTIAL` vs `BLOCKED` | `RESOLVED_IN_THIS_CHANGE` | `PARTIAL`: valid identity + output contract + `writes=0` with evidence gaps. `BLOCKED`: fail-closed contract violations only (identity/substitution/write/invalid contract/missing provenance). | `openspec/decisions/strict-single-nmid-audit-evidence/decision.md`; delta spec scenarios below |
+
+## Scope boundary (acceptance)
+
+This change proves strict single-NMID identity, read-only bounded execution,
+injected Owner-bot readers, explicit GAP/`PARTIAL` behavior, artifact handoff
+validation and zero write budget. It does **not** require every Owner-bot
+reader to succeed without runtime errors unless spec explicitly made that an
+acceptance criterion (it did not). Cross-loop PG / reader errors remain a
+separate follow-up track.
+
+Bounded Job evidence (task 4.4): `SCRIPTS_REPORT_t1048_handoff.md` supersedes
+legacy failed `SCRIPTS_REPORT.md`.
 
 ## Review Checklist
 
