@@ -1,0 +1,16 @@
+scripts/prokraft_14d_entry_economics_r1.py
+  h_267f51d775769b 736-743,895
+tests/unit/scripts/test_prokraft_14d_entry_economics_r1.py
+  h_267f51d775769b 171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "daec2afcdf754c99719b0a9eec004ff8aa65b09a",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
