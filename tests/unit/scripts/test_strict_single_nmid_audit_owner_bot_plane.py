@@ -34,7 +34,7 @@ def test_plane_reuses_single_loop_across_readers() -> None:
     """Несколько sync readers делают один async load (cache), без asyncio.run."""
     bundle = _Bundle(pg_rows=[], campaigns=[], fullstats=[], orders=[])
     plane = OwnerBotStrictSingleNmidReadOnlyPlane()
-    with patch.object(plane, "_run_coroutine", return_value=bundle) as run_coro:
+    with patch.object(plane._runtime, "run", return_value=bundle) as run_coro:
         with patch("asyncio.run") as mocked_run:
             list(plane.read_current_contour(IDENTITY, PERIOD))
             list(plane.read_orders(IDENTITY, PERIOD))
@@ -67,14 +67,7 @@ def test_ensure_bundle_prefetches_before_readers() -> None:
         orders=[],
     )
 
-    async def _fake_load_all() -> _Bundle:
-        return bundle
-
-    with patch.object(
-        plane,
-        "_run_coroutine",
-        side_effect=lambda coro: plane._loop.run_until_complete(_fake_load_all()),
-    ):
+    with patch.object(plane._runtime, "run", return_value=bundle):
         plane.ensure_bundle(IDENTITY, PERIOD)
         contour = list(plane.read_current_contour(IDENTITY, PERIOD))
     assert all(hasattr(item, "field") for item in contour)

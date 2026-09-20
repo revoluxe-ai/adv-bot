@@ -1,22 +1,17 @@
 """Owner-bot Job access plane для strict single-NMID read-only audit.
 
-Адаптер реализует ``OwnerBotReadOnlyPlane`` поверх существующего access plane
-(``get_access_for_wb_cabinet``, ``WBManagerHubFactory``, generated Reports и
-Promotion adapters). Новый raw HTTP-клиент не создаётся; mutation write
-поверхности блокируются ``mutation_guard``.
+Адаптер реализует ``OwnerBotReadOnlyPlane`` поверх shared evidence loader
+(``scripts.wb_api_readonly_ops.collect.owner_bot_evidence``) и existing
+Owner-bot access plane. Новый raw HTTP-клиент не создаётся.
 """
 
 from __future__ import annotations
 
-import asyncio
 import re
-import tempfile
-from collections import defaultdict
-from dataclasses import dataclass, field
+from collections.abc import Iterable
 from datetime import date, datetime
 from decimal import Decimal
-from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import Any
 
 from scripts.strict_single_nmid_audit import (
     CONFIRMED,
@@ -25,10 +20,17 @@ from scripts.strict_single_nmid_audit import (
     AuditPeriod,
     Evidence,
     SpendEvidence,
-    StrictAuditError,
     evidence,
 )
-from scripts.wb_api_readonly_ops.mutation_guard import assert_read_only_op
+from scripts.wb_api_readonly_ops.collect.owner_bot_evidence import (
+    EvidenceReaderFailure,
+    JobScopedEvidenceRuntime,
+    OwnerBotEvidenceBundle,
+    load_owner_bot_evidence_bundle,
+)
+
+# Backward-compatible alias для unit tests.
+_Bundle = OwnerBotEvidenceBundle
 
 
 def _read_int(row: dict[str, Any], *names: str) -> int:
@@ -44,24 +46,6 @@ def _read_int(row: dict[str, Any], *names: str) -> int:
         if parsed > 0:
             return parsed
     return 0
-
-
-def _jsonable(value: Any) -> Any:
-    """Привести WB DTO к JSON-совместимому dict для evidence readers."""
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    if isinstance(value, dict):
-        return {str(key): _jsonable(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple, set, frozenset)):
-        return [_jsonable(item) for item in value]
-    to_dict = getattr(value, "to_dict", None)
-    if callable(to_dict):
-        return _jsonable(to_dict())
-    if hasattr(value, "__dict__"):
-        return _jsonable(vars(value))
-    return str(value)
 
 
 def _read_number(row: dict[str, Any], *names: str) -> float | None:
@@ -133,177 +117,33 @@ def _orders_attestation(period: AuditPeriod, rows: list[dict[str, Any]]) -> dict
     }
 
 
-async def _load_pg_rows(shop_id: str, cabinet: int) -> list[dict[str, Any]]:
-    """Загрузить advsetting через explicit PURE_READ PostgreSQL session."""
-    assert_read_only_op("strict_single_nmid_audit_pg_select")
-    from sqlalchemy import text
-    from app.utils.db.session_maker import get_async_session_maker
-
-    async with get_async_session_maker(read_only=True) as session:
-        identity = (
-            await session.execute(
-                text("SELECT id, shop_id FROM public.wbcabinet WHERE id = :cabinet"),
-                {"cabinet": cabinet},
-            )
-        ).mappings().all()
-        if not identity:
-            raise StrictAuditError(f"PG identity missing for cabinet={cabinet}")
-        actual_shop = str(identity[0]["shop_id"])
-        if actual_shop != shop_id:
-            raise StrictAuditError(
-                f"PG shop_id mismatch: expected={shop_id} got={actual_shop}"
-            )
-        rows = (
-            await session.execute(
-                text(
-                    """
-                    SELECT a.id, a.adv_id, a._search_adv_id, a.name, a.nmids,
-                           a.type, a.active_status, a.bot_active,
-                           a.automatic_version, a.strategy,
-                           a.target_price_for_order, a.max_price_for_order,
-                           a.auto_budget_daily_limit,
-                           a.search_auto_budget_daily_limit,
-                           a.use_common_budget, a.common_budget_daily_limit
-                    FROM public.advsetting a
-                    WHERE a.wb_cabinet_id = :cabinet
-                    """
-                ),
-                {"cabinet": cabinet},
-            )
-        ).mappings().all()
-    return [dict(row) for row in rows]
-
-
-async def _load_wb_bundle(
-    shop_id: str,
-    period: AuditPeriod,
-    extra_campaign_ids: Iterable[int],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
-    """Собрать campaigns, fullstats и supplier orders через existing WB stack."""
-    assert_read_only_op("get_supplier_orders")
-    assert_read_only_op("get_supplier_sales")
-    from app.core.di.app_container import AppContainer
-    from app.core.di.di_manager import DIManager
-    from app.core.mp.wb.api.adapter.promotion_client.fullstats.chunked import (
-        run_chunked_single_range,
-    )
-    from app.modules.common_slaves.wildberries.super_cabinet_manager import (
-        get_access_for_wb_cabinet,
-    )
-    from scripts.wb_api_readonly_ops.collect.api_budget import ApiCallBudget
-    from scripts.wb_api_readonly_ops.collect.orders_sales import collect_orders_sales
-    from scripts.wb_api_readonly_ops.collect.raw_store import RawStore
-
-    _ = await get_access_for_wb_cabinet(shop_id)
-    async with await DIManager.create(AppContainer) as container:  # type: ignore[attr-defined]
-        factory = (
-            container.module_resources.wb_manager_hub_factory_container.wb_manager_hub_factory()  # type: ignore[attr-defined]
-        )
-        hub = factory.get_wb_manager_hub(shop_id)
-        promotion = hub.wb_data_manager.promotion_manager
-        campaign_ids_raw = await promotion._client.promotion_count_adapter.get_cabinet_adv_ids()
-        campaign_ids = sorted(
-            {
-                int(value)
-                for value in campaign_ids_raw or []
-                if str(value).isdigit()
-            }
-            | {int(value) for value in extra_campaign_ids if int(value) > 0}
-        )
-        campaigns: list[dict[str, Any]] = []
-        for offset in range(0, len(campaign_ids), 100):
-            payload = await promotion.get_adverts_v2_by_ids(
-                campaign_ids[offset : offset + 100]
-            )
-            if isinstance(payload, list):
-                for item in payload:
-                    normalized = _jsonable(item)
-                    if isinstance(normalized, dict):
-                        campaigns.append(cast(dict[str, Any], normalized))
-        fullstats: list[dict[str, Any]] = []
-        if campaign_ids:
-            adapter = promotion._client.fullstats_adapter
-
-            async def fetcher(
-                chunk: list[int], begin: date, end: date
-            ) -> list[Any]:
-                assert_read_only_op("fullstats_request_chunk")
-                return await adapter._request_chunk(chunk, begin, end)
-
-            raw_items = await run_chunked_single_range(
-                campaign_ids,
-                period.start,
-                period.end,
-                fetcher=fetcher,
-            )
-            fullstats = [
-                cast(dict[str, Any], _jsonable(item.to_dict()))
-                for item in raw_items
-                if hasattr(item, "to_dict")
-            ]
-        budget = ApiCallBudget(max_seconds=900.0, max_api_calls=50)
-        with tempfile.TemporaryDirectory(prefix="strict-nmid-audit-") as tmp:
-            store = RawStore(Path(tmp))
-            order_rows, _sales_rows = await collect_orders_sales(
-                hub.wb_data_manager,
-                store=store,
-                budget=budget,
-                orders_date_from=period.start.isoformat(),
-            )
-        orders = [dict(row) for row in order_rows]
-        return campaigns, fullstats, orders
-
-
-@dataclass
-class _Bundle:
-    """Кэш read-only фактов на один audit identity/period."""
-
-    pg_rows: list[dict[str, Any]]
-    campaigns: list[dict[str, Any]]
-    fullstats: list[dict[str, Any]]
-    orders: list[dict[str, Any]]
-    memberships: dict[int, set[int]] = field(default_factory=dict)
-
-
 class OwnerBotStrictSingleNmidReadOnlyPlane:
-    """Job-runtime plane: existing Owner-bot readers без duplicate HTTP.
-
-    Один экземпляр plane удерживает один asyncio event loop на весь Job run.
-    Повторные ``asyncio.run()`` на module-level async SQLAlchemy engine приводят
-    к ``RuntimeError: Event loop is closed`` при pool cleanup.
-    """
+    """Job-runtime plane: shared Owner-bot evidence loader без duplicate HTTP."""
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[str, int, str, str], _Bundle] = {}
-        self._loop = asyncio.new_event_loop()
+        self._cache: dict[tuple[str, int, str, str], OwnerBotEvidenceBundle] = {}
+        self._runtime = JobScopedEvidenceRuntime()
+        self._load_failure: EvidenceReaderFailure | None = None
+
+    @property
+    def _loop(self) -> Any:
+        """Совместимость с существующими unit tests."""
+        return self._runtime.loop
 
     def _run_coroutine(self, coro: Any) -> Any:
-        """Выполнить coroutine на Job-owned loop без ``asyncio.run()``."""
-        asyncio.set_event_loop(self._loop)
-        return self._loop.run_until_complete(coro)
+        return self._runtime.run(coro)
 
     def close(self) -> None:
-        """Закрыть loop и dispose async engines после bounded Job run."""
-        if self._loop.is_closed():
-            return
-        try:
-            from app.utils.db.session_maker import read_only_engine, read_write_engine
-
-            async def _dispose() -> None:
-                await read_only_engine.dispose()
-                await read_write_engine.dispose()
-
-            self._run_coroutine(_dispose())
-        except Exception:
-            pass
-        finally:
-            self._loop.close()
+        """Закрыть Job-scoped runtime после bounded run."""
+        self._runtime.close()
 
     def ensure_bundle(self, identity: AuditIdentity, period: AuditPeriod) -> None:
         """Предзагрузить bundle до sync section readers (один async load)."""
         self._bundle(identity, period)
 
-    def _bundle(self, identity: AuditIdentity, period: AuditPeriod) -> _Bundle:
+    def _bundle(self, identity: AuditIdentity, period: AuditPeriod) -> OwnerBotEvidenceBundle:
+        if self._load_failure is not None:
+            raise self._load_failure
         key = (
             identity.shop_id,
             identity.cabinet,
@@ -313,50 +153,18 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
         if key in self._cache:
             return self._cache[key]
 
-        async def _load_all() -> _Bundle:
-            pg_rows = await _load_pg_rows(identity.shop_id, identity.cabinet)
-            pg_campaign_ids = [
-                campaign_id
-                for row in pg_rows
-                for campaign_id in (
-                    _read_int(row, "adv_id"),
-                    _read_int(row, "_search_adv_id"),
+        try:
+            bundle = self._runtime.run(
+                load_owner_bot_evidence_bundle(
+                    identity.shop_id,
+                    identity.cabinet,
+                    period.start,
+                    period.end,
                 )
-                if campaign_id
-            ]
-            campaigns, fullstats, orders = await _load_wb_bundle(
-                identity.shop_id, period, pg_campaign_ids
             )
-            memberships: dict[int, set[int]] = defaultdict(set)
-            for row in pg_rows:
-                for adv_field in ("adv_id", "_search_adv_id"):
-                    campaign_id = _read_int(row, adv_field)
-                    if campaign_id:
-                        memberships[campaign_id].update(_parse_nmids(row.get("nmids")))
-            for campaign in campaigns:
-                campaign_id = _read_int(campaign, "advertId", "advert_id", "id")
-                if campaign_id and campaign_id not in memberships:
-                    auto = campaign.get("autoParams") or {}
-                    nms = auto.get("nms") if isinstance(auto, dict) else None
-                    if isinstance(nms, list):
-                        memberships[campaign_id].update(
-                            {
-                                parsed
-                                for item in nms
-                                if isinstance(item, dict)
-                                for parsed in (_read_int(item, "nm", "nmId", "nmID"),)
-                                if parsed
-                            }
-                        )
-            return _Bundle(
-                pg_rows=pg_rows,
-                campaigns=campaigns,
-                fullstats=fullstats,
-                orders=orders,
-                memberships=dict(memberships),
-            )
-
-        bundle = self._run_coroutine(_load_all())
+        except EvidenceReaderFailure as exc:
+            self._load_failure = exc
+            raise
         self._cache[key] = bundle
         return bundle
 

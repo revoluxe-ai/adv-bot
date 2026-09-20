@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Any, Final, Protocol, TypeAlias, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from scripts.wb_api_readonly_ops.collect.owner_bot_evidence import EvidenceReaderFailure
+
 SCHEMA_VERSION: Final = "strict-single-nmid-audit-v1"
 CONFIRMED: Final = "confirmed"
 MISSING: Final = "missing"
@@ -756,6 +758,13 @@ class StrictSingleNmidAudit:
                 section_statuses[section] = _section_status(normalized)
                 if not normalized:
                     gaps.append(f"{section}: no evidence returned")
+            except EvidenceReaderFailure as exc:
+                if exc.section == "identity" or "identity mismatch" in str(exc):
+                    section_statuses["identity"] = BLOCKED
+                section_statuses[section] = GAP
+                gaps.append(
+                    f"{section}: {exc.error_class} source={exc.source} phase={exc.phase}"
+                )
             except (RunBudgetExceeded, StrictAuditError) as exc:
                 if "identity mismatch" in str(exc):
                     section_statuses["identity"] = BLOCKED

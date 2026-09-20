@@ -153,11 +153,14 @@ def test_injected_read_only_plane_passes_mutation_guard() -> None:
 def test_owner_bot_plane_does_not_import_write_capable_collectors() -> None:
     """Job plane must not depend on A1 or unrelated write collectors."""
     from scripts import strict_single_nmid_audit_owner_bot_plane as plane_mod
+    from scripts.wb_api_readonly_ops.collect import owner_bot_evidence
 
-    source = Path(plane_mod.__file__).read_text(encoding="utf-8").lower()
-    assert "a1_strict_read_only_contract_collect" not in source
-    assert "prokraft_14d_entry_economics" not in source
-    assert "get_async_session_maker(read_only=true)" in source.replace(" ", "")
+    plane_source = Path(plane_mod.__file__).read_text(encoding="utf-8").lower()
+    shared_source = Path(owner_bot_evidence.__file__).read_text(encoding="utf-8").lower()
+    assert "a1_strict_read_only_contract_collect" not in plane_source
+    assert "prokraft_14d_entry_economics" not in plane_source
+    assert "owner_bot_evidence" in plane_source
+    assert "get_async_session_maker(read_only=true)" in shared_source.replace(" ", "")
 
 
 def test_main_success_in_kubernetes_runtime(
