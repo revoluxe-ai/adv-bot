@@ -258,47 +258,51 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
         )
         if key in self._cache:
             return self._cache[key]
-        pg_rows = asyncio.run(_load_pg_rows(identity.shop_id, identity.cabinet))
-        pg_campaign_ids = [
-            campaign_id
-            for row in pg_rows
-            for campaign_id in (
-                _read_int(row, "adv_id"),
-                _read_int(row, "_search_adv_id"),
+
+        async def _load_all() -> _Bundle:
+            pg_rows = await _load_pg_rows(identity.shop_id, identity.cabinet)
+            pg_campaign_ids = [
+                campaign_id
+                for row in pg_rows
+                for campaign_id in (
+                    _read_int(row, "adv_id"),
+                    _read_int(row, "_search_adv_id"),
+                )
+                if campaign_id
+            ]
+            campaigns, fullstats, orders = await _load_wb_bundle(
+                identity.shop_id, period, pg_campaign_ids
             )
-            if campaign_id
-        ]
-        campaigns, fullstats, orders = asyncio.run(
-            _load_wb_bundle(identity.shop_id, period, pg_campaign_ids)
-        )
-        memberships: dict[int, set[int]] = defaultdict(set)
-        for row in pg_rows:
-            for field in ("adv_id", "_search_adv_id"):
-                campaign_id = _read_int(row, field)
-                if campaign_id:
-                    memberships[campaign_id].update(_parse_nmids(row.get("nmids")))
-        for campaign in campaigns:
-            campaign_id = _read_int(campaign, "advertId", "advert_id", "id")
-            if campaign_id and campaign_id not in memberships:
-                auto = campaign.get("autoParams") or {}
-                nms = auto.get("nms") if isinstance(auto, dict) else None
-                if isinstance(nms, list):
-                    memberships[campaign_id].update(
-                        {
-                            parsed
-                            for item in nms
-                            if isinstance(item, dict)
-                            for parsed in (_read_int(item, "nm", "nmId", "nmID"),)
-                            if parsed
-                        }
-                    )
-        bundle = _Bundle(
-            pg_rows=pg_rows,
-            campaigns=campaigns,
-            fullstats=fullstats,
-            orders=orders,
-            memberships=dict(memberships),
-        )
+            memberships: dict[int, set[int]] = defaultdict(set)
+            for row in pg_rows:
+                for field in ("adv_id", "_search_adv_id"):
+                    campaign_id = _read_int(row, field)
+                    if campaign_id:
+                        memberships[campaign_id].update(_parse_nmids(row.get("nmids")))
+            for campaign in campaigns:
+                campaign_id = _read_int(campaign, "advertId", "advert_id", "id")
+                if campaign_id and campaign_id not in memberships:
+                    auto = campaign.get("autoParams") or {}
+                    nms = auto.get("nms") if isinstance(auto, dict) else None
+                    if isinstance(nms, list):
+                        memberships[campaign_id].update(
+                            {
+                                parsed
+                                for item in nms
+                                if isinstance(item, dict)
+                                for parsed in (_read_int(item, "nm", "nmId", "nmID"),)
+                                if parsed
+                            }
+                        )
+            return _Bundle(
+                pg_rows=pg_rows,
+                campaigns=campaigns,
+                fullstats=fullstats,
+                orders=orders,
+                memberships=dict(memberships),
+            )
+
+        bundle = asyncio.run(_load_all())
         self._cache[key] = bundle
         return bundle
 
