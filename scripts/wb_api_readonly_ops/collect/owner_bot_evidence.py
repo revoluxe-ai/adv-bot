@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import AsyncGenerator, Iterable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from time import time
 from typing import Any, cast
+
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from scripts.wb_api_readonly_ops.collect.jsonable import jsonable
 from scripts.wb_api_readonly_ops.mutation_guard import assert_read_only_op
@@ -59,49 +63,141 @@ class OwnerBotEvidenceBundle:
     memberships: dict[int, set[int]] = field(default_factory=dict)
 
 
+class JobScopedEvidenceRuntimeClosedError(RuntimeError):
+    """Runtime уже закрыт — повторный ``run()`` запрещён (fail-closed)."""
+
+
+def _create_job_read_only_engine() -> AsyncEngine:
+    """Создать read-only AsyncEngine, привязанный к текущему Job loop (не module singleton)."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from app.utils.db.session_maker import (
+        _pg_connect_args,
+        max_overflow,
+        pool_size,
+        read_only_db_connector,
+    )
+
+    return create_async_engine(
+        read_only_db_connector,
+        echo=False,
+        pool_size=pool_size,
+        max_overflow=max_overflow,
+        pool_recycle=180,
+        pool_pre_ping=True,
+        connect_args=_pg_connect_args,
+    )
+
+
 class JobScopedEvidenceRuntime:
-    """Один asyncio loop на Job execution + deterministic cleanup."""
+    """Один asyncio loop на Job execution + Job-local PG engine/session factory."""
 
     def __init__(self) -> None:
         self._loop = asyncio.new_event_loop()
+        self._closed = False
+        self._pg_engine: AsyncEngine | None = None
+        self._pg_session_maker: async_sessionmaker[AnalyticAsyncSession] | None = None
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop:
         return self._loop
 
+    @property
+    def pg_engine(self) -> AsyncEngine | None:
+        """Job-local read-only engine (``None`` до первого PG access)."""
+        return self._pg_engine
+
+    def _ensure_pg_factory(self) -> async_sessionmaker[AnalyticAsyncSession]:
+        if self._closed:
+            raise JobScopedEvidenceRuntimeClosedError(
+                "JobScopedEvidenceRuntime is closed"
+            )
+        if self._pg_session_maker is None:
+            from app.utils.db.session_maker import AnalyticAsyncSession
+
+            self._pg_engine = _create_job_read_only_engine()
+            self._pg_session_maker = async_sessionmaker(
+                bind=self._pg_engine,
+                expire_on_commit=False,
+                class_=AnalyticAsyncSession,
+            )
+        return self._pg_session_maker
+
+    @asynccontextmanager
+    async def job_read_only_session(self) -> AsyncGenerator[AsyncSession, None]:
+        """Read-only PG session на Job loop через runtime-local engine."""
+        session_start = time()
+        current_task = asyncio.current_task()
+        from app.utils.resource_limits import get_postgres_query_semaphore
+
+        session_maker = self._ensure_pg_factory()
+        semaphore = get_postgres_query_semaphore()
+        async with semaphore:
+            async with session_maker() as session:
+                try:
+                    yield session
+                finally:
+                    hold_time = time() - session_start
+                    if hold_time > 1.0 and current_task is not None:
+                        try:
+                            task_name = current_task.get_name()
+                        except Exception:
+                            task_name = "unknown"
+                        import logging
+
+                        logging.getLogger(__name__).warning(
+                            "Session held for too long: %.2fs by task %s",
+                            hold_time,
+                            task_name,
+                        )
+
     def run(self, coro: Any) -> Any:
         """Выполнить coroutine на Job-owned loop без ``asyncio.run()``."""
+        if self._closed:
+            raise JobScopedEvidenceRuntimeClosedError(
+                "JobScopedEvidenceRuntime is closed"
+            )
         asyncio.set_event_loop(self._loop)
         return self._loop.run_until_complete(coro)
 
     def close(self) -> None:
-        """Закрыть loop и dispose module-level async SQLAlchemy engines."""
-        if self._loop.is_closed():
+        """Dispose Job-local read-only engine и закрыть loop (без module engines)."""
+        if self._closed:
             return
-        try:
-            from app.utils.db.session_maker import read_only_engine, read_write_engine
+        dispose_error: BaseException | None = None
+        if self._pg_engine is not None:
+            engine = self._pg_engine
+            self._pg_engine = None
+            self._pg_session_maker = None
 
             async def _dispose() -> None:
-                await read_only_engine.dispose()
-                await read_write_engine.dispose()
+                await engine.dispose()
 
-            self.run(_dispose())
-        except Exception:
-            pass
-        finally:
+            try:
+                self.run(_dispose())
+            except BaseException as exc:
+                dispose_error = exc
+        self._closed = True
+        if not self._loop.is_closed():
             self._loop.close()
+        if dispose_error is not None:
+            raise dispose_error
 
 
-async def load_pg_advsetting_rows(shop_id: str, cabinet: int) -> list[dict[str, Any]]:
-    """Загрузить wbcabinet identity + advsetting через read-only SQLAlchemy session.
+async def load_pg_advsetting_rows(
+    shop_id: str,
+    cabinet: int,
+    *,
+    runtime: JobScopedEvidenceRuntime,
+) -> list[dict[str, Any]]:
+    """Загрузить wbcabinet identity + advsetting через Job-local read-only session.
 
     Session выполняется на текущем event loop Job runtime (не nested asyncio.run).
     """
     assert_read_only_op("strict_single_nmid_audit_pg_select")
     from sqlalchemy import text
-    from app.utils.db.session_maker import get_async_session_maker
 
-    async with get_async_session_maker(read_only=True) as session:
+    async with runtime.job_read_only_session() as session:
         identity = (
             await session.execute(
                 text("SELECT id, shop_id FROM public.wbcabinet WHERE id = :cabinet"),
@@ -289,10 +385,14 @@ async def load_owner_bot_evidence_bundle(
     cabinet: int,
     period_start: date,
     period_end: date,
+    *,
+    runtime: JobScopedEvidenceRuntime,
 ) -> OwnerBotEvidenceBundle:
     """PG + WB shared load для одного identity/window."""
     try:
-        pg_rows = await load_pg_advsetting_rows(shop_id, cabinet)
+        pg_rows = await load_pg_advsetting_rows(
+            shop_id, cabinet, runtime=runtime
+        )
     except EvidenceReaderFailure:
         raise
     except Exception as exc:

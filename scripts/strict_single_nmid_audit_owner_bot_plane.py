@@ -160,6 +160,7 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
                     identity.cabinet,
                     period.start,
                     period.end,
+                    runtime=self._runtime,
                 )
             )
         except EvidenceReaderFailure as exc:

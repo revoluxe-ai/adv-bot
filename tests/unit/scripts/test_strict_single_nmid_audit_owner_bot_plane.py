@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -77,18 +77,13 @@ def test_ensure_bundle_prefetches_before_readers() -> None:
 
 
 @pytest.mark.unit
-def test_close_disposes_engines_on_job_loop() -> None:
-    """close() вызывает dispose async engines на том же loop."""
+def test_close_disposes_job_local_engine_not_module_engines() -> None:
+    """close() dispose только Job-local read-only engine."""
     plane = OwnerBotStrictSingleNmidReadOnlyPlane()
-    dispose = AsyncMock()
-
-    with patch(
-        "app.utils.db.session_maker.read_only_engine",
-        dispose=dispose,
-    ):
-        with patch(
-            "app.utils.db.session_maker.read_write_engine",
-            dispose=dispose,
-        ):
-            plane.close()
+    mock_engine = MagicMock()
+    mock_engine.dispose = AsyncMock()
+    plane._runtime._pg_engine = mock_engine
+    plane._runtime._pg_session_maker = MagicMock()
+    plane.close()
+    mock_engine.dispose.assert_awaited_once()
     assert plane._loop.is_closed()
