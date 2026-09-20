@@ -1,0 +1,31 @@
+scripts/strict_single_nmid_audit.py
+  s_ff7f220b50a603::t_102b20f65af33f 27-28,761-767
+scripts/strict_single_nmid_audit_owner_bot_plane.py
+  s_ff7f220b50a603::t_d3c4a3edc47d2e 3-5,11,14,25-33,121,124-131,134,137-138,144-146,156-162,165-167
+scripts/wb_api_readonly_ops/collect/owner_bot_evidence.py
+  s_ff7f220b50a603::t_06f8e8b8d886c7 1-324
+tests/unit/scripts/test_owner_bot_evidence.py
+  s_ff7f220b50a603::t_99a8975997ce8a 1-47
+tests/unit/scripts/test_strict_single_nmid_audit_job.py
+  s_ff7f220b50a603::t_bfefb5df246fbe 156-163
+tests/unit/scripts/test_strict_single_nmid_audit_owner_bot_plane.py
+  s_ff7f220b50a603::t_c54c49e4593729 37,70
+tests/unit/scripts/test_strict_single_nmid_evidence_failures.py
+  s_ff7f220b50a603::t_ef464f4ee5ee01 1-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b0f645fc6b856513cff91c749fe26d5f43fde6cb",
+  "prompts": {},
+  "sessions": {
+    "s_ff7f220b50a603": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b18ba6be-7523-4eff-94b3-d76431f28ce9",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
