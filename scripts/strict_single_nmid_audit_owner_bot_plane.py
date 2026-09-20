@@ -216,7 +216,10 @@ async def _load_wb_bundle(
                 campaign_ids[offset : offset + 100]
             )
             if isinstance(payload, list):
-                campaigns.extend(cast(list[dict[str, Any]], payload))
+                for item in payload:
+                    normalized = _jsonable(item)
+                    if isinstance(normalized, dict):
+                        campaigns.append(cast(dict[str, Any], normalized))
         fullstats: list[dict[str, Any]] = []
         if campaign_ids:
             adapter = promotion._client.fullstats_adapter
