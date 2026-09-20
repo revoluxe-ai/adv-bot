@@ -1,0 +1,31 @@
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/decisions/strict-single-nmid-audit-evidence/decision.md
+  s_ff7ca45a8cc52f::t_b2e094f3dcb4a3 5,16-20,32-68,82-83,95,99-101,103-104,121
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/design.md
+  s_ff7ca45a8cc52f::t_99634432050d8a 51-53,56-59,160,162-183
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/specs/strict-single-nmid-read-only-audit/spec.md
+  s_ff7ca45a8cc52f::t_b5eef1ff8f82aa 213-223
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/tasks.md
+  s_ff7ca45a8cc52f::t_505c5d1bc0fc07 31
+openspec/decisions/index.md
+  s_ff7ca45a8cc52f::t_00e98f5d9b6849 38-42
+openspec/decisions/strict-single-nmid-audit-evidence/decision.md
+  s_ff7ca45a8cc52f::t_141c884b67679b 1-121
+openspec/specs/strict-single-nmid-read-only-audit/spec.md
+  s_ff7ca45a8cc52f::t_dfab54eb2808a9 1-269
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c8d9d7cfe80c8e691322dead746d5f3f6db8c9ea",
+  "prompts": {},
+  "sessions": {
+    "s_ff7ca45a8cc52f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "33402dd4-2640-4396-9b7c-94792d46efb4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
