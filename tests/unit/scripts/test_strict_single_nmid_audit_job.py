@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -123,6 +123,8 @@ def test_run_owner_bot_job_wires_injected_readers(
         output=output,
     )
     stub = _StubPlane()
+    stub.ensure_bundle = MagicMock()  # type: ignore[attr-defined]
+    stub.close = MagicMock()  # type: ignore[attr-defined]
     with patch(
         "scripts.strict_single_nmid_audit_owner_bot_plane.build_owner_bot_read_only_plane",
         return_value=stub,
@@ -133,6 +135,8 @@ def test_run_owner_bot_job_wires_injected_readers(
         ) as wired:
             payload = audit_mod.run_owner_bot_job(args)
             wired.assert_called_once_with(stub)
+            stub.ensure_bundle.assert_called_once()  # type: ignore[attr-defined]
+            stub.close.assert_called_once()  # type: ignore[attr-defined]
     assert output.is_file()
     assert payload["decision"]["status"] in {ACTIONABLE, "PARTIAL", "BLOCKED"}
 

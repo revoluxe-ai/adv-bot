@@ -244,10 +244,42 @@ class _Bundle:
 
 
 class OwnerBotStrictSingleNmidReadOnlyPlane:
-    """Job-runtime plane: existing Owner-bot readers без duplicate HTTP."""
+    """Job-runtime plane: existing Owner-bot readers без duplicate HTTP.
+
+    Один экземпляр plane удерживает один asyncio event loop на весь Job run.
+    Повторные ``asyncio.run()`` на module-level async SQLAlchemy engine приводят
+    к ``RuntimeError: Event loop is closed`` при pool cleanup.
+    """
 
     def __init__(self) -> None:
         self._cache: dict[tuple[str, int, str, str], _Bundle] = {}
+        self._loop = asyncio.new_event_loop()
+
+    def _run_coroutine(self, coro: Any) -> Any:
+        """Выполнить coroutine на Job-owned loop без ``asyncio.run()``."""
+        asyncio.set_event_loop(self._loop)
+        return self._loop.run_until_complete(coro)
+
+    def close(self) -> None:
+        """Закрыть loop и dispose async engines после bounded Job run."""
+        if self._loop.is_closed():
+            return
+        try:
+            from app.utils.db.session_maker import read_only_engine, read_write_engine
+
+            async def _dispose() -> None:
+                await read_only_engine.dispose()
+                await read_write_engine.dispose()
+
+            self._run_coroutine(_dispose())
+        except Exception:
+            pass
+        finally:
+            self._loop.close()
+
+    def ensure_bundle(self, identity: AuditIdentity, period: AuditPeriod) -> None:
+        """Предзагрузить bundle до sync section readers (один async load)."""
+        self._bundle(identity, period)
 
     def _bundle(self, identity: AuditIdentity, period: AuditPeriod) -> _Bundle:
         key = (
@@ -275,8 +307,8 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
             )
             memberships: dict[int, set[int]] = defaultdict(set)
             for row in pg_rows:
-                for field in ("adv_id", "_search_adv_id"):
-                    campaign_id = _read_int(row, field)
+                for adv_field in ("adv_id", "_search_adv_id"):
+                    campaign_id = _read_int(row, adv_field)
                     if campaign_id:
                         memberships[campaign_id].update(_parse_nmids(row.get("nmids")))
             for campaign in campaigns:
@@ -302,7 +334,7 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
                 memberships=dict(memberships),
             )
 
-        bundle = asyncio.run(_load_all())
+        bundle = self._run_coroutine(_load_all())
         self._cache[key] = bundle
         return bundle
 

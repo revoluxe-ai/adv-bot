@@ -968,7 +968,11 @@ def run_owner_bot_job(args: argparse.Namespace) -> dict[str, Any]:
     )
     plane = build_owner_bot_read_only_plane()
     audit = StrictSingleNmidAudit(identity)
-    payload = audit.run(readers_from_owner_bot_plane(plane))
+    try:
+        plane.ensure_bundle(identity, audit.period)
+        payload = audit.run(readers_from_owner_bot_plane(plane))
+    finally:
+        plane.close()
     write_output(payload, args.output)
     digest = hashlib.sha256(args.output.read_bytes()).hexdigest()
     sidecar = args.output.with_suffix(args.output.suffix + ".sha256")
