@@ -1,0 +1,19 @@
+scripts/wb_api_readonly_ops/collect/owner_bot_evidence.py
+  s_2c45f1e624ff04::t_e4037dc01f0dc4 21-33,119,146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3146a3a590b02f1c8fc522d6a82d51ef27c1c40c",
+  "prompts": {},
+  "sessions": {
+    "s_2c45f1e624ff04": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "3b6527d3-c9df-466b-972a-21478c7af3ff",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
