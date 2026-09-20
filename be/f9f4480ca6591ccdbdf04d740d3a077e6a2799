@@ -1,0 +1,25 @@
+pyrightconfig_strict.json
+  s_c3c41ce6bba322::t_dfdd034e4a6beb 50
+scripts/strict_single_nmid_audit.py
+  s_c3c41ce6bba322::t_ed846ddd5d6be1 12,14,16,945-979,993,995-1010
+scripts/strict_single_nmid_audit_owner_bot_plane.py
+  s_c3c41ce6bba322::t_ddb661a95a2707 1-585
+tests/unit/scripts/test_strict_single_nmid_audit_job.py
+  s_c3c41ce6bba322::t_0414cceee5f012 1-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bef9f4480ca6591ccdbdf04d740d3a077e6a2799",
+  "prompts": {},
+  "sessions": {
+    "s_c3c41ce6bba322": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "a2351900-f475-4024-a75c-57facb1de880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
