@@ -88,7 +88,7 @@
     "validate": "PASS: VALID",
     "check_drift": "PASS: IN_SYNC",
     "scoped_hardcoding_gate": "PASS",
-    "render": "NOT RUN: write mode not required"
+    "render": "PASS: RENDERED after post-merge scope correction"
   },
   "openspec_validation": {
     "config_contract": "PASS",
@@ -110,7 +110,8 @@
   "informational_limitations": [
     "Current R1 Registry has no operational composable row; no production-shaped COMPOSE PLAN_RUN probe was executed.",
     "No combined topology RUN plus fake-child harness exists; RUN machine routing and runtime gates are independently executable and green.",
-    "These limitations are not required for acceptance of the current R1 architecture change."
+    "These limitations are not required for acceptance of the current R1 architecture change.",
+    "Post-merge REGISTRY_SCOPE_EXPANSION_WITHOUT_FORMAL_CHANGE corrected: registry rows multi-client-strict-eight-target-directive-audit and prokraft-14d-entry-economics-r1 removed; on-disk collectors and unit tests preserved but are not R1-verified registry scope (no false A/B registry verification claim)."
   ],
   "blockers": [],
   "generated_at": "2026-09-19T13:10:00Z"
