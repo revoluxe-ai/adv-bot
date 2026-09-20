@@ -9,8 +9,11 @@ Owner-bot Job. Транспортные readers передаются вызыв�
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import re
+import sys
 import time
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping
@@ -939,6 +942,41 @@ def write_output(payload: Mapping[str, Any], path: Path) -> None:
     )
 
 
+def is_owner_bot_job_runtime() -> bool:
+    """True только внутри Kubernetes Owner-bot Job pod."""
+    return os.environ.get("KUBERNETES_SERVICE_HOST", "").strip() != ""
+
+
+def run_owner_bot_job(args: argparse.Namespace) -> dict[str, Any]:
+    """Собрать audit через injected Owner-bot read-only plane и записать output.
+
+    Raises:
+        StrictAuditError: при нарушении identity/output contract.
+    """
+    from scripts.set_path import add_project_root_to_path
+    from scripts.strict_single_nmid_audit_owner_bot_plane import (
+        build_owner_bot_read_only_plane,
+    )
+
+    add_project_root_to_path()
+    identity = AuditIdentity(
+        shop_id=args.shop_id,
+        cabinet=args.cabinet,
+        nmid=args.nmid,
+        size_id=args.size_id,
+        timezone=args.timezone,
+    )
+    plane = build_owner_bot_read_only_plane()
+    audit = StrictSingleNmidAudit(identity)
+    payload = audit.run(readers_from_owner_bot_plane(plane))
+    write_output(payload, args.output)
+    digest = hashlib.sha256(args.output.read_bytes()).hexdigest()
+    sidecar = args.output.with_suffix(args.output.suffix + ".sha256")
+    sidecar.write_text(f"{digest}  {args.output.name}\n", encoding="utf-8")
+    payload["primary_artifact_sha256"] = digest
+    return payload
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Разобрать identity и bounded Job output arguments."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -952,19 +990,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Проверить CLI identity; readers подключаются только Owner-bot Job-ом."""
+    """Job runtime injects Owner-bot readers; local bare execution fail-closed."""
     args = parse_args(argv)
-    identity = AuditIdentity(
-        shop_id=args.shop_id,
-        cabinet=args.cabinet,
-        nmid=args.nmid,
-        size_id=args.size_id,
-        timezone=args.timezone,
-    )
-    del identity
-    raise SystemExit(
-        "Owner-bot Job must inject existing WB/API readers; local execution is refused"
-    )
+    if not is_owner_bot_job_runtime():
+        print(
+            "Owner-bot Job must inject existing WB/API readers; local execution is refused",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        payload = run_owner_bot_job(args)
+    except StrictAuditError as exc:
+        print(f"strict-single-nmid-audit failed: {exc}", file=sys.stderr)
+        return 1
+    digest = str(payload.get("primary_artifact_sha256", ""))
+    if digest:
+        print(f"PRIMARY_SHA256={digest}")
+    print("ops-script: success; holding for output copy")
+    return 0
 
 
 if __name__ == "__main__":

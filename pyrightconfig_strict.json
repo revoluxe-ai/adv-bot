@@ -47,6 +47,7 @@
     "app/client_bot/user_interface/services/keyword_decision_trace_loader.py",
     "app/client_bot/user_interface/views/keyword_decision_trace_ui.py",
     "scripts/strict_single_nmid_audit.py",
+    "scripts/strict_single_nmid_audit_owner_bot_plane.py",
     "app/modules/shop_runner/service_manager/keyword_v3_decision_trace_ui",
     "app/client_bot/user_interface/handlers/adv_excel_roundtrip.py",
     "app/client_bot/user_interface/handlers/add_white_phrases.py",
