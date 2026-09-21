@@ -32,7 +32,7 @@ Do not set `battle_tested=YES` without Owner `RECORD_BATTLE GO` + evidence.
 | A1 strict read-only contract collector | scripts/a1_strict_read_only_contract_collect.py | WORKS | PARTIAL | NO | 2026-09-08T15:55:27Z | - | - | Exact 00-07 contract ZIP and checksum; no production writes. |
 | A1 V3 post-import verify collect | scripts/a1_v3_post_import_verify_collect.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Whole-shop factual economics | scripts/a1_whole_shop_economics_collect.py | WORKS | NONE | NO | - | 2026-09-12T03:39:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9c192d82af120121cfe9228ee748e55adc06ef1f | Legacy ledger row; not available to resolver. |
-| Whole store daily DRR dynamics | scripts/a1_whole_store_daily_drr_collect.py | WORKS | NONE | NO | - | 2026-09-13T10:16:35Z | - | Legacy ledger row; not available to resolver. |
+| Whole store daily DRR dynamics | scripts/a1_whole_store_daily_drr_collect.py | WORKS | PARTIAL | NO | - | 2026-09-13T10:16:35Z | - | Parameterized whole-store DRR; shared resolver capability whole-store-drr. |
 | Adv-bot historical state extractor | scripts/adv_bot_historical_state_extractor.py | WORKS | COVERED | NO | 2026-08-25T21:44:04Z | 2026-08-25T22:40:00Z | harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9d269aa9e95afe64da03f8c8f5c07231da26c50e | Legacy ledger row; not available to resolver. |
 | Backfill L2 | scripts/backfill_l2.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |
 | Backfill MV for keyword clusters | scripts/backfill_mv_for_keyword_clusters.py | UNKNOWN | NONE | NO | - | - | - | Legacy ledger row; not available to resolver. |

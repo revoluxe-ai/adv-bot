@@ -326,19 +326,105 @@ entries:
     tests: NONE
   resolution_enabled: false
   title: Whole-shop factual economics
-- deprecated_by: null
-  explicit_invocation_enabled: false
+- capabilities:
+  - whole-store-drr
+  composable: false
+  compose_with: []
+  deprecated_by: null
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers: []
+    justification: Cabinet and shop_id are runtime required_args; collector has no fixed tenant literals.
   id: a1-whole-store-daily-drr
+  optional_args:
+    company:
+      description: Company label for provenance (optional)
+      secret: false
+      type: string
+    daily_series_end:
+      description: Daily series end date (MSK calendar)
+      secret: false
+      type: date
+    daily_series_start:
+      description: Daily series start date (MSK calendar)
+      secret: false
+      type: date
+    target_drr_percent:
+      description: Target store DRR percent
+      secret: false
+      type: number
+    timezone:
+      description: IANA timezone for period boundaries
+      secret: false
+      type: string
+    window_14d_end:
+      description: 14d window end (MSK)
+      secret: false
+      type: date
+    window_14d_start:
+      description: 14d window start (MSK)
+      secret: false
+      type: date
+    window_3d_end:
+      description: 3d window end (MSK)
+      secret: false
+      type: date
+    window_3d_start:
+      description: 3d window start (MSK)
+      secret: false
+      type: date
+    window_7d_end:
+      description: 7d window end (MSK)
+      secret: false
+      type: date
+    window_7d_start:
+      description: 7d window start (MSK)
+      secret: false
+      type: date
+  output_schema_version: whole-store-daily-drr-v1
   path: scripts/a1_whole_store_daily_drr_collect.py
+  primary_artifact_pattern: whole_store_daily_drr.json
+  provided_fields:
+  - daily_series
+  - identity
+  - period
+  - store_drr
+  - store_factual_gmv
+  - store_total_ad_spend
+  - target_drr
+  - today_open_partial
+  - window_14d
+  - window_3d
+  - window_7d
   readiness:
     battle_tested: 'NO'
     last_cluster_at: '2026-09-13T10:16:35Z'
     last_image_ref: '-'
     last_local_at: '-'
-    notes: Legacy ledger row; not available to resolver.
+    notes: Parameterized whole-store DRR; shared resolver capability whole-store-drr.
     runnable: WORKS
-    tests: NONE
-  resolution_enabled: false
+    tests: PARTIAL
+  required_args:
+    cabinet:
+      description: WB cabinet id
+      secret: false
+      type: integer
+    output_dir:
+      description: Output directory for artifacts
+      secret: false
+      type: path
+    shop_id:
+      description: WB shop uuid
+      secret: false
+      type: string
+  resolution_enabled: true
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  sources:
+  - POSTGRES
+  - WB_API
+  tenant_scope: PARAMETERIZED
   title: Whole store daily DRR dynamics
 - deprecated_by: null
   explicit_invocation_enabled: false
