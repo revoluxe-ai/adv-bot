@@ -17,6 +17,21 @@ without ProKraft-specific forks.
 | Untyped `Exception` → section GAP | **Still present** — `StrictSingleNmidAudit.run` (~L764–766) | **In scope:** typed reader failure provenance |
 | Stock / full attribution catalog | strict `read_stock` empty; no shared stock source confirmed | **Out of scope** (follow-up) |
 
+### Runtime follow-up (published Job `3474164f687cb506e3760b30946673504c4c8d44`)
+
+Operational Job `ops-script-strict-nmid-186069402-20260921t0050` (`prod-adv-bot`,
+resolver `REUSE`, collector `scripts/strict_single_nmid_audit.py`) exited 1
+without artifact. Prior defects (`Event loop is closed`, PG cross-loop
+`RuntimeError`, reader `AttributeError`) were **absent**.
+
+Exact remaining defect: `EvidenceReaderFailure` `source=owner-bot-pg-advsetting`
+`phase=pg_load` caused by
+`TypeError: PG row is not mapping-like: <class 'sqlalchemy.engine.row.RowMapping'>`
+in shared `_pg_row_as_dict` (`scripts/wb_api_readonly_ops/collect/owner_bot_evidence.py`).
+Dict-only / incomplete mapping assumptions fail on the actual Job execute/result
+type. This is an **implementation compatibility defect**, not a legitimate GAP
+and not a reason to revert Job-local PG ownership or rewrite to asyncpg.
+
 Reference paths rechecked:
 
 - `scripts/a1_strict_read_only_contract_collect.py` — single `asyncio.run(_collect_wb)`; PG via `run_pg_query`; fullstats `_request_chunk`
@@ -33,8 +48,10 @@ Reference paths rechecked:
 
 - One Job-scoped async lifecycle for shared evidence loading.
 - Reuse `wb_api_readonly_ops` + official WB adapters; no parallel HTTP.
-- Job-safe reusable PG read strategy aligned with A1-stable path.
-- Typed reader failure contract for collector GAP provenance.
+- Job-safe reusable PG read strategy; Job-local SQLAlchemy ownership retained
+  with Mapping-protocol row normalization (`RowMapping` / `Row._mapping`).
+- Typed reader failure contract for collector GAP provenance; implementation
+  TypeError on supported mapping rows is not a legitimate GAP.
 - A1 strict collect behavior preserved (regression tests).
 - Strict single-NMID uses shared plane; zero production writes.
 
@@ -44,6 +61,8 @@ Reference paths rechecked:
 - New collector Registry entry; resolver semantic changes.
 - Stock source invention; full attribution endpoint catalog.
 - Mass refactor of unrelated scripts.
+- Asyncpg rewrite; reverting Job-local PG ownership; recasting RowMapping
+  TypeError as legitimate evidence GAP.
 
 ## Architecture Decision References
 
@@ -88,9 +107,19 @@ A1 and strict plane over copying A1's ZIP/campaign-specific logic.
 
 ### 3. PG alignment
 
-Replace ad-hoc SQLAlchemy session reads in strict plane with shared Job-safe PG
-read API (reuse `ch_a1_evidence.run_pg_query` semantics or extract shared
-helper). Do not introduce ProKraft-specific SQL.
+Shared Job-safe PG reads remain **lifecycle-bound** (Job-local engine/session,
+one Job-scoped loop, deterministic dispose). Do not introduce ProKraft-specific
+SQL. Do **not** reopen an asyncpg rewrite as owed work for this change.
+
+**PG row normalization (runtime 2026-09-21):** shared `_pg_row_as_dict` MUST
+accept mapping protocol data used by the Job SQLAlchemy path:
+
+- `collections.abc.Mapping` (including `sqlalchemy.engine.row.RowMapping`) →
+  deterministic plain `dict`;
+- SQLAlchemy `Row` at another seam → documented `row._mapping`, not positional
+  or private guessing;
+- unsupported arbitrary objects → explicit `TypeError` (fail closed);
+- this TypeError MUST NOT be converted into a legitimate evidence GAP.
 
 ### 4. Typed reader failures
 
@@ -108,6 +137,9 @@ requirement to re-run ProKraft Job during apply planning.
 - [Risk] Shared extract breaks A1 edge cases → [Mitigation] A1 targeted regression suite first-class gate.
 - [Risk] Engine dispose timing → [Mitigation] explicit tests simulating Job open/close.
 - [Risk] Fullstats shape mismatch persists → [Mitigation] shared jsonable/mapper tests with real adapter types.
+- [Risk] Dict-only PG row helper rejects SQLAlchemy `RowMapping` on Job path →
+  [Mitigation] Mapping-protocol normalizer + regression using real `RowMapping`
+  (or execute/result seam); negative test for non-mapping objects.
 
 ## Open Questions disposition
 
@@ -122,4 +154,4 @@ requirement to re-run ProKraft Job during apply planning.
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed for lifecycle gap
-- [ ] implementation matches decision (pending apply)
+- [x] implementation matches decision

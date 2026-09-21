@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.engine.row import Row, RowMapping
 
 from scripts.wb_api_readonly_ops.collect import owner_bot_evidence
+
+
+def _sqlite_engine() -> Engine:
+    """In-memory SQLAlchemy engine для реального execute/result seam."""
+    return create_engine("sqlite:///:memory:")
 
 
 @pytest.mark.unit
@@ -158,6 +167,74 @@ def test_close_propagates_dispose_failure() -> None:
     with pytest.raises(RuntimeError, match="dispose failed"):
         runtime.close()
     assert runtime.loop.is_closed()
+
+
+def _dict_only_pg_row(row: object) -> dict[str, object]:
+    """Сломанный dict-only helper: воспроизводит Job TypeError на RowMapping."""
+    if isinstance(row, dict):
+        return row
+    raise TypeError(f"PG row is not mapping-like: {type(row)!r}")
+
+
+@pytest.mark.unit
+def test_pg_row_as_dict_accepts_real_sqlalchemy_rowmapping() -> None:
+    """Job execute ``.mappings()`` даёт реальный RowMapping → plain dict."""
+    engine = _sqlite_engine()
+    try:
+        with engine.connect() as conn:
+            mapping = conn.execute(
+                text("SELECT 'acme' AS shop_id, 42 AS id")
+            ).mappings().one()
+    finally:
+        engine.dispose()
+
+    assert type(mapping) is RowMapping
+    assert mapping.__class__.__module__ == "sqlalchemy.engine.row"
+    assert isinstance(mapping, Mapping)
+    assert not isinstance(mapping, dict)
+
+    with pytest.raises(TypeError, match="mapping-like"):
+        _dict_only_pg_row(mapping)
+
+    normalized = owner_bot_evidence._pg_row_as_dict(mapping)
+    assert type(normalized) is dict
+    assert normalized["shop_id"] == "acme"
+    assert normalized["id"] == 42
+    assert list(normalized.keys()) == ["shop_id", "id"]
+
+
+@pytest.mark.unit
+def test_pg_row_as_dict_accepts_real_sqlalchemy_row_via_mapping() -> None:
+    """SQLAlchemy Row нормализуется через ``row._mapping``, без positional guess."""
+    engine = _sqlite_engine()
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT 'acme' AS shop_id, 42 AS id")).one()
+    finally:
+        engine.dispose()
+
+    assert type(row) is Row
+    assert not isinstance(row, Mapping)
+    assert isinstance(row._mapping, RowMapping)
+
+    normalized = owner_bot_evidence._pg_row_as_dict(row)
+    assert type(normalized) is dict
+    assert normalized == {"shop_id": "acme", "id": 42}
+    assert normalized != list(row)
+
+
+@pytest.mark.unit
+def test_pg_row_as_dict_rejects_unsupported_non_mapping() -> None:
+    """Неподдерживаемый объект → явный TypeError, не GAP и не stringify."""
+
+    class ArbitraryPayload:
+        value = "not-a-row"
+
+    with pytest.raises(TypeError, match="mapping-like") as caught:
+        owner_bot_evidence._pg_row_as_dict(ArbitraryPayload())
+
+    assert caught.value.__class__ is TypeError
+    assert "ArbitraryPayload" in str(caught.value)
 
 
 @pytest.mark.unit

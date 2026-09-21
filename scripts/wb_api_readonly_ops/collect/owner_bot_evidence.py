@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from collections.abc import AsyncGenerator, Iterable
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import date
@@ -23,16 +23,22 @@ from scripts.wb_api_readonly_ops.mutation_guard import assert_read_only_op
 
 
 def _pg_row_as_dict(row: Any) -> dict[str, Any]:
-    """Нормализовать SQLAlchemy RowMapping в plain dict для `.get()` readers."""
-    if isinstance(row, dict):
-        return cast(dict[str, Any], row)
-    if hasattr(row, "_mapping"):
-        normalized = jsonable(dict(row._mapping))
+    """Нормализовать mapping-like PG row в plain ``dict`` для ``.get()`` readers.
+
+    Принимает любой ``collections.abc.Mapping``, включая SQLAlchemy
+    ``RowMapping`` с Job execute/result. SQLAlchemy ``Row`` нормализуется
+    через документированный ``row._mapping``. Позиционные поля не угадываются;
+    произвольные объекты не coerce-ятся в строку или GAP.
+    """
+    mapping: Mapping[Any, Any]
+    if isinstance(row, Mapping):
+        mapping = row
     else:
-        normalized = jsonable(row)
-    if not isinstance(normalized, dict):
-        raise TypeError(f"PG row is not mapping-like: {type(row)!r}")
-    return cast(dict[str, Any], normalized)
+        candidate = getattr(row, "_mapping", None)
+        if not isinstance(candidate, Mapping):
+            raise TypeError(f"PG row is not mapping-like: {type(row)!r}")
+        mapping = candidate
+    return dict(mapping)
 
 
 @dataclass(frozen=True)

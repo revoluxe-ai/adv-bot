@@ -89,7 +89,9 @@ The change SHALL add or extend targeted automated tests proving:
 - supported Fullstats adapter seam (regression forbidding orphan API names);
 - resource cleanup at plane `close()`;
 - typed failure mapping at orchestration boundary;
-- A1 strict collect regression coverage for shared loader integration.
+- A1 strict collect regression coverage for shared loader integration;
+- SQLAlchemy `RowMapping` (or equivalent execute/result mapping type) → plain
+  `dict` without GAP recast; unsupported non-mapping → explicit `TypeError`.
 
 #### Scenario: Cross-loop regression test
 
@@ -101,6 +103,58 @@ The change SHALL add or extend targeted automated tests proving:
 
 - **WHEN** static or unit tests inspect strict plane fullstats loading
 - **THEN** tests SHALL fail if disallowed adapter method names are introduced
+
+### Requirement: SQLAlchemy PG row mapping normalization
+
+Shared PG row normalization used by the Owner-bot Job evidence plane SHALL
+accept actual SQLAlchemy mapping results from the Job execute/result path and
+normalize them deterministically to a plain `dict` with unchanged column names
+and values. The normalizer SHALL use Python/SQLAlchemy mapping protocol
+semantics (`collections.abc.Mapping`), not a `dict`-only type check.
+
+SQLAlchemy `engine.row.RowMapping` SHALL be accepted as mapping data.
+If SQLAlchemy `Row` is a supported upstream result at another seam, the
+normalizer SHALL use the documented mapping interface (`row._mapping`) rather
+than positional or private field guessing. Unsupported arbitrary objects SHALL
+fail closed with an explicit `TypeError`.
+
+This TypeError is an implementation defect. Collectors MUST NOT convert it into
+a legitimate evidence GAP. Job-local PG engine/session ownership, one
+Job-scoped loop, deterministic dispose, typed `EvidenceReaderFailure`,
+read-only posture, and existing WB/fullstats/orders behavior SHALL be
+preserved. The change SHALL NOT rewrite the plane to asyncpg or introduce a
+ProKraft-specific reader.
+
+#### Scenario: RowMapping normalizes to plain dict
+
+- **WHEN** the Job PG path yields `sqlalchemy.engine.row.RowMapping` (or an
+  execute/result seam that returns the same concrete mapping type)
+- **THEN** shared `_pg_row_as_dict` SHALL return a plain `dict`
+- **AND** column names and values SHALL be unchanged
+- **AND** the failure SHALL NOT be recorded as a legitimate evidence GAP
+
+#### Scenario: SQLAlchemy Row uses documented mapping
+
+- **WHEN** a supported seam yields SQLAlchemy `Row`
+- **THEN** the normalizer SHALL obtain mapping data via `row._mapping`
+- **AND** SHALL NOT infer columns from positional or undocumented private
+  attributes
+
+#### Scenario: Unsupported object fails closed
+
+- **WHEN** `_pg_row_as_dict` receives a non-mapping object that is not a
+  supported SQLAlchemy row/mapping result
+- **THEN** it SHALL raise an explicit `TypeError`
+- **AND** SHALL NOT silently coerce the object into a dict or GAP
+
+#### Scenario: RowMapping regression evidence
+
+- **WHEN** the required automated regression runs against real SQLAlchemy
+  `RowMapping` (preferably via execute/result)
+- **THEN** a dict-only / current-broken helper SHALL fail on that type
+- **AND** the corrected normalizer SHALL produce the expected plain dict
+- **AND** a negative case SHALL still fail closed for an unsupported
+  non-mapping object
 
 ## OUT OF SCOPE (explicit)
 

@@ -32,8 +32,16 @@ Shared read-only evidence loading для Owner-bot Job collectors MUST:
    and lifecycle-bound to the Job loop with proven cleanup.
 6. Map reader failures to **typed provenance** (source, error class, lifecycle
    phase) consumable by collector output contracts; raw unhandled exceptions
-   MUST NOT be the only signal.
+   MUST NOT be the only signal. An implementation `TypeError` from rejecting a
+   supported SQLAlchemy mapping row (`RowMapping`) MUST NOT be recast as a
+   legitimate evidence GAP.
 7. Preserve `READ_ONLY_NO_MUTATION` and `write_budget.writes=0`.
+8. When the Job-local SQLAlchemy path is retained, shared PG row normalization
+   MUST accept mapping-protocol results (`collections.abc.Mapping`, including
+   `sqlalchemy.engine.row.RowMapping`) and SQLAlchemy `Row` via documented
+   `row._mapping`, emitting a plain `dict` with unchanged keys/values.
+   Unsupported objects fail closed with explicit `TypeError`. This does **not**
+   authorize an asyncpg rewrite or a ProKraft-specific reader.
 
 ## Applies to
 
@@ -47,6 +55,8 @@ Shared read-only evidence loading для Owner-bot Job collectors MUST:
 - Single preload (`ensure_bundle`) before sync section readers
 - Explicit `close()`/dispose hooks at Job boundary
 - `PARTIAL` collector outcomes when evidence gaps remain after typed failures
+- Job-local SQLAlchemy engine/session ownership with Mapping-protocol row
+  normalization (`RowMapping` / `Row._mapping` → plain `dict`)
 
 ## Forbidden
 
@@ -69,4 +79,4 @@ Shared read-only evidence loading для Owner-bot Job collectors MUST:
 - [x] existing decisions searched
 - [x] relevant decisions cited
 - [x] new decision proposed for missing lifecycle invariant
-- [ ] implementation layer matches decision (pending apply)
+- [x] implementation layer matches decision

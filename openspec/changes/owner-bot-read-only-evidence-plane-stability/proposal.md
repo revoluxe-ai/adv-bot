@@ -19,9 +19,17 @@
 - PG read strategy становится Job-safe и reusable (общий с A1-stable asyncpg
   path или эквивалентный shared factory), без ProKraft-specific reader.
 - Reader failures нормализуются в typed GAP/error provenance для collector output
-  contracts.
+  contracts. **Implementation TypeError** на supported PG mapping rows
+  (`sqlalchemy.engine.row.RowMapping`) MUST NOT быть переквалифицирован в
+  legitimate evidence GAP.
+- Shared PG row normalizer MUST accept Python/SQLAlchemy mapping protocol
+  results used by the Job path (`collections.abc.Mapping`, including
+  `RowMapping`; SQLAlchemy `Row` via documented `_mapping`) and emit a plain
+  `dict` with unchanged column names/values; unsupported objects fail closed
+  with explicit `TypeError`.
 - Добавляется focused test contract: async lifecycle, adapter seam, resource
-  cleanup, A1 non-regression.
+  cleanup, A1 non-regression, **and** RowMapping regression (real SQLAlchemy
+  mapping type vs dict-only helper).
 - **Не меняются** Registry/resolver semantics, не создаётся новый collector id,
   не изобретаются stock/full attribution catalogs без подтверждённого shared
   source.

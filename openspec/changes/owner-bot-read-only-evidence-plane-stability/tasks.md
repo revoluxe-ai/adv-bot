@@ -29,3 +29,21 @@
 - [x] 5.1 `poetry run pytest` targeted suites for new/changed tests.
 - [x] 5.2 Confirm `write_budget.writes=0` invariant preserved in strict audit tests.
 - [x] 5.3 Document explicit non-goals: stock/attribution catalog, Registry/resolver untouched.
+
+## 6. SQLAlchemy RowMapping normalization + regression (runtime follow-up)
+
+Do **not** reopen completed tasks 1–5. Preserve Job-local PG ownership, one
+Job-scoped loop, deterministic dispose, typed `EvidenceReaderFailure`,
+read-only posture, and WB/fullstats/orders behavior. Do **not** rewrite to
+asyncpg or recast this TypeError as a legitimate GAP.
+
+- [x] 6.1 Update shared `_pg_row_as_dict` so Job-path SQLAlchemy mapping
+      results are accepted: `collections.abc.Mapping` including
+      `sqlalchemy.engine.row.RowMapping` → deterministic plain `dict`;
+      SQLAlchemy `Row` via documented `row._mapping`; unsupported objects →
+      explicit `TypeError`.
+- [x] 6.2 Add executable regression using real SQLAlchemy `RowMapping`
+      (preferably an execute/result seam returning the same concrete type):
+      dict-only / current helper fails; corrected helper preserves column
+      names and values; negative test: unsupported non-mapping object →
+      explicit `TypeError`.
