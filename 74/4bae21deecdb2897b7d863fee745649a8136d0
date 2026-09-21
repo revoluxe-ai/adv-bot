@@ -1,0 +1,35 @@
+openspec/changes/owner-bot-read-only-evidence-plane-stability/design.md
+  s_644160d86b9659::t_1cadae2a22e7a2 20-50
+openspec/changes/owner-bot-read-only-evidence-plane-stability/proposal.md
+  s_644160d86b9659::t_a570318ce6ab5a 10-17
+openspec/changes/owner-bot-read-only-evidence-plane-stability/specs/owner-bot-read-only-evidence-plane/spec.md
+  s_644160d86b9659::t_efc41b2e4ccc5d 159-253
+openspec/changes/owner-bot-read-only-evidence-plane-stability/tasks.md
+  s_644160d86b9659::t_5b9e6c3e377976 50-82
+scripts/strict_single_nmid_audit.py
+  s_644160d86b9659::t_b5c328e7ed8ca9 27-30,565-617,824-829,835-837,845-847
+scripts/strict_single_nmid_audit_owner_bot_plane.py
+  s_644160d86b9659::t_e0e99d5babde75 26,31,38-50,193,195-196,265-275,301-302,312-317,324-330,333-338,397-399,401-404,442-443,450-455
+scripts/wb_api_readonly_ops/collect/owner_bot_evidence.py
+  s_644160d86b9659::t_c63fc2ef3e95a3 61-118,306-311,407-414,431-436,446-451,508-511
+tests/unit/scripts/test_owner_bot_evidence.py
+  s_644160d86b9659::t_a12bd48d7f6f5c 240-260
+tests/unit/scripts/test_owner_bot_evidence_bundle_shapes.py
+  s_644160d86b9659::t_a92eb608072f4e 1-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "744bae21deecdb2897b7d863fee745649a8136d0",
+  "prompts": {},
+  "sessions": {
+    "s_644160d86b9659": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8ab94545-ff1e-4cb2-a5c7-b780747022a8",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
