@@ -1,0 +1,31 @@
+openspec/changes/owner-bot-read-only-evidence-plane-stability/decisions/owner-bot-job-evidence-plane-lifecycle/decision.md
+  s_d349e7be8371d8::t_e81f143a88d99d 35-37,39-44,58-59,82
+openspec/changes/owner-bot-read-only-evidence-plane-stability/design.md
+  s_d349e7be8371d8::t_837f2c9938c5a9 20-34,51-54,64-65,110-122,140-142,157
+openspec/changes/owner-bot-read-only-evidence-plane-stability/proposal.md
+  s_d349e7be8371d8::t_096d7acec322f5 22-29,31-32
+openspec/changes/owner-bot-read-only-evidence-plane-stability/specs/owner-bot-read-only-evidence-plane/spec.md
+  s_d349e7be8371d8::t_7c17853ab84b6a 92-94,107-158
+openspec/changes/owner-bot-read-only-evidence-plane-stability/tasks.md
+  s_d349e7be8371d8::t_5ba89dd310ec9a 32-49
+scripts/wb_api_readonly_ops/collect/owner_bot_evidence.py
+  s_d349e7be8371d8::t_ab3f8f8e9343c4 11,26-35,37-41
+tests/unit/scripts/test_owner_bot_evidence.py
+  s_d349e7be8371d8::t_a20f71f06cc720 5,10-12,17-21,172-239
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3a5a0e77f3b0f75598dab5a91c0a91eff29913c9",
+  "prompts": {},
+  "sessions": {
+    "s_d349e7be8371d8": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "31230c97-0aaa-45a4-bb3e-beb6e12cf8a0",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
