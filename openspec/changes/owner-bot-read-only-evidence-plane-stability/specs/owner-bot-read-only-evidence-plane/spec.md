@@ -156,6 +156,101 @@ ProKraft-specific reader.
 - **AND** a negative case SHALL still fail closed for an unsupported
   non-mapping object
 
+### Requirement: Bundle result-shape normalization for section readers
+
+Shared Owner-bot evidence loading SHALL produce bundle collections that section
+readers consume as plain `dict` trees at every `.get()` boundary:
+
+- `OwnerBotEvidenceBundle.pg_rows` — plain `dict` per PG advsetting row (post
+  `_pg_row_as_dict`);
+- `orders` — plain `dict` supplier order rows (post `jsonable` / pagination
+  merge semantics);
+- `fullstats` — plain `dict` per campaign stats item with recursively
+  JSON-safe `days` / `apps` / `nms` nodes (post `FullStatsItem.to_dict()` +
+  `jsonable`, or equivalent supported adapter mapping).
+
+Non-dict rows or campaign stats objects (for example attrs `FullStatsItem`
+instances) MUST NOT reach `OwnerBotStrictSingleNmidReadOnlyPlane` section
+readers. Failures from unsupported shapes are **implementation defects** and
+MUST NOT be reported as legitimate typed source GAPs solely because the
+orchestrator caught `AttributeError`.
+
+#### Scenario: PG rows are dict-safe for current_contour
+
+- **WHEN** the Job bundle is loaded for a supported cabinet
+- **THEN** each `pg_rows` entry SHALL be a plain `dict` usable with `.get()`
+- **AND** `read_current_contour` SHALL NOT raise `AttributeError` for supported
+  SQLAlchemy mapping inputs already accepted by `_pg_row_as_dict`
+
+#### Scenario: Orders rows are dict-safe for ORDERS reader
+
+- **WHEN** orders are loaded via shared `collect_orders_sales`
+- **THEN** each `bundle.orders` entry SHALL be a plain `dict` with WB field names
+- **AND** `read_orders` SHALL NOT raise `AttributeError` on supported supplier
+  order payloads
+
+#### Scenario: Fullstats tree is dict-safe for attribution and spend
+
+- **WHEN** fullstats are loaded via supported `FullstatsAdapter._request_chunk`
+- **THEN** each `bundle.fullstats` entry and nested day/app/nm nodes SHALL be
+  plain dicts (or explicitly typed GAP at load with provenance)
+- **AND** `read_attribution` / `read_physical_spend` SHALL NOT raise
+  `AttributeError` on supported production-shaped payloads
+
+### Requirement: Implementation failure vs legitimate GAP at section boundary
+
+`StrictSingleNmidAudit.run` SHALL distinguish:
+
+- legitimate source absence / adapter failure → typed `EvidenceReaderFailure` or
+  contract GAP with provenance;
+- malformed or unsupported **bundle/result shape** caused by loader/reader code →
+  implementation failure (fix shape or raise typed implementation failure), not
+  silent `{section}: AttributeError` as the only signal.
+
+Arbitrary `AttributeError` from `.get()` on non-dict bundle entries MUST NOT be
+treated as authoritative evidence absence. Wrapping all `AttributeError` into
+`EvidenceReaderFailure` without fixing shapes is forbidden.
+
+#### Scenario: AttributeError from shape mismatch is not authoritative GAP
+
+- **WHEN** a section reader raises `AttributeError` because a bundle entry is not
+  dict-shaped at a `.get()` boundary
+- **THEN** apply fixes SHALL normalize bundle data or harden the load contract
+- **AND** the collector MUST NOT treat that bare exception class alone as proof
+  that the upstream WB/PG source is unavailable
+
+#### Scenario: Typed source failure remains GAP
+
+- **WHEN** shared loading raises `EvidenceReaderFailure` for a supported source
+  (network, adapter, identity, lifecycle)
+- **THEN** orchestration SHALL record typed provenance (`source`, `phase`,
+  `error_class`)
+- **AND** `write_budget.writes` SHALL remain `0`
+
+### Requirement: Physical spend canonical reconciliation matches section evidence
+
+When `read_physical_spend` yields confirmed `SpendEvidence` for the audit
+identity and period, `reconcile_physical_spend` SHALL populate canonical
+`physical_spend` (`status`, `value`, `evidence`) consistently with the strict
+single-NMID audit contract. Confirmed spend facts MUST NOT appear only in
+top-level `evidence[]` while canonical `physical_spend` remains `missing`.
+
+#### Scenario: Confirmed spend in reader reconciles to canonical object
+
+- **WHEN** the physical spend reader yields confirmed `SpendEvidence` with an
+  explicit overlap key for the audit window
+- **THEN** `physical_spend.status` SHALL be `confirmed`
+- **AND** `physical_spend.value` SHALL match the reconciled total
+- **AND** `physical_spend.evidence` SHALL include the spend records used
+
+#### Scenario: t0055 regression shape
+
+- **WHEN** regression tests replay t0055-like bundle/output shapes (confirmed
+  spend fact `562.01` with overlap keys from promotion fullstats)
+- **THEN** canonical `physical_spend` SHALL NOT remain `missing`
+- **AND** `decision.gaps` SHALL NOT include `physical spend evidence is missing`
+  unless spend is genuinely absent
+
 ## OUT OF SCOPE (explicit)
 
 - Inventing authoritative stock views or full direct/associated attribution endpoint catalogs without an already accepted shared source.

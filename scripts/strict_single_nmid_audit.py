@@ -24,7 +24,10 @@ from pathlib import Path
 from typing import Any, Final, Protocol, TypeAlias, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from scripts.wb_api_readonly_ops.collect.owner_bot_evidence import EvidenceReaderFailure
+from scripts.wb_api_readonly_ops.collect.owner_bot_evidence import (
+    EvidenceImplementationFailure,
+    EvidenceReaderFailure,
+)
 
 SCHEMA_VERSION: Final = "strict-single-nmid-audit-v1"
 CONFIRMED: Final = "confirmed"
@@ -559,6 +562,59 @@ def readers_from_owner_bot_plane(
     }
 
 
+def _attribute_error_is_mapping_shape(exc: AttributeError) -> bool:
+    """True если ``AttributeError`` похож на ``.get()`` по non-dict bundle entry."""
+    message = str(exc)
+    return "has no attribute 'get'" in message or ".get" in message
+
+
+def _gap_line_for_attribute_error(section: str, exc: AttributeError) -> str:
+    """Сформировать gap line: implementation shape vs unknown AttributeError."""
+    if _attribute_error_is_mapping_shape(exc):
+        return (
+            f"{section}: AttributeError phase=implementation_shape "
+            f"implementation_shape=1 message={exc}"
+        )
+    return f"{section}: AttributeError"
+
+
+def _collect_spend_records(
+    raw_items: list[Evidence | SpendEvidence],
+    evidence_items: list[Evidence],
+    identity: AuditIdentity,
+    period: AuditPeriod,
+) -> list[SpendEvidence]:
+    """Собрать spend records для reconcile (SpendEvidence + projected Evidence)."""
+    spends = [item for item in raw_items if isinstance(item, SpendEvidence)]
+    if spends:
+        return spends
+    projected: list[SpendEvidence] = []
+    for item in evidence_items:
+        if item.section != "physical_spend" or item.field != "physical_spend":
+            continue
+        if item.status not in {CONFIRMED, GAP} or item.value is None:
+            continue
+        overlap_key = item.provenance.get("overlap_key")
+        if not isinstance(overlap_key, str) or not overlap_key:
+            continue
+        try:
+            amount = Decimal(str(item.value))
+        except (InvalidOperation, ValueError):
+            continue
+        projected.append(
+            SpendEvidence(
+                amount=amount,
+                source=item.source,
+                overlap_key=overlap_key,
+                identity=identity,
+                period=period,
+                provenance=dict(item.provenance),
+                status=item.status,
+            )
+        )
+    return projected
+
+
 def _as_evidence(
     value: Evidence | SpendEvidence, identity: AuditIdentity, period: AuditPeriod
 ) -> Evidence:
@@ -765,11 +821,20 @@ class StrictSingleNmidAudit:
                 gaps.append(
                     f"{section}: {exc.error_class} source={exc.source} phase={exc.phase}"
                 )
+            except EvidenceImplementationFailure as exc:
+                section_statuses[section] = GAP
+                gaps.append(
+                    f"{section}: {exc.error_class} phase={exc.phase} "
+                    f"implementation_shape=1 message={exc.message}"
+                )
             except (RunBudgetExceeded, StrictAuditError) as exc:
                 if "identity mismatch" in str(exc):
                     section_statuses["identity"] = BLOCKED
                 section_statuses[section] = GAP
                 gaps.append(f"{section}: {exc}")
+            except AttributeError as exc:
+                section_statuses[section] = GAP
+                gaps.append(_gap_line_for_attribute_error(section, exc))
             except Exception as exc:  # noqa: BLE001 — source becomes explicit GAP
                 section_statuses[section] = GAP
                 gaps.append(f"{section}: {type(exc).__name__}")
@@ -777,9 +842,9 @@ class StrictSingleNmidAudit:
         evidence_items = [
             _as_evidence(item, self.identity, self.period) for item in raw_items
         ]
-        spend_records = [
-            item for item in raw_items if isinstance(item, SpendEvidence)
-        ]
+        spend_records = _collect_spend_records(
+            raw_items, evidence_items, self.identity, self.period
+        )
         spend = reconcile_physical_spend(spend_records, self.identity, self.period)
         if spend["status"] != CONFIRMED:
             gaps.extend(spend["gaps"])

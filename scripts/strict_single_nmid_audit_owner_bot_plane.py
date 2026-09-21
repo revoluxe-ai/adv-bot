@@ -23,14 +23,29 @@ from scripts.strict_single_nmid_audit import (
     evidence,
 )
 from scripts.wb_api_readonly_ops.collect.owner_bot_evidence import (
+    EvidenceImplementationFailure,
     EvidenceReaderFailure,
     JobScopedEvidenceRuntime,
     OwnerBotEvidenceBundle,
     load_owner_bot_evidence_bundle,
+    normalize_evidence_dict_tree,
 )
 
 # Backward-compatible alias для unit tests.
 _Bundle = OwnerBotEvidenceBundle
+
+
+def _dict_row(row: Any, *, section: str) -> dict[str, Any]:
+    """Нормализовать bundle row перед ``.get()`` (defensive для tests/legacy cache)."""
+    try:
+        return normalize_evidence_dict_tree(row)
+    except TypeError as exc:
+        raise EvidenceImplementationFailure(
+            section=section,
+            phase="implementation_shape",
+            error_class="TypeError",
+            message=str(exc),
+        ) from exc
 
 
 def _read_int(row: dict[str, Any], *names: str) -> int:
@@ -175,9 +190,10 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
         """Прочитать current contour из PG/WB без A1 fallback."""
         bundle = self._bundle(identity, period)
         rows = [
-            row
+            _dict_row(row, section="current_contour")
             for row in bundle.pg_rows
-            if identity.nmid in _parse_nmids(row.get("nmids"))
+            if identity.nmid
+            in _parse_nmids(_dict_row(row, section="current_contour").get("nmids"))
         ]
         if not rows:
             yield evidence(
@@ -246,14 +262,17 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
     ) -> Iterable[Evidence]:
         """Orders/units/GMV через ORDERS_OR_SALES_REPORTS_READ identity."""
         bundle = self._bundle(identity, period)
-        scoped = [
-            row
-            for row in bundle.orders
-            if _read_int(row, "nmId", "nmID", "nm_id") == identity.nmid
-            and (day := _row_day(row)) is not None
-            and period.start <= day <= period.end
-            and not _is_cancel(row)
-        ]
+        scoped: list[dict[str, Any]] = []
+        for raw_row in bundle.orders:
+            row = _dict_row(raw_row, section="orders")
+            day = _row_day(row)
+            if (
+                _read_int(row, "nmId", "nmID", "nm_id") == identity.nmid
+                and day is not None
+                and period.start <= day <= period.end
+                and not _is_cancel(row)
+            ):
+                scoped.append(row)
         attestation = _orders_attestation(period, scoped)
         orders_count = len(scoped)
         units = sum(_read_int(row, "quantity", "qty") or 1 for row in scoped)
@@ -279,7 +298,8 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
         """Direct/associated counts только при explicit fullstats membership."""
         bundle = self._bundle(identity, period)
         direct = associated = 0
-        for item in bundle.fullstats:
+        for raw_item in bundle.fullstats:
+            item = _dict_row(raw_item, section="attribution")
             adv_id = _read_int(item, "advertId", "advert_id", "id")
             if not adv_id:
                 continue
@@ -289,22 +309,33 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
             days = item.get("days")
             if not isinstance(days, list):
                 continue
-            for day in days:
-                if not isinstance(day, dict):
-                    continue
+            for raw_day in days:
+                day = (
+                    raw_day
+                    if isinstance(raw_day, dict)
+                    else _dict_row(raw_day, section="attribution")
+                )
                 parsed = _parse_day(day.get("date"))
                 if parsed is None or not period.start <= parsed <= period.end:
                     continue
                 apps = day.get("apps")
                 if not isinstance(apps, list):
                     continue
-                for app in apps:
-                    nms = app.get("nms") if isinstance(app, dict) else None
+                for raw_app in apps:
+                    app = (
+                        raw_app
+                        if isinstance(raw_app, dict)
+                        else _dict_row(raw_app, section="attribution")
+                    )
+                    nms = app.get("nms")
                     if not isinstance(nms, list):
                         continue
-                    for nm in nms:
-                        if not isinstance(nm, dict):
-                            continue
+                    for raw_nm in nms:
+                        nm = (
+                            raw_nm
+                            if isinstance(raw_nm, dict)
+                            else _dict_row(raw_nm, section="attribution")
+                        )
                         ordered = _read_int(nm, "nmId", "nmID", "nm_id", "id")
                         if ordered != identity.nmid:
                             continue
@@ -363,10 +394,14 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
     ) -> Iterable[Evidence]:
         """Topology только при explicit campaign membership для nmid."""
         bundle = self._bundle(identity, period)
+        memberships_raw = (
+            bundle.memberships if isinstance(bundle.memberships, dict) else {}
+        )
         memberships = {
-            adv_id: sorted(nmids)
-            for adv_id, nmids in bundle.memberships.items()
-            if identity.nmid in nmids
+            int(adv_id): sorted(int(nmid) for nmid in nmids)
+            for adv_id, nmids in memberships_raw.items()
+            if isinstance(nmids, (set, list, tuple))
+            and identity.nmid in {int(nmid) for nmid in nmids}
         }
         if not memberships:
             yield evidence(
@@ -404,16 +439,20 @@ class OwnerBotStrictSingleNmidReadOnlyPlane:
         bundle = self._bundle(identity, period)
         total = Decimal("0")
         overlap_keys: set[str] = set()
-        for item in bundle.fullstats:
+        for raw_item in bundle.fullstats:
+            item = _dict_row(raw_item, section="physical_spend")
             adv_id = _read_int(item, "advertId", "advert_id", "id")
             if not adv_id or identity.nmid not in bundle.memberships.get(adv_id, set()):
                 continue
             days = item.get("days")
             if not isinstance(days, list):
                 continue
-            for day in days:
-                if not isinstance(day, dict):
-                    continue
+            for raw_day in days:
+                day = (
+                    raw_day
+                    if isinstance(raw_day, dict)
+                    else _dict_row(raw_day, section="physical_spend")
+                )
                 parsed = _parse_day(day.get("date"))
                 if parsed is None or not period.start <= parsed <= period.end:
                     continue

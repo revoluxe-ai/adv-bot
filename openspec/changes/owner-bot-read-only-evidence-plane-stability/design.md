@@ -17,6 +17,37 @@ without ProKraft-specific forks.
 | Untyped `Exception` → section GAP | **Still present** — `StrictSingleNmidAudit.run` (~L764–766) | **In scope:** typed reader failure provenance |
 | Stock / full attribution catalog | strict `read_stock` empty; no shared stock source confirmed | **Out of scope** (follow-up) |
 
+### Runtime follow-up (published Job `ops-script-strict-nmid-186069402-20260921t0055`)
+
+Operational Job `ops-script-strict-nmid-186069402-20260921t0055` (`prod-adv-bot`,
+resolver `REUSE`, image `adv-bot:3a5a0e77f3b0f75598dab5a91c0a91eff29913c9`,
+digest `sha256:803ec314ef8f1572f0d8ce8bef1760b1a52eb5edcdbed7728c15075004b93de9`)
+exited **0** with artifact SHA256 `ba0f46e9e0cb4adfd3e8d0a3c493797d25e8df25dde5769c0f62e0b386bcd1bf`.
+Contract / handoff / `write_budget.writes=0` / identity NMID `186069402` confirmed.
+Prior defects removed in logs: `Event loop is closed`, PG cross-loop
+`RuntimeError`, `RowMapping` `TypeError`, orphan `get_fullstats`.
+
+**Remaining acceptance gap:** `decision.status=PARTIAL` with untyped
+`{section}: AttributeError` for `current_contour`, `orders`, `attribution`,
+`topology` (not legitimate `EvidenceReaderFailure` GAPs). Additional shape
+signal: top-level `evidence[]` contains confirmed physical spend `562.01` from
+`owner-bot-promotion-fullstats` while canonical `physical_spend` object stays
+`missing` with gap `physical spend evidence is missing`.
+
+| Section | Code path (HEAD) | Operation raising `AttributeError` | Expected shape | t0055 / local repro | Class |
+|---------|------------------|-------------------------------------|----------------|---------------------|-------|
+| `current_contour` | `OwnerBotStrictSingleNmidReadOnlyPlane.read_current_contour` → `_read_int` / `row.get` on `bundle.pg_rows` (`strict_single_nmid_audit_owner_bot_plane.py` ~L172–L242) | `row.get(...)` when row is not `dict` | `list[dict[str, Any]]` plain column keys | Local repro: PG ORM/row objects without `.get` → `current_contour: AttributeError` | **Normalization** (loader must emit dict rows; reader must not assume SQLAlchemy row objects) |
+| `orders` | `read_orders` → `_read_int` / `_row_day` on `bundle.orders` (~L244–L274) | `row.get(...)` on non-dict order row | `list[dict]` supplier order payloads (`nmId`, `date`, `quantity`, …) | Local repro: non-dict order objects → `orders: AttributeError` | **Normalization** (orders must stay dict-shaped after `collect_orders_sales` + bundle load) |
+| `attribution` | `read_attribution` → `item.get("days")` on `bundle.fullstats` (~L276–L315) | `item.get(...)` when fullstats entry is not `dict` (e.g. `FullStatsItem` attrs object) | `list[dict]` campaign-day trees with dict `days` / `apps` / `nms` | Local repro: `FullStatsItem`-like object in `bundle.fullstats` → `attribution: AttributeError` | **Normalization** (deep `jsonable` / `to_dict` at load boundary) |
+| `topology` | `read_topology` → `bundle.memberships` + `evidence(...)` (~L361–L391) | `bundle.memberships` access or `evidence()` construction when bundle/membership shape invalid | `dict[int, set[int]]` membership map | t0055 gap present; local dict-shaped bundle does not reproduce — treat as **same bundle contract** failure until apply reproduces t0055 membership payload | **Reader adapter / bundle contract** (investigate with t0055-shaped fixture) |
+| `physical_spend` (canonical) | `StrictSingleNmidAudit.run` → `spend_records` filter + `reconcile_physical_spend` (`strict_single_nmid_audit.py` ~L777–L788) vs section reader `read_physical_spend` | Reconcile sees **empty** `spend_records` while `evidence[]` already projects confirmed spend `562.01` | `SpendEvidence` in `raw_items` → canonical `physical_spend.status=confirmed` | t0055 artifact: `evidence[].value=562.01`, `physical_spend.status=missing`, `physical_spend.evidence=[]` | **Orchestration / result-shape** (projection vs reconciliation split — not new spend semantics) |
+
+Orchestrator still maps unknown `Exception` to bare `{section}: AttributeError`
+(`strict_single_nmid_audit.py` ~L773–L775), which **masks implementation
+defects** as legitimate section GAPs. Apply MUST fix shapes first; optional
+typed implementation-failure provenance is allowed only where it does not
+replace normalization.
+
 ### Runtime follow-up (published Job `3474164f687cb506e3760b30946673504c4c8d44`)
 
 Operational Job `ops-script-strict-nmid-186069402-20260921t0050` (`prod-adv-bot`,

@@ -7,6 +7,14 @@
 легитимный `PARTIAL`, хотя output contract и `write_budget.writes=0` сохраняются.
 Нужен reusable shared evidence plane, а не параллельный ProKraft-specific stack.
 
+Runtime Job `ops-script-strict-nmid-186069402-20260921t0055` (image
+`3a5a0e77…`, artifact SHA256 `ba0f46e9…`) подтвердил lifecycle/RowMapping
+fixes, но **не** закрыл acceptance: `decision.status=PARTIAL` из-за bare
+`AttributeError` на `current_contour` / `orders` / `attribution` / `topology` и
+расхождения canonical `physical_spend` с подтверждённым spend fact в
+`evidence[]`. Этот change остаётся открытым до dict-safe bundle normalization и
+reconciliation regressions (tasks §7).
+
 ## What Changes
 
 - Вводится formal shared contract **Job-scoped read-only evidence plane** для

@@ -47,3 +47,36 @@ asyncpg or recast this TypeError as a legitimate GAP.
       dict-only / current helper fails; corrected helper preserves column
       names and values; negative test: unsupported non-mapping object →
       explicit `TypeError`.
+
+## 7. Runtime t0055 — bundle shape, section boundaries, physical_spend (apply only)
+
+Do **not** reopen tasks 1–6 or lifecycle/RowMapping/WB adapter fixes unless
+regression proof requires it. No new collector, Registry entry, or ProKraft fork.
+
+- [x] 7.1 **Shared bundle normalization:** ensure `load_owner_bot_evidence_bundle`
+      emits dict-only `pg_rows`, `orders`, and `fullstats` trees (recursive
+      `jsonable` / `to_dict` for `FullStatsItem` and nested day/app/nm nodes) so
+      plane readers never call `.get()` on attrs/ORM objects. Preserve Job-local
+      PG engine, one loop, dispose, `assert_read_only_op`, and existing WB seams.
+- [x] 7.2 **Section reader hardening:** align
+      `OwnerBotStrictSingleNmidReadOnlyPlane` `read_current_contour`,
+      `read_orders`, `read_attribution`, `read_topology`, and
+      `read_physical_spend` with the normalized bundle contract; fix
+      `read_topology` / membership handling for t0055-shaped payloads (no bare
+      `AttributeError` on supported shapes).
+- [x] 7.3 **Orchestration boundary:** update `StrictSingleNmidAudit.run` so
+      implementation shape failures are not mislabeled as legitimate section GAPs
+      via bare `{section}: AttributeError` when bundle/reader code is at fault;
+      preserve typed `EvidenceReaderFailure` mapping and `write_budget.writes=0`.
+      Do not “fix” by wrapping every `AttributeError` into `EvidenceReaderFailure`
+      without normalization.
+- [x] 7.4 **Physical spend reconciliation:** fix canonical `physical_spend`
+      vs top-level `evidence[]` split (t0055: confirmed `562.01` in `evidence[]`
+      but `physical_spend.status=missing` / empty `physical_spend.evidence`); no
+      new spend semantics.
+- [x] 7.5 **Executable regressions (t0055 shapes):** add tests using realistic
+      production objects/payloads (SQLAlchemy mapping rows → dict, supplier order
+      dicts, `FullStatsItem` / nested stats trees, t0055-like membership + spend
+      fixtures). Prove: no raw `AttributeError` crosses section boundary for
+      supported shapes; legitimate source absence stays typed GAP;
+      canonical `physical_spend` populated when spend reader confirms; `writes=0`.

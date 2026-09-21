@@ -238,6 +238,27 @@ def test_pg_row_as_dict_rejects_unsupported_non_mapping() -> None:
 
 
 @pytest.mark.unit
+def test_normalize_evidence_row_list_rejects_non_mapping() -> None:
+    """Неподдерживаемый row на load → typed ``EvidenceReaderFailure``."""
+
+    class _BadRow:
+        __slots__ = ("value",)
+
+        def __init__(self) -> None:
+            self.value = 1
+
+    with pytest.raises(owner_bot_evidence.EvidenceReaderFailure) as caught:
+        owner_bot_evidence.normalize_evidence_row_list(
+            [_BadRow()],
+            section="orders",
+            source="owner-bot-wb-orders",
+            phase="wb_orders_normalize",
+        )
+    assert caught.value.phase == "wb_orders_normalize"
+    assert caught.value.error_class == "TypeError"
+
+
+@pytest.mark.unit
 def test_evidence_reader_failure_is_typed_exception() -> None:
     """EvidenceReaderFailure несёт source/phase для GAP provenance."""
     exc = owner_bot_evidence.EvidenceReaderFailure(

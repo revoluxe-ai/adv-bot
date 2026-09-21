@@ -58,6 +58,64 @@ class EvidenceReaderFailure(Exception):
         )
 
 
+@dataclass(frozen=True)
+class EvidenceImplementationFailure(Exception):
+    """Ошибка формы bundle/reader (implementation), не legitimate source GAP."""
+
+    section: str
+    phase: str
+    error_class: str
+    message: str
+
+    def __str__(self) -> str:
+        return (
+            f"{self.error_class} phase={self.phase} implementation_shape=1: "
+            f"{self.message}"
+        )
+
+
+def normalize_evidence_dict_tree(value: Any) -> dict[str, Any]:
+    """Рекурсивно привести WB/PG payload к plain ``dict`` для ``.get()`` readers.
+
+    Поддерживает mapping rows, ``to_dict()`` / ``jsonable`` adapter models и
+    вложенные ``days`` / ``apps`` / ``nms`` узлы fullstats.
+    """
+    payload: Any = value
+    if isinstance(value, Mapping):
+        payload = dict(value)
+    elif hasattr(value, "to_dict"):
+        payload = value.to_dict()
+    normalized = jsonable(payload)
+    if not isinstance(normalized, dict):
+        raise TypeError(
+            f"evidence payload is not dict-like after jsonable: {type(normalized)!r}"
+        )
+    return cast(dict[str, Any], normalized)
+
+
+def normalize_evidence_row_list(
+    rows: Iterable[Any],
+    *,
+    section: str,
+    source: str,
+    phase: str,
+) -> list[dict[str, Any]]:
+    """Нормализовать список bundle rows; shape defect → typed load failure."""
+    normalized_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(rows):
+        try:
+            normalized_rows.append(normalize_evidence_dict_tree(row))
+        except TypeError as exc:
+            raise EvidenceReaderFailure(
+                section=section,
+                source=source,
+                phase=phase,
+                error_class="TypeError",
+                message=f"row[{index}] shape: {exc}",
+            ) from exc
+    return normalized_rows
+
+
 @dataclass
 class OwnerBotEvidenceBundle:
     """Кэш read-only фактов на один audit identity/period."""
@@ -245,7 +303,12 @@ async def load_pg_advsetting_rows(
                 {"cabinet": cabinet},
             )
         ).mappings().all()
-    return [_pg_row_as_dict(row) for row in rows]
+    return normalize_evidence_row_list(
+        [_pg_row_as_dict(row) for row in rows],
+        section="current_contour",
+        source="owner-bot-pg-advsetting",
+        phase="pg_row_normalize",
+    )
 
 
 def _parse_nmids(raw: Any) -> set[int]:
@@ -341,10 +404,14 @@ async def load_wb_evidence_bundle(
                 campaign_ids[offset : offset + 100]
             )
             if isinstance(payload, list):
-                for item in payload:
-                    normalized = jsonable(item)
-                    if isinstance(normalized, dict):
-                        campaigns.append(cast(dict[str, Any], normalized))
+                campaigns.extend(
+                    normalize_evidence_row_list(
+                        payload,
+                        section="topology",
+                        source="owner-bot-wb-campaigns",
+                        phase="wb_campaign_normalize",
+                    )
+                )
         fullstats: list[dict[str, Any]] = []
         if campaign_ids:
             adapter = promotion._client.fullstats_adapter
@@ -361,13 +428,12 @@ async def load_wb_evidence_bundle(
                 period_end,
                 fetcher=fetcher,
             )
-            for item in raw_items:
-                if hasattr(item, "to_dict"):
-                    normalized = jsonable(item.to_dict())
-                else:
-                    normalized = jsonable(item)
-                if isinstance(normalized, dict):
-                    fullstats.append(cast(dict[str, Any], normalized))
+            fullstats = normalize_evidence_row_list(
+                raw_items,
+                section="attribution",
+                source="owner-bot-promotion-fullstats",
+                phase="wb_fullstats_normalize",
+            )
         budget = ApiCallBudget(max_seconds=900.0, max_api_calls=50)
         with tempfile.TemporaryDirectory(prefix="owner-bot-evidence-") as tmp:
             store = RawStore(Path(tmp))
@@ -377,12 +443,12 @@ async def load_wb_evidence_bundle(
                 budget=budget,
                 orders_date_from=period_start.isoformat(),
             )
-        orders = [
-            cast(dict[str, Any], normalized)
-            for row in order_rows
-            for normalized in (jsonable(row),)
-            if isinstance(normalized, dict)
-        ]
+        orders = normalize_evidence_row_list(
+            order_rows,
+            section="orders",
+            source="owner-bot-wb-orders",
+            phase="wb_orders_normalize",
+        )
         return campaigns, fullstats, orders
 
 
@@ -439,5 +505,8 @@ async def load_owner_bot_evidence_bundle(
         campaigns=campaigns,
         fullstats=fullstats,
         orders=orders,
-        memberships=memberships,
+        memberships={
+            int(adv_id): {int(nmid) for nmid in nmids}
+            for adv_id, nmids in memberships.items()
+        },
     )
