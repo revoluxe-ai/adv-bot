@@ -535,7 +535,8 @@ class CoroutinesManager:
         )
         advs = [adv for adv in advs if adv.bot_active]
         advs = [adv for adv in advs if adv.is_part_auto_setting_active]
-        advs = [adv for adv in advs if adv.search_adv_active_status]
+        # V3 must tick while Search is PAUSE (empty-keywords pause, budget, etc.):
+        # plan/fact Redis, tick report, and keyword state need refresh before resume.
         from .services.auto_updater_v3 import process_adv_v3
         from .services.auto_updater_v3.card_ab_hold.mode import (
             CardAbHoldMode,

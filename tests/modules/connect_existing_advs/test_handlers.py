@@ -42,6 +42,8 @@ def _make_callback(
     callback_data: callbacks.ConnectExistingAdvs
     | callbacks.ConnectExistingConfirmType1
     | callbacks.ConnectExistingConfirmType2
+    | callbacks.ConnectExistingChooseAuction
+    | callbacks.ConnectExistingChooseAuto
     | callbacks.ConnectExistingCreateBoth
     | callbacks.ConnectExistingContinueDespiteInvalid
     | callbacks.ConnectExistingAdvsBackToShop
@@ -1187,3 +1189,80 @@ async def test_connect_existing_change_nmid() -> None:
     state.set_state.assert_called_once_with(ConnectExistingAdvsStates.waiting_nmid)
     bot.send_message.assert_called_once()
     assert "артикул" in bot.send_message.call_args[0][1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_choose_auto_list_sets_confirm_type2() -> None:
+    """choose_list в waiting_auto_adv_id выставляет confirm_type2 перед списком."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "auto_candidates": [{"id": 34331280, "name": "auto"}],
+        }
+    )
+    state.set_state = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingChooseAuto(action="choose_list"),
+        chat_id=333,
+    )
+    callback_data = callbacks.ConnectExistingChooseAuto(action="choose_list")
+
+    await connect_existing_advs.connect_existing_choose_auto(
+        callback, callback_data, bot, state
+    )
+
+    state.set_state.assert_awaited_once_with(
+        ConnectExistingAdvsStates.confirm_type2
+    )
+    bot.send_message.assert_awaited_once()
+    assert "Выберите авто-кампанию из списка" in bot.send_message.call_args[0][1]
+    markup = bot.send_message.call_args[1].get("reply_markup") or bot.send_message.call_args.kwargs.get(
+        "reply_markup"
+    )
+    assert markup is not None
+    first_btn = markup.inline_keyboard[0][0]
+    assert first_btn.callback_data == callbacks.ConnectExistingConfirmType2(
+        adv_id=34331280
+    ).pack()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_connect_existing_choose_auction_list_sets_confirm_type1() -> None:
+    """choose_list в waiting_auction_adv_id выставляет confirm_type1 перед списком."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    state = MagicMock()
+    state.get_data = AsyncMock(
+        return_value={
+            "auction_candidates": [{"id": 55, "name": "auction"}],
+            "wb_user_cabinet_original_id": 1,
+        }
+    )
+    state.set_state = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingChooseAuction(action="choose_list"),
+        chat_id=333,
+    )
+    callback_data = callbacks.ConnectExistingChooseAuction(action="choose_list")
+
+    await connect_existing_advs.connect_existing_choose_auction(
+        callback, callback_data, bot, state
+    )
+
+    state.set_state.assert_awaited_once_with(
+        ConnectExistingAdvsStates.confirm_type1
+    )
+    bot.send_message.assert_awaited_once()
+    assert "Выберите поисковую (аукцион) кампанию из списка" in bot.send_message.call_args[0][1]
+    markup = bot.send_message.call_args.kwargs.get("reply_markup")
+    if markup is None and len(bot.send_message.call_args) > 1:
+        markup = bot.send_message.call_args[1].get("reply_markup")
+    assert markup is not None
+    first_btn = markup.inline_keyboard[0][0]
+    assert first_btn.callback_data == callbacks.ConnectExistingConfirmType1(
+        adv_id=55
+    ).pack()
