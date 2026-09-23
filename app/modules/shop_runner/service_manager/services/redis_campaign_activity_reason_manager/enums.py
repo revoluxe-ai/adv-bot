@@ -23,6 +23,13 @@ class AutoReasonCode(StrEnum):
     COMMON_SPEND_EXCEEDED = "common_spend_exceeded"
     AUTO_LIMIT_0 = "auto_limit_0"
     AUTO_SPEND_EXCEEDED = "auto_spend_exceeded"
+    # Абсолютный (lifetime) лимит расхода исчерпан
+    COMMON_TOTAL_EXCEEDED = "common_total_exceeded"
+    AUTO_TOTAL_EXCEEDED = "auto_total_exceeded"
+    # Абсолютный лимит задан, но расход за всю историю получить не удалось
+    # (ClickHouse). Гейт fail-closed: пауза, пока расход неизвестен.
+    COMMON_TOTAL_UNKNOWN = "common_total_unknown"
+    AUTO_TOTAL_UNKNOWN = "auto_total_unknown"
     COST_DATA_INSUFFICIENT = "cost_data_insufficient"
     COST_RULE_FAILED = "cost_rule_failed"
     TIME_SCHEDULE = "time_schedule"
@@ -46,6 +53,13 @@ class AuctionReasonCode(StrEnum):
     SEARCH_SPEND_EXCEEDED = "search_spend_exceeded"
     SEARCH_LIMIT_OK = "search_limit_ok"
     SEARCH_LIMIT_0 = "search_limit_0"
+    # Абсолютный (lifetime) лимит расхода исчерпан
+    COMMON_TOTAL_EXCEEDED = "common_total_exceeded"
+    SEARCH_TOTAL_EXCEEDED = "search_total_exceeded"
+    # Абсолютный лимит задан, но расход за всю историю получить не удалось
+    # (ClickHouse). Гейт fail-closed: пауза, пока расход неизвестен.
+    COMMON_TOTAL_UNKNOWN = "common_total_unknown"
+    SEARCH_TOTAL_UNKNOWN = "search_total_unknown"
     TIME_SCHEDULE = "time_schedule"
     INSUFFICIENT_BALANCE = "insufficient_balance_auction"
     # Spec pause-on-empty-keywords (INC-PAUSE-02): пауза Search при пустых ключах

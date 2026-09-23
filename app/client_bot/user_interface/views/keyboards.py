@@ -64,6 +64,17 @@ def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboa
                 ).pack(),
             )
         )
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Абс. лимит на обе РК",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=None,
+                    scope="total",
+                ).pack(),
+            )
+        )
         auto_common_flag = bool(getattr(adv_setting, "auto_common_budget", False))
         auto_common_text = (
             "Включить авторасчёт общего бюджета"
@@ -101,6 +112,28 @@ def get_campaign_activity_menu_keyboard(adv_setting: AdvSetting) -> InlineKeyboa
                 ).pack(),
             )
         )
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Абс. лимит Аукцион",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=AdvType.SEARCH,
+                    scope="total",
+                ).pack(),
+            )
+        )
+        _ = builder.row(
+            InlineKeyboardButton(
+                text="Абс. лимит Авто",
+                callback_data=callbacks.ManageCampaignActivity(
+                    action="open",
+                    adv_setting_original_id=adv_setting.id,
+                    campaign_type=AdvType.AUTO,
+                    scope="total",
+                ).pack(),
+            )
+        )
 
     use_common_budget = getattr(adv_setting, "use_common_budget", False)
     common_budget_text = (
@@ -133,6 +166,7 @@ def get_campaign_activity_target_keyboard(
     adv_setting: AdvSetting,
     campaign_type: AdvType | None,
     current_limit: int,
+    scope: str = "daily",
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
@@ -143,6 +177,7 @@ def get_campaign_activity_target_keyboard(
                 action="change",
                 adv_setting_original_id=adv_setting.id,
                 campaign_type=campaign_type,
+                scope=scope,
             ).pack(),
         )
     )
@@ -155,6 +190,7 @@ def get_campaign_activity_target_keyboard(
                     action="turn_off",
                     adv_setting_original_id=adv_setting.id,
                     campaign_type=campaign_type,
+                    scope=scope,
                 ).pack(),
             )
         )

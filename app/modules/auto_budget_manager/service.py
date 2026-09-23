@@ -81,6 +81,8 @@ class AutoBudgetEnsureStatus(StrEnum):
 class _CampaignConfig:
     adv_id: int
     limit: int
+    total_limit: int = 0
+    """Абсолютный (lifetime) лимит расхода кампании, 0 = отключено."""
 
 
 @dataclass(slots=True)
@@ -301,6 +303,38 @@ class AutoBudgetService:
                 reason="Daily spend limit exceeded",
             )
 
+        # Абсолютный (lifetime) лимит расхода кампании: исчерпан — не пополняем,
+        # смена суток лимит не восстанавливает. Недоступная статистика — тоже
+        # блокировка (fail-closed): пополнять бюджет при неизвестном расходе
+        # нельзя, лимит мог быть уже исчерпан.
+        if config.total_limit > 0:
+            try:
+                total_spend = await self._calculate_total_spend([config.adv_id])
+            except Exception:
+                logger.exception(
+                    "Auto-budget: абсолютный расход кампании не получен adv_id=%s "
+                    "— пополнение заблокировано (лимит %s задан)",
+                    config.adv_id,
+                    config.total_limit,
+                )
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.ERROR,
+                    campaign_type=campaign_type,
+                    adv_id=config.adv_id,
+                    spend_today=spend_today,
+                    available_limit=0,
+                    reason="Total budget spend unknown — top-up blocked",
+                )
+            if total_spend >= config.total_limit:
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                    campaign_type=campaign_type,
+                    adv_id=config.adv_id,
+                    spend_today=spend_today,
+                    available_limit=0,
+                    reason="Total budget limit exceeded",
+                )
+
         budget_info = (
             cached_budget_info
             if cached_budget_info is not None
@@ -517,11 +551,16 @@ class AutoBudgetService:
         if campaign_type == AdvType.AUTO:
             adv_id = adv_setting.adv_id
             limit = adv_setting.auto_budget_daily_limit or 0
+            # Абсолютный лимит promo-overlay не масштабирует.
+            total_limit = getattr(adv_setting, "auto_budget_total_limit", 0) or 0
             if overlay is not None and getattr(overlay, "active", False):
                 limit = int(overlay.PromoAutoBudget)
         elif campaign_type == AdvType.SEARCH:
             adv_id = adv_setting.search_adv_id
             limit = adv_setting.search_auto_budget_daily_limit or 0
+            total_limit = (
+                getattr(adv_setting, "search_auto_budget_total_limit", 0) or 0
+            )
             if overlay is not None and getattr(overlay, "active", False):
                 limit = int(overlay.PropoSearchBudget)
         else:
@@ -531,6 +570,7 @@ class AutoBudgetService:
         return _CampaignConfig(
             adv_id=adv_id,
             limit=limit,
+            total_limit=total_limit,
         )
 
     @staticmethod
@@ -555,6 +595,20 @@ class AutoBudgetService:
             if spend:
                 total_spend += float(spend)
         return total_spend
+
+    @staticmethod
+    async def _calculate_total_spend(adv_ids: list[int]) -> float:
+        """Расход кампаний за всю историю (для абсолютного лимита бюджета).
+
+        Побочные эффекты: чтение ClickHouse ``full_adv_wb_stat``.
+
+        Args:
+            adv_ids: ID кампаний; ``None``-значения отфильтровать до вызова.
+
+        Returns:
+            Суммарный расход в рублях за всё время.
+        """
+        return await full_wb_adv_stat.get_total_spend_by_advs(adv_ids)
 
     @staticmethod
     async def _get_daily_topup_sums(
@@ -981,6 +1035,40 @@ class AutoBudgetService:
                 available_limit=0,
                 reason="Daily spend limit exceeded",
             )
+
+        # Абсолютный (lifetime) лимит расхода на обе РК: исчерпан — не пополняем,
+        # смена суток лимит не восстанавливает. Недоступная статистика — тоже
+        # блокировка (fail-closed), см. ``_ensure_budget_locked``.
+        total_limit_common = getattr(adv, "common_budget_total_limit", 0) or 0
+        if total_limit_common > 0:
+            try:
+                total_spend_common = await self._calculate_total_spend(
+                    [adv_id_auto, adv_id_search]
+                )
+            except Exception:
+                logger.exception(
+                    "Auto-budget: абсолютный расход РК не получен adv_setting_id=%s "
+                    "— общее пополнение заблокировано (лимит %s задан)",
+                    adv_setting_id,
+                    total_limit_common,
+                )
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.ERROR,
+                    campaign_type=AdvType.AUTO,
+                    adv_id=adv_id_auto,
+                    spend_today=spend_today,
+                    available_limit=0,
+                    reason="Total budget spend unknown — top-up blocked",
+                )
+            if total_spend_common >= total_limit_common:
+                return AutoBudgetEnsureResult(
+                    status=AutoBudgetEnsureStatus.LIMIT_REACHED,
+                    campaign_type=AdvType.AUTO,
+                    adv_id=adv_id_auto,
+                    spend_today=spend_today,
+                    available_limit=0,
+                    reason="Total budget limit exceeded",
+                )
 
         info_auto = (
             cached_info_auto

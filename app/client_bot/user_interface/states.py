@@ -105,6 +105,9 @@ class ShopMenuState(StatesGroup):
 
 class CampaignActivity(StatesGroup):
     waiting_for_new_limit = State()
+    # Абсолютный (lifetime) лимит расхода РК — отдельное состояние, чтобы
+    # ввод суточного и абсолютного лимита не путались между собой.
+    waiting_for_new_total_limit = State()
 
 
 class GateInvite(StatesGroup):

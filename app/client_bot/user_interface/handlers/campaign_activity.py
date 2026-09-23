@@ -1,3 +1,15 @@
+"""Хендлеры меню «Управление активностью РК»: лимиты расхода бюджета.
+
+Меню редактирует два вида лимитов на ``AdvSetting``:
+
+- ``daily`` — суточный лимит расхода (руб/сутки, календарный день MSK);
+- ``total`` — абсолютный (lifetime) лимит суммарного расхода за всё время.
+
+Оба вида подчиняются одному флагу ``use_common_budget``: при включённом общем
+бюджете действует один лимит на обе РК, иначе — свой лимит у Авто и Аукциона.
+Применяет лимиты shop-runner (``AutoAdvActiveControlService`` — пауза,
+``AutoBudgetService`` — блокировка автопополнений).
+"""
 import logging
 
 from aiogram import F, Router, types
@@ -18,19 +30,46 @@ logger = logging.getLogger(__name__)
 router = Router()
 sm = get_async_session_maker
 
+_DAILY_LIMIT_ATTRS: dict[AdvType | None, str] = {
+    None: "common_budget_daily_limit",
+    AdvType.SEARCH: "search_auto_budget_daily_limit",
+    AdvType.AUTO: "auto_budget_daily_limit",
+}
 
-def _limit_attr_name(campaign_type: AdvType | None) -> str:
-    if campaign_type is None:
-        return "common_budget_daily_limit"
-    if campaign_type == AdvType.SEARCH:
-        return "search_auto_budget_daily_limit"
-    if campaign_type == AdvType.AUTO:
-        return "auto_budget_daily_limit"
-    raise ValueError("Invalid campaign type")
+_TOTAL_LIMIT_ATTRS: dict[AdvType | None, str] = {
+    None: "common_budget_total_limit",
+    AdvType.SEARCH: "search_auto_budget_total_limit",
+    AdvType.AUTO: "auto_budget_total_limit",
+}
 
 
-def _get_limit_value(adv_setting: AdvSetting, campaign_type: AdvType | None) -> int:
-    value = getattr(adv_setting, _limit_attr_name(campaign_type), 0)
+def _limit_attr_name(campaign_type: AdvType | None, scope: str) -> str:
+    """Имя колонки ``AdvSetting`` по виду лимита и цели.
+
+    Args:
+        campaign_type: ``None`` — общий лимит на обе РК, иначе нога РК.
+        scope: ``"daily"`` или ``"total"``.
+
+    Raises:
+        ValueError: неизвестный ``scope`` или ``campaign_type``.
+    """
+    if scope == "total":
+        attrs = _TOTAL_LIMIT_ATTRS
+    elif scope == "daily":
+        attrs = _DAILY_LIMIT_ATTRS
+    else:
+        raise ValueError(f"Invalid limit scope: {scope}")
+    try:
+        return attrs[campaign_type]
+    except KeyError:
+        raise ValueError("Invalid campaign type") from None
+
+
+def _get_limit_value(
+    adv_setting: AdvSetting, campaign_type: AdvType | None, scope: str
+) -> int:
+    """Текущее значение лимита; ``0`` — лимит не задан/выключен."""
+    value = getattr(adv_setting, _limit_attr_name(campaign_type, scope), 0)
     return value or 0
 
 
@@ -47,6 +86,7 @@ async def show_activity_menu(
     callback: types.CallbackQuery,
     callback_data: callbacks.ManageCampaignActivity,
 ):
+    """Показать меню активности РК со сводкой суточных и абсолютных лимитов."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
     adv_setting = await _load_adv_setting(callback_data.adv_setting_original_id)
@@ -60,17 +100,20 @@ async def open_activity_target(
     callback: types.CallbackQuery,
     callback_data: callbacks.ManageCampaignActivity,
 ):
+    """Экран конкретного лимита (вид лимита — в ``callback_data.scope``)."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
     adv_setting = await _load_adv_setting(callback_data.adv_setting_original_id)
     campaign_type = callback_data.campaign_type
-    current_limit = _get_limit_value(adv_setting, campaign_type)
+    scope = callback_data.scope
+    current_limit = _get_limit_value(adv_setting, campaign_type, scope)
     await messages.CampaignActivityTargetMenu(
         callback.bot,
         callback.message.chat.id,
         adv_setting,
         campaign_type,
         current_limit,
+        scope,
     )()
 
 
@@ -80,18 +123,26 @@ async def start_limit_change(
     callback_data: callbacks.ManageCampaignActivity,
     state: FSMContext,
 ):
+    """Запросить новое значение лимита и перейти в соответствующее состояние."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
 
+    scope = callback_data.scope
     await state.update_data(
         adv_setting_id=callback_data.adv_setting_original_id,
         campaign_type=callback_data.campaign_type,
+        scope=scope,
     )
-    await state.set_state(states.CampaignActivity.waiting_for_new_limit)
+    await state.set_state(
+        states.CampaignActivity.waiting_for_new_total_limit
+        if scope == "total"
+        else states.CampaignActivity.waiting_for_new_limit
+    )
     await messages.CampaignActivityChangeLimit(
         callback.bot,
         callback.message.chat.id,
         callback_data.campaign_type,
+        scope,
     )()
 
 
@@ -100,16 +151,18 @@ async def turn_off_limit(
     callback: types.CallbackQuery,
     callback_data: callbacks.ManageCampaignActivity,
 ):
+    """Выключить лимит (записать ``0``) и вернуть экран лимита."""
     if callback.message is None:
         raise ValueError("Нет сообщения")
     campaign_type = callback_data.campaign_type
+    scope = callback_data.scope
     async with sm(read_only=False) as session:
         adv_setting = await session.get(
             AdvSetting, callback_data.adv_setting_original_id
         )
         if not adv_setting:
             raise ValueError("AdvSetting not found")
-        setattr(adv_setting, _limit_attr_name(campaign_type), 0)
+        setattr(adv_setting, _limit_attr_name(campaign_type, scope), 0)
         await session.commit()
         await messages.CampaignActivityTargetMenu(
             callback.bot,
@@ -117,14 +170,22 @@ async def turn_off_limit(
             adv_setting,
             campaign_type,
             0,
+            scope,
         )()
 
 
-@router.message(StateFilter(states.CampaignActivity.waiting_for_new_limit))
+@router.message(
+    StateFilter(
+        states.CampaignActivity.waiting_for_new_limit,
+        states.CampaignActivity.waiting_for_new_total_limit,
+    )
+)
 async def set_new_limit(message: types.Message, state: FSMContext):
+    """Сохранить введённый лимит; вид лимита берётся из данных FSM."""
     data = await state.get_data()
     adv_setting_id = data.get("adv_setting_id")
     campaign_type_value = data.get("campaign_type")
+    scope = data.get("scope") or "daily"
     if adv_setting_id is None:
         await message.answer("Произошла ошибка. Попробуйте ещё раз.")
         await state.clear()
@@ -141,7 +202,7 @@ async def set_new_limit(message: types.Message, state: FSMContext):
 
     if limit <= 0:
         await messages.CampaignActivityChangeLimit(
-            message.bot, message.chat.id, campaign_type
+            message.bot, message.chat.id, campaign_type, scope
         )()
         return
 
@@ -151,7 +212,7 @@ async def set_new_limit(message: types.Message, state: FSMContext):
             await message.answer("РК не найдена.")
             await state.clear()
             return
-        setattr(adv_setting, _limit_attr_name(campaign_type), limit)
+        setattr(adv_setting, _limit_attr_name(campaign_type, scope), limit)
         await session.commit()
         await state.clear()
         await messages.CampaignActivityTargetMenu(
@@ -160,4 +221,5 @@ async def set_new_limit(message: types.Message, state: FSMContext):
             adv_setting,
             campaign_type,
             limit,
+            scope,
         )()

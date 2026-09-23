@@ -174,6 +174,9 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._campaign_sales_state: SalesStates | None = None
         self._spend_auto_today: float | None = None
         self._spend_search_today: float | None = None
+        # Расход за всю историю кампаний — для абсолютного лимита бюджета РК.
+        self._spend_auto_total: float | None = None
+        self._spend_search_total: float | None = None
         self._emergency_mode_active: bool = False
         self._emergency_mode_reason: str | None = None
         self._stats_fresh: bool = True
@@ -433,7 +436,95 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             else:
                 self._spend_search_today = 0.0
 
+            await self._load_total_spend()
+
         return await super().__call__()
+
+    async def _load_total_spend(self) -> None:
+        """Подтянуть расход за всю историю РК, если абсолютный лимит задан.
+
+        Побочные эффекты: чтение ClickHouse ``full_adv_wb_stat``. При ошибке
+        значение остаётся ``None`` — в меню показывается «н/д».
+        """
+        if not self._total_limit_active():
+            return
+        try:
+            self._spend_auto_total = await full_wb_adv_stat.get_total_spend_by_advs(
+                [self.adv.adv_id]
+            )
+        except Exception:
+            logger.exception(
+                "Ошибка получения суммарного расхода Авто из ClickHouse"
+            )
+            self._spend_auto_total = None
+        if self.adv.search_adv_id:
+            try:
+                self._spend_search_total = (
+                    await full_wb_adv_stat.get_total_spend_by_advs(
+                        [self.adv.search_adv_id]
+                    )
+                )
+            except Exception:
+                logger.exception(
+                    "Ошибка получения суммарного расхода Аукциона из ClickHouse"
+                )
+                self._spend_search_total = None
+        else:
+            self._spend_search_total = 0.0
+
+    def _total_limit(self, attr_name: str) -> int:
+        """Значение абсолютного лимита с ``AdvSetting``; ``0`` — выключен."""
+        return getattr(self.adv, attr_name, 0) or 0
+
+    def _total_limit_active(self) -> bool:
+        """Задан ли хоть один абсолютный лимит в текущем режиме бюджета."""
+        if getattr(self.adv, "use_common_budget", False):
+            return self._total_limit("common_budget_total_limit") > 0
+        return (
+            self._total_limit("auto_budget_total_limit") > 0
+            or self._total_limit("search_auto_budget_total_limit") > 0
+        )
+
+    @staticmethod
+    def _total_limit_line(label: str, spend: float | None, limit: int) -> str:
+        """Строка «потрачено/лимит, остаток» для абсолютного лимита.
+
+        При недоступной статистике сообщаем, что РК остановлена: гейт абсолютного
+        лимита fail-closed и держит кампанию на паузе, пока расход неизвестен.
+        """
+        if limit <= 0:
+            return ""
+        if spend is None:
+            return f"{label}: расх н/д, лим {limit} р. — РК на паузе\n"
+        spend_rounded = int(round(spend))
+        remaining = max(0, limit - spend_rounded)
+        return f"{label}: {spend_rounded}/{limit} р., ост {remaining}\n"
+
+    def _total_limit_block(self) -> str:
+        """Блок абсолютных лимитов для меню РК по текущему режиму бюджета."""
+        if not self._total_limit_active():
+            return ""
+        if getattr(self.adv, "use_common_budget", False):
+            spend: float | None
+            if self._spend_auto_total is None or self._spend_search_total is None:
+                spend = None
+            else:
+                spend = self._spend_auto_total + self._spend_search_total
+            return self._total_limit_line(
+                "Об.абс", spend, self._total_limit("common_budget_total_limit")
+            )
+        block = self._total_limit_line(
+            "Авто абс",
+            self._spend_auto_total,
+            self._total_limit("auto_budget_total_limit"),
+        )
+        if self.adv.search_adv_id:
+            block += self._total_limit_line(
+                "Аук абс",
+                self._spend_search_total,
+                self._total_limit("search_auto_budget_total_limit"),
+            )
+        return block
 
     async def _resolve_ui_access(self) -> UiAccessMode:
         """Resolve effective freemium access for campaign menu rendering."""
@@ -512,6 +603,7 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
                 else:
                     if self._spend_auto_today is not None:
                         text += "\n"
+            text += self._total_limit_block()
 
         # Предупреждение о неудачном пополнении (из Redis) — показываем всегда при наличии записи
         if self._topup_failed:
