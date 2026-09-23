@@ -1,0 +1,66 @@
+tests/modules/shop_runner/service_manager/test_adv_settings_auto_update_v2_contract.py
+  s_f665c5202c4d51::t_2a4000d7ae7931 260-262,280
+  s_f665c5202c4d51::t_bae9fc2d69f174 243,251,283
+  s_f665c5202c4d51::t_b264f041d1ddec 7
+  s_f665c5202c4d51::t_4fd67a77ba6bb1 284
+alembic_/versions/d7e3c9f1a204_add_absolute_total_budget_limits.py
+  s_f665c5202c4d51::t_5436f85358395e 1-80
+app/client_bot/user_interface/handlers/campaign_activity.py
+  s_f665c5202c4d51::t_367c81879f1ca8 1-12,33-65,68-72,89,103,108-109,116,126,130,134-139,145,154,158,165,173,177-182,184,188,205,215,224
+app/client_bot/user_interface/services/adv_excel_roundtrip/schema.py
+  s_f665c5202c4d51::t_556956f620556c 86-88,271-273
+app/client_bot/user_interface/states.py
+  s_f665c5202c4d51::t_142fa8408645d8 108-110
+app/client_bot/user_interface/views/callbacks.py
+  s_f665c5202c4d51::t_6a2416b2f9665f 308-314,318
+app/client_bot/user_interface/views/keyboards.py
+  s_f665c5202c4d51::t_0daeb285740c6d 67-77,115-136,169,180,193
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py
+  s_f665c5202c4d51::t_968aa0c630ada7 177-179,439-440,443-528,606
+app/client_bot/user_interface/views/messages/messages.py
+  s_f665c5202c4d51::t_71092133c0b118 158-172,370-372,375,380-383,387-388,394-397,407-408,416,422,426-435,437-438,441,448-451,456-464,467,472-473
+app/modules/auto_budget_manager/service.py
+  s_f665c5202c4d51::t_bfb10e21c8653d 84-85,306-337,554-555,561-563,573,599-612,1039-1072
+app/modules/common_slaves/wildberries/models/models.py
+  s_f665c5202c4d51::t_71b68a31f2a3bc 728-749
+app/modules/shop_runner/service_manager/services/auto_adv_active_control/auto_adv_active_control_service.py
+  s_f665c5202c4d51::t_17d1556daf14f4 169-219,304,312,318,322,328,388-505,1087,1163-1196,1518,1560-1592
+app/modules/shop_runner/service_manager/services/redis_campaign_activity_reason_manager/enums.py
+  s_f665c5202c4d51::t_f31b2fb9a2a73d 26-32,56-62
+app/modules/shop_runner/service_manager/services/redis_campaign_activity_reason_manager/reason_display.py
+  s_f665c5202c4d51::t_31a5f5ad77d1b2 14-15,18-19,23-24,38-39
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py
+  s_f665c5202c4d51::t_96e842ff7cf0e6 566-590
+app/modules/shop_runner/wb_stat_manager/clickhouse_manager/full_wb_adv_stat.py
+  s_f665c5202c4d51::t_20a6da123a7b4c 260-299
+app/modules/shop_runner/wb_stat_manager/clickhouse_manager/sql/get_total_spend_by_advs.sql
+  s_f665c5202c4d51::t_c50201c8f298b9 1-24
+tests/app/modules/auto_budget_manager/test_service.py
+  s_f665c5202c4d51::t_f10df9cda0f215 97-99,729-963
+tests/app/modules/shop_runner/service_manager/test_auto_adv_active_control.py
+  s_f665c5202c4d51::t_f1500b5f2392c7 25,157-159,194-196,219-230,2215-2534
+tests/migrations/test_alembic_heads.py
+  s_f665c5202c4d51::t_dbe963eab2cca8 13
+tests/unit/client_bot/test_adv_excel_ui_parity.py
+  s_f665c5202c4d51::t_bd93bf294f2365 44-46
+tests/unit/client_bot/test_campaign_activity_total_limit.py
+  s_f665c5202c4d51::t_6c848ddeaf5134 1-189
+tests/unit/client_bot/test_common_budget_mode_toggle.py
+  s_f665c5202c4d51::t_3cce7b75a35744 10-12,14,16-18,35-37,39,45,58-60,96-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "01e29e36fa539e8bdf4307516af922e176c8a0d6",
+  "prompts": {},
+  "sessions": {
+    "s_f665c5202c4d51": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c86ba072-c0b5-454d-b143-535f2a6d6c93",
+        "model": "composer-2.5"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
