@@ -1,19 +1,16 @@
+"""User iterators for message sending and export scripts."""
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, AsyncIterator
 
 from sqlalchemy import select
-from sqlalchemy.orm import load_only, selectinload
+from sqlalchemy.orm import load_only
 
-from app.modules.billing.pricer import Pricer
-from app.modules.common_slaves.wildberries.models import (
-    AdvSetting,
-    WBUserCabinet,
-    WBCabinet,
-)
 from app.utils.db.models import User
 from app.utils.db.session_maker import get_async_session_maker as sm
 from scripts.get_users.get_users import get_users
+from scripts.users_communicate_module.test_user_cabinets import build_test_user_dto
 from scripts.users_csv_exporter.dto import UserDTO
 
 DEFAULT_USER_BATCH_SIZE = 30
@@ -21,42 +18,21 @@ DEFAULT_USER_BATCH_SIZE = 30
 # Список Telegram ID пользователей для тестовой рассылки.
 TEST_TELEGRAM_IDS: list[int] = [373435337]
 
-_USER_LOADING_OPTIONS = (
-    selectinload(User.wb_user_cabinets)
-    .load_only(WBUserCabinet.id, WBUserCabinet.name, WBUserCabinet.wb_cabinet_id)
-    .selectinload(WBUserCabinet.wb_cabinet)
-    .load_only(WBCabinet.id, WBCabinet.shop_id, WBCabinet.balance, WBCabinet.bonus)
-    .selectinload(WBCabinet.balance_payments),
-    selectinload(User.wb_user_cabinets)
-    .load_only(WBUserCabinet.id, WBUserCabinet.name, WBUserCabinet.wb_cabinet_id)
-    .selectinload(WBUserCabinet.wb_cabinet)
-    .load_only(WBCabinet.id, WBCabinet.shop_id, WBCabinet.balance, WBCabinet.bonus)
-    .selectinload(WBCabinet.bonus_payments),
-    selectinload(User.wb_user_cabinets)
-    .load_only(WBUserCabinet.id, WBUserCabinet.name, WBUserCabinet.wb_cabinet_id)
-    .selectinload(WBUserCabinet.wb_cabinet)
-    .load_only(WBCabinet.id, WBCabinet.shop_id, WBCabinet.balance, WBCabinet.bonus)
-    .selectinload(WBCabinet.adv_settings)
-    .load_only(AdvSetting.id, AdvSetting.bot_active, AdvSetting.nmids),
-)
-
-_pricer = Pricer()
-
 
 async def get_test_users_iterator() -> AsyncGenerator[UserDTO, None]:
-    """
-    Напрямую возвращает пользователей с Telegram ID из списка TEST_TELEGRAM_IDS.
-    Без использования get_users, get_test_users и прочих обёрток.
+    """Yield test users with lightweight mock cabinets.
+
+    Test mode loads only base user fields from the database and then attaches a
+    small deterministic set of transient cabinet/campaign models. This avoids
+    loading all real shops for heavy accounts and skips expensive tariff and
+    ClickHouse calculations.
     """
     if not TEST_TELEGRAM_IDS:
         return
 
     stmt = (
         select(User)
-        .options(
-            load_only(User.id, User.user_telegram_id, User.username),
-            *_USER_LOADING_OPTIONS,
-        )
+        .options(load_only(User.id, User.user_telegram_id, User.username))
         .where(User.user_telegram_id.in_(TEST_TELEGRAM_IDS))
         .order_by(User.id)
     )
@@ -66,12 +42,13 @@ async def get_test_users_iterator() -> AsyncGenerator[UserDTO, None]:
         users = result.unique().all()
 
     for user in users:
-        yield await UserDTO.from_user(user, _pricer, sm)
+        yield build_test_user_dto(user)
 
 
 async def get_users_iterator(
-    only_with_auto_campaign: bool = True,
     *,
+    only_with_auto_campaign: bool,
+    balance_more_than_0: bool,
     batch_size: int | None = None,
 ) -> AsyncIterator[UserDTO]:
     """Iterate users from DB in batches (``batch_size`` rows per query; default 30)."""
@@ -83,7 +60,7 @@ async def get_users_iterator(
     get_users_generator = get_users(
         batch_size=effective_batch,
         telegram_ids_filter=None,
-        only_with_auto_campaign=False,
-        balance_more_than_0=False,
+        only_with_auto_campaign=only_with_auto_campaign,
+        balance_more_than_0=balance_more_than_0,
     )
     return get_users_generator
