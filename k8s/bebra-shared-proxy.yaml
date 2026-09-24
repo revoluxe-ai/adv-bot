@@ -15,82 +15,18 @@ spec:
       labels:
         app: bebra-shared-proxy
     spec:
-      initContainers:
-        # Python json.dump avoids shell expansion of secret metacharacters (unquoted <<EOF).
-        - name: render-xray-config
-          image: python:3.12-alpine
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: SERVER
-              valueFrom:
-                secretKeyRef:
-                  name: bebra-proxy-params
-                  key: server
-            - name: SERVER_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: bebra-proxy-params
-                  key: server_port
-            - name: METHOD
-              valueFrom:
-                secretKeyRef:
-                  name: bebra-proxy-params
-                  key: method
-            - name: PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: bebra-proxy-params
-                  key: password
-          volumeMounts:
-            - name: xray-config
-              mountPath: /out
-          command:
-            - python3
-            - -c
-            - |
-              import json
-              import os
-
-              port_raw = os.environ["SERVER_PORT"].strip()
-              port = int(port_raw)
-
-              cfg = {
-                  "log": {"loglevel": "warning"},
-                  "inbounds": [
-                      {
-                          "port": 8080,
-                          "listen": "0.0.0.0",
-                          "protocol": "http",
-                          "settings": {},
-                      }
-                  ],
-                  "outbounds": [
-                      {
-                          "protocol": "shadowsocks",
-                          "settings": {
-                              "servers": [
-                                  {
-                                      "address": os.environ["SERVER"],
-                                      "port": port,
-                                      "method": os.environ["METHOD"],
-                                      "password": os.environ["PASSWORD"],
-                                  }
-                              ]
-                          },
-                      }
-                  ],
-              }
-              with open("/out/config.json", "w", encoding="utf-8") as f:
-                  json.dump(cfg, f, indent=2)
-                  f.write("\n")
       volumes:
         - name: xray-config
-          emptyDir: {}
+          configMap:
+            name: bebra-shared-proxy-config
+            items:
+              - key: config.json
+                path: config.json
       containers:
         - name: xray-proxy
-          image: teddysun/xray:latest
+          image: ghcr.io/xtls/xray-core:latest
           imagePullPolicy: IfNotPresent
-          command: ["/usr/bin/xray", "run", "-c", "/etc/xray/config.json"]
+          args: ["run", "-c", "/etc/xray/config.json"]
           volumeMounts:
             - name: xray-config
               mountPath: /etc/xray
