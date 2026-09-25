@@ -38,7 +38,7 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| `alembic_version` (prod) | `c4f8a1b2d3e4` |
+| `alembic_version` (prod) | `d7e3c9f1a204` |
 | Expand columns | shelf-exhausted pause SoT + `card_ab_hold_*` + `advsetting.auto_update_minus_phrases` (**NOT NULL**; backfill DONE 2026-08-28) + `raise_plan_on_promobonuses` + promo allocation/spend journals |
 | APPLICATION baseline | `baseline-adv-updater-20260731-post-cutover-app` / `RECONCILED` |
 | APPLICATION `source_history_hash` | `interim-forensics-20260731T093353Z` |
@@ -49,14 +49,14 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 
 | Field | Value |
 |-------|--------|
-| Image tag | `82c3d36b2d38192c8f859bb9abf85a45939430ff` |
-| Platform digest | `sha256:4b9a9e14acdb350f8d284b857eb0e1cbb0467bb560cc2b46799c0ea34ae4b2dd` (digest_pin) |
-| GHCR | `ghcr.io/revoluxe-ai/adv-bot:82c3d36b2d38192c8f859bb9abf85a45939430ff` |
-| App Deployments on this image | **all entrypoints on `82c3d36b2…`** (fix raise CPO on promo — chunked UPD backfill); `free-bot` replicas=0 |
-| Last CONTROL | `app-db-control-82c3d36-r1` → `ACQUIRED` (fencing_token=6; CONTROL_DRY_RUN=0) |
-| Last migrate Job | `app-db-migrate-82c3d36-r1` → `SUCCESS_NOOP` (schema already `c4f8a1b2d3e4`) |
-| Last complete_release | `app-db-ctrlplane-82c3d36-r1-complete` → OK lease released |
-| Prepared fallback (prior LKG) | tag `70106ad3838fc998f168453ce594938051001e12` / digest `sha256:aa29e42e80096e8899db5d3c9fdf6387523eb7bc7d8688105e2613b53391aab0` |
+| Image tag | `4d5fae43576d290ca8324424b29772ce0eb1a5f5` |
+| Platform digest | `sha256:51a966e5434421b7c858169cdb44521afe1bf485e82d24ead7ec55e3d317da28` (digest_pin) |
+| GHCR | `ghcr.io/revoluxe-ai/adv-bot:4d5fae43576d290ca8324424b29772ce0eb1a5f5` |
+| App Deployments on this image | **all entrypoints on `4d5fae43…`**; `free-bot` replicas=0 |
+| Last CONTROL | `app-db-control-4d5fae43-r1` → `ACQUIRED` (fencing_token=10; CONTROL_DRY_RUN=0) |
+| Last migrate Job | `app-db-migrate-4d5fae43-r1` → `SUCCESS_NOOP` (`d7e3c9f1a204` @ target) |
+| Last complete_release | `app-db-ctrlplane-4d5fae43-r1-complete` → OK lease released |
+| Prepared fallback (prior LKG) | tag `01e29e36fa539e8bdf4307516af922e176c8a0d6` / digest `sha256:f33349f2c163727b356ae3039ef5f2c73dfa08cde67758260cd5f77b1335b207` |
 
 ## Open risks / follow-ups
 
@@ -105,3 +105,5 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | 2026-09-05 | GO safe_prod_release `dd061bf0…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=4 → mark_started → migrate SUCCESS_NOOP `0b0fe…` → mark_noop → begin → CAS all entrypoints → complete_release OK; LKG `dd061bf0…` (WB token rotation) |
 | 2026-09-09 | GO safe_prod_release `70106ad38…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=5 → mark_started → migrate SUCCESS `c4f8a1…` → mark_succeeded → begin → phased CAS W1–W5 → complete_release OK; LKG `70106ad38…` (token add relax + promobonus) |
 | 2026-09-10 | GO safe_prod_release `82c3d36b2…` CONTROL_DRY_RUN=0 | CONTROL ACQUIRED token=6 → mark_started → migrate SUCCESS_NOOP `c4f8a1…` → mark_noop → begin → phased CAS W1–W5 → complete_release OK; LKG `82c3d36b2…` (fix raise CPO on promo) |
+| 2026-09-24 | GO safe_prod_release `01e29e36…` CONTROL_DRY_RUN=0 phased shop_runner_last | CONTROL ACQUIRED token=9 → mark_started → migrate SUCCESS `d7e3c9…` → mark_succeeded → begin → phased CAS W1–W7 → complete_release OK; LKG `01e29e36…` (absolute total budget limits) |
+| 2026-09-25 | GO safe_prod_release `4d5fae43…` CONTROL_DRY_RUN=0 phased shop_runner_last | CONTROL ACQUIRED token=10 → mark_started → migrate SUCCESS_NOOP `d7e3c9…` → mark_noop → begin → phased CAS W1–W7 → complete_release OK; LKG `4d5fae43…` (stage @ 4d5fae43) |
