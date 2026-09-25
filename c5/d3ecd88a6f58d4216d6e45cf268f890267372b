@@ -1,0 +1,21 @@
+tests/modules/modules/token_monitoring/test_token_monitoring.py
+  s_7de941d78e4888::t_bbd3ba6c0ebaac 9,14-35,342-396
+tests/modules/token_monitoring/test_improved_token_status.py
+  s_7de941d78e4888::t_a75cb20e822a95 66-69,106-155,329,375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "c5d3ecd88a6f58d4216d6e45cf268f890267372b",
+  "prompts": {},
+  "sessions": {
+    "s_7de941d78e4888": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ed429999-498a-4ac7-8a2e-68e58e4defaf",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
