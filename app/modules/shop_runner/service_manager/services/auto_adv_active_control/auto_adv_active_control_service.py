@@ -166,6 +166,57 @@ class WbWalletOkCache:
             return lock
 
 
+@dataclass
+class TotalSpendCache:
+    """Per-``ensure_campaigns_active`` run: cache all-time spend per campaign.
+
+    Абсолютный лимит проверяется в обоих handler'ах одной РК (Auto и Search), а
+    в режиме общего бюджета — по сумме расхода обеих ног. Без кэша запрос по
+    всей истории кампании уходил бы в ClickHouse дважды за тик. Per-``adv_id``
+    локи с double-checked loading — как в ``WbWalletOkCache``: между проверкой
+    членства и запросом есть ``await``.
+    """
+
+    spend_by_adv: dict[int, float] = field(default_factory=dict[int, float])
+    _locks_by_adv: dict[int, asyncio.Lock] = field(
+        default_factory=dict[int, asyncio.Lock]
+    )
+    _locks_meta: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+    async def lock_for(self, adv_id: int) -> asyncio.Lock:
+        async with self._locks_meta:
+            lock = self._locks_by_adv.get(adv_id)
+            if lock is None:
+                lock = asyncio.Lock()
+                self._locks_by_adv[adv_id] = lock
+            return lock
+
+
+@dataclass(frozen=True, slots=True)
+class TotalLimitState:
+    """Абсолютный (lifetime) лимит ноги РК и её расход за всю историю.
+
+    ``spend is None`` — расход получить не удалось (ошибка ClickHouse). Гейт
+    **fail-closed**: при заданном лимите неизвестный расход означает паузу, а не
+    «проверку пропустили». Иначе кампания, уже остановленная по исчерпанному
+    абсолютному лимиту, была бы снова запущена обычной ветки старта на первом же
+    тике с недоступной статистикой.
+    """
+
+    limit: int
+    spend: float | None
+
+    @property
+    def spend_unknown(self) -> bool:
+        """Расход за всю историю неизвестен (сбой источника статистики)."""
+        return self.spend is None
+
+    @property
+    def must_pause(self) -> bool:
+        """Нужно держать кампанию на паузе: лимит исчерпан либо расход неизвестен."""
+        return self.spend is None or self.limit <= self.spend
+
+
 class AutoAdvActiveControlService:
     """Управление активностью РК: пауза/запуск по бюджету и расписанию (paid ACT).
 
@@ -250,6 +301,7 @@ class AutoAdvActiveControlService:
             )
 
         wb_wallet_cache = WbWalletOkCache()
+        total_spend_cache = TotalSpendCache()
         for adv in latch_advs:
             handlers.append(
                 lambda complex_adv=adv: self._emergency_latch_force_pause(complex_adv)
@@ -257,21 +309,23 @@ class AutoAdvActiveControlService:
         for adv in complex_advs:
             db_state = time_settings_by_adv[adv.adv_setting.id]
             handlers.append(
-                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_cache: self._auto_campaign_handler(
+                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_cache, total_cache=total_spend_cache: self._auto_campaign_handler(
                     complex_adv,
                     start_of_day,
                     end_of_day,
                     db_state=ds,
                     wb_wallet_cache=cache,
+                    total_spend_cache=total_cache,
                 )
             )
             handlers.append(
-                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_cache: self._search_campaign_handler(
+                lambda complex_adv=adv, ds=db_state, cache=wb_wallet_cache, total_cache=total_spend_cache: self._search_campaign_handler(
                     complex_adv,
                     start_of_day,
                     end_of_day,
                     db_state=ds,
                     wb_wallet_cache=cache,
+                    total_spend_cache=total_cache,
                 )
             )
 
@@ -329,6 +383,124 @@ class AutoAdvActiveControlService:
             [adv_id],
             start_date,
             end_date,
+        )
+
+    @staticmethod
+    async def _get_total_spend_for_adv(
+        adv_id: int | None,
+        total_spend_cache: TotalSpendCache,
+    ) -> float:
+        """Расход кампании за всю историю, один ClickHouse-запрос на тик.
+
+        Args:
+            adv_id: ID кампании; ``None`` (нога не подключена) — 0.0.
+            total_spend_cache: кэш на один прогон ``ensure_campaigns_active``.
+        """
+        if adv_id is None:
+            return 0.0
+        cache = total_spend_cache.spend_by_adv
+        if adv_id in cache:
+            return cache[adv_id]
+
+        lock = await total_spend_cache.lock_for(adv_id)
+        async with lock:
+            if adv_id in cache:
+                return cache[adv_id]
+            spend = await full_wb_adv_stat.get_total_spend_by_advs([adv_id])
+            cache[adv_id] = spend
+            return spend
+
+    async def _total_limit_state(
+        self,
+        adv: ComplexAdv,
+        *,
+        leg: Literal["auto", "search"],
+        total_spend_cache: TotalSpendCache,
+    ) -> TotalLimitState | None:
+        """Абсолютный лимит и all-time расход для ноги РК.
+
+        Ветвление такое же, как у суточного лимита: при ``use_common_budget``
+        действует общий лимит против суммы расхода обеих ног, иначе — лимит
+        ноги против расхода только этой кампании.
+
+        Побочные эффекты: чтение ClickHouse (``full_adv_wb_stat``) через
+        ``total_spend_cache``.
+
+        Returns:
+            ``None``, если абсолютный лимит отключён (``0``) — гейт неактивен.
+            Иначе ``TotalLimitState`` с расходом либо с ``spend=None``, если
+            ClickHouse недоступен: это **не** «проверку пропустили», а
+            fail-closed пауза (см. ``TotalLimitState``).
+        """
+        if adv.use_common_budget:
+            limit = getattr(adv, "common_budget_total_limit", 0) or 0
+        elif leg == "auto":
+            limit = getattr(adv, "auto_budget_total_limit", 0) or 0
+        else:
+            limit = getattr(adv, "search_auto_budget_total_limit", 0) or 0
+        if limit <= 0:
+            return None
+
+        try:
+            if adv.use_common_budget:
+                spend_auto = await self._get_total_spend_for_adv(
+                    adv.auto_adv_id, total_spend_cache
+                )
+                spend_search = await self._get_total_spend_for_adv(
+                    adv.search_adv_id, total_spend_cache
+                )
+                spend = spend_auto + spend_search
+            elif leg == "auto":
+                spend = await self._get_total_spend_for_adv(
+                    adv.auto_adv_id, total_spend_cache
+                )
+            else:
+                spend = await self._get_total_spend_for_adv(
+                    adv.search_adv_id, total_spend_cache
+                )
+        except Exception:
+            logger.exception(
+                "Auto budget watcher: абсолютный расход РК не получен "
+                "adv_setting_id=%s shop_id=%s — fail-closed пауза (лимит %s задан)",
+                adv.adv_setting.id,
+                adv.shop_id,
+                limit,
+            )
+            return TotalLimitState(limit=limit, spend=None)
+        return TotalLimitState(limit=limit, spend=spend)
+
+    @staticmethod
+    def _auto_total_reason(
+        adv: ComplexAdv, state: TotalLimitState
+    ) -> AutoReasonCode:
+        """Reason-код Auto-ноги для паузы по абсолютному лимиту."""
+        if state.spend_unknown:
+            return (
+                AutoReasonCode.COMMON_TOTAL_UNKNOWN
+                if adv.use_common_budget
+                else AutoReasonCode.AUTO_TOTAL_UNKNOWN
+            )
+        return (
+            AutoReasonCode.COMMON_TOTAL_EXCEEDED
+            if adv.use_common_budget
+            else AutoReasonCode.AUTO_TOTAL_EXCEEDED
+        )
+
+    @staticmethod
+    def _search_total_reason(
+        adv: ComplexAdv, state: TotalLimitState
+    ) -> AuctionReasonCode:
+        """Reason-код Search-ноги для паузы по абсолютному лимиту."""
+        if state.spend_unknown:
+            return (
+                AuctionReasonCode.COMMON_TOTAL_UNKNOWN
+                if adv.use_common_budget
+                else AuctionReasonCode.SEARCH_TOTAL_UNKNOWN
+            )
+        return (
+            AuctionReasonCode.COMMON_TOTAL_EXCEEDED
+            if adv.use_common_budget
+            else AuctionReasonCode.SEARCH_TOTAL_EXCEEDED
         )
 
     async def _maybe_pause_for_empty_keywords_intent(
@@ -912,6 +1084,7 @@ class AutoAdvActiveControlService:
         *,
         db_state: TimeSettingsDbState | None,
         wb_wallet_cache: WbWalletOkCache,
+        total_spend_cache: TotalSpendCache,
     ) -> None:
         """Контроль Auto: budget/cost + terminal shelf-exhausted pause.
 
@@ -987,6 +1160,40 @@ class AutoAdvActiveControlService:
                 AutoReasonCode.REC_SYSTEM_MODE_OFF,
             )
             return None
+
+        # Абсолютный (lifetime) лимит расхода РК проверяется до суточного:
+        # исчерпание терминально, смена суток его не снимает. При недоступной
+        # статистике гейт fail-closed — иначе обычная ветка старта ниже снова
+        # запустила бы уже остановленную кампанию.
+        total_state = await self._total_limit_state(
+            adv, leg="auto", total_spend_cache=total_spend_cache
+        )
+        if total_state is not None and total_state.must_pause:
+            total_reason = self._auto_total_reason(adv, total_state)
+            if auto_status == WBAdvActiveStatus.STARTED:
+                if total_state.spend_unknown:
+                    logger.warning(
+                        "Auto budget watcher: pausing auto campaign (total spend unknown, total limit %s) adv_id=%s shop_id=%s",
+                        total_state.limit,
+                        auto_adv_id,
+                        adv.shop_id,
+                    )
+                else:
+                    logger.info(
+                        "Auto budget watcher: pausing auto campaign (total spend %.2f >= total limit %s) adv_id=%s shop_id=%s",
+                        total_state.spend,
+                        total_state.limit,
+                        auto_adv_id,
+                        adv.shop_id,
+                    )
+                await self._wb_modifier.pause_auto_campaign(adv)
+            await self._set_auto_reason(
+                auto_adv_id,
+                CampaignActivityCommand.PAUSE,
+                total_reason,
+            )
+            return None
+
         if adv.use_common_budget:
             common_limit = adv.common_budget_daily_limit or 0
             spend_auto = await self._get_spend_for_adv(
@@ -1308,6 +1515,7 @@ class AutoAdvActiveControlService:
         *,
         db_state: TimeSettingsDbState | None,
         wb_wallet_cache: WbWalletOkCache,
+        total_spend_cache: TotalSpendCache,
     ) -> None:
         adv_id = adv.search_adv_id
         if adv_id is None:
@@ -1346,6 +1554,39 @@ class AutoAdvActiveControlService:
                 adv_id,
                 CampaignActivityCommand.PAUSE,
                 AuctionReasonCode.INSUFFICIENT_BALANCE,
+            )
+            return None
+
+        # Абсолютный (lifetime) лимит расхода РК проверяется до суточного:
+        # исчерпание терминально, смена суток его не снимает. При недоступной
+        # статистике гейт fail-closed — иначе обычная ветка старта ниже снова
+        # запустила бы уже остановленную кампанию.
+        total_state = await self._total_limit_state(
+            adv, leg="search", total_spend_cache=total_spend_cache
+        )
+        if total_state is not None and total_state.must_pause:
+            total_reason = self._search_total_reason(adv, total_state)
+            if search_status == WBAdvActiveStatus.STARTED:
+                if total_state.spend_unknown:
+                    logger.warning(
+                        "Auto budget watcher: pausing auction campaign (total spend unknown, total limit %s) adv_id=%s shop_id=%s",
+                        total_state.limit,
+                        adv_id,
+                        adv.shop_id,
+                    )
+                else:
+                    logger.info(
+                        "Auto budget watcher: pausing auction campaign (total spend %.2f >= total limit %s) adv_id=%s shop_id=%s",
+                        total_state.spend,
+                        total_state.limit,
+                        adv_id,
+                        adv.shop_id,
+                    )
+                await self._wb_modifier.pause_auction_campaign(adv)
+            await self._set_search_reason(
+                adv_id,
+                CampaignActivityCommand.PAUSE,
+                total_reason,
             )
             return None
 

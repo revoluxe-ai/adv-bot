@@ -155,6 +155,21 @@ def _campaign_type_display(campaign_type: AdvType | None) -> str:
     raise ValueError("Неверный тип кампании")
 
 
+def _limit_units(scope: str) -> str:
+    """Единицы лимита: суточный — руб/сутки, абсолютный — руб за всё время."""
+    return "руб всего" if scope == "total" else "руб/сутки"
+
+
+def _limit_scope_display(scope: str) -> str:
+    """Название вида лимита для текста сообщения."""
+    return "абсолютный лимит" if scope == "total" else "лимит"
+
+
+def _total_limit_display(limit: int) -> str:
+    """Строка абсолютного лимита в сводке меню; ``0`` — выключено."""
+    return f"{limit} руб всего" if limit > 0 else "выключено"
+
+
 # def reverse_date(date_str: str) -> str:
 #     parts = date_str.split("-")
 #     if len(parts) == 3:
@@ -352,20 +367,34 @@ class CampaignActivityMenu(TextWithKeyboard):
         use_common = getattr(self._adv_setting, "use_common_budget", False)
         if use_common:
             common_limit = self._adv_setting.common_budget_daily_limit or 0
+            common_total = (
+                getattr(self._adv_setting, "common_budget_total_limit", 0) or 0
+            )
             limits_block = (
                 f"• Общий бюджет на обе РК: {common_limit} руб/сутки\n"
+                f"• Абс. лимит на обе РК: {_total_limit_display(common_total)}\n"
             )
         else:
             auto_limit = self._adv_setting.auto_budget_daily_limit or 0
             search_limit = self._adv_setting.search_auto_budget_daily_limit or 0
+            auto_total = getattr(self._adv_setting, "auto_budget_total_limit", 0) or 0
+            search_total = (
+                getattr(self._adv_setting, "search_auto_budget_total_limit", 0) or 0
+            )
             limits_block = (
                 f"• Аукцион: {search_limit} руб/сутки {'(выключено)' if search_limit <= 0 else ''}\n"
                 f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
+                f"• Абс. лимит Аукцион: {_total_limit_display(search_total)}\n"
+                f"• Абс. лимит Авто: {_total_limit_display(auto_total)}\n"
             )
         return (
             f"Управление активностью РК «{self._adv_setting.name}»\n"
             f"{limits_block}"
             f"• Контроль запуска кампаний и пополнения бюджета: {watchdog_status}\n"
+            "Абс. лимит — суммарный расход за всё время; при исчерпании РК "
+            "ставится на паузу и не пополняется.\n"
+            "Если абс. лимит задан, а статистика расхода временно недоступна, "
+            "РК тоже остаётся на паузе — пока расход не подтверждён.\n"
             "Выберите, какую активность хотите скорректировать:"
         )
 
@@ -375,6 +404,8 @@ class CampaignActivityMenu(TextWithKeyboard):
 
 
 class CampaignActivityTargetMenu(TextWithKeyboard):
+    """Экран одного лимита: суточного (``scope="daily"``) или абсолютного."""
+
     def __init__(
         self,
         bot: Bot,
@@ -382,38 +413,64 @@ class CampaignActivityTargetMenu(TextWithKeyboard):
         adv_setting: AdvSetting,
         campaign_type: AdvType | None,
         current_limit: int,
+        scope: str = "daily",
     ):
         super().__init__(bot, chat_id)
         self._adv_setting = adv_setting
         self._campaign_type = campaign_type
         self._current_limit = current_limit
+        self._scope = scope
 
     @property
     def text(self) -> str:
-        limit_str = f"{self._current_limit} руб/сутки" if self._current_limit > 0 else "выключено"
+        if self._current_limit > 0:
+            limit_str = f"{self._current_limit} {_limit_units(self._scope)}"
+        else:
+            limit_str = "выключено"
+        note = ""
+        if self._scope == "total" and self._current_limit > 0:
+            note = (
+                "Пока лимит включён, РК остаётся на паузе не только при его "
+                "исчерпании, но и когда статистика расхода недоступна.\n"
+            )
         return (
-            f"Настройка лимита для {_campaign_type_display(self._campaign_type)} "
+            f"Настройка {_limit_scope_display(self._scope)} для "
+            f"{_campaign_type_display(self._campaign_type)} "
             f"РК «{self._adv_setting.name}»\n"
             f"Текущий лимит: {limit_str}\n"
+            f"{note}"
             "Выберите действие:"
         )
 
     @property
     def keyboard(self) -> InlineKeyboardMarkup:
         return keyboards.get_campaign_activity_target_keyboard(
-            self._adv_setting, self._campaign_type, self._current_limit
+            self._adv_setting,
+            self._campaign_type,
+            self._current_limit,
+            self._scope,
         )
 
 
 class CampaignActivityChangeLimit(Text):
-    def __init__(self, bot: Bot, chat_id: int, campaign_type: AdvType | None):
+    """Запрос нового значения лимита (суточного или абсолютного)."""
+
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        campaign_type: AdvType | None,
+        scope: str = "daily",
+    ):
         super().__init__(bot, chat_id)
         self._campaign_type = campaign_type
+        self._scope = scope
 
     @property
     def text(self) -> str:
         return (
-            f"Введите новый лимит для {_campaign_type_display(self._campaign_type)} "
+            f"Введите новый {_limit_scope_display(self._scope)} для "
+            f"{_campaign_type_display(self._campaign_type)} "
             "в рублях (целое положительное число):"
         )
 

@@ -257,6 +257,46 @@ async def get_spend_by_last_days(
         raise
 
 
+async def get_total_spend_by_advs(adv_ids: list[int]) -> float:
+    """Суммарный расход кампаний за всю историю (абсолютный/lifetime spend).
+
+    В отличие от ``get_spend_by_last_days`` период не ограничивается: берутся
+    все дни, что есть в ``default_db.full_adv_wb_stat``. Используется гейтом
+    абсолютного лимита бюджета РК.
+
+    Args:
+        adv_ids: ID кампаний (Авто и/или Аукцион); пустой список — 0.0.
+
+    Returns:
+        Суммарный расход в рублях.
+
+    Raises:
+        Exception: пробрасывает ошибки ClickHouse после логирования; вызывающий
+            код решает, трактовать это как fail-open или нет.
+    """
+    if not adv_ids:
+        return 0.0
+
+    query = _load_sql_query("get_total_spend_by_advs")
+
+    try:
+        async with anti_ch_crash_semaphore:
+            async with get_clickhouse_client() as client:
+                res = await client.query(
+                    query,
+                    parameters={"adv_ids": adv_ids},
+                )
+                result = res.first_item
+                total_spend = result["total_spend"] if result else 0.0
+                return float(total_spend or 0.0)
+    except Exception:
+        logger.error(
+            "Ошибка получения суммарных затрат за всю историю из ClickHouse",
+            exc_info=True,
+        )
+        raise
+
+
 async def get_additional_cost_per_order_for_adv(
     adv_id: int, days: int = 7
 ) -> float | None:

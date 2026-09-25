@@ -4,7 +4,7 @@ Call chain (``CoroutinesManager.adv_settings_auto_update`` → ``process_adv_v3`
 
 1. ``settings.AUTO_SETTING_ACTIVE`` gate
 2. ``WBShopDataManager.get_complex_advs(load_extras=False)``
-3. Filters: ``bot_active``, ``is_part_auto_setting_active``, ``search_adv_active_status``
+3. Filters: ``bot_active``, ``is_part_auto_setting_active`` (search pause не отсекает v3-тик)
 4. A/B Hold pipeline (``process_ab_setup`` / ``process_ab_hold``) + ordinary ``process_adv_v3``
 5. ``run_tasks`` per handler
 """
@@ -240,7 +240,7 @@ async def test_adv_settings_auto_update_filters_when_part_auto_setting_inactive(
 
 
 @pytest.mark.asyncio
-async def test_adv_settings_auto_update_filters_when_search_adv_not_started(
+async def test_adv_settings_auto_update_still_runs_v3_when_search_paused(
     monkeypatch,
     access_mock,
     adv_setting_mock,
@@ -248,6 +248,7 @@ async def test_adv_settings_auto_update_filters_when_search_adv_not_started(
     client_session_mock,
     fake_redis,
 ):
+    """Paused search не блокирует v3: plan/fact и keyword state обновляются до resume."""
     monkeypatch.setenv("AUTO_SETTING_ACTIVE", "true")
     access_mock.shop_id = "shop-contract"
     _configure_adv_for_v2_pipeline(adv_setting_mock)
@@ -255,6 +256,9 @@ async def test_adv_settings_auto_update_filters_when_search_adv_not_started(
     search = _search_adv_started()
     search.active_status = "paused"
     adv = _make_complex_adv(wb_api, adv_setting_mock, keywords_mocks, search_adv=search)
+
+    async def _mget_entries(_shop_id: str, adv_ids: list[int]):
+        return [(adv_ids[0], None, "miss", None)]
 
     with (
         patch(
@@ -273,10 +277,11 @@ async def test_adv_settings_auto_update_filters_when_search_adv_not_started(
             plan_fact_reader=MagicMock(spec=PlanFactReader),
             wb_manager_hub=MagicMock(),
         )
-        manager._redis_stats_freshness_cache.mget_entries = AsyncMock()
+        manager._redis_stats_freshness_cache.mget_entries = AsyncMock(side_effect=_mget_entries)
         await manager.adv_settings_auto_update.__wrapped__(manager)
 
-    run_tasks_mock.assert_not_called()
+    run_tasks_mock.assert_called_once()
+    assert run_tasks_mock.call_args.kwargs["return_exceptions"] is False
 
 
 @pytest.mark.asyncio

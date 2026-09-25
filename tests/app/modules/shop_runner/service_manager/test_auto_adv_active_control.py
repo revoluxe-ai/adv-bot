@@ -22,6 +22,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
     PlanFactSummary,
 )
 from app.modules.shop_runner.service_manager.services.redis_campaign_activity_reason_manager import (
+    AuctionReasonCode,
     AutoReasonCode,
     CampaignActivityCommand,
 )
@@ -153,6 +154,9 @@ class _FakeComplexAdv:
         watchdog_enabled: bool = True,
         use_common_budget: bool = False,
         common_budget_daily_limit: int | None = None,
+        auto_budget_total_limit: int = 0,
+        search_auto_budget_total_limit: int = 0,
+        common_budget_total_limit: int = 0,
         plan_for_sales_for_day: Any = None,
         target_price_for_order: Any = None,
         max_price_for_order: Any = None,
@@ -187,6 +191,9 @@ class _FakeComplexAdv:
         self.search_adv_active_status_str = WBAdvActiveStatus(search_status)
         self._use_common_budget = use_common_budget
         self._common_budget_daily_limit = common_budget_daily_limit
+        self._auto_budget_total_limit = auto_budget_total_limit
+        self._search_auto_budget_total_limit = search_auto_budget_total_limit
+        self._common_budget_total_limit = common_budget_total_limit
         self.auto_adv_bid_control_enable = auto_adv_bid_control_enable
 
     @property
@@ -208,6 +215,18 @@ class _FakeComplexAdv:
     @property
     def common_budget_daily_limit(self) -> int | None:
         return self._common_budget_daily_limit
+
+    @property
+    def auto_budget_total_limit(self) -> int:
+        return self._auto_budget_total_limit
+
+    @property
+    def search_auto_budget_total_limit(self) -> int:
+        return self._search_auto_budget_total_limit
+
+    @property
+    def common_budget_total_limit(self) -> int:
+        return self._common_budget_total_limit
 
     @property
     def rec_system_promotion_mode_active(self) -> bool:
@@ -2193,3 +2212,323 @@ async def test_average_order_cost_uses_additional_views():
     stats_mock.assert_awaited_once()
     spend_mock.assert_awaited_once()
     views_orders_mock.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Абсолютный (lifetime) лимит расхода РК
+# ---------------------------------------------------------------------------
+
+
+def _total_limit_service() -> tuple[AutoAdvActiveControlService, MagicMock]:
+    """Сервис с замоканным WBModifier для проверок абсолютного лимита."""
+    wb_modifier = MagicMock()
+    wb_modifier.start_auto_campaign = AsyncMock()
+    wb_modifier.pause_auto_campaign = AsyncMock()
+    wb_modifier.start_auction_campaign = AsyncMock()
+    wb_modifier.pause_auction_campaign = AsyncMock()
+
+    plan_fact_reader = MagicMock(spec=PlanFactReader)
+    plan_fact_reader.get_latest_plan_fact = AsyncMock(return_value=None)
+    service = AutoAdvActiveControlService(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+    return service, wb_modifier
+
+
+async def _run_with_total_spend(
+    service: AutoAdvActiveControlService,
+    adv: _FakeComplexAdv,
+    *,
+    daily_spend: float,
+    total_spend_by_adv: dict[int, float] | Exception,
+) -> tuple[AsyncMock, AsyncMock]:
+    """Прогнать ensure_campaigns_active с подменой суточного и all-time расхода.
+
+    Returns:
+        Моки ``_set_auto_reason`` и ``_set_search_reason`` для проверки причин.
+    """
+
+    async def mock_daily_spend(*args, **kwargs) -> float:
+        return daily_spend
+
+    async def mock_total_spend(adv_ids: list[int]) -> float:
+        if isinstance(total_spend_by_adv, Exception):
+            raise total_spend_by_adv
+        return sum(total_spend_by_adv.get(adv_id, 0.0) for adv_id in adv_ids)
+
+    auto_reason_mock = AsyncMock()
+    search_reason_mock = AsyncMock()
+    mock_ts_repo = MagicMock()
+    mock_ts_repo.load_for_adv_ids = AsyncMock(
+        side_effect=_mock_load_time_settings_for_adv_ids
+    )
+    with patch(
+        f"{_SERVICE_MODULE}.run_tasks",
+        new=_run_tasks_for_tests,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._get_spend_for_adv",
+        new=AsyncMock(side_effect=mock_daily_spend),
+    ), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_total_spend_by_advs",
+        new=AsyncMock(side_effect=mock_total_spend),
+    ), patch(
+        f"{_SERVICE_MODULE}.full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._set_auto_reason",
+        new=auto_reason_mock,
+    ), patch(
+        f"{_SERVICE_MODULE}.AutoAdvActiveControlService._set_search_reason",
+        new=search_reason_mock,
+    ), patch(f"{_SERVICE_MODULE}._time_settings_repo", mock_ts_repo):
+        await service.ensure_campaigns_active([adv])
+
+    return auto_reason_mock, search_reason_mock
+
+
+@pytest.mark.asyncio
+async def test_total_limit_pauses_both_legs_in_separate_mode():
+    """Раздельный режим: каждая нога паузится по своему абсолютному лимиту."""
+    adv = _FakeComplexAdv(
+        auto_limit=100_000,
+        auto_status="started",
+        search_limit=100_000,
+        search_status="started",
+        auto_adv_id=21,
+        search_adv_id=22,
+        auto_budget_total_limit=500,
+        search_auto_budget_total_limit=500,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        total_spend_by_adv={21: 600.0, 22: 700.0},
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.start_auction_campaign.assert_not_called()
+    assert auto_reason.await_args[0][2] == AutoReasonCode.AUTO_TOTAL_EXCEEDED
+    assert search_reason.await_args[0][2] == AuctionReasonCode.SEARCH_TOTAL_EXCEEDED
+
+
+@pytest.mark.asyncio
+async def test_total_limit_pauses_both_legs_in_common_mode():
+    """Общий бюджет: паузим обе ноги по сумме all-time расхода."""
+    adv = _FakeComplexAdv(
+        auto_limit=0,
+        auto_status="started",
+        search_limit=0,
+        search_status="started",
+        auto_adv_id=31,
+        search_adv_id=32,
+        use_common_budget=True,
+        common_budget_daily_limit=100_000,
+        common_budget_total_limit=500,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        # 300 + 300 = 600 >= 500, хотя по отдельности каждая нога под лимитом
+        total_spend_by_adv={31: 300.0, 32: 300.0},
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv)
+    assert auto_reason.await_args[0][2] == AutoReasonCode.COMMON_TOTAL_EXCEEDED
+    assert search_reason.await_args[0][2] == AuctionReasonCode.COMMON_TOTAL_EXCEEDED
+
+
+@pytest.mark.asyncio
+async def test_total_limit_zero_does_not_pause():
+    """Лимит 0 = выключено: абсолютный гейт не трогает кампании."""
+    adv = _FakeComplexAdv(
+        auto_limit=100_000,
+        auto_status="started",
+        search_limit=100_000,
+        search_status="started",
+        auto_adv_id=41,
+        search_adv_id=42,
+        auto_budget_total_limit=0,
+        search_auto_budget_total_limit=0,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        total_spend_by_adv={41: 1_000_000.0, 42: 1_000_000.0},
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.pause_auction_campaign.assert_not_called()
+    auto_codes = [call.args[2] for call in auto_reason.await_args_list]
+    search_codes = [call.args[2] for call in search_reason.await_args_list]
+    assert AutoReasonCode.AUTO_TOTAL_EXCEEDED not in auto_codes
+    assert AuctionReasonCode.SEARCH_TOTAL_EXCEEDED not in search_codes
+
+
+@pytest.mark.asyncio
+async def test_total_limit_takes_precedence_over_daily_limit():
+    """Абсолютный лимит терминален: причина перекрывает суточный гейт."""
+    adv = _FakeComplexAdv(
+        auto_limit=1,
+        auto_status="started",
+        search_limit=1,
+        search_status="started",
+        auto_adv_id=51,
+        search_adv_id=52,
+        auto_budget_total_limit=500,
+        search_auto_budget_total_limit=500,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        # суточный лимит тоже исчерпан, но абсолютный проверяется раньше
+        daily_spend=5_000.0,
+        total_spend_by_adv={51: 600.0, 52: 600.0},
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv)
+    assert auto_reason.await_args[0][2] == AutoReasonCode.AUTO_TOTAL_EXCEEDED
+    assert search_reason.await_args[0][2] == AuctionReasonCode.SEARCH_TOTAL_EXCEEDED
+
+
+@pytest.mark.asyncio
+async def test_total_limit_pauses_when_spend_unknown_in_separate_mode():
+    """Ошибка ClickHouse при заданном лимите — fail-closed пауза, не пропуск гейта."""
+    adv = _FakeComplexAdv(
+        auto_limit=100_000,
+        auto_status="started",
+        search_limit=100_000,
+        search_status="started",
+        auto_adv_id=61,
+        search_adv_id=62,
+        auto_budget_total_limit=500,
+        search_auto_budget_total_limit=500,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        total_spend_by_adv=RuntimeError("clickhouse down"),
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv)
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.start_auction_campaign.assert_not_called()
+    assert auto_reason.await_args[0][2] == AutoReasonCode.AUTO_TOTAL_UNKNOWN
+    assert search_reason.await_args[0][2] == AuctionReasonCode.SEARCH_TOTAL_UNKNOWN
+
+
+@pytest.mark.asyncio
+async def test_total_limit_pauses_when_spend_unknown_in_common_mode():
+    """Общий режим: недоступная статистика тоже держит обе ноги на паузе."""
+    adv = _FakeComplexAdv(
+        auto_limit=0,
+        auto_status="started",
+        search_limit=0,
+        search_status="started",
+        auto_adv_id=71,
+        search_adv_id=72,
+        use_common_budget=True,
+        common_budget_daily_limit=100_000,
+        common_budget_total_limit=500,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        total_spend_by_adv=RuntimeError("clickhouse down"),
+    )
+
+    wb_modifier.pause_auto_campaign.assert_awaited_once_with(adv)
+    wb_modifier.pause_auction_campaign.assert_awaited_once_with(adv)
+    assert auto_reason.await_args[0][2] == AutoReasonCode.COMMON_TOTAL_UNKNOWN
+    assert search_reason.await_args[0][2] == AuctionReasonCode.COMMON_TOTAL_UNKNOWN
+
+
+@pytest.mark.asyncio
+async def test_total_limit_spend_unknown_does_not_restart_paused_campaign():
+    """Регресс: РК на паузе не должна перезапуститься при сбое ClickHouse.
+
+    Суточный лимит и себестоимость в норме, статус ``PAUSE`` — без fail-closed
+    гейта обычная ветка старта снова запустила бы уже остановленную кампанию.
+    """
+    adv = _FakeComplexAdv(
+        auto_limit=100_000,
+        auto_status="pause",
+        search_limit=100_000,
+        search_status="pause",
+        auto_adv_id=81,
+        search_adv_id=82,
+        auto_budget_total_limit=500,
+        search_auto_budget_total_limit=500,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        total_spend_by_adv=RuntimeError("clickhouse down"),
+    )
+
+    wb_modifier.start_auto_campaign.assert_not_called()
+    wb_modifier.start_auction_campaign.assert_not_called()
+    # Кампании уже на паузе — повторный WB-вызов не нужен, но причина пишется.
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.pause_auction_campaign.assert_not_called()
+    assert auto_reason.await_args[0][2] == AutoReasonCode.AUTO_TOTAL_UNKNOWN
+    assert search_reason.await_args[0][2] == AuctionReasonCode.SEARCH_TOTAL_UNKNOWN
+
+
+@pytest.mark.asyncio
+async def test_total_limit_zero_ignores_clickhouse_error():
+    """Лимит выключен: сбой статистики не влияет на активность РК."""
+    adv = _FakeComplexAdv(
+        auto_limit=100_000,
+        auto_status="started",
+        search_limit=100_000,
+        search_status="started",
+        auto_adv_id=91,
+        search_adv_id=92,
+        auto_budget_total_limit=0,
+        search_auto_budget_total_limit=0,
+    )
+    service, wb_modifier = _total_limit_service()
+
+    auto_reason, search_reason = await _run_with_total_spend(
+        service,
+        adv,
+        daily_spend=10.0,
+        total_spend_by_adv=RuntimeError("clickhouse down"),
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_called()
+    wb_modifier.pause_auction_campaign.assert_not_called()
+    auto_codes = [call.args[2] for call in auto_reason.await_args_list]
+    search_codes = [call.args[2] for call in search_reason.await_args_list]
+    assert AutoReasonCode.AUTO_TOTAL_UNKNOWN not in auto_codes
+    assert AuctionReasonCode.SEARCH_TOTAL_UNKNOWN not in search_codes

@@ -305,9 +305,17 @@ class ChangeAutoBid(CallbackData, prefix="change_auto_bid"):
 
 
 class ManageCampaignActivity(CallbackData, prefix="campaign_activity"):
+    """Меню управления активностью РК: суточные и абсолютные лимиты бюджета.
+
+    ``scope`` выбирает вид лимита: ``"daily"`` — суточный (руб/сутки),
+    ``"total"`` — абсолютный расход за всё время. ``campaign_type`` = ``None``
+    означает общий лимит на обе РК (режим ``use_common_budget``).
+    """
+
     action: str
     adv_setting_original_id: int
     campaign_type: AdvType | None = None
+    scope: str = "daily"
 
 
 class ChangeMinViewsForPredictCTR(
