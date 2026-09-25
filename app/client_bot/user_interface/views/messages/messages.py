@@ -47,6 +47,10 @@ from app.modules.common_slaves.wildberries.models.enums.strategy import Strategy
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
 from app.modules.relevant_phrase_manager import RelevantPhraseManager
+from app.client_bot.user_interface.services.total_spend_snapshot import (
+    TotalSpendSnapshot,
+    format_spend_rubles_display,
+)
 from app.client_bot.user_interface.services.keyword_v3_profile_loader import (
     load_keyword_v3_profile_data,
     profile_load_failure,
@@ -166,8 +170,69 @@ def _limit_scope_display(scope: str) -> str:
 
 
 def _total_limit_display(limit: int) -> str:
-    """Строка абсолютного лимита в сводке меню; ``0`` — выключено."""
-    return f"{limit} руб всего" if limit > 0 else "выключено"
+    """Строка абсолютного лимита в сводке меню; ``0`` — лимита нет."""
+    return f"{limit} руб всего" if limit > 0 else "нет лимита"
+
+
+def _total_spend_hint_line() -> str:
+    """Краткая подсказка: лимит > расхода; 0 = без лимита."""
+    return "Лимит должен быть больше расхода; 0 = лимита нет.\n"
+
+
+def _resolved_total_spend(
+    total_spend: TotalSpendSnapshot | None,
+) -> TotalSpendSnapshot:
+    return total_spend if total_spend is not None else TotalSpendSnapshot(None, None)
+
+
+def _spend_menu_line(label: str, spend: float | None) -> str:
+    return (
+        f"• {label}: {format_spend_rubles_display(spend)} р.\n"
+    )
+
+
+def _activity_menu_spend_block(total_spend: TotalSpendSnapshot | None) -> str:
+    """Три строки расхода за всё время для меню активности."""
+    snap = _resolved_total_spend(total_spend)
+    return (
+        _spend_menu_line("Расход Авто за всё время", snap.auto)
+        + _spend_menu_line("Расход Аукцион за всё время", snap.search)
+        + _spend_menu_line("Расход Авто+Аукцион за всё время", snap.common)
+        + _total_spend_hint_line()
+    )
+
+
+def _compared_spend_leg(campaign_type: AdvType | None) -> str:
+    if campaign_type is None:
+        return "common"
+    if campaign_type == AdvType.SEARCH:
+        return "search"
+    if campaign_type == AdvType.AUTO:
+        return "auto"
+    raise ValueError("Неверный тип кампании")
+
+
+def _total_scope_spend_block(
+    total_spend: TotalSpendSnapshot | None,
+    campaign_type: AdvType | None,
+) -> str:
+    """Блок расходов на экране абсолютного лимита с отметкой сравниваемой ноги."""
+    snap = _resolved_total_spend(total_spend)
+    compared = _compared_spend_leg(campaign_type)
+    legs: list[tuple[str, str, float | None]] = [
+        ("auto", "Авто", snap.auto),
+        ("search", "Аукцион", snap.search),
+        ("common", "Авто+Аукцион", snap.common),
+    ]
+    lines = ""
+    for leg_key, leg_label, value in legs:
+        marker = " ← для этого лимита" if leg_key == compared else ""
+        lines += (
+            f"• Расход {leg_label} за всё время: "
+            f"{format_spend_rubles_display(value)} р.{marker}\n"
+        )
+    lines += _total_spend_hint_line()
+    return lines
 
 
 # def reverse_date(date_str: str) -> str:
@@ -353,9 +418,16 @@ class ShopUpdateInfo(Text):
 
 
 class CampaignActivityMenu(TextWithKeyboard):
-    def __init__(self, bot: Bot, chat_id: int, adv_setting: AdvSetting):
+    def __init__(
+        self,
+        bot: Bot,
+        chat_id: int,
+        adv_setting: AdvSetting,
+        total_spend: TotalSpendSnapshot | None = None,
+    ):
         super().__init__(bot, chat_id)
         self._adv_setting = adv_setting
+        self._total_spend = total_spend
 
     @property
     def text(self) -> str:
@@ -373,6 +445,7 @@ class CampaignActivityMenu(TextWithKeyboard):
             limits_block = (
                 f"• Общий бюджет на обе РК: {common_limit} руб/сутки\n"
                 f"• Абс. лимит на обе РК: {_total_limit_display(common_total)}\n"
+                f"{_activity_menu_spend_block(self._total_spend)}"
             )
         else:
             auto_limit = self._adv_setting.auto_budget_daily_limit or 0
@@ -386,15 +459,17 @@ class CampaignActivityMenu(TextWithKeyboard):
                 f"• Авто: {auto_limit} руб/сутки {'(выключено)' if auto_limit <= 0 else ''}\n"
                 f"• Абс. лимит Аукцион: {_total_limit_display(search_total)}\n"
                 f"• Абс. лимит Авто: {_total_limit_display(auto_total)}\n"
+                f"{_activity_menu_spend_block(self._total_spend)}"
             )
         return (
             f"Управление активностью РК «{self._adv_setting.name}»\n"
             f"{limits_block}"
             f"• Контроль запуска кампаний и пополнения бюджета: {watchdog_status}\n"
-            "Абс. лимит — суммарный расход за всё время; при исчерпании РК "
-            "ставится на паузу и не пополняется.\n"
-            "Если абс. лимит задан, а статистика расхода временно недоступна, "
-            "РК тоже остаётся на паузе — пока расход не подтверждён.\n"
+            "Абс. лимит — суммарный расход за всё время; при значении > 0 и "
+            "исчерпании РК ставится на паузу и не пополняется. "
+            "0 = лимита нет.\n"
+            "Если абс. лимит задан (> 0), а статистика расхода временно "
+            "недоступна, РК тоже остаётся на паузе — пока расход не подтверждён.\n"
             "Выберите, какую активность хотите скорректировать:"
         )
 
@@ -414,24 +489,39 @@ class CampaignActivityTargetMenu(TextWithKeyboard):
         campaign_type: AdvType | None,
         current_limit: int,
         scope: str = "daily",
+        total_spend: TotalSpendSnapshot | None = None,
     ):
         super().__init__(bot, chat_id)
         self._adv_setting = adv_setting
         self._campaign_type = campaign_type
         self._current_limit = current_limit
         self._scope = scope
+        self._total_spend = total_spend
 
     @property
     def text(self) -> str:
         if self._current_limit > 0:
             limit_str = f"{self._current_limit} {_limit_units(self._scope)}"
+        elif self._scope == "total":
+            # Абсолютный 0 = лимита нет (не «выключено / пауза», как у суточного).
+            limit_str = "нет лимита"
         else:
             limit_str = "выключено"
         note = ""
         if self._scope == "total" and self._current_limit > 0:
             note = (
-                "Пока лимит включён, РК остаётся на паузе не только при его "
+                "Пока лимит задан (> 0), РК остаётся на паузе не только при его "
                 "исчерпании, но и когда статистика расхода недоступна.\n"
+            )
+        elif self._scope == "total":
+            note = (
+                "Лимита нет: РК не паузится и не блокируется по абсолютному "
+                "расходу. Чтобы ограничить, задайте значение больше нуля.\n"
+            )
+        spend_block = ""
+        if self._scope == "total":
+            spend_block = _total_scope_spend_block(
+                self._total_spend, self._campaign_type
             )
         return (
             f"Настройка {_limit_scope_display(self._scope)} для "
@@ -439,6 +529,7 @@ class CampaignActivityTargetMenu(TextWithKeyboard):
             f"РК «{self._adv_setting.name}»\n"
             f"Текущий лимит: {limit_str}\n"
             f"{note}"
+            f"{spend_block}"
             "Выберите действие:"
         )
 
@@ -461,17 +552,25 @@ class CampaignActivityChangeLimit(Text):
         chat_id: int,
         campaign_type: AdvType | None,
         scope: str = "daily",
+        total_spend: TotalSpendSnapshot | None = None,
     ):
         super().__init__(bot, chat_id)
         self._campaign_type = campaign_type
         self._scope = scope
+        self._total_spend = total_spend
 
     @property
     def text(self) -> str:
+        spend_block = ""
+        if self._scope == "total":
+            spend_block = _total_scope_spend_block(
+                self._total_spend, self._campaign_type
+            )
         return (
             f"Введите новый {_limit_scope_display(self._scope)} для "
             f"{_campaign_type_display(self._campaign_type)} "
-            "в рублях (целое положительное число):"
+            "в рублях (целое положительное число):\n"
+            f"{spend_block}"
         )
 
 

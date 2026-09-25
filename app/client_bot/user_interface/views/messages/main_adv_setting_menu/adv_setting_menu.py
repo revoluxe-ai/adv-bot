@@ -473,11 +473,11 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
             self._spend_search_total = 0.0
 
     def _total_limit(self, attr_name: str) -> int:
-        """Значение абсолютного лимита с ``AdvSetting``; ``0`` — выключен."""
+        """Значение абсолютного лимита с ``AdvSetting``; ``0`` — лимита нет."""
         return getattr(self.adv, attr_name, 0) or 0
 
     def _total_limit_active(self) -> bool:
-        """Задан ли хоть один абсолютный лимит в текущем режиме бюджета."""
+        """Задан ли хоть один абсолютный лимит (> 0) в текущем режиме бюджета."""
         if getattr(self.adv, "use_common_budget", False):
             return self._total_limit("common_budget_total_limit") > 0
         return (

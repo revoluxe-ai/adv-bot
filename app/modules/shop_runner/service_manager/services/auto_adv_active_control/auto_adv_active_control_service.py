@@ -196,8 +196,9 @@ class TotalSpendCache:
 class TotalLimitState:
     """Абсолютный (lifetime) лимит ноги РК и её расход за всю историю.
 
-    ``spend is None`` — расход получить не удалось (ошибка ClickHouse). Гейт
-    **fail-closed**: при заданном лимите неизвестный расход означает паузу, а не
+    ``limit == 0`` — лимита нет (гейт не должен создаваться; см.
+    ``_total_limit_state``). При ``limit > 0`` и ``spend is None`` (ошибка
+    ClickHouse) гейт **fail-closed**: неизвестный расход означает паузу, а не
     «проверку пропустили». Иначе кампания, уже остановленная по исчерпанному
     абсолютному лимиту, была бы снова запущена обычной ветки старта на первом же
     тике с недоступной статистикой.
@@ -213,8 +214,14 @@ class TotalLimitState:
 
     @property
     def must_pause(self) -> bool:
-        """Нужно держать кампанию на паузе: лимит исчерпан либо расход неизвестен."""
-        return self.spend is None or self.limit <= self.spend
+        """Нужна пауза: лимит > 0 и (расход неизвестен либо расход >= лимит).
+
+        ``limit <= 0`` — лимита нет: никогда не паузим (в отличие от суточного
+        лимита, где ``0`` = пауза).
+        """
+        if self.limit <= 0:
+            return False
+        return self.spend is None or self.spend >= self.limit
 
 
 class AutoAdvActiveControlService:
@@ -427,7 +434,8 @@ class AutoAdvActiveControlService:
         ``total_spend_cache``.
 
         Returns:
-            ``None``, если абсолютный лимит отключён (``0``) — гейт неактивен.
+            ``None``, если абсолютный лимит ``0`` (лимита нет) — гейт неактивен,
+            пауза и fail-closed по неизвестному расходу не применяются.
             Иначе ``TotalLimitState`` с расходом либо с ``spend=None``, если
             ClickHouse недоступен: это **не** «проверку пропустили», а
             fail-closed пауза (см. ``TotalLimitState``).
@@ -439,6 +447,7 @@ class AutoAdvActiveControlService:
         else:
             limit = getattr(adv, "search_auto_budget_total_limit", 0) or 0
         if limit <= 0:
+            # 0 = лимита нет (не «выключить РК», в отличие от суточного лимита).
             return None
 
         try:

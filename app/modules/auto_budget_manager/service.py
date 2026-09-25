@@ -82,7 +82,7 @@ class _CampaignConfig:
     adv_id: int
     limit: int
     total_limit: int = 0
-    """Абсолютный (lifetime) лимит расхода кампании, 0 = отключено."""
+    """Абсолютный (lifetime) лимит расхода кампании; 0 = лимита нет."""
 
 
 @dataclass(slots=True)

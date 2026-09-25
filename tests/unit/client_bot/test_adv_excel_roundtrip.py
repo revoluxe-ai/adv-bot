@@ -10,6 +10,7 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.deviation import
     compute_deviation_metrics,
 )
 from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
+    EDITABLE_ADV_SETTING_COLUMNS,
     EXCEL_TEMPLATE_VERSION,
     column_header,
     display_name_for_field,
@@ -22,7 +23,9 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
 )
 from app.client_bot.user_interface.handlers.adv_excel_roundtrip import _ProgressReporter
 from app.client_bot.user_interface.services.adv_excel_roundtrip.export_build import (
+    _export_headers,
     _first_offer_id_from_nmid,
+    _total_spend_for_ro_field,
 )
 
 
@@ -206,3 +209,46 @@ def test_first_offer_id_by_nmid_raises_when_missing() -> None:
     adv = SimpleNamespace(id=7)
     with pytest.raises(ValueError):
         _first_offer_id_from_nmid(adv, first_nmid=123, offer_by_nmid={})
+
+
+@pytest.mark.unit
+def test_total_spend_ro_columns_not_editable() -> None:
+    for name in (
+        "total_spend_auto",
+        "total_spend_search",
+        "total_spend_common",
+    ):
+        assert name not in EDITABLE_ADV_SETTING_COLUMNS
+
+
+@pytest.mark.unit
+def test_export_headers_total_spend_after_limit_columns() -> None:
+    headers = _export_headers()
+    auto_limit = edit_header("auto_budget_total_limit")
+    search_limit = edit_header("search_auto_budget_total_limit")
+    common_limit = edit_header("common_budget_total_limit")
+    assert headers.index(column_header("RO", "total_spend_auto")) == headers.index(
+        auto_limit
+    ) + 1
+    assert headers.index(column_header("RO", "total_spend_search")) == headers.index(
+        search_limit
+    ) + 1
+    assert headers.index(column_header("RO", "total_spend_common")) == headers.index(
+        common_limit
+    ) + 1
+
+
+@pytest.mark.unit
+def test_total_spend_for_ro_field_uses_ceil_and_empty_on_unknown() -> None:
+    from app.client_bot.user_interface.services.total_spend_snapshot import (
+        TotalSpendSnapshot,
+    )
+
+    snap = TotalSpendSnapshot(auto=10.4, search=5.1)
+    assert _total_spend_for_ro_field("total_spend_auto", snap) == 11
+    assert _total_spend_for_ro_field("total_spend_search", snap) == 6
+    assert _total_spend_for_ro_field("total_spend_common", snap) == 16
+    broken = TotalSpendSnapshot(auto=None, search=0.0)
+    assert _total_spend_for_ro_field("total_spend_auto", broken) == ""
+    assert _total_spend_for_ro_field("total_spend_search", broken) == 0
+    assert _total_spend_for_ro_field("total_spend_common", broken) == ""

@@ -869,7 +869,7 @@ async def test_ensure_common_budget_locked_blocks_topup_when_total_spend_unknown
 
 @pytest.mark.asyncio
 async def test_ensure_budget_locked_ignores_total_limit_when_zero(monkeypatch) -> None:
-    """Абсолютный лимит 0 = выключено: all-time расход даже не запрашивается."""
+    """Абсолютный лимит 0 = лимита нет: all-time расход даже не запрашивается."""
     monkeypatch.setattr(
         "app.modules.auto_budget_manager.service.settings", _build_settings()
     )

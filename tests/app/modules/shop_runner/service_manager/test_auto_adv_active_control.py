@@ -2219,6 +2219,19 @@ async def test_average_order_cost_uses_additional_views():
 # ---------------------------------------------------------------------------
 
 
+def test_total_limit_state_zero_never_pauses():
+    """``limit == 0`` — лимита нет: must_pause всегда False (в т.ч. при spend unknown)."""
+    from app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service import (
+        TotalLimitState,
+    )
+
+    assert TotalLimitState(limit=0, spend=None).must_pause is False
+    assert TotalLimitState(limit=0, spend=1_000_000.0).must_pause is False
+    assert TotalLimitState(limit=500, spend=None).must_pause is True
+    assert TotalLimitState(limit=500, spend=500.0).must_pause is True
+    assert TotalLimitState(limit=500, spend=499.0).must_pause is False
+
+
 def _total_limit_service() -> tuple[AutoAdvActiveControlService, MagicMock]:
     """Сервис с замоканным WBModifier для проверок абсолютного лимита."""
     wb_modifier = MagicMock()
@@ -2350,7 +2363,7 @@ async def test_total_limit_pauses_both_legs_in_common_mode():
 
 @pytest.mark.asyncio
 async def test_total_limit_zero_does_not_pause():
-    """Лимит 0 = выключено: абсолютный гейт не трогает кампании."""
+    """Лимит 0 = лимита нет: абсолютный гейт не трогает кампании."""
     adv = _FakeComplexAdv(
         auto_limit=100_000,
         auto_status="started",
@@ -2506,7 +2519,7 @@ async def test_total_limit_spend_unknown_does_not_restart_paused_campaign():
 
 @pytest.mark.asyncio
 async def test_total_limit_zero_ignores_clickhouse_error():
-    """Лимит выключен: сбой статистики не влияет на активность РК."""
+    """Лимита нет (0): сбой статистики не влияет на активность РК."""
     adv = _FakeComplexAdv(
         auto_limit=100_000,
         auto_status="started",

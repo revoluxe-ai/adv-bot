@@ -730,21 +730,21 @@ class AdvSetting(BaseTable):
         nullable=False,
         default=500,
         server_default=text("500"),
-        comment="Абсолютный лимит суммарного РАСХОДА (руб, за всё время) для автоматической кампании, 0 = отключено",
+        comment="Абсолютный лимит суммарного РАСХОДА (руб, за всё время) для автоматической кампании; 0 = лимита нет",
     )
     search_auto_budget_total_limit: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=500,
         server_default=text("500"),
-        comment="Абсолютный лимит суммарного РАСХОДА (руб, за всё время) для аукционной кампании, 0 = отключено",
+        comment="Абсолютный лимит суммарного РАСХОДА (руб, за всё время) для аукционной кампании; 0 = лимита нет",
     )
     common_budget_total_limit: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=500,
         server_default=text("500"),
-        comment="Общий абсолютный лимит расхода (руб, за всё время) на обе РК; действует при use_common_budget, 0 = отключено",
+        comment="Общий абсолютный лимит расхода (руб, за всё время) на обе РК; действует при use_common_budget; 0 = лимита нет",
     )
 
     auto_adv_target_status: Mapped[bool | None] = mapped_column(

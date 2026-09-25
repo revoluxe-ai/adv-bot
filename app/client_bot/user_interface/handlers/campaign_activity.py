@@ -16,6 +16,9 @@ from aiogram import F, Router, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 
+from app.client_bot.user_interface.services.total_spend_snapshot import (
+    load_total_spend_snapshot,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.shared.domains.wb.enums import (
     AdvType,
@@ -68,7 +71,11 @@ def _limit_attr_name(campaign_type: AdvType | None, scope: str) -> str:
 def _get_limit_value(
     adv_setting: AdvSetting, campaign_type: AdvType | None, scope: str
 ) -> int:
-    """Текущее значение лимита; ``0`` — лимит не задан/выключен."""
+    """Текущее значение лимита.
+
+    Для суточного ``0`` — лимит выключен (пауза РК). Для абсолютного ``0`` —
+    лимита нет (РК не ограничивается и не паузится по абсолютному расходу).
+    """
     value = getattr(adv_setting, _limit_attr_name(campaign_type, scope), 0)
     return value or 0
 
@@ -90,8 +97,9 @@ async def show_activity_menu(
     if callback.message is None:
         raise ValueError("Нет сообщения")
     adv_setting = await _load_adv_setting(callback_data.adv_setting_original_id)
+    total_spend = await load_total_spend_snapshot(adv_setting)
     await messages.CampaignActivityMenu(
-        callback.bot, callback.message.chat.id, adv_setting
+        callback.bot, callback.message.chat.id, adv_setting, total_spend=total_spend
     )()
 
 
@@ -107,6 +115,7 @@ async def open_activity_target(
     campaign_type = callback_data.campaign_type
     scope = callback_data.scope
     current_limit = _get_limit_value(adv_setting, campaign_type, scope)
+    total_spend = await load_total_spend_snapshot(adv_setting)
     await messages.CampaignActivityTargetMenu(
         callback.bot,
         callback.message.chat.id,
@@ -114,6 +123,7 @@ async def open_activity_target(
         campaign_type,
         current_limit,
         scope,
+        total_spend=total_spend,
     )()
 
 
@@ -138,11 +148,16 @@ async def start_limit_change(
         if scope == "total"
         else states.CampaignActivity.waiting_for_new_limit
     )
+    total_spend = None
+    if scope == "total":
+        adv_setting = await _load_adv_setting(callback_data.adv_setting_original_id)
+        total_spend = await load_total_spend_snapshot(adv_setting)
     await messages.CampaignActivityChangeLimit(
         callback.bot,
         callback.message.chat.id,
         callback_data.campaign_type,
         scope,
+        total_spend=total_spend,
     )()
 
 
@@ -151,7 +166,11 @@ async def turn_off_limit(
     callback: types.CallbackQuery,
     callback_data: callbacks.ManageCampaignActivity,
 ):
-    """Выключить лимит (записать ``0``) и вернуть экран лимита."""
+    """Записать ``0`` в выбранный лимит и вернуть экран лимита.
+
+    Суточный ``0`` — выключить (пауза). Абсолютный ``0`` — убрать лимит
+    (ограничения по абсолютному расходу нет).
+    """
     if callback.message is None:
         raise ValueError("Нет сообщения")
     campaign_type = callback_data.campaign_type
@@ -164,6 +183,7 @@ async def turn_off_limit(
             raise ValueError("AdvSetting not found")
         setattr(adv_setting, _limit_attr_name(campaign_type, scope), 0)
         await session.commit()
+        total_spend = await load_total_spend_snapshot(adv_setting)
         await messages.CampaignActivityTargetMenu(
             callback.bot,
             callback.message.chat.id,
@@ -171,6 +191,7 @@ async def turn_off_limit(
             campaign_type,
             0,
             scope,
+            total_spend=total_spend,
         )()
 
 
@@ -201,8 +222,16 @@ async def set_new_limit(message: types.Message, state: FSMContext):
         limit = 0
 
     if limit <= 0:
+        total_spend = None
+        if scope == "total":
+            adv_for_spend = await _load_adv_setting(adv_setting_id)
+            total_spend = await load_total_spend_snapshot(adv_for_spend)
         await messages.CampaignActivityChangeLimit(
-            message.bot, message.chat.id, campaign_type, scope
+            message.bot,
+            message.chat.id,
+            campaign_type,
+            scope,
+            total_spend=total_spend,
         )()
         return
 
@@ -215,6 +244,7 @@ async def set_new_limit(message: types.Message, state: FSMContext):
         setattr(adv_setting, _limit_attr_name(campaign_type, scope), limit)
         await session.commit()
         await state.clear()
+        total_spend = await load_total_spend_snapshot(adv_setting)
         await messages.CampaignActivityTargetMenu(
             message.bot,
             message.chat.id,
@@ -222,4 +252,5 @@ async def set_new_limit(message: types.Message, state: FSMContext):
             campaign_type,
             limit,
             scope,
+            total_spend=total_spend,
         )()

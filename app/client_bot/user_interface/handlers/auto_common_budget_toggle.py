@@ -2,6 +2,9 @@ from aiogram import Bot, Router
 from aiogram.types import CallbackQuery
 from sqlalchemy import update
 
+from app.client_bot.user_interface.services.total_spend_snapshot import (
+    load_total_spend_snapshot,
+)
 from app.client_bot.user_interface.views import keyboards, callbacks, messages
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.utils.db.session_maker import get_async_session_maker as sm
@@ -37,7 +40,10 @@ async def toggle_auto_common_budget(
     chat_id = msg.chat.id
     message_id = msg.message_id
 
-    menu = messages.CampaignActivityMenu(bot, chat_id, adv_setting)
+    total_spend = await load_total_spend_snapshot(adv_setting)
+    menu = messages.CampaignActivityMenu(
+        bot, chat_id, adv_setting, total_spend=total_spend
+    )
     text = menu.text
     keyboard = keyboards.get_campaign_activity_menu_keyboard(adv_setting)
     await bot.edit_message_text(
