@@ -1,0 +1,57 @@
+app/client_bot/user_interface/handlers/auto_common_budget_toggle.py
+  s_ae075d1f4c3941::t_2387df32b67885 5-7,43-46
+app/client_bot/user_interface/handlers/campaign_activity.py
+  s_ae075d1f4c3941::t_098caf7d522d76 19-21,74-78,100,102,118,126,151-154,160,169-173,186,194,225-228,230-234,247,255
+app/client_bot/user_interface/handlers/common_budget_mode_toggle.py
+  s_ae075d1f4c3941::t_7e68bb7bb2b812 5-7,86-89
+app/client_bot/user_interface/services/adv_excel_roundtrip/export_build.py
+  s_ae075d1f4c3941::t_ebbeacbbedb362 28-32,134-163,221,244,286-290
+app/client_bot/user_interface/services/adv_excel_roundtrip/schema.py
+  s_ae075d1f4c3941::t_e69b2c181bdace 271-276
+app/client_bot/user_interface/services/total_spend_snapshot.py
+  s_ae075d1f4c3941::t_6d9d75e77f6db1 1-73
+app/client_bot/user_interface/views/keyboards.py
+  s_ae075d1f4c3941::t_cd6b7715211d92 186,189
+app/client_bot/user_interface/views/messages/main_adv_setting_menu/adv_setting_menu.py
+  s_ae075d1f4c3941::t_e04ddfbb6e63dd 476,480
+app/client_bot/user_interface/views/messages/messages.py
+  s_ae075d1f4c3941::t_90d28050dcc923 50-53,173-235,421-427,430,448,462,468-472,492,499,505-507,513,516-525,532,555,560,564-568,572-573
+app/modules/auto_budget_manager/service.py
+  s_ae075d1f4c3941::t_a5f684c028b7dd 85
+app/modules/common_slaves/wildberries/models/models.py
+  s_ae075d1f4c3941::t_97d3b9107a649a 733,740,747
+app/modules/shop_runner/service_manager/services/auto_adv_active_control/auto_adv_active_control_service.py
+  s_ae075d1f4c3941::t_1f07ec33e6f21e 199-201,217-224,437-438,450
+app/modules/shop_runner/service_manager/wb_shop_data_manager/dto/complex_adv/complex_adv.py
+  s_ae075d1f4c3941::t_8b7f81fc8b62d2 568,571-572,578,586
+tests/app/modules/auto_budget_manager/test_service.py
+  s_ae075d1f4c3941::t_1eeeffbe584dbc 872
+tests/app/modules/shop_runner/service_manager/test_auto_adv_active_control.py
+  s_ae075d1f4c3941::t_0d03a56cd4aacd 2222-2234,2366,2522
+tests/unit/client_bot/test_adv_excel_roundtrip.py
+  s_ae075d1f4c3941::t_1ae1b646fc731c 13,26,28,212-254
+tests/unit/client_bot/test_auto_common_budget_toggle.py
+  s_ae075d1f4c3941::t_08ed883ee6cb97 9-11,76-80
+tests/unit/client_bot/test_campaign_activity_total_limit.py
+  s_ae075d1f4c3941::t_ae9ac712d9e6a8 58-70,120,156-158,183-185,187,208-371
+tests/unit/client_bot/test_common_budget_mode_toggle.py
+  s_ae075d1f4c3941::t_fa36fc6d5a5cb4 7-9,70-74,128-132
+tests/unit/client_bot/test_total_spend_snapshot.py
+  s_ae075d1f4c3941::t_0bfaaab0b5b503 1-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4d5fae43576d290ca8324424b29772ce0eb1a5f5",
+  "prompts": {},
+  "sessions": {
+    "s_ae075d1f4c3941": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9206476e-67f6-4f1c-b21d-5f5e4b0af76e",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
