@@ -15,6 +15,12 @@ artifacts:
       - **Why**: 1-2 sentences on the problem or opportunity. What problem does
       this solve? Why now?
 
+      - **Evolution Context (optional)**: Include only for an approved
+        EVOLUTION_HANDOFF. Record STAR_ID, INCREMENT_ID, Current Increment,
+        Contribution to North Star, Forward Compatibility Constraints, and Out
+        of Scope. Future Increments are context only and must not become this
+        change's requirements/tasks.
+
       - **What Changes**: Bullet list of changes. Be specific about new
       capabilities, modifications, or removals. Mark breaking changes with
       **BREAKING**.
@@ -162,6 +168,11 @@ artifacts:
       Sections:
 
       - **Context**: Background, current state, constraints, stakeholders
+
+      - **Evolution Context (optional)**: For linked changes, cite Title
+        (STAR_ID), INCREMENT_ID, Current Increment, Contribution to North Star,
+        and explain how the design respects Forward Compatibility Constraints
+        without implementing Future Increments.
 
       - **Goals / Non-Goals**: What this design achieves and explicitly excludes
 

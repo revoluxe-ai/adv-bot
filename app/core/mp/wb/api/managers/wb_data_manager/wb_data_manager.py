@@ -30,9 +30,16 @@ if typing.TYPE_CHECKING:
         AnalyticsManager,
         ProductsManager,
         PromotionManager,
+        ReportsManager,
     )
     from app.core.mp.wb.api.adapter.analitika_i_dannye_client.voronka_prodazh.post_sales_funnel_products_history.dto import (
         CommonSaleStatRow,
+    )
+    from app.core.mp.wb.api.generated.reports.v1.reports_client.models.orders_item import (
+        OrdersItem,
+    )
+    from app.core.mp.wb.api.generated.reports.v1.reports_client.models.sales_item import (
+        SalesItem,
     )
 
 logger = logging.getLogger(__name__)
@@ -49,10 +56,12 @@ class WBDataManager:
         analytics_manager: "AnalyticsManager",
         promotion_manager: "PromotionManager",
         products_manager: "ProductsManager",
+        reports_manager: "ReportsManager",
     ):
         self._analytics_manager = analytics_manager
         self._promotion_manager = promotion_manager
         self._products_manager = products_manager
+        self._reports_manager = reports_manager
 
     @property
     def promotion_manager(self) -> "PromotionManager":
@@ -61,6 +70,35 @@ class WBDataManager:
     @property
     def products_manager(self) -> "ProductsManager":
         return self._products_manager
+
+    @property
+    def reports_manager(self) -> "ReportsManager":
+        """Менеджер statistics-api GET supplier orders/sales (INC-RO-06)."""
+        return self._reports_manager
+
+    async def get_supplier_orders(
+        self,
+        *,
+        date_from: str,
+        flag: int | None = 0,
+    ) -> list["OrdersItem"]:
+        """Лента заказов поставщика (statistics-api); не funnel/fullstats."""
+        return await self._reports_manager.get_supplier_orders(
+            date_from=date_from,
+            flag=flag,
+        )
+
+    async def get_supplier_sales(
+        self,
+        *,
+        date_from: str,
+        flag: int | None = 0,
+    ) -> list["SalesItem"]:
+        """Лента продаж поставщика (statistics-api)."""
+        return await self._reports_manager.get_supplier_sales(
+            date_from=date_from,
+            flag=flag,
+        )
 
     async def get_keywords_positions_from_wb_api(
         self,

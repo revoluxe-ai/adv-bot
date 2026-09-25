@@ -221,7 +221,7 @@ async def test_apply_target_place_rows_in_session_persists(
 async def test_resolve_and_load_wb_cabinet_access_in_session(
     async_session: AsyncSession,
 ) -> None:
-    """Super-cabinet children resolve id; empty tokens mark inactive (WRITE)."""
+    """Super-cabinet children resolve id; empty tokens stay read-only (no deactivate)."""
     shop_id = f"sc_seam_{uuid.uuid4().hex}"
     cabinet = WBCabinet(
         shop_id=shop_id,
@@ -241,12 +241,12 @@ async def test_resolve_and_load_wb_cabinet_access_in_session(
 
     outcome = await load_wb_cabinet_access_in_session(async_session, cabinet_pk)
     assert outcome == shop_id
-    # Capture PKs before expire: expired instance attrs trigger MissingGreenlet.
+    # Чтение без токенов не выключает кабинет: деактивация только в get_access.
     async_session.expire_all()
     active = await async_session.scalar(
         select(WBCabinet.active).where(WBCabinet.id == cabinet_pk)
     )
-    assert active is False
+    assert active is True
 
 
 async def test_find_common_access_token_in_session_reads_valid_personal_token(

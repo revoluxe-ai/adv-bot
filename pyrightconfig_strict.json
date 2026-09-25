@@ -142,7 +142,8 @@
     "app/modules/common_slaves/wildberries/models/wb_campaign_promo_spend.py",
     "app/modules/plan_fact/provider.py",
     "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
-    "app/modules/sales_plan_settings/telegram/callbacks.py"
+    "app/modules/sales_plan_settings/telegram/callbacks.py",
+    "tools/wb_api_master_map.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

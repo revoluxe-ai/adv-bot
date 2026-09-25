@@ -35,6 +35,12 @@ architecture decisions belong here.
     a forward-only merge revision without schema/data operations; published
     history is immutable.
 
+- [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
+  - Status: Accepted
+  - Scope: ownership/layering for scripts/`/opsx-scripts` Job → existing
+    `app/core/mp/wb/api` stack; `READ_ONLY_NO_MUTATION`; no raw HTTP;
+    secret-strip Owner-local archive.
+
 ## Change Requirements
 
 - Every change that touches ownership, layering, write paths, or domain
@@ -110,6 +116,12 @@ architecture decisions belong here.
     TARGET_ENTITY_OR_LEG = auto-setting anchor + slot roles; ALLOWED billing
     adapters; forbid shop-runner/pause managers writing latch/AdvPayment;
     orthogonal to empty-keywords and shelf-exhausted pause write-paths.
+
+- [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
+  - Status: Accepted
+  - Scope: ownership/layering for scripts/`/opsx-scripts` Job → existing
+    `app/core/mp/wb/api` stack; `READ_ONLY_NO_MUTATION`; no raw HTTP;
+    secret-strip Owner-local archive.
 
 ## Change Requirements
 

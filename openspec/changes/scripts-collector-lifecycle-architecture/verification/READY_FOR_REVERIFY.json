@@ -1,0 +1,118 @@
+{
+  "schema_version": "opsx.change-verification.v1",
+  "change_id": "scripts-collector-lifecycle-architecture",
+  "status": "PASS_READY_FOR_MERGE",
+  "implementation_status": "CANONICAL_IMPLEMENTATION_VERIFIED",
+  "caller": {
+    "root": "C:/Users/vkita/my_code/meta-repo/scripts-fix",
+    "branch": "scripts-fix",
+    "head": "2df7e20471ccf09b988395be5c398ec4b902d4fb"
+  },
+  "canonical": {
+    "root": "C:/Users/vkita/my_code/meta-repo/scripts",
+    "branch": "refs/heads/scripts",
+    "implementation_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+    "common_dir": "C:/Users/vkita/my_code/meta-repo/adv-bot/.git",
+    "discovery_override": "NONE",
+    "topology_candidates": 1
+  },
+  "source_manifest": {
+    "file_count": 29,
+    "sha256_equivalence": "PASS",
+    "excluded": [
+      ".gitignore",
+      "verification/READY_FOR_REVERIFY.json",
+      "Temp/debug debris",
+      "caches",
+      "*.pyc"
+    ]
+  },
+  "e2e": {
+    "reuse": {
+      "mode": "PLAN_RUN",
+      "request_id": "canonical-reuse",
+      "exit_code": 0,
+      "outcome": "REUSE",
+      "execution_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+      "registry_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+      "selection": [
+        {
+          "registry_id": "a1-strict-read-only-contract",
+          "collector_path": "scripts/a1_strict_read_only_contract_collect.py"
+        }
+      ]
+    },
+    "run_routing": {
+      "mode": "RUN",
+      "request_id": "canonical-reuse",
+      "exit_code": 0,
+      "outcome": "REUSE",
+      "external_execution": "NOT_PERFORMED",
+      "machine_resolver_routing": "PASS",
+      "artifact_gate": "PASS_BY_EXECUTABLE_RUNTIME_TESTS"
+    },
+    "compose": {
+      "mode": "PLAN_RUN",
+      "request_id": "canonical-compose-probe",
+      "exit_code": 10,
+      "outcome": "FORMAL_CHANGE_REQUIRED",
+      "compose_plan": null,
+      "reason": "Committed Registry contains no resolution-enabled composable rows",
+      "status": "INFORMATIONAL_NOT_REQUIRED_FOR_R1_ACCEPTANCE"
+    },
+    "compose_executable_coverage": {
+      "deterministic_order": "PASS",
+      "acyclic_plan": "PASS",
+      "unbounded_more_than_four_children": "PASS",
+      "child_isolation": "PASS",
+      "no_semantic_merge": "PASS"
+    },
+    "runtime_artifact_gates": {
+      "unit_tests": "PASS",
+      "artifact_presence": "PASS",
+      "sha256_computation": "PASS",
+      "sha256_mismatch_rejection": "PASS",
+      "mandatory_failure_partial_artifact_retention": "PASS",
+      "external_handoff_on_failure": "NO",
+      "status": "PASS"
+    }
+  },
+  "targeted_tests": {
+    "correction_command": "poetry run pytest tests/unit/tools/test_scripts_registry_resolver.py tests/unit/tools/test_compose_runtime.py tests/integration/scripts/test_canonical_bootstrap_fixture.py -q",
+    "correction_result": "53 passed, 1 warning",
+    "full_command": "poetry run pytest tests/unit/tools/test_scripts_registry_resolver.py tests/unit/tools/test_compose_runtime.py tests/unit/tools/test_scripts_receipts.py tests/integration/scripts/test_canonical_bootstrap_fixture.py tests/unit/scripts/test_ch_a1_evidence_sql.py tests/unit/scripts/test_a1_strict_read_only_contract_collect.py -q",
+    "full_result": "78 passed, 1 warning",
+    "warning": "SQLAlchemy declarative_base deprecation at app/utils/db/base.py:5"
+  },
+  "registry_checks": {
+    "validate": "PASS: VALID",
+    "check_drift": "PASS: IN_SYNC",
+    "scoped_hardcoding_gate": "PASS",
+    "render": "PASS: RENDERED after post-merge scope correction"
+  },
+  "openspec_validation": {
+    "config_contract": "PASS",
+    "strict_change_validation": "PASS",
+    "status": "COMPLETE"
+  },
+  "provenance": {
+    "expected_registry_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+    "observed_registry_sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+    "registry_sha_equal": true,
+    "registry_sha_is_content_digest": false
+  },
+  "production_writes": "NONE",
+  "push_merge_rebase_reset": "NONE",
+  "integration_commit": {
+    "sha": "00fbc8b605f798ee77961ae1e2fe8820a75a8cfe",
+    "message": "fix(scripts): restore registry scope after merge; preserve remote collectors"
+  },
+  "informational_limitations": [
+    "Current R1 Registry has no operational composable row; no production-shaped COMPOSE PLAN_RUN probe was executed.",
+    "No combined topology RUN plus fake-child harness exists; RUN machine routing and runtime gates are independently executable and green.",
+    "These limitations are not required for acceptance of the current R1 architecture change.",
+    "Post-merge REGISTRY_SCOPE_EXPANSION_WITHOUT_FORMAL_CHANGE corrected: registry rows multi-client-strict-eight-target-directive-audit and prokraft-14d-entry-economics-r1 removed; on-disk collectors and unit tests preserved but are not R1-verified registry scope (no false A/B registry verification claim)."
+  ],
+  "blockers": [],
+  "generated_at": "2026-09-20T05:55:00Z"
+}

@@ -1,0 +1,1047 @@
+entries:
+- deprecated_by: multi-client-ad-preflight
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers:
+    - scripts/a1_cabinet401_run_go_contract_collect.py:22-34
+    justification: Cabinet 401 compatibility entrypoint retained for explicit script selection.
+  id: a1-cabinet401-run-go-contract
+  optional_args: {}
+  output_schema_version: a1-cabinet401-v1
+  path: scripts/a1_cabinet401_run_go_contract_collect.py
+  primary_artifact_pattern: A1-CABINET401-RUN-GO-CONTRACT.zip
+  provided_fields:
+  - artifact_sha256
+  - artifact_zip
+  - campaign_state
+  - nm_id
+  - performance
+  - promo
+  - shop_id
+  - store_economics
+  - wb_cabinet_id
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Strict read-only cabinet 401 compatibility envelope.
+    runnable: UNKNOWN
+    tests: PARTIAL
+  required_args:
+    output_dir:
+      description: Invocation-owned output directory
+      secret: false
+      type: path
+  resolution_enabled: false
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  tenant_scope: SPECIAL_PURPOSE
+  title: A1 cabinet-401 RUN GO contract collector
+- deprecated_by: multi-client-ad-preflight
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers:
+    - scripts/a1_cabinet401_run_go_contract_collect_v2.py:23-44
+    justification: Cabinet 401 compatibility entrypoint retained for explicit script selection.
+  id: a1-cabinet401-run-go-contract-v2
+  optional_args:
+    client_size_id:
+      description: Cabinet-specific client size identifier
+      secret: false
+      type: integer
+  output_schema_version: a1-cabinet401-v2
+  path: scripts/a1_cabinet401_run_go_contract_collect_v2.py
+  primary_artifact_pattern: A1-CABINET401-RUN-GO-CONTRACT-V2.zip
+  provided_fields:
+  - artifact_sha256
+  - artifact_zip
+  - campaign_state
+  - client_size_id
+  - nm_id
+  - performance
+  - promo
+  - shop_id
+  - store_economics
+  - wb_cabinet_id
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Isolated-worker cabinet 401 compatibility envelope.
+    runnable: UNKNOWN
+    tests: PARTIAL
+  required_args:
+    output_dir:
+      description: Invocation-owned output directory
+      secret: false
+      type: path
+  resolution_enabled: false
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  tenant_scope: SPECIAL_PURPOSE
+  title: A1 cabinet-401 RUN GO contract collector v2
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-client-management-scope-reconcile
+  path: scripts/a1_client_management_scope_reconcile_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Client management scope reconcile
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-controlled-ad-expansion-v1
+  path: scripts/a1_controlled_ad_expansion_v1.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '2026-09-08T05:45:00Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: COVERED
+  resolution_enabled: false
+  title: A1 controlled ad expansion v1
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-current-performance-drr-snapshot
+  path: scripts/a1_current_performance_drr_snapshot.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-08T02:48:08Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:349ef965a7b1af7b70f452c0f082af54ef6085ab
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: NONE
+  resolution_enabled: false
+  title: A1 current performance / DRR snapshot
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-current-state-gap
+  path: scripts/a1_current_state_gap_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-14T04:42:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:99611ce70986a790c428525635b48e6b5927b208
+    last_local_at: '2026-09-14T04:19:09Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: PARTIAL
+  resolution_enabled: false
+  title: A1 current state gap collector
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-daily-spend-control-reconciliation
+  path: scripts/a1_daily_spend_control_reconciliation.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: A1 daily spend control reconciliation
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-existing-campaign-reuse-inventory
+  path: scripts/a1_existing_campaign_reuse_inventory.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: A1 existing campaign reuse inventory
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-glue-topology-web-review
+  path: scripts/a1_glue_topology_web_review_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-06T15:15:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:332d565754f549aaa3e0465e06e2dfc74c20f3e4
+    last_local_at: '2026-09-06T15:11:00Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: PARTIAL
+  resolution_enabled: false
+  title: A1 glue topology Web review
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-prokraft-delayed-ad-effect
+  path: scripts/a1_prokraft_delayed_ad_effect_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-14T04:41:55Z'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: NONE
+  resolution_enabled: false
+  title: ProKraft delayed advertising-effect evidence collector
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-prokraft-spp-dynamics
+  path: scripts/a1_prokraft_spp_dynamics_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-14T16:55:01Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:d0d0a09e50bdddc36088e73b361f9b242e6e547d
+    last_local_at: '2026-09-14T16:35:00Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: PARTIAL
+  resolution_enabled: false
+  title: ProKraft historical SPP dynamics collector
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-promo-adjusted-drr
+  path: scripts/a1_promo_adjusted_drr_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-07T01:28:04Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:2f6d3026dbfe27c04d42a3bc357764c093720b90
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: NONE
+  resolution_enabled: false
+  title: A1 promo-adjusted DRR / cash ad cost
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-sku-factual-ad-economics
+  path: scripts/a1_sku_factual_ad_economics_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-10T12:18:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9d2a5b1f6ba0078f706ff35d98da8b6b64e58ebb
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: NONE
+  resolution_enabled: false
+  title: A1 SKU factual ad economics collect
+- capabilities:
+  - strict-read-only-contract
+  composable: false
+  compose_with: []
+  deprecated_by: null
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers: []
+    justification: ''
+  id: a1-strict-read-only-contract
+  optional_args: {}
+  output_schema_version: a1-strict-read-only-v1
+  path: scripts/a1_strict_read_only_contract_collect.py
+  primary_artifact_pattern: A1-STRICT-READ-ONLY-CONTRACT.zip
+  provided_fields:
+  - artifact_sha256
+  - artifact_zip
+  - campaign_id
+  - campaign_state
+  - nm_id
+  - performance
+  - promo
+  - shop_id
+  - store_economics
+  - target_nmid
+  - wb_cabinet_id
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '2026-09-08T15:55:27Z'
+    notes: Exact 00-07 contract ZIP and checksum; no production writes.
+    runnable: WORKS
+    tests: PARTIAL
+  required_args:
+    output_dir:
+      description: Invocation-owned output directory
+      secret: false
+      type: path
+    shop_id:
+      description: WB shop identity
+      secret: false
+      type: string
+    target_nmids:
+      description: Comma-separated target NMIDs
+      secret: false
+      type: string
+    wb_cabinet_id:
+      description: WB cabinet identity
+      secret: false
+      type: integer
+  resolution_enabled: true
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  sources:
+  - POSTGRES
+  - WB_API
+  tenant_scope: PARAMETERIZED
+  title: A1 strict read-only contract collector
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-v3-post-import-verify
+  path: scripts/a1_v3_post_import_verify_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: A1 V3 post-import verify collect
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: a1-whole-shop-economics
+  path: scripts/a1_whole_shop_economics_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-12T03:39:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9c192d82af120121cfe9228ee748e55adc06ef1f
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: NONE
+  resolution_enabled: false
+  title: Whole-shop factual economics
+- capabilities:
+  - whole-store-drr
+  composable: false
+  compose_with: []
+  deprecated_by: null
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers: []
+    justification: Cabinet and shop_id are runtime required_args; collector has no fixed tenant literals.
+  id: a1-whole-store-daily-drr
+  optional_args:
+    company:
+      description: Company label for provenance (optional)
+      secret: false
+      type: string
+    daily_series_end:
+      description: Daily series end date (MSK calendar)
+      secret: false
+      type: date
+    daily_series_start:
+      description: Daily series start date (MSK calendar)
+      secret: false
+      type: date
+    target_drr_percent:
+      description: Target store DRR percent
+      secret: false
+      type: number
+    timezone:
+      description: IANA timezone for period boundaries
+      secret: false
+      type: string
+    window_14d_end:
+      description: 14d window end (MSK)
+      secret: false
+      type: date
+    window_14d_start:
+      description: 14d window start (MSK)
+      secret: false
+      type: date
+    window_3d_end:
+      description: 3d window end (MSK)
+      secret: false
+      type: date
+    window_3d_start:
+      description: 3d window start (MSK)
+      secret: false
+      type: date
+    window_7d_end:
+      description: 7d window end (MSK)
+      secret: false
+      type: date
+    window_7d_start:
+      description: 7d window start (MSK)
+      secret: false
+      type: date
+  output_schema_version: whole-store-daily-drr-v1
+  path: scripts/a1_whole_store_daily_drr_collect.py
+  primary_artifact_pattern: whole_store_daily_drr.json
+  provided_fields:
+  - daily_series
+  - identity
+  - period
+  - store_drr
+  - store_factual_gmv
+  - store_total_ad_spend
+  - target_drr
+  - today_open_partial
+  - window_14d
+  - window_3d
+  - window_7d
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-13T10:16:35Z'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Parameterized whole-store DRR; shared resolver capability whole-store-drr.
+    runnable: WORKS
+    tests: PARTIAL
+  required_args:
+    cabinet:
+      description: WB cabinet id
+      secret: false
+      type: integer
+    output_dir:
+      description: Output directory for artifacts
+      secret: false
+      type: path
+    shop_id:
+      description: WB shop uuid
+      secret: false
+      type: string
+  resolution_enabled: true
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  sources:
+  - POSTGRES
+  - WB_API
+  tenant_scope: PARAMETERIZED
+  title: Whole store daily DRR dynamics
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: adv-bot-historical-state-extractor
+  path: scripts/adv_bot_historical_state_extractor.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-08-25T22:40:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:9d269aa9e95afe64da03f8c8f5c07231da26c50e
+    last_local_at: '2026-08-25T21:44:04Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: COVERED
+  resolution_enabled: false
+  title: Adv-bot historical state extractor
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: backfill-l2
+  path: scripts/backfill_l2.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Backfill L2
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: backfill-mv-for-keyword-clusters
+  path: scripts/backfill_mv_for_keyword_clusters.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Backfill MV for keyword clusters
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: delete-user-by-telegram-id
+  path: scripts/delete_user_by_telegram_id.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Delete user by Telegram id
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: enable-individual-keywords
+  path: scripts/enable_individual_keywords_for_new_tariff_cabinets.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Enable individual keywords for new tariff cabinets
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: export-last-wb-movements
+  path: scripts/export_last_wb_movements.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Export last WB movements
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: export-non-zero-balance-users
+  path: scripts/export_non_zero_balance_users.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Export non-zero balance users
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: export-single-article-campaign-stats
+  path: scripts/export_single_article_campaigns_stats.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Export single-article campaign stats
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: fill-bid-decision
+  path: scripts/fill_bid_decision.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Fill bid decision
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: get-dialogs-from-tg-export
+  path: scripts/get_dialogs_from_tg_export.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Get dialogs from TG export
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: get-users
+  path: scripts/get_users/get_users.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Get users
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: get-users-for-shop
+  path: scripts/get_worst_adv/get_users_for_shop_id.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Get users for shop (worst adv)
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: insert-adv-deltas
+  path: scripts/insert_adv_deltas.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Insert adv deltas
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: install-error-monitoring
+  path: scripts/INSTALL_ERROR_MONITORING.sh
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: shell; Job template is python-oriented
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Install error monitoring
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: invoke-prod-db-migrate-then-rollout
+  path: scripts/Invoke-ProdDbMigrateThenRollout.ps1
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: local/ops ps1; not default Job
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Prod DB migrate then rollout
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: main-user-generator
+  path: scripts/users_communicate_module/main_user_generator.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Main user generator
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: migrate-black-phrases
+  path: scripts/migrate_black_phrases_redis_to_postgres.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Migrate black phrases Redis to Postgres
+- capabilities:
+  - ad-preflight
+  - identity-reconciliation
+  composable: false
+  compose_with: []
+  deprecated_by: null
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers: []
+    justification: ''
+  id: multi-client-ad-preflight
+  optional_args:
+    period_end:
+      description: Inclusive period end
+      secret: false
+      type: date
+    period_start:
+      description: Inclusive period start
+      secret: false
+      type: date
+  output_schema_version: multi-client-ad-preflight-v1
+  path: scripts/multi_client_ad_preflight_collect.py
+  primary_artifact_pattern: PROKRAFT-CABINET*-PREFLIGHT-*.zip
+  provided_fields:
+  - artifact_sha256
+  - artifact_zip
+  - campaign_state
+  - client_size_id
+  - economics
+  - nm_id
+  - period
+  - shop_id
+  - target_nmid
+  - wb_cabinet_id
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Parameterized read-only identity envelope; explicit coverage gaps remain.
+    runnable: UNKNOWN
+    tests: PARTIAL
+  required_args:
+    client_size_id:
+      description: Client size identity
+      secret: false
+      type: integer
+    output_dir:
+      description: Invocation-owned output directory
+      secret: false
+      type: path
+    shop_id:
+      description: WB shop identity
+      secret: false
+      type: string
+    target_nmid:
+      description: Target NMID
+      secret: false
+      type: integer
+    wb_cabinet_id:
+      description: WB cabinet identity
+      secret: false
+      type: integer
+  resolution_enabled: true
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  sources:
+  - POSTGRES
+  - WB_API
+  tenant_scope: PARAMETERIZED
+  title: Generic multi-client advertising preflight
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: multi-client-cpc-topology
+  path: scripts/multi_client_cpc_topology_collect.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-09-17T20:25:06Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:57984c0250abee172f4c8b736807504e3a105fc7
+    last_local_at: '2026-09-17T20:25:06Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: PARTIAL
+  resolution_enabled: false
+  title: Generic multi-client CPC topology
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: path-smoke
+  path: scripts/test_path.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Path smoke
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: resource-gap
+  path: scripts/resource_gap.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Resource gap
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: run-billing-debug-cabinet
+  path: scripts/run_billing_debug_cabinet.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Billing debug cabinet
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: send-message-all-users
+  path: scripts/send_message/send_message_all_users.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Send message to all users
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: send-single-messages
+  path: scripts/send_message/single_messages.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Send single messages
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: set-false-for-non-qualifying-users
+  path: scripts/set_false_for_non_qualifying_users.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Set false for non-qualifying users
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: set-old-user-passed-gate
+  path: scripts/set_old_user_passed_gate.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Set old user passed gate
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: set-relevant-if-white-phrase
+  path: scripts/set_relevant_if_white_phrase.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Set relevant if white phrase
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: set-sales-plan
+  path: scripts/set_sales_plan.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Set sales plan
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: set-shop-id-for-all-wb-tokens
+  path: scripts/set_shop_id_for_all_wbtokens.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Set shop id for all WB tokens
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: start-campaigns-by-nmids
+  path: scripts/start_campaigns_by_nmids.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Start campaigns by nmids
+- capabilities:
+  - strict-read-only-audit
+  composable: false
+  compose_with: []
+  deprecated_by: null
+  explicit_invocation_enabled: true
+  hardcoded_context:
+    identifiers: []
+    justification: ''
+  id: strict-single-nmid-audit
+  optional_args: {}
+  output_schema_version: strict-single-nmid-audit-v1
+  path: scripts/strict_single_nmid_audit.py
+  primary_artifact_pattern: STRICT-SINGLE-NMID-AUDIT.json
+  provided_fields:
+  - attribution
+  - decision
+  - evidence
+  - human_summary
+  - identity
+  - period
+  - physical_spend
+  - stock
+  - totals
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Generic identity-safe bounded audit; readers are injected by Owner-bot Job.
+    runnable: UNKNOWN
+    tests: COVERED
+  required_args:
+    cabinet:
+      description: Exact WB cabinet identity
+      secret: false
+      type: integer
+    nmid:
+      description: Exact single NMID identity
+      secret: false
+      type: integer
+    output:
+      description: Invocation-owned output JSON path
+      secret: false
+      type: path
+    shop_id:
+      description: Exact WB shop identity
+      secret: false
+      type: string
+    size_id:
+      description: Exact client size identity
+      secret: false
+      type: integer
+    timezone:
+      description: IANA audit timezone
+      secret: false
+      type: string
+  resolution_enabled: true
+  side_effects:
+  - READ_ONLY
+  - LOCAL_ARTIFACT_WRITE
+  sources:
+  - POSTGRES
+  - WB_API
+  tenant_scope: PARAMETERIZED
+  title: Strict single-NMID read-only audit
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: sync-local-env
+  path: scripts/sync-local-env-from-k8s.ps1
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: local/ops ps1; not default Job
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Sync local env from k8s
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: translit-yaml
+  path: scripts/translit_yaml.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Translit YAML
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: users-csv-export
+  path: scripts/users_csv_exporter/csv_export.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-08-14T12:47:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:c1e1fa7c523cdcec81ea23aaf7d8b2dc8e08248a
+    last_local_at: '-'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: NONE
+  resolution_enabled: false
+  title: Users CSV export
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: verify-local-env
+  path: scripts/verify-local-env.ps1
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '-'
+    last_image_ref: '-'
+    last_local_at: '-'
+    notes: local/ops ps1; not default Job
+    runnable: UNKNOWN
+    tests: NONE
+  resolution_enabled: false
+  title: Verify local env
+- deprecated_by: null
+  explicit_invocation_enabled: false
+  id: wb-api-read-only-preflight
+  path: scripts/wb_api_readonly_ops/run.py
+  readiness:
+    battle_tested: 'NO'
+    last_cluster_at: '2026-08-21T15:40:00Z'
+    last_image_ref: harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:4451a5645f9256c1978af1b64420b84a00a540eb
+    last_local_at: '2026-08-21T10:54:00Z'
+    notes: Legacy ledger row; not available to resolver.
+    runnable: WORKS
+    tests: PARTIAL
+  resolution_enabled: false
+  title: WB API read-only preflight/collect
+generated:
+  markdown: scripts/REGISTRY.md
+  ordering: id
+schema: scripts-registry
+version: 2

@@ -64,18 +64,24 @@ async def test_get_access_parent_handoff_to_children_for_shop_id() -> None:
     resolve_mock.assert_awaited_once_with(session1, shop_id)
     load_mock.assert_awaited_once_with(session2, 321)
     assert sm_mock.call_args_list[0].kwargs.get("read_only") is True
-    assert sm_mock.call_args_list[1].kwargs.get("read_only") is False
+    assert sm_mock.call_args_list[1].kwargs.get("read_only") is True
 
 
 async def test_get_access_deactivate_path_uses_write_session() -> None:
-    """Missing personal tokens: child returns shop_id; parent deactivates."""
-    session = MagicMock()
+    """Нет пригодного доступа: чтение, затем write-сессия и деактивация."""
+    read_session = MagicMock()
+    write_session = MagicMock()
+    write_session.get = AsyncMock(return_value=None)
+    write_session.commit = AsyncMock(return_value=None)
     with (
         patch.object(
             super_cabinet_manager,
             "sm",
-            return_value=_build_sm_context(session),
-        ),
+            side_effect=[
+                _build_sm_context(read_session),
+                _build_sm_context(write_session),
+            ],
+        ) as sm_mock,
         patch.object(
             super_cabinet_manager,
             "load_wb_cabinet_access_in_session",
@@ -91,6 +97,8 @@ async def test_get_access_deactivate_path_uses_write_session() -> None:
         with pytest.raises(ApiForbiddenError):
             await super_cabinet_manager.get_access_for_wb_cabinet(999)
 
+    assert sm_mock.call_args_list[0].kwargs.get("read_only") is True
+    assert sm_mock.call_args_list[1].kwargs.get("read_only") is False
     deactivate_mock.assert_awaited_once()
 
 

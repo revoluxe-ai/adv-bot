@@ -129,6 +129,9 @@ rules:
   proposal:
     - "Всегда включать intent, scope in/out, current behavior, desired behavior, impact, risk и rollback idea."
     - "Один change должен иметь один intent."
+    - "Если передан approved EVOLUTION_HANDOFF, proposal должен фиксировать STAR_ID, INCREMENT_ID, CURRENT_INCREMENT и CONTRIBUTION_TO_NORTH_STAR; только CURRENT_INCREMENT является owed scope."
+    - "FUTURE_INCREMENTS из Evolution Context являются context-only и не должны становиться requirements, acceptance criteria или tasks текущего change."
+    - "Отсутствие STAR_ID не блокирует standalone, legacy-unlinked, bugfix, refactor или maintenance change."
     - "Proposal должен объяснять зачем и в каких границах делается изменение."
     - "Не писать в proposal список файлов, классов, функций или SQL-запросов."
     - "Явно указывать out of scope."
@@ -166,6 +169,7 @@ rules:
 
   design:
     - "Перед техническими изменениями изучать существующую реализацию."
+    - "Для linked change design должен объяснять CONTRIBUTION_TO_NORTH_STAR и учитывать FORWARD_COMPATIBILITY_CONSTRAINTS, но не создавать speculative framework и не реализовывать FUTURE_INCREMENTS."
     - "Перед design искать openspec/decisions/**/*.md и учитывать relevant accepted/proposed decisions."
     - "Design должен содержать обязательную секцию ## Architecture Decision References со ссылками на relevant decisions по path или явным Architecture Decision Missing."
     - "Design должен содержать обязательную секцию ## Ownership & Placement с указанием owner layer, forbidden layers и rationale."
@@ -196,6 +200,7 @@ rules:
     - "Regression tests должны падать при удалении guarded condition."
     - "Если gate имеет blocked и allowed behavior, tasks должны добавить или потребовать paired positive case."
     - "Tasks должны быть маленькими, последовательными, проверяемыми."
+    - "Для linked change tasks должны покрывать только CURRENT_INCREMENT; FUTURE_INCREMENTS запрещено добавлять как owed work без нового approved handoff."
     - "Включать characterization tests перед изменением рискованного или неясного поведения."
     - "Включать regression tests для bug fixes."
     - "Включать targeted tests для каждой новой или изменённой decision function."

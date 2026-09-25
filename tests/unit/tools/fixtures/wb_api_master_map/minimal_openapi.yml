@@ -1,0 +1,29 @@
+# Фикстура OpenAPI для unit-тестов wb-api-master-map (INC-RO-03).
+# Несколько path/method включая не-GET; family задаётся тестом при parse.
+openapi: 3.0.1
+info:
+  title: Fixture Family Alpha
+  version: "1"
+paths:
+  /api/v1/items:
+    get:
+      summary: List items
+      responses:
+        "200":
+          description: ok
+    post:
+      summary: Create item
+      responses:
+        "201":
+          description: created
+  /api/v1/items/{id}:
+    get:
+      summary: Get item
+      responses:
+        "200":
+          description: ok
+    delete:
+      summary: Delete item
+      responses:
+        "204":
+          description: gone

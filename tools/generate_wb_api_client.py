@@ -119,6 +119,14 @@ SWAGGER_TARGETS: dict[str, SwaggerTarget] = {
         target_root=REPO_ROOT / "app" / "core" / "mp" / "wb" / "api" / "generated" / "products",
         package_name="content_products_client",
     ),
+    "reports": SwaggerTarget(
+        key="reports",
+        spec_url="https://dev.wildberries.ru/api/swagger/yaml/en/12-reports.yaml",
+        spec_filename="12-reports.yaml",
+        target_root=REPO_ROOT / "app" / "core" / "mp" / "wb" / "api" / "generated" / "reports",
+        package_name="reports_client",
+        skip_transliteration=True,
+    ),
 }
 
 
