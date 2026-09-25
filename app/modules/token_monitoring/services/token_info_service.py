@@ -3,6 +3,7 @@
 import datetime
 import logging
 from dataclasses import dataclass
+from functools import cached_property
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -144,13 +145,20 @@ class TokenStatusReport:
             missing = ", ".join(sorted(self.missing_permissions))
             return f"Отсутствуют права: {missing}"
 
-    @property
-    def service_expiration_date(self) -> datetime.datetime | None:
-        """Date when required-rights coverage is first lost for personal tokens.
+    @cached_property
+    def _first_required_rights_coverage_loss(
+        self,
+    ) -> tuple[datetime.datetime, set[str]] | None:
+        """First expiry moment when required-rights coverage drops to zero.
 
-        Uses only personal valid tokens that contribute at least one required right.
-        The returned date is the earliest token expiry moment after which the union
-        of active personal-token rights no longer covers REQUIRED_RIGHTS.
+        Walks personal valid tokens grouped by exact ``expires`` datetime (ascending).
+        For each group, decrements coverage for all tokens in the group before
+        checking for lost rights. The result is cached for the lifetime of this
+        report so date, days-left, and lost-rights reads share one pass.
+
+        Returns:
+            ``(expires, lost_rights)`` at the first coverage loss, or ``None`` if
+            status is not Complete, no contributing personal tokens, or no loss.
         """
         if self.status != "Complete":
             return None
@@ -163,7 +171,6 @@ class TokenStatusReport:
         if not personal_tokens:
             return None
 
-        # Process expiry events from earliest to latest and detect first coverage loss.
         rights_coverage_count: dict[str, int] = {right: 0 for right in REQUIRED_RIGHTS}
         for token in personal_tokens:
             for right in token.categories & REQUIRED_RIGHTS:
@@ -172,14 +179,52 @@ class TokenStatusReport:
         if any(count == 0 for count in rights_coverage_count.values()):
             return None
 
-        for token in sorted(personal_tokens, key=lambda t: t.expires):
-            for right in token.categories & REQUIRED_RIGHTS:
-                rights_coverage_count[right] -= 1
+        sorted_tokens = sorted(personal_tokens, key=lambda t: t.expires)
+        index = 0
+        while index < len(sorted_tokens):
+            expires_at = sorted_tokens[index].expires
+            group: list[TokenInfo] = []
+            while (
+                index < len(sorted_tokens)
+                and sorted_tokens[index].expires == expires_at
+            ):
+                group.append(sorted_tokens[index])
+                index += 1
 
-            if any(count == 0 for count in rights_coverage_count.values()):
-                return token.expires
+            for token in group:
+                for right in token.categories & REQUIRED_RIGHTS:
+                    rights_coverage_count[right] -= 1
+
+            lost = {
+                right
+                for right, count in rights_coverage_count.items()
+                if count == 0
+            }
+            if lost:
+                return (expires_at, lost)
 
         return None
+
+    @property
+    def service_expiration_date(self) -> datetime.datetime | None:
+        """Date when required-rights coverage is first lost for personal tokens.
+
+        Uses only personal valid tokens that contribute at least one required right.
+        The returned date is the earliest token expiry moment after which the union
+        of active personal-token rights no longer covers REQUIRED_RIGHTS.
+        Delegates to ``_first_required_rights_coverage_loss``.
+        """
+        loss = self._first_required_rights_coverage_loss
+        return loss[0] if loss else None
+
+    @property
+    def rights_lost_at_service_expiration(self) -> set[str]:
+        """Required rights whose coverage hits zero at ``service_expiration_date``.
+
+        Пустое множество, если статус не Complete или дата потери покрытия не определена.
+        """
+        loss = self._first_required_rights_coverage_loss
+        return set(loss[1]) if loss else set()
 
     @property
     def days_until_service_breaks(self) -> int | None:
