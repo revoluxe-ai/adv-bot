@@ -1,0 +1,19 @@
+app/modules/token_monitoring/services/token_info_service.py
+  s_337284ec20392a::t_d4e40dd4e90c15 6,148-152,154-161,182-204,208-228
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "07926b1f5333e20489fddb90c350ffee57d32282",
+  "prompts": {},
+  "sessions": {
+    "s_337284ec20392a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8831c7e6-789a-4bda-943c-55c396f6ffd7",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
