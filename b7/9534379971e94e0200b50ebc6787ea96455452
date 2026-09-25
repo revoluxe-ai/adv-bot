@@ -1,0 +1,721 @@
+app/modules/common_slaves/wildberries/super_cabinet_manager.py
+  s_b9645704ff80d7::t_bd3d20765e2653 83-101,105,108-109,112-113,116,132,134-138,140,158-160,177-191,201,207-212
+tests/unit/client_bot/test_super_cabinet_pg_seam_handoff.py
+  s_b9645704ff80d7::t_974de8fa64f891 67,71-75,80-84,100-101
+.github/workflows/deploy_scripts.yml
+  s_37fe17efa61f92::t_df3a41c5bf79b7 1-81
+app/core/di/client_di/domain_managers_containers/reports_container.py
+  s_37fe17efa61f92::t_eb96c4c32d284a 1-28
+app/core/di/client_di/wb_data_container.py
+  s_37fe17efa61f92::t_a58cfd76d2c87b 13-15,22,46-50,63-66,72
+app/core/mp/wb/api/adapter/reports_client/__init__.py
+  s_37fe17efa61f92::t_b6360aab14a9bb 1-5
+app/core/mp/wb/api/adapter/reports_client/adapter.py
+  s_37fe17efa61f92::t_3474331a4f0d5f 1-94
+app/core/mp/wb/api/adapter/reports_client/base_section_adapter.py
+  s_37fe17efa61f92::t_3cf2af84aea4f8 1-10
+app/core/mp/wb/api/adapter/sections_enum.py
+  s_37fe17efa61f92::t_775d562b931140 8
+app/core/mp/wb/api/auth_client_handler.py
+  s_37fe17efa61f92::t_6c90ef5df2e604 81
+app/core/mp/wb/api/domain_managers/__init__.py
+  s_37fe17efa61f92::t_5acdf99aebec59 4,13
+app/core/mp/wb/api/domain_managers/reports/__init__.py
+  s_37fe17efa61f92::t_5584755e18c8e3 1-5
+app/core/mp/wb/api/domain_managers/reports/reports_manager.py
+  s_37fe17efa61f92::t_7b69c409560441 1-45
+app/core/mp/wb/api/generated/doc.md
+  s_37fe17efa61f92::t_8909708a7b31ad 25-26
+app/core/mp/wb/api/generated/reports/v1/reports_client/__init__.py
+  s_37fe17efa61f92::t_abd0aa034fefe3 1-8
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/__init__.py
+  s_37fe17efa61f92::t_b0415a30f8ef9c 1
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/acceptance_expenses/get_api_v1_acceptance_report.py
+  s_37fe17efa61f92::t_08ac0d650450e7 1-252
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/acceptance_expenses/get_api_v1_acceptance_report_tasks_task_id_download.py
+  s_37fe17efa61f92::t_55e96328483ca1 1-281
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/acceptance_expenses/get_api_v1_acceptance_report_tasks_task_id_status.py
+  s_37fe17efa61f92::t_fd92d24782d95e 1-228
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/blocked_items/get_api_v1_analytics_banned_products_blocked.py
+  s_37fe17efa61f92::t_a733d8a065816d 1-304
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/blocked_items/get_api_v1_analytics_banned_products_shadowed.py
+  s_37fe17efa61f92::t_89ee56f55e235c 1-300
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/main_reports/get_api_v1_supplier_orders.py
+  s_37fe17efa61f92::t_1f778ca5c08266 1-408
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/main_reports/get_api_v1_supplier_sales.py
+  s_37fe17efa61f92::t_84ce9362e19390 1-440
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/paid_storage/get_api_v1_paid_storage.py
+  s_37fe17efa61f92::t_7cdd10c2911100 1-248
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/paid_storage/get_api_v1_paid_storage_tasks_task_id_download.py
+  s_37fe17efa61f92::t_101f19bbed42c6 1-243
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/paid_storage/get_api_v1_paid_storage_tasks_task_id_status.py
+  s_37fe17efa61f92::t_eadbcafd74052b 1-228
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/report_on_items_with_mandatory_labeling/post_api_v1_analytics_excise_report.py
+  s_37fe17efa61f92::t_f42386e473e4af 1-281
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/retention_reports/get_api_v1_analytics_antifraud_details.py
+  s_37fe17efa61f92::t_4d4c418e060628 1-247
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/retention_reports/get_api_v1_analytics_goods_labeling.py
+  s_37fe17efa61f92::t_838d2bc1e7dd75 1-257
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/retention_reports/get_v1_deductions.py
+  s_37fe17efa61f92::t_fda0bdc63b8d00 1-342
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/retention_reports/get_v1_measurement_penalties.py
+  s_37fe17efa61f92::t_b7b62f73fba5cf 1-304
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/retention_reports/get_v1_warehouse_measurements.py
+  s_37fe17efa61f92::t_db8fa8d1ad46f1 1-292
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/returns_and_item_movement_report/get_api_v1_analytics_goods_return.py
+  s_37fe17efa61f92::t_8ace3f6cfbd797 1-259
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/sales_by_regions/get_api_v1_analytics_region_sale.py
+  s_37fe17efa61f92::t_5cc07643355623 1-250
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/share_of_brand_in_sales/get_api_v1_analytics_brand_share.py
+  s_37fe17efa61f92::t_c5391bc4a40b0f 1-284
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/share_of_brand_in_sales/get_api_v1_analytics_brand_share_brands.py
+  s_37fe17efa61f92::t_d6a1db5a719451 1-128
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/share_of_brand_in_sales/get_api_v1_analytics_brand_share_parent_subjects.py
+  s_37fe17efa61f92::t_a8249edd745ba0 1-284
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/warehouses_inventory_report/get_api_v1_warehouse_remains.py
+  s_37fe17efa61f92::t_e96f85133b129f 1-361
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/warehouses_inventory_report/get_api_v1_warehouse_remains_tasks_task_id_download.py
+  s_37fe17efa61f92::t_d9ce2f28110449 1-281
+app/core/mp/wb/api/generated/reports/v1/reports_client/api/warehouses_inventory_report/get_api_v1_warehouse_remains_tasks_task_id_status.py
+  s_37fe17efa61f92::t_5375c5c3b3f023 1-228
+app/core/mp/wb/api/generated/reports/v1/reports_client/client.py
+  s_37fe17efa61f92::t_9fadedab5dd08f 1-274
+app/core/mp/wb/api/generated/reports/v1/reports_client/errors.py
+  s_37fe17efa61f92::t_e58cb53e5f55fe 1-14
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/__init__.py
+  s_37fe17efa61f92::t_460656f3afda9e 1-123
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/create_task_response.py
+  s_37fe17efa61f92::t_d4ad6342809b19 1-71
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/create_task_response_data.py
+  s_37fe17efa61f92::t_edd822864aaca4 1-58
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/excise_report_request.py
+  s_37fe17efa61f92::t_ca8e5e2cb2f0cf 1-75
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/excise_report_request_countries_item.py
+  s_37fe17efa61f92::t_8f328e63c51b7a 1-13
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/excise_report_response.py
+  s_37fe17efa61f92::t_f1325795de635b 1-71
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/field_4_xx_response.py
+  s_37fe17efa61f92::t_aad0451ecbd1d4 1-85
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_acceptance_report_tasks_task_id_download_response_200_item.py
+  s_37fe17efa61f92::t_4d8c16bfa243a0 1-128
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_blocked_order.py
+  s_37fe17efa61f92::t_6242bb5c5bcab9 1-9
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_blocked_response_200.py
+  s_37fe17efa61f92::t_75a260b0385f1b 1-84
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_blocked_response_200_report_item.py
+  s_37fe17efa61f92::t_518933d27d087d 1-95
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_blocked_response_400.py
+  s_37fe17efa61f92::t_44668167c13ab4 1-94
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_blocked_sort.py
+  s_37fe17efa61f92::t_a7388fc8b85e17 1-12
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_shadowed_order.py
+  s_37fe17efa61f92::t_9bd6b795bc177d 1-9
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_shadowed_response_200.py
+  s_37fe17efa61f92::t_d4243ec537d5a7 1-84
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_shadowed_response_200_report_item.py
+  s_37fe17efa61f92::t_0c6c07d67063c4 1-94
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_shadowed_response_400.py
+  s_37fe17efa61f92::t_351c85fc0c8535 1-94
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_banned_products_shadowed_sort.py
+  s_37fe17efa61f92::t_9447203ffe472a 1-12
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_goods_return_response_200.py
+  s_37fe17efa61f92::t_33a656904b32c4 1-82
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_goods_return_response_200_report_item.py
+  s_37fe17efa61f92::t_4812f100cfc31d 1-287
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_analytics_goods_return_response_200_report_item_is_status_active.py
+  s_37fe17efa61f92::t_fe8316238d9ddd 1-9
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_warehouse_remains_tasks_task_id_download_response_200_item.py
+  s_37fe17efa61f92::t_c48d3960b8d0fb 1-149
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_api_v1_warehouse_remains_tasks_task_id_download_response_200_item_warehouses_item.py
+  s_37fe17efa61f92::t_628cefdde0aa98 1-71
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_tasks_response.py
+  s_37fe17efa61f92::t_a4dfde8cd61d45 1-71
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_tasks_response_data.py
+  s_37fe17efa61f92::t_36be520fb0edd2 1-72
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_v1_deductions_order.py
+  s_37fe17efa61f92::t_01a5168e2ce9ec 1-9
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/get_v1_deductions_sort.py
+  s_37fe17efa61f92::t_805df69bbf4989 1-10
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/measurement_penalties.py
+  s_37fe17efa61f92::t_4700749a16e9fc 1-64
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/measurement_penalties_data.py
+  s_37fe17efa61f92::t_2c99c5aed259db 1-87
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/measurement_penalties_data_reports_item.py
+  s_37fe17efa61f92::t_a5595eb76a1a73 1-238
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/models_excise_report_response.py
+  s_37fe17efa61f92::t_014f7e89cb7996 1-86
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/models_excise_report_response_data_item.py
+  s_37fe17efa61f92::t_5e31e420a5483f 1-163
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/orders_item.py
+  s_37fe17efa61f92::t_969e4c2f188a94 1-308
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/orders_item_warehouse_type.py
+  s_37fe17efa61f92::t_a6751fba150a4a 1-9
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/response_400_retentions.py
+  s_37fe17efa61f92::t_6dfc297804d410 1-94
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/response_403_retentions.py
+  s_37fe17efa61f92::t_d22873b3f05a6f 1-94
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/response_error_statistics.py
+  s_37fe17efa61f92::t_60680ece20a85a 1-60
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/response_error_statistics_2.py
+  s_37fe17efa61f92::t_aeaa471f2e569a 1-58
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/response_paid_storage_item.py
+  s_37fe17efa61f92::t_656e7a3a12090b 1-257
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/sales_item.py
+  s_37fe17efa61f92::t_dd3682d635c9ef 1-322
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/sales_item_warehouse_type.py
+  s_37fe17efa61f92::t_e6e2e879201e86 1-9
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/whm.py
+  s_37fe17efa61f92::t_540286b2df56eb 1-64
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/whm_data.py
+  s_37fe17efa61f92::t_1e363cba1a0f0f 1-81
+app/core/mp/wb/api/generated/reports/v1/reports_client/models/whm_data_reports_item.py
+  s_37fe17efa61f92::t_50b908579ef7e9 1-145
+app/core/mp/wb/api/generated/reports/v1/reports_client/types.py
+  s_37fe17efa61f92::t_f70a74a9a094d8 1-53
+app/core/mp/wb/api/generated/reports/v1/swagger/spec.lock.json
+  s_37fe17efa61f92::t_a8c7c2ee4ec710 1-10
+app/core/mp/wb/api/httpx_client_handler.py
+  s_37fe17efa61f92::t_b2e4cb774a6907 31
+app/core/mp/wb/api/managers/wb_data_manager/wb_data_manager.py
+  s_37fe17efa61f92::t_c4dec12488886e 33,38-43,59,64,74-102
+app/core/mp/wb/api/swagger_inventory/2026-08-04/swagger_urls.json
+  s_37fe17efa61f92::t_72043519d1cf08 1-60
+app/core/mp/wb/api/swagger_inventory/2026-08-04/swagger_urls.txt
+  s_37fe17efa61f92::t_77d229e02399f5 1-61
+app/core/mp/wb/api/swagger_inventory/README.md
+  s_37fe17efa61f92::t_6846e441730a58 1-40
+k8s/jobs/ops-script-runner.yaml
+  s_37fe17efa61f92::t_c8fdb1661f5787 1-58
+mypy.ini
+  s_37fe17efa61f92::t_0b56a3879ab163 5,82
+openspec/changes/adv-bot-historical-state-extractor/design.md
+  s_37fe17efa61f92::t_0abee4d0954020 1-57
+openspec/changes/adv-bot-historical-state-extractor/proposal.md
+  s_37fe17efa61f92::t_e6ef78f7c4ca0b 1-35
+openspec/changes/adv-bot-historical-state-extractor/specs/adv-bot-internal-history-extractor/spec.md
+  s_37fe17efa61f92::t_b144e113c30afa 1-46
+openspec/changes/adv-bot-historical-state-extractor/tasks.md
+  s_37fe17efa61f92::t_a5c5ef0a7f6c96 1-15
+openspec/changes/archive/2026-08-04-wb-readonly-api-preflight/decisions/scripts-wb-api-ops-stack/decision.md
+  s_37fe17efa61f92::t_6524fbc03b2cb2 1-107
+openspec/changes/archive/2026-08-04-wb-readonly-api-preflight/design.md
+  s_37fe17efa61f92::t_fa5ed0d3c8476c 1-101
+openspec/changes/archive/2026-08-04-wb-readonly-api-preflight/proposal.md
+  s_37fe17efa61f92::t_641450658a6ac0 1-108
+openspec/changes/archive/2026-08-04-wb-readonly-api-preflight/specs/wb-api-read-only-preflight/spec.md
+  s_37fe17efa61f92::t_482d4bbedd77b5 1-120
+openspec/changes/archive/2026-08-04-wb-readonly-api-preflight/tasks.md
+  s_37fe17efa61f92::t_b56f185fb28f03 1-52
+openspec/changes/archive/2026-08-05-statistics-orders-sales-get-adapter/decisions/orders-or-sales-reports-read-identity/decision.md
+  s_37fe17efa61f92::t_40528aea5169d5 1-117
+openspec/changes/archive/2026-08-05-statistics-orders-sales-get-adapter/design.md
+  s_37fe17efa61f92::t_dc572e2949e364 1-176
+openspec/changes/archive/2026-08-05-statistics-orders-sales-get-adapter/proposal.md
+  s_37fe17efa61f92::t_f591b213c048a1 1-129
+openspec/changes/archive/2026-08-05-statistics-orders-sales-get-adapter/specs/wb-api-read-only-preflight/spec.md
+  s_37fe17efa61f92::t_f62cdb6742a96f 1-212
+openspec/changes/archive/2026-08-05-statistics-orders-sales-get-adapter/tasks.md
+  s_37fe17efa61f92::t_cdbbb5578b0052 1-86
+openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/.openspec.yaml
+  s_37fe17efa61f92::t_676a4233a3b3dc 1-2
+openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/decisions/wb-api-master-local-swagger-map/decision.md
+  s_37fe17efa61f92::t_ed5b4e3165e463 1-124
+openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/design.md
+  s_37fe17efa61f92::t_442525d7f80fbc 1-140
+openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/proposal.md
+  s_37fe17efa61f92::t_f8d77ecd84d1b5 1-94
+openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/specs/wb-api-master-map/spec.md
+  s_37fe17efa61f92::t_d6ee204edee324 1-102
+openspec/changes/archive/2026-08-05-wb-api-master-swagger-map/tasks.md
+  s_37fe17efa61f92::t_8da8a4b7514e5e 1-45
+openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/JOB_EVIDENCE_PLAN.md
+  s_37fe17efa61f92::t_d96aba97679c2f 1-16
+openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/decisions/REUSE.md
+  s_37fe17efa61f92::t_947e141f7306d0 1-37
+openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/design.md
+  s_37fe17efa61f92::t_0aba85372327ae 1-137
+openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/proposal.md
+  s_37fe17efa61f92::t_e4118249256036 1-90
+openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/specs/wb-api-read-only-preflight/spec.md
+  s_37fe17efa61f92::t_7fc457877983d0 1-185
+openspec/changes/archive/2026-08-05-wb-readonly-job-smoke-reports/tasks.md
+  s_37fe17efa61f92::t_6bb342f91773f8 1-65
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/decisions/strict-single-nmid-audit-evidence/decision.md
+  s_37fe17efa61f92::t_75396fc03e0c94 1-121
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/design.md
+  s_37fe17efa61f92::t_2d6866a7749157 1-190
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/proposal.md
+  s_37fe17efa61f92::t_984e44798c90f9 1-66
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/specs/strict-single-nmid-read-only-audit/spec.md
+  s_37fe17efa61f92::t_fc726992bb2e9f 1-265
+openspec/changes/archive/2026-09-20-prod-adv-bot-strict-read-only-gap/tasks.md
+  s_37fe17efa61f92::t_5a39f4d367f644 1-31
+openspec/changes/col-r03-009-contract-preflight-return/.openspec.yaml
+  s_37fe17efa61f92::t_9525db8e2005c9 1-2
+openspec/changes/col-r03-009-contract-preflight-return/OWNER_BOT_INVOKE_PLAN.md
+  s_37fe17efa61f92::t_cb0de4ed2efed7 1-40
+openspec/changes/col-r03-009-contract-preflight-return/decisions/wb-readonly-contract-return-vs-l0/decision.md
+  s_37fe17efa61f92::t_416b2538df342e 1-115
+openspec/changes/col-r03-009-contract-preflight-return/design.md
+  s_37fe17efa61f92::t_359a69b4554ee1 1-138
+openspec/changes/col-r03-009-contract-preflight-return/proposal.md
+  s_37fe17efa61f92::t_392a254d6b846d 1-67
+openspec/changes/col-r03-009-contract-preflight-return/specs/wb-api-read-only-preflight/spec.md
+  s_37fe17efa61f92::t_80d4ccf8eb06a2 1-44
+openspec/changes/col-r03-009-contract-preflight-return/specs/wb-readonly-contract-preflight-return/spec.md
+  s_37fe17efa61f92::t_751dbc54cd4752 1-129
+openspec/changes/col-r03-009-contract-preflight-return/tasks.md
+  s_37fe17efa61f92::t_8254c076967265 1-90
+openspec/changes/inc-ro-08-orders-sales-period-collect/.openspec.yaml
+  s_37fe17efa61f92::t_fbe4217db1347a 1-2
+openspec/changes/inc-ro-08-orders-sales-period-collect/decisions/REUSE.md
+  s_37fe17efa61f92::t_e698efc31423fb 1-41
+openspec/changes/inc-ro-08-orders-sales-period-collect/design.md
+  s_37fe17efa61f92::t_fb1085809bae7b 1-174
+openspec/changes/inc-ro-08-orders-sales-period-collect/proposal.md
+  s_37fe17efa61f92::t_6b325925982be4 1-74
+openspec/changes/inc-ro-08-orders-sales-period-collect/specs/wb-api-read-only-preflight/spec.md
+  s_37fe17efa61f92::t_4d8f2cdbad065d 1-121
+openspec/changes/inc-ro-08-orders-sales-period-collect/tasks.md
+  s_37fe17efa61f92::t_4c2bca9b56b7ee 1-77
+openspec/changes/owner-bot-read-only-evidence-plane-stability/decisions/owner-bot-job-evidence-plane-lifecycle/decision.md
+  s_37fe17efa61f92::t_07adcca6ac5d42 1-82
+openspec/changes/owner-bot-read-only-evidence-plane-stability/design.md
+  s_37fe17efa61f92::t_aeb76ad23b8f22 1-188
+openspec/changes/owner-bot-read-only-evidence-plane-stability/proposal.md
+  s_37fe17efa61f92::t_7a94864284ef88 1-67
+openspec/changes/owner-bot-read-only-evidence-plane-stability/specs/owner-bot-read-only-evidence-plane/spec.md
+  s_37fe17efa61f92::t_e235e0a459127a 1-259
+openspec/changes/owner-bot-read-only-evidence-plane-stability/tasks.md
+  s_37fe17efa61f92::t_ac295d477c30e6 1-82
+openspec/changes/scripts-collector-lifecycle-architecture/.openspec.yaml
+  s_37fe17efa61f92::t_b0cf4047443e46 1-2
+openspec/changes/scripts-collector-lifecycle-architecture/decisions/scripts-collector-lifecycle-ownership/decision.md
+  s_37fe17efa61f92::t_c74b75b653f670 1-169
+openspec/changes/scripts-collector-lifecycle-architecture/design.md
+  s_37fe17efa61f92::t_d8933d2cc806c5 1-642
+openspec/changes/scripts-collector-lifecycle-architecture/proposal.md
+  s_37fe17efa61f92::t_17c86d79fd28a6 1-113
+openspec/changes/scripts-collector-lifecycle-architecture/specs/scripts-branch-independent-invocation/spec.md
+  s_37fe17efa61f92::t_029485e990fd87 1-280
+openspec/changes/scripts-collector-lifecycle-architecture/specs/scripts-collector-resolution/spec.md
+  s_37fe17efa61f92::t_07c43b7a46d007 1-362
+openspec/changes/scripts-collector-lifecycle-architecture/specs/scripts-registry-contract/spec.md
+  s_37fe17efa61f92::t_a70ad1eb829495 1-183
+openspec/changes/scripts-collector-lifecycle-architecture/tasks.md
+  s_37fe17efa61f92::t_d8ac89af6d61ee 1-127
+openspec/changes/scripts-collector-lifecycle-architecture/verification/READY_FOR_REVERIFY.json
+  s_37fe17efa61f92::t_ea3ef4be01246e 1-118
+openspec/config.yaml
+  s_37fe17efa61f92::t_f76784cfde5d70 132-134,172,203
+openspec/decisions/index.md
+  s_37fe17efa61f92::t_28bb783bd8f2cd 38-43,120-125
+openspec/decisions/orders-or-sales-reports-read-identity/decision.md
+  s_37fe17efa61f92::t_abb94cb862b4a5 1-117
+openspec/decisions/scripts-wb-api-ops-stack/decision.md
+  s_37fe17efa61f92::t_31a982b557b0f0 1-107
+openspec/decisions/strict-single-nmid-audit-evidence/decision.md
+  s_37fe17efa61f92::t_f0d9e155bae8cd 1-121
+openspec/decisions/wb-api-master-local-swagger-map/decision.md
+  s_37fe17efa61f92::t_59ba02ace6c827 1-124
+openspec/evolution/wb-safe-readonly-collect.md
+  s_37fe17efa61f92::t_d24e238f298948 1-385
+openspec/schemas/spec-driven/schema.yaml
+  s_37fe17efa61f92::t_e6a8dc3b7d8a85 18-23,172-176
+openspec/schemas/spec-driven/templates/design.md
+  s_37fe17efa61f92::t_006e99f9d36277 5-14
+openspec/schemas/spec-driven/templates/proposal.md
+  s_37fe17efa61f92::t_82f6ac638946b4 5-19
+openspec/specs/strict-single-nmid-read-only-audit/spec.md
+  s_37fe17efa61f92::t_65a84525f84772 1-269
+openspec/specs/wb-api-master-map/spec.md
+  s_37fe17efa61f92::t_79d7ac4fbc366f 1-110
+openspec/specs/wb-api-read-only-preflight/spec.md
+  s_37fe17efa61f92::t_1a5bdc5199e918 1-338
+pyproject.toml
+  s_37fe17efa61f92::t_8fea1f70c345ba 5,17
+pyrightconfig_strict.json
+  s_37fe17efa61f92::t_6def36af242331 145-146
+scripts/REGISTRY.md
+  s_37fe17efa61f92::t_1d555d7252563b 1-89
+scripts/REGISTRY.yaml
+  s_37fe17efa61f92::t_b3573ebe599443 1-1047
+scripts/a1_adv34210859_placement_economics.py
+  s_37fe17efa61f92::t_5f0b08bcba1025 1-477
+scripts/a1_baseline_v0_collect.py
+  s_37fe17efa61f92::t_0a1973aeea014c 1-913
+scripts/a1_cabinet401_run_go_contract_collect.py
+  s_37fe17efa61f92::t_6249537b0b17fc 1-270
+scripts/a1_cabinet401_run_go_contract_collect_v2.py
+  s_37fe17efa61f92::t_a0de47d0d99531 1-403
+scripts/a1_client_management_scope_reconcile_collect.py
+  s_37fe17efa61f92::t_a1d13c17cba094 1-501
+scripts/a1_closed_20260902_store_snapshot.py
+  s_37fe17efa61f92::t_4bfadb0ae216b7 1-568
+scripts/a1_controlled_ad_expansion_v1.py
+  s_37fe17efa61f92::t_70efd700b8ab94 1-961
+scripts/a1_cpc_candidate_fbs_stock_check.py
+  s_37fe17efa61f92::t_19a9c141ab475b 1-412
+scripts/a1_cpc_growth_experiment_prep.py
+  s_37fe17efa61f92::t_726ac165b1cc24 1-998
+scripts/a1_cpc_target_stock_check.py
+  s_37fe17efa61f92::t_9edca507a80e0c 1-283
+scripts/a1_cpc_two_sku_safety_preflight.py
+  s_37fe17efa61f92::t_c56367241986c9 1-741
+scripts/a1_current_ad_funding_snapshot.py
+  s_37fe17efa61f92::t_8fe22f1e7de41e 1-315
+scripts/a1_current_performance_drr_snapshot.py
+  s_37fe17efa61f92::t_36b171d1681c68 1-1460
+scripts/a1_current_state_gap_collect.py
+  s_37fe17efa61f92::t_ff96eb9b22c7b6 1-670
+scripts/a1_current_state_reconciliation.py
+  s_37fe17efa61f92::t_26fbe91755483e 1-742
+scripts/a1_current_store_snapshot.py
+  s_37fe17efa61f92::t_d5c86175cc2df6 1-694
+scripts/a1_daily_spend_cap_input_data.py
+  s_37fe17efa61f92::t_548f224ddc4359 1-510
+scripts/a1_daily_spend_control_reconciliation.py
+  s_37fe17efa61f92::t_9f1b8f27b625e5 1-972
+scripts/a1_daily_spend_control_reissue.py
+  s_37fe17efa61f92::t_a0deaad9a904a4 1-669
+scripts/a1_direct_associated_value_review.py
+  s_37fe17efa61f92::t_40b1bfb886d3be 1-724
+scripts/a1_direct_associated_value_review_v2.py
+  s_37fe17efa61f92::t_bf2df500254939 1-602
+scripts/a1_exact_subject_semantics.py
+  s_37fe17efa61f92::t_392f0231117833 1-688
+scripts/a1_existing_campaign_reuse_inventory.py
+  s_37fe17efa61f92::t_206d924ad1c6da 1-751
+scripts/a1_full_fbs_stock_snapshot.py
+  s_37fe17efa61f92::t_73d6afb88915b1 1-725
+scripts/a1_funding_balance_reconciliation.py
+  s_37fe17efa61f92::t_56cfc1dae1ff2d 1-418
+scripts/a1_glue_topology_web_review_collect.py
+  s_37fe17efa61f92::t_75ca73ff80cdf2 1-1286
+scripts/a1_iteration_04_current_state.py
+  s_37fe17efa61f92::t_2fd77da091916f 1-1074
+scripts/a1_iteration_05_observation.py
+  s_37fe17efa61f92::t_99b7262cf32658 1-702
+scripts/a1_iteration_06_aggressiveness_design.py
+  s_37fe17efa61f92::t_438c4fc3647df7 1-672
+scripts/a1_iteration_06_keyword_mechanism_baseline.py
+  s_37fe17efa61f92::t_12f7bb20667ced 1-695
+scripts/a1_order_growth_sku_decomposition.py
+  s_37fe17efa61f92::t_169de92d1c004e 1-701
+scripts/a1_paused_reuse_final_check.py
+  s_37fe17efa61f92::t_5b1a1a2a78be15 1-512
+scripts/a1_physical_contour_search_control_map.py
+  s_37fe17efa61f92::t_c6de5f821a6b48 1-696
+scripts/a1_prechange_ad_corrective_evidence.py
+  s_37fe17efa61f92::t_7d2a1e12aed90e 1-1134
+scripts/a1_pressure_and_shortlist_refresh.py
+  s_37fe17efa61f92::t_221dbe1b35e761 1-1161
+scripts/a1_prokraft_delayed_ad_effect_collect.py
+  s_37fe17efa61f92::t_8df4bb99c52379 1-829
+scripts/a1_prokraft_spp_dynamics_collect.py
+  s_37fe17efa61f92::t_a37c5f5e28d629 1-390
+scripts/a1_promo_adjusted_drr_collect.py
+  s_37fe17efa61f92::t_7393c11687217a 1-1040
+scripts/a1_promotion_funding_snapshot.py
+  s_37fe17efa61f92::t_f28d8c641c517b 1-326
+scripts/a1_sale_price_snapshot.py
+  s_37fe17efa61f92::t_f65032cbaeab93 1-308
+scripts/a1_sales_funnel_delta_collect.py
+  s_37fe17efa61f92::t_3299a708f3e994 1-913
+scripts/a1_sku837_ad_leg_launch_evidence.py
+  s_37fe17efa61f92::t_2c10cf4b84c6ea 1-722
+scripts/a1_sku837_exact_subject_patch.py
+  s_37fe17efa61f92::t_252db9e1017dac 1-483
+scripts/a1_sku837_temporal_candidate_stock.py
+  s_37fe17efa61f92::t_1082a468d46918 1-271
+scripts/a1_sku_195764899_bulk_order_forensic.py
+  s_37fe17efa61f92::t_fe1c9be0e0b3b7 1-335
+scripts/a1_sku_195764899_growth_forensic.py
+  s_37fe17efa61f92::t_db0a9d7ae6eaae 1-903
+scripts/a1_sku_837395782_bulk_order_forensic.py
+  s_37fe17efa61f92::t_ff24b336468af5 1-365
+scripts/a1_sku_837395782_growth_forensic.py
+  s_37fe17efa61f92::t_3569cc448514d4 1-749
+scripts/a1_sku_factual_ad_economics_collect.py
+  s_37fe17efa61f92::t_09b273aab4e539 1-490
+scripts/a1_store_baseline_rebuild.py
+  s_37fe17efa61f92::t_60f2d9fdbea0c0 1-598
+scripts/a1_strict_read_only_contract_collect.py
+  s_37fe17efa61f92::t_718ab29cc1f4ba 1-1650
+scripts/a1_traffic_spend_decomposition.py
+  s_37fe17efa61f92::t_c99b24faea774d 1-495
+scripts/a1_transactional_sale_price_fallback.py
+  s_37fe17efa61f92::t_5cf866f63bd7b9 1-295
+scripts/a1_v3_post_import_verify_collect.py
+  s_37fe17efa61f92::t_a7607a8c5b63fc 1-463
+scripts/a1_whole_shop_economics_collect.py
+  s_37fe17efa61f92::t_099b531024645e 1-129
+scripts/a1_whole_store_daily_drr_collect.py
+  s_37fe17efa61f92::t_6be4000e69d121 1-285
+scripts/adv_bot_historical_state_extractor.py
+  s_37fe17efa61f92::t_8c4e72367b8227 1-1336
+scripts/ch_a1_compact_export.py
+  s_37fe17efa61f92::t_2032605abba272 1-688
+scripts/ch_a1_evidence.py
+  s_37fe17efa61f92::t_f76e3396409ba5 1-2075
+scripts/ch_a1_profile.py
+  s_37fe17efa61f92::t_a37f472fbbbafb 1-853
+scripts/evidence/README.md
+  s_37fe17efa61f92::t_9b975e3d351981 1-51
+scripts/evidence/prod_revision_timeline.jsonl
+  s_37fe17efa61f92::t_cd6d5ceda68ce7 1-6
+scripts/multi_client_ad_preflight_collect.py
+  s_37fe17efa61f92::t_35dbe54ac2e92d 1-290
+scripts/multi_client_cpc_topology_collect.py
+  s_37fe17efa61f92::t_3559f653f56b5c 1-271
+scripts/multi_client_strict_eight_target_directive_audit.py
+  s_37fe17efa61f92::t_1c254db4cfc7e5 1-378
+scripts/ops_script_job_cp.ps1
+  s_37fe17efa61f92::t_240fd5f29cfd4d 1-220
+scripts/prokraft_14d_entry_economics_r1.py
+  s_37fe17efa61f92::t_38f8e01f6e2993 1-1553
+scripts/strict_single_nmid_audit.py
+  s_37fe17efa61f92::t_61fc5ad85708f3 1-1092
+scripts/strict_single_nmid_audit_owner_bot_plane.py
+  s_37fe17efa61f92::t_928a89327f22bc 1-491
+scripts/wb_a1_associated_conversions.py
+  s_37fe17efa61f92::t_b6db00d4e932a6 1-519
+scripts/wb_api_readonly_ops/MAPPING.md
+  s_37fe17efa61f92::t_5247b3818afe7d 1-77
+scripts/wb_api_readonly_ops/__init__.py
+  s_37fe17efa61f92::t_7c142fd9f68d15 1-10
+scripts/wb_api_readonly_ops/accept_gate.py
+  s_37fe17efa61f92::t_a46b33ea79c43f 1-51
+scripts/wb_api_readonly_ops/archive.py
+  s_37fe17efa61f92::t_1f8b2b887b6141 1-49
+scripts/wb_api_readonly_ops/authority/COL-R04-001/INSTALL.md
+  s_37fe17efa61f92::t_d109d37a6b36de 1-76
+scripts/wb_api_readonly_ops/authority/COL-R04-001/INSTALL_PACKAGE.sha256
+  s_37fe17efa61f92::t_53f5239db11c51 1
+scripts/wb_api_readonly_ops/authority/COL-R04-001/owner-instructions/01_OWNER_NEXT_STEP.md
+  s_37fe17efa61f92::t_13667ff96228c5 1-9
+scripts/wb_api_readonly_ops/authority/COL-R04-001/sources/COL-R04-001_OWNER_LOCAL_PREFLIGHT_TZ.md
+  s_37fe17efa61f92::t_39cc42b60ab628 1-90
+scripts/wb_api_readonly_ops/authority/COL-R04-001/sources/LAUNCH_SOURCE_SHA256SUMS.txt
+  s_37fe17efa61f92::t_f97d06a14f73bd 1-4
+scripts/wb_api_readonly_ops/authority/COL-R04-001/sources/OWNER_REQUEST_DISPATCHER_COL_R04_001.md
+  s_37fe17efa61f92::t_71f77757987020 1-31
+scripts/wb_api_readonly_ops/authority/COL-R04-001/sources/TOWER_PILOT_REOPEN_DECISION_r04.md
+  s_37fe17efa61f92::t_82cf85f2bdeae0 1-256
+scripts/wb_api_readonly_ops/authority/COL-R04-001/start-prompts/01_INSTALL_AND_RUN_OPSX.md
+  s_37fe17efa61f92::t_fa0c1a939e200d 1-27
+scripts/wb_api_readonly_ops/authority/COL-R04-001/tech/DISPATCH_DECISION.md
+  s_37fe17efa61f92::t_6ea6c0bfa37e27 1-11
+scripts/wb_api_readonly_ops/authority/COL-R04-001/tech/PACKAGE_SHA256SUMS.txt
+  s_37fe17efa61f92::t_572592cdfade41 1-11
+scripts/wb_api_readonly_ops/authority/COL-R04-001/tech/RETURN_TARGET.md
+  s_37fe17efa61f92::t_e19ff88f301583 1-3
+scripts/wb_api_readonly_ops/authority/COL-R04-001/tech/SOURCE_LAUNCH_SHA256.txt
+  s_37fe17efa61f92::t_d4d9cf17215d2d 1
+scripts/wb_api_readonly_ops/ceiling.py
+  s_37fe17efa61f92::t_39942fdd094d9d 1-41
+scripts/wb_api_readonly_ops/cli.py
+  s_37fe17efa61f92::t_65cdcfa9cede0e 1-188
+scripts/wb_api_readonly_ops/collect/__init__.py
+  s_37fe17efa61f92::t_38dcf829ab12e4 1-9
+scripts/wb_api_readonly_ops/collect/__main__.py
+  s_37fe17efa61f92::t_267a85f73c2444 1-5
+scripts/wb_api_readonly_ops/collect/ads.py
+  s_37fe17efa61f92::t_be28e689229bb7 1-148
+scripts/wb_api_readonly_ops/collect/api_budget.py
+  s_37fe17efa61f92::t_cabcb0f5d50f36 1-38
+scripts/wb_api_readonly_ops/collect/archive.py
+  s_37fe17efa61f92::t_878f2fbc20845e 1-114
+scripts/wb_api_readonly_ops/collect/cards.py
+  s_37fe17efa61f92::t_c5953216dbaa46 1-126
+scripts/wb_api_readonly_ops/collect/coverage.py
+  s_37fe17efa61f92::t_6ab1a827d0a43d 1-115
+scripts/wb_api_readonly_ops/collect/funnel.py
+  s_37fe17efa61f92::t_f28b2a6252fe5b 1-121
+scripts/wb_api_readonly_ops/collect/jsonable.py
+  s_37fe17efa61f92::t_48df826f45c1f9 1-38
+scripts/wb_api_readonly_ops/collect/normqueries.py
+  s_37fe17efa61f92::t_7abb1387cee73b 1-137
+scripts/wb_api_readonly_ops/collect/orders_sales.py
+  s_37fe17efa61f92::t_f48c9837bbf838 1-146
+scripts/wb_api_readonly_ops/collect/owner_bot_evidence.py
+  s_37fe17efa61f92::t_6c1f9822d45cc5 1-512
+scripts/wb_api_readonly_ops/collect/pagination.py
+  s_37fe17efa61f92::t_505525f2e373d8 1-74
+scripts/wb_api_readonly_ops/collect/portable.py
+  s_37fe17efa61f92::t_7398c61e82f0f3 1-452
+scripts/wb_api_readonly_ops/collect/raw_store.py
+  s_37fe17efa61f92::t_2b2e58b8887a6c 1-92
+scripts/wb_api_readonly_ops/collect/runner.py
+  s_37fe17efa61f92::t_788bda8ef870b1 1-231
+scripts/wb_api_readonly_ops/collect_layout.py
+  s_37fe17efa61f92::t_7382a529ff3170 1-60
+scripts/wb_api_readonly_ops/contract_constants.py
+  s_37fe17efa61f92::t_6c33d7c74dc1f4 1-59
+scripts/wb_api_readonly_ops/contract_flow.py
+  s_37fe17efa61f92::t_5150dd7613cd37 1-258
+scripts/wb_api_readonly_ops/contract_mapping.py
+  s_37fe17efa61f92::t_96f01096fdc44c 1-152
+scripts/wb_api_readonly_ops/contract_packager.py
+  s_37fe17efa61f92::t_cbec61897296b8 1-355
+scripts/wb_api_readonly_ops/families.py
+  s_37fe17efa61f92::t_91dc244fe7f5af 1-357
+scripts/wb_api_readonly_ops/models.py
+  s_37fe17efa61f92::t_d4d87827dd2543 1-179
+scripts/wb_api_readonly_ops/mutation_guard.py
+  s_37fe17efa61f92::t_06a91ee6685670 1-38
+scripts/wb_api_readonly_ops/orchestrator.py
+  s_37fe17efa61f92::t_71ee3a0e225f1f 1-105
+scripts/wb_api_readonly_ops/r04_003_constants.py
+  s_37fe17efa61f92::t_b966dce3678168 1-69
+scripts/wb_api_readonly_ops/r04_003_families.py
+  s_37fe17efa61f92::t_502079683827bf 1-316
+scripts/wb_api_readonly_ops/r04_003_flow.py
+  s_37fe17efa61f92::t_f2c361da0896b9 1-149
+scripts/wb_api_readonly_ops/r04_003_packager.py
+  s_37fe17efa61f92::t_e7541159caed6f 1-521
+scripts/wb_api_readonly_ops/r04_003b_constants.py
+  s_37fe17efa61f92::t_1ab89252a2d6ef 1-92
+scripts/wb_api_readonly_ops/r04_003b_flow.py
+  s_37fe17efa61f92::t_f900a13d3a2a62 1-110
+scripts/wb_api_readonly_ops/r04_003b_packager.py
+  s_37fe17efa61f92::t_78262021024074 1-402
+scripts/wb_api_readonly_ops/r04_003b_probe.py
+  s_37fe17efa61f92::t_ccbc57939ab970 1-172
+scripts/wb_api_readonly_ops/r04_constants.py
+  s_37fe17efa61f92::t_495f2ee3f496af 1-59
+scripts/wb_api_readonly_ops/r04_mapping.py
+  s_37fe17efa61f92::t_d12b9ccbf8baab 1-187
+scripts/wb_api_readonly_ops/r04_packager.py
+  s_37fe17efa61f92::t_3a8c7378ea36d7 1-417
+scripts/wb_api_readonly_ops/run.py
+  s_37fe17efa61f92::t_f5ae2c6c60ad23 1-315
+scripts/wb_api_readonly_ops/secret_strip.py
+  s_37fe17efa61f92::t_91b4c9a59a76c6 1-44
+tests/integration/client_bot/test_pg_seam_close_external_gap.py
+  s_37fe17efa61f92::t_bbd6a34b51bcdf 224,244,249
+tests/integration/scripts/test_canonical_bootstrap_fixture.py
+  s_37fe17efa61f92::t_4f16105284e5fc 1-337
+tests/unit/app/core/mp/wb/api/adapter/reports_client/test_supplier_orders_sales_adapter.py
+  s_37fe17efa61f92::t_44496f6d70da15 1-77
+tests/unit/scripts/test_a1_cabinet401_run_go_contract_collect.py
+  s_37fe17efa61f92::t_e915070ef25fd0 1-35
+tests/unit/scripts/test_a1_cabinet401_run_go_contract_collect_v2.py
+  s_37fe17efa61f92::t_a5bb28ff7215d5 1-41
+tests/unit/scripts/test_a1_controlled_ad_expansion_v1.py
+  s_37fe17efa61f92::t_c7a717c6b56dc7 1-144
+tests/unit/scripts/test_a1_current_performance_drr_snapshot.py
+  s_37fe17efa61f92::t_63bcb9b903e175 1-168
+tests/unit/scripts/test_a1_current_state_gap_collect.py
+  s_37fe17efa61f92::t_8f999f4dab9b66 1-34
+tests/unit/scripts/test_a1_daily_spend_control_layout.py
+  s_37fe17efa61f92::t_4ef2440dca7d2b 1-40
+tests/unit/scripts/test_a1_glue_topology_decision_spend.py
+  s_37fe17efa61f92::t_ef15514712220c 1-75
+tests/unit/scripts/test_a1_prokraft_spp_dynamics_collect.py
+  s_37fe17efa61f92::t_3634ed87060614 1-39
+tests/unit/scripts/test_a1_strict_read_only_contract_collect.py
+  s_37fe17efa61f92::t_8464032b1ee751 1-233
+tests/unit/scripts/test_adv_bot_historical_state_extractor.py
+  s_37fe17efa61f92::t_ac7f1699125924 1-438
+tests/unit/scripts/test_ch_a1_evidence_sql.py
+  s_37fe17efa61f92::t_22ee1c160037f7 1-124
+tests/unit/scripts/test_multi_client_ad_preflight_collect.py
+  s_37fe17efa61f92::t_654ca94ac5e9a4 1-98
+tests/unit/scripts/test_multi_client_cpc_topology_collect.py
+  s_37fe17efa61f92::t_196f21a07f5b71 1-56
+tests/unit/scripts/test_multi_client_strict_eight_target_directive_audit.py
+  s_37fe17efa61f92::t_f1671caa821112 1-62
+tests/unit/scripts/test_owner_bot_evidence.py
+  s_37fe17efa61f92::t_52b150cda54f2f 1-274
+tests/unit/scripts/test_owner_bot_evidence_bundle_shapes.py
+  s_37fe17efa61f92::t_4684acd9875eaf 1-159
+tests/unit/scripts/test_prokraft_14d_entry_economics_r1.py
+  s_37fe17efa61f92::t_6dc2f2ddd7c019 1-188
+tests/unit/scripts/test_strict_single_nmid_audit.py
+  s_37fe17efa61f92::t_89673cb93bb20d 1-369
+tests/unit/scripts/test_strict_single_nmid_audit_job.py
+  s_37fe17efa61f92::t_1efc4cc08010dc 1-191
+tests/unit/scripts/test_strict_single_nmid_audit_owner_bot_plane.py
+  s_37fe17efa61f92::t_3e415cbbd6af63 1-89
+tests/unit/scripts/test_strict_single_nmid_evidence_failures.py
+  s_37fe17efa61f92::t_1dcec9557a1b6d 1-77
+tests/unit/scripts/test_whole_store_drr_resolver_reuse.py
+  s_37fe17efa61f92::t_548fd1c2a64556 1-23
+tests/unit/scripts/wb_api_readonly_ops/test_cli_and_status.py
+  s_37fe17efa61f92::t_5b720a5e8309ec 1-80
+tests/unit/scripts/wb_api_readonly_ops/test_collect_core.py
+  s_37fe17efa61f92::t_9faa6622e7140a 1-568
+tests/unit/scripts/wb_api_readonly_ops/test_contract_preflight_return.py
+  s_37fe17efa61f92::t_a5fa47a87ebe46 1-308
+tests/unit/scripts/wb_api_readonly_ops/test_orchestrator.py
+  s_37fe17efa61f92::t_84b9c34c287013 1-84
+tests/unit/scripts/wb_api_readonly_ops/test_orders_family.py
+  s_37fe17efa61f92::t_93fa7d8504534f 1-254
+tests/unit/scripts/wb_api_readonly_ops/test_portable.py
+  s_37fe17efa61f92::t_7b7ee6262046e2 1-227
+tests/unit/scripts/wb_api_readonly_ops/test_r04_003_contract_preflight.py
+  s_37fe17efa61f92::t_e02e6ef2a43ab3 1-106
+tests/unit/scripts/wb_api_readonly_ops/test_r04_003b_contract_preflight.py
+  s_37fe17efa61f92::t_c483a60171cef6 1-85
+tests/unit/scripts/wb_api_readonly_ops/test_r04_contract_preflight.py
+  s_37fe17efa61f92::t_ff5a839428a5ee 1-91
+tests/unit/scripts/wb_api_readonly_ops/test_secret_strip.py
+  s_37fe17efa61f92::t_7feb408e5e363c 1-67
+tests/unit/test_super_cabinet_manager_personal_filter.py
+  s_37fe17efa61f92::t_c90ebb3cf238b0 39,46,62-63,74-79,90-91,97,109-111,116-166
+tests/unit/tools/fixtures/wb_api_master_map/minimal_openapi.yml
+  s_37fe17efa61f92::t_6bf5acb02ec745 1-29
+tests/unit/tools/test_compose_runtime.py
+  s_37fe17efa61f92::t_37501418e2bde5 1-470
+tests/unit/tools/test_generate_wb_api_client.py
+  s_37fe17efa61f92::t_cbac6d745ed60f 46-61
+tests/unit/tools/test_reports_swagger_target.py
+  s_37fe17efa61f92::t_273a16ae734f0b 1-39
+tests/unit/tools/test_scripts_receipts.py
+  s_37fe17efa61f92::t_1f9cf7d028beee 1-120
+tests/unit/tools/test_scripts_registry_resolver.py
+  s_37fe17efa61f92::t_6314fcbf203e7f 1-819
+tests/unit/tools/test_wb_api_master_map.py
+  s_37fe17efa61f92::t_e5cdac22cd7f13 1-226
+tools/generate_wb_api_client.py
+  s_37fe17efa61f92::t_253e3ca2cd9e00 122-129
+tools/scripts/__init__.py
+  s_37fe17efa61f92::t_e2979c9cdd732b 1
+tools/scripts/bootstrap.py
+  s_37fe17efa61f92::t_e212917c699f6f 1-136
+tools/scripts/compose_runtime.py
+  s_37fe17efa61f92::t_45b5f03009709d 1-316
+tools/scripts/receipts.py
+  s_37fe17efa61f92::t_2302e1567b69bb 1-269
+tools/scripts/registry.py
+  s_37fe17efa61f92::t_42a85688a626a3 1-612
+tools/scripts/resolver.py
+  s_37fe17efa61f92::t_d7d71ceb8580d5 1-786
+tools/wb_api_master_map.py
+  s_37fe17efa61f92::t_f9a1fd031da690 1-476
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b79534379971e94e0200b50ebc6787ea96455452",
+  "prompts": {},
+  "sessions": {
+    "s_37fe17efa61f92": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "7957e096-776b-4a59-9ea1-f14d1a35ad76",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_b9645704ff80d7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d931-a134-79e2-9e26-a8c6f4aa9059",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
