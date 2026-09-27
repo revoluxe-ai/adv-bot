@@ -1,0 +1,19 @@
+tests/integration/scripts/test_canonical_bootstrap_fixture.py
+  s_cb78cec0eb9c57::t_df30bc20e29de9 196-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "85888a88da9958945f875d55e3264d99d45c4d1b",
+  "prompts": {},
+  "sessions": {
+    "s_cb78cec0eb9c57": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "f2f1aac2-d443-45ed-b509-a3319a7b106b",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
