@@ -1,0 +1,14 @@
+AGENTS.md
+  h_267f51d775769b 46-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8da2cd69360087d34509619f4dae97e49061b458",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
