@@ -1,0 +1,16 @@
+app/client_bot/user_interface/handlers/connect_existing_advs.py
+  h_267f51d775769b 1588-1611
+tests/modules/connect_existing_advs/test_handlers.py
+  h_267f51d775769b 1001-1019
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "d802ee2ee4108262fcd9308362835db51986d38a",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
