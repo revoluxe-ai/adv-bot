@@ -1,0 +1,294 @@
+.cursor/commands/_fixtures/opsx-apply-design-review/01-pass.APPLY-DESIGN-REVIEW.json
+  h_267f51d775769b 1-119
+.cursor/commands/_fixtures/opsx-apply-design-review/01-pass.md
+  h_267f51d775769b 1-41
+.cursor/commands/_fixtures/opsx-apply-design-review/02-repairs-uncovered-interaction.APPLY-DESIGN-REVIEW.json
+  h_267f51d775769b 1-151
+.cursor/commands/_fixtures/opsx-apply-design-review/02-repairs-uncovered-interaction.md
+  h_267f51d775769b 1-31
+.cursor/commands/_fixtures/opsx-apply-design-review/03-stale-after-design-change.md
+  h_267f51d775769b 1-27
+.cursor/commands/_fixtures/opsx-apply-design-review/04-write-boundary.md
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-design-review/05-scaffold-gate.md
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-design-review/README.md
+  h_267f51d775769b 1-40
+.cursor/commands/_fixtures/opsx-apply-design/01-ready-valid-change.APPLY-DESIGN.json
+  h_267f51d775769b 1-417
+.cursor/commands/_fixtures/opsx-apply-design/01-ready-valid-change.md
+  h_267f51d775769b 1-58
+.cursor/commands/_fixtures/opsx-apply-design/02-write-boundary.md
+  h_267f51d775769b 1-28
+.cursor/commands/_fixtures/opsx-apply-design/03-planning-reality-conflict.APPLY-DESIGN.json
+  h_267f51d775769b 1-66
+.cursor/commands/_fixtures/opsx-apply-design/03-planning-reality-conflict.md
+  h_267f51d775769b 1-38
+.cursor/commands/_fixtures/opsx-apply-design/04-missing-planning-authority.APPLY-DESIGN.json
+  h_267f51d775769b 1-43
+.cursor/commands/_fixtures/opsx-apply-design/04-missing-planning-authority.md
+  h_267f51d775769b 1-36
+.cursor/commands/_fixtures/opsx-apply-design/05-existing-apply-compat.md
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-design/06-process-contract-not-protected.md
+  h_267f51d775769b 1-17
+.cursor/commands/_fixtures/opsx-apply-design/07-edge-without-composition.BAD.json
+  h_267f51d775769b 1-190
+.cursor/commands/_fixtures/opsx-apply-design/07-edge-without-composition.md
+  h_267f51d775769b 1-40
+.cursor/commands/_fixtures/opsx-apply-design/08-uncovered-critical-interaction.md
+  h_267f51d775769b 1-45
+.cursor/commands/_fixtures/opsx-apply-design/09-dogfood-failure-classes.md
+  h_267f51d775769b 1-38
+.cursor/commands/_fixtures/opsx-apply-design/README.md
+  h_267f51d775769b 1-51
+.cursor/commands/_fixtures/opsx-apply-green/01-select-implement-written.md
+  h_267f51d775769b 1-15
+.cursor/commands/_fixtures/opsx-apply-green/02-red-executed.md
+  h_267f51d775769b 1-13
+.cursor/commands/_fixtures/opsx-apply-green/03-green-proven-immediate.GREEN.json
+  h_267f51d775769b 1-104
+.cursor/commands/_fixtures/opsx-apply-green/04-fix-loop-then-green.GREEN.json
+  h_267f51d775769b 1-131
+.cursor/commands/_fixtures/opsx-apply-green/05-frozen-red-mutated.GREEN.json
+  h_267f51d775769b 1-24
+.cursor/commands/_fixtures/opsx-apply-green/06-env-failure.GREEN.json
+  h_267f51d775769b 1-36
+.cursor/commands/_fixtures/opsx-apply-green/07-unrelated.GREEN.json
+  h_267f51d775769b 1-44
+.cursor/commands/_fixtures/opsx-apply-green/08-design-change-required.GREEN.json
+  h_267f51d775769b 1-34
+.cursor/commands/_fixtures/opsx-apply-green/09-iteration-limit.GREEN.json
+  h_267f51d775769b 1-72
+.cursor/commands/_fixtures/opsx-apply-green/10-no-progress.GREEN.json
+  h_267f51d775769b 1-42
+.cursor/commands/_fixtures/opsx-apply-green/11-adjacent-repair.GREEN.json
+  h_267f51d775769b 1-108
+.cursor/commands/_fixtures/opsx-apply-green/12-apply-complete.GREEN.json
+  h_267f51d775769b 1-88
+.cursor/commands/_fixtures/opsx-apply-green/13-dependency-not-green.GREEN.json
+  h_267f51d775769b 1-21
+.cursor/commands/_fixtures/opsx-apply-green/14-apply-compat.md
+  h_267f51d775769b 1-14
+.cursor/commands/_fixtures/opsx-apply-green/15-not-whole-change.md
+  h_267f51d775769b 1-13
+.cursor/commands/_fixtures/opsx-apply-green/16-bounded-adjacent.md
+  h_267f51d775769b 1-12
+.cursor/commands/_fixtures/opsx-apply-green/17-stale-green-after-implement-regen.md
+  h_267f51d775769b 1-27
+.cursor/commands/_fixtures/opsx-apply-green/18-adjacent-alias-not-not-required.md
+  h_267f51d775769b 1-31
+.cursor/commands/_fixtures/opsx-apply-green/19-unrelated-adjacent-not-required.md
+  h_267f51d775769b 1-16
+.cursor/commands/_fixtures/opsx-apply-green/20-runner-unavailable.GREEN.json
+  h_267f51d775769b 1-48
+.cursor/commands/_fixtures/opsx-apply-green/README.md
+  h_267f51d775769b 1-46
+.cursor/commands/_fixtures/opsx-apply-green/alias-dependent-fixture.test.mjs
+  h_267f51d775769b 1-13
+.cursor/commands/_fixtures/opsx-apply-green/harness-fail.test.mjs
+  h_267f51d775769b 1-6
+.cursor/commands/_fixtures/opsx-apply-green/harness-pass.test.mjs
+  h_267f51d775769b 1-3
+.cursor/commands/_fixtures/opsx-apply-green/test_target_pytest_fail.py
+  h_267f51d775769b 1-2
+.cursor/commands/_fixtures/opsx-apply-green/test_target_pytest_pass.py
+  h_267f51d775769b 1-2
+.cursor/commands/_fixtures/opsx-apply-implement/01-select-red-proven.md
+  h_267f51d775769b 1-21
+.cursor/commands/_fixtures/opsx-apply-implement/02-write-boundary.md
+  h_267f51d775769b 1-20
+.cursor/commands/_fixtures/opsx-apply-implement/03-implementation-written.IMPLEMENTATION.json
+  h_267f51d775769b 1-78
+.cursor/commands/_fixtures/opsx-apply-implement/04-missing-red.IMPLEMENTATION.json
+  h_267f51d775769b 1-17
+.cursor/commands/_fixtures/opsx-apply-implement/05-stale-red.IMPLEMENTATION.json
+  h_267f51d775769b 1-21
+.cursor/commands/_fixtures/opsx-apply-implement/06-stale-apply-design.IMPLEMENTATION.json
+  h_267f51d775769b 1-18
+.cursor/commands/_fixtures/opsx-apply-implement/07-dependency-not-green.IMPLEMENTATION.json
+  h_267f51d775769b 1-19
+.cursor/commands/_fixtures/opsx-apply-implement/08-design-reality-drift.IMPLEMENTATION.json
+  h_267f51d775769b 1-24
+.cursor/commands/_fixtures/opsx-apply-implement/09-scope-expansion.IMPLEMENTATION.json
+  h_267f51d775769b 1-21
+.cursor/commands/_fixtures/opsx-apply-implement/10-new-production-file.IMPLEMENTATION.json
+  h_267f51d775769b 1-79
+.cursor/commands/_fixtures/opsx-apply-implement/11-frozen-red-mutated.IMPLEMENTATION.json
+  h_267f51d775769b 1-23
+.cursor/commands/_fixtures/opsx-apply-implement/12-no-test-execution.md
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-implement/13-apply-compat.md
+  h_267f51d775769b 1-14
+.cursor/commands/_fixtures/opsx-apply-implement/14-no-green-behavior.md
+  h_267f51d775769b 1-17
+.cursor/commands/_fixtures/opsx-apply-implement/15-test-identity-before-after.md
+  h_267f51d775769b 1-16
+.cursor/commands/_fixtures/opsx-apply-implement/16-semantic-current-slice-ok.md
+  h_267f51d775769b 1-19
+.cursor/commands/_fixtures/opsx-apply-implement/17-semantic-future-slice-behavior.IMPLEMENTATION.json
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-implement/18-reuse-duplication.IMPLEMENTATION.json
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-implement/19-structural-seam-reserved.md
+  h_267f51d775769b 1-22
+.cursor/commands/_fixtures/opsx-apply-implement/README.md
+  h_267f51d775769b 1-64
+.cursor/commands/_fixtures/opsx-apply-red/01-select-first-eligible.md
+  h_267f51d775769b 1-20
+.cursor/commands/_fixtures/opsx-apply-red/02-write-boundary.md
+  h_267f51d775769b 1-14
+.cursor/commands/_fixtures/opsx-apply-red/03-red-proven.RED.json
+  h_267f51d775769b 1-93
+.cursor/commands/_fixtures/opsx-apply-red/04-setup-failure.RED.json
+  h_267f51d775769b 1-63
+.cursor/commands/_fixtures/opsx-apply-red/05-repair-then-proven.RED.json
+  h_267f51d775769b 1-110
+.cursor/commands/_fixtures/opsx-apply-red/06-already-satisfied.RED.json
+  h_267f51d775769b 1-66
+.cursor/commands/_fixtures/opsx-apply-red/07-dependency-not-ready.md
+  h_267f51d775769b 1-23
+.cursor/commands/_fixtures/opsx-apply-red/08-deterministic-multi.md
+  h_267f51d775769b 1-14
+.cursor/commands/_fixtures/opsx-apply-red/09-stale-apply-design.md
+  h_267f51d775769b 1-20
+.cursor/commands/_fixtures/opsx-apply-red/10-apply-compat.md
+  h_267f51d775769b 1-14
+.cursor/commands/_fixtures/opsx-apply-red/11-sentinel-proven.RED.json
+  h_267f51d775769b 1-87
+.cursor/commands/_fixtures/opsx-apply-red/12-missing-import-not-red.RED.json
+  h_267f51d775769b 1-63
+.cursor/commands/_fixtures/opsx-apply-red/13-missing-symbol-not-red.RED.json
+  h_267f51d775769b 1-63
+.cursor/commands/_fixtures/opsx-apply-red/14-no-product-writes.md
+  h_267f51d775769b 1-8
+.cursor/commands/_fixtures/opsx-apply-red/15-four-commands-all-qualified.RED.json
+  h_267f51d775769b 1-180
+.cursor/commands/_fixtures/opsx-apply-red/16-three-qualify-one-setup.RED.json
+  h_267f51d775769b 1-118
+.cursor/commands/_fixtures/opsx-apply-red/17-repair-fourth-then-proven.RED.json
+  h_267f51d775769b 1-174
+.cursor/commands/_fixtures/opsx-apply-red/18-wrong-pattern-zero-tests.RED.json
+  h_267f51d775769b 1-49
+.cursor/commands/_fixtures/opsx-apply-red/19-incomplete-old-v1.RED.json
+  h_267f51d775769b 1-74
+.cursor/commands/_fixtures/opsx-apply-red/README.md
+  h_267f51d775769b 1-66
+.cursor/commands/_fixtures/opsx-apply-scaffold/01-select-first.md
+  h_267f51d775769b 1-6
+.cursor/commands/_fixtures/opsx-apply-scaffold/02-write-boundary.md
+  h_267f51d775769b 1-11
+.cursor/commands/_fixtures/opsx-apply-scaffold/03-ready-existing-noop.SCAFFOLD.json
+  h_267f51d775769b 1-54
+.cursor/commands/_fixtures/opsx-apply-scaffold/04-ready-introduce.SCAFFOLD.json
+  h_267f51d775769b 1-61
+.cursor/commands/_fixtures/opsx-apply-scaffold/05-behavior-forbidden.md
+  h_267f51d775769b 1-9
+.cursor/commands/_fixtures/opsx-apply-scaffold/06-apply-compat.md
+  h_267f51d775769b 1-7
+.cursor/commands/_fixtures/opsx-apply-scaffold/07-dependency-not-green.SCAFFOLD.json
+  h_267f51d775769b 1-20
+.cursor/commands/_fixtures/opsx-apply-scaffold/08-green-current-via-disk-hash.md
+  h_267f51d775769b 1-15
+.cursor/commands/_fixtures/opsx-apply-scaffold/README.md
+  h_267f51d775769b 1-14
+.cursor/commands/opsx-apply-design-review.md
+  h_267f51d775769b 2-87,92-567
+.cursor/commands/opsx-apply-design.md
+  h_267f51d775769b 2-85,90-757
+.cursor/commands/opsx-apply-green.md
+  h_267f51d775769b 2-86,91-558
+.cursor/commands/opsx-apply-implement.md
+  h_267f51d775769b 2-83,88-526
+.cursor/commands/opsx-apply-red.md
+  h_267f51d775769b 2-79,84-596
+.cursor/commands/opsx-apply-scaffold.md
+  h_267f51d775769b 2-74,79-418
+.cursor/commands/opsx-apply.md
+  h_267f51d775769b 10-28
+.cursor/commands/opsx-verify.md
+  h_267f51d775769b 18-24
+.cursor/pipeline/contracts/SPLIT_APPLY_TARGET_RUNTIME.md
+  h_267f51d775769b 1-72
+.cursor/pipeline/contracts/VERIFY_PHASES.md
+  h_267f51d775769b 70-91
+.opsx/adapters/python-poetry/README.md
+  h_267f51d775769b 1-11
+.opsx/registry/apply_coverage_reconcile.schema.json
+  h_267f51d775769b 1-77
+.opsx/registry/apply_design.schema.json
+  h_267f51d775769b 1-790
+.opsx/registry/apply_design_review.schema.json
+  h_267f51d775769b 1-298
+.opsx/registry/apply_green.schema.json
+  h_267f51d775769b 1-468
+.opsx/registry/apply_implement.schema.json
+  h_267f51d775769b 1-407
+.opsx/registry/apply_red.schema.json
+  h_267f51d775769b 1-472
+.opsx/registry/apply_scaffold.schema.json
+  h_267f51d775769b 1-271
+.opsx/registry/command_activation.ndjson
+  h_267f51d775769b 1-58,64-69
+.opsx/registry/command_transfer_manifest.md
+  h_267f51d775769b 22-27
+.opsx/registry/provenance.ndjson
+  h_267f51d775769b 35
+.opsx/tools/opsx-apply-composition.mjs
+  h_267f51d775769b 1-492
+.opsx/tools/opsx-apply-design-review.mjs
+  h_267f51d775769b 1-402
+.opsx/tools/opsx-apply-design.mjs
+  h_267f51d775769b 1-606
+.opsx/tools/opsx-apply-green.mjs
+  h_267f51d775769b 1-1084
+.opsx/tools/opsx-apply-implement.mjs
+  h_267f51d775769b 1-1224
+.opsx/tools/opsx-apply-pipeline-identity.mjs
+  h_267f51d775769b 1-1745
+.opsx/tools/opsx-apply-red.mjs
+  h_267f51d775769b 1-682
+.opsx/tools/opsx-apply-scaffold.mjs
+  h_267f51d775769b 1-361
+.opsx/tools/opsx-apply-verify-completion.mjs
+  h_267f51d775769b 1-600
+.opsx/tools/opsx-bug-learning-apply.mjs
+  h_267f51d775769b 1-413
+.opsx/tools/opsx-bug-learning-hash.mjs
+  h_267f51d775769b 1-45
+.opsx/tools/opsx-bug-learning-match.mjs
+  h_267f51d775769b 1-227
+.opsx/tools/opsx-process-repair-authority.mjs
+  h_267f51d775769b 1-1064
+tests/unit/opsxApplyDesignContract.test.mjs
+  h_267f51d775769b 1-305
+tests/unit/opsxApplyDesignReviewContract.test.mjs
+  h_267f51d775769b 1-267
+tests/unit/opsxApplyGreenContract.test.mjs
+  h_267f51d775769b 1-893
+tests/unit/opsxApplyImplementContract.test.mjs
+  h_267f51d775769b 1-822
+tests/unit/opsxApplyPipelineIdentityContract.test.mjs
+  h_267f51d775769b 1-732
+tests/unit/opsxApplyPlanningIdentityContract.test.mjs
+  h_267f51d775769b 1-292
+tests/unit/opsxApplyRedContract.test.mjs
+  h_267f51d775769b 1-620
+tests/unit/opsxApplyScaffoldContract.test.mjs
+  h_267f51d775769b 1-210
+tests/unit/opsxApplyTargetPytestContract.test.mjs
+  h_267f51d775769b 1-61
+tests/unit/opsxApplyVerifyCompletionContract.test.mjs
+  h_267f51d775769b 1-503
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "4578390d0ee29c5c0ca08fa126a0aa018fa107e3",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
