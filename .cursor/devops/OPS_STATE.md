@@ -72,6 +72,9 @@ If a **forward** image rollout fails (failed rollout / CrashLoop on a target Dep
 
 ## Open risks / follow-ups
 
+* **2026-09-30 cluster vs OPS_STATE drift (read-only kubectl):** live adv-bot entrypoints on image tag
+  `c5d3ecd88a6f58d4216d6e45cf268f890267372b`; this file still records LKG `4d5fae43…`. Reconcile via
+  `/opsx-devops INVESTIGATE` + Owner-confirmed `/opsx-meta-commit` — do not overwrite LKG from chat alone.
 * **Authz repair DONE (2026-08-14):** `release_controller` LOGIN exists; `app-db-control` → `release_controller` with EXECUTE on all 8 release-control functions; `app_migrator` has **no** release-control EXECUTE.
 * **Authz baseline SELECT DONE (2026-08-16):** Job `app-db-authz-grant-baseline-select-0816` → `release_controller` has `USAGE` on schema `migration_control` + `SELECT` on `migration_control.baseline_registry` (needed for CONTROL_DRY_RUN=1).
 * Zalando status `UpdateFailed` after adding `release_controller` (operator sync unhappy). Role/grants/secret work; CR pins `patroni.pg_hba` `host all all all md5` because `ssl=off` + default `hostnossl reject` broke remote Jobs. Investigate UpdateFailed separately.
