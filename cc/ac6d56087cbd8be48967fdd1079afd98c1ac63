@@ -1,0 +1,16 @@
+.cursor/rules/scripts-ops-lane.mdc
+  h_267f51d775769b 1-33
+.github/workflows/migration-gates.yml
+  h_267f51d775769b 12-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "ccac6d56087cbd8be48967fdd1079afd98c1ac63",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
