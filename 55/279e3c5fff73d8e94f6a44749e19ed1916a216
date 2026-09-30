@@ -1,0 +1,18 @@
+.cursor/pipeline/bounded-verify-tests/fixtures/registry_snapshot.yaml
+  h_267f51d775769b 1-16
+.cursor/pipeline/command-transfer-tests/test_inventory.py
+  h_267f51d775769b 296-301
+.opsx/registry/command_transfer_completion.json
+  h_267f51d775769b 4,12-13,52-64,84-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "55279e3c5fff73d8e94f6a44749e19ed1916a216",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
