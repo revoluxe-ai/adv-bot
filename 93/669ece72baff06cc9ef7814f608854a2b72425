@@ -1,0 +1,16 @@
+app/modules/adv_creator/backend/tasks.py
+  h_267f51d775769b 26-52,374-378,388-389,399
+tests/modules/adv_creator/backend/test_tasks_telegram_best_effort.py
+  h_267f51d775769b 1-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "93669ece72baff06cc9ef7814f608854a2b72425",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
