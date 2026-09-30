@@ -1,0 +1,210 @@
+.cursor/commands/bounded-executor.md
+  h_267f51d775769b 1-117
+.cursor/commands/opsx-apply-design-review.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-apply-design.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-apply-green.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-apply-implement.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-apply-red.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-apply-scaffold.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-browser-check.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-bug-disposition.md
+  h_267f51d775769b 1-224
+.cursor/commands/opsx-bug-family-plan.md
+  h_267f51d775769b 1-221
+.cursor/commands/opsx-bug-intake-clear.md
+  h_267f51d775769b 1-221
+.cursor/commands/opsx-bugbot-report.md
+  h_267f51d775769b 1-433
+.cursor/commands/opsx-control-plane-security-review.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-doctor.md
+  h_267f51d775769b 1-237
+.cursor/commands/opsx-estimate.md
+  h_267f51d775769b 1-323
+.cursor/commands/opsx-intent-align.md
+  h_267f51d775769b 1-352
+.cursor/commands/opsx-meta-add-command.md
+  h_267f51d775769b 1-225
+.cursor/commands/opsx-meta-analyze-pipeline.md
+  h_267f51d775769b 1-159
+.cursor/commands/opsx-meta-promote-process-lesson.md
+  h_267f51d775769b 1-140
+.cursor/commands/opsx-meta-update-all-snapshots.md
+  h_267f51d775769b 1-259
+.cursor/commands/opsx-meta.md
+  h_267f51d775769b 64-65
+.cursor/commands/opsx-models.md
+  h_267f51d775769b 1-208
+.cursor/commands/opsx-next-check.md
+  h_267f51d775769b 1-96
+.cursor/commands/opsx-orch-bug-fix.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-orch-bugbot-converge.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-plan-verification.md
+  h_267f51d775769b 1-84
+.cursor/commands/opsx-plan.md
+  h_267f51d775769b 1-69
+.cursor/commands/opsx-post-deploy-acceptance.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-rename-change.md
+  h_267f51d775769b 1-132
+.cursor/commands/opsx-risk.md
+  h_267f51d775769b 1-477
+.cursor/commands/opsx-run-build.md
+  h_267f51d775769b 1-160
+.cursor/commands/opsx-run-tests.md
+  h_267f51d775769b 1-181
+.cursor/commands/opsx-run-typecheck.md
+  h_267f51d775769b 1-174
+.cursor/commands/opsx-security-learn.md
+  h_267f51d775769b 1-27
+.cursor/commands/opsx-security-review.md
+  h_267f51d775769b 1-240
+.cursor/commands/opsx-security-triage.md
+  h_267f51d775769b 1-211
+.cursor/commands/opsx-sherlock.md
+  h_267f51d775769b 1-556
+.cursor/commands/opsx-ts-design.md
+  h_267f51d775769b 1-301
+.cursor/commands/opsx-ts-review.md
+  h_267f51d775769b 1-283
+.cursor/commands/tempo-bugbot.md
+  h_267f51d775769b 1-27
+.cursor/commands/tempo-project-bug-hunt.md
+  h_267f51d775769b 1-27
+.cursor/commands/tempo-security.md
+  h_267f51d775769b 1-27
+.cursor/commands/tempo-verification.md
+  h_267f51d775769b 1-27
+.cursor/pipeline/bounded-verify-tests/fixtures/minimal_change_tree.json
+  h_267f51d775769b 1-10
+.cursor/pipeline/bounded-verify-tests/run_bounded_verify_tests.py
+  h_267f51d775769b 1-36
+.cursor/pipeline/bounded-verify-tests/test_atomic_publication.py
+  h_267f51d775769b 1-230
+.cursor/pipeline/bounded-verify-tests/test_composition_interaction.py
+  h_267f51d775769b 1-894
+.cursor/pipeline/bounded-verify-tests/test_executor.py
+  h_267f51d775769b 1-344
+.cursor/pipeline/bounded-verify-tests/test_ledger_schedule.py
+  h_267f51d775769b 1-452
+.cursor/pipeline/bounded-verify-tests/test_plan_freeze.py
+  h_267f51d775769b 1-461
+.cursor/pipeline/bounded-verify-tests/test_result_model.py
+  h_267f51d775769b 1-188
+.cursor/pipeline/bounded-verify/__init__.py
+  h_267f51d775769b 1-74
+.cursor/pipeline/bounded-verify/bounded_verify_atomic.py
+  h_267f51d775769b 1-93
+.cursor/pipeline/bounded-verify/bounded_verify_executor.py
+  h_267f51d775769b 1-391
+.cursor/pipeline/bounded-verify/bounded_verify_ledger.py
+  h_267f51d775769b 1-593
+.cursor/pipeline/bounded-verify/bounded_verify_plan.py
+  h_267f51d775769b 1-420
+.cursor/pipeline/bounded-verify/bounded_verify_result.py
+  h_267f51d775769b 1-367
+.cursor/pipeline/command-transfer-tests/test_inventory.py
+  h_267f51d775769b 1-352
+.cursor/pipeline/command-transfer/inventory.py
+  h_267f51d775769b 1-406
+.cursor/pipeline/contracts/bounded-verify/ATOMIC_PUBLICATION.md
+  h_267f51d775769b 1-35
+.cursor/pipeline/contracts/bounded-verify/AUTHORITY_SPLIT.md
+  h_267f51d775769b 1-56
+.cursor/pipeline/contracts/bounded-verify/LEDGER_SCHEMA.json
+  h_267f51d775769b 1-88
+.cursor/pipeline/contracts/bounded-verify/PLAN_SCHEMA.json
+  h_267f51d775769b 1-102
+.cursor/pipeline/contracts/bounded-verify/RESULT_SCHEMA.json
+  h_267f51d775769b 1-62
+.cursor/pipeline/contracts/run-build/MANUAL_EXECUTION.md
+  h_267f51d775769b 1-37
+.cursor/pipeline/contracts/run-tests/MANUAL_EXECUTION.md
+  h_267f51d775769b 1-34
+.cursor/pipeline/control-plane-tests/run_command_transfer_contract_tests.py
+  h_267f51d775769b 1-1622
+.cursor/pipeline/control-plane-tests/run_required_verification_obligation_tests.py
+  h_267f51d775769b 1-362
+.cursor/pipeline/control-plane/verification_obligation.py
+  h_267f51d775769b 1-202
+.cursor/pipeline/intent-align-tests/test_intent_alignment.py
+  h_267f51d775769b 1-232
+.cursor/pipeline/intent-align/intent_alignment.py
+  h_267f51d775769b 1-419
+.cursor/pipeline/risk-tests/test_risk_receipt.py
+  h_267f51d775769b 1-358
+.cursor/pipeline/risk/risk_receipt.py
+  h_267f51d775769b 1-585
+.cursor/pipeline/run-build-tests/test_run_build_manual.py
+  h_267f51d775769b 1-148
+.cursor/pipeline/run-build/run_build.py
+  h_267f51d775769b 1-288
+.cursor/pipeline/run-tests-tests/test_run_tests_manual.py
+  h_267f51d775769b 1-262
+.cursor/pipeline/run-tests/run_tests.py
+  h_267f51d775769b 1-522
+.cursor/pipeline/security-review-tests/test_security_review.py
+  h_267f51d775769b 1-680
+.cursor/pipeline/security-review/security_review.py
+  h_267f51d775769b 1-903
+.cursor/pipeline/security-triage-tests/test_security_triage.py
+  h_267f51d775769b 1-521
+.cursor/pipeline/security-triage/SECURITY_FINDING_PACKET.schema.json
+  h_267f51d775769b 1-55
+.cursor/pipeline/security-triage/security_triage.py
+  h_267f51d775769b 1-1188
+.cursor/pipeline/sherlock-tests/test_sherlock_ledger.py
+  h_267f51d775769b 1-314
+.cursor/pipeline/sherlock/sherlock_ledger.py
+  h_267f51d775769b 1-588
+.cursor/pipeline/technical-strategy-tests/test_ts_design.py
+  h_267f51d775769b 1-272
+.cursor/pipeline/technical-strategy-tests/test_ts_review.py
+  h_267f51d775769b 1-390
+.cursor/pipeline/technical-strategy/README.md
+  h_267f51d775769b 1-19
+.cursor/pipeline/technical-strategy/technical_strategy.py
+  h_267f51d775769b 1-1175
+.cursor/pipeline/technical-strategy/ts_design.schema.json
+  h_267f51d775769b 1-111
+.cursor/pipeline/technical-strategy/ts_review.schema.json
+  h_267f51d775769b 1-38
+.cursor/static-check/contracts/synthesis.md
+  h_267f51d775769b 12-29
+.opsx/registry/command_activation.ndjson
+  h_267f51d775769b 34-59
+.opsx/registry/command_transfer_collision_inventory.json
+  h_267f51d775769b 1-2108
+.opsx/registry/command_transfer_completion.json
+  h_267f51d775769b 1-72
+.opsx/registry/command_transfer_manifest.md
+  h_267f51d775769b 1-117
+.opsx/registry/provenance.ndjson
+  h_267f51d775769b 15-33
+.opsx/shared/meta-orientation.md
+  h_267f51d775769b 24-46
+openspec/changes/s6-bounded-verify-activation/bounded-verify/plan.json
+  h_267f51d775769b 1
+openspec/changes/s6-bounded-verify-activation/tasks.md
+  h_267f51d775769b 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "6ea4d61efcd3fb9c737cdfff2ebc37125f529767",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
