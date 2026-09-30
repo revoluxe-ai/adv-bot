@@ -43,6 +43,11 @@
 - Keep subjects short and imperative; include context in the body if behavior changes.
 - PRs should describe the change, list test commands run, and link relevant issues/tickets.
 
+## Scripts / ops lane (non-blocking product CI)
+- Operational collectors and registry live under `scripts/`, `tools/scripts/`, and related k8s templates (e.g. `k8s/jobs/ops-script-runner.yaml`). They are outside core product runtime and **must not** block urgent `app/` hotfixes when absent from the PR.
+- Keep incident fixes narrow; land large `scripts` merges separately. See `.cursor/rules/scripts-ops-lane.mdc`.
+- `migration-gates` runs only for DB/migration paths and named migration jobs—not for ops script runner manifests.
+
 ## Configuration & Security Notes
 - Use `.env` and `env.sample` for configuration; do not commit secrets.
 - Local state and logs (`logs/`, `redis-data/`, `clickhouse-data/`) are disposable.
