@@ -23,6 +23,33 @@ from app.settings import settings
 logger = logging.getLogger(__name__)
 
 
+async def _send_user_message_best_effort(
+    bot: Any,
+    user_telegram_id: int,
+    text: str,
+    *,
+    log_context: str,
+    **send_kwargs: Any,
+) -> None:
+    """Отправить пользователю статус; сбой Telegram/прокси не прерывает ARQ-задачу.
+
+    Args:
+        bot: aiogram Bot из ctx воркера.
+        user_telegram_id: Telegram id пользователя.
+        text: Текст сообщения.
+        log_context: Короткая метка для логов (имя задачи/шага).
+        send_kwargs: Аргументы для ``bot.send_message`` (например disable_web_page_preview).
+    """
+    try:
+        _ = await bot.send_message(user_telegram_id, text, **send_kwargs)
+    except Exception:
+        logger.warning(
+            "Не удалось отправить Telegram-уведомление пользователю; задача продолжается",
+            exc_info=True,
+            extra={"log_context": log_context, "user_telegram_id": user_telegram_id},
+        )
+
+
 async def _notify_unknown_task_error(
     *,
     bot: Any,
@@ -344,8 +371,11 @@ async def _create_complex_advs(
         wb_api = WBApi(access, client_session)
         await data_manager.update_advs_data_from_wb_to_pg(wb_api)
 
-    await bot.send_message(
-        user_telegram_id, f"Создаю комплексную кампанию для артикула {nmid}"
+    await _send_user_message_best_effort(
+        bot,
+        user_telegram_id,
+        f"Создаю комплексную кампанию для артикула {nmid}",
+        log_context="create_complex_advs.progress",
     )
     try:
         result = await manager.create_complex_advs(
@@ -355,7 +385,8 @@ async def _create_complex_advs(
             return None
         auto_adv_id, search_adv_id = result
 
-        await bot.send_message(
+        await _send_user_message_best_effort(
+            bot,
             user_telegram_id,
             f"Комплексная кампания для артикула {nmid} создана,"
             f" ID Авто-РК: {auto_adv_id},"
@@ -365,6 +396,7 @@ async def _create_complex_advs(
             f"Если это так, то пожалуйста, удалите"
             f" лишние артикулы сами и сообщите "
             f"об этом инциденте в поддержку {const.SUPPORT_LINK}  Спасибо!",
+            log_context="create_complex_advs.success",
             disable_web_page_preview=True,
         )
     except CardsNotFoundForShopError:
