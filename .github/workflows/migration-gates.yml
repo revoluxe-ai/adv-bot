@@ -9,7 +9,8 @@ on:
       - "tests/migrations/**"
       - ".github/workflows/migration-gates.yml"
       - ".github/ci/migration-ephemeral.env"
-      - "k8s/jobs/**"
+      - "k8s/jobs/app-db-control.yaml"
+      - "k8s/jobs/app-db-migrate.yaml"
       - "k8s/migrations/**"
       - "scripts/Invoke-ProdDbMigrateThenRollout.ps1"
 

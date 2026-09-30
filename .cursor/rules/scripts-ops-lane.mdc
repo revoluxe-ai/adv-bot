@@ -1,0 +1,33 @@
+# Scripts / ops tooling lane (non-blocking product CI)
+
+## Контекст
+
+Каталоги `scripts/`, `tools/scripts/`, read-only WB collectors, OpenSpec-only
+planning under `openspec/changes/**`, и k8s-шаблоны вроде
+`k8s/jobs/ops-script-runner.yaml` относятся к **операционному** контуру
+(`/opsx-scripts`, DevOps runbooks). Они **не** являются продуктовым runtime
+`app/` и не должны блокировать срочные hotfix-PR в product gates.
+
+## Правила для агентов и PR
+
+1. **Инцидент / hotfix в `app/`** — держать PR узким (только затронутый модуль +
+   тесты). Не смешивать с merge ветки `scripts` или крупными ops-артефактами.
+2. **Product CI** (unit/integration/pyright на затронутых путях, deploy gates для
+   `app/`) — обязателен для изменений runtime. Падения только в
+   `scripts/` / `tools/scripts/` / ops-k8s **не** откладывают merge продуктового
+   фикса, если PR их не содержит.
+3. **Migration gates** (`migration-gates.yml`) — только для схемы БД и
+   **migration-related** k8s Job-манифестов (`app-db-migrate`,
+   `app-db-control`). Добавление `ops-script-runner.yaml` **не** должно
+   включать workflow migration-gates (явный path filter в workflow).
+4. Новые collectors и registry — отдельные PR или ветка `scripts`; после merge в
+   `stage` не требуют повторного прогона migration-ephemeral-pg для несвязанных
+   product-фиксов.
+
+## Связанные пути
+
+| Зона | Примеры |
+|------|---------|
+| Ops scripts | `scripts/*.py`, `scripts/REGISTRY.yaml`, `tools/scripts/` |
+| Ops k8s | `k8s/jobs/ops-script-runner.yaml`, `.github/workflows/deploy_scripts.yml` |
+| Product | `app/`, `tests/` (кроме `tests/unit/scripts/**` при изолированном scripts PR) |
