@@ -63,6 +63,10 @@ class TestImprovedTokenStatus:
         expiration_date = report.service_expiration_date
         assert expiration_date is not None
         assert expiration_date == token2.expires
+        assert report.rights_lost_at_service_expiration == {
+            "Аналитика",
+            "Продвижение",
+        }
 
         days_until_break = report.days_until_service_breaks
         assert days_until_break is not None
@@ -99,6 +103,56 @@ class TestImprovedTokenStatus:
         # Service is already broken, so no expiration date
         assert report.service_expiration_date is None
         assert report.days_until_service_breaks is None
+        assert report.rights_lost_at_service_expiration == set()
+
+    def test_coverage_loss_is_computed_once(self):
+        """Date, days-left, and lost rights share one coverage walk."""
+        token = TokenInfo(
+            id=1,
+            api_key="key1",
+            user_id=123,
+            shop_id="shop1",
+            expires=datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=10),
+            categories=REQUIRED_RIGHTS,
+            is_read_only=False,
+            is_valid=True,
+            is_expired=False,
+            is_personal=True,
+        )
+        report = TokenStatusReport(
+            shop_id="shop1",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[token],
+            valid_tokens=[token],
+            expired_tokens=[],
+            available_permissions=REQUIRED_RIGHTS,
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[],
+        )
+        calls = 0
+        original = TokenStatusReport._first_required_rights_coverage_loss.func
+
+        def counting(
+            self: TokenStatusReport,
+        ) -> tuple[datetime.datetime, set[str]] | None:
+            nonlocal calls
+            calls += 1
+            return original(self)
+
+        TokenStatusReport._first_required_rights_coverage_loss.func = counting
+        try:
+            expiration_date = report.service_expiration_date
+            days_until_break = report.days_until_service_breaks
+            lost_rights = report.rights_lost_at_service_expiration
+        finally:
+            TokenStatusReport._first_required_rights_coverage_loss.func = original
+
+        assert calls == 1
+        assert expiration_date == token.expires
+        assert days_until_break is not None
+        assert lost_rights == REQUIRED_RIGHTS
 
     def test_service_expiration_only_relevant_tokens(self):
         """Test that only tokens with required permissions affect expiration date."""
@@ -272,6 +326,7 @@ class TestImprovedTokenStatus:
         )
 
         assert report.service_expiration_date == same_date
+        assert report.rights_lost_at_service_expiration == REQUIRED_RIGHTS
         days_until_break = report.days_until_service_breaks
         assert days_until_break is not None
         assert 6 <= days_until_break <= 7
@@ -317,6 +372,7 @@ class TestImprovedTokenStatus:
         )
 
         assert report.service_expiration_date == full_rights_long.expires
+        assert report.rights_lost_at_service_expiration == REQUIRED_RIGHTS
         days_until_break = report.days_until_service_breaks
         assert days_until_break is not None
         assert 29 <= days_until_break <= 30

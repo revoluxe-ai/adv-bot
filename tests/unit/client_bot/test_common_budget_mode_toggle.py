@@ -4,6 +4,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.client_bot.user_interface.handlers import common_budget_mode_toggle
+from app.client_bot.user_interface.services.total_spend_snapshot import (
+    TotalSpendSnapshot,
+)
 
 
 class FakeSession:
@@ -65,6 +68,11 @@ async def test_toggle_common_budget_mode_rerenders_menu(monkeypatch) -> None:
         FakeSessionMaker(adv),
     )
     monkeypatch.setattr(
+        common_budget_mode_toggle,
+        "load_total_spend_snapshot",
+        AsyncMock(return_value=TotalSpendSnapshot(0.0, 0.0)),
+    )
+    monkeypatch.setattr(
         common_budget_mode_toggle.messages,
         "CampaignActivityMenu",
         MagicMock(return_value=SimpleNamespace(text="menu text")),
@@ -117,6 +125,11 @@ async def test_toggle_common_budget_mode_does_not_touch_total_limits(
     )
     session_maker = FakeSessionMaker(adv)
     monkeypatch.setattr(common_budget_mode_toggle, "sm", session_maker)
+    monkeypatch.setattr(
+        common_budget_mode_toggle,
+        "load_total_spend_snapshot",
+        AsyncMock(return_value=TotalSpendSnapshot(0.0, 0.0)),
+    )
     monkeypatch.setattr(
         common_budget_mode_toggle.messages,
         "CampaignActivityMenu",

@@ -25,6 +25,11 @@ from app.client_bot.user_interface.services.adv_excel_roundtrip.schema import (
     serialize_cell_value,
     serialize_shelf_bid_control_cell,
 )
+from app.client_bot.user_interface.services.total_spend_snapshot import (
+    TotalSpendSnapshot,
+    load_total_spend_snapshot,
+    spend_excel_cell_value,
+)
 from app.modules.common_slaves.wildberries.models import AdvSetting, WBCard, WBUserCabinet
 from app.modules.common_slaves.wildberries.models.auto_shelf_bid_control import (
     AutoShelfBidControlSettings,
@@ -126,6 +131,36 @@ def _base_ro_columns() -> list[str]:
     ]
 
 
+_TOTAL_SPEND_RO_AFTER_EDIT: dict[str, str] = {
+    "auto_budget_total_limit": "total_spend_auto",
+    "search_auto_budget_total_limit": "total_spend_search",
+    "common_budget_total_limit": "total_spend_common",
+}
+
+
+def _export_headers() -> list[str]:
+    """RO-колонки и EDIT с RO расхода сразу после абсолютных лимитов."""
+    headers: list[str] = _base_ro_columns()
+    for field in _ordered_edit_fields():
+        headers.append(edit_header(field))
+        ro_field = _TOTAL_SPEND_RO_AFTER_EDIT.get(field)
+        if ro_field is not None:
+            headers.append(column_header("RO", ro_field))
+    return headers
+
+
+def _total_spend_for_ro_field(
+    ro_field: str, snapshot: TotalSpendSnapshot
+) -> int | str:
+    if ro_field == "total_spend_auto":
+        return spend_excel_cell_value(snapshot.auto)
+    if ro_field == "total_spend_search":
+        return spend_excel_cell_value(snapshot.search)
+    if ro_field == "total_spend_common":
+        return spend_excel_cell_value(snapshot.common)
+    return ""
+
+
 async def build_adv_excel_export(
     *,
     wb_user_cabinet_id: int,
@@ -183,7 +218,7 @@ async def build_adv_excel_export_in_session(
             shelf_settings_by_nmid[int(settings.nmid)] = settings
 
     active = [a for a in advs if is_active_adv(a)]
-    headers = _base_ro_columns() + [edit_header(f) for f in _ordered_edit_fields()]
+    headers = _export_headers()
 
     rows: list[dict[str, Any]] = []
     now = datetime.now(UTC).isoformat()
@@ -206,6 +241,7 @@ async def build_adv_excel_export_in_session(
         shelf_settings: AutoShelfBidControlSettings | None = None
         if nmid is not None and len(adv.nmids or []) == 1:
             shelf_settings = shelf_settings_by_nmid.get(int(nmid))
+        total_spend = await load_total_spend_snapshot(adv)
         row: dict[str, Any] = {
             column_header("RO", "excel_template_version"): EXCEL_TEMPLATE_VERSION,
             column_header("RO", "snapshot_at"): now,
@@ -247,6 +283,11 @@ async def build_adv_excel_export_in_session(
                 )
                 continue
             row[edit_header(field)] = serialize_cell_value(field, getattr(adv, field))
+            ro_field = _TOTAL_SPEND_RO_AFTER_EDIT.get(field)
+            if ro_field is not None:
+                row[column_header("RO", ro_field)] = _total_spend_for_ro_field(
+                    ro_field, total_spend
+                )
         rows.append(row)
         if progress_callback is not None:
             awaitable = progress_callback(idx, total)

@@ -614,6 +614,9 @@ class ShopMenu(TextWithKeyboard):
                     expiration_date = token_status.service_expiration_date
                     if expiration_date:
                         date_str = expiration_date.strftime("%d.%m.%Y")
+                        lost_rights = sorted(
+                            token_status.rights_lost_at_service_expiration
+                        )
                         if days_until_break <= 3:
                             text += f"🚨 <b>Сервис перестанет работать {date_str} (через {days_until_break} дн.)!</b>\n"
                         elif days_until_break <= 7:
@@ -626,6 +629,10 @@ class ShopMenu(TextWithKeyboard):
                         else:
                             # Show expiration date even for distant dates
                             text += f"📅 Токены действуют до {date_str} (через {days_until_break} дн.)\n"
+                        if lost_rights:
+                            text += (
+                                f"Истекут права: {', '.join(lost_rights)}\n"
+                            )
             else:
                 # Missing permissions - show critical status
                 if _has_read_only_only_tokens(token_status):

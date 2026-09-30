@@ -183,9 +183,10 @@ def get_campaign_activity_target_keyboard(
     )
 
     if current_limit > 0:
+        off_text = "Убрать лимит" if scope == "total" else "Выключить"
         _ = builder.row(
             InlineKeyboardButton(
-                text="Выключить",
+                text=off_text,
                 callback_data=callbacks.ManageCampaignActivity(
                     action="turn_off",
                     adv_setting_original_id=adv_setting.id,

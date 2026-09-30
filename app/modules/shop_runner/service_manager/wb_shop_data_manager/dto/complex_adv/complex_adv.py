@@ -565,16 +565,17 @@ class ComplexAdv:
 
     @property
     def auto_budget_total_limit(self) -> int:
-        """Абсолютный лимит расхода Авто за всё время; 0 = отключено.
+        """Абсолютный лимит расхода Авто за всё время; 0 = лимита нет.
 
         Promo-overlay намеренно не применяется: абсолютный лимит не должен
-        расти вместе с promo-бюджетом.
+        расти вместе с promo-бюджетом. В отличие от суточного лимита,
+        ``0`` здесь не паузит РК и не блокирует пополнения.
         """
         return getattr(self._adv_setting, "auto_budget_total_limit", 0) or 0
 
     @property
     def search_auto_budget_total_limit(self) -> int:
-        """Абсолютный лимит расхода Аукциона за всё время; 0 = отключено.
+        """Абсолютный лимит расхода Аукциона за всё время; 0 = лимита нет.
 
         Promo-overlay намеренно не применяется (см. ``auto_budget_total_limit``).
         """
@@ -582,7 +583,7 @@ class ComplexAdv:
 
     @property
     def common_budget_total_limit(self) -> int:
-        """Общий абсолютный лимит расхода на обе РК; 0 = отключено.
+        """Общий абсолютный лимит расхода на обе РК; 0 = лимита нет.
 
         Действует при ``use_common_budget``. Promo-overlay не применяется.
         """

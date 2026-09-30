@@ -6,6 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.client_bot.user_interface.handlers import auto_common_budget_toggle
+from app.client_bot.user_interface.services.total_spend_snapshot import (
+    TotalSpendSnapshot,
+)
 from app.client_bot.user_interface.views import keyboards
 
 
@@ -69,6 +72,11 @@ async def test_toggle_auto_common_budget_rerenders_menu(monkeypatch) -> None:
         auto_common_budget_toggle,
         "sm",
         FakeSessionMaker(adv),
+    )
+    monkeypatch.setattr(
+        auto_common_budget_toggle,
+        "load_total_spend_snapshot",
+        AsyncMock(return_value=TotalSpendSnapshot(0.0, 0.0)),
     )
     monkeypatch.setattr(
         auto_common_budget_toggle.messages,

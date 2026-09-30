@@ -6,8 +6,31 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.modules.shop_menu.message import ShopMenu
 from app.modules.token_monitoring.services.token_info_service import (
+    TokenInfo,
     TokenStatusReport,
 )
+
+
+def _shop_menu_token_text(token_status: TokenStatusReport) -> str:
+    """Render ShopMenu.text with only the fields the token section needs."""
+    shop_menu = MagicMock(spec=ShopMenu)
+    shop_menu._balance = 1000.0
+    shop_menu._bonus = 200.0
+    shop_menu._total_active_advs_count = 1
+    shop_menu._tariff_details = None
+    shop_menu._last_charge_at = None
+    shop_menu._shop_balance_snapshot = None
+    shop_menu._format_cashback_snapshot_line = ShopMenu._format_cashback_snapshot_line
+    shop_menu._token_status_loaded = True
+    shop_menu._token_status = token_status
+    shop_menu._wb_user_cabinet = MagicMock()
+    shop_menu._wb_user_cabinet.name = "Test Shop"
+    shop_menu._wb_cabinet = MagicMock()
+    shop_menu._wb_cabinet.shop_id = "test_shop_123"
+    shop_menu._wb_cabinet.active = True
+    rendered = ShopMenu.text.__get__(shop_menu, ShopMenu)
+    assert isinstance(rendered, str)
+    return rendered
 
 
 class TestShopMenuTokenIntegration:
@@ -316,6 +339,61 @@ class TestShopMenuTokenIntegration:
                         # Verify expiring token warning is shown
                         assert "\n🔑 <b>Токены:</b> ✅ <b>Все в порядке</b>\n" in text
                         assert "🚨 <b>Сервис перестанет работать" in text
+                        assert (
+                            "Истекут права: Аналитика, Контент, Продвижение, Статистика\n"
+                            in text
+                        )
+
+    def test_shop_menu_text_lists_only_rights_lost_on_split_tokens(self):
+        """Early token drops only its own rights; the menu line names those rights."""
+        now = datetime.datetime.now(datetime.UTC)
+        early = TokenInfo(
+            id=1,
+            api_key="key-early",
+            user_id=1,
+            shop_id="test_shop_123",
+            expires=now + datetime.timedelta(days=10),
+            categories={"Аналитика", "Продвижение"},
+            is_read_only=False,
+            is_valid=True,
+            is_expired=False,
+            is_personal=True,
+        )
+        later = TokenInfo(
+            id=2,
+            api_key="key-later",
+            user_id=1,
+            shop_id="test_shop_123",
+            expires=now + datetime.timedelta(days=30),
+            categories={"Контент", "Статистика"},
+            is_read_only=False,
+            is_valid=True,
+            is_expired=False,
+            is_personal=True,
+        )
+        report = TokenStatusReport(
+            shop_id="test_shop_123",
+            shop_name="Test Shop",
+            status="Complete",
+            all_tokens=[early, later],
+            valid_tokens=[early, later],
+            expired_tokens=[],
+            available_permissions={
+                "Контент",
+                "Статистика",
+                "Аналитика",
+                "Продвижение",
+            },
+            missing_permissions=set(),
+            has_all_required_permissions=True,
+            expiring_tokens=[],
+        )
+
+        text = _shop_menu_token_text(report)
+
+        assert "⏰ Сервис перестанет работать" in text
+        assert "Истекут права: Аналитика, Продвижение\n" in text
+        assert "Истекут права: Аналитика, Контент" not in text
 
     @pytest.mark.asyncio
     async def test_shop_menu_text_with_token_loading_error(
