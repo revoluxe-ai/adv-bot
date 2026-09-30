@@ -1,0 +1,210 @@
+.cursor/commands/_shared/tempo-pipeline.md
+  h_267f51d775769b 1-191
+.cursor/commands/tempo-bugbot.md
+  h_267f51d775769b 2-3,8-75
+.cursor/commands/tempo-project-bug-hunt.md
+  h_267f51d775769b 2-3,8-76
+.cursor/commands/tempo-security.md
+  h_267f51d775769b 2-3,8-94
+.cursor/commands/tempo-verification.md
+  h_267f51d775769b 2-3,8-182
+.opsx/registry/command_activation.ndjson
+  h_267f51d775769b 60-63
+.opsx/registry/command_transfer_completion.json
+  h_267f51d775769b 4,17,21-22,64-76
+.opsx/registry/command_transfer_manifest.md
+  h_267f51d775769b 114-117
+.opsx/registry/provenance.ndjson
+  h_267f51d775769b 34
+tools/cursor_executor/.gitignore
+  h_267f51d775769b 1-7
+tools/cursor_executor/README.md
+  h_267f51d775769b 1-16
+tools/cursor_executor/cursor_executor/__init__.py
+  h_267f51d775769b 1-21
+tools/cursor_executor/cursor_executor/auth.py
+  h_267f51d775769b 1-61
+tools/cursor_executor/cursor_executor/bridge_local.py
+  h_267f51d775769b 1-53
+tools/cursor_executor/cursor_executor/cli.py
+  h_267f51d775769b 1-44
+tools/cursor_executor/cursor_executor/execution_identity.py
+  h_267f51d775769b 1-33
+tools/cursor_executor/cursor_executor/executor.py
+  h_267f51d775769b 1-864
+tools/cursor_executor/cursor_executor/ledger.py
+  h_267f51d775769b 1-195
+tools/cursor_executor/cursor_executor/preflight.py
+  h_267f51d775769b 1-119
+tools/cursor_executor/cursor_executor/schemas.py
+  h_267f51d775769b 1-286
+tools/cursor_executor/cursor_executor/sdk_client.py
+  h_267f51d775769b 1-319
+tools/cursor_executor/pyproject.toml
+  h_267f51d775769b 1-16
+tools/cursor_executor/requirements.txt
+  h_267f51d775769b 1-2
+tools/cursor_executor/tests/fake_sdk.py
+  h_267f51d775769b 1-105
+tools/cursor_executor/tests/test_bridge_local_store.py
+  h_267f51d775769b 1-46
+tools/cursor_executor/tests/test_executor_contract.py
+  h_267f51d775769b 1-378
+tools/temporal/.gitignore
+  h_267f51d775769b 1-8
+tools/temporal/CLOUD-BROWSER-HANDOFF.md
+  h_267f51d775769b 1-115
+tools/temporal/README.md
+  h_267f51d775769b 1-107
+tools/temporal/active_model_route_coverage.py
+  h_267f51d775769b 1-126
+tools/temporal/activities.py
+  h_267f51d775769b 1-774
+tools/temporal/adversarial_closure.py
+  h_267f51d775769b 1-138
+tools/temporal/agent-models.json
+  h_267f51d775769b 1-46
+tools/temporal/assets/README.md
+  h_267f51d775769b 1-12
+tools/temporal/assets/owner-browser-check-release.html
+  h_267f51d775769b 1-57
+tools/temporal/assets/owner-chrome-focus-gate.html
+  h_267f51d775769b 1-88
+tools/temporal/assets/owner-done-signal.html
+  h_267f51d775769b 1-48
+tools/temporal/commit_materialization.py
+  h_267f51d775769b 1-285
+tools/temporal/config.py
+  h_267f51d775769b 1-202
+tools/temporal/cursor_adapter.py
+  h_267f51d775769b 1-708
+tools/temporal/cursor_execution_activity.py
+  h_267f51d775769b 1-203
+tools/temporal/docker-compose.yml
+  h_267f51d775769b 1-47
+tools/temporal/finding_filter.py
+  h_267f51d775769b 1-130
+tools/temporal/fixtures/sdk_mutating_runs/.gitkeep
+  h_267f51d775769b 1
+tools/temporal/git_preflight.py
+  h_267f51d775769b 1-350
+tools/temporal/lanes.py
+  h_267f51d775769b 1-166
+tools/temporal/loop_engine.py
+  h_267f51d775769b 1-426
+tools/temporal/model_config.py
+  h_267f51d775769b 1-161
+tools/temporal/models.py
+  h_267f51d775769b 1-86
+tools/temporal/owner_browser_check_gate.py
+  h_267f51d775769b 1-341
+tools/temporal/owner_chrome_focus_gate.py
+  h_267f51d775769b 1-212
+tools/temporal/owner_done_signal.py
+  h_267f51d775769b 1-194
+tools/temporal/parsers.py
+  h_267f51d775769b 1-606
+tools/temporal/pipelines.json
+  h_267f51d775769b 1-184
+tools/temporal/repair_progress_evidence.py
+  h_267f51d775769b 1-152
+tools/temporal/requirements.txt
+  h_267f51d775769b 1-3
+tools/temporal/run_store.py
+  h_267f51d775769b 1-34
+tools/temporal/runtime.py
+  h_267f51d775769b 1-175
+tools/temporal/scripts/start-temporal.sh
+  h_267f51d775769b 1-36
+tools/temporal/sdk_cursor_adapter.py
+  h_267f51d775769b 1-199
+tools/temporal/sdk_execution_dogfood.py
+  h_267f51d775769b 1-225
+tools/temporal/sdk_model_route.py
+  h_267f51d775769b 1-111
+tools/temporal/singleton.py
+  h_267f51d775769b 1-131
+tools/temporal/start.py
+  h_267f51d775769b 1-381
+tools/temporal/tempo_operator.py
+  h_267f51d775769b 1-1385
+tools/temporal/temporal_client.py
+  h_267f51d775769b 1-40
+tools/temporal/tests/conftest.py
+  h_267f51d775769b 1-6
+tools/temporal/tests/test_commit_materialization.py
+  h_267f51d775769b 1-627
+tools/temporal/tests/test_cursor_adapter_encoding.py
+  h_267f51d775769b 1-19
+tools/temporal/tests/test_cursor_sdk_execution.py
+  h_267f51d775769b 1-336
+tools/temporal/tests/test_finding_filter.py
+  h_267f51d775769b 1-84
+tools/temporal/tests/test_git_preflight.py
+  h_267f51d775769b 1-171
+tools/temporal/tests/test_git_preflight_parser.py
+  h_267f51d775769b 1-35
+tools/temporal/tests/test_legacy_transport_callgraph.py
+  h_267f51d775769b 1-90
+tools/temporal/tests/test_loop_finding_filter.py
+  h_267f51d775769b 1-75
+tools/temporal/tests/test_loop_repo_path.py
+  h_267f51d775769b 1-29
+tools/temporal/tests/test_loop_session_reset.py
+  h_267f51d775769b 1-81
+tools/temporal/tests/test_mock_scenarios.py
+  h_267f51d775769b 1-141
+tools/temporal/tests/test_model_config.py
+  h_267f51d775769b 1-257
+tools/temporal/tests/test_owner_browser_check_gate.py
+  h_267f51d775769b 1-137
+tools/temporal/tests/test_owner_chrome_focus_gate.py
+  h_267f51d775769b 1-117
+tools/temporal/tests/test_owner_done_signal.py
+  h_267f51d775769b 1-76
+tools/temporal/tests/test_parser_blocked_review.py
+  h_267f51d775769b 1-60
+tools/temporal/tests/test_project_bug_hunt_lane.py
+  h_267f51d775769b 1-145
+tools/temporal/tests/test_repair_partial_complete.py
+  h_267f51d775769b 1-32
+tools/temporal/tests/test_repair_progress_evidence.py
+  h_267f51d775769b 1-162
+tools/temporal/tests/test_sdk_cursor_adapter.py
+  h_267f51d775769b 1-155
+tools/temporal/tests/test_sdk_execution_dogfood_mutation.py
+  h_267f51d775769b 1-33
+tools/temporal/tests/test_sdk_model_route.py
+  h_267f51d775769b 1-184
+tools/temporal/tests/test_security_lane.py
+  h_267f51d775769b 1-286
+tools/temporal/tests/test_singleton_pipeline.py
+  h_267f51d775769b 1-106
+tools/temporal/tests/test_target_activation_contract.py
+  h_267f51d775769b 1-73
+tools/temporal/tests/test_temporal_workflow.py
+  h_267f51d775769b 1-179
+tools/temporal/tests/test_verification_execution.py
+  h_267f51d775769b 1-453
+tools/temporal/verification_engine.py
+  h_267f51d775769b 1-588
+tools/temporal/verification_loop.py
+  h_267f51d775769b 1-317
+tools/temporal/verification_mock.py
+  h_267f51d775769b 1-411
+tools/temporal/worker.py
+  h_267f51d775769b 1-121
+tools/temporal/workflow.py
+  h_267f51d775769b 1-608
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "eb7d2955d1bdebd97f7260f2eb301f2f1b775803",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
