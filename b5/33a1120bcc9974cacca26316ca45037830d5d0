@@ -1,0 +1,25 @@
+.cursor/pipeline/control-plane-security-review-tests/test_control_plane_security_review.py
+  s_315b3b0f01d6ee::t_655a1076846c1e 1-139
+.cursor/pipeline/post-deploy-acceptance-tests/test_post_deploy_acceptance.py
+  s_315b3b0f01d6ee::t_b350f435289b4a 1-105
+.cursor/pipeline/security-triage-tests/test_security_triage.py
+  s_315b3b0f01d6ee::t_5df47c3e060788 360
+.cursor/pipeline/security-triage/security_triage.py
+  s_315b3b0f01d6ee::t_4820d220a032df 721-722
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "b533a1120bcc9974cacca26316ca45037830d5d0",
+  "prompts": {},
+  "sessions": {
+    "s_315b3b0f01d6ee": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f1e3-57d3-7e23-aff5-b2c8f095e966",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
