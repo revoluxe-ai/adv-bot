@@ -1000,6 +1000,25 @@ async def test_connect_existing_create_both_confirm_enqueue() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_connect_existing_create_both_stale_session_confirm() -> None:
+    """create_both вне FSM: явное сообщение вместо тишины (PAT-ADV-003)."""
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    callback = _make_callback(
+        callbacks.ConnectExistingCreateBoth(action="confirm"), chat_id=333
+    )
+    callback_data = callbacks.ConnectExistingCreateBoth(action="confirm")
+
+    await connect_existing_advs.connect_existing_create_both_stale_session(
+        callback, callback_data, bot
+    )
+
+    bot.send_message.assert_called_once()
+    assert "Сессия подключения кампаний истекла" in bot.send_message.call_args[0][1]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_connect_existing_continue_despite_invalid_confirm_enqueue() -> None:
     """continue_despite_invalid: confirm enqueues create_search_only with existing_auto_adv_id."""
     bot = MagicMock()
