@@ -1,0 +1,22 @@
+.cursor/commands/opsx-bug-disposition.md
+  h_267f51d775769b 3,83-96
+.cursor/commands/opsx-bug-family-plan.md
+  h_267f51d775769b 3,77-91
+.cursor/pipeline/control-plane-tests/run_command_transfer_contract_tests.py
+  h_267f51d775769b 754-755,763-764
+.opsx/registry/command_activation.ndjson
+  h_267f51d775769b 45-46
+.opsx/registry/provenance.ndjson
+  h_267f51d775769b 20,38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "f0c0d3f207a2f9bdf1991a4b6210789cbdc06a58",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
