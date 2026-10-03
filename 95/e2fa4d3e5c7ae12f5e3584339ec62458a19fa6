@@ -1,0 +1,47 @@
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/decisions/clickhouse-migration-lifecycle-ownership/decision.md
+  s_57efc3ec7fdd18::t_c1fcd9bc244e27 1-292
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/design.md
+  s_57efc3ec7fdd18::t_913c655d317bc2 1-630
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/owner-contract.md
+  s_57efc3ec7fdd18::t_a28887daffc4f2 1-54
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/proposal.md
+  s_57efc3ec7fdd18::t_2d736212aa320a 1-143
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/scenario-coverage/plan.md
+  s_57efc3ec7fdd18::t_f62a2af3464f9c 1-952
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/scenario-coverage/plan.receipt.json
+  s_57efc3ec7fdd18::t_a86f3ab6474f11 1-145
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/specs/clickhouse-migration-lifecycle/spec.md
+  s_57efc3ec7fdd18::t_39edae6c352544 1-613
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/tasks.md
+  s_57efc3ec7fdd18::t_376e17552c6881 1-472
+openspec/decisions/index.md
+  s_57efc3ec7fdd18::t_bee2ffb21f3650 38-44,127-133
+openspec/specs/clickhouse-migration-lifecycle/spec.md
+  s_57efc3ec7fdd18::t_4a33530d353c77 1-617
+openspec/decisions/clickhouse-migration-lifecycle-ownership/decision.md
+  s_554f0e621c3ef0::t_5ef2ddcb1adfaa 1-290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "95e2fa4d3e5c7ae12f5e3584339ec62458a19fa6",
+  "prompts": {},
+  "sessions": {
+    "s_554f0e621c3ef0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1ce7069d-0b14-4eab-bf90-d94ab69979c4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_57efc3ec7fdd18": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f4de-4984-7b11-91bf-b3dbeb46038f",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
