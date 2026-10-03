@@ -1,0 +1,78 @@
+DOTO/WORKLOG.md
+  h_267f51d775769b 854,861-890
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/decisions/clickhouse-migration-lifecycle-ownership/decision.md
+  h_267f51d775769b 1-292
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/design.md
+  h_267f51d775769b 1-630
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/owner-contract.md
+  h_267f51d775769b 1-54
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/proposal.md
+  h_267f51d775769b 1-143
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/scenario-coverage/plan.md
+  h_267f51d775769b 1-952
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/scenario-coverage/plan.receipt.json
+  h_267f51d775769b 1-145
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/specs/clickhouse-migration-lifecycle/spec.md
+  h_267f51d775769b 1-613
+openspec/changes/archive/2026-10-01-clickhouse-migrations-control-plane/tasks.md
+  h_267f51d775769b 1-472
+openspec/changes/clickhouse-migrations-control-plane-archive-test-regression/owner-contract.md
+  h_267f51d775769b 1-25
+openspec/decisions/clickhouse-migration-lifecycle-ownership/decision.md
+  h_267f51d775769b 1-290
+openspec/decisions/index.md
+  h_267f51d775769b 38-44,127-133
+openspec/specs/clickhouse-migration-lifecycle/spec.md
+  h_267f51d775769b 1-617
+pyrightconfig_strict.json
+  h_267f51d775769b 146-156
+scripts/clickhouse_migration_control_plane/__init__.py
+  h_267f51d775769b 1-7
+scripts/clickhouse_migration_control_plane/__main__.py
+  h_267f51d775769b 1-121
+scripts/clickhouse_migration_control_plane/coordinator_session.py
+  h_267f51d775769b 1-206
+scripts/clickhouse_migration_control_plane/corpus.py
+  h_267f51d775769b 1-280
+scripts/clickhouse_migration_control_plane/ledger.py
+  h_267f51d775769b 1-243
+scripts/clickhouse_migration_control_plane/mutations.py
+  h_267f51d775769b 1-599
+scripts/clickhouse_migration_control_plane/pre_execution.py
+  h_267f51d775769b 1-569
+scripts/clickhouse_migration_control_plane/statements.py
+  h_267f51d775769b 1-110
+scripts/clickhouse_migration_control_plane/target_port.py
+  h_267f51d775769b 1-398
+tests/unit/clickhouse_migration_contract_fixture.py
+  h_267f51d775769b 1-147
+tests/unit/test_clickhouse_migration_coordinator_session.py
+  h_267f51d775769b 1-195
+tests/unit/test_clickhouse_migration_corpus_acceptance.py
+  h_267f51d775769b 1-298
+tests/unit/test_clickhouse_migration_final_acceptance.py
+  h_267f51d775769b 1-147
+tests/unit/test_clickhouse_migration_isolated_target_port.py
+  h_267f51d775769b 1-347
+tests/unit/test_clickhouse_migration_ledger.py
+  h_267f51d775769b 1-292
+tests/unit/test_clickhouse_migration_legacy_baseline.py
+  h_267f51d775769b 1-196
+tests/unit/test_clickhouse_migration_mutations.py
+  h_267f51d775769b 1-764
+tests/unit/test_clickhouse_migration_pre_execution.py
+  h_267f51d775769b 1-405
+tests/unit/test_clickhouse_migration_read_only_commands.py
+  h_267f51d775769b 1-461
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "62c8d48b15498997b84357e015b0e688f44fd37b",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
