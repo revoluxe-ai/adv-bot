@@ -35,6 +35,13 @@ architecture decisions belong here.
     a forward-only merge revision without schema/data operations; published
     history is immutable.
 
+- [clickhouse-migration-lifecycle-ownership](clickhouse-migration-lifecycle-ownership/decision.md)
+  - Status: Accepted
+  - Scope: ownership/write-path for ClickHouse migration control plane:
+    immutable `001`–`005` corpus identity, target-side append-only ledger,
+    separate PostgreSQL advisory-lock coordinator, fail-closed unknown history,
+    schema DDL `001`–`004` only, privileged `005` separate; runtime/Alembic are forbidden owners.
+
 - [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
   - Status: Accepted
   - Scope: ownership/layering for scripts/`/opsx-scripts` Job → existing
@@ -116,6 +123,13 @@ architecture decisions belong here.
     TARGET_ENTITY_OR_LEG = auto-setting anchor + slot roles; ALLOWED billing
     adapters; forbid shop-runner/pause managers writing latch/AdvPayment;
     orthogonal to empty-keywords and shelf-exhausted pause write-paths.
+
+- [clickhouse-migration-lifecycle-ownership](clickhouse-migration-lifecycle-ownership/decision.md)
+  - Status: Accepted
+  - Scope: ownership/write-path for ClickHouse migration control plane:
+    immutable `001`–`005` corpus identity, target-side append-only ledger,
+    separate PostgreSQL advisory-lock coordinator, fail-closed unknown history,
+    schema DDL `001`–`004` only, privileged `005` separate; runtime/Alembic are forbidden owners.
 
 - [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
   - Status: Accepted
