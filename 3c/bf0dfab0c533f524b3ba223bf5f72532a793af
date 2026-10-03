@@ -1,0 +1,35 @@
+scripts/clickhouse_migration_control_plane/__init__.py
+  s_2f1d114eddcf88::t_b37e54fe04d9f4 1-7
+scripts/clickhouse_migration_control_plane/__main__.py
+  s_2f1d114eddcf88::t_6c21871edf7d7d 1-121
+scripts/clickhouse_migration_control_plane/coordinator_session.py
+  s_2f1d114eddcf88::t_038a4aa2798e8c 1-206
+scripts/clickhouse_migration_control_plane/corpus.py
+  s_2f1d114eddcf88::t_9d52d548b53fc6 1-280
+scripts/clickhouse_migration_control_plane/ledger.py
+  s_2f1d114eddcf88::t_65edc27ab01df9 1-243
+scripts/clickhouse_migration_control_plane/mutations.py
+  s_2f1d114eddcf88::t_6e4012a8f2c4a9 1-599
+scripts/clickhouse_migration_control_plane/pre_execution.py
+  s_2f1d114eddcf88::t_ac257f11ac7dbd 1-569
+scripts/clickhouse_migration_control_plane/statements.py
+  s_2f1d114eddcf88::t_5b37e074eae5cf 1-110
+scripts/clickhouse_migration_control_plane/target_port.py
+  s_2f1d114eddcf88::t_f36ee22507ddf8 1-398
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "3cbf0dfab0c533f524b3ba223bf5f72532a793af",
+  "prompts": {},
+  "sessions": {
+    "s_2f1d114eddcf88": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "agent-ed7b82f8-0bf3-4fde-8872-3137afaab8d0",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
