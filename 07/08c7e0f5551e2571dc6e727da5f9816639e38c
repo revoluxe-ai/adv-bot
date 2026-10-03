@@ -1,0 +1,19 @@
+openspec/changes/clickhouse-migrations-control-plane-archive-test-regression/owner-contract.md
+  s_554f0e621c3ef0::t_a28f2e8a759494 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "0708c7e0f5551e2571dc6e727da5f9816639e38c",
+  "prompts": {},
+  "sessions": {
+    "s_554f0e621c3ef0": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1ce7069d-0b14-4eab-bf90-d94ab69979c4",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
