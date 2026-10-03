@@ -1,0 +1,81 @@
+name: Scripts branch image (no PR)
+
+# Build+push app image from branch `scripts` for ops Jobs.
+# Does not require a PR. Does not deploy master/stage.
+#
+# CI publishes immutable SHA + :scripts tags to GHCR only.
+# Cluster Jobs pull via Harbor proxy-cache (read-through), not direct GHCR:
+#   harbor.skyline360.ru/git-registry-cache/revoluxe-ai/adv-bot:<commit-sha>
+on:
+  push:
+    branches: [scripts]
+  workflow_dispatch:
+
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: common-wb-adv-bot
+            repo_name: adv-bot
+            dockerfile: ./dockers/Dockerfile
+    env:
+      GHCR_NAMESPACE: revoluxe-ai
+      CR_REPOSITORY: ${{ matrix.repo_name }}
+      IMAGE_TAG: ${{ github.sha }}
+      LATEST_TAG: scripts
+      GHCR_REGISTRY: ghcr.io
+      HARBOR_PROXY_REGISTRY: harbor.skyline360.ru
+      HARBOR_PROXY_PROJECT: git-registry-cache
+      HARBOR_PROXY_REPOSITORY: revoluxe-ai/adv-bot
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image to GHCR
+        id: ghcr_push
+        run: |
+          set -euo pipefail
+          GHCR_IMAGE="${{ env.GHCR_REGISTRY }}/${{ env.GHCR_NAMESPACE }}/${{ env.CR_REPOSITORY }}"
+          docker buildx build \
+            --platform=linux/amd64 \
+            --push \
+            -t "${GHCR_IMAGE}:${{ env.IMAGE_TAG }}" \
+            -t "${GHCR_IMAGE}:${{ env.LATEST_TAG }}" \
+            -f ${{ matrix.dockerfile }} .
+          echo "ghcr_sha=${GHCR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
+          echo "ghcr_scripts=${GHCR_IMAGE}:${{ env.LATEST_TAG }}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish image references
+        if: always() && steps.ghcr_push.outcome == 'success'
+        run: |
+          HARBOR_PROXY_IMAGE="${{ env.HARBOR_PROXY_REGISTRY }}/${{ env.HARBOR_PROXY_PROJECT }}/${{ env.HARBOR_PROXY_REPOSITORY }}"
+          {
+            echo "## Published images (scripts branch)"
+            echo ""
+            echo "**GHCR (CI publication, required):**"
+            echo "- ${{ steps.ghcr_push.outputs.ghcr_sha }}"
+            echo "- ${{ steps.ghcr_push.outputs.ghcr_scripts }}"
+            echo ""
+            echo "**Harbor proxy-cache (cluster Job pull-through, not CI push):**"
+            echo "- ${HARBOR_PROXY_IMAGE}:${{ env.IMAGE_TAG }}"
+            echo "- ${HARBOR_PROXY_IMAGE}:${{ env.LATEST_TAG }}"
+            echo ""
+            echo "Harbor \`git-registry-cache\` is a proxy project; do not docker push there."
+            echo "Kubernetes Jobs use the Harbor refs above after GHCR publish succeeds."
+          } >> "$GITHUB_STEP_SUMMARY"

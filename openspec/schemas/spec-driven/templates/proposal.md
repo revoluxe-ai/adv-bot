@@ -2,6 +2,21 @@
 
 <!-- Explain the motivation for this change. What problem does this solve? Why now? -->
 
+## Evolution Context (optional)
+
+<!--
+Include only when an approved EVOLUTION_HANDOFF links this change.
+STAR_ID:
+INCREMENT_ID:
+CURRENT_INCREMENT:
+CONTRIBUTION_TO_NORTH_STAR:
+FORWARD_COMPATIBILITY_CONSTRAINTS:
+OUT_OF_SCOPE:
+
+North Star / Future Increments are context, not this change's owed DoD.
+Omit this section for standalone, legacy-unlinked, or not-applicable changes.
+-->
+
 ## What Changes
 
 <!-- Describe what will change. Be specific about new capabilities, modifications, or removals. -->

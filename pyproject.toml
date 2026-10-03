@@ -2,6 +2,7 @@
 [tool.poetry.scripts]
 check-openspec = "openspec.tools.check_openspec:main"
 pyright-strict = "app.pyright_strict_entry:main"
+wb-api-readonly-collect = "scripts.wb_api_readonly_ops.collect.portable:main"
 
 
 [tool.poetry]
@@ -13,6 +14,7 @@ readme = "README.md"
 packages = [
     { include = "app" },
     { include = "openspec" },
+    { include = "scripts" },
 ]
 
 [tool.black]

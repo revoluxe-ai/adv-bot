@@ -78,6 +78,7 @@ class AuthClientHandler:
             SectionsEnum.PROMOTION: "Продвижение",
             SectionsEnum.ANALYTIC_AND_DATA: "Аналитика",
             SectionsEnum.CONTENT: "Контент",
+            SectionsEnum.STATISTICS: "Статистика",
         }
 
         def func(token: WBToken):

@@ -80,21 +80,40 @@ async def resolve_wb_cabinet_id_by_shop_id_in_session(
     return int(wb_cabinet_id)
 
 
+def _token_keeps_cabinet_running(token: WBToken, shop_id: str) -> bool:
+    """Токен пригоден для работы бота: personal либо «только чтение».
+
+    ``read_only`` — бит JWT «Токен только на чтение», не режим сессии Postgres.
+    Такой токен не считается поводом выключать магазин.
+    """
+    if token.shop_id != shop_id:
+        return False
+    if token.is_personal:
+        return True
+    try:
+        return bool(token.read_only)
+    except Exception:
+        logger.debug(
+            "Не удалось прочитать read_only, пропускаем: token_id=%s", token.id
+        )
+        return False
+
+
 async def load_wb_cabinet_access_in_session(
     session: AsyncSession, wb_cabinet_id: int
 ) -> WBCabinetAccess | str:
-    """Load personal-token access or mark cabinet inactive (WRITE).
+    """Прочитать доступ кабинета. Сессия только на чтение, без деактивации.
 
     Args:
-        session: injectable async session (``sm(read_only=False)`` — may commit).
-        wb_cabinet_id: WBCabinet primary key.
+        session: injectable async session (``sm(read_only=True)``).
+        wb_cabinet_id: первичный ключ WBCabinet.
 
     Returns:
-        WBCabinetAccess when personal tokens exist; otherwise shop_id string after
-        marking the cabinet inactive (caller runs deactivate + raises).
+        WBCabinetAccess, если есть personal-токен или токен «только чтение»;
+        иначе строка shop_id. Кабинет эта функция не выключает.
 
     Raises:
-        WBCabinetNotFoundError: when cabinet id is missing.
+        WBCabinetNotFoundError: кабинет не найден.
     """
     wb_cabinet: WBCabinet | None = await session.get(WBCabinet, wb_cabinet_id)
 
@@ -110,18 +129,16 @@ async def load_wb_cabinet_access_in_session(
     for token in wb_tokens:
         token.api_key = token.api_key.replace("\r", "").replace("\n", "").strip()
         if not token.check_valid():
-            logger.debug(f"Не валидный токен {token.api_key}")
+            logger.debug("Не валидный токен, пропускаем: token_id=%s", token.id)
             continue
-        if not token.is_personal:
-            logger.debug("Не персональный токен, пропускаем: token_id=%s", token.id)
+        if not _token_keeps_cabinet_running(token, shop_id):
+            logger.debug(
+                "Токен без personal и без чтения, пропускаем: token_id=%s",
+                token.id,
+            )
             continue
-        if token.shop_id == shop_id:
-            valited_tokens.append(token)
+        valited_tokens.append(token)
     if not valited_tokens:
-        # Keep historical side effect expected by unit tests and callers:
-        # when access is forbidden due to missing personal tokens, mark cabinet inactive.
-        wb_cabinet.active = False
-        await session.commit()
         return shop_id
 
     return WBCabinetAccess(
@@ -138,7 +155,9 @@ async def find_common_access_token_in_session(
     async for wb_token in await session.stream_scalars(stmt):
         wb_token.api_key = wb_token.api_key.replace("\r", "").replace("\n", "").strip()
         if not wb_token.check_valid():
-            logger.debug(f"Не валидный токен {wb_token.api_key}")
+            logger.debug(
+                "Не валидный токен, пропускаем: token_id=%s", wb_token.id
+            )
             continue
         if not wb_token.is_personal:
             logger.debug(
@@ -155,7 +174,21 @@ async def find_common_access_token_in_session(
 async def get_access_for_wb_cabinet(
     wb_cabinet_id_or_shop_id: int | str,
 ) -> WBCabinetAccess | None:
-    """Resolve cabinet access with parent→child PG session handoff."""
+    """Собрать доступ к кабинету. Read-only токен оставляет магазин включённым.
+
+    Чтение идёт через ``sm(read_only=True)``. Запись и деактивация — только
+    если нет ни personal-токена, ни токена «только чтение».
+
+    Args:
+        wb_cabinet_id_or_shop_id: id кабинета или shop_id.
+
+    Returns:
+        Доступ с пригодными токенами.
+
+    Raises:
+        WBCabinetNotFoundError: кабинет не найден.
+        ApiForbiddenError: пригодного токена нет; кабинет при этом выключается.
+    """
     if isinstance(wb_cabinet_id_or_shop_id, str):
         shop_id: str = wb_cabinet_id_or_shop_id
         async with sm(read_only=True) as session:
@@ -165,11 +198,17 @@ async def get_access_for_wb_cabinet(
     else:
         wb_cabinet_id = wb_cabinet_id_or_shop_id
 
-    async with sm(read_only=False) as session:
+    async with sm(read_only=True) as session:
         access_or_shop = await load_wb_cabinet_access_in_session(session, wb_cabinet_id)
         if isinstance(access_or_shop, WBCabinetAccess):
             return access_or_shop
         shop_id_for_deactivate = access_or_shop
+
+    async with sm(read_only=False) as session:
+        wb_cabinet = await session.get(WBCabinet, wb_cabinet_id)
+        if wb_cabinet is not None:
+            wb_cabinet.active = False
+            await session.commit()
 
     await deactivate_cabinet_atomic_with_user_trackers(
         shop_id_for_deactivate,

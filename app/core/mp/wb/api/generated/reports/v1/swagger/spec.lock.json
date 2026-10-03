@@ -1,0 +1,10 @@
+{
+  "downloaded_at_utc": "2026-08-04T15:46:30.645527+00:00",
+  "generator": "openapi-python-client",
+  "generator_meta": "none",
+  "sha256": "718b4267065b985c2df13621258ef96ce4b9d15d9635d6bee5c934e835f018ea",
+  "size_bytes": 134126,
+  "spec_filename": "12-reports.yaml",
+  "spec_key": "reports",
+  "spec_url": "https://dev.wildberries.ru/api/swagger/yaml/en/12-reports.yaml"
+}

@@ -1,0 +1,67 @@
+## Why
+
+Стабильный A1 strict read-only collect и generic strict single-NMID audit
+должны опираться на одни и те же Owner-bot read-only primitives. Discovery и
+операционный t1048 показали, что расхождение async/resource orchestration и
+несогласованные adapter seams дают section `RuntimeError`/`AttributeError` и
+легитимный `PARTIAL`, хотя output contract и `write_budget.writes=0` сохраняются.
+Нужен reusable shared evidence plane, а не параллельный ProKraft-specific stack.
+
+Runtime Job `ops-script-strict-nmid-186069402-20260921t0055` (image
+`3a5a0e77…`, artifact SHA256 `ba0f46e9…`) подтвердил lifecycle/RowMapping
+fixes, но **не** закрыл acceptance: `decision.status=PARTIAL` из-за bare
+`AttributeError` на `current_contour` / `orders` / `attribution` / `topology` и
+расхождения canonical `physical_spend` с подтверждённым spend fact в
+`evidence[]`. Этот change остаётся открытым до dict-safe bundle normalization и
+reconciliation regressions (tasks §7).
+
+## What Changes
+
+- Вводится formal shared contract **Job-scoped read-only evidence plane** для
+  collectors, использующих Owner-bot DI, WB adapters и PG reads.
+- Выравнивается lifecycle: один совместимый event loop и deterministic cleanup
+  на Job execution для shared async loading (без cross-loop reuse module-level
+  SQLAlchemy engines).
+- Strict single-NMID plane переводится на supported Fullstats/orders paths из
+  `wb_api_readonly_ops` и official adapters; orphan API calls запрещены.
+- PG read strategy становится Job-safe и reusable (общий с A1-stable asyncpg
+  path или эквивалентный shared factory), без ProKraft-specific reader.
+- Reader failures нормализуются в typed GAP/error provenance для collector output
+  contracts. **Implementation TypeError** на supported PG mapping rows
+  (`sqlalchemy.engine.row.RowMapping`) MUST NOT быть переквалифицирован в
+  legitimate evidence GAP.
+- Shared PG row normalizer MUST accept Python/SQLAlchemy mapping protocol
+  results used by the Job path (`collections.abc.Mapping`, including
+  `RowMapping`; SQLAlchemy `Row` via documented `_mapping`) and emit a plain
+  `dict` with unchanged column names/values; unsupported objects fail closed
+  with explicit `TypeError`.
+- Добавляется focused test contract: async lifecycle, adapter seam, resource
+  cleanup, A1 non-regression, **and** RowMapping regression (real SQLAlchemy
+  mapping type vs dict-only helper).
+- **Не меняются** Registry/resolver semantics, не создаётся новый collector id,
+  не изобретаются stock/full attribution catalogs без подтверждённого shared
+  source.
+
+## Capabilities
+
+### New Capabilities
+
+- `owner-bot-read-only-evidence-plane`: reusable Job-scoped read-only evidence
+  loading contract (async lifecycle, shared WB/PG primitives, typed reader
+  failures, zero writes).
+
+### Modified Capabilities
+
+- Нет delta к archived/main `strict-single-nmid-read-only-audit` requirements.
+  Этот change stabilizes **implementation plane** под уже archived audit
+  contract, не расширяя NMID audit semantics.
+
+## Impact
+
+- `scripts/strict_single_nmid_audit_owner_bot_plane.py` (primary consumer refactor)
+- Potential shared module under `scripts/wb_api_readonly_ops/` or adjacent
+  Owner-bot read facade (extract, not duplicate A1 collector body)
+- `scripts/a1_strict_read_only_contract_collect.py` — regression-only verification
+- Tests under `tests/unit/scripts/` (and optional Job harness fixtures)
+- **Out of scope:** `scripts/REGISTRY.yaml`, resolver, new collector registration,
+  production writes, mass migration of unrelated scripts.

@@ -10,12 +10,16 @@ from app.core.di.client_di.domain_managers_containers.products_container import 
 from app.core.di.client_di.domain_managers_containers.promotion_container import (
     PromotionContainer,
 )
+from app.core.di.client_di.domain_managers_containers.reports_container import (
+    ReportsContainer,
+)
 from app.core.mp.wb.api.auth_client_handler import AuthClientHandler
 
 from app.core.mp.wb.api.domain_managers import (
     AnalyticsManager,
     ProductsManager,
     PromotionManager,
+    ReportsManager,
 )
 from app.core.mp.wb.api.managers import WBDataManager, WBModifier
 
@@ -39,6 +43,11 @@ class WBDataContainer(containers.DeclarativeContainer):
         _auth_client_handler=_auth_client_handler,
     )
 
+    _reports_container: Container[ReportsContainer] = providers.Container(
+        ReportsContainer,
+        _auth_client_handler=_auth_client_handler,
+    )
+
     _analytics_domain_manager: Provider[AnalyticsManager] = (  # pyright: ignore
         _analytics_and_data_container.analytics_domain_manager
     )  # pyright: ignore
@@ -51,11 +60,16 @@ class WBDataContainer(containers.DeclarativeContainer):
         _products_container.products_domain_manager
     )  # pyright: ignore
 
+    _reports_domain_manager: Provider[ReportsManager] = (  # pyright: ignore
+        _reports_container.reports_domain_manager
+    )  # pyright: ignore
+
     wb_data_manager = providers.Singleton(
         WBDataManager,
         analytics_manager=_analytics_domain_manager,
         promotion_manager=_promotion_domain_manager,
         products_manager=_products_domain_manager,
+        reports_manager=_reports_domain_manager,
     )
 
     wb_promotion_manager = providers.Singleton(
