@@ -850,3 +850,10 @@ FEFO remaining, top-up `get_campaign_config(AUTO|SEARCH)`.
 2. Тесты H1/P0-семантики, snapshot warmup и one-tick refresh.
 3. Решить A/B/C для CPO/common budget и композиции с V3 Raise MAX.
 4. Закрыть UPD recovery/backfill и зафиксировать policy для manual top-ups.
+
+---
+
+## Техдолг (не P0) — инцидент 138252141 / 2026-09-30
+
+- **connect_existing:** при `ce_create_both:confirm` без FSM `waiting_confirm_create_both` (старая кнопка) — сейчас `Update is not handled`, тишина; сделать ответ «сессия истекла, начните заново» (PAT-ADV-003).
+- **ops:** после выката `3693e936e-r1` — `/opsx-meta-commit` OPS_STATE/LAST.json; дожать `complete_release` (lease token=12, ctrlplane Job был Pending).
