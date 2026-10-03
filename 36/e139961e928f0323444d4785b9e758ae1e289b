@@ -1,0 +1,21 @@
+tools/cursor_executor/tests/test_process_client.py
+  s_6173ec1951174f::t_d4ab75024e23b6 1-60
+tools/temporal/sdk_cursor_adapter.py
+  s_6173ec1951174f::t_610f0eb88ad8d4 30,64,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "36e139961e928f0323444d4785b9e758ae1e289b",
+  "prompts": {},
+  "sessions": {
+    "s_6173ec1951174f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a100a0-4933-7371-adbf-6d78e184f220",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
