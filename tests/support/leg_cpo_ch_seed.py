@@ -41,6 +41,18 @@ def resolve_leg_cpo_window(
     return anchor - timedelta(days=days - 1), anchor
 
 
+def distribute_orders_across_window_days(total: int, day_count: int) -> tuple[int, ...]:
+    """Разнести ``total`` заказов по ``day_count`` дням; остаток — на ранние дни.
+
+    Сумма элементов всегда равна ``total`` (в отличие от uniform floor per day).
+    """
+    if day_count <= 0:
+        return ()
+    base = total // day_count
+    remainder = total % day_count
+    return tuple(base + (1 if index < remainder else 0) for index in range(day_count))
+
+
 def leg_cpo_seed_dates(
     *,
     now: datetime | None = None,
@@ -83,10 +95,15 @@ async def seed_leg_cpo_pair_rows(
     search_spend_per_day = (300.0 / len(window_dates)) if window_dates else 300.0
     auto_orders_total = 2
     search_orders_total = 3
-    auto_orders_per_day = max(auto_orders_total // len(window_dates), 1)
-    search_orders_per_day = max(search_orders_total // len(window_dates), 1)
+    day_count = len(window_dates)
+    auto_orders_by_day = distribute_orders_across_window_days(
+        auto_orders_total, day_count
+    )
+    search_orders_by_day = distribute_orders_across_window_days(
+        search_orders_total, day_count
+    )
 
-    for day in window_dates:
+    for day_index, day in enumerate(window_dates):
         rows.append(
             (
                 auto_adv_id,
@@ -95,7 +112,7 @@ async def seed_leg_cpo_pair_rows(
                 10,
                 auto_spend_per_day,
                 2,
-                auto_orders_per_day,
+                auto_orders_by_day[day_index],
                 1000.0,
                 1.0,
             )
@@ -109,7 +126,7 @@ async def seed_leg_cpo_pair_rows(
                     8,
                     search_spend_per_day,
                     2,
-                    search_orders_per_day,
+                    search_orders_by_day[day_index],
                     800.0,
                     1.0,
                 )

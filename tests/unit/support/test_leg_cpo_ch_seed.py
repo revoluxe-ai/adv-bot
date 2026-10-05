@@ -9,6 +9,7 @@ import pytest
 from tests.support.leg_cpo_ch_seed import (
     LEG_CPO_FIXED_DAYS,
     LEG_CPO_FIXED_NOW,
+    distribute_orders_across_window_days,
     leg_cpo_seed_dates,
     resolve_leg_cpo_window,
 )
@@ -27,3 +28,11 @@ def test_leg_cpo_seed_dates_cover_full_window() -> None:
     """Seed dates включают обе границы observation window."""
     dates = leg_cpo_seed_dates(now=LEG_CPO_FIXED_NOW, days=LEG_CPO_FIXED_DAYS)
     assert dates == (datetime(2026, 9, 28).date(), datetime(2026, 9, 29).date())
+
+
+def test_distribute_orders_across_window_days_matches_golden_totals() -> None:
+    """Сумма per-day orders совпадает с auto=2 / search=3 на 2-дневном окне."""
+    assert sum(distribute_orders_across_window_days(2, LEG_CPO_FIXED_DAYS)) == 2
+    assert distribute_orders_across_window_days(2, LEG_CPO_FIXED_DAYS) == (1, 1)
+    assert sum(distribute_orders_across_window_days(3, LEG_CPO_FIXED_DAYS)) == 3
+    assert distribute_orders_across_window_days(3, LEG_CPO_FIXED_DAYS) == (2, 1)

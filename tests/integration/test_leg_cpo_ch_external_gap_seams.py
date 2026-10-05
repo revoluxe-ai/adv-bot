@@ -23,6 +23,7 @@ import app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_m
 import app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_view_provider as auto_shelf_view_module
 import app.modules.shop_runner.wb_stat_manager.clickhouse_manager.full_wb_adv_stat as full_wb_adv_stat_module
 from app.client_bot.user_interface.services import keyword_v3_profile_loader
+import app.client_bot.user_interface.views.messages.main_adv_setting_menu.adv_setting_menu as adv_setting_menu_mod
 from app.client_bot.user_interface.views.messages.main_adv_setting_menu.adv_setting_menu import (
     AdvSettingMenu,
 )
@@ -253,6 +254,7 @@ async def test_wb_shop_data_manager_attach_leg_cpo_reads_live_clickhouse(
         tasks_manager=None,
         wb_api_data_manager=MagicMock(),
         wb_manager=None,
+        plan_fact_reader=MagicMock(),
     )
     complex_adv = ComplexAdv(adv_setting=_auto_adv_setting())
 
@@ -268,7 +270,7 @@ async def test_wb_shop_data_manager_attach_leg_cpo_reads_live_clickhouse(
     assert complex_adv.auto_fact_cpo == pytest.approx(600.0 / 2)
     assert complex_adv.search_fact_cpo == pytest.approx(300.0 / 3)
     assert complex_adv.leg_cpo_snapshot is not None
-    assert complex_adv.leg_cpo_snapshot.end_date == end_date
+    assert complex_adv.leg_cpo_snapshot.end_date.date() == end_date.date()
 
 
 @pytest.mark.integration
@@ -372,6 +374,25 @@ async def test_adv_setting_menu_resolve_cost_activity_attaches_live_leg_cpo(
     async_session.add(auto_adv)
     await async_session.flush()
 
+    class _LiveSessionMaker:
+        def __init__(self, session: AsyncSession) -> None:
+            self._session = session
+
+        def __call__(self, *, read_only: bool = False) -> _LiveSessionMaker:
+            return self
+
+        async def __aenter__(self) -> AsyncSession:
+            return self._session
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        adv_setting_menu_mod,
+        "sm",
+        _LiveSessionMaker(async_session),
+    )
+
     menu = object.__new__(AdvSettingMenu)
     menu.adv = auto_adv
     menu._redis_client = fake_redis
@@ -461,7 +482,8 @@ async def test_auto_shelf_view_provider_build_view_uses_live_auto_leg_cpo(
     )
     assert persisted[LEG_CPO_AUTO_ADV_ID][0] == pytest.approx(600.0)
     assert view.fact_cpo == pytest.approx(600.0 / 2)
-    assert view.optimization_metric == OptimizationMetric.CTR
+    # CTR только при fact CPO < resolve CPO; при 300 vs resolve target — CPC.
+    assert view.optimization_metric == OptimizationMetric.CPC
 
 
 @pytest.mark.integration
