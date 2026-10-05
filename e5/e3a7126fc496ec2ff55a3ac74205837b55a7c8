@@ -1,0 +1,211 @@
+app/modules/ai_package_v1/domain/export_inputs.py
+  s_87d64d0773fc72::t_394dcd40cc01ef 1-50
+app/modules/ai_package_v1/sql/funnel_by_nmids.sql
+  s_87d64d0773fc72::t_5cd3dab291418f 1-21
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/tasks.md
+  s_87d64d0773fc72::t_184a75c7996554 1-247
+app/modules/ai_package_v1/export/export_service.py
+  s_87d64d0773fc72::t_50a7a741964219 1-258
+tests/unit/ai_package_v1/a1_contract_stub.py
+  s_87d64d0773fc72::t_910395e85eccec 1-26
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/proposal.md
+  s_87d64d0773fc72::t_4ba03dc88ee8bf 1-107
+tests/unit/ai_package_v1/conftest.py
+  s_87d64d0773fc72::t_43d866f51bf902 1-109
+app/modules/ai_package_v1/readers/pg_campaign_settings_reader.py
+  s_87d64d0773fc72::t_93afaa40a32be5 1-43
+openspec/specs/data-source-selection/spec.md
+  s_87d64d0773fc72::t_ade07dad62f029 1-159
+openspec/changes/ai-package-campaign-settings-snapshot/proposal.md
+  s_87d64d0773fc72::t_f9890b63ab8391 1-81
+app/modules/ai_package_v1/scope/__init__.py
+  s_87d64d0773fc72::t_311a20e3132fc6 1-8
+app/modules/ai_package_v1/readers/__init__.py
+  s_87d64d0773fc72::t_272d25c91d5074 1-11
+app/modules/ai_package_v1/export/campaign_settings_assembler.py
+  s_87d64d0773fc72::t_bd317416c9ec6f 1-324
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/specs/data-source-selection/spec.md
+  s_87d64d0773fc72::t_f49e01a1b93d5e 1-152
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/decisions/ai-package-v1-exporter-ownership/decision.md
+  s_87d64d0773fc72::t_bdd6c0826f1275 1-94
+app/modules/ai_package_v1/domain/funnel_stat.py
+  s_87d64d0773fc72::t_83f068888d4d12 1-25
+app/modules/ai_package_v1/domain/campaign_stat.py
+  s_87d64d0773fc72::t_893e77d4aa1e12 1-98
+app/modules/ai_package_v1/domain/serialization.py
+  s_87d64d0773fc72::t_d95c0c690f3ebb 1-21
+tests/unit/ai_package_v1/test_export_settings_integration.py
+  s_87d64d0773fc72::t_6c23f3308fa806 1-226
+openspec/changes/ai-package-campaign-settings-snapshot/scenario-coverage/plan.receipt.json
+  s_87d64d0773fc72::t_db36100cbfcb43 1-67
+openspec/changes/ai-package-campaign-settings-snapshot/scenario-coverage/plan.md
+  s_87d64d0773fc72::t_df326ec532b265 1-517
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/specs/grain-preservation/spec.md
+  s_87d64d0773fc72::t_6d04eacc235602 1-97
+app/modules/ai_package_v1/validator/package_validator.py
+  s_87d64d0773fc72::t_a4938aacc5580b 1-173
+app/modules/ai_package_v1/export/scope_collect.py
+  s_87d64d0773fc72::t_3160dcadafd221 1-22
+app/modules/ai_package_v1/domain/dataset_card.py
+  s_87d64d0773fc72::t_4c6eeff6dc680d 1-84
+app/modules/ai_package_v1/readers/ch_funnel_reader.py
+  s_87d64d0773fc72::t_dd9fab4d1d6c87 1-109
+tests/unit/ai_package_v1/test_campaign_settings_snapshot_domain.py
+  s_87d64d0773fc72::t_542a7b5d5c9385 1-85
+openspec/changes/ai-package-campaign-settings-snapshot/decisions/ai-package-campaign-settings-snapshot-ownership/decision.md
+  s_87d64d0773fc72::t_dedb8cb6819c5f 1-113
+app/modules/ai_package_v1/readers/ch_freshness_reader.py
+  s_87d64d0773fc72::t_5c374503bb75b6 1-96
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/tasks.md
+  s_87d64d0773fc72::t_7e0dc9423bc355 1-98
+app/modules/ai_package_v1/scope/dto.py
+  s_87d64d0773fc72::t_7be863c22eba51 1-23
+openspec/changes/ai-package-campaign-settings-snapshot/design.md
+  s_87d64d0773fc72::t_83c7390ad56aa6 1-236
+app/modules/ai_package_v1/scope/pg_adv_setting_inventory_reader.py
+  s_87d64d0773fc72::t_a425bc46f5c45f 1-58
+openspec/specs/collection-modes/spec.md
+  s_87d64d0773fc72::t_8030b5afa4ae54 1-158
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/specs/collection-modes/spec.md
+  s_87d64d0773fc72::t_bfc8c93af0cc6e 1-151
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/owner-contract.md
+  s_87d64d0773fc72::t_af1ad0d4d76d10 1-84
+openspec/changes/ai-package-campaign-settings-snapshot/owner-contract.md
+  s_87d64d0773fc72::t_b889cf486956d8 1-54
+app/modules/ai_package_v1/readers/sql_loader.py
+  s_87d64d0773fc72::t_87b62d1300857c 1-21
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/scenario-coverage/plan.md
+  s_87d64d0773fc72::t_6a9ca5ac38f19e 1-676
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/owner-contract.md
+  s_87d64d0773fc72::t_2ed4641734449a 1-35
+app/modules/ai_package_v1/export/__init__.py
+  s_87d64d0773fc72::t_6249cbd6297df3 1-18
+app/modules/ai_package_v1/readers/ch_campaign_stat_reader.py
+  s_87d64d0773fc72::t_9dcd8919ea75af 1-106
+app/modules/ai_package_v1/domain/cards.py
+  s_87d64d0773fc72::t_71a84e2e886974 1-56
+openspec/specs/ai-package-v1-contract-tests/spec.md
+  s_87d64d0773fc72::t_d614e1d44aa18e 1-109
+app/modules/ai_package_v1/read/local_policy_projection.py
+  s_87d64d0773fc72::t_108856c6bb85a7 1-68
+app/modules/ai_package_v1/sql/freshness_full_adv_max_version.sql
+  s_87d64d0773fc72::t_91005c0abe46dd 1-15
+app/modules/ai_package_v1/scope/queries.py
+  s_87d64d0773fc72::t_b722dada25ffe6 1-35
+openspec/changes/ai-package-campaign-settings-snapshot/specs/ai-package-campaign-settings-snapshot/spec.md
+  s_87d64d0773fc72::t_62ab1ed9c49ef2 1-164
+openspec/decisions/ai-package-v1-exporter-ownership/decision.md
+  s_50ceba1427cf07::t_322b7d07956983 1-94
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/scenario-coverage/audit.report.md
+  s_87d64d0773fc72::t_5228aca7bf1adc 1-230
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/design.md
+  s_87d64d0773fc72::t_9f62da72d189fe 1-259
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/specs/ai-package-v1-contract-tests/spec.md
+  s_87d64d0773fc72::t_8c94a1455fbda6 1-108
+tests/unit/ai_package_v1/test_campaign_settings_assembler.py
+  s_87d64d0773fc72::t_4966808b7f2b41 1-197
+app/modules/ai_package_v1/sql/campaign_full_stat_by_adv_ids.sql
+  s_87d64d0773fc72::t_dcb661bc86e803 1-18
+openspec/changes/ai-package-campaign-settings-snapshot/specs/ai-package-v1-contract-tests/spec.md
+  s_87d64d0773fc72::t_dc7175fd76ca2a 1-56
+app/modules/ai_package_v1/zip_transport/__init__.py
+  s_87d64d0773fc72::t_d2f7989d932dad 1-5
+openspec/decisions/shop-data-source-strategy/decision.md
+  s_87d64d0773fc72::t_859af355602543 1-287
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/specs/ai-package-v1-exporter/spec.md
+  s_87d64d0773fc72::t_54db7dfbfaaa73 1-204
+app/modules/ai_package_v1/domain/export_period.py
+  s_87d64d0773fc72::t_fedbe14249ac91 1-15
+app/modules/ai_package_v1/export/manifest_cards.py
+  s_87d64d0773fc72::t_22624d1dfe974f 1-66
+openspec/changes/ai-package-campaign-settings-snapshot/specs/ai-package-v1-exporter/spec.md
+  s_87d64d0773fc72::t_5ef21da0ff946e 1-50
+app/modules/ai_package_v1/sql/freshness_common_stat_max_version.sql
+  s_87d64d0773fc72::t_d5f2c47de1f65a 1-11
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/decisions/shop-data-source-strategy/decision.md
+  s_87d64d0773fc72::t_f0e08390523403 1-285
+tests/unit/ai_package_v1/test_campaign_settings_contract.py
+  s_87d64d0773fc72::t_cb5b6d9a4f7274 1-81
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/scenario-coverage/plan.receipt.json
+  s_87d64d0773fc72::t_07b7edd3b2a142 1-65
+app/modules/ai_package_v1/domain/shop_id.py
+  s_87d64d0773fc72::t_497002d561a49b 1-27
+app/modules/ai_package_v1/export/payload_encode.py
+  s_87d64d0773fc72::t_03dfccc43409e0 1-129
+app/modules/ai_package_v1/import_guard.py
+  s_87d64d0773fc72::t_41891945dc7b55 1-38
+app/modules/ai_package_v1/domain/manifest.py
+  s_87d64d0773fc72::t_68d0ef91c36cc2 1-91
+app/modules/ai_package_v1/domain/__init__.py
+  s_87d64d0773fc72::t_d97f8bd0359545 1-29
+app/modules/ai_package_v1/validator/__init__.py
+  s_87d64d0773fc72::t_dd12c253c0fc47 1-13
+app/modules/ai_package_v1/domain/funnel_orders_boundary.py
+  s_87d64d0773fc72::t_a4f734d1f18e74 1-39
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/proposal.md
+  s_87d64d0773fc72::t_045323a268b922 1-108
+openspec/specs/coverage-provenance/spec.md
+  s_87d64d0773fc72::t_0064894b5ac9ac 1-116
+app/modules/ai_package_v1/read/__init__.py
+  s_87d64d0773fc72::t_e4fb1459dd43e7 1-7
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/specs/coverage-provenance/spec.md
+  s_87d64d0773fc72::t_f2f4bb71a67c9f 1-109
+app/modules/ai_package_v1/export/dataset_cards.py
+  s_87d64d0773fc72::t_44333bcdfc22bf 1-258
+app/modules/ai_package_v1/__init__.py
+  s_87d64d0773fc72::t_a731f30ebff3bc 1
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/scenario-coverage/audit.receipt.json
+  s_87d64d0773fc72::t_f08eb6d3c959c2 1-32
+app/modules/ai_package_v1/zip_transport/encode.py
+  s_87d64d0773fc72::t_32a3c413cbad2d 1-60
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/design.md
+  s_87d64d0773fc72::t_db7a89ddcdc7df 1-231
+app/modules/ai_package_v1/domain/enums.py
+  s_87d64d0773fc72::t_8ca452927458ab 1-61
+app/modules/ai_package_v1/domain/campaign_settings_snapshot_v1.py
+  s_87d64d0773fc72::t_3a136bf7b713e9 1-138
+openspec/specs/grain-preservation/spec.md
+  s_87d64d0773fc72::t_3c97b1d5ad5935 1-103
+app/modules/ai_package_v1/domain/coverage_rules.py
+  s_87d64d0773fc72::t_8164d463d84d07 1-90
+openspec/changes/ai-package-campaign-settings-snapshot/tasks.md
+  s_87d64d0773fc72::t_e5dc0b30fba92f 1-135
+openspec/specs/ai-package-v1-exporter/spec.md
+  s_87d64d0773fc72::t_676bf29f1c2cf0 1-205
+app/modules/ai_package_v1/domain/settings_enums.py
+  s_87d64d0773fc72::t_fd646f12bc2a55 1-57
+app/modules/ai_package_v1/scope/pg_export_shop_scope_reader.py
+  s_87d64d0773fc72::t_0402918e43e389 1-105
+app/modules/ai_package_v1/readers/pg_snapshot_reader.py
+  s_87d64d0773fc72::t_c2acbf3e96b5b3 1-50
+openspec/changes/ai-package-campaign-settings-snapshot/.openspec.yaml
+  s_87d64d0773fc72::t_3a7c4ac5386b42 1-2
+openspec/changes/archive/2026-09-26-ai-package-data-source-strategy/.openspec.yaml
+  s_87d64d0773fc72::t_c0b513abae591f 1-2
+openspec/changes/archive/2026-10-01-ai-package-v1-contract/.openspec.yaml
+  s_87d64d0773fc72::t_8ca22d30c83d9f 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e5e3a7126fc496ec2ff55a3ac74205837b55a7c8",
+  "prompts": {},
+  "sessions": {
+    "s_50ceba1427cf07": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f4e4-d064-7481-98c0-aa984fd7b01d",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    },
+    "s_87d64d0773fc72": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "13f4d0df-3e13-4409-92b0-586215410880",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
