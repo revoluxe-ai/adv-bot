@@ -78,6 +78,7 @@ from app.modules.shop_runner.service_manager.services.traffic_clicks_manager imp
     TrafficClicksManager,
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import load_leg_cpo_snapshot
 from app.modules.shop_runner.service_manager.old_modules.setting_auto_updater_v2.adv_control_system.sales_state import (
     SalesStates,
     sales_state_short_label,
@@ -168,6 +169,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         self._topup_failed: dict[str, str] | None = None
         self._last_topup_success: dict[str, str] | None = None
         self._is_campaign_active_by_cost: bool | None = None
+        self._auto_fact_cpo: float | None = None
+        self._search_fact_cpo: float | None = None
         self._cost_threshold_kind: str | None = None
         self._plan_set: bool = False
         self._plan_fact_ch_max_ts_str: str | None = None
@@ -245,6 +248,18 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         complex_adv.promo_fraction = overlay.fraction
         complex_adv.promo_multiplier = overlay.multiplier
         complex_adv.effective_promo_plan = overlay
+        try:
+            leg_snapshot = await load_leg_cpo_snapshot(
+                auto_adv_id=int(self.adv.adv_id),
+                search_adv_id=self.adv.search_adv_id,
+            )
+            complex_adv.attach_leg_cpo(leg_snapshot)
+        except Exception:
+            logger.warning(
+                "main_adv_setting_menu: leg CPO unavailable adv_id=%s",
+                self.adv.adv_id,
+                exc_info=True,
+            )
         return complex_adv
 
     # TODO Дублирует аналогичную в app.client_bot.user_interface.views.messages.adv_keyword_messages.adv_keyword_messages.AdvKeywordsSetting._get_status_auction
@@ -381,6 +396,8 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
         )
         self._target_cost = cost_metrics.target_cost
         self._avg_cost_additional = cost_metrics.avg_cost
+        self._auto_fact_cpo = cost_activity_complex_adv.auto_fact_cpo
+        self._search_fact_cpo = cost_activity_complex_adv.search_fact_cpo
         self._is_campaign_active_by_cost = cost_metrics.is_active
         self._cost_threshold_kind = cost_metrics.cost_threshold_kind
         self._plan_set = cost_metrics.plan_set
@@ -728,11 +745,23 @@ class AdvSettingMenu(TextWithKeyboardAndImage):
 
         id_auto = str(self.adv.adv_id) if self.adv.adv_id else "Не подкл"
         id_auction = str(self.adv.search_adv_id) if self.adv.search_adv_id else "Не подк"
+        auto_cpo_text = (
+            f"{self._auto_fact_cpo:.0f} р."
+            if self._auto_fact_cpo is not None
+            else "нет данных"
+        )
+        search_cpo_text = (
+            f"{self._search_fact_cpo:.0f} р."
+            if self._search_fact_cpo is not None
+            else "нет данных"
+        )
         text += (
             f"📢 {self.adv.name}\n"
             f"ID А:{id_auto} У:{id_auction}\n"
             f"Авто: {self._format_status_for_display(self.adv.active_status)}{suffix_auto}\n"
             f"Аук: {self._status_auction}{suffix_auction}\n"
+            f"CPO Auto: {auto_cpo_text}\n"
+            f"CPO Search: {search_cpo_text}\n"
             f"🎯 {format_adv_strategy(self.adv.strategy)}\n"
         )
         mark_cpo = "▶ " if self._strategy == Strategy.MIN_CPO else "  "

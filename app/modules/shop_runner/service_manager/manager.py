@@ -561,7 +561,12 @@ class CoroutinesManager:
         )
         fresh_ids = {int(adv.adv_id) for adv in fresh_advs}
 
-        for adv, ab_mode in filter_ab_hold_pipeline_candidates(advs):
+        ab_hold_candidates = filter_ab_hold_pipeline_candidates(advs)
+        if ab_hold_candidates:
+            await self._wb_shop_data_manager.attach_leg_cpo(
+                [adv for adv, _mode in ab_hold_candidates]
+            )
+        for adv, ab_mode in ab_hold_candidates:
             stats_fresh = int(adv.adv_id) in fresh_ids
             if ab_mode == CardAbHoldMode.PENDING_SETUP:
                 phase = getattr(adv.adv_setting, "card_ab_hold_phase", None)
@@ -835,6 +840,7 @@ class CoroutinesManager:
         если для auto-budget не нашлось кандидатов.
         """
         advs = await self._wb_shop_data_manager.get_complex_advs(only_bot_active=only_bot_active, load_extras=False)
+        await self._wb_shop_data_manager.attach_leg_cpo(advs)
         try:
             await self._auto_budget_service.refresh_promo_state(
                 advs,
@@ -1769,6 +1775,7 @@ class CoroutinesManager:
         ]
         if not control_candidates:
             return None
+        await self._wb_shop_data_manager.attach_leg_cpo(control_candidates)
         await self._wb_shop_data_manager.attach_min_nmids_bids(control_candidates)
         handlers: list[Callable[[], Awaitable[None]]] = []
         for adv in control_candidates:

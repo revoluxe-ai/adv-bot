@@ -21,9 +21,15 @@ async def test_build_complex_adv_wires_redis_keywords_provider() -> None:
     adv_setting = MagicMock()
     adv_setting.search_adv_id = None
 
-    with patch(
-        "app.client_bot.user_interface.services.keyword_v3_profile_loader.sm",
-    ) as sm_mock:
+    with (
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.sm",
+        ) as sm_mock,
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_leg_cpo_snapshot",
+            new=AsyncMock(side_effect=RuntimeError("leg CPO unavailable in unit")),
+        ),
+    ):
         session = AsyncMock()
         sm_mock.return_value.__aenter__.return_value = session
         complex_adv = await _build_complex_adv(adv_setting, "shop-42")
@@ -68,6 +74,10 @@ async def test_complex_adv_get_keywords_raises_cache_miss_not_runtime() -> None:
             new=AsyncMock(
                 side_effect=ShopRunnerKeywordsCacheMissError("miss", shop_id="s", adv_id=88)
             ),
+        ),
+        patch(
+            "app.client_bot.user_interface.services.keyword_v3_profile_loader.load_leg_cpo_snapshot",
+            new=AsyncMock(side_effect=RuntimeError("leg CPO unavailable in unit")),
         ),
     ):
         session = AsyncMock()

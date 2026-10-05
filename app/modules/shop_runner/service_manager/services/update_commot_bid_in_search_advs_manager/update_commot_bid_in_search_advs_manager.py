@@ -32,7 +32,8 @@ class UpdateCommotBidInSearchAdvsManager:
         if count_auto_keywords > 0:
             direct = 'reset'
         else:
-            fact_pay_for_order: float | None = adv.fact_pay_for_order
+            # leg-cpo-economics: Search common-bid belongs to Search leg.
+            fact_pay_for_order: float | None = adv.search_fact_cpo
             if fact_pay_for_order is None:
                 direct = 'reset'
             # TODO: Вынести этот коэффициент в общий настраиваемый grace-период

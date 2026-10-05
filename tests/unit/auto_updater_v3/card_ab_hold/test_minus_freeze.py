@@ -459,7 +459,7 @@ def _hold_complex_adv(*, current_degraded: bool) -> SimpleNamespace:
         adv_id=9,
         card_ab_hold_mode="active",
         adv_setting=adv_setting,
-        fact_pay_for_order=None,
+        search_fact_cpo=None,
     )
 
 

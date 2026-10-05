@@ -27,8 +27,10 @@ async def test_resolve_v3_fact_data_reuses_wb_adv_dto_fact() -> None:
         fact_method=FactMethods.DIRECT_SALES,
     )
     plan = PlanData(orders=10, target_pay_for_order=80, max_pay_for_order=100)
+    complex_adv = MagicMock()
+    complex_adv.search_fact_cpo = 18.0
     dto = WBAdvDTO(
-        complex_adv=MagicMock(),
+        complex_adv=complex_adv,
         plan=plan,
         fact=fact,
         keywords=[],
@@ -44,8 +46,12 @@ async def test_resolve_v3_fact_data_reuses_wb_adv_dto_fact() -> None:
         max_last_period=2,
     )
 
-    assert resolved is fact
-    assert source == "dto"
+    assert resolved is not fact
+    assert resolved.predict_orders == fact.predict_orders
+    assert resolved.original_orders == fact.original_orders
+    assert resolved.pay_for_order == 18.0
+    assert fact.pay_for_order == 42.0
+    assert source == "dto_search_leg"
     updater.get_fact_data.assert_not_awaited()
 
 

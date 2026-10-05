@@ -40,6 +40,11 @@ from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.single_run_decorator import (
     single_run,
 )
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import (
+    LegCpoSnapshot,
+    load_leg_cpo_snapshots,
+    resolve_leg_cpo_window,
+)
 from app.modules.shop_runner.tasks_manager.tasks_manager import (
     TasksManager,
     run_tasks,
@@ -374,6 +379,27 @@ class WBShopDataManager:
         stat = await manager.get_stat_data(keywords)
         fact = await manager.get_fact_data(stat)
 
+        # leg-cpo-economics: этот path уже загрузил presence-aware exact-leg stats,
+        # поэтому переносим те же CPO в runtime snapshot без второго ClickHouse read.
+        start_date = stat.stat_start_date
+        end_date = stat.stat_end_date
+        if start_date is None or end_date is None:
+            start_date, end_date = resolve_leg_cpo_window()
+        complex_adv.attach_leg_cpo(
+            LegCpoSnapshot(
+                auto_adv_id=int(complex_adv.adv_id),
+                search_adv_id=(
+                    int(complex_adv.search_adv_id)
+                    if complex_adv.search_adv_id is not None
+                    else None
+                ),
+                auto_cpo=stat.auto_cpo,
+                search_cpo=stat.search_cpo,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        )
+
         return WBAdvDataParts(
             complex_adv=complex_adv,
             plan=plan,
@@ -644,6 +670,28 @@ class WBShopDataManager:
             nmid,
         )
         return False
+
+    async def attach_leg_cpo(self, complex_advs: list["ComplexAdv"]) -> None:
+        """Одним read-only CH batch пришить Auto/Search CPO для leg-level control.
+
+        Spec leg-cpo-economics: aggregate plan/fact не меняется; missing leg
+        остаётся unavailable и не получает fallback.
+        """
+        if not complex_advs:
+            return None
+        try:
+            snapshots = await load_leg_cpo_snapshots(complex_advs)
+        except Exception:
+            logger.exception(
+                "leg_cpo batch read failed; keep leg CPO unavailable shop_id=%s",
+                self.shop_id,
+            )
+            return None
+        for adv in complex_advs:
+            snapshot = snapshots.get(int(adv.adv_id))
+            if snapshot is not None:
+                adv.attach_leg_cpo(snapshot)
+        return None
 
     async def attach_min_nmids_bids(self, complex_advs: list["ComplexAdv"]) -> None:
         """Подтянуть min_nmids_bids для переданных кампаний (без traffic enrich).

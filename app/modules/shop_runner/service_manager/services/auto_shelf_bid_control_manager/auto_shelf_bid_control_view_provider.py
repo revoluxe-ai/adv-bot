@@ -77,6 +77,7 @@ from app.modules.plan_fact.provider import PlanFactProvider
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import load_leg_cpo_snapshot
 from app.shared.domains.wb.utils.promo_overlay import fraction_from_cached_state
 from app.settings import settings
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
@@ -670,7 +671,19 @@ class AutoShelfBidControlViewProvider:
         )
         if plan_fact_summary is not None:
             fact_predict_orders = plan_fact_summary.fact_predict_orders
-            fact_cpo = plan_fact_summary.fact_pay_for_order
+        try:
+            leg_snapshot = await load_leg_cpo_snapshot(
+                auto_adv_id=auto_adv_id,
+                search_adv_id=getattr(adv, "search_adv_id", None),
+            )
+            fact_cpo = leg_snapshot.auto_cpo
+        except Exception:
+            warnings.append("auto_leg_cpo_unavailable")
+            logger.warning(
+                "auto_shelf_view: Auto CPO unavailable adv_id=%s",
+                auto_adv_id,
+                exc_info=True,
+            )
         resolve_cpo = resolve_target_cost(
             adv.plan_for_sales_for_day,
             adv.target_price_for_order,
@@ -1175,7 +1188,12 @@ class AutoShelfBidControlViewProvider:
                             "auto_shelf_bid_control_enabled": control_enabled,
                             "auto_shelf_bid_control_strategy": normalized_strategy,
                             "adv_setting": adv,
-                            "fact_pay_for_order": fact_cpo,
+                            "fact_pay_for_order": (
+                                plan_fact_summary.fact_pay_for_order
+                                if plan_fact_summary is not None
+                                else None
+                            ),
+                            "auto_fact_cpo": fact_cpo,
                             "resolve_cpo": resolve_cpo,
                             "original_max_cpo": getattr(adv, "original_max_cpo", None),
                             "min_nmids_bids": None,

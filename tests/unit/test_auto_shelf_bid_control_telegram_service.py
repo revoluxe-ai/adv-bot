@@ -28,6 +28,18 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 
 pytestmark = pytest.mark.unit
 
+
+@pytest.fixture(autouse=True)
+def _stub_leg_cpo_loader(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit Telegram tests не должны ходить в реальный ClickHouse."""
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services."
+        "auto_shelf_bid_control_manager.auto_shelf_bid_control_telegram_service."
+        "load_leg_cpo_snapshot",
+        AsyncMock(return_value=SimpleNamespace(auto_cpo=None)),
+    )
+
+
 BOT_ACTIVE_PAYWALL_MESSAGE = (
     "Управление ставкой в полках доступно только после включения автоуправления кампанией.\n\n"
     "Бесплатно можно смотреть аналитику и рекламные данные.\n"

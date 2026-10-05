@@ -48,6 +48,7 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
     wb_shop_data_manager_instance.get_complex_advs = AsyncMock(
         return_value=[enabled_adv, disabled_adv]
     )
+    wb_shop_data_manager_instance.attach_leg_cpo = AsyncMock()
 
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
@@ -96,6 +97,9 @@ async def test_auto_budget_watchdog_filters_campaigns_with_flag_enabled():
         )
         await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager, only_bot_active=True)
 
+    wb_shop_data_manager_instance.attach_leg_cpo.assert_awaited_once_with(
+        [enabled_adv, disabled_adv]
+    )
     auto_budget_service_instance.ensure_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_budget.call_args[0]
     assert called_args[0] == enabled_adv
@@ -128,6 +132,7 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
     wb_shop_data_manager_instance.get_complex_advs = AsyncMock(
         return_value=[common_adv]
     )
+    wb_shop_data_manager_instance.attach_leg_cpo = AsyncMock()
 
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
@@ -176,6 +181,7 @@ async def test_auto_budget_watchdog_common_mode_calls_ensure_common_budget():
         )
         await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager, only_bot_active=True)
 
+    wb_shop_data_manager_instance.attach_leg_cpo.assert_awaited_once_with([common_adv])
     auto_budget_service_instance.ensure_common_budget.assert_called_once()
     called_args = auto_budget_service_instance.ensure_common_budget.call_args[0]
     assert called_args[0] == common_adv
@@ -208,6 +214,7 @@ async def test_auto_budget_watchdog_runs_active_control_without_budget_handlers(
 
     wb_shop_data_manager_instance = MagicMock()
     wb_shop_data_manager_instance.get_complex_advs = AsyncMock(return_value=[adv])
+    wb_shop_data_manager_instance.attach_leg_cpo = AsyncMock()
 
     auto_budget_service_instance = MagicMock()
     auto_budget_service_instance.ensure_budget = AsyncMock(return_value=None)
@@ -252,6 +259,7 @@ async def test_auto_budget_watchdog_runs_active_control_without_budget_handlers(
         )
         await coroutines_manager.auto_budget_watchdog.__wrapped__(coroutines_manager, only_bot_active=True)
 
+    wb_shop_data_manager_instance.attach_leg_cpo.assert_awaited_once_with([adv])
     auto_budget_service_instance.ensure_budget.assert_not_called()
     auto_budget_service_instance.ensure_common_budget.assert_not_called()
     active_control.assert_awaited_once()

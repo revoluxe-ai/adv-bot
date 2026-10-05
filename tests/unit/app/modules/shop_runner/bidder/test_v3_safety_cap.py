@@ -86,6 +86,7 @@ async def test_build_v3_safety_cap_context_uses_profile_bid(monkeypatch: pytest.
             return_value=(
                 SimpleNamespace(
                     fact_pay_for_order=1857.99,
+                    search_fact_cpo=1857.99,
                     plan=SimpleNamespace(max_pay_for_order=520.0),
                 ),
                 raw_profiles,
@@ -133,6 +134,7 @@ async def test_build_v3_safety_cap_context_returns_empty_when_not_overspend(
             return_value=(
                 SimpleNamespace(
                     fact_pay_for_order=40.0,
+                    search_fact_cpo=40.0,
                     plan=SimpleNamespace(max_pay_for_order=50.0),
                 ),
                 raw_profiles,
@@ -205,6 +207,7 @@ async def test_build_v3_safety_cap_context_skips_when_no_usable_row(
             return_value=(
                 SimpleNamespace(
                     fact_pay_for_order=1857.99,
+                    search_fact_cpo=1857.99,
                     plan=SimpleNamespace(max_pay_for_order=520.0),
                 ),
                 raw_profiles,
@@ -254,3 +257,64 @@ def test_apply_v3_safety_cap_clamps_and_skips_on_technical_min() -> None:
     )
     assert skipped_cpm is None
     assert reason == "v3_safety_cap_below_technical_min"
+
+
+@pytest.mark.asyncio
+async def test_v3_safety_cap_uses_search_cpo_not_aggregate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec leg-cpo-economics: bidder cap обязан смотреть Search CPO, не common CPO."""
+    keyword = _make_keyword()
+    raw_profiles = {
+        "kw": [
+            BidPosition(
+                keyword="kw",
+                position=2,
+                bid=520,
+                timestamp=datetime.now(tz=timezone.utc),
+                _conv_carts_to_views=0.2,
+            )
+        ]
+    }
+    context = SimpleNamespace(adv_id=123, adv_setting=SimpleNamespace())
+    monkeypatch.setattr(
+        "app.modules.shop_runner.bidder.bidder_func.load_campaign_orders_per_cart_7d",
+        AsyncMock(return_value=1.0),
+    )
+    load_context = AsyncMock(
+        return_value=(
+            SimpleNamespace(
+                fact_pay_for_order=999.0,
+                search_fact_cpo=40.0,
+                plan=SimpleNamespace(max_pay_for_order=50.0),
+            ),
+            raw_profiles,
+        )
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.bidder.bidder_func.load_v3_wb_context",
+        load_context,
+    )
+
+    good_search = await build_v3_safety_cap_by_keyword_setting_original_id(
+        context,
+        [keyword],
+        wb_shop_data_manager=SimpleNamespace(),
+    )
+    assert good_search == {}
+
+    load_context.return_value = (
+        SimpleNamespace(
+            fact_pay_for_order=1.0,
+            search_fact_cpo=100.0,
+            plan=SimpleNamespace(max_pay_for_order=50.0),
+        ),
+        raw_profiles,
+    )
+    bad_search = await build_v3_safety_cap_by_keyword_setting_original_id(
+        context,
+        [keyword],
+        wb_shop_data_manager=SimpleNamespace(),
+    )
+    assert bad_search[11].overspend is True
+    assert bad_search[11].fact_pay_for_order == pytest.approx(100.0)

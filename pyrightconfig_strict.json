@@ -143,7 +143,12 @@
     "app/modules/plan_fact/provider.py",
     "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
     "app/modules/sales_plan_settings/telegram/callbacks.py",
-    "tools/wb_api_master_map.py"
+    "tools/wb_api_master_map.py",
+    "app/client_bot/user_interface/views/messages/adv_keyword_messages/adv_keyword_messages.py",
+    "app/modules/common_advs_stat/data_manager.py",
+    "app/modules/shop_runner/wb_stat_manager/clickhouse_manager/full_wb_adv_stat.py",
+    "app/shared/domains/wb/dto/wb_adv_dto.py",
+    "app/modules/shop_runner/wb_stat_manager/leg_cpo.py"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

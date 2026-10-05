@@ -861,7 +861,7 @@ class AutoShelfBidControlManager:
                 actual_bid_minor=actual_bid_minor,
                 min_bid_minor=min_bid_minor,
                 max_bid_minor=max_bid_minor,
-                fact_cpo=complex_adv.fact_pay_for_order,
+                fact_cpo=getattr(complex_adv, "auto_fact_cpo", None),
                 resolve_cpo=complex_adv.resolve_cpo,
             )
         if strategy == AutoShelfBidControlStrategy.CTR:
@@ -1134,7 +1134,7 @@ class AutoShelfBidControlManager:
             cycle_metric = OptimizationMetric.CPC
         else:
             cycle_metric = resolve_optimization_metric(
-                getattr(complex_adv, "fact_pay_for_order", None),
+                getattr(complex_adv, "auto_fact_cpo", None),
                 getattr(complex_adv, "resolve_cpo", None),
             )
         qualified_tested_bid_minors = collect_qualified_tested_bid_minors(

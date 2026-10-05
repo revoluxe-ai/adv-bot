@@ -405,3 +405,69 @@ async def test_get_auto_campaign_cost_activity_metrics_threshold_kind_max() -> N
         )
     assert metrics.target_cost == 300.0
     assert metrics.cost_threshold_kind == "max"
+
+@pytest.mark.asyncio
+async def test_cost_activity_with_complex_adv_uses_auto_cpo_not_aggregate() -> None:
+    """Auto cost-activity обязан подтверждаться Auto CPO при наличии ComplexAdv."""
+    adv = _FakeAdvSetting(
+        109,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=_plan_fact_summary(
+                fact_predict_orders=15.0,
+                fact_pay_for_order=999.0,
+            )
+        )
+    )
+    complex_adv = SimpleNamespace(auto_fact_cpo=80.0)
+
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity."
+        "full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=150.0),
+    ):
+        metrics = await get_auto_campaign_cost_activity_metrics(
+            adv,
+            plan_fact_reader=reader,
+            complex_adv=complex_adv,
+        )
+
+    assert metrics.fact_pay_for_order == 80.0
+    assert metrics.is_active is None
+
+@pytest.mark.asyncio
+async def test_cost_activity_missing_auto_cpo_does_not_fallback_to_aggregate() -> None:
+    """Missing Auto CPO остаётся unknown даже при плохом aggregate CPO."""
+    adv = _FakeAdvSetting(
+        110,
+        plan_for_sales_for_day=10,
+        target_price_for_order=100,
+        max_price_for_order=200,
+    )
+    reader = SimpleNamespace(
+        get_latest_plan_fact=AsyncMock(
+            return_value=_plan_fact_summary(
+                fact_predict_orders=15.0,
+                fact_pay_for_order=999.0,
+            )
+        )
+    )
+    complex_adv = SimpleNamespace(auto_fact_cpo=None)
+
+    with patch(
+        "app.shared.domains.wb.utils.auto_campaign_cost_activity."
+        "full_wb_adv_stat.get_additional_cost_per_order_for_adv",
+        new=AsyncMock(return_value=150.0),
+    ):
+        metrics = await get_auto_campaign_cost_activity_metrics(
+            adv,
+            plan_fact_reader=reader,
+            complex_adv=complex_adv,
+        )
+
+    assert metrics.fact_pay_for_order is None
+    assert metrics.is_active is None

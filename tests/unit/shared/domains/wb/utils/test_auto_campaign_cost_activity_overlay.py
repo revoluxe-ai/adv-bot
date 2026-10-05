@@ -77,8 +77,15 @@ def _adv_setting(
     )
 
 
-def _overlay_carrier(*, promo_fraction: Decimal = _PROMO_HALF) -> SimpleNamespace:
-    return SimpleNamespace(promo_fraction=promo_fraction)
+def _overlay_carrier(
+    *,
+    promo_fraction: Decimal = _PROMO_HALF,
+    auto_fact_cpo: float | None = 150.0,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        promo_fraction=promo_fraction,
+        auto_fact_cpo=auto_fact_cpo,
+    )
 
 
 def _reader(

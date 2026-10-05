@@ -103,7 +103,18 @@ class WBAdvDTO:
 
     @property
     def fact_pay_for_order(self) -> float | None:
+        """Aggregate plan/fact CPO; leg-level consumers используют explicit поля."""
         return self._fact.pay_for_order
+
+    @property
+    def auto_fact_cpo(self) -> float | None:
+        """Spec leg-cpo-economics: CPO structural Auto leg без fallback."""
+        return self._complex_adv.auto_fact_cpo
+
+    @property
+    def search_fact_cpo(self) -> float | None:
+        """Spec leg-cpo-economics: CPO structural Search leg без fallback."""
+        return self._complex_adv.search_fact_cpo
 
 
     @property

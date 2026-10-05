@@ -45,6 +45,7 @@ from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_
 )
 from ...old_modules.setting_auto_updater.data_classes import FactData, PlanData
 from ...wb_shop_data_manager.dto.complex_adv import ComplexAdv
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import load_leg_cpo_snapshots
 from app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.new_bids_calculator.update_bids_command import (
     DirectEnum,
     UpdateBidsCommand,
@@ -959,6 +960,11 @@ class UpdateClusterBidsManager:
         *,
         batch_trace: ShopBatchPhaseTrace | None = None,
     ) -> dict[int, FactData]:
+        """Собрать Search-leg CPO fact для cluster-bid safety gate.
+
+        Spec leg-cpo-economics: orders/method остаются из plan/fact summary,
+        но CPO для Search write-path берётся только из structural Search leg.
+        """
         if not advs:
             return {}
         trace = batch_trace or ShopBatchPhaseTrace.from_complex_advs(
@@ -967,8 +973,9 @@ class UpdateClusterBidsManager:
         adv_ids = [adv.adv_id for adv in advs]
         try:
             with trace.phase("fact_data_ch_get_latest_plan_facts"):
-                summaries_by_adv_id = await self._plan_fact_reader.get_latest_plan_facts(
-                    adv_ids
+                summaries_by_adv_id, leg_snapshots = await asyncio.gather(
+                    self._plan_fact_reader.get_latest_plan_facts(adv_ids),
+                    load_leg_cpo_snapshots(advs),
                 )
         except Exception as error:
             logger.error("Ошибка batch-получения факта из CH: %s", error)
@@ -980,8 +987,18 @@ class UpdateClusterBidsManager:
                 summaries_by_adv_id.get(adv.adv_id),
                 adv.adv_setting,
             )
-            if fact is not None:
-                adv_to_fact_map[adv.adv_id] = fact
+            if fact is None:
+                continue
+            leg_snapshot = leg_snapshots.get(int(adv.adv_id))
+            adv_to_fact_map[adv.adv_id] = fact.model_copy(
+                update={
+                    "pay_for_order": (
+                        leg_snapshot.search_cpo
+                        if leg_snapshot is not None
+                        else None
+                    )
+                }
+            )
         return adv_to_fact_map
 
     @staticmethod
