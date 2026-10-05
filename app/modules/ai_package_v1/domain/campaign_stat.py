@@ -7,11 +7,13 @@ from datetime import date
 
 from pydantic import BaseModel
 
+from app.modules.ai_package_v1.domain.shop_id import AuthoritativeShopId
+
 
 class CampaignStatRow(BaseModel):
     """Строка ``default_db.full_adv_wb_stat`` на зерне campaign_id + date."""
 
-    shop_id: int
+    shop_id: AuthoritativeShopId
     campaign_id: int
     date: date
     views: int = 0
@@ -26,7 +28,7 @@ class ScopedAdvIds:
     auction_adv_id: int | None
 
 
-def rows_for_shop(rows: list[CampaignStatRow], shop_id: int) -> list[CampaignStatRow]:
+def rows_for_shop(rows: list[CampaignStatRow], shop_id: str) -> list[CampaignStatRow]:
     """Shop isolation: только строки запрошенного магазина."""
     return [r for r in rows if r.shop_id == shop_id]
 

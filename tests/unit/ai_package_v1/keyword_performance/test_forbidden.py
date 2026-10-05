@@ -31,7 +31,7 @@ async def test_forbidden_guard_on_export_path(fake_deps: FakeKeywordDeps) -> Non
     assembler = build_fake_assembler(fake_deps)
     _ = await assembler.assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )

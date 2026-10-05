@@ -7,3 +7,4 @@
 - [x] Validator summary/gaps consistency
 - [x] Acceptance tests (two-run) + unit suite
 - [x] Document `PAYLOAD_HASH_ONLY` ZIP contract; byte-identical ZIP deferred follow-up
+- [x] Preserve authoritative `WBCabinet.shop_id` as `str` (no numeric coercion)

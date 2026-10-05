@@ -89,7 +89,7 @@ _COVERAGE_NESTED = "row_coverage"
 EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     *_specs(
         ExportFieldSpec("schema_version", "keyword_daily", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _DAILY_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_daily", "manifest_shop_id", "int", False, "required", "manifest scope", _DAILY_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_daily", "manifest_shop_id", "str", False, "required", "manifest scope", _DAILY_GRAIN),
         ExportFieldSpec("adv_setting_id", "keyword_daily", "PG AdvSetting.id via scope", "int", True, "null when unmapped", "scope join", _DAILY_GRAIN),
         ExportFieldSpec("adv_id", "keyword_daily", "clusters_adv_stats.adv_id", "int", False, "required PK", "physical CH adv_id", _DAILY_GRAIN, pk=True),
         ExportFieldSpec(
@@ -131,7 +131,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_windows", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _WINDOW_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_windows", "manifest_shop_id", "int", False, "required", "manifest scope", _WINDOW_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_windows", "manifest_shop_id", "str", False, "required", "manifest scope", _WINDOW_GRAIN),
         ExportFieldSpec("adv_setting_id", "keyword_windows", "scope", "int", True, "null when unmapped", "identity carry", _WINDOW_GRAIN),
         ExportFieldSpec("adv_id", "keyword_windows", "daily identity", "int", False, "required", "physical adv_id", _WINDOW_GRAIN, pk=True),
         ExportFieldSpec(
@@ -186,7 +186,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_current_state", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _CURRENT_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_current_state", "manifest", "int", False, "required", "manifest scope", _CURRENT_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_current_state", "manifest", "str", False, "required", "manifest scope", _CURRENT_GRAIN),
         ExportFieldSpec("adv_setting_id", "keyword_current_state", "scope", "int", True, "null when unmapped", "PG id", _CURRENT_GRAIN),
         ExportFieldSpec("adv_id", "keyword_current_state", "daily latest", "int", False, "required", "physical adv_id", _CURRENT_GRAIN, pk=True),
         ExportFieldSpec("leg_role", "keyword_current_state", "scope", "enum", False, "required", "leg assignment", _CURRENT_GRAIN),
@@ -224,7 +224,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_changes", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _CHANGE_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_changes", "window identity", "int", False, "required", "carry from window", _CHANGE_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_changes", "window identity", "str", False, "required", "carry from window", _CHANGE_GRAIN),
         ExportFieldSpec("adv_setting_id", "keyword_changes", "window identity", "int", True, "null when unmapped", "carry", _CHANGE_GRAIN),
         ExportFieldSpec("adv_id", "keyword_changes", "window identity", "int", False, "required", "physical adv_id", _CHANGE_GRAIN),
         ExportFieldSpec("leg_role", "keyword_changes", "window identity", "enum", False, "required", "leg", _CHANGE_GRAIN),
@@ -256,7 +256,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_positions", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _POSITION_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_positions", "manifest", "int", False, "required", "manifest scope", _POSITION_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_positions", "manifest", "str", False, "required", "manifest scope", _POSITION_GRAIN),
         ExportFieldSpec("adv_id", "keyword_positions", "optional join", "int", True, "null when unproven", "not fabricated", _POSITION_GRAIN),
         ExportFieldSpec("nmid", "keyword_positions", "keyword_position_from_api.nmid", "int", False, "required", "product id", _POSITION_GRAIN, pk=True),
         ExportFieldSpec("norm_query", "keyword_positions", "daily match only", "text", True, "null when NORMALIZATION_UNPROVEN", "never copy source_query_text", _POSITION_GRAIN),
@@ -276,7 +276,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_position_windows", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _POS_WINDOW_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_position_windows", "manifest", "int", False, "required", "manifest scope", _POS_WINDOW_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_position_windows", "manifest", "str", False, "required", "manifest scope", _POS_WINDOW_GRAIN),
         ExportFieldSpec("adv_id", "keyword_position_windows", "optional", "int", True, "null when unproven", "not fabricated", _POS_WINDOW_GRAIN),
         ExportFieldSpec("nmid", "keyword_position_windows", "position identity", "int", False, "required", "product", _POS_WINDOW_GRAIN, pk=True),
         ExportFieldSpec("norm_query", "keyword_position_windows", "position row", "text", True, "null when unproven", "provenance tagged", _POS_WINDOW_GRAIN),
@@ -303,7 +303,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_position_current", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _POS_CURRENT_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_position_current", "manifest", "int", False, "required", "manifest scope", _POS_CURRENT_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_position_current", "manifest", "str", False, "required", "manifest scope", _POS_CURRENT_GRAIN),
         ExportFieldSpec("adv_id", "keyword_position_current", "optional", "int", True, "null when unproven", "not fabricated", _POS_CURRENT_GRAIN),
         ExportFieldSpec("nmid", "keyword_position_current", "position latest", "int", False, "required", "product", _POS_CURRENT_GRAIN, pk=True),
         ExportFieldSpec("norm_query", "keyword_position_current", "position latest", "text", True, "null when unproven", "provenance tagged", _POS_CURRENT_GRAIN),
@@ -321,7 +321,7 @@ EXPORT_FIELD_SPECS: tuple[ExportFieldSpec, ...] = (
     ),
     *_specs(
         ExportFieldSpec("schema_version", "keyword_decisions", "constant", "semver", False, "required", "SCHEMA_VERSION_KEYWORD", _DECISION_GRAIN),
-        ExportFieldSpec("shop_id", "keyword_decisions", "manifest", "int", False, "required", "manifest scope", _DECISION_GRAIN),
+        ExportFieldSpec("shop_id", "keyword_decisions", "manifest", "str", False, "required", "manifest scope", _DECISION_GRAIN),
         ExportFieldSpec("adv_id", "keyword_decisions", "bid_decision_log.adv_id", "int", False, "required PK", "physical adv_id", _DECISION_GRAIN, pk=True),
         ExportFieldSpec("nmid", "keyword_decisions", "bid_decision_log.nmid", "int", False, "required PK", "product id", _DECISION_GRAIN, pk=True),
         ExportFieldSpec("norm_query", "keyword_decisions", "bid_decision_log.norm_query", "text", False, "required PK", "query key", _DECISION_GRAIN, pk=True),

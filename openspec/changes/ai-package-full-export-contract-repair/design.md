@@ -21,6 +21,18 @@ Checklist:
 - [x] Context-first decision lookup performed.
 - [x] No second exporter; assembler wraps ExportService only.
 - [x] Settings history / change events remain GAP catalog entries.
+- [x] Shop identity stays the authoritative PG string (`WBCabinet.shop_id`).
+
+## Shop identity
+
+Authoritative source is `WBCabinet.shop_id` (`Mapped[str]`). PG scope selects
+with `WBCabinet.shop_id == shop_id`. ClickHouse campaign and funnel SQL select
+by scoped `adv_id` / `nmid`; `shop_id` on those rows is a stamp of the same
+string, not a numeric database key.
+
+`manifest.shop_id`, dataset `shop_id` columns, keyword payloads, PACKAGE_SUMMARY,
+and DATA_MAP `shop_id` units are `str`. No int coercion, no UUID→int, no
+hash surrogate. A future alternate identity MUST be a separately named field.
 
 ## ZIP determinism
 

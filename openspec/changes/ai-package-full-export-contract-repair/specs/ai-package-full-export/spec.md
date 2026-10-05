@@ -52,3 +52,26 @@ semantics, and pointers under `keyword_performance/` for keyword payloads.
 - **WHEN** manifest datasets are serialized
 - **THEN** each dataset card MUST include `family_status` from canonical enum
 - **AND** unknown tokens MUST fail closed at validation
+
+### Requirement: Authoritative shop identity
+
+Full export MUST preserve `WBCabinet.shop_id` losslessly as `shop_id: str` from
+the export input through the manifest, every dataset row that carries `shop_id`,
+`PACKAGE_SUMMARY.json`, and DATA_MAP `shop_id` field units. UUID-like values
+MUST be valid. A decimal-looking string MUST remain a string. Empty or
+whitespace-only `shop_id` MUST fail closed. The exporter MUST NOT coerce
+`shop_id` to int, hash it, or invent a second hidden shop identifier.
+Whitespace MUST NOT be stripped from a non-blank identifier.
+
+#### Scenario: UUID shop id roundtrip
+
+- **WHEN** export is requested for a UUID-like `WBCabinet.shop_id`
+- **THEN** `manifest.shop_id` MUST equal that exact string
+- **AND** campaign, funnel, and keyword payload `shop_id` values MUST equal it
+- **AND** `PACKAGE_SUMMARY.json` `shop_id` MUST equal it
+- **AND** package validation MUST accept the package
+
+#### Scenario: Blank shop id fails closed
+
+- **WHEN** `shop_id` is empty or whitespace-only
+- **THEN** export input validation MUST fail before package production

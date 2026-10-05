@@ -11,6 +11,12 @@ identity, missing≠zero semantics, GAP для history/change-events без но
 Acceptance `FULL_AI_PACKAGE_ACCEPTANCE_REPORT` на stage `23c0671f3` показал
 PACKAGE_SUMMARY/JOINABILITY/AI_READABILITY gaps при рабочем ExportService.
 
+## Shop identity
+
+Канонический shop id пакета — authoritative `WBCabinet.shop_id` (`str`),
+включая UUID. Числовой coercion, hash-surrogate и второй скрытый идентификатор
+запрещены. Пустой shop id fail-closed.
+
 ## Non-goals
 
 Новые collectors, второй exporter, settings-history persistence, production writes.

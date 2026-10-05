@@ -69,7 +69,7 @@ pytestmark = pytest.mark.unit
 def test_cap_not_current_bid_evidence() -> None:
     """max_cpm policy cap exported separately; current_bid_evidence UNAVAILABLE."""
     row = KeywordDailyRowV1(
-        shop_id=1,
+        shop_id="1",
         adv_setting_id=101,
         adv_id=111,
         leg_role=KeywordLegRole.AUTO,
@@ -104,7 +104,7 @@ def test_cap_not_current_bid_evidence() -> None:
 def test_rebound_does_not_inherit_campaign_policy() -> None:
     """REBOUND_HISTORICAL rows must not carry current campaign policy as fact."""
     row = KeywordDailyRowV1(
-        shop_id=1,
+        shop_id="1",
         adv_setting_id=101,
         adv_id=999,
         leg_role=KeywordLegRole.REBOUND_AUTO,
@@ -133,7 +133,7 @@ def test_rebound_does_not_inherit_campaign_policy() -> None:
 def test_decision_timeline_source_derived_event_class() -> None:
     """Exported DECISION rows carry source-derived event_class, not SQL filter."""
     raw = make_bid_decision_raw(cpm_curr=200.0)
-    rows = assemble_decision_rows([raw], manifest_shop_id=1)
+    rows = assemble_decision_rows([raw], manifest_shop_id="1")
     assert rows[0].event_class == DecisionEventClass.DECISION
     assert rows[0].source_kind == DecisionSourceKind.RETROSPECTIVE_COMPUTED_CONTEXT
     assert rows[0].final_bid_semantics == (
@@ -144,7 +144,7 @@ def test_decision_timeline_source_derived_event_class() -> None:
 def test_decision_latest_coherent_conflict_null() -> None:
     """Equal max version conflicting tuples → AMBIGUOUS null metrics."""
     raw = make_bid_decision_raw(variants=2)
-    rows = assemble_decision_rows([raw], manifest_shop_id=1)
+    rows = assemble_decision_rows([raw], manifest_shop_id="1")
     assert rows[0].snapshot_status == SnapshotStatus.AMBIGUOUS
     assert rows[0].cpm_curr is None
     assert "SNAPSHOT_CONFLICT" in rows[0].row_coverage.reason_codes
@@ -262,7 +262,7 @@ def test_position_latest_never_uses_old_when_latest_null() -> None:
     )
 
     older = KeywordPositionRowV1(
-        shop_id=1,
+        shop_id="1",
         nmid=500,
         source_query_text="q",
         date="2026-01-01",
@@ -272,7 +272,7 @@ def test_position_latest_never_uses_old_when_latest_null() -> None:
         source="keyword_position_from_api",
     )
     newer_null = KeywordPositionRowV1(
-        shop_id=1,
+        shop_id="1",
         nmid=500,
         source_query_text="q",
         date="2026-01-05",
@@ -291,7 +291,7 @@ def test_per_metric_identity_day_coverage() -> None:
     """Coverage uses unique identity×day cohort, not raw row count."""
     daily = [
         KeywordDailyRowV1(
-            shop_id=1,
+            shop_id="1",
             adv_id=111,
             leg_role=KeywordLegRole.AUTO,
             nmid=500,
@@ -300,7 +300,7 @@ def test_per_metric_identity_day_coverage() -> None:
             views=10,
         ),
         KeywordDailyRowV1(
-            shop_id=1,
+            shop_id="1",
             adv_id=111,
             leg_role=KeywordLegRole.AUTO,
             nmid=500,
@@ -370,7 +370,7 @@ async def test_position_source_unavailable_coverage_reason() -> None:
     )
     result = await build_fake_assembler(deps).assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )
@@ -407,7 +407,7 @@ async def test_assembler_exports_decision_timeline_and_position_windows() -> Non
     )
     result = await build_fake_assembler(deps).assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )

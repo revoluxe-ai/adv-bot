@@ -41,7 +41,7 @@ from app.modules.ai_package_v1.keyword_performance.scope.dto import KeywordScope
 GENERATED_AT = "2026-10-03T12:00:00Z"
 PERIOD = ExportPeriod(start=date(2026, 1, 1), end=date(2026, 1, 7))
 SHOP_ID = "1"
-MANIFEST_SHOP_ID = 1
+MANIFEST_SHOP_ID = "1"
 
 
 @dataclass
@@ -368,7 +368,7 @@ class NoOpKeywordAssembler:
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         generated_at: str,
     ) -> KeywordAssemblyResult:

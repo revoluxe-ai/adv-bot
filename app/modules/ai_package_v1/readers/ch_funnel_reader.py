@@ -25,7 +25,7 @@ class ChFunnelReader:
 
     async def fetch_rows(
         self,
-        shop_id: int,
+        shop_id: str,
         nmids: Sequence[int],
         period: ExportPeriod,
     ) -> list[FunnelStatRow]:
@@ -33,7 +33,7 @@ class ChFunnelReader:
         Загружает funnel rows за период.
 
         Args:
-            shop_id: Manifest shop id.
+            shop_id: Authoritative ``WBCabinet.shop_id`` (str), штамп на строках; SQL выбирает по nmid.
             nmids: Только ``main_nmid`` из export scope (не shop-wide).
             period: Границы периода.
 
@@ -52,7 +52,7 @@ class ChFunnelReader:
         self,
         client: Any,
         *,
-        shop_id: int,
+        shop_id: str,
         nmids: Sequence[int],
         period: ExportPeriod,
     ) -> list[FunnelStatRow]:
@@ -61,7 +61,7 @@ class ChFunnelReader:
 
         Args:
             client: Async ClickHouse client.
-            shop_id: Manifest shop id.
+            shop_id: Authoritative ``WBCabinet.shop_id`` (str), штамп на строках; SQL выбирает по nmid.
             nmids: Scoped main nmids.
             period: Период export.
 

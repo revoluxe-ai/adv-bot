@@ -63,7 +63,7 @@ from app.modules.ai_package_v1.scope.pg_export_shop_scope_reader import (
 class ExportResult:
     """Результат export без ZIP-транспорта (domain manifest + payloads).
 
-    ``manifest.shop_id`` — int (manifest v1); входной PG ``shop_id`` — str.
+    ``manifest.shop_id`` совпадает с входным PG ``WBCabinet.shop_id`` (str).
     """
 
     manifest: ExportManifest
@@ -170,7 +170,7 @@ class ExportService:
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         scope: list[ExportScopeAdv],
         generated_at: str | None,

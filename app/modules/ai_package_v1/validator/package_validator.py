@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 from typing import Any, cast
 
@@ -47,6 +49,89 @@ class PackageValidationError(Exception):
     """Ошибка валидации пакета AI Package v1."""
 
 
+_DATASET_CSV_WITH_SHOP_ID = (
+    "datasets/campaign_full_stat.csv",
+    "datasets/complex_adv_funnel.csv",
+)
+
+
+def _require_manifest_shop_id(manifest: dict[str, Any]) -> str:
+    """Возвращает manifest shop_id, только если это непустая строка."""
+    shop_id = manifest.get("shop_id")
+    if not isinstance(shop_id, str) or shop_id.strip() == "":
+        raise PackageValidationError(
+            "manifest shop_id must be a non-blank authoritative string",
+        )
+    return shop_id
+
+
+def _validate_data_map_shop_id_type(data: dict[str, Any]) -> None:
+    """DATA_MAP shop_id units должны быть str, без numeric surrogate."""
+    matrix = data.get("export_field_matrix")
+    if not isinstance(matrix, list):
+        return
+    for row_obj in cast(list[Any], matrix):
+        if not isinstance(row_obj, dict):
+            continue
+        row = cast(dict[str, Any], row_obj)
+        if row.get("field") != "shop_id":
+            continue
+        if row.get("units") != "str":
+            raise PackageValidationError(
+                "DATA_MAP shop_id units must be str",
+            )
+
+
+def _validate_dataset_shop_identity(
+    manifest_shop_id: str,
+    files: dict[str, bytes],
+) -> None:
+    """Каждая exported shop_id ячейка равна manifest shop_id без coercion."""
+    for logical_name in _DATASET_CSV_WITH_SHOP_ID:
+        content = files.get(logical_name)
+        if content is None:
+            continue
+        _assert_csv_shop_id(logical_name, content, manifest_shop_id)
+    for logical_name, content in files.items():
+        if not logical_name.endswith(".jsonl"):
+            continue
+        _assert_jsonl_shop_id(logical_name, content, manifest_shop_id)
+
+
+def _assert_csv_shop_id(logical_name: str, content: bytes, expected: str) -> None:
+    text = content.decode("utf-8")
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None or "shop_id" not in reader.fieldnames:
+        raise PackageValidationError(f"{logical_name} missing shop_id column")
+    for row in reader:
+        if row.get("shop_id") != expected:
+            raise PackageValidationError(
+                f"{logical_name} shop_id must match manifest shop_id exactly",
+            )
+
+
+def _assert_jsonl_shop_id(logical_name: str, content: bytes, expected: str) -> None:
+    text = content.decode("utf-8")
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise PackageValidationError(
+                f"{logical_name} is not valid JSONL",
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise PackageValidationError(f"{logical_name} row must be an object")
+        row = cast(dict[str, Any], parsed)
+        if "shop_id" not in row:
+            continue
+        if row.get("shop_id") != expected or not isinstance(row.get("shop_id"), str):
+            raise PackageValidationError(
+                f"{logical_name} shop_id must match manifest shop_id exactly",
+            )
+
+
 def validate_domain_manifest(
     manifest: dict[str, Any],
     files: dict[str, bytes],
@@ -65,6 +150,7 @@ def validate_domain_manifest(
     for key in ("shop_id", "period", "datasets", "files"):
         if key not in manifest:
             raise PackageValidationError(f"missing manifest key: {key}")
+    manifest_shop_id = _require_manifest_shop_id(manifest)
 
     listed_raw = manifest.get("files", [])
     if not isinstance(listed_raw, list):
@@ -98,6 +184,7 @@ def validate_domain_manifest(
     _validate_keyword_root_payloads(manifest, files)
     _validate_family_gaps_payload(manifest, files)
     _validate_package_summary_payload(manifest, files)
+    _validate_dataset_shop_identity(manifest_shop_id, files)
 
 
 def validate_zip_package(zip_bytes: bytes) -> None:
@@ -189,8 +276,8 @@ def _validate_campaign_settings_payload(
         raise PackageValidationError(
             f"campaign_settings_snapshot contract validation failed: {exc}",
         ) from exc
-    manifest_shop_id = manifest.get("shop_id")
-    if manifest_shop_id is not None and parsed.shop_id != str(manifest_shop_id):
+    manifest_shop_id = _require_manifest_shop_id(manifest)
+    if parsed.shop_id != manifest_shop_id:
         raise PackageValidationError(
             "campaign_settings_snapshot shop_id must match manifest shop_id",
         )
@@ -233,6 +320,8 @@ def _validate_keyword_root_payloads(
         schema_version = data.get("schema_version")
         if schema_version is None:
             raise PackageValidationError(f"{logical_name} missing schema_version")
+        if logical_name == "DATA_MAP.json":
+            _validate_data_map_shop_id_type(data)
 
 
 def _validate_family_gaps_payload(
@@ -270,6 +359,10 @@ def _validate_family_gaps_payload(
     if data.get("document_kind") != GAP_DOCUMENT_KIND:
         raise PackageValidationError(
             f"{PACKAGE_FAMILY_GAPS_LOGICAL} missing document_kind",
+        )
+    if data.get("shop_id") != manifest.get("shop_id"):
+        raise PackageValidationError(
+            f"{PACKAGE_FAMILY_GAPS_LOGICAL} shop_id must match manifest shop_id exactly",
         )
     gaps_raw = data.get("gaps")
     if not isinstance(gaps_raw, list):
@@ -369,6 +462,10 @@ def _validate_package_summary_payload(
     if data.get("document_kind") != SUMMARY_DOCUMENT_KIND:
         raise PackageValidationError(
             f"{PACKAGE_SUMMARY_LOGICAL} missing document_kind",
+        )
+    if data.get("shop_id") != manifest.get("shop_id"):
+        raise PackageValidationError(
+            f"{PACKAGE_SUMMARY_LOGICAL} shop_id must match manifest shop_id exactly",
         )
     families_raw = data.get("families")
     if not isinstance(families_raw, list):
