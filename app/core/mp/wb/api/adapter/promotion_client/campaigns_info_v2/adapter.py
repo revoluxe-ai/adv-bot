@@ -1,9 +1,15 @@
+"""Read-only promotion v2 campaigns-info adapter.
+
+Транспорт и rate-limit для `/api/advert/v2/adverts`. Не пишет в WB и не
+меняет control-plane semantics.
+"""
+
 from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Mapping
-from typing import Any, Iterable, cast
+from collections.abc import Iterable, Mapping
+from typing import Any, cast
 
 from app.core.mp.wb.api.adapter.promotion_client.base_section_adapter import (
     BaseSectionAdapter,
