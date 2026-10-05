@@ -1,0 +1,16 @@
+tests/unit/ai_package_v1/test_campaign_settings_assembler.py
+  h_267f51d775769b 198-228
+tests/unit/ai_package_v1/test_campaign_settings_contract.py
+  h_267f51d775769b 10-11,16-20,22,25,82-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8e24655f72f35c0c2aa1ee98339860d6b7a68a86",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
