@@ -1,7 +1,9 @@
 ## 1. Reconciliation gate
 
-- [ ] 1.1 Before any production edit, record the local `wb_sky_control_plane` WIP reconciliation result. If that WIP already contains a ChangeSet contract, stop and reconcile; do not invent a second contract.
-- [ ] 1.2 Confirm `origin/stage` still has no `app/modules/wb_sky_control_plane/` and no `ChangeSetV1` type. Do not create that package.
+- [x] 1.1 Before any production edit, record the local `wb_sky_control_plane` WIP reconciliation result. If that WIP already contains a ChangeSet contract, stop and reconcile; do not invent a second contract.
+  - **Evidence (2026-10-05):** Verdict **CONFLICT**. Only inspected worktree: `C:/Users/vkita/my_code/meta-repo/adv-bot`, branch `stage`, HEAD `751e7bd29`, dirty (not modified by this recording). Untracked WIP: `app/modules/wb_sky_control_plane/` (38 Python files), `tests/unit/wb_sky_control_plane/` (9 tests), Alembic `e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py`. Local `ChangeSetV1` lives in that package (`models/changeset.py`, `validate_changeset` in `kernel/validate.py`), not in `campaign_settings_contract`. Forty-four other adv-bot worktrees: no `wb_sky_control_plane`. Local `stage` is 2 commits behind `origin/stage`. Implementation of tasks 2+ is **STOPPED** until a later reconciliation returns **NO_CONFLICT**; this recording is not NO_CONFLICT. Full write-up: project store doc `changeset-local-wip-reconciliation.md` (`/cursor/stores/self/docs/changeset-local-wip-reconciliation.md`).
+- [x] 1.2 Confirm `origin/stage` still has no `app/modules/wb_sky_control_plane/` and no `ChangeSetV1` type. Do not create that package.
+  - **Evidence:** `origin/stage` remains at `23c0671f372f0435b13a3573ec8990b4303b3e4a` with no `app/modules/wb_sky_control_plane/` and no `ChangeSetV1` in `campaign_settings_contract`. This OpenSpec change does not create that package. See `changeset-local-wip-reconciliation.md` (project store path above).
 
 ## 2. Domain types
 
