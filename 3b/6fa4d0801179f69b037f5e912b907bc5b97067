@@ -1,0 +1,96 @@
+app/core/mp/wb/api/domain_managers/promotion/promotion_manager.py
+  h_267f51d775769b 436-447
+app/modules/shop_runner/service_manager/manager.py
+  h_267f51d775769b 445-450,485-517,520-524,1060-1065,1155-1158
+app/modules/shop_runner/shop_wide_collection/__init__.py
+  h_267f51d775769b 1-192
+app/modules/shop_runner/shop_wide_collection/availability_append.py
+  h_267f51d775769b 1-110
+app/modules/shop_runner/shop_wide_collection/feature_flag.py
+  h_267f51d775769b 1-162
+app/modules/shop_runner/shop_wide_collection/full_adv_read_latest.py
+  h_267f51d775769b 1-120
+app/modules/shop_runner/shop_wide_collection/inventory_route_read.py
+  h_267f51d775769b 1-96
+app/modules/shop_runner/shop_wide_collection/inventory_upsert.py
+  h_267f51d775769b 1-393
+app/modules/shop_runner/shop_wide_collection/managed_record_contract.py
+  h_267f51d775769b 1-33
+app/modules/shop_runner/shop_wide_collection/route_handoff.py
+  h_267f51d775769b 1-257
+app/modules/shop_runner/shop_wide_collection/route_resolver.py
+  h_267f51d775769b 1-242
+app/modules/shop_runner/shop_wide_collection/route_transition_reconcile.py
+  h_267f51d775769b 1-256
+app/modules/shop_runner/shop_wide_collection/route_write_gate.py
+  h_267f51d775769b 1-134
+app/modules/shop_runner/shop_wide_collection/tick_wiring.py
+  h_267f51d775769b 1-148
+app/modules/shop_runner/shop_wide_collection/unmanaged_orchestrator.py
+  h_267f51d775769b 1-368
+app/modules/shop_runner/wb_shop.py
+  h_267f51d775769b 17-23,52-59,61-69,88-91
+env.sample
+  h_267f51d775769b 35-41
+openspec/architectural-debt/TEMPORARY_DUAL_CAMPAIGN_COLLECTION.md
+  h_267f51d775769b 1-97
+openspec/changes/shop-wide-campaign-data-collection/COMMON_SALES_BOUNDARY_RECONCILIATION.md
+  h_267f51d775769b 1-132
+openspec/changes/shop-wide-campaign-data-collection/decisions/shop-runner-shop-wide-collection/decision.md
+  h_267f51d775769b 1-145
+openspec/changes/shop-wide-campaign-data-collection/design.md
+  h_267f51d775769b 1-356
+openspec/changes/shop-wide-campaign-data-collection/owner-contract.md
+  h_267f51d775769b 1-56
+openspec/changes/shop-wide-campaign-data-collection/proposal.md
+  h_267f51d775769b 1-55
+openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/acceptance.md
+  h_267f51d775769b 1-86
+openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/acceptance.receipt.json
+  h_267f51d775769b 1-233
+openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/plan.md
+  h_267f51d775769b 1-542
+openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/plan.receipt.json
+  h_267f51d775769b 1-57
+openspec/changes/shop-wide-campaign-data-collection/specs/connected-shop-campaign-ad-data-collection/spec.md
+  h_267f51d775769b 1-370
+openspec/changes/shop-wide-campaign-data-collection/tasks.md
+  h_267f51d775769b 1-248
+pyrightconfig_strict.json
+  h_267f51d775769b 37
+scripts/clickhouse_migrations/007_create_shop_campaign_inventory_and_availability.sql
+  h_267f51d775769b 1-73
+tests/unit/shop_runner/test_campaign_collection_route_resolver.py
+  h_267f51d775769b 1-494
+tests/unit/shop_runner/test_legacy_record_collection_baseline.py
+  h_267f51d775769b 1-596
+tests/unit/shop_runner/test_managed_path_preservation.py
+  h_267f51d775769b 1-420
+tests/unit/shop_runner/test_partial_failure_availability_read_latest.py
+  h_267f51d775769b 1-612
+tests/unit/shop_runner/test_route_handoff.py
+  h_267f51d775769b 1-816
+tests/unit/shop_runner/test_shop_campaign_inventory_ddl.py
+  h_267f51d775769b 1-232
+tests/unit/shop_runner/test_shop_campaign_inventory_upsert.py
+  h_267f51d775769b 1-495
+tests/unit/shop_runner/test_shop_wide_collection_feature_flag.py
+  h_267f51d775769b 1-305
+tests/unit/shop_runner/test_shop_wide_tick_orchestration.py
+  h_267f51d775769b 1-483
+tests/unit/shop_runner/test_unmanaged_campaign_collector.py
+  h_267f51d775769b 1-649
+tools/openspec/openspec_guard.yaml
+  h_267f51d775769b 212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3b6fa4d0801179f69b037f5e912b907bc5b97067",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
