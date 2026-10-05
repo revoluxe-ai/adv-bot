@@ -73,7 +73,7 @@ async def test_package_zip_assembler_includes_family_gaps_and_validates(
     gaps_doc = json.loads(gaps_raw.decode("utf-8"))
     assert gaps_doc["document_kind"] == "package_family_gaps"
     assert len(gaps_doc["gaps"]) >= 1
-    assert all(entry["status"] == "GAP" for entry in gaps_doc["gaps"])
+    assert all(entry["family_status"] == "GAP" for entry in gaps_doc["gaps"])
 
 
 @pytest.mark.asyncio
