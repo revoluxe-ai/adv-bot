@@ -1,15 +1,15 @@
 # Tasks: shop-wide-common-sales-collection
 
-Spec: `openspec/changes/shop-wide-common-sales-collection/specs/shop-wide-common-sales-collection/spec.md`  
-Design: `openspec/changes/shop-wide-common-sales-collection/design.md`  
+Spec: `openspec/changes/shop-wide-common-sales-collection/specs/shop-wide-common-sales-collection/spec.md`
+Design: `openspec/changes/shop-wide-common-sales-collection/design.md`
 Decision: `openspec/changes/shop-wide-common-sales-collection/decisions/shop-wide-common-sales-ownership/decision.md`
 
-`TASKS_STATUS: EVIDENCE_CLOSURE_COMPLETE`  
-`NORMATIVE_MODALITY_PRESERVED: yes`  
-`CONDITIONAL_BRANCHES_PRESERVED: yes`  
-`PLANNING_REPAIR: WB-SKY-COMMON-SALES-PLAN-CLOSE-20261005-0130`  
-`IMPLEMENT_TASK: WB-SKY-COMMON-SALES-IMPLEMENT-20261005-0125`  
-`REMEDIATE_TASK: WB-SKY-COMMON-SALES-REMEDIATE-20261005-0140`  
+`TASKS_STATUS: EVIDENCE_CLOSURE_COMPLETE`
+`NORMATIVE_MODALITY_PRESERVED: yes`
+`CONDITIONAL_BRANCHES_PRESERVED: yes`
+`PLANNING_REPAIR: WB-SKY-COMMON-SALES-PLAN-CLOSE-20261005-0130`
+`IMPLEMENT_TASK: WB-SKY-COMMON-SALES-IMPLEMENT-20261005-0125`
+`REMEDIATE_TASK: WB-SKY-COMMON-SALES-REMEDIATE-20261005-0140`
 `EVIDENCE_CLOSE: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250`
 
 Scenario plan evidence: `scenario-coverage/plan.md` + `plan.receipt.json` (regenerated after repair).

@@ -1,8 +1,8 @@
 # OPSX_VERIFY mode=impl receipt
 
-TASK_ID: WB-SKY-COMMON-SALES-SCENARIO-CERTIFY-20261005-0260  
-CHANGE_ID: shop-wide-common-sales-collection  
-MODE: impl (read-only cross-check bundled with scenario certify)  
+TASK_ID: WB-SKY-COMMON-SALES-SCENARIO-CERTIFY-20261005-0260
+CHANGE_ID: shop-wide-common-sales-collection
+MODE: impl (read-only cross-check bundled with scenario certify)
 EXECUTED_AT: 2026-10-05T02:39:03+03:00
 
 ## Итоговый вердикт

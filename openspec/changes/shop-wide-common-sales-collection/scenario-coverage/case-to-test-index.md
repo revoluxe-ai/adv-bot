@@ -1,9 +1,9 @@
 # Case-to-test index (33 scenarios)
 
-TASK_ID: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250  
-SOURCE_PLAN: `scenario-coverage/plan.md` (PLAN_EVIDENCE_ID `SCPV1-shop-wide-common-sales-20261005-close`)  
-SCENARIO_COUNT: 33  
-PURPOSE: independent audit input — maps plan scenarios to authored test ids.  
+TASK_ID: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250
+SOURCE_PLAN: `scenario-coverage/plan.md` (PLAN_EVIDENCE_ID `SCPV1-shop-wide-common-sales-20261005-close`)
+SCENARIO_COUNT: 33
+PURPOSE: independent audit input — maps plan scenarios to authored test ids.
 VERDICT: **not issued** (preparation only).
 
 ## Primary test files

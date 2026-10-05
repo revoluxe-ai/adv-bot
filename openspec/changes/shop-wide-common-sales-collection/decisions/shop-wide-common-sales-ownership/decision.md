@@ -2,7 +2,7 @@
 
 Status: accepted
 
-Accepted: 2026-10-05 (evidence closure WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250)  
+Accepted: 2026-10-05 (evidence closure WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250)
 Basis: Owner GO upload `20261004-215744` + independent planning PASS
 `WB-SKY-COMMON-SALES-PLAN-FINAL-REVIEW-20261005-0135`. Identity and decision text
 preserved; no scope expansion beyond reviewed Owner Contract and planning artifacts.

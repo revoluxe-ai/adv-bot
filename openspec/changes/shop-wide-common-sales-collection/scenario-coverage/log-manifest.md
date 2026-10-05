@@ -1,7 +1,7 @@
 # Scenario coverage — log manifest
 
-TASK_ID: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250  
-CHANGE_ID: shop-wide-common-sales-collection  
+TASK_ID: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250
+CHANGE_ID: shop-wide-common-sales-collection
 MODE: evidence closure (docs only; no self-certify)
 
 Durable logs under `scenario-coverage/logs/`. External provenance copies remain at

@@ -1,8 +1,8 @@
 # Execution envelope — evidence closure
 
-TASK_ID: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250  
-CHANGE_ID: shop-wide-common-sales-collection  
-MODE: write (documentation/evidence only)  
+TASK_ID: WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250
+CHANGE_ID: shop-wide-common-sales-collection
+MODE: write (documentation/evidence only)
 SELF_CERTIFY: **NO**
 
 ## Worktree
@@ -11,7 +11,8 @@ SELF_CERTIFY: **NO**
 |-------|-------|
 | Path | `C:\Users\vkita\my_code\meta-repo\shop-wide-common-sales-collection` |
 | Branch | `shop-wide-common-sales-collection` |
-| HEAD | `62c8d48b15498997b84357e015b0e688f44fd37b` |
+| HEAD (evidence close) | `62c8d48b15498997b84357e015b0e688f44fd37b` |
+| IMPLEMENTATION_COMMIT | `3afdde673e667cc725131cab7f463db7e2b34b66` |
 | BASE_HEAD | `62c8d48b15498997b84357e015b0e688f44fd37b` |
 | WORKTREE_FINGERPRINT | `7ccebe8a8c0d5455d39d28f406ca7031b1d7a9b54c3c3734d45964a795d48c8c` |
 | `.venv` | Junction → `shop-wide-campaign-data-collection\.venv` (ready env; no new deps) |
@@ -21,10 +22,22 @@ SELF_CERTIFY: **NO**
 | Field | SHA256 |
 |-------|--------|
 | SOURCE_SPEC_SHA | `5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253` |
-| design.md | `07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9` |
+| design.md (current, doc-format normalized) | `288fd52afd0a7c6df06f232520e18c50cf0aaf4ed7ce17d7a22926d19a56fa18` |
+| design.md (evidence-close envelope binding) | `07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9` |
+| design.md (`3afdde6` preimage) | `ecf4921d8a77812bc3e3baeee6f43efe2093b2d7ec271126cc68b156d91df874` |
 | owner-contract.md | `1ef750fb242b6092aa375c815de39557b9a1d78c36f3a9486a1ffd35c95817af` |
 | plan.md | `c7e5882345385f9f1c39dc2e252b58c0b10a2c9319efab9a1ad16cb1f834d4a0` |
 | PLAN_EVIDENCE_ID | `SCPV1-shop-wide-common-sales-20261005-close` |
+
+## Doc-format-only current metadata (not source re-certification)
+
+| Field | Value |
+|-------|-------|
+| DOC_FORMAT_TASK | `WB-SKY-COMMON-SALES-LIFECYCLE-DOC-FIX-20261005-0452` |
+| CHANGE_CLASS | trailing whitespace removal + provenance correction |
+| SEMANTIC_DELTA | none — owner semantics, design decisions, readiness mode preserved |
+| CERTIFY_REISSUE | **NO** — `certify.receipt.json` and scenario report bindings unchanged |
+| PROVENANCE | `DOC_FORMAT_PROVENANCE.md` |
 
 ## Prior independent receipts (read-only references)
 

@@ -1,22 +1,24 @@
 # PREMERGE_SCOPE_RECEIPT
 
-TASK_ID: WB-SKY-COMMON-SALES-LIFECYCLE-COMMIT-20261005-0450  
-CHANGE_ID: shop-wide-common-sales-collection  
-MODE: scoped feature commit (docs metadata closure + certified implementation)  
+TASK_ID: WB-SKY-COMMON-SALES-LIFECYCLE-COMMIT-20261005-0450
+CHANGE_ID: shop-wide-common-sales-collection
+MODE: scoped feature commit (docs metadata closure + certified implementation)
 PREFLIGHT: `WB-SKY-COMMON-SALES-LIFECYCLE-PREFLIGHT-20261005-0445`
 
 ## Verdict
 
 | Field | Value |
 |-------|-------|
-| FEATURE_COMMIT_SCOPE | **PASS** (pending commit execution) |
+| FEATURE_COMMIT_SCOPE | **PASS** (committed) |
+| IMPLEMENTATION_COMMIT | `3afdde673e667cc725131cab7f463db7e2b34b66` (2026-10-05T04:47:58+03:00) |
+| DOC_FORMAT_FOLLOWUP | `WB-SKY-COMMON-SALES-LIFECYCLE-DOC-FIX-20261005-0452` (whitespace + provenance only) |
 | MERGE_REVIEW | **NOT_CLAIMED** — separate independent reviewer required |
 | PARENT_HEAD | `62c8d48b15498997b84357e015b0e688f44fd37b` |
 | BRANCH | `shop-wide-common-sales-collection` |
 
 ## Source byte equality (15 implementation paths)
 
-All native current bytes match certified overlay (preflight + re-verified 2026-10-05T04:50 MSK):
+All native current bytes match certified overlay (preflight + re-verified at implementation commit 2026-10-05T04:47:58+03:00):
 
 | Path | SHA256 |
 |------|--------|
@@ -36,7 +38,7 @@ All native current bytes match certified overlay (preflight + re-verified 2026-1
 | `app/modules/shop_runner/service_manager/services/shop_wide_common_sales/shop_assortment_reader.py` | `c7fab52381b20760868da97e12e8584c3c7138611b15d7b22f4d9c83d2a7ed64` |
 | `app/modules/shop_runner/service_manager/services/shop_wide_common_sales/taskgroup_no_ad_supervisor.py` | `c091af08093325abebdb50ba2bc74c059fb3f1aed39bae39235b96285396d07a` |
 
-## Certified bindings (immutable — unchanged)
+## Certified bindings (immutable core — unchanged by doc-format follow-up)
 
 | Artifact | SHA256 |
 |----------|--------|
@@ -44,7 +46,23 @@ All native current bytes match certified overlay (preflight + re-verified 2026-1
 | `scenario-coverage/plan.md` | `c7e5882345385f9f1c39dc2e252b58c0b10a2c9319efab9a1ad16cb1f834d4a0` |
 | `scenario-coverage/SCENARIO_TEST_COVERAGE_REPORT.md` | `d145f7816dd556176f29b375db820f2b49c9803c4f480ec6dffc0cd9794e6bf0` |
 | `scenario-coverage/certify.receipt.json` | `4e4ac8c69108054e29e056ca999c2a8daa148c2d07135c3da34a12a4de89f106` |
-| `design.md` | `ecf4921d8a77812bc3e3baeee6f43efe2093b2d7ec271126cc68b156d91df874` |
+
+### design.md lineage (doc-format normalization; semantics unchanged)
+
+| Snapshot | SHA256 | Notes |
+|----------|--------|-------|
+| evidence-close envelope binding | `07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9` | pre-implementation footer |
+| `3afdde6` implementation commit | `ecf4921d8a77812bc3e3baeee6f43efe2093b2d7ec271126cc68b156d91df874` | trailing whitespace on footer lines |
+| post doc-format normalization | see `DOC_FORMAT_PROVENANCE.md` | trailing whitespace removed only |
+
+## Whitespace gate (`git diff --check`)
+
+| Check | `3afdde6` result | Post doc-fix target |
+|-------|------------------|---------------------|
+| `git diff 62c8d48..3afdde6 --check` | **EXIT 2** — trailing whitespace in 10 new tracked doc/receipt files (all feature-introduced) | preserved as evidence in `3afdde6` |
+| `git diff 62c8d48..HEAD --check` (after doc-fix) | — | **EXIT 0** required |
+
+No waiver applied; gate failure was real and introduced by the feature commit, not pre-existing on base.
 
 ## EXECUTION_BINDINGS_VERIFIED logs (git add -f)
 
@@ -57,11 +75,11 @@ All native current bytes match certified overlay (preflight + re-verified 2026-1
 
 Certification: `WB-SKY-COMMON-SALES-SCENARIO-CERTIFY-20261005-0260` — PASS 33/33.
 
-## Docs metadata closure (this commit only)
+## Docs metadata closure (implementation commit `3afdde6`)
 
 | File | Change |
 |------|--------|
-| `tasks.md` | §4.1 NOT_RUN removed; §4.4 marked executed (CH 2/2); §7.4 clarified 19 supervised loaders |
+| `tasks.md` | section 4.1 NOT_RUN removed; section 4.4 marked executed (CH 2/2); section 7.4 clarified 19 supervised loaders |
 | `scenario-coverage/log-manifest.md` | Replaced stale "report not authored" with certify 0260 receipt |
 | `PREMERGE_SCOPE_RECEIPT.md` | This receipt |
 
