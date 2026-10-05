@@ -1,0 +1,22 @@
+scripts/clickhouse_migration_control_plane/corpus.py
+  h_267f51d775769b 31-34,76-81,205-208,215-218,220-221
+scripts/clickhouse_migration_control_plane/pre_execution.py
+  h_267f51d775769b 312
+tests/unit/test_clickhouse_migration_corpus_acceptance.py
+  h_267f51d775769b 60-62,65,84-87,230,233,235-237,242,251-252,256,266
+tests/unit/test_clickhouse_migration_legacy_baseline.py
+  h_267f51d775769b 48-50,59-67,70,154,157-159,173,176,178
+tests/unit/test_clickhouse_migration_pre_execution.py
+  h_267f51d775769b 59,290-291,294-295,301,319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4fe28087a9dd9910052ec513b4657afbf4b90a5a",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
