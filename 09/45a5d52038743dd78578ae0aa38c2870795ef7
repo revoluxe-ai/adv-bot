@@ -1,0 +1,39 @@
+.opsx/runs/scenario-coverage/shop-wide-common-sales-collection/receipts/PROVIDER-a3f8c2e1b904d7a6.md
+  s_282fff1188538d::t_87d5a15b2cca09 3-10,16-27
+openspec/changes/shop-wide-common-sales-collection/DOC_FORMAT_PROVENANCE.md
+  s_282fff1188538d::t_acf03c53ae5b93 1-68
+openspec/changes/shop-wide-common-sales-collection/PREMERGE_SCOPE_RECEIPT.md
+  s_282fff1188538d::t_db0e8ee6077f7e 3-5,12-14,21,41,49-65,78,82
+openspec/changes/shop-wide-common-sales-collection/SHOP_WIDE_COMMON_SALES_PLANNING_REPORT.md
+  s_282fff1188538d::t_a023b7e48ad3f3 3
+openspec/changes/shop-wide-common-sales-collection/decisions/shop-wide-common-sales-ownership/decision.md
+  s_282fff1188538d::t_7e145b0bcb8b49 5
+openspec/changes/shop-wide-common-sales-collection/design.md
+  s_282fff1188538d::t_5a1e5a5ad55030 327-328
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/case-to-test-index.md
+  s_282fff1188538d::t_33653a0db07aa2 3-6
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/execution-envelope.md
+  s_282fff1188538d::t_af95c5d04728a5 3-5,14-15,25-27,32-41
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/log-manifest.md
+  s_282fff1188538d::t_9de8f2921822d2 3-4
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/verify-impl.receipt.md
+  s_282fff1188538d::t_6f50180f927a58 3-5
+openspec/changes/shop-wide-common-sales-collection/tasks.md
+  s_282fff1188538d::t_4eb7160a00754a 3-4,7-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0945a5d52038743dd78578ae0aa38c2870795ef7",
+  "prompts": {},
+  "sessions": {
+    "s_282fff1188538d": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "df16578b-b490-4428-b6f2-b851598e47ef",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
