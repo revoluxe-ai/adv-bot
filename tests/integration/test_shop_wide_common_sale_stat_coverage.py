@@ -50,7 +50,7 @@ from tests.support.destructive_clickhouse import (
 )
 from tests.support.rewrite_default_db_ch_client import patch_get_clickhouse_client
 
-pytestmark = [pytest.mark.integration, pytest.mark.destructive_local]
+pytestmark = [pytest.mark.integration]
 
 WB_SKY_OWNED_CH_TASK_ENV = "WB_SKY_OWNED_CH_TASK"
 WB_SKY_OWNED_CH_TASK_ID = "WB-SKY-COMMON-SALES-20261005"
@@ -103,6 +103,7 @@ def dedicated_wb_sky_common_sales_clickhouse_client() -> Iterator[Any]:
     client.close()
 
 
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_shop_wide_coverage_read_write_roundtrip(
     dedicated_wb_sky_common_sales_clickhouse_client: Any,
@@ -183,6 +184,7 @@ async def test_shop_wide_coverage_read_write_roundtrip(
     assert buyouts_sum_rub == 50.33
 
 
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_collect_by_nmids_uses_production_writer(
     dedicated_wb_sky_common_sales_clickhouse_client: Any,

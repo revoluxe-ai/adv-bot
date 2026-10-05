@@ -25,9 +25,10 @@ from app.modules.campaign_settings_history.pg_reader import (
 from app.modules.common_slaves.wildberries.models import AdvSetting
 from app.modules.common_slaves.wildberries.models.wb_cabinet import WBCabinet
 
-pytestmark = [pytest.mark.integration, pytest.mark.destructive_local]
+pytestmark = [pytest.mark.integration]
 
 
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_pg_reader_discovers_and_loads_real_settings_rows(
     async_session: AsyncSession,
@@ -68,6 +69,7 @@ async def test_pg_reader_discovers_and_loads_real_settings_rows(
     assert campaign.sources.adv_setting["nmids"] == [111, 222]
 
 
+@pytest.mark.destructive_local
 @pytest.mark.asyncio
 async def test_pg_advisory_xact_lock_serializes_real_sessions(
     async_engine: AsyncEngine,
