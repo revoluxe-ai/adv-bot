@@ -1,0 +1,24 @@
+.cursor/pipeline/control-plane-tests/run_command_transfer_contract_tests.py
+  h_267f51d775769b 577-579,1739-1742,1748-1796,1820
+.cursor/pipeline/sherlock-tests/test_sherlock_ledger.py
+  h_267f51d775769b 311,313-323
+.opsx/registry/active_command_activation_proof.json
+  h_267f51d775769b 1-459
+.opsx/registry/command_transfer_manifest.md
+  h_267f51d775769b 18-21,28-29,31-43,45-78,81-87,89-97,99-113
+.opsx/registry/command_transfer_operational_completion.json
+  h_267f51d775769b 1-26
+.opsx/registry/existing_adaptation_reconciliation.json
+  h_267f51d775769b 1-534
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "469802c0621cdd5bb7942cd662b4e86f89818718",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
