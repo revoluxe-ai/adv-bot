@@ -83,7 +83,10 @@ class RewritingClickHouseClient:
         return await self._inner.command(*args, **kwargs)
 
     async def insert(self, *args: Any, **kwargs: Any) -> Any:
-        """Rewrite insert table ``default_db.*``, then forward to inner client."""
+        """Rewrite production insert table/database to the allowlisted test DB."""
+        database = kwargs.get("database")
+        if database == PROD_CH_DATABASE:
+            kwargs = {**kwargs, "database": TEST_CH_DATABASE}
         if args:
             table, *rest = args
             if isinstance(table, str):

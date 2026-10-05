@@ -21,6 +21,7 @@ from app.client_bot.user_interface.handlers.adv_setting.adv_setting import (
     load_adv_for_owner_cabinet_in_session,
     load_wb_user_cabinet_for_adv_in_session,
 )
+from app.modules.campaign_settings_contract import excel_alias, excel_editable_fields
 from app.modules.common_slaves.wildberries.models import KeywordSetting
 from app.utils.db.session_maker import get_async_session_maker
 
@@ -33,7 +34,22 @@ _LEGEND_TEXT = (
 )
 _HEADER_FILL = PatternFill(start_color="D9EAF7", end_color="D9EAF7", fill_type="solid")
 _HEADER_FONT = Font(bold=True)
-_HEADERS = ["keyword_id", "keyword", "current_target_place", "target_place"]
+_KEYWORD_ID_HEADER = excel_alias("KeywordSetting", "id")
+_KEYWORD_TEXT_HEADER = excel_alias("KeywordSetting", "text")
+_CURRENT_TARGET_PLACE_HEADER = excel_alias("KeywordSetting", "target_place")
+if (
+    _KEYWORD_ID_HEADER is None
+    or _KEYWORD_TEXT_HEADER is None
+    or _CURRENT_TARGET_PLACE_HEADER is None
+    or "target_place" not in excel_editable_fields("KeywordSetting")
+):
+    raise RuntimeError("campaign-settings-history keyword Excel registry is incomplete")
+_HEADERS = [
+    _KEYWORD_ID_HEADER,
+    _KEYWORD_TEXT_HEADER,
+    _CURRENT_TARGET_PLACE_HEADER,
+    "target_place",
+]
 
 
 class TargetPlaceAccessDeniedError(Exception):

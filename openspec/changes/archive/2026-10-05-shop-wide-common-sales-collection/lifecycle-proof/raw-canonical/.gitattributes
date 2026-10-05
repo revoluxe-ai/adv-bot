@@ -1,0 +1,2 @@
+# Preserve pyright proof logs/JSON as exact byte copies (no EOL normalization).
+* -text

@@ -1,0 +1,52 @@
+{
+  "SCHEMA_VERSION": 1,
+  "TASK_ID": "WB-SKY-KEYWORD-HISTORY-CUTOFF-PARITY-REPAIR-20261005-08",
+  "MODE": "write",
+  "STATUS": "AUTHORED_CLOSURE_PENDING_INDEPENDENT_REAUDIT",
+  "CHANGE_ID": "ai-package-keyword-performance-history",
+  "CREATED_AT": "2026-10-05T09:30:00+03:00",
+  "AUDIT_STATUS": "NOT_INDEPENDENTLY_AUDITED",
+  "SUPERSEDES": [
+    "scenario-coverage/audit.report.md SCAR-07 (47PASS/4FAIL)"
+  ],
+  "SOURCE_SPEC_SHA": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4",
+  "SOURCE_SPEC_SHA_RECIPE": "openspec/changes/ai-package-keyword-performance-history/evidence/verify_plan_evidence_repair3.py",
+  "PLAN_EVIDENCE_ID": "SCPV1-dad56a1027545bc3",
+  "WORKTREE_FINGERPRINT": "3929cd8e9e5e22a56c2cc4ef13b64757ca413c5698a188fcc7e6fe268fb75358",
+  "WORKTREE_FINGERPRINT_SCOPE": "65 paths — includes cutoff_guard.py, test_ch_stub_contract.py, test_contract cutoff payload cases",
+  "WORKTREE_FINGERPRINT_MANIFEST": "openspec/changes/ai-package-keyword-performance-history/evidence/worktree-fingerprint-cutoff-repair08.json",
+  "WORKTREE_HEAD_SHA": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+  "PRODUCTION_GUARD_REPAIR": "domain/cutoff_guard.py + keyword_assembler post-fetch filters + ch_keyword_bounds_reader last clamp",
+  "CLOSED_GAP_ROWS": [
+    "ai-package-keyword-performance-history::s51-cutoff-payload::1",
+    "ai-package-keyword-performance-history::s51-future-payload::2",
+    "ai-package-keyword-performance-history::s45-bounds::3",
+    "ai-package-keyword-performance-history::s37-s38-stub-parity::4"
+  ],
+  "EXECUTED_TEST_NODE_IDS": [
+    "tests/unit/ai_package_v1/keyword_performance/test_contract_keyword_export.py::test_contract_cutoff_excludes_future_date_payload",
+    "tests/unit/ai_package_v1/keyword_performance/test_contract_keyword_export.py::test_contract_cutoff_excludes_same_day_post_instant_daily_payload",
+    "tests/unit/ai_package_v1/keyword_performance/test_contract_keyword_export.py::test_contract_cutoff_excludes_future_position_version_payload",
+    "tests/unit/ai_package_v1/keyword_performance/test_daily_extended.py::test_cutoff_future_bounds_excluded_from_export_metadata",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_daily_reader_routing_and_cutoff_params",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_position_reader_routing_and_version_ms",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_bounds_reader_daily_and_position_queries",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_bid_probe_schema_and_sample_cutoff",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_bid_decision_reader_timeline_params",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_unknown_sql_fail_closed_empty_rows",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_fake_session_forbids_commit",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_pg_overlap_reader_read_only_session",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_daily_reader_coherent_nullable_tuple_shape",
+    "tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py::test_stub_contract_position_reader_future_version_parse_then_guard"
+  ],
+  "PRODUCER_COMMAND": "poetry run pytest -m unit tests/unit/ai_package_v1/ -v",
+  "PYTEST_RESULT": "132 passed, 0 failed",
+  "PYTEST_LOG_PATH": "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-cutoff-repair08.log",
+  "PYTEST_LOG_SHA256": "9c20c0661f250f92005fd8c6e4bd98c270567d18bf48543de8fd3622cb09a53e",
+  "PYRIGHT_COMMAND": "poetry run python -m pyright --project pyrightconfig_strict.json",
+  "PYRIGHT_RESULT": "0 errors, 0 warnings, 0 informations",
+  "OPENSPEC_VALIDATE": "PASS (poetry run openspec validate ai-package-keyword-performance-history --type change --strict)",
+  "GIT_DIFF_CHECK": "PASS",
+  "TASKS_6_4_6_5": "unchecked — independent scenario re-audit and /opsx-verify required",
+  "OVERALL_VERDICT": "NO_GO — writer closure only; independent audit07 re-run required"
+}

@@ -1,0 +1,145 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "clickhouse-migrations-control-plane",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "0390ceb9be3cedd1c9453ab03363d3c679eaec0bab0b3a7970464e3f4d308a33",
+  "PLAN_CONTENT_HASH": "7da6c403c548a7958ee29812c489df3222784a5cd1b7fbba858dd69fe93bf592",
+  "PLAN_PATH": "openspec/changes/clickhouse-migrations-control-plane/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/clickhouse-migrations-control-plane/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 42,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      {
+        "step": "L1",
+        "scenarios": [
+          "Register the existing corpus without executing it",
+          "Status without a target is not an applied record"
+        ]
+      },
+      {
+        "step": "L2",
+        "scenarios": [
+          "Register the existing corpus without executing it",
+          "Qualification stays in the existing SQL",
+          "Missing 006 is not imported",
+          "Raw bytes no longer match the fingerprint",
+          "Unreviewed numeric prefix blocks apply",
+          "A semicolon inside a string stops before apply",
+          "Test DDL is not canonical"
+        ]
+      },
+      {
+        "step": "L3",
+        "scenarios": [
+          "Privilege class cannot be substituted",
+          "Authorized apply still refuses 005"
+        ]
+      },
+      {
+        "step": "L4",
+        "scenarios": [
+          "File presence is not applied state",
+          "Empty ledger does not apply the corpus",
+          "Unresolved history blocks apply and mark-applied",
+          "Catch-up cannot close unknown history",
+          "Inspect does not write and does not baseline",
+          "Reconcile without flag or evidence writes nothing",
+          "Filename list and undetermined evidence do not apply a version",
+          "Missing or zero server UUID fails closed",
+          "Plan is dry",
+          "Status without a target is not an applied record"
+        ]
+      },
+      {
+        "step": "L5",
+        "scenarios": [
+          "Reconcile requires its own flag and inspection evidence",
+          "Schema writer may run only schema DDL under every gate",
+          "Statements commit one by one",
+          "Same checksum skips SQL",
+          "Partial and applying are not idempotent skips",
+          "Crash after a successful statement leaves the version unclosed",
+          "Apply without authorization refuses",
+          "Authorized ensure-ledger holds the advisory lock",
+          "Missing coordinator fails closed",
+          "Wrong coordinator is not this lock",
+          "Lock contention sends no statement",
+          "Lock loss stops further SQL",
+          "Ledger identity is the server UUID and default_db",
+          "Another database is not this corpus target",
+          "Ledger checksum differs from the file",
+          "Comments are not statements",
+          "Honest success and refusal",
+          "Isolated apply is real and production is untouched",
+          "Production target without a separate GO refuses",
+          "Raw bytes no longer match the fingerprint",
+          "A semicolon inside a string stops before apply"
+        ]
+      },
+      {
+        "step": "L6",
+        "scenarios": [
+          "Restart does not continue a partial or unknown history",
+          "Ledger checksum differs from the file"
+        ]
+      },
+      {
+        "step": "L7",
+        "scenarios": [
+          "Isolated apply is real and production is untouched",
+          "Production target without a separate GO refuses",
+          "The application client is not the migration executor",
+          "Alembic stays out of ClickHouse migrations",
+          "Shop-wide expansion waits",
+          "Test DDL is not canonical",
+          "Honest success and refusal"
+        ]
+      }
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/clickhouse-migrations-control-plane/design.md",
+      "content_hash": "15a0cc2647903e32b1a8662989e7b80ef5a701db3a647db6582b6e0fc8c5f021"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/clickhouse-migrations-control-plane/specs/clickhouse-migration-lifecycle/spec.md",
+        "content_hash": "e8d4fc05d3074a6135037943beafbca0b98338a3824a314d96eaebdfb2291c6b"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/clickhouse-migrations-control-plane/design.md",
+      "content_hash": "15a0cc2647903e32b1a8662989e7b80ef5a701db3a647db6582b6e0fc8c5f021"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/clickhouse-migrations-control-plane/owner-contract.md",
+      "content_hash": "252c243f6bc7813d4c2e3304f43870f9da0e5e85deed0a850ea9b831cbb3e7be"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/clickhouse-migrations-control-plane/design.md",
+      "content_hash": "15a0cc2647903e32b1a8662989e7b80ef5a701db3a647db6582b6e0fc8c5f021"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/clickhouse-migrations-control-plane/specs/clickhouse-migration-lifecycle/spec.md",
+        "content_hash": "e8d4fc05d3074a6135037943beafbca0b98338a3824a314d96eaebdfb2291c6b"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/clickhouse-migrations-control-plane/design.md",
+      "content_hash": "15a0cc2647903e32b1a8662989e7b80ef5a701db3a647db6582b6e0fc8c5f021"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/clickhouse-migrations-control-plane/owner-contract.md",
+      "content_hash": "252c243f6bc7813d4c2e3304f43870f9da0e5e85deed0a850ea9b831cbb3e7be"
+    }
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

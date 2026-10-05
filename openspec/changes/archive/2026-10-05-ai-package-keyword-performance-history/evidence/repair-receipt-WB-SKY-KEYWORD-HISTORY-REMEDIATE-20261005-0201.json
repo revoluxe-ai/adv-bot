@@ -1,0 +1,41 @@
+{
+  "task_id": "WB-SKY-KEYWORD-HISTORY-REMEDIATE-20261005-0201",
+  "status": "REPAIR_COMPLETE_PENDING_VERIFY",
+  "commands": [
+    {
+      "cmd": "poetry run pytest -m unit tests/unit/ai_package_v1/keyword_performance/ -v",
+      "result": "58 passed, 0 failed"
+    },
+    {
+      "cmd": "poetry run pytest -m unit tests/unit/ai_package_v1/ -v",
+      "result": "87 passed, 0 failed"
+    },
+    {
+      "cmd": ".venv\\Scripts\\pyright.exe --project pyrightconfig_strict.json app\\modules\\ai_package_v1\\keyword_performance",
+      "result": "0 errors, 0 warnings"
+    },
+    {
+      "cmd": "openspec validate ai-package-keyword-performance-history --type change --strict",
+      "result": "PASS"
+    },
+    {
+      "cmd": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "blockers_repaired": [
+    "P0 calendar previous_month/quarter/year full periods",
+    "P0 prev_7d real aggregates (removed synthetic zero prev)",
+    "P1 MTD/QTD/YTD comparable change rows",
+    "P1 DATA_MAP comparable formulas",
+    "P1 ChBidDecisionProbe default reader",
+    "P1 forbidden guard on export path",
+    "P2 coverage_pct computed from requested/observed",
+    "P2 pyrightconfig_strict include ai_package_v1",
+    "P2 year-batched daily CH fetch"
+  ],
+  "remaining_for_verify": [
+    "Independent /opsx-verify mode=impl",
+    "Full pyright-strict on entire pre-existing ai_package_v1 baseline if required by verify"
+  ]
+}

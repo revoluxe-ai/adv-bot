@@ -1,0 +1,67 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "ai-package-campaign-settings-snapshot",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-c1eba84a1b0b8a1e",
+  "PLAN_CONTENT_HASH": "d5e86b74361176a57230078d22da1cc646d1c6744ac02cc86d0dbf12ba7b46e5",
+  "PLAN_PATH": "openspec/changes/ai-package-campaign-settings-snapshot/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/ai-package-campaign-settings-snapshot/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 21,
+  "SOURCE_SPEC_SHA": "f6c56b7af60aa41b890ebbc4633f48d0aa1d6b1f39089f893e34d737a36959ac",
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01",
+      "L2:S01,S02,S04,S14,S15,S19",
+      "L3:S03,S04,S17,S19",
+      "L4:S05,S06,S07,S10,S11,S19",
+      "L5:S06,S08,S10,S16",
+      "L6:S09,S10,S13,S14,S17,S18",
+      "L7:S12,S13,S14,S17,S20,S21"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/ai-package-campaign-settings-snapshot/design.md",
+      "content_hash": "4776ca00405b6f574667dea4800e8d2d13752a6defc57522b24787c5a7fb7777"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/ai-package-campaign-settings-snapshot/specs/ai-package-campaign-settings-snapshot/spec.md",
+        "content_hash": "003bbdf8ef6f8b4ebec372cca5063d4a08a9daa5818bf9bb15511f2dbd8eb7fc"
+      },
+      {
+        "path": "openspec/changes/ai-package-campaign-settings-snapshot/specs/ai-package-v1-exporter/spec.md",
+        "content_hash": "158ab2030501a411587f44e6cef758ae127efd81de59ed12c4fab4222c876c6c"
+      },
+      {
+        "path": "openspec/changes/ai-package-campaign-settings-snapshot/specs/ai-package-v1-contract-tests/spec.md",
+        "content_hash": "4c44be22ad16b62334dbbac2d64659c10482348bf66d5d053682ab0925c98e5c"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/ai-package-campaign-settings-snapshot/design.md#derived-lifecycle-export-read",
+      "content_hash": "4776ca00405b6f574667dea4800e8d2d13752a6defc57522b24787c5a7fb7777"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/ai-package-campaign-settings-snapshot/owner-contract.md",
+      "content_hash": "9a1ee013b90538079abdc133789b396686e4a02048da12068aa2ca9125e87d87"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "4776ca00405b6f574667dea4800e8d2d13752a6defc57522b24787c5a7fb7777",
+    "SPEC_REVISION": [
+      "003bbdf8ef6f8b4ebec372cca5063d4a08a9daa5818bf9bb15511f2dbd8eb7fc",
+      "158ab2030501a411587f44e6cef758ae127efd81de59ed12c4fab4222c876c6c",
+      "4c44be22ad16b62334dbbac2d64659c10482348bf66d5d053682ab0925c98e5c"
+    ],
+    "LIFECYCLE_REVISION": "4776ca00405b6f574667dea4800e8d2d13752a6defc57522b24787c5a7fb7777",
+    "OWNER_CONTRACT_REVISION": "9a1ee013b90538079abdc133789b396686e4a02048da12068aa2ca9125e87d87",
+    "SOURCE_SPEC_SHA": "f6c56b7af60aa41b890ebbc4633f48d0aa1d6b1f39089f893e34d737a36959ac",
+    "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=plan change=ai-package-campaign-settings-snapshot"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

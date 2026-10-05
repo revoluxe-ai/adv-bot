@@ -1,0 +1,34 @@
+{
+  "task_id": "WB-SKY-KEYWORD-HISTORY-SOURCE-REPAIR-20261005-05",
+  "mode": "write",
+  "change": "ai-package-keyword-performance-history",
+  "generated_at": "2026-10-05T06:15:00+03:00",
+  "status": "SOURCE_REPAIR_COMPLETE_PENDING_AUDIT_VERIFY",
+  "pytest_command": "poetry run pytest -m unit tests/unit/ai_package_v1/",
+  "pytest_result": "106 passed, 0 failed",
+  "pyright_command": "poetry run python -m pyright --project pyrightconfig_strict.json",
+  "pyright_result": "0 errors, 0 warnings, 0 informations",
+  "openspec_validate": "PASS",
+  "git_diff_check": "PASS",
+  "new_tests": [
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_cap_not_current_bid_evidence",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_rebound_does_not_inherit_campaign_policy",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_decision_timeline_source_derived_event_class",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_decision_latest_coherent_conflict_null",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_bid_probe_missing_required_column_unsupported",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_bid_probe_query_failure_failed",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_bid_decision_latest_sql_row_coherent_not_per_field_argmax",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_position_api_future_version_excluded",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_position_max_version_conflict_parsed_ambiguous",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_position_norm_query_unproven_when_no_daily_match",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_position_latest_never_uses_old_when_latest_null",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_per_metric_identity_day_coverage",
+    "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py::test_assembler_exports_decision_timeline_and_position_windows"
+  ],
+  "remaining_gaps": [
+    "scenario-coverage audit hop: full field matrix / AT checkbox certification not done this hop",
+    "current_bid_evidence PROVEN path awaits documented persisted applied-bid PG/CH source (none wired)",
+    "live CH/PG integration tests intentionally absent (unit-only bounded worker)",
+    "DATA_MAP source_field_matrix full audit alignment deferred to separate documentation hop"
+  ]
+}

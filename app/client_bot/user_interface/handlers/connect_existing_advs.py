@@ -1585,6 +1585,30 @@ async def connect_existing_create_both(
     # После старта создания РК меню магазина не показываем — только сообщение об очереди.
 
 
+@router.callback_query(callbacks.ConnectExistingCreateBoth.filter())
+async def connect_existing_create_both_stale_session(
+    callback: CallbackQuery,
+    callback_data: callbacks.ConnectExistingCreateBoth,
+    bot: Bot,
+) -> None:
+    """Ответ на устаревшую inline-кнопку «создать обе» вне FSM waiting_confirm_create_both.
+
+    Регистрируется после stateful-хендлера: при валидном state срабатывает он;
+    иначе пользователь получает явный текст вместо «Update is not handled».
+    """
+    if callback.message is None:
+        return
+    chat_id = callback.message.chat.id
+    if callback_data.action == "cancel":
+        _ = await bot.send_message(chat_id, "Отменено.")
+        return
+    _ = await bot.send_message(
+        chat_id,
+        "Сессия подключения кампаний истекла. Откройте магазин и начните "
+        "«Подключить существующие» заново — не нажимайте старую кнопку в истории чата.",
+    )
+
+
 @router.callback_query(
     StateFilter(ConnectExistingAdvsStates.waiting_confirm_continue_invalid),
     callbacks.ConnectExistingContinueDespiteInvalid.filter(),

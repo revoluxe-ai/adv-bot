@@ -1,0 +1,258 @@
+{
+  "WORKTREE_FINGERPRINT": "a8960938ca0b8055738a5892fb17cb408dcd3377da12004290fc5377dbd075c0",
+  "MANIFEST_PATH_COUNT": 63,
+  "MANIFEST": [
+    {
+      "path": "app/modules/ai_package_v1/domain/enums.py",
+      "content_hash": "8bc5f8a8b38095c19708311f0161ff1647313556724e375b741b9b2a04a94306"
+    },
+    {
+      "path": "app/modules/ai_package_v1/export/export_service.py",
+      "content_hash": "46d9e734c7ae2e7733709701bfede27d6a0ef02f47022ca0f707fbf539e9f34b"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/__init__.py",
+      "content_hash": "6d6bc9894305d6e437d8bfdb5846d667f56d00a8e82774650ba86d2c605f9814"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/__init__.py",
+      "content_hash": "61acb3548f70ed6e52d93a4cf53da45da3eedfe8b39dbaff0a493303067992e5"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/coverage_assembler.py",
+      "content_hash": "b5a8da5e98e01b65f77f00687a51fb87b81ac205e7db00f4f867a64d8b5b5ae9"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/cutoff.py",
+      "content_hash": "c583fc82ed6660e8d0be925f1cf22232bb77090f007347db257fe2bb3934f302"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/data_map_builder.py",
+      "content_hash": "723494cabd0d3ccc4663f6c8044e94248a89d67de1270090b5f57d4f75228112"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/derived_metrics.py",
+      "content_hash": "628d1ae6838576bc9228d06ab1ed4b10080926716b9fe72dbc6f9402bee6ae79"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/enums.py",
+      "content_hash": "d381a50dad645c02f7fc59093bcc6e448f8862c91091195b331d06e235716ff3"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/export_field_registry.py",
+      "content_hash": "9fcb1118bae4e50309f5ccdb936ebc5cd3f69882e70e6ffad2f69491dfbbf0cc"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/models.py",
+      "content_hash": "a097cf720891c25c90471211d8f4e4d47394971fb3045337f30cdede330f1b6c"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/domain/spend_mapper.py",
+      "content_hash": "f59d4ef5c378086f6db80f93d853820432306a92e02da8a64e83bc2440270762"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/__init__.py",
+      "content_hash": "9bce2ed5b33da6e38369bd91549e582c48f2ee1340dd33253f70a93f6b300590"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/current_state.py",
+      "content_hash": "ba5a8fd274c8679cbf89891428d0aea43050ab7f1d4e149aa9fbd91190c6702c"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/daily_assembler.py",
+      "content_hash": "41206975688e43c1594dd6d5fcbbae30b00c36f2b27d1ee52ddb3a6fdc5f9d66"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/dataset_cards.py",
+      "content_hash": "2b24f3a7d8855b0ed24184be363637898104215bc77172cc9cee85782d41d95d"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/decision_assembler.py",
+      "content_hash": "16337df7c24b190d3ca5bb3c31b15d58484997216128c87c61fb0afe1718d339"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/keyword_assembler.py",
+      "content_hash": "62792da61e96d616c3c2b159cc153e14dc030a9f3e85eb0cea3728fc8fa04e7f"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/payload_encode.py",
+      "content_hash": "1832bd3866ed5eda5f487671ac0a7294ea2cb18b581d83713677d3a69c9aafd8"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/export/position_assembler.py",
+      "content_hash": "eae8ba3e3fd1575d8ff756e9308b38f7c17f94db5798c6cc6fec69f1f4ff636d"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/guards/__init__.py",
+      "content_hash": "90425c9e54c9d942b2c54746c09ac423a35a884b660689b30ed584dc264ec167"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/guards/forbidden_sources.py",
+      "content_hash": "2cd43f5a042376dd6ba4e7de08753d12a2ec94f2f773200942a2cffc0d79be56"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/__init__.py",
+      "content_hash": "8261a5f7e324cc8107c46f019eedabdba6aa5578ae591f2b6bfcab06fb799843"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/ch_bid_decision_probe.py",
+      "content_hash": "6cbb3e2721aff0b98670a243c62c4706f6618da5f601a005bba919f277dacab7"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/ch_bid_decision_reader.py",
+      "content_hash": "f5782ce4cba48c89c8d682fcb42612c76d8dc0031d0837067f6ff139a8179347"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/ch_keyword_bounds_reader.py",
+      "content_hash": "febab36f160a32657a8e28597a477b07ec391de81a38fb77577066153cfdb7a0"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/ch_keyword_daily_reader.py",
+      "content_hash": "d22e495edc685cc4141a3c775f46afe30b0173184eaa04a37fd68d5ea8886d29"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/ch_keyword_position_reader.py",
+      "content_hash": "54c0b10ae7405205937299bbb43b46216d2c59cd847f244e498802ccd5d1dfd4"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/pg_adv_id_overlap_reader.py",
+      "content_hash": "6ffac4757e84c83c3d4488ce39b8d161975285121892d4694a8b2fcffa6fee01"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/pg_keyword_policy_reader.py",
+      "content_hash": "a8515b24e274f63930fee530829c396bba065789cef6386063f3acb04b1d5cb1"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/pg_keyword_query_policy_reader.py",
+      "content_hash": "82dfc25058be16933b3506fb66b5afc00a38af586afd7801e9147d5ecbb3dec1"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/pg_session_adapter.py",
+      "content_hash": "058b88a4c6f170e045f801550ca35ad00b29aca54a03beb4d61d515d8892ebc2"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/reader_protocols.py",
+      "content_hash": "2b9ec417611ec8fc5958fcd40cf783f4eba3f0940442d968e841b8cff5cadddd"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/readers/sql_loader.py",
+      "content_hash": "1f4b520d39edbd5c1fe1cb968417ae237f5a6e22c6c410e9aa849b4e0e73c2eb"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/scope/__init__.py",
+      "content_hash": "6c54a1bed8d9d3c972f00fb585b5067101872bd367195d01a6a901ada6de0e4d"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/scope/adv_id_collector.py",
+      "content_hash": "41b8806618abf3c1e54a9645b87747fec923a25dcf8f2bf4276dec2c4ac767e0"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/scope/dto.py",
+      "content_hash": "b8712fcdabc63375159d3b32a7f16d340f04028e37d1216b4057735460214362"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/scope/keyword_export_scope_reader.py",
+      "content_hash": "c1c6b605e0b4c0abd7ff1e37cc6c37a1f91fe3bc27bdd1992f76823ba47e8b89"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/sql/bid_decision_latest.sql",
+      "content_hash": "54582d64d69c711526e160b911ad09eb9ed5fe45a71c240e7ebea91425b5d355"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/sql/bid_decision_timeline.sql",
+      "content_hash": "4e32adb9d265b05526a58caf766c04058e0f6b3da115307a7a35b9475f07dd12"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/sql/keyword_daily_from_clusters.sql",
+      "content_hash": "5ebd5dd3fa37c0d935bed397eb844c509966cb3a34a51f7a8b89651a03b69fe3"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/sql/keyword_history_bounds.sql",
+      "content_hash": "7cff66794a42ada025c05ddf72fa788957cb530f70a2433ddbcf18b38fd9eb0d"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/sql/keyword_position_bounds.sql",
+      "content_hash": "749513375cfda0dbb0cee818999acc72a4d9fd8e5ce7b98999e4063d8c8191cd"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/sql/keyword_position_from_api.sql",
+      "content_hash": "8ed9af6a23eb22001f474b20c99efc3788ae0153364d5808d42e99a1ec0b3597"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/windows/__init__.py",
+      "content_hash": "6ef142909cbd44c41cb1c7b21460e653db9bf7db646d1ee23a815585c8c07a3d"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/windows/engine.py",
+      "content_hash": "67563d44e14582f7afe0c843b250037a4fd5387018b140ffdd160564649e330a"
+    },
+    {
+      "path": "app/modules/ai_package_v1/keyword_performance/windows/position_engine.py",
+      "content_hash": "f6837ed5f33d99a19a510513faf1b787c1885b6c3bdae95b1b0de80ee509f165"
+    },
+    {
+      "path": "app/modules/ai_package_v1/validator/package_validator.py",
+      "content_hash": "41b43b3e898b751b710a6af4d8ba9a149419baa124a2cd85cc2c60f3fa3098f2"
+    },
+    {
+      "path": "pyrightconfig_strict.json",
+      "content_hash": "b58b623eea88bc881ac5fccacee0e2a322a1b9c61b0043f5298af40e2e058b84"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/conftest.py",
+      "content_hash": "0ab0b7178c36bb9b3790337e8095a411a96d7171fbf820aae7dae6c7c75339ac"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/boundary_fakes.py",
+      "content_hash": "0ad189d2739867bca12a8ef25a4574f2436d02ee6b75d97d5f2d5d0c83757f4d"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/conftest.py",
+      "content_hash": "c9909bb5ee8b776efc5724d39fa6df1d312acfb904007ae3b5b713ab1f8bfc11"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_contract_keyword_export.py",
+      "content_hash": "f6c90b5c83cca9a5edbcdb96138b5361acfc248c87ac3c88abaf2d4f32d274b3"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_daily.py",
+      "content_hash": "7d0a94defa5243a4757ca6413b6f45187b89ae5e2d0975eb3a80b0e4840b41e5"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_daily_extended.py",
+      "content_hash": "2d3ad264d44f815d4304d70b24e8f5dba2ac10a874fbe653fb5c7d3b705498cf"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_datamap.py",
+      "content_hash": "4203b46ac8fed93468d3a59218affd0e4b5162b2d1bea020756d12933a0162ee"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_default_pipeline_boundary.py",
+      "content_hash": "84d367a9fc38484d428373fa6d447773791e08343ee2a47ae67e2c988fc42bd2"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_export_integration.py",
+      "content_hash": "d910e28dce4342da2dbf26b5c2d2990f3ad98ab4255c8c2f10c81450e5d13738"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_forbidden.py",
+      "content_hash": "84cdc581c3b6f2823423c02b7585b74d7ba04c95b6ca18ebb7bc3df7cb38844e"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_scope.py",
+      "content_hash": "1c8c2aeb8bfa974b784b0a46af2acb6fd138a0e32fb17dfd6312b798a4f6b189"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_source_repair.py",
+      "content_hash": "206591d55c42d07d95a1db5fa827db935257b12b40e77f47840e18f7c7022d57"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/keyword_performance/test_windows.py",
+      "content_hash": "2a7b9f1ec34b0f5770ff74906e70d20891a7053ac898572b4910e854e7f8538b"
+    },
+    {
+      "path": "tests/unit/ai_package_v1/test_export_settings_integration.py",
+      "content_hash": "b3977da1964e6ac3d27d4f2906d1ecdfcaa08c504bd2405fb79e66e27556f015"
+    }
+  ]
+}

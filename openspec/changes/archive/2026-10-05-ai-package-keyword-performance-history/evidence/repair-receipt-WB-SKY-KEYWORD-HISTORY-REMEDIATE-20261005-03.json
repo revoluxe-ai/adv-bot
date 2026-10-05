@@ -1,0 +1,16 @@
+{
+  "task_id": "WB-SKY-KEYWORD-HISTORY-REMEDIATE-20261005-03",
+  "mode": "remediate",
+  "change": "ai-package-keyword-performance-history",
+  "generated_at": "2026-10-05T05:45:00+03:00",
+  "worktree_head_sha": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+  "implementation_fingerprint": "keyword_performance+bid_decision_reader+pyright0+93tests",
+  "source_spec_sha256": "23ebc55dc5207e3e77896e221e0aed40f4f742a795c89d1b8a164c3ac07af8b4",
+  "pytest_command": "poetry run pytest -m unit tests/unit/ai_package_v1/",
+  "pytest_result": "93 passed, 0 failed",
+  "pyright_command": "poetry run python -m pyright --project pyrightconfig_strict.json",
+  "pyright_canonical_blocked": "poetry run pyright-strict (spawn EPERM mkdir .cursor/projects/...)",
+  "pyright_equivalent_result": "0 errors, 0 warnings, 0 informations",
+  "blockers_closed": ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9"],
+  "status": "REMEDIATE_PASS"
+}

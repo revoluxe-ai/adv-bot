@@ -1,0 +1,182 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "campaign-settings-history",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "db0349d67c039d806e4a79cde16b8a71a761c0d73e62b64b96b925a6b4c065f3",
+  "PLAN_CONTENT_HASH": "5dbc61dc5796242f4a99952660503fc150e62a8027ef236f7724270ea4031721",
+  "PLAN_PATH": "openspec/changes/campaign-settings-history/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/campaign-settings-history/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 30,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      {
+        "step": "L1",
+        "scenarios": [
+          "Inactive settings owners remain observable",
+          "Repeated scheduler run remains idempotent"
+        ]
+      },
+      {
+        "step": "L2",
+        "scenarios": [
+          "First observation creates baseline snapshot",
+          "Unchanged settings are not duplicated",
+          "Changed settings append a new snapshot",
+          "Concurrent collectors serialize per cabinet",
+          "History write failure does not mutate current settings",
+          "Repeated scheduler run remains idempotent"
+        ]
+      },
+      {
+        "step": "L3",
+        "scenarios": [
+          "Build one canonical snapshot from registered settings sources",
+          "First observation creates baseline snapshot",
+          "Unchanged settings are not duplicated",
+          "Changed settings append a new snapshot",
+          "Inactive settings owners remain observable",
+          "History write failure does not mutate current settings",
+          "Repeated scheduler run remains idempotent",
+          "Unsupported field value is not recorded as valid history"
+        ]
+      },
+      {
+        "step": "L4",
+        "scenarios": [
+          "Build one canonical snapshot from registered settings sources",
+          "WB facts and runtime state stay outside settings history",
+          "New settings field cannot be forgotten",
+          "Removed or renamed field invalidates stale registry entry",
+          "Excluded field requires a reason",
+          "Reordered keyword or schedule rows do not create false change",
+          "Contract semantics change requires schema version bump",
+          "First observation creates baseline snapshot",
+          "Unchanged settings are not duplicated",
+          "Changed settings append a new snapshot",
+          "History write failure does not mutate current settings",
+          "Repeated scheduler run remains idempotent",
+          "Adding a field forces an Excel decision",
+          "Excel cannot silently diverge from history contract",
+          "Unsupported field value is not recorded as valid history"
+        ]
+      },
+      {
+        "step": "L5",
+        "scenarios": [
+          "First observation creates baseline snapshot",
+          "Unchanged settings are not duplicated",
+          "Changed settings append a new snapshot",
+          "Concurrent collectors serialize per cabinet",
+          "History write failure does not mutate current settings",
+          "Repeated scheduler run remains idempotent"
+        ]
+      },
+      {
+        "step": "L6",
+        "scenarios": [
+          "First observation creates baseline snapshot",
+          "Changed settings append a new snapshot",
+          "Concurrent collectors serialize per cabinet",
+          "History write failure does not mutate current settings",
+          "Repeated scheduler run remains idempotent",
+          "Read campaign settings timeline"
+        ]
+      },
+      {
+        "step": "L7",
+        "scenarios": [
+          "Unchanged settings are not duplicated",
+          "History write failure does not mutate current settings",
+          "Repeated scheduler run remains idempotent",
+          "Unsupported field value is not recorded as valid history"
+        ]
+      },
+      {
+        "step": "M1",
+        "scenarios": [
+          "Register reviewed 001 through 006 without execution",
+          "File presence is not applied state",
+          "Qualification stays in reviewed SQL",
+          "Reviewed 006 is accepted",
+          "Unreviewed successor blocks apply"
+        ]
+      },
+      {
+        "step": "M2",
+        "scenarios": [
+          "Plan includes reviewed 006 without execution"
+        ]
+      },
+      {
+        "step": "M3",
+        "scenarios": [
+          "Schema writer may run reviewed 006 under existing gates",
+          "Apply without authorization still refuses",
+          "Authorized apply still refuses 005",
+          "Isolated apply includes reviewed 006",
+          "Unreviewed successor blocks apply"
+        ]
+      },
+      {
+        "step": "M4",
+        "scenarios": [
+          "Production target still refuses",
+          "Application runtime client is not the migration executor"
+        ]
+      }
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/campaign-settings-history/design.md",
+      "content_hash": "c86633befed995473ee7c768bdfbd862e7b10f44149290aaa8c69871af38c978"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/campaign-settings-history/specs/campaign-settings-history/spec.md",
+        "content_hash": "c2dd8f1dcf625d2a454e9341572415c39790e8cdee8c0eec1c2b42b7175830ab"
+      },
+      {
+        "path": "openspec/changes/campaign-settings-history/specs/clickhouse-migration-lifecycle/spec.md",
+        "content_hash": "8d1b1994ca5c6cb46879285d8794f649662060cb77106db0912b06aa07c403fd"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/campaign-settings-history/design.md",
+      "content_hash": "c86633befed995473ee7c768bdfbd862e7b10f44149290aaa8c69871af38c978"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/campaign-settings-history/owner-contract.md",
+      "content_hash": "5295b85b45b38e0410a692e183edeaa10bef6ab9831a21865aa1e6effd1ab903"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/campaign-settings-history/design.md",
+      "content_hash": "c86633befed995473ee7c768bdfbd862e7b10f44149290aaa8c69871af38c978"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/campaign-settings-history/specs/campaign-settings-history/spec.md",
+        "content_hash": "c2dd8f1dcf625d2a454e9341572415c39790e8cdee8c0eec1c2b42b7175830ab"
+      },
+      {
+        "path": "openspec/changes/campaign-settings-history/specs/clickhouse-migration-lifecycle/spec.md",
+        "content_hash": "8d1b1994ca5c6cb46879285d8794f649662060cb77106db0912b06aa07c403fd"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/campaign-settings-history/design.md",
+      "content_hash": "c86633befed995473ee7c768bdfbd862e7b10f44149290aaa8c69871af38c978"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/campaign-settings-history/owner-contract.md",
+      "content_hash": "5295b85b45b38e0410a692e183edeaa10bef6ab9831a21865aa1e6effd1ab903"
+    }
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

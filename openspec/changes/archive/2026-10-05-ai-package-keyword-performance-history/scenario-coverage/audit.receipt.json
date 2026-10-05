@@ -1,0 +1,69 @@
+{
+  "SCHEMA_VERSION": 1,
+  "task_id": "WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09",
+  "mode": "audit",
+  "change": "ai-package-keyword-performance-history",
+  "generated_at": "2026-10-05T09:45:00+03:00",
+  "auditor": "independent",
+  "status": "INDEPENDENT_SCENARIO_AUDIT_PASS",
+  "supersedes": [
+    "scenario-coverage/audit.receipt.json SCAR-07 (47PASS/4FAIL)",
+    "repair-receipt-WB-SKY-KEYWORD-HISTORY-CUTOFF-PARITY-REPAIR-20261005-08.json writer closure claims"
+  ],
+  "report_path": "openspec/changes/ai-package-keyword-performance-history/scenario-coverage/audit.report.md",
+  "verdict": "INDEPENDENT_SCENARIO_AUDIT_PASS",
+  "scenarios_total": 51,
+  "scenarios_pass": 51,
+  "scenarios_fail": 0,
+  "scenarios_blocked": 0,
+  "scenarios_skipped": 0,
+  "stub_contracts_total": 6,
+  "stub_contracts_pass": 6,
+  "stub_contracts_fail": 0,
+  "worktree_head_sha": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+  "source_spec_sha256": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4",
+  "plan_evidence_id": "SCPV1-dad56a1027545bc3",
+  "worktree_fingerprint": "3929cd8e9e5e22a56c2cc4ef13b64757ca413c5698a188fcc7e6fe268fb75358",
+  "worktree_manifest_path_count": 65,
+  "test_content_sha256": "650f00b4361bf63919bd14ce280554ac0156594df1728aef6db42e3f1368a9b6",
+  "activation": {
+    "SCENARIO_COVERAGE_REQUIRED": true,
+    "SCENARIO_COVERAGE_REQUIRED_REASON": "materialized scenario-coverage/plan.receipt.json; tasks.md §6.4",
+    "PRODUCT_ACCEPTANCE_REQUIRED": false,
+    "PRODUCT_ACCEPTANCE_REQUIRED_REASON": "design.md omits PA; read-only DERIVED export per owner-contract D-012"
+  },
+  "freshness_checks": {
+    "verify_plan_evidence_repair3": "PASS",
+    "compute_worktree_fingerprint": "PASS",
+    "source_spec_sha_match": true,
+    "worktree_fingerprint_match": true,
+    "worktree_fingerprint_matches_repair08": true
+  },
+  "pytest_command": "poetry run pytest -m unit tests/unit/ai_package_v1/ -v",
+  "pytest_result": "132 passed, 0 failed",
+  "pytest_log_path": "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-independent-audit09.log",
+  "pytest_log_sha256": "4baff5018cad462a66f2be8a22401f85467dbdf5fca30cb63b175972aed1ff42",
+  "pyright_result": "0 errors, 0 warnings, 0 informations",
+  "openspec_validate": "PASS",
+  "git_diff_check": "PASS",
+  "closed_gap_rows": ["S37", "S38", "S45", "S51"],
+  "fail_rows": [],
+  "implementation_readiness": "IMPLEMENTATION_COMPLETE — 51/51 scenario rows pass; cutoff payload + stub parity gaps closed",
+  "claims": [
+    "INDEPENDENT_SCENARIO_AUDIT_PASS",
+    "IMPLEMENTATION_COMPLETE"
+  ],
+  "does_not_claim": [
+    "MERGE_READY",
+    "ARCHIVE_GO",
+    "SCENARIO_COVERAGE_CERTIFIED",
+    "PROVIDER_EXECUTION_RECEIPT",
+    "VERIFY_PASS archive-phase"
+  ],
+  "known_limitations": [
+    "Task 5.7 live CH/PG integration optional — absent",
+    "current_bid_evidence UNAVAILABLE intentional",
+    "Merge review pending vs stage 9a80c813ed4edaf3c6f2da6ae65af4221f7ec36e"
+  ],
+  "next_action": "/opsx-verify mode=impl change=ai-package-keyword-performance-history"
+}

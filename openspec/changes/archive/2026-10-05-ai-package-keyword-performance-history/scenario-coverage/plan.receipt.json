@@ -1,0 +1,81 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "ai-package-keyword-performance-history",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-dad56a1027545bc3",
+  "PLAN_CONTENT_HASH": "0bc0a4c2701783a5439d83d7e2e0f9b862b2beb2c8ce3077e8ec07cc30d5c7b1",
+  "PLAN_PATH": "openspec/changes/ai-package-keyword-performance-history/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/ai-package-keyword-performance-history/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 51,
+  "SOURCE_SPEC_SHA": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4",
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S-LEG-01",
+      "L2:S-LEG-02,S26,S46",
+      "L3:S06,S07,S40,S46",
+      "L4:S03,S04,S32,S39,S45,S51",
+      "L5:S01,S02,S05,S08,S09,S10,S11,S12,S18,S19,S25,S41,S42,S43,S44",
+      "L6:S14,S15,S16,S17,S20,S21,S22,S23,S27,S47,S48",
+      "L7:S13,S24,S29,S30,S31,S35,S36,S49,S50"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/ai-package-keyword-performance-history/design.md",
+      "content_hash": "e21c7cc8d27361bd69b732998ce2d71ca6463a2b45235e55522a1ec36d987a0b"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/ai-package-keyword-performance-history/specs/ai-package-keyword-performance-history/spec.md",
+        "content_hash": "ef271c4c15f69179c3aa3f03078ca06a5b982c7847c327faec55a7a2c3fa77d7"
+      },
+      {
+        "path": "openspec/changes/ai-package-keyword-performance-history/specs/ai-package-v1-exporter/spec.md",
+        "content_hash": "4bddc2f1380a994baa4a0ff3cee6905f5827b9fca0bd1c9499c6d6df7e7729e5"
+      },
+      {
+        "path": "openspec/changes/ai-package-keyword-performance-history/specs/ai-package-v1-contract-tests/spec.md",
+        "content_hash": "9ebf5a8a027111e17a20a82553d86bc5f11c4a144ce662f7a19407bf775e0e92"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/ai-package-keyword-performance-history/design.md#derived-lifecycle-export-read-path",
+      "content_hash": "e21c7cc8d27361bd69b732998ce2d71ca6463a2b45235e55522a1ec36d987a0b"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/ai-package-keyword-performance-history/owner-contract.md",
+      "content_hash": "5f258a6d17b92330c49e02a10361e808b75292883cbb3dec96473cc5f50d040b"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "e21c7cc8d27361bd69b732998ce2d71ca6463a2b45235e55522a1ec36d987a0b",
+    "SPEC_REVISION": [
+      "ef271c4c15f69179c3aa3f03078ca06a5b982c7847c327faec55a7a2c3fa77d7",
+      "4bddc2f1380a994baa4a0ff3cee6905f5827b9fca0bd1c9499c6d6df7e7729e5",
+      "9ebf5a8a027111e17a20a82553d86bc5f11c4a144ce662f7a19407bf775e0e92"
+    ],
+    "LIFECYCLE_REVISION": "e21c7cc8d27361bd69b732998ce2d71ca6463a2b45235e55522a1ec36d987a0b",
+    "OWNER_CONTRACT_REVISION": "5f258a6d17b92330c49e02a10361e808b75292883cbb3dec96473cc5f50d040b",
+    "SOURCE_SPEC_SHA": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "SUPERSEDES_PLAN_EVIDENCE_ID": "SCPV1-3bf22597d777c0f1",
+  "REPAIR_METADATA": {
+    "task_id": "WB-SKY-KEYWORD-HISTORY-PLAN-REPAIR3-20261005-0137",
+    "prior_planning_review": {
+      "task_id": "WB-SKY-KEYWORD-HISTORY-PLAN-FINAL-REVIEW-20261005-0134",
+      "status": "REPAIR_REQUIRED",
+      "unchanged": false
+    },
+    "hash_tooling": "content_hash=sha256(LF-normalized file bytes); SOURCE_SPEC_SHA=sha256(utf-8 concat SPEC_REVISION content_hash hex strings in array order); identity_blob=canonical JSON UTF-8 (sort_keys=True, separators=(',', ':'), no trailing newline) over {CHANGE_ID, MODE, DESIGN_REVISION, SPEC_REVISION[], LIFECYCLE_REVISION, OWNER_CONTRACT_REVISION, SOURCE_SPEC_SHA}; PLAN_EVIDENCE_ID=SCPV1-first16(sha256(identity_blob)); PLAN_CONTENT_HASH=sha256(LF-normalized plan.md bytes)",
+    "identity_blob_utf8": "{\"CHANGE_ID\":\"ai-package-keyword-performance-history\",\"DESIGN_REVISION\":\"e21c7cc8d27361bd69b732998ce2d71ca6463a2b45235e55522a1ec36d987a0b\",\"LIFECYCLE_REVISION\":\"e21c7cc8d27361bd69b732998ce2d71ca6463a2b45235e55522a1ec36d987a0b\",\"MODE\":\"plan\",\"OWNER_CONTRACT_REVISION\":\"5f258a6d17b92330c49e02a10361e808b75292883cbb3dec96473cc5f50d040b\",\"SOURCE_SPEC_SHA\":\"2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4\",\"SPEC_REVISION\":[\"ef271c4c15f69179c3aa3f03078ca06a5b982c7847c327faec55a7a2c3fa77d7\",\"4bddc2f1380a994baa4a0ff3cee6905f5827b9fca0bd1c9499c6d6df7e7729e5\",\"9ebf5a8a027111e17a20a82553d86bc5f11c4a144ce662f7a19407bf775e0e92\"]}",
+    "identity_blob_base64": "eyJDSEFOR0VfSUQiOiJhaS1wYWNrYWdlLWtleXdvcmQtcGVyZm9ybWFuY2UtaGlzdG9yeSIsIkRFU0lHTl9SRVZJU0lPTiI6ImUyMWM3Y2M4ZDI3MzYxYmQ2OWI3MzI5OThjZTJkNzFjYTY0NjNhMmI0NTIzNWU1NTUyMmExZWMzNmQ5ODdhMGIiLCJMSUZFQ1lDTEVfUkVWSVNJT04iOiJlMjFjN2NjOGQyNzM2MWJkNjliNzMyOTk4Y2UyZDcxY2E2NDYzYTJiNDUyMzVlNTU1MjJhMWVjMzZkOTg3YTBiIiwiTU9ERSI6InBsYW4iLCJPV05FUl9DT05UUkFDVF9SRVZJU0lPTiI6IjVmMjU4YTZkMTdiOTIzMzBjNDllMDJhMTAzNjFlODA4Yjc1MjkyODgzY2JiM2RlYzk2NDczY2M1ZjUwZDA0MGIiLCJTT1VSQ0VfU1BFQ19TSEEiOiIyZWY4MDA2YWNlZmNiYjg1MDZjZTM1ZWVmY2EyNWNjMDEyMGExMjJmM2EwZWZhMmY2YmYxY2FmNTQ2NTY4MmI0IiwiU1BFQ19SRVZJU0lPTiI6WyJlZjI3MWM0YzE1ZjY5MTc5YzNhYTNmMDMwNzhjYTA2YTViOTgyYzc4NDdjMzI3ZmFlYzU1YTdhMmMzZmE3N2Q3IiwiNGJkZGMyZjEzODBhOTk0YmFhNGEwZmYzY2VlNjkwNWY1ODI3YjlmY2EwYmQxYzk0OTljNmQ2ZGY3ZTc3MjllNSIsIjllYmY1YThhMDI3MTExZTE3YTIwYTgyNTUzZDg2YmM1ZjExYzRhMTQ0Y2U2NjJmN2ExOTQwN2JmNzc1ZTBlOTIiXX0=",
+    "identity_blob_sha256": "dad56a1027545bc36304a03c83d51893d18581d86d0dd9052b6b6717e359980f",
+    "verify_command": "python openspec/changes/ai-package-keyword-performance-history/evidence/verify_plan_evidence_repair3.py",
+    "git_commit": "not performed in repair hop (workspace dirty)"
+  }
+}

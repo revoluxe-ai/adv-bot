@@ -8,6 +8,12 @@ from typing import Any, Literal
 
 from sqlalchemy import Boolean, Enum as SAEnumColumn, Float, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
+
+from app.modules.campaign_settings_contract import (
+    excel_editable_fields,
+    excel_read_only_fields,
+    ordered_shelf_editable_aliases,
+)
 from app.modules.common_slaves.wildberries.models.enums import (
     OrdersSourceForAutoMode,
     TargetPositionMode,
@@ -34,85 +40,15 @@ TECH_HEADER_RE = re.compile(r"(RO|EDIT)__([A-Za-z0-9_]+?)(?:__([^()]+))?$")
 # v8: EDIT-колонка ``raise_plan_on_promobonuses`` (RaisePlanOnPromobonuses).
 EXCEL_TEMPLATE_VERSION = 8
 
-# Поля, которые нельзя менять через Excel (идентификаторы, синхронизация WB, JSON-списки)
-READ_ONLY_ADV_COLUMNS: frozenset[str] = frozenset(
-    {
-        "id",
-        "wb_cabinet_id",
-        "adv_id",
-        "_search_adv_id",
-        "name",
-        "active_status",
-        "nmids",
-        "black_phrases",
-        "relevant_phrases",
-        "last_update",
-        "hard_min_ctr",
-        "cpm",
-        "max_cpc",
-        "type",
-    }
-)
+# Spec campaign-settings-history:
+# membership source-owned Excel fields берётся только из canonical registry.
+# Adapter по-прежнему владеет presentation labels/formatting, но не whitelist.
+READ_ONLY_ADV_COLUMNS: frozenset[str] = excel_read_only_fields("AdvSetting")
 
-# Поля AdvSetting, доступные для правки из интерфейса РК (скаляры; без cpm — только через WB API)
-EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = frozenset(
-    {
-        "bot_active",
-        "auto_shelf_bid_control_enabled",
-        "max_cpm",
-        "min_views_for_ml_predict",
-        "clusters_mode",
-        "target_ctr_mode",
-        "hide_small_query_keywords",
-        "bidder_coroutine_type",
-        "target_ctr_mode_strategy",
-        "reset_place",
-        "exponent_predict_ctr",
-        "bidder_step",
-        "plan_for_sales_for_day",
-        "target_price_for_order",
-        "max_price_for_order",
-        "bidder_for_auto",
-        "auto_update_white_list",
-        "auto_budget_watchdog_enabled",
-        "auto_update_target_place",
-        "auto_update_exponent",
-        "rec_system_mode",
-        "hide_zero_views_keywords",
-        "auto_budget_daily_limit",
-        "search_auto_budget_daily_limit",
-        "use_common_budget",
-        "common_budget_daily_limit",
-        "auto_budget_total_limit",
-        "search_auto_budget_total_limit",
-        "common_budget_total_limit",
-        "auto_common_budget",
-        "auto_add_only_relevant_phrase",
-        "orders_source_for_auto_mode",
-        "predict_ctr_mode",
-        "sales_predict_method",
-        "aggressiveness",
-        "keyword_calibration_max_step",
-        "white_list_mode",
-        "individual_keywords_target_place_mode",
-        "target_position_mode",
-        "strategy",
-        "auto_update_strategy",
-        "updater_common_bid_in_search_adv_active_status",
-        "use_incremental_stats",
-        "max_place",
-        "substitute_fact_cpo_for_max",
-        "raise_plan_on_promobonuses",
-    }
-)
-
+EDITABLE_ADV_SETTING_COLUMNS: frozenset[str] = excel_editable_fields("AdvSetting")
 
 EDITABLE_SHELF_BID_CONTROL_COLUMNS: tuple[str, ...] = (
-    "auto_shelf_max_bid_rub",
-    "auto_shelf_test_share",
-    "auto_shelf_target_test_impressions",
-    "auto_shelf_target_test_observation_minutes",
-    "auto_shelf_min_bid_distance_rub",
+    ordered_shelf_editable_aliases()
 )
 
 

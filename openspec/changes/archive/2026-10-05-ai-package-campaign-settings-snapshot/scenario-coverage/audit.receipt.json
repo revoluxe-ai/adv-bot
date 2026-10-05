@@ -1,0 +1,40 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "ai-package-campaign-settings-snapshot",
+  "MODE": "audit",
+  "VERDICT": "PASS",
+  "PASS_SCOPE": "FULL_CHANGE",
+  "AUDIT_EVIDENCE_ID": "SCAR-1d4654fed90a099b",
+  "REPORT_CONTENT_HASH": "1d4654fed90a099b81cce78b5f72941b8a740112bdfd357089e43585ff896842",
+  "REPORT_PATH": "openspec/changes/ai-package-campaign-settings-snapshot/scenario-coverage/audit.report.md",
+  "RECEIPT_PATH": "openspec/changes/ai-package-campaign-settings-snapshot/scenario-coverage/audit.receipt.json",
+  "SOURCE_SPEC_SHA": "f6c56b7af60aa41b890ebbc4633f48d0aa1d6b1f39089f893e34d737a36959ac",
+  "WORKTREE_FINGERPRINT": "33eb7a05f94ffcb0cae8001ab966ef0880b8ff5eb8a3d681ea87329a1dfaf459",
+  "PLAN_EVIDENCE_ID": "SCPV1-c1eba84a1b0b8a1e",
+  "SNAPSHOT": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+  "SCENARIOS_TOTAL": 21,
+  "SCENARIOS_PASS": 21,
+  "SCENARIOS_FAIL": 0,
+  "SCENARIOS_BLOCKED": 0,
+  "SCENARIOS_SKIPPED": 0,
+  "EXECUTION": {
+    "UNIT_TESTS_PASSED": 30,
+    "UNIT_TESTS_FAILED": 0,
+    "INTEGRATION_TESTS_PASSED": 0,
+    "CACHE_MODE": "OFF",
+    "COMMAND": "poetry run pytest tests/unit/ai_package_v1/test_campaign_settings_assembler.py tests/unit/ai_package_v1/test_campaign_settings_contract.py tests/unit/ai_package_v1/test_campaign_settings_snapshot_domain.py tests/unit/ai_package_v1/test_export_settings_integration.py -vv --tb=no -q"
+  },
+  "GAPS": [],
+  "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=audit change=ai-package-campaign-settings-snapshot run=targeted",
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "GENERATED_AT": "2026-10-05T01:00:07.507514+00:00",
+  "PRIOR_AUDIT": {
+    "VERDICT": "FAIL",
+    "SCENARIOS_FAIL": 2,
+    "CLOSED_GAPS": [
+      "ai-package-campaign-settings-snapshot::2c5a906424e36bd151744fc0bd0fe2de0ffe20a7dde518aabb87fcf048a96880::001",
+      "ai-package-campaign-settings-snapshot::6c4605a847b4879718b75dc67258a6b5b43541bbeb4d20efc4daea00f78ad915::001"
+    ]
+  }
+}

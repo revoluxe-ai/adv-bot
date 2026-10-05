@@ -1,0 +1,73 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "shop-wide-common-sales-collection",
+  "MODE": "certify",
+  "TASK_ID": "WB-SKY-COMMON-SALES-SCENARIO-CERTIFY-20261005-0260",
+  "CERTIFY_EVIDENCE_ID": "SCPV1-shop-wide-common-sales-20261005-certify-0260",
+  "SUPERSEDES": null,
+  "VERDICT": "PASS",
+  "PASS_SCOPE": "FULL_CHANGE",
+  "SCENARIOS_TOTAL": 33,
+  "SCENARIOS_PASS": 33,
+  "SCENARIOS_FAIL": 0,
+  "SCENARIOS_BLOCKED": 0,
+  "SOURCE_SPEC_SHA": "5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253",
+  "WORKTREE_FINGERPRINT": "7ccebe8a8c0d5455d39d28f406ca7031b1d7a9b54c3c3734d45964a795d48c8c",
+  "HEAD": "62c8d48b15498997b84357e015b0e688f44fd37b",
+  "PLAN_EVIDENCE_ID": "SCPV1-shop-wide-common-sales-20261005-close",
+  "PLAN_CONTENT_HASH": "c7e5882345385f9f1c39dc2e252b58c0b10a2c9319efab9a1ad16cb1f834d4a0",
+  "EXEC_EVIDENCE_ID": "SCPV1-shop-wide-common-sales-20261005-evidence-close",
+  "REPORT_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/SCENARIO_TEST_COVERAGE_REPORT.md",
+  "REPORT_CONTENT_HASH": "d145f7816dd556176f29b375db820f2b49c9803c4f480ec6dffc0cd9794e6bf0",
+  "EXECUTED_AT": "2026-10-05T02:39:03+03:00",
+  "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=certify change=shop-wide-common-sales-collection",
+  "INDEPENDENT_REVIEWER": "REVIEWER0240",
+  "AUTHOR_SELF_CERTIFY": false,
+  "PROVIDER_RECEIPTS_VERIFIED": [
+    {
+      "GAP_FILE_ID": "a3f8c2e1b904d7a6",
+      "RESULT": "PASS",
+      "LOG_SHA": "47bff5dc48a30bf3916324a98a72618d968a3d69681859a190024fbec3f87a8d",
+      "FRESH": true
+    }
+  ],
+  "EXECUTION_BINDINGS_VERIFIED": [
+    {
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/unit-coordinator-updater.log",
+      "LOG_SHA256": "aebe39a8831d923dec5176a2c8d668b7d7bae70f3c0747840d4c2b1752021315",
+      "RESULT": "72 passed"
+    },
+    {
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/integration-ch-coverage.log",
+      "LOG_SHA256": "47bff5dc48a30bf3916324a98a72618d968a3d69681859a190024fbec3f87a8d",
+      "RESULT": "2 passed"
+    },
+    {
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/wb-shop-coroutines.log",
+      "LOG_SHA256": "6997e0eba891fb63258a494a65b08c8dd6bb8ef6508b56256d284906a14ac81f",
+      "RESULT": "2 passed"
+    },
+    {
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/pyright-strict-full-repo.json.log",
+      "LOG_SHA256": "af3260c309e77096686b7a867a42757163a5f88f4fc9bb87a3728160a2a83f1a",
+      "RESULT": "755 files 0 errors 0 warnings"
+    }
+  ],
+  "OPSX_VERIFY_IMPL": "PASS",
+  "SCENARIO_AUDIT": "PASS",
+  "MERGE_READINESS": "READY",
+  "LIMITATIONS": {
+    "LEGACY_WBSHOP_UNFILTERED": "2 failed — not authoritative",
+    "METRICS_SOURCE_CURRENCY": "unknown",
+    "STORE_DRR_NUMERATOR": "BLOCKED_BY_CAMPAIGN_COVERAGE",
+    "LIVE_WB": "not_executed",
+    "PROD_CH_DDL": "unverified",
+    "FULL_REPO_ALL_TESTS": "not_claimed"
+  },
+  "NON_BLOCKING_AUDIT_NOTES": [
+    "S13 placebo dedicated test; adequacy from static boundary + coordinator seams",
+    "S14 no full_adv insert spy; adequacy from module isolation + CH writer integration",
+    "S10 no caplog; log counters derive from proven partition"
+  ]
+}

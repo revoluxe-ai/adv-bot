@@ -1,0 +1,28 @@
+{
+  "SCHEMA_VERSION": 1,
+  "TASK_ID": "WB-SKY-KEYWORD-HISTORY-POST-REPAIR-REAUDIT-20261005-HEAD6bd565394",
+  "generated_at": "2026-10-05T13:52:00+03:00",
+  "auditor": "independent",
+  "FEATURE_HEAD": "6bd56539457558e3e1946ff4e1c2fc9cb2db1004",
+  "supersedes_audit_head": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+  "last_delta_classification": "EVIDENCE_AND_FORMATTING_ONLY",
+  "last_delta_commit": "6bd56539457558e3e1946ff4e1c2fc9cb2db1004",
+  "last_delta_files": [
+    "openspec/changes/ai-package-keyword-performance-history/evidence/.gitattributes",
+    "openspec/changes/ai-package-keyword-performance-history/evidence/AI_PACKAGE_KEYWORD_HISTORY_INVENTORY_REPORT.md",
+    "openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-EVIDENCE-FORMAT-REPAIR-20261005-12.json",
+    "openspec/changes/ai-package-keyword-performance-history/scenario-coverage/audit.report.md",
+    "tests/unit/ai_package_v1/keyword_performance/test_default_pipeline_boundary.py"
+  ],
+  "POST_REPAIR_REAUDIT": "PASS",
+  "git_diff_check": "PASS",
+  "TESTS": "PASS — poetry run pytest -m unit tests/unit/ai_package_v1/ → 132 passed",
+  "PYRIGHT": "PASS — poetry run pyright-strict → 0 errors",
+  "OPENSPEC": "PASS — poetry run openspec validate ai-package-keyword-performance-history --strict",
+  "openspec_guard_opsx_ff": "KNOWN_DEBT_FAIL — tools/openspec/openspec_guard.py --scenario opsx_ff --strict (chars over limit); out of change scope per tasks §0.3 debt",
+  "SCENARIO_AUDIT": "PASS — plan evidence verify_plan_evidence_repair3.py all CHECKS true; SCAR-09 51/51 remains valid for implementation tree (code delta since 37d0ec5fc immaterial)",
+  "verify_plan_evidence_id": "SCPV1-dad56a1027545bc3",
+  "export_write_path": "READ_ONLY — KeywordPerformanceAssembler via ExportService; test_forbidden + test_default_pipeline_boundary + settings contract no PG commit/WB API",
+  "PRODUCTION_WRITES": "NONE",
+  "pytest_log_note": "Fresh run 2026-10-05 lifecycle hop; not re-logged to binary .log (prior audit09 logs retained)"
+}
