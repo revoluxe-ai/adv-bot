@@ -274,6 +274,7 @@ async def test_task_82_s01_periodic_tick_initiates_dual_path_without_scripts_job
 
     with (
         patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as manager_cls,
+        patch("app.modules.shop_runner.wb_shop._taskgroup_coro", side_effect=lambda _name, factory: factory()),
         patch("asyncio.TaskGroup", new=_FakeTaskGroup),
     ):
         await shop.run()

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 # Имена managed RECORD coroutines, которые ``WBShop.run`` ставит с ``only_bot_active=False``.
 MANAGED_RECORD_COROUTINE_NAMES: tuple[str, ...] = (
-    "update_common_sale_stat",
     "update_full_adv_stat",
     "update_clusters_adv_stats_today",
     "update_clusters_adv_stats_history",

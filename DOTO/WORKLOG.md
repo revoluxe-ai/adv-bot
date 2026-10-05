@@ -850,3 +850,41 @@ FEFO remaining, top-up `get_campaign_config(AUTO|SEARCH)`.
 2. Тесты H1/P0-семантики, snapshot warmup и one-tick refresh.
 3. Решить A/B/C для CPO/common budget и композиции с V3 Raise MAX.
 4. Закрыть UPD recovery/backfill и зафиксировать policy для manual top-ups.
+
+
+---
+
+## Техдолг (не P0) — инцидент 138252141 / 2026-09-30
+
+- **connect_existing:** при `ce_create_both:confirm` без FSM `waiting_confirm_create_both` (старая кнопка) — сейчас `Update is not handled`, тишина; сделать ответ «сессия истекла, начните заново» (PAT-ADV-003).
+- **ops:** после выката `3693e936e-r1` — `/opsx-meta-commit` OPS_STATE/LAST.json; дожать `complete_release` (lease token=12, ctrlplane Job был Pending).
+
+## TECH DEBT: ClickHouse migration control plane — Bugbot review findings (2026-09-30)
+
+Контекст: два read-only review текущего working tree относительно локального `stage`: предыдущий Bugbot review и независимый Grok 4.7 Medium. Код не исправлялся; findings сознательно отложены в техдолг.
+
+- [ ] **HIGH — privileged `005` can be idempotent-skipped before refusal** — `scripts/clickhouse_migration_control_plane/mutations.py:320`. Если latest event для `005` уже `version_applied` с совпавшим SHA-256, `apply_migrations` проходит через idempotent skip до проверки `privileged_grant` и может вернуть success `applied` / `already_applied` вместо обязательного `blocked_privileged_grant` + non-success. Нет теста на apply `005` при уже-applied latest event.
+- [ ] **HIGH — status may report `ledger_absent` for an existing reconciled/applied ledger** — `scripts/clickhouse_migration_control_plane/pre_execution.py:366-379` (Grok final: line 379), плюс `ledger.py:131`. После `reconcile` / schema apply latest events включают `baseline_reconciled` / `baseline_not_applied`; `_status_code` может свалиться в `ledger_absent`, а `operator_state` протекает наружу raw-state `baseline_not_applied`, которого нет в закрытом operator-state set. Нет status-теста после reconcile/apply.
+- [ ] **MEDIUM — dry plan drops plan for reconciled `baseline_not_applied` schema version** — `scripts/clickhouse_migration_control_plane/pre_execution.py:212`. При non-empty ledger и следующей schema-version в `baseline_not_applied` `_plan_stop` возвращает `None`; `plan` отдаёт `success=false`, `mutation_not_opened`, пустой `planned_versions`. Теряются version order / privilege class / checksum / statements / stop reason. Нет теста plan после reconcile с not-applied schema version.
+- [ ] **MEDIUM — connected-target status skips fail-closed target identity gates** — `scripts/clickhouse_migration_control_plane/pre_execution.py:119-150`. `status` для attached target не применяет обязательные `serverUUID()` и `default_db` gates; zero/missing UUID или чужая database могут быть представлены как `ledger_absent` вместо `server_uuid_refused` / `database_not_corpus_target`.
+
+**Disposition:** ACCEPTED_TECH_DEBT / NO_FIX_IN_THIS_PASS. Не считать эти пункты закрытыми только из-за прохождения текущих тестов или certification; закрытие каждого требует отдельного исправления + регрессионного теста.
+
+
+### Grok 4.7 High follow-up (2026-09-30)
+
+Контекст: независимый read-only review на `Grok 4.7 256K High` текущего working tree относительно локального `stage`. Четыре ранее записанных finding не повторялись; ниже только новые подтверждённые failure paths.
+
+- [ ] **HIGH — `reconcile` can overwrite `partial/applying` and falsely close or replay a migration** — `scripts/clickhouse_migration_control_plane/mutations.py:217`. `reconcile` дописывает `version_applied` / `baseline_not_applied` для каждой corpus-version, не проверяя её текущий latest state. Если версия уже находится в `statement_ok` / `apply_started` / `partial` / `applying`, повторный санкционированный reconcile с evidence=`applied` делает latest event равным `version_applied`, после чего следующий `apply_migrations` idempotently пропускает оставшийся SQL и может вернуть success. Evidence=`not_applied` переводит latest event в `baseline_not_applied` и позволяет следующему apply начать файл заново. Это обход fail-closed recovery-инварианта и фактически вводит resume/replay policy, которую change не определяет. Текущий `test_partial_and_applying_are_not_idempotent_skips` проверяет только повторный `apply_migrations` и не вызывает `reconcile` поверх partial/applying ledger.
+- [ ] **MEDIUM — partial/applying gate is checked too late, after earlier DDL may already mutate target** — `scripts/clickhouse_migration_control_plane/mutations.py:312`. Проверка open-state выполняется внутри per-version loop только когда runner доходит до соответствующей версии. При default corpus order более ранняя `baseline_not_applied` версия может быть исполнена и закрыта как `version_applied` до того, как loop встретит более позднюю `partial/applying` версию и вернёт отказ. Аналогично explicit `version_ids` может вообще не включить open version. Требуемый fail-closed gate должен срабатывать до любой новой mutation цели. Текущие partial-тесты проверяют open-state на той же версии, которую непосредственно пытаются apply, поэтому этот порядок не ловят.
+
+**Disposition:** ACCEPTED_TECH_DEBT / NO_FIX_IN_THIS_PASS. Для закрытия нужны отдельные state-machine guards и regression tests; текущий review ничего в production implementation не исправлял.
+
+
+### Grok 4.7 High security review (2026-09-30)
+
+Контекст: прямой read-only security review текущего working tree относительно локального `stage` на `Grok 4.7 256K High`, по scope локального `/review-security`, без security-review subagent и без modification production implementation.
+
+**Result: NONE** — новых подтверждённых security findings поверх уже принятого техдолга не обнаружено. Ранее записанные 6 findings не дублировались; security review отдельно проверил SQL/GRANT boundary, secrets/credentials, authorization/production gates, target identity, path/file trust, injection, TOCTOU/concurrency и production reachability. Рассмотренные дополнительные кандидаты были отброшены как недостижимые через текущий command path, ограниченные in-memory test doubles либо спекулятивные для отсутствующего live adapter.
+
+**Disposition:** SECURITY_REVIEW_COMPLETE / NO_NEW_SECURITY_FINDINGS / KNOWN_TECH_DEBT_ACCEPTED_FOR_THIS_RELEASE.

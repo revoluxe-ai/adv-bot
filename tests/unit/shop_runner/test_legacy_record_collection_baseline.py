@@ -48,7 +48,6 @@ _SEARCH_ADV_ID = 202
 _SHOP_ID = "shop-legacy-baseline"
 
 _RECORD_COROUTINES = (
-    "update_common_sale_stat",
     "update_full_adv_stat",
     "update_clusters_adv_stats_today",
     "update_clusters_adv_stats_history",
@@ -345,9 +344,6 @@ async def _run_record_collectors(
     await manager.update_full_adv_stat.__wrapped__(  # type: ignore[attr-defined]
         manager, only_bot_active=False
     )
-    await manager.update_common_sale_stat.__wrapped__(  # type: ignore[attr-defined]
-        manager, only_bot_active=False
-    )
     await manager.update_clusters_adv_stats_today.__wrapped__(  # type: ignore[attr-defined]
         manager, only_bot_active=False
     )
@@ -357,7 +353,6 @@ async def _run_record_collectors(
 
     return SimpleNamespace(
         full_ids=full_ids,
-        common_batches=common.batches,
         clusters_today=clusters.today,
         clusters_history=clusters.history,
         forbidden=forbidden,
@@ -402,6 +397,7 @@ async def test_wb_shop_run_record_coroutines_only_bot_active_false(
 
     with (
         patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as manager_cls,
+        patch("app.modules.shop_runner.wb_shop._taskgroup_coro", side_effect=lambda _name, factory: factory()),
         patch("asyncio.TaskGroup", new=_FakeTaskGroup),
     ):
         await shop.run()
@@ -435,9 +431,6 @@ async def test_record_collectors_take_loader_ids_not_wb_only(
     assert _WB_ONLY_ADV_ID not in trace.loader_ids
     assert trace.full_ids == trace.loader_ids
     assert _WB_ONLY_ADV_ID not in trace.full_ids
-    assert len(trace.common_batches) == 1
-    assert _ids_of(trace.common_batches[0]) == trace.loader_ids
-    assert trace.common_batches[0][0] is loader_adv
     assert len(trace.clusters_today) == 1
     assert trace.clusters_today[0][0] is loader_adv
     assert _ids_of(trace.clusters_today[0]) == trace.loader_ids

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-10-05T02:51:15.174794+00:00",
+  "stage_head": "8938428d2c05d3fcfa86024ed88729f125026ebe",
+  "stage_branch": "stage",
+  "foreign_dirty_count": 92,
+  "foreign_mismatches": [],
+  "unexpected_dirty_paths": [],
+  "index_empty": true,
+  "source_matches": 15,
+  "source_total": 15,
+  "source_mismatches": [],
+  "feature_ancestor": true,
+  "feature_branch_absent": true,
+  "feature_worktree_absent": true,
+  "feature_directory_absent": true,
+  "archive_artifacts_missing": [],
+  "certified_bindings": {
+    "spec": true,
+    "plan": true,
+    "report": true
+  },
+  "archive_verify_final_marker": "\u2705 GO",
+  "campaign_python_exists": true,
+  "main_python_exists": true,
+  "diff_check": ""
+}

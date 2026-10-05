@@ -217,9 +217,6 @@ async def _run_managed_record_collectors(
     await manager.update_full_adv_stat.__wrapped__(  # type: ignore[attr-defined]
         manager, only_bot_active=only_false
     )
-    await manager.update_common_sale_stat.__wrapped__(  # type: ignore[attr-defined]
-        manager, only_bot_active=only_false
-    )
     await manager.update_clusters_adv_stats_today.__wrapped__(  # type: ignore[attr-defined]
         manager, only_bot_active=only_false
     )
@@ -229,7 +226,6 @@ async def _run_managed_record_collectors(
 
     return SimpleNamespace(
         full_ids=full_ids,
-        common_batches=common.batches,
         clusters_today=clusters.today,
         clusters_history=clusters.history,
         loader_ids=set(loader_adv.all_adv_ids),
@@ -268,7 +264,6 @@ def test_task_51_managed_record_contract_matches_loader_ownership() -> None:
     assert kwargs["only_bot_active"] is False
     assert kwargs["load_extras"] is False
     assert MANAGED_RECORD_COROUTINE_NAMES == (
-        "update_common_sale_stat",
         "update_full_adv_stat",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
@@ -291,13 +286,11 @@ async def test_task_51_record_collectors_use_loader_universe_only(
     manager = _create_manager(access_mock, fake_redis)
     trace = await _run_managed_record_collectors(manager, loader_adv, monkeypatch)
 
-    assert len(trace.loader_calls) == 4
+    assert len(trace.loader_calls) == 3
     assert all(call == managed_complex_advs_loader_kwargs() for call in trace.loader_calls)
     assert trace.loader_ids == {_PARENT_ADV_ID, _SEARCH_ADV_ID}
     assert _WB_ONLY_ADV_ID not in trace.loader_ids
     assert trace.full_ids == trace.loader_ids
-    assert len(trace.common_batches) == 1
-    assert trace.common_batches[0][0] is loader_adv
     assert len(trace.clusters_today) == 1
     assert trace.clusters_today[0][0] is loader_adv
     assert len(trace.clusters_history) == 1
@@ -400,6 +393,7 @@ async def test_task_53_paired_baseline_target_flag_preserves_managed_tick(
 
     with (
         patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as manager_cls,
+        patch("app.modules.shop_runner.wb_shop._taskgroup_coro", side_effect=lambda _name, factory: factory()),
         patch("asyncio.TaskGroup", new=_FakeTaskGroup),
     ):
         await shop.run()

@@ -287,6 +287,7 @@ async def test_wb_shop_run_keeps_managed_record_coroutines(
     shop._alive_worker_run = MagicMock(return_value=None)  # type: ignore[method-assign]
     with (
         patch("app.modules.shop_runner.wb_shop.CoroutinesManager") as manager_cls,
+        patch("app.modules.shop_runner.wb_shop._taskgroup_coro", side_effect=lambda _name, factory: factory()),
         patch("asyncio.TaskGroup", new=_FakeTaskGroup),
     ):
         await shop.run()

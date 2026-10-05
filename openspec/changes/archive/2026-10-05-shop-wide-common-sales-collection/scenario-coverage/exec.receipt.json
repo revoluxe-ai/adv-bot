@@ -1,0 +1,121 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "shop-wide-common-sales-collection",
+  "MODE": "exec",
+  "EXEC_STATUS": "provider_ready",
+  "EXEC_EVIDENCE_ID": "SCPV1-shop-wide-common-sales-20261005-evidence-close",
+  "TASK_ID": "WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250",
+  "SUPERSEDES": "SCPV1-shop-wide-common-sales-20261005-verify-close",
+  "SOURCE_SPEC_SHA": "5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253",
+  "WORKTREE_FINGERPRINT": "7ccebe8a8c0d5455d39d28f406ca7031b1d7a9b54c3c3734d45964a795d48c8c",
+  "PLAN_CONTENT_HASH": "c7e5882345385f9f1c39dc2e252b58c0b10a2c9319efab9a1ad16cb1f834d4a0",
+  "PLAN_EVIDENCE_ID": "SCPV1-shop-wide-common-sales-20261005-close",
+  "PLAN_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/exec.receipt.json",
+  "EXECUTED_AT": "2026-10-05T02:27:22+03:00",
+  "INTERPRETER": "C:\\Users\\vkita\\my_code\\meta-repo\\shop-wide-campaign-data-collection\\.venv\\Scripts\\python.exe",
+  "VENV_BINDING": {
+    "kind": "junction",
+    "feature_path": ".venv",
+    "target": "C:\\Users\\vkita\\my_code\\meta-repo\\shop-wide-campaign-data-collection\\.venv"
+  },
+  "HEAD": "62c8d48b15498997b84357e015b0e688f44fd37b",
+  "CONTRACT_ID": "not_applicable",
+  "CONTRACT_SHA": "not_applicable",
+  "TEST_CONTENT_SHA": "unknown",
+  "PRODUCTION_BOUNDARY_SHA": "unknown",
+  "FAKE_SHA": "not_applicable",
+  "SCHEMA_SHA": "not_applicable",
+  "PRODUCER_COMMAND": "WB-SKY-COMMON-SALES-EVIDENCE-CLOSE-20261005-0250",
+  "EXECUTION_BINDINGS": [
+    {
+      "SCENARIO_SEAM": "ShopAssortmentReader + coordinator unit matrix",
+      "COMMAND": "poetry run pytest -m unit tests/modules/shop_runner/service_manager/test_shop_wide_common_sale_stat_coordinator.py tests/modules/shop_runner/service_manager/test_common_sale_stat_updater.py -q",
+      "RESULT": "72 passed",
+      "EXECUTED_AT": "2026-10-05T01:58:12+03:00",
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/unit-coordinator-updater.log",
+      "LOG_SHA256": "aebe39a8831d923dec5176a2c8d668b7d7bae70f3c0747840d4c2b1752021315"
+    },
+    {
+      "SCENARIO_SEAM": "CH write + ClickHouseStatsFreshnessReader.get_common_updated_at + argMax read",
+      "COMMAND": "poetry run pytest -m \"integration and destructive_local\" tests/integration/test_shop_wide_common_sale_stat_coverage.py -v",
+      "ENV": {
+        "ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE": "1",
+        "WB_SKY_OWNED_CH_TASK": "WB-SKY-COMMON-SALES-20261005",
+        "CLICK_HOUSE_HOST": "127.0.0.1",
+        "CLICKHOUSE_PORT": "8124"
+      },
+      "RESULT": "2 passed",
+      "EXECUTED_AT": "2026-10-05T01:58:25+03:00",
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/integration-ch-coverage.log",
+      "LOG_SHA256": "47bff5dc48a30bf3916324a98a72618d968a3d69681859a190024fbec3f87a8d"
+    },
+    {
+      "SCENARIO_SEAM": "WBShop.run TaskGroup coroutine registry (targeted)",
+      "COMMAND": "poetry run pytest -m unit tests/test_wb_shop_run_coroutines.py -q",
+      "RESULT": "2 passed",
+      "EXECUTED_AT": "2026-10-05T01:58:38+03:00",
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/wb-shop-coroutines.log",
+      "LOG_SHA256": "6997e0eba891fb63258a494a65b08c8dd6bb8ef6508b56256d284906a14ac81f"
+    },
+    {
+      "SCENARIO_SEAM": "pyright strict — shop_wide_common_sales package",
+      "COMMAND": "poetry run python -m pyright --project pyrightconfig_strict.json app/modules/shop_runner/service_manager/services/shop_wide_common_sales",
+      "RESULT": "0 errors",
+      "EXECUTED_AT": "2026-10-05T01:58:46+03:00",
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/pyright-shop-wide-common-sales.log",
+      "LOG_SHA256": "2181295a08254d02d5113a1f6379c4d2732b61dfb05a62f5f31c98ffe1be1a69"
+    },
+    {
+      "SCENARIO_SEAM": "pyright-strict full repo (canonical ready env)",
+      "COMMAND": "poetry run pyright-strict --outputjson",
+      "RESULT": "755 files analyzed, 0 errors, 0 warnings",
+      "EXECUTED_AT": "2026-10-05T02:27:22+03:00",
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/pyright-strict-full-repo.json.log",
+      "LOG_SHA256": "af3260c309e77096686b7a867a42757163a5f88f4fc9bb87a3728160a2a83f1a",
+      "COMPARISON_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/pyright-strict-comparison.json",
+      "COMPARISON_SHA256": "09fae9bb3fc6980ea50eb84f242d6a6fce6df98421a6a441d04208b30a92b3a5",
+      "INTRODUCED_ERROR_OCCURRENCES": 0
+    }
+  ],
+  "PROVIDER_EXECUTION_RECEIPTS": [
+    {
+      "SCHEMA_VERSION": 1,
+      "KIND": "CH",
+      "GAP_ID": "shop-wide-common-sales-collection::s12-ch-roundtrip::1",
+      "GAP_FILE_ID": "a3f8c2e1b904d7a6",
+      "SCENARIO_ID": "specs/shop-wide-common-sales-collection/spec.md::Task-owned scratch CH endpoint proven",
+      "CONTRACT_ID": "wb_common_stat_write_read_freshness",
+      "CONTRACT_SHA": "unknown",
+      "PROVIDER_TEST_IDS": [
+        "tests/integration/test_shop_wide_common_sale_stat_coverage.py::test_shop_wide_coverage_read_write_roundtrip",
+        "tests/integration/test_shop_wide_common_sale_stat_coverage.py::test_collect_by_nmids_uses_production_writer"
+      ],
+      "TEST_CONTENT_SHA": "unknown",
+      "PRODUCTION_BOUNDARY_SHA": "unknown",
+      "SCHEMA_SHA": "unknown",
+      "WORKTREE_FINGERPRINT": "7ccebe8a8c0d5455d39d28f406ca7031b1d7a9b54c3c3734d45964a795d48c8c",
+      "EXECUTED_AT": "2026-10-05T01:58:25+03:00",
+      "EXECUTION_CLASS": "destructive_local",
+      "RESULT": "PASS",
+      "TESTS_PASSED": 2,
+      "TESTS_FAILED": 0,
+      "AUTHORIZATION_STATUS": "consumed",
+      "LOG_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/logs/integration-ch-coverage.log",
+      "LOG_SHA": "47bff5dc48a30bf3916324a98a72618d968a3d69681859a190024fbec3f87a8d",
+      "SECRETS_REDACTED": "YES"
+    }
+  ],
+  "LIMITATIONS": {
+    "LEGACY_WBSHOP_UNFILTERED": "2 failed baseline+current archive logs — FakeTaskGroup/supervisor; not authoritative PASS",
+    "METRICS_SOURCE_CURRENCY": "unknown",
+    "STORE_DRR_NUMERATOR_STATUS": "BLOCKED_BY_CAMPAIGN_COVERAGE",
+    "LIVE_WB_PROOF": "not_executed",
+    "PROD_CH_DDL": "unverified"
+  },
+  "SCENARIO_COVERAGE_VERDICT": "PENDING_INDEPENDENT_AUDIT",
+  "SELF_CERTIFY": false,
+  "READY_FOR_INDEPENDENT_AUDIT": true,
+  "NEXT_COMMAND": "/opsx-spec-scenario-coverage mode=audit change=shop-wide-common-sales-collection"
+}

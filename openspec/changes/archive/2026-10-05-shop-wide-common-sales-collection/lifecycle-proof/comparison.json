@@ -1,0 +1,98 @@
+{
+  "premerge_with_preserved_dirty": {
+    "path": "C:\\Users\\vkita\\my_code\\cursor-sdk-task-runner\\.runner-temp\\lifecycle-stage-strict-comparison-0475\\premerge_with_preserved_dirty",
+    "source_commit": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+    "overlay_dirty_count": 92,
+    "archive_sha256": "8374fc94f99d681ad122f90c4e7ba09ffa15c82a06e8605850875454650f495e",
+    "exit_code": 1,
+    "summary": {
+      "filesAnalyzed": 743,
+      "errorCount": 4,
+      "warningCount": 0,
+      "informationCount": 0,
+      "timeInSec": 26.77
+    },
+    "diagnostics": [
+      {
+        "file": "app/core/mp/wb/api/adapter/promotion_client/campaigns_info_v2/adapter.py",
+        "rule": "reportUnknownVariableType",
+        "message": "Type of \"adverts_raw\" is partially unknown\n\u00a0\u00a0Type of \"adverts_raw\" is \"Unknown | None\"",
+        "range": {
+          "start": {
+            "line": 85,
+            "character": 12
+          },
+          "end": {
+            "line": 85,
+            "character": 23
+          }
+        },
+        "severity": "error"
+      },
+      {
+        "file": "app/core/mp/wb/api/adapter/promotion_client/campaigns_info_v2/adapter.py",
+        "rule": "reportUnknownMemberType",
+        "message": "Type of \"get\" is partially unknown\n\u00a0\u00a0Type of \"get\" is \"Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]\"",
+        "range": {
+          "start": {
+            "line": 85,
+            "character": 26
+          },
+          "end": {
+            "line": 85,
+            "character": 37
+          }
+        },
+        "severity": "error"
+      },
+      {
+        "file": "app/core/mp/wb/api/adapter/promotion_client/campaigns_info_v2/adapter.py",
+        "rule": "reportUnknownVariableType",
+        "message": "Type of \"item\" is unknown",
+        "range": {
+          "start": {
+            "line": 90,
+            "character": 16
+          },
+          "end": {
+            "line": 90,
+            "character": 20
+          }
+        },
+        "severity": "error"
+      },
+      {
+        "file": "app/core/mp/wb/api/adapter/promotion_client/campaigns_info_v2/adapter.py",
+        "rule": "reportUnknownMemberType",
+        "message": "Type of \"get\" is partially unknown\n\u00a0\u00a0Type of \"get\" is \"Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]\"",
+        "range": {
+          "start": {
+            "line": 93,
+            "character": 19
+          },
+          "end": {
+            "line": 93,
+            "character": 27
+          }
+        },
+        "severity": "error"
+      }
+    ]
+  },
+  "merged_committed": {
+    "path": "C:\\Users\\vkita\\my_code\\cursor-sdk-task-runner\\.runner-temp\\lifecycle-stage-strict-comparison-0475\\merged_committed",
+    "source_commit": "58441b3589200e02f642628e05920e680e553355",
+    "overlay_dirty_count": 0,
+    "archive_sha256": "ac27504299300147566f205be054186bd81a5cd7cc5fedae91f25964bacd8a23",
+    "exit_code": 0,
+    "summary": {
+      "filesAnalyzed": 755,
+      "errorCount": 0,
+      "warningCount": 0,
+      "informationCount": 0,
+      "timeInSec": 26.417
+    },
+    "diagnostics": []
+  },
+  "timestamp": "2026-10-05T02:11:10.018563+00:00"
+}
