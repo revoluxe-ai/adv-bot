@@ -1,0 +1,21 @@
+tests/integration/campaign_settings_history/test_pg_boundary.py
+  s_5791fabf8ddb39::t_ad7b59066017fe 28,31,72
+tests/integration/test_shop_wide_common_sale_stat_coverage.py
+  s_5791fabf8ddb39::t_245918985496d6 53,106,187
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "751e7bd2965a2d35941c5827a13cfab0ad6fc588",
+  "prompts": {},
+  "sessions": {
+    "s_5791fabf8ddb39": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fec70482-9c70-4b5e-bc15-3f38d28dfca2",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
