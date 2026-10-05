@@ -1,0 +1,85 @@
+.opsx/runs/scenario-coverage/shop-wide-common-sales-collection/receipts/PROVIDER-a3f8c2e1b904d7a6.md
+  s_cba8cc1b6eea28::t_b7a0c45f51be02 1-30
+app/modules/shop_runner/service_manager/manager.py
+  s_cba8cc1b6eea28::t_daaba31bf38d40 445,450-453,458-464
+app/modules/shop_runner/service_manager/services/common_sale_stat_updater/common_sale_stat_updater.py
+  s_cba8cc1b6eea28::t_4861ab6ded7628 1-2,4,6-9,16-25,33-61,64-65,74-82,86-87,91-112,114-184,187,189-190,192-199,201-203,205-216,218-219,221-230,232-233,235-239
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/__init__.py
+  s_cba8cc1b6eea28::t_bfc6f962134d73 1-17
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/collect_types.py
+  s_cba8cc1b6eea28::t_27c17ffb4727e0 1-104
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/coordinator.py
+  s_cba8cc1b6eea28::t_28f9f13d65bb07 1-317
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/coverage_evidence.py
+  s_cba8cc1b6eea28::t_2ce2028d7eb60e 1-342
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/fact_validator.py
+  s_cba8cc1b6eea28::t_622a404ffd1086 1-216
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/legacy_assigned_nmids.py
+  s_cba8cc1b6eea28::t_798f2b9b6e9d9f 1-50
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/shop_assortment_reader.py
+  s_cba8cc1b6eea28::t_7c23fbfe2ef598 1-360
+app/modules/shop_runner/service_manager/services/shop_wide_common_sales/taskgroup_no_ad_supervisor.py
+  s_cba8cc1b6eea28::t_5fd106909b5fd6 1-102
+app/modules/shop_runner/wb_shop.py
+  s_cba8cc1b6eea28::t_cba273f14e30b7 3-4,18-21,28-37,69,76-220
+openspec/changes/shop-wide-common-sales-collection/PREMERGE_SCOPE_RECEIPT.md
+  s_cba8cc1b6eea28::t_a02eb56c05e0a8 1-82
+openspec/changes/shop-wide-common-sales-collection/SHOP_WIDE_COMMON_SALES_IMPLEMENTATION_REPORT.md
+  s_cba8cc1b6eea28::t_9c496c37e97920 1-91
+openspec/changes/shop-wide-common-sales-collection/SHOP_WIDE_COMMON_SALES_PLANNING_REPORT.md
+  s_cba8cc1b6eea28::t_03cd794bd67517 1-180
+openspec/changes/shop-wide-common-sales-collection/decisions/shop-wide-common-sales-ownership/decision.md
+  s_cba8cc1b6eea28::t_032c264f4c5777 1-128
+openspec/changes/shop-wide-common-sales-collection/design.md
+  s_cba8cc1b6eea28::t_00509f51fd2e51 1-329
+openspec/changes/shop-wide-common-sales-collection/owner-contract.md
+  s_cba8cc1b6eea28::t_69998eddc5d010 1-46
+openspec/changes/shop-wide-common-sales-collection/proposal.md
+  s_cba8cc1b6eea28::t_e79e30c455428b 1-33
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/SCENARIO_TEST_COVERAGE_REPORT.md
+  s_cba8cc1b6eea28::t_04197c2a7d1214 1-166
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/case-to-test-index.md
+  s_cba8cc1b6eea28::t_91c6b896945530 1-67
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/certify.receipt.json
+  s_cba8cc1b6eea28::t_14dc6e879aa54f 1-73
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/exec.receipt.json
+  s_cba8cc1b6eea28::t_39ddec66681f56 1-121
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/execution-envelope.md
+  s_cba8cc1b6eea28::t_3b057055a00eb2 1-92
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/log-manifest.md
+  s_cba8cc1b6eea28::t_7e7f55b42b990d 1-68
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/plan.md
+  s_cba8cc1b6eea28::t_6ca35445b7c122 1-316
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/plan.receipt.json
+  s_cba8cc1b6eea28::t_649ecdb6c52692 1-57
+openspec/changes/shop-wide-common-sales-collection/scenario-coverage/verify-impl.receipt.md
+  s_cba8cc1b6eea28::t_9fbb1d77dfc4f3 1-48
+openspec/changes/shop-wide-common-sales-collection/specs/shop-wide-common-sales-collection/spec.md
+  s_cba8cc1b6eea28::t_3db38c951920c4 1-417
+openspec/changes/shop-wide-common-sales-collection/tasks.md
+  s_cba8cc1b6eea28::t_3fd3fa546ab44c 1-106
+pyrightconfig_strict.json
+  s_cba8cc1b6eea28::t_ee27ee7d001ca7 37-38
+tests/integration/test_shop_wide_common_sale_stat_coverage.py
+  s_cba8cc1b6eea28::t_69952ca347669d 1-238
+tests/modules/shop_runner/service_manager/test_common_sale_stat_updater.py
+  s_cba8cc1b6eea28::t_546cb788c4c873 58,64-185
+tests/modules/shop_runner/service_manager/test_shop_wide_common_sale_stat_coordinator.py
+  s_cba8cc1b6eea28::t_6752c4cf1bc16a 1-1548
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3afdde673e667cc725131cab7f463db7e2b34b66",
+  "prompts": {},
+  "sessions": {
+    "s_cba8cc1b6eea28": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "39c240a4-b598-47e4-87cb-b7e8b03f989f",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
