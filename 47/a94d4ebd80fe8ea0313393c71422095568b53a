@@ -1,0 +1,19 @@
+pyrightconfig_strict.json
+  s_24b1d211f0e7c6::t_925b4d9adfded3 38-39,149-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "47a94d4ebd80fe8ea0313393c71422095568b53a",
+  "prompts": {},
+  "sessions": {
+    "s_24b1d211f0e7c6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fca1c-f484-7902-8def-58c655220210",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
