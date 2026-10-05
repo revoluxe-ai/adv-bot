@@ -4,11 +4,11 @@
   "CHANGE_ID": "campaign-settings-changeset-contract",
   "MODE": "plan",
   "PLAN_STATUS": "ready",
-  "PLAN_EVIDENCE_ID": "495bd3ad403240413c2f26804814b941eb34d06c2b0db706aa36e102cea8cfee",
-  "PLAN_CONTENT_HASH": "76caf83c8c6a08ad5557f4608f873fbca1ab975df05679f9551051d9c50ff3cc",
+  "PLAN_EVIDENCE_ID": "4ad4932e9ae9d0600c915add3898d2e9c003c7e5c1f68f1a16b2f3c9dfd28d25",
+  "PLAN_CONTENT_HASH": "013584fc282e1a0888bfec73068a9ae581686e764fbef4c75da626d8ec7eb3fd",
   "PLAN_PATH": "openspec/changes/campaign-settings-changeset-contract/scenario-coverage/plan.md",
   "RECEIPT_PATH": "openspec/changes/campaign-settings-changeset-contract/scenario-coverage/plan.receipt.json",
-  "SCENARIO_COUNT": 18,
+  "SCENARIO_COUNT": 21,
   "LIFECYCLE_STATUS": "DERIVED",
   "PRODUCT_ACCEPTANCE_REQUIRED": true,
   "INPUT_FRESHNESS": "current",
@@ -16,41 +16,41 @@
   "INPUTS": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/campaign-settings-changeset-contract/design.md",
-      "content_hash": "c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08"
+      "content_hash": "45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea"
     },
     "SPEC_REVISION": [
       {
         "path": "openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md",
-        "content_hash": "bfc66402a1fe9d659226e8937de2bd8c7339d113b98da5cb8411dc8d77ee528b"
+        "content_hash": "caa93914d7feec28f436123f1bcbea38e99530059806e39713407747e09aad9f"
       }
     ],
     "LIFECYCLE_REVISION": {
       "source": "openspec/changes/campaign-settings-changeset-contract/design.md",
-      "content_hash": "c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08"
+      "content_hash": "45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea"
     },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/campaign-settings-changeset-contract/owner-contract.md",
-      "content_hash": "315b194b566699849c15dcef1935718a1cc3972fd0b3642c118d758091f8bfcc"
+      "content_hash": "cb23940e598d9075574ed163f9e1793e78c2ea870d02e3635cffaa5c310f242b"
     }
   },
   "GENERATED_FROM": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/campaign-settings-changeset-contract/design.md",
-      "content_hash": "c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08"
+      "content_hash": "45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea"
     },
     "SPEC_REVISION": [
       {
         "path": "openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md",
-        "content_hash": "bfc66402a1fe9d659226e8937de2bd8c7339d113b98da5cb8411dc8d77ee528b"
+        "content_hash": "caa93914d7feec28f436123f1bcbea38e99530059806e39713407747e09aad9f"
       }
     ],
     "LIFECYCLE_REVISION": {
       "source": "openspec/changes/campaign-settings-changeset-contract/design.md",
-      "content_hash": "c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08"
+      "content_hash": "45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea"
     },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/campaign-settings-changeset-contract/owner-contract.md",
-      "content_hash": "315b194b566699849c15dcef1935718a1cc3972fd0b3642c118d758091f8bfcc"
+      "content_hash": "cb23940e598d9075574ed163f9e1793e78c2ea870d02e3635cffaa5c310f242b"
     }
   },
   "MATERIALIZATION_STATUS": "COMMITTED"

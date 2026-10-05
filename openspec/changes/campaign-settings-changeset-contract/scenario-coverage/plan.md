@@ -3,7 +3,7 @@
 CHANGE_ID: campaign-settings-changeset-contract
 MODE: plan
 PLAN_STATUS: ready
-PLAN_EVIDENCE_ID: 495bd3ad403240413c2f26804814b941eb34d06c2b0db706aa36e102cea8cfee
+PLAN_EVIDENCE_ID: 4ad4932e9ae9d0600c915add3898d2e9c003c7e5c1f68f1a16b2f3c9dfd28d25
 LIFECYCLE_STATUS: DERIVED
 PRODUCT_ACCEPTANCE_REQUIRED: true
 
@@ -16,24 +16,24 @@ PLAN_EVIDENCE_ID is sha256 of the UTF-8 LF blob below, including the final newli
 ```text
 campaign-settings-changeset-contract
 plan
-design.md:c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08
-specs/campaign-settings-changeset-contract/spec.md:bfc66402a1fe9d659226e8937de2bd8c7339d113b98da5cb8411dc8d77ee528b
-owner-contract.md:315b194b566699849c15dcef1935718a1cc3972fd0b3642c118d758091f8bfcc
-lifecycle:design.md:c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08
+design.md:45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea
+specs/campaign-settings-changeset-contract/spec.md:caa93914d7feec28f436123f1bcbea38e99530059806e39713407747e09aad9f
+owner-contract.md:cb23940e598d9075574ed163f9e1793e78c2ea870d02e3635cffaa5c310f242b
+lifecycle:design.md:45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea
 ```
 
 INPUTS:
-- DESIGN_REVISION: design.md content_hash c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08
-- SPEC_REVISION: specs/campaign-settings-changeset-contract/spec.md content_hash bfc66402a1fe9d659226e8937de2bd8c7339d113b98da5cb8411dc8d77ee528b
-- OWNER_CONTRACT_REVISION: owner-contract.md content_hash 315b194b566699849c15dcef1935718a1cc3972fd0b3642c118d758091f8bfcc
-- LIFECYCLE_REVISION: design.md content_hash c9242a6fd0defbdb3adf408f02a9eb0637755e0297e9215bca7bdcd97fafac08
+- DESIGN_REVISION: design.md content_hash 45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea
+- SPEC_REVISION: specs/campaign-settings-changeset-contract/spec.md content_hash caa93914d7feec28f436123f1bcbea38e99530059806e39713407747e09aad9f
+- OWNER_CONTRACT_REVISION: owner-contract.md content_hash cb23940e598d9075574ed163f9e1793e78c2ea870d02e3635cffaa5c310f242b
+- LIFECYCLE_REVISION: design.md content_hash 45b6e63b3efd507f6a921f2a306ea04e60907f10af3efc86fa98ec765f722cea
 
 ## LIFECYCLE_COVERAGE
 
-- L1: structural envelope, duplicate operation id, duplicate changeset id conflict, identical replay.
-- L2: identity, Auto/Search separation, registry, normalization, domain, capability.
-- L3: stale precondition and missing current snapshot.
-- L4: atomic `NO_CHANGE`, `CHANGE`, or `REJECTED`.
+- L1: envelope, state_token, duplicate operation id, duplicate changeset id conflict, identical replay.
+- L2: CampaignResourceRef / cmp_*, registry, normalization, domain, capability.
+- L3: expected_current_value under state_token; missing/stale token.
+- L4: atomic `NO_OP`, `OK`, or `REJECTED`.
 - L5: no production writer on any status.
 
 LIFECYCLE_GAPS: none
@@ -45,234 +45,268 @@ UNRESOLVED_PRODUCT_SEMANTICS: none
 
 STEADY_STATE_RECONCILE: present
 
-`Normalized value equal to current is NO_CHANGE` is the already-true case: the snapshot already matches the requested normalized value, and the pure validator must not emit an actionable change.
+`No semantic change is NO_OP` is the already-true case: the snapshot at `state_token` already matches normalized requested values.
 
 ## Global evidence rules
 
-RUNTIME_SCENARIO_SEAM: call real `validate_changeset_v1` plus real registry `normalize_value`. Do not mock classification, normalization, atomic rejection, or diff status.
+RUNTIME_SCENARIO_SEAM: call real `validate_changeset` (wb_sky_control_plane) plus real registry `normalize_value` where applicable. Do not mock classification, normalization, atomic rejection, or diff status.
 
-THIN_ENDS: none. The function has no I/O. Forbidden-adapter assertions are call-boundary spies proving WB, PostgreSQL write, ClickHouse, `apply_adv_excel_rows`, and shop-runner are not invoked.
+THIN_ENDS: none. Dry-run has no I/O. Forbidden-adapter assertions are call-boundary spies (WB, PostgreSQL write, ClickHouse, `apply_adv_excel_rows`, shop-runner, MIXED `campaigns_info_v2/adapter.py`).
 
-PROVIDER_RECEIPTS: not required. mode=plan does not execute tests. PostgreSQL and ClickHouse are outside this change.
+PROVIDER_RECEIPTS: not required. mode=plan does not execute tests.
 
-PRODUCTION_ENTRYPOINT: `app.modules.campaign_settings_contract.validate_changeset_v1` (name fixed by tasks.md).
+PRODUCTION_ENTRYPOINT: `app.modules.wb_sky_control_plane.kernel.validate.validate_changeset` (extend existing; name from reconciliation doc).
 
 ## Rows
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Valid single-field change produces CHANGE
-  REQUIREMENT_CONTEXT: ChangeSetV1 envelope
-  GIVEN_WHEN_THEN: GIVEN one mutable operation and a matching snapshot; WHEN validate runs; THEN status CHANGE with field, old_value, requested_value, normalized_value.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Valid existing bounded operation produces OK
+  REQUIREMENT_CONTEXT: ChangeSetV1 envelope and state_token
+  GIVEN_WHEN_THEN: GIVEN bounded op + matching state_token; WHEN validate_changeset; THEN OK with SemanticDiffEntryV1.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L1-L4
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_valid_single_field_change
-    BOUNDARY_INTEGRATION_WRITE: not_applicable
-    UNIT_COMPONENT: optional
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_valid_bounded_operation_ok
   LIFECYCLE_STEPS: L4
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Stale state_token is REJECTED
+  REQUIREMENT_CONTEXT: ChangeSetV1 envelope and state_token
+  GIVEN_WHEN_THEN: GIVEN mismatched state_token; WHEN dry-run; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L1 L3
+  THIN_ENDS: none
+  REQUIRED_TESTS:
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_stale_state_token
+  LIFECYCLE_STEPS: L3
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Missing state_token is REJECTED
+  REQUIREMENT_CONTEXT: ChangeSetV1 envelope and state_token
+  GIVEN_WHEN_THEN: GIVEN empty state_token; WHEN dry-run; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L1 L3
+  THIN_ENDS: none
+  REQUIRED_TESTS:
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_missing_state_token
+  LIFECYCLE_STEPS: L3
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Duplicate changeset id with a different body is REJECTED
-  REQUIREMENT_CONTEXT: ChangeSetV1 envelope
-  GIVEN_WHEN_THEN: GIVEN prior record with same id and different hash; WHEN validate runs; THEN REJECTED conflict and no writer.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  REQUIREMENT_CONTEXT: ChangeSetV1 envelope and state_token
+  GIVEN_WHEN_THEN: GIVEN prior record same id different hash; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L1
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_duplicate_changeset_id_conflict
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_duplicate_changeset_id_conflict
   LIFECYCLE_STEPS: L1 L5
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Identical changeset id replay is deterministic
-  REQUIREMENT_CONTEXT: ChangeSetV1 envelope
-  GIVEN_WHEN_THEN: GIVEN prior record with same id and same hash; WHEN validate runs; THEN same NO_CHANGE or CHANGE and no new persistence.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  REQUIREMENT_CONTEXT: ChangeSetV1 envelope and state_token
+  GIVEN_WHEN_THEN: GIVEN prior record same id same hash; WHEN validate; THEN same NO_OP or OK.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L1
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_duplicate_changeset_id_replay
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_duplicate_changeset_id_replay
   LIFECYCLE_STEPS: L1
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Auto and Search targets stay separate
-  REQUIREMENT_CONTEXT: Operation target identity
-  GIVEN_WHEN_THEN: GIVEN auto adv_id A and search adv_id K; WHEN Search operation validates; THEN old_value is the Search leg and A is not merged.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: cmp_star resource identity binds the diff
+  REQUIREMENT_CONTEXT: CampaignResourceRef identity
+  GIVEN_WHEN_THEN: GIVEN cmp_* registry row; WHEN validate; THEN diff binds CampaignResourceRef.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L2
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_auto_search_identity_separation
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_cmp_resource_identity
   LIFECYCLE_STEPS: L2
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Unsupported campaign source or type is REJECTED
-  REQUIREMENT_CONTEXT: Operation target identity
-  GIVEN_WHEN_THEN: GIVEN an unregistered source or campaign type; WHEN validate runs; THEN REJECTED.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Unresolved CampaignResourceRef is REJECTED
+  REQUIREMENT_CONTEXT: CampaignResourceRef identity
+  GIVEN_WHEN_THEN: GIVEN unknown ref; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L2
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_unsupported_campaign_type
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_unresolved_resource_ref
   LIFECYCLE_STEPS: L2
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Duplicate operation id rejects the changeset
-  REQUIREMENT_CONTEXT: Operation target identity
-  GIVEN_WHEN_THEN: GIVEN two operations with one operation_id; WHEN structural validation runs; THEN REJECTED with no partial accept.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  REQUIREMENT_CONTEXT: CampaignResourceRef identity
+  GIVEN_WHEN_THEN: GIVEN duplicate operation_id; WHEN structural validation; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L1
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_duplicate_operation_id
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_duplicate_operation_id
   LIFECYCLE_STEPS: L1
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Unsupported field is REJECTED
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Unsupported mutation is REJECTED
   REQUIREMENT_CONTEXT: mutation_policy extension
-  GIVEN_WHEN_THEN: GIVEN a field absent from registry and mutation_policy; WHEN validate runs; THEN REJECTED.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN unsupported op/field; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L2
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_unsupported_field
-  LIFECYCLE_STEPS: L2
-  ROW_PLAN: required
-
-SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Read-only field is REJECTED
-  REQUIREMENT_CONTEXT: mutation_policy extension
-  GIVEN_WHEN_THEN: GIVEN an identity, WB-fact, runtime, derived, technical, or unclassified setting field; WHEN validate runs; THEN REJECTED as not mutable.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
-  CAUSAL_PATH: L2
-  THIN_ENDS: none
-  REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_read_only_field
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_unsupported_mutation
   LIFECYCLE_STEPS: L2
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Invalid value is REJECTED
   REQUIREMENT_CONTEXT: mutation_policy extension
-  GIVEN_WHEN_THEN: GIVEN a value outside normalization or allowed_values; WHEN validate runs; THEN REJECTED.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN out-of-domain value; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L2
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_invalid_value
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_invalid_value
   LIFECYCLE_STEPS: L2
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Unknown capability is REJECTED
   REQUIREMENT_CONTEXT: mutation_policy extension
-  GIVEN_WHEN_THEN: GIVEN an unknown capability token or a missing required grant; WHEN capability validation runs; THEN REJECTED.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN unknown capability token; WHEN capability step; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L2
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_unknown_capability
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_unknown_capability
+  LIFECYCLE_STEPS: L2
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Unsupported capability tri-state is REJECTED
+  REQUIREMENT_CONTEXT: mutation_policy extension
+  GIVEN_WHEN_THEN: GIVEN unsupported tri-state; WHEN capability step; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L2
+  THIN_ENDS: none
+  REQUIRED_TESTS:
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_unsupported_capability
   LIFECYCLE_STEPS: L2
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Normalization records requested and normalized values
   REQUIREMENT_CONTEXT: Validation pipeline and normalization
-  GIVEN_WHEN_THEN: GIVEN a requested form that normalizes to a different current value; WHEN validate runs; THEN CHANGE keeps requested_value and normalized_value.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN form mismatch; WHEN validate; THEN OK with requested and normalized in SemanticDiffEntryV1.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L2 L4
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_normalization
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_normalization
   LIFECYCLE_STEPS: L2 L4
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Normalized value equal to current is NO_CHANGE
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: No semantic change is NO_OP
   REQUIREMENT_CONTEXT: Validation pipeline and normalization
-  GIVEN_WHEN_THEN: GIVEN every operation already matches the snapshot after normalization; WHEN validate runs; THEN NO_CHANGE.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN normalized match; WHEN validate; THEN NO_OP.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L4
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_no_op
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_no_op
   LIFECYCLE_STEPS: L4
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Multiple operations produce one atomic CHANGE
-  REQUIREMENT_CONTEXT: Atomic ChangeSet
-  GIVEN_WHEN_THEN: GIVEN two valid operations on different fields; WHEN validate runs; THEN one CHANGE diff contains both fields.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Deterministic diff for identical inputs
+  REQUIREMENT_CONTEXT: Validation pipeline and normalization
+  GIVEN_WHEN_THEN: GIVEN two identical invocations; WHEN validate twice; THEN equal status and diffs.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L4
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_multiple_operations
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_deterministic_diff
+  LIFECYCLE_STEPS: L4
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: expected_current_value mismatch is REJECTED
+  REQUIREMENT_CONTEXT: Precondition under state_token
+  GIVEN_WHEN_THEN: GIVEN valid token but stale expected_current_value; WHEN precondition; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L3
+  THIN_ENDS: none
+  REQUIRED_TESTS:
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_expected_current_mismatch
+  LIFECYCLE_STEPS: L3
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Omitting expected_current_value does not bypass state_token
+  REQUIREMENT_CONTEXT: Precondition under state_token
+  GIVEN_WHEN_THEN: GIVEN omitted expected_current_value and bad state_token; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L3
+  THIN_ENDS: none
+  REQUIRED_TESTS:
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_omit_expected_does_not_bypass_token
+  LIFECYCLE_STEPS: L3
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Multiple valid operations produce one OK
+  REQUIREMENT_CONTEXT: Atomic ChangeSet
+  GIVEN_WHEN_THEN: GIVEN two valid ops; WHEN validate; THEN OK with both diffs.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L4
+  THIN_ENDS: none
+  REQUIRED_TESTS:
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_multiple_operations_ok
   LIFECYCLE_STEPS: L4
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Mixed valid and invalid operations reject the whole changeset
   REQUIREMENT_CONTEXT: Atomic ChangeSet
-  GIVEN_WHEN_THEN: GIVEN one valid and one invalid operation; WHEN validate runs; THEN REJECTED and the valid operation is not actionable CHANGE.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN one valid one invalid; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L4
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_mixed_operations_atomic_reject
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_mixed_operations_atomic_reject
   LIFECYCLE_STEPS: L4
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Duplicate target field rejects the changeset
+  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Duplicate target mutation rejects the changeset
   REQUIREMENT_CONTEXT: Atomic ChangeSet
-  GIVEN_WHEN_THEN: GIVEN two operation ids for the same target field; WHEN validate runs; THEN REJECTED.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
-  CAUSAL_PATH: L4
+  GIVEN_WHEN_THEN: GIVEN two ops same resource+field; WHEN validate; THEN REJECTED.
+  PRODUCTION_ENTRYPOINT: validate_changeset
+  CAUSAL_PATH: L1 L4
   THIN_ENDS: none
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_duplicate_target_field
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_duplicate_target_mutation
   LIFECYCLE_STEPS: L1 L4
-  ROW_PLAN: required
-
-SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Stale expected current value is REJECTED
-  REQUIREMENT_CONTEXT: Precondition and missing state
-  GIVEN_WHEN_THEN: GIVEN expected_current_value differs from the snapshot; WHEN precondition validation runs; THEN REJECTED as stale.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
-  CAUSAL_PATH: L3
-  THIN_ENDS: none
-  REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_stale_precondition
-  LIFECYCLE_STEPS: L3
-  ROW_PLAN: required
-
-SCENARIO_EVIDENCE_ROW:
-  SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Missing current state is REJECTED
-  REQUIREMENT_CONTEXT: Precondition and missing state
-  GIVEN_WHEN_THEN: GIVEN no snapshot for the target; WHEN validate runs; THEN REJECTED as missing current state.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
-  CAUSAL_PATH: L3
-  THIN_ENDS: none
-  REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_missing_current_state
-  LIFECYCLE_STEPS: L3
   ROW_PLAN: required
 
 SCENARIO_EVIDENCE_ROW:
   SCENARIO_ID: openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md::#### Scenario: Validation result does not perform production writes
   REQUIREMENT_CONTEXT: No production write
-  GIVEN_WHEN_THEN: GIVEN a result of CHANGE, NO_CHANGE, or REJECTED; WHEN validate returns; THEN no forbidden adapter is invoked.
-  PRODUCTION_ENTRYPOINT: validate_changeset_v1
+  GIVEN_WHEN_THEN: GIVEN any terminal status; WHEN validate returns; THEN no forbidden adapter.
+  PRODUCTION_ENTRYPOINT: validate_changeset
   CAUSAL_PATH: L5
-  THIN_ENDS: spy only, no real writer
+  THIN_ENDS: spy only
   REQUIRED_TESTS:
-    SCENARIO_SEAM: tests/unit/campaign_settings_contract/test_changeset_v1.py::test_no_production_write
+    SCENARIO_SEAM: tests/unit/wb_sky_control_plane/test_changeset_dry_run.py::test_no_production_write
   LIFECYCLE_STEPS: L5
   ROW_PLAN: required

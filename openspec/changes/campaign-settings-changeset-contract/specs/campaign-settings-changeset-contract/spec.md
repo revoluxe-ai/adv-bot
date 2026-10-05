@@ -1,193 +1,203 @@
 ## ADDED Requirements
 
-### Requirement: ChangeSetV1 envelope
+### Requirement: ChangeSetV1 envelope and state_token
 
-The system MUST accept a transport-independent `ChangeSetV1` document with
-`schema_version` equal to `changeset.v1`, a unique `changeset_id`, `shop_id`,
-source metadata, actor metadata, `created_at`, an optional intent/reason, and
-a non-empty operation list. Any other `schema_version`, missing identity, or
-empty operation list MUST yield `REJECTED`. The document MUST NOT be treated
-as an Excel workbook or as `CampaignSettingsSnapshotV1`.
+The system MUST accept a transport-independent `ChangeSetV1` document (canonical
+type in `app/modules/wb_sky_control_plane/models/changeset.py` after adoption) with
+`schema_version` for changeset v1, `changeset_id`, shop scope, source and actor
+metadata, `created_at`, optional intent, a non-empty operation list, and a
+`state_token` identifying the snapshot generation used for dry-run. Missing,
+unknown, or stale `state_token` MUST reject the whole ChangeSet with `REJECTED`.
+The document MUST NOT be treated as Excel or `CampaignSettingsSnapshotV1`.
 
-#### Scenario: Valid single-field change produces CHANGE
+#### Scenario: Valid existing bounded operation produces OK
 
-- **GIVEN** a `changeset.v1` document with one operation for a mutable field
-- **AND** the injected current snapshot matches `expected_current_value`
-- **AND** the normalized requested value differs from the current value
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `CHANGE`
-- **AND** the operation diff MUST include `field`, `old_value`, `requested_value`, and `normalized_value`
+- **GIVEN** a `ChangeSetV1` with one operation from the existing bounded WIP operation set
+- **AND** a `state_token` matching the injected snapshot generation
+- **AND** grants satisfy required capabilities
+- **AND** normalized requested value differs from the snapshot
+- **WHEN** `validate_changeset` runs as dry-run
+- **THEN** the status MUST be `OK`
+- **AND** at least one `SemanticDiffEntryV1` MUST include old, requested, and normalized values
+
+#### Scenario: Stale state_token is REJECTED
+
+- **GIVEN** a `ChangeSetV1` whose `state_token` does not match the injected snapshot generation
+- **WHEN** dry-run validation runs
+- **THEN** the status MUST be `REJECTED`
+- **AND** the reason MUST identify stale or invalid generation token
+
+#### Scenario: Missing state_token is REJECTED
+
+- **GIVEN** a `ChangeSetV1` with a missing or empty `state_token`
+- **WHEN** dry-run validation runs
+- **THEN** the status MUST be `REJECTED`
 
 #### Scenario: Duplicate changeset id with a different body is REJECTED
 
 - **GIVEN** an injected prior record with the same `changeset_id` and a different canonical hash
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-- **AND** the reason MUST identify a changeset id conflict
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
 - **AND** no writer MUST be invoked
 
 #### Scenario: Identical changeset id replay is deterministic
 
 - **GIVEN** an injected prior record with the same `changeset_id` and the same canonical hash
-- **WHEN** `validate_changeset_v1` runs again
-- **THEN** the diff status MUST equal the prior status `NO_CHANGE` or `CHANGE`
+- **WHEN** `validate_changeset` runs again with the same inputs
+- **THEN** the status MUST equal the prior `NO_OP` or `OK`
 - **AND** the pure function MUST NOT persist a new idempotency record
 
-### Requirement: Operation target identity
+### Requirement: CampaignResourceRef identity
 
-Each operation MUST include `operation_id`, a target, `field`, `requested_value`,
-and `expected_current_value`. The target MUST name a registered settings source,
-the PostgreSQL `adv_setting_id` anchor, and `leg_role` of `AUTO`, `SEARCH`, or
-`ROW` when the source is row-scoped. Auto and Search legs MUST remain distinct
-targets. An unsupported source, campaign type, or leg MUST yield `REJECTED`
-for the whole ChangeSet.
+Each operation MUST include `operation_id`, a `CampaignResourceRef` (or equivalent
+target field in WIP `ChangeSetV1`) resolved through the `cmp_*` resource registry,
+and payload for one bounded policy operation. Unresolved or unknown resources MUST
+yield `REJECTED` for the whole ChangeSet. The plan MUST NOT introduce a parallel
+target schema using only `adv_setting_id` and `leg_role` as the ChangeSet owner
+identity model.
 
-#### Scenario: Auto and Search targets stay separate
+#### Scenario: cmp_star resource identity binds the diff
 
-- **GIVEN** one snapshot row with auto `adv_id` A and search `search_adv_id` K
-- **AND** a ChangeSet operation whose target leg is `SEARCH`
-- **WHEN** validation builds the diff
-- **THEN** the diff MUST bind the field to the Search leg identity
-- **AND** MUST NOT show the Auto leg value as `old_value`
-- **AND** MUST NOT merge A and K into one synthetic campaign id
+- **GIVEN** an injected snapshot where a `cmp_*` resource maps to a known campaign resource row
+- **AND** an operation targeting that `CampaignResourceRef`
+- **WHEN** dry-run builds `SemanticDiffEntryV1`
+- **THEN** the diff MUST bind to that resource identity
+- **AND** MUST NOT synthesize a second parallel target key outside `cmp_*` / `CampaignResourceRef`
 
-#### Scenario: Unsupported campaign source or type is REJECTED
+#### Scenario: Unresolved CampaignResourceRef is REJECTED
 
-- **GIVEN** an operation whose target source or campaign type is not registered
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-- **AND** no field diff MUST be marked actionable
+- **GIVEN** an operation whose `CampaignResourceRef` does not resolve in the injected registry snapshot
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
 
 #### Scenario: Duplicate operation id rejects the changeset
 
 - **GIVEN** two operations in one ChangeSet with the same `operation_id`
 - **WHEN** structural validation runs
-- **THEN** the diff status MUST be `REJECTED`
+- **THEN** the status MUST be `REJECTED`
 - **AND** neither operation MUST be partially accepted
 
 ### Requirement: mutation_policy extension
 
-Mutable fields MUST be declared in `mutation_policy` keyed by the existing
-campaign settings registry. A declaration MUST state mutability, supported
-target scope, normalization via the registry `NormalizationPolicy`, allowed
-value domain, required capabilities, and precondition requirement. Excel
-`editable` MUST NOT by itself make a field mutable. Fields with semantic role
-other than `setting`, and settings without a mutation entry, MUST be rejected
-as read-only or unsupported. Unknown fields MUST fail closed.
+Mutable fields and bounded operations MUST be declared in `mutation_policy` (or
+equivalent WIP policy tables) keyed to registry and operation types. Declarations
+MUST cover mutability, normalization, allowed domain, capability requirements, and
+precondition requirements. Unknown registry fields and unsupported operations MUST
+fail closed. Excel `editable` MUST NOT alone grant mutability.
 
-#### Scenario: Unsupported field is REJECTED
+#### Scenario: Unsupported mutation is REJECTED
 
-- **GIVEN** an operation whose `field` is absent from the registry and from `mutation_policy`
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-
-#### Scenario: Read-only field is REJECTED
-
-- **GIVEN** an operation that targets an identity, WB-fact, runtime, derived, or technical field
-- **OR** a setting field with no mutable `mutation_policy` entry
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-- **AND** the reason MUST identify the field as not mutable
+- **GIVEN** an operation type or field not covered by `mutation_policy` / bounded op set
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
 
 #### Scenario: Invalid value is REJECTED
 
-- **GIVEN** a mutable field whose requested value is outside the normalization domain or `allowed_values`
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
+- **GIVEN** a mutable operation whose requested value is outside normalization or allowed domain
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
 
 #### Scenario: Unknown capability is REJECTED
 
-- **GIVEN** a mutation policy or caller grant that names a capability outside the closed capability catalog
-- **OR** a required capability that was not granted
+- **GIVEN** a policy or grant naming a capability token outside the known catalog
 - **WHEN** capability validation runs
-- **THEN** the diff status MUST be `REJECTED`
+- **THEN** the status MUST be `REJECTED`
+
+#### Scenario: Unsupported capability tri-state is REJECTED
+
+- **GIVEN** a required capability that evaluates to unsupported in the existing tri-state model
+- **WHEN** capability validation runs
+- **THEN** the status MUST be `REJECTED`
 
 ### Requirement: Validation pipeline and normalization
 
-The validator MUST run in this order: structural validation, identity
-resolution, registry field validation, normalization, domain validation,
-capability validation, current-state precondition validation, then
-deterministic diff. A later step MUST NOT run as an accepting path after an
-earlier rejection. Normalization MUST use `normalize_value` from the campaign
-settings contract. Cross-field invariants MUST NOT be encoded only as JSON
-Schema or only as a registry row; a declared invariant with unknown
-implementation state MUST fail closed.
+The validator MUST run: structural validation, `state_token` binding, resource
+resolution, registry/`mutation_policy`, normalization via
+`campaign_settings_contract.normalize_value` for registered settings fields,
+deterministic domain validation, capability validation, optional
+`expected_current_value` check, then diff. Cross-field invariants MUST use named
+domain validators. A declared invariant without implementation MUST fail closed.
 
 #### Scenario: Normalization records requested and normalized values
 
-- **GIVEN** a mutable numeric or boolean field whose requested representation differs in form from the canonical value
-- **AND** the normalized value differs from the current value
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `CHANGE`
-- **AND** `requested_value` MUST preserve the request
-- **AND** `normalized_value` MUST equal the registry normalizer output
+- **GIVEN** a mutable settings field whose requested representation differs in form from the canonical value
+- **AND** normalized value differs from the current value at `state_token`
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `OK`
+- **AND** `SemanticDiffEntryV1` MUST preserve requested and normalized values
 
-#### Scenario: Normalized value equal to current is NO_CHANGE
+#### Scenario: No semantic change is NO_OP
 
-- **GIVEN** every operation normalizes to the current snapshot value
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `NO_CHANGE`
-- **AND** no actionable field change MUST be emitted
+- **GIVEN** every operation normalizes to the current snapshot value at `state_token`
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `NO_OP`
+- **AND** no actionable semantic change MUST be emitted
+
+#### Scenario: Deterministic diff for identical inputs
+
+- **GIVEN** two dry-run invocations with the same ChangeSet, snapshot, grants, and prior record injection
+- **WHEN** `validate_changeset` runs twice
+- **THEN** status and `SemanticDiffEntryV1` lists MUST be byte-for-byte equivalent
+
+### Requirement: Precondition under state_token
+
+`state_token` is the only concurrency contract. `expected_current_value`, when
+present, is a field-level semantic precondition evaluated only against the snapshot
+generation identified by `state_token`. Omitting `expected_current_value` does not
+bypass `state_token`. The validator MUST NOT open PostgreSQL or take distributed
+locks.
+
+#### Scenario: expected_current_value mismatch is REJECTED
+
+- **GIVEN** a valid `state_token`
+- **AND** an operation with `expected_current_value` that differs from the snapshot field after normalization
+- **WHEN** precondition validation runs
+- **THEN** the status MUST be `REJECTED`
+
+#### Scenario: Omitting expected_current_value does not bypass state_token
+
+- **GIVEN** an operation with no `expected_current_value` key
+- **AND** an invalid or missing `state_token`
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
+- **AND** omission MUST NOT be treated as acceptance
 
 ### Requirement: Atomic ChangeSet
 
-A ChangeSet MUST be atomic. If any operation is invalid, the ChangeSet status
-MUST be `REJECTED`. Valid sibling operations in the same document MUST NOT be
-returned as actionable `CHANGE` entries.
+A ChangeSet MUST be atomic. Any invalid operation MUST yield `REJECTED` for the
+entire document.
 
-#### Scenario: Multiple operations produce one atomic CHANGE
+#### Scenario: Multiple valid operations produce one OK
 
-- **GIVEN** two operations on two different mutable fields of one resolved target
-- **AND** both preconditions match and both normalized values differ
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `CHANGE`
-- **AND** both field diffs MUST be present
+- **GIVEN** two valid operations on distinct fields or resources
+- **AND** a matching `state_token`
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `OK`
+- **AND** both semantic diffs MUST be present
 
 #### Scenario: Mixed valid and invalid operations reject the whole changeset
 
-- **GIVEN** one valid mutable operation and one unsupported or invalid operation
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-- **AND** the valid operation MUST NOT be marked actionable `CHANGE`
+- **GIVEN** one valid operation and one unsupported or invalid operation
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
+- **AND** the valid operation MUST NOT appear as actionable `OK`
 
-#### Scenario: Duplicate target field rejects the changeset
+#### Scenario: Duplicate target mutation rejects the changeset
 
-- **GIVEN** two operations with different `operation_id` values that name the same target and the same field
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-
-### Requirement: Precondition and missing state
-
-Every operation MUST carry `expected_current_value`. Omission MUST NOT be
-treated as null. The value MUST be compared after normalization to the
-injected current snapshot. A mismatch MUST yield `REJECTED`. A missing
-snapshot or an unresolved target row MUST yield `REJECTED`. The validator
-MUST NOT take a distributed lock and MUST NOT read or write PostgreSQL itself.
-
-#### Scenario: Stale expected current value is REJECTED
-
-- **GIVEN** a mutable operation whose normalized `expected_current_value` differs from the snapshot
-- **WHEN** precondition validation runs
-- **THEN** the diff status MUST be `REJECTED`
-- **AND** the reason MUST identify a stale precondition
-
-#### Scenario: Missing current state is REJECTED
-
-- **GIVEN** no current snapshot for the operation target
-- **WHEN** `validate_changeset_v1` runs
-- **THEN** the diff status MUST be `REJECTED`
-- **AND** the reason MUST identify missing current state
+- **GIVEN** two operations with different `operation_id` values targeting the same resource and the same mutable field or op slot
+- **WHEN** `validate_changeset` runs
+- **THEN** the status MUST be `REJECTED`
 
 ### Requirement: No production write
 
-`validate_changeset_v1` and the diff builder MUST NOT call WB API writers,
-PostgreSQL settings writers, ClickHouse writers, `apply_adv_excel_rows`,
-shop-runner mutation, Telegram, MCP, or a public apply API. Rejection and
-acceptance both leave current settings unchanged.
+`validate_changeset` and the diff builder MUST NOT call WB API writers, PostgreSQL
+settings writers, ClickHouse writers, `apply_adv_excel_rows`, shop-runner mutation,
+Telegram, MCP, public apply, or the MIXED
+`campaigns_info_v2/adapter.py`.
 
 #### Scenario: Validation result does not perform production writes
 
-- **GIVEN** a ChangeSet that validates to `CHANGE`, `NO_CHANGE`, or `REJECTED`
-- **WHEN** `validate_changeset_v1` returns
+- **GIVEN** a ChangeSet that dry-runs to `OK`, `NO_OP`, or `REJECTED`
+- **WHEN** `validate_changeset` returns
 - **THEN** no forbidden adapter MUST be invoked
-- **AND** the function result MUST be only the diff or rejection document
+- **AND** the result MUST be only the dry-run status and diff or rejection document

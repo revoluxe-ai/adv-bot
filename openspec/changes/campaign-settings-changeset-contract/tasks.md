@@ -1,36 +1,35 @@
-## 1. Reconciliation gate
+## 1. Reconciliation gate (historical + resolved)
 
 - [x] 1.1 Before any production edit, record the local `wb_sky_control_plane` WIP reconciliation result. If that WIP already contains a ChangeSet contract, stop and reconcile; do not invent a second contract.
-  - **Evidence (2026-10-05):** Verdict **CONFLICT**. Only inspected worktree: `C:/Users/vkita/my_code/meta-repo/adv-bot`, branch `stage`, HEAD `751e7bd29`, dirty (not modified by this recording). Untracked WIP: `app/modules/wb_sky_control_plane/` (38 Python files), `tests/unit/wb_sky_control_plane/` (9 tests), Alembic `e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py`. Local `ChangeSetV1` lives in that package (`models/changeset.py`, `validate_changeset` in `kernel/validate.py`), not in `campaign_settings_contract`. Forty-four other adv-bot worktrees: no `wb_sky_control_plane`. Local `stage` is 2 commits behind `origin/stage`. Implementation of tasks 2+ is **STOPPED** until a later reconciliation returns **NO_CONFLICT**; this recording is not NO_CONFLICT. Full write-up: project store doc `changeset-local-wip-reconciliation.md` (`/cursor/stores/self/docs/changeset-local-wip-reconciliation.md`).
-- [x] 1.2 Confirm `origin/stage` still has no `app/modules/wb_sky_control_plane/` and no `ChangeSetV1` type. Do not create that package.
-  - **Evidence:** `origin/stage` remains at `23c0671f372f0435b13a3573ec8990b4303b3e4a` with no `app/modules/wb_sky_control_plane/` and no `ChangeSetV1` in `campaign_settings_contract`. This OpenSpec change does not create that package. See `changeset-local-wip-reconciliation.md` (project store path above).
+  - **Evidence (2026-10-05):** Verdict **CONFLICT**. Only inspected worktree: `C:/Users/vkita/my_code/meta-repo/adv-bot`, branch `stage`, HEAD `751e7bd29`, dirty (not modified by this recording). Untracked WIP: `app/modules/wb_sky_control_plane/` (38 Python files), `tests/unit/wb_sky_control_plane/` (9 tests), Alembic `e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py`. Local `ChangeSetV1` lives in that package (`models/changeset.py`, `validate_changeset` in `kernel/validate.py`), not in `campaign_settings_contract`. Forty-four other adv-bot worktrees: no `wb_sky_control_plane`. Local `stage` is 2 commits behind `origin/stage`. Full write-up: `/cursor/stores/bc-18f0b34a-df7b-4a06-b47a-7bfd4a10a089/docs/changeset-local-wip-reconciliation.md` (mirror: `/cursor/stores/self/docs/changeset-local-wip-reconciliation.md`).
+- [x] 1.2 Confirm `origin/stage` still has no committed `app/modules/wb_sky_control_plane/` and no `ChangeSetV1` in `campaign_settings_contract`.
+  - **Evidence:** `origin/stage` at `23c0671f372f0435b13a3573ec8990b4303b3e4a` has no committed control-plane package. See reconciliation doc above.
+- [x] 1.3 Owner reconciliation replan (2026-10-05): **REUSE_DECISION = EXTEND_EXISTING** — canonical `ChangeSetV1` and `validate_changeset` remain in `wb_sky_control_plane`; `campaign_settings_contract` is registry/normalization reuse only. Historical **CONFLICT** is no longer an unresolved blocker; **IMPLEMENTATION_BLOCKER = LOCAL_FOUNDATION_ADOPTION_REQUIRED**. Cite: `changeset-local-wip-reconciliation.md` (paths above).
 
-## 2. Domain types
+## 2. Adoption gate (before any product code)
 
-- [ ] 2.1 Add `ChangeSetV1`, operation, target, and diff dataclasses or pydantic models in `app/modules/campaign_settings_contract/` with `schema_version=changeset.v1`.
-- [ ] 2.2 Add `mutation_policy` entries only for registry fields whose `target_scope` is explicit. Leave unclassified settings non-mutable.
-- [ ] 2.3 Add the closed capability catalog `settings_mutation` and `campaign_lifecycle`.
-- [ ] 2.4 Export the pure `validate_changeset_v1` function. It MUST accept the changeset, an injected current snapshot, an injected capability grant, and `PriorChangeSetRecord | None`.
+- [ ] **LOCAL_FOUNDATION_ADOPTION_REQUIRED** — Record an explicit local preservation checkpoint that binds the exact owned paths (`app/modules/wb_sky_control_plane/**`, `tests/unit/wb_sky_control_plane/**`, Alembic `e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py`, and related WIP files) to change `campaign-settings-changeset-contract`. Do **not** claim existing HOME-PC dirty WIP already belongs to PR #449 without this checkpoint.
 
-## 3. Pipeline and diff
+## 3. Extend control plane (after adoption only)
 
-- [ ] 3.1 Implement structural, identity, registry, normalization (`normalize_value`), domain, capability, and precondition steps in that order.
-- [ ] 3.2 Implement atomic outcomes `NO_CHANGE`, `CHANGE`, and `REJECTED` with `field`, `old_value`, `requested_value`, and `normalized_value` only for actionable changes.
-- [ ] 3.3 Implement in-document duplicate `operation_id` and duplicate target+field rejection.
-- [ ] 3.4 Implement injected prior-record semantics for duplicate `changeset_id` without a database.
-- [ ] 3.5 Keep cross-field invariants out of the policy table. An unimplemented declared invariant MUST reject.
+- [ ] 3.1 Bind adopted WIP `ChangeSetV1` (`models/changeset.py`); do **not** create a second `ChangeSetV1` type or parallel package.
+- [ ] 3.2 Extend `mutation_policy` semantics for existing bounded operations (WIP examples include `SetBudgetPolicyOperation`; full set from `changeset.py` at adoption).
+- [ ] 3.3 Wire registered settings fields to `campaign_settings_contract.normalize_value`; control plane still owns ChangeSet and dry-run.
+- [ ] 3.4 Extend existing capability **tri-state**; unknown/unsupported tokens fail closed.
+- [ ] 3.5 Extend `validate_changeset` (`kernel/validate.py`) for dry-run only: injected snapshot, `state_token`, capability grant, `PriorChangeSetRecord | None`. **Do not** add `validate_changeset_v1` to `campaign_settings_contract`.
+- [ ] 3.6 Emit `SemanticDiffEntryV1` and statuses `NO_OP | OK | REJECTED`; implement idempotency contract (in-document duplicate `operation_id`; injected `changeset_id` hash conflict/replay) without durable store.
+- [ ] 3.7 Implement named domain validators for declared cross-field invariants; unimplemented declared invariant → atomic `REJECTED`.
 
-## 4. Tests
+## 4. Tests (after adoption only)
 
-- [ ] 4.1 Add unit scenario seams for every `#### Scenario` in `specs/campaign-settings-changeset-contract/spec.md`, including Auto versus Search separation and the paired assertion that forbidden adapters are not called.
-- [ ] 4.2 Assert mixed valid/invalid operations reject the whole ChangeSet.
-- [ ] 4.3 Assert missing snapshot, stale precondition, unknown capability, read-only field, and unsupported field.
-- [ ] 4.4 Do not add PostgreSQL, ClickHouse, WB, Excel, or shop-runner integration tests in this change.
+- [ ] 4.1 Unit scenario seams for every `#### Scenario` in `specs/campaign-settings-changeset-contract/spec.md` against real `validate_changeset` and real `normalize_value` where applicable.
+- [ ] 4.2 Assert atomic mixed valid/invalid rejection; stale/missing `state_token`; capability unknown/unsupported; forbidden adapters not called (including MIXED `campaigns_info_v2/adapter.py`).
+- [ ] 4.3 No PostgreSQL, ClickHouse, WB, Excel, or shop-runner integration tests in this change.
 
 ## 5. Non-goals check
 
-- [ ] 5.1 Diff the change and confirm there is no call to `apply_adv_excel_rows`, WB write clients, PostgreSQL writes, or ClickHouse writes.
-- [ ] 5.2 Confirm Telegram payload surfaces are unchanged. No bot text, callback, or keyboard edits.
+- [ ] 5.1 Diff confirms no `apply_adv_excel_rows`, WB write clients, PostgreSQL settings writes, ClickHouse writes, or MIXED adapter use on the dry-run path.
+- [ ] 5.2 Telegram payload surfaces unchanged. Checklist N/A for this change.
 
 ## Telegram UI / Message Safety
 
