@@ -45,6 +45,9 @@ _RAW_SHA256_BY_FILENAME: dict[str, str] = {
     "006_create_campaign_settings_history.sql": (
         "424ee03f2521eeeceb4f35a9276fbc13c678f8322382d69a7059c5682d332eb2"
     ),
+    "007_create_shop_campaign_inventory_and_availability.sql": (
+        "064772c5448a9824731cc8483a653e60b0c6a11f90937594b9ffd70a511479ab"
+    ),
 }
 
 _004_FILENAME = "004_create_auto_shelf_bid_increment_tables.sql"
@@ -53,10 +56,18 @@ _004_DEFAULT_DB_OBJECTS: tuple[str, ...] = (
     "CREATE TABLE IF NOT EXISTS default_db.auto_shelf_bid_prev",
 )
 
-_CORPUS_REVISION_IDS: tuple[str, ...] = ("001", "002", "003", "004", "005", "006")
+_CORPUS_REVISION_IDS: tuple[str, ...] = (
+    "001",
+    "002",
+    "003",
+    "004",
+    "005",
+    "006",
+    "007",
+)
 _ALEMBIC_REVISION_LINE = re.compile(
     r"(?m)^(?:Revision ID:\s*|revision\s*(?::\s*str\s*)?=\s*)['\"]?"
-    r"(00[1-6])['\"]?\s*$"
+    r"(00[1-7])['\"]?\s*$"
 )
 _TEXT_SUFFIXES: frozenset[str] = frozenset({".py", ".mako", ".ini", ".toml", ".cfg"})
 
@@ -140,15 +151,12 @@ def _alembic_text_files() -> list[Path]:
 
 
 def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
-    """Проверяет, что чужие слои не стали корпусом и ``006`` сюда не втянут.
+    """Проверяет, что Alembic и session DDL не стали корпусом ClickHouse.
 
     Spec ``clickhouse-migration-lifecycle``, сценарии ``Alembic stays out of
-    ClickHouse migrations``, ``Test DDL is not canonical``, ``Missing 006 is
-    not imported``, ``Shop-wide expansion waits``. Здесь только неизменность
-    чужих деревьев: Alembic не содержит ревизии ``001``–``005``, тестовый DDL
-    ``test_adv_bot_clickhouse`` не лежит в каталоге корпуса, файл ``006`` в
-    этом worktree не читается и не копируется, каталог корпуса не расширяется
-    shop-wide. Запрет импорта в запускаторе остаётся срезу 14.
+    ClickHouse migrations`` и ``Test DDL is not canonical``. Корпус ``001``–``007``
+    лежит только в ``scripts/clickhouse_migrations``; чужие ``008``+ не
+    подмешиваются из соседних worktree.
     """
     corpus_resolved = _CORPUS_DIR.resolve()
     destructive_resolved = _DESTRUCTIVE_CH_RESET.resolve()
@@ -162,12 +170,12 @@ def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
         assert "test_adv_bot_clickhouse" not in corpus_text
         assert "destructive_ch_reset" not in corpus_text
 
-    copied_007 = [
+    copied_008 = [
         path
         for path in _CORPUS_DIR.rglob("*")
-        if path.is_file() and path.name.startswith("007")
+        if path.is_file() and path.name.startswith("008")
     ]
-    assert copied_007 == []
+    assert copied_008 == []
     assert sorted(path.name for path in _CORPUS_DIR.iterdir() if path.is_file()) == (
         sorted(_RAW_SHA256_BY_FILENAME)
     )
@@ -196,4 +204,3 @@ def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
         relative = path.resolve().relative_to(_REPO_ROOT)
         assert relative.parts[0] not in {"k8s", "dockers"}
         assert path.name != ".env"
-        assert not path.name.startswith("007")

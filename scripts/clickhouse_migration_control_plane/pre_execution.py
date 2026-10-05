@@ -309,7 +309,7 @@ def gate_corpus(
     Returns:
         Отказ команды либо ``None``, если корпус совпал с отпечатком.
     """
-    if unreviewed_numeric_filenames(corpus_dir) != ():
+    if unreviewed_numeric_filenames(corpus_dir, recorded) != ():
         return CommandResult(success=False, code="unreviewed_version")
     try:
         current = accept_corpus(corpus_dir)

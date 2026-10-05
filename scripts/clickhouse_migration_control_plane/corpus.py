@@ -28,6 +28,10 @@ _CANONICAL_FILES: tuple[tuple[str, str], ...] = (
     ("004", "004_create_auto_shelf_bid_increment_tables.sql"),
     ("005", "005_grant_system_log_truncate_to_adv_bot_user.sql"),
     ("006", "006_create_campaign_settings_history.sql"),
+    (
+        "007",
+        "007_create_shop_campaign_inventory_and_availability.sql",
+    ),
 )
 
 # SHA-256 сырых байтов канонических файлов, включая комментарии и переводы
@@ -68,6 +72,12 @@ _IMMUTABLE_IDENTITY: tuple[tuple[str, str, str, str], ...] = (
         "006_create_campaign_settings_history.sql",
         _SCHEMA_DDL,
         "424ee03f2521eeeceb4f35a9276fbc13c678f8322382d69a7059c5682d332eb2",
+    ),
+    (
+        "007",
+        "007_create_shop_campaign_inventory_and_availability.sql",
+        _SCHEMA_DDL,
+        "064772c5448a9824731cc8483a653e60b0c6a11f90937594b9ffd70a511479ab",
     ),
 )
 
@@ -192,15 +202,23 @@ def immutable_fingerprint() -> CorpusFingerprint:
     return CorpusFingerprint(versions=versions)
 
 
-def unreviewed_numeric_filenames(corpus_dir: Path) -> tuple[str, ...]:
+def unreviewed_numeric_filenames(
+    corpus_dir: Path,
+    recorded: CorpusFingerprint | None = None,
+) -> tuple[str, ...]:
     """Имена ``*.sql`` с числовым префиксом вне отпечатка пакета.
 
     Spec ``clickhouse-migration-lifecycle``: такой файл, включая
     непроверенный ``006`` в каталоге чтения, есть ``unreviewed_version``.
     Имя без числового префикса, в том числе session DDL, сюда не входит.
     Функция файл не исполняет и в отпечаток не добавляет.
+
+    Args:
+        corpus_dir: каталог, где лежат файлы миграций.
+        recorded: принятый отпечаток пакета; по умолчанию ``immutable_fingerprint``.
     """
-    reviewed = frozenset(version.id for version in immutable_fingerprint().versions)
+    fingerprint = recorded if recorded is not None else immutable_fingerprint()
+    reviewed = frozenset(version.id for version in fingerprint.versions)
     found: list[str] = []
     for path in sorted(corpus_dir.iterdir()):
         if not path.is_file() or path.suffix != ".sql":
