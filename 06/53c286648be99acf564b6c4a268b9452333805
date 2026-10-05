@@ -1,0 +1,18 @@
+openspec/specs/ai-package-full-export/spec.md
+  h_267f51d775769b 1-38
+openspec/specs/ai-package-v1-contract-tests/spec.md
+  h_267f51d775769b 274-294
+openspec/specs/ai-package-v1-exporter/spec.md
+  h_267f51d775769b 303-323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0653c286648be99acf564b6c4a268b9452333805",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
