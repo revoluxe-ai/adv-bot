@@ -1,0 +1,19 @@
+openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/SHOP_WIDE_COMMON_SALES_LIFECYCLE_REPORT.md
+  s_de18cb5af00332::t_60efee3ca1c6bc 1-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8938428d2c05d3fcfa86024ed88729f125026ebe",
+  "prompts": {},
+  "sessions": {
+    "s_de18cb5af00332": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ed8bea38-b44a-4e05-a8cc-2b7c5750e576",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
