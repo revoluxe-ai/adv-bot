@@ -1,0 +1,22 @@
+# FULL_AI_PACKAGE_ACCEPTANCE_REPORT
+
+Evidence from `tests/unit/ai_package_v1/test_full_package_acceptance.py` (unit fixtures).
+
+```text
+PACKAGE_GENERATED: YES
+MANIFEST: PASS
+DATA_MAP: PASS
+PACKAGE_SUMMARY: PASS
+FAMILY_STATUS_EXPLICIT: YES
+CURRENT_SETTINGS: PARTIAL (by design — PG PARTIAL sync)
+SETTINGS_HISTORY: GAP
+CHANGE_EVENTS: GAP
+KEYWORD_HISTORY: PARTIAL (fixture-bound keyword export)
+COMMON_SALES: GAP
+CAMPAIGN_ADVERTISING: PARTIAL (empty CH rows in fixture)
+JOINABILITY: PASS (campaign_identity + join_keys in summary/DATA_MAP)
+MISSING_ZERO_NULL: PASS
+COVERAGE_METADATA: PASS
+DETERMINISM: PASS (fixed generated_at byte-stable ZIP)
+AI_READABILITY: PASS
+```
