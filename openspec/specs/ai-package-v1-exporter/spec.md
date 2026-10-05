@@ -109,19 +109,26 @@ or as shop product orders/sales.
 ### Requirement: PostgreSQL campaign inventory and relations (minimal v1)
 
 The export MAY include a PostgreSQL **campaign inventory / relations** dataset
-(manifest card id `campaign_settings_snapshot`) with **only** minimal
-shop-scoped fields: `AdvSetting` rows joined to `WBCabinet.shop_id`, campaign
-identifiers, and Auto/Search id linkage per repo evidence. Export MUST NOT
-treat this dataset as a **detailed** field-level advertising **settings**
-snapshot. Full detailed settings export is **out of v1** (future change
-`ai-package-campaign-settings-snapshot`).
+(manifest card id `campaign_settings_snapshot`). When change
+`ai-package-campaign-settings-snapshot` is applied, export MUST materialize the
+**detailed** read-only campaign settings snapshot defined by
+`ai-package-campaign-settings-snapshot` spec (`CampaignSettingsSnapshotV1`) for
+in-scope shop inventory rows. Until that implementation lands, export MAY continue
+minimal shop-scoped fields only: `AdvSetting` rows joined to `WBCabinet.shop_id`,
+campaign identifiers, and Auto/Search id linkage per repo evidence.
+
+Minimal-only export MUST NOT claim detailed field-level advertising settings
+coverage. Detailed export MUST NOT treat this dataset as a **detailed** snapshot
+without the dedicated domain contract, provenance, and leg model from change
+`ai-package-campaign-settings-snapshot`.
 
 Inclusion requires a proven read-only PG seam (`get_async_session_maker(read_only=True)`,
 shop-scoped SELECT only, no WB writes, no `WBShopDataManager` orchestrator).
 When the seam is not defensible at apply time, export MUST emit dataset-level
 `UNKNOWN` or omit with explicit `reason_codes`, not fabricated inventory or
 detailed settings rows. When included with partial discovery, `coverage` MUST
-reflect **PARTIAL** inventory (not FULL WB cabinet campaign universe).
+reflect **PARTIAL** inventory or **PARTIAL** detailed settings — not FULL WB
+cabinet campaign universe.
 
 #### Scenario: PG inventory is read-only minimal grain
 
@@ -129,15 +136,24 @@ reflect **PARTIAL** inventory (not FULL WB cabinet campaign universe).
 - **WHEN** export reads PG for shop S
 - **THEN** only SELECT/read-only session patterns MUST be used
 - **AND** `bot_active`, mode defaults, or WB write side effects MUST NOT occur
-- **AND** rows MUST represent shop-scoped inventory/relations only (not full
-  detailed settings field export)
+- **AND** rows MUST represent shop-scoped inventory/relations (not full
+  detailed settings field export unless detailed snapshot change is applied)
 
 #### Scenario: Detailed settings not implied by inventory card
 
-- **GIVEN** v1 export for shop S
+- **GIVEN** v1 export for shop S without detailed snapshot implementation
 - **WHEN** manifest describes `campaign_settings_snapshot`
 - **THEN** export MUST NOT claim complete detailed advertising settings coverage
 - **AND** absence of detailed settings MUST NOT be masked as FULL settings snapshot
+
+#### Scenario: Detailed settings export uses dedicated contract when applied
+
+- **GIVEN** change `ai-package-campaign-settings-snapshot` is implemented
+- **WHEN** export materializes `campaign_settings_snapshot` for shop S
+- **THEN** payload MUST conform to `CampaignSettingsSnapshotV1`
+- **AND** manifest card MUST declare detailed settings export semantics
+- **AND** Auto and Search legs MUST remain distinguishable in payload
+- **AND** export MUST NOT serialize control-plane `CampaignResourceSnapshotV1` as the payload
 
 ### Requirement: Shop product orders and sales unassigned
 
@@ -203,3 +219,84 @@ for identical inputs (stable ordering, stable serialization).
 - **GIVEN** identical PG/CH snapshot inputs and export parameters
 - **WHEN** export runs twice
 - **THEN** per-file `sha256` and manifest hash MUST match
+
+### Requirement: Keyword performance datasets in ExportService
+
+`ExportService` MUST integrate keyword performance datasets under logical prefix
+`keyword_performance/` as part of the single AI Package export. A second exporter
+MUST NOT be introduced.
+
+#### Scenario: Keyword datasets in same manifest
+
+- **GIVEN** keyword export enabled for shop S
+- **WHEN** `ExportService.export` completes
+- **THEN** manifest MUST list keyword dataset cards alongside existing v1 datasets
+- **AND** MUST NOT require separate export invocation
+
+#### Scenario: ExportService remains sole authority
+
+- **WHEN** AI Package ZIP is produced for keyword feature
+- **THEN** orchestration MUST flow through `ExportService`
+- **AND** MUST NOT use standalone script as sole authority
+
+### Requirement: DATA_MAP and coverage root files in manifest
+
+Export MUST emit `DATA_MAP.json` and `coverage.json` as manifest payload files with
+sha256 descriptors. Tampered DATA_MAP MUST fail validation.
+
+#### Scenario: DATA_MAP in file descriptors
+
+- **WHEN** export completes with keyword feature
+- **THEN** manifest.files MUST include DATA_MAP.json sha256
+- **AND** validator MUST verify hash on decode
+
+### Requirement: Keyword history bounds documented vs ExportPeriod
+
+Manifest `period` MUST continue describing caller bounds for legacy datasets.
+Keyword datasets MUST document `all_available` bounds separately in DATA_MAP and
+coverage metadata.
+
+#### Scenario: Dual bounds documented
+
+- **WHEN** DATA_MAP emitted
+- **THEN** MUST contain `export_period_bounds` and `keyword_history_bounds` sections
+- **AND** keyword_history_bounds MUST reflect CH MIN/MAX not ExportPeriod clip
+
+### Requirement: Default keyword assembler in ExportService
+
+`ExportService` MUST default-build `KeywordPerformanceAssembler` when the
+constructor param is omitted — same pattern as `CampaignSettingsAssembler`
+(`export_service.py:93-98`). Default export MUST include keyword datasets using
+real read-only readers.
+
+#### Scenario: Default export includes keyword datasets
+
+- **GIVEN** production wiring constructs `ExportService()` without keyword params
+- **WHEN** export completes for a shop with keyword history
+- **THEN** manifest MUST list keyword dataset cards and payloads
+- **AND** MUST NOT require optional feature flag opt-in
+
+### Requirement: Constructor-injected keyword seams for tests
+
+ExportService MUST accept optional constructor-injected keyword readers/assemblers
+so unit tests use fake CH/Redis without live stores.
+
+#### Scenario: Fake keyword reader in unit test
+
+- **GIVEN** test injects fake `KeywordPerformanceAssembler`
+- **WHEN** export runs
+- **THEN** MUST NOT open real ClickHouse client for keyword path
+
+### Requirement: Legacy export tests inject keyword fakes
+
+Existing ExportService integration tests MUST inject explicit fake keyword
+assemblers/readers to avoid live CH/Redis — same obligation as fake settings
+assemblers today. Silent keyword omission is forbidden.
+
+#### Scenario: Legacy integration test uses fake keyword assembler
+
+- **GIVEN** test constructs ExportService with fake settings assembler (existing pattern)
+- **WHEN** test also injects fake keyword assembler
+- **THEN** export MUST produce existing dataset cards without error
+- **AND** MUST NOT open live CH/Redis for keyword path
+
