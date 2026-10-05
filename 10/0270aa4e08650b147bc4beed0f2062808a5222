@@ -1,0 +1,18 @@
+openspec/changes/archive/2026-10-05-ai-package-campaign-settings-snapshot/scenario-coverage/audit.receipt.json
+  h_267f51d775769b 1-40
+openspec/changes/archive/2026-10-05-ai-package-campaign-settings-snapshot/scenario-coverage/audit.report.md
+  h_267f51d775769b 1-324
+openspec/specs/ai-package-campaign-settings-snapshot/spec.md
+  h_267f51d775769b 1-167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "100270aa4e08650b147bc4beed0f2062808a5222",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
