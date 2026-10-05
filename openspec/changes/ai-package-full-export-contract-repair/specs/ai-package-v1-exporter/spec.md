@@ -14,8 +14,3 @@ The exporter MUST emit root `PACKAGE_SUMMARY.json` included in manifest `files` 
 ### Requirement: Canonical family status
 
 Family status in summary and gap catalog MUST use `COMPLETE|PARTIAL|GAP|UNSUPPORTED|FAILED` only. Shop product orders/sales feed MUST be `GAP`. Current settings MUST be `PARTIAL`. Settings history and change events MUST be `GAP` without collectors.
-
-#### Scenario: Shop feed GAP in summary
-
-- **WHEN** a full package is validated
-- **THEN** `shop_product_orders_sales_feed` family `canonical_status` MUST be `GAP` with explicit reasons
