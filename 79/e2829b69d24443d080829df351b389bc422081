@@ -1,0 +1,18 @@
+openspec/specs/ai-package-keyword-performance-history/spec.md
+  h_267f51d775769b 1-415
+openspec/specs/ai-package-v1-contract-tests/spec.md
+  h_267f51d775769b 99-104,106,108,113-273
+openspec/specs/ai-package-v1-exporter/spec.md
+  h_267f51d775769b 112-123,130-131,139-140,144,149-157,222-302
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "79e2829b69d24443d080829df351b389bc422081",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
