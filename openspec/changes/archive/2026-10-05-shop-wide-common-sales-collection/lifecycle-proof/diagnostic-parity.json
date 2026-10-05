@@ -1,0 +1,31 @@
+﻿{
+    "actual_stage_summary":  {
+                                 "filesAnalyzed":  755,
+                                 "errorCount":  4,
+                                 "warningCount":  0,
+                                 "informationCount":  0,
+                                 "timeInSec":  44.961
+                             },
+    "premerge_baseline_summary":  {
+                                      "filesAnalyzed":  743,
+                                      "errorCount":  4,
+                                      "warningCount":  0,
+                                      "informationCount":  0,
+                                      "timeInSec":  26.77
+                                  },
+    "merged_committed_summary":  {
+                                     "filesAnalyzed":  755,
+                                     "errorCount":  0,
+                                     "warningCount":  0,
+                                     "informationCount":  0,
+                                     "timeInSec":  26.417
+                                 },
+    "new_diagnostics":  [
+
+                        ],
+    "missing_baseline_diagnostics":  [
+
+                                     ],
+    "diagnostic_parity":  true,
+    "actual_stage_log_sha256":  "2f64f0755cccaf4837fba3ff9307406fa2728a558d4cef5b9f559a6513e04bf0"
+}

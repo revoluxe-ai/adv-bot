@@ -1,0 +1,57 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "shop-wide-campaign-data-collection",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-f61151add8956265",
+  "PLAN_CONTENT_HASH": "ad9cc4313ceeb1db9e5f1870249691d758851346c6e6c30b27cab5f4bbdd4387",
+  "PLAN_PATH": "openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 22,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01,S03,S20",
+      "L2:S02,S03,S04,S05,S06,S07,S08,S09,S15,S19,S20",
+      "L3:S15,S17,S20,S22",
+      "L4:S01,S05,S08,S14,S20",
+      "L5:S02,S06,S07,S09,S10,S13,S18,S20",
+      "L6:S11,S12,S15,S17,S20,S22",
+      "L7:S16,S17,S18,S19,S22",
+      "L8:S01,S04,S10,S20,S21"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/shop-wide-campaign-data-collection/design.md",
+      "content_hash": "0fe9723107e4e66639c6766b79961b8cb81f140ebdf3df259dd4823e69229d28"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/shop-wide-campaign-data-collection/specs/connected-shop-campaign-ad-data-collection/spec.md",
+        "content_hash": "1104371ec73e146256cbba8f42ae57f48f16415f3bdbbc844b4bd84392eb9679"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/shop-wide-campaign-data-collection/design.md#derived-lifecycle",
+      "content_hash": "0fe9723107e4e66639c6766b79961b8cb81f140ebdf3df259dd4823e69229d28"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/shop-wide-campaign-data-collection/owner-contract.md",
+      "content_hash": "2c930383860f870d6b6eadf66d00c2afb227fd31d90b8e1b6f325e8f686d41b9"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "0fe9723107e4e66639c6766b79961b8cb81f140ebdf3df259dd4823e69229d28",
+    "SPEC_REVISION": [
+      "1104371ec73e146256cbba8f42ae57f48f16415f3bdbbc844b4bd84392eb9679"
+    ],
+    "LIFECYCLE_REVISION": "0fe9723107e4e66639c6766b79961b8cb81f140ebdf3df259dd4823e69229d28",
+    "OWNER_CONTRACT_REVISION": "2c930383860f870d6b6eadf66d00c2afb227fd31d90b8e1b6f325e8f686d41b9"
+  },
+  "SUPERSEDES_PLAN_EVIDENCE_ID": "SCPV1-0e11e1d5c3a8b2bb",
+  "INVALIDATION_REASON": "migration sequence reconcile (2026-10-05): design Migration Plan records CH DDL 007 and control-plane terminology; scenario matrix unchanged",
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

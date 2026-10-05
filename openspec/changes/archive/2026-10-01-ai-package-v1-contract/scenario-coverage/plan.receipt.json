@@ -1,0 +1,65 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "ai-package-v1-contract",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-39d14fba55537e56",
+  "PLAN_CONTENT_HASH": "ef059c7b24f09214c905ca8efe3eafaef918daa4cb16e45aca1656b8023932ee",
+  "PLAN_PATH": "openspec/changes/ai-package-v1-contract/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/ai-package-v1-contract/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 26,
+  "SOURCE_SPEC_SHA": "a2869c4e6341958fdfb9fe9a6ebe473f854b989181d129dc9861881c26956632",
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01",
+      "L2:S01,S02,S07,S08,S10,S23,S25",
+      "L3:S03,S04,S06,S07,S20,S22,S23",
+      "L4:S03,S08,S09,S20",
+      "L5:S03,S10,S11,S14,S26",
+      "L6:S09,S12,S21",
+      "L7:S04,S13,S14,S15,S16,S22",
+      "L8:S17,S24",
+      "L9:S05,S18,S19,S20,S24"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/ai-package-v1-contract/design.md",
+      "content_hash": "f9fbb10fc3da8381252b4d53b545de0aff88f2a35804a2d4a746e1fb5700d5cf"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/ai-package-v1-contract/specs/ai-package-v1-contract-tests/spec.md",
+        "content_hash": "6531e49810361e604c1007b0ad5167335b419af06da2c9613d7f1b2d8df480cd"
+      },
+      {
+        "path": "openspec/changes/ai-package-v1-contract/specs/ai-package-v1-exporter/spec.md",
+        "content_hash": "621a2a3ca85e42a863f19eaaf50305e5b9e28c9c17ecc825bce3b53fe5078ef8"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/ai-package-v1-contract/design.md#derived-lifecycle",
+      "content_hash": "f9fbb10fc3da8381252b4d53b545de0aff88f2a35804a2d4a746e1fb5700d5cf"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/ai-package-v1-contract/owner-contract.md",
+      "content_hash": "a696763d0f544777288c6824e5119dbb482d52e6d0a860c196091a789674a551"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "f9fbb10fc3da8381252b4d53b545de0aff88f2a35804a2d4a746e1fb5700d5cf",
+    "SPEC_REVISION": [
+      "6531e49810361e604c1007b0ad5167335b419af06da2c9613d7f1b2d8df480cd",
+      "621a2a3ca85e42a863f19eaaf50305e5b9e28c9c17ecc825bce3b53fe5078ef8"
+    ],
+    "LIFECYCLE_REVISION": "f9fbb10fc3da8381252b4d53b545de0aff88f2a35804a2d4a746e1fb5700d5cf",
+    "OWNER_CONTRACT_REVISION": "a696763d0f544777288c6824e5119dbb482d52e6d0a860c196091a789674a551",
+    "SOURCE_SPEC_SHA": "a2869c4e6341958fdfb9fe9a6ebe473f854b989181d129dc9861881c26956632",
+    "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=plan change=ai-package-v1-contract"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "SUPERSEDES_PLAN_EVIDENCE_ID": "SCPV1-ce004c8dce3e693d"
+}

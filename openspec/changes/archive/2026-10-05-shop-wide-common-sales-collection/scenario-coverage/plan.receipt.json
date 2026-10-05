@@ -1,0 +1,57 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "shop-wide-common-sales-collection",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-shop-wide-common-sales-20261005-close",
+  "SUPERSEDES": "SCPV1-shop-wide-common-sales-20261005-repair",
+  "PLAN_CONTENT_HASH": "c7e5882345385f9f1c39dc2e252b58c0b10a2c9319efab9a1ad16cb1f834d4a0",
+  "PLAN_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/shop-wide-common-sales-collection/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 33,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S10",
+      "L2:S01,S01b,S01c",
+      "L3:S02,S04,S04b,S04c,S04d,S04e",
+      "L4:S03,S03b",
+      "L5:S06,S06b,S06c,S07-S07f,S08,S08b",
+      "L6:S11,S11b,S11c",
+      "L7:S05,S05b,S10",
+      "L8:S08,S08b"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/shop-wide-common-sales-collection/design.md",
+      "content_hash": "07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/shop-wide-common-sales-collection/specs/shop-wide-common-sales-collection/spec.md",
+        "content_hash": "5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/shop-wide-common-sales-collection/design.md#derived-lifecycle",
+      "content_hash": "07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/shop-wide-common-sales-collection/owner-contract.md",
+      "content_hash": "1ef750fb242b6092aa375c815de39557b9a1d78c36f3a9486a1ffd35c95817af"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9",
+    "SPEC_REVISION": [
+      "5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253"
+    ],
+    "LIFECYCLE_REVISION": "07ea6d4d241eae80785b53ee3b7ae2d36f750b8ed3def29e5eeb4dd03c4929c9",
+    "OWNER_CONTRACT_REVISION": "1ef750fb242b6092aa375c815de39557b9a1d78c36f3a9486a1ffd35c95817af"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "PLANNING_REPAIR_TASK_ID": "WB-SKY-COMMON-SALES-PLAN-CLOSE-20261005-0130"
+}

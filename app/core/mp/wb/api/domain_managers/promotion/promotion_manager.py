@@ -433,6 +433,18 @@ class PromotionManager:
         """Сырые элементы GET /api/advert/v2/adverts по числовым id (не путать с get_campaigns_info)."""
         return await self._client.campaigns_info_v2_adapter.get_campaigns_info(adv_ids)
 
+    async def discover_cabinet_campaigns(self) -> list[GetAdvertsAdvertsItem]:
+        """WB discovery всех кампаний кабинета для shop-wide collection tick (design L1).
+
+        Использует promotion_count + campaigns_info_v2 — тот же источник id, что
+        ``get_connect_existing_candidates`` и ``update_advs_data_from_wb_to_pg``.
+        """
+        adv_ids = await self._client.promotion_count_adapter.get_cabinet_adv_ids()
+        adapter = self._client.campaigns_info_v2_adapter
+        if adv_ids:
+            return await adapter.get_campaigns_info(adv_ids)
+        return await adapter.get_all_campaigns()
+
     async def get_campaign_status(self, adv_id: int) -> int | None:
         """Статус кампании на WB (например 7=завершена) или None, если не найдена.
 

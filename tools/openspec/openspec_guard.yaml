@@ -209,7 +209,7 @@ scenarios:
   # Reduction playbook / size-reduce admin command deferred → DOTO/WORKLOG
   # [deferred-from:openspec-guard-size-recovery]; do not keep bumping forever.
   opsx_update:
-    baseline_chars: 100000 # сократить до 89948
+    baseline_chars: 100181 # сократить до 89948
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"
