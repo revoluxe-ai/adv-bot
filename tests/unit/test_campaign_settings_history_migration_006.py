@@ -22,7 +22,10 @@ _RUNTIME_PACKAGE = _ROOT / "app" / "modules" / "campaign_settings_history"
 
 
 def test_006_exact_hash_and_schema_contract_are_reviewed() -> None:
-    """Spec campaign-settings-history: 006 has reviewed bytes and exact table shape."""
+    """Spec ``clickhouse-migration-lifecycle``, сценарий ``Reviewed 006 is accepted``.
+
+    Spec campaign-settings-history: 006 has reviewed bytes and exact table shape.
+    """
     raw = _MIGRATION.read_bytes()
     sql = raw.decode("utf-8")
     identity = next(

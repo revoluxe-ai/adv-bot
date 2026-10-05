@@ -1,3 +1,11 @@
+# campaign-settings-history Specification
+
+## Purpose
+Canonical campaign settings history contract: registry-backed settings snapshots,
+PostgreSQL authority, ClickHouse append-only history, Excel parity.
+
+## Requirements
+
 ## ADDED Requirements
 
 ### Requirement: Canonical campaign settings are versioned and source-authoritative
