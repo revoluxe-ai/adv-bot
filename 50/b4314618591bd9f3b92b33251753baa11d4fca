@@ -1,0 +1,23 @@
+openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/ARCHIVE_CLOSE_RECEIPT.md
+  s_de18cb5af00332::t_274bd9835733bc 1-98
+openspec/decisions/shop-wide-common-sales-ownership/decision.md
+  s_de18cb5af00332::t_1b5f7f88182220 1-132
+openspec/specs/shop-wide-common-sales-collection/spec.md
+  s_de18cb5af00332::t_7f933b35101711 1-414
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "50b4314618591bd9f3b92b33251753baa11d4fca",
+  "prompts": {},
+  "sessions": {
+    "s_de18cb5af00332": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "ed8bea38-b44a-4e05-a8cc-2b7c5750e576",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
