@@ -63,7 +63,7 @@ def build_keyword_daily_card(period: ExportPeriod, *, row_count: int) -> Dataset
         row_count=row_count,
         row_file=KEYWORD_DAILY_LOGICAL,
         source=PrimarySource.CLICKHOUSE_CLUSTERS_ADV_STATS,
-        grain="adv_id × nmid × norm_query × date",
+        grain="adv_id × leg_role × nmid × norm_query × date",
     )
 
 

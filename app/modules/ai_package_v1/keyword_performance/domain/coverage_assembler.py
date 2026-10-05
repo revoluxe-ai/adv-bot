@@ -31,9 +31,9 @@ _DAILY_METRICS = (
 
 def _identity_day_keys(
     daily_rows: list[KeywordDailyRowV1],
-) -> set[tuple[int, int, str, str]]:
+) -> set[tuple[int, str, int, str, str]]:
     return {
-        (r.adv_id, r.nmid, r.norm_query, r.date)
+        (r.adv_id, r.leg_role.value, r.nmid, r.norm_query, r.date)
         for r in daily_rows
         if r.snapshot_status.value != "AMBIGUOUS"
     }
@@ -45,14 +45,14 @@ def _identity_day_coverage_pct(
     first_available: date | None,
     last_available: date | None,
 ) -> float | None:
-    """Coverage at (adv_id, nmid, norm_query, date) grain."""
+    """Coverage at (adv_id, leg_role, nmid, norm_query, date) grain."""
     if first_available is None or last_available is None:
         return None
     calendar_days = (last_available - first_available).days + 1
     if calendar_days <= 0:
         return None
     identities = {
-        (r.adv_id, r.nmid, r.norm_query)
+        (r.adv_id, r.leg_role.value, r.nmid, r.norm_query)
         for r in daily_rows
         if r.snapshot_status.value != "AMBIGUOUS"
     }
@@ -80,12 +80,12 @@ def _per_metric_coverage(
         return {}
     result: dict[str, dict[str, int | float | None]] = {}
     for metric in _DAILY_METRICS:
-        observed_keys: set[tuple[int, int, str, str]] = set()
+        observed_keys: set[tuple[int, str, int, str, str]] = set()
         confirmed_zero = 0
         for row in daily_rows:
             if row.snapshot_status.value == "AMBIGUOUS":
                 continue
-            key = (row.adv_id, row.nmid, row.norm_query, row.date)
+            key = (row.adv_id, row.leg_role.value, row.nmid, row.norm_query, row.date)
             if key not in cohort:
                 continue
             value = getattr(row, metric, None)

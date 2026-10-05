@@ -16,11 +16,30 @@ from app.modules.ai_package_v1.domain.manifest import (
     sha256_hex,
 )
 from app.modules.ai_package_v1.export.dataset_cards import CAMPAIGN_SETTINGS_JSON_LOGICAL
+from app.modules.ai_package_v1.domain.enums import FamilyStatus
 from app.modules.ai_package_v1.export.family_gaps import (
     GAP_DOCUMENT_KIND,
     PACKAGE_FAMILY_GAPS_LOGICAL,
     build_family_gap_catalog,
 )
+from app.modules.ai_package_v1.export.family_status import (
+    derive_family_status_from_card,
+    derive_keyword_performance_family_status,
+    family_status_for_gap_entry,
+)
+from app.modules.ai_package_v1.export.package_summary import (
+    PACKAGE_SUMMARY_LOGICAL,
+    SUMMARY_DOCUMENT_KIND,
+)
+from app.modules.ai_package_v1.domain.enums import (
+    CollectionOutcome,
+    Coverage,
+    DatasetId,
+    FreshnessStatus,
+    PrimarySource,
+)
+from app.modules.ai_package_v1.domain.dataset_card import DatasetCard, Provenance
+from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.zip_transport.encode import decode_package
 
 
@@ -78,6 +97,7 @@ def validate_domain_manifest(
     _validate_campaign_settings_payload(manifest, files)
     _validate_keyword_root_payloads(manifest, files)
     _validate_family_gaps_payload(manifest, files)
+    _validate_package_summary_payload(manifest, files)
 
 
 def validate_zip_package(zip_bytes: bytes) -> None:
@@ -260,3 +280,212 @@ def _validate_family_gaps_payload(
         raise PackageValidationError(
             f"{PACKAGE_FAMILY_GAPS_LOGICAL} gaps length mismatch",
         )
+    for entry_obj in gaps:
+        if not isinstance(entry_obj, dict):
+            raise PackageValidationError("gap entry must be object")
+        entry = cast(dict[str, Any], entry_obj)
+        status_token = entry.get("family_status")
+        if status_token is None:
+            raise PackageValidationError(
+                f"{PACKAGE_FAMILY_GAPS_LOGICAL} gap missing family_status",
+            )
+        try:
+            FamilyStatus(str(status_token))
+        except ValueError:
+            raise PackageValidationError(
+                f"{PACKAGE_FAMILY_GAPS_LOGICAL} invalid family_status: {status_token!r}",
+            )
+
+
+def _cards_from_manifest_dict(manifest: dict[str, Any]) -> list[DatasetCard]:
+    datasets = cast(list[Any], manifest.get("datasets", []))
+    cards: list[DatasetCard] = []
+    period_raw = manifest.get("period", {})
+    if not isinstance(period_raw, dict):
+        return cards
+    period = ExportPeriod.model_validate(period_raw)
+    for card_obj in datasets:
+        if not isinstance(card_obj, dict):
+            continue
+        card_dict = cast(dict[str, Any], card_obj)
+        dataset_id = card_dict.get("dataset_id")
+        if dataset_id in ("package_family_gaps", "package_summary"):
+            continue
+        prov_raw = card_dict.get("provenance", {})
+        prov = cast(dict[str, Any], prov_raw) if isinstance(prov_raw, dict) else {}
+        primary_source_raw = str(prov.get("primary_source", "UNKNOWN"))
+        try:
+            primary_source = PrimarySource(primary_source_raw)
+        except ValueError:
+            primary_source = PrimarySource.UNKNOWN
+        cards.append(
+            DatasetCard(
+                dataset_id=DatasetId(str(dataset_id)),
+                provenance=Provenance(
+                    primary_source=primary_source,
+                    grain=str(prov.get("grain", "")),
+                    notes=prov.get("notes"),
+                ),
+                period=period,
+                collection_outcome=CollectionOutcome(
+                    str(card_dict.get("collection_outcome", "UNKNOWN")),
+                ),
+                coverage=Coverage(str(card_dict.get("coverage", "UNKNOWN"))),
+                reason_codes=card_dict.get("reason_codes", []),
+                freshness=FreshnessStatus(str(card_dict.get("freshness", "UNKNOWN"))),
+                row_file=card_dict.get("row_file"),
+                row_count=card_dict.get("row_count"),
+            ),
+        )
+    return cards
+
+
+def _validate_package_summary_payload(
+    manifest: dict[str, Any],
+    files: dict[str, bytes],
+) -> None:
+    """Проверяет PACKAGE_SUMMARY.json и согласованность canonical_status."""
+    datasets = cast(list[Any], manifest.get("datasets", []))
+    has_summary_card = any(
+        isinstance(c, dict) and cast(dict[str, Any], c).get("dataset_id") == "package_summary"
+        for c in datasets
+    )
+    if not has_summary_card:
+        return
+    content = files.get(PACKAGE_SUMMARY_LOGICAL)
+    if content is None:
+        raise PackageValidationError(
+            f"missing package summary payload: {PACKAGE_SUMMARY_LOGICAL}",
+        )
+    try:
+        parsed_json = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackageValidationError(
+            f"{PACKAGE_SUMMARY_LOGICAL} is not valid JSON",
+        ) from exc
+    if not isinstance(parsed_json, dict):
+        raise PackageValidationError(f"{PACKAGE_SUMMARY_LOGICAL} must be a JSON object")
+    data = cast(dict[str, Any], parsed_json)
+    if data.get("document_kind") != SUMMARY_DOCUMENT_KIND:
+        raise PackageValidationError(
+            f"{PACKAGE_SUMMARY_LOGICAL} missing document_kind",
+        )
+    if data.get("zip_determinism_contract") != "PAYLOAD_HASH_ONLY":
+        raise PackageValidationError(
+            f"{PACKAGE_SUMMARY_LOGICAL} zip_determinism_contract must be PAYLOAD_HASH_ONLY",
+        )
+    families_raw = data.get("families")
+    if not isinstance(families_raw, list):
+        raise PackageValidationError(f"{PACKAGE_SUMMARY_LOGICAL} families must be a list")
+    if data.get("campaign_identity") is None:
+        raise PackageValidationError(
+            f"{PACKAGE_SUMMARY_LOGICAL} missing campaign_identity",
+        )
+    identity = cast(dict[str, Any], data.get("campaign_identity", {}))
+    if identity.get("campaign_id_equals_physical_adv_id") is not True:
+        raise PackageValidationError(
+            "campaign_identity.campaign_id_equals_physical_adv_id must be true",
+        )
+    if data.get("missing_zero_null") is None:
+        raise PackageValidationError(
+            f"{PACKAGE_SUMMARY_LOGICAL} missing missing_zero_null semantics",
+        )
+    for entry_obj in cast(list[Any], families_raw):
+        if not isinstance(entry_obj, dict):
+            raise PackageValidationError("summary family entry must be object")
+        entry = cast(dict[str, Any], entry_obj)
+        token = entry.get("canonical_status")
+        if token is None:
+            raise PackageValidationError("summary family missing canonical_status")
+        try:
+            status = FamilyStatus(str(token))
+        except ValueError:
+            raise PackageValidationError(
+                f"summary invalid canonical_status: {token!r}",
+            )
+        if status in (FamilyStatus.GAP, FamilyStatus.PARTIAL):
+            reasons = entry.get("reasons")
+            if not isinstance(reasons, list) or len(reasons) == 0:
+                raise PackageValidationError(
+                    f"summary family {entry.get('family_id')} requires reasons",
+                )
+        join_keys = entry.get("join_keys") or entry.get("primary_key") or []
+        if entry.get("family_id") == "keyword_performance":
+            if "leg_role" not in join_keys:
+                raise PackageValidationError(
+                    "keyword_performance join_keys must include leg_role",
+                )
+    cards = _cards_from_manifest_dict(manifest)
+    common_sales = _canonical_status_from_summary(data, "shop_product_orders_sales_feed")
+    if common_sales != FamilyStatus.GAP:
+        raise PackageValidationError("shop_product_orders_sales_feed must be GAP in v1")
+    settings_status = _canonical_status_from_summary(data, "campaign_settings_current")
+    if settings_status != FamilyStatus.PARTIAL:
+        raise PackageValidationError("campaign_settings_current must be PARTIAL in v1")
+    campaign_card = next(
+        (c for c in cards if c.dataset_id == DatasetId.CAMPAIGN_FULL_STAT),
+        None,
+    )
+    if campaign_card is not None:
+        adv_status = derive_family_status_from_card(campaign_card)
+        summary_adv = _canonical_status_from_summary(data, "campaign_full_stat")
+        if summary_adv is not None and summary_adv != adv_status:
+            raise PackageValidationError(
+                "campaign_full_stat canonical_status inconsistent with dataset card",
+            )
+    keyword_status = derive_keyword_performance_family_status(cards)
+    summary_kw = _canonical_status_from_summary(data, "keyword_performance")
+    if summary_kw is not None and summary_kw != keyword_status:
+        raise PackageValidationError(
+            "keyword_performance canonical_status inconsistent with keyword cards",
+        )
+    gaps_content = files.get(PACKAGE_FAMILY_GAPS_LOGICAL)
+    if gaps_content is not None:
+        gaps_parsed = json.loads(gaps_content.decode("utf-8"))
+        if isinstance(gaps_parsed, dict):
+            gaps_doc = cast(dict[str, Any], gaps_parsed)
+            gaps_list = gaps_doc.get("gaps", [])
+            if not isinstance(gaps_list, list):
+                gaps_list = []
+            for gap in cast(list[Any], gaps_list):
+                if not isinstance(gap, dict):
+                    continue
+                gap_dict = cast(dict[str, Any], gap)
+                gap_id = str(gap_dict.get("family_id", ""))
+                gap_token = gap_dict.get("family_status") or gap_dict.get("status", "GAP")
+                try:
+                    gap_status = family_status_for_gap_entry(str(gap_token))
+                except ValueError as exc:
+                    raise PackageValidationError(str(exc)) from exc
+                if gap_id == "campaign_settings_history":
+                    hist = _canonical_status_from_summary(
+                        data,
+                        "campaign_settings_history",
+                    )
+                    if hist is not None and hist != gap_status:
+                        raise PackageValidationError(
+                            "settings history status mismatch gaps vs summary",
+                        )
+
+
+def _canonical_status_from_summary(
+    summary: dict[str, Any],
+    family_id: str,
+) -> FamilyStatus | None:
+    families = summary.get("families")
+    if not isinstance(families, list):
+        return None
+    families_list = cast(list[Any], families)
+    for entry_obj in families_list:
+        if not isinstance(entry_obj, dict):
+            continue
+        entry = cast(dict[str, Any], entry_obj)
+        if entry.get("family_id") == family_id:
+            token = entry.get("canonical_status")
+            if token is None:
+                return None
+            try:
+                return family_status_for_gap_entry(str(token))
+            except ValueError as exc:
+                raise PackageValidationError(str(exc)) from exc
+    return None
