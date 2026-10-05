@@ -1,0 +1,78 @@
+{
+    "version": "1.1.411",
+    "time": "1791166227722",
+    "generalDiagnostics": [
+        {
+            "file": "c:\\Users\\vkita\\my_code\\cursor-sdk-task-runner\\.runner-temp\\lifecycle-stage-strict-comparison-0475\\premerge_with_preserved_dirty\\app\\core\\mp\\wb\\api\\adapter\\promotion_client\\campaigns_info_v2\\adapter.py",
+            "severity": "error",
+            "message": "Type of \"adverts_raw\" is partially unknown\n  Type of \"adverts_raw\" is \"Unknown | None\"",
+            "range": {
+                "start": {
+                    "line": 85,
+                    "character": 12
+                },
+                "end": {
+                    "line": 85,
+                    "character": 23
+                }
+            },
+            "rule": "reportUnknownVariableType"
+        },
+        {
+            "file": "c:\\Users\\vkita\\my_code\\cursor-sdk-task-runner\\.runner-temp\\lifecycle-stage-strict-comparison-0475\\premerge_with_preserved_dirty\\app\\core\\mp\\wb\\api\\adapter\\promotion_client\\campaigns_info_v2\\adapter.py",
+            "severity": "error",
+            "message": "Type of \"get\" is partially unknown\n  Type of \"get\" is \"Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]\"",
+            "range": {
+                "start": {
+                    "line": 85,
+                    "character": 26
+                },
+                "end": {
+                    "line": 85,
+                    "character": 37
+                }
+            },
+            "rule": "reportUnknownMemberType"
+        },
+        {
+            "file": "c:\\Users\\vkita\\my_code\\cursor-sdk-task-runner\\.runner-temp\\lifecycle-stage-strict-comparison-0475\\premerge_with_preserved_dirty\\app\\core\\mp\\wb\\api\\adapter\\promotion_client\\campaigns_info_v2\\adapter.py",
+            "severity": "error",
+            "message": "Type of \"item\" is unknown",
+            "range": {
+                "start": {
+                    "line": 90,
+                    "character": 16
+                },
+                "end": {
+                    "line": 90,
+                    "character": 20
+                }
+            },
+            "rule": "reportUnknownVariableType"
+        },
+        {
+            "file": "c:\\Users\\vkita\\my_code\\cursor-sdk-task-runner\\.runner-temp\\lifecycle-stage-strict-comparison-0475\\premerge_with_preserved_dirty\\app\\core\\mp\\wb\\api\\adapter\\promotion_client\\campaigns_info_v2\\adapter.py",
+            "severity": "error",
+            "message": "Type of \"get\" is partially unknown\n  Type of \"get\" is \"Overload[(key: Unknown, default: None = None, /) -> (Unknown | None), (key: Unknown, default: Unknown, /) -> Unknown, (key: Unknown, default: _T@get, /) -> (Unknown | _T@get)]\"",
+            "range": {
+                "start": {
+                    "line": 93,
+                    "character": 19
+                },
+                "end": {
+                    "line": 93,
+                    "character": 27
+                }
+            },
+            "rule": "reportUnknownMemberType"
+        }
+    ],
+    "summary": {
+        "filesAnalyzed": 743,
+        "errorCount": 4,
+        "warningCount": 0,
+        "informationCount": 0,
+        "timeInSec": 26.77
+    }
+}
+

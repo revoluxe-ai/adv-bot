@@ -2,6 +2,7 @@
 
 ```yaml
 TASK_ID: WB-SKY-COMMON-SALES-ARCHIVE-VERIFY-20261005-0480
+RECEIPT_CLOSE_TASK: WB-SKY-COMMON-SALES-ARCHIVE-RECEIPT-CLOSE-20261005-0481
 CHANGE_ID: shop-wide-common-sales-collection
 MODE: independent archive-scope audit bridge
 SUPERSEDES_BINDING: SCPV1-shop-wide-common-sales-20261005-certify-0260
@@ -10,6 +11,7 @@ HEAD: 58441b3589200e02f642628e05920e680e553355
 MERGE_COMMIT: 58441b3589200e02f642628e05920e680e553355
 IMPLEMENTATION_COMMIT: 3afdde673e667cc725131cab7f463db7e2b34b66
 CREATED_AT: 2026-10-05T05:16:22+03:00
+RECEIPT_CLOSED_AT: 2026-10-05T05:22:43+03:00
 VERDICT: PASS
 PASS_SCOPE: POST_MERGE_STAGE_ACCEPTANCE
 ```
@@ -21,13 +23,21 @@ Independent reviewer bridge (0480). Runtime / implementation paths unchanged sin
 
 | Artifact | SHA256 (git blob @ `58441b358`) |
 |----------|----------------------------------|
-| `specs/shop-wide-common-sales-collection/spec.md` | `4697e648d76f3efcf22b269c51db9048a6ef22e8` |
-| `scenario-coverage/plan.md` | `375e136f3d48864b4e8c77567b37bbb9edea40f7` |
-| `scenario-coverage/SCENARIO_TEST_COVERAGE_REPORT.md` (0260 historical) | `7bf22d434832dc8a2459de2dbc82d21f9f2cde74` @ HEAD (doc-only deltas after 0260; matrix unchanged) |
+| `specs/shop-wide-common-sales-collection/spec.md` | `5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253` |
+| `scenario-coverage/plan.md` | `c7e5882345385f9f1c39dc2e252b58c0b10a2c9319efab9a1ad16cb1f834d4a0` |
+| `scenario-coverage/SCENARIO_TEST_COVERAGE_REPORT.md` (0260 historical) | `d145f7816dd556176f29b375db820f2b49c9803c4f480ec6dffc0cd9794e6bf0` (byte-stable since 0260) |
 
-Historical 0260 bindings (`SOURCE_SPEC_SHA=5e24eab…`, `WORKTREE_FINGERPRINT=7ccebe8a…`) refer to
-pre-implementation planning worktree. Post-implementation spec blob stabilized at `4697e648…` from
-`3afdde673` through merge HEAD (`git diff 3afdde673 58441b358 -- specs/` empty).
+Historical 0260 bindings (`SOURCE_SPEC_SHA=5e24eab…`, `WORKTREE_FINGERPRINT=7ccebe8a…`) record
+LF-normalized git content hash. Post-implementation spec git object `ca08b9a5…` unchanged
+`3afdde673` → merge HEAD (`git diff 3afdde673 58441b358 -- specs/` empty).
+
+### 0481 EOL provenance (receipt-close; 0480 hash correction)
+
+0480 bridge listed spec `4697e648…` — **0481 audit recomputation finds no matching artifact**.
+Authoritative LF git blob SHA256 = `5e24eab…` (matches 0260 `SOURCE_SPEC_SHA` exactly).
+CRLF disk simulation → `8098b768…` (EOL-only class; cert fingerprint is LF git form, not Windows raw).
+No semantic delta: `git diff 3afdde673 58441b358` empty on all 15 implementation paths + specs.
+Historical cert/core artifacts **not rewritten**.
 
 ## Implementation immutability (15 paths)
 
@@ -87,6 +97,10 @@ All 33 rows from historical `SCENARIO_TEST_COVERAGE_REPORT.md` (0260) remain **P
 | actual stage + foreign dirty | 755 | 4 (foreign only) | — |
 
 `diagnostic_parity=true`, `new_diagnostics=[]`. See `lifecycle-proof/comparison.json`.
+
+Raw canonical pyright stdout/stderr (0475 runner, byte-exact copy): `lifecycle-proof/raw-canonical/`.
+Merged committed pyright JSON: `lifecycle-proof/raw-canonical/postmerge-pyright-merged-committed.json`
+(SHA256 `96977d6fffa811bf21e4bb6d221c1a2392ac50350714d8bc82e60dc45bb8f772`, errorCount 0).
 
 ## VERDICT
 

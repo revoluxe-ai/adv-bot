@@ -2,12 +2,14 @@
 
 ```yaml
 TASK_ID: WB-SKY-COMMON-SALES-ARCHIVE-VERIFY-20261005-0480
+RECEIPT_CLOSE_TASK: WB-SKY-COMMON-SALES-ARCHIVE-RECEIPT-CLOSE-20261005-0481
 CHANGE_ID: shop-wide-common-sales-collection
 MODE: archive
-REVIEWER: independent QA (0480)
+REVIEWER: independent QA (0480; receipt-close 0481 same reviewer)
 STAGE_HEAD: 58441b3589200e02f642628e05920e680e553355
 MERGE_COMMIT: 58441b3589200e02f642628e05920e680e553355
 FINISHED_AT: 2026-10-05T05:16:22+03:00
+RECEIPT_CLOSED_AT: 2026-10-05T05:22:43+03:00
 ARCHIVE_VERIFY: GO
 POST_MERGE_VERIFY: PASS (CHANGE_SCOPED)
 PRODUCT_ACCEPTANCE_STATUS: PASS
@@ -133,11 +135,26 @@ All `- [x]` in `tasks.md`; `openspec status --json` → `isComplete: true`.
 | Binding | 0260 (historical) | 0480 (current) |
 |---------|-------------------|----------------|
 | HEAD | `62c8d48…` (planning) | `58441b358` (merged stage) |
-| Spec SHA | `5e24eab…` (planning worktree) | `4697e648…` (stable since `3afdde673`) |
+| Spec SHA | `5e24eab…` (0260 cert LF binding) | `5e24eab…` (git blob LF, stable `3afdde673`→HEAD) |
 | Unit log | 72 passed | 74 passed (`dabdc328…`) |
 | CH log | `47bff5dc…` | `eb57f8a3…` (fresh 0470) |
 
 Historical cert/report **not rewritten**. Bridge artifact records deterministic current manifest.
+
+## Spec EOL provenance (0481 receipt-close lineage)
+
+0480 manifest row `4697e648…` for post-merge spec — **0481 recomputation invalidates that binding**
+(no artifact in repo or runner produces SHA256 `4697e648d76f3efcf22b269c51db9048a6ef22e8`).
+
+| Binding | SHA256 | Notes |
+|---------|--------|-------|
+| Git blob @ `3afdde673`..`58441b358` (LF, `.gitattributes eol=lf`) | `5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253` | git object `ca08b9a58bb65ab24c7dcbf81d2865ced813b59f`; worktree == blob |
+| 0260 `SOURCE_SPEC_SHA` (cert, immutable) | `5e24eab…` | same LF-normalized content hash — **not** a separate semantic revision |
+| CRLF simulation (Windows raw disk form) | `8098b768858249bf968a9ee6e7f26d8f765338232f9d2920bfb206fceb2a07bc` | EOL-only delta class; **no false raw-byte-equal claim** vs cert fingerprint |
+| `git diff 3afdde673 58441b358 -- specs/` | empty | no content delta beyond EOL class (none observed; LF byte-stable) |
+| 15-path implementation manifest | `git diff 3afdde673 58441b358` empty | exact physical path compare @ merge HEAD |
+
+Historical `certify.receipt.json` / `SCENARIO_TEST_COVERAGE_REPORT.md` **not rewritten**.
 
 ## Archive prep (evaluate only — not executed)
 
@@ -146,7 +163,7 @@ Historical cert/report **not rewritten**. Bridge artifact records deterministic 
 | Delta spec sync target | `openspec/specs/shop-wide-common-sales-collection/spec.md` — **not present** (sync at archive) |
 | Decision promotion | `decisions/shop-wide-common-sales-ownership/decision.md` → `openspec/decisions/` at archive |
 | index.md write | **forbidden** (foreign dirty) |
-| openspec archive CLI | `openspec archive shop-wide-common-sales-collection` (after Owner confirm / sync prompt) |
+| openspec archive CLI (non-interactive) | `poetry run openspec archive shop-wide-common-sales-collection -y` |
 
 ## OUT_OF_SCOPE (explicit, not blockers)
 
@@ -160,16 +177,21 @@ Historical cert/report **not rewritten**. Bridge artifact records deterministic 
 
 none
 
-## Следующая команда
+## Следующая команда (Owner-authorized; not executed by 0481)
 
+```powershell
+poetry run openspec archive shop-wide-common-sales-collection -y
 ```
-/opsx-archive shop-wide-common-sales-collection
-```
+
+Equivalent workflow entry: `/opsx-archive shop-wide-common-sales-collection` (uses `-y` / `--yes` to skip interactive sync prompt when Owner has pre-authorized sync+archive).
 
 ## Evidence artifacts (this run)
 
-- `CURRENT_SCOPE_AUDIT_CERTIFICATION.md`
+- `CURRENT_SCOPE_AUDIT_CERTIFICATION.md` (0481 EOL lineage addendum)
 - `POST_MERGE_VERIFY.md` (scoped PASS + historical 0470 FAIL preserved)
 - `MERGE_EVIDENCE.md` (0480 addendum)
 - `scenario-coverage/logs/postmerge-*.log`
 - `lifecycle-proof/comparison.json`, `diagnostic-parity.json`
+- `lifecycle-proof/raw-canonical/` (4 pyright stdout/stderr logs + `postmerge-pyright-merged-committed.json`)
+
+✅ GO
