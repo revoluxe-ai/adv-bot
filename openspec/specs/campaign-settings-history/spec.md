@@ -6,8 +6,6 @@ PostgreSQL authority, ClickHouse append-only history, Excel parity.
 
 ## Requirements
 
-## ADDED Requirements
-
 ### Requirement: Canonical campaign settings are versioned and source-authoritative
 
 The system MUST build one canonical campaign-settings snapshot from registered settings-owned sources while PostgreSQL remains the authority for current settings. The canonical snapshot MUST distinguish settings and identity metadata from WB-observed facts, runtime state, derived metrics, diagnostics, and technical storage fields. ClickHouse history MUST NOT become authority for current production settings writes.

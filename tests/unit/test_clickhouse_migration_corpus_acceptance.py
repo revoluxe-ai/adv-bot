@@ -232,9 +232,9 @@ def test_validate_fingerprint_is_exactly_001_through_007(
 ) -> None:
     """Reviewed ``006``–``007`` входят в corpus, чужой successor не входит.
 
-    Spec ``clickhouse-migration-lifecycle``, сценарии reviewed successor и
-    ``Unreviewed successor blocks apply``. Хеш копии включает комментарии,
-    а соседний ``008`` не расширяет reviewed fingerprint.
+    Spec ``clickhouse-migration-lifecycle``, сценарии ``Reviewed 006 is accepted``,
+    reviewed successor и ``Unreviewed successor blocks apply``. Хеш копии включает
+    комментарии, а соседний ``008`` не расширяет reviewed fingerprint.
     """
     corpus_dir = canonical_corpus_dir()
     canonical = validate()
