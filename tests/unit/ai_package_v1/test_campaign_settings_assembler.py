@@ -195,3 +195,34 @@ def test_pg_scope_query_has_no_bot_active_filter() -> None:
     assert "bot_active" not in where_sql
     assert "shop_id" in where_sql
     assert "active_status" in where_sql
+
+
+class _CapturingSessionMaker:
+    """Records ``read_only`` polarity passed to production PG inventory reader."""
+
+    def __init__(self) -> None:
+        self.read_only_calls: list[bool] = []
+
+    def __call__(self, read_only: bool = False, **kwargs: object) -> MagicMock:
+        _ = kwargs
+        self.read_only_calls.append(read_only)
+        session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(return_value=execute_result)
+        session_ctx = MagicMock()
+        session_ctx.__aenter__ = AsyncMock(return_value=session)
+        session_ctx.__aexit__ = AsyncMock(return_value=None)
+        session_factory = MagicMock(return_value=session_ctx)
+        return session_factory
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_pg_reader_read_only_session() -> None:
+    """S15: production ``load_inventory`` opens PG via ``session_maker(read_only=True)``."""
+    capturing_sm = _CapturingSessionMaker()
+    reader = PgAdvSettingInventoryReader(session_maker=capturing_sm)
+    rows = await reader.load_inventory("shop-1")
+    assert rows == []
+    assert capturing_sm.read_only_calls == [True]
