@@ -1,11 +1,11 @@
 # Independent Scenario Test Coverage Audit Report
 
-CHANGE_ID: ai-package-keyword-performance-history  
-MODE: audit  
-PASS_SCOPE: FULL_CHANGE  
-PRODUCER_COMMAND: /opsx-spec-scenario-coverage mode=audit change=ai-package-keyword-performance-history run=targeted  
-TASK_ID: WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09  
-EXECUTED_AT: 2026-10-05T09:45:00+03:00  
+CHANGE_ID: ai-package-keyword-performance-history
+MODE: audit
+PASS_SCOPE: FULL_CHANGE
+PRODUCER_COMMAND: /opsx-spec-scenario-coverage mode=audit change=ai-package-keyword-performance-history run=targeted
+TASK_ID: WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09
+EXECUTED_AT: 2026-10-05T09:45:00+03:00
 AUDITOR: independent (supersedes SCAR-07 47PASS/4FAIL; validates repair08 cutoff/stub closure)
 
 ```text
@@ -188,5 +188,5 @@ None (VERDICT=PASS).
 - **MERGE_READY not certified** — independent merge-review pending against committed stage `9a80c813ed4edaf3c6f2da6ae65af4221f7ec36e`
 - Archive path still requires `mode=archive` verify + commit of implementation manifest
 
-STATUS: PASS  
+STATUS: PASS
 VERDICT: INDEPENDENT_SCENARIO_AUDIT_PASS

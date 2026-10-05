@@ -144,4 +144,3 @@ async def test_default_export_service_no_writes_at_boundary() -> None:
         )
     redis_set.assert_not_called()
     assert any(c.dataset_id == DatasetId.KEYWORD_COVERAGE for c in export.manifest.datasets)
-
