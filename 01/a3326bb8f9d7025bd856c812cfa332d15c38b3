@@ -1,0 +1,24 @@
+.cursor/commands/opsx-models.md
+  h_267f51d775769b 5-6,9,11-12,17-23,25-31,34-36,39-69,77-81,83,85-88,90,92,94-96,98,100-101,103,105-113,116-206,209-215,218-224,226,228,230,232-236,238-239,241,243,245-294,299-301,303-342,345,347-350,352,354-388,392-402
+.cursor/pipeline/control-plane-tests/run_command_transfer_contract_tests.py
+  h_267f51d775769b 542-548,552,1246,1251-1257,1259-1262,1274-1275,1288,1294,1296,1298-1299,1301-1328
+.opsx/registry/command_activation.ndjson
+  h_267f51d775769b 54
+.opsx/registry/provenance.ndjson
+  h_267f51d775769b 39
+tools/cursor_executor/cursor_executor/command_preflight.py
+  h_267f51d775769b 27-100,179-193
+tools/cursor_executor/tests/test_command_preflight.py
+  h_267f51d775769b 39-58,117-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "01a3326bb8f9d7025bd856c812cfa332d15c38b3",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
