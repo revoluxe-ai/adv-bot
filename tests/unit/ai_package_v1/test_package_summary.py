@@ -71,6 +71,16 @@ async def test_package_summary_present_and_self_describing(
     assert str(current_settings.get("family_notes", "")).startswith(
         "CampaignSettingsSnapshotV1"
     )
+    current_semantics = cast(dict[str, str], current_settings["value_semantics"])
+    assert "JSON" in current_semantics["missing"] or "CampaignSettingsSnapshotV1" in current_semantics["missing"]
+    assert "CSV" not in current_semantics["missing"].lower()
+    sales_card = next(
+        c
+        for c in manifest["datasets"]
+        if c.get("dataset_id") == "shop_product_orders_sales"
+    )
+    assert sales_card.get("family_status") == "GAP"
+    assert "row_count" not in sales_card
     assert "row_count" not in families["campaign_settings_history"]
     assert "row_count" not in families["shop_common_sales"]
     assert len(summary["gap_catalog_family_ids"]) == 7

@@ -179,7 +179,7 @@ async def test_other_dataset_cards_unchanged_with_detailed_settings(
     assert funnel.provenance.primary_source == PrimarySource.CLICKHOUSE_WB_COMMON_STAT
     assert funnel.row_file == "datasets/complex_adv_funnel.csv"
     assert shop_orders.provenance.primary_source == PrimarySource.SOURCE_NOT_ASSIGNED
-    assert shop_orders.row_count in (None, 0)
+    assert shop_orders.row_count is None
 
 
 @pytest.mark.asyncio

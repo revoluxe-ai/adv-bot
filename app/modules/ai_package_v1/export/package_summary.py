@@ -128,6 +128,12 @@ def _value_semantics_for_family(family_id: str) -> dict[str, str]:
             "zero": "not applicable until source assigned",
             "null": "not applicable",
         }
+    if family_id == "campaign_settings_current":
+        return {
+            "missing": "no CampaignSettingsSnapshotV1 record for adv_setting in JSON payload",
+            "zero": "numeric 0 inside a present JSON record is an observed zero setting value",
+            "null": "null JSON field means absent or unknown in CURRENT snapshot, not CSV day-row",
+        }
     if family_id == "campaign_settings_history":
         return {
             "missing": "history not exported in v1 ZIP",
