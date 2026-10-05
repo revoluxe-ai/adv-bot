@@ -14,6 +14,13 @@ if typing.TYPE_CHECKING:
 
 from .shop_run_worker.redis_manager import RedisShopManager
 from .service_manager import CoroutinesManager
+from .shop_wide_collection.feature_flag import (
+    ShopWideCollectionMode,
+    apply_shop_wide_collection_gate,
+)
+from .shop_wide_collection.managed_record_contract import (
+    SHOP_WIDE_UNMANAGED_COROUTINE_NAME,
+)
 from .tasks_manager.tasks_manager import TasksManager
 
 logger = logging.getLogger(__name__)
@@ -42,7 +49,24 @@ class WBShop:
         return self._wb_api.shop_id
 
     async def run(self) -> None:
+        """Долгий tick магазина: managed RECORD и dual-path shop-wide orchestration.
+
+        Spec ``connected-shop-campaign-ad-data-collection``, design Migration
+        Plan. Per-shop флаг читается один раз на старте процесса. OFF и
+        rollback не добавляют unmanaged task и не удаляют историю ClickHouse.
+        ON ставит ``collect_shop_wide_campaign_advertising`` в shop-runner;
+        scripts/Job MUST NOT быть primary executor (decision §Forbidden).
+        """
         from .service_manager.exc import StopShopUpdateException
+
+        decision = apply_shop_wide_collection_gate(self.shop_id)
+        shop_wide_dual_path = decision.mode is ShopWideCollectionMode.DUAL_PATH_ACTIVE
+        if shop_wide_dual_path:
+            logger.info(
+                "shop-wide dual-path active shop_id=%s coroutine=%s",
+                self.shop_id,
+                SHOP_WIDE_UNMANAGED_COROUTINE_NAME,
+            )
         wb_api = self._wb_api
         coroutines_manager = CoroutinesManager(
             wb_api,
@@ -61,6 +85,10 @@ class WBShop:
                 tg.create_task(coroutines_manager.update_cards_data_from_wb_to_pg()) #  Тут вроде все и так работает под free
                 tg.create_task(coroutines_manager.update_common_sale_stat(only_bot_active=False)) # Здесь поставил загрузку всех
                 tg.create_task(coroutines_manager.update_full_adv_stat(only_bot_active=False)) # Здесь поставил загрузку всех
+                if shop_wide_dual_path:
+                    tg.create_task(
+                        coroutines_manager.collect_shop_wide_campaign_advertising()
+                    )
                 tg.create_task(coroutines_manager.update_clusters_adv_stats_today(only_bot_active=False)) # Здесь поставил загрузку всех
                 tg.create_task(
                     coroutines_manager.update_clusters_adv_stats_history(only_bot_active=False) # Здесь поставил загрузку всех

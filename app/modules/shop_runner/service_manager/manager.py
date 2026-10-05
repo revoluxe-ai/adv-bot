@@ -442,6 +442,12 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 5, 5)
     async def update_common_sale_stat(self, only_bot_active: bool = False) -> None:
+        """Managed RECORD: common funnel для loader universe §B.1 (задача 5.1).
+
+        Universe — ``get_complex_advs(only_bot_active=...)``; shop-wide tick
+        передаёт ``only_bot_active=False``, чтобы ``refused`` оставался в сборе.
+        Collection ownership ≠ ``bot_active`` (design §B.3).
+        """
         # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N Р Рљ)
         advs = await self._wb_shop_data_manager.get_complex_advs(only_bot_active=only_bot_active, load_extras=False)
         if not advs:
@@ -477,7 +483,45 @@ class CoroutinesManager:
 
 
     @while_coroutine_decorator(5 * 60, 1)
+    async def collect_shop_wide_campaign_advertising(self) -> None:
+        """Shop-wide dual-path tick: discovery → route → inventory → unmanaged (§8.1).
+
+        Spec ``connected-shop-campaign-ad-data-collection``.
+        Debt: ``openspec/architectural-debt/TEMPORARY_DUAL_CAMPAIGN_COLLECTION.md``.
+        Decision: ``decisions/shop-runner-shop-wide-collection/decision.md``.
+
+        Managed RECORD coroutines остаются отдельными задачами ``WBShop.run``.
+        Unmanaged slice стартует только при ``DUAL_PATH_ACTIVE`` per-shop flag.
+        **MUST NOT** delegate to ``scripts/`` Job; **MUST NOT** management writes.
+        """
+        from ..shop_wide_collection.feature_flag import (
+            ShopWideCollectionMode,
+            apply_shop_wide_collection_gate,
+        )
+        from ..shop_wide_collection.tick_wiring import run_shop_wide_unmanaged_tick
+
+        decision = apply_shop_wide_collection_gate(self.shop_id)
+        if decision.mode is not ShopWideCollectionMode.DUAL_PATH_ACTIVE:
+            return None
+
+        loader_complex_advs = await self._wb_shop_data_manager.get_complex_advs(
+            only_bot_active=False,
+            load_extras=False,
+        )
+        _ = await run_shop_wide_unmanaged_tick(
+            shop_id=self.shop_id,
+            loader_complex_advs=loader_complex_advs,
+            wb_manager_hub=self._wb_manager_hub,
+        )
+        return None
+
+    @while_coroutine_decorator(5 * 60, 1)
     async def update_full_adv_stat(self, only_bot_active: bool = False) -> None:
+        """Managed RECORD: ``full_adv_wb_stat`` для loader ``all_adv_ids`` (задача 5.1).
+
+        Search legs включаются через ``ComplexAdv.all_adv_ids``. Unmanaged slice
+        не дублирует grain для id из этого universe (resolver §B.1, S09/S14).
+        """
         advs: list[ComplexAdv] = await self._wb_shop_data_manager.get_complex_advs(
             only_bot_active=only_bot_active,
             load_extras=False
@@ -1013,7 +1057,12 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(5 * 60, 60)
     async def update_clusters_adv_stats_today(self, only_bot_active: bool = False) -> None:
-        """РћР±РЅРѕРІР»РµРЅРёРµ СЃС‚Р°С‚РёСЃС‚РёРєРё РєР»Р°СЃС‚РµСЂРѕРІ Р·Р° СЃРµРіРѕРґРЅСЏ."""
+        """Managed RECORD: clusters today для loader universe §B.1 (задачи 5.1, 5.2).
+
+        ``refused`` с непустыми ``nmids`` остаётся в universe и **MAY** получить
+        ``update_clusters_adv_stats_*``. Grain managed-only — unmanaged collector
+        не пишет ``clusters_adv_stats``.
+        """
 
         diag_enabled = _cluster_stats_diagnostic_enabled()
         started_at = time.perf_counter()
@@ -1103,7 +1152,10 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(24 * 60 * 60, 60)
     async def update_clusters_adv_stats_history(self, only_bot_active: bool = False) -> None:
-        """РћР±РЅРѕРІР»РµРЅРёРµ СЃС‚Р°С‚РёСЃС‚РёРєРё РєР»Р°СЃС‚РµСЂРѕРІ Р·Р° РїСЂРѕС€Р»С‹Рµ РґРЅРё."""
+        """Managed RECORD: clusters history для loader universe §B.1 (задачи 5.1, 5.2).
+
+        Парный history path для ``refused`` и прочих non-``done`` строк loader'а.
+        """
         wb_manager_hub = self._wb_manager_hub
         container = ClustersAdvStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: ClustersAdvStatUpdater = container.clusters_adv_stat_updater()

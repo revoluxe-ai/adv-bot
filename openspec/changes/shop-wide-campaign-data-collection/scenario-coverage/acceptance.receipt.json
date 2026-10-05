@@ -1,0 +1,233 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_ACCEPTANCE_RECEIPT": true,
+  "CHANGE_ID": "shop-wide-campaign-data-collection",
+  "TASK_ID": "WB-SKY-CAMPAIGN-COLLECTION-FINAL-CLOSURE-20261005-0440",
+  "TASK_CLOSURE": "9.1-9.3",
+  "PLAN_EVIDENCE_ID": "SCPV1-f61151add8956265",
+  "PLAN_RECEIPT_PATH": "openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/plan.receipt.json",
+  "ACCEPTANCE_PATH": "openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/acceptance.md",
+  "RECEIPT_PATH": "openspec/changes/shop-wide-campaign-data-collection/scenario-coverage/acceptance.receipt.json",
+  "ACCEPTANCE_STATUS": "COMPLETE",
+  "SCENARIO_COUNT": 22,
+  "SCENARIOS_CERTIFIED": 22,
+  "SCENARIOS_BLOCKED": 0,
+  "EXECUTION_CLASS": "unit_scenario_seam",
+  "TESTS_TOTAL": 82,
+  "TESTS_PASSED": 82,
+  "PYRIGHT_STRICT_ERRORS": 0,
+  "OPENSPEC_VALIDATE_STRICT": "PASS",
+  "GIT_DIFF_CHECK": "PASS",
+  "PLAN_RECEIPT_INTEGRITY": "CURRENT",
+  "ROWS": [
+    {
+      "SCENARIO": "S01",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "FINAL_ACCEPTANCE",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_shop_wide_tick_orchestration.py::test_task_82_s01_periodic_tick_initiates_dual_path_without_scripts_job",
+        "tests/unit/shop_runner/test_shop_wide_collection_feature_flag.py::test_wb_shop_run_keeps_managed_record_coroutines"
+      ]
+    },
+    {
+      "SCENARIO": "S02",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_32_s02_wb_only_unmanaged_no_adv_setting_side_effect",
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_wb_only_id_unmanaged_for_full_adv_not_clusters"
+      ]
+    },
+    {
+      "SCENARIO": "S03",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_shop_campaign_inventory_upsert.py::test_finished_and_unmapped_campaigns_are_upserted"
+      ]
+    },
+    {
+      "SCENARIO": "S04",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_33_s04_sync_row_managed_management_unproven",
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_sync_created_loader_row_managed_despite_bot_active_false"
+      ]
+    },
+    {
+      "SCENARIO": "S05",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_34_s05_refused_managed_no_unmanaged_duplicate",
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_refused_loader_universe_managed_for_both_grains"
+      ]
+    },
+    {
+      "SCENARIO": "S06",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_35_s06_s07_done_and_no_enrollment_unmanaged",
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_done_enrollment_absent_from_loader_unmanaged_when_discovered"
+      ]
+    },
+    {
+      "SCENARIO": "S07",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_35_s06_s07_done_and_no_enrollment_unmanaged"
+      ]
+    },
+    {
+      "SCENARIO": "S08",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_36_s08_search_leg_managed_full_adv_grain",
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_search_leg_managed_when_parent_in_loader"
+      ]
+    },
+    {
+      "SCENARIO": "S09",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_37_s09_managed_ownership_blocks_unmanaged_write_eligibility"
+      ]
+    },
+    {
+      "SCENARIO": "S10",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_unmanaged_campaign_collector.py::test_task_42_s10_unmanaged_collect_no_enrollment_side_effects",
+        "tests/unit/shop_runner/test_legacy_record_collection_baseline.py::test_record_collectors_do_not_reach_forbidden_management_writes"
+      ]
+    },
+    {
+      "SCENARIO": "S11",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_partial_failure_availability_read_latest.py::test_task_61_s11_single_collector_failure_records_reason_and_continues",
+        "tests/unit/shop_runner/test_partial_failure_availability_read_latest.py::test_task_63_integration_append_only_partial_failure_multi_campaign"
+      ]
+    },
+    {
+      "SCENARIO": "S12",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_partial_failure_availability_read_latest.py::test_task_62_s12_read_latest_retains_prior_success_after_failed_attempt"
+      ]
+    },
+    {
+      "SCENARIO": "S13",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_unmanaged_campaign_collector.py::test_task_43_s13_unmanaged_writes_full_adv_only_not_forbidden_seams",
+        "tests/unit/shop_runner/test_unmanaged_campaign_collector.py::test_orchestrator_module_forbids_forbidden_imports"
+      ]
+    },
+    {
+      "SCENARIO": "S14",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_managed_path_preservation.py::test_task_52_s14_refused_managed_clusters_no_unmanaged_full_adv_duplicate"
+      ]
+    },
+    {
+      "SCENARIO": "S15",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_38_s15_unknown_fail_closed_no_write_no_enrollment",
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_neither_managed_nor_discovered_resolves_unknown_fail_closed"
+      ]
+    },
+    {
+      "SCENARIO": "S16",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_71_s16_connect_handoff_managed_unmanaged_blocked_management_unproven",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_71_s16_post_connect_unmanaged_collect_no_fact_write"
+      ]
+    },
+    {
+      "SCENARIO": "S17",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_72_s17_overlap_connect_stale_epoch_blocks_write_no_double_count",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_72_s17_overlap_current_epoch_allows_inflight_write",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_72_s17_gate_pure_overlap_ownership_mismatch",
+        "tests/unit/shop_runner/test_unmanaged_campaign_collector.py::test_task_44_route_epoch_stale_skips_fact_write",
+        "tests/unit/shop_runner/test_unmanaged_campaign_collector.py::test_route_write_gate_pure_stale_epoch"
+      ]
+    },
+    {
+      "SCENARIO": "S18",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_73_s18_done_disconnect_transitions_to_unmanaged",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_73_s18_done_handoff_ch_history_retained",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_73_s18_done_unmanaged_collect_resumes"
+      ]
+    },
+    {
+      "SCENARIO": "S19",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_74_s19_refused_stays_managed_on_disconnect_like_event",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_74_s19_refused_unmanaged_collect_blocked"
+      ]
+    },
+    {
+      "SCENARIO": "S20",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "FINAL_ACCEPTANCE",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_shop_wide_tick_orchestration.py::test_task_83_s20_full_tick_discover_route_inventory_dual_collect",
+        "tests/unit/shop_runner/test_shop_campaign_inventory_upsert.py::test_inventory_upsert_is_wired_via_shop_runner_tick"
+      ]
+    },
+    {
+      "SCENARIO": "S21",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_campaign_collection_route_resolver.py::test_task_39_s21_bot_active_and_presence_not_ownership_proof"
+      ]
+    },
+    {
+      "SCENARIO": "S22",
+      "ROW_VERDICT": "certified",
+      "EVIDENCE_ROLE": "TARGET_REGRESSION",
+      "EXECUTED_TEST_IDS": [
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_75_s22_reconcile_dual_leg_records_availability_no_fact_write",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_75_s22_reconcile_stale_epoch_no_fact_write",
+        "tests/unit/shop_runner/test_route_handoff.py::test_task_75_s22_read_latest_no_double_count_dual_leg"
+      ]
+    }
+  ],
+  "SUPPORTING_SUITES": [
+    "tests/unit/shop_runner/test_shop_campaign_inventory_ddl.py",
+    "tests/unit/shop_runner/test_shop_campaign_inventory_upsert.py",
+    "tests/unit/shop_runner/test_shop_wide_collection_feature_flag.py",
+    "tests/unit/shop_runner/test_legacy_record_collection_baseline.py",
+    "tests/unit/shop_runner/test_managed_path_preservation.py"
+  ],
+  "OWNERSHIP_INVARIANTS": {
+    "wb_common_stat_writer": "shop-wide-common-sales-collection",
+    "campaign_grains": "full_adv_wb_stat, managed-only clusters_adv_stats",
+    "forbidden_management_writes": "verified_by_tests"
+  }
+}
