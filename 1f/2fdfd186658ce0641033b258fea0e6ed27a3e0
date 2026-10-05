@@ -1,0 +1,23 @@
+openspec/changes/archive/2026-10-05-shop-wide-campaign-data-collection/VERIFY_ARCHIVE_RECEIPT.md
+  s_5791fabf8ddb39::t_3c0cda6edc917f 1-39
+openspec/decisions/shop-runner-shop-wide-collection/decision.md
+  s_5791fabf8ddb39::t_b2f679d7cc6485 1-145
+openspec/specs/connected-shop-campaign-ad-data-collection/spec.md
+  s_5791fabf8ddb39::t_b1c6a0a674ca15 1-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1f2fdfd186658ce0641033b258fea0e6ed27a3e0",
+  "prompts": {},
+  "sessions": {
+    "s_5791fabf8ddb39": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fec70482-9c70-4b5e-bc15-3f38d28dfca2",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
