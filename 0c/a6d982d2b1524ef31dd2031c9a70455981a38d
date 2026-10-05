@@ -1,0 +1,19 @@
+openspec/changes/campaign-settings-history/tasks.md
+  s_6173ec1951174f::t_efa2dd7ed63b09 1-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0ca6d982d2b1524ef31dd2031c9a70455981a38d",
+  "prompts": {},
+  "sessions": {
+    "s_6173ec1951174f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a100a0-4933-7371-adbf-6d78e184f220",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
