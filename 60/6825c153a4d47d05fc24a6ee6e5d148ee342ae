@@ -1,0 +1,19 @@
+tests/unit/test_clickhouse_migration_corpus_acceptance.py
+  s_5791fabf8ddb39::t_64b043aee601c4 235-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "606825c153a4d47d05fc24a6ee6e5d148ee342ae",
+  "prompts": {},
+  "sessions": {
+    "s_5791fabf8ddb39": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fec70482-9c70-4b5e-bc15-3f38d28dfca2",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
