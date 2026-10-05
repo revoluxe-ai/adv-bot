@@ -16,6 +16,11 @@ from app.modules.ai_package_v1.domain.manifest import (
     sha256_hex,
 )
 from app.modules.ai_package_v1.export.dataset_cards import CAMPAIGN_SETTINGS_JSON_LOGICAL
+from app.modules.ai_package_v1.export.family_gaps import (
+    GAP_DOCUMENT_KIND,
+    PACKAGE_FAMILY_GAPS_LOGICAL,
+    build_family_gap_catalog,
+)
 from app.modules.ai_package_v1.zip_transport.encode import decode_package
 
 
@@ -72,6 +77,7 @@ def validate_domain_manifest(
     _validate_shop_orders_card(manifest)
     _validate_campaign_settings_payload(manifest, files)
     _validate_keyword_root_payloads(manifest, files)
+    _validate_family_gaps_payload(manifest, files)
 
 
 def validate_zip_package(zip_bytes: bytes) -> None:
@@ -207,3 +213,50 @@ def _validate_keyword_root_payloads(
         schema_version = data.get("schema_version")
         if schema_version is None:
             raise PackageValidationError(f"{logical_name} missing schema_version")
+
+
+def _validate_family_gaps_payload(
+    manifest: dict[str, Any],
+    files: dict[str, bytes],
+) -> None:
+    """Проверяет PACKAGE_FAMILY_GAPS.json при наличии карточки package_family_gaps."""
+    datasets = cast(list[Any], manifest.get("datasets", []))
+    has_gaps_card = False
+    for card_obj in datasets:
+        if not isinstance(card_obj, dict):
+            continue
+        card = cast(dict[str, Any], card_obj)
+        if card.get("dataset_id") == "package_family_gaps":
+            has_gaps_card = True
+            break
+    if not has_gaps_card:
+        return
+    content = files.get(PACKAGE_FAMILY_GAPS_LOGICAL)
+    if content is None:
+        raise PackageValidationError(
+            f"missing family gaps payload: {PACKAGE_FAMILY_GAPS_LOGICAL}",
+        )
+    try:
+        parsed_json = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PackageValidationError(
+            f"{PACKAGE_FAMILY_GAPS_LOGICAL} is not valid JSON",
+        ) from exc
+    if not isinstance(parsed_json, dict):
+        raise PackageValidationError(
+            f"{PACKAGE_FAMILY_GAPS_LOGICAL} must be a JSON object",
+        )
+    data = cast(dict[str, Any], parsed_json)
+    if data.get("document_kind") != GAP_DOCUMENT_KIND:
+        raise PackageValidationError(
+            f"{PACKAGE_FAMILY_GAPS_LOGICAL} missing document_kind",
+        )
+    gaps_raw = data.get("gaps")
+    if not isinstance(gaps_raw, list):
+        raise PackageValidationError(f"{PACKAGE_FAMILY_GAPS_LOGICAL} gaps must be a list")
+    gaps = cast(list[Any], gaps_raw)
+    expected_len = len(build_family_gap_catalog())
+    if len(gaps) != expected_len:
+        raise PackageValidationError(
+            f"{PACKAGE_FAMILY_GAPS_LOGICAL} gaps length mismatch",
+        )

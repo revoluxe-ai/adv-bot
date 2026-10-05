@@ -77,3 +77,4 @@ class DatasetId(StrEnum):
     KEYWORD_DECISIONS = "keyword_decisions"
     DATA_MAP = "DATA_MAP"
     KEYWORD_COVERAGE = "keyword_coverage"
+    PACKAGE_FAMILY_GAPS = "package_family_gaps"
