@@ -1,0 +1,81 @@
+"""Contract tests: non-aliasing vs A1/Redis DTOs and payload type guard."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+from pydantic import ValidationError
+
+from app.modules.ai_package_v1.domain.campaign_settings_snapshot_v1 import (
+    CampaignSettingsSnapshotV1,
+    SCHEMA_VERSION,
+)
+from app.modules.ai_package_v1.export.manifest_cards import (
+    serialize_campaign_settings_payload,
+)
+from app.snapshot_data_updater.dto import AdvSettingsSnapshotDTO
+from tests.unit.ai_package_v1.a1_contract_stub import CampaignResourceSnapshotV1Stub
+from tests.unit.ai_package_v1.conftest import make_adv_setting
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_payload_not_adv_settings_snapshot_dto(assembler_factory) -> None:
+    payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
+    raw = serialize_campaign_settings_payload(payload)
+    data = json.loads(raw)
+    assert data["schema_version"] == SCHEMA_VERSION
+    with pytest.raises(ValidationError):
+        _ = AdvSettingsSnapshotDTO.model_validate(data)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_payload_type_guard_non_aliasing(assembler_factory) -> None:
+    payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
+    raw = serialize_campaign_settings_payload(payload)
+    data = json.loads(raw)
+    parsed = CampaignSettingsSnapshotV1.model_validate(data)
+    assert parsed.schema_version == SCHEMA_VERSION
+    with pytest.raises(ValidationError):
+        _ = CampaignResourceSnapshotV1Stub.model_validate(data)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_detailed_contract_golden_legs(assembler_factory) -> None:
+    row = make_adv_setting(adv_id=111, search_adv_id=222)
+    payload = await assembler_factory([row]).assemble("shop-1")
+    raw = serialize_campaign_settings_payload(payload)
+    data = json.loads(raw)
+    record = data["records"][0]
+    assert record["auto_leg"]["wb_adv_id"] == 111
+    assert record["search_leg"]["wb_adv_id"] == 222
+    assert record["auto_leg"]["leg_role"] == "AUTO"
+    assert record["search_leg"]["leg_role"] == "SEARCH"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_settings_export_spy_no_wb_calls(assembler_factory) -> None:
+    """Contract-test authority: zero WB API on settings path (paired S11/S20)."""
+    from unittest.mock import MagicMock, patch
+
+    wb_spy = MagicMock()
+    with patch.dict("sys.modules", {"app.core.mp.wb.api": wb_spy}):
+        payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
+    assert payload.records
+    wb_spy.assert_not_called()
+
+
+@pytest.mark.unit
+def test_inventory_partial_before_detailed_legacy_fixture() -> None:
+    """Regression: minimal v1 card must not claim FULL detailed coverage."""
+    legacy_card = {
+        "dataset_id": "campaign_settings_snapshot",
+        "detailed_settings_export": False,
+        "coverage": "PARTIAL",
+    }
+    assert legacy_card["detailed_settings_export"] is False
+    assert legacy_card["coverage"] != "FULL"

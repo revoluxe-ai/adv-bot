@@ -1,0 +1,32 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "ai-package-v1-contract",
+  "MODE": "audit",
+  "VERDICT": "PASS",
+  "PASS_SCOPE": "FULL_CHANGE",
+  "AUDIT_EVIDENCE_ID": "SCAR-94e2e1bea191ca75",
+  "REPORT_CONTENT_HASH": "94e2e1bea191ca75feba814b3a4255e1aa67b89810ec2d0fd3ae73fc6e99071e",
+  "REPORT_PATH": "openspec/changes/ai-package-v1-contract/scenario-coverage/audit.report.md",
+  "RECEIPT_PATH": "openspec/changes/ai-package-v1-contract/scenario-coverage/audit.receipt.json",
+  "SOURCE_SPEC_SHA": "fbf1fc5c56c593089da567e7e5bc2c675d1ee71b2cd9fe4079ee894f83b7a7b4",
+  "WORKTREE_FINGERPRINT": "6f7f802adaa5555fc8507d4e28d0d15589f8685c7df4e701c4f967c9e42da30c",
+  "PLAN_EVIDENCE_ID": "SCPV1-39d14fba55537e56",
+  "SCENARIOS_TOTAL": 26,
+  "SCENARIOS_PASS": 26,
+  "SCENARIOS_FAIL": 0,
+  "SCENARIOS_BLOCKED": 0,
+  "EXECUTION": {
+    "UNIT_TESTS_PASSED": 75,
+    "INTEGRATION_TESTS_PASSED": 6,
+    "CACHE_MODE": "OFF",
+    "ENV": [
+      "ALLOW_DESTRUCTIVE_TEST_DB=1",
+      "ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE=1",
+      "ALLOW_DESTRUCTIVE_TEST_SUBPROCESS=1"
+    ]
+  },
+  "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=audit change=ai-package-v1-contract run=targeted",
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "GENERATED_AT": "2026-09-30T14:45:37.797764+00:00"
+}
