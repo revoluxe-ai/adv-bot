@@ -1,0 +1,97 @@
+alembic_/versions/e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py
+  s_492b0cf0678926::t_6595cd5eccffc7 1-81
+app/core/mp/wb/api/adapter/promotion_client/campaigns_info_v2/adapter.py
+  s_492b0cf0678926::t_157fe0f8c6a65b 4-6,62-98
+app/modules/wb_sky_control_plane/__init__.py
+  s_492b0cf0678926::t_f0473c868ce42a 1-11
+app/modules/wb_sky_control_plane/kernel/__init__.py
+  s_492b0cf0678926::t_6e014152e30d52 1-5
+app/modules/wb_sky_control_plane/kernel/canonical_json.py
+  s_492b0cf0678926::t_18ea7749525f72 1-37
+app/modules/wb_sky_control_plane/kernel/capabilities_eval.py
+  s_492b0cf0678926::t_1c66025ca57337 1-77
+app/modules/wb_sky_control_plane/kernel/classify.py
+  s_492b0cf0678926::t_ab97be4e84a319 1-89
+app/modules/wb_sky_control_plane/kernel/pipeline.py
+  s_492b0cf0678926::t_d3b732c84c940e 1-71
+app/modules/wb_sky_control_plane/kernel/planner.py
+  s_492b0cf0678926::t_b14f46ae4ff3fe 1-96
+app/modules/wb_sky_control_plane/kernel/semantic_digest.py
+  s_492b0cf0678926::t_e8a8f09350814b 1-58
+app/modules/wb_sky_control_plane/kernel/state_token.py
+  s_492b0cf0678926::t_ccc13de4785b9f 1-90
+app/modules/wb_sky_control_plane/kernel/validate.py
+  s_492b0cf0678926::t_06c38a00136658 1-76
+app/modules/wb_sky_control_plane/models/__init__.py
+  s_492b0cf0678926::t_fdf45fae01d389 1-57
+app/modules/wb_sky_control_plane/models/capabilities.py
+  s_492b0cf0678926::t_336e1fc7e89dfd 1-39
+app/modules/wb_sky_control_plane/models/changeset.py
+  s_492b0cf0678926::t_eb91bab307bc5a 1-160
+app/modules/wb_sky_control_plane/models/enums.py
+  s_492b0cf0678926::t_9af1f42ef6fb17 1-104
+app/modules/wb_sky_control_plane/models/errors.py
+  s_492b0cf0678926::t_9ea291c4399642 1-24
+app/modules/wb_sky_control_plane/models/plan.py
+  s_492b0cf0678926::t_80ded64975fff4 1-49
+app/modules/wb_sky_control_plane/models/snapshot.py
+  s_492b0cf0678926::t_35cbe286f8296e 1-75
+app/modules/wb_sky_control_plane/ports/__init__.py
+  s_492b0cf0678926::t_47ff6debce1652 1-5
+app/modules/wb_sky_control_plane/ports/wb_read_port.py
+  s_492b0cf0678926::t_f56557d809a070 1-16
+app/modules/wb_sky_control_plane/read/__init__.py
+  s_492b0cf0678926::t_2d6bd2ee627f60 1-11
+app/modules/wb_sky_control_plane/read/local_policy.py
+  s_492b0cf0678926::t_10f962991aca01 1-39
+app/modules/wb_sky_control_plane/read/normalizer.py
+  s_492b0cf0678926::t_c239bfe80e440d 1-182
+app/modules/wb_sky_control_plane/read/resolver.py
+  s_492b0cf0678926::t_47d0cdc985b950 1-181
+app/modules/wb_sky_control_plane/read/scope.py
+  s_492b0cf0678926::t_b4d5098d39d601 1-22
+app/modules/wb_sky_control_plane/read/wb_reader.py
+  s_492b0cf0678926::t_a97d439390d0a6 1-23
+app/modules/wb_sky_control_plane/registry/__init__.py
+  s_492b0cf0678926::t_0ba2ad5229c9e0 1-19
+app/modules/wb_sky_control_plane/registry/anchor.py
+  s_492b0cf0678926::t_293fbe26f1920c 1-22
+app/modules/wb_sky_control_plane/registry/backfill.py
+  s_492b0cf0678926::t_e2e4851a54f40c 1-255
+app/modules/wb_sky_control_plane/registry/model.py
+  s_492b0cf0678926::t_7fd9b90cc94f44 1-35
+tests/unit/wb_sky_control_plane/test_a1_safety_regression.py
+  s_492b0cf0678926::t_1a924cc763beb9 1-139
+tests/unit/wb_sky_control_plane/test_campaigns_info_v2_adapter_raw.py
+  s_492b0cf0678926::t_87d881aeda6224 1-100
+tests/unit/wb_sky_control_plane/test_capabilities_and_validate.py
+  s_492b0cf0678926::t_a5d7de2591d008 1-114
+tests/unit/wb_sky_control_plane/test_changeset_contract.py
+  s_492b0cf0678926::t_56bc11e15ba075 1-72
+tests/unit/wb_sky_control_plane/test_normalizer_strict_boundary.py
+  s_492b0cf0678926::t_6e14b8534eb562 1-115
+tests/unit/wb_sky_control_plane/test_pipeline_dry_run.py
+  s_492b0cf0678926::t_ba172ae4c49214 1-167
+tests/unit/wb_sky_control_plane/test_registry_backfill.py
+  s_492b0cf0678926::t_5fbb5c7050c8ce 1-176
+tests/unit/wb_sky_control_plane/test_semantic_digest_and_state_token.py
+  s_492b0cf0678926::t_8d5bd9e7efc148 1-302
+tests/unit/wb_sky_control_plane/test_wb_reader_delegation.py
+  s_492b0cf0678926::t_6ce6014e5c4fe5 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2b9b4f1d2d7b7a8ccf931aa1cc1bf83713e6ce36",
+  "prompts": {},
+  "sessions": {
+    "s_492b0cf0678926": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "b3455c21-fabb-4f67-8f6e-51b654a3d654",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
