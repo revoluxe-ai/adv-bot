@@ -1,0 +1,29 @@
+openspec/changes/shop-wide-common-sales-collection/CURRENT_SCOPE_AUDIT_CERTIFICATION.md
+  s_5633754b5759ad::t_c70e4f5c8c8035 1-94
+openspec/changes/shop-wide-common-sales-collection/MERGE_EVIDENCE.md
+  s_5633754b5759ad::t_9a8a4ffd5f0ebf 1-121
+openspec/changes/shop-wide-common-sales-collection/POST_MERGE_VERIFY.md
+  s_5633754b5759ad::t_8e927f154133f0 1-169
+openspec/changes/shop-wide-common-sales-collection/VERIFY_ARCHIVE_RECEIPT.md
+  s_5633754b5759ad::t_1126c2ec222be4 1-175
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/comparison.json
+  s_5633754b5759ad::t_bc6a71095eb105 1-98
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/diagnostic-parity.json
+  s_5633754b5759ad::t_9363615f3cc086 1-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "992c3b8292cdbc350bded0b2034ab2218de0340a",
+  "prompts": {},
+  "sessions": {
+    "s_5633754b5759ad": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "22ff6b00-0f9a-4133-9bb4-57fdbc338cfa",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
