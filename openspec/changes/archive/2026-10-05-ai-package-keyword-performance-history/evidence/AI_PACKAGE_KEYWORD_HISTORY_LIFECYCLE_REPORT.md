@@ -1,28 +1,39 @@
 # AI_PACKAGE_KEYWORD_HISTORY_LIFECYCLE_REPORT
 
-FEATURE_HEAD: 6bd56539457558e3e1946ff4e1c2fc9cb2db1004
-CURRENT_STAGE_PRE_MERGE_HEAD: 47a94d4ebd80fe8ea0313393c71422095568b53a
-STALE_RUNNER_STATUS: NONE_FOUND
-POST_REPAIR_REAUDIT: PASS
-TESTS: PASS (132 unit ai_package_v1)
-PYRIGHT: PASS (pyright-strict 0 errors)
-OPENSPEC: PASS (validate --strict); guard opsx_ff size FAIL documented debt
-SCENARIO_AUDIT: PASS (SCPV1-dad56a1027545bc3; SCAR-09 51/51 binding)
-FINAL_MERGE_REVIEW: PASS
-STAGE_DIRTY_OVERLAP: YES
-MERGE_COMMIT: (not created)
-CURRENT_STAGE_POST_MERGE_HEAD: 47a94d4ebd80fe8ea0313393c71422095568b53a
-FEATURE_ANCESTOR_OF_STAGE: NO
-POST_MERGE_VERIFY: FAIL (not run — merge blocked)
-OPENSPEC_ARCHIVE: NOT_DONE
-WORKTREE_REMOVED: NO
-BRANCH_REMOVED: NO
-UNRELATED_STAGE_CHANGES_PRESERVED: YES (no merge performed; dirty tree untouched)
-PRODUCTION_WRITES: NONE
-FINAL_STATUS: MERGE_BLOCKED
-NEXT_ACTION: On adv-bot stage checkout, commit or relocate uncommitted edits on tests/unit/ai_package_v1/test_campaign_settings_assembler.py and test_campaign_settings_contract.py (or stash with owner approval), then re-run merge into stage 47a94d4eb+; resolve pyrightconfig_strict.json union; complete post-merge verify and openspec archive.
+**FINAL_STATUS:** MERGED_AND_CLEANED
 
-Evidence receipts (this hop):
-- evidence/RECONCILIATION-20261005-lifecycle.json
-- evidence/POST_REPAIR_REAUDIT-20261005-HEAD6bd565394.json
-- evidence/FINAL_MERGE_REVIEW-20261005.json
+**CONFLICT_FILE_OWNER:** A
+
+**CONFLICT_RESOLUTION:** committed `8e24655f7` (S15/S18 campaign-settings snapshot test closure on stage)
+
+**DIRTY_PATHS_CLEARED:** YES (`test_campaign_settings_assembler.py`, `test_campaign_settings_contract.py` no longer dirty before merge)
+
+**FEATURE_HEAD:** `c66f46e09c4cbe9d4b4a48eca6eb558c9fd4037f`
+
+**STAGE_HEAD_PRE:** `4fe28087a9dd9910052ec513b4657afbf4b90a5a`
+
+**STAGE_HEAD_POST_CLOSURE:** `8e24655f7` (test closure)
+
+**STAGE_HEAD_POST_MERGE:** `b8c810159454acf180225b0310f9abe5c48b1912`
+
+**STAGE_HEAD_FINAL:** `79e2829b69d24443d080829df351b389bc422081` (openspec archive commit)
+
+**POST_REPAIR:** REUSED (`evidence/verify-impl-receipt-WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09.json`, `POST_REPAIR_REAUDIT-20261005-HEAD6bd565394.json`)
+
+**MERGE_COMMIT:** `b8c810159454acf180225b0310f9abe5c48b1912`
+
+**ANCESTOR:** YES (`git merge-base --is-ancestor c66f46e09 HEAD`)
+
+**POST_MERGE_VERIFY:** PASS — `pytest -m unit tests/unit/ai_package_v1/` 133 passed; `openspec validate ai-package-keyword-performance-history --type change --strict` (pre-archive); post-archive main specs synced; `git diff --check` clean; `pyright-strict` exit 0 (9 diagnostics on pre-existing dirty `adapter.py` + contract test typing, not keyword_performance)
+
+**ARCHIVE:** `openspec/changes/archive/2026-10-05-ai-package-keyword-performance-history` (commit `79e2829b6`)
+
+**WORKTREE_REMOVED:** YES (`C:/Users/vkita/my_code/meta-repo/ai-package-keyword-performance-history`)
+
+**BRANCH_REMOVED:** YES (`ai-package-keyword-performance-history`, `git branch -d`)
+
+**UNRELATED_STAGE_CHANGES_PRESERVED:** YES (SHA256 unchanged: `adapter.py` `a85f74fd…`, `openspec/decisions/index.md` `17a88219…`; other dirty/untracked paths untouched)
+
+**NEXT_ACTION:** none for keyword lifecycle (local only; no push per assignment). Optional: finish separate in-progress `ai-package-campaign-settings-snapshot` archive dirty on stage.
+
+**Classification note:** `internal/ai-package-keyword-history/conflict-classification.md`
