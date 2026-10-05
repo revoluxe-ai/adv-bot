@@ -1,0 +1,66 @@
+---
+description: Cursor Project routing — cloud-first development vs local-only execution (WB Sky adv-bot)
+globs: [".cursor/commands/opsx-*.md", "openspec/**/*.md", "AGENTS.md"]
+alwaysApply: true
+---
+# OPSX Cloud / Local routing
+
+## Authority detection (start of every change)
+
+Before inventory, planning, apply, verify, or archive, resolve:
+
+```text
+AUTHORITY_LOCATION:
+  REMOTE_COMMITTED
+  LOCAL_COMMITTED
+  LOCAL_WORKTREE_ONLY
+  MIXED
+  UNKNOWN
+```
+
+Rules:
+
+| AUTHORITY_LOCATION | Default execution |
+|---|---|
+| `REMOTE_COMMITTED` | Cloud preferred |
+| `LOCAL_COMMITTED` | Sync from remote or delegate Local Agent before writes |
+| `LOCAL_WORKTREE_ONLY` | Local required |
+| `MIXED` | Reconciliation required; fail closed on apply |
+| `UNKNOWN` | Fail closed |
+
+After a verified fast-forward push, **`origin/stage`** is the default development baseline for new isolated work. Always `git fetch origin` and prove `HEAD` matches the expected certified SHA before starting a change.
+
+Cloud agents must **not** infer «feature absent» when a local-only worktree or unpushed branch is invisible from the cloud clone.
+
+## Routing matrix
+
+| Task class | Route |
+|---|---|
+| Research, planning, design, independent review | `CLOUD_PREFERRED` |
+| New isolated feature implementation (one change → one branch) | `CLOUD_PREFERRED` |
+| `REMOTE_COMMITTED` baseline work | `CLOUD_PREFERRED` |
+| Existing local-only worktree | `LOCAL_REQUIRED` |
+| Local dirty-stage reconciliation | `LOCAL_REQUIRED` |
+| Machine-specific dependency (local DB, Docker stack, secrets on disk) | `LOCAL_REQUIRED` |
+| Final merge into authoritative local `stage` when Owner policy requires local integration checkout | `LOCAL_REQUIRED` unless Owner explicitly migrated to remote-first merge |
+| Production action | Forbidden without explicit Owner GO |
+
+Synonyms used in prompts:
+
+- `NEW_ISOLATED_FEATURE` → new isolated feature → `CLOUD_PREFERRED`
+- `LOCAL_DIRTY_RECONCILIATION` → local dirty reconciliation → `LOCAL_REQUIRED`
+- `MACHINE_SPECIFIC` → machine-specific dependency → `LOCAL_REQUIRED`
+- `UNKNOWN` authority → `FAIL_CLOSED`
+
+## WB Sky invariants (transport-independent)
+
+- AI proposes intent / ChangeSet; **WB Sky runtime** is sole production-write authority.
+- External mutations require deterministic validation; unknown or unsupported state fails closed.
+- Domain contracts are transport-independent (JSON / API / MCP share semantics).
+- Excel is human-facing, not the canonical control protocol.
+- One feature/spec → one OPSX change; contracts and invariants before transport/UI.
+- No production write without explicit Owner authorization.
+
+## OPSX spine (reuse, do not rewrite)
+
+Use existing `.cursor/commands/opsx-*.md`, `.cursor/skills/openspec-*`, and runner integrations. Project memory is coordination only; durable knowledge lives in repo artifacts (`openspec/`, `AGENTS.md`, rules, skills, Owner Contracts).

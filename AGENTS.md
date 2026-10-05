@@ -54,3 +54,9 @@
   Miss in shop-runner → `ShopRunnerKeywordsCacheMissError`; retry — `SHOP_RUNNER_REQUIRED_DATA_MISS_*` in `env.sample`.
 - **min_bids cache miss** on read-only path: log level **WARNING** (`min_bids cache miss`), not ERROR;
   WB refresh failures use ERROR (`refresh_min_bids_cache_miss`). See `README_min_bids.md`, `wb_manager.py`.
+
+## Cursor Project / OPSX (cloud-first)
+
+Development baseline after bootstrap: **`origin/stage`** (fetch and prove SHA before each new change). Resolve `AUTHORITY_LOCATION` at the start of every OPSX hop; routing matrix and fail-closed rules: `.cursor/rules/opsx-cloud-local-routing.mdc`.
+
+Absolute principles: AI proposes intent / ChangeSet; WB Sky is sole production-write authority; external AI mutations require deterministic validation; unknown state fails closed; domain contracts are transport-independent; JSON/API/MCP share operation semantics; Excel is human-facing not canonical control; one feature/spec = one OPSX change; contracts before transport/UI; no production write without explicit Owner GO.
