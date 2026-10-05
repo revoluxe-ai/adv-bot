@@ -1,0 +1,16 @@
+tools/cursor_executor/cursor_executor/command_preflight.py
+  h_267f51d775769b 182-248
+tools/cursor_executor/tests/test_command_preflight.py
+  h_267f51d775769b 144-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b09866475e74d8de944949ba59a159acfab2b72b",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
