@@ -1,0 +1,25 @@
+openspec/changes/ai-package-keyword-performance-history/evidence/.gitattributes
+  s_6d98a8c7d49a61::t_4d7b83ac5d18fd 1-6
+openspec/changes/ai-package-keyword-performance-history/evidence/AI_PACKAGE_KEYWORD_HISTORY_INVENTORY_REPORT.md
+  s_6d98a8c7d49a61::t_473efea1263180 3-4
+openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-EVIDENCE-FORMAT-REPAIR-20261005-12.json
+  s_6d98a8c7d49a61::t_6fc719a84de870 1-51
+openspec/changes/ai-package-keyword-performance-history/scenario-coverage/audit.report.md
+  s_6d98a8c7d49a61::t_9d69b73a490db7 3-8,191
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6bd56539457558e3e1946ff4e1c2fc9cb2db1004",
+  "prompts": {},
+  "sessions": {
+    "s_6d98a8c7d49a61": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "agent-e6dbdf76-cdee-4710-aa7d-f5d974a72d3a",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
