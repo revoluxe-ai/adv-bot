@@ -1,0 +1,20 @@
+openspec/changes/ai-package-keyword-performance-history/evidence/AI_PACKAGE_KEYWORD_HISTORY_LIFECYCLE_REPORT.md
+  h_267f51d775769b 1-28
+openspec/changes/ai-package-keyword-performance-history/evidence/FINAL_MERGE_REVIEW-20261005.json
+  h_267f51d775769b 1-24
+openspec/changes/ai-package-keyword-performance-history/evidence/POST_REPAIR_REAUDIT-20261005-HEAD6bd565394.json
+  h_267f51d775769b 1-28
+openspec/changes/ai-package-keyword-performance-history/evidence/RECONCILIATION-20261005-lifecycle.json
+  h_267f51d775769b 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c66f46e09c4cbe9d4b4a48eca6eb558c9fd4037f",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
