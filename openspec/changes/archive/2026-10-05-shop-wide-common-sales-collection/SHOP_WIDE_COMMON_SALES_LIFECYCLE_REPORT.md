@@ -1,89 +1,59 @@
 # SHOP_WIDE_COMMON_SALES_LIFECYCLE_REPORT
 
-```yaml
-TASK_ID: WB-SKY-COMMON-SALES-ARCHIVE-CLEANUP-20261005-0491
-CHANGE_ID: shop-wide-common-sales-collection
-FINISHED_AT: 2026-10-05T05:34:03+03:00
+```text
+CHANGE: shop-wide-common-sales-collection
+HOME_PC_ACCESS: ONLINE
+FEATURE_PREMERGE_STATE: UNCHANGED
+FEATURE_COMMIT: 3afdde673e667cc725131cab7f463db7e2b34b66
+FEATURE_TIP_MERGED: 2ccff6321700499c22cbc1a1f5b5541cb8683fef
+FINAL_MERGE_REVIEW: PASS
+STAGE_PRE_MERGE_HEAD: 37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0
+STAGE_DIRTY_OVERLAP: NO
+MERGE_METHOD: local git merge --no-ff
+STAGE_POST_MERGE_HEAD: 58441b3589200e02f642628e05920e680e553355
+FEATURE_IS_ANCESTOR_OF_STAGE: YES
+POST_MERGE_TESTS: 76 PASS (74 unit + 2 isolated ClickHouse integration)
+POST_MERGE_PYRIGHT: committed merged stage 755 files / 0 errors / 0 warnings; actual dirty stage 4 baseline errors / 0 new diagnostics
+POST_MERGE_OPENSPEC: PASS
+POST_MERGE_VERIFY: PASS (CHANGE_SCOPED)
+OPENSPEC_ARCHIVE_STATUS: DONE
+ARCHIVE_COMMIT: 50b4314618591bd9f3b92b33251753baa11d4fca
+WORKTREE_REMOVED: YES
+FEATURE_BRANCH_REMOVED: YES
+UNRELATED_STAGE_CHANGES_PRESERVED: YES (92/92 paths, statuses and hashes unchanged)
+DEPLOY_PERFORMED: NO
+PRODUCTION_WRITES_PERFORMED: NO
+PUSH_PERFORMED: NO
 FINAL_STATUS: MERGED_AND_CLEANED
+NEXT_ACTION: No action required for this local lifecycle.
 ```
 
-## Required fields
+The runtime remained identical to the certified implementation: final guard verified all 15 source/test/config SHA256 values. Documentation consistency and formatting were fixed in separate commits. The historical scenario certificate (33/33), spec/plan/report bindings, raw execution logs and independent receipts remain preserved.
 
-| Field | Value |
-|-------|-------|
-| HOME_PC_ACCESS | ONLINE |
-| FEATURE_PREMERGE_STATE | UNCHANGED (runtime) |
-| FEATURE_COMMIT | `3afdde673e667cc725131cab7f463db7e2b34b66` |
-| FEATURE_TIP | `2ccff6321700499c22cbc1a1f5b5541cb8683fef` |
-| FINAL_MERGE_REVIEW | PASS |
-| STAGE_PREMERGE_HEAD | `37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0` |
-| STAGE_DIRTY_OVERLAP | NO |
-| MERGE_METHOD | `--no-ff` |
-| STAGE_POST_MERGE_HEAD | `58441b3589200e02f642628e05920e680e553355` |
-| ANCESTOR (2ccff/3afd ⊆ stage) | YES |
-| POST_MERGE_TESTS | 76 PASS (74 unit + 2 integration CH) |
-| PYRIGHT_CANONICAL_COMMITTED | 755 files, 0 errors |
-| PYRIGHT_ACTUAL_DIRTY_BASELINE | 4 errors (foreign adapter.py only); introduced 0 |
-| OPENSPEC_VALIDATE | PASS (`shop-wide-common-sales-collection --strict`) |
-| POST_MERGE_VERIFY | PASS (CHANGE_SCOPED) |
-| ARCHIVE | DONE |
-| ARCHIVE_COMMIT | `50b4314618591bd9f3b92b33251753baa11d4fca` |
-| WORKTREE_REMOVED | YES (git registration); orphan empty directory remains — see note |
-| BRANCH_REMOVED | YES (`git branch -d shop-wide-common-sales-collection`) |
-| FOREIGN_PRESERVED | YES (92/92 snapshot hashes match post-archive) |
-| INDEX_EMPTY_BEFORE_ARCHIVE_COMMIT | YES |
-| DEPLOY | NO |
-| PROD_WRITES | NO |
-| NEXT_ACTION | none for local change |
+## Archive and canonical artifacts
 
-## Canonical paths
+- Archive: `openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/`
+- Synced main spec: `openspec/specs/shop-wide-common-sales-collection/spec.md`
+- Promoted accepted decision: `openspec/decisions/shop-wide-common-sales-ownership/decision.md`
+- Independent archive GO: `VERIFY_ARCHIVE_RECEIPT.md` (0480/0481, Product Acceptance PASS).
+- Archive command: `poetry run openspec archive shop-wide-common-sales-collection -y`, with normal validation/spec sync.
 
-| Artifact | Path |
-|----------|------|
-| Archive | `openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/` |
-| Main spec | `openspec/specs/shop-wide-common-sales-collection/spec.md` |
-| Canonical decision | `openspec/decisions/shop-wide-common-sales-ownership/decision.md` |
-| Archive close receipt | `openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/ARCHIVE_CLOSE_RECEIPT.md` |
+## Quality scope
 
-## Lifecycle QA / gate proof
+All 76 targeted tests passed on the actual merged main checkout. Actual dirty stage retains four pyright errors in the unrelated `campaigns_info_v2/adapter.py`. The pre-merge snapshot with the same preserved dirty files has exactly the same diagnostics; no new diagnostic was introduced. A Git archive of committed merged stage, using the same ready environment, passed the canonical strict gate with 755 files and zero errors/warnings.
 
-| Gate | Evidence |
-|------|----------|
-| Archive verify 0480 | `VERIFY_ARCHIVE_RECEIPT.md` → `✅ GO` |
-| Receipt close 0481 | `CURRENT_SCOPE_AUDIT_CERTIFICATION.md` EOL lineage `5e24eab…` |
-| Merge evidence | `MERGE_EVIDENCE.md`, `POST_MERGE_VERIFY.md` |
-| Pyright parity | `lifecycle-proof/comparison.json` (`diagnostic_parity=true`, `new_diagnostics=[]`) |
-| Foreign snapshot | `WB-SKY-COMMON-SALES-LIFECYCLE-PREFLIGHT-20261005-0445` — 0 mismatches @ 0491 |
-| Spec SHA (LF git blob) | `5e24eabdaa2f6bf4daaa494ea6bbca5da73dd443e0540d7568acbca78b508253` |
+The full repository test suite and production readiness are not claimed. Financial currency remains unknown; Store DRR numerator remains blocked by campaign coverage; history beyond seven days remains deferred.
 
-## Worktree / branch cleanup
+## Cleanup incident and repair
 
-| Step | Result |
-|------|--------|
-| `git worktree list` | feature path **absent** |
-| `git worktree remove` (no `--force`) | git metadata removed; final rmdir `Permission denied` |
-| Filesystem `shop-wide-common-sales-collection/` | empty orphan directory remains (not manually deleted per policy) |
-| `git branch -d shop-wide-common-sales-collection` | **deleted** (was `2ccff6321`) |
-| `git merge-base --is-ancestor 2ccff6321 HEAD` | exit 0 |
+The initial cleanup report committed as `8938428d2c05d3fcfa86024ed88729f125026ebe` prematurely marked completion while an empty directory remained. Git traversed the feature `.venv` junction and removed the campaign environment. This was an unintended cleanup error.
 
-### Junction / campaign env note
+The campaign environment was restored as a separate physical virtualenv from the ready main environment, without network downloads. All 228 main-environment package/version records are present; imports and pytest launch passed; 63 console scripts were regenerated, and the editable project path points to the campaign checkout. Exact identity with the deleted original environment is not claimed.
 
-Feature worktree `.venv` was a junction → `shop-wide-campaign-data-collection\.venv`.
-After worktree removal attempt, campaign `.venv` directory exists but is **empty**
-(no `Scripts/python.exe`). This is collateral outside shop-wide archive scope;
-Owner may need to recreate campaign worktree venv. Feature junction target was
-not intentionally deleted by this worker beyond git's worktree remove attempt.
+The orphan directory was held by a completed runner-owned PowerShell/Poetry/`check_openspec.py` process chain. Only those confirmed processes were stopped. Once Git registration had already been removed and the directory was verified empty, the directory was removed normally. No force branch deletion or manual deletion before Git cleanup was used.
 
-## Scope honesty
+Final guard at `2026-10-05T02:51:15.174794+00:00` verified both filesystem and Git absence, both feature commits as ancestors of stage, all required archive artifacts, unchanged certified bindings, an empty index, all 92 foreign dirty records, and working main/campaign Python executables. The task-owned test ClickHouse container was stopped; no shared service was stopped.
 
-- Whole working tree is **not** canonical green (foreign 4 pyright errors persist).
-- Full Store DRR / prod readiness **not** claimed.
-- `openspec/decisions/index.md` foreign dirty — **not modified**.
+Repair evidence: `CLEANUP_REPAIR_RECEIPT.md`, `lifecycle-proof/cleanup-repair.json`, `lifecycle-proof/final-guard.json`.
 
-## Commit lineage (snapshot before this report)
-
-| SHA | Description |
-|-----|-------------|
-| `58441b3589200e02f642628e05920e680e553355` | merge commit (implementation) |
-| `136bf73d92f68d443cf0562fdf838fe1a2fee4c6` | stage HEAD before archive commit |
-| `50b4314618591bd9f3b92b33251753baa11d4fca` | archive lifecycle commit |
+This report replaces the premature completion wording while preserving its original Git history.
