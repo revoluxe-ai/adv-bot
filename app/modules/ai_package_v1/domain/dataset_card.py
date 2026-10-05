@@ -67,8 +67,14 @@ class DatasetCard(BaseModel):
     def to_manifest_dict(self) -> dict[str, Any]:
         """Сериализуемое представление для manifest (стабильные ключи)."""
         self.validate_semantics()
+        from app.modules.ai_package_v1.export.family_status import (
+            derive_family_status_from_card,
+        )
+
+        family_status = derive_family_status_from_card(self)
         return {
             "dataset_id": str(self.dataset_id),
+            "family_status": str(family_status),
             "provenance": {
                 "primary_source": str(self.provenance.primary_source),
                 "grain": self.provenance.grain,

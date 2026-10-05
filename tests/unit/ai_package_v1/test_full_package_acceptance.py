@@ -18,13 +18,13 @@ from app.modules.ai_package_v1.validator.package_validator import validate_zip_p
 from app.modules.ai_package_v1.zip_transport.encode import decode_package, payload_sha256_map
 from tests.unit.ai_package_v1.conftest import AssemblerFactory, make_adv_setting
 from tests.unit.ai_package_v1.keyword_performance.conftest import FakeKeywordDeps
-from tests.unit.ai_package_v1.test_package_zip_assembler import (
+from tests.unit.ai_package_v1.package_zip_test_support import (
     GENERATED_AT,
     PERIOD,
     SHOP_ID,
-    _export_service,
+    build_export_service_for_zip,
+    scope_for_shop,
 )
-from tests.unit.ai_package_v1.test_export_settings_integration import _scope_for_shop
 
 pytestmark = pytest.mark.unit
 
@@ -59,16 +59,16 @@ async def _run_once(
     generated_at: str,
 ) -> tuple[bytes, AcceptanceReport]:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
+    service = build_export_service_for_zip(assembler_factory, [row], keyword_deps=fake_deps)
     assembler = PackageZipAssembler(export_service=service)
     zip_bytes = await assembler.assemble_zip_with_scope(
         SHOP_ID,
         PERIOD,
-        _scope_for_shop(),
+        scope_for_shop(),
         generated_at=generated_at,
     )
     validate_zip_package(zip_bytes)
-    manifest, files = decode_package(zip_bytes)
+    _manifest, files = decode_package(zip_bytes)
     summary = json.loads(files[PACKAGE_SUMMARY_LOGICAL].decode("utf-8"))
     data_map = json.loads(files["DATA_MAP.json"].decode("utf-8"))
     explicit = all(

@@ -290,7 +290,7 @@ def _validate_family_gaps_payload(
                 f"{PACKAGE_FAMILY_GAPS_LOGICAL} gap missing family_status",
             )
         try:
-            FamilyStatus(str(status_token))
+            _ = FamilyStatus(str(status_token))
         except ValueError:
             raise PackageValidationError(
                 f"{PACKAGE_FAMILY_GAPS_LOGICAL} invalid family_status: {status_token!r}",
@@ -389,7 +389,7 @@ def _validate_package_summary_payload(
         if token is None:
             raise PackageValidationError("summary family missing family_status")
         try:
-            FamilyStatus(str(token))
+            _ = FamilyStatus(str(token))
         except ValueError:
             raise PackageValidationError(
                 f"summary invalid family_status: {token!r}",

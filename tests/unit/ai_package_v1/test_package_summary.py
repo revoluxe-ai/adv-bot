@@ -11,19 +11,15 @@ from app.modules.ai_package_v1.export.package_zip_assembler import PackageZipAss
 from app.modules.ai_package_v1.validator.package_validator import validate_zip_package
 from app.modules.ai_package_v1.zip_transport.encode import decode_package, payload_sha256_map
 from tests.unit.ai_package_v1.conftest import AssemblerFactory, make_adv_setting
-from tests.unit.ai_package_v1.keyword_performance.conftest import (
-    FakeKeywordDeps,
-    build_fake_assembler,
-)
-from tests.unit.ai_package_v1.test_export_settings_integration import (
-    _NoOpReader,
-    _scope_for_shop,
-)
-from tests.unit.ai_package_v1.test_package_zip_assembler import (
+from typing import Any, cast
+
+from tests.unit.ai_package_v1.keyword_performance.conftest import FakeKeywordDeps
+from tests.unit.ai_package_v1.package_zip_test_support import (
     GENERATED_AT,
     PERIOD,
     SHOP_ID,
-    _export_service,
+    build_export_service_for_zip,
+    scope_for_shop,
 )
 
 pytestmark = pytest.mark.unit
@@ -35,17 +31,19 @@ async def test_package_summary_present_and_self_describing(
     fake_deps: FakeKeywordDeps,
 ) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
+    service = build_export_service_for_zip(assembler_factory, [row], keyword_deps=fake_deps)
     assembler = PackageZipAssembler(export_service=service)
     zip_bytes = await assembler.assemble_zip_with_scope(
         SHOP_ID,
         PERIOD,
-        _scope_for_shop(),
+        scope_for_shop(),
         generated_at=GENERATED_AT,
     )
     validate_zip_package(zip_bytes)
-    _manifest, files = decode_package(zip_bytes)
+    manifest, files = decode_package(zip_bytes)
     summary = json.loads(files[PACKAGE_SUMMARY_LOGICAL].decode("utf-8"))
+    raw_summary = files[PACKAGE_SUMMARY_LOGICAL].decode("utf-8")
+    assert "CARD_MISSING" not in raw_summary
     assert summary["document_kind"] == "package_summary"
     assert "campaign_identity" in summary
     identity = summary["campaign_identity"]
@@ -60,9 +58,38 @@ async def test_package_summary_present_and_self_describing(
     assert families["campaign_settings_history"]["family_status"] == str(FamilyStatus.GAP)
     assert families["campaign_change_events"]["family_status"] == str(FamilyStatus.GAP)
     assert "leg_role" in families["keyword_performance"]["primary_join_keys"]
-    for family in summary["families"]:
-        semantics = family.get("value_semantics")
-        assert isinstance(semantics, dict)
+    kw = families["keyword_performance"]
+    assert kw["dataset_ids"]
+    assert "keyword_daily" in kw["dataset_ids"]
+    assert all(
+        p.startswith("keyword_performance/") or p in ("DATA_MAP.json", "coverage.json")
+        for p in kw["data_pointers"]
+        if "keyword" in p or p.endswith(".jsonl")
+    )
+    assert families["campaign_advertising"].get("first_available_date") is None
+    current_settings = cast(dict[str, Any], families["campaign_settings_current"])
+    assert str(current_settings.get("family_notes", "")).startswith(
+        "CampaignSettingsSnapshotV1"
+    )
+    assert "row_count" not in families["campaign_settings_history"]
+    assert "row_count" not in families["shop_common_sales"]
+    assert len(summary["gap_catalog_family_ids"]) == 7
+    for card in manifest["datasets"]:
+        if card.get("dataset_id") in ("package_summary", "package_family_gaps"):
+            continue
+        assert "family_status" in card
+        assert card["family_status"] in {
+            "COMPLETE",
+            "PARTIAL",
+            "GAP",
+            "UNSUPPORTED",
+            "FAILED",
+        }
+    for family_obj in summary["families"]:
+        family = cast(dict[str, Any], family_obj)
+        semantics_raw = family.get("value_semantics")
+        assert isinstance(semantics_raw, dict)
+        semantics = cast(dict[str, Any], semantics_raw)
         assert "missing" in semantics
         assert semantics["missing"] != semantics.get("zero", "")
     assert summary["missing_zero_null"]["invariant"] == "missing_row != numeric_zero != json_null"
@@ -78,9 +105,9 @@ async def test_payload_deterministic_zip_differs_when_generated_at_changes(
 ) -> None:
     """Declared contract: payload file hashes stable; manifest timestamp changes ZIP."""
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
+    service = build_export_service_for_zip(assembler_factory, [row], keyword_deps=fake_deps)
     assembler = PackageZipAssembler(export_service=service)
-    scope = _scope_for_shop()
+    scope = scope_for_shop()
     zip_a = await assembler.assemble_zip_with_scope(
         SHOP_ID,
         PERIOD,
