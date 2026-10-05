@@ -1,0 +1,14 @@
+openspec/changes/archive/2026-10-05-ai-package-keyword-performance-history/evidence/AI_PACKAGE_KEYWORD_HISTORY_LIFECYCLE_REPORT.md
+  h_267f51d775769b 3-39
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f86e943ed2923808b7700062b03447e95df72292",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
