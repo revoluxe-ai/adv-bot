@@ -1,0 +1,20 @@
+openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/CLEANUP_REPAIR_RECEIPT.md
+  h_267f51d775769b 1-34
+openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/SHOP_WIDE_COMMON_SALES_LIFECYCLE_REPORT.md
+  h_267f51d775769b 3-26,28,31,33,35-39,41,43,45,47,49,51,53,55,57,59
+openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/lifecycle-proof/cleanup-repair.json
+  h_267f51d775769b 1-25
+openspec/changes/archive/2026-10-05-shop-wide-common-sales-collection/lifecycle-proof/final-guard.json
+  h_267f51d775769b 1-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9a80c813ed4edaf3c6f2da6ae65af4221f7ec36e",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
