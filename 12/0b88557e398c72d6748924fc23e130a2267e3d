@@ -1,0 +1,33 @@
+openspec/changes/archive/2026-10-05-campaign-settings-history/VERIFY_ARCHIVE_RECEIPT.md
+  s_5791fabf8ddb39::t_0af8a01e9d4c78 1-45
+openspec/changes/archive/2026-10-05-campaign-settings-history/specs/clickhouse-migration-lifecycle/spec.md
+  s_5791fabf8ddb39::t_edcc40f04243bd 5-15,26-31
+openspec/changes/archive/2026-10-05-campaign-settings-history/tasks.md
+  s_5791fabf8ddb39::t_b93c52fc5b25d4 71,74,76
+openspec/decisions/campaign-settings-contract-ownership/decision.md
+  s_5791fabf8ddb39::t_4c72a3747305f3 1-80
+openspec/decisions/clickhouse-migration-corpus-006/decision.md
+  s_5791fabf8ddb39::t_08273f73c06e1c 1-60
+openspec/decisions/index.md
+  s_5791fabf8ddb39::t_a5a8ab9b0cbd9e 83-96,102-112
+openspec/specs/campaign-settings-history/spec.md
+  s_5791fabf8ddb39::t_bdcd8e7592511f 1-137
+openspec/specs/clickhouse-migration-lifecycle/spec.md
+  s_5791fabf8ddb39::t_5398eec34abd7a 9,13,20,321,323,325,327,329-330,332,334-336
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "120b88557e398c72d6748924fc23e130a2267e3d",
+  "prompts": {},
+  "sessions": {
+    "s_5791fabf8ddb39": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fec70482-9c70-4b5e-bc15-3f38d28dfca2",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
