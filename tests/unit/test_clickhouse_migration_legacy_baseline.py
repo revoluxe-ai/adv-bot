@@ -42,6 +42,9 @@ _RAW_SHA256_BY_FILENAME: dict[str, str] = {
     "005_grant_system_log_truncate_to_adv_bot_user.sql": (
         "54a6ae0ea7b07ffb56784b50cbe29b627b56c0614f9377cd1a0cd69be7ce3cb0"
     ),
+    "006_create_campaign_settings_history.sql": (
+        "424ee03f2521eeeceb4f35a9276fbc13c678f8322382d69a7059c5682d332eb2"
+    ),
 }
 
 _004_FILENAME = "004_create_auto_shelf_bid_increment_tables.sql"
@@ -50,10 +53,10 @@ _004_DEFAULT_DB_OBJECTS: tuple[str, ...] = (
     "CREATE TABLE IF NOT EXISTS default_db.auto_shelf_bid_prev",
 )
 
-_CORPUS_REVISION_IDS: tuple[str, ...] = ("001", "002", "003", "004", "005")
+_CORPUS_REVISION_IDS: tuple[str, ...] = ("001", "002", "003", "004", "005", "006")
 _ALEMBIC_REVISION_LINE = re.compile(
     r"(?m)^(?:Revision ID:\s*|revision\s*(?::\s*str\s*)?=\s*)['\"]?"
-    r"(00[1-5])['\"]?\s*$"
+    r"(00[1-6])['\"]?\s*$"
 )
 _TEXT_SUFFIXES: frozenset[str] = frozenset({".py", ".mako", ".ini", ".toml", ".cfg"})
 
@@ -159,12 +162,12 @@ def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
         assert "test_adv_bot_clickhouse" not in corpus_text
         assert "destructive_ch_reset" not in corpus_text
 
-    copied_006 = [
+    copied_007 = [
         path
         for path in _CORPUS_DIR.rglob("*")
-        if path.is_file() and path.name.startswith("006")
+        if path.is_file() and path.name.startswith("007")
     ]
-    assert copied_006 == []
+    assert copied_007 == []
     assert sorted(path.name for path in _CORPUS_DIR.iterdir() if path.is_file()) == (
         sorted(_RAW_SHA256_BY_FILENAME)
     )
@@ -193,4 +196,4 @@ def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
         relative = path.resolve().relative_to(_REPO_ROOT)
         assert relative.parts[0] not in {"k8s", "dockers"}
         assert path.name != ".env"
-        assert not path.name.startswith("006")
+        assert not path.name.startswith("007")

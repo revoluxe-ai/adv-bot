@@ -426,6 +426,44 @@ def test_schema_writer_runs_001_under_every_gate_statement_by_statement() -> Non
     assert coordinator.calls[-1].function == "pg_advisory_unlock"
 
 
+def test_schema_writer_runs_reviewed_006_under_existing_gates() -> None:
+    """Scenarios: Schema writer may run reviewed 006 under existing gates; Isolated apply includes reviewed 006."""
+    corpus, recorded, port = _prepare_baseline(states={"006": "not_applied"})
+    coordinator = make_coordinator()
+    version = next(item for item in recorded.versions if item.id == "006")
+    expected = split_statements(
+        (corpus / version.filename).read_text(encoding="utf-8")
+    )
+
+    result = apply_migrations(
+        corpus,
+        recorded,
+        port=port,
+        coordinator=coordinator,
+        authorize_apply=True,
+        version_ids=("006",),
+        **_mutating_kwargs(),
+    )
+
+    assert result.success is True
+    assert result.exit_code == 0
+    executed_006 = tuple(
+        request.sql for request in port.executed if request.version_id == "006"
+    )
+    assert executed_006 == expected
+    assert all("default_db.campaign_settings_history" in sql for sql in executed_006)
+    events = [
+        event
+        for event in port.ledger_read(SERVER_UUID, CANONICAL_DATABASE).events
+        if event.version_id == "006"
+    ]
+    assert any(event.event_type == "apply_started" for event in events)
+    assert sum(event.event_type == "statement_ok" for event in events) == len(expected)
+    assert events[-1].event_type == "version_applied"
+    assert coordinator.calls[0].function == "pg_try_advisory_lock"
+    assert coordinator.calls[-1].function == "pg_advisory_unlock"
+
+
 def test_apply_without_authorization_refuses_before_statement() -> None:
     """Scenario: Apply without authorization refuses."""
     corpus, recorded, port = _prepare_baseline(states={"001": "not_applied"})

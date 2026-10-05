@@ -55,6 +55,7 @@ _FILENAMES: tuple[str, ...] = (
     "003_add_buyouts_sum_rub_to_wb_common_stat.sql",
     "004_create_auto_shelf_bid_increment_tables.sql",
     "005_grant_system_log_truncate_to_adv_bot_user.sql",
+    "006_create_campaign_settings_history.sql",
 )
 _VERSION_003 = "003_add_buyouts_sum_rub_to_wb_common_stat.sql"
 _VERSION_001 = "001_create_incremental_tables.sql"
@@ -285,7 +286,7 @@ def test_semicolon_inside_string_fails_validate_before_apply(
     assert _snapshot(canonical) == canonical_before
 
 
-def test_unreviewed_006_blocks_apply(tmp_path: Path) -> None:
+def test_unreviewed_007_blocks_apply(tmp_path: Path) -> None:
     """Непроверенный ``006`` в каталоге чтения блокирует apply.
 
     Spec ``clickhouse-migration-lifecycle``, сценарий ``Unreviewed numeric
@@ -296,7 +297,7 @@ def test_unreviewed_006_blocks_apply(tmp_path: Path) -> None:
     canonical = canonical_corpus_dir()
     canonical_before = _snapshot(canonical)
     corpus_dir = _copy_corpus(tmp_path)
-    foreign_name = "006_unreviewed.sql"
+    foreign_name = "007_unreviewed.sql"
     foreign_sql = (
         b"CREATE TABLE default_db.should_not_run (id UInt8) ENGINE = Memory;\n"
     )
@@ -313,6 +314,7 @@ def test_unreviewed_006_blocks_apply(tmp_path: Path) -> None:
         "003",
         "004",
         "005",
+        "006",
     )
     assert all(version.filename != foreign_name for version in accepted.versions)
     for result, port, coordinator in outcomes:

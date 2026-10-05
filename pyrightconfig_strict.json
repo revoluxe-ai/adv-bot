@@ -144,6 +144,8 @@
     "app/modules/common_slaves/wildberries/models/wb_auto_budget_topup.py",
     "app/modules/sales_plan_settings/telegram/callbacks.py",
     "tools/wb_api_master_map.py",
+    "app/modules/campaign_settings_contract",
+    "app/modules/campaign_settings_history",
     "scripts/clickhouse_migration_control_plane",
     "tests/unit/clickhouse_migration_contract_fixture.py",
     "tests/unit/test_clickhouse_migration_legacy_baseline.py",

@@ -86,24 +86,24 @@ def test_exec_sql_rejects_grant_line_even_with_schema_version_hash() -> None:
     assert port.executed == ()
 
 
-def test_exec_sql_rejects_unreviewed_version_without_reading_006() -> None:
-    """Версия ``006`` — непроверенный файл, statement не записывается.
+def test_exec_sql_rejects_unreviewed_version_without_reading_007() -> None:
+    """Версия ``007`` — непроверенный successor, statement не записывается.
 
-    Spec ``clickhouse-migration-lifecycle``: префикса ``006`` нет в
-    отпечатке. Отказ не требует открыть чужой worktree.
+    Spec ``clickhouse-migration-lifecycle``: reviewed fingerprint заканчивается
+    на ``006``. Отказ не требует открыть чужой worktree.
     """
     port = make_target_port()
     request = accepted_schema_request()
     unreviewed = type(request)(
         sql=request.sql,
-        version_id="006",
+        version_id="007",
         file_sha256=request.file_sha256,
     )
     absent = (
         _REPO_ROOT
         / "scripts"
         / "clickhouse_migrations"
-        / "006_unreviewed.sql"
+        / "007_unreviewed.sql"
     )
     assert absent.is_file() is False
 

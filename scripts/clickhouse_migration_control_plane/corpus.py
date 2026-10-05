@@ -27,6 +27,7 @@ _CANONICAL_FILES: tuple[tuple[str, str], ...] = (
     ("003", "003_add_buyouts_sum_rub_to_wb_common_stat.sql"),
     ("004", "004_create_auto_shelf_bid_increment_tables.sql"),
     ("005", "005_grant_system_log_truncate_to_adv_bot_user.sql"),
+    ("006", "006_create_campaign_settings_history.sql"),
 )
 
 # SHA-256 сырых байтов канонических файлов, включая комментарии и переводы
@@ -61,6 +62,12 @@ _IMMUTABLE_IDENTITY: tuple[tuple[str, str, str, str], ...] = (
         "005_grant_system_log_truncate_to_adv_bot_user.sql",
         _PRIVILEGED_GRANT,
         "54a6ae0ea7b07ffb56784b50cbe29b627b56c0614f9377cd1a0cd69be7ce3cb0",
+    ),
+    (
+        "006",
+        "006_create_campaign_settings_history.sql",
+        _SCHEMA_DDL,
+        "424ee03f2521eeeceb4f35a9276fbc13c678f8322382d69a7059c5682d332eb2",
     ),
 )
 

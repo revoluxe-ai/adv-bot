@@ -16,7 +16,7 @@ from typing import Protocol
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _CORPUS_DIR = _REPO_ROOT / "scripts" / "clickhouse_migrations"
-_SCHEMA_VERSIONS = frozenset({"001", "002", "003", "004"})
+_SCHEMA_VERSIONS = frozenset({"001", "002", "003", "004", "006"})
 _ZERO_SERVER_UUID = "00000000-0000-0000-0000-000000000000"
 _SERVER_UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"

@@ -20,8 +20,6 @@ _PACKAGE = _REPO / "scripts" / "clickhouse_migration_control_plane"
 _SPEC = (
     _REPO
     / "openspec"
-    / "changes"
-    / "clickhouse-migrations-control-plane"
     / "specs"
     / "clickhouse-migration-lifecycle"
     / "spec.md"
@@ -29,8 +27,6 @@ _SPEC = (
 _DECISION = (
     _REPO
     / "openspec"
-    / "changes"
-    / "clickhouse-migrations-control-plane"
     / "decisions"
     / "clickhouse-migration-lifecycle-ownership"
     / "decision.md"
@@ -135,13 +131,13 @@ def test_control_plane_import_graph_excludes_forbidden_runtime_adapters() -> Non
     )
 
 
-def test_proposed_decision_stays_proposed_and_shop_wide_runtime_is_outside_package() -> None:
-    """Scenarios: Shop-wide expansion waits; proposed lifecycle decision не промотирован."""
+def test_accepted_decision_is_stable_and_shop_wide_runtime_is_outside_package() -> None:
+    """Scenarios: Shop-wide expansion waits; archived lifecycle decision is Accepted."""
     decision = _DECISION.read_text(encoding="utf-8")
     package_text = "\n".join(
         path.read_text(encoding="utf-8") for path in sorted(_PACKAGE.glob("*.py"))
     )
 
-    assert "Proposed" in decision
+    assert "Accepted" in decision
     assert "shop_runner" not in package_text
     assert "CampaignCollectionRouteResolver" not in package_text
