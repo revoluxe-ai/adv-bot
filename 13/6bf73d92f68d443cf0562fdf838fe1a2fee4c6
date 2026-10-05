@@ -1,0 +1,33 @@
+openspec/changes/shop-wide-common-sales-collection/CURRENT_SCOPE_AUDIT_CERTIFICATION.md
+  s_baa068286fee23::t_5a35d0da5c5991 5,14,26-28,30-40,101-104
+openspec/changes/shop-wide-common-sales-collection/VERIFY_ARCHIVE_RECEIPT.md
+  s_baa068286fee23::t_e871fe6b97b2c9 5,8,12,138,144-158,166,180,182-183,185-186,190,195-197
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/raw-canonical/.gitattributes
+  s_baa068286fee23::t_276d449dcfaca5 1-2
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/raw-canonical/merged_committed.stderr.log
+  s_baa068286fee23::t_176a3e62eded0a 1-6
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/raw-canonical/merged_committed.stdout.log
+  s_baa068286fee23::t_83aa39f0a0b58a 1-13
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/raw-canonical/postmerge-pyright-merged-committed.json
+  s_baa068286fee23::t_366963b559745f 1-12
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/raw-canonical/premerge_with_preserved_dirty.stderr.log
+  s_baa068286fee23::t_9e5241c8a02fba 1-6
+openspec/changes/shop-wide-common-sales-collection/lifecycle-proof/raw-canonical/premerge_with_preserved_dirty.stdout.log
+  s_baa068286fee23::t_fd5ad941af7e39 1-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "136bf73d92f68d443cf0562fdf838fe1a2fee4c6",
+  "prompts": {},
+  "sessions": {
+    "s_baa068286fee23": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "72393a7a-0dc0-4712-addf-6c687083716d",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
