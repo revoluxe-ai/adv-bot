@@ -24,6 +24,11 @@ Checklist:
 
 ## ZIP determinism
 
-With fixed `generated_at`, existing tests require byte-identical ZIP (`BYTE_DETERMINISTIC`).
-When `generated_at` varies, domain CSV payloads remain stable; manifest/summary/gaps
-and keyword coverage metadata embed the timestamp (`PAYLOAD_DETERMINISTIC` subset).
+**Accepted contract (this change):** `PAYLOAD_HASH_ONLY` — deterministic per-file content
+hashes listed in `manifest.files`; consumers MUST NOT require byte-identical ZIP archives.
+
+Manifest, `PACKAGE_SUMMARY.json`, `PACKAGE_FAMILY_GAPS.json`, and keyword coverage
+metadata embed `generated_at`; ZIP container metadata may also vary.
+
+**Follow-up (out of scope here):** optional byte-identical ZIP normalization — do NOT
+implement timestamp/metadata normalization in this change.

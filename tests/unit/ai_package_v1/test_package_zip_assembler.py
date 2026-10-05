@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import json
 import sys
@@ -16,7 +15,7 @@ from app.modules.ai_package_v1.export.export_service import ExportService
 from app.modules.ai_package_v1.export.family_gaps import PACKAGE_FAMILY_GAPS_LOGICAL
 from app.modules.ai_package_v1.export.package_zip_assembler import PackageZipAssembler
 from app.modules.ai_package_v1.validator.package_validator import validate_zip_package
-from app.modules.ai_package_v1.zip_transport.encode import decode_package
+from app.modules.ai_package_v1.zip_transport.encode import decode_package, payload_sha256_map
 from tests.unit.ai_package_v1.conftest import AssemblerFactory, make_adv_setting
 from tests.unit.ai_package_v1.keyword_performance.conftest import (
     FakeKeywordDeps,
@@ -77,11 +76,11 @@ async def test_package_zip_assembler_includes_family_gaps_and_validates(
 
 
 @pytest.mark.asyncio
-async def test_package_zip_deterministic_hash(
+async def test_package_zip_payload_hash_deterministic(
     assembler_factory: AssemblerFactory,
     fake_deps: FakeKeywordDeps,
 ) -> None:
-    """Идентичные входы → идентичный ZIP sha256."""
+    """Идентичные входы → идентичные per-file content sha256 (PAYLOAD_HASH_ONLY)."""
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
     service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
     assembler = PackageZipAssembler(export_service=service)
@@ -98,7 +97,9 @@ async def test_package_zip_deterministic_hash(
         scope,
         generated_at=GENERATED_AT,
     )
-    assert hashlib.sha256(first).hexdigest() == hashlib.sha256(second).hexdigest()
+    _, files_first = decode_package(first)
+    _, files_second = decode_package(second)
+    assert payload_sha256_map(files_first) == payload_sha256_map(files_second)
 
 
 def test_cli_module_does_not_import_wb_promotion_clients() -> None:

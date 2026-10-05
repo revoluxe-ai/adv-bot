@@ -174,8 +174,10 @@ def build_data_map(
         "export_field_matrix": build_export_field_matrix(),
         "source_field_matrix": _legacy_source_field_summary(),
         "campaign_identity": {
+            "campaign_id_equals_physical_adv_id": True,
             "campaign_id_in_full_adv_wb_stat": (
-                "Physical WB adv_id; exported as campaign_id in campaign_full_stat.csv"
+                "campaign_id column IS the physical WB adv_id; "
+                "exported as campaign_id in campaign_full_stat.csv"
             ),
             "adv_id_in_keyword_daily": "Same physical id as campaign_id; leg_role required for Auto/Search",
             "pg_logical_campaign": "adv_setting_id + auto_adv_id/search_adv_id relation in settings snapshot",

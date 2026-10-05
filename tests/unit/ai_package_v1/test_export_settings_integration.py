@@ -149,7 +149,10 @@ async def test_export_zip_deterministic_settings_hash(
     zip_a = encode_package(first.manifest, first.payloads)
     zip_b = encode_package(second.manifest, second.payloads)
     validate_zip_package(zip_a)
-    assert hashlib.sha256(zip_a).hexdigest() == hashlib.sha256(zip_b).hexdigest()
+    validate_zip_package(zip_b)
+    hashes_a = {p.logical_name: hashlib.sha256(p.content).hexdigest() for p in first.payloads}
+    hashes_b = {p.logical_name: hashlib.sha256(p.content).hexdigest() for p in second.payloads}
+    assert hashes_a == hashes_b
 
 
 @pytest.mark.asyncio

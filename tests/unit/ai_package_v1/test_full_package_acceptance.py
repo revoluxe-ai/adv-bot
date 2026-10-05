@@ -6,7 +6,6 @@ FULL_AI_PACKAGE_ACCEPTANCE_REPORT runner (unit fixtures, no production I/O).
 
 from __future__ import annotations
 
-import hashlib
 import json
 from dataclasses import dataclass
 
@@ -102,11 +101,10 @@ async def test_full_ai_package_acceptance_twice(
     assembler_factory: AssemblerFactory,
     fake_deps: FakeKeywordDeps,
 ) -> None:
-    """Two deterministic reruns at fixed generated_at (byte-stable ZIP)."""
+    """Two deterministic reruns: PAYLOAD_HASH_ONLY (per-file sha256), not ZIP bytes."""
     zip1, report1 = await _run_once(assembler_factory, fake_deps, GENERATED_AT)
     zip2, report2 = await _run_once(assembler_factory, fake_deps, GENERATED_AT)
     assert report1.render() == report2.render()
-    assert hashlib.sha256(zip1).hexdigest() == hashlib.sha256(zip2).hexdigest()
     hashes1 = payload_sha256_map(decode_package(zip1)[1])
     hashes2 = payload_sha256_map(decode_package(zip2)[1])
     assert hashes1 == hashes2

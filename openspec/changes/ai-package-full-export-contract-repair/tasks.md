@@ -6,3 +6,4 @@
 - [x] DATA_MAP campaign_identity, leg_role primary key, missing_zero_null
 - [x] Validator summary/gaps consistency
 - [x] Acceptance tests (two-run) + unit suite
+- [x] Document `PAYLOAD_HASH_ONLY` ZIP contract; byte-identical ZIP deferred follow-up

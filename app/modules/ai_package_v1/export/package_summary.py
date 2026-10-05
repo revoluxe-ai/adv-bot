@@ -71,6 +71,11 @@ class _FamilyEntry(TypedDict, total=False):
 
 def _campaign_identity_block() -> dict[str, Any]:
     return {
+        "campaign_id_equals_physical_adv_id": True,
+        "campaign_id_semantics": (
+            "campaign_id in campaign_full_stat.csv IS the physical WB adv_id "
+            "(same value as keyword_daily.adv_id); not a synthetic logical campaign id"
+        ),
         "logical_campaign_resource": (
             "ComplexAdv / PG adv_setting row (adv_setting_id); not a single WB adv_id"
         ),
@@ -78,6 +83,7 @@ def _campaign_identity_block() -> dict[str, Any]:
             "column_name_in_campaign_full_stat_csv": "campaign_id",
             "meaning": (
                 "Physical WB advertisement id from default_db.full_adv_wb_stat; "
+                "campaign_id column equals physical adv_id; "
                 "equals auto_adv_id or search_adv_id from PG scope, not a synthetic merge"
             ),
         },
@@ -332,6 +338,12 @@ def build_package_summary_document(
             "family_gaps": "PACKAGE_FAMILY_GAPS.json",
             "manifest": "manifest.json",
         },
+        "zip_determinism_contract": "PAYLOAD_HASH_ONLY",
+        "zip_determinism_note": (
+            "Compare per-file content sha256 from manifest.files; "
+            "full ZIP bytes may differ when generated_at or ZIP metadata differ. "
+            "Byte-identical ZIP is out of scope for this contract."
+        ),
     }
 
 

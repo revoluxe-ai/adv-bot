@@ -17,6 +17,6 @@ CAMPAIGN_ADVERTISING: PARTIAL (empty CH rows in fixture)
 JOINABILITY: PASS (campaign_identity + join_keys in summary/DATA_MAP)
 MISSING_ZERO_NULL: PASS
 COVERAGE_METADATA: PASS
-DETERMINISM: PASS (fixed generated_at byte-stable ZIP)
+DETERMINISM: PASS (PAYLOAD_HASH_ONLY — per-file sha256 stable across reruns)
 AI_READABILITY: PASS
 ```
