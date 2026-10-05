@@ -1,0 +1,23 @@
+openspec/specs/campaign-settings-history/spec.md
+  s_5791fabf8ddb39::t_e38e8326a125fc 1-8
+tests/unit/test_campaign_settings_history_migration_006.py
+  s_5791fabf8ddb39::t_5643f7eaa37bb4 25-28
+tests/unit/test_clickhouse_migration_read_only_commands.py
+  s_5791fabf8ddb39::t_9e271c2c513a0a 46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "70e7762198ca0ad15bd2840e69427723c876e07a",
+  "prompts": {},
+  "sessions": {
+    "s_5791fabf8ddb39": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "fec70482-9c70-4b5e-bc15-3f38d28dfca2",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
