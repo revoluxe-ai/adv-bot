@@ -60,21 +60,6 @@ class PrimarySource(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
-class FamilyStatus(StrEnum):
-    """
-    Канонический статус семейства данных в PACKAGE_SUMMARY и PACKAGE_FAMILY_GAPS.
-
-    Не подменяет ``CollectionOutcome`` / ``Coverage`` в dataset cards; сводится
-    из них (и явных GAP-каталогов) одной функцией ``derive_family_status``.
-    """
-
-    COMPLETE = "COMPLETE"
-    PARTIAL = "PARTIAL"
-    GAP = "GAP"
-    UNSUPPORTED = "UNSUPPORTED"
-    FAILED = "FAILED"
-
-
 class DatasetId(StrEnum):
     """Логические идентификаторы датасетов v1."""
 
@@ -93,4 +78,3 @@ class DatasetId(StrEnum):
     DATA_MAP = "DATA_MAP"
     KEYWORD_COVERAGE = "keyword_coverage"
     PACKAGE_FAMILY_GAPS = "package_family_gaps"
-    PACKAGE_SUMMARY = "package_summary"
