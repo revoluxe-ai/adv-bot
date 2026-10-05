@@ -1,0 +1,19 @@
+openspec/changes/separate-auto-search-cpo/proposal.md
+  s_7afb6b93d4ce20::t_7ee527f3ec3c0f 1-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "784f468becfffcba5118592348adf914dc994d73",
+  "prompts": {},
+  "sessions": {
+    "s_7afb6b93d4ce20": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ec63-11c3-77c0-ab4f-c8addce7899a",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
