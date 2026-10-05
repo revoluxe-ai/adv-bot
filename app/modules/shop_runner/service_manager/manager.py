@@ -442,29 +442,26 @@ class CoroutinesManager:
 
     @while_coroutine_decorator(60 * 5, 5)
     async def update_common_sale_stat(self, only_bot_active: bool = False) -> None:
-        # load_extras=False: only nmids needed; skip traffic CH enrich + min_bids (scales with N Р Рљ)
-        advs = await self._wb_shop_data_manager.get_complex_advs(only_bot_active=only_bot_active, load_extras=False)
-        if not advs:
-            return None
+        """Shop-wide coordinator: A/E/U partition, disjoint collect, coverage evidence."""
         from .services.common_sale_stat_updater import (
             CommonSaleStatUpdater,
             CommonSaleStatUpdaterContainer,
         )
+        from .services.shop_wide_common_sales.coordinator import (
+            run_shop_wide_common_sale_stat_tick,
+        )
+
         wb_manager_hub = self._wb_manager_hub
         container = CommonSaleStatUpdaterContainer(_wb_manager_hub=wb_manager_hub)
         updater: CommonSaleStatUpdater = container.common_sale_stat_updater()
 
-        updated_nmids = await updater.update_last_week_stats(advs)
-        nmid_to_adv_ids: dict[int, set[int]] = {}
-        for adv in advs:
-            nmid_to_adv_ids.setdefault(adv.main_nmid, set()).update(adv.all_adv_ids)
-        for nmid in updated_nmids:
-            for adv_id in nmid_to_adv_ids.get(nmid, set()):
-                await self._redis_common_stat_timestamp_manager.set(adv_id)
-        logger.info(
-            "heartbeat update_common_sale_stat shop_id=%s updated_nmids=%s",
-            self.shop_id,
-            len(updated_nmids),
+        _ = await run_shop_wide_common_sale_stat_tick(
+            shop_id=self.shop_id,
+            wb_manager_hub=wb_manager_hub,
+            wb_shop_data_manager=self._wb_shop_data_manager,
+            updater=updater,
+            redis_client=wb_manager_hub.redis_client_wrapper,
+            redis_common_stat_timestamp_manager=self._redis_common_stat_timestamp_manager,
         )
         return None
 
