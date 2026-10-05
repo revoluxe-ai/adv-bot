@@ -2,7 +2,17 @@
 
 ### Requirement: Corpus identity stays immutable and separate from applied state
 
-The system MUST treat the canonical ClickHouse migration corpus of this database as exactly versions `001`, `002`, `003`, `004`, `005`, and reviewed schema version `006`, and MUST keep corpus identity separate from applied state. Identity is the version id, reviewed filename, privilege class derived from SQL text, and SHA-256 of raw file bytes. The system MUST NOT rewrite accepted bytes of `001`–`006`. Accepting a file into the corpus MUST NOT execute its SQL. File presence or idempotent DDL MUST NOT be treated as applied-state evidence.
+The system MUST treat the canonical ClickHouse migration corpus of this database as exactly versions `001`, `002`, `003`, `004`, `005`, and reviewed schema version `006`, and MUST keep corpus identity separate from applied state. Identity is the version id, reviewed filename, privilege class derived from SQL text, and SHA-256 of raw file bytes with no newline normalization and no comment stripping. The system MUST NOT rewrite accepted bytes of `001`–`006`. Accepting a file into the corpus MUST NOT execute its SQL. Presence of a file, and `IF NOT EXISTS` inside schema DDL, MUST NOT be a record that the version was applied. The system MUST NOT store applied state as a file in git or as a PostgreSQL row.
+
+#### Scenario: Register the existing corpus without executing it
+
+- **GIVEN** versions `001` through `006` already exist as reviewed manual SQL and no target ledger is attached
+- **WHEN** the control plane accepts that corpus
+- **THEN** it MUST record each version id, filename, privilege class, and raw-byte SHA-256
+- **AND** MUST classify `005` as privileged grant and `006` as schema DDL
+- **AND** MUST NOT change the SQL bytes
+- **AND** MUST NOT execute any statement
+- **AND** MUST NOT record any version as applied
 
 #### Scenario: Register reviewed 001 through 006 without execution
 - **GIVEN** reviewed versions `001` through `006` exist and no target ledger is attached
@@ -13,10 +23,12 @@ The system MUST treat the canonical ClickHouse migration corpus of this database
 - **AND** MUST NOT record any version as applied
 
 #### Scenario: File presence is not applied state
-- **GIVEN** reviewed corpus files are present
-- **WHEN** an operator asks whether a version is applied
-- **THEN** the system MUST answer only from target ledger state
-- **AND** MUST NOT write `version_applied` because the file exists
+
+- **GIVEN** the corpus files are present and `001`–`004` contain `IF NOT EXISTS`
+- **WHEN** an operator asks whether those versions are applied on a target
+- **THEN** the system MUST NOT answer from the files or from `IF NOT EXISTS`
+- **AND** MUST answer only from target ledger state
+- **AND** MUST NOT write a `version_applied` event for that reason
 ### Requirement: Plan does not execute and apply needs explicit authorization
 
 The system MUST keep status, validation, planning, and apply semantics unchanged except that reviewed schema DDL `006` is eligible wherever reviewed schema DDL `001`–`004` is eligible. Plan MUST remain read-only. Apply MUST still require explicit isolated target config, explicit coordinator config, apply authorization, matching checksum, sanctioned baseline, non-partial state, and held advisory lock. `005` MUST remain non-success for the schema writer.

@@ -68,10 +68,10 @@
 ## 8. Product acceptance and safety
 
 - [x] 8.1 РћР±РЅРѕРІРёС‚СЊ proposed decisions checklist `implementation layer matches decision` С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ С„Р°РєС‚РёС‡РµСЃРєРѕРіРѕ placement review.
-- [ ] 8.2 Р—Р°РїСѓСЃС‚РёС‚СЊ targeted unit/integration suite РґР»СЏ field registry, Excel parity, migration control plane, PG coordinator, CH repository Рё updater.
+- [x] 8.2 Р—Р°РїСѓСЃС‚РёС‚СЊ targeted unit/integration suite РґР»СЏ field registry, Excel parity, migration control plane, PG coordinator, CH repository Рё updater.
 - [x] 8.3 Р—Р°РїСѓСЃС‚РёС‚СЊ strict type/static checks РґР»СЏ РЅРѕРІС‹С…/РёР·РјРµРЅС‘РЅРЅС‹С… modules Рё `git diff --check`.
 - [x] 8.4 Р’С‹РїРѕР»РЅРёС‚СЊ `/opsx-spec-scenario-coverage mode=plan change=campaign-settings-history`, Р·Р°С‚РµРј independent audit РїРѕСЃР»Рµ implementation.
-- [ ] 8.5 Р”РѕРєР°Р·Р°С‚СЊ `PRODUCT_ACCEPTANCE_STATUS=PASS`: MEANING_LOCK resolved, Derived Lifecycle L1вЂ“L7 scenario-mapped, side-effect proof С‚РѕР»СЊРєРѕ РґР»СЏ isolated history storage seams.
+- [x] 8.5 Р”РѕРєР°Р·Р°С‚СЊ `PRODUCT_ACCEPTANCE_STATUS=PASS`: MEANING_LOCK resolved, Derived Lifecycle L1вЂ“L7 scenario-mapped, side-effect proof С‚РѕР»СЊРєРѕ РґР»СЏ isolated history storage seams.
 - [x] 8.6 РџРѕРґС‚РІРµСЂРґРёС‚СЊ, С‡С‚Рѕ change РЅРµ РІС‹РїРѕР»РЅСЏР» production ClickHouse migration/apply, РЅРµ РїРёСЃР°Р» WB Рё РЅРµ РјРµРЅСЏР» current PostgreSQL settings authority.
-- [ ] 8.7 Р’С‹РїРѕР»РЅРёС‚СЊ `/opsx-verify mode=archive campaign-settings-history`; archive СЂР°Р·СЂРµС€С‘РЅ С‚РѕР»СЊРєРѕ РїСЂРё С„РёРЅР°Р»СЊРЅРѕРј `вњ… GO`.
+- [x] 8.7 Р’С‹РїРѕР»РЅРёС‚СЊ `/opsx-verify mode=archive campaign-settings-history`; archive СЂР°Р·СЂРµС€С‘РЅ С‚РѕР»СЊРєРѕ РїСЂРё С„РёРЅР°Р»СЊРЅРѕРј `вњ… GO`.
 

@@ -6,19 +6,18 @@ TBD - created by archiving change clickhouse-migrations-control-plane. Update Pu
 ### Requirement: Corpus identity stays immutable and separate from applied state
 
 The system MUST treat the canonical ClickHouse migration corpus of this
-database as exactly the existing versions `001`, `002`, `003`, `004`, and
-`005`, and MUST treat corpus identity as a different fact from applied state
+database as exactly the existing versions `001`, `002`, `003`, `004`, `005`, and reviewed schema version `006`, and MUST treat corpus identity as a different fact from applied state
 on a target. Identity is the version id, the existing filename, the privilege
 class derived from the SQL text, and the SHA-256 of the raw file bytes with
 no newline normalization and no comment stripping. The system MUST NOT
-rewrite the bytes of `001`–`005`. Accepting a file into the corpus MUST NOT
+rewrite the bytes of `001`–`006`. Accepting a file into the corpus MUST NOT
 execute its SQL. Presence of a file, and `IF NOT EXISTS` inside `001`–`004`,
 MUST NOT be a record that the version was applied. The system MUST NOT store
 applied state as a file in git or as a PostgreSQL row.
 
 #### Scenario: Register the existing corpus without executing it
 
-- **GIVEN** versions `001` through `005` already exist as manual SQL and no
+- **GIVEN** versions `001` through `006` already exist as manual SQL and no
   target ledger is attached
 - **WHEN** the control plane accepts that corpus
 - **THEN** it MUST record each version id, filename, privilege class, and
@@ -319,31 +318,22 @@ qualification.
 - **AND** `005` MUST still name `system` objects in the `GRANT`
 - **AND** the system MUST NOT rewrite those files
 
-### Requirement: Missing 006 stays out and an unreviewed version blocks apply
+### Requirement: Reviewed 006 enters the corpus and an unreviewed successor blocks apply
 
-This database has no version `006`. The system MUST NOT copy `006` and
-MUST NOT modify `006`. The fingerprint of this change MUST NOT contain
-`006`. Absence of `006` MUST NOT by itself block the canonical corpus.
-The protocol MUST leave room for a later reviewed version to enter in a
-separate change. A file whose numeric prefix is not in this fingerprint
-MUST be an unreviewed version and MUST block apply. The system MUST NOT
-read a `006` file from another worktree in order to build this corpus.
+Reviewed version `006` MUST enter the canonical fingerprint only with its exact raw-byte SHA-256 and schema-DDL privilege class. Any numeric migration version not in the reviewed fingerprint, including an unreviewed successor or an alternate `006`, MUST block apply and MUST NOT execute.
 
-#### Scenario: Missing 006 is not imported
+#### Scenario: Reviewed 006 is accepted
 
-- **GIVEN** `006` is absent from this database and exists only in another
-  uncommitted worktree
+- **GIVEN** reviewed `006` is present with its accepted raw-byte SHA-256
 - **WHEN** the control plane builds the corpus fingerprint
-- **THEN** the fingerprint MUST be exactly `001`–`005`
-- **AND** MUST NOT copy or read that other `006`
-- **AND** absence of `006` MUST NOT itself mark the corpus drifted
+- **THEN** the fingerprint MUST be exactly `001`–`006`
+- **AND** `006` MUST be classified as schema DDL
 
-#### Scenario: Unreviewed numeric prefix blocks apply
+#### Scenario: Unreviewed successor blocks apply
 
-- **GIVEN** a SQL file with a numeric prefix that is not in the fingerprint,
-  including an unreviewed `006` placed where the corpus is read
-- **WHEN** the operator requests apply
-- **THEN** the system MUST classify that file as an unreviewed version
+- **GIVEN** a numeric migration file is not in the reviewed fingerprint
+- **WHEN** apply is requested
+- **THEN** the system MUST classify it as unreviewed
 - **AND** MUST block apply
 - **AND** MUST NOT execute it
 
