@@ -5,7 +5,6 @@ from __future__ import annotations
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.export.export_service import ExportService
 from app.modules.ai_package_v1.export.family_gaps import attach_family_gaps
-from app.modules.ai_package_v1.export.package_summary import attach_package_summary
 from app.modules.ai_package_v1.scope.dto import ExportScopeAdv
 from app.modules.ai_package_v1.zip_transport.encode import encode_package
 
@@ -45,8 +44,7 @@ class PackageZipAssembler:
             generated_at=generated_at,
         )
         enriched, _ = attach_family_gaps(export_result)
-        with_summary, _ = attach_package_summary(enriched)
-        return encode_package(with_summary.manifest, with_summary.payloads)
+        return encode_package(enriched.manifest, enriched.payloads)
 
     async def assemble_zip_with_scope(
         self,
@@ -75,5 +73,4 @@ class PackageZipAssembler:
             generated_at=generated_at,
         )
         enriched, _ = attach_family_gaps(export_result)
-        with_summary, _ = attach_package_summary(enriched)
-        return encode_package(with_summary.manifest, with_summary.payloads)
+        return encode_package(enriched.manifest, enriched.payloads)

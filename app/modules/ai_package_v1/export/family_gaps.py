@@ -9,7 +9,6 @@ from app.modules.ai_package_v1.domain.enums import (
     CollectionOutcome,
     Coverage,
     DatasetId,
-    FamilyStatus,
     FreshnessStatus,
     PrimarySource,
     ReasonCode,
@@ -28,7 +27,7 @@ class FamilyGapEntry(TypedDict):
     """Одна запись отсутствующего или неназначенного семейства."""
 
     family_id: str
-    family_status: str
+    status: str
     reason_codes: list[str]
     notes: str
 
@@ -43,7 +42,7 @@ def build_family_gap_catalog() -> list[FamilyGapEntry]:
     return [
         {
             "family_id": "shop_product_orders_sales_feed",
-            "family_status": str(FamilyStatus.GAP),
+            "status": "GAP",
             "reason_codes": [
                 str(ReasonCode.SOURCE_NOT_ASSIGNED),
                 str(ReasonCode.UNKNOWN),
@@ -56,7 +55,7 @@ def build_family_gap_catalog() -> list[FamilyGapEntry]:
         },
         {
             "family_id": "campaign_settings_history",
-            "family_status": str(FamilyStatus.GAP),
+            "status": "GAP",
             "reason_codes": [str(ReasonCode.UNKNOWN)],
             "notes": (
                 "История canonical settings (CH campaign_settings_history) "
@@ -64,17 +63,8 @@ def build_family_gap_catalog() -> list[FamilyGapEntry]:
             ),
         },
         {
-            "family_id": "campaign_change_events",
-            "family_status": str(FamilyStatus.GAP),
-            "reason_codes": [str(ReasonCode.UNKNOWN)],
-            "notes": (
-                "Таймлайн change events (settings/campaign mutations) не "
-                "экспортируется в v1 ZIP; нет назначенного read-only collector."
-            ),
-        },
-        {
             "family_id": "shop_inventory_discovery",
-            "family_status": str(FamilyStatus.GAP),
+            "status": "GAP",
             "reason_codes": [str(ReasonCode.UNKNOWN)],
             "notes": (
                 "Обнаружение кампаний вне PG inventory — "
@@ -83,19 +73,19 @@ def build_family_gap_catalog() -> list[FamilyGapEntry]:
         },
         {
             "family_id": "store_drr",
-            "family_status": str(FamilyStatus.GAP),
+            "status": "GAP",
             "reason_codes": [str(ReasonCode.UNKNOWN)],
             "notes": "Store DRR не экспортируется в v1 AI Package.",
         },
         {
             "family_id": "product_prices_stocks",
-            "family_status": str(FamilyStatus.GAP),
+            "status": "GAP",
             "reason_codes": [str(ReasonCode.UNKNOWN)],
             "notes": "Цены и остатки по артикулам не входят в v1 export.",
         },
         {
             "family_id": "finance_promo",
-            "family_status": str(FamilyStatus.GAP),
+            "status": "GAP",
             "reason_codes": [str(ReasonCode.UNKNOWN)],
             "notes": "Финансы и промо-отчёты не входят в v1 export.",
         },
