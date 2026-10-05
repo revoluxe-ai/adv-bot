@@ -45,6 +45,10 @@ from app.modules.ai_package_v1.export.scope_collect import (
     collect_main_nmids,
     collect_scoped_adv_ids,
 )
+from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler import (
+    KeywordAssemblerProtocol,
+    KeywordPerformanceAssembler,
+)
 from app.modules.ai_package_v1.readers.ch_campaign_stat_reader import ChCampaignStatReader
 from app.modules.ai_package_v1.readers.ch_funnel_reader import ChFunnelReader
 from app.modules.ai_package_v1.readers.ch_freshness_reader import ChExportFreshnessReader
@@ -82,6 +86,7 @@ class ExportService:
         freshness_reader: ChExportFreshnessReader | None = None,
         pg_snapshot_reader: PgSnapshotReader | None = None,
         settings_assembler: CampaignSettingsAssembler | None = None,
+        keyword_assembler: KeywordAssemblerProtocol | None = None,
     ) -> None:
         self._scope_reader = scope_reader or PgExportShopScopeReader()
         self._campaign_reader = campaign_reader or ChCampaignStatReader()
@@ -96,6 +101,10 @@ class ExportService:
             self._settings_assembler = CampaignSettingsAssembler(
                 session_maker=get_async_session_maker,
             )
+        if keyword_assembler is not None:
+            self._keyword_assembler = keyword_assembler
+        else:
+            self._keyword_assembler = KeywordPerformanceAssembler()
 
     async def export(
         self,
@@ -223,6 +232,16 @@ class ExportService:
             funnel_metrics, shop_orders_card
         )
 
+        timestamp = generated_at or datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        keyword_result = await self._keyword_assembler.assemble(
+            shop_id=shop_id,
+            manifest_shop_id=manifest_shop_id,
+            period=period,
+            generated_at=timestamp,
+        )
+
         payloads = [
             DomainPayload(
                 logical_name="datasets/campaign_full_stat.csv",
@@ -239,10 +258,8 @@ class ExportService:
                 dataset_id="campaign_settings_snapshot",
                 content=settings_payload_content,
             ),
+            *keyword_result.payloads,
         ]
-        timestamp = generated_at or datetime.now(timezone.utc).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
         manifest = ExportManifest(
             shop_id=manifest_shop_id,
             period=period,
@@ -252,6 +269,7 @@ class ExportService:
                 funnel_card,
                 settings_card,
                 shop_orders_card,
+                *keyword_result.cards,
             ],
             files=build_file_descriptors(payloads),
         )

@@ -22,7 +22,11 @@ from app.modules.ai_package_v1.validator.package_validator import (
     validate_zip_package,
 )
 from app.modules.ai_package_v1.zip_transport.encode import encode_package
-from tests.unit.ai_package_v1.conftest import make_adv_setting
+from tests.unit.ai_package_v1.conftest import AssemblerFactory, make_adv_setting
+from tests.unit.ai_package_v1.keyword_performance.conftest import (
+    FakeKeywordDeps,
+    build_fake_assembler,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -56,29 +60,41 @@ def _scope_for_shop(*, shop_id: str = SHOP_ID) -> list[ExportScopeAdv]:
     ]
 
 
-def _export_service(assembler_factory, rows: list[object]) -> ExportService:
+def _export_service(
+    assembler_factory: AssemblerFactory,
+    rows: list[object],
+    *,
+    keyword_deps: FakeKeywordDeps,
+) -> ExportService:
     assembler = assembler_factory(rows)
+    keyword = build_fake_assembler(keyword_deps)
     return ExportService(
         scope_reader=AsyncMock(),
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
         settings_assembler=assembler,
+        keyword_assembler=keyword,
     )
 
 
 @pytest.mark.asyncio
 async def test_export_service_emits_detailed_settings_json_payload(
-    assembler_factory,
+    assembler_factory: AssemblerFactory,
+    fake_deps: FakeKeywordDeps,
 ) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row])
+    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
     result = await service.export_with_scope(
         SHOP_ID,
         PERIOD,
         _scope_for_shop(),
         generated_at=GENERATED_AT,
     )
+    keyword_daily = next(
+        p for p in result.payloads if p.dataset_id == "keyword_daily"
+    )
+    assert keyword_daily.content
     settings_card = next(
         c
         for c in result.manifest.datasets
@@ -102,9 +118,12 @@ async def test_export_service_emits_detailed_settings_json_payload(
 
 
 @pytest.mark.asyncio
-async def test_export_zip_deterministic_settings_hash(assembler_factory) -> None:
+async def test_export_zip_deterministic_settings_hash(
+    assembler_factory: AssemblerFactory,
+    fake_deps: FakeKeywordDeps,
+) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row])
+    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
     first = await service.export_with_scope(
         SHOP_ID,
         PERIOD,
@@ -135,10 +154,11 @@ async def test_export_zip_deterministic_settings_hash(assembler_factory) -> None
 
 @pytest.mark.asyncio
 async def test_other_dataset_cards_unchanged_with_detailed_settings(
-    assembler_factory,
+    assembler_factory: AssemblerFactory,
+    fake_deps: FakeKeywordDeps,
 ) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row])
+    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
     result = await service.export_with_scope(
         SHOP_ID,
         PERIOD,
@@ -160,7 +180,10 @@ async def test_other_dataset_cards_unchanged_with_detailed_settings(
 
 
 @pytest.mark.asyncio
-async def test_export_shop_isolation_on_settings_payload(assembler_factory) -> None:
+async def test_export_shop_isolation_on_settings_payload(
+    assembler_factory: AssemblerFactory,
+    fake_deps: FakeKeywordDeps,
+) -> None:
     foreign = make_adv_setting(
         shop_id="999",
         adv_setting_id=999,
@@ -173,7 +196,7 @@ async def test_export_shop_isolation_on_settings_payload(assembler_factory) -> N
         adv_id=111,
         search_adv_id=222,
     )
-    service = _export_service(assembler_factory, [foreign, own])
+    service = _export_service(assembler_factory, [foreign, own], keyword_deps=fake_deps)
     result = await service.export_with_scope(
         SHOP_ID,
         PERIOD,
@@ -189,9 +212,12 @@ async def test_export_shop_isolation_on_settings_payload(assembler_factory) -> N
 
 
 @pytest.mark.asyncio
-async def test_validator_rejects_tampered_settings_payload(assembler_factory) -> None:
+async def test_validator_rejects_tampered_settings_payload(
+    assembler_factory: AssemblerFactory,
+    fake_deps: FakeKeywordDeps,
+) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
-    service = _export_service(assembler_factory, [row])
+    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
     result = await service.export_with_scope(
         SHOP_ID,
         PERIOD,
@@ -208,12 +234,13 @@ async def test_validator_rejects_tampered_settings_payload(assembler_factory) ->
 
 @pytest.mark.asyncio
 async def test_manifest_payload_hash_matches_domain_contract(
-    assembler_factory,
+    assembler_factory: AssemblerFactory,
+    fake_deps: FakeKeywordDeps,
 ) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222, shop_id=SHOP_ID)
     payload = await assembler_factory([row]).assemble(SHOP_ID)
     digest = payload_sha256(payload)
-    service = _export_service(assembler_factory, [row])
+    service = _export_service(assembler_factory, [row], keyword_deps=fake_deps)
     result = await service.export_with_scope(
         SHOP_ID,
         PERIOD,

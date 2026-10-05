@@ -1,0 +1,19 @@
+{
+  "SCHEMA_VERSION": 1,
+  "generated_at": "2026-10-05T13:50:00+03:00",
+  "task": "READ_ONLY_CURRENT_STATE_RECONCILIATION",
+  "adv_bot_checkout": "C:\\Users\\vkita\\my_code\\meta-repo\\adv-bot",
+  "feature_worktree": "C:\\Users\\vkita\\my_code\\meta-repo\\ai-package-keyword-performance-history",
+  "CURRENT_STAGE_PRE_MERGE_HEAD": "47a94d4ebd80fe8ea0313393c71422095568b53a",
+  "FEATURE_HEAD": "6bd56539457558e3e1946ff4e1c2fc9cb2db1004",
+  "merge_base_with_stage": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+  "feature_commits_above_merge_base": [
+    "028b261b5 feat(ai-package): export full keyword performance history",
+    "6bd565394 chore(ai-package): preserve raw evidence and fix formatting"
+  ],
+  "stage_commits_not_in_feature_count": 11,
+  "stage_dirty_porcelain_count": 22,
+  "stale_openspec_guard_process": "NONE_FOUND",
+  "cursor_sdk_task_runner": "C:\\Users\\vkita\\my_code\\cursor-sdk-task-runner (present; runner-first not invoked — gates run via poetry in feature worktree)",
+  "openspec_change_active_path": "openspec/changes/ai-package-keyword-performance-history/"
+}

@@ -1,0 +1,24 @@
+{
+  "SCHEMA_VERSION": 1,
+  "generated_at": "2026-10-05T13:53:00+03:00",
+  "reviewer": "independent",
+  "CURRENT_STAGE_PRE_MERGE_HEAD": "47a94d4ebd80fe8ea0313393c71422095568b53a",
+  "FEATURE_HEAD": "6bd56539457558e3e1946ff4e1c2fc9cb2db1004",
+  "FINAL_MERGE_REVIEW": "PASS",
+  "export_service_ownership": "PASS — keyword datasets wired through ExportService._keyword_assembler; CampaignSettingsAssembler unchanged in authority",
+  "collision_ai_package_campaign_settings_snapshot": "NONE on stage committed tree; feature includes campaign-settings test adjustments compatible with archived snapshot semantics",
+  "collision_shop_wide_common_sales_collection": "NONE — shop_runner paths disjoint from ai_package_v1/keyword_performance",
+  "collision_shop_wide_campaign_data_collection": "NONE — no overlap in app/modules/ai_package_v1",
+  "merge_tree_changed_in_both": [
+    "pyrightconfig_strict.json"
+  ],
+  "merge_tree_resolution": "Manual union expected (feature adds keyword_performance include paths); no semantic regression identified",
+  "semantic_regression": "NONE identified",
+  "stage_dirty_overlap_paths": [
+    "tests/unit/ai_package_v1/test_campaign_settings_assembler.py",
+    "tests/unit/ai_package_v1/test_campaign_settings_contract.py"
+  ],
+  "stage_dirty_overlap_hashes_differ_from_feature_head": true,
+  "git_merge_attempt": "BLOCKED — local changes would be overwritten (ort merge aborted)",
+  "note": "Semantic merge review PASS does not override STAGE_DIRTY_OVERLAP gate"
+}

@@ -1,0 +1,51 @@
+{
+  "SCHEMA_VERSION": 1,
+  "TASK_ID": "WB-SKY-KEYWORD-HISTORY-EVIDENCE-FORMAT-REPAIR-20261005-12",
+  "MODE": "write",
+  "STATUS": "FORMAT_REPAIR_AUTHORED_PENDING_INDEPENDENT_REAUDIT",
+  "CHANGE_ID": "ai-package-keyword-performance-history",
+  "CREATED_AT": "2026-10-05T06:52:00+03:00",
+  "AUDIT_STATUS": "NOT_INDEPENDENTLY_AUDITED",
+  "SUPERSEDES_BINDING_CLAIMS_ONLY": [
+    "commit-receipt-WB-SKY-KEYWORD-HISTORY-FINALIZE-20261005-10.json git_diff_check PASS",
+    "verify-impl-receipt-WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09.json git_diff_check PASS",
+    "scenario-coverage/audit.receipt.json SCAR-09 worktree_fingerprint 3929cd8e… binding"
+  ],
+  "SOURCE_SPEC_SHA": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4",
+  "SOURCE_SPEC_SHA_UNCHANGED": true,
+  "PRIOR_WORKTREE_FINGERPRINT_SCAR09": "3929cd8e9e5e22a56c2cc4ef13b64757ca413c5698a188fcc7e6fe268fb75358",
+  "WORKTREE_FINGERPRINT": "413c1b28476cb093d44fc628821a30ef84a6f5251d6dfedbe3d32022a1cafc1e",
+  "WORKTREE_FINGERPRINT_PATH_COUNT": 65,
+  "WORKTREE_FINGERPRINT_DELTA": "test_default_pipeline_boundary.py EOF-only (removed extra trailing blank line); all app/modules/ai_package_v1/** content hashes unchanged",
+  "PRIOR_TEST_CONTENT_SHA256_SCAR09": "650f00b4361bf63919bd14ce280554ac0156594df1728aef6db42e3f1368a9b6",
+  "TEST_CONTENT_SHA256": "d201b7c8c58a8625d1ae422e95f3e33d4cb55481993d8c2ee1e5d0c9e4782f42",
+  "TEST_CONTENT_SHA256_DELTA": "EOF-only on tests/unit/ai_package_v1/keyword_performance/test_default_pipeline_boundary.py; AST unchanged vs pre-repair HEAD",
+  "SCAR09_REBIND": "PENDING — TEST_CONTENT_SHA256 and WORKTREE_FINGERPRINT stale until independent reaudit",
+  "WORKTREE_HEAD_SHA_PRE_COMMIT": "028b261b5c63a235535d2c2099ef6dcc6eb74edb",
+  "FORMAT_FIXES": {
+    "evidence_gitattributes": "exact 4 pytest log filenames marked -diff -merge -text (replaces broad *.log -text)",
+    "inventory_report_trailing_spaces": "AI_PACKAGE_KEYWORD_HISTORY_INVENTORY_REPORT.md lines 3-4",
+    "audit_report_trailing_spaces": "scenario-coverage/audit.report.md lines 3-8, 191",
+    "test_eof": "test_default_pipeline_boundary.py — one final newline, no extra EOF blank line"
+  },
+  "RAW_LOG_SHA256_VERIFIED_UNCHANGED": {
+    "pytest-ai-package-v1-evidence-repair06.log": "4f85f4e514a6c5eb57d5d2e6938c0f5e6614d35892a92558f1a1b6a95d75c7b2",
+    "pytest-ai-package-v1-cutoff-repair08.log": "9c20c0661f250f92005fd8c6e4bd98c270567d18bf48543de8fd3622cb09a53e",
+    "pytest-ai-package-v1-independent-audit07.log": "3ee2ab7b082073bdc89fecc33bbc3f1d3ae4d6f7ffaf46195f046a8d400bb0a2",
+    "pytest-ai-package-v1-independent-audit09.log": "4baff5018cad462a66f2be8a22401f85467dbdf5fca30cb63b175972aed1ff42"
+  },
+  "GIT_DIFF_CHECK": {
+    "37d0ec5fc_to_pre_commit_HEAD": "BLOCKED — SDK EPERM on git diff --check spawn; coordinator must run ordinary process",
+    "cached_pre_commit": "NOT_RUN_SDK_BLOCKED",
+    "post_commit_full_range": "NOT_RUN_SDK_BLOCKED"
+  },
+  "PRODUCTION_APP_CHANGED": false,
+  "PYTEST_RERUN": "not required — AST/logic unchanged; prior 132/132 SCAR-09 proof may consume pending indep fresh gate",
+  "DOES_NOT_CLAIM": [
+    "AUDIT_PASS",
+    "INDEPENDENT_VERIFY_GO",
+    "MERGE_READY",
+    "GIT_DIFF_CHECK_PASS",
+    "SCAR09_REBIND_COMPLETE"
+  ]
+}

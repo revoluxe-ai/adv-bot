@@ -25,12 +25,14 @@ from app.modules.ai_package_v1.export.manifest_cards import (
 from app.modules.ai_package_v1.scope.dto import ExportScopeAdv
 from app.snapshot_data_updater.dto import AdvSettingsSnapshotDTO
 from tests.unit.ai_package_v1.a1_contract_stub import CampaignResourceSnapshotV1Stub
-from tests.unit.ai_package_v1.conftest import make_adv_setting
+from tests.unit.ai_package_v1.conftest import AssemblerFactory, make_adv_setting
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_payload_not_adv_settings_snapshot_dto(assembler_factory) -> None:
+async def test_payload_not_adv_settings_snapshot_dto(
+    assembler_factory: AssemblerFactory,
+) -> None:
     payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
     raw = serialize_campaign_settings_payload(payload)
     data = json.loads(raw)
@@ -41,7 +43,8 @@ async def test_payload_not_adv_settings_snapshot_dto(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_payload_type_guard_non_aliasing(assembler_factory) -> None:
+async def test_payload_type_guard_non_aliasing(assembler_factory: AssemblerFactory,
+) -> None:
     payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
     raw = serialize_campaign_settings_payload(payload)
     data = json.loads(raw)
@@ -53,7 +56,8 @@ async def test_payload_type_guard_non_aliasing(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_detailed_contract_golden_legs(assembler_factory) -> None:
+async def test_detailed_contract_golden_legs(assembler_factory: AssemblerFactory,
+) -> None:
     row = make_adv_setting(adv_id=111, search_adv_id=222)
     payload = await assembler_factory([row]).assemble("shop-1")
     raw = serialize_campaign_settings_payload(payload)
@@ -67,7 +71,8 @@ async def test_detailed_contract_golden_legs(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_settings_export_spy_no_wb_calls(assembler_factory) -> None:
+async def test_settings_export_spy_no_wb_calls(assembler_factory: AssemblerFactory,
+) -> None:
     """Contract-test authority: zero WB API on settings path (paired S11/S20)."""
     from unittest.mock import MagicMock, patch
 

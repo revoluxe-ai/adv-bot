@@ -1,0 +1,6 @@
+# Preserve raw-byte pytest log artifacts: exact filenames only (no broad *.log rule).
+# Binary classification prevents git diff --check CRLF/BOM false positives on audited logs.
+pytest-ai-package-v1-evidence-repair06.log -diff -merge -text
+pytest-ai-package-v1-cutoff-repair08.log -diff -merge -text
+pytest-ai-package-v1-independent-audit07.log -diff -merge -text
+pytest-ai-package-v1-independent-audit09.log -diff -merge -text

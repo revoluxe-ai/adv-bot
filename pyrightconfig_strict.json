@@ -158,7 +158,9 @@
     "tests/unit/test_clickhouse_migration_pre_execution.py",
     "tests/unit/test_clickhouse_migration_read_only_commands.py",
     "tests/unit/test_clickhouse_migration_mutations.py",
-    "tests/unit/test_clickhouse_migration_final_acceptance.py"
+    "tests/unit/test_clickhouse_migration_final_acceptance.py",
+    "app/modules/ai_package_v1",
+    "tests/unit/ai_package_v1"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

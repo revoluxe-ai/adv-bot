@@ -1,0 +1,32 @@
+{
+  "SCHEMA_VERSION": 1,
+  "TASK_ID": "WB-SKY-KEYWORD-HISTORY-INDEPENDENT-AUDIT-20261005-07",
+  "MODE": "verify",
+  "VERIFY_PHASE": "mode=impl",
+  "CHANGE_ID": "ai-package-keyword-performance-history",
+  "CREATED_AT": "2026-10-05T06:30:00+03:00",
+  "VERDICT": "IMPL_GAPS",
+  "FINAL_MARKER": "IMPL_GAPS",
+  "behavior_matches_spec": "partial",
+  "architecture_placement": "yes — matches ai-package-keyword-performance-history-ownership decision; read-only export path",
+  "semantic_write_target": "RESOLVED — keyword_query_daily_fact read path documented in design.md",
+  "targeted_tests": "passed — 118/118 unit ai_package_v1",
+  "scenario_coverage_report": "FAIL — 47/51 pass; see scenario-coverage/audit.report.md",
+  "task_completion_mismatch": true,
+  "task_mismatch_detail": "tasks.md 6.4 marked [x] before independent audit completed; 6.5 pending",
+  "archive_ready": false,
+  "blockers": [
+    "SCENARIO_TEST_COVERAGE_FAIL — S37,S38 stub parity; S45,S51 cutoff payload exclusion",
+    "task_completion_mismatch — 6.4 premature",
+    "tasks.md 6.5 /opsx-verify mode=impl independent receipt now authored as IMPL_GAPS"
+  ],
+  "non_blockers_documented": [
+    "Task 5.7 optional CH/PG integration absent",
+    "current_bid_evidence UNAVAILABLE intentional",
+    "No archive/certify/provider claims"
+  ],
+  "source_spec_sha": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4",
+  "worktree_fingerprint": "a8960938ca0b8055738a5892fb17cb408dcd3377da12004290fc5377dbd075c0",
+  "pytest_log_sha256": "3ee2ab7b082073bdc89fecc33bbc3f1d3ae4d6f7ffaf46195f046a8d400bb0a2",
+  "next_action": "/opsx-test"
+}
