@@ -71,6 +71,7 @@ def validate_domain_manifest(
 
     _validate_shop_orders_card(manifest)
     _validate_campaign_settings_payload(manifest, files)
+    _validate_keyword_root_payloads(manifest, files)
 
 
 def validate_zip_package(zip_bytes: bytes) -> None:
@@ -171,3 +172,38 @@ def _validate_campaign_settings_payload(
         raise PackageValidationError(
             "campaign_settings_snapshot must not claim FULL coverage in slice 1",
         )
+
+
+def _validate_keyword_root_payloads(
+    manifest: dict[str, Any],
+    files: dict[str, bytes],
+) -> None:
+    """Validate DATA_MAP.json and coverage.json when keyword export present."""
+    datasets = cast(list[Any], manifest.get("datasets", []))
+    has_keyword = False
+    for card_obj in datasets:
+        if not isinstance(card_obj, dict):
+            continue
+        card = cast(dict[str, Any], card_obj)
+        dataset_id = str(card.get("dataset_id", ""))
+        if dataset_id.startswith("keyword"):
+            has_keyword = True
+            break
+    if not has_keyword:
+        return
+    for logical_name in ("DATA_MAP.json", "coverage.json"):
+        content = files.get(logical_name)
+        if content is None:
+            raise PackageValidationError(f"missing keyword root payload: {logical_name}")
+        try:
+            parsed_json = json.loads(content.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise PackageValidationError(
+                f"{logical_name} is not valid JSON",
+            ) from exc
+        if not isinstance(parsed_json, dict):
+            raise PackageValidationError(f"{logical_name} must be a JSON object")
+        data = cast(dict[str, Any], parsed_json)
+        schema_version = data.get("schema_version")
+        if schema_version is None:
+            raise PackageValidationError(f"{logical_name} missing schema_version")

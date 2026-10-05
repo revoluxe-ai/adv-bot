@@ -18,13 +18,13 @@ from app.modules.ai_package_v1.export.manifest_cards import (
 from app.modules.ai_package_v1.scope.pg_adv_setting_inventory_reader import (
     PgAdvSettingInventoryReader,
 )
-from tests.unit.ai_package_v1.conftest import make_adv_setting
+from tests.unit.ai_package_v1.conftest import AssemblerFactory, make_adv_setting
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_payload_schema_is_campaign_settings_snapshot_v1(
-    assembler_factory,
+    assembler_factory: AssemblerFactory,
 ) -> None:
     row = make_adv_setting()
     assembler = assembler_factory([row])
@@ -34,7 +34,8 @@ async def test_payload_schema_is_campaign_settings_snapshot_v1(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_auto_and_search_legs_distinguishable(assembler_factory) -> None:
+async def test_auto_and_search_legs_distinguishable(assembler_factory: AssemblerFactory,
+) -> None:
     row = make_adv_setting(adv_id=7001, search_adv_id=7002)
     payload = await assembler_factory([row]).assemble("shop-1")
     record = payload.records[0]
@@ -47,7 +48,8 @@ async def test_auto_and_search_legs_distinguishable(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_primary_grain_adv_setting_id(assembler_factory) -> None:
+async def test_primary_grain_adv_setting_id(assembler_factory: AssemblerFactory,
+) -> None:
     row = make_adv_setting(adv_setting_id=555)
     payload = await assembler_factory([row]).assemble("shop-1")
     assert payload.records[0].inventory.adv_setting_id == 555
@@ -57,7 +59,7 @@ async def test_primary_grain_adv_setting_id(assembler_factory) -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_local_policy_provenance_not_wb_authoritative(
-    assembler_factory,
+    assembler_factory: AssemblerFactory,
 ) -> None:
     row = make_adv_setting(bot_active=False)
     payload = await assembler_factory([row]).assemble("shop-1")
@@ -71,7 +73,8 @@ async def test_local_policy_provenance_not_wb_authoritative(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_null_pg_column_stays_null(assembler_factory) -> None:
+async def test_null_pg_column_stays_null(assembler_factory: AssemblerFactory,
+) -> None:
     row = make_adv_setting(wb_bid_type=None, search_adv_id=None)
     payload = await assembler_factory([row]).assemble("shop-1")
     record = payload.records[0]
@@ -82,7 +85,8 @@ async def test_null_pg_column_stays_null(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_unsupported_field_explicit(assembler_factory) -> None:
+async def test_unsupported_field_explicit(assembler_factory: AssemblerFactory,
+) -> None:
     row = make_adv_setting()
     payload = await assembler_factory([row]).assemble("shop-1")
     auto_leg = payload.records[0].auto_leg
@@ -96,7 +100,8 @@ async def test_unsupported_field_explicit(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_partial_pg_wb_sync_explicit(assembler_factory) -> None:
+async def test_partial_pg_wb_sync_explicit(assembler_factory: AssemblerFactory,
+) -> None:
     payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
     assert payload.completeness.coverage == SettingsCoverageLevel.PARTIAL
     assert SettingsReasonCode.PARTIAL_PG_WB_SYNC in payload.completeness.reason_codes
@@ -104,7 +109,8 @@ async def test_partial_pg_wb_sync_explicit(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_four_completeness_dimensions_independent(assembler_factory) -> None:
+async def test_four_completeness_dimensions_independent(assembler_factory: AssemblerFactory,
+) -> None:
     payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
     card = build_campaign_settings_snapshot_card(payload)
     assert card["collection_outcome"]
@@ -116,7 +122,8 @@ async def test_four_completeness_dimensions_independent(assembler_factory) -> No
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_detailed_export_flag_true(assembler_factory) -> None:
+async def test_detailed_export_flag_true(assembler_factory: AssemblerFactory,
+) -> None:
     payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
     card = build_campaign_settings_snapshot_card(payload)
     assert card["detailed_settings_export"] is True
@@ -125,7 +132,8 @@ async def test_detailed_export_flag_true(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_manifest_references_domain_payload(assembler_factory) -> None:
+async def test_manifest_references_domain_payload(assembler_factory: AssemblerFactory,
+) -> None:
     payload = await assembler_factory([make_adv_setting()]).assemble("shop-1")
     card = build_campaign_settings_snapshot_card(payload)
     assert card["payload_file"] == "campaign_settings_snapshot.json"
@@ -135,7 +143,8 @@ async def test_manifest_references_domain_payload(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_shop_isolation_filters_foreign_shop(assembler_factory) -> None:
+async def test_shop_isolation_filters_foreign_shop(assembler_factory: AssemblerFactory,
+) -> None:
     foreign = make_adv_setting(shop_id="shop-foreign", adv_setting_id=999)
     own = make_adv_setting(shop_id="shop-1", adv_setting_id=101)
     payload = await assembler_factory([foreign, own]).assemble("shop-1")
@@ -145,7 +154,8 @@ async def test_shop_isolation_filters_foreign_shop(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_scope_not_bot_active_only(assembler_factory) -> None:
+async def test_scope_not_bot_active_only(assembler_factory: AssemblerFactory,
+) -> None:
     inactive = make_adv_setting(bot_active=False)
     payload = await assembler_factory([inactive]).assemble("shop-1")
     assert len(payload.records) == 1
@@ -154,7 +164,8 @@ async def test_scope_not_bot_active_only(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_settings_export_zero_wb_api_calls(assembler_factory) -> None:
+async def test_settings_export_zero_wb_api_calls(assembler_factory: AssemblerFactory,
+) -> None:
     wb_spy = MagicMock()
     with patch.dict(
         "sys.modules",
@@ -167,7 +178,8 @@ async def test_settings_export_zero_wb_api_calls(assembler_factory) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_export_does_not_write_state(assembler_factory) -> None:
+async def test_export_does_not_write_state(assembler_factory: AssemblerFactory,
+) -> None:
     session = AsyncMock()
     session.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))))
     session.add = MagicMock()

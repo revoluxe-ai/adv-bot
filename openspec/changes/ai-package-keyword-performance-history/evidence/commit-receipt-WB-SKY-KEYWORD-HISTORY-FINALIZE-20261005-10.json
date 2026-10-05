@@ -1,0 +1,60 @@
+{
+  "SCHEMA_VERSION": 1,
+  "TASK_ID": "WB-SKY-KEYWORD-HISTORY-FINALIZE-20261005-10",
+  "MODE": "finalize",
+  "CHANGE_ID": "ai-package-keyword-performance-history",
+  "CREATED_AT": "2026-10-05T10:00:00+03:00",
+  "VERDICT": "PRE_COMMIT_BOUNDARY_PASS",
+  "pre_commit_verification": {
+    "source_spec_sha": "2ef8006acefcbb8506ce35eefca25cc0120a122f3a0efa2f6bf1caf5465682b4",
+    "source_spec_sha_unchanged": true,
+    "worktree_fingerprint": "3929cd8e9e5e22a56c2cc4ef13b64757ca413c5698a188fcc7e6fe268fb75358",
+    "worktree_fingerprint_path_count": 65,
+    "worktree_fingerprint_unchanged": true,
+    "audited_head_sha_historical": "37d0ec5fce9acae46eb0b35dda7c0fea7b9845a0",
+    "pytest_log_sha256": "4baff5018cad462a66f2be8a22401f85467dbdf5fca30cb63b175972aed1ff42",
+    "pytest_log_path": "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-independent-audit09.log",
+    "pytest_log_sha256_verified_pre_commit": true
+  },
+  "audit_binding": {
+    "scenario_audit_id": "SCAR-09",
+    "scenario_audit_task_id": "WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09",
+    "scenario_audit_receipt": "openspec/changes/ai-package-keyword-performance-history/scenario-coverage/audit.receipt.json",
+    "verify_impl_receipt": "openspec/changes/ai-package-keyword-performance-history/evidence/verify-impl-receipt-WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09.json",
+    "scenarios_pass": "51/51",
+    "stub_contracts_pass": "6/6"
+  },
+  "tasks_updated": {
+    "6.4": "checked — SCAR-09 binding",
+    "6.5": "checked — VERIFY_PASS binding",
+    "5.7": "unchecked — optional CH/PG integration; explicit non-blocker"
+  },
+  "allowed_stage_paths": [
+    "app/modules/ai_package_v1/",
+    "tests/unit/ai_package_v1/",
+    "pyrightconfig_strict.json",
+    "openspec/changes/ai-package-keyword-performance-history/"
+  ],
+  "force_added_logs": [
+    "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-independent-audit09.log",
+    "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-cutoff-repair08.log",
+    "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-independent-audit07.log",
+    "openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-evidence-repair06.log"
+  ],
+  "gates_not_rerun": {
+    "pytest": "132/132 unit ai_package_v1 — SCAR-09 audited unchanged code",
+    "pyright_strict": "0 errors, 0 warnings — SCAR-09 audited unchanged code",
+    "openspec_validate": "PASS — SCAR-09 audited unchanged code"
+  },
+  "claims": [
+    "IMPLEMENTATION_MANIFEST_COMMITTED",
+    "TASKS_6_4_6_5_BOUND"
+  ],
+  "does_not_claim": [
+    "MERGE_READY",
+    "ARCHIVE_GO",
+    "PROVIDER_EXECUTION_RECEIPT"
+  ],
+  "merge_review_pending_against": "9a80c813ed4edaf3c6f2da6ae65af4221f7ec36e",
+  "next_action": "Independent merge-review vs stage 9a80c813; then archive verify when ready"
+}

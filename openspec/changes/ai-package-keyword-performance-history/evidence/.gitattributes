@@ -1,0 +1,2 @@
+# Preserve raw-byte pytest log hashes across Git checkout (LF/CRLF normalization off).
+*.log -text

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+pytest_plugins = ["tests.unit.ai_package_v1.keyword_performance.conftest"]
+
+from collections.abc import Callable
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -13,12 +16,14 @@ from app.modules.ai_package_v1.export.campaign_settings_assembler import (
     CampaignSettingsAssembler,
 )
 
+AssemblerFactory = Callable[[list[Any]], CampaignSettingsAssembler]
+
 
 def _enum_like(value: str) -> SimpleNamespace:
     return SimpleNamespace(value=value)
 
 
-def make_adv_setting(**overrides: Any) -> MagicMock:
+def make_adv_setting(**overrides: Any) -> Any:
     """Создаёт mock AdvSetting с PG-like полями для assembler tests."""
     cabinet = SimpleNamespace(shop_id=overrides.pop("shop_id", "shop-1"))
     row = MagicMock()
@@ -99,7 +104,7 @@ def fixed_clock() -> datetime:
 
 
 @pytest.fixture
-def assembler_factory(fixed_clock: datetime):
+def assembler_factory(fixed_clock: datetime) -> AssemblerFactory:
     def _factory(rows: list[Any]) -> CampaignSettingsAssembler:
         return CampaignSettingsAssembler(
             reader=FakeSettingsReader(rows),
