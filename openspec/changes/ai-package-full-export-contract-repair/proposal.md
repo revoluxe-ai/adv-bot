@@ -1,5 +1,15 @@
 # Proposal — ai-package-full-export-contract-repair
 
+## Why
+
+External AI consumers cannot interpret the Full AI Package without source code: missing summary, divergent status tokens, and ambiguous keyword join keys.
+
+## What Changes
+
+- `PACKAGE_SUMMARY.json` with canonical family status and identity blocks
+- Validator fail-closed cross-checks; keyword `leg_role` alignment
+- No new collectors; payload-hash determinism contract only
+
 ## Problem
 
 Full AI Package lacks `PACKAGE_SUMMARY.json`, a single canonical family status vocabulary, explicit campaign/keyword identity, and validator cross-checks. Shop feed and settings slices are ambiguous to external AI consumers.
