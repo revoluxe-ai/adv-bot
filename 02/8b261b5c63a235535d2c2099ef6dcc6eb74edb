@@ -1,0 +1,213 @@
+app/modules/ai_package_v1/domain/enums.py
+  s_6d98a8c7d49a61::t_988e3c8ce6d442 50-57,70-79
+app/modules/ai_package_v1/export/export_service.py
+  s_6d98a8c7d49a61::t_2ba1277746b812 48-51,89,104-107,235-244,261,272
+app/modules/ai_package_v1/keyword_performance/__init__.py
+  s_6d98a8c7d49a61::t_9c4b34b0e49d86 1-4
+app/modules/ai_package_v1/keyword_performance/domain/__init__.py
+  s_6d98a8c7d49a61::t_bcb7046a25f775 1
+app/modules/ai_package_v1/keyword_performance/domain/coverage_assembler.py
+  s_6d98a8c7d49a61::t_1d18bb3fa78c45 1-252
+app/modules/ai_package_v1/keyword_performance/domain/cutoff.py
+  s_6d98a8c7d49a61::t_24b5ddf8776d3b 1-41
+app/modules/ai_package_v1/keyword_performance/domain/cutoff_guard.py
+  s_6d98a8c7d49a61::t_32c924af6776db 1-135
+app/modules/ai_package_v1/keyword_performance/domain/data_map_builder.py
+  s_6d98a8c7d49a61::t_bacc7d778d035d 1-179
+app/modules/ai_package_v1/keyword_performance/domain/derived_metrics.py
+  s_6d98a8c7d49a61::t_fd7e44236459ea 1-37
+app/modules/ai_package_v1/keyword_performance/domain/enums.py
+  s_6d98a8c7d49a61::t_6d71b149c3f648 1-129
+app/modules/ai_package_v1/keyword_performance/domain/export_field_registry.py
+  s_6d98a8c7d49a61::t_e4696804a66bf1 1-410
+app/modules/ai_package_v1/keyword_performance/domain/models.py
+  s_6d98a8c7d49a61::t_bb7aadf8caa65f 1-295
+app/modules/ai_package_v1/keyword_performance/domain/spend_mapper.py
+  s_6d98a8c7d49a61::t_107ae159c86cbd 1-25
+app/modules/ai_package_v1/keyword_performance/export/__init__.py
+  s_6d98a8c7d49a61::t_a93d75e4aa9607 1
+app/modules/ai_package_v1/keyword_performance/export/current_state.py
+  s_6d98a8c7d49a61::t_cce808bcf44dfe 1-209
+app/modules/ai_package_v1/keyword_performance/export/daily_assembler.py
+  s_6d98a8c7d49a61::t_0d9cfc12a92c02 1-149
+app/modules/ai_package_v1/keyword_performance/export/dataset_cards.py
+  s_6d98a8c7d49a61::t_9c0b3583627a13 1-184
+app/modules/ai_package_v1/keyword_performance/export/decision_assembler.py
+  s_6d98a8c7d49a61::t_847265bebaab32 1-86
+app/modules/ai_package_v1/keyword_performance/export/keyword_assembler.py
+  s_6d98a8c7d49a61::t_63800b09f59661 1-429
+app/modules/ai_package_v1/keyword_performance/export/payload_encode.py
+  s_6d98a8c7d49a61::t_8d3759eb919194 1-33
+app/modules/ai_package_v1/keyword_performance/export/position_assembler.py
+  s_6d98a8c7d49a61::t_d40d4f406830b6 1-68
+app/modules/ai_package_v1/keyword_performance/guards/__init__.py
+  s_6d98a8c7d49a61::t_bddc990d51e7d4 1
+app/modules/ai_package_v1/keyword_performance/guards/forbidden_sources.py
+  s_6d98a8c7d49a61::t_7732521826e75a 1-29
+app/modules/ai_package_v1/keyword_performance/readers/__init__.py
+  s_6d98a8c7d49a61::t_bf039b613051c8 1
+app/modules/ai_package_v1/keyword_performance/readers/ch_bid_decision_probe.py
+  s_6d98a8c7d49a61::t_278faf9ef3f7c8 1-153
+app/modules/ai_package_v1/keyword_performance/readers/ch_bid_decision_reader.py
+  s_6d98a8c7d49a61::t_8187d294b1277a 1-231
+app/modules/ai_package_v1/keyword_performance/readers/ch_keyword_bounds_reader.py
+  s_6d98a8c7d49a61::t_33de7787e0112a 1-136
+app/modules/ai_package_v1/keyword_performance/readers/ch_keyword_daily_reader.py
+  s_6d98a8c7d49a61::t_789ce685213e1a 1-207
+app/modules/ai_package_v1/keyword_performance/readers/ch_keyword_position_reader.py
+  s_6d98a8c7d49a61::t_567e3a25f373d8 1-156
+app/modules/ai_package_v1/keyword_performance/readers/pg_adv_id_overlap_reader.py
+  s_6d98a8c7d49a61::t_9dc3ad48b3f322 1-72
+app/modules/ai_package_v1/keyword_performance/readers/pg_keyword_policy_reader.py
+  s_6d98a8c7d49a61::t_4627a6976a6268 1-98
+app/modules/ai_package_v1/keyword_performance/readers/pg_keyword_query_policy_reader.py
+  s_6d98a8c7d49a61::t_1351c238140c0c 1-84
+app/modules/ai_package_v1/keyword_performance/readers/pg_session_adapter.py
+  s_6d98a8c7d49a61::t_ca7170ae3c0cde 1-31
+app/modules/ai_package_v1/keyword_performance/readers/reader_protocols.py
+  s_6d98a8c7d49a61::t_abf382a4bb14ac 1-137
+app/modules/ai_package_v1/keyword_performance/readers/sql_loader.py
+  s_6d98a8c7d49a61::t_ac2a3c8c3989b0 1-12
+app/modules/ai_package_v1/keyword_performance/scope/__init__.py
+  s_6d98a8c7d49a61::t_e22d1633afbc50 1
+app/modules/ai_package_v1/keyword_performance/scope/adv_id_collector.py
+  s_6d98a8c7d49a61::t_9706a7b07aa077 1-121
+app/modules/ai_package_v1/keyword_performance/scope/dto.py
+  s_6d98a8c7d49a61::t_3e4ba5c118425f 1-60
+app/modules/ai_package_v1/keyword_performance/scope/keyword_export_scope_reader.py
+  s_6d98a8c7d49a61::t_1f17a855c4cd68 1-129
+app/modules/ai_package_v1/keyword_performance/sql/bid_decision_latest.sql
+  s_6d98a8c7d49a61::t_ce75d763eeeb8f 1-60
+app/modules/ai_package_v1/keyword_performance/sql/bid_decision_timeline.sql
+  s_6d98a8c7d49a61::t_da4da8b576b524 1-26
+app/modules/ai_package_v1/keyword_performance/sql/keyword_daily_from_clusters.sql
+  s_6d98a8c7d49a61::t_4016b8f2879a4c 1-62
+app/modules/ai_package_v1/keyword_performance/sql/keyword_history_bounds.sql
+  s_6d98a8c7d49a61::t_6ad743f9116cd7 1-15
+app/modules/ai_package_v1/keyword_performance/sql/keyword_position_bounds.sql
+  s_6d98a8c7d49a61::t_ea7049e825c07a 1-15
+app/modules/ai_package_v1/keyword_performance/sql/keyword_position_from_api.sql
+  s_6d98a8c7d49a61::t_a6216575ba54de 1-52
+app/modules/ai_package_v1/keyword_performance/windows/__init__.py
+  s_6d98a8c7d49a61::t_02445d9c49cd79 1
+app/modules/ai_package_v1/keyword_performance/windows/engine.py
+  s_6d98a8c7d49a61::t_64a990a99c8e84 1-748
+app/modules/ai_package_v1/keyword_performance/windows/position_engine.py
+  s_6d98a8c7d49a61::t_2f6d2b81785683 1-180
+app/modules/ai_package_v1/validator/package_validator.py
+  s_6d98a8c7d49a61::t_8106740945bd80 74,175-209
+openspec/changes/ai-package-keyword-performance-history/decisions/ai-package-keyword-performance-history-ownership/decision.md
+  s_6d98a8c7d49a61::t_71d9cf3fd195ab 1-134
+openspec/changes/ai-package-keyword-performance-history/design.md
+  s_6d98a8c7d49a61::t_969c825d058e9a 1-660
+openspec/changes/ai-package-keyword-performance-history/evidence/.gitattributes
+  s_6d98a8c7d49a61::t_78a4297f776e78 1-2
+openspec/changes/ai-package-keyword-performance-history/evidence/AI_PACKAGE_KEYWORD_HISTORY_INVENTORY_REPORT.md
+  s_6d98a8c7d49a61::t_62871ce565595a 1-233
+openspec/changes/ai-package-keyword-performance-history/evidence/APPLY_RECEIPT_WB-SKY-KEYWORD-HISTORY-IMPLEMENT-20261005-0142.json
+  s_6d98a8c7d49a61::t_d4c619b79f9d19 1-24
+openspec/changes/ai-package-keyword-performance-history/evidence/OWNER_CONTRACT_REVIEW_RECEIPT_WB-SKY-KEYWORD-HISTORY-OWNER-REREVIEW-20261005-0107.json
+  s_6d98a8c7d49a61::t_db0db7a05acf3c 1-22
+openspec/changes/ai-package-keyword-performance-history/evidence/commit-receipt-WB-SKY-KEYWORD-HISTORY-FINALIZE-20261005-10.json
+  s_6d98a8c7d49a61::t_30e1e50a305977 1-60
+openspec/changes/ai-package-keyword-performance-history/evidence/compute_worktree_fingerprint.py
+  s_6d98a8c7d49a61::t_417e12f7f23c08 1-75
+openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-cutoff-repair08.log
+  s_6d98a8c7d49a61::t_5e8c7afd0f8361 1-149
+openspec/changes/ai-package-keyword-performance-history/evidence/pytest-ai-package-v1-evidence-repair06.log
+  s_6d98a8c7d49a61::t_a1150ee75c9747 1-135
+openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-CUTOFF-PARITY-REPAIR-20261005-08.json
+  s_6d98a8c7d49a61::t_cd84d3fc19f56b 1-52
+openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-EVIDENCE-REPAIR-20261005-06.json
+  s_6d98a8c7d49a61::t_daf01f2996e9ac 1-220
+openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-REMEDIATE-20261005-0201.json
+  s_6d98a8c7d49a61::t_38a5b85c0c95d8 1-41
+openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-REMEDIATE-20261005-03.json
+  s_6d98a8c7d49a61::t_b9ba990efa670a 1-16
+openspec/changes/ai-package-keyword-performance-history/evidence/repair-receipt-WB-SKY-KEYWORD-HISTORY-SOURCE-REPAIR-20261005-05.json
+  s_6d98a8c7d49a61::t_6f8f006af76443 1-34
+openspec/changes/ai-package-keyword-performance-history/evidence/test-content-hash-audit09.json
+  s_6d98a8c7d49a61::t_72c37b5a2503d5 1-4
+openspec/changes/ai-package-keyword-performance-history/evidence/verify-impl-receipt-WB-SKY-KEYWORD-HISTORY-INDEPENDENT-AUDIT-20261005-07.json
+  s_6d98a8c7d49a61::t_85d5b635a9998c 1-32
+openspec/changes/ai-package-keyword-performance-history/evidence/verify-impl-receipt-WB-SKY-KEYWORD-HISTORY-INDEPENDENT-REAUDIT-20261005-09.json
+  s_6d98a8c7d49a61::t_4d0d5c3eaa7e4d 1-50
+openspec/changes/ai-package-keyword-performance-history/evidence/verify_plan_evidence_repair3.py
+  s_6d98a8c7d49a61::t_2f7e530c5f7243 1-147
+openspec/changes/ai-package-keyword-performance-history/evidence/worktree-fingerprint-independent-audit09.json
+  s_6d98a8c7d49a61::t_bc400ff3d246f6 1-266
+openspec/changes/ai-package-keyword-performance-history/evidence/worktree-fingerprint-repair06.json
+  s_6d98a8c7d49a61::t_b5aa5cadfea3eb 1-258
+openspec/changes/ai-package-keyword-performance-history/owner-contract.md
+  s_6d98a8c7d49a61::t_aa16e2ad9defea 1-192
+openspec/changes/ai-package-keyword-performance-history/proposal.md
+  s_6d98a8c7d49a61::t_9c72ae35cb16e3 1-90
+openspec/changes/ai-package-keyword-performance-history/scenario-coverage/audit.receipt.json
+  s_6d98a8c7d49a61::t_40c1ed56ee5b9a 1-69
+openspec/changes/ai-package-keyword-performance-history/scenario-coverage/audit.report.md
+  s_6d98a8c7d49a61::t_3b12dd7f65d824 1-192
+openspec/changes/ai-package-keyword-performance-history/scenario-coverage/plan.md
+  s_6d98a8c7d49a61::t_63109af61123ff 1-141
+openspec/changes/ai-package-keyword-performance-history/scenario-coverage/plan.receipt.json
+  s_6d98a8c7d49a61::t_6b19860a0d7b44 1-81
+openspec/changes/ai-package-keyword-performance-history/specs/ai-package-keyword-performance-history/spec.md
+  s_6d98a8c7d49a61::t_dfa5523437e6b5 1-413
+openspec/changes/ai-package-keyword-performance-history/specs/ai-package-v1-contract-tests/spec.md
+  s_6d98a8c7d49a61::t_cb8705842f64af 1-128
+openspec/changes/ai-package-keyword-performance-history/specs/ai-package-v1-exporter/spec.md
+  s_6d98a8c7d49a61::t_d8a60022b14830 1-83
+openspec/changes/ai-package-keyword-performance-history/tasks.md
+  s_6d98a8c7d49a61::t_3b65b21ac39d3c 1-168
+pyrightconfig_strict.json
+  s_6d98a8c7d49a61::t_e6551472be289e 156-158
+tests/unit/ai_package_v1/conftest.py
+  s_6d98a8c7d49a61::t_ccb72d69d53683 5-7,19-20,26,107
+tests/unit/ai_package_v1/keyword_performance/boundary_fakes.py
+  s_6d98a8c7d49a61::t_d6aedf432da343 1-179
+tests/unit/ai_package_v1/keyword_performance/conftest.py
+  s_6d98a8c7d49a61::t_8521a009a0589c 1-488
+tests/unit/ai_package_v1/keyword_performance/test_ch_stub_contract.py
+  s_6d98a8c7d49a61::t_77453d0e139173 1-247
+tests/unit/ai_package_v1/keyword_performance/test_contract_keyword_export.py
+  s_6d98a8c7d49a61::t_f1b2f913e8ba85 1-592
+tests/unit/ai_package_v1/keyword_performance/test_daily.py
+  s_6d98a8c7d49a61::t_61003ba9c00676 1-88
+tests/unit/ai_package_v1/keyword_performance/test_daily_extended.py
+  s_6d98a8c7d49a61::t_0f4d7c0d8d7915 1-275
+tests/unit/ai_package_v1/keyword_performance/test_datamap.py
+  s_6d98a8c7d49a61::t_7a5f3adb75546f 1-120
+tests/unit/ai_package_v1/keyword_performance/test_default_pipeline_boundary.py
+  s_6d98a8c7d49a61::t_6d4445f3f9a7f7 1-147
+tests/unit/ai_package_v1/keyword_performance/test_export_integration.py
+  s_6d98a8c7d49a61::t_2d9e870a2247e9 1-220
+tests/unit/ai_package_v1/keyword_performance/test_forbidden.py
+  s_6d98a8c7d49a61::t_b8e206c50643ef 1-46
+tests/unit/ai_package_v1/keyword_performance/test_scope.py
+  s_6d98a8c7d49a61::t_ba32816d7b1a5c 1-47
+tests/unit/ai_package_v1/keyword_performance/test_source_repair.py
+  s_6d98a8c7d49a61::t_eef44a1efd4d55 1-427
+tests/unit/ai_package_v1/keyword_performance/test_windows.py
+  s_6d98a8c7d49a61::t_ed15ecd2f8c8f5 1-298
+tests/unit/ai_package_v1/test_campaign_settings_assembler.py
+  s_6d98a8c7d49a61::t_192f1a4d0834f2 21,27,37-38,51-52,62,76-77,88-89,103-104,112-113,125-126,135-136,146-147,157-158,167-168,181-182
+tests/unit/ai_package_v1/test_campaign_settings_contract.py
+  s_6d98a8c7d49a61::t_b18b60d742fe2a 19,24-26,37-38,50-51,65-66
+tests/unit/ai_package_v1/test_export_settings_integration.py
+  s_6d98a8c7d49a61::t_4e2641c59efdb0 25-29,63-68,70,77,83-84,87,94-97,121-124,126,157-158,161,183-186,199,215-218,220,237-238,243
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "028b261b5c63a235535d2c2099ef6dcc6eb74edb",
+  "prompts": {},
+  "sessions": {
+    "s_6d98a8c7d49a61": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "agent-e6dbdf76-cdee-4710-aa7d-f5d974a72d3a",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
