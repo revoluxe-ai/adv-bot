@@ -191,6 +191,25 @@ async def test_bid_decision_latest_sql_row_coherent_not_per_field_argmax() -> No
     assert "argMax(cpm_curr, version)" not in sql
 
 
+def test_bid_decision_sql_max_version_not_nested_in_aggregates() -> None:
+    """Outer max(version) alias must not be version (ClickHouse code 184)."""
+    sql = ChBidDecisionReader().latest_query_text
+    final_select = sql.rsplit("SELECT", maxsplit=1)[1]
+    assert "FROM rows_at_max" in final_select
+    assert "max(version) AS max_version" in final_select
+    assert "max(version) AS version" not in sql
+    after_uniq = sql.split("uniqExact(", maxsplit=1)[1]
+    assert "max(version)" not in after_uniq
+    decision_tuple = (
+        "(cpm_curr, final_bid, decision_time, stats_max_timestamp, "
+        "decision_source, version)"
+    )
+    assert decision_tuple in final_select
+    assert "d.version = lv.max_version" in sql
+    assert "decision_time <= {package_cutoff_instant:DateTime}" in sql
+    assert "stats_max_timestamp <= {package_cutoff_instant:DateTime}" in sql
+
+
 @pytest.mark.asyncio
 async def test_position_api_future_version_excluded() -> None:
     """Position reader passes cutoff_instant_ms; future same-day version excluded."""
