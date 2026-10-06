@@ -54,11 +54,17 @@ class CampaignResourceRef(BaseModel):
 
 
 class OperationPreconditionV1(BaseModel):
-    """Precondition на per-resource state_token."""
+    """Поколение снимка и необязательное полевое предусловие.
+
+    ``state_token`` — единственный concurrency-контракт (поколение снимка).
+    ``expected_current_value`` не второй замок: его сравнивают только с полями
+    этого поколения. Пустой token отклоняет dry-run целиком.
+    """
 
     model_config = _FROZEN_FORBID
 
     state_token: str
+    expected_current_value: dict[str, str | int | float | bool | None] | None = None
 
 
 class BudgetPolicyPayload(BaseModel):
@@ -83,7 +89,8 @@ class SalesPolicyPayload(BaseModel):
 
     orders_source_for_auto_mode: str | None = None
     plan_for_sales_for_day: int | None = None
-    target_price_for_order: float | None = None
+    # int сохраняется как запрошенная форма; normalize_value приводит FLOAT.
+    target_price_for_order: int | float | None = None
     max_price_for_order: int | None = None
     sales_predict_method: str | None = None
     strategy: str | None = None
@@ -152,9 +159,11 @@ class ChangeSetV1(BaseModel):
 
     @model_validator(mode="after")
     def _validate_operations(self) -> ChangeSetV1:
+        """Пустой список операций — ошибка конверта.
+
+        Дубликат ``operation_id`` не рвёт разбор: его атомарно отклоняет
+        ``validate_changeset`` статусом REJECTED.
+        """
         if not self.operations:
             raise ValueError("operations must be non-empty")
-        operation_ids = [op.operation_id for op in self.operations]
-        if len(operation_ids) != len(set(operation_ids)):
-            raise ValueError("duplicate operation_id")
         return self

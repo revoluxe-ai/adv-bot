@@ -18,6 +18,7 @@ from app.modules.wb_sky_control_plane.models.changeset import (
 )
 from app.modules.wb_sky_control_plane.models.enums import (
     CampaignTopology,
+    DryRunStatus,
     MappingStatus,
     PaymentTypeAuthority,
     TriStateCapability,
@@ -106,9 +107,13 @@ def test_one_invalid_operation_rejects_whole_changeset() -> None:
             ),
         ],
     )
-    errors = validate_changeset(
+    result = validate_changeset(
         changeset,
         {resource_id: snapshot},
         {resource_id: caps},
     )
-    assert any(error.code == "RESOURCE_SNAPSHOT_MISSING" for error in errors)
+    assert result.status == DryRunStatus.REJECTED
+    assert result.diffs == []
+    assert any(
+        error.code == "RESOURCE_SNAPSHOT_MISSING" for error in result.errors
+    )

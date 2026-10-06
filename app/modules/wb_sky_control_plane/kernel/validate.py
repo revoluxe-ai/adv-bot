@@ -1,76 +1,533 @@
-"""Validate ChangeSet operations against snapshots and capabilities."""
+"""Dry-run проверка ChangeSetV1. Не пишет в WB, PostgreSQL или ClickHouse.
+
+Порядок: структура, идемпотентность (без хранилища), ``state_token``,
+``cmp_*``, mapping, capability, нормализация, domain-инварианты,
+``expected_current_value``, семантический diff ``NO_OP | OK | REJECTED``.
+"""
 
 from __future__ import annotations
 
+from pydantic import BaseModel
+
+from app.modules.wb_sky_control_plane.kernel.domain_validators import (
+    DomainContext,
+    run_declared_validators,
+)
+from app.modules.wb_sky_control_plane.kernel.mutation_policy import (
+    KNOWN_CAPABILITIES,
+    NormalizationFailure,
+    policy_for,
+    normalize_registered_value,
+)
+from app.modules.wb_sky_control_plane.kernel.semantic_digest import (
+    compute_semantic_digest,
+)
 from app.modules.wb_sky_control_plane.models.capabilities import CampaignCapabilitiesV1
-from app.modules.wb_sky_control_plane.models.changeset import ChangeSetV1
-from app.modules.wb_sky_control_plane.models.enums import CanonicalOperationKind
+from app.modules.wb_sky_control_plane.models.changeset import (
+    CampaignOperationV1,
+    ChangeSetV1,
+)
+from app.modules.wb_sky_control_plane.models.enums import DryRunStatus, MappingStatus
 from app.modules.wb_sky_control_plane.models.errors import ControlPlaneError
+from app.modules.wb_sky_control_plane.models.plan import (
+    ChangeSetValidationResult,
+    PlanEffectV1,
+    PlanV1,
+    PriorChangeSetRecord,
+    SemanticDiffEntryV1,
+)
 from app.modules.wb_sky_control_plane.models.snapshot import CampaignResourceSnapshotV1
 
-
-_SUPPORTED_OPS = {member.value for member in CanonicalOperationKind}
+_Scalar = str | int | float | bool | None
 
 
 def validate_changeset(
     changeset: ChangeSetV1,
     snapshots: dict[str, CampaignResourceSnapshotV1],
     capabilities: dict[str, CampaignCapabilitiesV1],
-) -> list[ControlPlaneError]:
-    """One invalid operation rejects the whole ChangeSet."""
+    *,
+    prior: PriorChangeSetRecord | None = None,
+    capability_grants: frozenset[str] | None = None,
+) -> ChangeSetValidationResult:
+    """Проверить ChangeSet целиком. Любая ошибка — REJECTED без diff действия.
+
+    ``prior`` только сравнивается. Функция не создаёт запись идемпотентности
+    и не открывает PostgreSQL, ClickHouse или WB.
+    """
+    digest = compute_semantic_digest(changeset)
+    duplicate_errors = _duplicate_operation_ids(changeset)
+    if duplicate_errors:
+        return _rejected(changeset, digest, duplicate_errors)
+    if (
+        prior is not None
+        and prior.changeset_id == changeset.changeset_id
+        and prior.canonical_hash != digest
+    ):
+        return _rejected(
+            changeset,
+            digest,
+            [
+                ControlPlaneError(
+                    code="CHANGESET_ID_CONFLICT",
+                    message="changeset_id replay has a different canonical hash",
+                    details={"changeset_id": changeset.changeset_id},
+                )
+            ],
+        )
+
     errors: list[ControlPlaneError] = []
+    if capability_grants is not None:
+        unknown = sorted(
+            token for token in capability_grants if token not in KNOWN_CAPABILITIES
+        )
+        if unknown:
+            errors.append(
+                ControlPlaneError(
+                    code="UNKNOWN_CAPABILITY",
+                    message="capability token is outside the known catalog",
+                    details={"tokens": ",".join(unknown)},
+                )
+            )
+
+    prepared: list[PlanEffectV1] = []
+    diffs: list[SemanticDiffEntryV1] = []
+    seen_slots: set[tuple[str, str]] = set()
+
     for index, operation in enumerate(changeset.operations):
-        op_name = operation.op
-        if op_name not in _SUPPORTED_OPS:
-            errors.append(
-                ControlPlaneError(
-                    code="UNSUPPORTED_OPERATION",
-                    message=f"Operation {op_name!r} is not in A1 bounded subset",
-                    operation_index=index,
-                    resource_id=operation.resource.resource_id,
-                )
-            )
+        before = len(errors)
+        effect = _validate_operation(
+            changeset_errors=errors,
+            operation=operation,
+            index=index,
+            snapshots=snapshots,
+            capabilities=capabilities,
+            capability_grants=capability_grants,
+            seen_slots=seen_slots,
+        )
+        if effect is None or len(errors) != before:
             continue
+        prepared.append(effect)
+        diffs.extend(effect.semantic_changes)
 
-        resource_id = operation.resource.resource_id
-        snapshot = snapshots.get(resource_id)
-        if snapshot is None:
-            errors.append(
+    if errors:
+        return _rejected(changeset, digest, errors)
+
+    is_no_op = all(effect.is_no_op for effect in prepared)
+    plan = PlanV1(effects=prepared, is_no_op=is_no_op)
+    status = DryRunStatus.NO_OP if is_no_op else DryRunStatus.OK
+    actionable = [] if is_no_op else diffs
+    return ChangeSetValidationResult(
+        status=status,
+        changeset_id=changeset.changeset_id,
+        semantic_digest=digest,
+        diffs=actionable,
+        plan=plan,
+    )
+
+
+def _rejected(
+    changeset: ChangeSetV1,
+    digest: str,
+    errors: list[ControlPlaneError],
+) -> ChangeSetValidationResult:
+    return ChangeSetValidationResult(
+        status=DryRunStatus.REJECTED,
+        changeset_id=changeset.changeset_id,
+        semantic_digest=digest,
+        errors=errors,
+        diffs=[],
+        plan=None,
+    )
+
+
+def _duplicate_operation_ids(changeset: ChangeSetV1) -> list[ControlPlaneError]:
+    seen: set[str] = set()
+    dupes: set[str] = set()
+    for operation in changeset.operations:
+        if operation.operation_id in seen:
+            dupes.add(operation.operation_id)
+        seen.add(operation.operation_id)
+    if not dupes:
+        return []
+    return [
+        ControlPlaneError(
+            code="DUPLICATE_OPERATION_ID",
+            message="duplicate operation_id",
+            details={"operation_id": ",".join(sorted(dupes))},
+        )
+    ]
+
+
+def _presented_token(operation: CampaignOperationV1) -> str | None:
+    preconditions = operation.preconditions
+    if preconditions is None:
+        return None
+    token = preconditions.state_token.strip()
+    if not token:
+        return None
+    return token
+
+
+def _payload_values(payload: BaseModel) -> dict[str, object]:
+    dumped = payload.model_dump(exclude_unset=True)
+    values: dict[str, object] = {}
+    for key, raw in dumped.items():
+        values[str(key)] = raw
+    return values
+
+
+def _bucket(
+    snapshot: CampaignResourceSnapshotV1,
+    bucket: str,
+) -> dict[str, object]:
+    local = snapshot.local_policy
+    if bucket == "budget":
+        return dict(local.budget)
+    if bucket == "sales":
+        return dict(local.sales)
+    return dict(local.bid_control)
+
+
+def _as_scalar(value: object) -> _Scalar | None:
+    """Вернуть JSON-скаляр либо None, если значение нескалярное."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return None
+
+
+def _failure_error(
+    failure: NormalizationFailure,
+    *,
+    index: int,
+    resource_id: str,
+    field_name: str,
+) -> ControlPlaneError:
+    return ControlPlaneError(
+        code=failure.code,
+        message=failure.message,
+        operation_index=index,
+        resource_id=resource_id,
+        details={"field": field_name},
+    )
+
+
+def _validate_operation(
+    *,
+    changeset_errors: list[ControlPlaneError],
+    operation: CampaignOperationV1,
+    index: int,
+    snapshots: dict[str, CampaignResourceSnapshotV1],
+    capabilities: dict[str, CampaignCapabilitiesV1],
+    capability_grants: frozenset[str] | None,
+    seen_slots: set[tuple[str, str]],
+) -> PlanEffectV1 | None:
+    op_name = operation.op
+    resource_id = operation.resource.resource_id
+    policy = policy_for(op_name)
+    if policy is None or op_name not in KNOWN_CAPABILITIES:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="UNSUPPORTED_OPERATION",
+                message=f"Operation {op_name!r} is not in the bounded set",
+                operation_index=index,
+                resource_id=resource_id,
+            )
+        )
+        return None
+    if policy.required_capability not in KNOWN_CAPABILITIES:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="UNKNOWN_CAPABILITY",
+                message="policy names a capability outside the known catalog",
+                operation_index=index,
+                resource_id=resource_id,
+                details={"capability": policy.required_capability},
+            )
+        )
+        return None
+
+    slot = (resource_id, op_name)
+    if slot in seen_slots:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="DUPLICATE_TARGET",
+                message="duplicate operation slot for the same resource",
+                operation_index=index,
+                resource_id=resource_id,
+                details={"operation": op_name},
+            )
+        )
+        return None
+    seen_slots.add(slot)
+
+    token = _presented_token(operation)
+    if token is None:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="STATE_TOKEN_MISSING",
+                message="state_token is missing",
+                operation_index=index,
+                resource_id=resource_id,
+            )
+        )
+
+    snapshot = snapshots.get(resource_id)
+    if snapshot is None:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="RESOURCE_SNAPSHOT_MISSING",
+                message="CampaignResourceRef does not resolve in the snapshot",
+                operation_index=index,
+                resource_id=resource_id,
+            )
+        )
+    if token is None or snapshot is None:
+        return None
+
+    if snapshot.mapping_status != MappingStatus.OK:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="MAPPING_NOT_OK",
+                message="campaign resource mapping is unknown or broken",
+                operation_index=index,
+                resource_id=resource_id,
+                details={"mapping_status": snapshot.mapping_status.value},
+            )
+        )
+        return None
+
+    actual = snapshot.state_token
+    if actual is None or actual != token:
+        changeset_errors.append(
+            ControlPlaneError(
+                code="STATE_TOKEN_STALE",
+                message="stale or invalid generation token",
+                operation_index=index,
+                resource_id=resource_id,
+                details={"expected": token, "actual": actual or ""},
+            )
+        )
+        return None
+
+    if (
+        capability_grants is not None
+        and policy.required_capability not in capability_grants
+    ):
+        changeset_errors.append(
+            ControlPlaneError(
+                code="CAPABILITY_NOT_ELIGIBLE",
+                message="required capability is not granted",
+                operation_index=index,
+                resource_id=resource_id,
+                details={"capability": policy.required_capability},
+            )
+        )
+        return None
+
+    caps = capabilities.get(resource_id)
+    if caps is None or not caps.is_write_eligible(op_name):
+        assessment = caps.assessment_for_op(op_name) if caps else None
+        reason = assessment.reason_code if assessment else "NO_CAPABILITIES"
+        changeset_errors.append(
+            ControlPlaneError(
+                code="CAPABILITY_NOT_ELIGIBLE",
+                message="Operation not write-eligible (fail-closed)",
+                operation_index=index,
+                resource_id=resource_id,
+                details={"reason_code": reason},
+            )
+        )
+        return None
+
+    bucket = _bucket(snapshot, policy.bucket)
+    requested_raw = _payload_values(operation.payload)
+    normalized_map: dict[str, object] = {}
+    for field_name, raw_value in requested_raw.items():
+        if field_name not in policy.fields:
+            changeset_errors.append(
                 ControlPlaneError(
-                    code="RESOURCE_SNAPSHOT_MISSING",
-                    message="Snapshot missing for operation resource",
+                    code="UNKNOWN_FIELD",
+                    message=f"field {field_name} is not mutable for {op_name}",
                     operation_index=index,
                     resource_id=resource_id,
+                    details={"field": field_name},
                 )
             )
             continue
-
-        caps = capabilities.get(resource_id)
-        if caps is None or not caps.is_write_eligible(op_name):
-            assessment = caps.assessment_for_op(op_name) if caps else None
-            reason = assessment.reason_code if assessment else "NO_CAPABILITIES"
-            errors.append(
-                ControlPlaneError(
-                    code="CAPABILITY_NOT_ELIGIBLE",
-                    message="Operation not write-eligible (fail-closed)",
-                    operation_index=index,
+        normalized, failure = normalize_registered_value(field_name, raw_value)
+        if failure is not None:
+            changeset_errors.append(
+                _failure_error(
+                    failure,
+                    index=index,
                     resource_id=resource_id,
-                    details={"reason_code": reason},
+                    field_name=field_name,
                 )
             )
             continue
+        normalized_map[field_name] = normalized
 
-        if operation.preconditions is not None:
-            expected = operation.preconditions.state_token
-            actual = snapshot.state_token
-            if actual is None or expected != actual:
-                errors.append(
+    expected = (
+        None
+        if operation.preconditions is None
+        else operation.preconditions.expected_current_value
+    )
+    if expected is not None:
+        for field_name, expected_raw in expected.items():
+            if field_name not in policy.fields:
+                changeset_errors.append(
                     ControlPlaneError(
-                        code="PRECONDITION_STATE_TOKEN_MISMATCH",
-                        message="state_token precondition failed",
+                        code="UNKNOWN_FIELD",
+                        message=f"field {field_name} is not mutable for {op_name}",
                         operation_index=index,
                         resource_id=resource_id,
-                        details={"expected": expected, "actual": actual or ""},
+                        details={"field": field_name},
                     )
                 )
-    return errors
+                continue
+            current_norm, current_failure = normalize_registered_value(
+                field_name,
+                bucket.get(field_name),
+            )
+            expected_norm, expected_failure = normalize_registered_value(
+                field_name,
+                expected_raw,
+            )
+            failure = current_failure or expected_failure
+            if failure is not None:
+                changeset_errors.append(
+                    _failure_error(
+                        failure,
+                        index=index,
+                        resource_id=resource_id,
+                        field_name=field_name,
+                    )
+                )
+                continue
+            if expected_norm != current_norm:
+                changeset_errors.append(
+                    ControlPlaneError(
+                        code="EXPECTED_CURRENT_VALUE_MISMATCH",
+                        message=(
+                            "expected_current_value does not match the "
+                            "state_token generation"
+                        ),
+                        operation_index=index,
+                        resource_id=resource_id,
+                        details={"field": field_name},
+                    )
+                )
+
+    if len(changeset_errors) > 0 and _op_failed(changeset_errors, index):
+        return None
+
+    merged = dict(bucket)
+    for field_name, normalized in normalized_map.items():
+        merged[field_name] = normalized
+    domain_errors = run_declared_validators(
+        policy.domain_validators,
+        DomainContext(
+            operation_index=index,
+            resource_id=resource_id,
+            bucket=policy.bucket,
+            requested=normalized_map,
+            merged=merged,
+        ),
+    )
+    if domain_errors:
+        changeset_errors.extend(domain_errors)
+        return None
+
+    semantic_changes = _semantic_changes(
+        resource_id=resource_id,
+        bucket_name=policy.bucket,
+        bucket=bucket,
+        requested_raw=requested_raw,
+        normalized_map=normalized_map,
+        index=index,
+        errors=changeset_errors,
+    )
+    if _op_failed(changeset_errors, index):
+        return None
+    return PlanEffectV1(
+        resource_id=resource_id,
+        operation=op_name,
+        operation_index=index,
+        semantic_changes=semantic_changes,
+        is_no_op=len(semantic_changes) == 0,
+    )
+
+
+def _op_failed(errors: list[ControlPlaneError], index: int) -> bool:
+    return any(error.operation_index == index for error in errors)
+
+
+def _semantic_changes(
+    *,
+    resource_id: str,
+    bucket_name: str,
+    bucket: dict[str, object],
+    requested_raw: dict[str, object],
+    normalized_map: dict[str, object],
+    index: int,
+    errors: list[ControlPlaneError],
+) -> list[SemanticDiffEntryV1]:
+    changes: list[SemanticDiffEntryV1] = []
+    for field_name, raw_value in requested_raw.items():
+        if field_name not in normalized_map:
+            continue
+        normalized = normalized_map[field_name]
+        current_norm, failure = normalize_registered_value(
+            field_name,
+            bucket.get(field_name),
+        )
+        if failure is not None:
+            errors.append(
+                _failure_error(
+                    failure,
+                    index=index,
+                    resource_id=resource_id,
+                    field_name=field_name,
+                )
+            )
+            continue
+        if current_norm == normalized:
+            continue
+        old = _as_scalar(current_norm)
+        requested = _as_scalar(raw_value)
+        canonical = _as_scalar(normalized)
+        if requested is None and raw_value is not None:
+            errors.append(
+                ControlPlaneError(
+                    code="INVALID_VALUE",
+                    message=f"requested value for {field_name} is not a scalar",
+                    operation_index=index,
+                    resource_id=resource_id,
+                    details={"field": field_name},
+                )
+            )
+            continue
+        if canonical is None and normalized is not None:
+            errors.append(
+                ControlPlaneError(
+                    code="INVALID_VALUE",
+                    message=f"normalized value for {field_name} is not a scalar",
+                    operation_index=index,
+                    resource_id=resource_id,
+                    details={"field": field_name},
+                )
+            )
+            continue
+        changes.append(
+            SemanticDiffEntryV1(
+                field_path=f"{resource_id}.{bucket_name}.{field_name}",
+                resource_id=resource_id,
+                current=old,
+                desired=canonical,
+                old=old,
+                requested=requested,
+                normalized=canonical,
+                intent="set",
+            )
+        )
+    return changes

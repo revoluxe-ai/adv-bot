@@ -12,24 +12,24 @@
 
 ## 3. Extend control plane (after adoption only)
 
-- [ ] 3.1 Bind adopted WIP `ChangeSetV1` (`models/changeset.py`); do **not** create a second `ChangeSetV1` type or parallel package.
-- [ ] 3.2 Extend `mutation_policy` semantics for existing bounded operations (WIP examples include `SetBudgetPolicyOperation`; full set from `changeset.py` at adoption).
-- [ ] 3.3 Wire registered settings fields to `campaign_settings_contract.normalize_value`; control plane still owns ChangeSet and dry-run.
-- [ ] 3.4 Extend existing capability **tri-state**; unknown/unsupported tokens fail closed.
-- [ ] 3.5 Extend `validate_changeset` (`kernel/validate.py`) for dry-run only: injected snapshot, `state_token`, capability grant, `PriorChangeSetRecord | None`. **Do not** add `validate_changeset_v1` to `campaign_settings_contract`.
-- [ ] 3.6 Emit `SemanticDiffEntryV1` and statuses `NO_OP | OK | REJECTED`; implement idempotency contract (in-document duplicate `operation_id`; injected `changeset_id` hash conflict/replay) without durable store.
-- [ ] 3.7 Implement named domain validators for declared cross-field invariants; unimplemented declared invariant → atomic `REJECTED`.
+- [x] 3.1 Bind adopted WIP `ChangeSetV1` (`models/changeset.py`); do **not** create a second `ChangeSetV1` type or parallel package.
+- [x] 3.2 Extend `mutation_policy` semantics for existing bounded operations (WIP examples include `SetBudgetPolicyOperation`; full set from `changeset.py` at adoption).
+- [x] 3.3 Wire registered settings fields to `campaign_settings_contract.normalize_value`; control plane still owns ChangeSet and dry-run.
+- [x] 3.4 Extend existing capability **tri-state**; unknown/unsupported tokens fail closed.
+- [x] 3.5 Extend `validate_changeset` (`kernel/validate.py`) for dry-run only: injected snapshot, `state_token`, capability grant, `PriorChangeSetRecord | None`. **Do not** add `validate_changeset_v1` to `campaign_settings_contract`.
+- [x] 3.6 Emit `SemanticDiffEntryV1` and statuses `NO_OP | OK | REJECTED`; implement idempotency contract (in-document duplicate `operation_id`; injected `changeset_id` hash conflict/replay) without durable store.
+- [x] 3.7 Implement named domain validators for declared cross-field invariants; unimplemented declared invariant → atomic `REJECTED`.
 
 ## 4. Tests (after adoption only)
 
-- [ ] 4.1 Unit scenario seams for every `#### Scenario` in `specs/campaign-settings-changeset-contract/spec.md` against real `validate_changeset` and real `normalize_value` where applicable.
-- [ ] 4.2 Assert atomic mixed valid/invalid rejection; stale/missing `state_token`; capability unknown/unsupported; forbidden adapters not called (including MIXED `campaigns_info_v2/adapter.py`).
-- [ ] 4.3 No PostgreSQL, ClickHouse, WB, Excel, or shop-runner integration tests in this change.
+- [x] 4.1 Unit scenario seams for every `#### Scenario` in `specs/campaign-settings-changeset-contract/spec.md` against real `validate_changeset` and real `normalize_value` where applicable.
+- [x] 4.2 Assert atomic mixed valid/invalid rejection; stale/missing `state_token`; capability unknown/unsupported; forbidden adapters not called (including MIXED `campaigns_info_v2/adapter.py`).
+- [x] 4.3 No PostgreSQL, ClickHouse, WB, Excel, or shop-runner integration tests in this change.
 
 ## 5. Non-goals check
 
-- [ ] 5.1 Diff confirms no `apply_adv_excel_rows`, WB write clients, PostgreSQL settings writes, ClickHouse writes, or MIXED adapter use on the dry-run path.
-- [ ] 5.2 Telegram payload surfaces unchanged. Checklist N/A for this change.
+- [x] 5.1 Diff confirms no `apply_adv_excel_rows`, WB write clients, PostgreSQL settings writes, ClickHouse writes, or MIXED adapter use on the dry-run path.
+- [x] 5.2 Telegram payload surfaces unchanged. Checklist N/A for this change.
 
 ## Telegram UI / Message Safety
 

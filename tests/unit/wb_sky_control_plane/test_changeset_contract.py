@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from app.modules.wb_sky_control_plane.kernel.validate import validate_changeset
 from app.modules.wb_sky_control_plane.models.changeset import (
     BudgetPolicyPayload,
     CampaignResourceRef,
@@ -12,6 +13,7 @@ from app.modules.wb_sky_control_plane.models.changeset import (
     LogicalScopeV1,
     SetBudgetPolicyOperation,
 )
+from app.modules.wb_sky_control_plane.models.enums import DryRunStatus
 
 pytestmark = pytest.mark.unit
 
@@ -36,15 +38,19 @@ def test_changeset_rejects_empty_operations() -> None:
 
 
 def test_changeset_rejects_duplicate_operation_id() -> None:
-    with pytest.raises(ValidationError, match="duplicate operation_id"):
-        ChangeSetV1(
-            changeset_id="cs-1",
-            scope=LogicalScopeV1(shop_id="shop-a"),
-            operations=[
-                _op(operation_id="dup"),
-                _op(operation_id="dup"),
-            ],
-        )
+    """Дубликат operation_id остаётся конвертом и отклоняется dry-run целиком."""
+    changeset = ChangeSetV1(
+        changeset_id="cs-1",
+        scope=LogicalScopeV1(shop_id="shop-a"),
+        operations=[
+            _op(operation_id="dup"),
+            _op(operation_id="dup"),
+        ],
+    )
+    result = validate_changeset(changeset, {}, {})
+    assert result.status == DryRunStatus.REJECTED
+    assert result.diffs == []
+    assert any(error.code == "DUPLICATE_OPERATION_ID" for error in result.errors)
 
 
 def test_changeset_rejects_extra_fields() -> None:

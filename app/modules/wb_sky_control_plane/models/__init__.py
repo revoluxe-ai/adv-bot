@@ -20,9 +20,11 @@ from app.modules.wb_sky_control_plane.models.errors import (
     ControlPlaneWarning,
 )
 from app.modules.wb_sky_control_plane.models.plan import (
+    ChangeSetValidationResult,
     DryRunResultV1,
     PlanEffectV1,
     PlanV1,
+    PriorChangeSetRecord,
     SemanticDiffEntryV1,
 )
 from app.modules.wb_sky_control_plane.models.snapshot import (
@@ -44,6 +46,7 @@ __all__ = [
     "CapabilityAssessment",
     "ChangeSetMetadataV1",
     "ChangeSetV1",
+    "ChangeSetValidationResult",
     "LogicalScopeV1",
     "ControlPlaneError",
     "ControlPlaneWarning",
@@ -52,6 +55,7 @@ __all__ = [
     "OperationPreconditionV1",
     "PlanEffectV1",
     "PlanV1",
+    "PriorChangeSetRecord",
     "SalesPolicyPayload",
     "SemanticDiffEntryV1",
 ]
