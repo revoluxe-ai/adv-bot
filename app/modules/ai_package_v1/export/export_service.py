@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from app.modules.ai_package_v1.domain.campaign_stat import (
     assert_no_synthetic_merge,
+    assert_observed_ids_are_physical,
     rows_for_shop,
 )
 from app.modules.ai_package_v1.domain.cards import (
@@ -125,7 +126,7 @@ class ExportService:
             ``ExportResult`` с карточками датасетов и CSV payloads.
 
         Raises:
-            ValueError: при нарушении grain Auto/Search, невалидном shop_id или period.
+            ValueError: при synthetic campaign_id, невалидном shop_id или period.
         """
         manifest_id = validate_export_inputs(shop_id, period)
         scope = await self._scope_reader.load_scope(shop_id)
@@ -182,15 +183,19 @@ class ExportService:
             manifest_shop_id, adv_ids, period
         )
         campaign_rows = rows_for_shop(campaign_rows, manifest_shop_id)
+        assert_observed_ids_are_physical(
+            {row.campaign_id for row in campaign_rows},
+            set(adv_ids),
+        )
         for item in scope:
             if item.search_adv_id is not None and item.search_adv_id != item.auto_adv_id:
-                scoped_rows = [
-                    r
-                    for r in campaign_rows
-                    if r.campaign_id in (item.auto_adv_id, item.search_adv_id)
+                leg_rows = [
+                    row
+                    for row in campaign_rows
+                    if row.campaign_id in (item.auto_adv_id, item.search_adv_id)
                 ]
                 assert_no_synthetic_merge(
-                    scoped_rows, item.auto_adv_id, item.search_adv_id
+                    leg_rows, item.auto_adv_id, item.search_adv_id
                 )
 
         funnel_rows = await self._funnel_reader.fetch_rows(
@@ -212,9 +217,11 @@ class ExportService:
         settings_payload_content = serialize_campaign_settings_payload(
             settings_snapshot
         )
+        observed_adv_ids = sorted({row.campaign_id for row in campaign_rows})
         campaign_card = build_campaign_full_stat_card(
             period,
             scoped_adv_ids=adv_ids,
+            observed_adv_ids=observed_adv_ids,
             row_count=len(campaign_rows),
             freshness=campaign_freshness,
         )

@@ -17,6 +17,12 @@ PACKAGE_SUMMARY/JOINABILITY/AI_READABILITY gaps при рабочем ExportServ
 включая UUID. Числовой coercion, hash-surrogate и второй скрытый идентификатор
 запрещены. Пустой shop id fail-closed.
 
+Отсутствие строк по одной физической ноге Auto/Search в периоде — допустимое
+состояние данных (`PARTIAL_COLLECTION`). Это не synthetic merge и не нулевая
+строка. Отказ export — только если в выходе есть campaign_id вне физических
+adv_id scope. Если в источнике есть строки и для Auto, и для Search, обе
+сохраняются раздельно.
+
 ## Non-goals
 
 Новые collectors, второй exporter, settings-history persistence, production writes.

@@ -55,13 +55,8 @@ semantics, and pointers under `keyword_performance/` for keyword payloads.
 
 ### Requirement: Authoritative shop identity
 
-Full export MUST preserve `WBCabinet.shop_id` losslessly as `shop_id: str` from
-the export input through the manifest, every dataset row that carries `shop_id`,
-`PACKAGE_SUMMARY.json`, and DATA_MAP `shop_id` field units. UUID-like values
-MUST be valid. A decimal-looking string MUST remain a string. Empty or
-whitespace-only `shop_id` MUST fail closed. The exporter MUST NOT coerce
-`shop_id` to int, hash it, or invent a second hidden shop identifier.
-Whitespace MUST NOT be stripped from a non-blank identifier.
+Full export MUST preserve authoritative `WBCabinet.shop_id` as `shop_id: str`
+with no numeric coercion, hash surrogate, or second hidden identifier.
 
 #### Scenario: UUID shop id roundtrip
 
@@ -75,3 +70,50 @@ Whitespace MUST NOT be stripped from a non-blank identifier.
 
 - **WHEN** `shop_id` is empty or whitespace-only
 - **THEN** export input validation MUST fail before package production
+
+### Requirement: Missing campaign leg is not a synthetic merge
+
+A missing Auto or Search physical leg MUST NOT be treated as a synthetic merge
+or as a zero-valued row. An unexpected `campaign_id` MUST fail closed. A
+non-empty proper subset of expected physical ids MUST stay partial coverage
+with `PARTIAL_COLLECTION`.
+
+#### Scenario: Both physical ids present
+
+- **GIVEN** rows for Auto id A and Search id K
+- **WHEN** campaign stat is exported
+- **THEN** the payload MUST contain both A and K as separate `campaign_id`s
+- **AND** MUST NOT replace them with one synthetic id
+
+#### Scenario: Only Auto rows exist
+
+- **GIVEN** PG scope has distinct Auto id A and Search id K
+- **AND** the campaign-stat slice contains rows only for A
+- **WHEN** campaign stat is exported
+- **THEN** export MUST succeed
+- **AND** the payload MUST contain A and MUST NOT contain a fabricated K row
+- **AND** campaign coverage MUST NOT be `FULL` or family `COMPLETE`
+- **AND** reason metadata MUST include `PARTIAL_COLLECTION`
+
+#### Scenario: Only Search rows exist
+
+- **GIVEN** PG scope has distinct Auto id A and Search id K
+- **AND** the campaign-stat slice contains rows only for K
+- **WHEN** campaign stat is exported
+- **THEN** export MUST succeed
+- **AND** the payload MUST contain K and MUST NOT contain a fabricated A row
+
+#### Scenario: Neither physical id has rows
+
+- **GIVEN** PG scope has distinct Auto and Search ids
+- **AND** the campaign-stat slice is empty
+- **WHEN** campaign stat is exported
+- **THEN** the payload MUST NOT contain fabricated zero rows
+- **AND** campaign coverage MUST NOT be `FULL` or family `COMPLETE`
+
+#### Scenario: Unexpected campaign id rejected
+
+- **GIVEN** a row whose `campaign_id` is not a permitted physical adv_id
+- **WHEN** campaign stat is exported
+- **THEN** export MUST fail closed
+- **AND** MUST NOT emit that id as a campaign row
