@@ -80,16 +80,12 @@ Handler MUST получить ZIP только из `PackageZipAssembler.assembl
 - **AND** имя файла заканчивается на `.zip`
 - **AND** перед сборкой отправлено `Формирую AI-пакет…`
 
-### Requirement: Failures stay safe
+### Requirement: Assembler and generic transport failures are redacted
 
-The handler MUST keep export and transport failures user-safe.
-Исключение assembler или отказ отправки, который не является отказом по
-размеру, MUST давать `Не удалось сформировать AI-пакет. Попробуйте позже.`
-Сырой exception и секреты MUST NOT попадать пользователю. Если Telegram
-отклоняет документ из-за размера, пользователь MUST получить явную ошибку.
-ZIP MUST NOT урезаться и файлы пакета MUST NOT выкидываться. Логи MAY
-содержать telegram user id, WBUserCabinet id, shop_id и traceback и MUST NOT
-содержать WB token, bot token, credentials или сырые ZIP bytes.
+The handler MUST keep assembler and non-size transport failures user-safe.
+Исключение `assemble_zip` или отказ `send_document`, не связанный с размером,
+MUST давать `Не удалось сформировать AI-пакет. Попробуйте позже.` Сырой
+exception и секреты MUST NOT попадать пользователю.
 
 #### Scenario: Assembler error is redacted
 
@@ -97,11 +93,27 @@ ZIP MUST NOT урезаться и файлы пакета MUST NOT выкиды
 - **THEN** пользователь видит только безопасную фразу отказа
 - **AND** секрет и имя типа исключения отсутствуют в тексте
 
+### Requirement: Telegram size rejection is explicit
+
+Если Telegram отклоняет документ из-за размера, пользователь MUST получить
+явную ошибку. ZIP MUST NOT урезаться и файлы пакета MUST NOT выкидываться.
+
 #### Scenario: Size rejection is explicit
 
 - **WHEN** `send_document` падает с TelegramBadRequest о слишком большом файле
 - **THEN** пользователь получает явное сообщение про размер
 - **AND** повторная отправка урезанного ZIP не выполняется
+
+### Requirement: Export failure logs stay bounded
+
+Логи MAY содержать telegram user id, `WBUserCabinet` id, shop_id и traceback.
+Логи MUST NOT содержать WB token, bot token, credentials или сырые ZIP bytes.
+
+#### Scenario: Logs omit secrets and raw zip bytes
+
+- **WHEN** export завершается ошибкой assembler или transport
+- **THEN** диагностические логи не содержат WB token, bot token, credentials
+  или сырые ZIP bytes
 
 ### Requirement: Duplicate clicks do not double the export
 

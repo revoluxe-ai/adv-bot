@@ -29,7 +29,7 @@
     "SPEC_REVISION": [
       {
         "path": "openspec/changes/telegram-ai-package-export/specs/telegram-ai-package-export/spec.md",
-        "content_hash": "b6513e15e68a4110bf33c6610b7820457ae598b3664556efb3900069cf4f7da4"
+        "content_hash": "49030409270e2aa298a2051f9b2df66bf9b48e8707396ff4512f9436cdfce670"
       }
     ],
     "LIFECYCLE_REVISION": {
@@ -44,7 +44,7 @@
   "GENERATED_FROM": {
     "DESIGN_REVISION": "39af2982f7b90497ddb3482987d4e853320adc236d4259308b751859ebcf846a",
     "SPEC_REVISION": [
-      "b6513e15e68a4110bf33c6610b7820457ae598b3664556efb3900069cf4f7da4"
+      "49030409270e2aa298a2051f9b2df66bf9b48e8707396ff4512f9436cdfce670"
     ],
     "LIFECYCLE_REVISION": "39af2982f7b90497ddb3482987d4e853320adc236d4259308b751859ebcf846a",
     "OWNER_CONTRACT_REVISION": "f935ae2394143dcf94ea284f7f5aa92bc4f751cbdf0b7a3513d4c1d43681aae6"
