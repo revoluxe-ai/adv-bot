@@ -85,7 +85,9 @@ async def test_settings_export_spy_no_wb_calls(assembler_factory: AssemblerFacto
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_inventory_partial_before_detailed(assembler_factory) -> None:
+async def test_inventory_partial_before_detailed(
+    assembler_factory: AssemblerFactory,
+) -> None:
     """S18: legacy inventory card builder keeps PARTIAL grain without detailed export."""
     period = ExportPeriod(start=date(2026, 1, 1), end=date(2026, 1, 7))
     inventory_rows = [
