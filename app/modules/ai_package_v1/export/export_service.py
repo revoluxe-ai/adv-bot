@@ -41,7 +41,6 @@ from app.modules.ai_package_v1.export.payload_encode import (
     encode_campaign_stat_csv,
     encode_funnel_stat_csv,
 )
-from app.utils.db.session_maker import get_async_session_maker
 from app.modules.ai_package_v1.export.scope_collect import (
     collect_main_nmids,
     collect_scoped_adv_ids,
@@ -49,6 +48,9 @@ from app.modules.ai_package_v1.export.scope_collect import (
 from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler import (
     KeywordAssemblerProtocol,
     KeywordPerformanceAssembler,
+)
+from app.modules.ai_package_v1.keyword_performance.readers.pg_session_adapter import (
+    default_pg_session_factory,
 )
 from app.modules.ai_package_v1.readers.ch_campaign_stat_reader import ChCampaignStatReader
 from app.modules.ai_package_v1.readers.ch_funnel_reader import ChFunnelReader
@@ -89,6 +91,12 @@ class ExportService:
         settings_assembler: CampaignSettingsAssembler | None = None,
         keyword_assembler: KeywordAssemblerProtocol | None = None,
     ) -> None:
+        """Собирает read-only зависимости export.
+
+        Settings inventory по умолчанию получает ``default_pg_session_factory``.
+        Reader открывает сессию как ``session_maker(read_only=True)()``, поэтому
+        фабрика возвращает ``async_sessionmaker``.
+        """
         self._scope_reader = scope_reader or PgExportShopScopeReader()
         self._campaign_reader = campaign_reader or ChCampaignStatReader()
         self._funnel_reader = funnel_reader or ChFunnelReader()
@@ -100,7 +108,7 @@ class ExportService:
             self._settings_assembler = settings_assembler
         else:
             self._settings_assembler = CampaignSettingsAssembler(
-                session_maker=get_async_session_maker,
+                session_maker=default_pg_session_factory,
             )
         if keyword_assembler is not None:
             self._keyword_assembler = keyword_assembler
